@@ -1,0 +1,89 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.583333333333333,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -218.362,
+            400,
+            -268.207
+          ],
+          "target": [
+            134.69,
+            0,
+            -703.371
+          ],
+          "fov": 32.52
+        },
+        {
+          "time": 4.583333333333333,
+          "position": [
+            -204.554,
+            400,
+            -256.148
+          ],
+          "target": [
+            179.119,
+            0,
+            -664.57
+          ],
+          "fov": 32.52,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr082",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.583333333333333,
+    "about": "fr082 08 The crater and the mud (@margoengine/scenes/fauld-blast): The mud wave pouring down the valley toward the works | drone 400 m, track 4 m/s | overcast; mud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "1944",
+        "sky": "overcast",
+        "focus": "150,-690",
+        "stop": "8",
+        "focusDistance": "558.4",
+        "blast": "130",
+        "mud": "1"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.2916666666666665
+    },
+    "subject": {
+      "target": [
+        150,
+        0,
+        -690
+      ],
+      "size": 60
+    }
+  }
+}

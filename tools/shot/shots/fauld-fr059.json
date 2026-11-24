@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            167.825,
+            1.7,
+            2846.445
+          ],
+          "target": [
+            30.974,
+            612,
+            47.946
+          ],
+          "fov": 32.52
+        },
+        {
+          "time": 4.916666666666667,
+          "position": [
+            167.788,
+            1.7,
+            2843.496
+          ],
+          "target": [
+            234.226,
+            612,
+            45.388
+          ],
+          "fov": 32.52,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr059",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.916666666666667,
+    "about": "fr059 06 Ten past eleven (@margoengine/scenes/fauld-blast): A lone hedge tree in front, the twin columns climbing beyond the fields | 135 mm, slow push | overcast; backlit smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "133,47",
+        "stop": "8",
+        "focusDistance": "2710.2",
+        "blast": "25"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4583333333333335
+    },
+    "subject": {
+      "target": [
+        132.6,
+        612,
+        46.667
+      ],
+      "size": 1003
+    }
+  }
+}

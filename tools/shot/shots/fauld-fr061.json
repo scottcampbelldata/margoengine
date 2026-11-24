@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.583333333333333,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            515.297,
+            1.7,
+            611.938
+          ],
+          "target": [
+            -3.949,
+            40,
+            3.325
+          ],
+          "fov": 5.94
+        },
+        {
+          "time": 5.583333333333333,
+          "position": [
+            513.14,
+            1.7,
+            609.376
+          ],
+          "target": [
+            3.949,
+            40,
+            -3.325
+          ],
+          "fov": 5.94,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr061",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 5.583333333333333,
+    "about": "fr061 07 A mile around (@margoengine/scenes/fauld-blast): The farm on the ridge vanishing into the dust cloud, from 800 m | 135 mm, slow push | dust; smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "0,0",
+        "stop": "8",
+        "focusDistance": "793.2",
+        "blast": "8"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.7916666666666665
+    },
+    "subject": {
+      "target": [
+        0,
+        40,
+        0
+      ],
+      "size": 147
+    }
+  }
+}

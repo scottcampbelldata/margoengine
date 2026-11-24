@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            120.136,
+            1.7,
+            2014.965
+          ],
+          "target": [
+            -26.644,
+            379,
+            19.038
+          ],
+          "fov": 32.52
+        },
+        {
+          "time": 5.916666666666667,
+          "position": [
+            120.136,
+            1.7,
+            2014.965
+          ],
+          "target": [
+            293.305,
+            379,
+            7.154
+          ],
+          "fov": 32.52,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr055",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 5.916666666666667,
+    "about": "fr055 06 Ten past eleven (@margoengine/scenes/fauld-blast): The second eruption beside the first, the two clouds merging | 85 mm from 2 km, pan 5 deg | overcast; fire",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "46,16",
+        "stop": "8",
+        "focusDistance": "1928.7",
+        "blast": "8"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.9583333333333335
+    },
+    "subject": {
+      "target": [
+        45.902,
+        379,
+        16.343
+      ],
+      "size": 755
+    }
+  }
+}

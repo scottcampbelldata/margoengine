@@ -8,10 +8,15 @@
 //   driver steps. Camera heights in the Fauld shot files are above the ground: the tool adds `fauldStill.height`.
 // - By hand (`shot=frNNN`, fauld-still.mjs): reads tools/shot/shots/fauld-frNNN.json, sets the camera at `t` seconds
 //   (default the shot's mid probe) with the ground added, renders `frames` frames and reports GPU errors.
+// - place=blast (@margoengine/scenes/fauld-blast): `blast` is the film second since the first explosion at the shot's
+//   start and `mud=1` runs the burst reservoir's mud. The page's apply hook (`fauldStill.apply`, shot.page.apply) seeks
+//   the explosion to blast + the shot's own time before every frame, so a frame at time t is the same whatever came
+//   before it; by hand, the still is the explosion at blast + t.
 // /asset-library/ is the asset library (fauld-still.mjs serves it; the shot tool's server serves it from MARGO_ASSETS).
 import {Engine} from '/packages/core/dist/index.js';
 import {attach as countryside} from '/packages/scenes/dist/fauld-countryside.js';
 import {attach as crater} from '/packages/scenes/dist/fauld-crater.js';
+import {attach as blastScene} from '/packages/scenes/dist/fauld-blast.js';
 const q=new URLSearchParams(location.search),errors=[],canvas=document.querySelector('canvas');
 const byHand=q.has('shot');
 const shot=byHand?await (await fetch(`/tools/shot/shots/fauld-${q.get('shot')}.json`)).json():null;
@@ -30,9 +35,13 @@ engine.stop();
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const focus=(query.get('focus')??'0,0').split(',').map(Number);
 const since=performance.now();
-const scene=await (query.get('place')==='crater'?crater:countryside)(engine,{era:query.get('era')??undefined,sky:query.get('sky')??undefined,focus,radius:Number(query.get('radius')??1200),lens:{stop:Number(query.get('stop')??8),focusDistance:Number(query.get('focusDistance')??1000)}});
+const place=query.get('place'),blastAt=Number(query.get('blast')??0);
+const common={era:query.get('era')??undefined,sky:query.get('sky')??undefined,focus,radius:Number(query.get('radius')??1200),lens:{stop:Number(query.get('stop')??8),focusDistance:Number(query.get('focusDistance')??1000)}};
+const scene=place==='blast'?await blastScene(engine,{...common,time:blastAt+t,mud:query.get('mud')==='1',clock:false}):await (place==='crater'?crater:countryside)(engine,common);
 const built=performance.now()-since;
-globalThis.fauldStill={engine,scene,height:(x,z)=>scene.height(x,z),errors};
+// The shot tool's apply hook: the explosion at the film second blast + the shot's own time.
+const apply=(state,{time})=>{if(place==='blast')scene.seek(blastAt+time);};
+globalThis.fauldStill={engine,scene,height:(x,z)=>scene.height(x,z),apply,errors};
 if(!byHand)engine.start();
 if(byHand){
   const pos=mix(a.position,b.position),tgt=mix(a.target,b.target);
@@ -42,7 +51,7 @@ if(byHand){
     const frames=Number(q.get('frames')??90);
     for(let i=0;i<frames;i++){engine.render({delta:1/24});if(i%10===9){await engine.gpu.queue.onSubmittedWorkDone();await scene.settle();}}
     await engine.gpu.queue.onSubmittedWorkDone();
-    return {errors,built,fields:scene.farm.fields.length,hedges:scene.farm.hedges.length,trees:scene.farm.trees.length,lanes:scene.farm.lanes.length,camera:{pos,tgt}};
+    return {errors,built,blast:place==='blast'?scene.time:null,fields:scene.farm.fields.length,hedges:scene.farm.hedges.length,trees:scene.farm.trees.length,lanes:scene.farm.lanes.length,camera:{pos,tgt}};
   }};
 }
 window.ready=true;

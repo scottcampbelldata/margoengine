@@ -45,3 +45,25 @@ export const fauldCraterInfo: SceneInfo = {
   anchors,
   views: ['rim', 'aerial', 'floor'],
 };
+
+/** The catalogue entry of the explosion of 27 November 1944 over the countryside, on film time. */
+export const fauldBlastInfo: SceneInfo = {
+  name: 'fauld-blast',
+  title: 'The Fauld explosion (Staffordshire, 11:11 on 27 November 1944)',
+  about:
+    'The countryside round Fauld at the moment of the explosion: two releases seconds apart rising as one merging mushroom cloud with fire at its foot, earth clods and gypsum blocks thrown out and landing with dust, the incendiary dump burning, and the mud of the burst reservoir pouring down to the works; every part on film time, so a seek shows the same frame.',
+  entry: '@margoengine/scenes/fauld-blast',
+  settings: {
+    ...settings,
+    sky: { ...settings.sky, default: 'overcast' },
+    time: { default: 0, range: [0, 3600], unit: 's', about: 'film seconds since the first explosion' },
+    mud: { default: false, about: 'the mud of the burst reservoir flows to the works (a GPU flood solver)' },
+  },
+  presets: {
+    eruption: { time: 2 },
+    column: { time: 60 },
+    mud: { era: '1944', time: 90, mud: true },
+  },
+  anchors,
+  views: ['aerial', 'valley', 'field'],
+};

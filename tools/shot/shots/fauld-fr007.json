@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 6.5,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            777.138,
+            1.7,
+            -2828.715
+          ],
+          "target": [
+            562.149,
+            1059,
+            167.092
+          ],
+          "fov": 42.5
+        },
+        {
+          "time": 6.5,
+          "position": [
+            777.138,
+            1.7,
+            -2828.715
+          ],
+          "target": [
+            -39.191,
+            1059,
+            94.583
+          ],
+          "fov": 42.5,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr007",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 6.5,
+    "about": "fr007 00 Cold open (@margoengine/scenes/fauld-blast): The column at full height from across the Dove valley, 3 km, black against grey cloud | 75 mm at @dove_floor, slow pan 6 deg | overcast; distance haze",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "418,150",
+        "stop": "8",
+        "focusDistance": "2814",
+        "blast": "75"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 3.25
+    },
+    "subject": {
+      "target": [
+        418.001,
+        1059,
+        149.711
+      ],
+      "size": 1494
+    }
+  }
+}

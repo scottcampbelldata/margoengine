@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            323.938,
+            1.2,
+            -2575.378
+          ],
+          "target": [
+            76.935,
+            237,
+            13.672
+          ],
+          "fov": 22.62
+        },
+        {
+          "time": 5.916666666666667,
+          "position": [
+            323.23,
+            1.2,
+            -2569.504
+          ],
+          "target": [
+            -51.562,
+            237,
+            -1.823
+          ],
+          "fov": 22.62,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr056",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 5.916666666666667,
+    "about": "fr056 06 Ten past eleven (@margoengine/scenes/fauld-blast): From the Dove valley floor: the shock crossing the meadows, grass flattening toward camera | 35 mm, 1.2 m up, push in 1 m/s | overcast; shock",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "13,6",
+        "stop": "8",
+        "focusDistance": "2563.5",
+        "blast": "1.5"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.9583333333333335
+    },
+    "subject": {
+      "target": [
+        12.687,
+        237,
+        5.924
+      ],
+      "size": 616
+    }
+  }
+}

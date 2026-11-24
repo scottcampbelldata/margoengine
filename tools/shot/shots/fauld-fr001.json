@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            1399.976,
+            1.6,
+            1434.135
+          ],
+          "target": [
+            -22.405,
+            173,
+            27.704
+          ],
+          "fov": 15.94
+        },
+        {
+          "time": 4,
+          "position": [
+            1397.181,
+            1.6,
+            1431.274
+          ],
+          "target": [
+            27.452,
+            173,
+            -20.992
+          ],
+          "fov": 15.94,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr001",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4,
+    "about": "fr001 00 Cold open (@margoengine/scenes/fauld-blast): HOOK. From 2 km across winter fields the hill heaves: a dark dome of earth splits and the first black column punches up | 85 mm, 1.6 m high at @far_south, push in 1 m/s | overcast; late morning",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "3,3",
+        "stop": "8",
+        "focusDistance": "1960.7",
+        "blast": "0.5"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2
+    },
+    "subject": {
+      "target": [
+        2.524,
+        173,
+        3.356
+      ],
+      "size": 561
+    }
+  }
+}

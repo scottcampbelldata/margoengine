@@ -4,7 +4,7 @@
 import { duneCoastInfo } from './dune-coast-info.js';
 import { timberValleyInfo } from './timber-valley-info.js';
 import { fauldTunnelsInfo } from './fauld-tunnels-info.js';
-import { fauldCountrysideInfo, fauldCraterInfo } from './fauld-world-info.js';
+import { fauldBlastInfo, fauldCountrysideInfo, fauldCraterInfo } from './fauld-world-info.js';
 
 /** One setting of a scene: its default, and its range, unit or allowed values. */
 export interface SceneSetting {
@@ -62,6 +62,7 @@ export const scenes: readonly SceneInfo[] = Object.freeze([
   fauldTunnelsInfo,
   fauldCountrysideInfo,
   fauldCraterInfo,
+  fauldBlastInfo,
 ]);
 
 /**

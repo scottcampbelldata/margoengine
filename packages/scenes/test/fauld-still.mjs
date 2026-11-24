@@ -15,7 +15,8 @@ const w = Number(arg('w', 1280)),
   out = arg('out', 'test-results/fauld-stills'),
   library = arg('library', process.env.MARGO_ASSET_LIBRARY ?? resolve(process.cwd(), '../../Assets/blender-library')),
   shots = arg('shots', 'fr008').split(','),
-  port = 5321,
+  frames = Number(arg('frames', 90)),
+  port = Number(arg('port', 5321)),
   context = await openBrowser({ startPath: '/packages/scenes/test/fauld-still.html', port }),
   { page } = context,
   pageErrors = [];
@@ -38,7 +39,9 @@ const failed = [];
 try {
   for (const shot of shots) {
     try {
-      await page.goto(`http://127.0.0.1:${port}/packages/scenes/test/fauld-still.html?shot=${shot}&w=${w}&h=${h}`);
+      await page.goto(
+        `http://127.0.0.1:${port}/packages/scenes/test/fauld-still.html?shot=${shot}&w=${w}&h=${h}&frames=${frames}`,
+      );
       await page.waitForFunction(() => window.ready, null, { timeout: 600000 });
       const r = await page.evaluate(() => window.check.run());
       const png = await page.locator('canvas').screenshot();
@@ -50,6 +53,7 @@ try {
       console.log(
         shot,
         `built ${Math.round(r.built)} ms`,
+        r.blast === null ? '' : `film ${r.blast.toFixed(2)} s`,
         `${r.fields} fields ${r.hedges} hedges ${r.trees} trees ${r.lanes} lanes`,
         `mean ${mean.toFixed(1)}`,
         r.errors.length ? `ERRORS ${r.errors[0]}` : '',

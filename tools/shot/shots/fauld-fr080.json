@@ -1,0 +1,89 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.208333333333333,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -6.579,
+            200,
+            -386.859
+          ],
+          "target": [
+            167.263,
+            0,
+            -606.591
+          ],
+          "fov": 32.52
+        },
+        {
+          "time": 4.208333333333333,
+          "position": [
+            3.031,
+            200,
+            -378.672
+          ],
+          "target": [
+            192.347,
+            0,
+            -585.222
+          ],
+          "fov": 32.52,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr080",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.208333333333333,
+    "about": "fr080 08 The crater and the mud (@margoengine/scenes/fauld-blast): Water meeting the blown earth: the flow turning brown and thick | drone 200 m, track 3 m/s | overcast; mud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "1944",
+        "sky": "overcast",
+        "focus": "175,-600",
+        "stop": "8",
+        "focusDistance": "244.3",
+        "blast": "70",
+        "mud": "1"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.125
+    },
+    "subject": {
+      "target": [
+        175,
+        0,
+        -600
+      ],
+      "size": 200
+    }
+  }
+}

@@ -7,7 +7,16 @@
 // Camera heights are above the ground under the camera and under the target: the shot tool adds the page's ground
 // (`shot.page.ground`, fauldStill.height of packages/scenes/test/fauld-still.html).
 // The place, era and sky go in the page query; `shot.subject` names the target and the subject's width. Places: FAULD_PLACES of @margoengine/scenes/fauld-world.
+// The blast rows (set margo:scenes/fauld-blast) take their film second, subject and aim from BLAST below, and frame the
+// whole column when the row's visual is the column: the lens is the row's own, or the longest band lens that holds the
+// column (its height and width at the shot's middle from BlastCloud, built packages) when the row's is too long.
+// It also writes packages/scenes/test/fauld-blast-ground.json: the OS Terrain 50 ground under every blast camera key
+// (--dem=<grid .f32>, default the asset library's dem/os-terrain-50/fauld_sk12_sk23.f32 beside the Projects folder),
+// which the scenes test reads to keep each blast camera clear under the cloud deck (the grid is not in the repository).
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { FAULD_CENTRE, FAULD_SIZE } from '../../packages/scenes/dist/fauld-countryside.js';
+import { BlastCloud } from '../../packages/weather/dist/eruption.js';
 
 const arg = (n, d) => process.argv.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3) ?? d;
 const csv = readFileSync(arg('csv', '../channel-films/Docs/fauld-shot-list-recut.csv'), 'utf8');
@@ -66,6 +75,70 @@ const SIZES = {
   reservoir: 300,
   dove: 300,
   fields: 400,
+};
+// Blast rows: the film second since the first explosion at the shot's start, what the shot is about (`column`: the
+// whole cloud; `base`: the fire at its foot; or a place of PLACES), the aim's height above the ground for a place, the
+// camera's bearing from the subject when the row names where it stands (radians, 0 east, pi/2 south, -pi/2 north),
+// the distance when the visual names none, and the mud. Mud rows show the fresh crater (era 1944).
+const BLAST = {
+  fr001: { t: 0.5, what: 'column' },
+  fr002: { t: 2, what: 'column' },
+  fr004: { t: 18, what: 'column' },
+  fr006: { t: 90, what: 'slope', aim: 0, mud: true },
+  fr007: { t: 75, what: 'column', bearing: -Math.PI / 2 + 0.12 },
+  fr054: { t: 0.4, what: 'column' },
+  fr055: { t: 8, what: 'column' },
+  fr056: { t: 1.5, what: 'column', bearing: -Math.PI / 2 + 0.12, dist: 2600 },
+  fr057: { t: 30, what: 'dump', aim: 12 },
+  fr058: { t: 45, what: 'column' },
+  fr059: { t: 25, what: 'column', dist: 2800 },
+  fr060: { t: 6, what: 'base' },
+  fr061: { t: 8, what: 'crater', aim: 40 },
+  fr064: { t: 10, what: 'landing', aim: 2, dist: 60 },
+  fr072: { t: 120, what: 'column', dist: 2800 },
+  fr078: { t: 30, what: 'reservoir', aim: 0, mud: true },
+  fr079: { t: 45, what: 'reservoir', aim: 0, mud: true },
+  fr080: { t: 70, what: 'slope', aim: 0, mud: true },
+  fr081: { t: 100, what: 'front', aim: 2, mud: true },
+  fr082: { t: 130, what: 'front', aim: 0, mud: true },
+  fr083: { t: 180, what: 'works', aim: 0, mud: true },
+};
+// The scene's explosions (FAULD_BLASTS of @margoengine/scenes/fauld-blast; heights above the source's ground).
+const cloud = new BlastCloud({
+  sources: [
+    { at: 0, tnt: 2.2e6, speed: 120, position: [-40, 0, 10] },
+    { at: 1.6, tnt: 1.8e6, speed: 110, position: [55, 0, -15] },
+  ],
+  altitude: 90,
+  wind: 3,
+  windDirection: 70,
+  fireDuration: 6,
+  seed: 1944,
+});
+const column = (t) => {
+  let top = 0,
+    spread = 0,
+    x = 0,
+    z = 0;
+  const all = cloud.thermals(t);
+  for (const th of all) {
+    top = Math.max(top, th.centre[1] + th.thickness);
+    spread = Math.max(spread, th.spread);
+    x += th.centre[0] / all.length;
+    z += th.centre[2] / all.length;
+  }
+  return { top, width: 2 * spread + 100, x, z };
+};
+Object.assign(PLACES, { slope: [175, -600], dump: [-150, 95], landing: [-330, 230], front: [150, -690] });
+Object.assign(SIZES, { slope: 200, dump: 80, landing: 40, front: 60 });
+// The longest lens of the bands at or under `mm` (a column too tall for the row's lens is framed whole on a wider one).
+const atMost = (mm) => {
+  let best = BANDS[0][0];
+  for (const [lo, hi] of BANDS) {
+    if (hi <= mm) best = hi;
+    else if (lo <= mm) best = Math.floor(mm);
+  }
+  return best;
 };
 const subject = (r) => {
   const v = `${r.visual} ${r.fallback}`.toLowerCase();
@@ -132,21 +205,58 @@ const lensFor = (focalMm, distance, size) => {
 const eraOf = (r) => (r.state === 'today' ? 'today' : r.state === 'morning' ? 'before' : '1944');
 const hash = (s) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) / 4294967296;
 const round = (v) => v.map((x) => Math.round(x * 1000) / 1000);
+// The OS Terrain 50 grid (float32 metres, row 0 the northmost; its .json gives the size and corner), bilinear between
+// sample centres like loadDem of fauld-world.ts.
+const demPath = arg(
+  'dem',
+  fileURLToPath(new URL('../../../../Assets/dem/os-terrain-50/fauld_sk12_sk23.f32', import.meta.url)),
+);
+const demMeta = JSON.parse(readFileSync(demPath.replace(/\.f32$/, '.json'), 'utf8')),
+  demBytes = readFileSync(demPath),
+  dem = new Float32Array(demBytes.buffer, demBytes.byteOffset, demBytes.length / 4);
+const demAt = (east, north) => {
+  const c = demMeta.cellsize_m,
+    fx = (east - demMeta.xll_easting - c / 2) / c,
+    fz = (demMeta.ytop_northing - c / 2 - north) / c,
+    i = Math.max(0, Math.min(demMeta.width - 2, Math.floor(fx))),
+    j = Math.max(0, Math.min(demMeta.depth - 2, Math.floor(fz))),
+    u = Math.max(0, Math.min(1, fx - i)),
+    v = Math.max(0, Math.min(1, fz - j)),
+    at = (a, b) => dem[b * demMeta.width + a];
+  return (
+    at(i, j) * (1 - u) * (1 - v) + at(i + 1, j) * u * (1 - v) + at(i, j + 1) * (1 - u) * v + at(i + 1, j + 1) * u * v
+  );
+};
+// The ground the page may put under a camera at world (x, z): the grid there, or at the nearest point of the scene's
+// square for a camera outside it (the terrain's edge), whichever is higher.
+const half = FAULD_SIZE / 2,
+  groundUnder = (x, z) =>
+    Math.max(
+      demAt(FAULD_CENTRE.easting + x, FAULD_CENTRE.northing - z),
+      demAt(
+        FAULD_CENTRE.easting + Math.max(-half, Math.min(half, x)),
+        FAULD_CENTRE.northing - Math.max(-half, Math.min(half, z)),
+      ),
+    );
+const blastGround = {};
 let n = 0;
 for (const r of parse(csv)) {
-  if (!/fauld-(crater|countryside)$/.test(r.set)) continue;
+  if (!/fauld-(crater|countryside|blast)$/.test(r.set)) continue;
+  const b = r.set.endsWith('fauld-blast') ? BLAST[r.id] : null;
+  if (r.set.endsWith('fauld-blast') && !b) throw new Error(`${r.id}: a blast row with no BLAST entry; add one`);
   const cam = r.camera.toLowerCase(),
     vis = r.visual.toLowerCase(),
     // A whole number of frames at 24 fps (the shot tool's rule).
     dur = Math.max(1, Math.round(Number(r.dur_s) * 24)) / 24,
-    lens = inBand(Number(cam.match(/(\d+) mm/)?.[1] ?? (cam.includes('drone') ? 24 : 35))),
-    fov = (2 * Math.atan(FILMBACK[1] / 2 / lens) * 180) / Math.PI,
+    listed = inBand(Number(cam.match(/(\d+) mm/)?.[1] ?? (cam.includes('drone') ? 24 : 35))),
     drone = cam.match(/drone (\d+)(?: to (\d+))? m/),
     up = cam.match(/(\d+(?:\.\d+)?) m (?:up|high)|, (\d+(?:\.\d+)?) m,/),
     km = `${vis} ${cam}`.match(/(\d+(?:\.\d+)?) km/),
     from = `${vis} ${cam}`.match(/(?:from|at) (?:the [a-z ]+ )?(\d+) m\b/),
-    what = subject(r),
-    [tx, tz] = PLACES[what],
+    whole = b?.what === 'column' || b?.what === 'base',
+    what = b ? (whole ? 'crater' : b.what) : subject(r),
+    col = b ? column(b.t + dur / 2) : null,
+    [tx, tz] = whole ? [col.x, col.z] : PLACES[what],
     h0 = drone ? Number(drone[1]) : Number(up?.[1] ?? up?.[2] ?? 1.7),
     h1 = drone?.[2] ? Number(drone[2]) : h0;
   // Distance: named, else from the lens (a long lens stands far off), else from a drone's height.
@@ -156,21 +266,44 @@ for (const r of parse(csv)) {
       ? Number(from[1])
       : drone
         ? Math.max(120, h0 * 1.4)
-        : lens >= 135
+        : listed >= 135
           ? 450
-          : lens >= 85
+          : listed >= 85
             ? 160
-            : lens >= 50
+            : listed >= 50
               ? 60
               : 25;
   if (what === 'crater' && !drone && /rim|wood|memorial|stone|path|fence|birch|leaves/.test(vis))
     dist = Math.max(dist, 150);
+  if (b?.dist) dist = b.dist;
+  // A column shot holds the whole cloud at the shot's middle: aimed at half its top, 1.3 of its height and 1.2 of its
+  // width in frame, on the row's lens or the longest band lens that holds it.
+  let lens = listed;
+  if (b?.what === 'column') {
+    const vfov = 2 * Math.atan((0.65 * col.top) / dist),
+      hfov = 2 * Math.atan((0.6 * col.width) / dist);
+    lens = Math.min(
+      listed,
+      atMost(Math.min(FILMBACK[1] / (2 * Math.tan(vfov / 2)), FILMBACK[0] / (2 * Math.tan(hfov / 2)))),
+    );
+  }
+  const fov = (2 * Math.atan(FILMBACK[1] / 2 / lens) * 180) / Math.PI;
   // Look from the south half (the low November sun behind or beside the camera), bearing by row.
-  const bearing = Math.PI * (0.25 + 0.5 * hash(r.id)),
+  const bearing = b?.bearing ?? Math.PI * (0.25 + 0.5 * hash(r.id)),
     ox = Math.cos(bearing) * dist,
     oz = Math.sin(bearing) * dist,
     pos0 = [tx + ox, h0, tz + oz],
-    tgtH = drone ? 0 : what === 'crater' && /floor|up the|walls/.test(vis) ? 25 : 2,
+    tgtH = b
+      ? b.what === 'column'
+        ? Math.round(col.top / 2)
+        : b.what === 'base'
+          ? 90
+          : b.aim
+      : drone
+        ? 0
+        : what === 'crater' && /floor|up the|walls/.test(vis)
+          ? 25
+          : 2,
     tgt0 = [tx, tgtH, tz];
   let pos1 = [...pos0],
     tgt1 = [...tgt0];
@@ -206,16 +339,20 @@ for (const r of parse(csv)) {
   tgt1[2] += side[1] * drift;
   // The subject is what the frame holds of the place: never wider than the frame at the subject's distance (a shot from
   // among the fields frames a part of them, and a subject wider than the frame would put the camera inside it).
-  const size = Math.min(SIZES[what], Math.round(dist * (FILMBACK[0] / lens))),
+  const size = Math.min(
+      b?.what === 'column' ? Math.round(col.width) : b?.what === 'base' ? 300 : SIZES[what],
+      Math.round(dist * (FILMBACK[0] / lens)),
+    ),
     optics = lensFor(lens, dist, size);
-  const place = r.set.endsWith('crater') ? 'crater' : 'countryside',
+  const place = b ? 'blast' : r.set.endsWith('crater') ? 'crater' : 'countryside',
     query = new URLSearchParams({
       place,
-      era: eraOf(r),
-      sky: skyOf(r.look),
+      era: b ? (b.mud ? '1944' : 'before') : eraOf(r),
+      sky: b ? 'overcast' : skyOf(r.look),
       focus: `${Math.round(tx)},${Math.round(tz)}`,
       stop: String(optics.stop),
       focusDistance: String(optics.focusDistance),
+      ...(b ? { blast: String(b.t), ...(b.mud ? { mud: '1' } : {}) } : {}),
     }),
     people = r.source_tag.includes('PEOPLE') ? ` (fallback until people: ${r.fallback})` : '';
   const file = {
@@ -254,6 +391,7 @@ for (const r of parse(csv)) {
         query: Object.fromEntries(query),
         engine: 'fauldStill.engine',
         ground: 'fauldStill.height',
+        ...(b ? { apply: 'fauldStill.apply' } : {}),
         canvas: 'canvas',
         ready: 'canvas',
       },
@@ -268,6 +406,13 @@ for (const r of parse(csv)) {
     },
   };
   writeFileSync(`tools/shot/shots/fauld-${r.id}.json`, `${JSON.stringify(file, null, 2)}\n`);
+  if (place === 'blast')
+    blastGround[r.id] = file.tracks[0].keys.map((k) => [
+      k.position[0],
+      k.position[2],
+      Math.round(groundUnder(k.position[0], k.position[2]) * 10) / 10,
+    ]);
   n++;
 }
+writeFileSync('packages/scenes/test/fauld-blast-ground.json', `${JSON.stringify(blastGround)}\n`);
 console.log(`${n} Fauld shot files written`);

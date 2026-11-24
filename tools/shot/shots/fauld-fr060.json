@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            1311.958,
+            1.7,
+            1549.853
+          ],
+          "target": [
+            23.203,
+            90,
+            20.384
+          ],
+          "fov": 5.94
+        },
+        {
+          "time": 4.916666666666667,
+          "position": [
+            1311.958,
+            1.7,
+            1549.853
+          ],
+          "target": [
+            43.049,
+            300.208,
+            3.879
+          ],
+          "fov": 5.94,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr060",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.916666666666667,
+    "about": "fr060 06 Ten past eleven (@margoengine/scenes/fauld-blast): Fire at the base of the columns, black smoke rolling up | 200 mm from 2 km, tilt up 6 deg | fire; smoke",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "33,12",
+        "stop": "8",
+        "focusDistance": "1988.8",
+        "blast": "6"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4583333333333335
+    },
+    "subject": {
+      "target": [
+        33.126,
+        90,
+        12.131
+      ],
+      "size": 300
+    }
+  }
+}

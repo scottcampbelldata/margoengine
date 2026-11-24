@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import * as countryside from '@margoengine/scenes/fauld-countryside';
 import * as crater from '@margoengine/scenes/fauld-crater';
+import * as blast from '@margoengine/scenes/fauld-blast';
 import { scenes } from '@margoengine/scenes';
 
 const shots = new URL('../../../tools/shot/shots/', import.meta.url);
@@ -60,7 +61,7 @@ const FAULD_TUNNEL_STATES = scenes.find((scene) => scene.name === 'fauld-tunnels
 test('every Fauld shot file names its place, era and sky and keeps its camera in the world, looking at its subject', () => {
   const files = readdirSync(shots).filter((f) => /^fauld-fr\d{3}\.json$/.test(f));
   const outdoor = files.filter((f) => !tunnelRow(JSON.parse(readFileSync(new URL(f, shots), 'utf8'))));
-  assert.equal(outdoor.length, 81);
+  assert.equal(outdoor.length, 102);
   const half = countryside.FAULD_SIZE / 2;
   for (const f of outdoor) {
     const s = JSON.parse(readFileSync(new URL(f, shots), 'utf8'));
@@ -68,7 +69,7 @@ test('every Fauld shot file names its place, era and sky and keeps its camera in
     // The tool's page with its query; the tool adds the page's ground under the camera and target (page.ground).
     assert.equal(s.shot.page.path, 'packages/scenes/test/fauld-still.html', f);
     const q = new URLSearchParams(s.shot.page.query);
-    assert.ok(['crater', 'countryside'].includes(q.get('place')), `${f} place`);
+    assert.ok(['crater', 'countryside', 'blast'].includes(q.get('place')), `${f} place`);
     assert.ok(['before', '1944', 'today'].includes(q.get('era')), `${f} era`);
     assert.ok(
       ['dawn', 'lowSun', 'overcast', 'grey', 'dusk', 'night', 'snow', 'rain', 'mist'].includes(q.get('sky')),
@@ -133,4 +134,49 @@ test('the overcast deck stands above every Fauld camera', () => {
   }
   assert.ok(highest >= 400, `the drone rows fly at ${highest} m`);
   assert.ok(bottom > highest + 176.2, `deck base ${bottom} m over a camera ${highest} m above ground up to 176.2 m`);
+});
+
+// Fauld recut round 6 (fr072): a 900 m drone row put its lens 100 m under the deck, in the wisps. The deck is a world
+// setting shared by about 20 overcast shots, so cameras come down instead: every fauld-blast camera key stays 150 m or
+// more under the deck's base in world height (its height above the ground plus the OS Terrain 50 ground under it,
+// fauld-blast-ground.json, written with the shot files by tools/shot/fauld-shots.mjs).
+test('every fauld-blast camera stays 150 m under the cloud deck in world height', () => {
+  const { bottom } = countryside.FAULD_CLOUD_DECK;
+  const ground = JSON.parse(readFileSync(new URL('./fauld-blast-ground.json', import.meta.url), 'utf8'));
+  let checked = 0;
+  for (const name of readdirSync(shots).filter((f) => /^fauld-fr\d+\.json$/.test(f))) {
+    const json = JSON.parse(readFileSync(new URL(name, shots), 'utf8'));
+    if (json.shot.scene !== 'fauld-blast') continue;
+    const id = name.slice('fauld-'.length, -'.json'.length),
+      keys = json.tracks.find((t) => t.type === 'camera').keys,
+      under = ground[id];
+    assert.ok(under, `${name}: no ground record; run node tools/shot/fauld-shots.mjs`);
+    assert.equal(under.length, keys.length, `${name}: ground record out of date; run node tools/shot/fauld-shots.mjs`);
+    keys.forEach((k, i) => {
+      const [x, z, g] = under[i];
+      assert.deepEqual([x, z], [k.position[0], k.position[2]], `${name}: ground record out of date`);
+      const world = k.position[1] + g;
+      assert.ok(world <= bottom - 150, `${name} key ${i}: camera at ${world.toFixed(1)} m, deck base ${bottom} m`);
+      checked++;
+    });
+  }
+  assert.ok(checked > 0);
+});
+
+test('fauld-blast shares the world, holds the two releases 1.6 s apart and checks its film time before building', async () => {
+  assert.equal(blast.FAULD_PLACES, countryside.FAULD_PLACES);
+  assert.ok(Object.isFrozen(blast.FAULD_BLASTS));
+  assert.deepEqual(
+    blast.FAULD_BLASTS.map((b) => b.at),
+    [0, 1.6],
+  );
+  // 4,000 t of TNT equivalent in all.
+  assert.equal(
+    blast.FAULD_BLASTS.reduce((s, b) => s + b.tnt, 0),
+    4e6,
+  );
+  // A bad time rejects before the world is built, so an engine with nothing on it is never touched.
+  await assert.rejects(blast.attach({}, { time: -1 }), RangeError);
+  await assert.rejects(blast.attach({}, { time: 3601 }), RangeError);
+  assert.ok(scenes.some((s) => s.name === 'fauld-blast' && s.entry === '@margoengine/scenes/fauld-blast'));
 });

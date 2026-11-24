@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -130.249,
+            1.7,
+            494.512
+          ],
+          "target": [
+            -156.961,
+            12,
+            95.344
+          ],
+          "fov": 15.94
+        },
+        {
+          "time": 5.916666666666667,
+          "position": [
+            -165.144,
+            1.7,
+            494.713
+          ],
+          "target": [
+            -143.039,
+            12,
+            94.656
+          ],
+          "fov": 15.94,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr057",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 5.916666666666667,
+    "about": "fr057 06 Ten past eleven (@margoengine/scenes/fauld-blast): The incendiary dump on the surface burning, flames and black smoke | 50 mm from 400 m, slow arc | overcast; fire",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "-150,95",
+        "stop": "8",
+        "focusDistance": "396",
+        "blast": "30"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.9583333333333335
+    },
+    "subject": {
+      "target": [
+        -150,
+        12,
+        95
+      ],
+      "size": 80
+    }
+  }
+}

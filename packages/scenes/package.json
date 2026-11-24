@@ -49,6 +49,10 @@
       "types": "./dist/fauld-countryside.d.ts",
       "import": "./dist/fauld-countryside.js"
     },
+    "./fauld-blast": {
+      "types": "./dist/fauld-blast.d.ts",
+      "import": "./dist/fauld-blast.js"
+    },
     "./fauld-crater": {
       "types": "./dist/fauld-crater.d.ts",
       "import": "./dist/fauld-crater.js"

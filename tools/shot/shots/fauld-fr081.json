@@ -1,0 +1,89 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.291666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -139.716,
+            1.7,
+            -345.668
+          ],
+          "target": [
+            147.778,
+            2,
+            -691.87
+          ],
+          "fov": 5.94
+        },
+        {
+          "time": 4.291666666666667,
+          "position": [
+            -139.716,
+            1.7,
+            -345.668
+          ],
+          "target": [
+            182.347,
+            2,
+            -662.784
+          ],
+          "fov": 5.94,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr081",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.291666666666667,
+    "about": "fr081 08 The crater and the mud (@margoengine/scenes/fauld-blast): The front of the flow carrying timber and stones | 135 mm, 50 m away, pan | overcast; mud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "1944",
+        "sky": "overcast",
+        "focus": "150,-690",
+        "stop": "8",
+        "focusDistance": "448",
+        "blast": "100",
+        "mud": "1"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.1666666666666665
+    },
+    "subject": {
+      "target": [
+        150,
+        2,
+        -690
+      ],
+      "size": 60
+    }
+  }
+}

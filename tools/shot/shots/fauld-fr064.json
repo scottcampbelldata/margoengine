@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.291666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -290.514,
+            1,
+            275.176
+          ],
+          "target": [
+            -331.124,
+            2,
+            230.983
+          ],
+          "fov": 22.62
+        },
+        {
+          "time": 5.291666666666667,
+          "position": [
+            -287.327,
+            1,
+            272.39
+          ],
+          "target": [
+            -325.688,
+            2,
+            226.231
+          ],
+          "fov": 22.62,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr064",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 5.291666666666667,
+    "about": "fr064 07 A mile around (@margoengine/scenes/fauld-blast): Clods and white gypsum blocks thudding into a field, spurts of soil | 35 mm, 1 m up, slide 0.8 m/s | overcast; dust",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "-330,230",
+        "stop": "8",
+        "focusDistance": "53.3",
+        "blast": "10"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.6666666666666665
+    },
+    "subject": {
+      "target": [
+        -330,
+        2,
+        230
+      ],
+      "size": 40
+    }
+  }
+}

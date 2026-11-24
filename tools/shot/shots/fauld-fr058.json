@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.916666666666667,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            298.543,
+            500,
+            3085.601
+          ],
+          "target": [
+            104.869,
+            817,
+            88.701
+          ],
+          "fov": 40.45
+        },
+        {
+          "time": 4.916666666666667,
+          "position": [
+            -15.295,
+            500,
+            3075.039
+          ],
+          "target": [
+            379.921,
+            817,
+            83.552
+          ],
+          "fov": 40.45,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr058",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.916666666666667,
+    "about": "fr058 06 Ten past eleven (@margoengine/scenes/fauld-blast): Two black columns with mushroom caps, the countryside tiny below (3 km) | drone 500 m, slow orbit 6 deg | overcast; fire glow",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "242,86",
+        "stop": "8",
+        "focusDistance": "2874.5",
+        "blast": "45"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.4583333333333335
+    },
+    "subject": {
+      "target": [
+        242.395,
+        817,
+        86.127
+      ],
+      "size": 1227
+    }
+  }
+}

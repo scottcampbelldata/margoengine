@@ -1,0 +1,89 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 4.583333333333333,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            375.209,
+            300,
+            -376.58
+          ],
+          "target": [
+            166.89,
+            0,
+            -592.733
+          ],
+          "fov": 32.52
+        },
+        {
+          "time": 4.583333333333333,
+          "position": [
+            385.449,
+            300,
+            -385.757
+          ],
+          "target": [
+            193.35,
+            0,
+            -616.443
+          ],
+          "fov": 32.52,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr006",
+    "kind": "long",
+    "scene": "fauld-blast",
+    "seconds": 4.583333333333333,
+    "about": "fr006 00 Cold open (@margoengine/scenes/fauld-blast): From 300 m: a brown tongue of mud pours off the slope toward the works roofs | drone 300 m, track with the flow 3 m/s | overcast; mud",
+    "page": {
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "blast",
+        "era": "1944",
+        "sky": "overcast",
+        "focus": "175,-600",
+        "stop": "8",
+        "focusDistance": "266.7",
+        "blast": "90",
+        "mud": "1"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
+      "apply": "fauldStill.apply",
+      "canvas": "canvas",
+      "ready": "canvas"
+    },
+    "warmup": 60,
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "shutter": 180,
+    "probes": {
+      "mid": 2.2916666666666665
+    },
+    "subject": {
+      "target": [
+        175,
+        0,
+        -600
+      ],
+      "size": 200
+    }
+  }
+}

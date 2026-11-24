@@ -304,6 +304,45 @@ stills through the shot tool, which adds the page's ground under each camera (`s
 `node tools/shot/cli.mjs tools/shot/shots/fauld-fr008.json --stills --out <folder>`, or by hand
 `node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder>`.
 
+## The Fauld explosion: `@margoengine/scenes/fauld-blast`
+
+The countryside above at 11:11 on 27 November 1944, with the explosion drawn into it on film time. Two releases 1.6 s
+apart (`FAULD_BLASTS`, 4,000 t of TNT equivalent split 55 / 45) rise as one merging mushroom cloud (`BlastCloud` of
+`@margoengine/weather/eruption` in `Clouds` of `@margoengine/vfx/clouds`, the fire inside it in a second, unlit
+`Clouds`); earth clods and gypsum blocks fly and land with dust (`Debris` of `@margoengine/vfx/debris`); the incendiary
+dump catches at `FAULD_FIRE_AT` (`Fire` of `@margoengine/vfx/fire`); and with `mud: true` the burst reservoir's mud
+pours down to the works from `FAULD_MUD_AT` (`Flood` of `@margoengine/water/flood`, a GPU solver). Every part is a
+function of the film time, so `seek(t)` shows the same frame in any order, and each engine frame moves the film on by
+its delta unless `clock: false`. It takes the countryside's settings (the `sky` default is `overcast`) plus:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `time` | 0 | film seconds since the first explosion, 0 to 3,600; checked before the world is built |
+| `mud` | `false` | the burst reservoir's mud flows to the works |
+| `clock` | `true` | each engine frame moves the film on; `false` leaves it where `seek` puts it (a shot tool's own clock) |
+| `puffs` | `{cap: 2040, stem: 1020}` | puffs of each cap and each stem drawn by `BlastCloud.draw` |
+
+```ts
+import { Engine } from 'margoengine';
+import { attach, FAULD_BLASTS, FAULD_CLOUD_DECK } from 'margoengine/scenes/fauld-blast';
+
+// Needs the asset library served at /asset-library/, like the countryside.
+async function show(canvas: HTMLCanvasElement) {
+  const engine = await Engine.create(canvas, { camera: { far: 40000 } });
+  const scene = await attach(engine, { time: 30 });
+  scene.look([-1800, 150, 900], [0, 900, 0], 30);
+  scene.seek(60); // the column a minute after the first explosion
+  engine.start();
+  return scene;
+}
+console.log(typeof show, FAULD_BLASTS.length, FAULD_CLOUD_DECK.bottom); // function 2 1000
+```
+
+The blast rows of the shot list (`margo:scenes/fauld-blast`) come from the same `node tools/shot/fauld-shots.mjs`. Every
+blast camera stays over the 6.4 km world and 150 m or more under the overcast deck's base in world height; the
+generator records the OS Terrain 50 ground under each camera key in `packages/scenes/test/fauld-blast-ground.json`
+for the scenes test, so the world and the weather are never moved for one camera.
+
 ## Look families: one call, every package
 
 `applyLookFamily(name, targets)` (`@margoengine/scenes/look-family`) applies a look family by name through each package's own
