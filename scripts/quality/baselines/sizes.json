@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17498184,
+  "total": 17499650,
   "history": [
     {
       "date": "2026-10-24",
@@ -11361,6 +11361,12 @@
       "commit": "c529223b60",
       "reason": "culling/shadows 20,595 -> 20,693 B gzip: the WebGL2 layer builds cascade caster lists on the CPU (reachesCascade, prepareHost). Behind import() it cost more: the size gate counts the compat chunk in every entry that loads it (shadows 20,754, dynamic +84, bounds +36)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "69153cf68d",
+      "reason": "FG-05/FG-06 far field: Water.setFarField (+60 B) and Flood farField/farFieldAt (+96 B); a split would need a second Water shader variant",
+      "grew": 2
     }
   ],
   "items": {
@@ -12809,11 +12815,11 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 31276,
+    "@margoengine/water": 32277,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 12177,
+    "@margoengine/water/flood": 12642,
     "@margoengine/water/flood-bake": 2766,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,

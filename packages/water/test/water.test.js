@@ -301,7 +301,10 @@ test('a Water with no options is the sea of a 6 m/s wind, and `waves` keeps its 
   assert.equal(waves.v[23], 1);
   assert.equal(waves.v[34], Math.fround(0.3));
   assert.doesNotThrow(() => new Water({ segments: 4 }).setWind(12));
-  assert.throws(() => new Water({ segments: 4, waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(12), /setWind needs a Water without options.waves/);
+  assert.throws(
+    () => new Water({ segments: 4, waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(12),
+    /setWind needs a Water without options.waves/,
+  );
 });
 test('borrowed HDR optics retain resources and copy descriptors between frames', async () => {
   const h = optionalGPU(),

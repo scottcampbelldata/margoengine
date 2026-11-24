@@ -14,7 +14,9 @@ struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec
 export const oceanWaves =
   swellWaves +
   `
-fn swell(w:Wave,xz:vec2f,index:u32,sampleWidth:f32)->Swell {return swellAt(w,xz,index,sampleWidth,frame.settings.x);}`.slice(1) +
+fn swell(w:Wave,xz:vec2f,index:u32,sampleWidth:f32)->Swell {return swellAt(w,xz,index,sampleWidth,frame.settings.x);}`.slice(
+    1,
+  ) +
   swellAtWave;
 /**
  * The surf (surf.ts) as CoastalFlow takes it from Water, so entries that build no surf (water/rivers) never bundle it:
@@ -23,13 +25,7 @@ fn swell(w:Wave,xz:vec2f,index:u32,sampleWidth:f32)->Swell {return swellAt(w,xz,
 export interface CoastSurf {
   readonly waves: string;
   words(cells: number): number;
-  build(
-    device: GPUDevice,
-    uniform: GPUBuffer,
-    terrain: GPUTexture,
-    connected: GPUBuffer,
-    frame: string,
-  ): SurfBuilder;
+  build(device: GPUDevice, uniform: GPUBuffer, terrain: GPUTexture, connected: GPUBuffer, frame: string): SurfBuilder;
   /** Frames of three steps the flow spins up for before its first frame (surf.ts `SURF_SPIN`). */
   readonly spinFrames: number;
 }
@@ -208,8 +204,8 @@ fn faceStep(p:vec2i,axis:i32,dt:f32)->f32 {
  for(var k=0;k<4;k++){let axis=k/2;let back=k%2==0;let f=faceStep(select(p,p-axisStep(axis),back),axis,dt);out[k]=max(0.0,select(f,-f,back));}
  var q=vec4f(out[0],out[1],out[2],out[3]);
 ${
-   sea
-     ? ` // The surf's relaxation zone drives the flux toward the swell's (surfSea; none until the surf field is built).
+  sea
+    ? ` // The surf's relaxation zone drives the flux toward the swell's (surfSea; none until the surf field is built).
  if(connected[u32(p.y*size.x+p.x)+1u]==0u&&surfReady(u32(size.x*size.y))){
   let sea=oceanHeight(p,size,v.y);
   q=mix(q,vec4f(max(0.0,-sea.z),max(0.0,sea.z),max(0.0,-sea.w),max(0.0,sea.w)),(1.0-exp(-dt*4.0))*sea.y);
@@ -219,8 +215,8 @@ ${
   for(var k=0;k<4;k++){let axis=k/2;if(faceDepth(select(p,p-axisStep(axis),k%2==0),axis)<=COAST_DRY){q[k]=0.0;}}
  }
 `
-     : ''
- } if(p.x==0){q.x=0;}if(p.x==size.x-1){q.y=0;}if(p.y==0){q.z=0;}if(p.y==size.y-1){q.w=0;}
+    : ''
+} if(p.x==0){q.x=0;}if(p.x==size.x-1){q.y=0;}if(p.y==0){q.z=0;}if(p.y==size.y-1){q.w=0;}
  // Limit the complete outflow together so a cell cannot spend more water than it owns.
  let outgoing=(q.x+q.y)/frame.flow.y+(q.z+q.w)/frame.flow.z;
  q*=min(1.0,v.x/max(0.000001,dt*outgoing));textureStore(next,p,q);
@@ -340,7 +336,10 @@ export class CoastalFlow {
       this.initializer = compute(device, initialize);
       const sea = surf && surfOcean(surf.waves);
       this.flowing = compute(device, river?.flow ?? (sea ? coastFlow(sea) : coastFlowShader));
-      this.integrating = compute(device, river?.integrate ?? (sea ? integrateShader('coastStep(size)', '', sea) : integrate));
+      this.integrating = compute(
+        device,
+        river?.integrate ?? (sea ? integrateShader('coastStep(size)', '', sea) : integrate),
+      );
       if (river) {
         this.device = device;
         this.sources = device.createBuffer({

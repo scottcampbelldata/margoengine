@@ -147,7 +147,17 @@ test('environment: the family reaches the air and the scene fog, and natural giv
   const r = reaches({
     part: 'environment',
     make: () => ({ air: new VolumetricFog({}), fog: new Fog() }),
-    state: (t) => json([t.air.options, t.fog.enabled, t.fog.color, t.fog.near, t.fog.far, t.fog.density, t.fog.heightFalloff, t.fog.height]),
+    state: (t) =>
+      json([
+        t.air.options,
+        t.fog.enabled,
+        t.fog.color,
+        t.fog.near,
+        t.fog.far,
+        t.fog.density,
+        t.fog.heightFalloff,
+        t.fog.height,
+      ]),
     direct: applyEnvironmentSettings,
   });
   assert.deepEqual(JSON.parse(r.natural)[0], {}, 'the air holds no option again, as a fresh VolumetricFog');
@@ -170,7 +180,18 @@ test('vfx: the family reaches blown sand, smoke and flames, and natural gives ba
   assert.equal(smoke.natural, smoke.plain, 'byte-identical smoke rows');
   const kit = () => ({
     particles: {
-      flames: { options: { size: 0.2, intensity: 40, curves: { color: [{ at: 0, color: [1, 0.8, 0.3] }, { at: 1, color: [0.8, 0.2, 0.05] }] } } },
+      flames: {
+        options: {
+          size: 0.2,
+          intensity: 40,
+          curves: {
+            color: [
+              { at: 0, color: [1, 0.8, 0.3] },
+              { at: 1, color: [0.8, 0.2, 0.05] },
+            ],
+          },
+        },
+      },
     },
   });
   const fire = reaches({ part: 'fire', make: kit, state: (t) => json(t.particles), direct: applyFlameSettings });

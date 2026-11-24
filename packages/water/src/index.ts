@@ -99,7 +99,6 @@ export interface WaterCapture {
   /** This frame's capture pass: these targets and a depth attachment of the context's format; ended by the owner. */
   begin(): GPURenderPassEncoder;
 }
-/** Water settings, read at construction unless noted. Invalid values throw RangeError or TypeError. */
 /** At most this many samples in a {@link WaterFarField} profile. */
 export const WATER_FAR_SAMPLES = 64;
 const FAR_FLOATS = 8 + WATER_FAR_SAMPLES;
@@ -123,6 +122,7 @@ export interface WaterFarField {
    */
   spread?: number;
 }
+/** Water settings, read at construction unless noted. Invalid values throw RangeError or TypeError. */
 export interface WaterOptions {
   /** Grid extent in world units (X, Z), each 0-100,000 (exclusive of 0). Default [100, 100]. */
   size?: readonly [number, number];
