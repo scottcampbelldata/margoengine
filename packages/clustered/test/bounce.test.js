@@ -40,7 +40,10 @@ function cast(scene, origin, d, far = Infinity, near = 1e-6) {
     if (Math.abs(denom) < 1e-12) continue;
     const t = dot(sub(r.c, origin), r.n) / denom;
     if (!(t > near) || t >= far || (best && t >= best.t)) continue;
-    const p = sub(origin.map((o, k) => o + d[k] * t), r.c);
+    const p = sub(
+      origin.map((o, k) => o + d[k] * t),
+      r.c,
+    );
     if (Math.abs(dot(p, r.u)) > dot(r.u, r.u) + 1e-9 || Math.abs(dot(p, r.v)) > dot(r.v, r.v) + 1e-9) continue;
     best = { t, r };
   }
@@ -88,9 +91,13 @@ const box = (lo, hi, albedo) => {
 // b = 1 to each side), the wall facing the patch: integrating z c / (pi r^4) over the patch gives
 // F = 2 [atan(b / c) - c / sqrt(a^2 + c^2) atan(b / sqrt(a^2 + c^2))] / (2 pi) (Howell's catalogue, a differential
 // element to a perpendicular rectangle, by superposition of the two halves).
-const formFactor = (c, a = 2, b = 1) => (2 * (Math.atan(b / c) - (c / Math.hypot(a, c)) * Math.atan(b / Math.hypot(a, c)))) / (2 * Math.PI);
+const formFactor = (c, a = 2, b = 1) =>
+  (2 * (Math.atan(b / c) - (c / Math.hypot(a, c)) * Math.atan(b / Math.hypot(a, c)))) / (2 * Math.PI);
 test('the patch-to-wall form factor matches midpoint quadrature to 1e-5', () => {
-  for (const [c, expected] of [[0.5, 0.31755], [1, 0.19014]]) {
+  for (const [c, expected] of [
+    [0.5, 0.31755],
+    [1, 0.19014],
+  ]) {
     const steps = 1000;
     let sum = 0;
     for (let ix = 0; ix < steps; ix++)
@@ -108,20 +115,30 @@ test('the patch-to-wall form factor matches midpoint quadrature to 1e-5', () => 
 
 test('texel solid angles sum to 4 pi over a cube and to the cone view over a spot', () => {
   let sum = 0;
-  for (let f = 0; f < 6; f++) for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) sum += texelSolidAngle(1, 32, i, j);
+  for (let f = 0; f < 6; f++)
+    for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) sum += texelSolidAngle(1, 32, i, j);
   assert.ok(Math.abs(sum - 4 * Math.PI) < 1e-9, `cube ${sum}`);
   const t = Math.tan(0.3);
   let spot = 0;
   for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) spot += texelSolidAngle(t, 16, i, j);
-  assert.ok(Math.abs(spot - 4 * Math.asin(t * t / (1 + t * t))) < 1e-9, `spot view ${spot}`);
+  assert.ok(Math.abs(spot - 4 * Math.asin((t * t) / (1 + t * t))) < 1e-9, `spot view ${spot}`);
 });
 
 test("Lambert's polygon irradiance of a rectangle matches quadrature, clipped at the receiver's horizon", () => {
   const source = { kind: 'rect', position: [0, 1, 0], normal: [0, 0, 1], u: [0.5, 0, 0], v: [0, 0.5, 0] };
   for (const [x, n] of [
-    [[0.2, 0.3, 1.5], [0, 0, -1]],
-    [[0.3, 1, 0.8], [0, 1, 0]],
-    [[0.1, 0, 2], [0, 0.6, -0.8]],
+    [
+      [0.2, 0.3, 1.5],
+      [0, 0, -1],
+    ],
+    [
+      [0.3, 1, 0.8],
+      [0, 1, 0],
+    ],
+    [
+      [0.1, 0, 2],
+      [0, 0.6, -0.8],
+    ],
   ]) {
     const steps = 600;
     let sum = 0;
@@ -135,7 +152,10 @@ test("Lambert's polygon irradiance of a rectangle matches quadrature, clipped at
         if (ci > 0 && cs > 0) sum += (ci * cs) / (Math.PI * r * r);
       }
     sum /= steps * steps;
-    assert.ok(Math.abs(rectIrradiance(source, x, n) / Math.PI - sum) < 2e-4 * Math.max(sum, 0.01), `${x}: ${rectIrradiance(source, x, n) / Math.PI} vs ${sum}`);
+    assert.ok(
+      Math.abs(rectIrradiance(source, x, n) / Math.PI - sum) < 2e-4 * Math.max(sum, 0.01),
+      `${x}: ${rectIrradiance(source, x, n) / Math.PI} vs ${sum}`,
+    );
   }
   assert.equal(rectIrradiance(source, [0, 1, -1], [0, 0, 1]), 0, 'one-sided: nothing behind it');
 });
@@ -168,7 +188,10 @@ test("an opening's capture looks out from in front of its glazing bars, and sees
   // near plane (0.05 m) clips the faces round the eye, so it sees along the bars to their far inner faces.
   const seen = (s) => {
     const out = reduceBounce(capture([...bars, snow], s, 32, 0.05), s, { vpls: 32, near: 0.15 });
-    return { lit: out.points.filter((p) => onBars(p.position) && rectIrradiance(s, p.position, p.normal) > 0).length, out };
+    return {
+      lit: out.points.filter((p) => onBars(p.position) && rectIrradiance(s, p.position, p.normal) > 0).length,
+      out,
+    };
   };
   const before = seen({ ...source, front: 0 }),
     after = seen(source);
@@ -180,16 +203,39 @@ test("an opening's capture looks out from in front of its glazing bars, and sees
 // KB-BOUNCE-REVEAL1: an opening's light set back in its wall lights only what its reveal and sill let it reach, so
 // the snow it bounces off is lit as the opening light lights it (`AreaLights` clips the same rectangle).
 test("a recessed opening's irradiance is the rectangle its reveal and sill let through, as a traced wall", () => {
-  const source = { kind: 'rect', position: [0, 1.5, 0], normal: [0, 0, 1], u: [0.6, 0, 0], v: [0, 0.55, 0], recess: 0.22, sill: 0.09 },
+  const source = {
+      kind: 'rect',
+      position: [0, 1.5, 0],
+      normal: [0, 0, 1],
+      u: [0.6, 0, 0],
+      v: [0, 0.55, 0],
+      recess: 0.22,
+      sill: 0.09,
+    },
     bare = { ...source, recess: 0, sill: 0 },
     wall = { center: source.position, right: source.u, up: source.v, recess: source.recess, sill: source.sill };
   let shaded = 0;
   for (const [x, n] of [
-    [[0.3, 0.1, 0.6], [0, 1, 0]],
-    [[0, 0.1, 1.2], [0, 1, 0]],
-    [[1.4, 0.1, 1.5], [0, 1, 0]],
-    [[0.2, 1.6, 2], [0, 0, -1]],
-    [[0.1, 0.951, 0.28], [0, 1, 0]],
+    [
+      [0.3, 0.1, 0.6],
+      [0, 1, 0],
+    ],
+    [
+      [0, 0.1, 1.2],
+      [0, 1, 0],
+    ],
+    [
+      [1.4, 0.1, 1.5],
+      [0, 1, 0],
+    ],
+    [
+      [0.2, 1.6, 2],
+      [0, 0, -1],
+    ],
+    [
+      [0.1, 0.951, 0.28],
+      [0, 1, 0],
+    ],
   ]) {
     const steps = 400;
     let sum = 0;
@@ -216,16 +262,29 @@ test("a recessed opening's irradiance is the rectangle its reveal and sill let t
 // The patch under a spot 100 m up (intensity 1e4, half angle atan 0.02, 1.15 degrees): direct irradiance 1 on the
 // patch, which fills the middle 16 x 16 texels of the 32 x 32 capture.
 const patchScene = [rect([0, 0, 1], [1, 0, 0], [0, 0, 1], [0.8, 0.8, 0.8])],
-  spot = { kind: 'point', position: [0, 100, 1], range: 0, direction: [0, -1, 0], cosOuter: 1 / Math.hypot(1, 0.02), cosInner: 1 / Math.hypot(1, 0.02) },
+  spot = {
+    kind: 'point',
+    position: [0, 100, 1],
+    range: 0,
+    direction: [0, -1, 0],
+    cosOuter: 1 / Math.hypot(1, 0.02),
+    cosInner: 1 / Math.hypot(1, 0.02),
+  },
   patch = () => reduceBounce(capture(patchScene, spot, 32), spot, { vpls: 32, near: 0.15 });
 test('the patch bounces onto the wall as the form factor gives, within 5%', () => {
   const { vpls, points } = patch(),
     maps = buildVisibility(vpls, points, { resolution: 32 }),
     data = packBounce([[1e4, 1e4, 1e4]], vpls, maps, 32);
-  for (const [c, expected] of [[0.5, 0.254], [1, 0.1521]]) {
+  for (const [c, expected] of [
+    [0.5, 0.254],
+    [1, 0.1521],
+  ]) {
     const e = bounceIrradiance(data, [0, c, 0], [0, 0, 1]);
     assert.ok(Math.abs(expected - 0.8 * formFactor(c)) < 2e-4);
-    assert.ok(Math.abs(e[0] / expected - 1) < 0.05, `c ${c}: ${e[0]} vs ${expected} (${((e[0] / expected - 1) * 100).toFixed(2)}%)`);
+    assert.ok(
+      Math.abs(e[0] / expected - 1) < 0.05,
+      `c ${c}: ${e[0]} vs ${expected} (${((e[0] / expected - 1) * 100).toFixed(2)}%)`,
+    );
   }
 });
 test('the VPLs carry the reflected flux exactly, and the same capture gives the same VPLs', () => {
@@ -251,12 +310,22 @@ const gather = (scene, sources, receivers, { visible = true, openings = [] } = {
     vpls.push(...out.vpls);
     points.push(...out.points);
   });
-  const maps = visible ? buildVisibility(vpls, points, { resolution: 32, openings }) : new Float32Array(vpls.length * 1024).fill(OPEN);
-  const data = packBounce(sources.map(() => [1, 1, 1]), vpls, maps, 32);
+  const maps = visible
+    ? buildVisibility(vpls, points, { resolution: 32, openings })
+    : new Float32Array(vpls.length * 1024).fill(OPEN);
+  const data = packBounce(
+    sources.map(() => [1, 1, 1]),
+    vpls,
+    maps,
+    32,
+  );
   return { vpls, points, data, at: receivers.map(([x, n]) => bounceIrradiance(data, x, n)[0]) };
 };
 test('the wall between two rooms keeps the bounce out of the dark one (under 2% of unblocked)', () => {
-  const x = [[6.3, 0, 2], [0, 1, 0]],
+  const x = [
+      [6.3, 0, 2],
+      [0, 1, 0],
+    ],
     blocked = gather([...roomA, ...roomB], [lamp], [x]).at[0],
     open = gather([...roomA, ...roomB], [lamp], [x], { visible: false }).at[0];
   assert.ok(open > 1e-3, `unblocked ${open}`);
@@ -278,7 +347,15 @@ function traced(scene, vpls, x, n) {
       b = x.map((p, k) => p + n[k] * 1e-3),
       ab = sub(b, a),
       l = Math.hypot(...ab);
-    if (cast(scene, a, ab.map((c) => c / l), l - 1e-3)) continue;
+    if (
+      cast(
+        scene,
+        a,
+        ab.map((c) => c / l),
+        l - 1e-3,
+      )
+    )
+      continue;
     e += (v.flux[0] * cj * ci) / (Math.PI * r * r + v.area);
   }
   return e;
@@ -304,8 +381,14 @@ function reference(scene, source, x, n, resolution = 96) {
 test('a receiver under a table keeps the bounce from the lit walls', () => {
   const table = [rect([2, 0.8, 2], [0.6, 0, 0], [0, 0, 0.35], [0.5, 0.4, 0.3])],
     scene = [...roomA, ...table],
-    under = [[2, 0, 2], [0, 1, 0]],
-    open = [[0.6, 0, 0.6], [0, 1, 0]],
+    under = [
+      [2, 0, 2],
+      [0, 1, 0],
+    ],
+    open = [
+      [0.6, 0, 0.6],
+      [0, 1, 0],
+    ],
     run = gather(scene, [lamp], [under, open]),
     got = run.at,
     exact = reference(scene, lamp, ...under),
@@ -338,12 +421,18 @@ test('VPLs on a convex mound are not hidden by their own surface', () => {
     mound.push(rect([0, (y0 + y1) / 2, (z0 + z1) / 2], [2, 0, 0], [0, (y1 - y0) / 2, (z1 - z0) / 2], [0.9, 0.9, 0.9]));
   }
   const light = { kind: 'point', position: [0, 3, 0.5], range: 0 },
-    beside = [[0, 1.2, 3.2], [0, 0, -1]],
+    beside = [
+      [0, 1.2, 3.2],
+      [0, 0, -1],
+    ],
     run = gather(mound, [light], [beside]),
     open = gather(mound, [light], [beside], { visible: false }).at[0],
     exact = reference(mound, light, ...beside);
   assert.ok(exact > 1e-3, `the mound lights the wall: ${exact}`);
-  assert.ok(Math.abs(run.at[0] / exact - 1) < 0.2, `beside the mound ${run.at[0]} vs exact ${exact} (unblocked ${open})`);
+  assert.ok(
+    Math.abs(run.at[0] / exact - 1) < 0.2,
+    `beside the mound ${run.at[0]} vs exact ${exact} (unblocked ${open})`,
+  );
 });
 
 // A room with a 1.2 x 1.1 m window in its +z wall (0.3 m of logs), snow outside; the lamp inside.
@@ -362,21 +451,39 @@ const windowAt = [2, 1.5, 4.3],
     rect([2, 0.95, 4.15], [0.6, 0, 0], [0, 0, 0.15], [0.5, 0.4, 0.3]),
     rect([2, 2.05, 4.15], [0.6, 0, 0], [0, 0, 0.15], [0.5, 0.4, 0.3]),
   ],
-  cabin = [...box([0, 0, 0], [4, 2.5, 4], [0.5, 0.4, 0.3]).filter((r) => !(r.c[2] === 4)), ...wall(4), ...wall(4.3), ...reveal],
+  cabin = [
+    ...box([0, 0, 0], [4, 2.5, 4], [0.5, 0.4, 0.3]).filter((r) => !(r.c[2] === 4)),
+    ...wall(4),
+    ...wall(4.3),
+    ...reveal,
+  ],
   snowy = [...cabin, rect([2, -0.001, 10], [10, 0, 0], [0, 0, 5.7], [0.9, 0.92, 0.95])],
-  outsideWall = [[2, 0.6, 4.31], [0, 0, 1]],
-  onSnow = [[2, 0, 9], [0, 1, 0]];
+  outsideWall = [
+    [2, 0.6, 4.31],
+    [0, 0, 1],
+  ],
+  onSnow = [
+    [2, 0, 9],
+    [0, 1, 0],
+  ];
 test('count once: a room-side VPL lights nothing through the opening; the opening light does', () => {
   for (const frosted of [false, true]) {
     const openings = [opening(frosted)],
       room = gather(snowy, [lamp], [outsideWall, onSnow], { openings }),
       inside = room.vpls.filter((v) => v.position[2] < 4.3);
     // With the rule the room's VPLs light the snow only through the logs' imperfect maps; without it, through the window.
-    const lit = (list) => packBounce([[1, 1, 1]], inside, buildVisibility(inside, room.points, { resolution: 32, openings: list }), 32),
+    const lit = (list) =>
+        packBounce([[1, 1, 1]], inside, buildVisibility(inside, room.points, { resolution: 32, openings: list }), 32),
       kept = bounceIrradiance(lit(openings), ...onSnow)[0],
       through = bounceIrradiance(lit([]), ...onSnow)[0];
-    assert.ok(through > 1e-4, `${frosted ? 'frosted' : 'clear'}: the room's light reaches the snow through the window, ${through}`);
-    assert.ok(kept < 0.02 * through, `${frosted ? 'frosted' : 'clear'}: room light through the opening ${kept} of ${through}`);
+    assert.ok(
+      through > 1e-4,
+      `${frosted ? 'frosted' : 'clear'}: the room's light reaches the snow through the window, ${through}`,
+    );
+    assert.ok(
+      kept < 0.02 * through,
+      `${frosted ? 'frosted' : 'clear'}: room light through the opening ${kept} of ${through}`,
+    );
     // Frosted: the lamp's capture stops at the pane, so no VPL lies outside; clear: its beam lights the snow.
     const outside = room.vpls.filter((v) => v.position[2] > 4.3);
     if (frosted) assert.equal(outside.length, 0);
@@ -392,7 +499,8 @@ test("the opening's light on the snow bounces with the flux Lambert's formula gi
   let expected = 0;
   const step = 0.05;
   for (let x = -8; x < 12; x += step)
-    for (let z = 4.3; z < 15.7; z += step) expected += rectIrradiance(source, [x + step / 2, 0, z + step / 2], [0, 1, 0]) * step * step;
+    for (let z = 4.3; z < 15.7; z += step)
+      expected += rectIrradiance(source, [x + step / 2, 0, z + step / 2], [0, 1, 0]) * step * step;
   expected *= 0.9;
   const snow = vpls.filter((v) => v.position[1] < 0.01).reduce((s, v) => s + v.flux[0], 0);
   assert.ok(Math.abs(snow / expected - 1) < 0.03, `snow flux ${snow} vs ${expected}`);
@@ -401,7 +509,9 @@ test("the opening's light on the snow bounces with the flux Lambert's formula gi
 
 test('the lit shader adds clusterBounceLighting only while a bounce hook is set', () => {
   const plain = clusteredSampling(0),
-    hooked = clusteredSampling(0, undefined, undefined, false, false, false, { bounce: { declarations: (g) => bounceWgsl(g) } });
+    hooked = clusteredSampling(0, undefined, undefined, false, false, false, {
+      bounce: { declarations: (g) => bounceWgsl(g) },
+    });
   assert.ok(!plain.includes('clusterBounce'));
   assert.ok(hooked.includes(`@binding(${BOUNCE_BINDING}) var<storage,read> clusterBounce:array<vec4f>`));
   assert.ok(hooked.includes('+clusterBounceLighting(position,n,base,metal))*clusterFrame.intensity.x'));
@@ -422,7 +532,8 @@ test('LightBounce checks its options before it touches a GPU', async () => {
     ['intensity', [-1, 17, Infinity]],
     ['refresh', [-1, 7]],
   ])
-    for (const value of bad) assert.throws(() => new LightBounce({ lights, [name]: value }), RangeError, `${name} ${value}`);
+    for (const value of bad)
+      assert.throws(() => new LightBounce({ lights, [name]: value }), RangeError, `${name} ${value}`);
   assert.throws(() => new LightBounce({ lights, occlusion: 1 }), TypeError);
   const light = { position: [0, 1, 0], direction: [0, 0, 1], width: 1, height: 1, color: [1, 1, 1], intensity: 1 };
   assert.throws(() => new LightBounce({ lights, openings: Array(5).fill({ light }) }), RangeError);
@@ -435,11 +546,27 @@ test('LightBounce checks its options before it touches a GPU', async () => {
   recessed['select']();
   assert.deepEqual([recessed['states'][0].source.recess, recessed['states'][0].source.sill], [0.2, 0.05]);
   // Its glazing bars move the capture's eye out in front of them (KB-BOUNCE-CAPEYE1); one lite has no bars.
-  for (const bad of [{ lites: [2] }, { lites: [0, 2] }, { lites: [2, 1.5] }, { lites: [17, 1] }, { barDepth: 0 }, { barDepth: 0.31 }])
+  for (const bad of [
+    { lites: [2] },
+    { lites: [0, 2] },
+    { lites: [2, 1.5] },
+    { lites: [17, 1] },
+    { barDepth: 0 },
+    { barDepth: 0.31 },
+  ])
     assert.throws(() => new LightBounce({ lights, openings: [{ light, ...bad }] }), RangeError, JSON.stringify(bad));
-  const barred = new LightBounce({ lights, openings: [{ light, lites: [2, 2], barDepth: 0.05 }, { light, lites: [1, 1], barDepth: 0.05 }] });
+  const barred = new LightBounce({
+    lights,
+    openings: [
+      { light, lites: [2, 2], barDepth: 0.05 },
+      { light, lites: [1, 1], barDepth: 0.05 },
+    ],
+  });
   barred['select']();
-  assert.deepEqual(barred['states'].map((s) => s.source.front && Math.round(s.source.front * 1e9) / 1e9), [0.075, undefined]);
+  assert.deepEqual(
+    barred['states'].map((s) => s.source.front && Math.round(s.source.front * 1e9) / 1e9),
+    [0.075, undefined],
+  );
   const n = barred['states'][0].source.normal,
     p = barred['states'][0].source.position;
   assert.deepEqual(
@@ -448,7 +575,16 @@ test('LightBounce checks its options before it touches a GPU', async () => {
   );
   const bounce = new LightBounce({ lights, openings: [{ light, glazing: 'frosted' }] });
   assert.deepEqual(
-    [bounce.maxLights, bounce.vpls, bounce.resolution, bounce.visibility, bounce.near, bounce.intensity, bounce.occlusion, bounce.refresh],
+    [
+      bounce.maxLights,
+      bounce.vpls,
+      bounce.resolution,
+      bounce.visibility,
+      bounce.near,
+      bounce.intensity,
+      bounce.occlusion,
+      bounce.refresh,
+    ],
     [4, 32, 32, 32, 0.15, 1, true, 1],
   );
   assert.equal(bounce.openings.length, 1);
@@ -465,12 +601,21 @@ test("the capture draws core's shader from the capture's camera, tone-mapped or 
     linearTaa = `${head}@group(0) @binding(18) var<uniform> taaCamera:mat4x4f;\n${vertex('taaCamera')}@fragment fn fragment(i:Output)->@location(0) vec4f {let linear=i.color;\nreturn vec4f(linear,1);\n}`;
   for (const shader of [toneMapped, linearTaa]) {
     const code = frameCapture(shader, 165, tail, 'LightBounce');
-    assert.ok(code.includes('@group(0) @binding(165) var<uniform> frame:Frame;') && code.includes('_=margoMainFrame.eye;'));
-    assert.ok(code.includes(`if(false){_=linear;}${tail}`) && !code.includes('return vec4f(mapped,1);') && !code.includes('return vec4f(linear,1);'));
+    assert.ok(
+      code.includes('@group(0) @binding(165) var<uniform> frame:Frame;') && code.includes('_=margoMainFrame.eye;'),
+    );
+    assert.ok(
+      code.includes(`if(false){_=linear;}${tail}`) &&
+        !code.includes('return vec4f(mapped,1);') &&
+        !code.includes('return vec4f(linear,1);'),
+    );
     assert.ok(code.includes('o.clip=frame.camera*p;'), 'the capture camera places the vertices');
   }
   assert.ok(frameCapture(linearTaa, 165, tail, 'LightBounce').includes('o.clip=frame.camera*p;_=taaCamera;'));
-  assert.throws(() => frameCapture('@fragment fn fragment()->@location(0) vec4f {return vec4f(1);}', 165, tail, 'LightBounce'), /standard core lighting shader/);
+  assert.throws(
+    () => frameCapture('@fragment fn fragment()->@location(0) vec4f {return vec4f(1);}', 165, tail, 'LightBounce'),
+    /standard core lighting shader/,
+  );
 });
 
 // KB-BOUNCE-CLUSTER1: a cluster spanned the snow, the window's sill top and a glazing bar's face (all facing up, at
@@ -497,7 +642,11 @@ test('32 VPLs light the cabin log crest as the capture texels do: no cluster spa
     const capture = { views: c.views, resolution: res, texels },
       at = (count) => {
         const { vpls } = reduceBounce(capture, c.source, { vpls: count, near: 0.15 });
-        return bounceIrradiance(packBounce([[1, 1, 1]], vpls, new Float32Array(vpls.length * 1024).fill(OPEN), 32), crest, n)[0];
+        return bounceIrradiance(
+          packBounce([[1, 1, 1]], vpls, new Float32Array(vpls.length * 1024).fill(OPEN), 32),
+          crest,
+          n,
+        )[0];
       },
       got = at(32),
       exact = at(1e6);
@@ -513,7 +662,14 @@ test('a wall texel takes its normal from its own wall, not the floor or ceiling 
   // 38.7 degrees, so their surfels stood out of the wall and VPL rays slipped past them.
   const room = box([0, 0, 0], [6, 2.5, 4], [0.6, 0.6, 0.6]),
     { points } = reduceBounce(capture(room, nearWall, 32), nearWall, { vpls: 32, near: 0.15 }),
-    wall = points.filter((p) => p.position[2] > 3.999 && p.position[1] > 0.02 && p.position[1] < 2.48 && p.position[0] > 0.02 && p.position[0] < 5.98);
+    wall = points.filter(
+      (p) =>
+        p.position[2] > 3.999 &&
+        p.position[1] > 0.02 &&
+        p.position[1] < 2.48 &&
+        p.position[0] > 0.02 &&
+        p.position[0] < 5.98,
+    );
   assert.ok(wall.length > 2000, `${wall.length} wall texels`);
   for (const p of wall) assert.ok(-p.normal[2] > Math.cos((2 * Math.PI) / 180), `normal ${p.normal} at ${p.position}`);
 });
@@ -523,7 +679,11 @@ test('surfels seen at grazing angles cover their wall in every VPL map (elliptic
     { points } = reduceBounce(capture(wall, nearWall, 32), nearWall, { vpls: 32, near: 0.15 }),
     res = 32;
   assert.ok(points.every((p) => p.ray && Math.abs(Math.hypot(...p.ray) - 1) < 1e-9));
-  for (const position of [[2, 1.3, 0], [5.5, 0.8, 2.8], [0.5, 2, 1]]) {
+  for (const position of [
+    [2, 1.3, 0],
+    [5.5, 0.8, 2.8],
+    [0.5, 2, 1],
+  ]) {
     const vpl = { position, normal: [0, 0, 1], flux: [1, 1, 1], area: 0.01, source: 0 },
       map = buildVisibility([vpl], points, { resolution: res, budget: points.length }),
       [t, b] = basis(vpl.normal);
@@ -540,7 +700,10 @@ test('surfels seen at grazing angles cover their wall in every VPL map (elliptic
           hy = position[1] + c[1] * s;
         if (hx < 0.3 || hx > 5.7 || hy < 0.1 || hy > 2.4) continue;
         inside++;
-        assert.ok(Math.abs(map[y * res + x] - s) < 0.05 * s, `VPL at ${position}: texel ${x},${y} holds ${map[y * res + x]}, the wall is at ${s}`);
+        assert.ok(
+          Math.abs(map[y * res + x] - s) < 0.05 * s,
+          `VPL at ${position}: texel ${x},${y} holds ${map[y * res + x]}, the wall is at ${s}`,
+        );
       }
     assert.ok(inside > 30, `${inside} texels on the wall`);
   }
@@ -551,24 +714,48 @@ test('surfels seen at grazing angles cover their wall in every VPL map (elliptic
 // The scene's own triangles (sampleSurfaces) close it; the maps of the triangles are exact along every centre ray.
 const asMesh = (r) => {
   const vertices = new Float32Array(24);
-  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b], i) => vertices.set([...[0, 1, 2].map((k) => r.c[k] + a * r.u[k] + b * r.v[k]), ...r.n], i * 6));
-  return { vertices, indices: new Uint32Array([0, 1, 2, 0, 2, 3]), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
+  [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].forEach(([a, b], i) => vertices.set([...[0, 1, 2].map((k) => r.c[k] + a * r.u[k] + b * r.v[k]), ...r.n], i * 6));
+  return {
+    vertices,
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  };
 };
 test('a wall no source sees still hides the room: the scene triangles are occluders (under 2% of unblocked)', () => {
-  const scene = [...box([0, 0, 0], [6, 2.5, 4], [0.6, 0.6, 0.6]), rect([1.5, 0.97, 3.6], [1, 0, 0], [0, 0, 0.4], [0.5, 0.4, 0.3])],
+  const scene = [
+      ...box([0, 0, 0], [6, 2.5, 4], [0.6, 0.6, 0.6]),
+      rect([1.5, 0.97, 3.6], [1, 0, 0], [0, 0, 0.4], [0.5, 0.4, 0.3]),
+    ],
     { vpls, points } = reduceBounce(capture(scene, nearWall, 32), nearWall, { vpls: 32, near: 0.15 }),
     occluders = sampleSurfaces(scene.map(asMesh), vpls, { resolution: 32 }),
     lit = (o) => packBounce([[1, 1, 1]], vpls, buildVisibility(vpls, points, { resolution: 32, occluders: o }), 32),
     open = packBounce([[1, 1, 1]], vpls, new Float32Array(vpls.length * 1024).fill(OPEN), 32),
     [captured, meshes] = [lit([]), lit(occluders)];
-  assert.ok(occluders.every((p) => p.corners?.length === 9), 'big triangles stay whole and exact');
+  assert.ok(
+    occluders.every((p) => p.corners?.length === 9),
+    'big triangles stay whole and exact',
+  );
   // Behind the table, on the ground outside the wall the lantern stands 0.4 m from (exact visibility: 0).
-  for (const x of [[1, 0.05, 5], [1.5, 0.05, 4.5], [1.5, 0.05, 4.3], [1, 0.3, 4.5], [2, 0.05, 4.2]]) {
+  for (const x of [
+    [1, 0.05, 5],
+    [1.5, 0.05, 4.5],
+    [1.5, 0.05, 4.3],
+    [1, 0.3, 4.5],
+    [2, 0.05, 4.2],
+  ]) {
     const unblocked = bounceIrradiance(open, x, [0, 1, 0])[0],
       before = bounceIrradiance(captured, x, [0, 1, 0])[0],
       after = bounceIrradiance(meshes, x, [0, 1, 0])[0];
     assert.ok(traced(scene, vpls, x, [0, 1, 0]) === 0 && unblocked > 0.02, `${x}: traced 0, unblocked ${unblocked}`);
-    assert.ok(before > 0.05 * unblocked, `${x}: the captures alone leak (${before} of ${unblocked}), as before the fix`);
+    assert.ok(
+      before > 0.05 * unblocked,
+      `${x}: the captures alone leak (${before} of ${unblocked}), as before the fix`,
+    );
     assert.ok(after < 0.02 * unblocked, `${x}: ${after} of unblocked ${unblocked}`);
   }
   // Each map holds the true first hit of every centre ray in front of its VPL.
@@ -585,7 +772,8 @@ test('a wall no source sees still hides the room: the scene triangles are occlud
         if (q > 0.98) continue;
         const hit = cast(scene, vpl.position, c, Infinity, 1e-4),
           got = maps[j * res * res + y * res + x];
-        if (hit && dot(c, vpl.normal) > 0.05) assert.ok(Math.abs(got - hit.t) < 1e-4 * hit.t + 1e-5, `VPL ${j} texel ${x},${y}: ${got} vs ${hit.t}`);
+        if (hit && dot(c, vpl.normal) > 0.05)
+          assert.ok(Math.abs(got - hit.t) < 1e-4 * hit.t + 1e-5, `VPL ${j} texel ${x},${y}: ${got} vs ${hit.t}`);
       }
   });
 });
@@ -595,8 +783,11 @@ test('sampleSurfaces merges small far triangles into covering surfels and leaves
       const n = 21,
         vertices = new Float32Array(n * n * 6),
         indices = [];
-      for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) vertices.set([i / 20 - 0.5, k / 20 - 0.5, z, 0, 0, -1], (i * n + k) * 6);
-      for (let i = 0; i < 20; i++) for (let k = 0; k < 20; k++) indices.push(i * n + k, (i + 1) * n + k, i * n + k + 1, (i + 1) * n + k, (i + 1) * n + k + 1, i * n + k + 1);
+      for (let i = 0; i < n; i++)
+        for (let k = 0; k < n; k++) vertices.set([i / 20 - 0.5, k / 20 - 0.5, z, 0, 0, -1], (i * n + k) * 6);
+      for (let i = 0; i < 20; i++)
+        for (let k = 0; k < 20; k++)
+          indices.push(i * n + k, (i + 1) * n + k, i * n + k + 1, (i + 1) * n + k, (i + 1) * n + k + 1, i * n + k + 1);
       return { vertices, indices: new Uint32Array(indices), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
     },
     vpl = { position: [0, 0, 0], normal: [0, 0, 1], flux: [1, 1, 1], area: 0.01, source: 0 },
@@ -609,7 +800,10 @@ test('sampleSurfaces merges small far triangles into covering surfels and leaves
   for (let i = 0; i <= 20; i++)
     for (let k = 0; k <= 20; k++) {
       const c = [i / 20 - 0.5, k / 20 - 0.5, 20];
-      assert.ok(points.some((p) => Math.hypot(...sub(c, p.position)) <= p.reach + 1e-9), `corner ${c} is covered`);
+      assert.ok(
+        points.some((p) => Math.hypot(...sub(c, p.position)) <= p.reach + 1e-9),
+        `corner ${c} is covered`,
+      );
     }
 });
 test('buildVisibility skips the map tiles a triangle cannot cover, with the same maps (KB-SHOT-COMPAT-SKYCOV1)', () => {
@@ -666,7 +860,13 @@ test('buildVisibility skips the map tiles a triangle cannot cover, with the same
     const [a, b, c] = [corners.slice(0, 3), corners.slice(3, 6), corners.slice(6, 9)],
       g = [0, 1, 2].map((k) => (a[k] + b[k] + c[k]) / 3),
       x = cross(sub(b, a), sub(c, a));
-    return { position: g, normal: unit(x), area: Math.hypot(...x) / 2, reach: Math.max(...[a, b, c].map((p) => Math.hypot(...sub(p, g)))), corners };
+    return {
+      position: g,
+      normal: unit(x),
+      area: Math.hypot(...x) / 2,
+      reach: Math.max(...[a, b, c].map((p) => Math.hypot(...sub(p, g)))),
+      corners,
+    };
   };
   // A cabin: a 6 x 4 m floor and four 2.5 m walls of 0.5 m quads, a table, and VPLs on the floor (1 mm up, the
   // near-coplanar case), on the walls and on the table, as the cabin's bounce places them.
@@ -675,7 +875,10 @@ test('buildVisibility skips the map tiles a triangle cannot cover, with the same
       for (let i = 0; i < nu; i++)
         for (let k = 0; k < nv; k++) {
           const p = (s, r) => [0, 1, 2].map((d) => o[d] + u[d] * ((i + s) / nu) + v[d] * ((k + r) / nv));
-          occluders.push(triangle([...p(0, 0), ...p(1, 0), ...p(0, 1)]), triangle([...p(1, 0), ...p(1, 1), ...p(0, 1)]));
+          occluders.push(
+            triangle([...p(0, 0), ...p(1, 0), ...p(0, 1)]),
+            triangle([...p(1, 0), ...p(1, 1), ...p(0, 1)]),
+          );
         }
     };
   quad([-3, 0, -2], [6, 0, 0], [0, 0, 4], 12, 8);
@@ -685,22 +888,62 @@ test('buildVisibility skips the map tiles a triangle cannot cover, with the same
   quad([3, 0, -2], [0, 0, 4], [0, 2.5, 0], 8, 5);
   quad([-0.6, 0.75, -0.4], [1.2, 0, 0], [0, 0, 0.8], 1, 1);
   // One far, large ground triangle beyond the walls, and one standing on its edge through a VPL's plane.
-  occluders.push(triangle([-90, -0.01, -90, 90, -0.01, -90, 0, -0.01, 90]), triangle([1, -0.5, 0.5, 1.5, 1, 0.5, 2, -0.5, 0.5]));
+  occluders.push(
+    triangle([-90, -0.01, -90, 90, -0.01, -90, 0, -0.01, 90]),
+    triangle([1, -0.5, 0.5, 1.5, 1, 0.5, 2, -0.5, 0.5]),
+  );
   const vpls = [];
-  for (const [x, z] of [[-2, -1], [0, 0], [1.3, 1.1], [2.9, -1.9], [0.5, 0.5]]) vpls.push({ position: [x, 0.001, z], normal: [0, 1, 0] });
+  for (const [x, z] of [
+    [-2, -1],
+    [0, 0],
+    [1.3, 1.1],
+    [2.9, -1.9],
+    [0.5, 0.5],
+  ])
+    vpls.push({ position: [x, 0.001, z], normal: [0, 1, 0] });
   vpls.push({ position: [0.1, 0.751, 0.1], normal: [0, 1, 0] });
   vpls.push({ position: [-2.999, 1.2, 0.3], normal: [1, 0, 0] });
   vpls.push({ position: [0.4, 1.7, 1.999], normal: [0, 0, -1] });
   vpls.push({ position: [0, 1, 0], normal: unit([0.3, 0.8, -0.2]) });
-  for (const [res, share] of [[32, 0.35], [13, 0.75]]) {
+  for (const [res, share] of [
+    [32, 0.35],
+    [13, 0.75],
+  ]) {
     const stats = { rays: 0 },
       maps = buildVisibility(vpls, [], { resolution: res, occluders, stats }),
       want = brute(vpls, occluders, res);
     assert.deepEqual(maps, want.maps, `resolution ${res}: the tiles change no texel`);
-    assert.ok(maps.some((d) => d < OPEN), 'the walls are in the maps');
+    assert.ok(
+      maps.some((d) => d < OPEN),
+      'the walls are in the maps',
+    );
     // The brute force tests 1,024 rays at 32 for each triangle beside a VPL; the tiles about a quarter of its 2 million
     // rays (0.66 of them at 13, where a tile is a third of the map's width).
     console.log(`resolution ${res}: ${stats.rays} rays of the brute force's ${want.rays}`);
-    assert.ok(stats.rays > 0 && stats.rays < share * want.rays, `resolution ${res}: ${stats.rays} rays of the brute force's ${want.rays}`);
+    assert.ok(
+      stats.rays > 0 && stats.rays < share * want.rays,
+      `resolution ${res}: ${stats.rays} rays of the brute force's ${want.rays}`,
+    );
   }
+});
+
+// KB-BOUNCE-NEAREST1: of a row of equal lamps, the four that bounce were the first four in the list, wherever the camera
+// stood, so a camera down the row saw no bounce at all. The lamps beside the camera bounce now.
+test('LightBounce bounces the lamps nearest the camera of a row of equal lamps', async () => {
+  const { LightBounce } = await import('../dist/bounce.js'),
+    { Clustered } = await import('../dist/index.js'),
+    lights = new Clustered({ grid: [1, 1, 1] });
+  lights.setLights(
+    Array.from({ length: 8 }, (_, i) => ({ position: [i * 10, 2, 0], range: 12, intensity: 50, bounce: true })),
+  );
+  const bounce = new LightBounce({ lights });
+  const at = () => bounce['states'].map((s) => s.source.position[0]).sort((a, b) => a - b);
+  bounce['select']([70, 1.6, 0]);
+  assert.deepEqual(at(), [40, 50, 60, 70]);
+  bounce['select']([0, 1.6, 0]);
+  assert.deepEqual(at(), [0, 10, 20, 30]);
+  bounce['select']();
+  assert.equal(bounce['states'].length, 4);
+  bounce.dispose?.();
+  lights.dispose();
 });

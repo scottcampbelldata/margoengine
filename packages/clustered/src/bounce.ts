@@ -34,10 +34,24 @@ export {
 } from './bounce-math.js';
 
 import type { EngineKernel } from '@margoengine/core';
-import { Camera, engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  Camera,
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import type { RectAreaLight } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import type { Clustered, ClusteredBounce, ClusteredLightRecord, ClusteredLightTerm, PointLight, SpotLight } from './index.js';
+import type {
+  Clustered,
+  ClusteredBounce,
+  ClusteredLightRecord,
+  ClusteredLightTerm,
+  PointLight,
+  SpotLight,
+} from './index.js';
 import {
   BOUNCE_BINDING,
   OPEN,
@@ -100,7 +114,11 @@ export function lightEmission(
   };
 }
 /** A spot's unit axis and cone cosines as `Clustered.setLights` packs them; nothing for a point light. */
-function spotAxis(l: PointLight & Partial<SpotLight>): { direction?: [number, number, number]; cosOuter?: number; cosInner?: number } {
+function spotAxis(l: PointLight & Partial<SpotLight>): {
+  direction?: [number, number, number];
+  cosOuter?: number;
+  cosInner?: number;
+} {
   if (!l.direction) return {};
   const length = Math.hypot(l.direction[0], l.direction[1], l.direction[2]),
     outer = l.angle ?? l.outerAngle!,
@@ -230,7 +248,11 @@ function occluderMeshes(batches: Batches = []): BounceMesh[] {
   for (const batch of batches)
     if (!batch.claimed && batch.geometry.indices.length)
       for (let r = 0; r < batch.count; r++)
-        out.push({ vertices: batch.geometry.vertices, indices: batch.geometry.indices, matrix: batch.instances.subarray(r * 24, r * 24 + 16) });
+        out.push({
+          vertices: batch.geometry.vertices,
+          indices: batch.geometry.indices,
+          matrix: batch.instances.subarray(r * 24, r * 24 + 16),
+        });
   return out;
 }
 /**
@@ -324,7 +346,8 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     for (const state of this.states) state.read.fill(-1);
   }
   private checkOpenings(list: readonly BounceOpeningLight[]): readonly BounceOpeningLight[] {
-    if (!Array.isArray(list) || list.length > 4) throw new RangeError('Invalid LightBounce openings; give an array of up to 4');
+    if (!Array.isArray(list) || list.length > 4)
+      throw new RangeError('Invalid LightBounce openings; give an array of up to 4');
     for (const o of list) {
       if (
         !o?.light ||
@@ -337,7 +360,8 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
         throw new RangeError("Invalid LightBounce opening glazing; give 'clear' or 'frosted'");
       const count = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 16;
       if (
-        (o.lites !== undefined && !(Array.isArray(o.lites) && o.lites.length === 2 && count(o.lites[0]) && count(o.lites[1]))) ||
+        (o.lites !== undefined &&
+          !(Array.isArray(o.lites) && o.lites.length === 2 && count(o.lites[0]) && count(o.lites[1]))) ||
         (o.barDepth !== undefined && !(Number.isFinite(o.barDepth) && o.barDepth > 0 && o.barDepth <= 0.3))
       )
         throw new RangeError('Invalid LightBounce opening lites or barDepth; give them as openingLight takes them');
@@ -390,15 +414,28 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     if (id === undefined) this.termIds.set(term, (id = ++this.termCount));
     return id;
   }
-  /** This frame's sources: the strongest bouncing lights, then the openings; a source that stays keeps its capture. */
-  private select(): void {
+  /**
+   * This frame's sources: the bouncing lights that matter most to the view, then the openings; a source that stays
+   * keeps its capture. A light's weight is its luminous power over its squared distance from `eye` (the camera), the
+   * flux-over-distance importance of many-light rendering (Walter et al., "Lightcuts", SIGGRAPH 2005; Dachsbacher et
+   * al., "Scalable Realistic Rendering with Many-Light Methods", Computer Graphics Forum 33(1), 2014), so of a row of
+   * equal lamps the ones beside the camera bounce, not the first four in the list (KB-BOUNCE-NEAREST1). Without an eye
+   * the weight is the power alone.
+   */
+  private select(eye?: ArrayLike<number>): void {
     const lights = (this.lights.list as readonly (PointLight & Partial<SpotLight>)[])
       .map((l, index) => ({ l, index }))
       .filter(({ l }) => (l.bounce ?? !!l.castShadow) && (l.intensity ?? 1) > 0)
       .map(({ l, index }) => {
         const c = l.color ?? [1, 1, 1],
           k = (l.intensity ?? 1) * this.intensity;
-        return { index, power: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], scale: [c[0] * k, c[1] * k, c[2] * k] };
+        const p = l.position,
+          d2 = eye ? Math.max(1e-4, (p[0] - eye[0]) ** 2 + (p[1] - eye[1]) ** 2 + (p[2] - eye[2]) ** 2) : 1;
+        return {
+          index,
+          power: (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / d2,
+          scale: [c[0] * k, c[1] * k, c[2] * k],
+        };
       })
       .sort((a, b) => b.power * b.scale[1] - a.power * a.scale[1])
       .slice(0, this.maxLights);
@@ -409,10 +446,12 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
           return `${this.termId(t)}.${typeof state === 'number' ? state : (state as object[]).map((w) => (w ? this.termId(w) : 0)).join('.')}`;
         })
         .join(','),
-      next: { key: string; source: BounceSource; scale: [number, number, number] }[] = lights.map(({ index, scale }) => {
-        const source = bounceLightSource(this.lights, index);
-        return { key: `${JSON.stringify(source)}|${terms}`, source, scale: scale as [number, number, number] };
-      });
+      next: { key: string; source: BounceSource; scale: [number, number, number] }[] = lights.map(
+        ({ index, scale }) => {
+          const source = bounceLightSource(this.lights, index);
+          return { key: `${JSON.stringify(source)}|${terms}`, source, scale: scale as [number, number, number] };
+        },
+      );
     for (const o of this.openingList) {
       const opening = openingOf(o),
         k = (o.light.intensity ?? 1) * this.intensity,
@@ -474,7 +513,7 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
         this.frame++;
         for (const b of this.retired) b.destroy();
         this.retired.length = 0;
-        this.select();
+        this.select(c.camera?.position);
         // Views never read, or read too long ago, first; then `refresh` more, round robin.
         const due: [SourceState, number][] = [],
           all: [SourceState, number][] = [];
@@ -490,8 +529,17 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
         for (const [s, v] of due) this.capture(c, s, v);
         if (this.dirty || this.states.some((s) => s.changed)) this.rebuild(c.batches);
         else if (this.scaled) {
-          setBounceScales(this.data, this.states.map((s) => s.scale));
-          c.device.queue.writeBuffer(this.buffer!, 16, this.data as Float32Array<ArrayBuffer>, 4, this.states.length * 4);
+          setBounceScales(
+            this.data,
+            this.states.map((s) => s.scale),
+          );
+          c.device.queue.writeBuffer(
+            this.buffer!,
+            16,
+            this.data as Float32Array<ArrayBuffer>,
+            4,
+            this.states.length * 4,
+          );
         }
         this.scaled = false;
       },
@@ -508,7 +556,11 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
       depthFormat = c.descriptor.depthStencil?.format ?? 'depth32float';
     if (this.depth?.format !== depthFormat) {
       this.depth?.destroy();
-      this.depth = device.createTexture({ size: [res, res], format: depthFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT });
+      this.depth = device.createTexture({
+        size: [res, res],
+        format: depthFormat,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      });
       this.pipeline = undefined;
     }
     if (this.pipeline?.source !== c.shader || this.pipeline?.buffers !== buffers) {
@@ -560,7 +612,9 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
           depthClearValue: 0,
           depthLoadOp: 'clear',
           depthStoreOp: 'store',
-          ...(depthFormat.includes('stencil') ? { stencilClearValue: 0, stencilLoadOp: 'clear', stencilStoreOp: 'store' } : {}),
+          ...(depthFormat.includes('stencil')
+            ? { stencilClearValue: 0, stencilLoadOp: 'clear', stencilStoreOp: 'store' }
+            : {}),
         },
       })
       .end();
@@ -583,8 +637,15 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
       if (!hadView) delete (c as { view?: unknown }).view;
     }
     const row = Math.ceil((res * 8) / 256) * 256,
-      read = (s.buffers[v] ??= device.createBuffer({ size: row * res, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }));
-    encoder.copyTextureToBuffer({ texture: this.color!, origin: [0, 0, v] }, { buffer: read, bytesPerRow: row, rowsPerImage: res }, [res, res, 1]);
+      read = (s.buffers[v] ??= device.createBuffer({
+        size: row * res,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      }));
+    encoder.copyTextureToBuffer(
+      { texture: this.color!, origin: [0, 0, v] },
+      { buffer: read, bytesPerRow: row, rowsPerImage: res },
+      [res, res, 1],
+    );
     device.queue.submit([encoder.finish()]);
     this.captured++;
     s.pending[v] = true;
@@ -634,10 +695,19 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
       res = this.visibility,
       occluders = this.occlusion ? sampleSurfaces(occluderMeshes(batches), vpls, { resolution: res }) : [],
       maps = this.occlusion
-        ? buildVisibility(vpls, this.states.flatMap((s) => s.points), { resolution: res, openings, occluders })
+        ? buildVisibility(
+            vpls,
+            this.states.flatMap((s) => s.points),
+            { resolution: res, openings, occluders },
+          )
         : new Float32Array(vpls.length * res * res).fill(OPEN);
     this.occluders = occluders.length;
-    this.data = packBounce(this.states.map((s) => s.scale), vpls, maps, res);
+    this.data = packBounce(
+      this.states.map((s) => s.scale),
+      vpls,
+      maps,
+      res,
+    );
     this.dirty = false;
     this.upload();
   }

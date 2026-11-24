@@ -289,6 +289,9 @@ test('local shadows: options are validated', () => {
     { receiverPlane: 1 },
   ])
     assert.throws(() => new LocalShadows({ lights, ...bad }), RangeError);
+  // The message names maxLights and its cap, so a caller asking for more shadowed lamps knows which option to change.
+  for (const maxLights of [0, 17, 1.5])
+    assert.throws(() => new LocalShadows({ lights, maxLights }), /maxLights to an integer from 1 to 16/);
   const shadows = new LocalShadows({ lights });
   assert.throws(() => shadows.bindings(), /not attached/);
   shadows[Symbol.dispose]();
@@ -942,15 +945,24 @@ test('local shadows: hard edges compare each texel with the receiver plane unles
     shadows.add(caster(h.engine));
     h.frame();
     const frame = new Float32Array(shadows.bindings()[0].resource.buffer.data);
-    assert.deepEqual([...frame.subarray(0, 3)].map((v) => +v.toFixed(4)), settings);
+    assert.deepEqual(
+      [...frame.subarray(0, 3)].map((v) => +v.toFixed(4)),
+      settings,
+    );
     assert.equal(frame[7], lift);
     // One PCF for every hard map: the receiver plane's 16 texel loads, and the comparison sampler's 9 taps when off.
     assert.match(h.context.shader, /fn localShadowPCF\(/);
     assert.match(h.context.shader, /if\(plane<0\.5\)\{for/);
-    assert.match(h.context.shader, /let rise=dot\(slope,\(t\+0\.5\)\/size-uv\);if\(behind>0&&stored<z\+rise-behind\)\{continue;\}/);
+    assert.match(
+      h.context.shader,
+      /let rise=dot\(slope,\(t\+0\.5\)\/size-uv\);if\(behind>0&&stored<z\+rise-behind\)\{continue;\}/,
+    );
     assert.match(h.context.shader, /z\+max\(rise,0\.0\)\*plane>=stored/);
     // Point and spot lights keep every texel (behind 0): their filter is the KB-LOCALSHADOW-OFFSET1 one.
-    assert.match(h.context.shader, /return localShadowPCF\(localShadowFrame\.matrices\[layer\],p,n,uv,ndc\.z,i32\(layer\),texel\*4\.0,info\.w,0\.0\);/);
+    assert.match(
+      h.context.shader,
+      /return localShadowPCF\(localShadowFrame\.matrices\[layer\],p,n,uv,ndc\.z,i32\(layer\),texel\*4\.0,info\.w,0\.0\);/,
+    );
     shadows.dispose();
     lights.dispose();
   }
