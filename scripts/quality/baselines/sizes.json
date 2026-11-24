@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17566014,
+  "total": 17566302,
   "history": [
     {
       "date": "2026-10-24",
@@ -11409,6 +11409,12 @@
       "commit": "9aedbb75b",
       "reason": "soft entry gains shape matching (Mueller 2005/2016) and the trimesh builder: entry 14,233 to 17,856 B gzip, lazy kernel chunk 6,777 to 9,552 B (rotation extraction and the per-body matching pass), loader and builders 6,698 to 7,382 B. Rapier's trimesh holds its shape by shape matching, so it is needed for parity; a split would repeat the loader.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "b30b3e21f",
+      "reason": "soft entry gains createSurfaceCollider (a deformable trimesh follows a cloth or trimesh body, with vertex speeds): loader and builders 7,382 to 7,670 B gzip. Needed so convex hulls and meshes meet a soft surface, as Rapier's deformable colliders do.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12169,7 +12175,7 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 18392,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7638,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7926,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 9839,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,

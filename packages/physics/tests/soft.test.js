@@ -307,3 +307,41 @@ test('softening shape matching lets a trimesh sag and spring back', async () => 
   assert.ok(start > 0.2, `it starts deformed (${start})`);
   assert.ok(end < start * 0.35, `it settles back: ${end} from ${start}`);
 });
+
+test('a surface collider lets a convex hull rest on a cloth that the particles alone would let it through', async () => {
+  const dropHull = async (surface) => {
+    const { physics, soft } = await create();
+    const n = 12,
+      d = 0.1;
+    const cloth = soft.create(
+      SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n)
+        .setPinnedParticles([0, n - 1, (n - 1) * n, n * n - 1])
+        .setLinearDamping(3)
+        .setParticleMass(0.02)
+        .setParticleRadius(0.04),
+    );
+    assert.equal(cloth.triangles().length, (n - 1) * (n - 1) * 6);
+    if (surface) soft.createSurfaceCollider(cloth, { friction: 0.8 });
+    // An octahedron: a convex hull, which particles do not see directly.
+    const hull = physics.addBody(null, {
+      position: [0, 1.5, 0],
+      colliders: {
+        shape: 'convexHull',
+        points: [0.15, 0, 0, -0.15, 0, 0, 0, 0.15, 0, 0, -0.15, 0, 0, 0, 0.15, 0, 0, -0.15],
+        density: 400,
+      },
+    });
+    steps(physics, 300);
+    return { hullY: hull.position[1], clothY: cloth.particlePosition(6 * n + 6)[1], soft, cloth };
+  };
+  const without = await dropHull(false),
+    withSurface = await dropHull(true);
+  assert.ok(without.hullY < 0, `without a surface the hull falls through: ${without.hullY}`);
+  assert.ok(
+    withSurface.hullY > withSurface.clothY,
+    `with one it rests on the cloth: ${withSurface.hullY} over ${withSurface.clothY}`,
+  );
+  assert.ok(withSurface.hullY - withSurface.clothY < 0.4, 'it sits in the cloth');
+  withSurface.soft.remove(withSurface.cloth);
+  assert.equal(withSurface.cloth.surface, null);
+});

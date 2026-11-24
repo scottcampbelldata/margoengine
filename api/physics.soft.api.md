@@ -19,6 +19,7 @@ export class SoftBodies implements PhysicsAttachment {
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
+    createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     afterSync(): void;
     bodyRemoved(_body: PhysicsBody): void;
     dispose(): void;
@@ -54,6 +55,7 @@ export class SoftBody {
     pointForces: Map<number, Vec3>;
     tornSeen: Set<number>;
     triangleList: Uint32Array<ArrayBuffer>;
+    surface: PhysicsBody | null;
     matched: boolean;
     get valid(): boolean;
     private get c();

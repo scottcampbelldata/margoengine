@@ -4,6 +4,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { PhysicsBody } from './body.js';
+import type { PhysicsCollider } from './collider.js';
+import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 
@@ -196,7 +198,10 @@ export class SoftBodyDesc {
       for (let j = 0; j < nv; j++) {
         if (j + 1 < nv) desc.edgePairs.push(at(i, j), at(i, j + 1));
         desc.edgePairs.push(at(i, j), at(i + 1, j));
-        if (j + 1 < nv) desc.edgePairs.push(at(i, j), at(i + 1, j + 1), at(i + 1, j), at(i, j + 1));
+        if (j + 1 < nv) {
+          desc.edgePairs.push(at(i, j), at(i + 1, j + 1), at(i + 1, j), at(i, j + 1));
+          desc.triangles.push(at(i, j), at(i, j + 1), at(i + 1, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1));
+        }
         if (j + 2 < nv) desc.bendPairs.push(at(i, j), at(i, j + 2));
         if (wrap || i + 2 < nu) desc.bendPairs.push(at(i, j), at(i + 2, j));
       }
@@ -414,6 +419,8 @@ export class SoftBody {
   /** @internal */ pointForces = new Map<number, Vec3>();
   /** @internal */ tornSeen = new Set<number>();
   /** @internal */ triangleList = new Uint32Array(0);
+  /** @internal The fixed body that holds this body's surface collider, once it has one. */
+  surface: PhysicsBody | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
 
   /** False once the body was removed. */
@@ -938,6 +945,8 @@ export class SoftBodies implements PhysicsAttachment {
     this.particleCount = particles;
     this.edgeCount = edges;
     body.removed = true;
+    body.surface?.remove();
+    body.surface = null;
     this.bodies.splice(at, 1);
   }
 
@@ -990,6 +999,7 @@ export class SoftBodies implements PhysicsAttachment {
       if (k[0] !== 0 || k[1] !== 0 || k[2] !== 0) row.body.applyTorqueImpulse(k);
     });
     if (this.exports.soft_torn() > 0) this.report(after);
+    for (const body of this.bodies) if (body.surface) this.moveSurface(body, after);
   }
 
   private applyForces(c: Columns, dt: number): void {
@@ -1067,6 +1077,46 @@ export class SoftBodies implements PhysicsAttachment {
     return rows;
   }
 
+  /**
+   * Gives a body made from triangles (`trimesh`, `cloth`, `clothTube`) a deformable triangle-mesh collider that follows its
+   * particles each step, so every rigid shape, meshes and hulls included, meets the moving surface (the collider's contacts
+   * see each vertex's speed, so friction and bounce count it). Particles still meet spheres, boxes and capsules directly and
+   * push them back; a surface collider is how the other shapes feel the body. It is removed with the body.
+   */
+  createSurfaceCollider(body: SoftBody, settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {}): PhysicsCollider {
+    if (body.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
+    if (body.surface) throw new MargoError('state', 'This soft body already has a surface collider.');
+    if (body.triangleList.length === 0)
+      throw new RangeError('This body has no triangles; build it with trimesh, cloth or clothTube.');
+    const host = this.physics.addBody(null, {
+      type: 'fixed',
+      colliders: {
+        shape: 'trimesh',
+        vertices: body.particlePositions(),
+        indices: body.triangleList,
+        deformable: true,
+        ...settings,
+      },
+    });
+    body.surface = host;
+    return host.colliders[0]!;
+  }
+
+  private moveSurface(body: SoftBody, c: Columns): void {
+    const positions = new Float32Array(body.particles * 3),
+      velocities = new Float32Array(body.particles * 3);
+    for (let i = 0; i < body.particles; i++) {
+      const row = body.firstParticle + i;
+      positions[i * 3] = c.x[row]!;
+      positions[i * 3 + 1] = c.y[row]!;
+      positions[i * 3 + 2] = c.z[row]!;
+      velocities[i * 3] = c.vx[row]!;
+      velocities[i * 3 + 1] = c.vy[row]!;
+      velocities[i * 3 + 2] = c.vz[row]!;
+    }
+    body.surface!.colliders[0]!.setVertices(positions, { velocities });
+  }
+
   private report(c: Columns): void {
     for (const body of this.bodies) {
       const fresh: number[] = [];
@@ -1089,7 +1139,11 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed) return;
     this.disposed = true;
     this.physics.detach(this);
-    for (const body of this.bodies) body.removed = true;
+    for (const body of this.bodies) {
+      body.removed = true;
+      body.surface?.remove();
+      body.surface = null;
+    }
     this.bodies.length = 0;
     this.listeners.clear();
   }
