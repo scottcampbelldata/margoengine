@@ -7,7 +7,7 @@ import { openBrowser } from '../../../../scripts/browser.js';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const compat = compatRun();
+compatRun();
 const context = await openBrowser({ startPath: '/packages/culling/test/gpu/shadows-cull.html', port: 5287 }),
   { page } = context,
   pageErrors = [];
@@ -35,13 +35,7 @@ try {
     console.log(`step ${i} ${r.label}: ${parts} and ${rows} differ, parts ${r.parts}, rows ${r.rows} of ${r.count}`);
     assert.equal(parts, 0, `${r.label}: CascadeParts changed the frame`);
     assert.equal(rows, 0, `${r.label}: CascadeInstances changed the frame`);
-    if (compat) {
-      // The WebGL2 layer builds no cascade lists and draws every caster in every cascade (README, "Shadows per
-      // cascade"), so both classes resolve no lists and the frames above equal the plain classes'.
-      assert.deepEqual(r.parts, [], `${r.label}: compat: CascadeParts keeps no lists`);
-      assert.deepEqual(r.rows, [], `${r.label}: compat: CascadeInstances keeps no lists`);
-      continue;
-    }
+    // The WebGL2 layer builds the same lists on the CPU (no compute there) and uploads them: the same checks hold.
     assert.equal(r.parts.length, 3, `${r.label}: a list per cascade`);
     assert.ok(r.parts[0] < r.count / 2, `${r.label}: the nearest cascade drops parts (${r.parts[0]})`);
     assert.ok(r.rows[0] < r.count / 2, `${r.label}: the nearest cascade drops rows (${r.rows[0]})`);

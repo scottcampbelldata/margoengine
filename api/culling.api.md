@@ -23,6 +23,7 @@ export class CulledInstances implements EnginePlugin {
     protected readonly batches: readonly CulledBatch[];
     protected readonly slots: number;
     protected readonly records: Float32Array;
+    protected readonly bounds: Float32Array;
     protected readonly batchOf: Uint32Array;
     protected readonly table: Uint32Array;
     protected readonly hidden: Uint32Array;

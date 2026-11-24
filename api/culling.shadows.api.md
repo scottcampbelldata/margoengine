@@ -80,6 +80,7 @@ class CulledInstances implements EnginePlugin {
     protected readonly batches: readonly CulledBatch[];
     protected readonly slots: number;
     protected readonly records: Float32Array;
+    protected readonly bounds: Float32Array;
     protected readonly batchOf: Uint32Array;
     protected readonly table: Uint32Array;
     protected readonly hidden: Uint32Array;
@@ -188,6 +189,7 @@ class DynamicInstances implements EnginePlugin {
     disposed: boolean;
     protected readonly geometry: Geometry;
     protected readonly own: Geometry;
+    protected readonly states: Uint32Array;
     protected high: number;
     protected engine?: Engine;
     protected device?: GPUDevice;

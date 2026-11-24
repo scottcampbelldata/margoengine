@@ -212,7 +212,7 @@ export class DynamicInstances implements EnginePlugin {
   /** Per row: rgb tint as floats and the state word (0 free, 1 shown, 2 hidden), as the GPU reads it (`vec4u`). */
   private readonly attributes: ArrayBuffer;
   private readonly tints: Float32Array;
-  private readonly states: Uint32Array;
+  protected readonly states: Uint32Array;
   private readonly free: Int32Array;
   private freeCount = 0;
   /** Rows the kernels visit: one past the highest row ever added. */

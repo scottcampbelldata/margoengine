@@ -77,7 +77,7 @@ export class CulledInstances implements EnginePlugin {
   protected readonly slots: number;
   protected readonly records: Float32Array;
   // Per batch: the geometry's local bounding sphere (the cull pass places it under each part's matrix).
-  private readonly bounds: Float32Array;
+  protected readonly bounds: Float32Array;
   // What the kernels read, three vec4f per batch: that sphere, then the geometry's box as centre and half size.
   private readonly shapes: Float32Array;
   private readonly boxes: boolean;

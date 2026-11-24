@@ -232,8 +232,11 @@ Shadows.attach(engine).add(parts);
 ```
 
 `readCascades()` resolves the casters kept per cascade in the last shadow frame. Each list costs one u32 per slot per cascade.
-Lists too large to bind, the WebGL2 layer, and a pass with no `prepareShadow` in its frame all draw every caster, as the
-plain classes do. With no lists (too large to bind, or the WebGL2 layer) `readCascades()` resolves an empty array. Parts keep their sphere for this test whatever `bounds` says.
+On the WebGL2 layer, which has no compute, the same test runs on the CPU each shadow frame (in double precision, so it
+keeps every caster the GPU kernel keeps) and the lists and indirect arguments are uploaded; `readCascades()` resolves the
+same counts there without a readback. Lists too large to bind and a pass with no `prepareShadow` in its frame draw every
+caster, as the plain classes do; with lists too large to bind `readCascades()` resolves an empty array. Parts keep their
+sphere for this test whatever `bounds` says.
 
 
 ## Levels of detail: `LodInstances`

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17497465,
+  "total": 17498184,
   "history": [
     {
       "date": "2026-10-24",
@@ -11355,6 +11355,12 @@
       "commit": "e6665a26e6",
       "reason": "FG-03: new optional entry water/flood-bake (bakeFlood async iterator; flood fields as EXR images, flipbook atlases and 16-bit PNGs, EXR writer loaded lazily from environment/exr-write); biomes/io takes CRC-32 from shared/crc32.js (quality duplicates)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "c529223b60",
+      "reason": "culling/shadows 20,595 -> 20,693 B gzip: the WebGL2 layer builds cascade caster lists on the CPU (reachesCascade, prepareHost). Behind import() it cost more: the size gate counts the compat chunk in every entry that loads it (shadows 20,754, dynamic +84, bounds +36)",
+      "grew": 1
     }
   ],
   "items": {
@@ -11602,7 +11608,7 @@
     "@margoengine/culling/meshlets": 18951,
     "@margoengine/culling/models": 9103,
     "@margoengine/culling/parts": 14017,
-    "@margoengine/culling/shadows": 20595,
+    "@margoengine/culling/shadows": 21314,
     "@margoengine/culling/sort": 14158,
     "@margoengine/culling/webgl2": 3284,
     "@margoengine/cutscene": 7115,

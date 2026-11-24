@@ -3139,7 +3139,11 @@ An effect with `style` wraps the light's whole shadow in `shadowLit`: `direct*st
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On
-the WebGL2 layer every shown instance draws the first level. Evidence: `packages/culling/test/gpu/lod-check.mjs`, 0 differing
+the WebGL2 layer every shown instance draws the first level. Cascade caster lists (`CascadeParts`, `CascadeInstances`,
+2026-11-24): on the WebGL2 layer the per-cascade light-box test runs on the CPU in double precision (the kernel's planes
+and padding, `reachesCascade` in packages/culling/src/shadows.ts) and the lists and indirect arguments are uploaded;
+`packages/culling/test/gpu/shadows-cull-check.mjs` gives 0 differing pixels and the same counts as WebGPU on both
+backends (RTX A6000), and packages/culling/test/shadows-cull.test.js holds the CPU lists Planes from the matrix rows as in Gribb and Hartmann 2001, "Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix" (https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf), with WebGPU's 0 to w depth. Evidence: `packages/culling/test/gpu/lod-check.mjs`, 0 differing
 pixels against core meshes with levels worked out on the CPU, RTX A6000. Still missing: a timed run.
 
 `MeshletMesh` (`@margoengine/culling/meshlets`) splits one mesh into clusters of up to 64 vertices and 124 triangles, grown

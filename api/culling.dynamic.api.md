@@ -17,6 +17,7 @@ export class DynamicInstances implements EnginePlugin {
     disposed: boolean;
     protected readonly geometry: Geometry;
     protected readonly own: Geometry;
+    protected readonly states: Uint32Array;
     protected high: number;
     protected engine?: Engine;
     protected device?: GPUDevice;
