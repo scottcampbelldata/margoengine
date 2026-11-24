@@ -88,7 +88,7 @@ export interface Lane {
 
 export type LaneEnd = 'junction' | 'edge' | 'gate';
 
-export function farmlandEdits(farm: Farmland, biomes?: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood', string>>>, woods?: readonly (readonly Pt[])[]): BiomeEdit[];
+export function farmlandEdits(farm: Farmland, biomes?: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood' | 'hedge', string>>>, woods?: readonly (readonly Pt[])[]): BiomeEdit[];
 
 export function fieldAt(farm: Farmland, x: number, z: number): Field | undefined;
 
@@ -217,6 +217,12 @@ type Exclusion = {
     readonly verge?: number;
 };
 
+interface GroundImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 interface GroundLayer {
     readonly material: string;
     readonly slope?: Range;
@@ -240,6 +246,8 @@ interface MaterialLook {
     readonly detail?: number;
     readonly bump?: number;
     readonly macro?: number;
+    readonly image?: GroundImage;
+    readonly repeat?: number;
 }
 
 interface MountainValleyOptions {

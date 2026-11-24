@@ -124,6 +124,12 @@ export interface BiomeWetness extends WetGroundLook {
     readonly size: readonly [number, number];
 }
 
+export interface GroundImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 export const HORIZON_SKIRT = 40;
 
 export interface HorizonHeights {
@@ -155,6 +161,8 @@ export interface MaterialLook {
     readonly detail?: number;
     readonly bump?: number;
     readonly macro?: number;
+    readonly image?: GroundImage;
+    readonly repeat?: number;
 }
 
 export type OverviewCorner = (s: BiomeSample, x: number, z: number, weights: Uint8Array, at: number) => void;
@@ -177,7 +185,9 @@ export interface ViewTile {
     readonly weights: readonly Uint8Array[];
 }
 
-export function biomeMaterials(look: BiomeLookName | BiomeLookValues, base?: Readonly<Record<string, MaterialLook>>): Record<string, Required<MaterialLook>>;
+export function biomeMaterials(look: BiomeLookName | BiomeLookValues, base?: Readonly<Record<string, MaterialLook>>): Record<string, LookedMaterial>;
+
+export function checkMaterialImage(key: string, m: MaterialLook): void;
 
 export function clipmapLevels(bounds: readonly [number, number, number, number], radius: number, clipmap?: {
     readonly cellSize?: number;
@@ -195,7 +205,9 @@ export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: rea
 
 export function horizonHeights(source: HorizonSource): HorizonHeights;
 
-export function materialPixels(key: string, material: MaterialLook): Uint8Array[];
+export function layerSize(looks: readonly MaterialLook[]): number;
+
+export function materialPixels(key: string, material: MaterialLook, size?: number): Uint8Array[];
 
 export function overviewRows(world: BiomeWorld, materials: readonly string[], textureResolution: number, v0: number, v1: number, corner?: OverviewCorner): OverviewWeights & {
     readonly v0: number;
@@ -488,6 +500,8 @@ interface LayerWrite {
     readonly data: Uint8Array | undefined;
     readonly changed?: readonly [number, number, number, number];
 }
+
+type LookedMaterial = MaterialLook & Required<Pick<MaterialLook, 'color' | 'detail' | 'bump' | 'macro'>>;
 
 interface MountainValleyOptions {
     readonly outlet?: 'west' | 'east' | 'north' | 'south';

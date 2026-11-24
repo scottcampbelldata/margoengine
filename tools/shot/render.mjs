@@ -13,7 +13,15 @@ import { blueNoise } from './pixels.js';
 import { pixelScript } from './pixel-script.mjs';
 import { checkShotFileSettings, shotValuesAt } from './scene-settings.mjs';
 import { writeMoving } from './motion.mjs';
-import { DERIVED_AOVS, compareRenders, frameName, probeFrames, renderSize, shotFrames, subframeOffsets } from './shot-file.mjs';
+import {
+  DERIVED_AOVS,
+  compareRenders,
+  frameName,
+  probeFrames,
+  renderSize,
+  shotFrames,
+  subframeOffsets,
+} from './shot-file.mjs';
 import { shotBrowser } from './platform.mjs';
 
 /** The clock's first reading, ms: a frame at 0 would read as "no frame before" to engines that keep the last time. */
@@ -39,7 +47,13 @@ function sheetFrames(file) {
   const count = Math.round(file.shot.seconds * file.shot.fps);
   const frames = probes.length
     ? [...new Set(probes)].sort((a, b) => a - b)
-    : [...new Set(Array.from({ length: Math.min(SHEET_FRAMES, count) }, (_, i) => Math.floor((i * count) / Math.min(SHEET_FRAMES, count))))];
+    : [
+        ...new Set(
+          Array.from({ length: Math.min(SHEET_FRAMES, count) }, (_, i) =>
+            Math.floor((i * count) / Math.min(SHEET_FRAMES, count)),
+          ),
+        ),
+      ];
   return new Map(frames.map((frame, i) => [frame, i]));
 }
 
@@ -150,7 +164,24 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     // clock time and camera, the GPU settled between them, and a kept frame captured from all of them.
     const step = (args) =>
       page.evaluate(
-        async ({ subs, kept, capture = true, engine, apply, settingsHook, ground, canvas, png, expectHash, thumbnail, warmup, masks, viewProjection, recordSky, skyCoverage }) => {
+        async ({
+          subs,
+          kept,
+          capture = true,
+          engine,
+          apply,
+          settingsHook,
+          ground,
+          canvas,
+          png,
+          expectHash,
+          thumbnail,
+          warmup,
+          masks,
+          viewProjection,
+          recordSky,
+          skyCoverage,
+        }) => {
           const shot = globalThis.__margoShot;
           let result = null,
             drawn = null;
@@ -162,12 +193,14 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             if (camera && ground) {
               const at = shot.get(ground);
               if (typeof at !== 'function') {
-                if (!warmup) throw new Error(`${ground} is not a function in the page; set shot.page.ground to the page's ground`);
+                if (!warmup)
+                  throw new Error(`${ground} is not a function in the page; set shot.page.ground to the page's ground`);
                 camera = null;
               } else {
                 const a = at(camera.position[0], camera.position[2]),
                   b = at(camera.target[0], camera.target[2]);
-                if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`${ground} gave ${a} and ${b}, not metres`);
+                if (!Number.isFinite(a) || !Number.isFinite(b))
+                  throw new Error(`${ground} gave ${a} and ${b}, not metres`);
                 camera = {
                   ...camera,
                   position: [camera.position[0], camera.position[1] + a, camera.position[2]],
@@ -179,7 +212,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             if (camera) {
               const target = shot.get(engine)?.camera;
               // The engine may appear only after the page's first frames, while it still loads.
-              if (!target && !warmup) throw new Error(`no engine at ${engine}; set shot.page.engine to the page's engine`);
+              if (!target && !warmup)
+                throw new Error(`no engine at ${engine}; set shot.page.engine to the page's engine`);
               if (target) {
                 target.position = camera.position;
                 target.target = camera.target;
@@ -215,7 +249,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
                 // view-projection core computed for this frame, at the canvas's aspect.
                 if (viewProjection) {
                   const matrix = shot.get(engine)?.camera?.matrix;
-                  if (matrix?.length !== 16) throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
+                  if (matrix?.length !== 16)
+                    throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
                   result.viewProjection = Array.from(matrix);
                 }
                 // The camera as drawn (heights above sea level, the ground added), for the stills' record.
@@ -230,9 +265,21 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       );
     // A shot with no page sky mask asks the page's sky (if it has one) where it drew, for skyClip (KB-HEARTH-CLIP1).
     const recordSky = !shot.aovs.includes('sky') && probes.size > 0,
-      common = { engine: shot.page.engine, apply: shot.page.apply, settingsHook: shot.page.settings, ground: shot.page.ground, canvas: shot.page.canvas, recordSky },
+      common = {
+        engine: shot.page.engine,
+        apply: shot.page.apply,
+        settingsHook: shot.page.settings,
+        ground: shot.page.ground,
+        canvas: shot.page.canvas,
+        recordSky,
+      },
       masks = shot.aovs.length
-        ? { hook: shot.page.aovs, names: [...shot.aovs], derived: shot.aovs.filter((name) => DERIVED_AOVS.includes(name)), horizon: shot.horizon }
+        ? {
+            hook: shot.page.aovs,
+            names: [...shot.aovs],
+            derived: shot.aovs.filter((name) => DERIVED_AOVS.includes(name)),
+            horizon: shot.horizon,
+          }
         : null;
     // Warm-up: the shot's first instant drawn `warmup` times, so pipelines compile and the temporal passes (TAA,
     // the cloud march) settle before frame 0; the clock does not move, so the scene does not either.
@@ -242,7 +289,14 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     for (let w = 0; w < shot.warmup; w++) {
       const args = {
         ...common,
-        subs: [{ time: { ms: CLOCK_START, seconds: 0 }, camera: first.camera, state: shot.page.apply ? first : null, settings: shotValuesAt(shot, tables, shot.from) }],
+        subs: [
+          {
+            time: { ms: CLOCK_START, seconds: 0 },
+            camera: first.camera,
+            state: shot.page.apply ? first : null,
+            settings: shotValuesAt(shot, tables, shot.from),
+          },
+        ],
         kept: null,
         warmup: true,
       };
@@ -250,9 +304,12 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       while ((await step(args))?.idle)
         await page.waitForFunction(() => globalThis.__margoShot.queued > 0, null, { timeout: 180_000, polling: 250 });
     }
-    if (errors.length) throw new Error(`the page reported errors while loading:\n  ${errors.slice(0, 10).join('\n  ')}`);
+    if (errors.length)
+      throw new Error(`the page reported errors while loading:\n  ${errors.slice(0, 10).join('\n  ')}`);
     if (shot.page.ready && !(await page.$(shot.page.ready)))
-      throw new Error(`the page is not ready after ${shot.warmup} warm-up frames (${shot.page.ready} matches nothing); raise shot.warmup`);
+      throw new Error(
+        `the page is not ready after ${shot.warmup} warm-up frames (${shot.page.ready} matches nothing); raise shot.warmup`,
+      );
     const size = await page.evaluate((selector) => {
         const canvas = document.querySelector(selector);
         return canvas ? [canvas.width, canvas.height] : null;
@@ -355,20 +412,41 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
   if (check !== 'every' && check !== 'probes') throw new TypeError(`check is 'every' or 'probes', not ${check}`);
   const probeSet = new Set(Object.values(probeFrames(file)));
   if (runs === 2 && check === 'probes' && !probeSet.size)
-    throw new TypeError(`shot ${file.shot.id} names no probes: a production render checks its probe frames, so name some in shot.probes`);
+    throw new TypeError(
+      `shot ${file.shot.id} names no probes: a production render checks its probe frames, so name some in shot.probes`,
+    );
   mkdirSync(out, { recursive: true });
   let browser;
   try {
     browser = await openShotPage(file);
-    log(`shot ${file.shot.id}: ${file.shot.size.join(' x ')} at ${file.shot.fps} fps, ${file.shot.seconds} s, on ${describeAdapter(browser.hardware)}`);
-    const a = await renderOnce(browser, file, { out, label: 'a', write: true, progress: join(out, 'progress-a.json'), log });
+    log(
+      `shot ${file.shot.id}: ${file.shot.size.join(' x ')} at ${file.shot.fps} fps, ${file.shot.seconds} s, on ${describeAdapter(browser.hardware)}`,
+    );
+    const a = await renderOnce(browser, file, {
+      out,
+      label: 'a',
+      write: true,
+      progress: join(out, 'progress-a.json'),
+      log,
+    });
     let verdict = { runs: 1, identical: null };
     if (runs === 2) {
       const only = check === 'probes' ? probeSet : null,
         expect = a.frames.map((frame) => frame.sha256),
-        b = await renderOnce(browser, file, { out, label: 'b', write: false, expect, only, progress: join(out, 'progress-b.json'), log });
+        b = await renderOnce(browser, file, {
+          out,
+          label: 'b',
+          write: false,
+          expect,
+          only,
+          progress: join(out, 'progress-b.json'),
+          log,
+        });
       // A production render compares the probe frames of render a with render b's copies of them.
-      const difference = compareRenders(only ? { ...a, frames: a.frames.filter((frame) => only.has(frame.index)) } : a, b);
+      const difference = compareRenders(
+        only ? { ...a, frames: a.frames.filter((frame) => only.has(frame.index)) } : a,
+        b,
+      );
       verdict = {
         runs: 2,
         check,
@@ -378,7 +456,8 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
       };
       if (difference) {
         // The first differing frame of render a beside render b's copy, for a look by eye.
-        for (const frame of b.frames.filter((f) => f.mismatch)) log(`differs: ${frame.mismatch} against frames/${frameName(frame.index)}`);
+        for (const frame of b.frames.filter((f) => f.mismatch))
+          log(`differs: ${frame.mismatch} against frames/${frameName(frame.index)}`);
       }
     }
     const probes = Object.fromEntries(
@@ -416,8 +495,18 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
         const record = a.frames.find((frame) => frame.index === entry.frame),
           next = a.frames.find((frame) => frame.index === entry.frame + 1);
         if (!next?.viewProjection || !record?.viewProjection || !record.eye)
-          throw new Error(`probe ${name} has no frame after it or no camera: shot.moving needs a camera track and a probe before the last frame`);
-        entry.moving = await writeMoving({ out, name, nextFile: next.file, eye: record.eye, viewProjection: record.viewProjection, nextViewProjection: next.viewProjection, shot: file.shot });
+          throw new Error(
+            `probe ${name} has no frame after it or no camera: shot.moving needs a camera track and a probe before the last frame`,
+          );
+        entry.moving = await writeMoving({
+          out,
+          name,
+          nextFile: next.file,
+          eye: record.eye,
+          viewProjection: record.viewProjection,
+          nextViewProjection: next.viewProjection,
+          shot: file.shot,
+        });
       }
     const manifest = {
       format: 'margo-shot-frames',
@@ -475,4 +564,6 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
 }
 
 const describeAdapter = (hardware) =>
-  hardware?.webgpu ? [hardware.webgpu.vendor, hardware.webgpu.architecture, hardware.webgpu.description].filter(Boolean).join(' ') : 'no WebGPU adapter';
+  hardware?.webgpu
+    ? [hardware.webgpu.vendor, hardware.webgpu.architecture, hardware.webgpu.description].filter(Boolean).join(' ')
+    : 'no WebGPU adapter';

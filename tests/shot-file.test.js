@@ -704,7 +704,9 @@ test('page.ground: heights above the ground, set on it under the camera and unde
   assert.throws(() => onGround({ position: [0, 0, 0], target: [1, 0, 0] }, () => Number.NaN), /must give metres/);
   // --cameras says the heights are above the ground, so a reader never takes them as sea-level heights.
   const out = cameraFrames(
-    parseShot(shot({ fps: 2, seconds: 1, page: { path: 'a/b.html', engine: 'x.engine', ground: 'x.height' } }, { tracks })),
+    parseShot(
+      shot({ fps: 2, seconds: 1, page: { path: 'a/b.html', engine: 'x.engine', ground: 'x.height' } }, { tracks }),
+    ),
   );
   assert.equal(out.heights, 'ground');
   assert.equal(cameraFrames(parseShot(shot({ fps: 2, seconds: 1 }, { tracks }))).heights, 'world');

@@ -879,7 +879,11 @@ test('regression KB-BIOMES-RIVERSTEP1: the ground under a creek takes the riverb
 // `disturbance`: burnt and flooded plants by themselves. The response each kind of part gets, and the refusals.
 test('disturbanceResponse: bark is all stem, conifer and broadleaf crowns start above a base, shrubs and grass burn whole, stone is left alone', () => {
   assert.equal(disturbanceResponse('procedural:rock', 'stone'), undefined);
-  assert.deepEqual(disturbanceResponse('procedural:conifer', 'bark'), { crownBase: 0, trunkRadius: 1000, stiffness: 2e5 });
+  assert.deepEqual(disturbanceResponse('procedural:conifer', 'bark'), {
+    crownBase: 0,
+    trunkRadius: 1000,
+    stiffness: 2e5,
+  });
   assert.equal(disturbanceResponse('procedural:conifer', 'foliage').crownBase, 4);
   // A northern Rockies conifer key's crown starts at its own lowest live branch (scenes plan M8).
   assert.equal(disturbanceResponse('procedural:douglas-fir/pole', 'foliage', { crownBase: 6 }).crownBase, 6);
@@ -889,17 +893,30 @@ test('disturbanceResponse: bark is all stem, conifer and broadleaf crowns start 
   assert.equal(disturbanceResponse('procedural:shrub', 'foliage').crownBase, 0);
   assert.equal(disturbanceResponse('procedural:shrub', 'foliage').trunkRadius, 0);
   const grass = disturbanceResponse('procedural:grass', 'foliage');
-  assert.ok(grass.stiffness < disturbanceResponse('procedural:shrub', 'foliage').stiffness, 'grass bends in a flow more than a shrub');
+  assert.ok(
+    grass.stiffness < disturbanceResponse('procedural:shrub', 'foliage').stiffness,
+    'grass bends in a flow more than a shrub',
+  );
 });
 
 test('disturbance: a cell size outside 0.5 to 1000 is refused before anything loads', async () => {
   const world = await BiomeWorld.create({ size: [512, 512] }),
     history = {
-      nx: 2, nz: 2, step: 512, height: new Int32Array(4), seed: 0, years: 10,
-      age: new Uint16Array(4).fill(65535), flood: new Uint16Array(4), stage: new Uint8Array(4),
+      nx: 2,
+      nz: 2,
+      step: 512,
+      height: new Int32Array(4),
+      seed: 0,
+      years: 10,
+      age: new Uint16Array(4).fill(65535),
+      flood: new Uint16Array(4),
+      stage: new Uint8Array(4),
     };
   for (const cell of [0, 0.1, 5000, NaN])
-    await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { disturbance: { history, cell } }), RangeError);
+    await assert.rejects(
+      BiomeView.attach({ backend: 'webgpu' }, world, { disturbance: { history, cell } }),
+      RangeError,
+    );
 });
 
 test('wetness: a record that is not a function, a bad rectangle or a look out of range is refused before anything loads', async () => {
@@ -946,7 +963,13 @@ test('a ground material draws its photographed texture at its colour and repeat;
   assert.equal(layerSize([MATERIALS.grass]), 256);
   // Generated materials keep their pattern when the layers are 1,024 texels.
   assert.equal(materialPixels('rock', MATERIALS.rock, 1024).length, 11);
-  assert.throws(() => checkMaterialImage('x', { ...look, image: { width: 100, height: 100, data: new Uint8Array(40000) } }), /square power of two/);
-  assert.throws(() => checkMaterialImage('x', { ...look, image: { width: 64, height: 64, data: new Uint8Array(10) } }), /RGBA8/);
+  assert.throws(
+    () => checkMaterialImage('x', { ...look, image: { width: 100, height: 100, data: new Uint8Array(40000) } }),
+    /square power of two/,
+  );
+  assert.throws(
+    () => checkMaterialImage('x', { ...look, image: { width: 64, height: 64, data: new Uint8Array(10) } }),
+    /RGBA8/,
+  );
   assert.throws(() => checkMaterialImage('x', { ...look, repeat: 0.1 }), /repeat/);
 });

@@ -1265,6 +1265,7 @@
       "MOON_PHASES",
       "SUN_ILLUMINANCE",
       "Sky",
+      "cloudHaze",
       "cloudTransmittance",
       "moonAirmass",
       "moonLook",

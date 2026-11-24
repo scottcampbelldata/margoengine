@@ -54,7 +54,17 @@ const PLACES = {
   fields: [-450, 420],
 };
 // How wide each subject is, metres (the film pipeline's framing and focus checks read `shot.subject`).
-const SIZES = { crater: 230, farm: 60, hanbury: 400, church: 30, inn: 20, works: 200, reservoir: 300, dove: 300, fields: 400 };
+const SIZES = {
+  crater: 230,
+  farm: 60,
+  hanbury: 400,
+  church: 30,
+  inn: 20,
+  works: 200,
+  reservoir: 300,
+  dove: 300,
+  fields: 400,
+};
 const subject = (r) => {
   const v = `${r.visual} ${r.fallback}`.toLowerCase();
   if (r.set.endsWith('fauld-crater')) return 'crater';

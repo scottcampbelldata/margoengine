@@ -890,5 +890,7 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
 
 /** The paint layers of the farm biomes, for `BiomeWorld.create({ paint })`. */
 export const FARMLAND_PAINT = Object.freeze(
-  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood', 'hedgerow'].map((biome) => Object.freeze({ biome })),
+  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood', 'hedgerow'].map((biome) =>
+    Object.freeze({ biome }),
+  ),
 );

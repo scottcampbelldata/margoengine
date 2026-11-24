@@ -105,9 +105,11 @@ export interface MaterialLook {
     readonly detail?: number;
     readonly bump?: number;
     readonly macro?: number;
+    readonly image?: GroundImage;
+    readonly repeat?: number;
 }
 
-export function biomeMaterials(look: BiomeLookName | BiomeLookValues, base?: Readonly<Record<string, MaterialLook>>): Record<string, Required<MaterialLook>>;
+export function biomeMaterials(look: BiomeLookName | BiomeLookValues, base?: Readonly<Record<string, MaterialLook>>): Record<string, LookedMaterial>;
 
 export function disturbanceOptions(values?: Readonly<Record<string, number>>): {
     readonly intensity: number;
@@ -155,6 +157,12 @@ interface ErosionOptions {
     readonly sea?: number;
 }
 
+interface GroundImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 interface HeightGrid {
     readonly height: Int32Array;
     readonly nx: number;
@@ -167,6 +175,8 @@ interface IslandOptions {
     readonly radius?: number;
     readonly shelf?: number;
 }
+
+type LookedMaterial = MaterialLook & Required<Pick<MaterialLook, 'color' | 'detail' | 'bump' | 'macro'>>;
 
 interface MountainValley {
     readonly axis: Int32Array;

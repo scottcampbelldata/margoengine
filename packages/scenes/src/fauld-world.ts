@@ -114,20 +114,50 @@ export interface FauldWorld extends Disposable {
 const SKY: Readonly<
   Record<
     FauldSky,
-    { hour: number; weather: Partial<WeatherState>; preset: 'dawn' | 'goldenHour' | 'noon' | 'overcast'; clouds: 'stratus' | 'cumulus' }
+    {
+      hour: number;
+      weather: Partial<WeatherState>;
+      preset: 'dawn' | 'goldenHour' | 'noon' | 'overcast';
+      clouds: 'stratus' | 'cumulus';
+    }
   >
 > = {
-  dawn: { hour: 8.7, weather: { cloud: 0.85, fog: 0.25, humidity: 0.92, temperature: -1, wind: 1.5 }, preset: 'overcast', clouds: 'stratus' },
-  lowSun: { hour: 11.5, weather: { cloud: 0.6, fog: 0.12, humidity: 0.75, temperature: 4, wind: 3 }, preset: 'noon', clouds: 'cumulus' },
-  overcast: { hour: 11.2, weather: { ...WEATHER_PRESETS.overcast, cloud: 0.9, fog: 0.14, temperature: 5 }, preset: 'overcast', clouds: 'stratus' },
-  grey: { hour: 12.5, weather: { ...WEATHER_PRESETS.overcast, cloud: 0.95, fog: 0.22, temperature: 4 }, preset: 'overcast', clouds: 'stratus' },
+  dawn: {
+    hour: 8.7,
+    weather: { cloud: 0.85, fog: 0.25, humidity: 0.92, temperature: -1, wind: 1.5 },
+    preset: 'overcast',
+    clouds: 'stratus',
+  },
+  lowSun: {
+    hour: 11.5,
+    weather: { cloud: 0.6, fog: 0.12, humidity: 0.75, temperature: 4, wind: 3 },
+    preset: 'noon',
+    clouds: 'cumulus',
+  },
+  overcast: {
+    hour: 11.2,
+    weather: { ...WEATHER_PRESETS.overcast, cloud: 0.9, fog: 0.14, temperature: 5 },
+    preset: 'overcast',
+    clouds: 'stratus',
+  },
+  grey: {
+    hour: 12.5,
+    weather: { ...WEATHER_PRESETS.overcast, cloud: 0.95, fog: 0.22, temperature: 4 },
+    preset: 'overcast',
+    clouds: 'stratus',
+  },
   dusk: {
     hour: 15.9,
     weather: { cloud: 0.7, fog: 0.18, humidity: 0.85, temperature: 1, wind: 2 },
     preset: 'goldenHour',
     clouds: 'stratus',
   },
-  night: { hour: 19, weather: { cloud: 0.8, fog: 0.2, humidity: 0.9, temperature: 0, wind: 1 }, preset: 'overcast', clouds: 'stratus' },
+  night: {
+    hour: 19,
+    weather: { cloud: 0.8, fog: 0.2, humidity: 0.9, temperature: 0, wind: 1 },
+    preset: 'overcast',
+    clouds: 'stratus',
+  },
   snow: { hour: 12, weather: { ...WEATHER_PRESETS.snow }, preset: 'overcast', clouds: 'stratus' },
   rain: { hour: 12, weather: { ...WEATHER_PRESETS.rain, wind: 5 }, preset: 'overcast', clouds: 'stratus' },
   mist: { hour: 8.6, weather: { ...WEATHER_PRESETS.fog, fog: 0.4 }, preset: 'overcast', clouds: 'stratus' },
@@ -184,7 +214,9 @@ async function loadDem(url: string, signal?: AbortSignal) {
     bytes = await (await fetch(url, signal ? { signal } : {})).arrayBuffer(),
     data = new Float32Array(bytes);
   if (data.length !== meta.width * meta.depth)
-    throw new RangeError(`fauld: ${url} holds ${data.length} heights, not ${meta.width} x ${meta.depth}; regenerate the grid and its .json together.`);
+    throw new RangeError(
+      `fauld: ${url} holds ${data.length} heights, not ${meta.width} x ${meta.depth}; regenerate the grid and its .json together.`,
+    );
   // Height at OS (easting, northing), bilinear between sample centres.
   return (e: number, n: number) => {
     const fx = (e - meta.xll_easting - meta.cellsize_m / 2) / meta.cellsize_m,
@@ -248,20 +280,25 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     disposers: (() => void)[] = [],
     meshes: Mesh[] = [];
   if (!SKY[skyName]) throw new RangeError(`fauld: unknown sky ${skyName}; pass one of ${Object.keys(SKY).join(', ')}.`);
-  if (!['before', '1944', 'today'].includes(era)) throw new RangeError(`fauld: unknown era ${era}; pass 'before', '1944' or 'today'.`);
-  if (!(radius >= 200 && radius <= 3000)) throw new RangeError(`fauld: radius ${radius} is outside 200 to 3,000 metres.`);
+  if (!['before', '1944', 'today'].includes(era))
+    throw new RangeError(`fauld: unknown era ${era}; pass 'before', '1944' or 'today'.`);
+  if (!(radius >= 200 && radius <= 3000))
+    throw new RangeError(`fauld: radius ${radius} is outside 200 to 3,000 metres.`);
   try {
     const demAt = await loadDem(settings.dem ?? join(library, 'dem/os-terrain-50/fauld_sk12_sk23.f32'), signal),
       // The crater model gives only its heights (the terrain draws the crater, textured like the ground round it).
       crater =
         era === 'before'
           ? undefined
-          : await libraryMesh(join(library, `margo-library/fauld/crater/crater_inner_${era === '1944' ? '1944' : 'today'}.gltf`), {
-              kind: 'stone',
-              color: [0.5, 0.5, 0.5],
-              maxTriangles: 600000,
-              ...(signal ? { signal } : {}),
-            }),
+          : await libraryMesh(
+              join(library, `margo-library/fauld/crater/crater_inner_${era === '1944' ? '1944' : 'today'}.gltf`),
+              {
+                kind: 'stone',
+                color: [0.5, 0.5, 0.5],
+                maxTriangles: 600000,
+                ...(signal ? { signal } : {}),
+              },
+            ),
       bowl = crater ? craterHeights(crater) : undefined;
     // The rim height the crater model's edge meets: the ground's mean round a 250 m circle.
     let rim = 0;
@@ -368,12 +405,14 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     // Bracken dead and brown by late November (the fern's own colour only, never its green summer fronds).
     registry['library:fern'] = [
       {
-        geometry: (await libraryMesh(join(library, 'big-burn-1910/plants/fern_02/fern_02_2k.gltf'), {
-          kind: 'foliage',
-          color: [0.2, 0.12, 0.06],
-          maxTriangles: 60000,
-          ...(signal ? { signal } : {}),
-        })).geometry,
+        geometry: (
+          await libraryMesh(join(library, 'big-burn-1910/plants/fern_02/fern_02_2k.gltf'), {
+            kind: 'foliage',
+            color: [0.2, 0.12, 0.06],
+            maxTriangles: 60000,
+            ...(signal ? { signal } : {}),
+          })
+        ).geometry,
         color: [0.2, 0.12, 0.06],
         kind: 'foliage',
       },

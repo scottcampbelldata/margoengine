@@ -221,6 +221,8 @@ export interface SkyOptions {
     coverage?: boolean;
 }
 
+export function cloudHaze(clear: readonly number[], sunlight: readonly number[], sunUp: number, up: number, coverage: number, T: number): [number, number, number];
+
 export function cloudTransmittance(cover: number): number;
 
 export function moonAirmass(up: number): number;

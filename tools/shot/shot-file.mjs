@@ -293,7 +293,10 @@ export function validateShot(input) {
     if ('aovs' in page && (typeof page.aovs !== 'string' || !DOTTED.test(page.aovs)))
       add('shot.page.aovs', 'must name a function from globalThis with dots, for example stormLight.aovs');
     if ('ground' in page && (typeof page.ground !== 'string' || !DOTTED.test(page.ground)))
-      add('shot.page.ground', 'must name the page function (x, z) => ground height from globalThis, for example fauldStill.height');
+      add(
+        'shot.page.ground',
+        'must name the page function (x, z) => ground height from globalThis, for example fauldStill.height',
+      );
     for (const key of ['ready', 'canvas'])
       if (key in page && (typeof page[key] !== 'string' || !page[key].trim()))
         add(`shot.page.${key}`, 'must be a CSS selector');

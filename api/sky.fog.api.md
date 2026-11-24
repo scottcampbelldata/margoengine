@@ -6,6 +6,8 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export function cloudHaze(clear: readonly number[], sunlight: readonly number[], sunUp: number, up: number, coverage: number, T: number): [number, number, number];
+
 export const fog: NonNullable<SkyFeatures['fog']>;
 
 // Not exported from this entry, but used by the exports above:
