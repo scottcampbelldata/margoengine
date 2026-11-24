@@ -504,8 +504,8 @@ export class SoftBodyDesc {
   /**
    * A woven sheet whose threads have springs of their own: like {@link SoftBodyDesc.cloth}, with the warp along `du` and the
    * weft along `dv`, and the material's `warpSoftness`, `weftSoftness` and `shearSoftness` (and `bendSoftness`) setting how
-   * each resists (after Thomaszewski, Wacker and Strasser, 2008, "A consistent bending model for cloth simulation", for the
-   * bend, and the separate stretch and shear of Baraff and Witkin, 1998, and Wang, O'Brien and Ramamoorthi, 2011, "Data-driven
+   * each resists (after Thomaszewski, Wacker and Strasser, 2006, "A consistent bending model for cloth simulation with corotational
+   * subdivision finite elements", for the bend, and the separate stretch and shear of Baraff and Witkin, 1998, and Wang, O'Brien and Ramamoorthi, 2011, "Data-driven
    * elastic models for cloth": an orthotropic sheet's stretch along each thread and its shear are separate).
    */
   static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc {
