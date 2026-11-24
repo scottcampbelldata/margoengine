@@ -15,6 +15,8 @@ import {
   SEA,
   groundMaterials,
   materialPixels,
+  layerSize,
+  checkMaterialImage,
   groundWeights,
   overviewRows,
   overviewWeights,
@@ -915,4 +917,36 @@ test('wetness: a record that is not a function, a bad rectangle or a look out of
     [{ ...good, dryTime: 0 }, RangeError],
   ])
     await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { wetness }), kind, JSON.stringify(wetness));
+});
+
+// Fauld recut round 2 (2026-11-24): every field drew one generated 256-texel noise at a 4 m repeat, so pasture read as
+// one tiled green and the plough as flat paint. A material can now carry a photographed CC0 texture (its pattern, its
+// mean brought to the look's colour) at its own repeat, and the layers grow to 1,024 texels when one does.
+test('a ground material draws its photographed texture at its colour and repeat; layers grow to 1,024 texels', () => {
+  const side = 128,
+    data = new Uint8Array(side * side * 4);
+  // Stripes 8 texels wide, dark and light (a furrowed field), mean 100 in each channel.
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const v = (x >> 3) % 2 ? 150 : 50;
+      data.set([v, v, v, 255], (y * side + x) * 4);
+    }
+  const look = { color: [0.4, 0.3, 0.2], image: { width: side, height: side, data }, repeat: 6 },
+    levels = materialPixels('plough', look, 1024);
+  assert.equal(levels.length, 11);
+  assert.equal(levels[0].length, 1024 * 1024 * 4);
+  const base = levels[0],
+    mean = [0, 0, 0];
+  for (let k = 0; k < base.length; k += 4) for (let c = 0; c < 3; c++) mean[c] += base[k + c] / (1024 * 1024);
+  for (let c = 0; c < 3; c++) assert.ok(Math.abs(mean[c] - look.color[c] * 255) < 1.5, `channel ${c} mean ${mean[c]}`);
+  // The stripes survive (upsampled 8x: 64 texels a stripe): light stripe brighter than dark by the image's ratio.
+  const red = (x) => base[(512 * 1024 + x) * 4];
+  assert.ok(red(32) < red(96) * 0.5, `stripes ${red(32)} and ${red(96)}`);
+  assert.equal(layerSize([MATERIALS.grass, look]), 1024);
+  assert.equal(layerSize([MATERIALS.grass]), 256);
+  // Generated materials keep their pattern when the layers are 1,024 texels.
+  assert.equal(materialPixels('rock', MATERIALS.rock, 1024).length, 11);
+  assert.throws(() => checkMaterialImage('x', { ...look, image: { width: 100, height: 100, data: new Uint8Array(40000) } }), /square power of two/);
+  assert.throws(() => checkMaterialImage('x', { ...look, image: { width: 64, height: 64, data: new Uint8Array(10) } }), /RGBA8/);
+  assert.throws(() => checkMaterialImage('x', { ...look, repeat: 0.1 }), /repeat/);
 });

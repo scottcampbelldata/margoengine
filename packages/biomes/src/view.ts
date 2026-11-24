@@ -26,7 +26,7 @@ import type { BiomeSample } from './sample.js';
 import type { BiomeSeasons } from './seasons.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
-export { BIOME_LOOKS, MATERIALS, biomeMaterials, type BiomeLookName, type BiomeLookValues, type MaterialLook } from './looks.js';
+export { BIOME_LOOKS, MATERIALS, biomeMaterials, type BiomeLookName, type BiomeLookValues, type GroundImage, type MaterialLook } from './looks.js';
 import { MATERIALS, type MaterialLook } from './looks.js';
 
 /** Settings of {@link BiomeView.attach}. */
@@ -650,23 +650,87 @@ export function terrainColorsFor(
   };
 }
 
-/**
- * The generated texture of a ground material, as a view draws it: 256 x 256 RGBA8 sRGB bytes and its 8 mip levels
- * (9 arrays, 256 to 1 texels a side), three octaves of tileable value noise (16, 64 and 256 cells across) around
- * `material.color` with `material.detail` contrast, seeded by `key`.
- */
-export function materialPixels(key: string, material: MaterialLook): Uint8Array[] {
-  const m = material,
-    size = 256,
-    base = new Uint8Array(size * size * 4),
-    detail = m.detail ?? 0.25,
-    seed = hash3(0x6d61, key.length, key.charCodeAt(0) * 31 + key.charCodeAt(key.length - 1));
+/** Texels a side of a view's ground layers: 1,024 when any material has an image, else 256. */
+export function layerSize(looks: readonly MaterialLook[]): number {
+  return looks.some((l) => l.image) ? 1024 : 256;
+}
+
+/** A square RGBA8 image resampled to `size` a side (box average down, bilinear with wrap up), tileable either way. */
+function resample(data: ArrayLike<number>, from: number, size: number): Uint8Array {
+  const out = new Uint8Array(size * size * 4);
+  if (from >= size) {
+    const f = from / size; // float division: view only
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++)
+        for (let c = 0; c < 4; c++) {
+          let sum = 0;
+          for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) sum += data[((y * f + j) * from + x * f + i) * 4 + c];
+          out[(y * size + x) * 4 + c] = Math.round(sum / (f * f)); // float division: view only
+        }
+    return out;
+  }
+  const f = from / size; // float division: view only
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
+      const sx = (x + 0.5) * f - 0.5,
+        sy = (y + 0.5) * f - 0.5,
+        x0 = Math.floor(sx),
+        y0 = Math.floor(sy),
+        u = sx - x0,
+        v = sy - y0,
+        at = (a: number, b: number, c: number) =>
+          data[((((b % from) + from) % from) * from + (((a % from) + from) % from)) * 4 + c];
+      for (let c = 0; c < 4; c++)
+        out[(y * size + x) * 4 + c] = Math.round(
+          (at(x0, y0, c) * (1 - u) + at(x0 + 1, y0, c) * u) * (1 - v) + (at(x0, y0 + 1, c) * (1 - u) + at(x0 + 1, y0 + 1, c) * u) * v,
+        );
+    }
+  return out;
+}
+
+/** Checks a material's image and repeat. @throws RangeError naming the material. */
+export function checkMaterialImage(key: string, m: MaterialLook): void {
+  if (m.repeat !== undefined && !(Number.isFinite(m.repeat) && m.repeat >= 0.5 && m.repeat <= 64))
+    throw rangeError(`BiomeView: material ${key} repeat ${m.repeat} is outside 0.5 to 64 metres`, 'biomes');
+  const i = m.image;
+  if (!i) return;
+  if (!(Number.isInteger(i.width) && i.width === i.height && i.width >= 64 && i.width <= 4096 && (i.width & (i.width - 1)) === 0))
+    throw rangeError(`BiomeView: material ${key} image is ${i.width} x ${i.height}; give a square power of two from 64 to 4,096 texels`, 'biomes');
+  if (i.data.length !== i.width * i.height * 4)
+    throw rangeError(`BiomeView: material ${key} image holds ${i.data.length} bytes, not ${i.width * i.height * 4} (RGBA8)`, 'biomes');
+}
+
+/**
+ * The texture of a ground material, as a view draws it: `size` x `size` RGBA8 sRGB bytes (256 by default) and its mip
+ * levels down to 1 texel. Generated: three octaves of tileable value noise (16, 64 and 256 cells across the texture)
+ * around `material.color` with `material.detail` contrast, seeded by `key`. With `material.image`: the image resampled
+ * to `size`, each channel scaled so its mean is `material.color`.
+ */
+export function materialPixels(key: string, material: MaterialLook, size = 256): Uint8Array[] {
+  if (material.image) {
+    checkMaterialImage(key, material);
+    const img = material.image,
+      base = resample(img.data, img.width, size),
+      mean = [0, 0, 0];
+    for (let k = 0; k < base.length; k += 4) for (let c = 0; c < 3; c++) mean[c] += base[k + c];
+    const gain = mean.map((v, c) => (material.color[c] * 255 * size * size) / Math.max(1, v)); // float division: view only
+    for (let k = 0; k < base.length; k += 4) {
+      for (let c = 0; c < 3; c++) base[k + c] = clampInt(Math.round(base[k + c] * gain[c]), 0, 255);
+      base[k + 3] = 255;
+    }
+    return mipChain(base, size);
+  }
+  const m = material,
+    gen = 256,
+    base = new Uint8Array(gen * gen * 4),
+    detail = m.detail ?? 0.25,
+    seed = hash3(0x6d61, key.length, key.charCodeAt(0) * 31 + key.charCodeAt(key.length - 1));
+  for (let y = 0; y < gen; y++)
+    for (let x = 0; x < gen; x++) {
       // Three octaves of tileable lattice noise (16, 64 and 256 cells over the texture). Red and green share the two
       // coarse ones and blue has its own, so patches shift between warm and cool, not only light and dark; the fine
       // octave (one value a texel) is grain shared by all three, the light and dark the terrain's bump turns into relief.
-      const k = (y * size + x) * 4,
+      const k = (y * gen + x) * 4,
         grain = cellNoise(seed + 4, x, y, 256);
       for (let c = 0; c < 3; c++) {
         const n =
@@ -677,6 +741,11 @@ export function materialPixels(key: string, material: MaterialLook): Uint8Array[
       }
       base[k + 3] = 255;
     }
+  return mipChain(size === gen ? base : resample(base, gen, size), size);
+}
+
+/** A texture and its box-filtered mip levels down to 1 texel. */
+function mipChain(base: Uint8Array, size: number): Uint8Array[] {
   const levels = [base];
   for (let s = size >> 1; s >= 1; s >>= 1) {
     const prev = levels[levels.length - 1],
@@ -869,11 +938,13 @@ export class BiomeView implements Disposable {
       ...(canopy ? ['canopy'] : []),
     ]);
     checkMaterialCount(this.materials);
+    for (const key of this.materials) checkMaterialImage(key, look(key, options.materials));
     const looks = this.materials.map((key) => look(key, options.materials)),
       // The terrain needs 4 to 16 layers: repeat the last material when there are fewer.
       layerKeys = [...this.materials];
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
-    const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
+    const texels = layerSize(looks),
+      pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)], texels));
     // With seasons, the plant cover layers of seasonal biomes take a tint texture of `seasons.tintAt` over the world, a
     // texel every `regionResolution` metres (the finest the states change at) or every weight texel when those are
     // coarser, and coarser by halves only past the device's largest texture: each texel its own state, 0 where no
@@ -930,11 +1001,11 @@ export class BiomeView implements Disposable {
       levels: clipmapLevels(world.bounds, this.#radius, options.clipmap),
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
-        const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
+        const { bump = 0, macro = 0, repeat = 4 } = looks[Math.min(i, looks.length - 1)];
         return {
           height: [-1e6, 1e6] as const,
           slope: [0, 1] as const,
-          scale: 0.25,
+          scale: 1 / repeat, // float division: view only
           bump,
           macro,
           ...(seasonal.has(layerKeys[i]) ? { tint: true } : {}),
@@ -946,14 +1017,14 @@ export class BiomeView implements Disposable {
           height = device.createTexture({ size, format: 'r32float', usage }),
           weights = view.#weights.map(() => device.createTexture({ size, format: 'rgba8unorm', usage })),
           layers = device.createTexture({
-            size: [256, 256, layerKeys.length],
+            size: [1 << (pixels[0].length - 1), 1 << (pixels[0].length - 1), layerKeys.length],
             format: 'rgba8unorm-srgb',
             usage,
-            mipLevelCount: 9,
+            mipLevelCount: pixels[0].length,
           });
         pixels.forEach((levels, layer) =>
           levels.forEach((data, mip) => {
-            const s = 256 >> mip;
+            const s = (1 << (pixels[0].length - 1)) >> mip;
             device.queue.writeTexture(
               { texture: layers, mipLevel: mip, origin: [0, 0, layer] },
               data as Uint8Array<ArrayBuffer>,
@@ -1841,10 +1912,10 @@ export class BiomeView implements Disposable {
           painted = weights.map(() => device.createTexture({ size, format: 'rgba8unorm', usage })),
           hole = device.createTexture({ size: [far.width - 1, far.depth - 1], format: 'r8unorm', usage }),
           layers = device.createTexture({
-            size: [256, 256, layerKeys.length],
+            size: [1 << (pixels[0].length - 1), 1 << (pixels[0].length - 1), layerKeys.length],
             format: 'rgba8unorm-srgb',
             usage,
-            mipLevelCount: 9,
+            mipLevelCount: pixels[0].length,
           });
         device.queue.writeTexture({ texture: heightmap }, far.heights as Float32Array<ArrayBuffer>, { bytesPerRow: far.width * 4 }, size);
         painted.forEach((texture, i) =>
@@ -1856,7 +1927,7 @@ export class BiomeView implements Disposable {
         ]);
         pixels.forEach((levels, layer) =>
           levels.forEach((data, mip) => {
-            const s = 256 >> mip;
+            const s = (1 << (pixels[0].length - 1)) >> mip;
             device.queue.writeTexture(
               { texture: layers, mipLevel: mip, origin: [0, 0, layer] },
               data as Uint8Array<ArrayBuffer>,

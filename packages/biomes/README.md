@@ -135,6 +135,21 @@ const materials = biomeMaterials('animatedFeature');
 console.log(materials.grass.detail < 0.4, materials.rock.macro > 0.5); // true true
 ```
 
+A material can draw a photographed ground texture (a CC0 scan such as Poly Haven's `leafy_grass`, decoded to RGBA8)
+in place of the generated detail: `image` (square, a power of two from 64 to 4,096 texels) and `repeat` (metres one
+repeat covers, default 4). Its pattern is kept and its mean brought to `color`, so one scan gives a summer or a winter
+field; the view's layers are drawn at 1,024 texels a side when any material has an image. `materialPixels(key, look, size)`
+gives the texture and its mips.
+
+```js
+import { materialPixels } from '@margoengine/biomes/view';
+
+const side = 64,
+  data = new Uint8Array(side * side * 4).fill(128); // decode a real scan here (createImageBitmap, getImageData)
+const levels = materialPixels('winter-pasture', { color: [0.31, 0.37, 0.2], image: { width: side, height: side, data }, repeat: 3 }, 1024);
+console.log(levels.length, levels[0][1]); // 11 94
+```
+
 ## Wet ground and plants after a flood: `BiomeView`'s `wetness`
 
 `BiomeView.attach(engine, world, { wetness: { record, velocity, origin, size } })` draws the biome wet where a flood has

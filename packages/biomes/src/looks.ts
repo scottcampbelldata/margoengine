@@ -18,6 +18,25 @@ export interface MaterialLook {
    * scales the colour, so far slopes are not one flat tone). Default 0.
    */
   readonly macro?: number;
+  /**
+   * A photographed ground texture (a CC0 scan such as Poly Haven's `leafy_grass`) in place of the generated detail:
+   * RGBA8 sRGB pixels, square, 64 to 4,096 texels a side. The view draws its pattern with its mean brought to `color`
+   * (each channel scaled), so one scan serves a green summer field or a dun winter one; `detail` is then unused. Every
+   * view layer is redrawn at 1,024 texels a side when any material has an image. Default none (generated detail).
+   */
+  readonly image?: GroundImage;
+  /** Metres of ground one repeat of the texture covers, 0.5 to 64. Default 4. */
+  readonly repeat?: number;
+}
+
+/** A material after a look family: its colour, detail, relief and macro set; its image and repeat as given. */
+export type LookedMaterial = MaterialLook & Required<Pick<MaterialLook, 'color' | 'detail' | 'bump' | 'macro'>>;
+
+/** A ground texture's pixels for {@link MaterialLook.image}: RGBA8 sRGB, `width` = `height`, rows top first. */
+export interface GroundImage {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array | Uint8ClampedArray;
 }
 
 /** Built-in material looks, by key (the materials the presets use). Unknown keys get a neutral grey-brown. */
@@ -77,12 +96,12 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export function biomeMaterials(
   look: BiomeLookName | BiomeLookValues,
   base: Readonly<Record<string, MaterialLook>> = MATERIALS,
-): Record<string, Required<MaterialLook>> {
+): Record<string, LookedMaterial> {
   const v: BiomeLookValues | undefined = typeof look === 'string' ? (BIOME_LOOKS as Record<string, BiomeLookValues>)[look] : look;
   if (!v) throw rangeError(`Unknown biome look ${String(look)}; use one of ${Object.keys(BIOME_LOOKS).join(', ')}`, 'biomes');
   for (const key of ['saturation', 'detail', 'bump', 'macro'] as const)
     if (!(v[key] >= 0 && Number.isFinite(v[key]))) throw rangeError(`Invalid biome look ${key}; use a finite number of 0 or more`, 'biomes');
-  const out: Record<string, Required<MaterialLook>> = {};
+  const out: Record<string, LookedMaterial> = {};
   for (const [key, m] of Object.entries(base)) {
     const luma = 0.2126 * m.color[0] + 0.7152 * m.color[1] + 0.0722 * m.color[2];
     out[key] = {
@@ -90,6 +109,8 @@ export function biomeMaterials(
       detail: clamp01((m.detail ?? 0.25) * v.detail),
       bump: clamp01((m.bump ?? 0) * v.bump),
       macro: clamp01((m.macro ?? 0) * v.macro),
+      ...(m.image ? { image: m.image } : {}),
+      ...(m.repeat !== undefined ? { repeat: m.repeat } : {}),
     };
   }
   return out;
