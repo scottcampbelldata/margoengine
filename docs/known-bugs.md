@@ -9121,6 +9121,13 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open: a rigid body far lighter than the soft particles is not held by a default cloth (physics soft, KB-SOFT-LIGHT1, found 2026-11-24)
+
+- **Repro:** a default cloth (`SoftBodyDesc.cloth([-0.55, 1, -0.55], [0.1, 0, 0], [0, 0, 0.1], 12, 12)` with its four corners pinned: particles of 1 kg, radius 0.05) and a box of half extents 0.02 with density 400 (about 26 g) dropped from 0.5 m over the middle of a cell: the box is thrown up or goes through the cloth within two seconds (`physics/tests` has no test for it yet; a one-minute script with `soft.create` and `physics.addBody` shows it, and a box of 1 kg is thrown too).
+- **Cause:** not found. What is known: the contact's reaction on the body is a position correction turned into an impulse, shared by inverse mass; a body hundreds of times lighter than the particles that meet it takes almost the whole correction as velocity, from several particles in one piece of the step (each sees the plane before the others' impulses have moved the body), and the force over the step that carries it to the real body does not move the body as the kernel assumed. A cap on the speed a body takes from one contact and planes that follow the body's velocity change inside the step were tried (not landed): they calmed the light box and broke the dominance and paddle tests.
+- **Needed:** a contact that is solved for the body and the particles together at the velocity level for light bodies (a mass-split or a small velocity solve over the contacts of one body), and the test: a box smaller than the particle spacing and a thin rod dropped on a default cloth rest on it.
+
+
 ### Open: a rigid chain's stiffness depends on the iterations, the substeps and the mass ratio (physics soft, KB-SOFT-ITER1, found 2026-11-24)
 
 - **Repro:** `SoftBodyDesc.rope([0, 6, 0], [0, 2.2, 0], 20, {bending: false})` pinned at the top, rigid edges, attach its end to a 16 kg crate (`rope.attachParticle(19, crate)`), 600 steps at 1/60 s: with particles of 0.01 kg the rope hangs 4.12 m below the pin at 2 iterations and 8 substeps (3.8 m long, 8% stretch), 3.98 at 8 iterations, 3.85 at 16 substeps; with 0.5 kg particles 3.82. A rope that must not stretch carries a different stretch for each setting.
