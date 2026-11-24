@@ -926,7 +926,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * `generic`) between them. The joints are made here and are ordinary joints too, with their limits and motors; the tree
    * holds them exactly, so they cannot drift open and a branch is as stiff as a chain.
    * @throws MargoError (`state`) for a body in another multibody, a parent not in the tree yet, or a loop.
-   * @throws RangeError for a tree past 39 links or 64 joint speeds.
+   * @throws RangeError for a tree with no link.
    */
   addMultibody(root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
     for (const body of [root, ...links.map((link) => link.body), ...links.flatMap((link) => (link.parent ? [link.parent] : []))])

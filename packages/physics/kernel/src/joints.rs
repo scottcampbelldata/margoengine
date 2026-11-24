@@ -740,7 +740,7 @@ impl World {
     }
     /// The doubles of a joint's scratch.
     #[inline(always)]
-    fn doubles(&self, row: usize) -> *mut f64 {
+    pub(crate) fn doubles(&self, row: usize) -> *mut f64 {
         unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + 64) as *mut f64 }
     }
 

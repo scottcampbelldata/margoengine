@@ -2,29 +2,27 @@
 // algorithms (Featherstone, Rigid Body Dynamics Algorithms, 2008, chapters 6 to 9), written here with the maximal
 // coordinates the rest of the kernel keeps and projected onto the joint space each substep.
 //
-// A tree of links has the generalised velocity qd: the root's six speeds when the root moves, and the free axes of each joint.
-// A link's twist is linear in it, v_i = b_i + J_i qd, with b_i what a root that does not move carries along. The contact
-// and joint passes of a substep push the links apart in full space; what a joint tree would have done with those impulses is
-// their projection onto the joint space in the metric of the masses, the least change of kinetic energy that keeps every joint
-// closed. That is the minimiser of 1/2 (v - b - J qd)^T M (v - b - J qd), so with H = J^T M J, the joint-space inertia matrix
-// that Featherstone's composite rigid body algorithm builds (2008, section 6.2),
+// A link's twist u_i (its centre's speed and its turn) follows its parent's through the joint: u_i = P_i u_parent + S_i qd_i,
+// P the transport of a twist from one centre to the next and S_i the free axes of the joint. The contact and joint passes of a
+// substep push the links apart in full space; what a joint tree would have done with those impulses is their projection onto
+// the joint space in the metric of the masses, the least change of kinetic energy that keeps every joint closed:
 //
-//   H qd = J^T M (v - b),
+//   minimise the sum over links of 1/2 (u_i - v_i)^T M_i (u_i - v_i), v_i the speeds the passes left.
 //
-// solved here by Cholesky in doubles. The same result comes from applying the impulses through the articulated-body
-// inertias (Featherstone 2008, section 7.2; Baraff 1996 for the maximal-coordinate view); this form costs O(links dof^2) and
-// needs no spatial algebra, which suits trees of a few dozen links. Positions are held the same way: after the poses
-// move, every link is put back where its parent and its joint's free axes place it (forward kinematics), so a tree cannot
-// drift open however many substeps it takes, as one held by constraint impulses alone can.
+// Its normal equations are Featherstone's joint-space inertia matrix system H qd = J^T M v (2008, section 6.2), and for a tree
+// they are solved without ever forming H, by dynamic programming over the tree: each link's cost, a quadratic in its own
+// twist, gains from its children their cost with the joint speeds minimised out (the articulated-body inertia A - A S D^-1 S^T A,
+// Featherstone 2008, section 7.2, here for impulses and so with no bias force), and a pass from the root recovers the speeds. Cost
+// O(links) with 6 by 6 matrices, as the articulated-body algorithm has, so a chain of hundreds of links costs what a chain of
+// ten does a link. Each link keeps its working numbers in the scratch rows of its joint, which every joint already has and which
+// the next substep's joint pass writes again, so the memory grows with the world's joints and a tree has no size of its own.
+// Positions are held the same way: after the poses move, a link that stands more than DRIFT from where its parent and its
+// joint's free axes place it is put back (forward kinematics).
 //
 // Determinism: only + - * / sqrt in doubles and f32, in a fixed order.
 use crate::layout::*;
 use crate::math::*;
 use crate::world::{NONE, World};
-
-/// Most links of a tree, and most generalised speeds it can hold.
-pub const MAX_LINKS: usize = 40;
-pub const MAX_DOF: usize = 64;
 
 /// How far a link may stand from where its joints place it, in metres and radians, before the pose is put back. The joint rows
 /// keep every joint that closely themselves; the pose pass is for what they leave under a heavy load or on a branch.
@@ -32,6 +30,8 @@ pub const DRIFT: f32 = 1e-3;
 const TURN: f32 = 6.283_185_5;
 
 type D3 = [f64; 3];
+type M6 = [[f64; 6]; 6];
+type V6 = [f64; 6];
 #[inline(always)]
 fn d3(v: V3) -> D3 {
     [v.x as f64, v.y as f64, v.z as f64]
@@ -41,39 +41,141 @@ fn sub(a: D3, b: D3) -> D3 {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 #[inline(always)]
-fn dot(a: D3, b: D3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-#[inline(always)]
 fn cross(a: D3, b: D3) -> D3 {
     [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
+/// A free axis of a joint, as the twist it gives the link beyond it.
 #[derive(Clone, Copy)]
-struct Dof {
+struct Axis {
     angular: bool,
     axis: D3,
     point: D3,
-    /// The link whose joint owns this speed; the root for its own six.
-    owner: usize,
 }
-
-const NO_DOF: Dof = Dof { angular: false, axis: [0.0; 3], point: [0.0; 3], owner: 0 };
+const NO_AXIS: Axis = Axis { angular: false, axis: [0.0; 3], point: [0.0; 3] };
 const UNIT: [V3; 3] = [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)];
 
-impl World {
-    /// The links of the tree rooted at `root`, parents first; 0 when the chain is longer than the tree can hold.
-    fn mb_chain(&self, root: usize, rows: &mut [usize; MAX_LINKS]) -> usize {
-        let (mut count, mut at) = (0, root as u32);
-        while at != NONE {
-            if count == MAX_LINKS {
-                return 0;
+// Where a link keeps its numbers, in doubles from the start of its joint's scratch: its subtree's inertia A, the right side r, the
+// joint's axes S (a column a row of six), the inverse of D = S^T A S, the count of axes, and the twist the pass found.
+const A_AT: usize = 0;
+const R_AT: usize = 36;
+const S_AT: usize = 42;
+const DINV_AT: usize = 78;
+const K_AT: usize = 114;
+const U_AT: usize = 115;
+
+/// The transport of a twist at a centre to one at a centre `r` further on: v + w x r, w.
+fn transport(r: D3) -> M6 {
+    let mut p = [[0.0; 6]; 6];
+    for k in 0..6 {
+        p[k][k] = 1.0;
+    }
+    // v_new = v + w x r = v - [r]x w
+    p[0][4] = r[2];
+    p[0][5] = -r[1];
+    p[1][3] = -r[2];
+    p[1][5] = r[0];
+    p[2][3] = r[1];
+    p[2][4] = -r[0];
+    p
+}
+fn mul6(a: &M6, b: &M6) -> M6 {
+    let mut c = [[0.0; 6]; 6];
+    for i in 0..6 {
+        for k in 0..6 {
+            let x = a[i][k];
+            if x != 0.0 {
+                for j in 0..6 {
+                    c[i][j] += x * b[k][j];
+                }
             }
-            rows[count] = at as usize;
-            count += 1;
-            at = self.uu(MB_NEXT, at as usize);
         }
-        count
+    }
+    c
+}
+fn transposed(a: &M6) -> M6 {
+    let mut t = [[0.0; 6]; 6];
+    for i in 0..6 {
+        for j in 0..6 {
+            t[j][i] = a[i][j];
+        }
+    }
+    t
+}
+fn apply6(a: &M6, v: &V6) -> V6 {
+    let mut o = [0.0; 6];
+    for i in 0..6 {
+        for j in 0..6 {
+            o[i] += a[i][j] * v[j];
+        }
+    }
+    o
+}
+/// The inverse of the leading `n` by `n` of a symmetric positive semi-definite matrix plus a whisper on its diagonal, so a
+/// direction that carries no mass inverts to something large and is multiplied by a zero right side. Gauss-Jordan without
+/// pivoting, which is stable for a positive definite matrix.
+fn inverse(mut a: M6, n: usize, whisper: f64) -> M6 {
+    let mut out = [[0.0; 6]; 6];
+    for i in 0..n {
+        out[i][i] = 1.0;
+        a[i][i] += whisper;
+    }
+    for p in 0..n {
+        let pivot = 1.0 / a[p][p];
+        for j in 0..n {
+            a[p][j] *= pivot;
+            out[p][j] *= pivot;
+        }
+        for i in 0..n {
+            if i != p {
+                let f = a[i][p];
+                if f != 0.0 {
+                    for j in 0..n {
+                        a[i][j] -= f * a[p][j];
+                        out[i][j] -= f * out[p][j];
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+fn whisper_of(a: &M6, n: usize) -> f64 {
+    let mut biggest = 0.0f64;
+    for i in 0..n {
+        if a[i][i] > biggest {
+            biggest = a[i][i];
+        }
+    }
+    if biggest * 1e-12 > 1e-18 { biggest * 1e-12 } else { 1e-18 }
+}
+
+impl World {
+    /// Checks the tree rooted at `root` and writes each link's place before it (MB_PREV); the last link, or None when a joint
+    /// of the tree is gone, broken or not the one that holds its link to its parent.
+    fn mb_check(&mut self, root: usize) -> Option<usize> {
+        let (mut at, mut before, mut guard) = (root as u32, NONE, 0u32);
+        while at != NONE {
+            let row = at as usize;
+            if row != root {
+                let joint = self.uu(MB_JOINT, row);
+                if joint == NONE {
+                    return None;
+                }
+                let flags = self.uu(JOINT_FLAGS, joint as usize);
+                if flags & JOINT_ALIVE == 0 || flags & JOINT_IDLE != 0 || self.uu(JOINT_A, joint as usize) != self.uu(MB_PARENT, row) {
+                    return None;
+                }
+            }
+            self.set_u(MB_PREV, row, before);
+            before = at;
+            at = self.uu(MB_NEXT, row);
+            guard += 1;
+            if guard > self.header().rows {
+                return None;
+            }
+        }
+        if before == NONE { None } else { Some(before as usize) }
     }
 
     /// Calls `each` once with the root of every multibody that has a body awake.
@@ -104,32 +206,6 @@ impl World {
         self.mb_roots(|w, root| w.fk_tree(root, h));
     }
 
-    fn tree_ok(&self, rows: &[usize; MAX_LINKS], count: usize) -> bool {
-        if count == 0 {
-            return false;
-        }
-        for i in 1..count {
-            let joint = self.uu(MB_JOINT, rows[i]);
-            if joint == NONE {
-                return false;
-            }
-            let flags = self.uu(JOINT_FLAGS, joint as usize);
-            if flags & JOINT_ALIVE == 0 || flags & JOINT_IDLE != 0 || self.uu(JOINT_A, joint as usize) != self.uu(MB_PARENT, rows[i]) {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn mb_parent_index(&self, rows: &[usize; MAX_LINKS], i: usize) -> usize {
-        let parent = self.uu(MB_PARENT, rows[i]) as usize;
-        let mut j = 0;
-        while j < i && rows[j] != parent {
-            j += 1;
-        }
-        j
-    }
-
     /// True when the axis stands at one of its limits and its speed runs into it.
     fn at_limit(&self, joint: usize, flags: u32, axis: usize, value: f32, rate: f32) -> bool {
         if flags & (JOINT_LIMIT << axis) == 0 {
@@ -139,218 +215,266 @@ impl World {
         (value <= low + DRIFT && rate < 0.0) || (value >= high - DRIFT && rate > 0.0)
     }
 
-    fn project_tree(&mut self, root: usize) {
-        let mut rows = [0usize; MAX_LINKS];
-        let count = self.mb_chain(root, &mut rows);
-        if !self.tree_ok(&rows, count) {
-            return;
-        }
-        let mut dofs = [NO_DOF; MAX_DOF];
+    /// The free axes of the joint that holds `body` to `parent`, less any a limit holds the speed of at zero.
+    fn joint_axes(&self, joint: usize, body: usize, parent: usize) -> ([Axis; 6], usize) {
+        let mut axes = [NO_AXIS; 6];
         let mut n = 0;
-        let mut anc = [0u64; MAX_LINKS];
-        anc[0] = 1;
-        let root_center = d3(self.v(CENTER_X, root));
+        let flags = self.uu(JOINT_FLAGS, joint);
+        let rotation = self.q(ROTATION_X, parent);
+        let frame = rotation.mul(self.q(JOINT_FRAME_A_X, joint));
+        let point = self.v(POSITION_X, parent).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
+        let (center_b, center_p) = (self.v(CENTER_X, body), self.v(CENTER_X, parent));
+        let anchor_b = self.v(POSITION_X, body).add(self.q(ROTATION_X, body).rotate(self.v(JOINT_ANCHOR_B_X, joint)));
+        let along = self
+            .v(LINEAR_X, body)
+            .add(self.v(ANGULAR_X, body).cross(anchor_b.sub(center_b)))
+            .sub(self.v(LINEAR_X, parent).add(self.v(ANGULAR_X, parent).cross(point.sub(center_p))));
+        let spin = self.v(ANGULAR_X, body).sub(self.v(ANGULAR_X, parent));
+        let gap = anchor_b.sub(point);
+        let free_turns = (0..3).filter(|k| flags & (JOINT_LOCK << (3 + k)) == 0).count();
+        for k in 0..3 {
+            if flags & (JOINT_LOCK << k) == 0 {
+                let axis = frame.rotate(UNIT[k]);
+                // A limit the joint stands at and moves into is a wall: its speed along the axis is held at zero.
+                if !self.at_limit(joint, flags, k, gap.dot(axis), along.dot(axis)) {
+                    axes[n] = Axis { angular: false, axis: d3(axis), point: d3(point) };
+                    n += 1;
+                }
+            }
+        }
+        for k in 0..3 {
+            if flags & (JOINT_LOCK << (3 + k)) == 0 {
+                let axis = frame.rotate(UNIT[k]);
+                if !(free_turns == 1 && self.at_limit(joint, flags, 3 + k, self.s(JOINT_ANGLE, joint), spin.dot(axis))) {
+                    axes[n] = Axis { angular: true, axis: d3(axis), point: d3(point) };
+                    n += 1;
+                }
+            }
+        }
+        (axes, n)
+    }
+
+    /// A link's mass matrix in world axes, zero for a body that does not move.
+    fn mass6(&self, body: usize) -> M6 {
+        let mut m = [[0.0; 6]; 6];
+        let inverse = self.s(INVERSE_MASS, body);
+        if !(inverse > 0.0) || self.flags(body) & KIND != DYNAMIC {
+            return m;
+        }
+        let mass = 1.0 / inverse as f64;
+        let frame = self.q(ROTATION_X, body).mul(self.q(INERTIA_FRAME_X, body));
+        let principal = d3(self.v(INERTIA_X, body));
+        for k in 0..3 {
+            m[k][k] = mass;
+            let e = frame.unrotate(UNIT[k]);
+            let col = d3(frame.rotate(v3(e.x * principal[0] as f32, e.y * principal[1] as f32, e.z * principal[2] as f32)));
+            // The columns of R diag(I) R^T in doubles, from the f32 rotation of each unit vector.
+            for j in 0..3 {
+                m[3 + j][3 + k] = col[j];
+            }
+        }
+        m
+    }
+
+    fn project_tree(&mut self, root: usize) {
+        let Some(last) = self.mb_check(root) else { return };
         let root_moves = self.flags(root) & KIND == DYNAMIC;
-        if root_moves {
-            for k in 0..3 {
-                dofs[n] = Dof { angular: false, axis: d3(UNIT[k]), point: root_center, owner: 0 };
-                n += 1;
-            }
-            for k in 0..3 {
-                dofs[n] = Dof { angular: true, axis: d3(UNIT[k]), point: root_center, owner: 0 };
-                n += 1;
-            }
-        }
-        for i in 1..count {
-            let (body, parent) = (rows[i], self.mb_parent_index(&rows, i));
-            anc[i] = anc[parent] | (1u64 << i);
-            let joint = self.uu(MB_JOINT, body) as usize;
-            let flags = self.uu(JOINT_FLAGS, joint);
-            let p_row = rows[parent];
-            let rotation = self.q(ROTATION_X, p_row);
-            let frame = rotation.mul(self.q(JOINT_FRAME_A_X, joint));
-            let point = d3(self.v(POSITION_X, p_row).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint))));
-            let (c_row, p_center) = (body, self.v(CENTER_X, p_row));
-            let center_c = self.v(CENTER_X, c_row);
-            let anchor_b = self.v(POSITION_X, c_row).add(self.q(ROTATION_X, c_row).rotate(self.v(JOINT_ANCHOR_B_X, joint)));
-            let anchor_a = self.v(POSITION_X, p_row).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
-            let along = self
-                .v(LINEAR_X, c_row)
-                .add(self.v(ANGULAR_X, c_row).cross(anchor_b.sub(center_c)))
-                .sub(self.v(LINEAR_X, p_row).add(self.v(ANGULAR_X, p_row).cross(anchor_a.sub(p_center))));
-            let spin = self.v(ANGULAR_X, c_row).sub(self.v(ANGULAR_X, p_row));
-            let gap = anchor_b.sub(anchor_a);
-            let free_turns = (0..3).filter(|k| flags & (JOINT_LOCK << (3 + k)) == 0).count();
-            for k in 0..3 {
-                if flags & (JOINT_LOCK << k) == 0 {
-                    let axis = frame.rotate(UNIT[k]);
-                    // A limit the joint stands at and moves into is a wall: its speed along the axis is held at zero.
-                    if self.at_limit(joint, flags, k, gap.dot(axis), along.dot(axis)) {
-                        continue;
+        let twist_of = |w: &World, b: usize| -> V6 {
+            let (l, a) = (d3(w.v(LINEAR_X, b)), d3(w.v(ANGULAR_X, b)));
+            [l[0], l[1], l[2], a[0], a[1], a[2]]
+        };
+        // Each link's own cost: its mass matrix and mass matrix times the speed the passes left it.
+        let mut a0 = self.mass6(root);
+        let mut r0 = apply6(&a0, &twist_of(self, root));
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let joint = self.uu(MB_JOINT, b) as usize;
+            let (m, d) = (self.mass6(b), self.doubles(joint));
+            let r = apply6(&m, &twist_of(self, b));
+            unsafe {
+                for i in 0..6 {
+                    for j in 0..6 {
+                        *d.add(A_AT + 6 * i + j) = m[i][j];
                     }
-                    if n == MAX_DOF {
-                        return;
-                    }
-                    dofs[n] = Dof { angular: false, axis: d3(axis), point, owner: i };
-                    n += 1;
+                    *d.add(R_AT + i) = r[i];
                 }
             }
-            for k in 0..3 {
-                if flags & (JOINT_LOCK << (3 + k)) == 0 {
-                    let axis = frame.rotate(UNIT[k]);
-                    if free_turns == 1 && self.at_limit(joint, flags, 3 + k, self.s(JOINT_ANGLE, joint), spin.dot(axis)) {
-                        continue;
+            at = self.uu(MB_NEXT, b);
+        }
+        // From the last link to the first, each hands its subtree's cost, its joint minimised out, to its parent.
+        let mut at = last as u32;
+        while at as usize != root {
+            let b = at as usize;
+            let (joint, parent) = (self.uu(MB_JOINT, b) as usize, self.uu(MB_PARENT, b) as usize);
+            let d = self.doubles(joint);
+            let (mut a, mut r) = ([[0.0; 6]; 6], [0.0; 6]);
+            unsafe {
+                for i in 0..6 {
+                    for j in 0..6 {
+                        a[i][j] = *d.add(A_AT + 6 * i + j);
                     }
-                    if n == MAX_DOF {
-                        return;
-                    }
-                    dofs[n] = Dof { angular: true, axis: d3(axis), point, owner: i };
-                    n += 1;
+                    r[i] = *d.add(R_AT + i);
                 }
             }
-        }
-        if n == 0 {
-            return;
-        }
-        // What a root that does not move carries each link along with.
-        let (root_v, root_w) = (d3(self.v(LINEAR_X, root)), d3(self.v(ANGULAR_X, root)));
-        let mut h = [[0.0f64; MAX_DOF]; MAX_DOF];
-        let mut r = [0.0f64; MAX_DOF];
-        // The columns of each link: linear and angular part of every speed that reaches it.
-        let mut col_l = [[0.0f64; 3]; MAX_DOF];
-        let mut col_a = [[0.0f64; 3]; MAX_DOF];
-        let mut reach = [0usize; MAX_DOF];
-        let mut twist = [[[0.0f64; 3]; 2]; MAX_LINKS];
-        for i in 0..count {
-            let body = rows[i];
-            let center = d3(self.v(CENTER_X, body));
-            let base_l = if root_moves { [0.0; 3] } else { let c = cross(root_w, sub(center, root_center)); [root_v[0] + c[0], root_v[1] + c[1], root_v[2] + c[2]] };
-            let base_a = if root_moves { [0.0; 3] } else { root_w };
-            twist[i] = [base_l, base_a];
-            let inverse = self.s(INVERSE_MASS, body);
-            if !(inverse > 0.0) || self.flags(body) & KIND != DYNAMIC {
-                continue;
+            let (axes, k) = self.joint_axes(joint, b, parent);
+            let center = d3(self.v(CENTER_X, b));
+            let mut s = [[0.0; 6]; 6];
+            for c in 0..k {
+                let ax = axes[c];
+                let (lin, ang) = if ax.angular { (cross(ax.axis, sub(center, ax.point)), ax.axis) } else { (ax.axis, [0.0; 3]) };
+                for i in 0..3 {
+                    s[c][i] = lin[i];
+                    s[c][3 + i] = ang[i];
+                }
             }
-            let mass = 1.0 / inverse as f64;
-            let frame = self.q(ROTATION_X, body).mul(self.q(INERTIA_FRAME_X, body));
-            let principal = d3(self.v(INERTIA_X, body));
-            let world_inertia = |x: D3| -> D3 {
-                let local = d3(frame.unrotate(v3(x[0] as f32, x[1] as f32, x[2] as f32)));
-                let scaled = [local[0] * principal[0], local[1] * principal[1], local[2] * principal[2]];
-                d3(frame.rotate(v3(scaled[0] as f32, scaled[1] as f32, scaled[2] as f32)))
+            // A S, S^T A S and S^T r, S a list of k rows of six.
+            let (mut a_s, mut dm, mut s_r) = ([[0.0; 6]; 6], [[0.0; 6]; 6], [0.0; 6]);
+            for c in 0..k {
+                a_s[c] = apply6(&a, &s[c]);
+                for i in 0..6 {
+                    s_r[c] += s[c][i] * r[i];
+                }
+            }
+            for c in 0..k {
+                for e in 0..k {
+                    for i in 0..6 {
+                        dm[c][e] += s[c][i] * a_s[e][i];
+                    }
+                }
+            }
+            let dinv = if k > 0 { inverse(dm, k, whisper_of(&dm, k)) } else { [[0.0; 6]; 6] };
+            let (mut hat_a, mut hat_r) = (a, r);
+            for c in 0..k {
+                for e in 0..k {
+                    let f = dinv[c][e];
+                    for i in 0..6 {
+                        for j in 0..6 {
+                            hat_a[i][j] -= a_s[c][i] * f * a_s[e][j];
+                        }
+                    }
+                    for i in 0..6 {
+                        hat_r[i] -= a_s[c][i] * f * s_r[e];
+                    }
+                }
+            }
+            unsafe {
+                for c in 0..6 {
+                    for i in 0..6 {
+                        *d.add(S_AT + 6 * c + i) = s[c][i];
+                        *d.add(DINV_AT + 6 * c + i) = dinv[c][i];
+                    }
+                }
+                *d.add(K_AT) = k as f64;
+            }
+            let p = transport(sub(center, d3(self.v(CENTER_X, parent))));
+            let (pt, back) = (transposed(&p), mul6(&mul6(&transposed(&p), &hat_a), &p));
+            let up = apply6(&pt, &hat_r);
+            if parent == root {
+                for i in 0..6 {
+                    r0[i] += up[i];
+                    for j in 0..6 {
+                        a0[i][j] += back[i][j];
+                    }
+                }
+            } else {
+                let dp = self.doubles(self.uu(MB_JOINT, parent) as usize);
+                unsafe {
+                    for i in 0..6 {
+                        *dp.add(R_AT + i) += up[i];
+                        for j in 0..6 {
+                            *dp.add(A_AT + 6 * i + j) += back[i][j];
+                        }
+                    }
+                }
+            }
+            at = self.uu(MB_PREV, b);
+        }
+        // The root's twist: free when it moves, as it stands when it does not.
+        let u0 = if root_moves {
+            let inv = inverse(a0, 6, whisper_of(&a0, 6));
+            apply6(&inv, &r0)
+        } else {
+            twist_of(self, root)
+        };
+        if root_moves && self.s(INVERSE_MASS, root) > 0.0 {
+            self.set_v(LINEAR_X, root, v3(u0[0] as f32, u0[1] as f32, u0[2] as f32));
+            self.set_v(ANGULAR_X, root, v3(u0[3] as f32, u0[4] as f32, u0[5] as f32));
+        }
+        // From the root out: each link's joint speeds from what its parent's twist leaves, and its own twist.
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let (joint, parent) = (self.uu(MB_JOINT, b) as usize, self.uu(MB_PARENT, b) as usize);
+            let d = self.doubles(joint);
+            let up = if parent == root {
+                u0
+            } else {
+                let dp = self.doubles(self.uu(MB_JOINT, parent) as usize);
+                let mut u = [0.0; 6];
+                for i in 0..6 {
+                    u[i] = unsafe { *dp.add(U_AT + i) };
+                }
+                u
             };
-            let dv = sub(d3(self.v(LINEAR_X, body)), base_l);
-            let dw = sub(d3(self.v(ANGULAR_X, body)), base_a);
-            let i_dw = world_inertia(dw);
-            let mut reached = 0;
-            for d in 0..n {
-                if anc[i] >> dofs[d].owner & 1 == 0 {
-                    continue;
-                }
-                let dof = dofs[d];
-                if dof.angular {
-                    col_a[reached] = dof.axis;
-                    col_l[reached] = cross(dof.axis, sub(center, dof.point));
-                } else {
-                    col_a[reached] = [0.0; 3];
-                    col_l[reached] = dof.axis;
-                }
-                reach[reached] = d;
-                reached += 1;
-            }
-            for a in 0..reached {
-                let m_l = [mass * col_l[a][0], mass * col_l[a][1], mass * col_l[a][2]];
-                let m_a = world_inertia(col_a[a]);
-                r[reach[a]] += dot(m_l, dv) + dot(col_a[a], i_dw);
-                for b in a..reached {
-                    h[reach[a]][reach[b]] += dot(m_l, col_l[b]) + dot(m_a, col_a[b]);
-                }
-            }
-        }
-        // Cholesky of H plus a whisper on the diagonal, so a dof that carries no mass solves to zero.
-        let mut biggest = 0.0f64;
-        for a in 0..n {
-            if h[a][a] > biggest {
-                biggest = h[a][a];
-            }
-        }
-        let whisper = if biggest * 1e-12 > 1e-18 { biggest * 1e-12 } else { 1e-18 };
-        for a in 0..n {
-            for b in 0..a {
-                h[a][b] = h[b][a];
-            }
-        }
-        for j in 0..n {
-            let mut pivot = h[j][j] + whisper;
-            for k in 0..j {
-                pivot -= h[j][k] * h[j][k];
-            }
-            let pivot = if pivot > whisper { sqrt64(pivot) } else { sqrt64(whisper) };
-            h[j][j] = pivot;
-            for i in j + 1..n {
-                let mut sum = h[i][j];
-                for k in 0..j {
-                    sum -= h[i][k] * h[j][k];
-                }
-                h[i][j] = sum / pivot;
-            }
-        }
-        let mut qd = [0.0f64; MAX_DOF];
-        for i in 0..n {
-            let mut sum = r[i];
-            for k in 0..i {
-                sum -= h[i][k] * qd[k];
-            }
-            qd[i] = sum / h[i][i];
-        }
-        for i in (0..n).rev() {
-            let mut sum = qd[i];
-            for k in i + 1..n {
-                sum -= h[k][i] * qd[k];
-            }
-            qd[i] = sum / h[i][i];
-        }
-        for i in 0..count {
-            let body = rows[i];
-            if !(self.s(INVERSE_MASS, body) > 0.0) || self.flags(body) & KIND != DYNAMIC {
-                continue;
-            }
-            let center = d3(self.v(CENTER_X, body));
-            let (mut lin, mut ang) = (twist[i][0], twist[i][1]);
-            for d in 0..n {
-                if anc[i] >> dofs[d].owner & 1 == 0 {
-                    continue;
-                }
-                let dof = dofs[d];
-                if dof.angular {
-                    let l = cross(dof.axis, sub(center, dof.point));
-                    for k in 0..3 {
-                        ang[k] += dof.axis[k] * qd[d];
-                        lin[k] += l[k] * qd[d];
+            let p = transport(sub(d3(self.v(CENTER_X, b)), d3(self.v(CENTER_X, parent))));
+            let moved = apply6(&p, &up);
+            let k = unsafe { *d.add(K_AT) } as usize;
+            let mut u = moved;
+            if k > 0 {
+                let (mut a, mut r, mut s, mut dinv) = ([[0.0; 6]; 6], [0.0; 6], [[0.0; 6]; 6], [[0.0; 6]; 6]);
+                unsafe {
+                    for i in 0..6 {
+                        for j in 0..6 {
+                            a[i][j] = *d.add(A_AT + 6 * i + j);
+                            s[i][j] = *d.add(S_AT + 6 * i + j);
+                            dinv[i][j] = *d.add(DINV_AT + 6 * i + j);
+                        }
+                        r[i] = *d.add(R_AT + i);
                     }
-                } else {
-                    for k in 0..3 {
-                        lin[k] += dof.axis[k] * qd[d];
+                }
+                let a_moved = apply6(&a, &moved);
+                let mut rhs = [0.0; 6];
+                for c in 0..k {
+                    for i in 0..6 {
+                        rhs[c] += s[c][i] * (r[i] - a_moved[i]);
+                    }
+                }
+                for c in 0..k {
+                    let mut q = 0.0;
+                    for e in 0..k {
+                        q += dinv[c][e] * rhs[e];
+                    }
+                    for i in 0..6 {
+                        u[i] += s[c][i] * q;
                     }
                 }
             }
-            self.set_v(LINEAR_X, body, v3(lin[0] as f32, lin[1] as f32, lin[2] as f32));
-            self.set_v(ANGULAR_X, body, v3(ang[0] as f32, ang[1] as f32, ang[2] as f32));
+            unsafe {
+                for i in 0..6 {
+                    *d.add(U_AT + i) = u[i];
+                }
+            }
+            if self.s(INVERSE_MASS, b) > 0.0 && self.flags(b) & KIND == DYNAMIC {
+                self.set_v(LINEAR_X, b, v3(u[0] as f32, u[1] as f32, u[2] as f32));
+                self.set_v(ANGULAR_X, b, v3(u[3] as f32, u[4] as f32, u[5] as f32));
+            }
+            at = self.uu(MB_NEXT, b);
         }
     }
 
     fn fk_tree(&mut self, root: usize, h: f32) {
-        let mut rows = [0usize; MAX_LINKS];
-        let count = self.mb_chain(root, &mut rows);
-        if !self.tree_ok(&rows, count) {
+        if self.mb_check(root).is_none() {
             return;
         }
-        for i in 1..count {
-            let (body, parent) = (rows[i], self.mb_parent_index(&rows, i));
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let body = at as usize;
+            at = self.uu(MB_NEXT, body);
             if self.flags(body) & KIND != DYNAMIC {
                 continue;
             }
-            let p_row = rows[parent];
+            let p_row = self.uu(MB_PARENT, body) as usize;
             let joint = self.uu(MB_JOINT, body) as usize;
             let flags = self.uu(JOINT_FLAGS, joint);
             let (rp, pp) = (self.q(ROTATION_X, p_row), self.v(POSITION_X, p_row));

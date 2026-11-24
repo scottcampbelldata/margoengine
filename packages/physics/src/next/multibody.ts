@@ -8,10 +8,6 @@ import type { PhysicsBody } from './body.js';
 import type { PhysicsJoint } from './joint.js';
 import { coordinates, inverseKinematics, jointVelocities, setCoordinates, type IkOptions, type IkResult, type IkTarget } from './kinematics.js';
 
-/** Most links a multibody holds, the root included, and most speeds the joints of one may leave free. */
-export const MAX_LINKS = 40;
-export const MAX_DOF = 64;
-
 /** One link added to a multibody: its body, the body it hangs from, and the joint between them. */
 export interface MultibodyLinkOptions {
   body: PhysicsBody;
@@ -104,14 +100,13 @@ export class Multibody {
 
 /**
  * Builds the joints and writes the tree into the kernel's columns, parents before children.
- * @throws RangeError or MargoError for a body already in a tree, a parent that is not in this one, a joint that is not made of
- * locks, or a tree past its limits.
+ * @throws RangeError or MargoError for a body already in a tree, a parent that is not in this one, or a joint that is not made of
+ * locks.
  */
 export function buildMultibody(owner: MultibodyOwner, root: PhysicsBody, links: readonly MultibodyLinkOptions[]): Multibody {
   const { kernel } = owner,
     columns = kernel.columns;
-  if (links.length < 1 || links.length >= MAX_LINKS)
-    throw new RangeError(`A multibody holds from 1 to ${MAX_LINKS - 1} links besides its root; got ${links.length}.`);
+  if (links.length < 1) throw new RangeError('A multibody needs at least one link besides its root; pass the bodies that hang from it.');
   const inTree = new Set<PhysicsBody>([root]);
   if (columns.mbRole[root.row] !== 0) throw new MargoError('state', 'A body can be in one multibody only; remove the first with multibody.remove().');
   for (const link of links) {
@@ -133,8 +128,6 @@ export function buildMultibody(owner: MultibodyOwner, root: PhysicsBody, links: 
       placed.add(link.body);
       last = link.body;
     }
-    const probe = new Multibody(owner, root, built);
-    if (probe.dof > MAX_DOF) throw new RangeError(`A multibody holds at most ${MAX_DOF} joint speeds; this one has ${probe.dof}. Lock axes or split the tree.`);
   } catch (error) {
     for (const link of built) link.joint.remove();
     throw error;

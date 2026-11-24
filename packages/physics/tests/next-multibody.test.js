@@ -213,6 +213,41 @@ test('removing a multibody or a body of one frees the others, and bad trees thro
   physics.dispose();
 });
 
+test('a chain of 200 links holds its length, and replays bit for bit', async () => {
+  await Physics.load();
+  const run = () => {
+    const physics = new Physics(null);
+    const pivot = physics.addBody(null, { type: 'fixed', colliders: [] });
+    const bodies = [];
+    const links = [];
+    for (let i = 0; i < 200; i++) {
+      const body = physics.addBody(null, { position: [0, -0.1 * (i + 1), 0], colliders: bob(0.02, 0.5) });
+      bodies.push(body);
+      links.push({ body, joint: { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0], anchorB: [0, 0.1, 0] } });
+    }
+    const mb = physics.addMultibody(pivot, links);
+    assert.equal(mb.coordinates().length, 200);
+    mb.setCoordinates(Array.from({ length: 200 }, (_, i) => (i % 2 ? 0.02 : -0.02)));
+    let worst = 0;
+    for (let i = 0; i < 120; i++) {
+      physics.step();
+      let previous = [0, 0, 0];
+      for (const body of bodies) {
+        worst = Math.max(worst, Math.abs(dist(previous, body.position) - 0.1));
+        previous = body.position;
+      }
+    }
+    const hash = physics.kernel.hash;
+    const tip = bodies[199].position;
+    physics.dispose();
+    return { worst, hash, tip };
+  };
+  const first = run();
+  assert.ok(first.worst < 1e-3, `a link of the chain opened by ${first.worst}`);
+  assert.ok(Math.hypot(...first.tip) < 20.01, 'the chain is no longer than 200 links of 0.1 m');
+  assert.equal(run().hash, first.hash);
+});
+
 test('a multibody replays bit for bit', async () => {
   await Physics.load();
   const hash = () => {

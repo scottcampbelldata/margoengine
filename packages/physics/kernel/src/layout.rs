@@ -160,6 +160,8 @@ columns! {
     MB_JOINT u32 Body,
     MB_PARENT u32 Body,
     MB_STAMP u32 Body,
+    // The link before this one in the tree, which the pass from the last link to the first walks.
+    MB_PREV u32 Body,
     // A body's place in the awake list, NONE when it is not there.
     AWAKE_SLOT u32 Body,
     // Islands of this step: the forest, and a body's island.
