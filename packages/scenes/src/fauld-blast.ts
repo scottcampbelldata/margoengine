@@ -93,7 +93,8 @@ const MUD = { origin: [-200, -1000] as const, size: [800, 800] as const, cells: 
 export async function attach(engine: EngineKernel, settings: FauldBlastSettings = {}): Promise<FauldBlast> {
   // Settings are checked before anything is built.
   const start = settings.time ?? 0;
-  if (!(start >= 0 && start <= 3600)) throw new RangeError(`fauld-blast time ${start} is outside 0 to 3,600 seconds.`);
+  if (!(start >= 0 && start <= 3600))
+    throw new RangeError(`fauld-blast time ${start} is outside 0 to 3,600 seconds; pass a film time in that range.`);
   const world = await attachFauldWorld(engine, { era: 'before', sky: 'overcast', ...settings }),
     disposers: (() => void)[] = [];
   try {

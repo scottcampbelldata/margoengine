@@ -3811,6 +3811,10 @@
       "types": "./dist/scenes/fauld-countryside.d.ts",
       "import": "./dist/scenes/fauld-countryside.js"
     },
+    "./scenes/fauld-blast": {
+      "types": "./dist/scenes/fauld-blast.d.ts",
+      "import": "./dist/scenes/fauld-blast.js"
+    },
     "./scenes/fauld-crater": {
       "types": "./dist/scenes/fauld-crater.d.ts",
       "import": "./dist/scenes/fauld-crater.js"
