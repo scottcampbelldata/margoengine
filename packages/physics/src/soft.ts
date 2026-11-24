@@ -42,6 +42,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_damping(damping: number): void;
   soft_fem_torn(): number;
   soft_fem_trim(tets: number, clusters: number, members: number): void;
+  soft_fem_reserve_elements(edges: number, bodies: number): void;
+  soft_fem_step_begin(): void;
 }
 
 const PINNED = 1;
@@ -66,7 +68,28 @@ const INTEGER_COLUMNS = new Set([
   'vb_count',
 ]);
 const TORN_CELL = 1;
-const INTEGER_CELL_COLUMNS = new Set(['p0', 'p1', 'p2', 'p3', 'model', 'flags', 'cstart', 'ccount', 'member']);
+const INTEGER_CELL_COLUMNS = new Set([
+  'p0',
+  'p1',
+  'p2',
+  'p3',
+  'model',
+  'flags',
+  'cstart',
+  'ccount',
+  'member',
+  'cbody',
+  'nb0',
+  'nb1',
+  'nb2',
+  'nb3',
+  'e_flow',
+  'bd_tear_max',
+  'bd_min_piece',
+]);
+const NO_NEIGHBOUR = 0xffffffff;
+const CELL_MODEL = { 'neo-hookean': 0, corotated: 1, volume: 2 } as const;
+const INTERIOR_CELL = 2;
 
 let columnNames: readonly string[] = [];
 let cellColumnNames: readonly string[] = [];
@@ -108,6 +131,28 @@ export class SoftBodyMaterial {
   shapeMatchingSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
   /** The spring that holds a closed surface to its volume (default rigid: the volume is held exactly). */
   volumeSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+  /**
+   * Plastic flow of the structural edges: a stretch or squeeze (per its `edgePlasticFlow`) past this fraction of the rest length
+   * moves the rest length, so the edge keeps the set (0, the default, is elastic all the way).
+   */
+  edgePlasticYield = 0;
+  /** How fast an edge flows, per second (0, the default: at once). */
+  edgePlasticCreep = 0;
+  /** The most an edge's rest length may change in all, as a fraction of the length it was made with (0: no cap). */
+  edgePlasticMax = 0;
+  /** Which way an edge flows: when squeezed, when stretched or either (default). */
+  edgePlasticFlow: 'compression' | 'stretch' | 'both' = 'both';
+  /**
+   * A structural edge pulled with more force than this, in newtons, tears at the end of the step (0, the default, never). The
+   * force is the constraint's multiplier over the step squared, so it reads as the force that holds the edge at its length.
+   */
+  tearForce = 0;
+  /** Seconds over which an edge's load is smoothed before it is tested against its tear threshold, so a spike does not tear (default 0: not smoothed). */
+  tearSmoothing = 0;
+  /** The most elements this body tears in one step, the most loaded first (0, the default, any number). A load past twice its threshold tears regardless. */
+  maxTearsPerStep = 0;
+  /** The fewest cells a tear may split off as a piece of its own; a tear that would leave fewer waits (0 or 1, the default: any). */
+  minPiece = 0;
   /** Both edge kinds as one spring, Rapier's `SoftBodyMaterial.uniform(freq, damping)`. */
   static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial {
     const material = new SoftBodyMaterial();
@@ -123,12 +168,20 @@ export class SoftBodyMaterial {
     copy.tearStrain = this.tearStrain;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
     copy.volumeSoftness = { ...this.volumeSoftness };
+    copy.edgePlasticYield = this.edgePlasticYield;
+    copy.edgePlasticCreep = this.edgePlasticCreep;
+    copy.edgePlasticMax = this.edgePlasticMax;
+    copy.edgePlasticFlow = this.edgePlasticFlow;
+    copy.tearForce = this.tearForce;
+    copy.tearSmoothing = this.tearSmoothing;
+    copy.maxTearsPerStep = this.maxTearsPerStep;
+    copy.minPiece = this.minPiece;
     return copy;
   }
 }
 
 /** The elastic model of a body's cells. */
-export type CellModel = 'neo-hookean' | 'corotated';
+export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
 /**
  * What the tetrahedral cells of a soft body are made of. The defaults are a soft rubber that is elastic all the way and never
@@ -142,9 +195,21 @@ export class CellMaterial {
   /**
    * `'neo-hookean'` (default) is the stable Neo-Hookean of Smith, de Goes and Kim (2018) held by the constraints of Macklin and
    * Mueller (2021): an inverted cell comes back and nothing locks near zero volume. `'corotated'` is the co-rotated linear
-   * elasticity of Mueller and Gross (2004): stiffer for a given modulus at small strain.
+   * elasticity of Mueller and Gross (2004): stiffer for a given modulus at small strain. `'volume'` is one constraint on each cell's
+   * volume, held by the bulk modulus, and nothing else: the cheapest, with the shape left to the edges; it never flows or tears.
    */
   model: CellModel = 'neo-hookean';
+  /**
+   * Damping of the elastic body as a share of critical for a cell's own shear wave (default 0): the cell's constraints lose
+   * 2 x this x the cell's wave frequency (shear modulus over density, over its size) of their speed each second, on top of
+   * `deformationDamping`. It damps deformation, not the body's motion as a whole.
+   */
+  elasticDampingRatio = 0;
+  /**
+   * What the cells' constraints lose of their speed each second, whatever the cell (null, the default: `soft.cellDamping`, 10 per
+   * second). Raise it for a body that wobbles after an impact.
+   */
+  deformationDamping: number | null = null;
   /** Kilograms per cubic metre, for the mass the cells give their particles when no mass was set (default 1000). */
   density = 1000;
   /**
@@ -154,6 +219,32 @@ export class CellMaterial {
   yieldStrain = 0;
   /** How fast flow follows, per second (default 0: at once, so the cell never holds more than its yield strain). */
   creep = 0;
+  /**
+   * The most a cell may flow in all, as the sum of the deviatoric strain it has handed to its rest shape (default 0: no cap), so a
+   * body bends only so far.
+   */
+  plasticMax = 0;
+  /** Rapier's name for {@link CellMaterial.yieldStrain}. */
+  get plasticYield(): number {
+    return this.yieldStrain;
+  }
+  set plasticYield(value: number) {
+    this.yieldStrain = value;
+  }
+  /** Rapier's name for {@link CellMaterial.creep}. */
+  get plasticCreep(): number {
+    return this.creep;
+  }
+  set plasticCreep(value: number) {
+    this.creep = value;
+  }
+  /** Seconds over which a cell's load is smoothed before it is tested against `tearStrain` (default 0: not smoothed). */
+  tearSmoothing = 0;
+  /**
+   * How much tougher a cell is that has no outside face and no torn neighbour (default 1: no difference), so tears start at the
+   * surface and at damage; the factor multiplies `tearStrain` there.
+   */
+  interiorStrength = 1;
   /**
    * The stretch (the Frobenius norm of the stretch's strain, about 1.7 times the stretch fraction along one axis) past which a cell
    * is removed at the end of the step (0, the default, never). A torn cell stays torn.
@@ -176,8 +267,19 @@ function checkCellMaterial(m: CellMaterial): void {
     throw new RangeError("Young's modulus is a positive number of pascals.");
   if (!(m.poissonRatio >= 0 && m.poissonRatio < 0.5))
     throw new RangeError("Poisson's ratio is 0 or more and below 0.5.");
-  if (m.model !== 'neo-hookean' && m.model !== 'corotated')
-    throw new RangeError("Cell model is 'neo-hookean' or 'corotated'.");
+  if (m.model !== 'neo-hookean' && m.model !== 'corotated' && m.model !== 'volume')
+    throw new RangeError("Cell model is 'neo-hookean', 'corotated' or 'volume'.");
+  if (!(m.elasticDampingRatio >= 0 && Number.isFinite(m.elasticDampingRatio)))
+    throw new RangeError('elasticDampingRatio is 0 or more.');
+  if (m.deformationDamping !== null && !(m.deformationDamping >= 0 && Number.isFinite(m.deformationDamping)))
+    throw new RangeError('deformationDamping is null, 0 or more.');
+  for (const [value, label] of [
+    [m.plasticMax, 'plasticMax'],
+    [m.tearSmoothing, 'tearSmoothing'],
+  ] as const)
+    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} is 0 or more.`);
+  if (!(m.interiorStrength >= 1 && Number.isFinite(m.interiorStrength)))
+    throw new RangeError('interiorStrength is 1 (no difference) or more.');
   if (!(m.density > 0 && Number.isFinite(m.density))) throw new RangeError('Density is a positive number of kg/m3.');
   for (const [value, label] of [
     [m.yieldStrain, 'yieldStrain'],
@@ -226,6 +328,18 @@ function checkMaterial(material: SoftBodyMaterial): void {
   checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
     throw new RangeError('tearStrain is 0 (never) or the stretch fraction that tears an edge.');
+  for (const [value, label] of [
+    [material.edgePlasticYield, 'edgePlasticYield'],
+    [material.edgePlasticCreep, 'edgePlasticCreep'],
+    [material.edgePlasticMax, 'edgePlasticMax'],
+    [material.tearForce, 'tearForce'],
+    [material.tearSmoothing, 'tearSmoothing'],
+    [material.maxTearsPerStep, 'maxTearsPerStep'],
+    [material.minPiece, 'minPiece'],
+  ] as const)
+    if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} is 0 or more.`);
+  if (!['compression', 'stretch', 'both'].includes(material.edgePlasticFlow))
+    throw new RangeError("edgePlasticFlow is 'compression', 'stretch' or 'both'.");
 }
 
 const count = (value: number, label: string, least: number): number => {
@@ -615,6 +729,31 @@ export class SoftBodyDesc {
     }
     this.cells = next;
     if (material) this.setCellMaterial(material);
+    return this;
+  }
+  /**
+   * Adds every edge of every cell as a structural edge that is not one already (rest length the distance now), so the edges and
+   * the cells hold the body together: a `'volume'` cell holds only its volume, and these hold its shape. Edges of the cells never
+   * overlap an edge set before.
+   */
+  addCellEdges(): this {
+    const have = new Set<number>(),
+      n = this.particleCount;
+    for (let e = 0; e < this.edgePairs.length; e += 2)
+      have.add(
+        Math.min(this.edgePairs[e]!, this.edgePairs[e + 1]!) * n + Math.max(this.edgePairs[e]!, this.edgePairs[e + 1]!),
+      );
+    for (let t = 0; t < this.cells.length; t += 4)
+      for (let a = 0; a < 4; a++)
+        for (let b = a + 1; b < 4; b++) {
+          const i = this.cells[t + a]!,
+            j = this.cells[t + b]!,
+            key = Math.min(i, j) * n + Math.max(i, j);
+          if (!have.has(key)) {
+            have.add(key);
+            this.edgePairs.push(i, j);
+          }
+        }
     return this;
   }
   /** Replaces the cells' material (copied). */
@@ -1082,6 +1221,19 @@ export class SoftBody {
     }
     return total;
   }
+  /** Takes back every permanent deformation, of cells and edges alike: the rest shapes and rest lengths are the ones the body was made with. */
+  resetPlasticity(): this {
+    this.check();
+    const f = this.owner.cellColumns(),
+      c = this.c,
+      { first, count } = this.cellRange;
+    for (let t = first; t < first + count; t++) {
+      for (let k = 0; k < 9; k++) f[`b${k}`]![t] = f[`o${k}`]![t]!;
+      f.flowed![t] = 0;
+    }
+    for (let e = 0; e < this.edgeTotal; e++) c.rest[this.firstEdge + e] = f.e_rest0![this.firstEdge + e]!;
+    return this;
+  }
   /** Replaces the cells' material, taking effect at once; a cell keeps the shape it has flowed into. */
   setCellMaterial(material: CellMaterial): this {
     this.check();
@@ -1222,7 +1374,7 @@ export class SoftBodies implements PhysicsAttachment {
   private edgeCount = 0;
   private cellView: Columns | null = null;
   private cellViewBuffer: ArrayBuffer | null = null;
-  private cellCapacity = [0, 0, 0];
+  private cellCapacity = [0, 0, 0, 0, 0];
   private cellTotal = 0;
   private clusterTotal = 0;
   private memberTotal = 0;
@@ -1293,14 +1445,18 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed) throw new MargoError('state', 'SoftBodies was disposed.');
     const buffer = this.exports.memory.buffer;
     if (this.cellView && this.cellViewBuffer === buffer) return this.cellView;
-    const [tets, clusters, members] = this.cellCapacity,
+    const [tets, clusters, members, edges, bodies] = this.cellCapacity,
       view: Columns = {};
     cellColumnNames.forEach((name, id) => {
       const rows = /^(cstart|ccount|comega)$/.test(name)
           ? clusters!
           : /^(member|rest\d)$/.test(name)
             ? members!
-            : tets!,
+            : name.startsWith('e_')
+              ? edges!
+              : name.startsWith('bd_')
+                ? bodies!
+                : tets!,
         at = this.exports.soft_fem_column(id);
       view[name] = (
         INTEGER_CELL_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
@@ -1316,6 +1472,22 @@ export class SoftBodies implements PhysicsAttachment {
       Math.max(this.cellCapacity[0]!, tets),
       Math.max(this.cellCapacity[1]!, clusters),
       Math.max(this.cellCapacity[2]!, members),
+      this.cellCapacity[3]!,
+      this.cellCapacity[4]!,
+    ];
+    this.view = null;
+    this.cellView = null;
+  }
+
+  /** Makes room for the per-edge and per-body settings the cells' module keeps. */
+  private reserveElements(edges: number, bodies: number): void {
+    this.exports.soft_fem_reserve_elements(edges, bodies);
+    this.cellCapacity = [
+      this.cellCapacity[0]!,
+      this.cellCapacity[1]!,
+      this.cellCapacity[2]!,
+      Math.max(this.cellCapacity[3]!, edges),
+      Math.max(this.cellCapacity[4]!, bodies),
     ];
     this.view = null;
     this.cellView = null;
@@ -1353,6 +1525,7 @@ export class SoftBodies implements PhysicsAttachment {
       firstEdge = this.edgeCount,
       handle = this.bodies.length;
     this.reserve(firstParticle + particles, firstEdge + edges, handle + 1, 0);
+    this.reserveElements(firstEdge + edges, handle + 1);
     this.particleCount += particles;
     this.edgeCount += edges;
     const c = this.columns(),
@@ -1413,6 +1586,10 @@ export class SoftBodies implements PhysicsAttachment {
     };
     writeEdges(desc.edgePairs, 0);
     writeEdges(desc.bendPairs, structural);
+    {
+      const fem = this.cellColumns();
+      for (let e = 0; e < edges; e++) fem.e_rest0![firstEdge + e] = c.rest[firstEdge + e]!;
+    }
     c.gravity_scale[handle] = desc.gravity;
     c.linear_damping[handle] = desc.damping;
     const cells = desc.cells.length / 4,
@@ -1455,7 +1632,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.selfFriction = desc.selfFriction;
     if (cells) {
       const [mu, lambda] = desc.cellMaterial.lame(),
-        model = desc.cellMaterial.model === 'corotated' ? 1 : 0;
+        model = CELL_MODEL[desc.cellMaterial.model];
       for (let t = 0; t < cells; t++) {
         const [a, b, d, e] = [0, 1, 2, 3].map((k) => firstParticle + desc.cells[t * 4 + k]!) as [
           number,
@@ -1466,6 +1643,7 @@ export class SoftBodies implements PhysicsAttachment {
         // The cells were checked when they were set, so none is flat.
         this.exports.soft_tet_set(range.first + t, a, b, d, e, mu, lambda, model);
       }
+      this.linkCells(range, handle);
     }
     if (memberCount) {
       const members = this.cellColumns().member!;
@@ -1586,16 +1764,50 @@ export class SoftBodies implements PhysicsAttachment {
     for (let t = first; t < first + count; t++) {
       f.mu![t] = mu;
       f.lambda![t] = lambda;
-      (f.model as unknown as Uint32Array)[t] = m.model === 'corotated' ? 1 : 0;
+      (f.model as unknown as Uint32Array)[t] = CELL_MODEL[m.model];
       f.yield_strain![t] = m.yieldStrain;
       f.creep![t] = m.creep;
       f.tear![t] = m.tearStrain;
+      f.flow_max![t] = m.plasticMax;
+      f.smooth![t] = m.tearSmoothing;
+      f.interior![t] = m.interiorStrength;
+      // A cell's shear wave crosses it in size / sqrt(mu / density): damping 2 zeta of that frequency.
+      const size = Math.cbrt(6 * f.vol0![t]!),
+        wave = Math.sqrt(mu / m.density) / size;
+      f.damp![t] = (m.deformationDamping ?? this.cellDamping) + 2 * m.elasticDampingRatio * wave;
     }
+  }
+
+  /** @internal Finds the cell across each face of a body's cells, marks the ones with no outside face, and names their body. */
+  private linkCells(range: CellRange, handle: number): void {
+    const f = this.cellColumns(),
+      faces = new Map<string, [number, number]>(),
+      none = NO_NEIGHBOUR;
+    for (let t = range.first; t < range.first + range.count; t++) {
+      const corner = [f.p0![t]!, f.p1![t]!, f.p2![t]!, f.p3![t]!];
+      (f.cbody as unknown as Uint32Array)[t] = handle;
+      for (let k = 0; k < 4; k++) {
+        (f[`nb${k}`] as unknown as Uint32Array)[t] = none;
+        const key = corner
+          .filter((_, j) => j !== k)
+          .sort((a, b) => a - b)
+          .join(',');
+        const other = faces.get(key);
+        if (other) {
+          (f[`nb${k}`] as unknown as Uint32Array)[t] = other[0];
+          (f[`nb${other[1]}`] as unknown as Uint32Array)[other[0]] = t;
+        } else faces.set(key, [t, k]);
+      }
+    }
+    for (let t = range.first; t < range.first + range.count; t++)
+      if ([0, 1, 2, 3].every((k) => (f[`nb${k}`] as unknown as Uint32Array)[t] !== none))
+        (f.flags as unknown as Uint32Array)[t] = (f.flags as unknown as Uint32Array)[t]! | INTERIOR_CELL;
   }
 
   /** @internal Writes a body's material into its edge rows. */
   writeMaterial(body: SoftBody): void {
     const c = this.columns(),
+      fem = this.cellColumns(),
       { edgeSoftness, bendSoftness, tearStrain, shapeMatchingSoftness } = body.material;
     c.b_omega[body.handle] = shapeMatchingSoftness.naturalFrequency * 2 * Math.PI;
     c.b_zeta[body.handle] = shapeMatchingSoftness.dampingRatio;
@@ -1607,8 +1819,21 @@ export class SoftBodies implements PhysicsAttachment {
         softness = bend ? bendSoftness : edgeSoftness;
       c.omega[row] = softness.naturalFrequency * 2 * Math.PI;
       c.zeta[row] = softness.dampingRatio;
-      c.tear[row] = bend ? 0 : tearStrain;
+      // The cells' module tears and flows the edges (it smooths the load, shields the interior and keeps the pieces), so the
+      // solver's own test is off.
+      c.tear[row] = 0;
+      const m = body.material,
+        flow = { compression: 0, stretch: 1, both: 2 }[m.edgePlasticFlow];
+      fem.e_strain![row] = bend ? 0 : tearStrain;
+      fem.e_force![row] = bend ? 0 : m.tearForce;
+      fem.e_smooth![row] = m.tearSmoothing;
+      fem.e_yield![row] = bend ? 0 : m.edgePlasticYield;
+      fem.e_creep![row] = m.edgePlasticCreep;
+      fem.e_max![row] = m.edgePlasticMax;
+      (fem.e_flow as unknown as Uint32Array)[row] = flow;
     }
+    (fem.bd_tear_max as unknown as Uint32Array)[body.handle] = body.material.maxTearsPerStep;
+    (fem.bd_min_piece as unknown as Uint32Array)[body.handle] = body.material.minPiece;
   }
 
   /** Removes a body and its particles; later bodies keep their order, but their numbers shift down by one. */
@@ -1682,7 +1907,28 @@ export class SoftBodies implements PhysicsAttachment {
         'creep',
         'tear',
         'flags',
+        'damp',
+        ...Array.from({ length: 9 }, (_, k) => `o${k}`),
+        'flowed',
+        'flow_max',
+        'smooth',
+        'interior',
+        'cbody',
+        'nb0',
+        'nb1',
+        'nb2',
+        'nb3',
       ],
+      edgeNames = ['e_yield', 'e_creep', 'e_max', 'e_flow', 'e_rest0', 'e_force', 'e_strain', 'e_smooth'],
+      bodyNames = ['bd_tear_max', 'bd_min_piece'],
+      edgeSaved = keep.map((b) => {
+        const f = this.cellColumns();
+        return edgeNames.map((name) => f[name]!.slice(b.firstEdge, b.firstEdge + b.edgeTotal));
+      }),
+      bodySaved = keep.map((b) => {
+        const f = this.cellColumns();
+        return bodyNames.map((name) => f[name]![b.handle]!);
+      }),
       memberNames = ['member', 'rest0', 'rest1', 'rest2'],
       cellSaved = keep.map((b) => {
         const r = b.cellRange;
@@ -1691,6 +1937,7 @@ export class SoftBodies implements PhysicsAttachment {
         return {
           tets: tetNames.map((name) => {
             const part = f[name]!.slice(r.first, r.first + r.count);
+            if (/^nb\d$/.test(name)) return part.map((v) => (v === NO_NEIGHBOUR ? v : v - r.first));
             return /^p\d$/.test(name) ? part.map((v) => v - b.firstParticle) : part;
           }),
           cstart: f.cstart!.slice(r.clusterFirst, r.clusterFirst + r.clusterCount).map((v) => v - r.memberFirst),
@@ -1747,7 +1994,8 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.exports.soft_fem_reserve(tets, clusters, members);
     this.exports.soft_fem_trim(tets, clusters, members);
-    this.cellCapacity = [tets, clusters, members];
+    this.exports.soft_fem_reserve_elements(edges, keep.length);
+    this.cellCapacity = [tets, clusters, members, edges, keep.length];
     this.view = null;
     this.cellView = null;
     this.cellTotal = this.clusterTotal = this.memberTotal = 0;
@@ -1762,11 +2010,22 @@ export class SoftBodies implements PhysicsAttachment {
           memberFirst: this.memberTotal,
           memberCount: r.memberCount,
         };
+      const fem = this.cellColumns();
+      edgeNames.forEach((name, n) => fem[name]!.set(edgeSaved[k]![n]!, b.firstEdge));
+      bodyNames.forEach((name, n) => {
+        fem[name]![k] = bodySaved[k]![n]!;
+      });
       if (saved) {
-        const f = this.cellColumns();
+        const f = fem;
         tetNames.forEach((name, n) => {
           const part = saved.tets[n]!;
-          f[name]!.set(/^p\d$/.test(name) ? part.map((v) => v + b.firstParticle) : part, next.first);
+          if (name === 'cbody') f[name]!.fill(k, next.first, next.first + next.count);
+          else if (/^nb\d$/.test(name))
+            f[name]!.set(
+              part.map((v) => (v === NO_NEIGHBOUR ? v : v + next.first)),
+              next.first,
+            );
+          else f[name]!.set(/^p\d$/.test(name) ? part.map((v) => v + b.firstParticle) : part, next.first);
         });
         f.cstart!.set(
           saved.cstart.map((v) => v + next.memberFirst),
@@ -1807,6 +2066,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.view = null;
     this.exports.soft_fem_damping(this.cellDamping);
     this.findPlanes(dt, rows, bodies);
+    this.exports.soft_fem_step_begin();
     this.exports.soft_begin(dt);
     for (let piece = 0; piece < this.substeps; piece++) {
       this.exports.soft_pre(h, this.iterations, g[0], g[1], g[2]);

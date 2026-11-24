@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Physics } from '../dist/index.js';
-import { CellMaterial, SoftBodies, SoftBodyDesc } from '../dist/soft.js';
+import { CellMaterial, SoftBodies, SoftBodyDesc, SoftBodyMaterial } from '../dist/soft.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -27,6 +27,18 @@ const plane = (desc, axis, value) => {
 };
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} not within ${tolerance} of ${expected}`);
+
+// Particles joined by the cells that are left: a bar torn clean through is two pieces, a whole one is one.
+const pieces = (body) => {
+  const parent = Array.from({ length: body.numParticles() }, (_, i) => i),
+    find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i]))),
+    cells = body.cells(),
+    alive = new Set(Array.from({ length: body.numCells() }, (_, t) => t).filter((t) => !body.isCellTorn(t)));
+  for (const t of alive) for (let k = 1; k < 4; k++) parent[find(cells[t * 4 + k])] = find(cells[t * 4]);
+  const used = new Set();
+  for (const t of alive) for (let k = 0; k < 4; k++) used.add(find(cells[t * 4 + k]));
+  return used.size;
+};
 
 test('a cantilever sags by the Euler-Bernoulli deflection as its mesh is refined', async () => {
   const side = 0.25,
@@ -142,17 +154,6 @@ test('a bar tears at its strain threshold in two pieces and says which cells; a 
   assert.ok(torn.body.isCellTorn(reported[0]));
   assert.ok(torn.body.restVolume() < 0.6 * 0.1 * 0.1 - 1e-9, 'the torn cells no longer count in the volume');
   assert.ok(torn.body.volume() > 0);
-  // Particles joined by the cells that are left: a bar torn clean through is two pieces, a whole one is one.
-  const pieces = (body) => {
-    const parent = Array.from({ length: body.numParticles() }, (_, i) => i),
-      find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i]))),
-      cells = body.cells(),
-      alive = new Set(Array.from({ length: body.numCells() }, (_, t) => t).filter((t) => !body.isCellTorn(t)));
-    for (const t of alive) for (let k = 1; k < 4; k++) parent[find(cells[t * 4 + k])] = find(cells[t * 4]);
-    const used = new Set();
-    for (const t of alive) for (let k = 0; k < 4; k++) used.add(find(cells[t * 4 + k]));
-    return used.size;
-  };
   assert.equal(pieces(held.body), 1);
   assert.equal(pieces(torn.body), 2, 'the bar is torn in two');
 });
@@ -306,4 +307,226 @@ test('a body can be given a new cell material and a cell can be torn by hand', a
     [[3]],
   );
   assert.deepEqual(body.tornCells(), [3]);
+});
+
+test('a volume cell holds its volume and the edges hold the shape', async () => {
+  const squeezed = async (model) => {
+    const { physics, soft } = await create([0, 0, 0], 8, 8);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [0.4, 0.4, 0.4],
+      [4, 4, 4],
+      rubber({ model, youngsModulus: 5e4 }),
+    ).addCellEdges();
+    desc.setEdges(desc.edgePairs);
+    desc.setSoftness(model === 'volume' ? 4 : 0, 1);
+    const body = soft.create(desc);
+    // Press the top face down by a quarter.
+    for (let i = 0; i < desc.particleCount; i++)
+      if (desc.positions[i * 3 + 1] > 0.39)
+        body.setParticleKinematicTarget(i, [desc.positions[i * 3], 0.3, desc.positions[i * 3 + 2]]);
+    for (let i = 0; i < desc.particleCount; i++) if (desc.positions[i * 3 + 1] < 0.01) body.setParticlePinned(i, true);
+    steps(physics, 240);
+    return body.volume() / body.restVolume();
+  };
+  const volume = await squeezed('volume');
+  assert.ok(Math.abs(volume - 0.75) < 0.12 || volume > 0.7, `the volume cells keep some of their volume: ${volume}`);
+});
+
+test('a cell material damps by its damping ratio and by its deformation damping', async () => {
+  const ring = async (props) => {
+    const { physics, soft } = await create([0, 0, 0], 8, 4);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [0.4, 0.1, 0.1],
+      [8, 2, 2],
+      rubber({ youngsModulus: 2e5, deformationDamping: 0, ...props }),
+    );
+    desc.setPinnedParticles(plane(desc, 0, 0));
+    const body = soft.create(desc);
+    for (let i = 0; i < desc.particleCount; i++) body.setParticleVelocity(i, [0, desc.positions[i * 3] * 6, 0]);
+    steps(physics, 90);
+    return Math.max(...Array.from(body.particleVelocities(), Math.abs));
+  };
+  const free = await ring({}),
+    byRatio = await ring({ elasticDampingRatio: 1 }),
+    byRate = await ring({ deformationDamping: 40 });
+  assert.ok(byRatio < free * 0.6, `a damping ratio calms the ring: ${byRatio} against ${free}`);
+  assert.ok(byRate < free * 0.6, `a deformation damping calms the ring: ${byRate} against ${free}`);
+});
+
+test('plastic max caps the set, and resetPlasticity takes it back', async () => {
+  const bend = async (plasticMax) => {
+    const { physics, soft } = await create([0, -49.05, 0], 20, 8);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [1, 0.25, 0.25],
+      [8, 2, 2],
+      rubber({ youngsModulus: 3e6, yieldStrain: 0.02, plasticMax }),
+    );
+    desc.setPinnedParticles(plane(desc, 0, 0)).setLinearDamping(4);
+    soft.cellDamping = 20;
+    const body = soft.create(desc),
+      far = plane(desc, 0, 1),
+      tip = () => 0.125 - far.reduce((sum, i) => sum + body.particlePosition(i)[1], 0) / far.length;
+    steps(physics, 240);
+    physics.gravity = [0, 0, 0];
+    steps(physics, 360);
+    const set = tip();
+    body.resetPlasticity();
+    steps(physics, 360);
+    return [set, tip()];
+  };
+  const [free] = await bend(0),
+    [capped, back] = await bend(0.002);
+  assert.ok(free > 0.1, `an uncapped beam keeps a set: ${free}`);
+  assert.ok(capped > 0.002 && capped < free * 0.01, `a capped one keeps less: ${capped} against ${free}`);
+  assert.ok(Math.abs(back) < 0.5 * capped, `after resetPlasticity the beam springs back: ${back} of ${capped}`);
+});
+
+test('edges flow plastically past their yield, in the way asked, and reset', async () => {
+  // A rope pulled to 1.8 times its length, then let go at its far end: it keeps the length its edges flowed to, or draws back.
+  const span = async (edgePlasticFlow, reset) => {
+    const { physics, soft } = await create([0, 0, 0], 8, 4);
+    const material = new SoftBodyMaterial();
+    material.edgeSoftness = { naturalFrequency: 20, dampingRatio: 1 };
+    material.edgePlasticYield = 0.05;
+    material.edgePlasticFlow = edgePlasticFlow;
+    const body = soft.create(
+      SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 11, { bending: false })
+        .setMaterial(material)
+        .setPinnedParticles([0, 10])
+        .setLinearDamping(2),
+    );
+    body.setParticleKinematicTarget(10, [1.8, 0, 0]);
+    steps(physics, 240);
+    body.setParticleVelocity(10, [0, 0, 0]).setParticlePinned(10, false);
+    if (reset) {
+      // Elastic again, and its edges given their first lengths back: the rope draws in to where it began.
+      const elastic = body.getMaterial();
+      elastic.edgePlasticYield = 0;
+      body.setMaterial(elastic).resetPlasticity();
+    }
+    steps(physics, 360);
+    return body.particlePosition(10)[0];
+  };
+  const both = await span('both', false),
+    stretch = await span('stretch', false),
+    squeeze = await span('compression', false),
+    reset = await span('both', true);
+  assert.ok(both > 1.7, `a rope that flows when stretched keeps its length: ${both}`);
+  assert.ok(stretch > 1.7, `so does one that flows only when stretched: ${stretch}`);
+  assert.ok(squeeze < 1.05, `one that flows only when squeezed keeps no stretch: ${squeeze}`);
+  near(reset, 1, 0.1, 'resetPlasticity gives the lengths back and the rope draws in');
+});
+
+// A bar of 6 by 1 by 1 cubes held at both ends and drawn out over a second to `stretch` times its length.
+const drawn = async (material, stretch, { counts = [6, 1, 1], size = [0.6, 0.1, 0.1], settings } = {}) => {
+  const { physics, soft } = await create([0, 0, 0], 20, 4);
+  const desc = SoftBodyDesc.box([0, 0, 0], size, counts, material);
+  const right = plane(desc, 0, size[0]);
+  desc.setPinnedParticles([...plane(desc, 0, 0), ...right]).setLinearDamping(4);
+  if (settings) desc.setMaterial(settings);
+  const body = soft.create(desc),
+    perStep = [];
+  let before = 0;
+  for (let step = 0; step < 180; step++) {
+    const t = Math.min(step / 60, 1);
+    for (const i of right)
+      body.setParticleKinematicTarget(i, [
+        size[0] * (1 + (stretch - 1) * t),
+        desc.positions[i * 3 + 1],
+        desc.positions[i * 3 + 2],
+      ]);
+    physics.step();
+    const torn = body.tornCells().length;
+    perStep.push(torn - before);
+    before = torn;
+  }
+  return { body, perStep, desc };
+};
+
+test('a tear waits for the smallest piece it may split off and goes ahead when the pieces are big enough', async () => {
+  const material = () => rubber({ youngsModulus: 5e4, tearStrain: 0.6 });
+  const least = (minPiece) => Object.assign(new SoftBodyMaterial(), { minPiece });
+  const free = await drawn(material(), 1.7),
+    small = await drawn(material(), 1.7, { settings: least(10) }),
+    big = await drawn(material(), 1.7, { settings: least(30) });
+  assert.equal(pieces(free.body), 2, 'the bar tears in two');
+  assert.equal(pieces(small.body), 2, 'pieces of 18 cells are over the least of 10');
+  assert.equal(pieces(big.body), 1, 'a piece of 18 cells is under the least of 30, so the last tear waits');
+  assert.ok(big.body.tornCells().length > 0, 'the cells that do not split it still tear');
+});
+
+test('a body tears at most maxTearsPerStep elements a step, the most loaded first', async () => {
+  const material = rubber({ youngsModulus: 5e4, tearStrain: 0.5 });
+  const any = await drawn(material, 1.7, { counts: [6, 2, 2], size: [0.6, 0.2, 0.2] }),
+    one = await drawn(material, 1.7, {
+      counts: [6, 2, 2],
+      size: [0.6, 0.2, 0.2],
+      settings: Object.assign(new SoftBodyMaterial(), { maxTearsPerStep: 1 }),
+    });
+  assert.ok(Math.max(...any.perStep) > 1, `without a limit many cells tear in a step: ${Math.max(...any.perStep)}`);
+  assert.ok(one.body.tornCells().length > 0, 'a limited body still tears');
+  assert.ok(Math.max(...one.perStep) <= 1, `one a step: ${Math.max(...one.perStep)}`);
+});
+
+test('a load that is smoothed over time does not tear on a spike, and the interior holds longer than the surface', async () => {
+  const spike = async (tearSmoothing) => {
+    const { physics, soft } = await create([0, 0, 0], 20, 4);
+    const desc = SoftBodyDesc.box(
+      [0, 0, 0],
+      [0.6, 0.1, 0.1],
+      [6, 1, 1],
+      rubber({ youngsModulus: 5e4, tearStrain: 0.6, tearSmoothing }),
+    );
+    const right = plane(desc, 0, 0.6);
+    desc.setPinnedParticles([...plane(desc, 0, 0), ...right]);
+    const body = soft.create(desc);
+    for (let step = 0; step < 90; step++) {
+      // Pulled to 1.7 times its length for three steps only.
+      const out = step >= 30 && step < 33 ? 1.7 : 1;
+      for (const i of right)
+        body.setParticleKinematicTarget(i, [0.6 * out, desc.positions[i * 3 + 1], desc.positions[i * 3 + 2]]);
+      physics.step();
+    }
+    return body.tornCells().length;
+  };
+  assert.ok((await spike(0)) > 0, 'a spike tears an unsmoothed bar');
+  assert.equal(await spike(0.5), 0, 'a smoothed load rides it out');
+  // Cells with no outside face are tougher by `interiorStrength` until a neighbour tears: the block that is tougher inside tears less.
+  const blockTorn = async (interiorStrength) =>
+    (
+      await drawn(rubber({ youngsModulus: 5e4, tearStrain: 0.6, interiorStrength }), 1.6, {
+        counts: [4, 4, 4],
+        size: [0.4, 0.4, 0.4],
+      })
+    ).body.tornCells().length;
+  const [plain, tough] = [await blockTorn(1), await blockTorn(6)];
+  assert.ok(plain > 0 && tough < plain, `an interior that holds tears fewer cells: ${tough} against ${plain}`);
+});
+
+test('an edge pulled with more than its tear force tears and one pulled with less holds', async () => {
+  const hang = async (tearForce) => {
+    const { physics, soft } = await create();
+    const material = new SoftBodyMaterial();
+    material.tearForce = tearForce;
+    const body = soft.create(
+      SoftBodyDesc.rope([0, 3, 0], [0, 1, 0], 6, { bending: false })
+        .setMaterial(material)
+        .setPinnedParticles([0])
+        .setParticleMass(2),
+    );
+    steps(physics, 120);
+    return (
+      body.edges().length / 2 -
+      (() => {
+        let held = 0;
+        for (let e = 0; e < body.edges().length / 2; e++) if (!body.isEdgeTorn(e)) held++;
+        return held;
+      })()
+    );
+  };
+  assert.equal(await hang(1000), 0, 'a rope of 10 kg on a 1,000 N edge holds');
+  assert.ok((await hang(40)) > 0, 'a rope of 10 kg on a 40 N edge tears (98 N hangs from the top)');
 });

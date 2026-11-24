@@ -10,15 +10,24 @@ export class CellMaterial {
     youngsModulus: number;
     poissonRatio: number;
     model: CellModel;
+    elasticDampingRatio: number;
+    deformationDamping: number | null;
     density: number;
     yieldStrain: number;
     creep: number;
+    plasticMax: number;
+    get plasticYield(): number;
+    set plasticYield(value: number);
+    get plasticCreep(): number;
+    set plasticCreep(value: number);
+    tearSmoothing: number;
+    interiorStrength: number;
     tearStrain: number;
     clone(): CellMaterial;
     lame(): [number, number];
 }
 
-export type CellModel = 'neo-hookean' | 'corotated';
+export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
 export class SoftBodies implements PhysicsAttachment {
     cellTornByHand: boolean;
@@ -117,6 +126,7 @@ export class SoftBody {
     tearCell(cell: number): this;
     volume(): number;
     restVolume(): number;
+    resetPlasticity(): this;
     setCellMaterial(material: CellMaterial): this;
     getCellMaterial(): CellMaterial;
     setMaterial(material: SoftBodyMaterial): this;
@@ -177,6 +187,7 @@ export class SoftBodyDesc {
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
+    addCellEdges(): this;
     setCellMaterial(material: CellMaterial): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
     resolvedMasses(): number[];
@@ -203,6 +214,14 @@ export class SoftBodyMaterial {
     tearStrain: number;
     shapeMatchingSoftness: SoftSoftness;
     volumeSoftness: SoftSoftness;
+    edgePlasticYield: number;
+    edgePlasticCreep: number;
+    edgePlasticMax: number;
+    edgePlasticFlow: 'compression' | 'stretch' | 'both';
+    tearForce: number;
+    tearSmoothing: number;
+    maxTearsPerStep: number;
+    minPiece: number;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
 }

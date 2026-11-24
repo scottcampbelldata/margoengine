@@ -20,6 +20,12 @@ fem_columns! {
     (vol0, vol0), (mu, mu), (lambda, lambda), (model, model), (yield_strain, yield_strain), (creep, creep), (tear, tear),
     (flags, flags), (cstart, cstart), (ccount, ccount), (comega, comega), (member, member),
     (rest0, rest[0]), (rest1, rest[1]), (rest2, rest[2]),
+    (damp, damp), (o0, b0[0]), (o1, b0[1]), (o2, b0[2]), (o3, b0[3]), (o4, b0[4]), (o5, b0[5]), (o6, b0[6]), (o7, b0[7]), (o8, b0[8]),
+    (flowed, flowed), (flow_max, flow_max), (smooth, smooth), (interior, interior), (cbody, body),
+    (nb0, nb[0]), (nb1, nb[1]), (nb2, nb[2]), (nb3, nb[3]),
+    (e_yield, e_yield), (e_creep, e_creep), (e_max, e_max), (e_flow, e_flow), (e_rest0, e_rest0), (e_force, e_force),
+    (e_strain, e_strain), (e_smooth, e_smooth),
+    (bd_tear_max, tear_max), (bd_min_piece, min_piece),
 }
 
 /// Makes room for tetrahedra, clusters and cluster members. Views over the memory are stale after it, and so are the soft world's.
@@ -65,6 +71,18 @@ pub extern "C" fn soft_fem_trim(tets: u32, clusters: u32, members: u32) {
     f.count = tets as usize;
     f.clusters = clusters as usize;
     f.members = members as usize;
+}
+
+/// Makes room for the per-edge and per-body settings: `edges` edges and `bodies` soft bodies.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_reserve_elements(edges: u32, bodies: u32) {
+    world().fem_reserve_elements(edges as usize, bodies as usize);
+}
+
+/// Starts a step: each body may tear as many elements as its material allows.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_step_begin() {
+    world().fem_step_begin();
 }
 
 /// The number of tetrahedra in use.

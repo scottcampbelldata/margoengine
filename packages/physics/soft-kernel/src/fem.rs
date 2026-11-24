@@ -36,6 +36,12 @@ pub const TORN_TET: u32 = 1;
 /// Elasticity models.
 pub const STABLE_NEO_HOOKEAN: u32 = 0;
 pub const COROTATED: u32 = 1;
+/// One constraint on the volume of the cell, nothing else: the shape is held by the edges.
+pub const VOLUME: u32 = 2;
+/// The cell has no torn neighbour and touches no outside face: it is tougher by its material's interior strength.
+pub const INTERIOR_TET: u32 = 2;
+/// No neighbour across a face.
+pub const NONE: u32 = u32::MAX;
 
 const U: Col<u32> = Col::new();
 const F: Col<f32> = Col::new();
@@ -62,6 +68,44 @@ pub struct Fem {
     /// The multipliers a substep has gathered.
     pub ld: Col<f32>,
     pub lh: Col<f32>,
+    /// Damping rate of the cell, 1 / s (below 0: the world's `damping`); the rest shape it was made with, to reset plasticity (the
+    /// columns hold it unchanged, TypeScript copies them back); how much it has flowed in all; the cap on that (0 for none).
+    pub damp: Col<f32>,
+    pub b0: [Col<f32>; 9],
+    pub flowed: Col<f32>,
+    pub flow_max: Col<f32>,
+    /// Tear strength: seconds over which the load is smoothed before it is tested (0 for no smoothing), the smoothed load, the
+    /// multiplier on the strain a cell with no outside face and no torn neighbour holds, and the load over the threshold.
+    pub smooth: Col<f32>,
+    pub load: Col<f32>,
+    pub interior: Col<f32>,
+    pub ratio: Col<f32>,
+    /// The body of the cell, the cell across each face (NONE for the outside), and scratch for finding pieces.
+    pub body: Col<u32>,
+    pub nb: [Col<u32>; 4],
+    pub mark: Col<u32>,
+    pub stack: Col<u32>,
+    pub stamp: u32,
+    /// Per body: the tears one step may make (0 for any number) and how many are left this step; the smallest piece (in cells) a
+    /// tear may split off (0 or 1 for any).
+    pub bodies: usize,
+    pub tear_max: Col<u32>,
+    pub tears_left: Col<u32>,
+    pub min_piece: Col<u32>,
+    /// Per edge: plastic yield, creep, cap (all as a fraction of the rest length), which way it flows (0 compression, 1 stretch,
+    /// 2 both), the rest length it was made with, tear force (0 for none), tear strain (0 for none), the smoothing time, the
+    /// smoothed load, how much of the rest length it has flowed.
+    pub edges: usize,
+    pub e_yield: Col<f32>,
+    pub e_creep: Col<f32>,
+    pub e_max: Col<f32>,
+    pub e_flow: Col<u32>,
+    pub e_rest0: Col<f32>,
+    pub e_force: Col<f32>,
+    pub e_strain: Col<f32>,
+    pub e_smooth: Col<f32>,
+    pub e_load: Col<f32>,
+    pub e_ratio: Col<f32>,
     /// Clusters: first member, member count, natural frequency, and the members' rest places from their centre of mass.
     pub clusters: usize,
     pub members: usize,
@@ -90,6 +134,34 @@ impl Fem {
             flags: U,
             ld: F,
             lh: F,
+            damp: F,
+            b0: [F; 9],
+            flowed: F,
+            flow_max: F,
+            smooth: F,
+            load: F,
+            interior: F,
+            ratio: F,
+            body: U,
+            nb: [U; 4],
+            mark: U,
+            stack: U,
+            stamp: 0,
+            bodies: 0,
+            tear_max: U,
+            tears_left: U,
+            min_piece: U,
+            edges: 0,
+            e_yield: F,
+            e_creep: F,
+            e_max: F,
+            e_flow: U,
+            e_rest0: F,
+            e_force: F,
+            e_strain: F,
+            e_smooth: F,
+            e_load: F,
+            e_ratio: F,
             clusters: 0,
             members: 0,
             cstart: U,
@@ -183,6 +255,18 @@ impl World {
         }
         f.model.resize(tets);
         f.flags.resize(tets);
+        for c in f.b0.iter_mut() {
+            c.resize(tets);
+        }
+        for c in [&mut f.damp, &mut f.flowed, &mut f.flow_max, &mut f.smooth, &mut f.load, &mut f.interior, &mut f.ratio] {
+            c.resize(tets);
+        }
+        for c in f.nb.iter_mut() {
+            c.resize(tets);
+        }
+        for c in [&mut f.body, &mut f.mark, &mut f.stack] {
+            c.resize(tets);
+        }
         for c in [&mut f.cstart, &mut f.ccount] {
             c.resize(clusters);
         }
@@ -191,6 +275,20 @@ impl World {
         for c in f.rest.iter_mut() {
             c.resize(members);
         }
+    }
+
+    /// Room for the per-edge and per-body settings of the soft world's `edges` edges and `bodies` bodies.
+    pub fn fem_reserve_elements(&mut self, edges: usize, bodies: usize) {
+        let f = &mut self.fem;
+        for c in [&mut f.e_yield, &mut f.e_creep, &mut f.e_max, &mut f.e_rest0, &mut f.e_force, &mut f.e_strain, &mut f.e_smooth, &mut f.e_load, &mut f.e_ratio] {
+            c.resize(edges);
+        }
+        f.e_flow.resize(edges);
+        for c in [&mut f.tear_max, &mut f.tears_left, &mut f.min_piece] {
+            c.resize(bodies);
+        }
+        f.edges = edges;
+        f.bodies = bodies;
     }
 
     /// Makes tetrahedron `t` of the four particles with the shape they stand in now as its rest shape, and the material given. Corners
@@ -231,6 +329,20 @@ impl World {
         f.creep[t] = 0.0;
         f.tear[t] = 0.0;
         f.flags[t] = 0;
+        f.damp[t] = -1.0;
+        for k in 0..9 {
+            f.b0[k][t] = inv[k];
+        }
+        f.flowed[t] = 0.0;
+        f.flow_max[t] = 0.0;
+        f.smooth[t] = 0.0;
+        f.load[t] = 0.0;
+        f.interior[t] = 1.0;
+        f.ratio[t] = 0.0;
+        f.body[t] = 0;
+        for k in 0..4 {
+            f.nb[k][t] = NONE;
+        }
         f.count = f.count.max(t + 1);
         true
     }
@@ -326,7 +438,8 @@ impl World {
         let gd = self.corner_gradients(t, pd);
         let gh = self.corner_gradients(t, ph);
         let (ad, ah) = (ad / (h * h), ah / (h * h));
-        let damping = self.fem.damping * h;
+        let rate = if self.fem.damp[t] < 0.0 { self.fem.damping } else { self.fem.damp[t] };
+        let damping = rate * h;
         let (gam_d, gam_h) = (ad * damping, ah * damping);
         let (mut dd, mut dh, mut hh, mut reld, mut relh) = (0.0, 0.0, 0.0, 0.0, 0.0);
         for k in 0..4 {
@@ -362,6 +475,33 @@ impl World {
         }
     }
 
+    /// One damped compliant constraint of a cell, C with gradient `p` against F and compliance `a`, on the four corners.
+    fn tet_single(&mut self, t: usize, corners: [usize; 4], value: f32, p: &M3, a: f32, h: f32) {
+        let g = self.corner_gradients(t, p);
+        let a = a / (h * h);
+        let rate = if self.fem.damp[t] < 0.0 { self.fem.damping } else { self.fem.damp[t] };
+        let gam = a * rate * h;
+        let (mut gg, mut rel) = (0.0, 0.0);
+        for k in 0..4 {
+            let i = corners[k];
+            gg += self.w[i] * (g[k][0] * g[k][0] + g[k][1] * g[k][1] + g[k][2] * g[k][2]);
+            rel += g[k][0] * (self.x[i] - self.px[i]) + g[k][1] * (self.y[i] - self.py[i]) + g[k][2] * (self.z[i] - self.pz[i]);
+        }
+        let denom = (1.0 + gam) * gg + a;
+        if !(denom > 1e-30) {
+            return;
+        }
+        let dl = -(value + a * self.fem.ld[t] + gam * rel) / denom;
+        self.fem.ld[t] += dl;
+        for k in 0..4 {
+            let i = corners[k];
+            let w = self.w[i];
+            self.x[i] += w * g[k][0] * dl;
+            self.y[i] += w * g[k][1] * dl;
+            self.z[i] += w * g[k][2] * dl;
+        }
+    }
+
     /// One pass over every live tetrahedron and cluster.
     pub(crate) fn solve_fem(&mut self, h: f32) {
         for t in 0..self.fem.count {
@@ -370,7 +510,14 @@ impl World {
             }
             let (mu, lambda, vol) = (self.fem.mu[t], self.fem.lambda[t], self.fem.vol0[t]);
             let (f, c) = self.gradient(t);
-            if self.fem.model[t] == COROTATED {
+            if self.fem.model[t] == VOLUME {
+                // d(det F) / dF, the cofactor of F, against det F = 1; the bulk modulus lambda + 2 mu / 3 holds the volume.
+                let col = |k: usize| [f[k], f[3 + k], f[6 + k]];
+                let cross = |a: [f32; 3], b: [f32; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+                let (c0, c1, c2) = (cross(col(1), col(2)), cross(col(2), col(0)), cross(col(0), col(1)));
+                let cof: M3 = [c0[0], c1[0], c2[0], c0[1], c1[1], c2[1], c0[2], c1[2], c2[2]];
+                self.tet_single(t, c, det(&f) - 1.0, &cof, 1.0 / ((lambda + 2.0 * mu / 3.0) * vol), h);
+            } else if self.fem.model[t] == COROTATED {
                 let r = rotation_of(&f);
                 let mut e = [0.0; 9];
                 for k in 0..9 {
@@ -457,10 +604,18 @@ impl World {
         }
     }
 
-    /// After a substep's solve: plastic flow into the rest shape, and tearing.
+    /// Starts a step: every body may tear as many elements as its material allows.
+    pub fn fem_step_begin(&mut self) {
+        for b in 0..self.fem.bodies {
+            self.fem.tears_left[b] = if self.fem.tear_max[b] == 0 { u32::MAX } else { self.fem.tear_max[b] };
+        }
+    }
+
+    /// After a substep's solve: plastic flow into the rest shape of cells and edges, and tearing of both.
     pub(crate) fn fem_end(&mut self, h: f32) {
         for t in 0..self.fem.count {
-            if self.fem.flags[t] & TORN_TET != 0 {
+            self.fem.ratio[t] = 0.0;
+            if self.fem.flags[t] & TORN_TET != 0 || self.fem.model[t] == VOLUME {
                 continue;
             }
             let (yield_strain, tear) = (self.fem.yield_strain[t], self.fem.tear[t]);
@@ -475,10 +630,13 @@ impl World {
             strain[0] -= 1.0;
             strain[4] -= 1.0;
             strain[8] -= 1.0;
-            if tear > 0.0 && frob(&strain) > tear {
-                self.fem.flags[t] |= TORN_TET;
-                self.fem.torn += 1;
-                continue;
+            if tear > 0.0 {
+                let n = frob(&strain);
+                let tau = self.fem.smooth[t];
+                let load = if tau > 0.0 { self.fem.load[t] + (n - self.fem.load[t]) * (h / tau).min(1.0) } else { n };
+                self.fem.load[t] = load;
+                let tough = if self.fem.flags[t] & INTERIOR_TET != 0 { tear * self.fem.interior[t] } else { tear };
+                self.fem.ratio[t] = load / tough;
             }
             if yield_strain > 0.0 {
                 // Only the deviatoric part flows, so a plastic element keeps its volume.
@@ -489,7 +647,16 @@ impl World {
                 dev[8] -= tr;
                 let n = frob(&dev);
                 if n > yield_strain {
-                    let flow = if self.fem.creep[t] > 0.0 { (self.fem.creep[t] * h).min(1.0) } else { 1.0 };
+                    let mut flow = if self.fem.creep[t] > 0.0 { (self.fem.creep[t] * h).min(1.0) } else { 1.0 };
+                    let cap = self.fem.flow_max[t];
+                    if cap > 0.0 {
+                        let room = cap - self.fem.flowed[t];
+                        if room <= 0.0 {
+                            continue;
+                        }
+                        flow = flow.min(room / (n - yield_strain));
+                    }
+                    self.fem.flowed[t] += flow * (n - yield_strain);
                     let keep = 1.0 - flow * (1.0 - yield_strain / n);
                     // S' = I + tr I + keep * dev; the rest shape takes B <- B S^-1 S'.
                     let mut next = [0.0f32; 9];
@@ -511,5 +678,169 @@ impl World {
                 }
             }
         }
+        self.edges_end(h);
+        self.tear_over_threshold();
+    }
+
+    /// Plastic flow and the tear load of every edge.
+    fn edges_end(&mut self, h: f32) {
+        let h2 = h * h;
+        for e in 0..self.fem.edges.min(self.edges) {
+            self.fem.e_ratio[e] = 0.0;
+            if self.eflags[e] & crate::world::TORN != 0 {
+                continue;
+            }
+            let (a, b) = (self.ea[e] as usize, self.eb[e] as usize);
+            let (dx, dy, dz) = (self.x[a] - self.x[b], self.y[a] - self.y[b], self.z[a] - self.z[b]);
+            let len = sqrt(dx * dx + dy * dy + dz * dz);
+            let rest = self.rest[e];
+            let (strain_tear, force_tear) = (self.fem.e_strain[e], self.fem.e_force[e]);
+            if strain_tear > 0.0 || force_tear > 0.0 {
+                let mut ratio = 0.0f32;
+                let tau = self.fem.e_smooth[e];
+                let stretch = (len - rest) / rest;
+                let force = (self.lambda[e] / h2).abs();
+                // The strain and the force each read as a share of their threshold; the larger one rules.
+                let (ls, lf) = (stretch.max(0.0), force);
+                let load = if tau > 0.0 {
+                    let kept = self.fem.e_load[e];
+                    let blend = (h / tau).min(1.0);
+                    let next = (ls / strain_tear.max(1e-30)).max(if force_tear > 0.0 { lf / force_tear } else { 0.0 });
+                    kept + (next - kept) * blend
+                } else {
+                    (if strain_tear > 0.0 { ls / strain_tear } else { 0.0 }).max(if force_tear > 0.0 { lf / force_tear } else { 0.0 })
+                };
+                self.fem.e_load[e] = load;
+                ratio = ratio.max(load);
+                self.fem.e_ratio[e] = ratio;
+            }
+            let yield_strain = self.fem.e_yield[e];
+            if yield_strain > 0.0 {
+                let s = (len - rest) / rest;
+                let way = self.fem.e_flow[e];
+                let active = (s > yield_strain && way != 0) || (s < -yield_strain && way != 1);
+                if active {
+                    let flow = if self.fem.e_creep[e] > 0.0 { (self.fem.e_creep[e] * h).min(1.0) } else { 1.0 };
+                    let excess = (s.abs() - yield_strain) * rest;
+                    let mut delta = flow * excess * if s > 0.0 { 1.0 } else { -1.0 };
+                    let cap = self.fem.e_max[e];
+                    if cap > 0.0 {
+                        let base = self.fem.e_rest0[e];
+                        let lo = base * (1.0 - cap);
+                        let hi = base * (1.0 + cap);
+                        let target = (rest + delta).max(lo).min(hi);
+                        delta = target - rest;
+                    }
+                    self.rest[e] = rest + delta;
+                }
+            }
+        }
+    }
+
+    /// Tears what has passed its threshold: the most loaded first, as many as each body's step allows (a load past twice its
+    /// threshold always tears), and not where it would split off a piece smaller than the body's smallest piece.
+    fn tear_over_threshold(&mut self) {
+        loop {
+            let (mut best, mut best_ratio, mut is_edge) = (usize::MAX, 1.0f32, false);
+            for t in 0..self.fem.count {
+                let r = self.fem.ratio[t];
+                if r > best_ratio && self.fem.flags[t] & TORN_TET == 0 && self.may_tear(self.fem.body[t] as usize, r) {
+                    best = t;
+                    best_ratio = r;
+                }
+            }
+            for e in 0..self.fem.edges.min(self.edges) {
+                let r = self.fem.e_ratio[e];
+                if r > best_ratio && self.eflags[e] & crate::world::TORN == 0 && self.may_tear(self.pbody[self.ea[e] as usize] as usize, r) {
+                    best = e;
+                    best_ratio = r;
+                    is_edge = true;
+                }
+            }
+            if best == usize::MAX {
+                return;
+            }
+            if is_edge {
+                self.eflags[best] |= crate::world::TORN;
+                self.fem.e_ratio[best] = 0.0;
+                let b = self.pbody[self.ea[best] as usize] as usize;
+                self.spend(b, best_ratio);
+                self.torn += 1;
+                continue;
+            }
+            let body = self.fem.body[best] as usize;
+            self.fem.flags[best] |= TORN_TET;
+            if best_ratio <= 2.0 && self.strands_piece(best, body) {
+                // The tear would leave a piece too small: it waits.
+                self.fem.flags[best] &= !TORN_TET;
+                self.fem.ratio[best] = 0.0;
+                continue;
+            }
+            self.fem.ratio[best] = 0.0;
+            self.fem.torn += 1;
+            self.spend(body, best_ratio);
+            // The cells it was joined to now have an outside face.
+            for k in 0..4 {
+                let n = self.fem.nb[k][best];
+                if n != NONE {
+                    self.fem.flags[n as usize] &= !INTERIOR_TET;
+                }
+            }
+        }
+    }
+
+    fn may_tear(&self, body: usize, ratio: f32) -> bool {
+        ratio > 2.0 || body >= self.fem.bodies || self.fem.tears_left[body] > 0
+    }
+
+    fn spend(&mut self, body: usize, ratio: f32) {
+        if ratio <= 2.0 && body < self.fem.bodies && self.fem.tears_left[body] != u32::MAX && self.fem.tears_left[body] > 0 {
+            self.fem.tears_left[body] -= 1;
+        }
+    }
+
+    /// True when tearing cell `t` (already marked torn) leaves a piece of fewer cells than the body's smallest, cut off from the rest.
+    fn strands_piece(&mut self, t: usize, body: usize) -> bool {
+        let limit = if body < self.fem.bodies { self.fem.min_piece[body] as usize } else { 0 };
+        if limit <= 1 {
+            return false;
+        }
+        for k in 0..4 {
+            let start = self.fem.nb[k][t];
+            if start == NONE || self.fem.flags[start as usize] & TORN_TET != 0 {
+                continue;
+            }
+            // Flood from this neighbour through live cells, counting up to the limit and noting whether another neighbour of `t`
+            // is reached (then nothing was split).
+            self.fem.stamp = self.fem.stamp.wrapping_add(1);
+            let stamp = self.fem.stamp;
+            let (mut top, mut count, mut touched) = (0usize, 0usize, false);
+            self.fem.stack[0] = start;
+            self.fem.mark[start as usize] = stamp;
+            top += 1;
+            while top > 0 && count < limit {
+                top -= 1;
+                let c = self.fem.stack[top] as usize;
+                count += 1;
+                for j in 0..4 {
+                    let n = self.fem.nb[j][c];
+                    if n == NONE || self.fem.mark[n as usize] == stamp || self.fem.flags[n as usize] & TORN_TET != 0 {
+                        continue;
+                    }
+                    self.fem.mark[n as usize] = stamp;
+                    self.fem.stack[top] = n;
+                    top += 1;
+                    for q in 0..4 {
+                        if self.fem.nb[q][t] == n && q != k {
+                            touched = true;
+                        }
+                    }
+                }
+            }
+            if count < limit && !touched {
+                return true;
+            }
+        }
+        false
     }
 }
