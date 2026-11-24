@@ -512,6 +512,10 @@ export class PhysicsBody {
     set maxLinearSpeed(speed: number);
     get maxAngularSpeed(): number;
     set maxAngularSpeed(speed: number);
+    get sleepThreshold(): number;
+    set sleepThreshold(energy: number);
+    get sleepTime(): number;
+    set sleepTime(seconds: number);
     lockRotations(locked?: boolean): this;
     lockTranslations(locked?: boolean): this;
     addCollider(options: ColliderOptions): PhysicsCollider;
