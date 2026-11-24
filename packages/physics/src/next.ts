@@ -4,6 +4,8 @@ export { ContactModification, Physics } from './next/physics.js';
 export { PhysicsBody } from './next/body.js';
 export { PhysicsCollider } from './next/collider.js';
 export { PhysicsJoint } from './next/joint.js';
+export { PidController } from './next/pid.js';
+export type { PidOptions } from './next/pid.js';
 export { collisionGroups } from './shapes.js';
 export { buildHull as convexHull } from './next/hull.js';
 export { cleanTrimesh } from './next/mesh-clean.js';

@@ -819,6 +819,25 @@ console.log(Math.hypot(...body.linearVelocity).toFixed(2)); // '5.00'
 physics.dispose();
 ```
 
+### PID controller
+
+`PidController` drives a body toward a target pose, as Rapier's does. `linearCorrection(dt, body, target, targetVelocity?)` and `angularCorrection(dt, body, target, targetAngularVelocity?)` return the acceleration it asks for: `kp` times the error, plus `ki` times the error summed over time, plus `kd` times the speed error. `applyLinear` and `applyAngular` land it as an impulse of mass (or world inertia) times acceleration times `dt`, so a heavy body and a light one follow the same path. Call once a step with the step's length. `axes` masks the world axes it works on, `reset()` clears the integral, and gravity is not compensated: the integral takes it up. The angular error is twice the vector part of the short turn to the target, which is the angle in radians to 0.1 percent below 0.1 radian and a little under it beyond. Gains must be finite and at least 0; a step must be above 0.
+
+```ts
+import {PidController, Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const body = physics.addBody(null, {colliders: {shape: 'sphere', radius: 0.25, density: 1000}});
+const pid = new PidController({kp: 60, ki: 400, kd: 16});
+for (let i = 0; i < 600; i++) {
+  pid.applyLinear(1 / 60, body, [0, 2, 0]); // hold 2 m up against gravity
+  physics.step();
+}
+console.log(body.position[1].toFixed(2)); // '2.00'
+physics.dispose();
+```
+
 ## Parity with Rapier 3D
 
 Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
@@ -851,7 +870,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Multibody (reduced-coordinate) joints and inverse kinematics | none | missing |
 | Cross-platform determinism | bit-equal replay in Node, native code, Chromium and Firefox; `world.hash` | partial: no named mode |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
-| PID controller | none | missing |
+| PID controller | `PidController` | full |
 | Debug-render data: colliders, joints, contacts, boxes | none | missing |
 
 ## Limits
