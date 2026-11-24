@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17352133,
+  "total": 17353872,
   "history": [
     {
       "date": "2026-10-24",
@@ -11253,6 +11253,12 @@
       "commit": "b678369d7e",
       "reason": "scenes gains the fauld-tunnels entry (the RAF Fauld bomb store place: glTF PBR instancing, clustered lamps with local shadows, bounce, volumetric fog, fire, GTAO, DOF, bloom, AgX; statically imported like dune-coast, since the entry exists to build that scene) and its catalogue info in the root (2,965 to 3,676 B); fauld-countryside and fauld-crater grow 6,131 to 7,910 B through the shared libraryMesh chunk, which now draws library models with their PBR maps (Fauld recut gap 5)",
       "grew": 19
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "958beae05a",
+      "reason": "Fauld places draw their Tripo buildings, vehicles and cattle; errors name their fix (rebased on fauld-tunnels)",
+      "grew": 3
     }
   ],
   "items": {
@@ -11335,7 +11341,7 @@
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/erosion-wasm": 2649,
     "@margoengine/biomes/far": 4020,
-    "@margoengine/biomes/farmland": 5577,
+    "@margoengine/biomes/farmland": 5853,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
@@ -11356,7 +11362,7 @@
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/valley": 5060,
-    "@margoengine/biomes/view": 14880,
+    "@margoengine/biomes/view": 15565,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4905,
@@ -12365,7 +12371,7 @@
     "@margoengine/sky/compat-clouds lazy hurricane storm field": 4617,
     "@margoengine/sky/day-presets": 1757,
     "@margoengine/sky/ephemeris": 2235,
-    "@margoengine/sky/fog": 2295,
+    "@margoengine/sky/fog": 3077,
     "@margoengine/sky/hillaire": 10843,
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 4834,
@@ -12886,18 +12892,14 @@
     "leak @margoengine/scenes/dune-coast -> @margoengine/water": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/biomes/view": 1,
-    "leak @margoengine/scenes/fauld-countryside -> @margoengine/geometry": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/post/gtao": 1,
-    "leak @margoengine/scenes/fauld-countryside -> @margoengine/scatter": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/shadows": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/sky/scenes": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/sky/volumetric-clouds": 1,
     "leak @margoengine/scenes/fauld-countryside -> @margoengine/tonemap": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/biomes/view": 1,
-    "leak @margoengine/scenes/fauld-crater -> @margoengine/geometry": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/post/gtao": 1,
-    "leak @margoengine/scenes/fauld-crater -> @margoengine/scatter": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/shadows": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/sky/scenes": 1,
     "leak @margoengine/scenes/fauld-crater -> @margoengine/sky/volumetric-clouds": 1,
