@@ -409,6 +409,16 @@ export interface DynamicCharacterOptions {
     groundAcceleration?: number;
     airAcceleration?: number;
     facingFrequency?: number;
+    hover?: {
+        height: number;
+        frequency?: number;
+        damping?: number;
+        maxForce?: number;
+    };
+    stairs?: {
+        maxHeight: number;
+        minDepth?: number;
+    };
 }
 
 export interface ExplosionOptions {

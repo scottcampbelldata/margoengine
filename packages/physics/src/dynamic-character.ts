@@ -32,6 +32,18 @@ export interface DynamicCharacterOptions {
   airAcceleration?: number;
   /** Turn rate towards the facing set with `setFacing`, hertz of the same stable controller (default 6). */
   facingFrequency?: number;
+  /**
+   * A hover spring: the character floats `height` metres above the ground (the gap between its shape and what is under it), held by a
+   * critically damped spring that also cancels its weight, so steps lower than the hover pass under it and the ground is felt
+   * through the spring, not through contact. `frequency` (default 5 Hz), `damping` ratio (default 1) and `maxForce` newtons (default no
+   * limit). The ground it stands on is pushed down by the reaction. Off by default.
+   */
+  hover?: { height: number; frequency?: number; damping?: number; maxForce?: number };
+  /**
+   * Steps up what is too high for the hover (or for a plain character): when a riser of `maxHeight` or less blocks the walk and there
+   * is ground at least `minDepth` deep on top (default 0.1 m), the character is lifted onto it. Off by default.
+   */
+  stairs?: { maxHeight: number; minDepth?: number };
 }
 
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -44,6 +56,14 @@ const len = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
 const scale = (a: Vec3, k: number): [number, number, number] => [a[0] * k, a[1] * k, a[2] * k];
 const add = (a: Vec3, b: Vec3): [number, number, number] => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a: Vec3, b: Vec3): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+/**
+ * The change of velocity that takes a displacement and a velocity to rest in one implicit step of a damped spring with unit mass (Tan et
+ * al. 2011): v' = (v - h k x) / (1 + 2 h zeta w + h^2 k) with k = w^2.
+ */
+function implicit(dt: number, displacement: number, velocity: number, frequency: number, ratio: number): number {
+  const k = frequency * frequency;
+  return (velocity - dt * k * displacement) / (1 + dt * 2 * ratio * frequency + dt * dt * k) - velocity;
+}
 function rotateBy(q: readonly number[], v: Vec3): [number, number, number] {
   const [x, y, z, w] = q as [number, number, number, number],
     tx = 2 * (y * v[2] - z * v[1]),
@@ -83,6 +103,9 @@ export class DynamicCharacter {
   private isGrounded = false;
   private ground: ShapeCastHit | null = null;
   private held: [number, number, number] = [0, 0, 0];
+  private readonly hoverSpring: { height: number; frequency: number; damping: number; maxForce: number } | null;
+  private readonly stairs: { maxHeight: number; minDepth: number } | null;
+  private airborne = 0;
 
   /** @internal */
   constructor(
@@ -118,6 +141,26 @@ export class DynamicCharacter {
       ['facingFrequency', this.facingFrequency],
     ] as const)
       if (!(value > 0)) throw new RangeError(`${name} must be more than zero`);
+    const hover = options.hover;
+    this.hoverSpring = hover
+      ? {
+          height: hover.height,
+          frequency: hover.frequency ?? 5,
+          damping: hover.damping ?? 1,
+          maxForce: hover.maxForce ?? Infinity,
+        }
+      : null;
+    if (this.hoverSpring) {
+      const { height, frequency, damping, maxForce } = this.hoverSpring;
+      if (!(height >= 0)) throw new RangeError('hover height must be zero or more metres');
+      if (!(frequency > 0) || !(maxForce > 0))
+        throw new RangeError('hover frequency and maxForce must be more than zero');
+      if (!(damping >= 0)) throw new RangeError('hover damping must be zero or more');
+    }
+    const stairs = options.stairs;
+    this.stairs = stairs ? { maxHeight: stairs.maxHeight, minDepth: stairs.minDepth ?? 0.1 } : null;
+    if (this.stairs && !(this.stairs.maxHeight > 0 && this.stairs.minDepth >= 0))
+      throw new RangeError('stairs maxHeight must be more than zero and minDepth zero or more');
     if (!(this.damping >= 0)) throw new RangeError('uprightDamping must be zero or more');
     if (!(this.probe >= 0)) throw new RangeError('groundProbe must be zero or more');
   }
@@ -186,10 +229,11 @@ export class DynamicCharacter {
       hit = this.owner.shapeCast(colliderShape(collider), pose.position, pose.rotation, scale(up, -1), {
         exclude: body,
         excludeSensors: true,
-        maxDistance: this.probe,
+        maxDistance: this.hoverSpring ? this.hoverSpring.height + this.probe : this.probe,
         stopAtPenetration: true,
       });
-    this.ground = hit && dot(hit.normal, up) >= this.cosClimb - 1e-6 ? hit : null;
+    this.airborne = Math.max(0, this.airborne - dt);
+    this.ground = hit && this.airborne === 0 && dot(hit.normal, up) >= this.cosClimb - 1e-6 ? hit : null;
     this.isGrounded = this.ground !== null;
 
     // Velocity: relative to what it stands on.
@@ -217,16 +261,35 @@ export class DynamicCharacter {
     if (this.ground) {
       const n = this.ground.normal,
         g = scale(this.owner.gravity, body.gravityScale);
-      hold = scale(sub(scale(n, dot(g, n)), g), mass);
+      // A hover spring carries the whole weight; resting on the ground only the share along it.
+      hold = this.hoverSpring ? scale(g, -mass) : scale(sub(scale(n, dot(g, n)), g), mass);
     }
     const adjust = sub(hold, this.held);
     if (adjust[0] !== 0 || adjust[1] !== 0 || adjust[2] !== 0) body.addForce(adjust);
     this.held = hold;
+    // The hover spring: the gap to the ground against the height asked, the implicit step of a damped spring on the velocity along up.
+    if (this.hoverSpring && this.ground && hit) {
+      const spring = this.hoverSpring,
+        along = implicit(
+          dt,
+          hit.distance - spring.height,
+          dot(rel, up),
+          spring.frequency * 2 * Math.PI,
+          spring.damping,
+        ),
+        wanted = along * mass,
+        capped = Math.max(-spring.maxForce * dt, Math.min(spring.maxForce * dt, wanted));
+      change = add(change, scale(up, capped / mass));
+      if (this.ground.body.type === 'dynamic') this.ground.body.applyImpulse(scale(up, -capped), this.ground.point);
+    }
     if (this.jumpSpeed !== null && this.ground) {
       change = add(change, scale(up, this.jumpSpeed - dot(rel, up)));
       this.isGrounded = false;
       this.ground = null;
+      // The spring would hold it down: leave it alone for the time a jump needs to clear its reach.
+      this.airborne = 0.15;
     }
+    if (this.stairs && this.ground && len(flat(this.wish)) > 1e-6) this.stepUp(flat(this.wish), pose);
     this.jumpSpeed = null;
     if (change[0] !== 0 || change[1] !== 0 || change[2] !== 0) body.applyImpulse(scale(change, mass));
 
@@ -242,12 +305,6 @@ export class DynamicCharacter {
     let displaced: [number, number, number] = [0, 0, 0];
     if (sin > 1e-9) displaced = scale(axis, -angle / sin);
     else if (angle > 1) displaced = scale(cross(up, Math.abs(up[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]), -angle);
-    // The change of velocity that takes the displacement and spin to rest in one implicit step (Tan et al., unit inertia):
-    // v' = (v - dt k x) / (1 + dt c + dt^2 k), k = w^2 and c = 2 zeta w.
-    const implicit = (displacement: number, velocity: number, frequency: number, ratio: number): number => {
-      const k = frequency * frequency;
-      return (velocity - dt * k * displacement) / (1 + dt * 2 * ratio * frequency + dt * dt * k) - velocity;
-    };
     const across = flat(spin),
       shift = len(displaced);
     let delta: [number, number, number];
@@ -255,16 +312,16 @@ export class DynamicCharacter {
       const dir = scale(displaced, 1 / shift),
         along = dot(across, dir);
       delta = add(
-        scale(dir, implicit(shift, along, w, this.damping)),
-        scale(sub(across, scale(dir, along)), implicit(0, 1, w, this.damping)),
+        scale(dir, implicit(dt, shift, along, w, this.damping)),
+        scale(sub(across, scale(dir, along)), implicit(dt, 0, 1, w, this.damping)),
       );
-    } else delta = scale(across, implicit(0, 1, w, this.damping));
+    } else delta = scale(across, implicit(dt, 0, 1, w, this.damping));
     if (this.facing) {
       const want = flat(this.facing),
         forward = flat(rotateBy(body.rotation, this.forwardAxis()));
       if (len(want) > 1e-6 && len(forward) > 1e-6) {
         const yaw = Math.atan2(dot(cross(forward, want), up), dot(forward, want));
-        delta = add(delta, scale(up, implicit(-yaw, dot(spin, up), this.facingFrequency * 2 * Math.PI, 1)));
+        delta = add(delta, scale(up, implicit(dt, -yaw, dot(spin, up), this.facingFrequency * 2 * Math.PI, 1)));
       }
     }
     const dl = len(delta);
@@ -279,6 +336,49 @@ export class DynamicCharacter {
           (inverse[5]! + inverse[7]!) * u[1] * u[2] +
           inverse[8]! * u[2] * u[2];
       if (stiff > 0) body.applyTorqueImpulse(scale(u, Math.min(dl / stiff, this.maxTorque * dt)));
+    }
+  }
+
+  /**
+   * A riser that blocks the walk, of `maxHeight` or less, with ground `minDepth` deep on top: the body is put on top of it. The shape is
+   * cast along the walk, up the height it may step, forward over the riser and down again.
+   */
+  private stepUp(
+    walk: [number, number, number],
+    pose: { position: [number, number, number]; rotation: [number, number, number, number] },
+  ): void {
+    const stairs = this.stairs!,
+      { body, up } = this,
+      dt = this.owner.fixedTimestep,
+      way = scale(walk, 1 / len(walk)),
+      reach = Math.max(len(walk) * dt * 2, 0.05),
+      shape = colliderShape(body.colliders[0]!),
+      cast = (from: Vec3, direction: Vec3, max: number) =>
+        this.owner.shapeCast(shape, from, pose.rotation, direction, {
+          exclude: body,
+          excludeSensors: true,
+          maxDistance: max,
+          stopAtPenetration: false,
+        });
+    const ahead = cast(pose.position, way, reach);
+    // Only a riser: a surface too steep to walk on and in the way.
+    if (!ahead || dot(ahead.normal, up) >= this.cosClimb) return;
+    const rise = cast(pose.position, up, stairs.maxHeight),
+      height = rise ? rise.distance : stairs.maxHeight;
+    if (!(height > 1e-3)) return;
+    const raised = add(pose.position, scale(up, height)),
+      depth = reach + stairs.minDepth,
+      onto = cast(raised, way, depth);
+    if (onto && onto.distance < depth - 1e-4) return;
+    const over = add(raised, scale(way, depth)),
+      land = cast(over, scale(up, -1), height + 1e-3);
+    if (!land || dot(land.normal, up) < this.cosClimb - 1e-6) return;
+    const lift = height - land.distance;
+    if (lift > 1e-3) {
+      body.setPosition(add(body.position, scale(up, lift)));
+      // What was going into the riser is gone with it.
+      const v = body.linearVelocity;
+      body.setLinearVelocity(sub(v, scale(up, Math.min(0, dot(v, up)))));
     }
   }
 

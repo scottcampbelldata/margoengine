@@ -175,6 +175,120 @@ test('a hard blow tips it and it rises again; a facing turns it about up', () =>
   physics.dispose();
 });
 
+test('a hover spring floats it at the height asked, settles after a drop, and carries its weight onto a dynamic ground', () => {
+  const physics = new Physics(null);
+  floor(physics);
+  const body = hero(physics, { position: [0, rest + 0.8, 0] }),
+    character = physics.createDynamicCharacter(body, { hover: { height: 0.2 } });
+  let worst = 0;
+  drive(physics, character, 240, (i) => {
+    if (i > 120) worst = Math.max(worst, Math.abs(body.position[1] - (rest + 0.2)));
+  });
+  near(body.position[1], rest + 0.2, 0.005, 'floating 20 cm above the floor');
+  assert.ok(worst < 0.005, `and it stays there: ${worst}`);
+  assert.ok(character.grounded, 'a hovering character is grounded');
+  physics.dispose();
+  // On a dynamic box the weight goes into the box: a light box under a heavy character sinks only as far as the spring lets it.
+  const world = new Physics(null);
+  const slab = world.addBody(null, {
+      position: [0, 0.25, 0],
+      colliders: { shape: 'box', halfExtents: [3, 0.25, 3], density: 1, friction: 0 },
+    }),
+    ground = floor(world),
+    walker = hero(world, { position: [0, 0.5 + rest + 0.2, 0] }),
+    stand = world.createDynamicCharacter(walker, { hover: { height: 0.2 } });
+  assert.ok(ground.valid);
+  drive(world, stand, 240);
+  near(walker.position[1], 0.5 + rest + 0.2, 0.02, 'floating above the box');
+  assert.ok(
+    slab.position[1] < 0.2501 + 1e-3 && slab.position[1] > 0.2,
+    `the box holds the weight at rest: ${slab.position[1]}`,
+  );
+  world.dispose();
+});
+
+test('a hovering character passes over a step lower than its hover, and a jump still clears the spring', () => {
+  const physics = new Physics(null);
+  floor(physics);
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [3, 0.1, 0],
+    colliders: { shape: 'box', halfExtents: [1, 0.1, 3], friction: 0 },
+  });
+  const body = hero(physics, { position: [0, rest + 0.25, 0] }),
+    character = physics.createDynamicCharacter(body, { hover: { height: 0.25 } });
+  drive(physics, character, 60);
+  drive(physics, character, 240, () => character.setTargetVelocity([2, 0, 0]));
+  assert.ok(body.position[0] > 2.5, `it went on to the step: x = ${body.position[0]}`);
+  const top = body.position[0] > 3 ? 0.2 : 0;
+  assert.ok(top === 0.2 || body.position[1] > rest, 'it rode up onto the step');
+  drive(physics, character, 120, () => character.setTargetVelocity([0, 0, 0]));
+  const base = body.position[1];
+  assert.ok(character.jump(4));
+  let apex = 0;
+  for (let i = 0; i < 90; i++) {
+    character.update();
+    physics.step();
+    apex = Math.max(apex, body.position[1] - base);
+  }
+  near(apex, (4 * 4) / (2 * 9.81), 0.1, 'the jump goes as high as its speed gives');
+  physics.dispose();
+});
+
+test('stairs lift it over a riser it could not pass, and not over one that is too high', () => {
+  const run = (stairs, riser) => {
+    const physics = new Physics(null);
+    floor(physics);
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [3, riser / 2, 0],
+      colliders: { shape: 'box', halfExtents: [1, riser / 2, 3], friction: 0 },
+    });
+    const body = hero(physics),
+      character = physics.createDynamicCharacter(body, stairs ? { stairs } : {});
+    drive(physics, character, 30);
+    let top = 0;
+    drive(physics, character, 110, () => {
+      character.setTargetVelocity([2, 0, 0]);
+      top = Math.max(top, body.position[1]);
+    });
+    const result = { x: body.position[0], y: top };
+    physics.dispose();
+    return result;
+  };
+  const without = run(undefined, 0.2),
+    over = run({ maxHeight: 0.3 }, 0.2),
+    high = run({ maxHeight: 0.3 }, 0.5);
+  assert.ok(without.x < 2.75, `blocked without stairs: x = ${without.x}`);
+  assert.ok(over.x > 2.9 && over.y > rest + 0.19, `up onto it with stairs: x = ${over.x}, y = ${over.y}`);
+  assert.ok(high.x < 2.75, `a 50 cm riser is too high for 30 cm stairs: x = ${high.x}`);
+});
+
+test('a flight of stairs is climbed with the hover and the steps', () => {
+  const physics = new Physics(null);
+  floor(physics);
+  for (let k = 0; k < 6; k++)
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [2 + 0.5 * k + 0.25, 0.075 * (k + 1), 0],
+      colliders: { shape: 'box', halfExtents: [0.25, 0.075 * (k + 1), 3], friction: 0 },
+    });
+  const body = hero(physics),
+    character = physics.createDynamicCharacter(body, {
+      hover: { height: 0.05 },
+      stairs: { maxHeight: 0.2, minDepth: 0.1 },
+    });
+  drive(physics, character, 60);
+  let top = 0;
+  drive(physics, character, 300, () => {
+    character.setTargetVelocity([1.5, 0, 0]);
+    top = Math.max(top, body.position[1]);
+  });
+  // Six risers of 15 cm: the top tread is 90 cm up.
+  assert.ok(top > rest + 0.05 + 0.85, `up the flight: the highest it got was ${top}`);
+  physics.dispose();
+});
+
 test('a dynamic character needs a dynamic body of this world with a collider, and a disposed one refuses', () => {
   const physics = new Physics(null),
     fixed = physics.addBody(null, { type: 'fixed', colliders: { shape: 'sphere', radius: 1 } }),
