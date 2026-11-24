@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-24: a character standing on a slope steeper than minSlopeSlideAngle does not slide down it (KB-PHYS-CHARACTER-SLIDE1, physics character controller)
+
+- **Repro:** a fixed box (halfExtents 10, 0.05, 10) turned 25 degrees about z; a kinematic position capsule (halfHeight 0.4, radius 0.3) above it; `physics.createCharacterController(capsule, {minSlopeSlideAngle: 20 degrees, maxSlopeClimbAngle: 60 degrees, autostep: false, snapToGround: 0.2})`; every step `controller.move([0, -0.08, 0])`. After 200 steps the capsule is where it landed (x = 0) with `movement` [0, 0, 0]. Rapier 0.21's character controller on the same scene slides it downhill by about 0.031 m a step (x = -6.3 after 210 steps), `movement` [-0.031, -0.014, 0]; with `minSlopeSlideAngle` 40 degrees (above the slope) both hold still.
+- **Cause (not confirmed by a fix):** `packages/physics/src/character.ts` has the slide rule (`cosine < cosSlide`), but after the first downward hit the capsule rests exactly at the controller's `offset` from the slope, and the next cast along the slide direction (parallel to the slope) reports a hit at distance 0, as Rapier's own shape cast does within the target distance (`compare-rapier-floors` shows the same class of hit). Each of the 8 iterations then travels 0 and the remaining slide is dropped. Rapier's controller carries on from such a hit; this one does not.
+- **Needs:** a fix in the character controller with a regression test in `packages/physics/tests/next-character.test.js` that runs the repro above on the own solver and on Rapier (the oracle) and asserts the downhill slide for the 20 degree setting and none for the 40 degree one.
+
 ### Fixed 2026-11-24: a cone joint with a rest pose off its frames drives itself to its limit under a rotation motor (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
 
 - **Repro:** as the entry stood: body A fixed at identity; body B a rod rotated by 0.15 rad about X; a cone with `frameA: R * fB`, `frameB: fB` (a quarter turn about Z), and every step a rotation motor aimed at identity. The rod swung to the 3 rad limit within 20 steps.

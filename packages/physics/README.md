@@ -1041,7 +1041,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full | `next-bodies.test.js`, `next-events.test.js` |
 | Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full | `next-bodies.test.js`, `next-dynamics.test.js` |
 | Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addForceAtPoint`, `addTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques` | full | `next-dynamics.test.js` |
-| Linear and angular damping, gravity scale | body options | full | angular damping and gravity scale 0: `next-dynamics.test.js`, `physics.test.js`; none yet for linear damping or a gravity scale other than 0 |
+| Linear and angular damping, gravity scale | body options | full | `next-damping-gravity.test.js`, `next-dynamics.test.js` |
 | Dominance groups | `dominance` | full | `next-dynamics.test.js` |
 | Locked translation and rotation axes, per axis | `lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations` (options, and readable and settable on a body) | full | `next-dynamics.test.js` |
 | Additional mass, additional mass properties, mass from colliders | `setAdditionalMass`, `setMassProperties`, collider density | full | `next-bodies.test.js`, `next-collider-api.test.js` |
@@ -1052,14 +1052,14 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Continuous collision detection | `ccd` | full | `next-ccd.test.js` |
 | Islands | island forest, an island sleeps together | full | `kernel-sleep.test.js`, `next-bodies.test.js` |
 | Integration parameters: step length, substeps, solver iterations | `fixedTimestep`, `substeps`, `iterations` | full | `frames.test.js`, `next-physics.test.js` |
-| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full | `next-parameters.test.js`, `kernel-solver.test.js`; `jointShare` is read back only, none yet for `jointLooseShare` and `jointMaxPush` |
+| Integration parameters: contact stiffness and damping ratio, joint stiffness, maximum corrective velocity, allowed linear error, warm starting share | `setSolver` | full | `next-parameters.test.js`, `kernel-solver.test.js`, `next-joint-share.test.js` |
 | Integration parameters: prediction distance, length unit, maximum CCD substeps | `predictionDistance` (`tests/next-prediction.test.js`), `lengthUnit`, `maxCcdSubsteps` (`tests/next-parameters.test.js`) | full (a value above 1 of `maxCcdSubsteps` is the same as 1: the one pass resolves a whole sweep) | `next-prediction.test.js` |
 | Step timing counters | `timing` | partial: the step and its seven phases; not Rapier's finer solver and CCD timers | `next-parameters.test.js` |
 | Iterating the active bodies | `forEachActiveBody` | full | `next-parameters.test.js` |
 | User data on bodies and colliders | `userData` | full | `next-parameters.test.js`, `next-collider-api.test.js` |
 | Joints: fixed, revolute, prismatic, spherical, rope, spring, generic six-axis | `addJoint` | full | `next-joints.test.js` |
 | Joint limits, per axis | `setLimits`, `setAxisLimits` | full | `next-joints.test.js` |
-| Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full | `next-joints.test.js`, `next-cone-motor.test.js`, `next-cone-motor-oracle.test.js` |
+| Joint motors: velocity, position (stiffness and damping), force and acceleration models, maximum force | `setMotor`, `setAxisMotor`, `setRotationMotor` | full | `next-joints.test.js`, `next-motor-models.test.js`, `next-cone-motor.test.js`, `next-cone-motor-oracle.test.js` |
 | Joint local frames and anchors, contacts between jointed bodies | `anchorA`, `frameA`, `contactsEnabled` | full | `next-joints.test.js`, `frames.test.js` |
 | Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full | `next-joint-break.test.js` |
 | Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full | `next-multibody.test.js`, `next-multibody-oracle.test.js` |
@@ -1072,12 +1072,12 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 
 | Capability (Rapier 3D) | `margoengine/physics` | Status | Tests |
 | --- | --- | --- | --- |
-| Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full | `next-character.test.js`; none yet for `minSlopeSlideAngle` |
+| Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full | `next-character.test.js`; `minSlopeSlideAngle` is KB-PHYS-CHARACTER-SLIDE1 in docs/known-bugs.md |
 | Character controller: pushing dynamic bodies, character mass, the collisions of a move | `applyImpulsesToDynamicBodies`, `characterMass`, `controller.collisions` | full | `next-character.test.js` |
 | Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction | `Vehicle` | full | `next-vehicle.test.js` |
 | Ragdoll with cone joints, motors and balance | `@margoengine/ragdoll` | partial: powered ragdolls on the cone joint differ from the spherical one, see KB-PHYS-SWITCH-CONE1 | `packages/ragdoll/tests` |
 | Convex decomposition of a concave mesh | `convexDecomposition` from `margoengine/physics/decomposition` (CoACD) | full: build-time, never a bare mesh on `addBody` | `next-decomposition.test.js` |
-| Colliders for a glTF model, one body or one per node | `addModel` | full | none yet for `addModel` |
+| Colliders for a glTF model, one body or one per node | `addModel` | full | `add-model.test.js` |
 | A body that follows a mesh | `follow: true` | full | `nested.test.js` |
 
 ## Limits
