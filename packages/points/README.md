@@ -418,7 +418,7 @@ for tools and round-trip tests.
 `cylindrical` or `visualReference`): the encoded JPEG or PNG bytes, an optional PNG mask, width and height, the
 guid of the scan it belongs to, and the projection parameters by name (`focalLength`, `pixelWidth`, `principalPointX`,
 `radius`, ...). Poses are in the file's world frame; subtract `e57.origin` to match the recentred scan positions.
-`writeE57(scans, { images })` writes them. Pass `images: false` to skip reading them.
+`writeE57Document(scans, { images })` writes them. Pass `images: false` to skip reading them.
 
 ```ts
 import { loadE57 } from 'margoengine/points/e57';

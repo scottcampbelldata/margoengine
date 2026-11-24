@@ -25,6 +25,7 @@ export interface E57File {
     readonly xml: E57Element;
     readonly origin: readonly [number, number, number];
     readonly scans: readonly E57Scan[];
+    readonly images: readonly E57Image[];
     readonly coordinateMetadata?: string;
 }
 
@@ -37,10 +38,32 @@ export interface E57Header {
     readonly pageSize: number;
 }
 
+export interface E57Image {
+    readonly name: string;
+    readonly guid: string;
+    readonly associatedScanGuid?: string;
+    readonly description?: string;
+    readonly projection: E57ImageProjection;
+    readonly width: number;
+    readonly height: number;
+    readonly format: 'jpeg' | 'png';
+    readonly mime: 'image/jpeg' | 'image/png';
+    readonly data: Uint8Array<ArrayBuffer>;
+    readonly mask?: Uint8Array<ArrayBuffer>;
+    readonly pose: {
+        readonly rotation: readonly [number, number, number, number];
+        readonly translation: readonly [number, number, number];
+    };
+    readonly parameters: Readonly<Record<string, number>>;
+}
+
+export type E57ImageProjection = 'pinhole' | 'spherical' | 'cylindrical' | 'visualReference';
+
 export interface E57Options {
     origin?: readonly [number, number, number];
     verifyChecksums?: boolean;
     keepInvalid?: boolean;
+    images?: boolean;
     signal?: AbortSignal;
 }
 
@@ -58,6 +81,22 @@ export interface E57Scan {
     readonly intensity?: Float32Array;
     readonly colors?: Uint8Array;
     readonly attributes: Readonly<Record<string, Float64Array>>;
+}
+
+export interface E57WriteImage {
+    name?: string;
+    data: Uint8Array;
+    format: 'jpeg' | 'png';
+    projection: 'pinhole' | 'spherical' | 'cylindrical';
+    width: number;
+    height: number;
+    mask?: Uint8Array;
+    scan?: number;
+    pose?: {
+        rotation?: readonly [number, number, number, number];
+        translation?: readonly [number, number, number];
+    };
+    parameters?: Readonly<Record<string, number>>;
 }
 
 export interface E57WriteScan {
@@ -88,5 +127,10 @@ export function readE57Header(bytes: Uint8Array): E57Header;
 
 export function writeE57(scans: readonly E57WriteScan[], options?: {
     packetBytes?: number;
+}): Uint8Array;
+
+export function writeE57Document(scans: readonly E57WriteScan[], options?: {
+    packetBytes?: number;
+    images?: readonly E57WriteImage[];
 }): Uint8Array;
 ```

@@ -176,9 +176,9 @@ export interface E57Image {
   readonly format: 'jpeg' | 'png';
   readonly mime: 'image/jpeg' | 'image/png';
   /** The encoded picture, ready for `new Blob([data], { type: mime })` or `createImageBitmap`. */
-  readonly data: Uint8Array;
+  readonly data: Uint8Array<ArrayBuffer>;
   /** Optional PNG mask (non-zero pixels are valid). */
-  readonly mask?: Uint8Array;
+  readonly mask?: Uint8Array<ArrayBuffer>;
   /** Camera pose in the file's world frame (not recentred on `origin`): rotation [w, x, y, z] and translation. */
   readonly pose: {
     readonly rotation: readonly [number, number, number, number];
@@ -266,7 +266,7 @@ class Logical {
       }
   }
   /** Copies `length` logical bytes starting at a logical offset. */
-  read(logical: number, length: number): Uint8Array {
+  read(logical: number, length: number): Uint8Array<ArrayBuffer> {
     if (!Number.isFinite(logical) || logical < 0 || length < 0 || logical + length > this.length)
       throw new RangeError(
         `E57 read of ${length} bytes at logical ${logical} passes the file; it is truncated or corrupt`,
@@ -459,7 +459,7 @@ function readPose(e: E57Element): E57Image['pose'] {
 }
 
 /** Reads a Blob element's bytes: a 16-byte blob section header (id 0, length) then `length` data bytes. */
-function readBlob(file: Logical, blob: E57Element, what: string): Uint8Array {
+function readBlob(file: Logical, blob: E57Element, what: string): Uint8Array<ArrayBuffer> {
   const offset = Number(blob.attributes.fileOffset),
     length = Number(blob.attributes.length);
   if (!Number.isFinite(offset) || !Number.isInteger(length) || length < 0)
@@ -792,7 +792,12 @@ export interface E57WriteImage {
 }
 
 /** Writes an E57 file (bitPack codec, one data packet stream per scan). Meant for tools and round-trip tests. */
-export function writeE57(
+export function writeE57(scans: readonly E57WriteScan[], options: { packetBytes?: number } = {}): Uint8Array {
+  return writeE57Document(scans, options);
+}
+
+/** `writeE57` with pictures: the same scans plus `images` written as images2D with their poses and projections. */
+export function writeE57Document(
   scans: readonly E57WriteScan[],
   options: { packetBytes?: number; images?: readonly E57WriteImage[] } = {},
 ): Uint8Array {

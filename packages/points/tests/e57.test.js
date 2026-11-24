@@ -2,7 +2,7 @@ import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import test from 'node:test';
-import { crc32c, parseE57, parseXML, readE57Header, writeE57 } from '../dist/e57.js';
+import { crc32c, parseE57, parseXML, readE57Header, writeE57, writeE57Document } from '../dist/e57.js';
 
 function scanData(n, seed = 9) {
   let s = seed;
@@ -154,7 +154,7 @@ test('E57 images2D: pinhole, spherical and cylindrical pictures come back with b
     png = Uint8Array.from({ length: 3000 }, (_, i) => (i * 31) % 256), // spans several 1020-byte pages
     mask = Uint8Array.from([137, 80, 78, 71, 9]);
   const pose = { rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], translation: [4, 5, 6] };
-  const file = writeE57([{ name: 'a', positions: new Float64Array([1, 2, 3]) }], {
+  const file = writeE57Document([{ name: 'a', positions: new Float64Array([1, 2, 3]) }], {
     images: [
       {
         name: 'front',
@@ -216,11 +216,11 @@ test('E57 images2D: pinhole, spherical and cylindrical pictures come back with b
   // The points still read, and images can be skipped.
   assert.equal(e57.scans[0].count, 1);
   assert.equal(parseE57(file, { images: false }).images.length, 0);
-  assert.equal(parseE57(writeE57([{ positions: [0, 0, 0] }])).images.length, 0);
+  assert.equal(parseE57(writeE57Document([{ positions: [0, 0, 0] }])).images.length, 0);
 });
 
 test('E57 images2D: a Blob pointing at the wrong section is rejected', () => {
-  const file = writeE57([{ positions: [0, 0, 0] }], {
+  const file = writeE57Document([{ positions: [0, 0, 0] }], {
     images: [{ data: Uint8Array.of(1, 2, 3), format: 'png', projection: 'pinhole', width: 1, height: 1 }],
   });
   assert.equal(parseE57(file).images.length, 1);
