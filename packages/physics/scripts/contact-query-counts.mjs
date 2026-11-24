@@ -2,7 +2,7 @@
 // touching and contactPoints at 5,000 cubes (the harness S9 layout), after 1 s and 10 s.
 // Old walk: every pair row of the world (world_pair_rows) and the objects kernel.contacts() builds. New walk: the rows on
 // the asking body's collider chains and their parts.
-import { Physics } from '../dist/next.js';
+import { Physics } from '../dist/index.js';
 await Physics.load();
 const n = 5000, NONE = 0xffffffff, p = new Physics(null), side = Math.ceil(Math.cbrt(n)), bodies = [];
 p.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [200, 0.5, 200], friction: 0.5 } });

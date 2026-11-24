@@ -2,7 +2,7 @@
 // kernel sources it came from, so a stale one fails; the native test and every browser must then match it.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { kernelSourceHash } from './build-kernel.mjs';
-import { KernelWorld, Physics } from '../dist/next.js';
+import { KernelWorld, Physics } from '../dist/index.js';
 import { REPLAY_EVERY, REPLAY_STEPS, kernelScene, physicsScene } from '../tests/replay-scene.js';
 
 await Physics.load();
