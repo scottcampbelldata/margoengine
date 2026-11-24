@@ -1,0 +1,81 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 5.083333333333333,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            176.0,
+            2.1,
+            -3.4
+          ],
+          "target": [
+            180.0,
+            0.6,
+            -4.6
+          ],
+          "fov": 32.269
+        },
+        {
+          "time": 5.083333333333333,
+          "position": [
+            177.4,
+            1.9,
+            -3.7
+          ],
+          "target": [
+            180.0,
+            0.6,
+            -4.6
+          ],
+          "fov": 32.269,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "fauld-fr129",
+    "kind": "long",
+    "seed": 1944,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 5.083333333333333,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 12,
+    "probes": {
+      "still": 2.5416666666666665
+    },
+    "page": {
+      "path": "examples/fauld/index.html",
+      "query": {
+        "shot": "fr129",
+        "state": "after",
+        "focal": 35.0,
+        "stop": 2.8,
+        "start": "712.3"
+      },
+      "css": "#status{display:none!important}",
+      "engine": "fauld.engine",
+      "apply": "fauld.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

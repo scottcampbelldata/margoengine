@@ -57,6 +57,10 @@
       "types": "./dist/timber-valley.d.ts",
       "import": "./dist/timber-valley.js"
     },
+    "./fauld-tunnels": {
+      "types": "./dist/fauld-tunnels.d.ts",
+      "import": "./dist/fauld-tunnels.js"
+    },
     "./library": {
       "types": "./dist/library.d.ts",
       "import": "./dist/library.js"
@@ -76,8 +80,11 @@
   },
   "dependencies": {
     "@margoengine/biomes": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/dof": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/post": "^1.0.0",
     "@margoengine/procedural": "^1.0.0",

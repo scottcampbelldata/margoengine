@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { sceneInfo, scenes } from '@margoengine/scenes';
 import { attach, grassCover, ground, info } from '@margoengine/scenes/dune-coast';
 
-test('the catalogue lists dune-coast and timber-valley with every default inside its range', () => {
+test('the catalogue lists dune-coast, timber-valley and fauld-tunnels with every default inside its range', () => {
   assert.deepEqual(
     scenes.map((s) => s.name),
-    ['dune-coast', 'timber-valley'],
+    ['dune-coast', 'timber-valley', 'fauld-tunnels'],
   );
   assert.equal(sceneInfo('dune-coast'), info);
   assert.throws(() => sceneInfo('nowhere'), RangeError);

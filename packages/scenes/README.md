@@ -123,6 +123,44 @@ LC-W86-120 and LC-W85-110 (public domain, https://www.loc.gov/pictures/collectio
 to the hill and the shore; McFarland (ed.) 1953, *The Papers of Wilbur and Orville Wright*, for the hangar and the
 rail. The ground, the sky and the sea come from their packages' own sources (terrain/dunes, sky/sun, water).
 
+## Fauld tunnels: `@margoengine/scenes/fauld-tunnels`
+
+The RAF Fauld underground bomb store in Staffordshire (the explosion of 27 November 1944): the arched gypsum bays with
+their racks of 1,000 lb and 500 lb bombs, the narrow-gauge rails and trolleys, the brick blast walls, the work bay, the
+timbered Old Mine roadways beyond, and the portal yard in the hillside. Plan metres (+x into the hill, +y north, z up)
+map to Margo as (x, z, -y). Every model is a library glTF with full PBR maps (`<library>/fauld-1944/tunnels/<id>`,
+converted from the film's kit in Blender), drawn once each and repeated by GPU instancing.
+
+```ts
+import {dressState, FAULD_STATE_EV, FAULD_TUNNEL_STATES} from 'margoengine/scenes/fauld-tunnels';
+const working = dressState('working');
+console.log(FAULD_TUNNEL_STATES.length, working.lamps.length, FAULD_STATE_EV.working); // 10 55 2
+```
+
+`attach(engine, settings)` (async) loads the state's models and draws them with clustered lights: each bulkhead bulb
+a 2700 K lamp of the lighting plan's catalogue (40 W 400 lm, 60 W 690 lm, 100 W 1,250 lm, light output 0.65, lower
+hemisphere only) in candela, hand lamps as 40 lm cones, the nearest and brightest lamps shadowed (`LocalShadows` with
+`shadowBudget`, 16 in `film`, 8 in `preview`), one `LightBounce`, a glowing bulb at each fitting (`flameEmission`),
+lamp-lit `VolumetricFog` (gypsum dust, or smoke after the blast and in the fire), `Fire` and `Smoke` of the state,
+and a `PostStack` of `GTAO`, `DOF`, `Bloom`, an AgX `Tonemap` white-balanced to 3200 K at the state's one metered
+exposure (`FAULD_STATE_EV`, EV100) and `SMAA`. The yard states use the overcast `PresetScene` sky. `frame(position,
+target, focal, stop)` sets the camera, its field of view on a 36 mm gate and the focus; `advanceTime(seconds)` runs
+the fires; `counts`, `parts` and `dispose()` as the other places. The page `examples/fauld` draws one row of the
+film's shot list (`tools/shot/shots/fauld-frNNN.json`) and `examples/fauld/stills.mjs` renders their stills.
+
+| Setting | Default | Range or values |
+| --- | --- | --- |
+| `state` | `working` | `working`, `blast`, `fire`, `after`, `flooded`, `sealed`, `yard_day`, `yard_night`, `yard_fire`, `yard_sealed` |
+| `time` | 0 | 0 to 600 s of fire and smoke |
+| `quality` | `film` | `film` (16 shadowed lamps, 1,024 maps), `preview` (8, 512) |
+| `library` | `/asset-library/` | the URL root of the asset library |
+
+Sources: the film's reference bible and lighting plan (fauld-reference-bible.md and fauld-tunnel-lighting-plan.md);
+the store's records at Kew (AIR 17/8, 17/10, 17/12, plan MFQ 1/1003); McCamley, *Disasters Underground* (2004);
+Waltham 2001, *Mercian Geologist* 15(2), 123 to 125, for the white gypsum about 35 m down; the Osram-GEC 60 W 240 V
+coiled-coil lamp, 690 lm at 2700 K (lamptech.co.uk); Lagarde and de Rousiers 2014, *Moving Frostbite to PBR*, s5.1,
+for EV100 metering. Fauld's own lamp wattage and spacing are not on record online, so the rig follows period practice.
+
 ## Timber valley: `@margoengine/scenes/timber-valley`
 
 A northern Rockies mountain valley in the 1910 fires (the Big Burn of 20 and 21 August 1910, Idaho and Montana). The
