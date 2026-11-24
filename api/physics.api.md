@@ -318,6 +318,21 @@ export interface DragOptions {
     maxForce?: number;
 }
 
+export class GearJoint extends Mechanism {
+    constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: GearOptions);
+    protected measure(): {
+        speed: number;
+        inverse: number;
+    };
+    protected apply(impulse: number): void;
+}
+
+export interface GearOptions extends MechanismOptions {
+    axisA?: Vec3;
+    axisB?: Vec3;
+    ratio?: number;
+}
+
 export interface HalfEdgeTopology {
     vertex: Uint32Array;
     twin: Uint32Array;
@@ -679,6 +694,12 @@ export class KernelWorld {
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;
+}
+
+export interface MechanismOptions {
+    frequency?: number;
+    damping?: number;
+    correction?: number;
 }
 
 export interface MeshCleanOptions {
@@ -1270,6 +1291,23 @@ export interface PointProjection {
     readonly featureId: number | undefined;
 }
 
+export class PulleyJoint extends Mechanism {
+    constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options: PulleyOptions);
+    protected measure(): {
+        speed: number;
+        inverse: number;
+    };
+    protected apply(impulse: number): void;
+}
+
+export interface PulleyOptions extends MechanismOptions {
+    groundA: Vec3;
+    groundB: Vec3;
+    anchorA?: Vec3;
+    anchorB?: Vec3;
+    ratio?: number;
+}
+
 export type Quat = readonly [number, number, number, number];
 
 export interface QueryFilter {
@@ -1285,6 +1323,21 @@ export interface QueryFilter {
     onlyKinematic?: boolean;
     onlyFixed?: boolean;
     predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
+}
+
+export class RackAndPinionJoint extends Mechanism {
+    constructor(physics: Physics, pinion: PhysicsBody, rack: PhysicsBody, options?: RackAndPinionOptions);
+    protected measure(): {
+        speed: number;
+        inverse: number;
+    };
+    protected apply(impulse: number): void;
+}
+
+export interface RackAndPinionOptions extends MechanismOptions {
+    pinionAxis?: Vec3;
+    rackAxis?: Vec3;
+    radius?: number;
 }
 
 export interface RaycastHit {
@@ -1634,6 +1687,25 @@ interface KernelShapeCastHit {
     queryPoint: [number, number, number];
     queryNormal: [number, number, number];
     started: boolean;
+}
+
+abstract class Mechanism implements PhysicsAttachment {
+    protected readonly physics: Physics;
+    protected readonly a: PhysicsBody;
+    protected readonly b: PhysicsBody;
+    protected error: number;
+    protected absolute: boolean;
+    protected last: number;
+    protected constructor(physics: Physics, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    protected abstract measure(): {
+        speed: number;
+        inverse: number;
+    };
+    protected abstract apply(impulse: number): void;
+    beforeStep(dt: number): void;
+    bodyRemoved(body: PhysicsBody): void;
+    remove(): void;
+    dispose(): void;
 }
 
 interface MeshConversionOptions {

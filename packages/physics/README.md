@@ -136,6 +136,30 @@ console.log(crate.position, drag.gripPoint());
 drag.remove();
 ```
 
+## Gear, rack and pinion, pulley
+
+`new GearJoint(physics, bodyA, bodyB, {axisA, axisB, ratio})` keeps the angle of the first body about its axis plus `ratio` times the angle of the second constant (the two turn against each other at the ratio); `new RackAndPinionJoint(physics, pinion, rack, {pinionAxis, rackAxis, radius})` moves the rack `radius` metres a radian; `new PulleyJoint(physics, bodyA, bodyB, {groundA, groundB, anchorA, anchorB, ratio})` keeps the rope length on one side plus `ratio` times the other constant, as a rope that pulls and never pushes (an Atwood machine). Each is one velocity constraint on the speeds of two bodies, solved every step as the soft constraint of Catto (GDC 2011): rigid by default, or soft with `frequency` and `damping`; `correction` is the share of the position error removed each step. They act next to the joints that guide the bodies (hinge each gear and the pinion, slide the rack), and `remove()` lets go.
+
+```ts
+import {GearJoint, Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.gravity = [0, 0, 0];
+const wheel = (x: number) => {
+  const post = physics.addBody(null, {type: 'fixed', position: [x, 0, 0], colliders: []});
+  const body = physics.addBody(null, {position: [x, 0, 0], colliders: {shape: 'sphere', radius: 0.4, mass: 2}});
+  physics.addJoint(post, body, {type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0], anchorB: [0, 0, 0]});
+  return body;
+};
+const big = wheel(0),
+  small = wheel(1);
+new GearJoint(physics, big, small, {ratio: 2}); // the small wheel turns half as fast, the other way
+big.setAngularVelocity([0, 0, 2]);
+for (let i = 0; i < 60; i++) physics.step();
+console.log(big.angularVelocity[2], small.angularVelocity[2]);
+```
+
 ## Soft bodies
 
 Ropes, cloth and particle meshes live in their own entry, `margoengine/physics/soft`, so a game that never imports it pays nothing: the root entry does not load it, and its kernel (a small Rust program compiled to Wasm) is a chunk of its own. Particles are held by compliant distance constraints (XPBD, Macklin, Müller and Chentanez 2016) solved in many small steps (Macklin et al. 2019); they collide with every shape of the rigid world (balls, boxes, capsules, cylinders, cones, hulls, meshes, height fields, voxels, compounds and half spaces; the rigid world is asked once a step for up to four planes each particle may meet, each collider swept along its own motion so a fast paddle cannot pass a particle, a deformable mesh's vertex speeds counted for friction, and sensors left out), and the bodies they press on take the impulse back, shared by the body's inverse mass and inertia, so a light crate on cloth sinks it and a heavy one sinks it more.
