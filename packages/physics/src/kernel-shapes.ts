@@ -248,7 +248,13 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
 export interface HullRows {
   addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
   hullVolume(row: number): number;
-  addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean, oriented?: boolean): number;
+  addTrimesh(
+    vertices: Float32Array,
+    indices: Uint32Array,
+    fixInternalEdges: boolean,
+    oriented?: boolean,
+    deformable?: boolean,
+  ): number;
   addHeightfield(
     rows: number,
     columns: number,
@@ -374,6 +380,7 @@ export function kernelCollider(
         Uint32Array.from(meshIndices),
         options.fixInternalEdges ?? false,
         options.oriented ?? false,
+        options.deformable ?? false,
       ),
     ];
     data = { vertices: Float32Array.from(meshVertices), indices: Uint32Array.from(meshIndices) };

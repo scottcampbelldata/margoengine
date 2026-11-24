@@ -127,6 +127,7 @@ interface KernelExports extends WebAssembly.Exports {
   hull_next(rows: number): number;
   mesh_begin(vertices: number, triangles: number): number;
   mesh_end(vertices: number, triangles: number, flags: number): number;
+  collider_refit(collider: number, motion: number): number;
   mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_next(rows: number): number;
   voxels_begin(cells: number): number;
@@ -377,6 +378,8 @@ export interface KernelTrimeshOptions {
    * how many triangles a ray from the point crosses. Default false.
    */
   oriented?: boolean;
+  /** The vertices may move later: {@link KernelWorld.refitCollider} follows them with no rebuild (Rapier's `DEFORMABLE`). Default false. */
+  deformable?: boolean;
 }
 
 /** Options of {@link KernelWorld.addHeightfield}. */
@@ -1251,7 +1254,7 @@ export class KernelWorld {
    */
   addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options: KernelTrimeshOptions = {}): number {
     const { api } = this,
-      { fixInternalEdges = false, oriented = false } = options,
+      { fixInternalEdges = false, oriented = false, deformable = false } = options,
       count = vertices.length / 3,
       triangles = indices.length / 3;
     if (!Number.isInteger(count) || !Number.isInteger(triangles))
@@ -1287,10 +1290,25 @@ export class KernelWorld {
         links[k][t0 + t] = other < 0 ? 0xffffffff : other;
       }
     }
-    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0));
+    const row = api.mesh_end(count, triangles, (fixInternalEdges ? 1 : 0) | (oriented ? 4 : 0) | (deformable ? 8 : 0));
     if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;
+  }
+  /**
+   * Follows the vertices of a deformable trimesh collider's mesh, written into the mesh's vertex rows, with no rebuild: every
+   * node's box is refit once, edge classes and bounds are recomputed, the broad phase is told, what rests on it wakes, and
+   * contacts reach `motion` (how far the farthest vertex moved) further until the next refit.
+   * @returns The nodes it touched, each once.
+   * @throws RangeError for a collider that is not a deformable trimesh or a vertex that is not finite.
+   */
+  refitCollider(collider: number, motion: number): number {
+    const touched = this.api.collider_refit(collider, motion);
+    if (touched < 0)
+      throw new RangeError(
+        `Collider ${collider} cannot be refit (code ${touched}); it must be a trimesh made with deformable: true, with finite vertices.`,
+      );
+    return touched;
   }
   /**
    * Adds a height field that colliders can share, for {@link KernelWorld.addCollider} with shape `trimesh`, laid out as

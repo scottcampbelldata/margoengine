@@ -435,6 +435,7 @@ export interface KernelSolverOptions {
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
     oriented?: boolean;
+    deformable?: boolean;
 }
 
 export class KernelWorld {
@@ -483,6 +484,7 @@ export class KernelWorld {
     addCompound(body: number, parts: readonly KernelCompoundPart[], options?: KernelColliderOptions): number;
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
+    refitCollider(collider: number, motion: number): number;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
@@ -841,6 +843,7 @@ export class PhysicsCollider {
         w: number;
     };
     vertices(): Float32Array;
+    setVertices(positions: ArrayLike<number>): void;
     indices(): Uint32Array | undefined;
     containsPoint(point: {
         x: number;
@@ -1104,6 +1107,7 @@ export type ShapeOptions = {
     deleteDuplicateTriangles?: boolean;
     deleteBadTopologyTriangles?: boolean;
     oriented?: boolean;
+    deformable?: boolean;
 } | {
     shape: 'heightfield';
     rows: number;

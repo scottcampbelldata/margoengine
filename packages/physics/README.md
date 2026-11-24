@@ -599,6 +599,24 @@ ball.enabled = false;
 physics.dispose();
 ```
 
+A `trimesh` with `deformable: true` (Rapier's `TriMeshFlags.DEFORMABLE`) keeps its vertices movable: `collider.setVertices(positions)` takes one packed x, y, z a vertex, in the collider's frame, and follows them with a refit of the mesh's tree (every node touched once, no rebuild), so rays, queries and contacts see the moved surface from the next call and what rests on it wakes. Call it between steps, as often as every step. Contacts and the broad phase reach as far as the farthest vertex moved, so a surface rising towards a body meets it; the surface has no velocity of its own, so one that moves through a body by more than its radius in one step passes it (limits). A mesh that is not `deformable` throws a `state` error from `setVertices`.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+const vertices = [-2, 0, -2, 2, 0, -2, 0, 0, 2];
+const floor = physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh', vertices, indices: [0, 2, 1], deformable: true}});
+const ball = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'sphere', radius: 0.25}});
+for (let step = 0; step < 120; step++) {
+  const lift = 0.002 * step;
+  floor.colliders[0].setVertices(vertices.map((v, i) => (i % 3 === 1 ? lift : v)));
+  physics.step();
+}
+console.log(ball.position[1] > 0.4);
+```
+
 A `contactFilter` may also answer `'noForces'`: the pair's contacts are found and its `contactstart` and `contactend` events fire, but nothing pushes (Rapier's `filterContactPair` answering with no solver flags). `false` still lets the pair pass through with no events, and `true` solves it.
 
 ```ts

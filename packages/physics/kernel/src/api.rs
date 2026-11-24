@@ -355,6 +355,24 @@ pub extern "C" fn mesh_begin(vertices: u32, triangles: u32) -> u32 {
 pub extern "C" fn mesh_end(vertices: u32, triangles: u32, flags: u32) -> i32 {
     world().end_mesh(vertices, triangles, flags)
 }
+/// Follows the vertices a deformable collider's mesh now holds (written into its vertex rows): the tree's boxes, the edge
+/// classes and the box are refit with no rebuild, the broad phase and what rests on it are told, and contacts reach `motion`
+/// (how far the farthest vertex moved) further until the next refit. The nodes touched, or a negative MESH_ code.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_refit(collider: u32, motion: f32) -> i32 {
+    let w = world();
+    let at = collider as usize;
+    if collider >= w.header().collider_rows || w.uu(COLLIDER_STATE, at) & REMOVED != 0 || w.uu(COLLIDER_SHAPE, at) != SHAPE_TRIMESH {
+        return -1;
+    }
+    let touched = w.refit_mesh(w.uu(COLLIDER_HULL, at) as usize, motion);
+    if touched >= 0 {
+        w.mark_pending(collider);
+        w.touch_collider(collider);
+        w.wake(w.uu(COLLIDER_BODY, at));
+    }
+    touched
+}
 /// Finishes a height field written after `mesh_begin(vertices, 0)` as `(rows + 1) (columns + 1)` vertices, column
 /// major: its row, or a negative MESH_ code. `flags` holds MESH_ bits.
 #[unsafe(no_mangle)]

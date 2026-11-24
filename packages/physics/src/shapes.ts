@@ -57,6 +57,11 @@ export type ShapeOptions =
        * unchanged. Only the own solver holds it.
        */
       oriented?: boolean;
+      /**
+       * The vertices may move after the mesh is made (default false), Rapier's `TriMeshFlags.DEFORMABLE`: `collider.setVertices`
+       * moves them, and the tree follows by a refit with no rebuild. A deformable mesh is not shared between colliders.
+       */
+      deformable?: boolean;
     }
   | {
       shape: 'heightfield';

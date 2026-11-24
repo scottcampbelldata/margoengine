@@ -14668,5 +14668,14 @@
     "reason": "The pair filter's result widens from `boolean` to `boolean | 'noForces'`: `'noForces'` finds a pair's contacts and fires its events without forces, as Rapier's contact hook answering with no solver flags. A filter returning a boolean keeps working. Approved through the physics manager session that Scott handed his approvals to.",
     "date": "2026-11-24",
     "approved": "Scott 2026-11-24"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "ShapeOptions",
+    "change": "signature",
+    "was": "f573187c",
+    "reason": "The `trimesh` shape option gains the optional `deformable` flag (Rapier's `TriMeshFlags.DEFORMABLE`), so `PhysicsCollider.setVertices` can move its vertices. Existing options keep working. Approved through the physics manager session that Scott handed his approvals to.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24"
   }
 ]

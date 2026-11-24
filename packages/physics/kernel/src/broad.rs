@@ -61,6 +61,7 @@ impl World {
         let flags = self.flags(at);
         let rotation = self.q(ROTATION_X, at);
         let mut center = self.v(POSITION_X, at).add(rotation.rotate(self.v(COLLIDER_X, c)));
+        let mut moved = 0.0f32;
         let turn = rotation.mul(self.q(COLLIDER_ROTATION_X, c));
         let (a, b, d) = (self.s(COLLIDER_A, c), self.s(COLLIDER_B, c), self.s(COLLIDER_C, c));
         let (extent, radius) = match self.uu(COLLIDER_SHAPE, c) {
@@ -89,6 +90,7 @@ impl World {
                 let y = turn.rotate(v3(0.0, half.y, 0.0)).abs();
                 let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
                 center = center.add(turn.rotate(self.v(MESH_BOX_X, mesh)));
+                moved = self.s(MESH_MOTION, mesh);
                 (x.add(y).add(z), self.s(MESH_RADIUS, mesh))
             }
             SHAPE_CYLINDER | SHAPE_CONE => {
@@ -105,7 +107,7 @@ impl World {
             }
         };
         // Soft CCD and a skin: the box reaches that much further every way, so the pair exists when the contacts are asked for.
-        let soft = self.s(SOFT_CCD, at) + self.s(COLLIDER_SKIN, c);
+        let soft = self.s(SOFT_CCD, at) + self.s(COLLIDER_SKIN, c) + moved;
         let extent = extent.add(v3(soft, soft, soft));
         let (mut low, mut high) = (center.sub(extent), center.add(extent));
         let kind = flags & KIND;

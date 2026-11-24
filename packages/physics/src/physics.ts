@@ -456,8 +456,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       return row;
     },
     hullVolume: (row) => this.kernel.columns.hullVolume[row],
-    addTrimesh: (vertices, indices, fixInternalEdges, oriented) =>
-      this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented }),
+    addTrimesh: (vertices, indices, fixInternalEdges, oriented, deformable) =>
+      this.kernel.addTrimesh(vertices, indices, { fixInternalEdges, oriented, deformable }),
     addHeightfield: (rows, columns, heights, scale, fixInternalEdges) =>
       this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], { fixInternalEdges }),
     addVoxels: (cells, size) => this.kernel.addVoxels(cells, [size[0], size[1], size[2]]),

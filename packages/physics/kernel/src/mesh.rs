@@ -262,6 +262,77 @@ impl World {
         [corner(TRIANGLE_A), corner(TRIANGLE_B), corner(TRIANGLE_C)]
     }
 
+    /// Follows a deformable mesh's moved vertices (written into its MESH_VERTEX_ rows) without a rebuild: every node's box
+    /// is recomputed bottom up, each triangle's edge classes again, and the mesh's box and radius. `motion` is how far the
+    /// farthest vertex moved; contacts and the search reach that much further until the next refit. The nodes it touched,
+    /// once each, or a MESH_ code (-1 not a deformable triangle mesh, -3 a vertex is not finite).
+    pub fn refit_mesh(&mut self, mesh: usize, motion: f32) -> i32 {
+        if mesh >= self.header().mesh_rows[0] as usize
+            || self.uu(MESH_FLAGS, mesh) & (MESH_DEFORMABLE | MESH_VOXELS) != MESH_DEFORMABLE
+            || self.uu(MESH_COLUMNS, mesh) != 0
+            || !(motion >= 0.0 && motion.is_finite())
+        {
+            return MESH_EMPTY;
+        }
+        let (v0, vertices) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_VERTICES, mesh) as usize);
+        let (t0, triangles) = (self.uu(MESH_FIRST_TRIANGLE, mesh) as usize, self.uu(MESH_TRIANGLES, mesh) as usize);
+        let (n0, nodes) = (self.uu(MESH_FIRST_NODE, mesh) as usize, self.uu(MESH_NODES, mesh) as usize);
+        let (mut low, mut high) = (v3(f32::INFINITY, f32::INFINITY, f32::INFINITY), v3(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY));
+        for i in v0..v0 + vertices {
+            let p = self.v(MESH_VERTEX_X, i);
+            if !(p.x.is_finite() && p.y.is_finite() && p.z.is_finite()) {
+                return MESH_NOT_FINITE;
+            }
+            low = low.min(p);
+            high = high.max(p);
+        }
+        // A node's children come after it, so the last node first finds both children done.
+        for node in (n0..n0 + nodes).rev() {
+            let count = self.uu(NODE_COUNT, node) as usize;
+            let first = self.uu(NODE_FIRST, node) as usize;
+            let (mut lo, mut hi) = (v3(f32::INFINITY, f32::INFINITY, f32::INFINITY), v3(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY));
+            if count > 0 {
+                for k in first..first + count {
+                    let t = t0 + self.uu(TRIANGLE_ORDER, t0 + k) as usize;
+                    let [a, b, c] = self.triangle_corners(v0, t);
+                    lo = lo.min(a).min(b).min(c);
+                    hi = hi.max(a).max(b).max(c);
+                }
+            } else {
+                for child in [n0 + first, n0 + first + 1] {
+                    lo = lo.min(self.v(NODE_MIN_X, child));
+                    hi = hi.max(self.v(NODE_MAX_X, child));
+                }
+            }
+            self.set_v(NODE_MIN_X, node, lo);
+            self.set_v(NODE_MAX_X, node, hi);
+        }
+        for t in t0..t0 + triangles {
+            let corners = self.triangle_corners(v0, t);
+            let mut classes = 0;
+            if let Some(front) = triangle_normal(corners[0], corners[1], corners[2]) {
+                for k in 0..3 {
+                    let across = self.uu(TRIANGLE_ACROSS_0 + k, t);
+                    if across != NONE {
+                        classes |= edge_class(corners, front, k, self.triangle_corners(v0, t0 + across as usize)) << (2 * k);
+                    }
+                }
+            }
+            self.set_u(TRIANGLE_EDGES, t, classes);
+        }
+        let center = low.add(high).scale(0.5);
+        let mut radius = 0.0f32;
+        for i in v0..v0 + vertices {
+            let off = self.v(MESH_VERTEX_X, i).sub(center);
+            radius = radius.max(off.dot(off));
+        }
+        self.set_v(MESH_BOX_X, mesh, center);
+        self.set_v(MESH_HALF_X, mesh, high.sub(low).scale(0.5));
+        self.set_s(MESH_RADIUS, mesh, sqrt(radius));
+        self.set_s(MESH_MOTION, mesh, motion);
+        nodes as i32
+    }
+
     /// Grows the mesh classes to at least these rows; false when memory cannot.
     pub fn reserve_mesh(&mut self, rows: [u32; 5]) -> bool {
         let old = self.header().capacity;
@@ -581,6 +652,8 @@ impl World {
     pub fn mesh_pair(&mut self, row: usize, a: usize, b: usize, limit: f32, ratio: f32) {
         let (mesh_collider, other, other_is_a) = self.mesh_sides(a, b);
         let bodies = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
+        // A mesh that moved in its last refit is met that much further off.
+        let limit = limit + self.s(MESH_MOTION, self.uu(COLLIDER_HULL, mesh_collider) as usize);
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
             // Two voxel grids meet cell by cell; a grid and a mesh, or two meshes, do not meet, as on Rapier.
             let voxels = |c: usize| self.is_voxels(self.uu(COLLIDER_HULL, c) as usize);
@@ -616,7 +689,7 @@ impl World {
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
         // The mesh's own skin reaches triangles that far from the other collider's box.
-        let skin = self.s(COLLIDER_SKIN, mesh_collider);
+        let skin = self.s(COLLIDER_SKIN, mesh_collider) + self.s(MESH_MOTION, mesh);
         let (low, high) = (low.sub(v3(skin, skin, skin)), high.add(v3(skin, skin, skin)));
         let mut manifold = Manifold::new();
         if let Some((rows, columns)) = self.grid_size(mesh) {

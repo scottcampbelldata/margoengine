@@ -511,6 +511,8 @@ columns! {
     MESH_HALF_Y f32 Mesh,
     MESH_HALF_Z f32 Mesh,
     MESH_RADIUS f32 Mesh,
+    // How far the surface moved in its last refit (deformable meshes): the search and the contact limit reach that much further.
+    MESH_MOTION f32 Mesh,
     // A voxel grid (MESH_VOXELS): its first word, its cells along x, y and z, the cell at its corner (i32 bits) and one
     // cell's size. Cell (i, j, k) spans [i, i + 1] times the size along x, and so on, in the collider's frame.
     VOXEL_FIRST u32 Mesh,
@@ -661,6 +663,9 @@ pub const MESH_VOXELS: u32 = 2;
 /// MESH_FLAGS: a closed surface with its outside known, so a point is inside it when a ray from the point leaves through an
 /// odd number of triangles: point queries and rays from inside (Rapier's `TriMeshFlags.ORIENTED`).
 pub const MESH_ORIENTED: u32 = 4;
+/// MESH_FLAGS: the vertices may move after the mesh is made (`TriMeshFlags.DEFORMABLE`): `refit_mesh` follows them with the
+/// tree, the boxes and the edge classes, with no rebuild.
+pub const MESH_DEFORMABLE: u32 = 8;
 /// TRIANGLE_EDGES, two bits an edge: open (no triangle across), convex, concave, or flat.
 pub const EDGE_OPEN: u32 = 0;
 pub const EDGE_CONVEX: u32 = 1;

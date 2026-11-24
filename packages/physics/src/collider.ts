@@ -276,6 +276,46 @@ export class PhysicsCollider {
       throw new MargoError('state', `A ${this.shape} collider holds no vertices; ask a trimesh or convexHull.`);
     return this.data.vertices;
   }
+  /**
+   * Moves the vertices of a `deformable` trimesh to these packed xyz positions (in the collider's frame, as many as it has):
+   * the mesh's tree is refit in one pass with no rebuild, so rays, queries and contacts see the moved surface from the next
+   * call, and what rests on it wakes. Contacts reach as far as the farthest vertex moved until the next call. Call it
+   * between steps, as often as every step.
+   * @throws RangeError for a count that is not the mesh's, or a position that is not finite.
+   * @throws MargoError code `state` for a collider that is not a trimesh made with `deformable: true`.
+   */
+  setVertices(positions: ArrayLike<number>): void {
+    const columns = this.columns(),
+      data = this.data;
+    const mesh = columns.colliderHull[this.handle]!;
+    if (this.shape !== 'trimesh' || !data || (columns.meshFlags[mesh]! & 8) === 0)
+      throw new MargoError(
+        'state',
+        `A ${this.shape} collider cannot move its vertices; make a trimesh with deformable: true.`,
+      );
+    if (positions.length !== data.vertices.length)
+      throw new RangeError(
+        `This mesh has ${data.vertices.length / 3} vertices and setVertices got ${positions.length / 3}; pass one x, y, z per vertex.`,
+      );
+    let farthest = 0;
+    for (let i = 0; i < positions.length; i += 3) {
+      const dx = positions[i]! - data.vertices[i]!,
+        dy = positions[i + 1]! - data.vertices[i + 1]!,
+        dz = positions[i + 2]! - data.vertices[i + 2]!,
+        d = dx * dx + dy * dy + dz * dz;
+      if (!Number.isFinite(d) || !Number.isFinite(positions[i]! + positions[i + 1]! + positions[i + 2]!))
+        throw new RangeError(`Vertex ${i / 3} is not finite; pass finite numbers.`);
+      if (d > farthest) farthest = d;
+    }
+    const first = columns.meshFirstVertex[mesh]!;
+    for (let i = 0; i < positions.length / 3; i++) {
+      columns.meshVertexX[first + i] = positions[3 * i]!;
+      columns.meshVertexY[first + i] = positions[3 * i + 1]!;
+      columns.meshVertexZ[first + i] = positions[3 * i + 2]!;
+    }
+    data.vertices.set(positions as ArrayLike<number>);
+    this.kernel.refitCollider(this.handle, Math.sqrt(farthest));
+  }
   /** Triangle indices of a trimesh. */
   indices(): Uint32Array | undefined {
     return this.data?.indices;
