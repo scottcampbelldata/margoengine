@@ -232,6 +232,32 @@ test('the polygon edit paints exactly the cells whose corner is inside, and farm
         assert.ok(r.mesh.startsWith('library:'), `${b.id} ${r.id} draws a library model, not a procedural one`);
     for (const e of edits) editor.apply(e);
     assert.ok(FARMLAND_MATERIALS.plough.color.every((v) => v >= 0 && v <= 1));
+    // Fauld recut round 2: hedges were drawn only within 1.2 km of the shot's focus and untextured, and bare hedge
+    // trees stood in open pasture. Hedges are now painted strips of the hedgerow biome along every hedge, its gates left
+    // open, so the view grows their shrubs and trees with its LOD rings and far impostors.
+    const hedgePaths = edits.filter((e) => e.kind === 'path' && e.layer === 'paint/hedgerow');
+    assert.ok(hedgePaths.length >= small.hedges.length, `${hedgePaths.length} hedge runs for ${small.hedges.length} hedges`);
+    assert.ok(FARMLAND_PAINT.some((p) => p.biome === 'hedgerow'));
+    const hedgerow = lowlandFarmWorld.biomes.find((b) => b.id === 'hedgerow');
+    assert.deepEqual(
+      hedgerow.plants.map((p) => p.mesh),
+      ['library:hawthorn', 'library:blackthorn', 'library:oak', 'library:ash', 'library:holly'],
+    );
+    // A hedge's middle is hedgerow paint; a gate in it is not.
+    const h = small.hedges.find((x) => x.points.length >= 2 && Math.hypot(x.points[1][0] - x.points[0][0], x.points[1][1] - x.points[0][1]) > 20 && !x.gaps.length);
+    if (h) {
+      const [a, b] = h.points,
+        mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+        tx = Math.floor((mid[0] - bx) / w.tileSize),
+        tz = Math.floor((mid[1] - w.bounds[1]) / w.tileSize),
+        r = w.readLayer('paint/hedgerow', tx, tz),
+        k = Math.floor((mid[1] - w.bounds[1] - tz * w.tileSize) / w.resolution) * cells + Math.floor((mid[0] - bx - tx * w.tileSize) / w.resolution);
+      assert.ok(r && r[k] > 0, 'the middle of a hedge is painted hedgerow');
+    }
+    const gated = { ...small, hedges: [{ points: [[-50, 0], [50, 0]], fields: [0, 1], gaps: [[45, 55]], height: 2.2, width: 2, lane: false }] };
+    const runs = farmlandEdits(gated).filter((e) => e.layer === 'paint/hedgerow');
+    assert.equal(runs.length, 2, 'a gate splits a hedge into two runs');
+    assert.ok(runs.every((e) => e.path.points.every(([x]) => x <= -5 + 1e-9 || x >= 5 - 1e-9)), 'nothing painted in the gate');
   } finally {
     w.dispose();
   }

@@ -735,11 +735,35 @@ export function fieldAt(farm: Farmland, x: number, z: number): Field | undefined
  */
 export function farmlandEdits(
   farm: Farmland,
-  biomes: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood', string>>> = {},
+  biomes: Readonly<Partial<Record<Exclude<FieldUse, 'none'> | 'lane' | 'wood' | 'hedge', string>>> = {},
   woods: readonly (readonly Pt[])[] = [],
 ): BiomeEdit[] {
-  const id = (k: Exclude<FieldUse, 'none'> | 'lane' | 'wood') =>
-    biomes[k] ?? (k === 'lane' ? 'farm-lane' : k === 'wood' ? 'farm-wood' : k);
+  const id = (k: Exclude<FieldUse, 'none'> | 'lane' | 'wood' | 'hedge') =>
+    biomes[k] ?? (k === 'lane' ? 'farm-lane' : k === 'wood' ? 'farm-wood' : k === 'hedge' ? 'hedgerow' : k);
+  // A hedge's runs between its gaps (the gates stay open ground).
+  const runs = (h: Hedge): Pt[][] => {
+    const out: Pt[][] = [];
+    const open = (d: number) => h.gaps.some(([a, b]) => d >= a && d <= b);
+    let run: Pt[] = open(0) ? [] : [h.points[0]],
+      along = 0;
+    for (let i = 1; i < h.points.length; i++) {
+      const [ax, az] = h.points[i - 1],
+        [bx, bz] = h.points[i],
+        l = Math.hypot(bx - ax, bz - az),
+        steps = Math.max(1, Math.ceil(l / 2));
+      for (let k = 1; k <= steps; k++) {
+        const p: Pt = [ax + ((bx - ax) * k) / steps, az + ((bz - az) * k) / steps],
+          d = along + (l * k) / steps;
+        if (open(d)) {
+          if (run.length > 1) out.push(run);
+          run = [];
+        } else run.push(p);
+      }
+      along += l;
+    }
+    if (run.length > 1) out.push(run);
+    return out;
+  };
   return [
     ...farm.fields
       .filter((f) => f.use !== 'none')
@@ -753,6 +777,20 @@ export function farmlandEdits(
           falloff: 'constant',
         }),
       ),
+    // Hedges as narrow painted strips of the hedgerow biome: its shrubs and hedge trees grow along them, drawn by the
+    // view with the rest of its plants (LOD rings, far impostors, shadows and wind), never cut off at one radius.
+    ...farm.hedges.flatMap((h) =>
+      runs(h).map(
+        (points): BiomeEdit => ({
+          kind: 'path',
+          layer: `paint/${id('hedge')}`,
+          path: { points, width: h.width, edge: 0.5 },
+          strength: 1,
+          mode: 'set',
+          falloff: 'constant',
+        }),
+      ),
+    ),
     ...woods.map(
       (points): BiomeEdit => ({
         kind: 'polygon',
@@ -818,10 +856,24 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
         { id: 'oak', mesh: 'library:oak', density: 120, radius: 5, shade: 0.4 },
         { id: 'ash', mesh: 'library:ash', density: 90, radius: 4.5, shade: 0.5 },
         { id: 'birch', mesh: 'library:birch', density: 50, radius: 3, shade: 0.3 },
-        { id: 'holly', mesh: 'library:holly', density: 200, radius: 1.5, shade: 0.8 },
+        { id: 'holly', mesh: 'library:holly', density: 40, radius: 1.5, shade: 0.8 },
         { id: 'hazel', mesh: 'library:hazel', density: 300, radius: 1.4, shade: 0.6 },
       ],
       details: [{ id: 'fern', mesh: 'library:fern', density: 6, light: [0, 0.6] }],
+    } as BiomeDefinition),
+    // Hedgerows (painted along the hedges by farmlandEdits): hawthorn and blackthorn shrubs about 1.2 m apart, the
+    // hedgerow oaks and ashes of the Staffordshire claylands about 12 and 6 a kilometre, holly the one evergreen.
+    Object.freeze({
+      id: 'hedgerow',
+      climate: { height: NEVER },
+      ground: [{ material: 'rough-meadow' }, { material: 'mud', moisture: [0.85, null] }],
+      plants: [
+        { id: 'hawthorn', mesh: 'library:hawthorn', density: 2600, radius: 0.8, shade: 0.5 },
+        { id: 'blackthorn', mesh: 'library:blackthorn', density: 900, radius: 0.8, shade: 0.4 },
+        { id: 'hedge-oak', mesh: 'library:oak', density: 60, radius: 5, shade: 0.4 },
+        { id: 'hedge-ash', mesh: 'library:ash', density: 30, radius: 4.5, shade: 0.5 },
+        { id: 'hedge-holly', mesh: 'library:holly', density: 40, radius: 1.5, shade: 0.8 },
+      ],
     } as BiomeDefinition),
     // The base biome: pasture wherever nothing else is painted (kept ground such as a village or a yard included).
     Object.freeze({
@@ -838,5 +890,5 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
 
 /** The paint layers of the farm biomes, for `BiomeWorld.create({ paint })`. */
 export const FARMLAND_PAINT = Object.freeze(
-  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood'].map((biome) => Object.freeze({ biome })),
+  ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood', 'hedgerow'].map((biome) => Object.freeze({ biome })),
 );

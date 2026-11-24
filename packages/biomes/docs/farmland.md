@@ -26,8 +26,12 @@ world.dispose();
 ```
 
 Draw it with `BiomeView` and `materials: FARMLAND_MATERIALS` (winter pasture, ploughed red-brown clay, stubble, rough
-meadow, lane gravel); pass `farm.exclusions` as the view's `exclusions` so no stored tree stands in a lane or a hedge, and
-draw the hedges and hedge trees from `farm.hedges` and `farm.trees` with your own models (a scene's library meshes).
+meadow, lane gravel); pass `farm.exclusions` as the view's `exclusions` so no stored tree stands in a lane. `farmlandEdits`
+paints every hedge as a strip of the `hedgerow` biome (its gates left open), whose plants are hawthorn and blackthorn
+about 1.2 m apart, hedgerow oaks and ashes (about 12 and 6 a kilometre) and holly, the one evergreen: give the view's
+`meshes` the keys `library:hawthorn`, `library:blackthorn`, `library:oak`, `library:ash` and `library:holly`, and the
+hedges draw with the rest of the plants, LOD rings and far impostors included, at any distance the view draws plants.
+`farm.trees` still lists hedge tree spots for a scene that places its own field trees.
 
 ## How it is laid out
 
