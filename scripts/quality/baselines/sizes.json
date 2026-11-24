@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17820088,
+  "total": 17831505,
   "history": [
     {
       "date": "2026-10-24",
@@ -11631,6 +11631,12 @@
       "commit": "1a9ed2b1e",
       "reason": "new optional entry @margoengine/physics/meshfiles (STL and OBJ readers, 993 B gzip)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "1059484ce",
+      "reason": "physics with its kernel 282,538 to 285,393 B gzip on the Mac: paths of any length (about 400 B: growable point store, box index, closed paths) plus the turning shape cast landed in 9a777c9c5, whose growth the baseline did not record",
+      "grew": 1
     }
   ],
   "items": {
@@ -12388,7 +12394,7 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 282538,
+    "@margoengine/physics": 293955,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 73246,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 215980,
     "@margoengine/physics/decomposition": 11130,
