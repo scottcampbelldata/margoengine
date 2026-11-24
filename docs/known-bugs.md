@@ -20,11 +20,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/committed-blueprint.test.js` (every committed deflated blueprint is kept whatever the compressor would give, a changed kernel is compressed again, and the four builds call it).
 - **Candidate, not landed:** a deterministic compressor whose bytes our own code defines would give a blueprint about 50 B smaller; it changes core's embedded bytes, so it is a separate core change.
 
-### Open 2026-11-24: ragdoll balance and push recovery were tuned on Rapier's joints (KB-PHYS-SWITCH-BAL1, ragdoll)
+### Open 2026-11-24: ragdoll balance and push recovery differ from the Rapier results they were measured on (KB-PHYS-SWITCH-BAL1, ragdoll)
 
-- **Repro:** `node --test packages/ragdoll/tests/balance.test.js`: "without it the character folds up" reads `motors alone sink (0.4004 of 0.4057)` (the kernel's motors hold the standing pose instead of folding), and "pushed to its left it steps that way, catches itself and stands" ends moving at 0.77 m/s.
-- **Cause:** the balance controller's gains, `LEG_INERTIA` and solver passes were measured against Rapier's softer joints and iteration scheme. The kernel's joints and 8 substeps of 2 passes answer differently. `SOLVER_PASSES` is 16 now (8 substeps of the world plus the island's extra substeps).
-- **State:** the cone rotation motor now holds (KB-PHYS-SWITCH-CONE1 above); retuning is the open work.
+- **Repro:** `node --test packages/ragdoll/tests/balance.test.js`: "without it the character folds up" reads `motors alone sink (0.4004 of 0.4057)`, and the four "pushed ... it steps that way, catches itself and stands" tests end in `fallen` after a 1.5 m/s push of the upper body.
+- **Findings so far (dynamics session):**
+  - Single joints agree. A rod on a spherical or a cone joint under a force-model motor sags by the closed form m g L / (2 k) (0.049 rad at k = 200) and as far as Rapier's spherical motor with the same gains, within 15 percent (Rapier reads 0.056), and a `maxForce` cap acts the same on both (`next-cone-motor-oracle.test.js`). The cone drive had two faults, now fixed (KB-PHYS-SWITCH-CONE1 above), which caused most of the earlier ragdoll failures.
+  - "Motors alone sink": the kernel's motors hold the standing pose (hips at 98.4 percent of height for 10 s, still), where Rapier's ankles rolled over (foot cone 0.66 rad). A straight standing pose needs almost no ankle torque, so the kernel's reading is the physical one and the expectation looks like a Rapier softness quirk; not changed yet.
+  - Push recovery: the kernel recovers pushes of up to 1.2 m/s in all four directions (steps, stands, speed 0) with no change to the controller, and falls at 1.5 m/s, which Rapier's run recovers. The first 0.3 s after the push (the whole body leaps to 1.27 of its height, both feet 0.15 m up) is the same in both. They part after the landing: Rapier's legs give and it recovers by 1.5 s; the kernel's stay stiff and it hops on. The outcome at 1.5 m/s is chaotic in every solver setting (iterations, substeps, extra passes, warm start, contact softness), so no single parameter is the cause.
+- **Cause:** not found beyond the above: Rapier dissipates more in the landing than the kernel does, and the controller's reach at 1.5 m/s is marginal.
+- **State:** open. Gains, thresholds and budgets change only if the old values are shown to encode a Rapier quirk, and then as an accepted difference in `docs/limits.md`.
 
 ### Open 2026-11-24: a query with no `groups` misses colliders whose filter is 0 (KB-PHYS-SWITCH-GROUPS1, physics collision)
 
