@@ -856,6 +856,23 @@ console.log(rope.broken, weight.position[1] < -2); // true true
 physics.dispose();
 ```
 
+### Debug lines
+
+`physics.debugRender(options)` returns Rapier's debug-render data: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the outlines of every collider (all shapes, a compound by its parts, a mesh by its edges, a voxel grid by its box), a line across each joint with a line from each anchor to its body (dark red once broken), and each contact point of the last step with a short line along its normal. `boxes: true` adds the world box of each collider; `colliders`, `joints` and `contacts` switch their lines off. Colours: green awake dynamic bodies, grey fixed, blue kinematic, dim green sleeping, yellow sensors, red joints, magenta contacts, translucent cyan boxes. Draw them with `@margoengine/lines`.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [5, 0.5, 5]}});
+physics.addBody(null, {position: [0, 0.6, 0], colliders: {shape: 'sphere', radius: 0.5}});
+physics.step();
+const {vertices, colors} = physics.debugRender({boxes: true});
+console.log(vertices.length / 6 > 12, colors.length / 4 === vertices.length / 3); // true true
+physics.dispose();
+```
+
 ## Parity with Rapier 3D
 
 Margo builds its own solver to replace Rapier, so every capability Rapier's public user guide lists (rigid bodies, joints, multibody joints, integration parameters, determinism, serialization, the PID controller and the debug-render pipeline) has a row here, with what the kernel and `margoengine/physics/next` hold today. `full` means built, typed, documented and proven by a test; `partial` names what is left; `missing` is not built. A row is closed in the commit that builds it, and the table shows what is left until every row reads `full`. Only Rapier's public user documentation was read to make the list, never its source or any other engine's.
@@ -889,7 +906,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Cross-platform determinism | bit-equal replay in Node, native code, Chromium and Firefox; `world.hash` | partial: no named mode |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full |
 | PID controller | `PidController` | full |
-| Debug-render data: colliders, joints, contacts, boxes | none | missing |
+| Debug-render data: colliders, joints, contacts, boxes | `debugRender` | full |
 
 ## Limits
 

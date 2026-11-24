@@ -8388,3 +8388,7 @@ Reflected objects beyond the captured extent are unavailable to the planar adapt
 ## Physics joint breaking and PID controller (own solver)
 
 A joint's break load is read at the last substep of a step, from the impulses its rows carry over that substep's length, so a limit is met by the load at the end of the step rather than the peak inside it, and a short spike that the soft rows spread over a few substeps reads lower than its peak. Linear rows count the three lines of frame A and angular rows the three turns about it, motors excluded. `PidController` returns an acceleration and applies it as an impulse of mass or world inertia times that acceleration times the step; it does not compensate gravity or contacts, and its angular error is twice the vector part of the short turn, which is the angle to 0.1 percent below 0.1 radian and a little under it beyond.
+
+## Physics debug lines (own solver)
+
+`debugRender` draws what the kernel holds at the last step: a sphere as three rings of 24 segments, a capsule, cylinder and cone as rings and lines (their rounded borders are not drawn), a hull by its edges, a mesh by each distinct edge once, a half space as a 20 m grid on its plane through its origin, a voxel grid as its box, and a compound by its parts. Poses are the step's, not the interpolated ones, so a drawn body can lead its mesh by up to one step.

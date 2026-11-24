@@ -31,6 +31,7 @@ import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
+import { debugLines, type DebugLines, type DebugRenderOptions } from './debug.js';
 import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
 import { kernelCollider, multiply, queryParts, queryShape, shapeServed, turn, type HullRows } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
@@ -1207,9 +1208,13 @@ export class Physics implements EnginePlugin, BodyOwner {
     return points;
   }
 
-  /** Not served yet: throws. */
-  debugRender(): never {
-    throw later('debugRender', 'the debug entry');
+  /**
+   * Rapier's debug lines: `vertices` (x, y, z, two vertices a segment) and `colors` (r, g, b, a a vertex) for the collider
+   * outlines, joints and last-step contact points of the world, and with `boxes` the box around each collider. Draw them with
+   * `@margoengine/lines`: `new Line({mode: 'segments', positions: vertices, colors})`. Reads the poses of the last step.
+   */
+  debugRender(options: DebugRenderOptions = {}): DebugLines {
+    return debugLines(this.kernel, this.bodies, this.joints, options);
   }
 
   /** Frees every body and the world. Detaches from the engine if attached. */

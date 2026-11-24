@@ -9,6 +9,7 @@ export type { PidOptions } from './next/pid.js';
 export { collisionGroups } from './shapes.js';
 export { buildHull as convexHull } from './next/hull.js';
 export { cleanTrimesh } from './next/mesh-clean.js';
+export type { DebugLines, DebugRenderOptions } from './next/debug.js';
 export type { MeshCleanOptions } from './next/mesh-clean.js';
 export type { HullFaces } from './next/hull.js';
 export type { ConeJointOptions, NextJointOptions } from './next/joint.js';

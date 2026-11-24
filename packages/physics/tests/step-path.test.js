@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const source = new URL('../src/', import.meta.url);
-const offPath = new Set(['next/sync.ts', 'next/collider.ts']);
+const offPath = new Set(['next/sync.ts', 'next/collider.ts', 'next/debug.ts']);
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 
 /** `text` with comments and the insides of strings blanked, newlines kept. The checked files hold no regular expressions. */
