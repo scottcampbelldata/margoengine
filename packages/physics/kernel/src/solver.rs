@@ -118,18 +118,18 @@ pub struct Moving {
 impl Moving {
     /// The change of an impulse `p` at the arm `r`.
     #[inline(always)]
-    fn push(&mut self, p: V3, r: V3) {
+    pub(crate) fn push(&mut self, p: V3, r: V3) {
         self.linear = self.linear.add(self.mass.mul(p));
         self.angular = self.angular.add(self.inertia.mul(r.cross(p)));
     }
     /// How much a unit impulse along `d` at `r` changes the speed there along `d`.
     #[inline(always)]
-    fn give(&self, d: V3, r: V3) -> f32 {
+    pub(crate) fn give(&self, d: V3, r: V3) -> f32 {
         let turn = r.cross(d);
         d.mul(d).dot(self.mass) + turn.dot(self.inertia.mul(turn))
     }
     #[inline(always)]
-    fn at(&self, r: V3) -> V3 {
+    pub(crate) fn at(&self, r: V3) -> V3 {
         self.linear.add(self.angular.cross(r))
     }
     /// Takes no push: a wall to whatever it is solved against.

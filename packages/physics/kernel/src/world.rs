@@ -104,6 +104,8 @@ pub struct Header {
     /// meaning the same as every other contact.
     pub static_hertz: f32,
     pub static_damping: f32,
+    /// The mechanisms that tie two bodies' motion together (src/couplings.rs).
+    pub couplings: [crate::couplings::Coupling; crate::couplings::MAX_COUPLINGS],
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -202,6 +204,7 @@ impl World {
                 max_linear_speed: 0.0,
                 static_hertz: 0.0,
                 static_damping: 0.0,
+                couplings: [crate::couplings::Coupling::NONE; crate::couplings::MAX_COUPLINGS],
             });
         }
         Some(world)

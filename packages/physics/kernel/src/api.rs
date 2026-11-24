@@ -293,6 +293,30 @@ pub extern "C" fn body_set_own(body: u32, mass: f32, x: f32, y: f32, z: f32, ix:
     }
 }
 /// A new joint between two bodies, or -1 when one is gone, they are one body, or memory is out. JS then writes its columns.
+/// Adds a coupling (1 gear, 2 rack and pinion, 3 pulley) between two bodies; its slot, or -1.
+#[unsafe(no_mangle)]
+pub extern "C" fn coupling_add(kind: u32, a: u32, b: u32) -> i32 {
+    world().add_coupling(kind, a, b).map_or(-1, |slot| slot as i32)
+}
+/// Writes a field of a coupling: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B (three numbers each);
+/// 6 ratio, 7 total (the first number); 8 softness (frequency, damping ratio, correction).
+#[unsafe(no_mangle)]
+pub extern "C" fn coupling_set(slot: u32, field: u32, x: f32, y: f32, z: f32) {
+    world().set_coupling(slot as usize, field, [x, y, z]);
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn coupling_remove(slot: u32) -> u32 {
+    world().remove_coupling(slot as usize) as u32
+}
+/// The error a coupling has built up, and the impulse it gave in the last substep it was solved.
+#[unsafe(no_mangle)]
+pub extern "C" fn coupling_error(slot: u32) -> f32 {
+    world().coupling_error(slot as usize)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn coupling_impulse(slot: u32) -> f32 {
+    world().coupling_impulse(slot as usize)
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn joint_add(a: u32, b: u32, flags: u32) -> i32 {
     world().add_joint(a, b, flags).map_or(-1, |row| row as i32)

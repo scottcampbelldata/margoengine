@@ -158,6 +158,7 @@ impl World {
             world.timing[phase] = (at - stamp) as f32;
             stamp = at;
         };
+        self.wake_couplings();
         self.begin_step(dt);
         lap(self, 1);
         self.broad_update(dt);
@@ -177,6 +178,7 @@ impl World {
             self.refresh_joints();
             self.warm_start();
             self.warm_start_joints();
+            self.warm_start_couplings();
             // An island that asks for e extra passes takes the last iterations + e of iterations + most, so it runs as a world of
             // iterations + e would and the pushing pass stays the last for all. `least` is the fewest extra passes a row's
             // island must ask for to join a pass.
@@ -190,10 +192,12 @@ impl World {
             for pass in 1..=all {
                 let least = most.saturating_add(1).saturating_sub(pass);
                 self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
+                self.solve_couplings(h, pass == all);
                 self.solve_contacts(h, stiffness, true, substep as usize, least, false);
             }
             self.clamp_speeds();
             self.integrate_poses(h, substep + 1 == substeps);
+            self.track_couplings(h);
             self.fk_multibodies(h);
             self.tally_drift(h);
             self.refresh_joints();
