@@ -947,3 +947,43 @@ test('a soft cube with a surface collider cut in two becomes two bodies, each wi
     assert.ok(lowest > 0.1 - 0.02, `the piece rests on the box: ${lowest}`);
   }
 });
+
+test('shape matching goes with the pieces: a torn bent rope with shape matching straightens in each piece', async () => {
+  const { physics, soft } = await create([0, 0, 0], 8, 2);
+  soft.splitOnTear = 'all';
+  const material = new SoftBodyMaterial();
+  material.shapeMatchingSoftness = { naturalFrequency: 8, dampingRatio: 1 };
+  const rope = soft.create(
+    SoftBodyDesc.rope([0, 0, 0], [1, 0, 0], 11, { bending: false })
+      .setShapeMatching(true)
+      .setMaterial(material)
+      .setLinearDamping(2),
+  );
+  for (let i = 3; i < 8; i++) rope.setParticlePosition(i, [i * 0.1, 0.15, 0]);
+  const event = soft.tear(rope, { edges: [4] });
+  assert.equal(event.pieces.length, 2);
+  assert.ok(
+    event.pieces.every((piece) => piece.matched),
+    'both pieces keep shape matching',
+  );
+  steps(physics, 240);
+  for (const piece of event.pieces) {
+    const p = piece.particlePositions();
+    // How far each particle lies from the line through the piece's ends.
+    const last = (piece.numParticles() - 1) * 3,
+      line = [p[last] - p[0], p[last + 1] - p[1], p[last + 2] - p[2]],
+      length = Math.hypot(...line);
+    let worst = 0;
+    for (let i = 0; i < piece.numParticles(); i++) {
+      const d = [p[i * 3] - p[0], p[i * 3 + 1] - p[1], p[i * 3 + 2] - p[2]],
+        along = (d[0] * line[0] + d[1] * line[1] + d[2] * line[2]) / length,
+        off = Math.hypot(
+          d[0] - (line[0] * along) / length,
+          d[1] - (line[1] * along) / length,
+          d[2] - (line[2] * along) / length,
+        );
+      worst = Math.max(worst, off);
+    }
+    assert.ok(worst < 0.02, `a piece is straight again: ${worst}`);
+  }
+});

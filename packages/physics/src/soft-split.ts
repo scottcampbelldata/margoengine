@@ -147,6 +147,13 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       after.vz[row] = c.vz[old]!;
       where.set(p, { body: piece, particle: k });
     });
+    carryShape(
+      soft,
+      body,
+      c,
+      piece,
+      members.map((p) => body.firstParticle + p),
+    );
     pieces.push(piece);
     // A surface collider for each piece, like the body's, and the body's own is taken away with it.
     if (body.surface && desc.triangles.length > 0) {
@@ -156,6 +163,38 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
   }
   soft.remove(body);
   return { pieces, destinations: (p) => (where.has(p) ? [where.get(p)!] : []) };
+}
+
+/**
+ * Gives a piece with shape matching the rest offsets its particles had in the body, taken about the piece's own centre of mass (the
+ * spring pulls each particle toward its place in the rest shape the body had, whole or part of it).
+ */
+function carryShape(
+  soft: SoftBodies,
+  body: SoftBody,
+  c: Record<string, Float32Array>,
+  piece: SoftBody,
+  oldRows: number[],
+): void {
+  if (!body.matched) return;
+  const after = soft.columns();
+  let w = 0,
+    x = 0,
+    y = 0,
+    z = 0;
+  for (const old of oldRows) {
+    w += c.sw![old]!;
+    x += c.sw![old]! * c.rx![old]!;
+    y += c.sw![old]! * c.ry![old]!;
+    z += c.sw![old]! * c.rz![old]!;
+  }
+  oldRows.forEach((old, k) => {
+    const row = piece.firstParticle + k;
+    after.sw![row] = c.sw![old]!;
+    after.rx![row] = c.rx![old]! - x / w;
+    after.ry![row] = c.ry![old]! - y / w;
+    after.rz![row] = c.rz![old]! - z / w;
+  });
 }
 
 /** What a piece copies from the body it was split from. */
@@ -174,6 +213,7 @@ function carry(
   desc.setMaterial(body.material);
   desc.setCellMaterial(body.cellMaterial);
   desc.groups = body.collisionGroups;
+  desc.shapeMatching = body.matched;
   desc.solver = body.solverKind;
   void local;
 }
@@ -340,6 +380,7 @@ function splitCells(
       list.push({ body: piece, particle: k });
       where.set(p - body.firstParticle, list);
     });
+    carryShape(soft, body, c, piece, origin);
     pieces.push(piece);
     if (body.surface && desc.triangles.length > 0)
       soft.createSurfaceCollider(piece, { friction: body.surface.colliders[0]!.friction() });
