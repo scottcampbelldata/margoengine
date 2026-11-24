@@ -13,7 +13,7 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 5;
+const VERSION: u32 = 6;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -113,14 +113,14 @@ fn kind_code(k: Kind) -> u8 {
 
 fn write_motor(w: &mut Writer, m: Option<Motor>) {
     w.bool(m.is_some());
-    let m = m.unwrap_or(Motor { target_position: 0.0, target_velocity: 0.0, stiffness: 0.0, damping: 0.0, max_force: 0.0 });
-    for v in [m.target_position, m.target_velocity, m.stiffness, m.damping, m.max_force] {
+    let m = m.unwrap_or(Motor { target_position: 0.0, target_velocity: 0.0, stiffness: 0.0, damping: 0.0, max_force: 0.0, per_mass: 0.0 });
+    for v in [m.target_position, m.target_velocity, m.stiffness, m.damping, m.max_force, m.per_mass] {
         w.f32(v);
     }
 }
 fn read_motor(r: &mut Reader) -> Result<Option<Motor>, PhysicsError> {
     let some = r.bool()?;
-    let m = Motor { target_position: r.f32()?, target_velocity: r.f32()?, stiffness: r.f32()?, damping: r.f32()?, max_force: r.f32()? };
+    let m = Motor { target_position: r.f32()?, target_velocity: r.f32()?, stiffness: r.f32()?, damping: r.f32()?, max_force: r.f32()?, per_mass: r.f32()? };
     Ok(some.then_some(m))
 }
 fn write_limits(w: &mut Writer, l: Option<(f32, f32)>) {

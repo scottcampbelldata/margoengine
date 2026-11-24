@@ -364,6 +364,7 @@ export interface MotorOptions2D {
     stiffness?: number;
     damping?: number;
     maxForce?: number;
+    model?: 'force' | 'acceleration';
 }
 
 export class Physics2D implements EnginePlugin, BodyOwner2D {

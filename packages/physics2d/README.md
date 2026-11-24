@@ -83,7 +83,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Bodies | locked translation axes, locked rotation after creation | `lockTranslation` (an exact joint constraint that follows teleports), `lockRotation(locked)` | full |
 | Colliders | collision types, events and the contact force threshold, changed after creation | `setActiveCollisionTypes`, `setActiveEvents`, `setContactForceEventThreshold` and their readers | full |
 | Bodies | soft CCD | none | missing |
-| Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
+| Joints | fixed, revolute, prismatic, rope, spring, limits, motors in the force or the acceleration model (`motor: {model}`; the force model is the default, the acceleration model per unit of effective mass so a light body and a heavy one follow it alike), contacts between jointed bodies | `addJoint` | full |
 | Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
 | Joints | multibody joints: joint space, joint motors and limits, kinematics, inverse kinematics | `addArticulation` (`Articulation2D`: positions and velocities, motors, limits, forward and inverse kinematics, Jacobian) over exact maximal-coordinate trees: chains and branched trees solve in one sweep, so a 1000:1 mass ratio across a branch keeps every joint closed | full, see limits |
 | Tools | PID controller | `PidController2D` | full |

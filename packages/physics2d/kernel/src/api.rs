@@ -414,7 +414,7 @@ pub extern "C" fn shape_read(handle: i32, shape: u32) -> i32 {
 pub extern "C" fn joint_create(handle: i32, a: u32, b: u32, collide: u32) -> i32 {
     with_world!(handle, |w| {
         let limits = (io()[5] != 0).then(|| (f(6), f(7)));
-        let motor = (io()[8] != 0).then(|| Motor { target_position: f(9), target_velocity: f(10), stiffness: f(11), damping: f(12), max_force: f(13) });
+        let motor = (io()[8] != 0).then(|| Motor { target_position: f(9), target_velocity: f(10), stiffness: f(11), damping: f(12), max_force: f(13), per_mass: if io()[25] != 0 { 1.0 } else { 0.0 } });
         let kind = match io()[0] {
             0 => JointKind::Revolute { limits, motor },
             1 => JointKind::Prismatic { axis: point(14), limits, motor },
@@ -439,11 +439,11 @@ pub extern "C" fn joint_remove(handle: i32, joint: u32) -> i32 {
 pub extern "C" fn joint_set_limits(handle: i32, joint: u32, has: u32, lo: f32, hi: f32) -> i32 {
     with_world!(handle, |w| w.set_joint_limits(joint, (has != 0).then_some((lo, hi))).map(|()| 0))
 }
-/// io: target position, target speed, stiffness, damping, most force.
+/// io: target position, target speed, stiffness, damping, most force, then 1 for gains per unit of mass.
 #[unsafe(no_mangle)]
 pub extern "C" fn joint_set_motor(handle: i32, joint: u32, has: u32) -> i32 {
     with_world!(handle, |w| {
-        let motor = (has != 0).then(|| Motor { target_position: f(0), target_velocity: f(1), stiffness: f(2), damping: f(3), max_force: f(4) });
+        let motor = (has != 0).then(|| Motor { target_position: f(0), target_velocity: f(1), stiffness: f(2), damping: f(3), max_force: f(4), per_mass: f(5) });
         w.set_joint_motor(joint, motor).map(|()| 0)
     })
 }

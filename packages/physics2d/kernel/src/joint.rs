@@ -48,12 +48,15 @@ pub struct Motor {
     pub damping: f32,
     /// The most force (prismatic) or torque (revolute); infinity for no bound.
     pub max_force: f32,
+    /// Not zero: stiffness and damping are per unit of the row's effective mass, so a light body and a heavy one follow the motor
+    /// alike (the acceleration model); zero is a force, in newtons per metre or per radian.
+    pub per_mass: f32,
 }
 
 impl Motor {
     /// A velocity motor, physics2d's `{ targetVelocity, factor }`.
     pub fn velocity(target: f32, factor: f32) -> Motor {
-        Motor { target_position: 0.0, target_velocity: target, stiffness: 0.0, damping: factor, max_force: f32::INFINITY }
+        Motor { target_position: 0.0, target_velocity: target, stiffness: 0.0, damping: factor, max_force: f32::INFINITY, per_mass: 0.0 }
     }
 }
 
@@ -404,11 +407,12 @@ fn motor_row(pair: &mut Pair, row: &Coupled, x: f32, m: &Motor, impulse: &mut f3
         return;
     }
     let mass = 1.0 / k;
-    let Some((ms, is, per_error)) = force_spring(m.stiffness, m.damping, mass, h) else {
+    let (stiffness, damping) = if m.per_mass != 0.0 { (m.stiffness * mass, m.damping * mass) } else { (m.stiffness, m.damping) };
+    let Some((ms, is, per_error)) = force_spring(stiffness, damping, mass, h) else {
         return;
     };
-    let s = h * (h * m.stiffness + m.damping);
-    let bias = per_error * (x - m.target_position) - h * m.damping * m.target_velocity / s;
+    let s = h * (h * stiffness + damping);
+    let bias = per_error * (x - m.target_position) - h * damping * m.target_velocity / s;
     let v = row.speed(pair);
     let most = m.max_force * h;
     let total = crate::math::clamp(*impulse - ms * mass * (v + bias) - is * *impulse, -most, most);
@@ -482,7 +486,7 @@ fn solve_rows(joint: &mut Joint, pair: &mut Pair, pass: &Pass) {
         JointKind::Spring { rest_length, stiffness, damping } => {
             let (u, distance) = pair.separation().normalize();
             if distance > 0.0 {
-                let m = Motor { target_position: rest_length, target_velocity: 0.0, stiffness, damping, max_force: f32::INFINITY };
+                let m = Motor { target_position: rest_length, target_velocity: 0.0, stiffness, damping, max_force: f32::INFINITY, per_mass: 0.0 };
                 let row = Coupled::new(pair, pair.along(u), &free);
                 motor_row(pair, &row, distance, &m, &mut joint.motor, &mut lock, pass.h);
             }

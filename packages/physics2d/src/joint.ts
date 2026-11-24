@@ -14,6 +14,12 @@ export interface MotorOptions2D {
   stiffness?: number;
   damping?: number;
   maxForce?: number;
+  /**
+   * `'force'` (default): `stiffness` and `damping` are forces, per unit of error and of speed, so a heavy body follows the motor
+   * slowly. `'acceleration'`: they are per unit of the joint's effective mass, so a light body and a heavy one follow it alike
+   * (Rapier's default model).
+   */
+  model?: 'force' | 'acceleration';
 }
 
 /** Options for a joint between two bodies. Anchors are in each body's local space, world units. */
@@ -75,7 +81,10 @@ export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number
     io.f[7] = finite(limits[1], 'joint limit') * unit;
   }
   const motor = (o as { motor?: MotorOptions2D }).motor;
-  if (motor) writeMotor(io.f, io.u, 8, motor, unit);
+  if (motor) {
+    writeMotor(io.f, io.u, 8, motor, unit);
+    io.u[25] = motor.model === 'acceleration' ? 1 : 0;
+  }
   switch (o.type) {
     case 'revolute':
       io.u[0] = 0;
@@ -126,6 +135,8 @@ export function writeJoint(kernel: Kernel, o: JointOptions2D, k: number): number
 
 /** The kernel's motor from the options: a velocity motor chases `targetVelocity` with gain `factor`, a position motor is a spring. */
 function writeMotor(f: Float32Array, u: Uint32Array, at: number, m: MotorOptions2D, unit: number): void {
+  if (m.model !== undefined && m.model !== 'force' && m.model !== 'acceleration')
+    throw new RangeError(`Motor model must be 'force' or 'acceleration', got ${String(m.model)}; pass one of them.`);
   u[at] = 1;
   const velocity = m.targetVelocity !== undefined,
     position = m.targetPosition !== undefined;
@@ -177,6 +188,7 @@ export class Joint2D {
     writeMotor(io.f, io.u, 0, motor, this.unit);
     // `writeMotor` puts its flag first; the kernel reads the five numbers from word 0.
     io.f.copyWithin(0, 1, 6);
+    io.f[5] = motor.model === 'acceleration' ? 1 : 0;
     this.kernel.ok(this.kernel.exports.joint_set_motor(this.world, this.handle, 1));
     return this;
   }
