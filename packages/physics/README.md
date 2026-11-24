@@ -671,7 +671,7 @@ A collider can be edited after it is made: `collider.setTranslationWrtParent([x,
 A collider answers what Rapier's collider API does. `volume()`, `mass()` and `setMass(kg)` (which sets the density from the volume); `massProperties: {mass, centerOfMass, principalInertia, inertiaFrame}` as an option, or `setMassProperties(...)` and `clearMassProperties()`, give it a mass, centre and inertia of its own in place of its shape's, and the body's are worked out from them. `frictionCombineRule()` and `restitutionCombineRule()` with their setters, `borderRadius()` and `setBorderRadius()` (a box, hull, triangle, cylinder or cone), `translation()` and `rotation()` in the world, and `vertices()`, `indices()` and `heightfieldHeights()`, `heightfieldNRows()`, `heightfieldNCols()` and `heightfieldScale()` (heights as scaled, the scale `[width, 1, depth]`) read it back. `activeHooks` (`filterContactPairs`, `filterIntersectionPairs`, `modifyContacts`) as an option or `setActiveHooks(...)` says which hooks involve it: a pair is shown to `contactFilter` (or, with a sensor in it, to `intersectionFilter`) when either collider has the flag, and both flags are on by default. On the world: `contactPairsWith(collider)` and `intersectionPairsWith(collider)` list what it touches as of the last step, `contactShape(collider, shape, position, rotation, prediction)` gives the manifolds with a shape, `castColliderOnto(moving, target, direction)` and `castCollider(moving, direction)` cast a collider as it is, and `getColliders()` visits every collider. `contactPair` also gives the pair's friction and restitution and each point's `normalImpulse` and `tangentImpulse` (the solver's last substep, 0 for a contact the world does not hold), and a `contactforce` event the `totalForce` vector, `maxForceMagnitude` and `maxForceDirection` of the pair's contacts (the last substep's pushes scaled to the step's impulse). Ray hits and point projections carry `featureType` ('vertex', 'edge', 'face' or 'unknown') and `featureId`, worked out when read: a box's faces are `2 axis + (low side ? 1 : 0)`, its edges `4 axis + two bits`, its vertices three bits; a hull's faces, vertices and edges are its rows; a mesh's faces are triangle numbers; a height field's `2 cell + half`; other shapes are unknown.
 
 ```ts
-import {Physics} from 'margoengine/physics/next';
+import {Physics} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null, {gravity: [0, 0, 0]});
@@ -679,9 +679,9 @@ const crate = physics.addBody(null, {colliders: {shape: 'box', halfExtents: [0.5
 const wall = physics.addBody(null, {type: 'fixed', position: [3, 0, 0], colliders: {shape: 'box', halfExtents: [0.5, 2, 2]}}).colliders[0];
 physics.step();
 console.log(crate.volume(), crate.mass());                         // 1 800
-const hit = physics.raycast([-5, 0.2, 0.3], [1, 0, 0]);
+const hit = physics.raycast([-5, 0.2, 0.3], [1, 0, 0])!;
 console.log(hit.featureType, hit.featureId);                       // 'face' 1: the crate's -x face
-console.log(physics.castColliderOnto(crate, wall, [1, 0, 0]).distance.toFixed(2)); // '2.00'
+console.log(physics.castColliderOnto(crate, wall, [1, 0, 0])!.distance.toFixed(2)); // '2.00'
 physics.dispose();
 ```
 
