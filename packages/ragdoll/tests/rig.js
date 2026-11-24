@@ -46,8 +46,21 @@ export function accessor({ doc, bin }, index, Type = Float32Array) {
 /**
  * An engine with Physics attached first, then the file's model, Animation and (with `states`) an Animator, the order a
  * game attaches them in. `floor` adds a fixed ground plane top at y = 0. `prepare` sees the Animation before the Animator.
+ * `physics` is the solver class (default the package's own) and `physicsOptions` go to its constructor.
  */
-export async function realRig(path, { states, initial, gravity = [0, -9.81, 0], floor = true, edit, prepare } = {}) {
+export async function realRig(
+  path,
+  {
+    states,
+    initial,
+    gravity = [0, -9.81, 0],
+    floor = true,
+    edit,
+    prepare,
+    physics: World = Physics,
+    physicsOptions = {},
+  } = {},
+) {
   const asset = glb(path);
   edit?.(asset);
   const store = await TransformStore.create(128),
@@ -58,7 +71,8 @@ export async function realRig(path, { states, initial, gravity = [0, -9.81, 0], 
       render() {},
       dispose() {},
     }),
-    physics = Physics.attach(engine, { gravity }),
+    // `physics` is the solver's class: the package's own by default, or the Rapier oracle for an A/B (scripts/balance-ab.mjs).
+    physics = new World(engine, { gravity, ...physicsOptions }),
     model = new PBRModel(engine, new GLTFAsset(asset.doc, [asset.bin])),
     animation = new Animation(model);
   engine.use({ name: animation.name, setup() {} });

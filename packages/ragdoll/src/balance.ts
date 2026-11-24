@@ -11,6 +11,7 @@
 import type { Mesh } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
+import { insideLimits, swingTwist } from './limits.js';
 import type { RagdollMotors } from './powered.js';
 import type { Ragdoll, RagdollPart } from './ragdoll.js';
 
@@ -418,20 +419,12 @@ export class RagdollBalance {
       this.motors.standing(leg.foot, !leg.swing);
       if (leg.swing) {
         const inertia = this.motors.limbInertia(leg.foot);
-        leg.foot.joint!.setRotationMotor(
-          multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest) as [
-            number,
-            number,
-            number,
-            number,
-          ],
-          {
-            model: 'force',
-            stiffness: inertia * FOOT_FREQUENCY * FOOT_FREQUENCY * strength,
-            damping: 2 * inertia * FOOT_FREQUENCY * Math.sqrt(strength),
-            maxForce: inertia * MOTOR_ACCELERATION * strength,
-          },
-        );
+        leg.foot.joint!.setRotationMotor(this.swingFoot(leg) as [number, number, number, number], {
+          model: 'force',
+          stiffness: inertia * FOOT_FREQUENCY * FOOT_FREQUENCY * strength,
+          damping: 2 * inertia * FOOT_FREQUENCY * Math.sqrt(strength),
+          maxForce: inertia * MOTOR_ACCELERATION * strength,
+        });
         continue;
       }
       const share = Math.min(1, Math.abs(leg.bend - this.kneeAngle(leg)) / KNEE_BAND) * strength;
@@ -446,6 +439,27 @@ export class RagdollBalance {
         });
       else leg.lower.joint!.clearMotor();
     }
+  }
+
+  /**
+   * The swing foot's motor target, relative to its shin: the sole level, as SIMBICON keeps a swing foot parallel to the ground
+   * (K. Yin, K. Loken, M. van de Panne, SIGGRAPH 2007), heading where the hips head now, and inside the ankle's limits as every
+   * motor target is. The foot's rest pose in the world was level but kept the heading the character stood with, so once the
+   * body turned about the vertical it asked the ankle for more twist than it has: on a joint whose limits hold, the motor and
+   * the limit pulled against each other through the shin and turned the leg and the body with them.
+   */
+  private swingFoot(leg: Leg): number[] {
+    return this.levelFoot(leg, this.ragdoll.bones[0].body.rotation, this.standing);
+  }
+
+  /**
+   * A foot level on the ground, heading as `turned` heads now against `from` (the foot's own rest by default, so a planted foot
+   * keeps the heading it has), relative to its shin and inside the ankle's limits.
+   */
+  private levelFoot(leg: Leg, turned: ArrayLike<number>, from: ArrayLike<number> = leg.footRest): number[] {
+    const heading = swingTwist(multiplyQuaternions(turned, conjugateQuaternion(from)), this.up).twist,
+      level = multiplyQuaternions(turnAbout(this.up, heading), leg.footRest);
+    return insideLimits(leg.foot, multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), level));
   }
 
   /** The hinge angle the knee stands at. */
@@ -748,7 +762,7 @@ export class RagdollBalance {
       bend = Math.min(spec.limits[1], Math.max(spec.limits[0], Math.PI - knee - leg.restBend));
     motors.setTarget(leg.upper, multiplyQuaternions(conjugateQuaternion(body.rotation), upper));
     motors.setTarget(leg.lower, multiplyQuaternions(leg.lower.rest, turnAbout(spec.axis, bend)));
-    motors.setTarget(leg.foot, multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest));
+    motors.setTarget(leg.foot, this.levelFoot(leg, leg.foot.body.rotation));
     leg.bend = bend;
   }
 
