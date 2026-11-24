@@ -146,3 +146,35 @@ test('with a floating origin every relief read takes the world phase, the self-s
   for (const uv of reads) assert.match(uv, /^\(xz\+layerRules\[layer\]\.wrap\.xz\)\*/, uv);
   assert.match(added, /fract\(\(p\.xz\+layerRules\[layer\]\.wrap\.xz\)\*s\)/);
 });
+
+test('sun shadow lookups move to where the displaced point sees the sun, whichever effect attached first', () => {
+  // Shadow maps hold the clipmap surface; read at the displaced point (under it), the relief was 95.2% shadowed by its
+  // own ground (displace-shadows.browser.mjs).
+  const r = rig(false),
+    code = r.displacement.shader(r.materials.shader(r.lit, 1), 1);
+  assert.match(
+    code,
+    /fn terrainDisplaceShadowPoint\(p:vec3f\)->vec3f \{return select\(p,terrainDisplaceLift,terrainDisplaced\);\}/,
+  );
+  assert.match(code, /terrainDisplaceLift=p\+l\*max\(dot\(position-p,normal\),0\.0\)\/max\(dot\(l,normal\),0\.05\);/);
+  // The patches Shadows and VirtualShadows add, before or after the displacement.
+  for (const added of [
+    'let linear=shadowLit(direct,i.position,i.normal)*',
+    'shadowLit(direct,i.position,s.n)+ambient(s)',
+  ])
+    assert.ok(
+      r.displacement
+        .finish(code + added)
+        .endsWith(added.replace('i.position', 'terrainDisplaceShadowPoint(i.position)')),
+    );
+  // A shader without the displacement is left alone.
+  assert.equal(r.displacement.finish('shadowLit(direct,i.position,i.normal)'), 'shadowLit(direct,i.position,i.normal)');
+  // Terrain runs every effect's finish after every effect's shader, so one attached later is reached too.
+  const seen = [],
+    t = new Terrain(terrainOptions(false));
+  t.setup(r.engine);
+  t.addLighting({ shader: (s) => s, bindings: () => [], finish: (s) => (seen.push(s.endsWith('/*later*/')), s) });
+  t.addLighting({ shader: (s) => s + '/*later*/', bindings: () => [] });
+  t.shader(); // the lit shader every draw builds (private in the types)
+  assert.deepEqual(seen, [true]);
+});

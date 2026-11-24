@@ -1969,6 +1969,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
   Until then the public figures are not changed from one machine.
 
+### Fixed 2026-11-24: displaced terrain relief read as shadowed by its own ground in the sun's shadow maps (terrain displace, shadows)
+
+- **Repro:** `TerrainDisplacement` (30 cm relief) on a terrain added to `Shadows` (`shadows.add(terrain)`), a 14 degree
+  sun: 95.2% of the lit relief turned dark (mean sun share 0.052), and a box held over it cast no visible shadow.
+- **Cause:** the displaced hit point lies up to `depth` under the clipmap surface the shadow map holds, and the sun
+  shadow lookup (`shadowLit(direct,i.position,...)`, added by `Shadows` and `VirtualShadows`) read it there, so the
+  ground's own depth occluded it. Now the displacement moves that lookup to where the point's ray toward the sun leaves
+  the clipmap surface (exact for any occluder above the ground; the relief's own shadow stays its maximum mipmap trace),
+  through a new optional `TerrainLighting.finish` step that Terrain runs after every effect's `shader`, so the order of
+  attachment does not matter. Regressions: packages/terrain/test/displace.test.js ("sun shadow lookups move ...") and
+  packages/terrain/test/displace-shadows.browser.mjs (relief darkened 0%, the box shadows 3.9% of it, both orders).
+
 ### Fixed 2026-11-24: `Outlines` drew nothing around a skinned parent (GAP-OUTLINES-INSTANCED, toon, react)
 
 - **Repro:** `<Outlines />` inside a skinned `Model`: no line (it threw: it needs a `<Mesh>`). drei outlines

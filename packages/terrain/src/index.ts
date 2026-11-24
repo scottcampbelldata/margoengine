@@ -34,7 +34,13 @@ export {
   type TerrainLook,
   type TerrainLookUpdate,
 } from './colors.js';
-export { heightfield, heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
+export {
+  heightfield,
+  heightfieldGeometry,
+  TerrainHeightmap,
+  type HeightField,
+  type HeightfieldOptions,
+} from './heightfield.js';
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -180,6 +186,11 @@ export interface TerrainLighting {
   shader(source: string, group: number): string;
   /** The group-1 entries the patched shader reads, asked every frame. */
   bindings(): GPUBindGroupEntry[];
+  /**
+   * Optional: runs on the whole lit shader after every effect's `shader`, in the same order, so an effect can adjust
+   * what effects attached after it added (displacement moves their sun shadow lookups). Returns the shader.
+   */
+  finish?(source: string, group: number): string;
 }
 interface Ring {
   uniform: GPUBuffer;
@@ -645,6 +656,7 @@ export class Terrain implements EnginePlugin {
   private shader(): string {
     let code = this.base();
     for (const effect of this.lighting) code = effect.shader(code, 1);
+    for (const effect of this.lighting) if (effect.finish) code = effect.finish(code, 1);
     return code;
   }
   /**

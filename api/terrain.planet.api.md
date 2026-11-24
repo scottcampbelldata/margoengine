@@ -88,5 +88,6 @@ interface TerrainLighting {
     readonly owner?: Engine;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    finish?(source: string, group: number): string;
 }
 ```

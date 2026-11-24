@@ -146,7 +146,11 @@ fn terrainDisplaceSunArea(p:vec3f,normal:vec3f,depth:f32)->f32 {
 const functions = (group: number, painted: number, shadows: boolean): string => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var<uniform> terrainDisplaceRules:array<vec4f,17>;
 var<private> terrainDisplaced:bool;var<private> terrainDisplaceDx:vec3f;var<private> terrainDisplaceDy:vec3f;
-var<private> terrainDisplaceShadow:f32=1.0;var<private> terrainDisplaceW:array<f32,16>;
+var<private> terrainDisplaceShadow:f32=1.0;var<private> terrainDisplaceW:array<f32,16>;var<private> terrainDisplaceLift:vec3f;
+// Where a sun shadow map is read for the shaded point: a displaced point lies under the clipmap surface the shadow map
+// holds, so it is read where the point's ray toward the sun leaves that surface (exact for anything above the ground;
+// the relief's own shadow is terrainDisplaceShadow's).
+fn terrainDisplaceShadowPoint(p:vec3f)->vec3f {return select(p,terrainDisplaceLift,terrainDisplaced);}
 fn terrainDisplaceWeights(position:vec3f,normal:vec3f)->f32 {
   var total=0.0;var depth=0.0;let count=u32(frame.heights.z);${
     painted
@@ -190,7 +194,8 @@ fn terrainDisplace(position:vec3f,normal:vec3f)->vec3f {
     d0=d1;f0=f1;
   }
   var hit=d1;if(f1>=0.0&&f1>f0){hit=d0+(d1-d0)*(-f0)/(f1-f0);}
-  let p=position+ray*hit;terrainDisplaced=true;${shadows ? 'terrainDisplaceShadow=terrainDisplaceSunArea(p,normal,depth);' : ''}
+  let p=position+ray*hit;terrainDisplaced=true;
+  let l=normalize(frame.light.xyz);terrainDisplaceLift=p+l*max(dot(position-p,normal),0.0)/max(dot(l,normal),0.05);${shadows ? 'terrainDisplaceShadow=terrainDisplaceSunArea(p,normal,depth);' : ''}
   return p;
 }`;
 /** Builds one level of the maximum mipmap: level 0 from the surface maps' height (alpha), the rest from the level below. */
@@ -395,6 +400,16 @@ export class TerrainDisplacement implements EnginePlugin, TerrainLighting {
     if (this.#cache.size >= 16) this.#cache.clear();
     this.#cache.set(key, code);
     return code;
+  }
+
+  /**
+   * Moves the sun shadow lookups that effects attached after it added (`@margoengine/shadows` `Shadows` and
+   * `VirtualShadows`) to where each displaced point's ray toward the sun leaves the clipmap surface.
+   */
+  finish(source: string): string {
+    return source.includes('fn terrainDisplaceShadowPoint')
+      ? source.replace(/shadowLit\(([^,()]+),i\.position,/g, 'shadowLit($1,terrainDisplaceShadowPoint(i.position),')
+      : source;
   }
 
   onDeviceRestored(engine: Engine): void {

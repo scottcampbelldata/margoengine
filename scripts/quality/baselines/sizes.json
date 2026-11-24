@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17771606,
+  "total": 17771974,
   "history": [
     {
       "date": "2026-10-24",
@@ -11571,6 +11571,12 @@
       "commit": "daa51eb68",
       "reason": "physics/soft: the volume constraint and the skin carry into the pieces of a body that tears (soft-split.ts): base budget 24,181 to 24,382 B gzip; clustered/contact 6,158 to 6,457 B is another session's change that the baseline had not recorded",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "97e4dd0934",
+      "reason": "terrain/displace 4342 -> 4454 gzip: displaced relief read its sun shadow maps under the clipmap surface and showed 95% falsely shadowed; the lookup now moves to where the point's sun ray leaves that surface (finish step). No split: it is part of the same shader patch.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12788,7 +12794,7 @@
     "@margoengine/terrain": 17067,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 5488,
-    "@margoengine/terrain/displace": 4342,
+    "@margoengine/terrain/displace": 4710,
     "@margoengine/terrain/dunes": 2250,
     "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,

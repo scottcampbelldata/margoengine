@@ -136,6 +136,7 @@ export interface TerrainLighting {
     readonly owner?: Engine;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    finish?(source: string, group: number): string;
 }
 
 export type TerrainLook = Pick<TerrainColorOptions, 'sand' | 'meadow' | 'stone' | 'shore' | 'meadowHeight' | 'stoneHeight' | 'stoneNormal' | 'wetHeight' | 'wetDarkening' | 'wetDryTime' | 'wetGlossTime'> & {

@@ -16,6 +16,7 @@ export class TerrainDisplacement implements EnginePlugin, TerrainLighting {
     setup(engine: Engine): void;
     bindings(): GPUBindGroupEntry[];
     shader(source: string, group: number): string;
+    finish(source: string): string;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -106,6 +107,7 @@ interface TerrainLighting {
     readonly owner?: Engine;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    finish?(source: string, group: number): string;
 }
 
 interface TerrainMaterialOptions {

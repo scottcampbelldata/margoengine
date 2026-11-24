@@ -874,6 +874,11 @@ pixel's centre: 0.176 and 0.024). Cost not timed.
   1,024-texel layers.
 - Attach it after `TerrainMaterials`, before any effect that replaces the terrain's lit shader. `shadows` darkens the
   sun's light only, not ambient or image-based light.
+- Shadow maps: with `@margoengine/shadows` (`Shadows` or `VirtualShadows`, attached before or after the displacement)
+  objects' sun shadows fall on the relief. The maps hold the clipmap surface, the relief's top, so each point reads
+  them where its ray toward the sun leaves that surface: the relief is not shadowed by its own ground (checked on a
+  real GPU by `test/displace-shadows.browser.mjs`: none of the lit relief darkened; before, 95.2% did), and an object
+  sitting within the relief's depth does not shadow it. The relief casts no shadow onto other objects.
 
 ## Wind-built dunes: `@margoengine/terrain/dunes`
 
