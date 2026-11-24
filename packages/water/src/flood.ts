@@ -51,6 +51,8 @@ declare const GPUBufferUsage: {
 declare const GPUMapMode: { READ: number };
 
 const G = 9.81;
+// Samples of the far field's profile (Water's WATER_FAR_SAMPLES).
+const FAR_SAMPLES = 64;
 /** Courant number the step keeps under at `maxDepth` and `maxSpeed`. */
 const COURANT = 0.25;
 /** Ticks a second: the whole film clock (a step is a tick at m = 1). */
@@ -177,6 +179,13 @@ export interface FloodOptions {
   surgeRise?: number;
   /** The continental shelf the wind sets the sea up over: length 1..1e7 m and depth 0.1..1e4 m. Default 50 km x 20 m. */
   shelf?: { length?: number; depth?: number };
+  /**
+   * The open sea the Water draws past the 'sea' sides (FG-05, FG-06): the surge and the tsunamis travel on to the map at
+   * the long-wave speed sqrt(g `depth`) over `range` metres of it, so a crest stands out at sea before it reaches the
+   * edge, and the open sea starts from the sim's own edge level. `depth` 0.1..1e4 m, default the shelf's depth; `range`
+   * 1..1e7 m, default 20,000. Null: one flat sea level everywhere, as before. Read every frame.
+   */
+  farField?: { depth?: number; range?: number } | null;
   /** Map edges. Default 'wall' on every side. */
   boundary?: { west?: FloodBoundary; east?: FloodBoundary; south?: FloodBoundary; north?: FloodBoundary };
   /** The deepest water expected (m), 0.01..1,000; sets the time step with `maxSpeed`. Default 20. */
@@ -448,6 +457,7 @@ export class Flood implements EnginePlugin {
   private written: number;
   private surge: Surge = { from: 0, to: 0, at: 0, rise: 0 };
   private surfaceGone = false;
+  private farDrawn = false;
   /** The inputs by the tick they begin at, in order; the first is tick 0. */
   private readonly log: Inputs[] = [];
   private disposed = false;
@@ -803,10 +813,38 @@ export class Flood implements EnginePlugin {
   private driveSurface(): void {
     const surface = this.options.surface as unknown as { setSeaLevel?: (y: number) => unknown };
     if (this.surfaceGone || typeof surface.setSeaLevel !== 'function') return;
+    this.driveFarField();
     const level = Math.fround(this.seaLevelAt());
     if (level === this.written) return;
     surface.setSeaLevel(level);
     this.written = level;
+  }
+  /**
+   * The far field the Water draws now: the sea sides, and the sea level `r` metres out less the edge's, where the wave
+   * now there reaches the edge r / c seconds later (c = sqrt(g depth)); null without a 'sea' side or with `farField` null.
+   */
+  farFieldAt(
+    t = this.seconds,
+  ): { sides: Record<'west' | 'east' | 'south' | 'north', boolean>; profile: Float32Array; range: number } | null {
+    const b = this.options.boundary ?? {},
+      o = this.options.farField,
+      sides = { west: b.west === 'sea', east: b.east === 'sea', south: b.south === 'sea', north: b.north === 'sea' };
+    if (o === null || !(sides.west || sides.east || sides.south || sides.north)) return null;
+    const depth = finite(o?.depth, this.shelf().depth, 'farField depth', 0.1, 1e4),
+      range = finite(o?.range, 20000, 'farField range', 1, 1e7),
+      c = Math.sqrt(G * depth),
+      edge = this.seaLevelAt(t),
+      profile = new Float32Array(FAR_SAMPLES);
+    for (let i = 0; i < FAR_SAMPLES; i++) profile[i] = this.seaLevelAt(t + (range * i) / (FAR_SAMPLES - 1) / c) - edge;
+    return { sides, profile, range };
+  }
+  private driveFarField(): void {
+    const surface = this.options.surface as unknown as { setFarField?: (field: unknown) => unknown };
+    if (typeof surface.setFarField !== 'function') return;
+    const field = this.farFieldAt();
+    if (!field && !this.farDrawn) return;
+    surface.setFarField(field);
+    this.farDrawn = !!field;
   }
   /**
    * Fills the per-tick part of the uniform for tick `k`: settings, sea, wind and rain, sources and walls with their breach
@@ -904,6 +942,8 @@ export class Flood implements EnginePlugin {
     if (waterSolvers.get(this.options.surface) === this.factory) waterSolvers.delete(this.options.surface);
     if (!this.surfaceGone && typeof surface.setSeaLevel === 'function' && this.written !== this.base)
       surface.setSeaLevel(this.base);
+    if (!this.surfaceGone && this.farDrawn)
+      (surface as unknown as { setFarField: (field: null) => unknown }).setFarField(null);
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     this.solver = undefined;

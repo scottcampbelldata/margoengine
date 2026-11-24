@@ -100,6 +100,29 @@ export interface WaterCapture {
   begin(): GPURenderPassEncoder;
 }
 /** Water settings, read at construction unless noted. Invalid values throw RangeError or TypeError. */
+/** At most this many samples in a {@link WaterFarField} profile. */
+export const WATER_FAR_SAMPLES = 64;
+const FAR_FLOATS = 8 + WATER_FAR_SAMPLES;
+/**
+ * The open sea past a flood's 'sea' sides (`Water.setFarField`; `water/flood` sets it every frame): a long wave
+ * travelling on to the map from outside it, and the sim's own edge level carried out from the coastal grid.
+ */
+export interface WaterFarField {
+  /** The sides of the coastal grid (the `terrain` rectangle) the sea lies beyond. */
+  sides: { west?: boolean; east?: boolean; south?: boolean; north?: boolean };
+  /**
+   * The incoming wave's rise over the sea level, metres, at evenly spaced distances 0..`range` past the sea sides (2 to
+   * 64 samples; the first is the edge, usually 0). Past `range` the last sample holds.
+   */
+  profile: ArrayLike<number>;
+  /** Metres past the sea sides that `profile` covers, above 0 to 1e7. */
+  range: number;
+  /**
+   * The length L in metres the sim's edge level spreads from: its difference from the sea level falls as 1 / sqrt(1 + r / L)
+   * r metres out (a long wave leaving an edge of length L). Above 0 to 1e7; default the coastal grid's longer side.
+   */
+  spread?: number;
+}
 export interface WaterOptions {
   /** Grid extent in world units (X, Z), each 0-100,000 (exclusive of 0). Default [100, 100]. */
   size?: readonly [number, number];
@@ -282,9 +305,38 @@ fn surfHere(xz:vec2f,sampleWidth:f32,foam:bool)->SurfHere {
  let ground=mix(mix(textureLoad(coast,lo,0).y,textureLoad(coast,vec2i(hi.x,lo.y),0).y,t.x),mix(textureLoad(coast,vec2i(lo.x,hi.y),0).y,textureLoad(coast,hi,0).y,t.x),t.y);
  return SurfHere(surfSample(xz,sampleWidth,frame.settings.y-ground,field,foam),field.weight*coastBlend(xz).z);
 }
+// The open sea past a flood's 'sea' sides (setFarField; frame.far[0] the sea sides west, east, south, north as 1 or 0,
+// frame.far[1] the range, the sample count, the spreading length and 1 when on, frame.far[2..17] the samples). Outside
+// the coastal grid the long wave travels on to and from the map (Blayo and Debreu 2005): the incoming part is the
+// sampled rise over the edge's level at r metres out, r the distance past the sea sides; the outgoing part is the
+// sim's own edge level less the sea level, read at the nearest point of the grid where water stands there and spread
+// as 1 / sqrt(1 + r / L) (a long wave from an edge of length L, Lamb 1932 sec. 191), so the open sea meets the sim's
+// edge with no step, whatever the side lets in (FG-06).
+fn farSample(i:u32)->f32 {return frame.far[2u+i/4u][i%4u];}
+fn farSea(xz:vec2f)->f32 {
+ let on=frame.far[1];if(on.w<0.5){return 0.0;}
+ let lo=frame.coast.xy;let hi=lo+frame.coast.zw;let sides=frame.far[0];
+ let beyond=vec4f(lo.x-xz.x,xz.x-hi.x,lo.y-xz.y,xz.y-hi.y);
+ let r=max(0.0,max(max(beyond.x*sides.x,beyond.y*sides.y),max(beyond.z*sides.z,beyond.w*sides.w)));
+ let count=u32(on.y);let s=clamp(r/max(on.x,0.001),0.0,1.0)*f32(count-1u);let i=min(u32(floor(s)),count-1u);let j=min(i+1u,count-1u);
+ let incoming=mix(farSample(i),farSample(j),s-f32(i));
+ let m=max(max(beyond.x,beyond.y),max(beyond.z,beyond.w));
+ let nearest=select(select(select(sides.w,sides.z,beyond.z==m),sides.y,beyond.y==m),sides.x,beyond.x==m);
+ if(nearest<0.5||frame.flow.w<0.5){return incoming;}
+ let size=vec2i(textureDimensions(coast));let uv=(clamp(xz,lo,hi)-lo)/frame.coast.zw;
+ let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let a0=vec2i(floor(pixel));let a1=min(a0+1,size-1);let t=fract(pixel);
+ let a=textureLoad(coast,a0,0);let b=textureLoad(coast,vec2i(a1.x,a0.y),0);let c=textureLoad(coast,vec2i(a0.x,a1.y),0);let d=textureLoad(coast,a1,0);
+ let w=vec4f((1.0-t.x)*(1.0-t.y),t.x*(1.0-t.y),(1.0-t.x)*t.y,t.x*t.y);let depth=vec4f(a.x,b.x,c.x,d.x);
+ let wet=w*smoothstep(vec4f(0.0),vec4f(0.5),depth);let total=dot(wet,vec4f(1));
+ if(total<0.0001){return incoming;}
+ let level=dot(wet,depth+vec4f(a.y,b.y,c.y,d.y))/total;
+ return incoming+(level-frame.settings.y)*min(1.0,total/dot(w,vec4f(1)))/sqrt(1.0+r/max(on.z,1.0));
+}
 struct Surface {position:vec3f,normal:vec3f,crest:f32}
 fn surface(xz:vec2f,sampleWidth:f32)->Surface {
- var p=vec3f(xz.x,frame.settings.y,xz.y);var tangent=vec3f(1,0,0);var binormal=vec3f(0,0,1);var crest=0.0;
+ let far=farSea(xz);var p=vec3f(xz.x,frame.settings.y+far,xz.y);var tangent=vec3f(1,0,0);var binormal=vec3f(0,0,1);var crest=0.0;
+ // The far sea's slope, by forward differences half a metre long (it varies over hundreds of metres).
+ if(frame.far[1].w>0.5){tangent.y=(farSea(xz+vec2f(0.5,0))-far)*2.0;binormal.y=(farSea(xz+vec2f(0,0.5))-far)*2.0;}
  for(var j=0u;j<u32(frame.settings.w);j++){
   let w=frame.waves[j];
   for(var component=0u;component<3u;component++){
@@ -648,7 +700,7 @@ export class Water implements EnginePlugin {
   private pipeline?: GPURenderPipeline;
   private format = '';
   private seconds = 0;
-  private readonly values = new Float32Array(140);
+  private readonly values = new Float32Array(140 + FAR_FLOATS);
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
@@ -948,6 +1000,42 @@ export class Water implements EnginePlugin {
     if (this.disposed || typeof y !== 'number' || !Number.isFinite(Math.fround(y)) || Math.abs(y) > 100000)
       throw new RangeError('Invalid water sea level; use a finite world Y from -100000 to 100000');
     this.values[21] = y;
+    return this;
+  }
+  /**
+   * Sets the open sea past the coastal grid's sea sides, or null (the default) for one flat sea level everywhere:
+   * outside the grid the surface carries `profile`, the long wave travelling on to it, and near and past a sea side it
+   * starts from the flow's own edge level where water stands there, so the open sea and the simulated edge meet with
+   * no step. Needs `terrain`. Read every frame; `water/flood` sets it from its tsunamis and surge.
+   * @throws RangeError for a profile of other than 2 to 64 finite samples, or a range or spread outside (0, 1e7].
+   */
+  setFarField(field: WaterFarField | null): this {
+    const v = this.values;
+    if (field === null) {
+      v.fill(0, 140, 140 + FAR_FLOATS);
+      return this;
+    }
+    const profile = field?.profile,
+      n = profile?.length ?? 0;
+    if (!field || typeof field !== 'object' || n < 2 || n > WATER_FAR_SAMPLES)
+      throw new RangeError(
+        `Invalid water far field; use { sides, profile, range } with 2 to ${WATER_FAR_SAMPLES} samples`,
+      );
+    for (let i = 0; i < n; i++)
+      if (!Number.isFinite(profile[i]) || Math.abs(profile[i]) > 1e5)
+        throw new RangeError('Invalid water far field profile; use finite metres from -100000 to 100000');
+    const span = (x: number | undefined, name: string, fallback: number) => {
+      const y = x ?? fallback;
+      if (!Number.isFinite(y) || y <= 0 || y > 1e7)
+        throw new RangeError(`Invalid water far field ${name}; use metres above 0 and up to 10000000`);
+      return y;
+    };
+    const t = this.options.terrain,
+      range = span(field.range, 'range', 1),
+      spread = span(field.spread, 'spread', t ? Math.max(t.size[0], t.size[1]) : 1),
+      sides = field.sides ?? {};
+    v.set([+!!sides.west, +!!sides.east, +!!sides.south, +!!sides.north, range, n, spread, 1], 140);
+    for (let i = 0; i < WATER_FAR_SAMPLES; i++) v[148 + i] = profile[Math.min(i, n - 1)];
     return this;
   }
   /** The mean sea level, world Y (`WaterOptions.height`, or the last `setSeaLevel`). */

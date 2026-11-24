@@ -63,7 +63,7 @@ test('a solver on the bridge replaces the coastal flow, and Water goes back to i
   assert.ok(bridge, 'one bridge map hands Water a solver');
   const [{ input, solver }] = log;
   assert.equal(input.terrain, terrain);
-  assert.equal(input.uniform.size, 560, 'the solver gets the frame uniform');
+  assert.equal(input.uniform.size, 848, 'the solver gets the frame uniform');
   assert.ok(own.destroyed, 'the coastal flow is released');
   assert.equal(water.coastalDepthTexture, solver.states[0]);
   assert.equal(solver.steps, 1);

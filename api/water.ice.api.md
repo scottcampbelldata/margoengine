@@ -375,6 +375,7 @@ class Water implements EnginePlugin {
     get wind(): Readonly<WaterWind> | undefined;
     setColor(color: readonly [number, number, number]): this;
     setSeaLevel(y: number): this;
+    setFarField(field: WaterFarField | null): this;
     get seaLevel(): number;
     setGlitterRoughness(roughness: number): this;
     setFoamSoftness(amount: number): this;
@@ -404,6 +405,18 @@ interface WaterCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+interface WaterFarField {
+    sides: {
+        west?: boolean;
+        east?: boolean;
+        south?: boolean;
+        north?: boolean;
+    };
+    profile: ArrayLike<number>;
+    range: number;
+    spread?: number;
 }
 
 interface WaterHeightSource {

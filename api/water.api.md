@@ -30,6 +30,8 @@ export interface TerrainHeights {
     readonly height: number;
 }
 
+export const WATER_FAR_SAMPLES = 64;
+
 export class Water implements EnginePlugin {
     readonly options: WaterOptions;
     readonly name: string;
@@ -43,6 +45,7 @@ export class Water implements EnginePlugin {
     get wind(): Readonly<WaterWind> | undefined;
     setColor(color: readonly [number, number, number]): this;
     setSeaLevel(y: number): this;
+    setFarField(field: WaterFarField | null): this;
     get seaLevel(): number;
     setGlitterRoughness(roughness: number): this;
     setFoamSoftness(amount: number): this;
@@ -72,6 +75,18 @@ export interface WaterCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+export interface WaterFarField {
+    sides: {
+        west?: boolean;
+        east?: boolean;
+        south?: boolean;
+        north?: boolean;
+    };
+    profile: ArrayLike<number>;
+    range: number;
+    spread?: number;
 }
 
 export interface WaterLight {

@@ -242,6 +242,13 @@ and the wave queries ride on the new level. `test/surge.browser.mjs` raises a be
 0.45 m floods to 0.55 m within 0.1 m, ground at 1.45 m stays dry, and after the fall the beach drains to under 0.02 m
 and the sea returns to its volume within 2%, on WebGPU and the WebGL2 layer.
 
+`water.setFarField({sides, profile, range, spread})` (null by default, read every frame) makes the open sea past the
+terrain's sea sides a long wave instead of one level: `profile` is the rise over the sea level at 2 to 64 evenly spaced
+distances from 0 to `range` metres past the sides (the last holds beyond), and near a side the sea starts from the flow's
+own edge level where water stands there, its difference spread as 1 / sqrt(1 + r / `spread`) (default the terrain's
+longer side). The surface, its normals and the wave queries all carry it. `water/flood` sets it from its surge and
+tsunamis (see "The sea, tsunamis, wind and rain").
+
 ```ts
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
@@ -814,6 +821,29 @@ at rest stays at rest, and the sea comes back over an edge the trough bared, or 
 no faster than a dam break. The Water's own `seaLevel` follows (`flood.seaLevelAt()`), so the
 open sea beyond the map rides on the surge and the waves; a level you set with `water.setSeaLevel` becomes the new base,
 and `dispose()` gives the Water its level back.
+
+Past the sea sides the drawn sea is not one flat level (FG-05, FG-06): the flood sets `water.setFarField` every frame, so
+the surge and the tsunamis travel on to the map at the long-wave speed c = sqrt(g `farField.depth`) (default the shelf's
+depth) over `farField.range` metres (default 20 km), a crest standing out at sea r / c seconds before it reaches the
+side, and near the side the open sea starts from the sim's own edge level, its difference from the sea level spreading
+out as 1 / sqrt(1 + r / L) (a long wave leaving an edge of length L, the map's longer side; Lamb 1932 sec. 191). The
+incoming and outgoing parts are the characteristic split of Blayo and Debreu (2005). `flood.farFieldAt(t)` gives the
+profile the Water draws; `farField: null` keeps one flat level. Measured on the Doggerland film's 42 m trough over 40 m of
+sea (`test/flood-far.browser.mjs`, WebGPU and the WebGL2 layer): the drawn sea 2 km out matches the travelling wave within
+2e-5 m, and the open sea meets the sim's edge cell within 0.2 m all through the trough, where the flat sea stood 19.5 m
+below it. Between samples the profile is linear (64 samples over `range`); the outgoing part keeps the edge's current
+difference rather than its history, so a fast change at the side shows at once along the open sea.
+
+```ts
+// A wider Water than the map, so the open sea in the west shows the tsunami coming in.
+const deep = engine.gpu!.createTexture({size: [64, 8], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+engine.gpu!.queue.writeTexture({texture: deep}, new Float32Array(64 * 8).fill(-40), {bytesPerRow: 64 * 4}, [64, 8]);
+const ocean = Water.attach(engine, {height: 0, size: [6000, 600], terrain: {heightmap: () => deep, origin: [0, 0], size: [512, 64]}});
+const offshore = Flood.attach(engine, {surface: ocean, boundary: {west: 'sea'}, maxDepth: 90, maxSpeed: 40, farField: {depth: 40, range: 20000}});
+offshore.tsunami({height: 20, period: 260, at: 60});
+engine.render({delta: 1 / 30});
+console.log(offshore.farFieldAt()?.profile[63]); // the crest 20 km out, about 16 minutes before it reaches the side
+```
 
 - `tsunami({height = 3, period = 300, leading = 'trough', at = now, shape = 'n-wave'})` (at most 8): the N-wave of
   Tadepalli and Synolakis (1994), `height` is both the crest and the trough, the sea draws back first by default and the

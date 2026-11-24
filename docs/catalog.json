@@ -2047,6 +2047,7 @@
     "imports": "import { Water } from '@margoengine/water';",
     "exports": [
       "BREAKER_GAMMA",
+      "WATER_FAR_SAMPLES",
       "Water",
       "breakerDepth",
       "contourSegments"
