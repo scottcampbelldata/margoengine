@@ -1303,6 +1303,10 @@
       "types": "./dist/environment/fog-volumes.d.ts",
       "import": "./dist/environment/fog-volumes.js"
     },
+    "./environment/density-volume": {
+      "types": "./dist/environment/density-volume.d.ts",
+      "import": "./dist/environment/density-volume.js"
+    },
     "./environment/settings": {
       "types": "./dist/environment/settings.d.ts",
       "import": "./dist/environment/settings.js"

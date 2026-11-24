@@ -495,3 +495,115 @@ export function floodBirths(sites: FloodSites, seconds: number, options: FloodBi
   }
   return { count, position: Float32Array.from(position), velocity: Float32Array.from(velocity) };
 }
+
+// Spray mist (FG-10): the fine drops a breaking flood throws stay in the air as a cloud. Each spray site is a steady
+// point source; its mist is the sum of puffs it released over the last few lifetimes, a Lagrangian puff model (D. B.
+// Turner, "Workbook of Atmospheric Dispersion Estimates", US EPA AP-26, 1970, section 3; G. T. Csanady, "Turbulent
+// Diffusion in the Environment", Reidel 1973, chapter 3): a puff of age t holds the drops released t seconds ago, less
+// those that have fallen out or evaporated, exp(-t / lifetime), carried by the wind, spread as a Gaussian whose
+// variance grows by 2 K t with the eddy diffusivity K (Taylor 1921, "Diffusion by continuous movements", Proc. London
+// Math. Soc. 20, the long-time Fickian limit). The drops rise to the ballistic apex of the site's launch speed, v^2 /
+// 2g, and then settle at their fall speed, not below the water they left. Extinction is that of drops large against
+// the wavelength, twice their cross-section (van de Hulst, "Light Scattering by Small Particles", 1957, the extinction
+// paradox): sigma = 2 pi r^2 N per metre for N drops per cubic metre, so a puff's peak extinction is its drops times
+// 2 pi r^2 over (2 pi)^(3/2) s^3.
+
+/** Options for {@link floodMist}. Invalid values throw RangeError. */
+export interface FloodMistOptions {
+  /** Wind [x, z] in m/s that carries the mist. Default [0, 0]. */
+  wind?: readonly [number, number];
+  /** E-folding time of the mist in seconds, 0.05..600 (fall-out and evaporation). Default 3. */
+  lifetime?: number;
+  /** Eddy diffusivity K in m^2/s, 0..100. Default 0.3 (light wind over water). */
+  diffusivity?: number;
+  /** Fall speed of the drops in m/s, 0..10. Default 0.3 (drops of about 0.1 mm radius). */
+  fallSpeed?: number;
+  /** Drop radius in metres, 1e-6..0.01. Default 1e-4. */
+  dropRadius?: number;
+  /** Drops each spray particle of the sites' rates stands for, 0..1e12. Default 1e4. */
+  dropsPerParticle?: number;
+  /** Spread of a new puff in metres, 0.01..100. Default 0.5. */
+  sourceRadius?: number;
+  /** Puffs per site, covering three lifetimes, 1..256. Default 6. */
+  puffs?: number;
+  /** Most puffs in all, the strongest kept (ties by site, then age). 0..1,048,576. Default 16,384. */
+  maxPuffs?: number;
+}
+/** Gaussian puffs of mist: centres, standard deviations and peak extinctions per metre, for `DensityVolume.splat`. */
+export interface FloodMist {
+  count: number;
+  /** x, y, z per puff, world metres. */
+  position: Float32Array;
+  /** Standard deviation per puff, metres. */
+  radius: Float32Array;
+  /** Peak extinction per metre per puff. */
+  weight: Float32Array;
+}
+
+/**
+ * The spray mist of a flood frame's spray sites (`floodEmitters(reading, ...).spray`): Gaussian puffs whose sum is the
+ * mist's extinction per metre, to splat into a `DensityVolume` (@margoengine/environment/density-volume) with density
+ * 1 and draw through VolumetricFog. Deterministic: the same sites and options give the same puffs in the same order.
+ * @throws TypeError without sites; RangeError for an option out of its range.
+ */
+export function floodMist(spray: FloodSites, options: FloodMistOptions = {}): FloodMist {
+  if (!spray || !(spray.position instanceof Float32Array) || !(spray.rate instanceof Float32Array))
+    throw new TypeError('Flood mist needs spray sites, floodEmitters(...).spray');
+  const o = options ?? {},
+    wind = o.wind ?? [0, 0];
+  if (!Array.isArray(wind) || wind.length !== 2 || !wind.every((v) => Number.isFinite(v) && Math.abs(v) <= 1000))
+    throw new RangeError('Flood mist wind must be [x, z] in m/s, each within 1000');
+  const lifetime = finiteIn(o.lifetime, 3, 'lifetime', 0.05, 600),
+    K = finiteIn(o.diffusivity, 0.3, 'diffusivity', 0, 100),
+    fall = finiteIn(o.fallSpeed, 0.3, 'fallSpeed', 0, 10),
+    r = finiteIn(o.dropRadius, 1e-4, 'dropRadius', 1e-6, 0.01),
+    drops = finiteIn(o.dropsPerParticle, 1e4, 'dropsPerParticle', 0, 1e12),
+    s0 = finiteIn(o.sourceRadius, 0.5, 'sourceRadius', 0.01, 100),
+    puffs = finiteIn(o.puffs, 6, 'puffs', 1, 256),
+    max = finiteIn(o.maxPuffs, 16384, 'maxPuffs', 0, 1 << 20);
+  if (!Number.isInteger(puffs) || !Number.isInteger(max))
+    throw new RangeError('Flood mist puffs and maxPuffs must be whole numbers');
+  const span = 3 * lifetime,
+    dt = span / puffs,
+    cross = 2 * Math.PI * r * r * drops,
+    norm = Math.pow(2 * Math.PI, 1.5),
+    all: { site: number; age: number; x: number; y: number; z: number; s: number; w: number }[] = [];
+  for (let i = 0; i < spray.count; i++) {
+    const rate = spray.rate[i];
+    if (!(rate > 0)) continue;
+    const vy = Math.max(0, spray.velocity[3 * i + 1]),
+      apex = (vy * vy) / (2 * G),
+      rise = vy / G;
+    for (let k = 0; k < puffs; k++) {
+      const t = (k + 0.5) * dt,
+        s = Math.sqrt(s0 * s0 + 2 * K * t),
+        // Drops released over dt, the share still in the air, their extinction cross-section.
+        w = (rate * dt * Math.exp(-t / lifetime) * cross) / (norm * s * s * s),
+        height = t < rise ? vy * t - 0.5 * G * t * t : apex - fall * (t - rise);
+      all.push({
+        site: i,
+        age: k,
+        x: spray.position[3 * i] + wind[0] * t,
+        y: spray.position[3 * i + 1] + Math.max(0, height),
+        z: spray.position[3 * i + 2] + wind[1] * t,
+        s,
+        w,
+      });
+    }
+  }
+  all.sort((a, b) => b.w - a.w || a.site - b.site || a.age - b.age);
+  const count = Math.min(max, all.length),
+    out: FloodMist = {
+      count,
+      position: new Float32Array(count * 3),
+      radius: new Float32Array(count),
+      weight: new Float32Array(count),
+    };
+  for (let i = 0; i < count; i++) {
+    const p = all[i];
+    out.position.set([p.x, p.y, p.z], 3 * i);
+    out.radius[i] = p.s;
+    out.weight[i] = p.w;
+  }
+  return out;
+}

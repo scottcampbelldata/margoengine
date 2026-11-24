@@ -37,6 +37,7 @@
     "test:gi:browser": "npm run build && node scripts/test-browser.js --page=gi",
     "test:visibility:browser": "npm run build && node scripts/test-browser.js --page=visibility",
     "test:fog-volumes:browser": "npm run build && node scripts/test-browser.js --page=fog-volumes",
+    "test:density-volume:browser": "npm run build && node scripts/test-browser.js --page=density-volume && node scripts/test-browser.js --page=density-volume --compat",
     "test:studio:browser": "npm run build && node scripts/test-browser.js --page=studio",
     "test:prefiltered:browser": "npm run build && node scripts/test-browser.js --page=prefiltered",
     "test:reflector-pbr:browser": "npm run build && node scripts/test-browser.js --page=reflector-pbr",
@@ -110,6 +111,10 @@
     "./fog-volumes": {
       "types": "./dist/fog-volumes.d.ts",
       "import": "./dist/fog-volumes.js"
+    },
+    "./density-volume": {
+      "types": "./dist/density-volume.d.ts",
+      "import": "./dist/density-volume.js"
     },
     "./settings": {
       "types": "./dist/settings.d.ts",

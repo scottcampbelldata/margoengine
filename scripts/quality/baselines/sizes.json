@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17772554,
+  "total": 17777093,
   "history": [
     {
       "date": "2026-10-24",
@@ -11583,6 +11583,12 @@
       "commit": "d0cc35ea50",
       "reason": "KB-RESTORE-BORROWED1: the tonemap auto exposure mask goes through the shared TextureOption, with setAutoExposureMask",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-10",
+      "reason": "FG-10 new optional entry environment/density-volume, 3,934 B gzip: sparse 8^3-brick density grid (VDB leaf layout) with splats, VDB import and the froxel medium WGSL; water/flood-bake 3,729 to 4,334 B for floodMist, the spray-mist puff model beside the emitters it reads (a separate entry would repeat the option checks and the sites type)",
+      "grew": 2
     }
   ],
   "items": {
@@ -11902,6 +11908,7 @@
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
+    "@margoengine/environment/density-volume": 3934,
     "@margoengine/environment/exr-codecs": 1729,
     "@margoengine/environment/exr-tiled": 8898,
     "@margoengine/environment/exr-write": 2084,
@@ -13042,7 +13049,7 @@
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
     "@margoengine/water/flood": 12642,
-    "@margoengine/water/flood-bake": 3729,
+    "@margoengine/water/flood-bake": 4334,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,

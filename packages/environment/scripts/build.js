@@ -32,6 +32,7 @@ for (const [entry, emptyOutDir] of [
   ['ground', false],
   ['gi', false],
   ['fog-volumes', false],
+  ['density-volume', false],
   ['settings', false],
   ['studio', false],
   ['prefiltered', false],

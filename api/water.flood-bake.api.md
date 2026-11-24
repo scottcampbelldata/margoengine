@@ -85,6 +85,25 @@ export interface FloodImageOptions {
     northUp?: boolean;
 }
 
+export interface FloodMist {
+    count: number;
+    position: Float32Array;
+    radius: Float32Array;
+    weight: Float32Array;
+}
+
+export interface FloodMistOptions {
+    wind?: readonly [number, number];
+    lifetime?: number;
+    diffusivity?: number;
+    fallSpeed?: number;
+    dropRadius?: number;
+    dropsPerParticle?: number;
+    sourceRadius?: number;
+    puffs?: number;
+    maxPuffs?: number;
+}
+
 export interface FloodPNGOptions {
     channel?: string;
     range?: readonly [number, number];
@@ -113,6 +132,8 @@ export function floodBirths(sites: FloodSites, seconds: number, options: FloodBi
 export function floodEmitters(reading: FloodReading, options: FloodEmitterOptions): FloodEmitters;
 
 export function floodImage(reading: FloodReading, options?: FloodImageOptions): FloodImage;
+
+export function floodMist(spray: FloodSites, options?: FloodMistOptions): FloodMist;
 
 // Not exported from this entry, but used by the exports above:
 

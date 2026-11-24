@@ -1130,6 +1130,39 @@ const births = floodBirths(spray, 1 / 24, {cell: [place.size[0] / frame.width, p
 console.log(spray.count, debris.count, births.count);
 ```
 
+#### Spray mist (FG-10)
+
+`floodMist(spray, options)` turns the spray sites into the mist the breaking water leaves hanging in the air: Gaussian
+puffs (a Lagrangian puff model, Turner 1970 and Csanady 1973) whose sum is the mist's extinction per metre. Each site is
+a steady source; a puff of age t holds the drops released t seconds ago that are still in the air, exp(-t / `lifetime`)
+(default 3 s), drifts with `wind` ([x, z] m/s, default [0, 0]), spreads with variance `sourceRadius`^2 (0.5 m) + 2 K t
+(`diffusivity` K, default 0.3 m^2/s, Taylor 1921) and rises to the ballistic apex of the site's launch speed before
+settling at `fallSpeed` (0.3 m/s), never below the water. Each spray particle stands for `dropsPerParticle` (1e4) drops of
+`dropRadius` (0.1 mm), each blocking twice its cross-section (van de Hulst 1957), so the puffs carry a real extinction.
+`puffs` (6) per site cover three lifetimes; at most `maxPuffs` (16,384) are kept, the strongest first. Splat them into a
+`DensityVolume` (`@margoengine/environment/density-volume`) with density 1 and give it to `VolumetricFog` as its
+`volumes`: the mist takes the sun, its shafts and shadows like any fog. `test/flood-mist.test.js` checks the puffs
+against the formulas and that the splatted grid holds every airborne drop's cross-section.
+
+```ts
+import {floodEmitters, floodMist} from 'margoengine/water/flood-bake';
+import {DensityVolume} from 'margoengine/environment/density-volume';
+import type {FloodReading} from 'margoengine/water/flood';
+
+const frame = {
+  time: 0, steps: 0, ticks: 0, volume: 0, wetArea: 32, maxDepth: 3, maxSpeed: 2, courant: 0, capped: 0, foamArea: 0,
+  width: 2, height: 1,
+  depth: Float32Array.from([3, 2]), bed: Float32Array.from([-3, -2]),
+  velocity: Float32Array.from([2, 0, 2, 0]), foam: new Float32Array(2), breaker: Float32Array.from([0.9, 0.5]),
+} satisfies FloodReading;
+const {spray} = floodEmitters(frame, {place: {origin: [0, 0], size: [8, 4]}});
+const mist = floodMist(spray, {wind: [3, 0.5], lifetime: 4});
+const grid = new DensityVolume({voxelSize: 0.5});
+grid.splat(mist.position, {radius: mist.radius, weight: mist.weight});
+console.log(mist.count, grid.brickCount, grid.sample([1, 1, 2]).toFixed(4));
+// new VolumetricFog({volumes: grid}) draws it; clear() and splat() again each frame.
+```
+
 ### Breaking and plunging fronts: `@margoengine/water/breaking` (FG-04, FG-12)
 
 The flood keeps one height per cell, so its fronts draw as a steep hump and never overturn. `breakingFronts(reading,

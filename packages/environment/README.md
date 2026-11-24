@@ -214,6 +214,30 @@ How it works. Each froxel adds every volume's extinction at its sample point to 
 
 Limits: every froxel tests every volume, so the froxel pass grows with the volume count (not timed); boxes are axis-aligned; a volume thinner than a froxel (about 8 x 8 pixels across and a slice deep with the default grid) is blurred over its froxel and its neighbours (the 3 x 3 tent); a moved volume shows over `temporal`'s history like any change; no volume carves fog out of the global fog. Real-GPU check: `npm run test:fog-volumes:browser` (the integrated volume of a box, a sphere and a noisy box equals a CPU mirror of the froxel pass, every froxel; each volume's fog takes its albedo; a moved sphere moves its fog on the next frame).
 
+## Sparse density grids (VDB volumes, spray mist)
+
+`@margoengine/environment/density-volume` is a heterogeneous medium on a sparse grid for `VolumetricFog`: smoke, steam or spray mist with detail anywhere in the world, written by a program, splatted from particles or read from an OpenVDB file. It goes into the fog's froxel grid as its `volumes`, so it is lit by the sun, its shafts and shadows, the ambient and clustered lights with the fog's phase function and reprojection:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+import {VolumetricFog} from 'margoengine/environment/volumetric';
+import {DensityVolume} from 'margoengine/environment/density-volume';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+Tonemap.attach(engine);
+const mist = new DensityVolume({voxelSize: 0.25, density: 0.8, color: [0.95, 0.97, 1]});
+mist.splat([0, 1, -4, 1.5, 1.4, -5], {radius: [0.8, 1.2], weight: [1, 0.6]}); // two Gaussian puffs
+mist.set(4, 4, -16, 2);                                                       // one voxel by index
+const fog = VolumetricFog.attach(engine, {density: 0, volumes: mist});
+mist.clear(); mist.splat([0, 1.2, -4], {radius: 1});                          // shows on the next frame
+```
+
+A VDB grid read by `parseVDB` of `@margoengine/loaders/vdb` loads with `DensityVolume.fromVDB(file.grids[0], {density})`: its active leaves and tiles, placed by the grid's own matrix (inactive voxels read 0; vector grids and level sets are refused). For a flood's spray mist, `floodMist` of `@margoengine/water/flood-bake` gives Gaussian puffs to `splat`.
+
+How it works. The grid is the leaf layout of OpenVDB (Museth 2013): bricks of 8 x 8 x 8 voxels, z fastest, and constant tiles for whole bricks of one value. On the GPU a page table over the box of occupied bricks holds one entry a brick (empty, a tile's value, or its slot in the voxel store); each froxel maps its sample point to index space through the inverse of the index-to-world matrix and filters the eight voxel centres around it trilinearly, so `sample(p)` on the CPU gives the same value. A voxel value of 1 is `density` extinction per metre with albedo `color`. `splat` adds Gaussians of a given peak and world radius, cut at three radii. The page table and voxels upload only when the grid changed; the matrix, box and look every frame.
+
+Options and defaults: `voxelSize` 0.5 m and `origin` [0, 0, 0] (voxel (0, 0, 0)'s centre), or `matrix` (affine, column-major index to world); `density` 1 per m; `color` [1, 1, 1]; `maxBricks` 32,768 (64 MiB of voxels); `maxPages` 16,777,216 (the page table spans the box round every brick, 4 B a brick of the box). Limits: detail finer than a froxel (about 8 x 8 pixels and a slice deep with the default grid) is averaged into it, so a close-up of fine smoke needs a finer `grid`; one `volumes` source per fog (this or `FogVolumes`); voxel indices within +-524,288; values below 0 read as 0. Real-GPU check: `npm run test:density-volume:browser` (WebGPU and the WebGL2 layer: Gaussian splats, a VDB leaf and a tile give an integrated froxel volume equal to a CPU mirror built on `sample`, every froxel; the albedo colours the fog; a rewritten grid shows on the next frame; an empty grid is clear).
+
 ## Sliders for the air: `@margoengine/environment/settings`
 
 `VolumetricFog` reads its options each frame into one uniform, and `Fog`, `Environment` and `EnvironmentBackground` write theirs through setters, so the look changes while the scene runs and nothing is rebuilt. `@margoengine/environment/settings` lists those controls as a table for sliders and panels: `ENVIRONMENT_SETTINGS` has 29 rows (`name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live`), grouped as the air (`air.visibility`, `air.heightFalloff`, `air.height`, `air.color`, `air.ambient`, `air.anisotropy`, `air.multipleScattering`, `air.range`, `air.temporal`, `air.enabled`), its noise and drift (`noise.*`), the scene fog (`sceneFog.*`), the environment (`environment.intensity`, `environment.rotation`) and the background (`background.exposure`, `background.blur`, `background.rotation`). `applyEnvironmentSettings({air, fog, environment, background}, values)` writes a set of values onto the objects you give (a name left out takes its default), and `ENVIRONMENT_LOOKS` names six looks made only of row values: `clear`, `haze`, `mist`, `fog`, `smokePall` and `dustHaze`. An unknown name throws `TypeError`, a value outside its row's range `RangeError`, and a row moved off its default whose object you did not pass `TypeError`.
@@ -1051,6 +1075,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `ImageBackground(options)` | `shape` (`'box'`, `'sphere'` or `'cylinder'`), `images` (6 faces or 1 panorama), `filter` (`'linear'`), `height` (cylinder: 2 * PI * h / w), `rotation` (0), `order` (0.5), `name` (`'background'`); `ImageBackground.load` decodes URLs and image sources |
 | `TransparentCanvas(options)` | `order` (0.5), `name` (`'transparent-canvas'`) |
 | `VolumetricFog(options)` (`/volumetric`) | `visibility` (23,000 m: clear air; extinction 3.912 / visibility), `density` (from `visibility`; give one), `heightFalloff` (1 / 1,200 m, or 0 with `density`), `height` (0), `color` (albedo, [1, 1, 1]), `anisotropy` (0.5), `multipleScattering` (0 m: single scattering only), `ambient` (the horizon sky with a sky, else engine ambient), `sky` (the scene's `sky` plugin; null for none), `noise` (0), `noiseScale` (8 m), `wind` ([0, 0, 0] m/s), `range` (100 m), `grid` ([160, 90, 64]), `temporal` (0.9), `shadows`, `lights`, `depth`, `volumes`, `lightning` (none; `albedo` `CLOUD_ALBEDO`, 0.8); `fog.add(model or effect)` fogs transparents |
+| `DensityVolume(options)` (`/density-volume`) | `voxelSize` (0.5 m), `origin` ([0, 0, 0]) or `matrix`, `density` (1 per m), `color` ([1, 1, 1]), `maxBricks` (32,768), `maxPages` (16,777,216); `splat` `radius` (1 m), `weight` (1) |
 | `FogVolumes(volumes)` (`/fog-volumes`) | per volume: `shape` (`'box'` with `min`, `max`; `'sphere'` with `center`, `radius`), `density` (0.1 per m), `color` ([1, 1, 1]), `edge` (0 m), `noise` (0), `noiseScale` (2 m) |
 | `studio(options)` (`/studio`) | `width` (512), `floor` (0.12 grey), `walls` (0.3 grey), `ceiling` (0.45 grey), `horizon` (0.08 rad), `lights` (`STUDIO_LIGHTS`); per light `direction`, `width`, `height`, `intensity`, `color` ([1, 1, 1]), `softness` (0.15) |
 | `ColorOutput(options)` | `gamut` (`'p3'`), `hdr` (true), `peak` (4, 1..16), `force` (false); name `'color-output'` |
