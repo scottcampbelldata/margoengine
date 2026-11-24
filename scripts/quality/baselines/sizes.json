@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17740815,
+  "total": 17754351,
   "history": [
     {
       "date": "2026-10-24",
@@ -11529,6 +11529,12 @@
       "commit": "b7734e7df",
       "reason": "physics: multibody dynamics (mass matrix, Jacobian, inverse and forward dynamics) in the root entry: dynamics.ts",
       "grew": 2
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "91190ba14",
+      "reason": "physics gains shape forms, mesh tools, height field cell status, wide interaction groups, two combine rules and collider boxes; features Rapier's Rust crate has and its JavaScript build lacks",
+      "grew": 2
     }
   ],
   "items": {
@@ -12286,8 +12292,8 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 265708,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 60846,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 66637,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 206519,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/soft": 72231,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 21969,
