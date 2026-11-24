@@ -300,6 +300,7 @@ impl World {
             }
         }
         self.wake_across_joints();
+        self.wake_across_couplings();
         let awake = self.header().awake as usize;
         for i in 0..awake {
             let body = self.uu(AWAKE, i);
@@ -322,6 +323,7 @@ impl World {
             }
         }
         self.unite_joints();
+        self.unite_couplings();
         // Number the islands, count their bodies, and see whether all of each are ready. A root holds its island's number.
         let mut islands = 0usize;
         for i in 0..awake {

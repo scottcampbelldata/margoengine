@@ -158,7 +158,6 @@ impl World {
             world.timing[phase] = (at - stamp) as f32;
             stamp = at;
         };
-        self.wake_couplings();
         self.begin_step(dt);
         lap(self, 1);
         self.broad_update(dt);

@@ -104,8 +104,8 @@ pub struct Header {
     /// meaning the same as every other contact.
     pub static_hertz: f32,
     pub static_damping: f32,
-    /// The mechanisms that tie two bodies' motion together (src/couplings.rs).
-    pub couplings: [crate::couplings::Coupling; crate::couplings::MAX_COUPLINGS],
+    /// Coupling slots handed out so far (src/couplings.rs).
+    pub coupling_rows: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -133,7 +133,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5]);
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5], 0);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -204,7 +204,7 @@ impl World {
                 max_linear_speed: 0.0,
                 static_hertz: 0.0,
                 static_damping: 0.0,
-                couplings: [crate::couplings::Coupling::NONE; crate::couplings::MAX_COUPLINGS],
+                coupling_rows: 0,
             });
         }
         Some(world)
@@ -245,7 +245,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old)))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old), old[19]))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -752,6 +752,7 @@ mod tests {
         assert!(world.reserve_hull(5, 5, 5, 5));
         assert!(world.reserve_mesh([5, 5, 5, 5, 5]));
         assert!(world.grow_joints());
+        assert!(world.grow_couplings());
         for row in 0..5 {
             for column in 0..COLUMNS {
                 unsafe { *world.u(column).add(row) = (column * 100 + row) as u32 };
@@ -761,6 +762,7 @@ mod tests {
         assert!(world.reserve_hull(1000, 1000, 1000, 1000));
         assert!(world.reserve_mesh([1000, 1000, 1000, 1000, 1000]));
         assert!(world.grow_joints());
+        assert!(world.grow_couplings());
         assert_eq!(world.header().capacity[0], 1000);
         for row in 0..5 {
             for column in 0..COLUMNS {

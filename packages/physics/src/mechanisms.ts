@@ -52,7 +52,7 @@ abstract class Mechanism implements PhysicsAttachment {
     const slot = physics.kernel.addCoupling(kind, a.row, b.row);
     if (slot < 0)
       throw new RangeError(
-        'A mechanism joins two different live bodies, and a world holds 64; pass two bodies, or remove one first.',
+        'A mechanism joins two different live bodies, and memory may be out; pass two bodies, or remove one first.',
       );
     this.slot = slot;
     physics.kernel.setCoupling(slot, 8, [frequency, damping, correction]);

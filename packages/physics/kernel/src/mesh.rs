@@ -417,7 +417,7 @@ impl World {
         if need == have {
             return true;
         }
-        self.grow(capacities(old[0], old[1], old[3], hull_capacity(&old), old[11], need))
+        self.grow(capacities(old[0], old[1], old[3], hull_capacity(&old), old[11], need, old[19]))
     }
 
     /// Makes room for one more mesh. The caller then writes MESH_VERTEX_ columns, TRIANGLE_A, B, C and TRIANGLE_ACROSS_

@@ -139,3 +139,81 @@ fn a_distance_range_stops_a_body_at_its_greatest_and_its_least() {
     let (length, _) = hang(v3(0.0, -0.5, 0.0), v3(0.0, 0.0, 0.0), 0.0, 1.0, 8.0, 240);
     assert!(length > 1.0 && length < 1.25, "a soft range stretches a little and holds: {length}");
 }
+
+/// A wheel on a hinge that may sleep.
+fn sleepy_wheel(w: &mut World, at: V3) -> u32 {
+    let post = w.add_body(FIXED).unwrap();
+    w.set_pose(post, at, Q::IDENTITY, false);
+    let body = w.add_body(DYNAMIC).unwrap();
+    let row = body as usize;
+    w.set_s(INVERSE_MASS, row, 0.5);
+    w.set_v(INERTIA_X, row, v3(0.2, 0.2, 0.2));
+    w.set_v(INVERSE_INERTIA_X, row, v3(5.0, 5.0, 5.0));
+    w.set_pose(body, at, Q::IDENTITY, false);
+    let joint = w.add_joint(post, body, LOCK_LINEAR_ROWS | JOINT_LOCK * (6 << 3)).unwrap();
+    w.set_joint_axis(joint, v3(0.0, 0.0, 1.0));
+    body
+}
+
+#[test]
+fn a_resting_train_of_gears_sleeps_as_one_and_a_touch_on_one_end_wakes_it_all() {
+    let mut w = World::new(32, 32).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let train: Vec<u32> = (0..4).map(|k| sleepy_wheel(&mut w, v3(k as f32, 0.0, 0.0))).collect();
+    for pair in train.windows(2) {
+        let gear = w.add_coupling(GEAR, pair[0], pair[1]).unwrap();
+        w.set_coupling(gear, 0, [0.0, 0.0, 1.0]);
+        w.set_coupling(gear, 1, [0.0, 0.0, 1.0]);
+    }
+    run(&mut w, 90);
+    for &wheel in &train {
+        assert!(w.flags(wheel as usize) & SLEEPING != 0, "the resting train sleeps");
+    }
+    // A touch on the first gear: it wakes, and its coupling wakes the rest.
+    w.set_v(ANGULAR_X, train[0] as usize, v3(0.0, 0.0, 3.0));
+    w.wake(train[0]);
+    run(&mut w, 3);
+    for &wheel in &train {
+        assert!(w.flags(wheel as usize) & SLEEPING == 0, "the whole train wakes");
+    }
+    assert!(w.v(ANGULAR_X, train[1] as usize).z.abs() > 0.05, "and the next gear turns");
+}
+
+#[test]
+fn a_gear_that_is_moving_keeps_its_partner_awake() {
+    let mut w = World::new(16, 16).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let a = sleepy_wheel(&mut w, v3(0.0, 0.0, 0.0));
+    let b = sleepy_wheel(&mut w, v3(1.0, 0.0, 0.0));
+    let gear = w.add_coupling(GEAR, a, b).unwrap();
+    w.set_coupling(gear, 0, [0.0, 0.0, 1.0]);
+    w.set_coupling(gear, 1, [0.0, 0.0, 1.0]);
+    w.set_v(ANGULAR_X, a as usize, v3(0.0, 0.0, 20.0));
+    run(&mut w, 120);
+    assert!(w.flags(a as usize) & SLEEPING == 0 && w.flags(b as usize) & SLEEPING == 0, "a spinning pair stays awake");
+}
+
+#[test]
+fn a_thousand_gears_in_a_train_fit_in_the_table() {
+    let mut w = World::new(2100, 2100).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let train: Vec<u32> = (0..1001).map(|k| wheel(&mut w, v3(k as f32, 0.0, 0.0), 1.0, 0.1)).collect();
+    let mut slots = Vec::new();
+    for pair in train.windows(2) {
+        let gear = w.add_coupling(GEAR, pair[0], pair[1]).expect("room for another gear");
+        w.set_coupling(gear, 0, [0.0, 0.0, 1.0]);
+        w.set_coupling(gear, 1, [0.0, 0.0, 1.0]);
+        slots.push(gear);
+    }
+    assert_eq!(slots.len(), 1000);
+    assert!(slots.windows(2).all(|s| s[1] == s[0] + 1), "slots come in order");
+    w.set_v(ANGULAR_X, train[0] as usize, v3(0.0, 0.0, 2.0));
+    run(&mut w, 30);
+    // Each gear passes its turn on, and a thousand gears are a heavy load for the first one: it turns slowly, and the first pair
+    // still meshes at one to one, the other way.
+    let (w0, w1) = (w.v(ANGULAR_X, train[0] as usize).z, w.v(ANGULAR_X, train[1] as usize).z);
+    assert!((w0 + w1).abs() < 0.05 * w0.abs() && w0.abs() > 1e-5, "the first pair meshes: {w0} {w1}");
+    // A removed coupling gives its slot back.
+    assert!(w.remove_coupling(slots[10]));
+    assert_eq!(w.add_coupling(GEAR, train[10], train[11]), Some(slots[10]));
+}

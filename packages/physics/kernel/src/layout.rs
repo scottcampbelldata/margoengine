@@ -33,8 +33,10 @@ pub enum Rows {
     MeshNode,
     /// Cells of voxel grids, four a word, held for the world's life.
     Voxel,
+    /// COUPLING_WORDS rows a coupling: the gears, racks, pulleys and distance ranges that tie two bodies' motion together.
+    Coupling,
 }
-pub const ROW_CLASSES: usize = 19;
+pub const ROW_CLASSES: usize = 20;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -587,6 +589,8 @@ columns! {
     // Four cells a word, a byte each from the low end: bit 0 filled, bits 1 to 6 whether the cell across each face is
     // filled, faces in a box's order (+x, -x, +y, -y, +z, -z), across a coupled grid's border too (voxel.rs).
     VOXEL_WORD u32 Voxel,
+    // The couplings (src/couplings.rs), COUPLING_WORDS words each, read as structs.
+    COUPLINGS f32 Coupling,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -616,7 +620,7 @@ pub const MANIFOLD: usize = 4;
 
 /// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull and mesh rows a world already has room
 /// for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5]) -> [u32; ROW_CLASSES] {
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5], couplings: u32) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
     let [mesh, mesh_vertices, triangles, nodes, words] = meshes;
     [
@@ -639,6 +643,7 @@ pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], join
         triangles,
         nodes,
         words,
+        couplings,
     ]
 }
 
@@ -657,6 +662,9 @@ pub fn mesh_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 5] {
 /// Most bodies and colliders one world holds.
 pub const MAX_BODIES: u32 = 1 << 22;
 pub const MAX_COLLIDERS: u32 = 1 << 22;
+/// Words of COUPLINGS a coupling takes.
+pub const COUPLING_WORDS: u32 = (core::mem::size_of::<crate::couplings::Coupling>() / 4) as u32;
+
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
 /// 6 of what the pushing pass gave.
 pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4);

@@ -12,7 +12,7 @@ use crate::solver::Moving;
 use crate::world::{NONE, World};
 
 /// Most couplings a world holds.
-pub const MAX_COUPLINGS: usize = 64;
+pub const MAX_COUPLINGS: u32 = 1 << 20;
 
 /// What a coupling is.
 pub const GEAR: u32 = 1;
@@ -89,21 +89,58 @@ struct Row {
 }
 
 impl World {
-    /// Adds a coupling between two live bodies; its slot, or None when they are one body, one is gone, or the table is full.
+    /// The coupling in a slot.
+    #[inline]
+    fn coupling(&self, slot: usize) -> Coupling {
+        unsafe { *(self.f(COUPLINGS).add(slot * COUPLING_WORDS as usize) as *const Coupling) }
+    }
+
+    #[inline]
+    fn put_coupling(&mut self, slot: usize, c: Coupling) {
+        unsafe { *(self.f(COUPLINGS).add(slot * COUPLING_WORDS as usize) as *mut Coupling) = c };
+    }
+
+    /// Makes room for more couplings.
+    pub fn grow_couplings(&mut self) -> bool {
+        let capacity = self.header().capacity;
+        let slots = capacity[Rows::Coupling as usize] / COUPLING_WORDS;
+        if slots >= MAX_COUPLINGS {
+            return false;
+        }
+        let mut next = capacity;
+        next[Rows::Coupling as usize] = (if slots < 16 { 16 } else { slots * 2 }) * COUPLING_WORDS;
+        self.grow(next)
+    }
+
+    /// Adds a coupling between two live bodies; its slot, or None when they are one body, one is gone, the kind is not one, or
+    /// memory is out.
     pub fn add_coupling(&mut self, kind: u32, a: u32, b: u32) -> Option<usize> {
         if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=DISTANCE).contains(&kind) {
             return None;
         }
-        let slot = (0..MAX_COUPLINGS).find(|&k| self.header().couplings[k].kind == 0)?;
-        self.header_mut().couplings[slot] = Coupling { kind, a, b, ..Coupling::NONE };
+        let used = self.header().coupling_rows as usize;
+        let slot = match (0..used).find(|&k| self.coupling(k).kind == 0) {
+            Some(free) => free,
+            None => {
+                if used as u32 >= self.header().capacity[Rows::Coupling as usize] / COUPLING_WORDS && !self.grow_couplings() {
+                    return None;
+                }
+                self.header_mut().coupling_rows = used as u32 + 1;
+                used
+            }
+        };
+        self.put_coupling(slot, Coupling { kind, a, b, ..Coupling::NONE });
         self.wake(a);
         self.wake(b);
         Some(slot)
     }
 
-    /// Writes one of a coupling's parameters: the slot's fields by index (see `COUPLING_FIELDS`).
+    /// Writes one of a coupling's parameters: the slot's fields by index (see `coupling_set` in api.rs).
     pub fn set_coupling(&mut self, slot: usize, field: u32, value: [f32; 3]) {
-        let Some(c) = self.header_mut().couplings.get_mut(slot) else { return };
+        if slot >= self.header().coupling_rows as usize {
+            return;
+        }
+        let mut c = self.coupling(slot);
         match field {
             0 => c.axis_a = value,
             1 => c.axis_b = value,
@@ -121,24 +158,23 @@ impl World {
             _ => {}
         }
         c.impulse = 0.0;
+        self.put_coupling(slot, c);
     }
 
     pub fn remove_coupling(&mut self, slot: usize) -> bool {
-        match self.header_mut().couplings.get_mut(slot) {
-            Some(c) if c.kind != 0 => {
-                *c = Coupling::NONE;
-                true
-            }
-            _ => false,
+        if slot < self.header().coupling_rows as usize && self.coupling(slot).kind != 0 {
+            self.put_coupling(slot, Coupling::NONE);
+            return true;
         }
+        false
     }
 
     pub fn coupling_error(&self, slot: usize) -> f32 {
-        self.header().couplings.get(slot).map_or(0.0, |c| c.error)
+        if slot < self.header().coupling_rows as usize { self.coupling(slot).error } else { 0.0 }
     }
 
     pub fn coupling_impulse(&self, slot: usize) -> f32 {
-        self.header().couplings.get(slot).map_or(0.0, |c| c.impulse)
+        if slot < self.header().coupling_rows as usize { self.coupling(slot).impulse } else { 0.0 }
     }
 
     /// Whether a coupling's two bodies are both there.
@@ -146,16 +182,39 @@ impl World {
         c.kind != 0 && self.body_alive(c.a) && self.body_alive(c.b)
     }
 
-    /// Wakes the other body of a coupling whose one body is awake, before the islands are made, so the pair sleeps and wakes as one.
-    pub fn wake_couplings(&mut self) {
-        for k in 0..MAX_COUPLINGS {
-            let c = self.header().couplings[k];
+    /// Wakes what a moving body is coupled to, as `wake_across_joints` does for joints.
+    pub fn wake_across_couplings(&mut self) {
+        for k in 0..self.header().coupling_rows as usize {
+            let c = self.coupling(k);
             if !self.coupling_live(&c) {
                 continue;
             }
-            let (a_asleep, b_asleep) = (self.flags(c.a as usize) & SLEEPING != 0, self.flags(c.b as usize) & SLEEPING != 0);
-            if a_asleep != b_asleep {
-                self.wake(if a_asleep { c.a } else { c.b });
+            let (a, b) = (c.a as usize, c.b as usize);
+            let (sleeping_a, sleeping_b) = (self.flags(a) & SLEEPING != 0, self.flags(b) & SLEEPING != 0);
+            if sleeping_a && !sleeping_b && self.disturbs(b) {
+                self.wake(c.a);
+            } else if sleeping_b && !sleeping_a && self.disturbs(a) {
+                self.wake(c.b);
+            }
+        }
+    }
+
+    /// Coupled bodies are one island, as joined ones are: they sleep together and are woken together.
+    pub fn unite_couplings(&mut self) {
+        for k in 0..self.header().coupling_rows as usize {
+            let c = self.coupling(k);
+            if !self.coupling_live(&c) {
+                continue;
+            }
+            let (a, b) = (c.a as usize, c.b as usize);
+            let (kind_a, kind_b) = (self.flags(a) & KIND, self.flags(b) & KIND);
+            let awake = self.is_awake(a) && self.is_awake(b);
+            if kind_a == DYNAMIC && kind_b == DYNAMIC && awake {
+                self.unite(c.a, c.b);
+            } else if kind_b == DYNAMIC && self.moving_kinematic(a) {
+                self.set_s(SLEEP_TIME, b, 0.0);
+            } else if kind_a == DYNAMIC && self.moving_kinematic(b) {
+                self.set_s(SLEEP_TIME, a, 0.0);
             }
         }
     }
@@ -253,8 +312,8 @@ impl World {
 
     /// Gives every coupling the impulse it carries, at the start of a substep.
     pub fn warm_start_couplings(&mut self) {
-        for k in 0..MAX_COUPLINGS {
-            let c = self.header().couplings[k];
+        for k in 0..self.header().coupling_rows as usize {
+            let c = self.coupling(k);
             if !self.coupling_live(&c) || c.impulse == 0.0 {
                 continue;
             }
@@ -268,8 +327,8 @@ impl World {
 
     /// One pass over the couplings; `bias` is the pass that also closes the error.
     pub fn solve_couplings(&mut self, h: f32, bias: bool) {
-        for k in 0..MAX_COUPLINGS {
-            let c = self.header().couplings[k];
+        for k in 0..self.header().coupling_rows as usize {
+            let c = self.coupling(k);
             if !self.coupling_live(&c) {
                 continue;
             }
@@ -311,21 +370,25 @@ impl World {
             Self::coupling_push(&c, &row, &mut a, &mut b, change);
             self.settle(c.a as usize, &a);
             self.settle(c.b as usize, &b);
-            self.header_mut().couplings[k].impulse = c.impulse + change;
+            let mut kept = self.coupling(k);
+            kept.impulse = c.impulse + change;
+            self.put_coupling(k, kept);
         }
     }
 
     /// After a substep's poses: the error a gear and a rack have built up follows from the speed they ended with.
     pub fn track_couplings(&mut self, h: f32) {
-        for k in 0..MAX_COUPLINGS {
-            let c = self.header().couplings[k];
+        for k in 0..self.header().coupling_rows as usize {
+            let c = self.coupling(k);
             if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE {
                 continue;
             }
             let (row, _) = self.coupling_row(&c);
             let (a, b) = (self.moving(c.a as usize), self.moving(c.b as usize));
             let (speed, _) = Self::coupling_speed(&c, &row, &a, &b);
-            self.header_mut().couplings[k].error = c.error + speed * h;
+            let mut kept = self.coupling(k);
+            kept.error = c.error + speed * h;
+            self.put_coupling(k, kept);
         }
     }
 }
