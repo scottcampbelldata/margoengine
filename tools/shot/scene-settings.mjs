@@ -17,17 +17,28 @@ export async function loadShotTables(shot, info = sceneInfo(shot.scene)) {
   const tables = {};
   for (const target of Object.keys(shot.settings)) {
     const entry = info.targets?.[target];
-    if (!entry) throw new TypeError(`shot.settings.${target}: scene ${shot.scene} has no target ${target}; use one of ${Object.keys(info.targets ?? {}).join(', ') || 'none (the scene lists no targets)'}`);
+    if (!entry)
+      throw new TypeError(
+        `shot.settings.${target}: scene ${shot.scene} has no target ${target}; use one of ${Object.keys(info.targets ?? {}).join(', ') || 'none (the scene lists no targets)'}`,
+      );
     // `entry` is a package entry, or `entry#NAME` to name the table when the entry exports more than one.
     const [path, wanted] = entry.split('#');
     const module = await import(path);
-    const found = Object.keys(module).filter((key) => key.endsWith('_SETTINGS') && !key.endsWith('_LIVE_SETTINGS') && Array.isArray(module[key]));
+    const found = Object.keys(module).filter(
+      (key) => key.endsWith('_SETTINGS') && !key.endsWith('_LIVE_SETTINGS') && Array.isArray(module[key]),
+    );
     // With several tables, the one named after the package is the entry's own: `@margoengine/weather/settings` gives
     // WEATHER_SETTINGS beside the AVALANCHE_ and SNOW_ tables an entry adds later, so a catalogue line keeps working.
-    const own = `${path.replace(/^@[^/]+\//, '').split('/')[0].replace(/-/g, '_').toUpperCase()}_SETTINGS`;
+    const own = `${path
+      .replace(/^@[^/]+\//, '')
+      .split('/')[0]
+      .replace(/-/g, '_')
+      .toUpperCase()}_SETTINGS`;
     const name = wanted ?? (found.length === 1 ? found[0] : found.includes(own) ? own : undefined);
     if (!name || !Array.isArray(module[name]))
-      throw new TypeError(`shot.settings.${target}: ${path} exports ${found.length ? `${found.join(', ')}; name one as ${path}#NAME` : 'no *_SETTINGS table'}`);
+      throw new TypeError(
+        `shot.settings.${target}: ${path} exports ${found.length ? `${found.join(', ')}; name one as ${path}#NAME` : 'no *_SETTINGS table'}`,
+      );
     tables[target] = module[name];
   }
   return tables;
@@ -51,6 +62,20 @@ export const shotValuesAt = (shot, tables, seconds) =>
   tables ? shotSettingsAt(shot.settings, tables, Math.max(0, seconds - shot.from)) : null;
 
 /**
+ * The keyed rows of a shot's values at cutscene time `seconds` (shotValuesAt): what a frame writes, as a held row goes
+ * in once with the warm-up (docs/shots.md, Scene settings per shot). Null when the shot keys no row.
+ */
+export function shotKeyedValuesAt(shot, tables, seconds) {
+  const values = shotValuesAt(shot, tables, seconds);
+  if (!values) return null;
+  const keyed = {};
+  for (const [target, rows] of Object.entries(values))
+    for (const [row, value] of Object.entries(rows))
+      if (Array.isArray(shot.settings?.[target]?.[row]?.keys)) (keyed[target] ??= {})[row] = value;
+  return Object.keys(keyed).length ? keyed : null;
+}
+
+/**
  * The shot files of a scene, written from `info.shots` so a shot is authored once: for each `SceneShot`, a header with its
  * `seconds`, `scene`, `settings` and probes' names, around the cutscene `tracks` the caller gives for that shot name (the
  * camera moves come from the scene's views and anchors, which the catalogue does not hold).
@@ -59,7 +84,10 @@ export const shotValuesAt = (shot, tables, seconds) =>
  */
 export function shotFilesFromScene(info, { page, tracks, kind = 'long' }) {
   return (info.shots ?? []).map((s) => {
-    if (!tracks[s.name]) throw new RangeError(`No tracks for shot ${s.name} of scene ${info.name}; pass tracks[${JSON.stringify(s.name)}].`);
+    if (!tracks[s.name])
+      throw new RangeError(
+        `No tracks for shot ${s.name} of scene ${info.name}; pass tracks[${JSON.stringify(s.name)}].`,
+      );
     return {
       format: 'margo-cutscene',
       version: 1,

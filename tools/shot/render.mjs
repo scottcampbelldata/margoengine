@@ -11,7 +11,7 @@ import { openBrowser } from '../../scripts/browser.js';
 import { installShotDriver } from './driver.js';
 import { blueNoise } from './pixels.js';
 import { pixelScript } from './pixel-script.mjs';
-import { checkShotFileSettings, shotValuesAt } from './scene-settings.mjs';
+import { checkShotFileSettings, shotKeyedValuesAt, shotValuesAt } from './scene-settings.mjs';
 import { writeMoving } from './motion.mjs';
 import {
   DERIVED_AOVS,
@@ -225,6 +225,122 @@ export const shotStep = async ({
   return result;
 };
 
+/** How long the tool waits for the page to load or to ask for a frame, ms; an error on the page ends a wait at once. */
+export const PAGE_TIMEOUT_MS = 180_000;
+
+/**
+ * Watches an open page: its errors as they come (uncaught exceptions and console errors), the files it loads from its
+ * own origin (`loaded`, URL paths, for the stills' record of what a still depends on), and `failed`, a promise that
+ * rejects at the first error, so a wait on the page ends at once instead of at its timeout (KB-SHOT-FAILFAST1: a page
+ * whose module threw, for example on a model the loader refused, never asked for a frame, and the tool waited out its
+ * 180 s timeout before saying why). `stop()` removes the listeners.
+ * @param {import('@playwright/test').Page} page
+ */
+export function watchPage(page) {
+  const errors = [],
+    loaded = new Set();
+  let reject;
+  const failed = new Promise((_, fail) => (reject = fail));
+  failed.catch(() => {});
+  const add = (text) => {
+    errors.push(text);
+    reject(new Error(`the page reported an error: ${text}`));
+  };
+  const onError = (error) => add(error.message ?? String(error));
+  const onConsole = (message) => message.type() === 'error' && add(message.text());
+  const onLoaded = (request) => {
+    const url = new URL(request.url()),
+      origin = page.url().startsWith('http') ? new URL(page.url()).origin : null;
+    if (url.origin === origin) loaded.add(decodeURIComponent(url.pathname));
+  };
+  page.on('pageerror', onError);
+  page.on('console', onConsole);
+  page.on('requestfinished', onLoaded);
+  return {
+    errors,
+    loaded,
+    failed,
+    stop() {
+      page.off('pageerror', onError);
+      page.off('console', onConsole);
+      page.off('requestfinished', onLoaded);
+    },
+  };
+}
+
+/** Waits for the page to ask for its next frame; rejects at the page's first error (watchPage) or at the timeout. */
+export async function untilQueued(page, watch) {
+  const asked = page.waitForFunction(() => globalThis.__margoShot.queued > 0, null, {
+    timeout: PAGE_TIMEOUT_MS,
+    polling: 250,
+  });
+  asked.catch(() => {});
+  await Promise.race([asked, watch.failed]);
+}
+
+/** The page hooks every frame step passes on (shotStep). */
+export const pageHooks = (shot, recordSky = false) => ({
+  engine: shot.page.engine,
+  apply: shot.page.apply,
+  settingsHook: shot.page.settings,
+  ground: shot.page.ground,
+  canvas: shot.page.canvas,
+  recordSky,
+});
+
+/**
+ * Loads the shot's page in an open browser and draws its warm-up, as every render and measure does: the shot's first
+ * instant drawn `warmup` times, so pipelines compile and the temporal passes (TAA, the cloud march) settle before
+ * frame 0; the clock does not move, so the scene does not either. Resolves the shot's settings tables, checked
+ * against the packages' own rows before anything draws (docs/shots.md). Rejects at the page's first error, when the
+ * page is not ready after the warm-up, or when its canvas is not the render size.
+ */
+export async function loadShotPage(browser, file, watch, common) {
+  const { page, server } = browser,
+    { shot } = file,
+    origin = `http://127.0.0.1:${server.config.server.port}`,
+    loading = page.goto(pageUrl(origin, file), { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
+  loading.catch(() => {});
+  await Promise.race([loading, watch.failed]);
+  // The page asks for its first frame once it has loaded what it needs; nothing is drawn before that.
+  await untilQueued(page, watch);
+  const tables = await checkShotFileSettings(shot),
+    first = new Cutscene(file).evaluate(0),
+    args = {
+      ...common,
+      subs: [
+        {
+          time: { ms: CLOCK_START, seconds: 0 },
+          camera: first.camera,
+          state: shot.page.apply ? first : null,
+          settings: shotValuesAt(shot, tables, shot.from),
+        },
+      ],
+      kept: null,
+      warmup: true,
+    };
+  for (let w = 0; w < shot.warmup; w++) {
+    // A page still loading between its first frames asks for the next one when it is ready: wait for that.
+    while ((await page.evaluate(shotStep, args))?.idle) await untilQueued(page, watch);
+  }
+  if (watch.errors.length)
+    throw new Error(`the page reported errors while loading:\n  ${watch.errors.slice(0, 10).join('\n  ')}`);
+  if (shot.page.ready && !(await page.$(shot.page.ready)))
+    throw new Error(
+      `the page is not ready after ${shot.warmup} warm-up frames (${shot.page.ready} matches nothing); raise shot.warmup`,
+    );
+  const size = await page.evaluate((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas ? [canvas.width, canvas.height] : null;
+    }, shot.page.canvas),
+    render = renderSize(shot);
+  if (!size || size[0] !== render[0] || size[1] !== render[1])
+    throw new Error(
+      `the canvas is ${size ? size.join(' x ') : 'missing'}, not ${render.join(' x ')} (${shot.size.join(' x ')} at ${shot.supersample}x supersampling): make it fill the window with shot.page.css`,
+    );
+  return tables;
+}
+
 /**
  * One render of a shot in an open page: load, warm up, then every frame of shotFrames(). `write` keeps PNG files;
  * `expect` (another render's hashes) writes the frames that differ from it into `out/mismatch`. `only` (a set of
@@ -235,7 +351,7 @@ export const shotStep = async ({
  * @returns {Promise<{ size: number[], warmup: number, frames: { index: number, time: number, file?: string, sha256: string }[], adapter: unknown }>}
  */
 export async function renderOnce(browser, file, { out, label, write, expect, only = null, progress, log = () => {} }) {
-  const { page, server, hardware } = browser,
+  const { page, hardware } = browser,
     { shot } = file,
     cutscene = new Cutscene(file),
     last = only ? Math.max(...only) : Infinity,
@@ -257,29 +373,16 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     return { size: [...shot.size], warmup: shot.warmup, frames: done, adapter: hardware.webgpu };
   }
   if (done.length) log(`${label}: resuming at kept frame ${done.length}`);
-  const origin = `http://127.0.0.1:${server.config.server.port}`,
-    errors = [];
-  const onError = (error) => errors.push(error.message ?? String(error));
-  const onConsole = (message) => message.type() === 'error' && errors.push(message.text());
-  page.on('pageerror', onError);
-  page.on('console', onConsole);
+  const watch = watchPage(page),
+    { errors } = watch;
   try {
-    await page.goto(pageUrl(origin, file), { waitUntil: 'load', timeout: 180_000 });
-    // The page asks for its first frame once it has loaded what it needs; nothing is drawn before that.
-    await page.waitForFunction(() => globalThis.__margoShot.queued > 0, null, { timeout: 180_000, polling: 250 });
     // One frame of the render: each of `subs` (one, or a kept frame's sub-frames over the shutter) drawn on its own
     // clock time and camera, the GPU settled between them, and a kept frame captured from all of them.
     const step = (args) => page.evaluate(shotStep, args);
     // A shot with no page sky mask asks the page's sky (if it has one) where it drew, for skyClip (KB-HEARTH-CLIP1).
     const recordSky = !shot.aovs.includes('sky') && probes.size > 0,
-      common = {
-        engine: shot.page.engine,
-        apply: shot.page.apply,
-        settingsHook: shot.page.settings,
-        ground: shot.page.ground,
-        canvas: shot.page.canvas,
-        recordSky,
-      },
+      common = pageHooks(shot, recordSky),
+      tables = await loadShotPage(browser, file, watch, common),
       masks = shot.aovs.length
         ? {
             hook: shot.page.aovs,
@@ -288,44 +391,6 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             horizon: shot.horizon,
           }
         : null;
-    // Warm-up: the shot's first instant drawn `warmup` times, so pipelines compile and the temporal passes (TAA,
-    // the cloud march) settle before frame 0; the clock does not move, so the scene does not either.
-    // The shot's settings, checked against the packages' own rows before anything draws (docs/shots.md).
-    const tables = await checkShotFileSettings(shot);
-    const first = cutscene.evaluate(0);
-    for (let w = 0; w < shot.warmup; w++) {
-      const args = {
-        ...common,
-        subs: [
-          {
-            time: { ms: CLOCK_START, seconds: 0 },
-            camera: first.camera,
-            state: shot.page.apply ? first : null,
-            settings: shotValuesAt(shot, tables, shot.from),
-          },
-        ],
-        kept: null,
-        warmup: true,
-      };
-      // A page still loading between its first frames asks for the next one when it is ready: wait for that.
-      while ((await step(args))?.idle)
-        await page.waitForFunction(() => globalThis.__margoShot.queued > 0, null, { timeout: 180_000, polling: 250 });
-    }
-    if (errors.length)
-      throw new Error(`the page reported errors while loading:\n  ${errors.slice(0, 10).join('\n  ')}`);
-    if (shot.page.ready && !(await page.$(shot.page.ready)))
-      throw new Error(
-        `the page is not ready after ${shot.warmup} warm-up frames (${shot.page.ready} matches nothing); raise shot.warmup`,
-      );
-    const size = await page.evaluate((selector) => {
-        const canvas = document.querySelector(selector);
-        return canvas ? [canvas.width, canvas.height] : null;
-      }, shot.page.canvas),
-      render = renderSize(shot);
-    if (!size || size[0] !== render[0] || size[1] !== render[1])
-      throw new Error(
-        `the canvas is ${size ? size.join(' x ') : 'missing'}, not ${render.join(' x ')} (${shot.size.join(' x ')} at ${shot.supersample}x supersampling): make it fill the window with shot.page.css`,
-      );
     if (write) mkdirSync(join(out, 'frames'), { recursive: true });
     // Frames up to the last one a resumed render had captured are drawn again, one sub-frame each, not captured.
     const passed = done.length ? done.at(-1).index : -1;
@@ -343,6 +408,10 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             time: { ms: CLOCK_START + (frame.render * 1000) / shot.fps + offset * 1000, seconds },
             camera: state.camera,
             state: shot.page.apply ? state : null,
+            // The shot's keyed rows at this sub-frame's own time, written through the page's settings hook each
+            // sub-frame, so they move (KB-SHOT-SETTINGS2: only the warm-up wrote them, so a keyed row held its first
+            // value for the whole shot); a held row went in once, with the warm-up.
+            settings: shotKeyedValuesAt(shot, tables, seconds),
           };
         });
       const result = await step({
@@ -398,10 +467,16 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     if (errors.length) throw new Error(`the page reported errors:\n  ${errors.slice(0, 10).join('\n  ')}`);
     if (capture && shot.msaa && capture.samples !== shot.msaa)
       throw new Error(`the page draws with ${capture.samples} MSAA samples, not the shot's ${shot.msaa}`);
-    return { size: [...shot.size], warmup: shot.warmup, frames: done, adapter: hardware.webgpu, capture };
+    return {
+      size: [...shot.size],
+      warmup: shot.warmup,
+      frames: done,
+      adapter: hardware.webgpu,
+      capture,
+      loaded: [...watch.loaded].sort(),
+    };
   } finally {
-    page.off('pageerror', onError);
-    page.off('console', onConsole);
+    watch.stop();
   }
 }
 

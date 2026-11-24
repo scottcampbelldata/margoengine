@@ -65,6 +65,9 @@ export async function shootStills(file, { out, source, log = console.error } = {
       fps: file.shot.fps,
       adapter: a.adapter,
       stills,
+      // Every file the page loaded from its own origin (URL paths: the repository and /asset-library/), so a film
+      // pipeline can tell when a still's models, maps or modules changed after it was rendered.
+      ...(a.loaded ? { loaded: a.loaded } : {}),
     };
     writeFileSync(join(out, 'stills.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     rmSync(work, { recursive: true, force: true });

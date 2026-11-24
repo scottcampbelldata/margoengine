@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--once] [--production] [--check] [--encode] [--stills] [--cameras]
+// node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--once] [--production] [--check] [--encode] [--stills] [--cameras] [--measure]
 // Renders a shot file to PNG frames twice and checks the two renders match (docs/shots.md). --check only validates
 // the file. Output goes to <MARGO_SHOT_OUT or test-results/shots>/<day>/<id>/ unless --out names a folder.
 // --seconds renders the first part of the shot; --once skips the second render (no determinism verdict);
@@ -8,6 +8,8 @@
 // gets its look checks after the render (look.mjs): look.md, look.json and look.png beside manifest.json.
 // --stills renders only the probe frames, as <out>/<probe>.png with <out>/stills.json (a film's storyboard stills);
 // --cameras prints the camera of every kept frame as JSON (cameraFrames in shot-file.mjs), with no browser.
+// --measure loads the page as a render does, captures nothing, and prints its measure as JSON (measure.mjs): the page's
+// errors, the camera's near and far planes and the ground under every kept frame's camera and target.
 // Exit codes: 0 rendered and identical (and every look check and master check passed), 1 failed, 2 bad arguments or
 // shot file, 3 rendered but a look check failed (look.md says which).
 import { readFileSync } from 'node:fs';
@@ -17,7 +19,7 @@ import { cameraFrames, firstSeconds, parseShot } from './shot-file.mjs';
 import { shotOutput } from './platform.mjs';
 
 const usage =
-  'usage: node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--browser=<name>] [--once] [--production] [--check] [--encode] [--stills] [--cameras]';
+  'usage: node tools/shot/cli.mjs <shot.json> [--day YYYY-MM-DD] [--out <dir>] [--seconds <s>] [--browser=<name>] [--once] [--production] [--check] [--encode] [--stills] [--cameras] [--measure]';
 
 // Renders, checks and encodes as asked; resolves to the exit code above.
 async function main() {
@@ -37,6 +39,7 @@ async function main() {
         encode: { type: 'boolean', default: false },
         stills: { type: 'boolean', default: false },
         cameras: { type: 'boolean', default: false },
+        measure: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
     }));
@@ -55,8 +58,9 @@ async function main() {
     return 2;
   }
   const alone = values.once || values.production || values.encode || values.check || values.seconds !== undefined;
-  if ((values.stills || values.cameras) && (alone || (values.stills && values.cameras))) {
-    console.error(`--stills and --cameras each stand alone, with no other mode\n${usage}`);
+  const own = [values.stills, values.cameras, values.measure].filter(Boolean).length;
+  if (own && (alone || own > 1)) {
+    console.error(`--stills, --cameras and --measure each stand alone, with no other mode\n${usage}`);
     return 2;
   }
   const root = resolve(import.meta.dirname, '../..'),
@@ -97,6 +101,16 @@ async function main() {
   } catch (error) {
     console.error(error.message);
     return 2;
+  }
+  if (values.measure) {
+    const { measureShot } = await import('./measure.mjs');
+    try {
+      console.log(JSON.stringify(await measureShot(file)));
+      return 0;
+    } catch (error) {
+      console.error(error.stack ?? String(error));
+      return 1;
+    }
   }
   const out = resolve(values.out ?? output.frames);
   if (values.stills) {

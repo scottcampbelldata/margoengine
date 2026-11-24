@@ -190,7 +190,22 @@ file and holds the motion capture until every still is approved). It needs probe
 `tools/shot/shot-file.mjs`): `{id, fps, frames, size, subject, cameras: [{frame, time, position, target, fov,
 roll}]}`, the camera track read at each frame's clock time as a render reads it, pre-roll skipped, `time` from the
 first kept frame, `fov` in degrees and `roll` in radians. A film pipeline's camera checks read it instead of a
-render. `--stills` and `--cameras` each stand alone: with another mode (or each other) the tool exits 2.
+render. `--stills`, `--cameras` and `--measure` each stand alone: with another mode (or each other) the tool exits 2.
+
+`stills.json` also names, as `loaded`, every file the page loaded from its own origin while it rendered (URL paths:
+repository files and `/asset-library/` models and maps), so a film pipeline can tell when a model, map or module a
+still depends on changed after the still was made.
+
+## Measure
+
+`node tools/shot/cli.mjs <shot> --measure` loads the shot's page and draws its warm-up exactly as a render does,
+captures nothing, and prints one JSON line (`measureShot` in `tools/shot/measure.mjs`, format `margo-shot-measure`):
+`{id, heights, near, far, errors, adapter, cameras: [{frame, ground}], subjectGround}`. `near` and `far` are the page engine's
+camera clip planes in metres; with `shot.page.ground` each kept frame's `ground` is `[under the camera, under the
+target]` from the page's ground function, `subjectGround` the ground under `shot.subject`, and `heights` is `'ground'` (the track's heights are above it), otherwise
+`ground` is null and `heights` is `'world'`. A film pipeline's rules gate reads it before any still is made: camera
+height over the ground, the near clip and the page loading with no error on the current build. It exits 1 naming
+the page's error. It writes no picture.
 
 ## Masks (AOVs)
 
@@ -299,7 +314,7 @@ check name failing, and a probe's own `lookBounds` replacing the shot's for the 
 
 ## Limits
 
-A shot renders from its first frame to its last in one run: nothing pauses it and no option limits its time. The queue runner ends a job only as hung, after 12 hours, with its child processes. Each captured frame writes `progress-a.json` and `progress-b.json`, so a render that crashed or hung can be run again with the same command and goes on from its last captured frame. Waiting for a free page has its own limit, and every wait that ends one says what it waited for.
+A shot renders from its first frame to its last in one run: nothing pauses it and no option limits its time. The queue runner ends a job only as hung, after 12 hours, with its child processes. Each captured frame writes `progress-a.json` and `progress-b.json`, so a render that crashed or hung can be run again with the same command and goes on from its last captured frame. Waiting for a free page has its own limit, and every wait that ends one says what it waited for. Loading the page and waiting for it to ask for a frame stop at 180 s, or at once when the page reports an error (an uncaught exception or a console error): the tool then fails naming it (KB-SHOT-FAILFAST1), instead of waiting out the limit for a page whose module threw.
 
 ## Output and the hand-off to encoding
 
