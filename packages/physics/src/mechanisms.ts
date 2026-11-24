@@ -240,8 +240,10 @@ export class DistanceJoint extends Mechanism {
 
 /** Options of {@link PathJoint}. */
 export interface PathOptions extends MechanismOptions {
-  /** The curve: a Catmull-Rom spline through these points (2 to 16), in the first body's frame. */
+  /** The curve: a Catmull-Rom spline through these points (2 or more, as many as you like), in the first body's frame. */
   points: readonly Vec3[];
+  /** The curve closes on itself: the last point runs on to the first, a track or a ring (default false). Needs 3 points or more. */
+  closed?: boolean;
   /** The follower's point that rides the curve, in its own frame (default its centre). */
   anchor?: Vec3;
   /** A motor along the curve: its speed in m/s (positive toward the last point) and the most force it may use in N. */
@@ -257,8 +259,10 @@ export class PathJoint extends Mechanism {
   constructor(physics: Physics, base: PhysicsBody, follower: PhysicsBody, options: PathOptions) {
     const { points, motor } = options,
       anchor: V = options.anchor ? ([...options.anchor] as V) : [0, 0, 0];
-    if (!Array.isArray(points) || points.length < 2 || points.length > 16)
-      throw new RangeError('A path has 2 to 16 points; pass options.points with that many.');
+    if (!Array.isArray(points) || points.length < (options.closed ? 3 : 2) || points.length > 1048576)
+      throw new RangeError(
+        'A path has 2 points or more (3 when closed), up to 1,048,576; pass options.points with that many.',
+      );
     points.forEach((point, i) => checkVec(point, `Path point ${i}`));
     checkVec(anchor, 'Anchor');
     if (motor && !(Number.isFinite(motor.speed) && motor.maxForce >= 0 && Number.isFinite(motor.maxForce)))
@@ -268,6 +272,7 @@ export class PathJoint extends Mechanism {
     super(physics, PATH, base, follower, options);
     const k = physics.kernel;
     k.setCoupling(this.slot, 3, anchor);
+    if (options.closed) k.setCoupling(this.slot, 11, [1, 0, 0]);
     for (const point of points) k.setCoupling(this.slot, 9, point as V);
     if (motor) k.setCoupling(this.slot, 10, [motor.speed, motor.maxForce, 0]);
   }

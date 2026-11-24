@@ -299,7 +299,8 @@ pub extern "C" fn coupling_add(kind: u32, a: u32, b: u32) -> i32 {
     world().add_coupling(kind, a, b).map_or(-1, |slot| slot as i32)
 }
 /// Writes a field of a coupling: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B (three numbers each);
-/// 6 ratio, 7 total (the first number); 8 softness (frequency, damping ratio, correction).
+/// 6 ratio, 7 total (the first number); 8 softness (frequency, damping ratio, correction); 9 adds a point to a path, 10 sets its
+/// motor (speed, force), 11 closes it (1) or opens it (0).
 #[unsafe(no_mangle)]
 pub extern "C" fn coupling_set(slot: u32, field: u32, x: f32, y: f32, z: f32) {
     world().set_coupling(slot as usize, field, [x, y, z]);

@@ -35,8 +35,10 @@ pub enum Rows {
     Voxel,
     /// COUPLING_WORDS rows a coupling: the gears, racks, pulleys and distance ranges that tie two bodies' motion together.
     Coupling,
+    /// Words of the points of couplings' paths, and the boxes that index them, in ranges a coupling owns (src/couplings.rs).
+    PathPoint,
 }
-pub const ROW_CLASSES: usize = 20;
+pub const ROW_CLASSES: usize = 21;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -591,6 +593,8 @@ columns! {
     VOXEL_WORD u32 Voxel,
     // The couplings (src/couplings.rs), COUPLING_WORDS words each, read as structs.
     COUPLINGS f32 Coupling,
+    // The points of every path and the boxes of their spans, in ranges of words (src/couplings.rs).
+    PATH_WORD f32 PathPoint,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -620,7 +624,7 @@ pub const MANIFOLD: usize = 4;
 
 /// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull and mesh rows a world already has room
 /// for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5], couplings: u32) -> [u32; ROW_CLASSES] {
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5], couplings: u32, paths: u32) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
     let [mesh, mesh_vertices, triangles, nodes, words] = meshes;
     [
@@ -644,6 +648,7 @@ pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], join
         nodes,
         words,
         couplings,
+        paths,
     ]
 }
 

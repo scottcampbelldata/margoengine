@@ -2525,9 +2525,11 @@ export class KernelWorld {
     if (this.api.world_layout() !== this.layout) this.bind();
     return slot;
   }
-  /** Writes a coupling's field: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B, 6 ratio, 7 total, 8 softness (hertz, damping, correction), 9 add a path point, 10 path motor (speed, force). */
+  /** Writes a coupling's field: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B, 6 ratio, 7 total, 8 softness (hertz, damping, correction), 9 add a path point, 10 path motor (speed, force), 11 path closed (1) or open (0). */
   setCoupling(slot: number, field: number, value: readonly [number, number, number]): void {
     this.api.coupling_set(slot, field, value[0], value[1], value[2]);
+    // A path's points grow the store, which moves the columns.
+    if (this.api.world_layout() !== this.layout) this.bind();
   }
   /** Removes a coupling. */
   removeCoupling(slot: number): boolean {

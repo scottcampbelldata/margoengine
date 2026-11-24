@@ -20,10 +20,21 @@ pub const RACK_AND_PINION: u32 = 2;
 pub const PULLEY: u32 = 3;
 /// Two anchors that keep a distance within a range: `ratio` is the least, `total` the greatest (0 for no greatest).
 pub const DISTANCE: u32 = 4;
-/// A body held to a curve fixed on another: a Catmull-Rom spline through up to `PATH_POINTS` points (in A's frame), with a motor along it.
+/// A body held to a curve fixed on another: a Catmull-Rom spline through any number of points (in A's frame), open or closed, with a
+/// motor along it. The points live in a shared column, a range each, with an index of boxes over its spans.
 pub const PATH: u32 = 5;
 /// Most points of a path.
-pub const PATH_POINTS: usize = 16;
+pub const MAX_PATH_POINTS: u32 = 1 << 20;
+/// Most words of the path column.
+const MAX_PATH_WORDS: u32 = 1 << 26;
+/// Spans a block of the index covers.
+const BLOCK: usize = 16;
+
+/// Words of a path range of `cap` points: the points, a box (six numbers) for each span, and a box for each block of spans.
+#[inline]
+fn path_words(cap: u32) -> u32 {
+    9 * cap + 6 * (cap / BLOCK as u32 + 1)
+}
 
 /// One coupling: bodies `a` and `b`, directions in their own frames, and the row's memory. A free slot has kind 0.
 #[repr(C)]
@@ -51,10 +62,17 @@ pub struct Coupling {
     /// The error of the combination, and the impulse the row has given.
     pub error: f32,
     pub impulse: f32,
-    /// A path: its points in A's frame and how many there are, the impulses of its two normal rows beside `impulse` (the motor's),
-    /// and the motor's speed along the path and the most force it may use (0 for no motor).
-    pub points: [[f32; 3]; PATH_POINTS],
+    /// A path: where its range starts in the path column (words), how many points it holds and has room for, whether it closes on
+    /// itself, how many points the index was built for (it is rebuilt when they change) and the span the follower was nearest last,
+    /// where the next search starts.
+    pub path: u32,
     pub count: u32,
+    pub cap: u32,
+    pub closed: u32,
+    pub indexed: u32,
+    pub last_span: u32,
+    /// The impulses of a path's two normal rows beside `impulse` (the motor's), and the motor's speed along the path and the most
+    /// force it may use (0 for no motor).
     pub impulse_n1: f32,
     pub impulse_n2: f32,
     pub motor_speed: f32,
@@ -79,8 +97,12 @@ impl Coupling {
         correction: 0.2,
         error: 0.0,
         impulse: 0.0,
-        points: [[0.0; 3]; PATH_POINTS],
+        path: 0,
         count: 0,
+        cap: 0,
+        closed: 0,
+        indexed: 0,
+        last_span: 0,
         impulse_n1: 0.0,
         impulse_n2: 0.0,
         motor_speed: 0.0,
@@ -158,6 +180,10 @@ impl World {
         if slot >= self.header().coupling_rows as usize {
             return;
         }
+        if field == 9 {
+            self.add_path_point(slot, value);
+            return;
+        }
         let mut c = self.coupling(slot);
         match field {
             0 => c.axis_a = value,
@@ -173,16 +199,11 @@ impl World {
                 c.zeta = value[1];
                 c.correction = value[2];
             }
-            9 => {
-                if (c.count as usize) < PATH_POINTS {
-                    c.points[c.count as usize] = value;
-                    c.count += 1;
-                }
-            }
             10 => {
                 c.motor_speed = value[0];
                 c.motor_force = value[1];
             }
+            11 => c.closed = (value[0] != 0.0) as u32,
             _ => {}
         }
         c.impulse = 0.0;
@@ -444,7 +465,7 @@ fn spline(p0: V3, p1: V3, p2: V3, p3: V3, t: f32) -> (V3, V3) {
 }
 
 /// What a path row needs: the nearest point of the curve to the follower's anchor, the curve's direction there, two directions
-/// across it, and the arms from each body's centre.
+/// across it, the arms from each body's centre and the span it lies on.
 struct PathState {
     on: V3,
     tangent: V3,
@@ -453,44 +474,248 @@ struct PathState {
     ra: V3,
     rb: V3,
     error: V3,
+    span: u32,
+}
+
+/// The squared distance from `p` to a box of `lo` and `hi`.
+#[inline]
+fn box_distance(lo: V3, hi: V3, p: V3) -> f32 {
+    let d = |lo: f32, hi: f32, p: f32| if p < lo { lo - p } else if p > hi { p - hi } else { 0.0 };
+    let (x, y, z) = (d(lo.x, hi.x, p.x), d(lo.y, hi.y, p.y), d(lo.z, hi.z, p.z));
+    x * x + y * y + z * z
 }
 
 impl World {
-    fn path_state(&self, c: &Coupling) -> Option<PathState> {
+    #[inline]
+    fn path_at(&self, word: usize) -> V3 {
+        unsafe {
+            let p = self.f(PATH_WORD).add(word);
+            v3(*p, *p.add(1), *p.add(2))
+        }
+    }
+
+    #[inline]
+    fn path_put(&mut self, word: usize, v: V3) {
+        unsafe {
+            let p = self.f(PATH_WORD).add(word);
+            *p = v.x;
+            *p.add(1) = v.y;
+            *p.add(2) = v.z;
+        }
+    }
+
+    /// Point `i` of a path, in A's frame: past an end it wraps on a closed path and holds the end's point on an open one.
+    fn path_point(&self, c: &Coupling, i: i64) -> V3 {
+        let n = c.count as i64;
+        let at = if c.closed != 0 { ((i % n) + n) % n } else if i < 0 { 0 } else if i > n - 1 { n - 1 } else { i };
+        self.path_at(c.path as usize + 3 * at as usize)
+    }
+
+    /// The four neighbours of span `s`.
+    fn span_points(&self, c: &Coupling, s: usize) -> (V3, V3, V3, V3) {
+        let s = s as i64;
+        (self.path_point(c, s - 1), self.path_point(c, s), self.path_point(c, s + 1), self.path_point(c, s + 2))
+    }
+
+    /// How many spans a path has.
+    fn path_spans(c: &Coupling) -> usize {
         let n = c.count as usize;
-        if n < 2 {
+        if n < 2 { 0 } else if c.closed != 0 { n } else { n - 1 }
+    }
+
+    /// Makes the path column hold at least `words` words.
+    pub fn reserve_paths(&mut self, words: u32) -> bool {
+        let mut next = self.header().capacity;
+        if next[Rows::PathPoint as usize] >= words {
+            return true;
+        }
+        next[Rows::PathPoint as usize] = words;
+        self.grow(next)
+    }
+
+    /// Hands out `words` of the path column, packing the ranges first and growing the column when they do not fit.
+    fn path_alloc(&mut self, words: u32) -> Option<u32> {
+        let (used, capacity) = (self.header().path_used, self.header().capacity[Rows::PathPoint as usize]);
+        if used as u64 + words as u64 > capacity as u64 {
+            self.compact_paths();
+            let used = self.header().path_used;
+            if used as u64 + words as u64 > capacity as u64 {
+                let need = (used as u64 + words as u64).next_power_of_two().max(1024);
+                if need > MAX_PATH_WORDS as u64 {
+                    return None;
+                }
+                if !self.reserve_paths(need as u32) {
+                    return None;
+                }
+            }
+        }
+        let start = self.header().path_used;
+        self.header_mut().path_used = start + words;
+        Some(start)
+    }
+
+    /// Moves every live path's range down against the one before it, in the order the ranges lie, so what removed couplings and
+    /// grown paths left behind is free again. A moved path's index is rebuilt at its next solve.
+    fn compact_paths(&mut self) {
+        let (mut next, mut last) = (0u32, -1i64);
+        loop {
+            let mut pick = None;
+            for k in 0..self.header().coupling_rows as usize {
+                let c = self.coupling(k);
+                if c.kind == PATH && c.cap > 0 && c.path as i64 > last && pick.map_or(true, |(_, at)| c.path < at) {
+                    pick = Some((k, c.path));
+                }
+            }
+            let Some((k, at)) = pick else { break };
+            let mut c = self.coupling(k);
+            if c.path != next {
+                unsafe {
+                    let base = self.f(PATH_WORD);
+                    core::ptr::copy(base.add(c.path as usize), base.add(next as usize), 3 * c.count as usize);
+                }
+                c.path = next;
+                c.indexed = 0;
+                self.put_coupling(k, c);
+            }
+            next += path_words(c.cap);
+            last = at as i64;
+        }
+        self.header_mut().path_used = next;
+    }
+
+    /// Appends a point to a path, moving it to a larger range when its own is full.
+    fn add_path_point(&mut self, slot: usize, value: [f32; 3]) {
+        let c = self.coupling(slot);
+        if c.kind != PATH || c.count >= MAX_PATH_POINTS {
+            return;
+        }
+        if c.count == c.cap {
+            let cap = if c.cap < 4 { 8 } else { c.cap * 2 };
+            let Some(start) = self.path_alloc(path_words(cap)) else { return };
+            // A compaction inside the allocation may have moved this path.
+            let mut c = self.coupling(slot);
+            unsafe {
+                let base = self.f(PATH_WORD);
+                core::ptr::copy(base.add(c.path as usize), base.add(start as usize), 3 * c.count as usize);
+            }
+            c.path = start;
+            c.cap = cap;
+            self.put_coupling(slot, c);
+        }
+        let mut c = self.coupling(slot);
+        self.path_put(c.path as usize + 3 * c.count as usize, vec(value));
+        c.count += 1;
+        c.indexed = 0;
+        c.impulse = 0.0;
+        c.impulse_n1 = 0.0;
+        c.impulse_n2 = 0.0;
+        self.put_coupling(slot, c);
+    }
+
+    /// Builds the boxes over a path's spans and over blocks of them when its points have changed. A Catmull-Rom span is the Bezier
+    /// curve whose inner control points are `p1 + (p2 - p0) / 6` and `p2 - (p3 - p1) / 6`, so it lies in the box of those four.
+    fn index_path(&mut self, k: usize) {
+        let mut c = self.coupling(k);
+        if c.indexed == c.count {
+            return;
+        }
+        let spans = Self::path_spans(&c);
+        let (boxes, blocks) = (c.path as usize + 3 * c.cap as usize, c.path as usize + 9 * c.cap as usize);
+        let grow = |lo: &mut V3, hi: &mut V3, p: V3| {
+            if p.x < lo.x { lo.x = p.x }
+            if p.y < lo.y { lo.y = p.y }
+            if p.z < lo.z { lo.z = p.z }
+            if p.x > hi.x { hi.x = p.x }
+            if p.y > hi.y { hi.y = p.y }
+            if p.z > hi.z { hi.z = p.z }
+        };
+        let blocks_used = (spans + BLOCK - 1) / BLOCK;
+        for b in 0..blocks_used {
+            let (mut blo, mut bhi) = (v3(f32::MAX, f32::MAX, f32::MAX), v3(-f32::MAX, -f32::MAX, -f32::MAX));
+            for s in b * BLOCK..(b * BLOCK + BLOCK).min(spans) {
+                let (p0, p1, p2, p3) = self.span_points(&c, s);
+                let (q1, q2) = (p1.add(p2.sub(p0).scale(1.0 / 6.0)), p2.sub(p3.sub(p1).scale(1.0 / 6.0)));
+                let (mut lo, mut hi) = (p1, p1);
+                for p in [q1, q2, p2] {
+                    grow(&mut lo, &mut hi, p);
+                }
+                self.path_put(boxes + 6 * s, lo);
+                self.path_put(boxes + 6 * s + 3, hi);
+                grow(&mut blo, &mut bhi, lo);
+                grow(&mut blo, &mut bhi, hi);
+            }
+            self.path_put(blocks + 6 * b, blo);
+            self.path_put(blocks + 6 * b + 3, bhi);
+        }
+        c.indexed = c.count;
+        self.put_coupling(k, c);
+    }
+
+    /// The nearest point of span `s` to `p` by sixteen samples: its squared distance and parameter.
+    fn sample_span(&self, c: &Coupling, s: usize, p: V3) -> (f32, f32) {
+        self.path_samples.set(self.path_samples.get() + 1);
+        let (p0, p1, p2, p3) = self.span_points(c, s);
+        let (mut best, mut at) = (f32::MAX, 0.0f32);
+        for k in 0..=16 {
+            let t = k as f32 / 16.0;
+            let d = spline(p0, p1, p2, p3, t).0.sub(p);
+            let l = d.dot(d);
+            if l < best {
+                best = l;
+                at = t;
+            }
+        }
+        (best, at)
+    }
+
+    fn path_state(&self, c: &Coupling) -> Option<PathState> {
+        let spans = Self::path_spans(c);
+        if spans == 0 || c.indexed != c.count {
             return None;
         }
         let (a, b) = (c.a as usize, c.b as usize);
         let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
         let (pa, pb) = (self.v(POSITION_X, a), self.v(POSITION_X, b));
-        let at = |i: usize| pa.add(qa.rotate(vec(c.points[i.min(n - 1)])));
+        self.path_searches.set(self.path_searches.get() + 1);
         let anchor = pb.add(qb.rotate(vec(c.anchor_b)));
-        // Sixteen samples a span, then two Newton steps on the nearest.
-        let (mut best, mut span, mut at_t) = (f32::MAX, 0usize, 0.0f32);
-        for i in 0..n - 1 {
-            let (p0, p1, p2, p3) = (at(i.saturating_sub(1)), at(i), at(i + 1), at(i + 2));
-            for k in 0..=16 {
-                let t = k as f32 / 16.0;
-                let d = spline(p0, p1, p2, p3, t).0.sub(anchor);
-                let l = d.dot(d);
-                if l < best {
-                    best = l;
-                    span = i;
-                    at_t = t;
+        // The search runs in A's frame, where the points and their boxes stand still.
+        let local = qa.unrotate(anchor.sub(pa));
+        let (boxes, blocks) = (c.path as usize + 3 * c.cap as usize, c.path as usize + 9 * c.cap as usize);
+        // Start from where the follower was: the spans beside the last one give a distance the boxes then prune against.
+        let seed = (c.last_span as usize).min(spans - 1);
+        let (mut best, mut span, mut at_t) = (f32::MAX, seed, 0.0f32);
+        for s in [seed, (seed + 1) % spans, (seed + spans - 1) % spans] {
+            let (d, t) = self.sample_span(c, s, local);
+            if d < best {
+                (best, span, at_t) = (d, s, t);
+            }
+        }
+        for blk in 0..(spans + BLOCK - 1) / BLOCK {
+            if box_distance(self.path_at(blocks + 6 * blk), self.path_at(blocks + 6 * blk + 3), local) >= best {
+                continue;
+            }
+            for s in blk * BLOCK..(blk * BLOCK + BLOCK).min(spans) {
+                if box_distance(self.path_at(boxes + 6 * s), self.path_at(boxes + 6 * s + 3), local) >= best {
+                    continue;
+                }
+                let (d, t) = self.sample_span(c, s, local);
+                if d < best {
+                    (best, span, at_t) = (d, s, t);
                 }
             }
         }
-        let (p0, p1, p2, p3) = (at(span.saturating_sub(1)), at(span), at(span + 1), at(span + 2));
+        let (p0, p1, p2, p3) = self.span_points(c, span);
         for _ in 0..2 {
             let (point, slope) = spline(p0, p1, p2, p3, at_t);
             let denom = slope.dot(slope);
             if denom > 1e-12 {
-                let next = at_t - point.sub(anchor).dot(slope) / denom;
+                let next = at_t - point.sub(local).dot(slope) / denom;
                 at_t = if next < 0.0 { 0.0 } else if next > 1.0 { 1.0 } else { next };
             }
         }
-        let (on, slope) = spline(p0, p1, p2, p3, at_t);
+        let (on_local, slope_local) = spline(p0, p1, p2, p3, at_t);
+        let on = pa.add(qa.rotate(on_local));
+        let slope = qa.rotate(slope_local);
         let length = sqrt(slope.dot(slope));
         let tangent = if length > 1e-9 { slope.scale(1.0 / length) } else { v3(1.0, 0.0, 0.0) };
         // The two directions across the curve: from the world axis least along it.
@@ -504,7 +729,7 @@ impl World {
         let n1 = tangent.cross(axis);
         let n1 = n1.scale(1.0 / sqrt(n1.dot(n1)));
         let n2 = tangent.cross(n1);
-        Some(PathState { on, tangent, n1, n2, ra: on.sub(self.v(CENTER_X, a)), rb: anchor.sub(self.v(CENTER_X, b)), error: anchor.sub(on) })
+        Some(PathState { on, tangent, n1, n2, ra: on.sub(self.v(CENTER_X, a)), rb: anchor.sub(self.v(CENTER_X, b)), error: anchor.sub(on), span: span as u32 })
     }
 
     fn warm_curve(&mut self, k: usize) {
@@ -512,6 +737,8 @@ impl World {
         if !self.coupling_live(&c) || (c.impulse == 0.0 && c.impulse_n1 == 0.0 && c.impulse_n2 == 0.0) {
             return;
         }
+        self.index_path(k);
+        let c = self.coupling(k);
         let Some(s) = self.path_state(&c) else { return };
         let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
         for (d, p) in [(s.n1, c.impulse_n1), (s.n2, c.impulse_n2), (s.tangent, c.impulse)] {
@@ -524,8 +751,10 @@ impl World {
 
     /// One pass over a path: the follower's anchor is held on the curve by two rows across it, and a motor along it drives it.
     fn solve_curve(&mut self, k: usize, h: f32, bias: bool) {
+        self.index_path(k);
         let mut c = self.coupling(k);
         let Some(s) = self.path_state(&c) else { return };
+        c.last_span = s.span;
         let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
         let speed_of = |a: &Moving, b: &Moving, d: V3| d.dot(b.at(s.rb).sub(a.at(s.ra)));
         for row in 0..3 {

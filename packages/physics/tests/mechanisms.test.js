@@ -169,3 +169,36 @@ test('a path joint holds a bead on a curve, lets it swing as a pendulum of the c
   assert.throws(() => new PathJoint(rail, base, car, { points: [[0, 0, 0]] }), RangeError);
   assert.throws(() => track.setMotor(1, -1), RangeError);
 });
+
+test('a path of a thousand points closes on itself and a car rides it round', () => {
+  const loop = new Physics(null);
+  loop.gravity = [0, 0, 0];
+  const base = loop.addBody(null, { type: 'fixed', colliders: [] }),
+    car = loop.addBody(null, {
+      position: [0, -5, 0],
+      colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 2 },
+    }),
+    points = Array.from({ length: 1000 }, (_, k) => {
+      const angle = -Math.PI / 2 + (k / 1000) * 2 * Math.PI;
+      return [5 * Math.cos(angle), 5 * Math.sin(angle), 0];
+    });
+  assert.throws(() => new PathJoint(loop, base, car, { points: points.slice(0, 2), closed: true }), RangeError);
+  new PathJoint(loop, base, car, { points, closed: true, motor: { speed: 3, maxForce: 1000 } });
+  let off = 0,
+    last = 0,
+    turned = 0;
+  for (let i = 0; i < 480; i++) {
+    loop.step();
+    const [x, y, z] = car.position;
+    off = Math.max(off, Math.abs(Math.hypot(x, y) - 5), Math.abs(z));
+    const angle = Math.atan2(y, x) + Math.PI / 2;
+    let turn = angle - last;
+    if (turn < -Math.PI) turn += 2 * Math.PI;
+    if (turn > Math.PI) turn -= 2 * Math.PI;
+    turned += turn;
+    last = angle;
+  }
+  assert.ok(off < 0.01, `it stays on the loop: ${off}`);
+  near(turned, 4.8, 0.25, 'it goes round at the motor speed');
+  loop.dispose();
+});

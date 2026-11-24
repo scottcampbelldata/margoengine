@@ -106,6 +106,8 @@ pub struct Header {
     pub static_damping: f32,
     /// Coupling slots handed out so far (src/couplings.rs).
     pub coupling_rows: u32,
+    /// Words of PATH_WORD handed out so far, ranges abandoned by a growing path included until the next compaction.
+    pub path_used: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -128,6 +130,10 @@ pub struct World {
     pub query_motion: [f32; 9],
     /// The index of the part (triangle, height field triangle or voxel cell) `each_part` last handed out. Not in the arena.
     pub part_id: core::cell::Cell<u32>,
+    /// Spans of paths sampled by the nearest-point searches so far (a work count for the tests; not part of the world's state).
+    pub path_samples: core::cell::Cell<u64>,
+    /// Nearest-point searches of paths so far, the other half of that count.
+    pub path_searches: core::cell::Cell<u64>,
 }
 
 impl World {
@@ -137,7 +143,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5], 0);
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5], 0, 0);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -152,6 +158,8 @@ impl World {
             query_groups_hi: 0,
             query_motion: [0.0; 9],
             part_id: core::cell::Cell::new(u32::MAX),
+            path_samples: core::cell::Cell::new(0),
+            path_searches: core::cell::Cell::new(0),
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
@@ -211,6 +219,7 @@ impl World {
                 static_hertz: 0.0,
                 static_damping: 0.0,
                 coupling_rows: 0,
+                path_used: 0,
             });
         }
         Some(world)
@@ -251,7 +260,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old), old[19]))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old), old[19], old[20]))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -759,6 +768,7 @@ mod tests {
         assert!(world.reserve_mesh([5, 5, 5, 5, 5]));
         assert!(world.grow_joints());
         assert!(world.grow_couplings());
+        assert!(world.reserve_paths(64));
         for row in 0..5 {
             for column in 0..COLUMNS {
                 unsafe { *world.u(column).add(row) = (column * 100 + row) as u32 };
@@ -769,6 +779,7 @@ mod tests {
         assert!(world.reserve_mesh([1000, 1000, 1000, 1000, 1000]));
         assert!(world.grow_joints());
         assert!(world.grow_couplings());
+        assert!(world.reserve_paths(4096));
         assert_eq!(world.header().capacity[0], 1000);
         for row in 0..5 {
             for column in 0..COLUMNS {

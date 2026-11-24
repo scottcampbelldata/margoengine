@@ -1914,6 +1914,7 @@ interface MultibodyOwner {
 
 interface PathOptions extends MechanismOptions {
     points: readonly Vec3[];
+    closed?: boolean;
     anchor?: Vec3;
     motor?: {
         speed: number;

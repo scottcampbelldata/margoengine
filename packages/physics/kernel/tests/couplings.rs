@@ -221,6 +221,9 @@ fn a_thousand_gears_in_a_train_fit_in_the_table() {
 fn sin(x: f32) -> f32 {
     x.sin()
 }
+fn atan2(y: f32, x: f32) -> f32 {
+    y.atan2(x)
+}
 fn cos(x: f32) -> f32 {
     x.cos()
 }
@@ -275,4 +278,95 @@ fn a_path_motor_drives_the_bead_along_the_curve_to_its_speed_within_its_force() 
     run(&mut w, 60);
     // A force of 0.5 N on 2 kg gives a quarter of a metre a second a second.
     assert!((w.v(LINEAR_X, bead as usize).x - 0.25).abs() < 0.03, "the force caps the drive: {}", w.v(LINEAR_X, bead as usize).x);
+}
+
+/// A circle of `n` points of radius `r` about `centre`, in the xy plane, starting at the bottom and turning counter-clockwise.
+fn circle(n: usize, r: f32, centre: [f32; 3]) -> Vec<[f32; 3]> {
+    (0..n)
+        .map(|k| {
+            let angle = -core::f32::consts::FRAC_PI_2 + k as f32 / n as f32 * 2.0 * core::f32::consts::PI;
+            [centre[0] + r * cos(angle), centre[1] + r * sin(angle), centre[2]]
+        })
+        .collect()
+}
+
+#[test]
+fn a_bead_follows_a_closed_loop_of_a_thousand_points_with_a_search_that_does_not_sample_it_end_to_end() {
+    let (n, r) = (1000usize, 5.0f32);
+    let mut w = World::new(8, 8).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let post = w.add_body(FIXED).unwrap();
+    w.set_pose(post, v3(0.0, 0.0, 0.0), Q::IDENTITY, false);
+    let bead = point(&mut w, v3(0.0, -r, 0.0), 2.0, 0.1);
+    let path = w.add_coupling(PATH, post, bead).unwrap();
+    w.set_coupling(path, 11, [1.0, 0.0, 0.0]);
+    for p in circle(n, r, [0.0; 3]) {
+        w.set_coupling(path, 9, p);
+    }
+    w.set_coupling(path, 10, [3.0, 1000.0, 0.0]);
+    let (mut worst, mut laps_angle, mut last) = (0.0f32, 0.0f32, 0.0f32);
+    let (before, searches) = (w.path_samples.get(), w.path_searches.get());
+    let steps = 480;
+    for _ in 0..steps {
+        w.step(DT);
+        let p = w.v(POSITION_X, bead as usize);
+        worst = worst.max((sqrt(p.dot(p)) - r).abs()).max(p.z.abs());
+        // The angle the bead has gone round, unwrapped from its x and y.
+        let angle = atan2(p.y, p.x) + core::f32::consts::FRAC_PI_2;
+        let mut turn = angle - last;
+        if turn < -core::f32::consts::PI { turn += 2.0 * core::f32::consts::PI }
+        if turn > core::f32::consts::PI { turn -= 2.0 * core::f32::consts::PI }
+        laps_angle += turn;
+        last = angle;
+    }
+    assert!(worst < 0.01, "the bead stays on the loop: off by {worst}");
+    // 8 s at 3 m/s on a circle of 5 m is 4.8 radians, the motor getting to speed within a few steps.
+    assert!((laps_angle - 4.8).abs() < 0.25, "it goes round at the motor's speed: {laps_angle} radians");
+    // The search starts at the span the bead was at and prunes by boxes: a handful of spans a search, not the thousand.
+    let per = (w.path_samples.get() - before) as f32 / (w.path_searches.get() - searches) as f32;
+    assert!(per < 8.0, "{per} spans sampled a search out of 1000");
+}
+
+#[test]
+fn paths_grown_together_and_removed_keep_their_points_when_the_store_packs_and_grows() {
+    let mut w = World::new(16, 16).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let post = w.add_body(FIXED).unwrap();
+    w.set_pose(post, v3(0.0, 0.0, 0.0), Q::IDENTITY, false);
+    let mut paths = Vec::new();
+    for k in 0..3 {
+        let centre = [0.0, 0.0, 10.0 * k as f32];
+        let bead = point(&mut w, v3(0.0, -2.0, centre[2]), 1.0, 0.1);
+        let path = w.add_coupling(PATH, post, bead).unwrap();
+        w.set_coupling(path, 11, [1.0, 0.0, 0.0]);
+        w.set_coupling(path, 10, [1.0, 100.0, 0.0]);
+        paths.push((path, bead, centre));
+    }
+    // Their points arrive interleaved, so each outgrows its range again and again, and the first is removed half way.
+    let loops: Vec<Vec<[f32; 3]>> = paths.iter().map(|(_, _, c)| circle(700, 2.0, *c)).collect();
+    for i in 0..700 {
+        for (k, (path, _, _)) in paths.iter().enumerate() {
+            if k == 0 && i >= 350 {
+                continue;
+            }
+            w.set_coupling(*path, 9, loops[k][i]);
+        }
+        if i == 350 {
+            assert!(w.remove_coupling(paths[0].0));
+        }
+    }
+    // A new path takes what the removed one left and what the packing frees.
+    let late = w.add_coupling(PATH, post, paths[1].1).unwrap();
+    for p in circle(1500, 3.0, [0.0, 0.0, 99.0]) {
+        w.set_coupling(late, 9, p);
+    }
+    assert!(w.remove_coupling(late));
+    run(&mut w, 120);
+    for (k, (_, bead, centre)) in paths.iter().enumerate().skip(1) {
+        let p = w.v(POSITION_X, *bead as usize);
+        let d = v3(p.x - centre[0], p.y - centre[1], p.z - centre[2]);
+        assert!((sqrt(d.dot(d)) - 2.0).abs() < 0.01 && d.z.abs() < 0.01, "bead {k} stays on its own loop: {} {} {}", d.x, d.y, d.z);
+        let v = w.v(LINEAR_X, *bead as usize);
+        assert!(v.x.abs() + v.y.abs() > 0.5, "and it is moving");
+    }
 }
