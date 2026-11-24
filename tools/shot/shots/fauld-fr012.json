@@ -45,6 +45,7 @@
     "version": 1,
     "id": "fauld-fr012",
     "kind": "long",
+    "scene": "fauld-countryside",
     "seconds": 6.708333333333333,
     "about": "fr012 01 Gentle country (@margoengine/scenes/fauld-countryside): Crane up over a hedgerow lane (the lane runs across frame) to the fields rolling to the ridge | 35 mm, 2 m up to 25 m, crane 2 m/s | frost; low sun",
     "page": {

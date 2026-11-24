@@ -191,6 +191,8 @@ for (const r of parse(csv)) {
       version: 1,
       id: `fauld-${r.id}`,
       kind: 'long',
+      // The catalogue scene (@margoengine/scenes), so validateShot and the shot's settings know it.
+      scene: `fauld-${place}`,
       seconds: dur,
       about: `${r.id} ${r.section} (@margoengine/scenes/fauld-${place}): ${r.visual} | ${r.camera} | ${r.look}${people}`,
       // The shot tool adds the page's ground under the camera and the target (page.ground, docs/shots.md).

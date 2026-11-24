@@ -45,6 +45,7 @@
     "version": 1,
     "id": "fauld-fr018",
     "kind": "long",
+    "scene": "fauld-countryside",
     "seconds": 4.791666666666667,
     "about": "fr018 01 Gentle country (@margoengine/scenes/fauld-countryside): The works yard from the hill: a gypsum labourer (civ_gypsum_b) wheels a barrow across, small at 90 m | 85 mm from the hill, pan with him | day; winter sun (fallback until people: the empty yard, barrow by the shed)",
     "page": {

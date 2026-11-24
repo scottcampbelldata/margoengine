@@ -45,6 +45,7 @@
     "version": 1,
     "id": "fauld-fr114",
     "kind": "long",
+    "scene": "fauld-crater",
     "seconds": 5.083333333333333,
     "about": "fr114 11 The inquiry (@margoengine/scenes/fauld-crater): A sentry small at the fence in the snow, back to camera | 135 mm, slow push | winter; snow (fallback until people: the fence and a warning board in the snow)",
     "page": {

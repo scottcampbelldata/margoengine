@@ -45,6 +45,7 @@
     "version": 1,
     "id": "fauld-fr110",
     "kind": "long",
+    "scene": "fauld-crater",
     "seconds": 5.416666666666667,
     "about": "fr110 10 Seventy lives (@margoengine/scenes/fauld-crater): The crater floor at night, mist settling, nothing moving (framing of fd107) | 24 mm, crane down 1 m/s | night; mist",
     "page": {

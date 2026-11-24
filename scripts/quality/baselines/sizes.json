@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17353872,
+  "total": 17354552,
   "history": [
     {
       "date": "2026-10-24",
@@ -11259,6 +11259,12 @@
       "commit": "958beae05a",
       "reason": "Fauld places draw their Tripo buildings, vehicles and cattle; errors name their fix (rebased on fauld-tunnels)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "7106ba73d3",
+      "reason": "catalogue entries for fauld-countryside and fauld-crater, so their shot files name a scene",
+      "grew": 1
     }
   ],
   "items": {
@@ -12227,7 +12233,7 @@
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
-    "@margoengine/scenes": 3676,
+    "@margoengine/scenes": 4356,
     "@margoengine/scenes/dune-coast": 6475,
     "@margoengine/scenes/fauld-countryside": 7910,
     "@margoengine/scenes/fauld-crater": 7910,

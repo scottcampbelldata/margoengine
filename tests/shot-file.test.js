@@ -722,7 +722,12 @@ test('every Fauld countryside and crater shot file is a valid shot on the Fauld 
     );
   assert.equal(files.length, 81, `${files.length} Fauld countryside and crater shot files`);
   for (const name of files) {
-    const file = parseShot(JSON.parse(readFileSync(join(dir, name), 'utf8')));
+    const json = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+    // A catalogue scene, the query apart from the path, an engine: validateShot passes (tools/shot/fauld-shots.mjs).
+    assert.deepEqual(validateShot(json), [], name);
+    assert.equal(json.shot.scene, `fauld-${json.shot.page.query.place}`, name);
+    assert.ok(!json.shot.page.path.includes('?'), name);
+    const file = parseShot(json);
     assert.equal(file.shot.page.path, 'packages/scenes/test/fauld-still.html', name);
     assert.equal(file.shot.page.ground, 'fauldStill.height', name);
     assert.equal(file.shot.page.engine, 'fauldStill.engine', name);

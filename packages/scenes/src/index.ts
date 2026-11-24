@@ -4,6 +4,7 @@
 import { duneCoastInfo } from './dune-coast-info.js';
 import { timberValleyInfo } from './timber-valley-info.js';
 import { fauldTunnelsInfo } from './fauld-tunnels-info.js';
+import { fauldCountrysideInfo, fauldCraterInfo } from './fauld-world-info.js';
 
 /** One setting of a scene: its default, and its range, unit or allowed values. */
 export interface SceneSetting {
@@ -55,7 +56,13 @@ export interface SceneInfo {
 }
 
 /** Every scene in the catalogue. Import an entry's `attach` to build it. */
-export const scenes: readonly SceneInfo[] = Object.freeze([duneCoastInfo, timberValleyInfo, fauldTunnelsInfo]);
+export const scenes: readonly SceneInfo[] = Object.freeze([
+  duneCoastInfo,
+  timberValleyInfo,
+  fauldTunnelsInfo,
+  fauldCountrysideInfo,
+  fauldCraterInfo,
+]);
 
 /**
  * The catalogue entry named `name`.
