@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.1,
+  "duration": 6.083333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 53.13
         },
         {
-          "time": 6.1,
+          "time": 6.083333333333333,
           "position": [
             -956.264,
             352,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr067",
     "kind": "long",
-    "seconds": 6.1,
-    "scene": "fauld-countryside",
-    "about": "fr067 07 A mile around: Hanbury ridge from 400 m: roofs stripped, dust haze and smoke | drone 400 m, slow descent | grey; dust",
+    "seconds": 6.083333333333333,
+    "about": "fr067 07 A mile around (@margoengine/scenes/fauld-countryside): Hanbury ridge from 400 m: roofs stripped, dust haze and smoke | drone 400 m, slow descent | grey; dust",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-1225%2C-175&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "-1225,-175"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.05
+      "mid": 3.0416666666666665
     },
     "subject": {
       "target": [

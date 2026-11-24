@@ -342,7 +342,7 @@ export async function attachFauldWorld(engine: EngineKernel, settings: FauldWorl
     ) as Record<string, NonNullable<BiomeViewOptions['meshes']>[string]>;
     registry['library:fern'] = [
       {
-        geometry: (await fetchPart('blender-library/big-burn-1910/plants/fern_02/fern_02_2k.gltf', 60000)).geometry,
+        geometry: (await fetchPart('big-burn-1910/plants/fern_02/fern_02_2k.gltf', 60000)).geometry,
         color: [0.16, 0.13, 0.07],
         kind: 'foliage',
       },

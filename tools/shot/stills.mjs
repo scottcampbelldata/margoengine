@@ -47,7 +47,13 @@ export async function shootStills(file, { out, source, log = console.error } = {
       const record = a.frames.find((frame) => frame.index === index);
       if (!record?.file) throw new Error(`the stills render kept no frame ${index} for probe ${name}`);
       writeFileSync(join(out, `${name}.png`), readFileSync(join(work, record.file)));
-      stills[name] = { frame: index, file: `${name}.png`, sha256: record.sha256 };
+      stills[name] = {
+        frame: index,
+        file: `${name}.png`,
+        sha256: record.sha256,
+        // The camera as drawn: with shot.page.ground its heights are the ground's plus the shot's.
+        ...(record.camera ? { camera: record.camera } : {}),
+      };
     }
     const manifest = {
       format: 'margo-shot-stills',

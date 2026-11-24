@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 5.4,
+  "duration": 5.416666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 10.16
         },
         {
-          "time": 5.4,
+          "time": 5.416666666666667,
           "position": [
-            108.134,
+            108.135,
             1.7,
-            -333.398
+            -333.408
           ],
           "target": [
             120,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr100",
     "kind": "long",
-    "seconds": 5.4,
-    "scene": "fauld-countryside",
-    "about": "fr100 09 The rescue: Rescuers small on the mud field probing with poles, seen from the slope | 135 mm, slow push | grey; mud (fallback until people: poles standing in the mud where the search went)",
+    "seconds": 5.416666666666667,
+    "about": "fr100 09 The rescue (@margoengine/scenes/fauld-countryside): Rescuers small on the mud field probing with poles, seen from the slope | 135 mm, slow push | grey; mud (fallback until people: poles standing in the mud where the search went)",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.7
+      "mid": 2.7083333333333335
     },
     "subject": {
       "target": [

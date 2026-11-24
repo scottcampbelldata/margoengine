@@ -46,13 +46,21 @@
     "id": "fauld-fr068",
     "kind": "long",
     "seconds": 6,
-    "scene": "fauld-countryside",
-    "about": "fr068 07 A mile around: Over the village roofs at 250 m: slipped tiles, broken chimney pots, the valley behind | drone 250 m, dolly 3 m/s | grey; dust",
+    "about": "fr068 07 A mile around (@margoengine/scenes/fauld-countryside): Over the village roofs at 250 m: slipped tiles, broken chimney pots, the valley behind | drone 250 m, dolly 3 m/s | grey; dust",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-1225%2C-175&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "-1225,-175"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

@@ -150,11 +150,32 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     // clock time and camera, the GPU settled between them, and a kept frame captured from all of them.
     const step = (args) =>
       page.evaluate(
-        async ({ subs, kept, capture = true, engine, apply, settingsHook, canvas, png, expectHash, thumbnail, warmup, masks, viewProjection, recordSky, skyCoverage }) => {
+        async ({ subs, kept, capture = true, engine, apply, settingsHook, ground, canvas, png, expectHash, thumbnail, warmup, masks, viewProjection, recordSky, skyCoverage }) => {
           const shot = globalThis.__margoShot;
-          let result = null;
+          let result = null,
+            drawn = null;
           for (let sub = 0; sub < subs.length; sub++) {
-            const { time, camera, state, settings } = subs[sub];
+            const { time, state, settings } = subs[sub];
+            let { camera } = subs[sub];
+            // Heights above the ground (shot.page.ground): the page's ground added under the camera and the target,
+            // as onGround in shot-file.mjs does. The page may give its ground only once it has loaded it.
+            if (camera && ground) {
+              const at = shot.get(ground);
+              if (typeof at !== 'function') {
+                if (!warmup) throw new Error(`${ground} is not a function in the page; set shot.page.ground to the page's ground`);
+                camera = null;
+              } else {
+                const a = at(camera.position[0], camera.position[2]),
+                  b = at(camera.target[0], camera.target[2]);
+                if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`${ground} gave ${a} and ${b}, not metres`);
+                camera = {
+                  ...camera,
+                  position: [camera.position[0], camera.position[1] + a, camera.position[2]],
+                  target: [camera.target[0], camera.target[1] + b, camera.target[2]],
+                };
+              }
+            }
+            if (camera) drawn = camera;
             if (camera) {
               const target = shot.get(engine)?.camera;
               // The engine may appear only after the page's first frames, while it still loads.
@@ -197,6 +218,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
                   if (matrix?.length !== 16) throw new Error(`no engine camera at ${engine} for the probe's view-projection`);
                   result.viewProjection = Array.from(matrix);
                 }
+                // The camera as drawn (heights above sea level, the ground added), for the stills' record.
+                if (drawn) result.camera = { position: [...drawn.position], target: [...drawn.target], fov: drawn.fov };
               }
             }
             await shot.settle();
@@ -207,7 +230,7 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       );
     // A shot with no page sky mask asks the page's sky (if it has one) where it drew, for skyClip (KB-HEARTH-CLIP1).
     const recordSky = !shot.aovs.includes('sky') && probes.size > 0,
-      common = { engine: shot.page.engine, apply: shot.page.apply, settingsHook: shot.page.settings, canvas: shot.page.canvas, recordSky },
+      common = { engine: shot.page.engine, apply: shot.page.apply, settingsHook: shot.page.settings, ground: shot.page.ground, canvas: shot.page.canvas, recordSky },
       masks = shot.aovs.length
         ? { hook: shot.page.aovs, names: [...shot.aovs], derived: shot.aovs.filter((name) => DERIVED_AOVS.includes(name)), horizon: shot.horizon }
         : null;
@@ -276,7 +299,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       const record = { index: kept, time: frame.time - shot.from, sha256: result.sha256 };
       if (result.viewProjection) record.viewProjection = result.viewProjection;
       // The eye of the last sub-frame, the one the view-projection above is of.
-      if (result.viewProjection && subs.at(-1).camera) record.eye = [...subs.at(-1).camera.position];
+      if (result.viewProjection && result.camera) record.eye = [...result.camera.position];
+      if (result.camera) record.camera = result.camera;
       capture ??= { via: result.via, render: result.render, samples: result.samples };
       if (result.aovs) {
         record.aovs = {};

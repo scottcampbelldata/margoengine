@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.7,
+  "duration": 6.708333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 37.85
         },
         {
-          "time": 6.7,
+          "time": 6.708333333333333,
           "position": [
             -17.117,
             25,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr012",
     "kind": "long",
-    "seconds": 6.7,
-    "scene": "fauld-countryside",
-    "about": "fr012 01 Gentle country: Crane up over a hedgerow lane (the lane runs across frame) to the fields rolling to the ridge | 35 mm, 2 m up to 25 m, crane 2 m/s | frost; low sun",
+    "seconds": 6.708333333333333,
+    "about": "fr012 01 Gentle country (@margoengine/scenes/fauld-countryside): Crane up over a hedgerow lane (the lane runs across frame) to the fields rolling to the ridge | 35 mm, 2 m up to 25 m, crane 2 m/s | frost; low sun",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=lowSun&focus=0%2C10&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "before",
+        "sky": "lowSun",
+        "focus": "0,10"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.35
+      "mid": 3.375
     },
     "subject": {
       "target": [

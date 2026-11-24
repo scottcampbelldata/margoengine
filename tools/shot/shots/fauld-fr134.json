@@ -46,13 +46,21 @@
     "id": "fauld-fr134",
     "kind": "long",
     "seconds": 6.5,
-    "scene": "fauld-crater",
-    "about": "fr134 12 After the war: A chain link fence with a faded warning sign in the wood | 50 mm, slide 0.5 m/s | day; dappled",
+    "about": "fr134 12 After the war (@margoengine/scenes/fauld-crater): A chain link fence with a faded warning sign in the wood | 50 mm, slide 0.5 m/s | day; dappled",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

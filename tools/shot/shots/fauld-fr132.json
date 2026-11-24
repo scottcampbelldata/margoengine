@@ -46,13 +46,21 @@
     "id": "fauld-fr132",
     "kind": "long",
     "seconds": 6.5,
-    "scene": "fauld-crater",
-    "about": "fr132 12 After the war: Time passing over the crater: snow, then grass, then young trees on the floor | drone 400 m, very slow orbit | time-lapse; seasons",
+    "about": "fr132 12 After the war (@margoengine/scenes/fauld-crater): Time passing over the crater: snow, then grass, then young trees on the floor | drone 400 m, very slow orbit | time-lapse; seasons",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

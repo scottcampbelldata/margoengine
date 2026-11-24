@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 5.6,
+  "duration": 5.583333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 26.99
         },
         {
-          "time": 5.6,
+          "time": 5.583333333333333,
           "position": [
-            35.295,
+            35.306,
             2,
-            41.396
+            41.409
           ],
           "target": [
             0,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr062",
     "kind": "long",
-    "seconds": 5.6,
-    "scene": "fauld-crater",
-    "about": "fr062 07 A mile around: The dust drifting off the ridge to show empty churned ground where the farm was (framing of fd063) | 50 mm, 2 m up, dolly 1 m/s | overcast; dust",
+    "seconds": 5.583333333333333,
+    "about": "fr062 07 A mile around (@margoengine/scenes/fauld-crater): The dust drifting off the ridge to show empty churned ground where the farm was (framing of fd063) | 50 mm, 2 m up, dolly 1 m/s | overcast; dust",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.8
+      "mid": 2.7916666666666665
     },
     "subject": {
       "target": [

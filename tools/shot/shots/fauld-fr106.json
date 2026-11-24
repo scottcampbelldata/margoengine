@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 4.4,
+  "duration": 4.416666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 53.13
         },
         {
-          "time": 4.4,
+          "time": 4.416666666666667,
           "position": [
-            -459.804,
+            -459.801,
             120,
-            574.489
+            574.439
           ],
           "target": [
             -450,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr106",
     "kind": "long",
-    "seconds": 4.4,
-    "scene": "fauld-countryside",
-    "about": "fr106 10 Seventy lives: A grey field at dusk, hedges dusted, empty of animals | drone 120 m, dolly 3 m/s | dusk; dust",
+    "seconds": 4.416666666666667,
+    "about": "fr106 10 Seventy lives (@margoengine/scenes/fauld-countryside): A grey field at dusk, hedges dusted, empty of animals | drone 120 m, dolly 3 m/s | dusk; dust",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=dusk&focus=-450%2C420&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "dusk",
+        "focus": "-450,420"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.2
+      "mid": 2.2083333333333335
     },
     "subject": {
       "target": [

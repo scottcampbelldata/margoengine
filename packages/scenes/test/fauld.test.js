@@ -46,15 +46,16 @@ test('every Fauld shot file names its place, era and sky and keeps its camera in
   for (const f of outdoor) {
     const s = JSON.parse(readFileSync(new URL(f, shots), 'utf8'));
     assert.equal(s.format, 'margo-cutscene', f);
-    assert.match(s.shot.scene, /^fauld-(crater|countryside)$/, f);
-    const q = new URLSearchParams(s.shot.page.path.split('?')[1]);
-    assert.equal(`fauld-${q.get('place')}`, s.shot.scene, f);
+    // The tool's page with its query; the tool adds the page's ground under the camera and target (page.ground).
+    assert.equal(s.shot.page.path, 'packages/scenes/test/fauld-still.html', f);
+    const q = new URLSearchParams(s.shot.page.query);
+    assert.ok(['crater', 'countryside'].includes(q.get('place')), `${f} place`);
     assert.ok(['before', '1944', 'today'].includes(q.get('era')), `${f} era`);
     assert.ok(
       ['dawn', 'lowSun', 'overcast', 'grey', 'dusk', 'night', 'snow', 'rain', 'mist'].includes(q.get('sky')),
       `${f} sky`,
     );
-    assert.equal(q.get('yref'), 'ground', f);
+    assert.equal(s.shot.page.ground, 'fauldStill.height', f);
     assert.ok(s.shot.probes.mid > 0 && s.shot.probes.mid < s.duration, `${f} mid probe`);
     assert.ok(s.shot.subject.target.every(Number.isFinite) && s.shot.subject.size > 0, `${f} subject`);
     const cam = s.tracks.find((t) => t.type === 'camera');

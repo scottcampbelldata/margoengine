@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.7,
+  "duration": 6.708333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,16 +23,16 @@
           "fov": 16.07
         },
         {
-          "time": 6.7,
+          "time": 6.708333333333333,
           "position": [
-            -986.435,
+            -986.428,
             1.7,
-            29.014
+            29.009
           ],
           "target": [
-            -1114.864,
+            -1114.858,
             2,
-            -124.302
+            -124.308
           ],
           "fov": 16.07,
           "ease": "smoothstep"
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr138",
     "kind": "long",
-    "seconds": 6.7,
-    "scene": "fauld-countryside",
-    "about": "fr138 12 After the war: The Cock Inn and a quiet lane today from 200 m, low winter sun | 85 mm, slide 1 m/s | day; winter sun",
+    "seconds": 6.708333333333333,
+    "about": "fr138 12 After the war (@margoengine/scenes/fauld-countryside): The Cock Inn and a quiet lane today from 200 m, low winter sun | 85 mm, slide 1 m/s | day; winter sun",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=today&sky=lowSun&focus=-1120%2C-120&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "-1120,-120"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.35
+      "mid": 3.375
     },
     "subject": {
       "target": [

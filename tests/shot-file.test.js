@@ -14,6 +14,7 @@ import {
   compareRenders,
   firstSeconds,
   frameName,
+  onGround,
   parseShot,
   probeFrames,
   shotFrames,
@@ -683,5 +684,40 @@ test('cli --cameras prints the camera frames as JSON; --stills and --cameras eac
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('page.ground: heights above the ground, set on it under the camera and under the target (Fauld recut, yref=ground)', () => {
+  const tracks = [{ type: 'camera', id: 'c', keys: [{ time: 0, position: [10, 30, 0], target: [0, 2, 0], fov: 40 }] }];
+  assert.deepEqual(paths(shot({ page: { path: 'a/b.html', engine: 'x.engine', ground: 'x.height' } }, { tracks })), []);
+  assert.deepEqual(paths(shot({ page: { path: 'a/b.html', engine: 'x.engine', ground: 'x => 1' } })), [
+    'shot.page.ground',
+  ]);
+  assert.deepEqual(paths(shot({ page: { path: 'a/b.html', engine: 'x.engine', ground: 3 } })), ['shot.page.ground']);
+  // The ground rises 1 m per metre east: 10 m under the camera, 0 under the target.
+  const ground = (x, z) => x + 0 * z,
+    placed = onGround({ position: [10, 30, 0], target: [0, 2, 0], fov: 40, up: [0, 1, 0] }, ground);
+  assert.deepEqual(placed.position, [10, 40, 0]);
+  assert.deepEqual(placed.target, [0, 2, 0]);
+  assert.equal(placed.fov, 40);
+  assert.deepEqual(placed.up, [0, 1, 0]);
+  assert.throws(() => onGround({ position: [0, 0, 0], target: [1, 0, 0] }, () => Number.NaN), /must give metres/);
+  // --cameras says the heights are above the ground, so a reader never takes them as sea-level heights.
+  const out = cameraFrames(
+    parseShot(shot({ fps: 2, seconds: 1, page: { path: 'a/b.html', engine: 'x.engine', ground: 'x.height' } }, { tracks })),
+  );
+  assert.equal(out.heights, 'ground');
+  assert.equal(cameraFrames(parseShot(shot({ fps: 2, seconds: 1 }, { tracks }))).heights, 'world');
+});
+
+test('every Fauld shot file is a valid shot on the Fauld still page with its ground', () => {
+  const dir = join(root, 'tools/shot/shots'),
+    files = readdirSync(dir).filter((name) => /^fauld-fr\d+\.json$/.test(name));
+  assert.ok(files.length >= 81, `${files.length} Fauld shot files`);
+  for (const name of files) {
+    const file = parseShot(JSON.parse(readFileSync(join(dir, name), 'utf8')));
+    assert.equal(file.shot.page.path, 'packages/scenes/test/fauld-still.html', name);
+    assert.equal(file.shot.page.ground, 'fauldStill.height', name);
+    assert.equal(file.shot.page.engine, 'fauldStill.engine', name);
   }
 });

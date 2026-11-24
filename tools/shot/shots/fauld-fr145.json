@@ -46,13 +46,21 @@
     "id": "fauld-fr145",
     "kind": "long",
     "seconds": 5,
-    "scene": "fauld-crater",
-    "about": "fr145 13 The crater today: The footpath across a field toward the wood, a stile, frost on the grass (framing of fd138) | 35 mm, 1.6 m, dolly 1 m/s | frost; low sun",
+    "about": "fr145 13 The crater today (@margoengine/scenes/fauld-crater): The footpath across a field toward the wood, a stile, frost on the grass (framing of fd138) | 35 mm, 1.6 m, dolly 1 m/s | frost; low sun",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

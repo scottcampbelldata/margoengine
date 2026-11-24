@@ -1,7 +1,8 @@
 // Stills of the Fauld places from their shot files (tools/shot/shots/fauld-frNNN.json), one per shot at its mid probe:
 //   node packages/scenes/test/fauld-still.mjs --shots=fr008,fr074 --out=<folder> [--w=1920 --h=1080] [--library=<asset library>]
 // Each still must draw with no GPU error and not be blank. The asset library (models, the OS Terrain 50 grid) is served
-// at /asset-library/ from --library, else MARGO_ASSETS, else the Assets folder beside the Projects folder (../../Assets).
+// at /asset-library/ from --library, else MARGO_ASSET_LIBRARY, else ../../Assets/blender-library (as vite.config.mjs serves it;
+// it holds junctions margo-library and dem to the Fauld models and the OS Terrain 50 grid).
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -12,7 +13,7 @@ const arg = (name, fallback) =>
 const w = Number(arg('w', 1280)),
   h = Number(arg('h', 720)),
   out = arg('out', 'test-results/fauld-stills'),
-  library = arg('library', process.env.MARGO_ASSETS ?? resolve(process.cwd(), '../../Assets')),
+  library = arg('library', process.env.MARGO_ASSET_LIBRARY ?? resolve(process.cwd(), '../../Assets/blender-library')),
   shots = arg('shots', 'fr008').split(','),
   port = 5321,
   context = await openBrowser({ startPath: '/packages/scenes/test/fauld-still.html', port }),

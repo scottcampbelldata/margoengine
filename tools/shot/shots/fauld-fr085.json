@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.2,
+  "duration": 6.208333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,16 +23,16 @@
           "fov": 10.16
         },
         {
-          "time": 6.2,
+          "time": 6.208333333333333,
           "position": [
-            -175.757,
+            -175.754,
             1.7,
-            -440.829
+            -440.826
           ],
           "target": [
-            122.322,
+            122.325,
             2,
-            -777.947
+            -777.944
           ],
           "fov": 10.16,
           "ease": "smoothstep"
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr085",
     "kind": "long",
-    "seconds": 6.2,
-    "scene": "fauld-countryside",
-    "about": "fr085 08 The crater and the mud: Water trickling off the mud field in thin channels | 135 mm low, slide 0.5 m/s | overcast; mud",
+    "seconds": 6.208333333333333,
+    "about": "fr085 08 The crater and the mud (@margoengine/scenes/fauld-countryside): Water trickling off the mud field in thin channels | 135 mm low, slide 0.5 m/s | overcast; mud",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.1
+      "mid": 3.125
     },
     "subject": {
       "target": [

@@ -46,6 +46,7 @@ evaluated state goes to the page's `apply` hook when it has one.
 | `page.engine` | required | Where the page keeps its engine, as a dotted path from `globalThis` (for example `stormLight.engine`); names only, never code |
 | `page.apply` | none | A function in the page, dotted path, called with the evaluated cutscene state and `{ time, kept }` before each frame |
 | `page.aovs` | none | A function in the page, dotted path, that returns `{device, textures: {name: GPUTexture}}` for the masks it draws; needed when `aovs` is set |
+| `page.ground` | none | A function in the page, dotted path, `(x, z) => metres`: the camera track's heights are then above the ground, and each frame the tool adds the ground under the camera to its height and the ground under the target to the target's (`onGround` in `shot-file.mjs`); `stills.json` records each probe's camera as drawn, and `--cameras` prints `heights: 'ground'` (otherwise `'world'`). A Fauld shot uses `fauldStill.height` |
 | `page.ready` | none | A CSS selector that must match after the warm-up, or the shot fails asking for more warm-up |
 | `page.canvas` | `"canvas"` | The canvas to copy |
 

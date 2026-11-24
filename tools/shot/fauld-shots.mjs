@@ -3,7 +3,8 @@
 // Each row's camera text gives the lens (vertical field of view of a 24 mm high frame), the height (drone N m, N m up),
 // the distance (from N m, N km) and the move (dolly, push, pull back, orbit, pan, crane, rise, descend, track, slide,
 // tilt); its visual names the subject (Hanbury, the works, the reservoir, the farm, the crater, the valley, the fields).
-// Camera heights are above the ground under the camera and under the target (the page adds the ground: `yref=ground`).
+// Camera heights are above the ground under the camera and under the target: the shot tool adds the page's ground
+// (`shot.page.ground`, fauldStill.height of packages/scenes/test/fauld-still.html).
 // The place, era and sky go in the page query; `shot.subject` names the target and the subject's width. Places: FAULD_PLACES of @margoengine/scenes/fauld-world.
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -86,7 +87,8 @@ for (const r of parse(csv)) {
   if (!/fauld-(crater|countryside)$/.test(r.set)) continue;
   const cam = r.camera.toLowerCase(),
     vis = r.visual.toLowerCase(),
-    dur = Number(r.dur_s),
+    // A whole number of frames at 24 fps (the shot tool's rule).
+    dur = Math.max(1, Math.round(Number(r.dur_s) * 24)) / 24,
     lens = Number(cam.match(/(\d+) mm/)?.[1] ?? (cam.includes('drone') ? 24 : 35)),
     fov = (2 * Math.atan(12 / lens) * 180) / Math.PI,
     drone = cam.match(/drone (\d+)(?: to (\d+))? m/),
@@ -151,7 +153,6 @@ for (const r of parse(csv)) {
       era: eraOf(r),
       sky: skyOf(r.look),
       focus: `${Math.round(tx)},${Math.round(tz)}`,
-      yref: 'ground',
     }),
     people = r.source_tag.includes('PEOPLE') ? ` (fallback until people: ${r.fallback})` : '';
   const file = {
@@ -181,15 +182,23 @@ for (const r of parse(csv)) {
       id: `fauld-${r.id}`,
       kind: 'long',
       seconds: dur,
-      scene: `fauld-${place}`,
-      about: `${r.id} ${r.section}: ${r.visual} | ${r.camera} | ${r.look}${people}`,
-      page: { path: `packages/scenes/test/fauld-still.html?${query}`, canvas: 'canvas', ready: 'canvas' },
+      about: `${r.id} ${r.section} (@margoengine/scenes/fauld-${place}): ${r.visual} | ${r.camera} | ${r.look}${people}`,
+      // The shot tool adds the page's ground under the camera and the target (page.ground, docs/shots.md).
+      page: {
+        path: 'packages/scenes/test/fauld-still.html',
+        query: Object.fromEntries(query),
+        engine: 'fauldStill.engine',
+        ground: 'fauldStill.height',
+        canvas: 'canvas',
+        ready: 'canvas',
+      },
+      warmup: 60,
       seed: 1944,
       size: [1920, 1080],
       fps: 24,
       shutter: 180,
-      probes: { mid: Math.round((dur / 2) * 100) / 100 },
-      // Heights are above the ground, like the camera's (`yref=ground`).
+      probes: { mid: Math.round(dur * 12) / 24 },
+      // Heights are above the ground, like the camera's (`page.ground`).
       subject: { target: round(tgt0), size: SIZES[what] },
     },
   };

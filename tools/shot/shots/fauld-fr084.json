@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.2,
+  "duration": 6.208333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 53.13
         },
         {
-          "time": 6.2,
+          "time": 6.208333333333333,
           "position": [
             -160.133,
             264,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr084",
     "kind": "long",
-    "seconds": 6.2,
-    "scene": "fauld-countryside",
-    "about": "fr084 08 The crater and the mud: The works after: a grey lake of mud to the eaves, a chimney stump (300 m) | drone 300 m, slow descent | overcast; mud",
+    "seconds": 6.208333333333333,
+    "about": "fr084 08 The crater and the mud (@margoengine/scenes/fauld-countryside): The works after: a grey lake of mud to the eaves, a chimney stump (300 m) | drone 300 m, slow descent | overcast; mud",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.1
+      "mid": 3.125
     },
     "subject": {
       "target": [

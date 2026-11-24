@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 5.4,
+  "duration": 5.416666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 53.13
         },
         {
-          "time": 5.4,
+          "time": 5.416666666666667,
           "position": [
             94.847,
             200,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr102",
     "kind": "long",
-    "seconds": 5.4,
-    "scene": "fauld-countryside",
-    "about": "fr102 09 The rescue: Winter weeks later: frost on the mud, the works still buried, a hut and a crane at the edge | drone 200 m, slow orbit | winter; frost",
+    "seconds": 5.416666666666667,
+    "about": "fr102 09 The rescue (@margoengine/scenes/fauld-countryside): Winter weeks later: frost on the mud, the works still buried, a hut and a crane at the edge | drone 200 m, slow orbit | winter; frost",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=lowSun&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "lowSun",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.7
+      "mid": 2.7083333333333335
     },
     "subject": {
       "target": [

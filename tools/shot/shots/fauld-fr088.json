@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.3,
+  "duration": 6.291666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 10.16
         },
         {
-          "time": 6.3,
+          "time": 6.291666666666667,
           "position": [
             -758.281,
             1.7,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr088",
     "kind": "long",
-    "seconds": 6.3,
-    "scene": "fauld-countryside",
-    "about": "fr088 09 The rescue: 1944 fire engines (NFS tender) on the lane toward the smoke, from the hill | 135 mm, pan with them | grey; smoke",
+    "seconds": 6.291666666666667,
+    "about": "fr088 09 The rescue (@margoengine/scenes/fauld-countryside): 1944 fire engines (NFS tender) on the lane toward the smoke, from the hill | 135 mm, pan with them | grey; smoke",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-450%2C420&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "-450,420"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.15
+      "mid": 3.1666666666666665
     },
     "subject": {
       "target": [

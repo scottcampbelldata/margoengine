@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 5.9,
+  "duration": 5.916666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 37.85
         },
         {
-          "time": 5.9,
+          "time": 5.916666666666667,
           "position": [
-            88.417,
+            88.409,
             1.7,
-            115.277
+            115.266
           ],
           "target": [
             0,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr149",
     "kind": "long",
-    "seconds": 5.9,
-    "scene": "fauld-crater",
-    "about": "fr149 13 The crater today: Down the wooded slope toward the hollow, the pond glinting through (framing of fd142) | 35 mm, dolly 0.8 m/s | day; dappled",
+    "seconds": 5.916666666666667,
+    "about": "fr149 13 The crater today (@margoengine/scenes/fauld-crater): Down the wooded slope toward the hollow, the pond glinting through (framing of fd142) | 35 mm, dolly 0.8 m/s | day; dappled",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.95
+      "mid": 2.9583333333333335
     },
     "subject": {
       "target": [

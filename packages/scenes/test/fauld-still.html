@@ -1,37 +1,49 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Fauld still</title>
-<style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style></head><body>
 <canvas aria-label="A Fauld place, for its stills"></canvas>
 <script type="module">
-// @margoengine/scenes/fauld-countryside and /fauld-crater as a still page: `shot=frNNN` reads tools/shot/shots/fauld-frNNN.json,
-// sets the place, era and sky from its query and the camera at `t` seconds (default the shot's mid probe), renders
-// `frames` frames and reports GPU errors. /asset-library/ is the asset library (fauld-still.mjs serves it).
+// @margoengine/scenes/fauld-countryside and /fauld-crater as a still page, in two modes.
+// - The shot tool (tools/shot, `shot.page`: engine `fauldStill.engine`, ground `fauldStill.height`): the query names the
+//   place, era, sky and focus; the canvas fills the window and the engine runs its own frame loop, which the tool's
+//   driver steps. Camera heights in the Fauld shot files are above the ground: the tool adds `fauldStill.height`.
+// - By hand (`shot=frNNN`, fauld-still.mjs): reads tools/shot/shots/fauld-frNNN.json, sets the camera at `t` seconds
+//   (default the shot's mid probe) with the ground added, renders `frames` frames and reports GPU errors.
+// /asset-library/ is the asset library (fauld-still.mjs serves it; the shot tool's server serves it from MARGO_ASSETS).
 import {Engine} from '/packages/core/dist/index.js';
 import {attach as countryside} from '/packages/scenes/dist/fauld-countryside.js';
 import {attach as crater} from '/packages/scenes/dist/fauld-crater.js';
 const q=new URLSearchParams(location.search),errors=[],canvas=document.querySelector('canvas');
-const w=Number(q.get('w')??960),h=Number(q.get('h')??540);
-canvas.width=w;canvas.height=h;canvas.style.width=w+'px';canvas.style.height=h+'px';
-const shot=await (await fetch(`/tools/shot/shots/fauld-${q.get('shot')}.json`)).json();
-const query=new URLSearchParams(shot.shot.page.path.split('?')[1]??'');
-const keys=shot.tracks[0].keys,t=Number(q.get('t')??shot.shot.probes.mid);
-const a=keys[0],b=keys[keys.length-1],u0=Math.min(1,Math.max(0,(t-a.time)/(b.time-a.time||1))),u=b.ease==='smoothstep'?u0*u0*(3-2*u0):u0;
+const byHand=q.has('shot');
+const shot=byHand?await (await fetch(`/tools/shot/shots/fauld-${q.get('shot')}.json`)).json():null;
+const query=byHand?new URLSearchParams(shot.shot.page.query??{}):q;
+let w,h;
+if(byHand){w=Number(q.get('w')??960);h=Number(q.get('h')??540);}
+else{w=Math.round(innerWidth*devicePixelRatio);h=Math.round(innerHeight*devicePixelRatio);}
+canvas.width=w;canvas.height=h;canvas.style.width=(byHand?w:innerWidth)+'px';canvas.style.height=(byHand?h:innerHeight)+'px';
+const keys=byHand?shot.tracks[0].keys:null,t=byHand?Number(q.get('t')??shot.shot.probes.mid):0;
+const a=byHand?keys[0]:{position:[0,300,600],target:[0,0,0],fov:45},b=byHand?keys[keys.length-1]:a;
+const u0=Math.min(1,Math.max(0,(t-a.time)/(b.time-a.time||1))),u=b.ease==='smoothstep'?u0*u0*(3-2*u0):u0;
 const mix=(p,r)=>p.map((v,i)=>v+(r[i]-v)*u);
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:a.position,target:a.target,fov:a.fov,near:0.5,far:40000}});
+// No frame until the place is built: the shot tool's first frame is then the place's first frame.
 engine.stop();
 engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const focus=(query.get('focus')??'0,0').split(',').map(Number);
 const since=performance.now();
 const scene=await (query.get('place')==='crater'?crater:countryside)(engine,{era:query.get('era')??undefined,sky:query.get('sky')??undefined,focus,radius:Number(query.get('radius')??1200)});
 const built=performance.now()-since;
-// Camera heights in the shot file are above the ground under the camera and under the target.
-const pos=mix(a.position,b.position),tgt=mix(a.target,b.target);
-pos[1]+=scene.height(pos[0],pos[2]);tgt[1]+=scene.height(tgt[0],tgt[2]);
-scene.look(pos,tgt,a.fov+(b.fov-a.fov)*u);
-window.check={async run(){
-  const frames=Number(q.get('frames')??90);
-  for(let i=0;i<frames;i++){engine.render({delta:1/24});if(i%10===9){await engine.gpu.queue.onSubmittedWorkDone();await scene.settle();}}
-  await engine.gpu.queue.onSubmittedWorkDone();
-  return {errors,built,fields:scene.farm.fields.length,hedges:scene.farm.hedges.length,trees:scene.farm.trees.length,lanes:scene.farm.lanes.length,camera:{pos,tgt}};
-}};
+globalThis.fauldStill={engine,scene,height:(x,z)=>scene.height(x,z),errors};
+if(!byHand)engine.start();
+if(byHand){
+  const pos=mix(a.position,b.position),tgt=mix(a.target,b.target);
+  pos[1]+=scene.height(pos[0],pos[2]);tgt[1]+=scene.height(tgt[0],tgt[2]);
+  scene.look(pos,tgt,a.fov+(b.fov-a.fov)*u);
+  window.check={async run(){
+    const frames=Number(q.get('frames')??90);
+    for(let i=0;i<frames;i++){engine.render({delta:1/24});if(i%10===9){await engine.gpu.queue.onSubmittedWorkDone();await scene.settle();}}
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return {errors,built,fields:scene.farm.fields.length,hedges:scene.farm.hedges.length,trees:scene.farm.trees.length,lanes:scene.farm.lanes.length,camera:{pos,tgt}};
+  }};
+}
 window.ready=true;
 </script></body></html>

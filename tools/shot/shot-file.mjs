@@ -292,6 +292,8 @@ export function validateShot(input) {
       add('shot.page.settings', 'must name a function from globalThis with dots, for example margoShot.settings');
     if ('aovs' in page && (typeof page.aovs !== 'string' || !DOTTED.test(page.aovs)))
       add('shot.page.aovs', 'must name a function from globalThis with dots, for example stormLight.aovs');
+    if ('ground' in page && (typeof page.ground !== 'string' || !DOTTED.test(page.ground)))
+      add('shot.page.ground', 'must name the page function (x, z) => ground height from globalThis, for example fauldStill.height');
     for (const key of ['ready', 'canvas'])
       if (key in page && (typeof page[key] !== 'string' || !page[key].trim()))
         add(`shot.page.${key}`, 'must be a CSS selector');
@@ -440,6 +442,23 @@ export function firstSeconds(json, seconds) {
 }
 
 /**
+ * A camera whose heights are above the ground (`shot.page.ground`) set on the ground: `ground(x, z)` added to the
+ * position's height under the position and to the target's height under the target. Returns a new camera; `up`, `fov`
+ * and `roll` are kept. The render does the same in the page, with the page's ground function.
+ * @param {{ position: number[], target: number[] }} camera
+ * @param {(x: number, z: number) => number} ground
+ */
+export function onGround(camera, ground) {
+  const [px, py, pz] = camera.position,
+    [tx, ty, tz] = camera.target,
+    a = ground(px, pz),
+    b = ground(tx, tz);
+  if (!Number.isFinite(a) || !Number.isFinite(b))
+    throw new RangeError(`the page's ground gave ${a} under the camera and ${b} under the target; it must give metres`);
+  return { ...camera, position: [px, py + a, pz], target: [tx, ty + b, tz] };
+}
+
+/**
  * The camera of every kept frame of a parsed shot, read from its camera track the way a render reads it (each frame at
  * its own time, pre-roll included in the clock): `{ id, fps, frames, size, subject, cameras: [{ frame, time,
  * position, target, fov, roll }] }`, fov in degrees, roll in radians, time in seconds from the first kept frame. Plain
@@ -464,5 +483,15 @@ export function cameraFrames(file) {
       roll: camera.roll,
     });
   }
-  return { id: shot.id, fps: shot.fps, frames: cameras.length, size: [...shot.size], subject: shot.subject, cameras };
+  return {
+    id: shot.id,
+    fps: shot.fps,
+    frames: cameras.length,
+    size: [...shot.size],
+    subject: shot.subject,
+    // With page.ground the camera and target heights are above the ground under each (the page adds it as it draws):
+    // a reader that needs heights above sea level takes them from the stills' stills.json.
+    heights: shot.page?.ground ? 'ground' : 'world',
+    cameras,
+  };
 }

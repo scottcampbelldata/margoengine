@@ -46,13 +46,21 @@
     "id": "fauld-fr008",
     "kind": "long",
     "seconds": 5.5,
-    "scene": "fauld-countryside",
-    "about": "fr008 00 Cold open: Hard cut, calm: the ridge at dawn from 400 m, frost on the field quilt, the farm small on the ridge with chimney smoke | drone 400 m, dolly 4 m/s | dawn; frost",
+    "about": "fr008 00 Cold open (@margoengine/scenes/fauld-countryside): Hard cut, calm: the ridge at dawn from 400 m, frost on the field quilt, the farm small on the ridge with chimney smoke | drone 400 m, dolly 4 m/s | dawn; frost",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=dawn&focus=0%2C10&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "before",
+        "sky": "dawn",
+        "focus": "0,10"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.3,
+  "duration": 6.291666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 26.99
         },
         {
-          "time": 6.3,
+          "time": 6.291666666666667,
           "position": [
-            84.257,
+            84.259,
             1.7,
-            121.808
+            121.811
           ],
           "target": [
             0,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr155",
     "kind": "long",
-    "seconds": 6.3,
-    "scene": "fauld-crater",
-    "about": "fr155 13 The crater today: The memorial stone in the mist (framing of fd148) | 50 mm, push in 0.3 m/s | dawn; mist",
+    "seconds": 6.291666666666667,
+    "about": "fr155 13 The crater today (@margoengine/scenes/fauld-crater): The memorial stone in the mist (framing of fd148) | 50 mm, push in 0.3 m/s | dawn; mist",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=mist&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "mist",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.15
+      "mid": 3.1666666666666665
     },
     "subject": {
       "target": [

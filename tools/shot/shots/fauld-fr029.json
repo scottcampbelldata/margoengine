@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 4.8,
+  "duration": 4.791666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 16.07
         },
         {
-          "time": 4.8,
+          "time": 4.791666666666667,
           "position": [
             122.062,
             1.7,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr029",
     "kind": "long",
-    "seconds": 4.8,
-    "scene": "fauld-countryside",
-    "about": "fr029 03 A thousand workers: The works yard at shift change from the hill: civ_gypsum_b and others in caps cross to the mill, small | 85 mm, pan 6 deg | day; overcast (fallback until people: the empty yard, a coat on a peg by the door)",
+    "seconds": 4.791666666666667,
+    "about": "fr029 03 A thousand workers (@margoengine/scenes/fauld-countryside): The works yard at shift change from the hill: civ_gypsum_b and others in caps cross to the mill, small | 85 mm, pan 6 deg | day; overcast (fallback until people: the empty yard, a coat on a peg by the door)",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=overcast&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.4
+      "mid": 2.4166666666666665
     },
     "subject": {
       "target": [

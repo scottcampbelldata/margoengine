@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.4,
+  "duration": 6.416666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 53.13
         },
         {
-          "time": 6.4,
+          "time": 6.416666666666667,
           "position": [
             -563.245,
             400,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr087",
     "kind": "long",
-    "seconds": 6.4,
-    "scene": "fauld-countryside",
-    "about": "fr087 08 The crater and the mud: Slow pull back down the valley, smoke drifting across | drone 200 to 400 m, pull back | overcast; smoke",
+    "seconds": 6.416666666666667,
+    "about": "fr087 08 The crater and the mud (@margoengine/scenes/fauld-countryside): Slow pull back down the valley, smoke drifting across | drone 200 to 400 m, pull back | overcast; smoke",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=grey&focus=-300%2C-2600&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "-300,-2600"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.2
+      "mid": 3.2083333333333335
     },
     "subject": {
       "target": [

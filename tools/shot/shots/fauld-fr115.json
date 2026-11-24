@@ -46,13 +46,21 @@
     "id": "fauld-fr115",
     "kind": "long",
     "seconds": 5,
-    "scene": "fauld-crater",
-    "about": "fr115 11 The inquiry: Aerial: the scar dark against snowy fields (framing of fd126) | drone 500 m, slow orbit | winter; snow",
+    "about": "fr115 11 The inquiry (@margoengine/scenes/fauld-crater): Aerial: the scar dark against snowy fields (framing of fd126) | drone 500 m, slow orbit | winter; snow",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=snow&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "1944",
+        "sky": "snow",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

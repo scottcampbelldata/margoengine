@@ -46,13 +46,21 @@
     "id": "fauld-fr077",
     "kind": "long",
     "seconds": 6,
-    "scene": "fauld-crater",
-    "about": "fr077 08 The crater and the mud: Orbit at 600 m: the quarter kilometre bowl against the fields | drone 600 m, orbit 10 deg | overcast; steam",
+    "about": "fr077 08 The crater and the mud (@margoengine/scenes/fauld-crater): Orbit at 600 m: the quarter kilometre bowl against the fields | drone 600 m, orbit 10 deg | overcast; steam",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=1944&sky=grey&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "1944",
+        "sky": "grey",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

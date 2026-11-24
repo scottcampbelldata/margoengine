@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 4.9,
+  "duration": 4.916666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 16.07
         },
         {
-          "time": 4.9,
+          "time": 4.916666666666667,
           "position": [
-            -457.061,
+            -457.06,
             1.7,
-            576.901
+            576.891
           ],
           "target": [
             -450,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr103",
     "kind": "long",
-    "seconds": 4.9,
-    "scene": "fauld-countryside",
-    "about": "fr103 09 The rescue: Women in headscarves at a WVS van in the damaged street, 60 m | 85 mm, slow push | winter; overcast (fallback until people: a tea urn and blankets on a trestle by the van)",
+    "seconds": 4.916666666666667,
+    "about": "fr103 09 The rescue (@margoengine/scenes/fauld-countryside): Women in headscarves at a WVS van in the damaged street, 60 m | 85 mm, slow push | winter; overcast (fallback until people: a tea urn and blankets on a trestle by the van)",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=1944&sky=overcast&focus=-450%2C420&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "1944",
+        "sky": "overcast",
+        "focus": "-450,420"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.45
+      "mid": 2.4583333333333335
     },
     "subject": {
       "target": [

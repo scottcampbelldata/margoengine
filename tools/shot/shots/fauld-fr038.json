@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 6.7,
+  "duration": 6.708333333333333,
   "tracks": [
     {
       "type": "camera",
@@ -23,11 +23,11 @@
           "fov": 53.13
         },
         {
-          "time": 6.7,
+          "time": 6.708333333333333,
           "position": [
-            7.989,
+            7.988,
             150,
-            193.026
+            192.992
           ],
           "target": [
             0,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr038",
     "kind": "long",
-    "seconds": 6.7,
-    "scene": "fauld-countryside",
-    "about": "fr038 04 Monday morning: Dawn over the fields above Fauld, mist in the hollows, the farm small on the ridge | drone 150 m, dolly 4 m/s | dawn; mist",
+    "seconds": 6.708333333333333,
+    "about": "fr038 04 Monday morning (@margoengine/scenes/fauld-countryside): Dawn over the fields above Fauld, mist in the hollows, the farm small on the ridge | drone 150 m, dolly 4 m/s | dawn; mist",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=mist&focus=0%2C10&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "before",
+        "sky": "mist",
+        "focus": "0,10"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 3.35
+      "mid": 3.375
     },
     "subject": {
       "target": [

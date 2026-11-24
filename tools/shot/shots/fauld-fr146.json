@@ -46,13 +46,21 @@
     "id": "fauld-fr146",
     "kind": "long",
     "seconds": 5,
-    "scene": "fauld-crater",
-    "about": "fr146 13 The crater today: A walker in modern clothes small at the wood's edge, far away | 200 mm, slow pan | frost; low sun (fallback until people: the empty path disappearing into the wood)",
+    "about": "fr146 13 The crater today (@margoengine/scenes/fauld-crater): A walker in modern clothes small at the wood's edge, far away | 200 mm, slow pan | frost; low sun (fallback until people: the empty path disappearing into the wood)",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=crater&era=today&sky=lowSun&focus=0%2C0&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "crater",
+        "era": "today",
+        "sky": "lowSun",
+        "focus": "0,0"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,

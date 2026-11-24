@@ -1,7 +1,7 @@
 {
   "format": "margo-cutscene",
   "version": 1,
-  "duration": 5.3,
+  "duration": 5.291666666666667,
   "tracks": [
     {
       "type": "camera",
@@ -23,7 +23,7 @@
           "fov": 53.13
         },
         {
-          "time": 5.3,
+          "time": 5.291666666666667,
           "position": [
             101.23,
             700,
@@ -45,14 +45,22 @@
     "version": 1,
     "id": "fauld-fr022",
     "kind": "long",
-    "seconds": 5.3,
-    "scene": "fauld-countryside",
-    "about": "fr022 02 The Dump: High aerial: only fields, the farm and the works; nothing shows of the store below | drone 700 m, slow orbit | day; overcast",
+    "seconds": 5.291666666666667,
+    "about": "fr022 02 The Dump (@margoengine/scenes/fauld-countryside): High aerial: only fields, the farm and the works; nothing shows of the store below | drone 700 m, slow orbit | day; overcast",
     "page": {
-      "path": "packages/scenes/test/fauld-still.html?place=countryside&era=before&sky=overcast&focus=120%2C-780&yref=ground",
+      "path": "packages/scenes/test/fauld-still.html",
+      "query": {
+        "place": "countryside",
+        "era": "before",
+        "sky": "overcast",
+        "focus": "120,-780"
+      },
+      "engine": "fauldStill.engine",
+      "ground": "fauldStill.height",
       "canvas": "canvas",
       "ready": "canvas"
     },
+    "warmup": 60,
     "seed": 1944,
     "size": [
       1920,
@@ -61,7 +69,7 @@
     "fps": 24,
     "shutter": 180,
     "probes": {
-      "mid": 2.65
+      "mid": 2.6666666666666665
     },
     "subject": {
       "target": [
