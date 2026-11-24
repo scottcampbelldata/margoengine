@@ -11102,3 +11102,7 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 - M. Macklin, M. Müller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", Motion in Games, 2016; M. Macklin et al., "Small Steps in Physics Simulation", SCA 2019.
 - H. Kuhn, "Some combinatorial lemmas in topology", IBM J. Res. Dev. 4(5), 1960 (the cube cut into six tetrahedra that match across faces).
 - Check: the Euler-Bernoulli deflection of a uniformly loaded cantilever, rho g A L^4 / (8 E I), from any text on the mechanics of materials.
+
+### Volume preservation (`@margoengine/physics/soft`, 2026-11-24)
+
+One scalar constraint on the volume a closed triangle surface encloses, V = sum of x_a . (x_b x x_c) / 6 over its triangles, whose gradient at a vertex is the sum of the cross products of the other two vertices of each triangle around it over 6, held to a target by the XPBD correction (Macklin, Mueller and Chentanez 2016). The balloon constraint is that of M. Mueller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007, section 4.4, with the divergence-theorem volume of a closed mesh (any computational geometry text).

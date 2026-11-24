@@ -19,6 +19,7 @@ pub mod api;
 mod col;
 pub mod attach;
 pub mod collide;
+mod volume;
 pub mod fem;
 mod fem_api;
 #[cfg(target_arch = "wasm32")]

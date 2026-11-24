@@ -541,3 +541,49 @@ test('a pinned particle drags a light crate along, and a fixed body holds a part
   near(lone.particlePosition(0)[0], 0.3, 0.01, 'a fixed body keeps its particle at the anchor');
   assert.throws(() => lone.attachParticle(3, fixed), RangeError);
 });
+
+test('a sphere keeps its volume as it lands and squashes, and a volume factor inflates it', async () => {
+  const { physics, soft } = await create();
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5], friction: 1 },
+  });
+  const material = new SoftBodyMaterial();
+  material.edgeSoftness = { naturalFrequency: 6, dampingRatio: 0.3 };
+  material.bendSoftness = { naturalFrequency: 4, dampingRatio: 0.3 };
+  const ball = soft.create(
+    SoftBodyDesc.sphere([0, 1.2, 0], 0.5, { detail: 2 }).setMaterial(material).setParticleMass(0.01),
+  );
+  const rest = ball.surfaceVolume();
+  near(rest, (4 / 3) * Math.PI * 0.125, 0.04, 'an icosphere of radius 0.5 encloses about 4/3 pi r cubed');
+  let lowest = Infinity;
+  for (let i = 0; i < 240; i++) {
+    physics.step();
+    if (i % 4 === 0) {
+      const p = ball.particlePositions();
+      for (let k = 0; k < p.length; k += 3) lowest = Math.min(lowest, p[k + 1]);
+      near(ball.surfaceVolume(), rest, rest * 0.03, `volume at step ${i}`);
+    }
+  }
+  assert.ok(lowest < 0.1, `it came down to the floor: ${lowest}`);
+  // Inflate to twice the volume.
+  ball.setVolumeFactor(2);
+  steps(physics, 120);
+  near(ball.surfaceVolume(), 2 * rest, rest * 0.06, 'inflated to twice its volume');
+  assert.throws(
+    () => soft.create(SoftBodyDesc.cloth([0, 0, 0], [1, 0, 0], [0, 0, 1], 2, 2).setVolumeFactor(1)),
+    RangeError,
+    'a flat sheet has no volume',
+  );
+});
+
+test('a body whose triangles face inward cannot hold a volume', async () => {
+  const { soft } = await create();
+  const desc = SoftBodyDesc.sphere([0, 0, 0], 1, { detail: 0 });
+  const flipped = SoftBodyDesc.trimesh(
+    desc.positions,
+    desc.triangles.map((v, k, a) => (k % 3 === 1 ? a[k + 1] : k % 3 === 2 ? a[k - 1] : v)),
+  ).setVolumeFactor(1);
+  assert.throws(() => soft.create(flipped), RangeError);
+});

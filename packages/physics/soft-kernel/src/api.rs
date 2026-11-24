@@ -17,6 +17,8 @@ static mut WORLD: World = World {
     b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(), kc: Col::new(), knx: Col::new(), kny: Col::new(), knz: Col::new(),
     kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(),
     at_p: Col::new(), at_row: Col::new(), at_rx: Col::new(), at_ry: Col::new(), at_rz: Col::new(), attachments: 0,
+    vtri: Col::new(), vb_on: Col::new(), vb_first: Col::new(), vb_count: Col::new(), vb_target: Col::new(), vb_omega: Col::new(),
+    vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -45,6 +47,7 @@ columns! {
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
     kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
     at_p, at_row, at_rx, at_ry, at_rz,
+    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -64,6 +67,18 @@ pub extern "C" fn soft_attach_reserve(attachments: u32) {
     let w = world();
     w.reserve_attachments(attachments as usize);
     w.attachments = attachments as usize;
+}
+
+/// Makes room for the triangles of closed surfaces that keep their volume (three particle indices each in `vtri`).
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_volume_reserve(triangles: u32) {
+    world().vtri.resize(3 * triangles as usize);
+}
+
+/// The current volume of the closed surface of body `b`, in cubic metres.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_volume(b: u32) -> f32 {
+    world().surface_volume(b as usize)
 }
 
 /// Where a column starts in the memory.

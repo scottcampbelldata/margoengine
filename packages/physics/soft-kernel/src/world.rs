@@ -138,6 +138,19 @@ pub struct World {
     pub at_ry: Col<f32>,
     pub at_rz: Col<f32>,
     pub attachments: usize,
+    // Closed surfaces that keep their volume (src/volume.rs): the triangles (three particle indices each) and per body: on or
+    // off, the first triangle and how many, the target volume, the spring and the multiplier; per particle, the gradient.
+    pub vtri: Col<u32>,
+    pub vb_on: Col<u32>,
+    pub vb_first: Col<u32>,
+    pub vb_count: Col<u32>,
+    pub vb_target: Col<f32>,
+    pub vb_omega: Col<f32>,
+    pub vb_zeta: Col<f32>,
+    pub vb_lambda: Col<f32>,
+    pub vgx: Col<f32>,
+    pub vgy: Col<f32>,
+    pub vgz: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -173,6 +186,15 @@ impl World {
             grow(v, particles * SLOTS);
         }
         grow(&mut self.kc, particles * SLOTS);
+        for v in [&mut self.vgx, &mut self.vgy, &mut self.vgz] {
+            grow(v, particles);
+        }
+        for v in [&mut self.vb_target, &mut self.vb_omega, &mut self.vb_zeta, &mut self.vb_lambda] {
+            grow(v, bodies);
+        }
+        grow(&mut self.vb_on, bodies);
+        grow(&mut self.vb_first, bodies);
+        grow(&mut self.vb_count, bodies);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
         for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
@@ -274,12 +296,14 @@ impl World {
         }
         self.shape_begin();
         self.fem_begin();
+        self.volume_begin();
         for _ in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
             }
             self.solve_shape(h);
             self.solve_fem(h);
+            self.solve_volume(h);
         }
         self.collide(h);
     }

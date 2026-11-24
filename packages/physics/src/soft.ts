@@ -22,6 +22,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_cloth_reserve(triangles: number, contacts: number): number;
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_attach_reserve(attachments: number): void;
+  soft_volume_reserve(triangles: number): void;
+  soft_volume(body: number): number;
   soft_torn(): number;
   soft_hash(): number;
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
@@ -58,6 +60,10 @@ const INTEGER_COLUMNS = new Set([
   'kc',
   'at_p',
   'at_row',
+  'vtri',
+  'vb_on',
+  'vb_first',
+  'vb_count',
 ]);
 const TORN_CELL = 1;
 const INTEGER_CELL_COLUMNS = new Set(['p0', 'p1', 'p2', 'p3', 'model', 'flags', 'cstart', 'ccount', 'member']);
@@ -100,6 +106,8 @@ export class SoftBodyMaterial {
    * on (default rigid, 0 Hz).
    */
   shapeMatchingSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+  /** The spring that holds a closed surface to its volume (default rigid: the volume is held exactly). */
+  volumeSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
   /** Both edge kinds as one spring, Rapier's `SoftBodyMaterial.uniform(freq, damping)`. */
   static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial {
     const material = new SoftBodyMaterial();
@@ -114,6 +122,7 @@ export class SoftBodyMaterial {
     copy.bendSoftness = { ...this.bendSoftness };
     copy.tearStrain = this.tearStrain;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
+    copy.volumeSoftness = { ...this.volumeSoftness };
     return copy;
   }
 }
@@ -214,6 +223,7 @@ function checkMaterial(material: SoftBodyMaterial): void {
   checkSoftness(material.edgeSoftness, 'Edge softness');
   checkSoftness(material.bendSoftness, 'Bend softness');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
+  checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
     throw new RangeError('tearStrain is 0 (never) or the stretch fraction that tears an edge.');
 }
@@ -239,6 +249,7 @@ export class SoftBodyDesc {
   /** @internal */ damping = 0;
   /** @internal */ shift: Vec3 = [0, 0, 0];
   /** @internal */ shapeMatching = false;
+  /** @internal */ volumeFactor: number | null = null;
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
@@ -414,6 +425,88 @@ export class SoftBodyDesc {
     if (!Number.isInteger(groups) || groups < 0 || groups > 0xffffffff)
       throw new RangeError("Collision groups is a packed 32-bit word, as a collider's collisionGroups.");
     this.groups = groups;
+    return this;
+  }
+
+  /**
+   * A ball of triangles: an icosphere of the given `radius` about `center`, subdivided `detail` times (0 is 12 vertices, 2 the
+   * default is 162), with edges, bend edges across shared edges and the volume held (Rapier's `sphere`), so it squashes and
+   * springs back as a rubber ball does. Soften it with `setSoftness` and the material's `volumeSoftness`; inflate it with
+   * `setVolumeFactor`.
+   */
+  static sphere(center: Vec3, radius: number, { detail = 2 }: { detail?: number } = {}): SoftBodyDesc {
+    checkVec(center, 'Sphere centre');
+    if (!(radius > 0 && Number.isFinite(radius))) throw new RangeError('Sphere radius is a positive number of metres.');
+    count(detail, 'detail', 0);
+    if (detail > 5) throw new RangeError('A sphere is subdivided at most 5 times.');
+    const t = (1 + Math.sqrt(5)) / 2;
+    const points: Vec3[] = [
+      [-1, t, 0],
+      [1, t, 0],
+      [-1, -t, 0],
+      [1, -t, 0],
+      [0, -1, t],
+      [0, 1, t],
+      [0, -1, -t],
+      [0, 1, -t],
+      [t, 0, -1],
+      [t, 0, 1],
+      [-t, 0, -1],
+      [-t, 0, 1],
+    ];
+    let faces = [
+      0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4,
+      2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
+    ];
+    for (let level = 0; level < detail; level++) {
+      const middle = new Map<number, number>(),
+        next: number[] = [],
+        mid = (a: number, b: number): number => {
+          const key = a < b ? a * 100000 + b : b * 100000 + a;
+          let m = middle.get(key);
+          if (m === undefined) {
+            m = points.length;
+            points.push([
+              (points[a]![0] + points[b]![0]) / 2,
+              (points[a]![1] + points[b]![1]) / 2,
+              (points[a]![2] + points[b]![2]) / 2,
+            ]);
+            middle.set(key, m);
+          }
+          return m;
+        };
+      for (let f = 0; f < faces.length; f += 3) {
+        const a = faces[f]!,
+          b = faces[f + 1]!,
+          c = faces[f + 2]!,
+          ab = mid(a, b),
+          bc = mid(b, c),
+          ca = mid(c, a);
+        next.push(a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca);
+      }
+      faces = next;
+    }
+    const vertices: number[] = [];
+    for (const p of points) {
+      const length = Math.hypot(p[0], p[1], p[2]);
+      vertices.push(
+        center[0] + (p[0] / length) * radius,
+        center[1] + (p[1] / length) * radius,
+        center[2] + (p[2] / length) * radius,
+      );
+    }
+    return SoftBodyDesc.trimesh(vertices, faces).setShapeMatching(false).setVolumeFactor(1);
+  }
+
+  /**
+   * Holds the enclosed volume of the body's closed triangle surface (outward-facing triangles) to `factor` times its volume
+   * at creation: 1 keeps it, above 1 inflates, below 1 deflates (Rapier's `setVolumeFactor`). The spring is the material's
+   * `volumeSoftness`; `null` turns it off.
+   */
+  setVolumeFactor(factor: number | null): this {
+    if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
+      throw new RangeError('Volume factor is a positive number.');
+    this.volumeFactor = factor;
     return this;
   }
 
@@ -731,6 +824,8 @@ export class SoftBody {
   /** @internal The fixed body that holds this body's surface collider, once it has one. */
   surface: PhysicsBody | null = null;
   /** @internal Whether shape matching holds this body. */ matched = false;
+  /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
+  /** @internal */ surfaceRest = 0;
   /** @internal The packed groups the particles meet colliders by; undefined meets every collider. */ collisionGroups:
     | number
     | undefined = undefined;
@@ -858,6 +953,21 @@ export class SoftBody {
     ty[row] = position[1];
     tz[row] = position[2];
     pflags[row] = pflags[row]! | TARGETED;
+    return this;
+  }
+  /** The volume the body's closed triangle surface encloses now, in cubic metres (0 for a body that holds no volume). */
+  surfaceVolume(): number {
+    this.check();
+    return this.volumeOn ? this.owner.surfaceVolume(this) : 0;
+  }
+  /** Changes the volume the body holds: `factor` times the volume it was made with (null lets it go). */
+  setVolumeFactor(factor: number | null): this {
+    this.check();
+    if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
+      throw new RangeError('Volume factor is a positive number.');
+    if (factor !== null && !this.volumeOn)
+      throw new RangeError('This body has no closed triangle surface to hold a volume.');
+    this.owner.setVolume(this, factor);
     return this;
   }
   /** The triangles of a body built from a mesh (`SoftBodyDesc.trimesh`), as particle indices, three per triangle. */
@@ -1106,7 +1216,7 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
-  private capacity = [0, 0, 0, 0, 0];
+  private capacity = [0, 0, 0, 0, 0, 0];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
   private particleCount = 0;
   private edgeCount = 0;
@@ -1165,10 +1275,10 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed) throw new MargoError('state', 'SoftBodies was disposed.');
     const buffer = this.exports.memory.buffer;
     if (this.view && this.viewBuffer === buffer) return this.view;
-    const [particles, edges, bodies, colliders, attachments] = this.capacity,
+    const [particles, edges, bodies, colliders, attachments, volumeTriangles] = this.capacity,
       view: Columns = {};
     columnNames.forEach((name, id) => {
-      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!),
+      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!, volumeTriangles!),
         at = this.exports.soft_column(id);
       view[name] = (
         INTEGER_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
@@ -1221,6 +1331,7 @@ export class SoftBodies implements PhysicsAttachment {
       Math.max(this.capacity[2]!, bodies),
       Math.max(this.capacity[3]!, colliders),
       this.capacity[4]!,
+      this.capacity[5]!,
     ];
     this.view = null;
   }
@@ -1232,6 +1343,10 @@ export class SoftBodies implements PhysicsAttachment {
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
     if (particles === 0) throw new RangeError('A soft body has at least one particle.');
+    // A body that holds its volume needs a closed surface whose triangles face outward.
+    const restVolume = desc.volumeFactor === null ? 0 : this.meshVolume(desc.positions, desc.triangles);
+    if (desc.volumeFactor !== null && !(restVolume > 0))
+      throw new RangeError('A body that holds its volume needs a closed surface whose triangles face outward.');
     const structural = desc.edgePairs.length / 2,
       edges = structural + desc.bendPairs.length / 2,
       firstParticle = this.particleCount,
@@ -1333,6 +1448,10 @@ export class SoftBodies implements PhysicsAttachment {
     body.matched = desc.shapeMatching;
     body.collisionGroups = desc.groups;
     body.selfContacts = desc.selfContacts;
+    if (restVolume > 0) {
+      body.surfaceRest = restVolume;
+      body.volumeOn = true;
+    }
     body.selfFriction = desc.selfFriction;
     if (cells) {
       const [mu, lambda] = desc.cellMaterial.lame(),
@@ -1365,7 +1484,56 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeMaterial(body);
     this.writeCellMaterial(body);
     this.syncCloth();
+    this.syncVolume(desc.volumeFactor);
     return body;
+  }
+
+  /** @internal The volume a closed triangle surface encloses, in cubic metres (positive when it faces outward). */
+  private meshVolume(positions: readonly number[], triangles: readonly number[]): number {
+    let v = 0;
+    for (let t = 0; t < triangles.length; t += 3) {
+      const [a, b, c] = [triangles[t]! * 3, triangles[t + 1]! * 3, triangles[t + 2]! * 3] as [number, number, number],
+        p = positions;
+      v +=
+        (p[a]! * (p[b + 1]! * p[c + 2]! - p[b + 2]! * p[c + 1]!) +
+          p[a + 1]! * (p[b + 2]! * p[c]! - p[b]! * p[c + 2]!) +
+          p[a + 2]! * (p[b]! * p[c + 1]! - p[b + 1]! * p[c]!)) /
+        6;
+    }
+    return v;
+  }
+
+  /** @internal The current volume of a body's closed surface. */
+  surfaceVolume(body: SoftBody): number {
+    return this.exports.soft_volume(body.handle);
+  }
+
+  /** @internal Sets the volume a body holds, as a factor of its rest volume, or lets it go. */
+  setVolume(body: SoftBody, factor: number | null): void {
+    const c = this.columns();
+    c.vb_on[body.handle] = factor === null ? 0 : 1;
+    c.vb_target[body.handle] = (factor ?? 1) * body.surfaceRest;
+  }
+
+  /** Lays the triangles of the bodies that hold a volume into the kernel and, for a new body, its target. */
+  private syncVolume(factor: number | null): void {
+    const on = this.bodies.filter((b) => b.volumeOn);
+    let triangles = 0;
+    for (const b of on) triangles += b.triangleList.length / 3;
+    this.exports.soft_volume_reserve(triangles);
+    this.capacity[5] = Math.max(this.capacity[5]!, triangles);
+    this.view = null;
+    const c = this.columns();
+    let at = 0;
+    for (const b of on) {
+      c.vb_first[b.handle] = at / 3;
+      c.vb_count[b.handle] = b.triangleList.length / 3;
+      for (const v of b.triangleList) c.vtri[at++] = b.firstParticle + v;
+    }
+    if (factor !== null) {
+      const b = this.bodies[this.bodies.length - 1]!;
+      if (b.volumeOn) this.setVolume(b, factor);
+    }
   }
 
   /** @internal Pins a particle to a point fixed in a rigid body: where the particle is now, in the body's frame. */
@@ -1431,6 +1599,8 @@ export class SoftBodies implements PhysicsAttachment {
       { edgeSoftness, bendSoftness, tearStrain, shapeMatchingSoftness } = body.material;
     c.b_omega[body.handle] = shapeMatchingSoftness.naturalFrequency * 2 * Math.PI;
     c.b_zeta[body.handle] = shapeMatchingSoftness.dampingRatio;
+    c.vb_omega[body.handle] = body.material.volumeSoftness.naturalFrequency * 2 * Math.PI;
+    c.vb_zeta[body.handle] = body.material.volumeSoftness.dampingRatio;
     for (let e = 0; e < body.edgeTotal; e++) {
       const row = body.firstEdge + e,
         bend = e >= body.structural,
@@ -1473,7 +1643,19 @@ export class SoftBodies implements PhysicsAttachment {
         'slz',
         'sw',
       ] as const,
-      bcols = ['b_on', 'b_omega', 'b_zeta', 'bqx', 'bqy', 'bqz', 'bqw'] as const,
+      bcols = [
+        'b_on',
+        'b_omega',
+        'b_zeta',
+        'bqx',
+        'bqy',
+        'bqz',
+        'bqw',
+        'vb_on',
+        'vb_omega',
+        'vb_zeta',
+        'vb_target',
+      ] as const,
       ecols = ['rest', 'omega', 'zeta', 'lambda', 'tear', 'eflags'] as const,
       saved = keep.map((b) => ({
         body: b,
@@ -1610,6 +1792,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.surface = null;
     this.bodies.splice(at, 1);
     this.syncCloth();
+    this.syncVolume(null);
   }
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */
@@ -1931,7 +2114,10 @@ function rowsOf(
   bodies: number,
   colliders: number,
   attachments: number,
+  volumeTriangles: number,
 ): number {
+  if (name === 'vtri') return volumeTriangles * 3;
+  if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;

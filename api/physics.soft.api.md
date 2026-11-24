@@ -33,6 +33,8 @@ export class SoftBodies implements PhysicsAttachment {
     columns(): Columns;
     cellColumns(): Columns;
     create(desc: SoftBodyDesc): SoftBody;
+    surfaceVolume(body: SoftBody): number;
+    setVolume(body: SoftBody, factor: number | null): void;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
     release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
     writeCellMaterial(body: SoftBody): void;
@@ -82,6 +84,8 @@ export class SoftBody {
     triangleList: Uint32Array<ArrayBuffer>;
     surface: PhysicsBody | null;
     matched: boolean;
+    volumeOn: boolean;
+    surfaceRest: number;
     collisionGroups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -99,6 +103,8 @@ export class SoftBody {
     detachParticle(index: number, body?: PhysicsBody): boolean;
     isParticlePinned(index: number): boolean;
     setParticleKinematicTarget(index: number, position: Vec3): this;
+    surfaceVolume(): number;
+    setVolumeFactor(factor: number | null): this;
     triangles(): Uint32Array;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
@@ -139,6 +145,7 @@ export class SoftBodyDesc {
     damping: number;
     shift: Vec3;
     shapeMatching: boolean;
+    volumeFactor: number | null;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -162,6 +169,10 @@ export class SoftBodyDesc {
         friction?: number;
     }): this;
     setCollisionGroups(groups: number): this;
+    static sphere(center: Vec3, radius: number, { detail }?: {
+        detail?: number;
+    }): SoftBodyDesc;
+    setVolumeFactor(factor: number | null): this;
     setShapeMatching(on: boolean): this;
     static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
     static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
@@ -191,6 +202,7 @@ export class SoftBodyMaterial {
     bendSoftness: SoftSoftness;
     tearStrain: number;
     shapeMatchingSoftness: SoftSoftness;
+    volumeSoftness: SoftSoftness;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
 }
