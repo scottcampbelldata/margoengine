@@ -1205,6 +1205,14 @@
       "status": "exempt",
       "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
     },
+    "xr:XREyeSceneDepth.texture": {
+      "status": "exempt",
+      "reason": "the eye scene depth the XR renderer hands each eye pass for one frame, valid until the encoder is submitted (rule 6)"
+    },
+    "xr:XRGPUDepthLike.texture": {
+      "status": "exempt",
+      "reason": "the browser XRGPUDepthInformation texture for this frame, which the session hands out per frame (rule 6)"
+    },
     "xr:XRSubImage.colorTexture": {
       "status": "exempt",
       "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
