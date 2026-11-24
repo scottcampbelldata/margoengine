@@ -2,7 +2,7 @@
 // the one instanced draw, on the fake GPU. The real-GPU checks are test/clouds-check.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Clouds, layoutPuffs, defaultPuffTexture } from '../dist/clouds.js';
+import { Clouds, layoutPuffs, defaultPuffTexture, scattered } from '../dist/clouds.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 // Reversed-Z perspective times look-at, column-major, as core's Camera builds it.
@@ -15,7 +15,24 @@ function viewProjection(eye, target, fov = 60, aspect = 1, near = 0.1) {
     x = norm(cross([0, 1, 0], z)),
     y = cross(z, x),
     f = 1 / Math.tan((fov * Math.PI) / 360);
-  const view = [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, eye), -dot(y, eye), -dot(z, eye), 1];
+  const view = [
+    x[0],
+    y[0],
+    z[0],
+    0,
+    x[1],
+    y[1],
+    z[1],
+    0,
+    x[2],
+    y[2],
+    z[2],
+    0,
+    -dot(x, eye),
+    -dot(y, eye),
+    -dot(z, eye),
+    1,
+  ];
   // Infinite reversed Z: z_clip = near, w_clip = -z_view.
   const proj = [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, 0, -1, 0, 0, near, 0];
   const out = new Float32Array(16);
@@ -42,7 +59,10 @@ test('a seed gives the same layout every time, and another seed another layout',
   assert.deepEqual(a, b);
   assert.notDeepEqual(a, c);
   for (let i = 0; i < 20; i++) {
-    assert.ok(Math.abs(a[i * 6]) <= 2.5 && Math.abs(a[i * 6 + 1]) <= 0.5 && Math.abs(a[i * 6 + 2]) <= 0.5, 'in the box');
+    assert.ok(
+      Math.abs(a[i * 6]) <= 2.5 && Math.abs(a[i * 6 + 1]) <= 0.5 && Math.abs(a[i * 6 + 2]) <= 0.5,
+      'in the box',
+    );
     assert.ok(a[i * 6 + 3] >= 6 * 0.25 - 1e-6 && a[i * 6 + 3] <= 6 + 1e-6, 'size within smallestVolume..volume');
   }
 });
@@ -89,7 +109,14 @@ test('a puff in the shadow of another gets exp(-density) of the light; one besid
     cloud = clouds.add({
       segments: 3,
       volume: 1,
-      distribute: (i) => ({ point: [[0, 0, 0], [0, 0.6, 0], [0.9, 0, 0]][i], volume: 1 }),
+      distribute: (i) => ({
+        point: [
+          [0, 0, 0],
+          [0, 0.6, 0],
+          [0.9, 0, 0],
+        ][i],
+        volume: 1,
+      }),
       bounds: [10, 10, 10],
     });
   const [low, high, side] = clouds.puffs();
@@ -97,6 +124,73 @@ test('a puff in the shadow of another gets exp(-density) of the light; one besid
   assert.equal(high.light, 1, 'nothing above the top puff');
   assert.ok(Math.abs(low.light - Math.exp(-0.7)) < 1e-6, `under: ${low.light}`);
   assert.ok(side.light > 0.999, `beside: ${side.light}`);
+});
+
+test('a half-size puff shades with half the optical depth of a full-size one: density is per full-size puff', () => {
+  const shade = (size) => {
+    const clouds = new Clouds({ lightDirection: [0, 1, 0], density: 0.7 });
+    clouds.add({
+      segments: 2,
+      volume: 1,
+      distribute: (i) => ({
+        point: [
+          [0, 0, 0],
+          [0, 0.6, 0],
+        ][i],
+        volume: [1, size][i],
+      }),
+      bounds: [10, 10, 10],
+    });
+    return clouds.puffs()[0].light;
+  };
+  assert.ok(Math.abs(shade(1) - Math.exp(-0.7)) < 1e-6);
+  // Regression: every puff used to count the whole density, so a heap of small puffs went black.
+  assert.ok(Math.abs(shade(0.5) - Math.exp(-0.35)) < 1e-6, `half size: ${shade(0.5)}`);
+});
+
+test('distribute gives each puff its own colour and glow; puffs without one keep the cloud colour', () => {
+  const clouds = new Clouds();
+  clouds.add({
+    segments: 2,
+    color: [0.2, 0.3, 0.4],
+    distribute: (i) => (i ? { point: [0, 0, 0] } : { point: [0, 0, 0], color: [1, 0.5, 0], emission: [4, 1, 0] }),
+  });
+  const [a, b] = clouds.puffs();
+  assert.deepEqual(a.color.slice(0, 3), [1, 0.5, 0]);
+  assert.deepEqual(a.emission, [4, 1, 0]);
+  assert.deepEqual(
+    b.color.slice(0, 3).map((x) => Math.round(x * 100) / 100),
+    [0.2, 0.3, 0.4],
+  );
+  assert.deepEqual(b.emission, [0, 0, 0]);
+  assert.throws(() => {
+    const bad = new Clouds();
+    bad.add({ segments: 1, distribute: () => ({ point: [0, 0, 0], emission: [-1, 0, 0] }) });
+  }, /pass \[r, g, b\]/);
+});
+
+test('relief: the sky light under a puff and the multiple-scattering octaves (Wrenninge et al. 2013)', () => {
+  assert.equal(scattered(0), 1);
+  assert.ok(scattered(20) > 0.03 && scattered(20) < 0.1, 'deep inside stays grey, not black');
+  for (const d of [0.5, 2, 8]) assert.ok(scattered(d) > Math.exp(-d), 'more light than single scattering');
+  const make = (relief) => {
+    const clouds = new Clouds({ lightDirection: [1, 0, 0], relief, density: 1 });
+    clouds.add({
+      segments: 2,
+      volume: 1,
+      bounds: [10, 10, 10],
+      distribute: (i) => ({
+        point: [
+          [0, 0, 0],
+          [0, 0.6, 0],
+        ][i],
+      }),
+    });
+    return clouds.puffs()[0];
+  };
+  assert.equal(make(0).sky, 1, 'flat puffs keep the full sky');
+  assert.ok(Math.abs(make(1).sky - scattered(1)) < 1e-6, 'the puff above takes its share of the sky');
+  assert.throws(() => new Clouds({ relief: 2 }), /relief/);
 });
 
 test('animation is a function of the clock: the same deltas give the same puffs; speed 0 never moves', () => {
@@ -139,8 +233,12 @@ test('puffs are culled outside the view, sorted far to near, and cut at range an
   cloud.matrix[12] = 0;
   const cam = camera([0, 0, 10]);
   const count = clouds['collect'](context(cam));
-  assert.deepEqual(clouds.stats, { puffs: 7, dropped: 2, culled: 1, drawn: 4 }, 'limit 5, the puff at z 12 is behind the camera');
-  const depths = Array.from({ length: count }, (_, i) => clouds['data'][i * 12 + 2]);
+  assert.deepEqual(
+    clouds.stats,
+    { puffs: 7, dropped: 2, culled: 1, drawn: 4 },
+    'limit 5, the puff at z 12 is behind the camera',
+  );
+  const depths = Array.from({ length: count }, (_, i) => clouds['data'][i * 16 + 2]);
   assert.deepEqual(depths, [-5, -3, -1, 2], 'far to near');
   clouds.options.range = 2;
   clouds.options.frustumCulled = false;
@@ -168,7 +266,11 @@ test('every cloud draws in one instanced draw of 4 vertices per puff, depth test
   const pipeline = h.pipelines.at(-1);
   assert.equal(pipeline.primitive.topology, 'triangle-strip');
   assert.equal(pipeline.vertex.buffers[0].stepMode, 'instance');
-  assert.deepEqual(pipeline.depthStencil, { format: 'depth32float', depthWriteEnabled: false, depthCompare: 'greater-equal' });
+  assert.deepEqual(pipeline.depthStencil, {
+    format: 'depth32float',
+    depthWriteEnabled: false,
+    depthCompare: 'greater-equal',
+  });
   assert.deepEqual(pipeline.fragment.targets[0].blend.color, { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' });
   assert.match(pipeline.vertex.module.code, /smoothstep\(0\.0,extra\.z,distance\)/, 'the near fade');
   assert.doesNotMatch(pipeline.vertex.module.code, /sceneDepth/, 'no depth sampling without softness');

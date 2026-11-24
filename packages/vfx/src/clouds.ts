@@ -44,6 +44,10 @@ export interface CloudPuffPlacement {
   point: Vec3;
   /** Size as a fraction of `volume`, 0..1. Default 1. */
   volume?: number;
+  /** This puff's colour, linear RGB 0 or more, in place of the cloud's `color`. Default: the cloud's colour. */
+  color?: Vec3;
+  /** Light the puff gives off, linear RGB 0 or more, added after the lighting (a fire inside smoke). Default none. */
+  emission?: Vec3;
 }
 
 /** Options of one cloud (`Clouds.add`). Read every frame: change a field and the next frame shows it. */
@@ -100,6 +104,13 @@ export interface CloudsOptions {
   ambient?: number;
   /** Optical depth through the centre of a full-size puff, for the light reaching the puffs behind it, 0 or more. Default 1. */
   density?: number;
+  /**
+   * 0..1: shades each puff of 'scatter' as a lit sphere instead of a flat disc, so a heap of puffs reads as rounded
+   * lobes with lit tops and dark undersides: the direct light by the half-Lambert of the sphere's normal, and the
+   * ambient by the sky the normal faces times the sky light left after the puffs above it; above 0 the light through
+   * the cloud also counts multiple scattering (three octaves, Wrenninge et al. 2013). 0 keeps flat puffs. Default 0.
+   */
+  relief?: number;
   /** World units over which a puff fades out in front of the surface behind it (needs `depth`); 0 is off. Default 0. */
   softness?: number;
   /**
@@ -119,6 +130,10 @@ export interface CloudPuff {
   angle: number;
   /** Share of the light that reaches the puff, 0..1. */
   light: number;
+  /** Share of the sky light from straight above that reaches the puff, 0..1 (1 unless `relief` is above 0). */
+  sky: number;
+  /** Light the puff gives off, linear RGB. */
+  emission: [number, number, number];
   /** Linear RGB and opacity (before the near fade). */
   color: [number, number, number, number];
   /** The cloud's `fade`. */
@@ -137,7 +152,7 @@ export interface CloudsStats {
   drawn: number;
 }
 
-const FLOATS = 12; // centre xyz + size, colour rgb + alpha, angle, light, fade, 0
+const FLOATS = 16; // centre xyz + size, colour rgb + alpha, angle, light, fade, sky, emission rgb + 0
 const UNIFORM_FLOATS = 36;
 let nextId = 0;
 
@@ -164,6 +179,8 @@ export class Cloud {
   /** Column-major world matrix of the cloud (position, rotation and scale). Write it any time. */
   readonly matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   /** @internal */ layout: Float32Array = new Float32Array(0);
+  /** @internal Per puff: colour rgb (NaN: the cloud's) and emission rgb, from `distribute`. */
+  tints: Float32Array = new Float32Array(0);
   /** @internal */ key = '';
   /** @internal */ distribute: CloudOptions['distribute'] = null;
   /** @internal */ readonly number: number;
@@ -199,7 +216,8 @@ export class Cloud {
     if (key === this.key && distribute === this.distribute) return;
     this.key = key;
     this.distribute = distribute;
-    this.layout = layoutPuffs(segments, bounds, concentrate, volume, smallest, seed, distribute);
+    this.tints = new Float32Array(distribute ? segments * 6 : 0);
+    this.layout = layoutPuffs(segments, bounds, concentrate, volume, smallest, seed, distribute, this.tints);
   }
 }
 
@@ -215,6 +233,7 @@ export function layoutPuffs(
   smallestVolume: number,
   seed: number,
   distribute: CloudOptions['distribute'] = null,
+  tints?: Float32Array,
 ): Float32Array {
   const random = createRandom(seed),
     out = new Float32Array(segments * 6);
@@ -230,6 +249,11 @@ export function layoutPuffs(
       const p = vector(placed?.point, [0, 0, 0], 'Cloud distribute point');
       [x, y, z] = p;
       size = number(placed.volume, 1, 'Cloud distribute volume', 0, 1);
+      if (tints) {
+        const colour = rgb(placed.color, 'Cloud distribute color'),
+          glow = rgb(placed.emission, 'Cloud distribute emission');
+        tints.set([...(colour ?? [NaN, NaN, NaN]), ...(glow ?? [0, 0, 0])], i * 6);
+      }
     } else {
       const edge = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
       size = Math.max(smallestVolume, concentrate === 'inside' ? 1 - edge : concentrate === 'outside' ? edge : size);
@@ -238,6 +262,17 @@ export function layoutPuffs(
   }
   return out;
 }
+
+/** Transmittance with multiple scattering: sum of 0.5^i exp(-0.25^i depth), i = 0..2, over 1.75. */
+export const scattered = (depth: number): number =>
+  (Math.exp(-depth) + 0.5 * Math.exp(-0.25 * depth) + 0.25 * Math.exp(-0.0625 * depth)) / 1.75;
+
+const rgb = (v: Vec3 | undefined, label: string): Vec3 | null => {
+  if (v === undefined) return null;
+  if (!Array.isArray(v) || v.length !== 3 || !v.every((c) => typeof c === 'number' && Number.isFinite(c) && c >= 0))
+    throw new TypeError(`${label} must be three linear RGB numbers of 0 or more; pass [r, g, b]`);
+  return v;
+};
 
 /** A soft, lumpy puff: a smooth radial falloff times value-noise octaves, white, alpha the coverage. */
 export function defaultPuffTexture(size = 128): CloudPixels {
@@ -277,7 +312,14 @@ export function defaultPuffTexture(size = 128): CloudPixels {
 function pixelsOf(texture: CloudTexture): CloudPixels {
   if ('data' in texture && texture.data) {
     const { width, height, data } = texture as CloudPixels;
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096)
+    if (
+      !Number.isInteger(width) ||
+      !Number.isInteger(height) ||
+      width < 1 ||
+      height < 1 ||
+      width > 4096 ||
+      height > 4096
+    )
       fail(`Clouds texture is ${width} x ${height}; pass whole sizes from 1 to 4096`);
     if (data.length !== width * height * 4)
       fail(`Clouds texture data has ${data.length} bytes for ${width} x ${height}; pass width * height * 4 RGBA bytes`);
@@ -287,7 +329,10 @@ function pixelsOf(texture: CloudTexture): CloudPixels {
     width = (source as HTMLImageElement).naturalWidth || source.width,
     height = (source as HTMLImageElement).naturalHeight || source.height;
   if (typeof OffscreenCanvas !== 'function')
-    throw new MargoError('unsupported', 'Clouds texture image sources need OffscreenCanvas; pass {width, height, data}');
+    throw new MargoError(
+      'unsupported',
+      'Clouds texture image sources need OffscreenCanvas; pass {width, height, data}',
+    );
   const canvas = new OffscreenCanvas(width, height),
     context = canvas.getContext('2d')!;
   context.drawImage(source as CanvasImageSource, 0, 0);
@@ -299,8 +344,7 @@ const toLinear = new Float32Array(256).map((_, i) => {
   const c = i / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 });
-const toByte = (c: number) =>
-  Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
+const toByte = (c: number) => Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
 /** The mip chain of `pixels`, each level a 2 x 2 box filter of the one above (colour in linear light). */
 function mipChain(pixels: CloudPixels): CloudPixels[] {
   const levels = [pixels];
@@ -332,11 +376,12 @@ struct Frame {camera:mat4x4f,right:vec4f,up:vec4f,eye:vec4f,light:vec4f,lightCol
 @group(0) @binding(1) var puffTexture:texture_2d<f32>;
 @group(0) @binding(2) var puffSampler:sampler;
 ${samples ? softDepthWgsl(samples) : ''}${fogged ? fogWgsl(0, 5) : ''}
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f,@location(2) world:vec3f,@location(3) viewDepth:f32}
-@vertex fn vertex(@builtin(vertex_index) v:u32,@location(0) centre:vec4f,@location(1) tint:vec4f,@location(2) extra:vec4f)->Out {
+struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f,@location(2) world:vec3f,@location(3) viewDepth:f32,@location(4) offset:vec2f,@location(5) back:vec3f,@location(6) shade:vec2f,@location(7) glow:vec3f}
+@vertex fn vertex(@builtin(vertex_index) v:u32,@location(0) centre:vec4f,@location(1) tint:vec4f,@location(2) extra:vec4f,@location(3) glow:vec4f)->Out {
   let corner=vec2f(f32(v&1u),f32(v>>1u))*2.0-1.0;
   let c=cos(extra.x);let s=sin(extra.x);
-  let r=vec2f(c*corner.x-s*corner.y,s*corner.x+c*corner.y)*(centre.w*0.5);
+  let offset=vec2f(c*corner.x-s*corner.y,s*corner.x+c*corner.y);
+  let r=offset*(centre.w*0.5);
   let world=centre.xyz+frame.right.xyz*r.x+frame.up.xyz*r.y;
   var o:Out;
   o.clip=frame.camera*vec4f(world,1);
@@ -348,8 +393,11 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) col
   let near=select(1.0,smoothstep(0.0,extra.z,distance),extra.z>0.0);
   // Rayleigh phase 3/4 (1 + cos^2) between the view ray and the light (Harris 2002, section 2.1).
   let cosine=select(0.0,dot(toPuff/max(distance,1e-6),frame.light.xyz),distance>0.0);
-  let lit=vec3f(frame.light.w)+frame.lightColor.rgb*(extra.y*0.75*(1.0+cosine*cosine));
-  o.color=vec4f(tint.rgb*select(vec3f(1.0),lit,frame.lightColor.w>0.5),tint.a*near);
+  o.offset=offset;
+  o.back=-toPuff/max(distance,1e-6);
+  o.shade=vec2f(extra.y*0.75*(1.0+cosine*cosine),extra.w);
+  o.glow=glow.rgb;
+  o.color=vec4f(tint.rgb,tint.a*near);
   return o;
 }
 ${
@@ -364,6 +412,18 @@ fn encodeSrgb(c:vec3f)->vec3f {return select(1.055*pow(c,vec3f(1.0/2.4))-0.055,c
   var a=t.a*i.color.a;
   ${samples ? 'a*=contrast(clamp(softGap(i.clip,i.viewDepth),0.0,1.0));' : ''}
   var rgb=i.color.rgb*t.rgb;
+  if (frame.lightColor.w>0.5) {
+    // relief (frame.right.w): the puff as a sphere whose normal follows the quad offset, lit by the half-Lambert
+    // ((n.L + 1) / 2)^2 x 2 (Mitchell, McTaggart and Green 2006) and the sky it faces, from 0.4 below to 1.6 above.
+    let relief=frame.right.w;
+    let n=normalize(frame.right.xyz*i.offset.x+frame.up.xyz*i.offset.y+i.back*sqrt(max(1.0-dot(i.offset,i.offset),0.0)));
+    let h=dot(n,frame.light.xyz)*0.5+0.5;
+    let direct=mix(1.0,2.0*h*h,relief)*i.shade.x;
+    // The puffs above hide the upper half of the sky from a side-facing point, all of it from an upward-facing one.
+    let sky=frame.light.w*mix(1.0,(0.4+0.6*(n.y+1.0))*mix(1.0,i.shade.y,0.5+0.5*max(n.y,0.0)),relief);
+    rgb*=vec3f(sky)+frame.lightColor.rgb*direct;
+  }
+  rgb+=i.glow*t.rgb;
   ${fogged ? 'rgb=mix(rgb,margoFog.color.rgb,fogAmount(i.world));' : ''}
   ${encode ? 'rgb=encodeSrgb(max(rgb,vec3f(0.0)));' : ''}
   return vec4f(rgb*a,a);
@@ -465,6 +525,7 @@ export class Clouds implements EnginePlugin {
     if (range !== Infinity && !Number.isInteger(range)) fail(`Clouds range is ${range}; pass a whole number`);
     number(o.ambient, 0.55, 'Clouds ambient', 0);
     number(o.density, 1, 'Clouds density', 0);
+    number(o.relief, 0, 'Clouds relief', 0, 1);
     const softness = number(o.softness, 0, 'Clouds softness', 0);
     if (softness > 0 && typeof o.depth !== 'function')
       throw new TypeError(
@@ -488,6 +549,7 @@ export class Clouds implements EnginePlugin {
   puffs(): CloudPuff[] {
     const o = this.options,
       density = o.density ?? 1,
+      relief = o.relief ?? 0,
       direction = vector(o.lightDirection, [0.4, 1, 0.3], 'Clouds lightDirection'),
       length = Math.hypot(...direction),
       L = direction.map((x) => x / length),
@@ -503,9 +565,9 @@ export class Clouds implements EnginePlugin {
         opacity = number(c.opacity, 1, 'Cloud opacity', 0, 1),
         rgb = parseColor(c.color ?? [1, 1, 1]) as number[],
         // A puff's size follows the cloud's mean axis scale.
-        scale =
-          (Math.hypot(m[0], m[1], m[2]) + Math.hypot(m[4], m[5], m[6]) + Math.hypot(m[8], m[9], m[10])) / 3,
+        scale = (Math.hypot(m[0], m[1], m[2]) + Math.hypot(m[4], m[5], m[6]) + Math.hypot(m[8], m[9], m[10])) / 3,
         layout = cloud.layout,
+        tints = cloud.tints,
         first = out.length;
       for (let i = 0; i < layout.length; i += 6) {
         const x = layout[i],
@@ -523,27 +585,42 @@ export class Clouds implements EnginePlugin {
           size: layout[i + 3] * scale * (1 + breathe),
           angle: layout[i + 4] + phase * speed * t,
           light: 1,
-          color: [rgb[0], rgb[1], rgb[2], opacity],
+          sky: 1,
+          color:
+            tints.length && !Number.isNaN(tints[i])
+              ? [tints[i], tints[i + 1], tints[i + 2], opacity]
+              : [rgb[0], rgb[1], rgb[2], opacity],
+          emission: tints.length ? [tints[i + 3], tints[i + 4], tints[i + 5]] : [0, 0, 0],
           fade,
         });
       }
       // Light through the cloud: puff j shades puff k when j is nearer the light; the optical depth falls off as a
-      // Gaussian of k's distance from j's light ray, in units of j's radius.
+      // Gaussian of k's distance from j's light ray, in units of j's radius. With relief, the same sum straight up gives
+      // the sky light left under the puffs above (the dark underside of a cap and the stem in its shade). `density` is
+      // the optical depth through a full-size puff, so a puff's depth scales with its width: a small puff's chord is short.
+      const full = (number(c.volume, 6, 'Cloud volume', 0) * scale) / 2;
       for (let k = first; k < out.length; k++) {
         const pk = out[k].centre;
-        let depth = 0;
+        let depth = 0,
+          above = 0;
         for (let j = first; j < out.length; j++) {
           if (j === k) continue;
           const pj = out[j].centre,
-            d = [pj[0] - pk[0], pj[1] - pk[1], pj[2] - pk[2]],
-            along = d[0] * L[0] + d[1] * L[1] + d[2] * L[2];
-          if (along <= 0) continue;
-          const radius = out[j].size / 2;
+            d0 = pj[0] - pk[0],
+            d1 = pj[1] - pk[1],
+            d2 = pj[2] - pk[2],
+            along = d0 * L[0] + d1 * L[1] + d2 * L[2],
+            radius = out[j].size / 2;
           if (!(radius > 0)) continue;
-          const off = d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - along * along;
-          depth += density * Math.exp(-off / (radius * radius));
+          const r2 = d0 * d0 + d1 * d1 + d2 * d2;
+          const tau = density * (full > 0 ? radius / full : 1);
+          if (along > 0) depth += tau * Math.exp(-(r2 - along * along) / (radius * radius));
+          if (relief > 0 && d1 > 0) above += tau * Math.exp(-(r2 - d1 * d1) / (radius * radius));
         }
-        out[k].light = Math.exp(-depth);
+        // With relief, light scattered many times inside the cloud keeps deep puffs from going black: three octaves of
+        // the optical depth, each a quarter of the one before and half its weight (Wrenninge, Kulla and Lundqvist 2013).
+        out[k].light = relief > 0 ? scattered(depth) : Math.exp(-depth);
+        out[k].sky = relief > 0 ? scattered(above) : 1;
       }
     }
     return out;
@@ -611,7 +688,9 @@ export class Clouds implements EnginePlugin {
       d[i * FLOATS + 8] = puff.angle;
       d[i * FLOATS + 9] = puff.light;
       d[i * FLOATS + 10] = puff.fade;
-      d[i * FLOATS + 11] = 0;
+      d[i * FLOATS + 11] = puff.sky;
+      d.set(puff.emission, i * FLOATS + 12);
+      d[i * FLOATS + 15] = 0;
     });
     s.drawn = order.length;
     return order.length;
@@ -667,17 +746,24 @@ export class Clouds implements EnginePlugin {
       u[24 + i] = c.camera.position[i];
       u[28 + i] = light[i] / length;
     }
+    u[19] = o.relief ?? 0;
     u[31] = o.ambient ?? 0.55;
     parseColor(o.lightColor ?? [1, 1, 1], u, 32);
     u[35] = (o.shading ?? 'scatter') === 'scatter' ? 1 : 0;
-    this.uniform ??= device.createBuffer({ size: UNIFORM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform ??= device.createBuffer({
+      size: UNIFORM_FLOATS * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     device.queue.writeBuffer(this.uniform, 0, u as Float32Array<ArrayBuffer>);
     const fog = this.fogSource,
       encode = !c.format.includes('float') && !c.format.endsWith('-srgb');
     if (fog) {
       // Fog mixes in linear light here; the shader encodes the result for an 8-bit target.
       writeFog(fog, c.camera.position, this.fogData);
-      this.fogBuffer ??= device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.fogBuffer ??= device.createBuffer({
+        size: FOG_BYTES,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       device.queue.writeBuffer(this.fogBuffer, 0, this.fogData as Float32Array<ArrayBuffer>);
     }
     const softness = o.softness ?? 0;
@@ -703,7 +789,7 @@ export class Clouds implements EnginePlugin {
             {
               arrayStride: FLOATS * 4,
               stepMode: 'instance',
-              attributes: [0, 1, 2].map((shaderLocation) => ({
+              attributes: [0, 1, 2, 3].map((shaderLocation) => ({
                 shaderLocation,
                 offset: shaderLocation * 16,
                 format: 'float32x4' as const,

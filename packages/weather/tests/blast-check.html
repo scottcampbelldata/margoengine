@@ -30,7 +30,7 @@ async function read(texture){
  await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
 }
 const fire=Clouds.attach(engine,{limit:400,shading:'unlit'});
-const smoke=Clouds.attach(engine,{limit:2000,lightDirection:[-0.3,1,-0.2],lightColor:[1,0.98,0.95],ambient:0.6,density:1.4});
+const smoke=Clouds.attach(engine,{limit:20000,relief:1,lightDirection:[-0.3,1,-0.2],lightColor:[1,0.98,0.95],ambient:0.6,density:0.35});
 const blast=new BlastCloud({sources:[{at:0,tnt:1.6e6,speed:45},{at:2,tnt:5e5,position:[70,0,15],speed:35}],wind:4,windDirection:60,seed:3});
 async function pixels(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
 const count=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-3)n++;return n;};
@@ -41,11 +41,11 @@ window.check={samples:sceneSamples,
  async run(){
   const out={};device.pushErrorScope('validation');
   const bare=await pixels();
-  blast.seek(1);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});const early=await pixels();out.earlyChanged=count(bare,early);
-  blast.seek(30);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});const risen=await pixels();
+  blast.seek(1);blast.draw(smoke,fire,{cap:252,stem:84,fire:20});const early=await pixels();out.earlyChanged=count(bare,early);
+  blast.seek(30);blast.draw(smoke,fire,{cap:252,stem:84,fire:20});const risen=await pixels();
   out.risenChanged=count(bare,risen);out.darker=contrast(bare,risen);out.sameTwice=count(risen,await pixels());
   out.moved=count(early,risen);
-  blast.seek(1);blast.draw(smoke,fire,{cap:60,stem:50,fire:20});out.seekBack=count(early,await pixels());
+  blast.seek(1);blast.draw(smoke,fire,{cap:252,stem:84,fire:20});out.seekBack=count(early,await pixels());
   blast.clear();out.cleared=count(bare,await pixels());
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);

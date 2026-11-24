@@ -18,6 +18,7 @@ export interface BlastCloudOptions {
     sources?: readonly BlastSource[];
     altitude?: number;
     heatShare?: number;
+    fireTemperature?: number;
     entrainment?: number;
     addedMass?: number;
     airTemperature?: number;
@@ -30,6 +31,7 @@ export interface BlastCloudOptions {
     color?: readonly [number, number, number];
     stemColor?: readonly [number, number, number];
     fireColor?: readonly [number, number, number];
+    fireGlow?: number;
     seed?: number;
 }
 
@@ -63,6 +65,10 @@ export interface BlastThermal {
     readonly speed: number;
     readonly buoyancy: number;
     readonly sourceBuoyancy: number;
+    readonly density: number;
+    readonly spread: number;
+    readonly thickness: number;
+    readonly merged: number;
     readonly fire: number;
 }
 

@@ -10,6 +10,7 @@ export class Cloud {
     readonly options: CloudOptions;
     readonly matrix: Float32Array<ArrayBuffer>;
     layout: Float32Array;
+    tints: Float32Array;
     key: string;
     distribute: CloudOptions['distribute'];
     readonly number: number;
@@ -46,6 +47,8 @@ export interface CloudPuff {
     size: number;
     angle: number;
     light: number;
+    sky: number;
+    emission: [number, number, number];
     color: [number, number, number, number];
     fade: number;
 }
@@ -53,6 +56,8 @@ export interface CloudPuff {
 export interface CloudPuffPlacement {
     point: Vec3;
     volume?: number;
+    color?: Vec3;
+    emission?: Vec3;
 }
 
 export type CloudTexture = CloudPixels | ImageData | ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
@@ -89,6 +94,7 @@ export interface CloudsOptions {
     lightColor?: ColorInput;
     ambient?: number;
     density?: number;
+    relief?: number;
     softness?: number;
     depth?: () => GPUTexture | undefined;
 }
@@ -114,7 +120,9 @@ export interface FogLike {
 
 export function defaultPuffTexture(size?: number): CloudPixels;
 
-export function layoutPuffs(segments: number, bounds: Vec3, concentrate: 'inside' | 'outside' | 'random', volume: number, smallestVolume: number, seed: number, distribute?: CloudOptions['distribute']): Float32Array;
+export function layoutPuffs(segments: number, bounds: Vec3, concentrate: 'inside' | 'outside' | 'random', volume: number, smallestVolume: number, seed: number, distribute?: CloudOptions['distribute'], tints?: Float32Array): Float32Array;
+
+export const scattered: (depth: number) => number;
 
 // Not exported from this entry, but used by the exports above:
 

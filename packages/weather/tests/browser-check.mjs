@@ -138,9 +138,10 @@ const checks = {
       r.earlyChanged > 30 && r.risenChanged > r.earlyChanged,
       `the cloud draws and grows: ${r.earlyChanged} then ${r.risenChanged} pixels`,
     );
+    // The Halifax cloud of 1917 (photograph ref_10) is 0.48 of its sky's light, measured on the print in linear light.
     assert.ok(
-      r.darker < 0.5,
-      `the column stands dark against the pale overcast: ${r.darker.toFixed(3)} of the sky's light`,
+      r.darker > 0.28 && r.darker < 0.68,
+      `the column stands grey against the pale overcast, as the Halifax cloud: ${r.darker.toFixed(3)} of the sky's light`,
     );
     assert.ok(r.moved > 100, `it rises: ${r.moved} pixels differ from 1 s to 30 s`);
     assert.equal(r.sameTwice, 0, 'the same frame twice is the same');

@@ -9909,6 +9909,13 @@ page only (props, defaults and behaviour notes), never their source, and no othe
   stand-in for his per-pixel read back.
 - Mark J. Harris and Anselmo Lastra, "Real-Time Cloud Rendering", Computer Graphics Forum 20(3), 2001,
   https://doi.org/10.1111/1467-8659.00500 . Abstract only (paywalled); the GDC paper above restates it.
+- Relief, per-puff colour and glow (2026-11-24): J. Mitchell, M. McTaggart and C. Green, "Shading in Valve's Source
+  Engine", SIGGRAPH 2006 course "Advanced Real-Time Rendering in 3D Graphics and Games" (the half-Lambert
+  ((n.l + 1) / 2)^2, here on each puff's sphere normal); M. Wrenninge, C. Kulla and V. Lundqvist, "Oz: The Great and
+  Volumetric", SIGGRAPH 2013 Talks, https://doi.org/10.1145/2504459.2504518 (multiple scattering as octaves of the
+  optical depth, each scaled down and weighted down; here three octaves, 0.25 and 0.5, a model choice). The sky term
+  (0.4 below to 1.6 above, the puffs above hiding half the sky from a side-facing point) and the per-puff optical
+  depth in proportion to the puff's width (the `density` option's documented meaning) are Margo's model choices.
 - Tristan Lorach, "Soft Particles", NVIDIA whitepaper, January 2007,
   https://developer.download.nvidia.com/whitepapers/2007/SDK10/SoftParticles_hi.pdf . Read in full. Used: fading a
   sprite by the gap between its depth and the scene depth behind it, read with a texel load at the fragment's window
@@ -10973,6 +10980,25 @@ Elsevier, 1983 (cube-root scaling and the TNT heat of detonation). Model choices
 radius tnt^(1/3) m, `heatShare` 0.4, the cap's ring proportions and the base surge's growth. Tests check the laws:
 b - b0 = alpha z and z^2 growing at 2 B / ((1 + k) alpha^3) in uniform air, the stopping height doubling for 16 times
 the buoyancy or a quarter of N, and the ICAO N^2.
+
+Second pass (2026-11-24, judged on film frames against the Halifax 1917 and Sailor Hat photographs). Added sources,
+read as text: F. P. Ricou and D. B. Spalding, J. Fluid Mech. 11, 21-32, 1961, https://doi.org/10.1017/S0022112061000834,
+and B. R. Morton, Symp. (Int.) Combust. 10, 973-982, 1965, https://doi.org/10.1016/S0082-0784(65)80240-5 (entrainment
+of a light flow scaled by (rho / rho_a)^(1/2)); Escudier and Maxworthy 1973 again (a light thermal's momentum is its own
+small mass plus the added mass); T. B. Benjamin, J. Fluid Mech. 31, 209-248, 1968,
+https://doi.org/10.1017/S0022112068000133, and M. Ungarish, An Introduction to Gravity Currents and Intrusions, CRC
+Press, 2009 (an intrusion's front at Fr N h, giving the umbrella R^3 = R_s^3 (1 + 4 Fr N t) for a fixed volume, Fr 0.5
+a model choice); P. D. Kaye and P. F. Linden, J. Fluid Mech. 502, 41-63, 2004 (coalescing plumes, used for merging
+caps once their spheres overlap); A. Bouthors and F. Neyret, "Modeling clouds shape", Eurographics 2004 short papers,
+and F. Neyret, Eurographics Workshop on Animation and Simulation 1997, 113-124 (the cauliflower surface as a hierarchy
+of blobs on their parents' outward side at about half the size; here 1 + 5 + 15 puffs a tree). Measured data the tests
+hold the model to: Glasstone and Dolan 1977, table 2.12 (the 1 Mt cloud top at 2, 4 and 6 miles after 0.3, 0.7 and
+1.1 minutes, read as text from the archive.org transcription; the model, with 0.65 of the yield as heat, is 10 to
+20 percent low), and the Halifax cloud's peak of 3,600 m for about 2.9 kt (Ruffman and Howell, Ground Zero, 1994,
+p. 323, read through its citation, not the book; the model gives 3,465 m at `heatShare` 0.4). Model choices: the
+hot start at `fireTemperature` 2,000 K, the lightest cloud 0.05 of the air's density, the oblate cap of half height
+0.75 b keeping the thermal's top, the merge ramp, the tree's sizes (children 0.42 to 0.58 of the parent, 0.78 and
+0.62 of its radius out), the glow's share by height and level, and the stem's widths.
 
 ## Explosion crater: terrain/ground-change 'crater' event (2026-11-24)
 

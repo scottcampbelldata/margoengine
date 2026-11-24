@@ -373,13 +373,20 @@ Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume`
 
 `BlastCloud` from `margoengine/weather/eruption` is the mushroom cloud of one or more instantaneous releases (an
 ammunition dump, a quarry blast, a buried charge) over film time. Each source is a buoyant thermal (Morton, Taylor and
-Turner 1956): the heat it puts into the air makes a cloud that rises, spreads as b = alpha z (Scorer 1957, alpha 0.25),
-carries the ambient air it pushes aside (Escudier and Maxworthy 1973) and slows in the stable standard atmosphere until
-it stops at a height that scales as B^(1/4) N^(-1/2). Its cap is a dark vortex ring (Turner 1957) over a stem of
-thrown earth and a base surge, with a fire at its base for `fireDuration` seconds. `draw(clouds, fire)` lays every
-source's caps in one cloud and stems in another of a `Clouds` from `margoengine/vfx/clouds`, so the caps shadow each
-other; attach the fire's `Clouds` (`shading: 'unlit'`) first so the smoke draws over it. `thermals(t)` gives each cap's
-centre, radius, speed and buoyancy. `seek` to any time gives the same cloud however it got there.
+Turner 1956): the heat it puts into the air makes a hot, light cloud that accelerates hard (its momentum is its own
+small mass plus the air it pushes aside, Escudier and Maxworthy 1973; it entrains at (rho / rho_a)^(1/2) of the cool
+rate, Ricou and Spalding 1961), then spreads as b = alpha z (Scorer 1957, alpha 0.25) and slows in the stable standard
+atmosphere until it stops at a height that scales as B^(1/4) N^(-1/2), where its cap spreads sideways into an umbrella
+(an intrusion, Benjamin 1968). Caps that overlap merge into one (Kaye and Linden 2004). The rise is held to measured
+clouds: the Halifax cloud of 1917 (about 2.9 kt, peak measured at 3,600 m; the model gives 3,465 m) and the 1 Mt cloud
+of Glasstone and Dolan's table 2.12 (the model 10 to 20 percent low in the first minute). The cap and stem are
+cauliflower heaps of puffs at three scales (Bouthors and Neyret 2004), each puff coloured, with the fire glowing inside
+the base of the cap and the stem while it burns. `draw(clouds, fire?)` lays every source's cap, stem and base surge in
+one cloud of a `Clouds` from `margoengine/vfx/clouds`, so the cap shades its own underside and the stem; give that
+Clouds `relief: 1` and a `density` near 0.35 so each puff shades as a rounded lobe. An optional second `Clouds`
+(`shading: 'unlit'`, attached first) takes small fire puffs at the base. `thermals(t)` gives each cap's centre,
+radius, spread, thickness, speed, buoyancy, density and merge. `seek` to any time gives the same cloud however it got
+there.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -400,22 +407,24 @@ const blast = new BlastCloud({
   windDirection: 60,
 });
 const fire = Clouds.attach(engine, { limit: 400, shading: 'unlit' });
-const smoke = Clouds.attach(engine, { limit: 2000, lightDirection: [-0.3, 1, -0.2], ambient: 0.6, density: 1.4 });
+const smoke = Clouds.attach(engine, { limit: 8000, relief: 1, lightDirection: [-0.3, 1, -0.2], ambient: 0.6, density: 0.35 });
 engine.onFrame((_, delta) => {
   blast.update(delta);
   blast.draw(smoke, fire);
 });
 blast.seek(30);
 const [first] = blast.thermals();
-console.log(first.height, first.radius); // about 700 m up, 300 m across the cap
+console.log(first.height, first.radius); // about 730 m up, a cap radius near 320 m
 ```
 
 Options (every one optional): `sources` (1 to 8 of `{ at, position, tnt, radius, speed }`; `radius` defaults to
 tnt^(1/3) m, `speed` to 0), `altitude` (0), `heatShare` (0.4 of the charge's energy heats the air), `entrainment`
-(0.25), `addedMass` (0.5), `airTemperature` (288.15 K), `tropopause` (11,000 m), `stability` (null follows the ICAO
+(0.25), `addedMass` (0.5), `fireTemperature` (2,000 K, the hot start's temperature), `airTemperature` (288.15 K), `tropopause` (11,000 m), `stability` (null follows the ICAO
 atmosphere; a value holds N^2), `wind` (0 m/s at 10 m) and `windDirection` (0 degrees, toward +Z), `horizon` (900 s
-solved), `fireDuration` (4 s), `color` (near-black smoke), `stemColor` (dark brown earth), `fireColor` and `seed`.
-`draw`'s third argument sets the puff counts (`cap` 220, `stem` 160, `fire` 60 per source). `airStability(z)` and
+solved), `fireDuration` (4 s), `fireGlow` (6, the glow's brightness inside the smoke), `color` (smoke grey),
+`stemColor` (earth brown), `fireColor` and `seed`. `draw`'s third argument sets the puff counts (`cap` 1,260, `stem`
+504, `fire` 60 per source); the cloud's light is summed over every pair of puffs on the CPU, so 3,500 puffs cost
+about 0.1 s a frame. `airStability(z)` and
 `thermalTop(B, N2)` are exported too.
 
 ## Lava flows, fountains and bombs

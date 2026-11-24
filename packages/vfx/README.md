@@ -1207,14 +1207,19 @@ console.log(clouds.clouds.length); // 2
   image; default a generated soft, lumpy puff, filtered with mips), `frustumCulled` (true: puffs wholly outside the
   view are skipped), `shading` (`'scatter'` default, `'unlit'` draws the colour as it is), `lightDirection` (toward the
   light, default [0.4, 1, 0.3]), `lightColor` (white), `ambient` (0.55), `density` (1, the optical depth through a
-  full-size puff for the light behind it), `softness` (0; world units over which a puff fades into the surface behind
+  full-size puff for the light behind it; a smaller puff shades in proportion to its width), `relief` (0; up to 1 each
+  puff is shaded as a rounded lobe: the half-Lambert of its sphere normal for the direct light, the sky it faces and
+  the sky light left under the puffs above it for the ambient, and three octaves of multiple scattering through the
+  cloud, so a heap of puffs reads as a cauliflower cloud with lit tops and dark undersides), `softness` (0; world units over which a puff fades into the surface behind
   it) with `depth` (the scene depth, `() => depthTexture.texture` with `DepthTexture` from
   `@margoengine/post/depth`). `setFog(fog)` fogs the puffs with an `@margoengine/environment` `Fog`.
 - A cloud (`clouds.add(options)`, options read every frame; `cloud.matrix` is its world matrix, `cloud.remove()` takes
   it out): `seed` (default its number in its Clouds), `segments` (20 puffs), `bounds` ([5, 1, 1], the box the centres
   lie in), `concentrate` (`'inside'` makes puffs smaller toward the box edge, `'outside'` larger, `'random'`),
   `volume` (6, the width of a full-size puff), `smallestVolume` (0.25 of `volume`), `distribute(index, random)`
-  (return `{point, volume}` in -1..1 box units to place each puff yourself), `speed` (0; puffs turn at up to `speed`
+  (return `{point, volume}` in -1..1 box units to place each puff yourself, plus optional `color`, linear RGB in place
+  of the cloud's, and `emission`, linear RGB light the puff gives off, added after the lighting, for a fire glowing
+  inside smoke; `clouds.puffs()` reports each puff's `light`, `sky` and `emission`), `speed` (0; puffs turn at up to `speed`
   radians a second and breathe), `growth` (4: a puff breathes by up to 1 / growth of its size), `fade` (10: a puff
   closer to the camera than this fades out, to nothing at the camera), `opacity` (1) and `color` (white). Puff sizes
   follow the matrix scale.

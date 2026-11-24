@@ -378,6 +378,7 @@ class Cloud {
     readonly options: CloudOptions;
     readonly matrix: Float32Array<ArrayBuffer>;
     layout: Float32Array;
+    tints: Float32Array;
     key: string;
     distribute: CloudOptions['distribute'];
     readonly number: number;
@@ -414,6 +415,8 @@ interface CloudPuff {
     size: number;
     angle: number;
     light: number;
+    sky: number;
+    emission: [number, number, number];
     color: [number, number, number, number];
     fade: number;
 }
@@ -421,6 +424,8 @@ interface CloudPuff {
 interface CloudPuffPlacement {
     point: Vec3;
     volume?: number;
+    color?: Vec3;
+    emission?: Vec3;
 }
 
 type CloudTexture = CloudPixels | ImageData | ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
@@ -457,6 +462,7 @@ interface CloudsOptions {
     lightColor?: ColorInput;
     ambient?: number;
     density?: number;
+    relief?: number;
     softness?: number;
     depth?: () => GPUTexture | undefined;
 }
