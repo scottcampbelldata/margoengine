@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17635227,
+  "total": 17668746,
   "history": [
     {
       "date": "2026-10-24",
@@ -11475,6 +11475,12 @@
       "commit": "FG-04",
       "reason": "FG-04 new optional entry water/breaking, 3,538 B gzip: breaking fronts of a flood frame, the overturning crest mesh and BreakingWaveMaterial (FG-12 face, FG-13 sediment); the materials and gltf/pbr-model edges are the WgslMaterial the material extends, as water/ice's IceMaterial",
       "grew": 3
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "3c5e4de0b6",
+      "reason": "new @margoengine/environment/main entry (KB-REACT-ENVDECODERS1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -11801,6 +11807,7 @@
     "@margoengine/environment/gi": 19467,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/lightformer": 4556,
+    "@margoengine/environment/main": 33519,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,
     "@margoengine/environment/reflector": 12251,
