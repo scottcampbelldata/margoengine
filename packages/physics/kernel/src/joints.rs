@@ -1080,10 +1080,15 @@ impl World {
             let view = self.view(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
             let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            // A rotation drive's motors push along the target's axes, not along the rows the joint's own limits use.
+            let (mut rows, mut at) = (view.rows, view.at);
+            if column == JOINT_MOTOR_0 && self.uu(JOINT_FLAGS, row) & JOINT_DRIVE != 0 {
+                self.drive_rows(row, a, b, &mut rows, &mut at);
+            }
             for k in 0..6 {
                 let impulse = self.s(column + k, row);
                 if impulse != 0.0 {
-                    view.rows[k].push(&mut body_a, &mut body_b, impulse);
+                    rows[k].push(&mut body_a, &mut body_b, impulse);
                 }
             }
             self.settle(a, &body_a);

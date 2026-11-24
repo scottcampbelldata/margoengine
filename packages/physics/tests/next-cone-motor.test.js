@@ -31,6 +31,7 @@ const swingOf = ([x, , z]) => {
   const ay = 1 - 2 * (x * x + z * z);
   return Math.acos(Math.max(-1, Math.min(1, -ay)) * -1);
 };
+const near = (a, e, t, label) => assert.ok(Math.abs(a - e) <= t, `${label}: ${a} is not within ${t} of ${e}`);
 const twistOf = ([, y, , w]) => 2 * Math.atan2(y, w);
 const gains = { stiffness: 400, damping: 40 };
 const run = (physics, steps) => {
@@ -101,4 +102,24 @@ test('a driven cone replays bit for bit', async () => {
     return h;
   };
   assert.equal(hash(), hash());
+});
+
+test('a driven cone holds a swing against gravity with its anchor where it was: the motor pushes along its own rows, not the cone\'s', async () => {
+  await Physics.load();
+  const physics = new Physics(null);
+  const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    body = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
+    joint = physics.addJoint(top, body, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
+  joint.setRotationMotor(about([0, 0, 1], 0.3), { model: 'force', stiffness: 40, damping: 4 });
+  let stray = 0;
+  for (let i = 0; i < 360; i++) {
+    physics.step();
+    // The rod's top end is the pivot; its centre stays half a metre from it.
+    stray = Math.max(stray, Math.abs(Math.hypot(...body.position) - 0.5));
+  }
+  assert.ok(stray < 1e-3, `the pivot of the rod strayed ${stray} m`);
+  assert.ok(Math.hypot(...body.linearVelocity) < 1e-2, 'at rest');
+  // Spring 40 N m/rad against the weight's torque 0.1 kg x 9.81 x 0.5 m x sin(angle): about 0.296 rad.
+  near(swingOf(body.rotation), 0.296, 0.01, 'swing');
+  physics.dispose();
 });
