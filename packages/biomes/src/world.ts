@@ -398,6 +398,13 @@ export class BiomeWorld implements Disposable {
     return this.#region;
   }
 
+  /** The widest paint blend in metres: the world's `ecotone` or a paint layer's own, whichever is wider. */
+  get paintEcotone(): number {
+    let m = this.ecotone;
+    for (const p of this.#paint) if (p.ecotone !== undefined) m = Math.max(m, p.ecotone);
+    return m;
+  }
+
   /** The paint layers in composition order. */
   get paint(): readonly PaintLayer[] {
     return this.#paint;
@@ -697,6 +704,8 @@ export class BiomeWorld implements Disposable {
           rows + 2 * margin,
         ),
       ecotone,
+      // Each paint layer's own feather (PaintLayer.ecotone), in classifier order; the world's where it gives none.
+      feathers: this.#paint.map((p) => (p.ecotone === undefined ? ecotone : featherCells(p.ecotone, this.resolution))),
     };
   }
 
@@ -739,7 +748,7 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(writes)) throw typeError('BiomeWorld writeLayers takes an array of layer writes', 'biomes');
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: exact
       t = this.tileSize,
-      r = this.resolution * paintReach(this.ecotone, this.resolution),
+      r = this.resolution * paintReach(this.paintEcotone, this.resolution),
       [bx0, bz0, bx1, bz1] = this.bounds;
     for (const w of writes) {
       const paint = /^paint\/([a-z0-9][a-z0-9-]*)$/.exec(w?.name);

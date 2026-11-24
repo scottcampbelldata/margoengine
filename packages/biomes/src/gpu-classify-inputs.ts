@@ -10,7 +10,7 @@
 // Claim: bytes equal classify() within this domain, given classifyWarpGPU equals warpPlanes.
 // No ecology, default-backend or performance claim. Internal opt-in only; no public export.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { classifyPlanes, type Classifier, type ClassifyInput, type ClassifyPlanes } from './classify.js';
+import { classifyPlanes, widestFeather, type Classifier, type ClassifyInput, type ClassifyPlanes } from './classify.js';
 import { warpLattice } from './classify-warp.js';
 import { classifyWarpGPU } from './gpu-classify-warp.js';
 
@@ -156,6 +156,8 @@ function prepare(device: GPUDevice, c: Classifier, input: ClassifyInput) {
     throw rangeError('Supply an integer seed and a positive safe integer cell size in mm', 'biomes');
   if (input.ecotone !== undefined && (!Number.isSafeInteger(input.ecotone) || input.ecotone < 0))
     throw rangeError('Supply a nonnegative integer ecotone half width in cells', 'biomes');
+  if (input.feathers !== undefined && !input.feathers.every((f) => Number.isSafeInteger(f) && f >= 0))
+    throw rangeError('Supply nonnegative integer paint feather half widths in cells', 'biomes');
   const cells = n * depth,
     slots = c.inputs.length,
     count = c.ids.length,
@@ -250,7 +252,7 @@ function prepare(device: GPUDevice, c: Classifier, input: ClassifyInput) {
     sizes,
     packed,
     table,
-    feathered: !!input.ecotone && !!c.paint.length,
+    feathered: !!widestFeather(input) && !!c.paint.length,
   };
 }
 

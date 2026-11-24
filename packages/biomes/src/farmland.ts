@@ -863,11 +863,14 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
       details: [{ id: 'fern', mesh: 'library:fern', density: 6, light: [0, 0.6] }],
     } as BiomeDefinition),
     // Hedgerows (painted along the hedges by farmlandEdits): hawthorn and blackthorn shrubs about 1.2 m apart, the
-    // hedgerow oaks and ashes of the Staffordshire claylands about 12 and 6 a kilometre, holly the one evergreen.
+    // hedgerow oaks and ashes of the Staffordshire claylands about 12 and 6 a kilometre, holly the one evergreen. The
+    // ground under a hedge is its own fallen leaves and bare soil, shaded all year (G. Barr et al., "Countryside Survey
+    // 2000 Module 7: Hedgerow Survey", 2003; Defra "Hedgerow Survey Handbook", 2nd ed., 2007: the hedge base), so the
+    // strip reads as a dark line from the air where the view draws no shrubs.
     Object.freeze({
       id: 'hedgerow',
       climate: { height: NEVER },
-      ground: [{ material: 'rough-meadow' }, { material: 'mud', moisture: [0.85, null] }],
+      ground: [{ material: 'leaf-litter' }, { material: 'mud', moisture: [0.85, null] }],
       plants: [
         { id: 'hawthorn', mesh: 'library:hawthorn', density: 2600, radius: 0.8, shade: 0.5 },
         { id: 'blackthorn', mesh: 'library:blackthorn', density: 900, radius: 0.8, shade: 0.4 },
@@ -889,9 +892,17 @@ export const lowlandFarmWorld: PresetWorld & { readonly biomes: readonly BiomeDe
   ]),
 });
 
-/** The paint layers of the farm biomes, for `BiomeWorld.create({ paint })`. */
+/**
+ * Blend widths, metres, of the narrow painted features. A hedge (about 3 m) or a lane painted into the world's default
+ * 24 m blend is spread over it: the 3 m hedge strip peaked at about an eighth of its weight, so its hawthorn and
+ * blackthorn thinned to a few bushes, its hedge trees stood loose in the pasture either side, and its ground never
+ * showed from the air (Fauld recut round 3). Field and wood edges keep the world's blend.
+ */
+export const FARMLAND_EDGES: Readonly<Record<string, number>> = Object.freeze({ hedgerow: 1, 'farm-lane': 2 });
+
+/** The paint layers of the farm biomes, for `BiomeWorld.create({ paint })`: hedges and lanes with their own blend. */
 export const FARMLAND_PAINT = Object.freeze(
   ['pasture', 'plough', 'stubble', 'meadow', 'farm-lane', 'farm-wood', 'hedgerow'].map((biome) =>
-    Object.freeze({ biome }),
+    Object.freeze(FARMLAND_EDGES[biome] === undefined ? { biome } : { biome, ecotone: FARMLAND_EDGES[biome] }),
   ),
 );

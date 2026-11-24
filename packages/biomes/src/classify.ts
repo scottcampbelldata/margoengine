@@ -17,6 +17,12 @@ export interface PaintLayer {
   /** Default `'replace'`. */
   readonly mode?: PaintMode;
   readonly mask?: string;
+  /**
+   * Metres over which this layer's painted edge blends, 0..128; default the world's `ecotone`. A feature narrower than
+   * the blend (a 3 m hedge, a lane) is otherwise spread over it and diluted: a 3 m strip in the default 24 m blend
+   * peaks at about an eighth of its weight, so its plants thin out and its ground never shows.
+   */
+  readonly ecotone?: number;
 }
 
 /**
@@ -163,7 +169,8 @@ export function checkPaint(paint: readonly PaintLayer[], ids: readonly string[])
         p &&
         ids.includes(p.biome) &&
         (p.mode === undefined || MODES.includes(p.mode)) &&
-        (p.mask === undefined || (typeof p.mask === 'string' && p.mask.length > 0)),
+        (p.mask === undefined || (typeof p.mask === 'string' && p.mask.length > 0)) &&
+        (p.ecotone === undefined || (Number.isFinite(p.ecotone) && p.ecotone >= 0 && p.ecotone <= 128)),
     )
   );
 }
@@ -248,6 +255,11 @@ export interface ClassifyInput {
    * are then read with a margin of twice this.
    */
   readonly ecotone?: number;
+  /**
+   * Half width in cells of each paint layer's own feather, in the classifier's paint order (`PaintLayer.ecotone`);
+   * a layer without one takes `ecotone`. The paint grids are read with a margin of twice the widest.
+   */
+  readonly feathers?: readonly number[];
   /** Global cell of grid cell (0, 0). */
   readonly gx: number;
   readonly gz: number;
@@ -299,7 +311,7 @@ export function classifyInputs(c: Classifier, input: ClassifyInput): ClassifyPla
     warped = scratch(1, slots * cells),
     dT = scratch(2, cells),
     n2 = scratch(3, cells),
-    feather = input.ecotone ?? 0,
+    feather = widestFeather(input),
     // The x warp noise, kept per cell only when paint is feathered (it moves where the paint is read).
     n1s = feather && c.paint.length ? scratch(6, cells) : undefined;
   warpPlanes(
@@ -358,7 +370,8 @@ export function classifyPlanes(
     cells = n * depth,
     { rank, envelopes } = c,
     { warped, member, n2, n1s } = planes,
-    feather = input.ecotone ?? 0;
+    feather = input.ecotone ?? 0,
+    featherOf = (q: number) => input.feathers?.[q] ?? feather;
   // The biomes with any weight in this frame, in biome order: the planes of the others are all 0, and stay out of the sums.
   const live = new Int32Array(count);
   let liveCount = 0;
@@ -405,14 +418,14 @@ export function classifyPlanes(
     order = new Int32Array(4),
     paint = c.paint,
     feathered = new Map<string, Int32Array | undefined>(),
-    read = (name: string, neutral: number) => {
+    read = (name: string, neutral: number, h: number) => {
       if (!n1s) return input.user(name);
-      const key = `${neutral}:${name}`;
-      if (!feathered.has(key)) feathered.set(key, featherPaint(input, name, neutral, feather, n1s, n2));
+      const key = `${neutral}:${h}:${name}`;
+      if (!feathered.has(key)) feathered.set(key, featherPaint(input, name, neutral, h, n1s, n2));
       return feathered.get(key);
     },
-    paintGrid = paint.map((p) => (p.biome < 0 ? undefined : read(p.layer, p.mode === 2 ? 255 : 0))),
-    maskGrid = paint.map((p) => (p.mask ? read(p.mask, 0) : undefined));
+    paintGrid = paint.map((p, q) => (p.biome < 0 ? undefined : read(p.layer, p.mode === 2 ? 255 : 0, featherOf(q)))),
+    maskGrid = paint.map((p, q) => (p.mask ? read(p.mask, 0, featherOf(q)) : undefined));
   let stale = false;
   for (let j = 0; j < innerRows; j++)
     for (let i = 0; i < inner; i++) {
@@ -540,6 +553,13 @@ export function classifyPlanes(
         weights[out + s] = live ? share[order[s]] : 0;
       }
     }
+}
+
+/** The widest paint feather of a classification input, in cells: the world's and every layer's own. */
+export function widestFeather(input: Pick<ClassifyInput, 'ecotone' | 'feathers'>): number {
+  let h = input.ecotone ?? 0;
+  for (const f of input.feathers ?? []) h = Math.max(h, f);
+  return h;
 }
 
 /**

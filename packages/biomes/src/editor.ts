@@ -301,12 +301,12 @@ export class BiomeEditor implements Disposable {
 
   /**
    * How far beyond its brushed cells an edit can change the world, in metres: what classification reads across (one
-   * cell for the blur, or the paint feather of the world's `ecotone`) plus, for placement, 6 rounds of 2 x the largest
+   * cell for the blur, or the widest paint feather: the world's `ecotone` or a layer's own) plus, for placement, 6 rounds of 2 x the largest
    * species radius and the widest cluster spread.
    */
   margin(): number {
     const w = this.#world;
-    return w.resolution * paintReach(w.ecotone, w.resolution) + placementReach(w.biomes, ROUNDS);
+    return w.resolution * paintReach(w.paintEcotone, w.resolution) + placementReach(w.biomes, ROUNDS);
   }
 
   /** Every applied edit, then each new one as it is made, until the editor is disposed. */

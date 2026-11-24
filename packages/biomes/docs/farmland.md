@@ -31,6 +31,10 @@ paints every hedge as a strip of the `hedgerow` biome (its gates left open), who
 about 1.2 m apart, hedgerow oaks and ashes (about 12 and 6 a kilometre) and holly, the one evergreen: give the view's
 `meshes` the keys `library:hawthorn`, `library:blackthorn`, `library:oak`, `library:ash` and `library:holly`, and the
 hedges draw with the rest of the plants, LOD rings and far impostors included, at any distance the view draws plants.
+`FARMLAND_PAINT` gives the hedgerow and lane layers their own narrow blend (`FARMLAND_EDGES`: 1 m and 2 m), so a 2 m
+hedge keeps its full weight on its line and none 8 m off it instead of a thin smear across the world's 24 m blend; the
+hedge's ground is leaf litter and bare soil, the dark line it draws from the air. Shrubs (hawthorn, blackthorn, hazel,
+holly) draw within the view's 300 m small-plant radius; beyond it the hedge reads by its trees and that dark strip.
 `farm.trees` still lists hedge tree spots for a scene that places its own field trees.
 
 ## How it is laid out

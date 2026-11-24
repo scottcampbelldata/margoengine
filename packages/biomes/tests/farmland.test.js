@@ -290,3 +290,60 @@ test('the polygon edit paints exactly the cells whose corner is inside, and farm
     w.dispose();
   }
 });
+
+// Fauld recut round 3: a 2 m hedge painted into the world's 24 m blend peaked at about an eighth of its weight, so its
+// shrubs thinned out, its hedge trees stood loose in the pasture and its ground never showed from the air. The hedgerow
+// and lane paint layers now blend over their own width (PaintLayer.ecotone, FARMLAND_EDGES).
+test('a hedge keeps its width: hedgerow paint blends over its own metre, not the world 24 m', async () => {
+  const weightOnHedge = async (paint) => {
+    const w = await BiomeWorld.create({
+      seed: 5,
+      size: [256, 256],
+      climate: lowlandFarmWorld.climate,
+      biomes: lowlandFarmWorld.biomes,
+      paint,
+    });
+    try {
+      assert.equal(w.ecotone, 24);
+      BiomeEditor.attach(w).apply({
+        kind: 'path',
+        layer: 'paint/hedgerow',
+        path: {
+          points: [
+            [-100, 0.5],
+            [100, 0.5],
+          ],
+          width: 2,
+          edge: 0.5,
+        },
+        strength: 1,
+        mode: 'set',
+        falloff: 'constant',
+      });
+      for (let tz = 0; tz < w.tilesZ; tz++) for (let tx = 0; tx < w.tilesX; tx++) await w.tile(tx, tz);
+      const at = (z) => {
+        const s = w.sample(10, z),
+          i = s.biomes.indexOf('hedgerow');
+        return i < 0 ? 0 : s.weights[i];
+      };
+      return { centre: at(0.5), side: at(8.5) };
+    } finally {
+      w.dispose();
+    }
+  };
+  const own = await weightOnHedge(FARMLAND_PAINT),
+    shared = await weightOnHedge(FARMLAND_PAINT.map((p) => ({ biome: p.biome })));
+  assert.ok(FARMLAND_PAINT.find((p) => p.biome === 'hedgerow')?.ecotone <= 2, 'the hedgerow layer has its own blend');
+  assert.ok(own.centre > 0.9, `own blend: hedgerow ${own.centre} on the hedge`);
+  assert.equal(own.side, 0, 'own blend: no hedgerow 8 m off the hedge');
+  assert.ok(shared.centre < 0.35, `the world blend dilutes it: ${shared.centre}`);
+  assert.ok(shared.side > 0, `the world blend spreads it 8 m out: ${shared.side}`);
+  // The hedge base is shaded leaf litter, dark from the air.
+  assert.equal(lowlandFarmWorld.biomes.find((b) => b.id === 'hedgerow').ground[0].material, 'leaf-litter');
+  // A layer's own blend is checked like the world's.
+  for (const ecotone of [-1, 129, NaN])
+    await assert.rejects(
+      BiomeWorld.create({ size: [256, 256], biomes: lowlandFarmWorld.biomes, paint: [{ biome: 'hedgerow', ecotone }] }),
+      RangeError,
+    );
+});

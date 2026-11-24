@@ -69,7 +69,10 @@ through a mask: `world.update({ paint: [{ biome: 'desert', mode: 'replace', mask
 recomputes that tile and its neighbours and calls the `onChange` listeners. Painted edges blend over the world's
 `ecotone` (default 24 m): each cell reads the paint at the cell the climate warp moves it to, through a box that wide,
 so a constant dab ramps from full strength to nothing across about 24 m and its border wanders by several metres like
-the generated ecotones (`BiomeWorld.create({ ecotone: 0 })` keeps the old one-cell step). Stored plants follow the
+the generated ecotones (`BiomeWorld.create({ ecotone: 0 })` keeps the old one-cell step). A paint layer may set its own
+blend, `{ biome: 'hedgerow', ecotone: 1 }` (metres, 0 to 128): a feature narrower than the world's blend, a hedge or a
+lane, would otherwise be spread over it and diluted (a 2 m strip peaks near an eighth of its weight in a 24 m blend).
+`world.paintEcotone` is the widest of them, the reach an edit's dirty rectangle grows by. Stored plants follow the
 blended weights, so a forest thins across the band. `readLayer` returns a copy. Stored plants
 thin with the painted share: none of a replaced biome stand where its paint reaches 255, and where half is painted a
 dense stand keeps somewhat more than half, because fewer seedlings meet fewer neighbours (a temperate forest keeps 75
