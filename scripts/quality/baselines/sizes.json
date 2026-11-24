@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17558792,
+  "total": 17566014,
   "history": [
     {
       "date": "2026-10-24",
@@ -11403,6 +11403,12 @@
       "commit": "20322dcbd6",
       "reason": "FG-08 spray and debris emitters (floodEmitters, floodBirths) in water/flood-bake, 2,766 to 3,729 B; renderer outputs of a flood frame belong with the bake, and a new entry would repeat its reading checks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "9aedbb75b",
+      "reason": "soft entry gains shape matching (Mueller 2005/2016) and the trimesh builder: entry 14,233 to 17,856 B gzip, lazy kernel chunk 6,777 to 9,552 B (rotation extraction and the per-body matching pass), loader and builders 6,698 to 7,382 B. Rapier's trimesh holds its shape by shape matching, so it is needed for parity; a split would repeat the loader.",
+      "grew": 3
     }
   ],
   "items": {
@@ -12162,9 +12168,9 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 53176,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 198774,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/soft": 14660,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 6954,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 7033,
+    "@margoengine/physics/soft": 18392,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 7638,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 9839,
     "@margoengine/physics2d": 18716,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

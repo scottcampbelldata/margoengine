@@ -91,6 +91,25 @@ pub struct World {
     pub colliders: usize,
     /// Edges that tore in the last step.
     pub torn: u32,
+    // Shape matching (src/shape.rs). Per particle: the offset from the body's rest centre, the multipliers of the three axes
+    // and the mass that weights the centre. Per body: on or off, the spring, the first particle and how many, and the
+    // rotation kept from the last pass.
+    pub rx: Col<f32>,
+    pub ry: Col<f32>,
+    pub rz: Col<f32>,
+    pub slx: Col<f32>,
+    pub sly: Col<f32>,
+    pub slz: Col<f32>,
+    pub sw: Col<f32>,
+    pub b_on: Col<u32>,
+    pub b_omega: Col<f32>,
+    pub b_zeta: Col<f32>,
+    pub b_first: Col<u32>,
+    pub b_count: Col<u32>,
+    pub bqx: Col<f32>,
+    pub bqy: Col<f32>,
+    pub bqz: Col<f32>,
+    pub bqw: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -110,6 +129,15 @@ impl World {
         ] {
             grow(v, particles);
         }
+        for v in [&mut self.rx, &mut self.ry, &mut self.rz, &mut self.slx, &mut self.sly, &mut self.slz, &mut self.sw] {
+            grow(v, particles);
+        }
+        for v in [&mut self.b_omega, &mut self.b_zeta, &mut self.bqx, &mut self.bqy, &mut self.bqz, &mut self.bqw] {
+            grow(v, bodies);
+        }
+        grow(&mut self.b_on, bodies);
+        grow(&mut self.b_first, bodies);
+        grow(&mut self.b_count, bodies);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
         for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
@@ -188,10 +216,12 @@ impl World {
         for e in 0..self.edges {
             self.lambda[e] = 0.0;
         }
+        self.shape_begin();
         for _ in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
             }
+            self.solve_shape(h);
         }
         for i in 0..self.particles {
             self.contact(i, h);

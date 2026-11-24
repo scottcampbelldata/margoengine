@@ -12,7 +12,9 @@ static mut WORLD: World = World {
     lvx: Col::new(), lvy: Col::new(), lvz: Col::new(), avx: Col::new(), avy: Col::new(), avz: Col::new(), mx: Col::new(),
     my: Col::new(), mz: Col::new(), jx: Col::new(), jy: Col::new(), jz: Col::new(), kx: Col::new(), ky: Col::new(),
     kz: Col::new(), wm: Col::new(), iixx: Col::new(), iixy: Col::new(), iixz: Col::new(), iiyy: Col::new(),
-    iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0,
+    iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0, rx: Col::new(), ry: Col::new(), rz: Col::new(), slx: Col::new(), sly: Col::new(),
+    slz: Col::new(), sw: Col::new(), b_on: Col::new(), b_omega: Col::new(), b_zeta: Col::new(), b_first: Col::new(),
+    b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -38,6 +40,7 @@ columns! {
     ea, eb, rest, omega, zeta, lambda, tear, eflags, gravity_scale, linear_damping,
     c_kind, cx, cy, cz, qx, qy, qz, qw, sx, sy, sz, friction, lvx, lvy, lvz, avx, avy, avz, mx, my, mz,
     jx, jy, jz, kx, ky, kz, wm, iixx, iixy, iixz, iiyy, iiyz, iizz,
+    rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

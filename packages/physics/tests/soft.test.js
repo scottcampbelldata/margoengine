@@ -229,3 +229,81 @@ test('forces, impulses and the material act as documented', async () => {
   assert.throws(() => new SoftBodyDesc([0, 0, 0]).setPinnedParticles([3]), RangeError);
   void physics;
 });
+
+// A unit cube of eight vertices and twelve triangles.
+const cubeMesh = () => {
+  const vertices = [];
+  for (const z of [-0.5, 0.5]) for (const y of [-0.5, 0.5]) for (const x of [-0.5, 0.5]) vertices.push(x, y, z);
+  const q = (a, b, c, d) => [a, b, c, a, c, d];
+  const indices = [
+    ...q(0, 2, 3, 1),
+    ...q(4, 5, 7, 6),
+    ...q(0, 1, 5, 4),
+    ...q(2, 6, 7, 3),
+    ...q(0, 4, 6, 2),
+    ...q(1, 3, 7, 5),
+  ];
+  return { vertices, indices };
+};
+const pairSpread = (positions, rest) => {
+  let worst = 0;
+  const n = rest.length / 3;
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++) {
+      const was = Math.hypot(
+        rest[i * 3] - rest[j * 3],
+        rest[i * 3 + 1] - rest[j * 3 + 1],
+        rest[i * 3 + 2] - rest[j * 3 + 2],
+      );
+      const now = Math.hypot(
+        positions[i * 3] - positions[j * 3],
+        positions[i * 3 + 1] - positions[j * 3 + 1],
+        positions[i * 3 + 2] - positions[j * 3 + 2],
+      );
+      worst = Math.max(worst, Math.abs(now - was));
+    }
+  return worst;
+};
+
+test('a trimesh keeps its edges, bend edges and triangles, and holds its shape as it lands', async () => {
+  const { physics, soft } = await create();
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+  });
+  const { vertices, indices } = cubeMesh();
+  const desc = SoftBodyDesc.trimesh(vertices, indices).setParticleRadius(0.05).setTranslation([0, 2, 0.1]);
+  const cube = soft.create(desc);
+  assert.equal(cube.edges().length / 2, 18);
+  assert.ok(cube.bendEdges().length > 0);
+  assert.deepEqual([...cube.triangles()], indices);
+  // Tumble it as it falls: give two corners a push.
+  cube.applyParticleImpulse(0, [0, 0, 1.5]);
+  cube.applyParticleImpulse(7, [1.5, 0, 0]);
+  steps(physics, 300);
+  const p = cube.particlePositions();
+  assert.ok(pairSpread(p, vertices) < 0.03, `the cube drifts by ${pairSpread(p, vertices)}`);
+  let low = Infinity;
+  for (let i = 0; i < 8; i++) low = Math.min(low, p[i * 3 + 1]);
+  near(low, 0.05, 0.04, 'a corner rests on the floor');
+});
+
+test('softening shape matching lets a trimesh sag and spring back', async () => {
+  const { physics, soft } = await create({ gravity: [0, 0, 0] });
+  const { vertices, indices } = cubeMesh();
+  const material = new SoftBodyMaterial();
+  material.edgeSoftness = { naturalFrequency: 0, dampingRatio: 1 };
+  material.shapeMatchingSoftness = { naturalFrequency: 4, dampingRatio: 0.2 };
+  const cube = soft.create(SoftBodyDesc.trimesh(vertices, indices, { bending: false }).setMaterial(material));
+  cube.setParticlePosition(7, [0.9, 0.9, 0.9]);
+  // Edges are rigid here, so pulling one corner out stretches nothing: only shape matching moves it back.
+  cube.setMaterial(
+    Object.assign(new SoftBodyMaterial(), { shapeMatchingSoftness: { naturalFrequency: 4, dampingRatio: 0.2 } }),
+  );
+  const start = pairSpread(cube.particlePositions(), vertices);
+  steps(physics, 360);
+  const end = pairSpread(cube.particlePositions(), vertices);
+  assert.ok(start > 0.2, `it starts deformed (${start})`);
+  assert.ok(end < start * 0.35, `it settles back: ${end} from ${start}`);
+});

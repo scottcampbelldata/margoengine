@@ -53,6 +53,8 @@ export class SoftBody {
     force: Vec3;
     pointForces: Map<number, Vec3>;
     tornSeen: Set<number>;
+    triangleList: Uint32Array<ArrayBuffer>;
+    matched: boolean;
     get valid(): boolean;
     private get c();
     numParticles(): number;
@@ -65,6 +67,7 @@ export class SoftBody {
     setParticlePinned(index: number, pinned: boolean): this;
     isParticlePinned(index: number): boolean;
     setParticleKinematicTarget(index: number, position: Vec3): this;
+    triangles(): Uint32Array;
     edges(): Uint32Array;
     bendEdges(): Uint32Array;
     isEdgeTorn(edge: number): boolean;
@@ -94,6 +97,8 @@ export class SoftBodyDesc {
     gravity: number;
     damping: number;
     shift: Vec3;
+    shapeMatching: boolean;
+    triangles: number[];
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -101,6 +106,10 @@ export class SoftBodyDesc {
     }): SoftBodyDesc;
     static cloth(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
     static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+    static trimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, { bending }?: {
+        bending?: boolean;
+    }): SoftBodyDesc;
+    setShapeMatching(on: boolean): this;
     setEdges(pairs: ArrayLike<number>): this;
     setBendEdges(pairs: ArrayLike<number>): this;
     addEdges(pairs: ArrayLike<number>): this;
@@ -122,6 +131,7 @@ export class SoftBodyMaterial {
     edgeSoftness: SoftSoftness;
     bendSoftness: SoftSoftness;
     tearStrain: number;
+    shapeMatchingSoftness: SoftSoftness;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
 }

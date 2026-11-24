@@ -22,7 +22,7 @@ const CAPSULE = 2;
 const PINNED = 1;
 const TARGETED = 2;
 const TORN = 1;
-const INTEGER_COLUMNS = new Set(['pflags', 'pbody', 'ea', 'eb', 'eflags', 'c_kind']);
+const INTEGER_COLUMNS = new Set(['pflags', 'pbody', 'ea', 'eb', 'eflags', 'c_kind', 'b_on', 'b_first', 'b_count']);
 
 let columnNames: readonly string[] = [];
 // The blueprint (the deflated kernel) is a chunk of its own: an app that imports this entry but never attaches soft bodies
@@ -55,6 +55,11 @@ export class SoftBodyMaterial {
    * structural and shear edges tear; a torn edge stays torn.
    */
   tearStrain = 0;
+  /**
+   * The spring that pulls every particle toward its place in the best-fit rotated rest shape, for a body with shape matching
+   * on (default rigid, 0 Hz).
+   */
+  shapeMatchingSoftness: SoftSoftness = { naturalFrequency: 0, dampingRatio: 1 };
   /** Both edge kinds as one spring, Rapier's `SoftBodyMaterial.uniform(freq, damping)`. */
   static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial {
     const material = new SoftBodyMaterial();
@@ -68,6 +73,7 @@ export class SoftBodyMaterial {
     copy.edgeSoftness = { ...this.edgeSoftness };
     copy.bendSoftness = { ...this.bendSoftness };
     copy.tearStrain = this.tearStrain;
+    copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
     return copy;
   }
 }
@@ -82,6 +88,7 @@ function checkSoftness(softness: SoftSoftness, label: string): void {
 function checkMaterial(material: SoftBodyMaterial): void {
   checkSoftness(material.edgeSoftness, 'Edge softness');
   checkSoftness(material.bendSoftness, 'Bend softness');
+  checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
     throw new RangeError('tearStrain is 0 (never) or the stretch fraction that tears an edge.');
 }
@@ -106,6 +113,8 @@ export class SoftBodyDesc {
   /** @internal */ gravity = 1;
   /** @internal */ damping = 0;
   /** @internal */ shift: Vec3 = [0, 0, 0];
+  /** @internal */ shapeMatching = false;
+  /** @internal */ triangles: number[] = [];
 
   /** Raw particles from flat x, y, z numbers or a list of points; add the elements with `setEdges`. */
   constructor(positions: ArrayLike<number> | readonly Vec3[]) {
@@ -199,6 +208,60 @@ export class SoftBodyDesc {
     return desc;
   }
 
+  /**
+   * A mesh of triangles as particles at its vertices (flat x, y, z) and edges along its triangle edges, plus bend edges that
+   * join the two vertices across each shared edge (unless `bending` is false). Shape matching is on, as in Rapier's `trimesh`,
+   * so the body keeps its shape until you soften it with `shapeMatchingSoftness`. `triangles()` gives the mesh back.
+   */
+  static trimesh(
+    vertices: ArrayLike<number>,
+    indices: ArrayLike<number>,
+    { bending = true }: { bending?: boolean } = {},
+  ): SoftBodyDesc {
+    const desc = new SoftBodyDesc(vertices);
+    if (indices.length % 3 !== 0 || indices.length === 0)
+      throw new RangeError('Indices are triangles, three per triangle.');
+    const seen = new Map<number, number>(),
+      key = (a: number, b: number): number => (a < b ? a * desc.particleCount + b : b * desc.particleCount + a),
+      opposite = new Map<number, number[]>();
+    for (let t = 0; t < indices.length; t += 3) {
+      const tri = [indices[t]!, indices[t + 1]!, indices[t + 2]!];
+      for (const v of tri)
+        if (!Number.isInteger(v) || v < 0 || v >= desc.particleCount)
+          throw new RangeError(`Triangle index ${v} is not a vertex (0 to ${desc.particleCount - 1}).`);
+      if (tri[0] === tri[1] || tri[1] === tri[2] || tri[0] === tri[2])
+        throw new RangeError(`Triangle ${t / 3} repeats a vertex.`);
+      desc.triangles.push(...tri);
+      for (let k = 0; k < 3; k++) {
+        const a = tri[k]!,
+          b = tri[(k + 1) % 3]!,
+          third = tri[(k + 2) % 3]!,
+          id = key(a, b);
+        if (!seen.has(id)) {
+          seen.set(id, desc.edgePairs.length / 2);
+          desc.edgePairs.push(Math.min(a, b), Math.max(a, b));
+        }
+        const list = opposite.get(id) ?? [];
+        list.push(third);
+        opposite.set(id, list);
+      }
+    }
+    if (bending)
+      for (const list of opposite.values())
+        if (list.length === 2 && list[0] !== list[1] && !seen.has(key(list[0]!, list[1]!))) {
+          seen.set(key(list[0]!, list[1]!), -1);
+          desc.bendPairs.push(Math.min(list[0]!, list[1]!), Math.max(list[0]!, list[1]!));
+        }
+    desc.shapeMatching = true;
+    return desc;
+  }
+
+  /** Turns shape matching on or off (on for `trimesh`, off otherwise). It pulls the particles toward their rest shape. */
+  setShapeMatching(on: boolean): this {
+    this.shapeMatching = on;
+    return this;
+  }
+
   /** Replaces the structural edges, as pairs of particle indices. */
   setEdges(pairs: ArrayLike<number>): this {
     this.edgePairs = this.checkPairs(pairs, 'Edge');
@@ -231,6 +294,8 @@ export class SoftBodyDesc {
   append(other: SoftBodyDesc): this {
     const base = this.particleCount;
     this.positions.push(...other.positions);
+    for (const t of other.triangles) this.triangles.push(t + base);
+    this.shapeMatching = this.shapeMatching || other.shapeMatching;
     this.masses.push(...other.masses);
     for (const p of other.edgePairs) this.edgePairs.push(p + base);
     for (const p of other.bendPairs) this.bendPairs.push(p + base);
@@ -348,6 +413,8 @@ export class SoftBody {
   /** @internal */ force: Vec3 = [0, 0, 0];
   /** @internal */ pointForces = new Map<number, Vec3>();
   /** @internal */ tornSeen = new Set<number>();
+  /** @internal */ triangleList = new Uint32Array(0);
+  /** @internal Whether shape matching holds this body. */ matched = false;
 
   /** False once the body was removed. */
   get valid(): boolean {
@@ -456,6 +523,11 @@ export class SoftBody {
     tz[row] = position[2];
     pflags[row] = pflags[row]! | TARGETED;
     return this;
+  }
+  /** The triangles of a body built from a mesh (`SoftBodyDesc.trimesh`), as particle indices, three per triangle. */
+  triangles(): Uint32Array {
+    this.check();
+    return this.triangleList.slice();
   }
   /** Structural edges as flat pairs of particle indices (shear edges included; bend edges are in {@link SoftBody.bendEdges}). */
   edges(): Uint32Array {
@@ -714,6 +786,29 @@ export class SoftBodies implements PhysicsAttachment {
       c.w[row] = pinned ? 0 : 1 / masses[i]!;
       c.pflags[row] = pinned ? PINNED : 0;
     }
+    // Shape matching: each particle's offset from the mass-weighted centre of the rest shape.
+    let total = 0,
+      sx = 0,
+      sy = 0,
+      sz = 0;
+    for (let i = 0; i < particles; i++) {
+      total += masses[i]!;
+      sx += masses[i]! * pos[i * 3]!;
+      sy += masses[i]! * pos[i * 3 + 1]!;
+      sz += masses[i]! * pos[i * 3 + 2]!;
+    }
+    for (let i = 0; i < particles; i++) {
+      const row = firstParticle + i;
+      c.sw[row] = masses[i]!;
+      c.rx[row] = pos[i * 3]! - sx / total;
+      c.ry[row] = pos[i * 3 + 1]! - sy / total;
+      c.rz[row] = pos[i * 3 + 2]! - sz / total;
+      c.slx[row] = c.sly[row] = c.slz[row] = 0;
+    }
+    c.b_on[handle] = desc.shapeMatching ? 1 : 0;
+    c.b_first[handle] = firstParticle;
+    c.b_count[handle] = particles;
+    c.bqx[handle] = c.bqy[handle] = c.bqz[handle] = c.bqw[handle] = 0;
     const writeEdges = (pairs: number[], first: number): void => {
       for (let e = 0; e < pairs.length / 2; e++) {
         const row = firstEdge + first + e,
@@ -740,6 +835,8 @@ export class SoftBodies implements PhysicsAttachment {
       masses,
       desc.material.clone(),
     );
+    body.triangleList = Uint32Array.from(desc.triangles);
+    body.matched = desc.shapeMatching;
     this.bodies.push(body);
     this.writeMaterial(body);
     return body;
@@ -748,7 +845,9 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal Writes a body's material into its edge rows. */
   writeMaterial(body: SoftBody): void {
     const c = this.columns(),
-      { edgeSoftness, bendSoftness, tearStrain } = body.material;
+      { edgeSoftness, bendSoftness, tearStrain, shapeMatchingSoftness } = body.material;
+    c.b_omega[body.handle] = shapeMatchingSoftness.naturalFrequency * 2 * Math.PI;
+    c.b_zeta[body.handle] = shapeMatchingSoftness.dampingRatio;
     for (let e = 0; e < body.edgeTotal; e++) {
       const row = body.firstEdge + e,
         bend = e >= body.structural,
@@ -767,7 +866,31 @@ export class SoftBodies implements PhysicsAttachment {
     // Keep the rows of the other bodies, in order, and write them back without the removed one.
     const keep = this.bodies.filter((b) => b !== body),
       c = this.columns(),
-      cols = ['x', 'y', 'z', 'px', 'py', 'pz', 'vx', 'vy', 'vz', 'w', 'radius', 'tx', 'ty', 'tz', 'pflags'] as const,
+      cols = [
+        'x',
+        'y',
+        'z',
+        'px',
+        'py',
+        'pz',
+        'vx',
+        'vy',
+        'vz',
+        'w',
+        'radius',
+        'tx',
+        'ty',
+        'tz',
+        'pflags',
+        'rx',
+        'ry',
+        'rz',
+        'slx',
+        'sly',
+        'slz',
+        'sw',
+      ] as const,
+      bcols = ['b_on', 'b_omega', 'b_zeta', 'bqx', 'bqy', 'bqz', 'bqw'] as const,
       ecols = ['rest', 'omega', 'zeta', 'lambda', 'tear', 'eflags'] as const,
       saved = keep.map((b) => ({
         body: b,
@@ -775,6 +898,7 @@ export class SoftBodies implements PhysicsAttachment {
         e: ecols.map((name) => c[name]!.slice(b.firstEdge, b.firstEdge + b.edgeTotal)),
         ea: c.ea.slice(b.firstEdge, b.firstEdge + b.edgeTotal).map((v) => v - b.firstParticle),
         eb: c.eb.slice(b.firstEdge, b.firstEdge + b.edgeTotal).map((v) => v - b.firstParticle),
+        b: bcols.map((name) => c[name]![b.handle]!),
         gravity: c.gravity_scale[b.handle]!,
         damping: c.linear_damping[b.handle]!,
       }));
@@ -798,6 +922,11 @@ export class SoftBodies implements PhysicsAttachment {
         d.ea[ei + e] = s.ea[e]! + pi;
         d.eb[ei + e] = s.eb[e]! + pi;
       }
+      bcols.forEach((name, k) => {
+        d[name]![handle] = s.b[k]!;
+      });
+      d.b_first[handle] = pi;
+      d.b_count[handle] = b.particles;
       d.gravity_scale[handle] = s.gravity;
       d.linear_damping[handle] = s.damping;
       b.handle = handle;
@@ -1013,7 +1142,7 @@ function inverseMass(body: PhysicsBody): number[] {
 
 function rowsOf(name: string, particles: number, edges: number, bodies: number, colliders: number): number {
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
-  if (name === 'gravity_scale' || name === 'linear_damping') return bodies;
+  if (/^(gravity_scale|linear_damping|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
     /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|ii(xx|xy|xz|yy|yz|zz))$/.test(
       name,

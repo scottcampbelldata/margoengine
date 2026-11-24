@@ -11082,3 +11082,8 @@ Written clean room from the papers below and Rapier's published Soft-bodies user
 - M. Macklin, M. Müller, N. Chentanez and T.-Y. Kim, "Unified Particle Physics for Real-Time Applications", ACM TOG 33(4), 2014 (friction as a bounded displacement, and the share of a contact correction between particle and body).
 - M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007.
 - Catenary check: the closed form of a hanging chain, length = 2a sinh(span / 2a), height = a cosh(x / a) (any mechanics text).
+
+### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
+
+- M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.
+- M. Müller, J. Bender, N. Chentanez and M. Macklin, "A Robust Method to Extract the Rotational Part of Deformations", MIG 2016. The rotation step uses the quaternion Cayley form (a rotation about w by 2 atan(|w| / 2)) in place of the paper's exact exponential, so the step path calls no trigonometric function. The constraint is the XPBD form of the same paper family as the edges (Macklin et al. 2016).
