@@ -4,6 +4,7 @@
 // bound of Buss and Kim 2005, "Selectively Damped Least Squares for Inverse Kinematics" (section 4: a bound on how far one step
 // may turn any joint).
 import { MargoError } from '@margoengine/math/errors';
+import { conjugateQuaternion, multiplyQuaternions, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
 import { JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from './kernel.js';
 import type { Quat, Vec3 } from './math.js';
 import type { Multibody } from './multibody.js';
@@ -45,28 +46,11 @@ export interface IkResult {
 type V = [number, number, number];
 type Q = [number, number, number, number];
 
-const qmul = (a: Q, b: Q): Q => [
-  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
-  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
-  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
-  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
-];
-const qconj = (q: Q): Q => [-q[0], -q[1], -q[2], q[3]];
-const qnorm = (q: Q): Q => {
-  const n = 1 / Math.hypot(q[0], q[1], q[2], q[3]);
-  return [q[0] * n, q[1] * n, q[2] * n, q[3] * n];
-};
+const qmul = (a: Q, b: Q): Q => multiplyQuaternions(a, b);
+const qconj = (q: Q): Q => conjugateQuaternion(q);
+const qnorm = (q: Q): Q => normalizeQuaternion(q);
 const qshort = (q: Q): Q => (q[3] < 0 ? [-q[0], -q[1], -q[2], -q[3]] : q);
-function qrot(q: Q, v: Vec3): V {
-  const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
-    ty = 2 * (q[2] * v[0] - q[0] * v[2]),
-    tz = 2 * (q[0] * v[1] - q[1] * v[0]);
-  return [
-    v[0] + q[3] * tx + q[1] * tz - q[2] * ty,
-    v[1] + q[3] * ty + q[2] * tx - q[0] * tz,
-    v[2] + q[3] * tz + q[0] * ty - q[1] * tx,
-  ];
-}
+const qrot = (q: Q, v: Vec3): V => rotateByQuaternion(v, q);
 function fromVector(r: Vec3): Q {
   const angle = Math.hypot(r[0], r[1], r[2]);
   if (angle < 1e-12) return qnorm([r[0] / 2, r[1] / 2, r[2] / 2, 1]);
