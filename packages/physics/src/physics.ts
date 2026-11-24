@@ -367,13 +367,13 @@ export interface ShapeCastHit extends RaycastHit {
   queryNormal: [number, number, number];
 }
 /** The point of a collider nearest a query point, whether the query point is inside it, and how far it is. */
-/** What {@link Physics.contactPair} returns for one part of a pair: the normal from the first collider to the second. */
-export interface ContactManifold {
+/** A contact manifold between a collider and a query shape (see {@link Physics.colliderShapeContacts}): normal from the collider to the shape. */
+export interface ShapeContactManifold {
   /** The pair's friction and restitution: what the solver mixed for it, or the colliders' by their combine rules. */
   friction?: number;
   restitution?: number;
   normal: [number, number, number];
-  /** Up to four points: where each collider's surface is, how far apart they are (negative when they overlap) and an id that stays with the feature. */
+  /** Up to four points: where each side's surface is, how far apart they are (negative when they overlap) and an id that stays with the feature. */
   points: {
     pointA: [number, number, number];
     pointB: [number, number, number];
@@ -384,6 +384,25 @@ export interface ContactManifold {
     /** The friction impulse the solver last gave it, along the pair's surface. */
     tangentImpulse: [number, number, number];
   }[];
+}
+
+/** What {@link Physics.contactPair} returns for one part of a pair: the normal from the first collider to the second. */
+export interface ContactManifold extends Omit<ShapeContactManifold, 'points'> {
+  /** The normal in the first collider's frame, and the reverse of it (the normal the second sees) in the second's. */
+  localNormalA: [number, number, number];
+  localNormalB: [number, number, number];
+  /** The sub-shape of each collider the manifold is on: a compound's child index or a mesh's triangle (a height field's triangle, a voxel grid's cell); undefined for a plain shape. */
+  subShapeA?: number;
+  subShapeB?: number;
+  points: (ShapeContactManifold['points'][number] & {
+    /** The point in each collider's own frame. */
+    localPointA: [number, number, number];
+    localPointB: [number, number, number];
+    /** What the solver reads for the point, as Rapier's solver contact: the pair's friction and restitution and its surface velocity. */
+    friction: number;
+    restitution: number;
+    tangentVelocity: [number, number, number];
+  })[];
 }
 
 /** What {@link Physics.colliderDistance} returns. */
@@ -1717,17 +1736,67 @@ export class Physics implements EnginePlugin, BodyOwner {
       stored = this.storedContacts(first, second),
       friction = stored?.friction ?? this.mixed(first, second, false),
       restitution = stored?.restitution ?? this.mixed(first, second, true);
-    return this.kernel.pairContacts(first, second, prediction).map((m) => ({
-      ...this.manifold(m, stored?.points),
-      friction,
-      restitution,
-    }));
+    const surface = this.pairSurface(first, second);
+    return this.kernel.pairContacts(first, second, prediction).map((m) => {
+      const manifold = this.manifold(m, stored?.points);
+      return {
+        ...this.localize(manifold, a, b, m, { friction, restitution, surface }),
+      };
+    });
+  }
+  /** The surface velocity a stored pair holds, or zero. */
+  private pairSurface(a: number, b: number): [number, number, number] {
+    const kernel = this.kernel,
+      c = kernel.columns;
+    for (let row = kernel.firstPair(a); row !== NONE; row = kernel.nextPair(row, a))
+      if ((c.pairA[row] === a && c.pairB[row] === b) || (c.pairA[row] === b && c.pairB[row] === a))
+        return [c.pairSurfaceX[row]!, c.pairSurfaceY[row]!, c.pairSurfaceZ[row]!];
+    return [0, 0, 0];
+  }
+  /** A manifold with its normal and points also in each collider's frame, its sub-shapes and what the solver reads for each point. */
+  private localize(
+    manifold: ShapeContactManifold,
+    a: PhysicsCollider,
+    b: PhysicsCollider,
+    raw: KernelManifold,
+    solver: { friction: number; restitution: number; surface: [number, number, number] },
+  ): ContactManifold {
+    const frame = (collider: PhysicsCollider) => {
+        const p = collider.translation(),
+          q = collider.rotation();
+        return { p: [p.x, p.y, p.z] as Vec3, q: [-q.x, -q.y, -q.z, q.w] as Quat };
+      },
+      into = (f: { p: Vec3; q: Quat }, v: Vec3, point: boolean): [number, number, number] => {
+        const r = turn(f.q, point ? [v[0] - f.p[0], v[1] - f.p[1], v[2] - f.p[2]] : [v[0], v[1], v[2]]);
+        return [r[0], r[1], r[2]];
+      },
+      fa = frame(a),
+      fb = frame(b),
+      n = manifold.normal,
+      reverse: Vec3 = [-n[0], -n[1], -n[2]];
+    return {
+      ...manifold,
+      friction: solver.friction,
+      restitution: solver.restitution,
+      localNormalA: into(fa, n, false),
+      localNormalB: into(fb, reverse, false),
+      ...(raw.subA === null ? {} : { subShapeA: raw.subA }),
+      ...(raw.subB === null ? {} : { subShapeB: raw.subB }),
+      points: manifold.points.map((p) => ({
+        ...p,
+        localPointA: into(fa, p.pointA, true),
+        localPointB: into(fb, p.pointB, true),
+        friction: solver.friction,
+        restitution: solver.restitution,
+        tangentVelocity: solver.surface,
+      })),
+    };
   }
   /** A manifold of the kernel in this entry's names, with the impulses a stored pair holds for its points. */
   private manifold(
     m: KernelManifold,
     held?: Map<number, { normalImpulse: number; tangentImpulse: [number, number, number] }>,
-  ): ContactManifold {
+  ): ShapeContactManifold {
     return {
       normal: m.normal,
       points: m.points.map((p) => ({
@@ -1942,7 +2011,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     position: Vec3,
     rotation: Quat = [0, 0, 0, 1],
     prediction = 0,
-  ): ContactManifold[] {
+  ): ShapeContactManifold[] {
     checkVec(position, 'Shape position');
     checkRotation(rotation);
     this.live();

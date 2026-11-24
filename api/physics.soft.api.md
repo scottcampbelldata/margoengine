@@ -659,18 +659,18 @@ interface ContactForceEvent {
     maxForceDirection: [number, number, number];
 }
 
-interface ContactManifold {
-    friction?: number;
-    restitution?: number;
-    normal: [number, number, number];
-    points: {
-        pointA: [number, number, number];
-        pointB: [number, number, number];
-        separation: number;
-        id: number;
-        normalImpulse: number;
-        tangentImpulse: [number, number, number];
-    }[];
+interface ContactManifold extends Omit<ShapeContactManifold, 'points'> {
+    localNormalA: [number, number, number];
+    localNormalB: [number, number, number];
+    subShapeA?: number;
+    subShapeB?: number;
+    points: (ShapeContactManifold['points'][number] & {
+        localPointA: [number, number, number];
+        localPointB: [number, number, number];
+        friction: number;
+        restitution: number;
+        tangentVelocity: [number, number, number];
+    })[];
 }
 
 class ContactModification {
@@ -944,6 +944,8 @@ interface KernelLoadOptions {
 
 interface KernelManifold {
     normal: [number, number, number];
+    subA: number | null;
+    subB: number | null;
     points: {
         onA: [number, number, number];
         onB: [number, number, number];
@@ -1386,7 +1388,7 @@ class Physics implements EnginePlugin, BodyOwner {
     getColliders(): PhysicsCollider[];
     contactPairsWith(collider: PhysicsCollider): PhysicsCollider[];
     intersectionPairsWith(collider: PhysicsCollider): PhysicsCollider[];
-    contactShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat, prediction?: number): ContactManifold[];
+    contactShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat, prediction?: number): ShapeContactManifold[];
     castColliderOnto(moving: PhysicsCollider, target: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     castCollider(moving: PhysicsCollider, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
@@ -1815,6 +1817,20 @@ type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model'
 interface ShapeCastHit extends RaycastHit {
     queryPoint: [number, number, number];
     queryNormal: [number, number, number];
+}
+
+interface ShapeContactManifold {
+    friction?: number;
+    restitution?: number;
+    normal: [number, number, number];
+    points: {
+        pointA: [number, number, number];
+        pointB: [number, number, number];
+        separation: number;
+        id: number;
+        normalImpulse: number;
+        tangentImpulse: [number, number, number];
+    }[];
 }
 
 type ShapeOptions = {

@@ -672,6 +672,9 @@ export interface KernelProjection {
 /** One manifold of two colliders: the normal from the first to the second and up to four points. */
 export interface KernelManifold {
   normal: [number, number, number];
+  /** The sub-shape of the first and of the second collider the manifold is on: a compound's child index or a mesh's triangle or cell; null for none. */
+  subA: number | null;
+  subB: number | null;
   points: { onA: [number, number, number]; onB: [number, number, number]; separation: number; id: number }[];
 }
 /** The distance between two colliders (0 when they overlap) and the nearest point on each. */
@@ -2148,12 +2151,12 @@ export class KernelWorld {
     return this.readManifolds(total);
   }
   private readManifolds(total: number): KernelManifold[] {
-    const kept = total < 56 ? total : 56,
-      words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), 36 * kept),
-      f = new Float32Array(words.buffer, words.byteOffset, 36 * kept),
+    const kept = total < 53 ? total : 53,
+      words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), 38 * kept),
+      f = new Float32Array(words.buffer, words.byteOffset, 38 * kept),
       manifolds: KernelManifold[] = [];
     for (let m = 0; m < kept; m++) {
-      const at = 36 * m,
+      const at = 38 * m,
         points: KernelManifold['points'] = [];
       for (let k = 0; k < words[at + 3]!; k++) {
         const p = at + 4 + 8 * k;
@@ -2164,7 +2167,12 @@ export class KernelWorld {
           id: words[p + 7]!,
         });
       }
-      manifolds.push({ normal: [f[at]!, f[at + 1]!, f[at + 2]!], points });
+      manifolds.push({
+        normal: [f[at]!, f[at + 1]!, f[at + 2]!],
+        subA: words[at + 36] === 0xffffffff ? null : words[at + 36]!,
+        subB: words[at + 37] === 0xffffffff ? null : words[at + 37]!,
+        points,
+      });
     }
     return manifolds;
   }

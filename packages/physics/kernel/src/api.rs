@@ -807,18 +807,21 @@ pub extern "C" fn collider_mass(collider: u32) -> f32 {
     if !collider_alive(collider) { -1.0 } else { world().collider_mass(collider as usize) }
 }
 
-/// Manifold `k` of a contacts answer into the query buffer, 36 words (kept up to 56 of them).
-fn write_manifold(k: usize, m: &crate::narrow::Manifold) {
-    if k >= 56 {
+/// Manifold `k` of a contacts answer into the query buffer, 38 words (kept up to 53 of them): the 36 of a manifold, then the
+/// sub-shape of each collider it is on (a compound's child index or a mesh's triangle or cell, 0xffffffff for none).
+fn write_manifold(k: usize, m: &crate::narrow::Manifold, sub_a: u32, sub_b: u32) {
+    if k >= 53 {
         return;
     }
-    let mut words = [0u32; 36];
+    let mut words = [0u32; 38];
+    words[36] = sub_a;
+    words[37] = sub_b;
     words[..4].copy_from_slice(&[m.normal.x.to_bits(), m.normal.y.to_bits(), m.normal.z.to_bits(), m.count as u32]);
     for (i, p) in m.points.iter().enumerate().take(m.count) {
         let at = 4 + 8 * i;
         words[at..at + 8].copy_from_slice(&[p.on_a.x.to_bits(), p.on_a.y.to_bits(), p.on_a.z.to_bits(), p.on_b.x.to_bits(), p.on_b.y.to_bits(), p.on_b.z.to_bits(), p.separation.to_bits(), p.id]);
     }
-    write_words(36 * k, &words);
+    write_words(38 * k, &words);
 }
 
 /// Manifolds of a collider and a query shape within `prediction` of touching (the layout of `pair_contacts`), normals from
@@ -832,7 +835,7 @@ pub extern "C" fn collider_shape_contacts(collider: u32, kind: u32, a: f32, b: f
     }
     let mut count = 0usize;
     world().shape_contacts(collider as usize, shape, pose, prediction, &mut |m| {
-        write_manifold(count, m);
+        write_manifold(count, m, u32::MAX, u32::MAX);
         count += 1;
     });
     count as i32
@@ -920,17 +923,18 @@ pub extern "C" fn pair_intersects(a: u32, b: u32) -> i32 {
     world().pair_intersects(a as usize, b as usize) as i32
 }
 
-/// Manifolds of two colliders within `prediction` of touching, into the query buffer, 36 words each: the normal from a to
-/// b (3), the point count (1), then four points of on a (3), on b (3), separation, id. The count of all manifolds comes
-/// back, 56 at most are kept; -1 when either collider is gone or `prediction` is not 0 or more.
+/// Manifolds of two colliders within `prediction` of touching, into the query buffer, 38 words each: the normal from a to
+/// b (3), the point count (1), then four points of on a (3), on b (3), separation, id, then the sub-shape of a and of b (a
+/// compound's child index or a mesh's triangle or cell, 0xffffffff for none). The count of all manifolds comes
+/// back, 53 at most are kept; -1 when either collider is gone or `prediction` is not 0 or more.
 #[unsafe(no_mangle)]
 pub extern "C" fn pair_contacts(a: u32, b: u32, prediction: f32) -> i32 {
     if !collider_alive(a) || !collider_alive(b) || !(prediction >= 0.0 && prediction < f32::INFINITY) {
         return -1;
     }
     let mut count = 0usize;
-    world().pair_contacts(a as usize, b as usize, prediction, &mut |m| {
-        write_manifold(count, m);
+    world().pair_contacts(a as usize, b as usize, prediction, &mut |m, sub_a, sub_b| {
+        write_manifold(count, m, sub_a, sub_b);
         count += 1;
     });
     count as i32

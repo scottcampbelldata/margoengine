@@ -380,3 +380,62 @@ test('a collider with mass properties of its own gives the body that mass, centr
   assert.throws(() => own.setMassProperties(1, [0, 0, 0], [-1, 1, 1]), /mass properties/);
   for (const physics of worlds) physics.dispose();
 });
+
+test("a contact pair gives its normal and points in each collider's frame, the sub-shapes, and what the solver reads for each point", () => {
+  const physics = new Physics(null);
+  const floor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [10, 0.5, 10], friction: 0.8 },
+  }).colliders[0];
+  // The crate is turned a quarter about y and moved to x = 2, so its own frame differs from the world's.
+  const crate = physics.addBody(null, {
+    position: [2, 0.5, 0],
+    rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+    colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], friction: 0.4 },
+  });
+  for (let i = 0; i < 60; i++) physics.step();
+  const piece = crate.colliders[0],
+    [manifold] = physics.contactPair(floor, piece);
+  assert.equal(manifold.subShapeA, undefined, 'plain shapes have no sub-shape');
+  near(manifold.localNormalA[1], 1, 1e-4, 'the floor sees the normal up in its own frame');
+  near(manifold.localNormalB[1], -1, 1e-4, 'and the crate sees it down');
+  for (const p of manifold.points) {
+    near(p.localPointA[0], p.pointA[0], 1e-4, 'the floor is at the world origin turned by nothing');
+    near(Math.abs(p.localPointB[0]), 0.5, 0.05, "the crate point is on its own frame's side");
+    near(p.localPointB[1], -0.5, 0.05, "at the crate's own bottom");
+    near(p.friction, 0.6, 1e-4, 'the mixed friction');
+    assert.deepEqual(p.tangentVelocity, [0, 0, 0]);
+  }
+  physics.dispose();
+  // A compound's child and a mesh's triangle name the sub-shape.
+  const world = new Physics(null);
+  const ground = world.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: [-4, 0, -4, -4, 0, 4, 4, 0, -4, 4, 0, 4], indices: [0, 1, 2, 2, 1, 3] },
+  }).colliders[0];
+  const ball = world.addBody(null, { position: [2, 0.3, 2], colliders: { shape: 'sphere', radius: 0.5 } });
+  world.step();
+  const [onMesh] = world.contactPair(ground, ball.colliders[0], 0.1);
+  assert.ok(
+    Number.isInteger(onMesh.subShapeA) && onMesh.subShapeA >= 0 && onMesh.subShapeA < 2,
+    `triangle ${onMesh.subShapeA}`,
+  );
+  assert.equal(onMesh.subShapeB, undefined);
+  const group = world.addBody(null, {
+    position: [-2, 3, 0],
+    colliders: {
+      shape: 'compound',
+      parts: [
+        { shape: 'sphere', radius: 0.4 },
+        { shape: 'sphere', radius: 0.4, offset: [0, 1, 0] },
+      ],
+    },
+  }).colliders[0];
+  const seen = world
+    .contactPair(group, ground, 4)
+    .map((m) => m.subShapeA)
+    .sort();
+  assert.deepEqual([...new Set(seen)], [0, 1], 'each child of the compound is named by its index');
+  world.dispose();
+});

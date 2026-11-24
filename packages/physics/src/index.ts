@@ -9,6 +9,7 @@ export type {
   JointBreakEvent,
   ContactForceEvent,
   ContactManifold,
+  ShapeContactManifold,
   QueryFilter,
   PhysicsRaycastOptions,
   PhysicsShapeCastOptions,

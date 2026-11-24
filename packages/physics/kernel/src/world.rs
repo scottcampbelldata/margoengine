@@ -126,6 +126,8 @@ pub struct World {
     pub query_groups_hi: u32,
     /// The motion of the next turning shape cast, set by `query_motion`.
     pub query_motion: [f32; 9],
+    /// The index of the part (triangle, height field triangle or voxel cell) `each_part` last handed out. Not in the arena.
+    pub part_id: core::cell::Cell<u32>,
 }
 
 impl World {
@@ -149,6 +151,7 @@ impl World {
             timing: [0.0; 8],
             query_groups_hi: 0,
             query_motion: [0.0; 9],
+            part_id: core::cell::Cell::new(u32::MAX),
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);

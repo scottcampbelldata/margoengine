@@ -68,18 +68,24 @@ impl World {
     /// Calls `visit` with each manifold of two colliders within `prediction` of touching: one for a pair of convex
     /// colliders, one for each pair of children of a compound, one for each triangle or cell of a mesh near the other
     /// collider. Normals run from `a` to `b`.
-    pub fn pair_contacts(&self, a: usize, b: usize, prediction: f32, visit: &mut dyn FnMut(&Manifold)) {
+    pub fn pair_contacts(&self, a: usize, b: usize, prediction: f32, visit: &mut dyn FnMut(&Manifold, u32, u32)) {
         let (shape_a, shape_b) = (self.meshy_shape(a), self.meshy_shape(b));
         if shape_a == SHAPE_COMPOUND || shape_b == SHAPE_COMPOUND {
             let ((first_a, compound_a), (first_b, compound_b)) = (self.side(a), self.side(b));
-            let mut ca = first_a;
+            let (mut ca, mut index_a) = (first_a, 0u32);
             while ca != NONE {
-                let mut cb = first_b;
+                let (mut cb, mut index_b) = (first_b, 0u32);
                 while cb != NONE {
-                    self.pair_contacts(ca as usize, cb as usize, prediction, visit);
+                    // A child's index in its compound; a mesh child's own triangle is the part below it.
+                    let (own_a, own_b) = (if compound_a { index_a } else { NONE }, if compound_b { index_b } else { NONE });
+                    self.pair_contacts(ca as usize, cb as usize, prediction, &mut |m, sub_a, sub_b| {
+                        visit(m, if sub_a == NONE { own_a } else { sub_a }, if sub_b == NONE { own_b } else { sub_b })
+                    });
                     cb = if compound_b { self.uu(COLLIDER_NEXT, cb as usize) } else { NONE };
+                    index_b += 1;
                 }
                 ca = if compound_a { self.uu(COLLIDER_NEXT, ca as usize) } else { NONE };
+                index_a += 1;
             }
             return;
         }
@@ -113,7 +119,8 @@ impl World {
                             core::mem::swap(&mut point.on_a, &mut point.on_b);
                         }
                     }
-                    visit(&world);
+                    let part = self.part_id.get();
+                    visit(&world, if other_is_a { NONE } else { part }, if other_is_a { part } else { NONE });
                 }
                 true
             });
@@ -122,7 +129,7 @@ impl World {
         let mut manifold = Manifold::new();
         self.collide(a, b, prediction, &mut manifold);
         if manifold.count > 0 {
-            visit(&manifold);
+            visit(&manifold, NONE, NONE);
         }
     }
 

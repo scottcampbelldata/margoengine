@@ -661,6 +661,7 @@ impl World {
             let mut going = true;
             self.each_cell(mesh, (low, high), &mut |index, at| {
                 if going && self.cell_byte(mesh, index) & CELL_FILLED != 0 {
+                    self.part_id.set(index);
                     going = visit(Solid::Poly { poly, pose: Pose { p: at, q: Q::IDENTITY } });
                 }
             });
@@ -673,6 +674,7 @@ impl World {
                     if self.cell_reaches(mesh, rows, r, c, low.y, high.y) {
                         let cell = 2 * (r + rows * c);
                         for triangle in [cell, cell + 1] {
+                            self.part_id.set(triangle);
                             if self.triangle_alive(mesh, triangle) && !visit(Solid::Triangle(self.mesh_triangle(mesh, triangle))) {
                                 return;
                             }
@@ -702,7 +704,9 @@ impl World {
                 continue;
             }
             for place in first..first + count {
-                if !visit(Solid::Triangle(self.mesh_triangle(mesh, self.uu(TRIANGLE_ORDER, t0 + place as usize)))) {
+                let triangle = self.uu(TRIANGLE_ORDER, t0 + place as usize);
+                self.part_id.set(triangle);
+                if !visit(Solid::Triangle(self.mesh_triangle(mesh, triangle))) {
                     return;
                 }
             }
