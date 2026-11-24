@@ -214,6 +214,8 @@ export class CharacterController {
         ...exclude,
         excludeDynamic: exclude.excludeDynamic || ignoreDynamic,
         maxDistance: max,
+        // The controller rests a skin off what it stands on and slides along it, so a shape that touches without moving into
+        // a surface is not an obstacle: only a cast that closes the gap to the target distance stops it.
         stopAtPenetration: false,
         targetDistance: this.offset,
       });

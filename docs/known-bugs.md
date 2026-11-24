@@ -6,11 +6,11 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-24: ragdoll on the kernel's cone joint fails its powered and balance tests (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
+### Open 2026-11-24: a cone joint with a rest pose off its frames drives itself to its limit under a rotation motor (KB-PHYS-SWITCH-CONE1, physics, ragdoll)
 
-- **Repro:** in `packages/ragdoll/src/ragdoll.ts` build the default `cone` joint as `{type: 'cone', frameA, frameB, swing, twist}` (the patch is `join()` with frame X on the bone axis) and run `node --test packages/ragdoll/tests/*.test.js`: 32 of 89 fail (a head "turned 0.71 rad" under its motors, "hips drifted 1.6 m"), where the spherical joint with the ragdoll's own limit projection fails 5.
-- **Cause:** the kernel's cone joint holds swing and twist correctly (the limit tests pass on it) and now takes `setRotationMotor`, but the powered ragdoll's springs, written against Rapier's spherical-joint motor, reach a different pose inside the cone: not yet traced to the motor formulation, the cone's frame or the solver passes. The projection the ragdoll keeps on the spherical joint turns unstable on the kernel (the child's spin grows from 0.7 to over 100 rad/s once a limit pushes back) and fails the two limit tests.
-- **State:** the ragdoll stays on the spherical joint with its projection (5 failing tests: the two limit tests, the Fox and Knight hull silhouettes, and the balance sink) until the powered difference is found.
+- **Repro:** body A fixed at identity; body B a 1 m rod (mass 2, box offset 0.5 m along Y) rotated by `R` = 0.15 rad about X; `addJoint(A, B, {type: 'cone', frameA: R * fB, frameB: fB, swing: 3, twist: [-0.5, 0.5]})` with `fB` = the quarter turn about Z that takes frame X to the bone's Y. Every step `setRotationMotor([0, 0, 0, 1], {model: 'force', stiffness: I w^2, damping: 2 I w 0.7, maxForce: 1e6})` (w = 2 pi 8; the target is identity, which is `frameA^-1 * R * frameB` for the rest pose). The rod holds at rest with identity frames, with `frameA = frameB` and with `frameA = R, frameB = identity`, but with the two together it swings to the 3 rad limit within 20 steps (0.15 rad: 2.2, 3.1, 2.0 rad; the acceleration model sits at 3.0). The spherical joint and the cone without the combination hold.
+- **Cause:** not found; the drive rows of a cone (`drive_rows` in `joints.rs`) are the only code that reads frames this way. Ragdolls build exactly this joint (rest rotation `R` and frame X on the bone axis), so on it 29 of 89 ragdoll tests fail (a head "turned 0.71 rad" under its motors, hips drift).
+- **State:** the ragdoll stays on a spherical joint with its own limit projection (5 failing tests: the two limit tests, the two hull silhouettes, the balance sink) until the cone holds this case. Dynamics work in `packages/physics/kernel`.
 
 ### Open 2026-11-24: ragdoll balance and push recovery were tuned on Rapier's joints (KB-PHYS-SWITCH-BAL1, ragdoll)
 
@@ -23,12 +23,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Repro:** `physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh', vertices, indices, collisionGroups: (0x4000 << 16) >>> 0}})` then `physics.raycast(origin, direction)`: null. `packages/ragdoll/tests/hulls.test.js` ("Fox in centimetres") reads 0 against 0 because its probe mesh is such a collider.
 - **Cause:** `Physics.filterWords` sends `0xffffffff` for a query without `groups` and the kernel's `groups_meet` tests it against the collider's groups; a query without groups must see every collider, as Rapier's does.
 - **State:** needs a "no group test" flag in the kernel's query filter (collision work in `packages/physics/kernel/src/query.rs`).
-
-### Open 2026-11-24: `shapeCast` reports a hit at distance 0 for a shape moving along a surface within the contact margin (KB-PHYS-SWITCH-CAST1, physics collision)
-
-- **Repro:** a capsule 2 cm above a floor, cast sideways with `stopAtPenetration` true (the default): a hit at distance 0. With `stopAtPenetration: false` it is null. Gaps up to about 0.06 m answer the same.
-- **Cause:** the cast treats the contact prediction margin as penetration. A shape that does not overlap should not stop at the start.
-- **State:** the character controller works around it with `stopAtPenetration: false`.
 
 ### Open 2026-11-24: a long thin body that hits a wall hard and spinning swings through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 

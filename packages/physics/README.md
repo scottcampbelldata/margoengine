@@ -943,7 +943,6 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | --- | --- | --- |
 | Kinematic character controller: offset, up vector, autostep, maximum slope climb angle, minimum slope slide angle, snap to ground, sliding | `createCharacterController` and `move` | full |
 | Character controller: pushing dynamic bodies, character mass, the collisions of a move | `applyImpulsesToDynamicBodies`, `characterMass`, `controller.collisions` | full |
-| Character controller: ground contact on a collider that the shape cast reports inside the contact margin | works around it with `stopAtPenetration: false` | partial: see KB-PHYS-SWITCH-CAST1 |
 | Dynamic ray-cast vehicle controller: suspension, engine, brake, steering, wheel friction | `Vehicle` | full |
 | Ragdoll with cone joints, motors and balance | `@margoengine/ragdoll` | partial: powered ragdolls on the cone joint differ from the spherical one, see KB-PHYS-SWITCH-CONE1 |
 | Convex decomposition of a concave mesh | `convexDecomposition` from `margoengine/physics/decomposition` (CoACD) | full: build-time, never a bare mesh on `addBody` |
