@@ -576,11 +576,23 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
   bad.dispose();
 });
 
-test('ocean horizon retains the central grid and supplies larger sample footprints offshore', async () => {
+test('ocean horizon retains the central grid, grows offshore footprints and appends a flat far quad', async () => {
   const bounded = new Water({ size: [160, 160], segments: 32 }),
     ocean = new Water({ size: [160, 160], segments: 32, horizon: true });
-  assert.equal(ocean.positions.length, bounded.positions.length);
-  assert.deepEqual(ocean.triangles, bounded.triangles);
+  const far = bounded.positions.length / 3;
+  assert.deepEqual(ocean.triangles.subarray(0, bounded.triangles.length), bounded.triangles);
+  assert.deepEqual(Array.from(ocean.triangles.subarray(bounded.triangles.length)), [
+    far,
+    far + 2,
+    far + 1,
+    far + 1,
+    far + 2,
+    far + 3,
+  ]);
+  assert.deepEqual(
+    Array.from(ocean.positions.subarray(bounded.positions.length)),
+    [-1e7, -1e7, -1, 1e7, -1e7, -1, -1e7, 1e7, -1, 1e7, 1e7, -1],
+  );
   for (let i = 0; i < bounded.positions.length; i += 3) {
     const x = bounded.positions[i],
       z = bounded.positions[i + 1];
