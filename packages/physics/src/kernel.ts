@@ -264,6 +264,8 @@ export const JOINT_CONE = 1 << 26;
 export const JOINT_DISTANCE = 1 << 27;
 /** The joint broke under its load and solves nothing. */
 export const JOINT_BROKEN = 1 << 29;
+/** The turning motors drive frame B toward the `jointDrive` rotation in frame A (a cone's rotation motor). */
+export const JOINT_DRIVE = 1 << 30;
 /** Bits of the `colliderFlags` column. */
 export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;

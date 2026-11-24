@@ -8392,3 +8392,7 @@ A joint's break load is read at the last substep of a step, from the impulses it
 ## Physics debug lines (own solver)
 
 `debugRender` draws what the kernel holds at the last step: a sphere as three rings of 24 segments, a capsule, cylinder and cone as rings and lines (their rounded borders are not drawn), a hull by its edges, a mesh by each distinct edge once, a half space as a 20 m grid on its plane through its origin, a voxel grid as its box, and a compound by its parts. Poses are the step's, not the interpolated ones, so a drawn body can lead its mesh by up to one step.
+
+## Physics cone rotation motor (own solver)
+
+A cone joint's rotation motor is three turning motor rows along the axes of the target frame, with their own carried impulses, and the joint's limits solve after them in the same pass. A force-model motor stiffer than the limit's own soft stiffness (the effective mass times (2 pi 120 Hz) squared, held under a quarter of the substep rate) pushes past a limit by that ratio, so a light limb with a very stiff force-model motor can leave its cone by a few degrees; the acceleration model scales both alike and keeps the limit. The cone's twist motor and its rotation motor share the gains of the twist axis.

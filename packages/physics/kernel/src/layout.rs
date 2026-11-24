@@ -438,6 +438,11 @@ columns! {
     // The angle of a joint with one free turning axis, counted past a whole turn.
     JOINT_ANGLE f32 Joint,
     // The load that breaks the joint, in newtons along its linear rows and newton metres about its angular rows; zero never.
+    // The rotation of frame B in frame A that a JOINT_DRIVE joint's turning motors drive toward, x, y, z, w.
+    JOINT_DRIVE_X f32 Joint,
+    JOINT_DRIVE_Y f32 Joint,
+    JOINT_DRIVE_Z f32 Joint,
+    JOINT_DRIVE_W f32 Joint,
     JOINT_BREAK_FORCE f32 Joint,
     JOINT_BREAK_TORQUE f32 Joint,
     // The step a joint was last listed in, plus one.
@@ -731,5 +736,8 @@ pub const JOINT_DISTANCE: u32 = 1 << 27;
 pub const JOINT_OFF: u32 = 1 << 28;
 /// The joint was loaded past its break force or torque: it solves nothing and keeps its bodies from nothing.
 pub const JOINT_BROKEN: u32 = 1 << 29;
+/// The three turning motors drive frame B toward JOINT_DRIVE_ in frame A, whatever the joint's own turning rows measure: a
+/// cone's rows are its twist and swing, so its rotation motor cannot ride on them.
+pub const JOINT_DRIVE: u32 = 1 << 30;
 /// Either reason a joint solves nothing.
 pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN;

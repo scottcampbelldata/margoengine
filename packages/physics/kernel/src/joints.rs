@@ -1124,15 +1124,38 @@ impl World {
         }
     }
 
+    /// The turning rows of a rotation drive: the axes of frame A turned by the target, and what is left of the turn from there
+    /// to frame B, as a rotation vector along them. It is the measure of a free ball joint whose frame A sat on the target,
+    /// read without moving frame A, so a cone's own frames and rows stay as its limits want them.
+    fn drive_rows(&self, row: usize, a: usize, b: usize, rows: &mut [Row; 6], at: &mut [f32; 6]) {
+        let (frame_a, frame_b) = (self.q(ROTATION_X, a).mul(self.q(JOINT_FRAME_A_X, row)), self.q(ROTATION_X, b).mul(self.q(JOINT_FRAME_B_X, row)));
+        let target = frame_a.mul(self.q(JOINT_DRIVE_X, row));
+        let mut left = target.conjugate().mul(frame_b);
+        if left.w < 0.0 {
+            left = Q { x: -left.x, y: -left.y, z: -left.z, w: -left.w };
+        }
+        let turn = left.to_rotation_vector();
+        let along = [turn.x, turn.y, turn.z];
+        for k in 0..3 {
+            let axis = target.rotate(AXES[k]);
+            rows[3 + k] = Row { d: v3(0.0, 0.0, 0.0), ta: axis, tb: axis };
+            at[3 + k] = along[k];
+        }
+    }
+
     /// A joint's motors and limits, one row at a time: they stop and start, which a factored path cannot.
     fn soft_rows(&mut self, row: usize, flags: u32, h: f32, stiffness: Soft, most: f32, pass: Pass) {
         let view = self.view(row);
         let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
         let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
         if pass != Pass::Relax {
+            let (mut rows, mut at) = (view.rows, view.at);
+            if flags & JOINT_DRIVE != 0 {
+                self.drive_rows(row, a, b, &mut rows, &mut at);
+            }
             for k in 0..6 {
                 if flags & (JOINT_MOTOR_ON << k) != 0 {
-                    self.motor_row(row, k, flags & (JOINT_MOTOR_FORCE << k) != 0, &view.rows[k], view.at[k], h, &mut body_a, &mut body_b);
+                    self.motor_row(row, k, flags & (JOINT_MOTOR_FORCE << k) != 0, &rows[k], at[k], h, &mut body_a, &mut body_b);
                 }
             }
         }

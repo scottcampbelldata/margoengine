@@ -2,7 +2,7 @@
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
 import type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
-import { JOINT_BROKEN, JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
+import { JOINT_BROKEN, JOINT_CONE, JOINT_DRIVE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -204,7 +204,7 @@ export class PhysicsJoint {
    */
   setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
     if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    if (this.type !== 'spherical' && this.type !== 'cone') throw new TypeError('Rotation motors need a spherical or cone joint; use setMotor on a hinge.');
     const [x, y, z, w] = rotation;
     const squared = x * x + y * y + z * z + w * w;
     if (!(squared > 0.998 && squared < 1.002))
@@ -214,10 +214,20 @@ export class PhysicsJoint {
     const { row } = this,
       columns = this.owner.kernel.columns,
       spin = motor.targetVelocity;
-    columns.jointFrameAX[row] = x;
-    columns.jointFrameAY[row] = y;
-    columns.jointFrameAZ[row] = z;
-    columns.jointFrameAW[row] = w;
+    if (this.type === 'cone') {
+      // A cone's frames hold its axis, so the target lives in columns of its own, and its limits keep acting.
+      const n = 1 / sqrtOf(squared);
+      columns.jointDriveX[row] = x * n;
+      columns.jointDriveY[row] = y * n;
+      columns.jointDriveZ[row] = z * n;
+      columns.jointDriveW[row] = w * n;
+      columns.jointFlags[row] |= JOINT_DRIVE;
+    } else {
+      columns.jointFrameAX[row] = x;
+      columns.jointFrameAY[row] = y;
+      columns.jointFrameAZ[row] = z;
+      columns.jointFrameAW[row] = w;
+    }
     for (let k = 0; k < 3; k++) {
       const axis = TURN + k,
         force = JOINT_MOTOR_FORCE << axis;
@@ -249,7 +259,7 @@ export class PhysicsJoint {
   }
   /** Turns the motor off: every axis's, on a spherical or generic joint. */
   clearMotor(): this {
-    const many = (this.type === 'spherical' || this.type === 'generic') && !this.removed,
+    const many = (this.type === 'spherical' || this.type === 'generic' || this.type === 'cone') && !this.removed,
       first = !many ? this.unit() : this.type === 'generic' ? 0 : TURN,
       { row } = this,
       columns = this.owner.kernel.columns;
@@ -257,6 +267,7 @@ export class PhysicsJoint {
       columns.jointFlags[row] &= ~(JOINT_MOTOR_ON << axis);
       columns[`jointMotor${axis}`][row] = 0;
     }
+    if (this.type === 'cone') columns.jointFlags[row] &= ~JOINT_DRIVE;
     this.wake();
     return this;
   }
@@ -410,4 +421,11 @@ function genericLocks(locked: readonly JointDof[]): number {
     bits |= JOINT_LOCK << axis;
   }
   return bits;
+}
+
+/** The square root by Newton's method, so a joint set up in one browser is the joint set up in another. */
+function sqrtOf(value: number): number {
+  let r = value > 1 ? value : 1;
+  for (let i = 0; i < 40; i++) r = 0.5 * (r + value / r);
+  return r;
 }
