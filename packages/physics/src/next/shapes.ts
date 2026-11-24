@@ -2,7 +2,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
-import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
+import { bounds, geometryPositions, roundness, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
 import { buildHull } from './hull.js';
 
 const PI = 3.141592653589793;
@@ -231,7 +231,8 @@ export function kernelCollider(
   let size: number[],
     parts: KernelCompoundPart[] | undefined,
     voxels: number | undefined,
-    segment: { middle: Vec3; rotation: Quat4 } | undefined;
+    segment: { middle: Vec3; rotation: Quat4 } | undefined,
+    border = 0;
   const surface = options.shape === 'segment' || options.shape === 'triangle' || options.shape === 'polyline';
   if (surface && (options.mass !== undefined || options.density !== undefined))
     throw new RangeError(
@@ -246,6 +247,7 @@ export function kernelCollider(
     }
     checkVec(half, 'Box halfExtents');
     size = [...half];
+    border = roundness(options.borderRadius, 'Box');
   } else if (options.shape === 'sphere') {
     if (options.radius === undefined) {
       const points = fitted(),
@@ -259,6 +261,7 @@ export function kernelCollider(
     const points = options.points ?? (options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
       { vertices, faces } = buildHull(points);
     size = [hulls.addHull(vertices, faces)];
+    border = roundness(options.borderRadius, 'Convex hull');
   } else if (options.shape === 'trimesh') {
     const source = options.geometry ?? (options.vertices ? null : fit.geometry),
       vertices = options.vertices ? Float32Array.from(options.vertices) : source ? geometryPositions(source, fit.scale) : fitted(),
@@ -360,6 +363,7 @@ export function kernelCollider(
       restitution: options.restitution,
       frictionCombine: options.frictionCombine,
       restitutionCombine: options.restitutionCombine,
+      border,
     },
   };
 }
@@ -371,6 +375,11 @@ export function kernelCollider(
  * volume.
  */
 export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryShape {
+  if ((options.shape === 'box' || options.shape === 'convexHull') && roundness(options.borderRadius, 'Query shape') > 0)
+    throw new MargoError(
+      'unsupported',
+      'A box or convexHull query shape with a borderRadius is not in the own solver yet; cast a cylinder, cone, sphere or capsule, or leave the border out.',
+    );
   if (options.shape === 'sphere' && options.radius !== undefined) return { shape: 'ball', size: [options.radius] };
   if (options.shape === 'box' && options.halfExtents) {
     checkVec(options.halfExtents, 'Box halfExtents');

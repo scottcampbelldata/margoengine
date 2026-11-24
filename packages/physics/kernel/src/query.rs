@@ -295,18 +295,38 @@ fn cone_interval(o: V3, d: V3, r: f32, h: f32) -> Option<(f32, V3, f32, V3)> {
 /// normal is read in closed form, from the core's point nearest the hit (the profile projection): GJK's own direction is
 /// held only to the square root of its relative stop, a few 1e-4 on a curve.
 fn ray_rounded(o: V3, d: V3, shape: crate::revolve::Revolved, border: f32, max: f32, solid: bool) -> Option<RayHit> {
+    use crate::cast::Solid;
+    let target = Solid::Revolved { shape, border, pose: crate::sat::Pose { p: ZERO, q: Q::IDENTITY } };
+    ray_round_solid(o, d, &target, |p| shape.project(p, 0.0).0, shape.reach(border), max, solid)
+}
+
+/// A ray against a polyhedron with a border, centred at the origin, as `ray_rounded`.
+fn ray_round_poly(o: V3, d: V3, poly: &crate::hull::Poly, border: f32, max: f32, solid: bool) -> Option<RayHit> {
+    use crate::cast::Solid;
+    let target = Solid::RoundPoly { poly: *poly, pose: crate::sat::Pose { p: ZERO, q: Q::IDENTITY }, border };
+    let mut reach = 0.0f32;
+    for i in 0..poly.vertices {
+        let v = poly.vertex(i);
+        reach = reach.max(sqrt(v.dot(v)));
+    }
+    ray_round_solid(o, d, &target, |p| crate::cast::poly_closest(poly, p), reach + border, max, solid)
+}
+
+/// The cast of a point along a ray against a round solid centred at the origin, with `nearest` the core's point nearest a
+/// point outside it and `reach` how far the surface lies from the origin.
+fn ray_round_solid(o: V3, d: V3, target: &crate::cast::Solid, nearest: impl Fn(V3) -> V3, reach: f32, max: f32, solid: bool) -> Option<RayHit> {
     use crate::cast::{CastOptions, Solid, cast_convex};
     let l = sqrt(d.dot(d));
     if l == 0.0 {
         return None;
     }
     let r = d.scale(1.0 / l);
-    let target = Solid::Revolved { shape, border, pose: crate::sat::Pose { p: ZERO, q: Q::IDENTITY } };
+    let target = *target;
     let point = |p: V3| Solid::Round { p, q: p, r: 0.0 };
     let options = |max: f32| CastOptions { max, target: 0.0, stop: true, geometry: true };
     // The surface's outward normal at a point on it: from the core's nearest point, a border away.
     let outward = |p: V3, fallback: V3| {
-        let n = p.sub(shape.project(p, 0.0).0);
+        let n = p.sub(nearest(p));
         let squared = n.dot(n);
         if squared > 0.0 { n.scale(1.0 / sqrt(squared)) } else { fallback }
     };
@@ -317,7 +337,7 @@ fn ray_rounded(o: V3, d: V3, shape: crate::revolve::Revolved, border: f32, max: 
     if solid {
         return Some(RayHit { t: 0.0, normal: ZERO });
     }
-    let beyond = sqrt(o.dot(o)) + 2.0 * shape.reach(border);
+    let beyond = sqrt(o.dot(o)) + 2.0 * reach;
     let back = cast_convex(&point(o.add(r.scale(beyond))), &target, r.scale(-1.0), &options(beyond))?;
     let t = (beyond - back.t) / l;
     if t <= max { Some(RayHit { t, normal: outward(o.add(d.scale(t)), back.normal).scale(-1.0) }) } else { None }
@@ -496,8 +516,14 @@ impl World {
         let pose = self.collider_pose(c);
         let (o, d) = (pose.unapply(origin), pose.q.unrotate(dir));
         let size = self.v(COLLIDER_A, c);
+        let border = self.s(COLLIDER_BORDER, c);
         let hit = match shape {
             SHAPE_BALL => ray_ball(o, d, size.x, max, solid),
+            SHAPE_BOX if border > 0.0 => {
+                let mut data = crate::hull::BoxData::new();
+                ray_round_poly(o, d, &crate::hull::box_poly(size, &mut data), border, max, solid)
+            }
+            SHAPE_HULL if border > 0.0 => ray_round_poly(o, d, &self.hull_poly(self.uu(COLLIDER_HULL, c) as usize), border, max, solid),
             SHAPE_BOX => ray_box(o, d, size, max, solid),
             SHAPE_CAPSULE => ray_capsule(o, d, size.y, size.x, max, solid),
             SHAPE_CYLINDER | SHAPE_CONE if size.z > 0.0 => {

@@ -59,6 +59,7 @@ fn moved(s: &Solid, by: V3) -> Solid {
     match *s {
         Solid::Round { p, q, r } => Solid::Round { p: p.add(by), q: q.add(by), r },
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
+        Solid::RoundPoly { poly, pose, border } => Solid::RoundPoly { poly, pose: Pose { p: pose.p.add(by), q: pose.q }, border },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
         Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
@@ -348,9 +349,9 @@ fn walks(w: &World, c: usize, frame: Pose, targets: &[Solid], seed: u32, spread:
         let r = if k % 4 == 0 { frame.q.rotate(v3(0.0, -1.0, 0.0)) } else { rng.unit() };
         let q = rng.turn();
         let shape = match k % 3 {
-            0 => Shape { kind: SHAPE_BALL, size: v3(0.4, 0.0, 0.0), hull: 0 },
-            1 => Shape { kind: SHAPE_CAPSULE, size: v3(0.25, 0.5, 0.0), hull: 0 },
-            _ => Shape { kind: SHAPE_BOX, size: v3(0.3, 0.5, 0.2), hull: 0 },
+            0 => Shape { kind: SHAPE_BALL, size: v3(0.4, 0.0, 0.0), hull: 0, border: 0.0 },
+            1 => Shape { kind: SHAPE_CAPSULE, size: v3(0.25, 0.5, 0.0), hull: 0, border: 0.0 },
+            _ => Shape { kind: SHAPE_BOX, size: v3(0.3, 0.5, 0.2), hull: 0, border: 0.0 },
         };
         let o2 = CastOptions { max: 20.0, target: if k % 5 == 0 { 0.1 } else { 0.0 }, ..PLAIN };
         let got = w.cast_collider(c, shape, Pose { p: o, q }, r, &o2);
@@ -489,7 +490,7 @@ fn the_world_picks_the_nearest_collider_and_overlaps_follow_gjk() {
     let ball = w.add_collider(a, SHAPE_BALL, [1.0, 0.0, 0.0], [0.0; 3], ID, 1.0).unwrap();
     let b = fixed(&mut w, v3(3.0, 0.0, 0.0), Q::from_rotation_vector(v3(0.0, 0.7, 0.0)));
     let cube = w.add_collider(b, SHAPE_BOX, [1.0, 1.0, 1.0], [0.0; 3], ID, 1.0).unwrap();
-    let probe = Shape { kind: SHAPE_BALL, size: v3(0.5, 0.0, 0.0), hull: 0 };
+    let probe = Shape { kind: SHAPE_BALL, size: v3(0.5, 0.0, 0.0), hull: 0, border: 0.0 };
     let from = Pose { p: v3(0.0, 0.0, 0.0), q: Q::IDENTITY };
     let (c, hit) = w.cast_shape(probe, from, v3(-1.0, 0.0, 0.0), &PLAIN, &ALL).unwrap();
     assert!(c == ball && (hit.t - 1.5).abs() < 1e-4, "{c} {hit:?}");
@@ -502,7 +503,7 @@ fn the_world_picks_the_nearest_collider_and_overlaps_follow_gjk() {
     let mut rng = Rng(51);
     for _ in 0..2000 {
         let pose = Pose { p: v3(rng.range(-6.0, 6.0), rng.range(-2.5, 2.5), rng.range(-2.5, 2.5)), q: rng.turn() };
-        let shape = Shape { kind: SHAPE_CAPSULE, size: v3(0.3, 0.6, 0.0), hull: 0 };
+        let shape = Shape { kind: SHAPE_CAPSULE, size: v3(0.3, 0.6, 0.0), hull: 0, border: 0.0 };
         let mut d = (BoxData::new(), BoxData::new());
         let query = w.solid(shape, pose, &mut d.0).unwrap();
         for (c, target) in [(ball, Solid::Round { p: v3(-3.0, 0.0, 0.0), q: v3(-3.0, 0.0, 0.0), r: 1.0 }), (cube, Solid::Poly { poly: box_poly(v3(1.0, 1.0, 1.0), &mut d.1), pose: w.collider_pose(cube as usize) })] {

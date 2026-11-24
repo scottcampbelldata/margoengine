@@ -41,6 +41,8 @@ const ZERO: V3 = V3 { x: 0.0, y: 0.0, z: 0.0 };
 pub enum Solid {
     Round { p: V3, q: V3, r: f32 },
     Poly { poly: Poly, pose: Pose },
+    /// A polyhedron with a border: every point within `border` of it (Rapier's round cuboid and round convex).
+    RoundPoly { poly: Poly, pose: Pose, border: f32 },
     Triangle([V3; 3]),
     Revolved { shape: Revolved, border: f32, pose: Pose },
 }
@@ -55,6 +57,11 @@ impl Convex for Solid {
                 if l > 0.0 { core.add(d.scale(r / sqrt(l))) } else { core }
             }
             Solid::Poly { poly, pose } => pose.apply(poly.support(pose.q.unrotate(d))),
+            Solid::RoundPoly { poly, pose, border } => {
+                let core = pose.apply(poly.support(pose.q.unrotate(d)));
+                let l = d.dot(d);
+                if border > 0.0 && l > 0.0 { core.add(d.scale(border / sqrt(l))) } else { core }
+            }
             Solid::Revolved { shape, border, pose } => {
                 let core = pose.apply(shape.support(pose.q.unrotate(d)));
                 let l = d.dot(d);
@@ -80,6 +87,8 @@ pub struct Shape {
     pub kind: u32,
     pub size: V3,
     pub hull: u32,
+    /// A box's or hull's border, 0 for none (a cylinder's or cone's is in `size.z`).
+    pub border: f32,
 }
 
 /// A cast's first touch: how far along, the unit normal outward from the collider hit, and the touching points, all in
@@ -184,6 +193,7 @@ fn shifted(s: &Solid, by: V3) -> Solid {
     match *s {
         Solid::Round { p, q, r } => Solid::Round { p: p.add(by), q: q.add(by), r },
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
+        Solid::RoundPoly { poly, pose, border } => Solid::RoundPoly { poly, pose: Pose { p: pose.p.add(by), q: pose.q }, border },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
         Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
@@ -194,6 +204,7 @@ pub(crate) fn core(s: &Solid) -> (Solid, f32) {
     match *s {
         Solid::Round { p, q, r } => (Solid::Round { p, q, r: 0.0 }, r),
         Solid::Revolved { shape, border, pose } => (Solid::Revolved { shape, border: 0.0, pose }, border),
+        Solid::RoundPoly { poly, pose, border } => (Solid::Poly { poly, pose }, border),
         other => (other, 0.0),
     }
 }
@@ -256,7 +267,7 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
         }
         for (s, sign) in [(b, 1.0f32), (&moved, -1.0)] {
             match *s {
-                Solid::Poly { poly, pose } => {
+                Solid::Poly { poly, pose } | Solid::RoundPoly { poly, pose, .. } => {
                     for f in 0..poly.faces {
                         consider(pose.q.rotate(poly.normal(f)).scale(sign));
                     }
@@ -369,6 +380,31 @@ pub fn project_convex(s: &Solid, p: V3, solid: bool) -> Projection {
             }
             Projection { point: pose.apply(poly_closest(&poly, local)), inside: false }
         }
+        Solid::RoundPoly { poly, pose, border } => {
+            // The core's nearest point, a border further along the way to `p`, or along the face it lies in when `p` is inside.
+            let local = pose.unapply(p);
+            let (mut most, mut face) = (f32::NEG_INFINITY, 0);
+            for f in 0..poly.faces {
+                let s = poly.normal(f).dot(local) - poly.plane(f);
+                if s > most {
+                    (most, face) = (s, f);
+                }
+            }
+            if most <= 0.0 {
+                if solid {
+                    return Projection { point: p, inside: true };
+                }
+                let n = poly.normal(face);
+                return Projection { point: pose.apply(local.sub(n.scale(most)).add(n.scale(border))), inside: true };
+            }
+            let near = poly_closest(&poly, local);
+            let d = local.sub(near);
+            let l = d.dot(d);
+            if l <= border * border {
+                return if solid { Projection { point: p, inside: true } } else { Projection { point: pose.apply(near.add(d.scale(border / sqrt(l)))), inside: true } };
+            }
+            Projection { point: pose.apply(near.add(d.scale(border / sqrt(l)))), inside: false }
+        }
         Solid::Triangle(t) => Projection { point: triangle_closest(t, p), inside: false },
         Solid::Revolved { shape, border, pose } => {
             let (point, inside) = shape.project(pose.unapply(p), border);
@@ -409,7 +445,7 @@ fn triangle_closest([a, b, c]: [V3; 3], p: V3) -> V3 {
 /// region); failing that, the nearest point of the edges. Comparing squared distances cannot settle it, as a slide of
 /// 5e-4 along the surface changes the square of a 4 m distance by less than its rounding; nor can GJK's stop at a
 /// relative gap of 1e-6, which leaves the point up to the root of that off along the surface.
-fn poly_closest(poly: &Poly, p: V3) -> V3 {
+pub(crate) fn poly_closest(poly: &Poly, p: V3) -> V3 {
     let (mut best, mut near) = (f32::INFINITY, ZERO);
     let mut offer = |q: V3| {
         let d = q.sub(p).dot(q.sub(p));
@@ -503,7 +539,11 @@ impl World {
                 let along = pose.q.rotate(v3(0.0, shape.size.y, 0.0));
                 Solid::Round { p: pose.p.sub(along), q: pose.p.add(along), r: shape.size.x }
             }
+            SHAPE_BOX if shape.border > 0.0 => Solid::RoundPoly { poly: box_poly(shape.size, data), pose, border: shape.border },
             SHAPE_BOX => Solid::Poly { poly: box_poly(shape.size, data), pose },
+            SHAPE_HULL if shape.hull < self.header().hull_rows[0] && shape.border > 0.0 => {
+                Solid::RoundPoly { poly: self.hull_poly(shape.hull as usize), pose, border: shape.border }
+            }
             SHAPE_HULL if shape.hull < self.header().hull_rows[0] => Solid::Poly { poly: self.hull_poly(shape.hull as usize), pose },
             SHAPE_CYLINDER | SHAPE_CONE => {
                 Solid::Revolved { shape: Revolved { cone: shape.kind == SHAPE_CONE, r: shape.size.x, h: shape.size.y }, border: shape.size.z, pose }
@@ -513,7 +553,7 @@ impl World {
     }
 
     pub(crate) fn shape_of(&self, c: usize) -> Shape {
-        Shape { kind: self.uu(COLLIDER_SHAPE, c), size: self.v(COLLIDER_A, c), hull: self.uu(COLLIDER_HULL, c) }
+        Shape { kind: self.uu(COLLIDER_SHAPE, c), size: self.v(COLLIDER_A, c), hull: self.uu(COLLIDER_HULL, c), border: self.s(COLLIDER_BORDER, c) }
     }
 
     /// The first touch of a query shape at `pose` moving along unit `r` (world space) with collider `c`.

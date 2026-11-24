@@ -179,6 +179,8 @@ columns! {
     COLLIDER_ROTATION_Z f32 Collider,
     COLLIDER_ROTATION_W f32 Collider,
     COLLIDER_DENSITY f32 Collider,
+    // A box's or hull's border radius (Rapier's round cuboid and round convex); 0 for none. A cylinder's and cone's is C.
+    COLLIDER_BORDER f32 Collider,
     // The hull row of a SHAPE_HULL collider.
     COLLIDER_HULL u32 Collider,
     // Surface: friction, bounce, and how each mixes with another collider's, two bits for friction then two for bounce.

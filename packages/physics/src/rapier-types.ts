@@ -328,6 +328,8 @@ export interface RapierModule {
     capsule(halfHeight: number, radius: number): ColliderDesc;
     cylinder(halfHeight: number, radius: number): ColliderDesc;
     cone(halfHeight: number, radius: number): ColliderDesc;
+    roundCuboid(hx: number, hy: number, hz: number, borderRadius: number): ColliderDesc;
+    roundConvexHull(points: Float32Array, borderRadius: number): ColliderDesc | null;
     roundCylinder(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
     roundCone(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
     convexHull(points: Float32Array): ColliderDesc | null;
@@ -369,7 +371,15 @@ export interface RapierModule {
   /** Rapier 0.20 and later. */
   SphericalImpulseJoint?: new (rawSet: never, bodySet: never, handle: number) => SphericalImpulseJoint;
   CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
-  ActiveCollisionTypes: { ALL: number } & Record<string, number>;
+  ActiveCollisionTypes: {
+    ALL: number;
+    DYNAMIC_DYNAMIC: number;
+    DYNAMIC_KINEMATIC: number;
+    DYNAMIC_FIXED: number;
+    KINEMATIC_KINEMATIC: number;
+    KINEMATIC_FIXED: number;
+    FIXED_FIXED: number;
+  };
   ActiveEvents: { COLLISION_EVENTS: number };
   ActiveHooks: Record<'FILTER_CONTACT_PAIRS' | 'FILTER_INTERSECTION_PAIRS', number>;
 }

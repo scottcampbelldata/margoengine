@@ -66,7 +66,8 @@ impl World {
                 let x = turn.rotate(v3(a, 0.0, 0.0)).abs();
                 let y = turn.rotate(v3(0.0, b, 0.0)).abs();
                 let z = turn.rotate(v3(0.0, 0.0, d)).abs();
-                (x.add(y).add(z), sqrt(a * a + b * b + d * d))
+                let border = self.s(COLLIDER_BORDER, c);
+                (x.add(y).add(z).add(v3(border, border, border)), sqrt(a * a + b * b + d * d) + border)
             }
             SHAPE_HULL => {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
@@ -75,7 +76,8 @@ impl World {
                 let y = turn.rotate(v3(0.0, half.y, 0.0)).abs();
                 let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
                 center = center.add(turn.rotate(self.v(HULL_BOX_X, hull)));
-                (x.add(y).add(z), self.s(HULL_RADIUS, hull))
+                let border = self.s(COLLIDER_BORDER, c);
+                (x.add(y).add(z).add(v3(border, border, border)), self.s(HULL_RADIUS, hull) + border)
             }
             SHAPE_TRIMESH => {
                 let mesh = self.uu(COLLIDER_HULL, c) as usize;

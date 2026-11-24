@@ -254,6 +254,13 @@ pub extern "C" fn collider_add(
 ) -> i32 {
     world().add_collider(body, shape, [a, b, c], [x, y, z], [qx, qy, qz, qw], density).map_or(-1, |row| row as i32)
 }
+/// Gives a box or hull collider a border: every point within `border` of it (Rapier's round cuboid and round convex). The
+/// mass stays the core's. 0 for none. False for a collider that is dead, is not a box or hull, or a border that is negative
+/// or not finite.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_border(collider: u32, border: f32) -> u32 {
+    world().set_collider_border(collider, border) as u32
+}
 /// Adds a convex child to a compound collider, placed in the compound's frame: its row, or -1 when the rows are used up,
 /// the compound is gone or the shape is not a ball, box, capsule or hull.
 #[unsafe(no_mangle)]
@@ -413,7 +420,7 @@ fn shape_args(kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f
     if !(x.is_finite() && y.is_finite() && z.is_finite() && l > 0.0 && l < f32::INFINITY && a.is_finite() && b.is_finite() && c.is_finite()) {
         return None;
     }
-    Some((Shape { kind, size: v3(a, b, c), hull }, Pose { p: v3(x, y, z), q: q.normalized() }))
+    Some((Shape { kind, size: v3(a, b, c), hull, border: 0.0 }, Pose { p: v3(x, y, z), q: q.normalized() }))
 }
 
 /// Sixteen words of a cast hit: collider, distance, the point and normal on the collider, the point and normal on the

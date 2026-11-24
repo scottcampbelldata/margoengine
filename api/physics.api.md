@@ -501,6 +501,8 @@ export interface RapierModule {
         capsule(halfHeight: number, radius: number): ColliderDesc;
         cylinder(halfHeight: number, radius: number): ColliderDesc;
         cone(halfHeight: number, radius: number): ColliderDesc;
+        roundCuboid(hx: number, hy: number, hz: number, borderRadius: number): ColliderDesc;
+        roundConvexHull(points: Float32Array, borderRadius: number): ColliderDesc | null;
         roundCylinder(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
         roundCone(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
         convexHull(points: Float32Array): ColliderDesc | null;
@@ -539,7 +541,13 @@ export interface RapierModule {
     CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
     ActiveCollisionTypes: {
         ALL: number;
-    } & Record<string, number>;
+        DYNAMIC_DYNAMIC: number;
+        DYNAMIC_KINEMATIC: number;
+        DYNAMIC_FIXED: number;
+        KINEMATIC_KINEMATIC: number;
+        KINEMATIC_FIXED: number;
+        FIXED_FIXED: number;
+    };
     ActiveEvents: {
         COLLISION_EVENTS: number;
     };
@@ -592,6 +600,7 @@ export interface ShapeCastHit extends Hit {
 export type ShapeOptions = {
     shape: 'box';
     halfExtents?: Vec3;
+    borderRadius?: number;
 } | {
     shape: 'sphere';
     radius?: number;
@@ -615,6 +624,7 @@ export type ShapeOptions = {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
     points?: ArrayLike<number>;
+    borderRadius?: number;
 } | {
     shape: 'trimesh';
     geometry?: ColliderGeometry;

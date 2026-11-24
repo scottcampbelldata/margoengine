@@ -25,7 +25,6 @@ use crate::layout::*;
 use crate::math::*;
 use crate::narrow::{Manifold, Point, Round, collide_polys, collide_round_poly, face_contact, ID_END};
 use crate::cast::{Solid, core};
-use crate::narrow::is_revolved;
 use crate::sat::Pose;
 use crate::smooth::{clip_along, collide_solids};
 use crate::world::{NONE, World};
@@ -502,7 +501,7 @@ impl World {
         let shape = self.uu(COLLIDER_SHAPE, other);
         let round = shape == SHAPE_BALL || shape == SHAPE_CAPSULE;
         let mut smooth_data = crate::hull::BoxData::new();
-        let smooth = if is_revolved(shape) { self.solid(self.shape_of(other), self.collider_pose(other), &mut smooth_data) } else { None };
+        let smooth = if self.is_smoothed(other) { self.solid(self.shape_of(other), self.collider_pose(other), &mut smooth_data) } else { None };
         let world_tri = Solid::Triangle([pose.apply(corners[0]), pose.apply(corners[1]), pose.apply(corners[2])]);
         // Every routine below gives the normal from the triangle to the other shape, `on_a` on the triangle.
         if let Some(solid) = smooth {

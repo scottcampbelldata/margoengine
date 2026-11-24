@@ -473,6 +473,14 @@ fn edge_on_face(core: &Segment, poly: &Poly, normal: V3, radius: f32, limit: f32
 }
 
 impl World {
+    /// Whether a collider goes through the general convex routes (GJK and clipping on solids): a cylinder or cone, or a
+    /// box or hull with a border.
+    #[inline(always)]
+    pub(crate) fn is_smoothed(&self, c: usize) -> bool {
+        let shape = self.uu(COLLIDER_SHAPE, c);
+        is_revolved(shape) || ((shape == SHAPE_BOX || shape == SHAPE_HULL) && self.s(COLLIDER_BORDER, c) > 0.0)
+    }
+
     /// A collider's frame in world space.
     #[inline(always)]
     pub fn collider_pose(&self, c: usize) -> Pose {
@@ -528,11 +536,11 @@ impl World {
         let (x, y, z) = (self.s(COLLIDER_A, c), self.s(COLLIDER_B, c), self.s(COLLIDER_C, c));
         let radius = match self.uu(COLLIDER_SHAPE, c) {
             SHAPE_BALL => x,
-            SHAPE_BOX => sqrt(x * x + y * y + z * z),
+            SHAPE_BOX => sqrt(x * x + y * y + z * z) + self.s(COLLIDER_BORDER, c),
             SHAPE_HULL => {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 let center = self.v(HULL_CENTER_X, hull);
-                self.s(HULL_RADIUS, hull) + sqrt(center.dot(center))
+                self.s(HULL_RADIUS, hull) + sqrt(center.dot(center)) + self.s(COLLIDER_BORDER, c)
             }
             SHAPE_TRIMESH => {
                 let mesh = self.uu(COLLIDER_HULL, c) as usize;
@@ -568,7 +576,7 @@ impl World {
         let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
         let polyhedral = |shape: u32| shape == SHAPE_BOX || shape == SHAPE_HULL;
         let (mut data_a, mut data_b) = (BoxData::new(), BoxData::new());
-        if is_revolved(shape_a) || is_revolved(shape_b) {
+        if self.is_smoothed(a) || self.is_smoothed(b) {
             let (Some(sa), Some(sb)) = (
                 self.solid(self.shape_of(a), self.collider_pose(a), &mut data_a),
                 self.solid(self.shape_of(b), self.collider_pose(b), &mut data_b),

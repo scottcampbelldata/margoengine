@@ -127,6 +127,7 @@ export interface KernelColliderOptions {
     restitution?: number;
     frictionCombine?: KernelCombine;
     restitutionCombine?: KernelCombine;
+    border?: number;
 }
 
 export type KernelColumn = Float32Array | Uint32Array;
@@ -532,6 +533,7 @@ export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 
 export type ShapeOptions = {
     shape: 'box';
     halfExtents?: Vec3;
+    borderRadius?: number;
 } | {
     shape: 'sphere';
     radius?: number;
@@ -555,6 +557,7 @@ export type ShapeOptions = {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
     points?: ArrayLike<number>;
+    borderRadius?: number;
 } | {
     shape: 'trimesh';
     geometry?: ColliderGeometry;

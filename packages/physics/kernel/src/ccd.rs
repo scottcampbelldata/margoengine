@@ -107,12 +107,12 @@ impl World {
         let size = self.v(COLLIDER_A, c);
         match self.uu(COLLIDER_SHAPE, c) {
             SHAPE_BALL | SHAPE_CAPSULE => size.x,
-            SHAPE_BOX => size.x.min(size.y).min(size.z),
+            SHAPE_BOX => size.x.min(size.y).min(size.z) + self.s(COLLIDER_BORDER, c),
             SHAPE_CYLINDER | SHAPE_CONE => Revolved { cone: self.uu(COLLIDER_SHAPE, c) == SHAPE_CONE, r: size.x, h: size.y }.thickness(size.z),
             SHAPE_HULL => {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 let (poly, center) = (self.hull_poly(hull), self.v(HULL_CENTER_X, hull));
-                (0..poly.faces).fold(f32::INFINITY, |least, f| least.min(poly.plane(f) - poly.normal(f).dot(center)))
+                (0..poly.faces).fold(f32::INFINITY, |least, f| least.min(poly.plane(f) - poly.normal(f).dot(center))) + self.s(COLLIDER_BORDER, c)
             }
             _ => 0.0,
         }
@@ -248,6 +248,7 @@ impl World {
         let round = match self.uu(COLLIDER_SHAPE, c) {
             SHAPE_BALL | SHAPE_CAPSULE => self.s(COLLIDER_A, c),
             SHAPE_CYLINDER | SHAPE_CONE => self.s(COLLIDER_C, c),
+            SHAPE_BOX | SHAPE_HULL => self.s(COLLIDER_BORDER, c),
             _ => 0.0,
         };
         self.collider_reach_of(c) - round
@@ -429,7 +430,7 @@ fn contact_axis(piece: &Solid, target: &Solid, at_start: &Distance) -> Option<V3
     }
     for (s, sign) in [(target, 1.0f32), (piece, -1.0)] {
         match *s {
-            Solid::Poly { poly, pose } => {
+            Solid::Poly { poly, pose } | Solid::RoundPoly { poly, pose, .. } => {
                 for f in 0..poly.faces {
                     consider(pose.q.rotate(poly.normal(f)).scale(sign));
                 }

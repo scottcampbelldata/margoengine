@@ -393,7 +393,7 @@ impl World {
         let mut data = BoxData::new();
         let poly = box_poly(half, &mut data);
         let shape = self.uu(COLLIDER_SHAPE, other);
-        if crate::narrow::is_revolved(shape) {
+        if self.is_smoothed(other) {
             // A cylinder or cone: the cell as a solid box through `smooth`, snapped to the face the rule names.
             let mut smooth_data = BoxData::new();
             let Some(solid) = self.solid(self.shape_of(other), self.collider_pose(other), &mut smooth_data) else { return };

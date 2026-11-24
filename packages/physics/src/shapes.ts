@@ -11,7 +11,12 @@ export type ColliderGeometry =
 
 /** Collider shape description: a primitive, mesh or heightfield with its size. */
 export type ShapeOptions =
-  | { shape: 'box'; halfExtents?: Vec3 }
+  | {
+      shape: 'box';
+      halfExtents?: Vec3;
+      /** Rounds every edge and corner with a border outside `halfExtents` (default 0), Rapier's `roundCuboid`. */
+      borderRadius?: number;
+    }
   | { shape: 'sphere'; radius?: number }
   | { shape: 'capsule'; halfHeight: number; radius: number }
   /**
@@ -21,7 +26,13 @@ export type ShapeOptions =
   | { shape: 'cylinder'; halfHeight: number; radius: number; borderRadius?: number }
   /** Apex at +`halfHeight` on local Y, base disk at -`halfHeight`; `borderRadius` as a cylinder's, Rapier's `roundCone`. */
   | { shape: 'cone'; halfHeight: number; radius: number; borderRadius?: number }
-  | { shape: 'convexHull'; geometry?: ColliderGeometry; points?: ArrayLike<number> }
+  | {
+      shape: 'convexHull';
+      geometry?: ColliderGeometry;
+      points?: ArrayLike<number>;
+      /** Rounds every edge and corner with a border outside the hull (default 0), Rapier's `roundConvexHull`. */
+      borderRadius?: number;
+    }
   | {
       shape: 'trimesh';
       geometry?: ColliderGeometry;
@@ -220,6 +231,14 @@ export function bounds(positions: Float32Array): { min: [number, number, number]
   return { min, max };
 }
 
+/** A border radius: 0 for none, else above zero and finite. */
+export function roundness(border: number | undefined, label: string): number {
+  if (border === undefined) return 0;
+  if (!(border >= 0) || !Number.isFinite(border))
+    throw new RangeError(`${label} borderRadius must be 0 or more and finite (got ${border}).`);
+  return border;
+}
+
 /**
  * Builds a Rapier ColliderDesc. Geometry-derived shapes and auto-fitted boxes and spheres use `fit`
  * (the mesh geometry and scale); their center offset is returned so it can be added to the collider offset.
@@ -245,11 +264,10 @@ export function createColliderDesc(
         for (let a = 0; a < 3; a++) center[a] = (min[a] + max[a]) / 2;
       }
       checkVec(half, 'Box halfExtents');
-      desc = R.ColliderDesc.cuboid(
-        positive(half[0], 'Box half extent'),
-        positive(half[1], 'Box half extent'),
-        positive(half[2], 'Box half extent'),
-      );
+      const border = roundness(options.borderRadius, 'Box');
+      desc = border
+        ? R.ColliderDesc.roundCuboid(positive(half[0], 'Box half extent'), positive(half[1], 'Box half extent'), positive(half[2], 'Box half extent'), border)
+        : R.ColliderDesc.cuboid(positive(half[0], 'Box half extent'), positive(half[1], 'Box half extent'), positive(half[2], 'Box half extent'));
       break;
     }
     case 'sphere': {
@@ -294,7 +312,8 @@ export function createColliderDesc(
           : fitted();
       if (points.length < 12 || points.length % 3) throw new RangeError('A convex hull needs at least 4 points');
       finite(points, 'Convex hull points');
-      desc = R.ColliderDesc.convexHull(points);
+      const round = roundness(options.borderRadius, 'Convex hull');
+      desc = round ? R.ColliderDesc.roundConvexHull(points, round) : R.ColliderDesc.convexHull(points);
       if (!desc)
         throw new RangeError(
           'Convex hull failed because the points are degenerate; provide points that span a volume.',

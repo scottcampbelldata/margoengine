@@ -47,7 +47,7 @@ fn feature(s: &Solid, d: V3, corners: &mut Corners) -> Feature {
             let c = axis.dot(d) / l;
             if c.abs() <= SQUARE { Feature::Segment(p, q) } else { Feature::Point(if c > 0.0 { q } else { p }) }
         }
-        Solid::Poly { poly, pose } => {
+        Solid::Poly { poly, pose } | Solid::RoundPoly { poly, pose, .. } => {
             let local = pose.q.unrotate(d);
             let (mut face, mut best) = (0, f32::NEG_INFINITY);
             for f in 0..poly.faces {
@@ -150,7 +150,7 @@ fn feature(s: &Solid, d: V3, corners: &mut Corners) -> Feature {
 fn inner(s: &Solid) -> V3 {
     match *s {
         Solid::Round { p, q, .. } => p.add(q).scale(0.5),
-        Solid::Poly { poly, pose } => pose.apply(poly.center),
+        Solid::Poly { poly, pose } | Solid::RoundPoly { poly, pose, .. } => pose.apply(poly.center),
         Solid::Triangle([a, b, c]) => a.add(b).add(c).scale(1.0 / 3.0),
         Solid::Revolved { pose, .. } => pose.p,
     }

@@ -423,6 +423,23 @@ impl World {
         Some(row)
     }
 
+    /// Sets a box's or hull's border (see `api::collider_set_border`).
+    pub fn set_collider_border(&mut self, collider: u32, border: f32) -> bool {
+        let at = collider as usize;
+        if collider >= self.header().collider_rows
+            || self.uu(COLLIDER_STATE, at) & REMOVED != 0
+            || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
+            || !(border >= 0.0 && border < f32::INFINITY)
+            || !matches!(self.uu(COLLIDER_SHAPE, at), SHAPE_BOX | SHAPE_HULL)
+        {
+            return false;
+        }
+        self.set_s(COLLIDER_BORDER, at, border);
+        self.mark_pending(collider);
+        self.wake(self.uu(COLLIDER_BODY, at));
+        true
+    }
+
     /// A free collider row, or None when the rows are used up.
     fn take_collider_row(&mut self) -> Option<u32> {
         let header = self.header();

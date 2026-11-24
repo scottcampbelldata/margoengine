@@ -30,7 +30,8 @@ Where each row lives: K = kernel (Rust), N = `next` entry (TS). Tests are in `pa
 | Triangle | full | a one-triangle mesh, both sides; ray and rest tested against Rapier |
 | Polyline | full | a compound of segments; as a query shape see shape cast |
 | Half space | missing | root entry has it |
-| Round cuboid, round convex hull, round triangle | missing | border radius exists for cylinder and cone only |
+| Round cuboid, round convex hull | partial | `borderRadius` on box and hull colliders, tested against Rapier; not on compound parts or query shapes |
+| Round triangle | missing | |
 | Collider shape change after creation | missing | |
 | Collider position and rotation relative to its body, set after creation | partial | read only |
 

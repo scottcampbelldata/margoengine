@@ -88,6 +88,7 @@ interface KernelExports extends WebAssembly.Exports {
     qw: number,
     density: number,
   ): number;
+  collider_set_border(collider: number, border: number): number;
   collider_add_part(
     compound: number,
     shape: number,
@@ -398,6 +399,8 @@ export interface KernelColliderOptions {
   frictionCombine?: KernelCombine;
   /** How a pair mixes its two restitutions (default 'average'). */
   restitutionCombine?: KernelCombine;
+  /** A box's or hull's border: every point within it of the shape, outside its size (default 0). Its mass stays the core's. */
+  border?: number;
 }
 
 /** Bits of the `flags` column (kernel/src/layout.rs). */
@@ -738,7 +741,12 @@ export class KernelWorld {
       throw new RangeError(`Row ${body} holds no body; use a row addBody returned.`);
     this.checkSize(shape, size);
     this.checkPose(position, rotation);
-    return this.place(body, spec[0], size, options);
+    const { border } = options;
+    if (border !== undefined && !(border >= 0 && Number.isFinite(border) && (border === 0 || shape === 'box' || shape === 'hull')))
+      throw new RangeError(`A border is 0 or more and finite, and only a box or hull takes one here (got ${border} on a ${shape}).`);
+    const row = this.place(body, spec[0], size, options);
+    if (border) this.api.collider_set_border(row, border);
+    return row;
   }
 
   /**
