@@ -1540,6 +1540,17 @@ export type ShapeOptions = {
     normal?: Vec3;
 };
 
+export interface UniversalJointOptions {
+    anchorA?: Vec3;
+    anchorB?: Vec3;
+    frameA?: Quat;
+    frameB?: Quat;
+    limitsX?: readonly [number, number];
+    limitsY?: readonly [number, number];
+    motorX?: Parameters<PhysicsJoint['setAxisMotor']>[1];
+    motorY?: Parameters<PhysicsJoint['setAxisMotor']>[1];
+}
+
 export type Vec3 = readonly [number, number, number];
 
 export class Vehicle implements PhysicsAttachment {
@@ -1584,6 +1595,23 @@ export interface VehicleOptions {
 }
 
 export type VoxelFill = 'surface' | 'filled';
+
+export interface WheelJoint {
+    readonly joint: PhysicsJoint;
+    readonly knuckle: PhysicsBody | null;
+    drive(speed: number): void;
+    coast(): void;
+    steer(angle: number): void;
+}
+
+export interface WheelJointOptions {
+    anchor?: Vec3;
+    wheelAnchor?: Vec3;
+    frequency?: number;
+    damping?: number;
+    travel?: readonly [number, number];
+    maxTorque?: number;
+}
 
 export interface WheelOptions {
     position: Vec3;
@@ -1636,6 +1664,12 @@ export interface WindOptions {
     };
     filter?: QueryFilter;
 }
+
+export function addUniversalJoint(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: UniversalJointOptions): PhysicsJoint;
+
+export function addWheelJoint(physics: Physics, chassis: PhysicsBody, wheel: PhysicsBody, options?: WheelJointOptions & {
+    steerable?: boolean;
+}): WheelJoint;
 
 export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): {
     vertices: Float32Array;

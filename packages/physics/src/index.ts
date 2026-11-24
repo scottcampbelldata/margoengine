@@ -59,8 +59,16 @@ export { explosion, WindField } from './fields.js';
 export type { ExplosionOptions, WindOptions } from './fields.js';
 export { DragJoint } from './drag.js';
 export type { DragOptions } from './drag.js';
+export { addUniversalJoint, addWheelJoint } from './joint-presets.js';
+export type { UniversalJointOptions, WheelJoint, WheelJointOptions } from './joint-presets.js';
 export { DistanceJoint, GearJoint, PulleyJoint, RackAndPinionJoint } from './mechanisms.js';
-export type { DistanceOptions, GearOptions, MechanismOptions, PulleyOptions, RackAndPinionOptions } from './mechanisms.js';
+export type {
+  DistanceOptions,
+  GearOptions,
+  MechanismOptions,
+  PulleyOptions,
+  RackAndPinionOptions,
+} from './mechanisms.js';
 export { Rope } from './rope.js';
 export type { RopeOptions } from './rope.js';
 export { eulerToQuat } from './math.js';

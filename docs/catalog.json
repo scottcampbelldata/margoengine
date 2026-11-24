@@ -2819,6 +2819,8 @@
       "Rope",
       "Vehicle",
       "WindField",
+      "addUniversalJoint",
+      "addWheelJoint",
       "cleanTrimesh",
       "collisionGroups",
       "convertMesh",
