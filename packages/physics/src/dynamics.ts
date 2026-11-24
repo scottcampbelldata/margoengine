@@ -141,7 +141,7 @@ function cholesky(a: number[][], b: number[]): number[] {
       for (let k = 0; k < j; k++) sum -= l[i]![k]! * l[j]![k]!;
       if (i === j) {
         if (!(sum > 0))
-          throw new RangeError('The mass matrix is not positive definite: a link has no mass or inertia.');
+          throw new RangeError('The mass matrix is not positive definite: a link has no mass or inertia; give every link a collider with a density, or call setMassProperties on it.');
         l[i]![j] = Math.sqrt(sum);
       } else l[i]![j] = sum / l[j]![j]!;
     }
@@ -184,7 +184,7 @@ export function massMatrix(kernel: KernelWorld, multibody: Multibody): number[][
 export function jacobian(kernel: KernelWorld, multibody: Multibody, link: PhysicsBody, point: Vec3): number[][] {
   const bodies = [multibody.root, ...multibody.links.map((l) => l.body)],
     at = bodies.indexOf(link);
-  if (at < 0) throw new RangeError('That link is not in this tree.');
+  if (at < 0) throw new RangeError('That link is not in this tree; pass a body that was given to physics.addMultibody.');
   const tree = read(kernel, multibody),
     pose = poseOf(kernel, link.row);
   return jacobianOf(tree, at, add(pose.p, qrot(pose.q, point)));

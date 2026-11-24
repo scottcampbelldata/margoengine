@@ -249,6 +249,7 @@ interface BoundMesh {
  */
 export type SoftSolver = 'constraints' | 'fem';
 
+/** The elastic model of a body's cells: see {@link CellMaterial.model}. */
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
 /**
