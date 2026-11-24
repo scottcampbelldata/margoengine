@@ -331,7 +331,7 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 
 | Row | Rapier | Root today (`physics2d`) | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-01 | 2D bodies, types, forces, damping, sleep, locks | yes, on the own kernel (2026-11-24) | the kernel: static, kinematic (velocity or position driven) and dynamic bodies, gravity scale, damping, forces, torques, impulses at a point, fixed rotation, dominance, islands that sleep and wake as one (`physics2d/kernel/tests/world.rs`, `bodies.rs`); locked translation axes and additional mass not yet | PARTIAL: locked axes and additional mass MISSING | Wasm | Wasm |
+| T-01 | 2D bodies, types, forces, damping, sleep, locks | yes, on the own kernel (2026-11-24) | the kernel: static, kinematic (velocity or position driven) and dynamic bodies, gravity scale, damping, forces, torques, impulses at a point, fixed rotation, dominance, additional mass, islands that sleep and wake as one (`physics2d/kernel/tests/world.rs`, `bodies.rs`, `snapshot.rs`); locked translation axes not yet | PARTIAL: locked translation axes MISSING | Wasm | Wasm |
 | T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | yes, on the own kernel | the kernel and the Wasm facade: circle, box, capsule, segment, convex polygon, concave polygons split by ear clipping and Hertel-Mehlhorn (`kernel/tests/decompose.rs`), polylines with ghost vertices (`physics2d/tests/physics2d.test.js`) | DONE | Wasm | Wasm |
 | T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | `triangle`, `borderRadius` | kernel cores with a radius, exact mass, facade options (`physics2d/tests/shapes-more.test.js`) | DONE | Wasm | Wasm |
 | T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | `heightfield`, `halfspace`, `compound`, `voxels`, `trimesh`, concave polygons | chains, a polygon 200,000 units across for the half space, pieces of one collider, merged outlines for voxels (`physics2d/tests/shapes-more.test.js`); accepted differences in limits.md | DONE | Wasm | Wasm |
@@ -343,8 +343,8 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 | T-10 | 2D queries: ray, point, shape overlap, shape cast, filters | yes, on the own kernel | ray (solid or not), point, shape overlap and shape cast with filters (`physics2d/kernel/tests/queries.rs`, `physics2d/tests/physics2d.test.js`) | DONE | Wasm | Wasm |
 | T-11 | 2D events, sensors, collision and solver groups, contact filter, dominance, CCD | yes, on the own kernel | events, sensors, collision groups, solver groups, active collision types, contact force events, dominance and CCD against fixed and kinematic bodies (`kernel/tests/events.rs`, `bodies.rs`, `ccd.rs`); contact filter hooks not yet | PARTIAL: physics hooks MISSING, CCD between dynamic bodies MISSING | Wasm | Wasm |
 | T-12 | 2D character controller, every option and output | yes, on the own kernel | slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector on the kernel's shape cast (`physics2d/tests/physics2d.test.js`); the PID controller is T-15 | DONE | Wasm | Wasm |
-| T-13 | 2D debug render | no | none | PLANNED 127 (`/debug`) | lines | lines on compat; W-02 |
-| T-14 | 2D snapshot | no | none | PLANNED 127 (`/snapshot`) | Wasm | Wasm |
+| T-13 | 2D debug render | `debugRender` | `kernel/src/debug.rs`: outlines, joints, contacts, boxes as coloured segments (`physics2d/kernel/tests/debug.rs`, `kernel-features.test.js`) | DONE | lines | lines on compat; W-02 |
+| T-14 | 2D snapshot | `snapshot`, `restore` | `kernel/src/snapshot.rs`: a restored world steps bit for bit (`physics2d/kernel/tests/snapshot.rs`, `kernel-features.test.js`) | DONE | Wasm | Wasm |
 | T-15 | 2D PID controller (`AngZ` only for angles) | no | none | MISSING, 143.4 | Wasm | Wasm |
 | T-16 | 2D `length_unit` | `pixelsPerMeter` | none | PLANNED 127 (keeps `pixelsPerMeter`) | Wasm | Wasm |
 
@@ -541,7 +541,7 @@ Counted from the rows on 2026-11-08 by `node scripts/check-rapier-parity.mjs`, o
 
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 252 | 93 | 21 | 0 | 9 | 125 | 4 |
+| 1, Rapier parity | 252 | 95 | 21 | 0 | 7 | 125 | 4 |
 | 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans; 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.

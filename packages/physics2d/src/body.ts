@@ -42,6 +42,8 @@ export interface BodyOptions2D {
    * default 0.
    */
   dominance?: number;
+  /** Mass in kilograms added to what the colliders weigh; the body turns as a heavier body of the same build. Default 0. */
+  additionalMass?: number;
   userData?: unknown;
 }
 
@@ -180,6 +182,7 @@ export class Body2D {
   /** @internal */
   dirty = true;
   private removed = false;
+  private extraMass = 0;
 
   /** @internal */
   constructor(
@@ -317,6 +320,19 @@ export class Body2D {
   }
   get mass(): number {
     return this.read().f[7];
+  }
+  /** @internal The added mass a restored snapshot carries. */
+  restoreAdditionalMass(value: number): void {
+    this.extraMass = value;
+  }
+  /** Mass added to what the colliders weigh, in kilograms. */
+  get additionalMass(): number {
+    return this.extraMass;
+  }
+  set additionalMass(value: number) {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_set_additional_mass(h, this.handle, encode(value, 'additional mass')));
+    this.extraMass = value;
   }
   get sleeping(): boolean {
     return this.read().u[8] === 0;

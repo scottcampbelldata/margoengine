@@ -38,6 +38,10 @@ interface Exports {
   body_set_next(world: number, body: number, x: number, y: number, c: number, s: number): number;
   body_wake(world: number, body: number): number;
   body_sleep(world: number, body: number): number;
+  body_set_additional_mass(world: number, body: number, mass: number): number;
+  world_snapshot(world: number): number;
+  world_restore(world: number, bytes: number): number;
+  debug_lines(world: number, what: number): number;
   shape_create(world: number, body: number, kind: number): number;
   shape_remove(world: number, shape: number): number;
   shape_set(world: number, shape: number): number;

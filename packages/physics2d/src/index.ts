@@ -4,6 +4,7 @@ export type {
   Physics2DLoadOptions,
   KernelWasmSource,
   ContactForceEvent2D,
+  DebugLines2D,
   Physics2DEventMap,
   CollisionEvent2D,
   CollisionEventType2D,

@@ -77,12 +77,14 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance | `BodyOptions2D` | full |
 | Bodies | forces, torques, impulses (at the centre or a point), velocities, wake and sleep | `Body2D` methods | full |
-| Bodies | locked translation axes, additional mass, soft CCD | none | missing |
+| Bodies | additional mass | `additionalMass` | full |
+| Bodies | locked translation axes, soft CCD | none | missing |
 | Joints | fixed, revolute, prismatic, rope, spring, limits, motors, contacts between jointed bodies | `addJoint` | full |
 | Joints | generic joint (locked axes), reduced-coordinate multibody joints | none | missing |
 | Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
-| World | snapshots (serialise and restore the world), debug render data | none | missing |
+| World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |
+| World | debug render data | `debugRender()` | full |
 | Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
 
 ## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)

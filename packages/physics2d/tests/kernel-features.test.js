@@ -167,3 +167,57 @@ test('queries reject shapes the kernel cannot cast, and a stale handle is a stat
   assert.throws(() => body.applyImpulse([1, 1]), { name: 'MargoError', code: 'state' });
   physics.dispose();
 });
+
+test('a snapshot restores the world and it steps exactly as the original did', () => {
+  const physics = world();
+  const ground = floor(physics);
+  const bodies = [];
+  for (let i = 0; i < 8; i++)
+    bodies.push(physics.addBody(null, { position: [(i % 4) * 14, i * 15], colliders: i % 2 ? { shape: 'box', width: 12, height: 10 } : { shape: 'circle', radius: 6 } }));
+  const pole = physics.addBody(null, { type: 'fixed', position: [-100, 0], colliders: [] });
+  const swing = physics.addBody(null, { position: [-80, 0], colliders: { shape: 'box', width: 30, height: 4 } });
+  physics.addJoint(pole, swing, { type: 'revolute', anchorB: [-15, 0] });
+  const trace = () => [ground, ...bodies, swing].flatMap((b) => [...b.position, b.rotation]);
+  run(physics, 90);
+  const bytes = physics.snapshot();
+  const original = [];
+  for (let i = 0; i < 120; i++) {
+    physics.step();
+    original.push(trace());
+  }
+  physics.restore(bytes);
+  const again = [];
+  for (let i = 0; i < 120; i++) {
+    physics.step();
+    again.push(trace());
+  }
+  assert.deepEqual(again, original, 'bit for bit');
+  // Adding a body since the snapshot makes it unrestorable, and bytes that are not a snapshot are refused.
+  physics.addBody(null, { colliders: { shape: 'circle', radius: 2 } });
+  assert.throws(() => physics.restore(bytes), { name: 'MargoError', code: 'state' });
+  assert.throws(() => physics.restore(new Uint8Array(12)), RangeError);
+  physics.dispose();
+});
+
+test('debugRender gives lines with colour codes; additionalMass adds to the mass', () => {
+  const physics = world();
+  floor(physics);
+  const ball = physics.addBody(null, { position: [0, 60], colliders: { shape: 'circle', radius: 6 }, additionalMass: 2 });
+  const plain = physics.addBody(null, { position: [60, 60], colliders: { shape: 'circle', radius: 6 } });
+  assert.ok(Math.abs(ball.mass - plain.mass - 2) < 1e-4, `${ball.mass} against ${plain.mass}`);
+  assert.equal(ball.additionalMass, 2);
+  ball.additionalMass = 0;
+  assert.ok(Math.abs(ball.mass - plain.mass) < 1e-5);
+  assert.throws(() => (ball.additionalMass = -1), RangeError);
+  run(physics, 60);
+  const all = physics.debugRender();
+  assert.equal(all.vertices.length, 4 * all.colors.length);
+  assert.ok(all.colors.includes(0) && (all.colors.includes(1) || all.colors.includes(2)) && all.colors.includes(8));
+  const shapes = physics.debugRender({ shapes: true });
+  assert.ok(shapes.colors.every((c) => c <= 4) && shapes.colors.length < all.colors.length);
+  // Lines are in world units: the floor's top edge is at y 90.
+  let top = false;
+  for (let i = 0; i < shapes.colors.length; i++) if (shapes.colors[i] === 0 && Math.abs(shapes.vertices[4 * i + 1] - 90) < 0.01 && Math.abs(shapes.vertices[4 * i + 3] - 90) < 0.01) top = true;
+  assert.ok(top, 'the floor outline is drawn in pixels');
+  physics.dispose();
+});

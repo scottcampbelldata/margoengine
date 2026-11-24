@@ -524,3 +524,61 @@ pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
         Ok(hits.len() as i32)
     })
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_additional_mass(handle: i32, body: u32, mass: f32) -> i32 {
+    with_world!(handle, |w| w.set_additional_mass(body, mass).map(|()| 0))
+}
+
+/// Writes the world's snapshot to the buffer as bytes and returns their count.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_snapshot(handle: i32) -> i32 {
+    with_world!(handle, |w| {
+        let bytes = w.snapshot();
+        ensure(bytes.len().div_ceil(4));
+        let words = io();
+        for (i, chunk) in bytes.chunks(4).enumerate() {
+            let mut word = [0u8; 4];
+            word[..chunk.len()].copy_from_slice(chunk);
+            words[i] = u32::from_le_bytes(word);
+        }
+        Ok(bytes.len() as i32)
+    })
+}
+
+/// Replaces the world with the snapshot of `len` bytes in the buffer; handles into it stay what they were.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_restore(handle: i32, len: u32) -> i32 {
+    if world(handle).is_err() {
+        return fail(PhysicsError::InvalidHandle);
+    }
+    let len = len as usize;
+    if len.div_ceil(4) > io().len() {
+        return fail(PhysicsError::InvalidParameter);
+    }
+    let mut bytes = Vec::with_capacity(len);
+    for word in io().iter().take(len.div_ceil(4)) {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    bytes.truncate(len);
+    match World::from_snapshot(&bytes) {
+        Ok(restored) => {
+            state().worlds[handle as usize] = Some(Box::new(restored));
+            0
+        }
+        Err(error) => fail(error),
+    }
+}
+
+/// Writes the lines to draw (five numbers each: x1, y1, x2, y2, colour; `what` is the `DEBUG_*` bits) and returns how many.
+#[unsafe(no_mangle)]
+pub extern "C" fn debug_lines(handle: i32, what: u32) -> i32 {
+    with_world!(handle, |w| {
+        let lines = w.debug_lines(what);
+        ensure(lines.len());
+        for (i, v) in lines.iter().enumerate() {
+            put(i, *v);
+        }
+        Ok((lines.len() / 5) as i32)
+    })
+}

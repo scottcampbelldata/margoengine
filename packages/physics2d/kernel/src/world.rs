@@ -101,6 +101,8 @@ pub struct Body {
     pub fixed_rotation: bool,
     pub ccd: bool,
     pub dominance: i8,
+    /// Mass added to what the shapes weigh; the inertia grows in proportion (a heavier body of the same build).
+    pub additional_mass: f32,
     /// A force and a torque that act every step until reset.
     pub force: V2,
     pub torque: f32,
@@ -400,6 +402,12 @@ impl Broad {
             Broad::Sweep(s) => s.pairs(out, keep),
         }
     }
+    fn fat(&self, key: u32) -> Option<Bounds<2>> {
+        match self {
+            Broad::Tree(t) => t.fat(key).copied(),
+            Broad::Sweep(s) => s.fat(key).copied(),
+        }
+    }
     fn remove(&mut self, key: u32) {
         match self {
             Broad::Tree(t) => t.remove(key),
@@ -476,12 +484,12 @@ pub struct World {
     pub events: Vec<Event>,
     pub force_events: Vec<ForceEvent>,
     /// Stop events of pairs that lost a shape between steps; the next step reports them first.
-    pending_events: Vec<Event>,
-    free_bodies: Vec<u32>,
-    free_shapes: Vec<u32>,
+    pub(crate) pending_events: Vec<Event>,
+    pub(crate) free_bodies: Vec<u32>,
+    pub(crate) free_shapes: Vec<u32>,
     /// Each joint's stable id, by index, and the index of each id (`NONE` once removed).
-    joint_ids: Vec<u32>,
-    joint_slot: Vec<u32>,
+    pub(crate) joint_ids: Vec<u32>,
+    pub(crate) joint_slot: Vec<u32>,
     pub counts: Counts,
     pub steps: u64,
     pub(crate) broad: Broad,
@@ -525,6 +533,14 @@ fn bounds_from_validated(core: &Core, xf: Xf) -> Result<Bounds<2>, PhysicsError>
 }
 
 impl World {
+    /// The fat box the broad phase holds for a shape.
+    pub(crate) fn broad_fat(&self, shape: u32) -> Option<Bounds<2>> {
+        self.broad.fat(shape)
+    }
+    /// Gives a shape exactly this fat box (restoring a snapshot).
+    pub(crate) fn broad_place_exact(&mut self, shape: u32, fat: &Bounds<2>) {
+        self.broad.place(shape, fat, 0.0);
+    }
     pub fn new(settings: Settings) -> Self {
         World {
             settings,
@@ -576,6 +592,7 @@ impl World {
             fixed_rotation: def.fixed_rotation,
             ccd: def.ccd,
             dominance: def.dominance,
+            additional_mass: 0.0,
             force: V2::ZERO,
             torque: 0.0,
             next_target: None,
@@ -731,6 +748,12 @@ impl World {
             for i in 0..core.count {
                 extent = extent.max(core.vertices[i].sub(local_center).length() + core.radius);
             }
+        }
+        // Added mass makes the body heavier and its inertia grows with it, as a denser build of the same shape would.
+        let extra = body.additional_mass;
+        if mass > 0.0 && extra > 0.0 {
+            inertia *= (mass + extra) / mass;
+            mass += extra;
         }
         let dynamic_mass = if mass > 0.0 { mass } else { 1.0 };
         let inverse_mass = 1.0 / dynamic_mass;
@@ -970,6 +993,19 @@ impl World {
         if linear_damping < 0.0 || angular_damping < 0.0 { return Err(PhysicsError::InvalidParameter); }
         let b = self.live_body(body)?;
         (b.linear_damping, b.angular_damping, b.gravity_scale, b.can_sleep, b.ccd, b.dominance) = (linear_damping, angular_damping, gravity_scale, can_sleep, ccd, dominance);
+        self.wake(body)
+    }
+
+    /// Adds `mass` kilograms to what the body's shapes weigh (0 takes it away) and works the mass out again.
+    pub fn set_additional_mass(&mut self, body: u32, mass: f32) -> Result<(), PhysicsError> {
+        if !mass.is_finite() { return Err(PhysicsError::NotFinite); }
+        if mass < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let before = self.live_body(body)?.clone();
+        self.bodies[body as usize].additional_mass = mass;
+        if let Err(error) = self.update_mass(body) {
+            self.bodies[body as usize] = before;
+            return Err(error);
+        }
         self.wake(body)
     }
 

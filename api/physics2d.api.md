@@ -35,6 +35,9 @@ export class Body2D {
     applyTorque(torque: number): this;
     resetForces(): this;
     get mass(): number;
+    restoreAdditionalMass(value: number): void;
+    get additionalMass(): number;
+    set additionalMass(value: number);
     get sleeping(): boolean;
     wakeUp(): this;
     sleep(): this;
@@ -56,6 +59,7 @@ export interface BodyOptions2D {
     canSleep?: boolean;
     lockRotation?: boolean;
     dominance?: number;
+    additionalMass?: number;
     userData?: unknown;
 }
 
@@ -157,6 +161,11 @@ export interface ContactForceEvent2D {
     normal: [number, number];
 }
 
+export interface DebugLines2D {
+    vertices: Float32Array;
+    colors: Uint8Array;
+}
+
 export interface Hit2D {
     body: Body2D;
     sprite: SpriteLike | null;
@@ -254,6 +263,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     overlapShape(shape: ShapeOptions2D, position: Vec2D, rotation?: number, filter?: QueryFilter2D): Body2D[];
     castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D, rotation?: number): CastHit2D | null;
     cast(d: Described, x: number, y: number, angle: number, dx: number, dy: number, max: number, filter?: QueryFilter2D): CastHit2D | null;
+    snapshot(): Uint8Array;
+    restore(bytes: Uint8Array): void;
+    debugRender(options?: {
+        shapes?: boolean;
+        joints?: boolean;
+        contacts?: boolean;
+        boxes?: boolean;
+    }): DebugLines2D;
     on<K extends keyof Physics2DEventMap>(type: K, listener: (event: Physics2DEventMap[K]) => void): () => void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -472,6 +489,10 @@ interface Exports {
     body_set_next(world: number, body: number, x: number, y: number, c: number, s: number): number;
     body_wake(world: number, body: number): number;
     body_sleep(world: number, body: number): number;
+    body_set_additional_mass(world: number, body: number, mass: number): number;
+    world_snapshot(world: number): number;
+    world_restore(world: number, bytes: number): number;
+    debug_lines(world: number, what: number): number;
     shape_create(world: number, body: number, kind: number): number;
     shape_remove(world: number, shape: number): number;
     shape_set(world: number, shape: number): number;

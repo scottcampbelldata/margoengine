@@ -13,6 +13,7 @@ extern crate self as margoengine_physics2d_kernel;
 pub(crate) mod ccd;
 #[cfg(target_arch = "wasm32")]
 pub mod api;
+pub mod debug;
 pub mod decompose;
 pub mod edit;
 pub mod error;
@@ -23,6 +24,7 @@ pub mod query;
 pub mod math;
 pub mod shape;
 pub mod smooth;
+pub mod snapshot;
 pub mod solver;
 pub mod world;
 

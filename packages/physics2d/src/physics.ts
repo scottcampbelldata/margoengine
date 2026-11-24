@@ -86,6 +86,12 @@ export interface Physics2DEventMap {
   afterstep: number;
 }
 
+/** Lines that draw a world: four numbers a line, and a colour code a line. */
+export interface DebugLines2D {
+  vertices: Float32Array;
+  colors: Uint8Array;
+}
+
 /** Limits which colliders a scene query can hit. */
 export interface QueryFilter2D {
   /** Packed interaction groups of the query, see `interactionGroups`. */
@@ -407,6 +413,14 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const handle = this.kernel.ok(this.kernel.exports.body_create(this.handle, BODY_KIND[type], flags));
     const body = new Body2D(this, handle, sprite, type);
     body.userData = options.userData;
+    if (options.additionalMass) {
+      try {
+        body.additionalMass = options.additionalMass;
+      } catch (error) {
+        this.kernel.exports.body_remove(this.handle, handle);
+        throw error;
+      }
+    }
     this.bodies.add(body);
     this.movers = null;
     try {
@@ -632,6 +646,95 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       return { ...base, distance: f[8 * i + 1] * k, point: [f[8 * i + 4] * k, f[8 * i + 5] * k], normal: [0 - f[8 * i + 6], 0 - f[8 * i + 7]] };
     }
     return null;
+  }
+
+  /**
+   * The world as bytes: bodies, colliders and joints with their velocities, contacts and sleep timers. `restore` puts a
+   * world back to it, and a restored world steps bit for bit as the original would have, so it serves rollback netcode,
+   * replays and save games. The bytes are only good for this world's own bodies: see {@link Physics2D.restore}.
+   */
+  snapshot(): Uint8Array {
+    this.live();
+    const { kernel } = this;
+    const length = kernel.ok(kernel.exports.world_snapshot(this.handle));
+    const state = kernel.io(Math.ceil(length / 4)).u;
+    const bytes = new Uint8Array(state.buffer.slice(state.byteOffset, state.byteOffset + length));
+    const bodies = [...this.bodies].map((b) => [b.handle, b.colliders.map((c) => c.shapes)] as const);
+    const header = new TextEncoder().encode(
+      JSON.stringify({
+        gravity: this.gravityValue,
+        bodies,
+        joints: [...this.joints].map((j) => j.handle),
+        extra: [...this.bodies].map((b) => b.additionalMass),
+      }),
+    );
+    const out = new Uint8Array(8 + header.length + bytes.length);
+    new DataView(out.buffer).setUint32(0, 0x50443253, true);
+    new DataView(out.buffer).setUint32(4, header.length, true);
+    out.set(header, 8);
+    out.set(bytes, 8 + header.length);
+    return out;
+  }
+
+  /**
+   * Puts the world back to a {@link Physics2D.snapshot}. The bodies, colliders and joints must be the ones that existed
+   * when it was taken (none added or removed since; moving, waking and changing them is fine); the interpolation
+   * history of every body restarts at the restored pose, and listeners and sprites stay as they are.
+   * @throws MargoError (`state`) when bodies, colliders or joints were added or removed since the snapshot.
+   * @throws RangeError when `bytes` is not a snapshot of this package.
+   */
+  restore(bytes: Uint8Array): void {
+    this.live();
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (bytes.byteLength < 8 || view.getUint32(0, true) !== 0x50443253 || 8 + view.getUint32(4, true) > bytes.byteLength)
+      throw new RangeError('Physics2D.restore needs the bytes Physics2D.snapshot returned.');
+    const headerLength = view.getUint32(4, true);
+    const header = JSON.parse(new TextDecoder().decode(bytes.subarray(8, 8 + headerLength))) as {
+      gravity: [number, number];
+      bodies: Array<[number, number[][]]>;
+      joints: number[];
+      extra: number[];
+    };
+    const now = JSON.stringify([...this.bodies].map((b) => [b.handle, b.colliders.map((c) => c.shapes)]));
+    if (now !== JSON.stringify(header.bodies) || JSON.stringify([...this.joints].map((j) => j.handle)) !== JSON.stringify(header.joints))
+      throw new MargoError('state', 'Physics2D.restore: bodies, colliders or joints were added or removed since the snapshot; restore it before changing them, or take a new snapshot.');
+    const state = bytes.subarray(8 + headerLength);
+    const { kernel } = this;
+    const io = kernel.io(Math.ceil(state.length / 4));
+    new Uint8Array(io.u.buffer, io.u.byteOffset, state.length).set(state);
+    kernel.ok(kernel.exports.world_restore(this.handle, state.length));
+    this.gravityValue = [header.gravity[0], header.gravity[1]];
+    this.accumulator = 0;
+    let index = 0;
+    for (const body of this.bodies) {
+      body.snapshot();
+      body.pose.copyWithin(0, 3, 6);
+      body.dirty = true;
+      body.restoreAdditionalMass(header.extra[index++] ?? 0);
+    }
+  }
+
+  /**
+   * Lines that draw the world, in world units: `vertices` holds x1, y1, x2, y2 for each line and `colors` its colour
+   * code (0 fixed, 1 awake, 2 sleeping, 3 kinematic, 4 sensor, 5 joint, 6 contact point, 7 contact normal, 8 broad
+   * phase box). Everything is drawn unless `options` picks parts.
+   */
+  debugRender(options: { shapes?: boolean; joints?: boolean; contacts?: boolean; boxes?: boolean } = {}): DebugLines2D {
+    this.live();
+    const all = Object.keys(options).length === 0;
+    const what =
+      (all || options.shapes ? 1 : 0) | (all || options.joints ? 2 : 0) | (all || options.contacts ? 4 : 0) | (all || options.boxes ? 8 : 0);
+    const { kernel } = this;
+    const count = kernel.ok(kernel.exports.debug_lines(this.handle, what));
+    const f = kernel.io(5 * count).f;
+    const k = 1 / this.scale;
+    const vertices = new Float32Array(4 * count),
+      colors = new Uint8Array(count);
+    for (let i = 0; i < count; i++) {
+      for (let j = 0; j < 4; j++) vertices[4 * i + j] = f[5 * i + j] * k;
+      colors[i] = f[5 * i + 4];
+    }
+    return { vertices, colors };
   }
 
   /** Adds a listener; returns a function that removes it. */
