@@ -30,6 +30,7 @@ const GEAR = 1;
 const RACK_AND_PINION = 2;
 const PULLEY = 3;
 const DISTANCE = 4;
+const PATH = 5;
 
 abstract class Mechanism implements PhysicsAttachment {
   protected readonly slot: number;
@@ -37,7 +38,7 @@ abstract class Mechanism implements PhysicsAttachment {
 
   protected constructor(
     protected readonly physics: Physics,
-    kind: 1 | 2 | 3 | 4,
+    kind: 1 | 2 | 3 | 4 | 5,
     protected readonly a: PhysicsBody,
     protected readonly b: PhysicsBody,
     options: MechanismOptions,
@@ -234,5 +235,48 @@ export class DistanceJoint extends Mechanism {
     k.setCoupling(this.slot, 3, anchorB);
     k.setCoupling(this.slot, 6, [min, 0, 0]);
     k.setCoupling(this.slot, 7, [max, 0, 0]);
+  }
+}
+
+/** Options of {@link PathJoint}. */
+export interface PathOptions extends MechanismOptions {
+  /** The curve: a Catmull-Rom spline through these points (2 to 16), in the first body's frame. */
+  points: readonly Vec3[];
+  /** The follower's point that rides the curve, in its own frame (default its centre). */
+  anchor?: Vec3;
+  /** A motor along the curve: its speed in m/s (positive toward the last point) and the most force it may use in N. */
+  motor?: { speed: number; maxForce: number };
+}
+
+/**
+ * A path constraint: a point of the second body is held on a curve fixed to the first, free to slide along it, with an optional
+ * motor along the curve (Jolt's path constraint, for a body riding a rail, a slot or a track). The follower keeps its own
+ * orientation: add a joint or a motor for that. Rigid by default, or soft across the curve with `frequency`.
+ */
+export class PathJoint extends Mechanism {
+  constructor(physics: Physics, base: PhysicsBody, follower: PhysicsBody, options: PathOptions) {
+    const { points, motor } = options,
+      anchor: V = options.anchor ? ([...options.anchor] as V) : [0, 0, 0];
+    if (!Array.isArray(points) || points.length < 2 || points.length > 16)
+      throw new RangeError('A path has 2 to 16 points; pass options.points with that many.');
+    points.forEach((point, i) => checkVec(point, `Path point ${i}`));
+    checkVec(anchor, 'Anchor');
+    if (motor && !(Number.isFinite(motor.speed) && motor.maxForce >= 0 && Number.isFinite(motor.maxForce)))
+      throw new RangeError(
+        'A path motor has a finite speed and a maxForce of 0 or more; pass options.motor with both.',
+      );
+    super(physics, PATH, base, follower, options);
+    const k = physics.kernel;
+    k.setCoupling(this.slot, 3, anchor);
+    for (const point of points) k.setCoupling(this.slot, 9, point as V);
+    if (motor) k.setCoupling(this.slot, 10, [motor.speed, motor.maxForce, 0]);
+  }
+
+  /** Drives the follower along the curve at `speed` m/s with at most `maxForce` newtons (0 force lets it go). */
+  setMotor(speed: number, maxForce: number): this {
+    if (!(Number.isFinite(speed) && maxForce >= 0 && Number.isFinite(maxForce)))
+      throw new RangeError('A path motor has a finite speed and a maxForce of 0 or more; pass both.');
+    this.physics.kernel.setCoupling(this.slot, 10, [speed, maxForce, 0]);
+    return this;
   }
 }

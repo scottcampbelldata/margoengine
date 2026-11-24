@@ -2459,16 +2459,16 @@ export class KernelWorld {
     return Number.isInteger(joint) && joint >= 0 && this.api.joint_remove(joint) === 1;
   }
   /**
-   * Adds a coupling between two bodies: `kind` 1 is a gear, 2 a rack and pinion, 3 a pulley, 4 a distance range (see `couplings.rs`). Returns its slot
+   * Adds a coupling between two bodies: `kind` 1 is a gear, 2 a rack and pinion, 3 a pulley, 4 a distance range, 5 a path (see `couplings.rs`). Returns its slot
    * or -1 when the bodies are one, one is gone or memory is out.
    */
-  addCoupling(kind: 1 | 2 | 3 | 4, a: number, b: number): number {
+  addCoupling(kind: 1 | 2 | 3 | 4 | 5, a: number, b: number): number {
     const slot = this.api.coupling_add(kind, a, b);
     // The table grows with the world, which moves the columns.
     if (this.api.world_layout() !== this.layout) this.bind();
     return slot;
   }
-  /** Writes a coupling's field: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B, 6 ratio, 7 total, 8 softness (hertz, damping, correction). */
+  /** Writes a coupling's field: 0 axis A, 1 axis B, 2 anchor A, 3 anchor B, 4 ground A, 5 ground B, 6 ratio, 7 total, 8 softness (hertz, damping, correction), 9 add a path point, 10 path motor (speed, force). */
   setCoupling(slot: number, field: number, value: readonly [number, number, number]): void {
     this.api.coupling_set(slot, field, value[0], value[1], value[2]);
   }

@@ -1,7 +1,7 @@
 // Gear, rack and pinion and pulley joints against their closed forms.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DistanceJoint, GearJoint, PulleyJoint, Physics, RackAndPinionJoint } from '../dist/index.js';
+import { DistanceJoint, GearJoint, PathJoint, PulleyJoint, Physics, RackAndPinionJoint } from '../dist/index.js';
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -129,4 +129,43 @@ test('a distance joint with a range holds a body between its least and greatest 
   const b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
   assert.throws(() => new DistanceJoint(physics, a, b, { min: -1 }), RangeError);
   assert.throws(() => new DistanceJoint(physics, a, b, { min: 2, max: 1 }), RangeError);
+});
+
+test('a path joint holds a bead on a curve, lets it swing as a pendulum of the curve and drives it along', async () => {
+  const swing = new Physics(null);
+  const post = swing.addBody(null, { type: 'fixed', colliders: [] });
+  // An arc of radius 1 under the post, a tenth of a radian between points.
+  const arc = Array.from({ length: 13 }, (_, k) => [Math.sin((k - 6) * 0.1), -Math.cos((k - 6) * 0.1), 0]);
+  const bead = swing.addBody(null, {
+    position: [Math.sin(0.2), -Math.cos(0.2), 0],
+    colliders: { shape: 'sphere', radius: 0.05, mass: 2 },
+  });
+  new PathJoint(swing, post, bead, { points: arc });
+  let off = 0;
+  for (let i = 1; i <= 60; i++) {
+    swing.step();
+    off = Math.max(off, Math.abs(Math.hypot(bead.position[0], bead.position[1]) - 1), Math.abs(bead.position[2]));
+    if (i === 30) near(bead.position[0], 0, 0.05, 'at the bottom after a quarter of the period of a 1 m pendulum');
+  }
+  assert.ok(off < 0.004, `it stays on the curve: ${off}`);
+  const rail = new Physics(null);
+  rail.gravity = [0, 0, 0];
+  const base = rail.addBody(null, { type: 'fixed', colliders: [] });
+  const car = rail.addBody(null, {
+    position: [0.2, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 2 },
+  });
+  const track = new PathJoint(rail, base, car, {
+    points: [
+      [0, 0, 0],
+      [2, 0, 0],
+      [4, 0, 0],
+    ],
+    motor: { speed: 1.5, maxForce: 100 },
+  });
+  for (let i = 0; i < 30; i++) rail.step();
+  near(car.linearVelocity[0], 1.5, 0.05, 'the motor drives it along the rail');
+  track.setMotor(0, 0);
+  assert.throws(() => new PathJoint(rail, base, car, { points: [[0, 0, 0]] }), RangeError);
+  assert.throws(() => track.setMotor(1, -1), RangeError);
 });

@@ -20,6 +20,10 @@ pub const RACK_AND_PINION: u32 = 2;
 pub const PULLEY: u32 = 3;
 /// Two anchors that keep a distance within a range: `ratio` is the least, `total` the greatest (0 for no greatest).
 pub const DISTANCE: u32 = 4;
+/// A body held to a curve fixed on another: a Catmull-Rom spline through up to `PATH_POINTS` points (in A's frame), with a motor along it.
+pub const PATH: u32 = 5;
+/// Most points of a path.
+pub const PATH_POINTS: usize = 16;
 
 /// One coupling: bodies `a` and `b`, directions in their own frames, and the row's memory. A free slot has kind 0.
 #[repr(C)]
@@ -47,6 +51,14 @@ pub struct Coupling {
     /// The error of the combination, and the impulse the row has given.
     pub error: f32,
     pub impulse: f32,
+    /// A path: its points in A's frame and how many there are, the impulses of its two normal rows beside `impulse` (the motor's),
+    /// and the motor's speed along the path and the most force it may use (0 for no motor).
+    pub points: [[f32; 3]; PATH_POINTS],
+    pub count: u32,
+    pub impulse_n1: f32,
+    pub impulse_n2: f32,
+    pub motor_speed: f32,
+    pub motor_force: f32,
 }
 
 impl Coupling {
@@ -67,6 +79,12 @@ impl Coupling {
         correction: 0.2,
         error: 0.0,
         impulse: 0.0,
+        points: [[0.0; 3]; PATH_POINTS],
+        count: 0,
+        impulse_n1: 0.0,
+        impulse_n2: 0.0,
+        motor_speed: 0.0,
+        motor_force: 0.0,
     };
 }
 
@@ -115,7 +133,7 @@ impl World {
     /// Adds a coupling between two live bodies; its slot, or None when they are one body, one is gone, the kind is not one, or
     /// memory is out.
     pub fn add_coupling(&mut self, kind: u32, a: u32, b: u32) -> Option<usize> {
-        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=DISTANCE).contains(&kind) {
+        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=PATH).contains(&kind) {
             return None;
         }
         let used = self.header().coupling_rows as usize;
@@ -155,9 +173,21 @@ impl World {
                 c.zeta = value[1];
                 c.correction = value[2];
             }
+            9 => {
+                if (c.count as usize) < PATH_POINTS {
+                    c.points[c.count as usize] = value;
+                    c.count += 1;
+                }
+            }
+            10 => {
+                c.motor_speed = value[0];
+                c.motor_force = value[1];
+            }
             _ => {}
         }
         c.impulse = 0.0;
+        c.impulse_n1 = 0.0;
+        c.impulse_n2 = 0.0;
         self.put_coupling(slot, c);
     }
 
@@ -314,6 +344,10 @@ impl World {
     pub fn warm_start_couplings(&mut self) {
         for k in 0..self.header().coupling_rows as usize {
             let c = self.coupling(k);
+            if c.kind == PATH {
+                self.warm_curve(k);
+                continue;
+            }
             if !self.coupling_live(&c) || c.impulse == 0.0 {
                 continue;
             }
@@ -330,6 +364,10 @@ impl World {
         for k in 0..self.header().coupling_rows as usize {
             let c = self.coupling(k);
             if !self.coupling_live(&c) {
+                continue;
+            }
+            if c.kind == PATH {
+                self.solve_curve(k, h, bias);
                 continue;
             }
             let (row, rope) = self.coupling_row(&c);
@@ -380,7 +418,7 @@ impl World {
     pub fn track_couplings(&mut self, h: f32) {
         for k in 0..self.header().coupling_rows as usize {
             let c = self.coupling(k);
-            if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE {
+            if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE || c.kind == PATH {
                 continue;
             }
             let (row, _) = self.coupling_row(&c);
@@ -390,5 +428,149 @@ impl World {
             kept.error = c.error + speed * h;
             self.put_coupling(k, kept);
         }
+    }
+}
+
+/// A point of a Catmull-Rom span (the uniform spline through `p1` and `p2`, with `p0` and `p3` as neighbours) and its derivative.
+fn spline(p0: V3, p1: V3, p2: V3, p3: V3, t: f32) -> (V3, V3) {
+    let (t2, t3) = (t * t, t * t * t);
+    let a = p1.scale(2.0);
+    let b = p2.sub(p0);
+    let c = p0.scale(2.0).sub(p1.scale(5.0)).add(p2.scale(4.0)).sub(p3);
+    let d = p3.sub(p0).add(p1.sub(p2).scale(3.0));
+    let point = a.add(b.scale(t)).add(c.scale(t2)).add(d.scale(t3)).scale(0.5);
+    let slope = b.add(c.scale(2.0 * t)).add(d.scale(3.0 * t2)).scale(0.5);
+    (point, slope)
+}
+
+/// What a path row needs: the nearest point of the curve to the follower's anchor, the curve's direction there, two directions
+/// across it, and the arms from each body's centre.
+struct PathState {
+    on: V3,
+    tangent: V3,
+    n1: V3,
+    n2: V3,
+    ra: V3,
+    rb: V3,
+    error: V3,
+}
+
+impl World {
+    fn path_state(&self, c: &Coupling) -> Option<PathState> {
+        let n = c.count as usize;
+        if n < 2 {
+            return None;
+        }
+        let (a, b) = (c.a as usize, c.b as usize);
+        let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let (pa, pb) = (self.v(POSITION_X, a), self.v(POSITION_X, b));
+        let at = |i: usize| pa.add(qa.rotate(vec(c.points[i.min(n - 1)])));
+        let anchor = pb.add(qb.rotate(vec(c.anchor_b)));
+        // Sixteen samples a span, then two Newton steps on the nearest.
+        let (mut best, mut span, mut at_t) = (f32::MAX, 0usize, 0.0f32);
+        for i in 0..n - 1 {
+            let (p0, p1, p2, p3) = (at(i.saturating_sub(1)), at(i), at(i + 1), at(i + 2));
+            for k in 0..=16 {
+                let t = k as f32 / 16.0;
+                let d = spline(p0, p1, p2, p3, t).0.sub(anchor);
+                let l = d.dot(d);
+                if l < best {
+                    best = l;
+                    span = i;
+                    at_t = t;
+                }
+            }
+        }
+        let (p0, p1, p2, p3) = (at(span.saturating_sub(1)), at(span), at(span + 1), at(span + 2));
+        for _ in 0..2 {
+            let (point, slope) = spline(p0, p1, p2, p3, at_t);
+            let denom = slope.dot(slope);
+            if denom > 1e-12 {
+                let next = at_t - point.sub(anchor).dot(slope) / denom;
+                at_t = if next < 0.0 { 0.0 } else if next > 1.0 { 1.0 } else { next };
+            }
+        }
+        let (on, slope) = spline(p0, p1, p2, p3, at_t);
+        let length = sqrt(slope.dot(slope));
+        let tangent = if length > 1e-9 { slope.scale(1.0 / length) } else { v3(1.0, 0.0, 0.0) };
+        // The two directions across the curve: from the world axis least along it.
+        let axis = if tangent.x.abs() < 0.6 {
+            v3(1.0, 0.0, 0.0)
+        } else if tangent.y.abs() < 0.6 {
+            v3(0.0, 1.0, 0.0)
+        } else {
+            v3(0.0, 0.0, 1.0)
+        };
+        let n1 = tangent.cross(axis);
+        let n1 = n1.scale(1.0 / sqrt(n1.dot(n1)));
+        let n2 = tangent.cross(n1);
+        Some(PathState { on, tangent, n1, n2, ra: on.sub(self.v(CENTER_X, a)), rb: anchor.sub(self.v(CENTER_X, b)), error: anchor.sub(on) })
+    }
+
+    fn warm_curve(&mut self, k: usize) {
+        let c = self.coupling(k);
+        if !self.coupling_live(&c) || (c.impulse == 0.0 && c.impulse_n1 == 0.0 && c.impulse_n2 == 0.0) {
+            return;
+        }
+        let Some(s) = self.path_state(&c) else { return };
+        let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
+        for (d, p) in [(s.n1, c.impulse_n1), (s.n2, c.impulse_n2), (s.tangent, c.impulse)] {
+            a.push(d.scale(-p), s.ra);
+            b.push(d.scale(p), s.rb);
+        }
+        self.settle(c.a as usize, &a);
+        self.settle(c.b as usize, &b);
+    }
+
+    /// One pass over a path: the follower's anchor is held on the curve by two rows across it, and a motor along it drives it.
+    fn solve_curve(&mut self, k: usize, h: f32, bias: bool) {
+        let mut c = self.coupling(k);
+        let Some(s) = self.path_state(&c) else { return };
+        let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
+        let speed_of = |a: &Moving, b: &Moving, d: V3| d.dot(b.at(s.rb).sub(a.at(s.ra)));
+        for row in 0..3 {
+            let (d, held) = match row {
+                0 => (s.n1, c.impulse_n1),
+                1 => (s.n2, c.impulse_n2),
+                _ => (s.tangent, c.impulse),
+            };
+            if row == 2 && !(c.motor_force > 0.0) {
+                continue;
+            }
+            let inverse = a.give(d, s.ra) + b.give(d, s.rb);
+            if !(inverse > 0.0) {
+                continue;
+            }
+            let speed = speed_of(&a, &b, d);
+            let (beta, gamma) = if row < 2 && c.hertz > 0.0 {
+                let mass = 1.0 / inverse;
+                let omega = 2.0 * core::f32::consts::PI * c.hertz;
+                let damping = 2.0 * mass * c.zeta * omega;
+                let spring = mass * omega * omega;
+                (spring / (damping + h * spring), 1.0 / (h * (damping + h * spring)))
+            } else {
+                (if bias && row < 2 { c.correction / h } else { 0.0 }, 0.0)
+            };
+            let error = if row == 0 { s.error.dot(s.n1) } else if row == 1 { s.error.dot(s.n2) } else { 0.0 };
+            let target = if row == 2 { c.motor_speed } else { 0.0 };
+            let mut change = -(speed - target + beta * error + gamma * held) / (inverse + gamma);
+            if row == 2 {
+                let cap = c.motor_force * h;
+                let wanted = held + change;
+                let kept = if wanted > cap { cap } else if wanted < -cap { -cap } else { wanted };
+                change = kept - held;
+            }
+            a.push(d.scale(-change), s.ra);
+            b.push(d.scale(change), s.rb);
+            match row {
+                0 => c.impulse_n1 += change,
+                1 => c.impulse_n2 += change,
+                _ => c.impulse += change,
+            }
+        }
+        self.settle(c.a as usize, &a);
+        self.settle(c.b as usize, &b);
+        self.put_coupling(k, c);
+        let _ = s.on;
     }
 }

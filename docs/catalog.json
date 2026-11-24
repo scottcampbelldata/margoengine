@@ -2809,6 +2809,7 @@
       "HeightfieldCell",
       "KernelWorld",
       "Multibody",
+      "PathJoint",
       "Physics",
       "PhysicsBody",
       "PhysicsCollider",

@@ -711,7 +711,7 @@ export class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
-    addCoupling(kind: 1 | 2 | 3 | 4, a: number, b: number): number;
+    addCoupling(kind: 1 | 2 | 3 | 4 | 5, a: number, b: number): number;
     setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
     removeCoupling(slot: number): boolean;
     couplingState(slot: number): {
@@ -839,6 +839,11 @@ export interface MultibodyLinkOptions {
 }
 
 export type NextJointOptions = JointOptions | ConeJointOptions;
+
+export class PathJoint extends Mechanism {
+    constructor(physics: Physics, base: PhysicsBody, follower: PhysicsBody, options: PathOptions);
+    setMotor(speed: number, maxForce: number): this;
+}
 
 export class Physics implements EnginePlugin, BodyOwner {
     readonly name: string;
@@ -1812,7 +1817,7 @@ abstract class Mechanism implements PhysicsAttachment {
     protected readonly a: PhysicsBody;
     protected readonly b: PhysicsBody;
     protected readonly slot: number;
-    protected constructor(physics: Physics, kind: 1 | 2 | 3 | 4, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    protected constructor(physics: Physics, kind: 1 | 2 | 3 | 4 | 5, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
     state(): {
         error: number;
         impulse: number;
@@ -1833,6 +1838,15 @@ interface MultibodyOwner {
     readonly kernel: KernelWorld;
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
     removeMultibody(multibody: Multibody): void;
+}
+
+interface PathOptions extends MechanismOptions {
+    points: readonly Vec3[];
+    anchor?: Vec3;
+    motor?: {
+        speed: number;
+        maxForce: number;
+    };
 }
 
 interface PhysicsAttachment {

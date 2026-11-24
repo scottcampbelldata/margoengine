@@ -217,3 +217,62 @@ fn a_thousand_gears_in_a_train_fit_in_the_table() {
     assert!(w.remove_coupling(slots[10]));
     assert_eq!(w.add_coupling(GEAR, train[10], train[11]), Some(slots[10]));
 }
+
+fn sin(x: f32) -> f32 {
+    x.sin()
+}
+fn cos(x: f32) -> f32 {
+    x.cos()
+}
+
+fn path_world(points: &[[f32; 3]], start: V3, speed: f32, force: f32) -> (World, u32) {
+    let mut w = World::new(8, 8).unwrap();
+    let post = w.add_body(FIXED).unwrap();
+    w.set_pose(post, v3(0.0, 0.0, 0.0), Q::IDENTITY, false);
+    let bead = point(&mut w, start, 2.0, 0.1);
+    let path = w.add_coupling(PATH, post, bead).unwrap();
+    for p in points {
+        w.set_coupling(path, 9, *p);
+    }
+    w.set_coupling(path, 10, [speed, force, 0.0]);
+    (w, bead)
+}
+
+#[test]
+fn a_bead_on_a_curved_path_swings_as_a_pendulum_of_the_curve_s_radius() {
+    // An arc of a circle of radius 1 under the post, through thirteen points a tenth of a radian apart.
+    let arc: Vec<[f32; 3]> = (-6..=6).map(|k| {
+        let angle = k as f32 * 0.1;
+        [sin(angle), -cos(angle), 0.0]
+    }).collect();
+    let start = v3(sin(0.2), -cos(0.2), 0.0);
+    let (mut w, bead) = path_world(&arc, start, 0.0, 0.0);
+    let mut worst = 0.0f32;
+    let mut at_quarter = 0.0;
+    for step in 1..=60 {
+        w.step(DT);
+        let p = w.v(POSITION_X, bead as usize);
+        worst = worst.max((sqrt(p.dot(p)) - 1.0).abs()).max(p.z.abs());
+        if step == 30 {
+            at_quarter = p.x;
+        }
+    }
+    assert!(worst < 0.004, "the bead stays on the curve: off by {worst}");
+    // A quarter of the period of a pendulum 1 m long is 0.5 s: the bead is at the bottom.
+    assert!(at_quarter.abs() < 0.05, "at the bottom after a quarter period: x = {at_quarter}");
+}
+
+#[test]
+fn a_path_motor_drives_the_bead_along_the_curve_to_its_speed_within_its_force() {
+    let line = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [4.0, 0.0, 0.0]];
+    let (mut w, bead) = path_world(&line, v3(0.2, 0.0, 0.0), 1.5, 100.0);
+    w.header_mut().gravity = [0.0; 3];
+    run(&mut w, 30);
+    let v = w.v(LINEAR_X, bead as usize);
+    assert!((v.x - 1.5).abs() < 0.05 && v.y.abs() < 1e-3, "driven to its speed: {} {}", v.x, v.y);
+    let (mut w, bead) = path_world(&line, v3(0.2, 0.0, 0.0), 1.5, 0.5);
+    w.header_mut().gravity = [0.0; 3];
+    run(&mut w, 60);
+    // A force of 0.5 N on 2 kg gives a quarter of a metre a second a second.
+    assert!((w.v(LINEAR_X, bead as usize).x - 0.25).abs() < 0.03, "the force caps the drive: {}", w.v(LINEAR_X, bead as usize).x);
+}
