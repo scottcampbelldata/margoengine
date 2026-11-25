@@ -136,7 +136,12 @@ test('the fixed gate scripts end by their event loop with their exit codes', (t)
   // check:wgsl: a package with no WGSL source has nothing to compile (exit 0), and opens no browser.
   const wgsl = run('scripts/check-wgsl.mjs', ['--packages=no-such-package']);
   assert.equal(wgsl.status, 0, wgsl.stderr);
+  // check:banned-terms: `--files` with no path is a usage error (exit 2), found before any file is read.
+  const banned = run('scripts/check-banned-terms.mjs', ['--files']);
+  assert.equal(banned.status, 2, banned.stderr);
+  assert.match(banned.stderr, /--files needs at least one path/);
   const ends = lines();
+  assert.ok(ends.includes('--files loop 2'), `check:banned-terms did not end by its event loop: ${ends.join(' | ')}`);
   assert.ok(ends.includes('sizes loop 2'), `quality did not end by its event loop: ${ends.join(' | ')}`);
   assert.ok(ends.includes('--reason=x loop 2'), `quality did not end by its event loop: ${ends.join(' | ')}`);
   assert.ok(

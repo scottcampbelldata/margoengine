@@ -164,12 +164,15 @@ export function selectFiles(args, changed = changedFiles) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  let files;
+  let files, usage;
   try {
     files = selectFiles(process.argv.slice(2));
   } catch (failure) {
-    console.error(`check:banned-terms: ${failure.message}`);
-    process.exit(2);
+    usage = failure;
   }
-  process.exitCode = main({ scanAll: () => scanRepo(undefined, files, files !== undefined) });
+  // A usage error ends with code 2 by the event loop, as every check does (KB-OWN-EXIT2).
+  if (usage) {
+    console.error(`check:banned-terms: ${usage.message}`);
+    process.exitCode = 2;
+  } else process.exitCode = main({ scanAll: () => scanRepo(undefined, files, files !== undefined) });
 }

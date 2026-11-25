@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { endRecorder } from './support/end-recorder.js';
 
 const script = resolve(import.meta.dirname, '..', 'scripts', 'rebase-main.mjs');
 const env = {
@@ -54,7 +55,8 @@ function repository(t, files) {
   git(clone, 'push', '-q', 'origin', 'main');
   git(clone, 'checkout', '-q', 'work');
   const read = (path) => readFileSync(join(clone, path), 'utf8').replace(/\r\n/g, '\n');
-  const rebase = () => spawnSync(process.execPath, [script], { cwd: clone, env, encoding: 'utf8', timeout: 120_000 });
+  const rebase = (runEnv = env) =>
+    spawnSync(process.execPath, [script], { cwd: clone, env: runEnv, encoding: 'utf8', timeout: 120_000 });
   return { clone, git: (...args) => git(clone, ...args), read, rebase };
 }
 
@@ -86,9 +88,12 @@ test('a conflict in a source file stops the rebase, names it, and a second run f
     'docs/b.md': ['b\n', 'b\n', 'b\n'],
     'site/llms.txt': ['a\nb\n', 'a upstream\nb\n', 'a work\nb\n'],
   });
-  const result = repo.rebase();
+  // The stop ends by the event loop with code 1, never through process.exit (KB-OWN-EXIT2).
+  const recorder = endRecorder(mkdtempSync(join(repo.clone, '..', 'ends-')), env);
+  const result = repo.rebase(recorder.env);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /outside the generated files:\n {2}docs\/a\.md/);
+  assert.deepEqual(recorder.lines(), ['undefined loop 1']);
   writeFileSync(join(repo.clone, 'docs/a.md'), 'a both\n');
   repo.git('add', 'docs/a.md');
   const resumed = repo.rebase();

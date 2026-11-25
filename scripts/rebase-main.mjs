@@ -39,12 +39,12 @@ const lines = (args) => git(args).stdout.split('\n').filter(Boolean);
 const script = (...args) => run(process.execPath, args);
 const unresolved = () => lines(['diff', '--name-only', '--diff-filter=U']);
 
+/** The stop of a run: `main` ends there and the script ends by its event loop with code 1 (KB-OWN-EXIT2). */
+class Stopped extends Error {}
 function stop(message) {
-  console.error(`rebase:main stopped. ${message}`);
-  process.exit(1);
+  throw new Stopped(message);
 }
 
-root = git(['rev-parse', '--show-toplevel']).stdout.trim();
 const gitPath = (name) => resolve(root, git(['rev-parse', '--git-path', name]).stdout.trim());
 const rebasing = () => existsSync(gitPath('rebase-merge')) || existsSync(gitPath('rebase-apply'));
 
@@ -74,8 +74,8 @@ function mergeSizes() {
 }
 
 // What to regenerate, kept in the git directory so a run stopped by your own conflict still knows it afterwards.
-const ledger = gitPath('rebase-main.json');
-const owed = () => (existsSync(ledger) ? JSON.parse(readFileSync(ledger, 'utf8')) : []);
+const ledger = () => gitPath('rebase-main.json');
+const owed = () => (existsSync(ledger()) ? JSON.parse(readFileSync(ledger(), 'utf8')) : []);
 
 function settle(conflicts) {
   const unmerged = lines(['ls-files', '-u']);
@@ -84,7 +84,7 @@ function settle(conflicts) {
     readFileSync(gitPath(`rebase-merge/${name}`), 'utf8').trim(),
   );
   const changed = lines(['diff', '--name-only', `${onto}...${head}`]);
-  writeFileSync(ledger, JSON.stringify([...new Set([...owed(), ...conflicts, ...changed])]));
+  writeFileSync(ledger(), JSON.stringify([...new Set([...owed(), ...conflicts, ...changed])]));
   for (const file of conflicts) {
     const stages = new Set(unmerged.filter((l) => l.endsWith(`\t${file}`)).map((l) => l.split(/\s+/)[2]));
     if (file === SIZES && stages.size === 3) mergeSizes();
@@ -114,37 +114,48 @@ function regenerate() {
   if (existsSync(resolve(root, 'api'))) git(['add', '--', 'api']);
   if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status !== 0)
     git(['commit', '-q', '-m', 'chore: generated files after the rebase']);
-  rmSync(ledger, { force: true });
+  rmSync(ledger(), { force: true });
 }
 
-if (!rebasing() && !existsSync(ledger)) {
-  git(['fetch', '-q', 'origin', 'main']);
-  const result = git(['rebase', 'origin/main'], { allowFail: true });
-  if (result.status !== 0 && !rebasing()) stop(`git rebase origin/main failed:\n${result.stdout}${result.stderr}`);
-}
-while (rebasing()) {
-  const conflicts = unresolved();
-  const own = conflicts.filter((file) => !GENERATED.some((pattern) => pattern.test(file)));
-  if (own.length)
-    stop(
-      `Conflicts outside the generated files:\n  ${own.join('\n  ')}\n` +
-        'Resolve and `git add` them, then run npm run rebase:main again.',
-    );
-  if (conflicts.length) {
-    console.log(`rebase:main: taking upstream's ${conflicts.join(', ')}`);
-    settle(conflicts);
+function main() {
+  root = git(['rev-parse', '--show-toplevel']).stdout.trim();
+  if (!rebasing() && !existsSync(ledger())) {
+    git(['fetch', '-q', 'origin', 'main']);
+    const result = git(['rebase', 'origin/main'], { allowFail: true });
+    if (result.status !== 0 && !rebasing()) stop(`git rebase origin/main failed:\n${result.stdout}${result.stderr}`);
   }
-  if (git(['diff', '--quiet'], { allowFail: true }).status !== 0)
-    stop('The working tree has changes that are not added; add or undo them, then run it again.');
-  const empty = git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0;
-  const result = git(['rebase', empty ? '--skip' : '--continue'], { allowFail: true });
-  // A failure with new conflicts is the next commit's stop; one with none would loop for ever.
-  if (result.status !== 0 && !unresolved().length)
-    stop(`git rebase could not go on:\n${result.stdout}${result.stderr}`);
+  while (rebasing()) {
+    const conflicts = unresolved();
+    const own = conflicts.filter((file) => !GENERATED.some((pattern) => pattern.test(file)));
+    if (own.length)
+      stop(
+        `Conflicts outside the generated files:\n  ${own.join('\n  ')}\n` +
+          'Resolve and `git add` them, then run npm run rebase:main again.',
+      );
+    if (conflicts.length) {
+      console.log(`rebase:main: taking upstream's ${conflicts.join(', ')}`);
+      settle(conflicts);
+    }
+    if (git(['diff', '--quiet'], { allowFail: true }).status !== 0)
+      stop('The working tree has changes that are not added; add or undo them, then run it again.');
+    const empty = git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0;
+    const result = git(['rebase', empty ? '--skip' : '--continue'], { allowFail: true });
+    // A failure with new conflicts is the next commit's stop; one with none would loop for ever.
+    if (result.status !== 0 && !unresolved().length)
+      stop(`git rebase could not go on:\n${result.stdout}${result.stderr}`);
+  }
+  if (existsSync(ledger())) regenerate();
+  const markers = conflictMarkers(root);
+  if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
+  console.log(
+    'rebase:main: done, no conflict markers. Run your checks, then push at once with git push origin HEAD:main.',
+  );
 }
-if (existsSync(ledger)) regenerate();
-const markers = conflictMarkers(root);
-if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
-console.log(
-  'rebase:main: done, no conflict markers. Run your checks, then push at once with git push origin HEAD:main.',
-);
+
+try {
+  main();
+} catch (error) {
+  if (!(error instanceof Stopped)) throw error;
+  console.error(`rebase:main stopped. ${error.message}`);
+  process.exitCode = 1;
+}
