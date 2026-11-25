@@ -98,6 +98,7 @@ export const GPU_STEPS = [
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = [
+  'check:mass-deletion',
   'check:core-stress',
   'check:road-invariants',
   'check:testpage-contracts',

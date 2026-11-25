@@ -147,6 +147,11 @@ function main() {
   if (existsSync(ledger())) regenerate();
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
+  // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".
+  const mass = run(process.execPath, [resolve(import.meta.dirname, 'check-mass-deletion.mjs'), '--range', 'origin/main..HEAD'], {
+    allowFail: true,
+  });
+  if (mass.status !== 0) stop(`${mass.stderr || mass.stdout}Do not push these commits.`);
   console.log(
     'rebase:main: done, no conflict markers. Run your checks, then push at once with git push origin HEAD:main.',
   );
