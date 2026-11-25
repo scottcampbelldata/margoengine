@@ -11729,6 +11729,30 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### Flight: wings, rotors and lifting gas (AERO-03, `WingForce`, `RotorForce` and `LiftingGas` in `@margoengine/physics/flight`, 2026-11-25)
+
+`packages/physics/src/flight.ts`, on the vortex-lattice core `packages/physics/src/lattice.ts` that `SailForce` (AERO-02)
+now shares. Written from:
+
+- The vortex-lattice method as restated by the Wikipedia article "Vortex lattice method" and by Klein et al., arXiv:1501.04983
+  (both read for AERO-02; see that record).
+- Y. Su, Fan, Onoue, Vejdani and Breuer, "An improved aerodynamic model for quasi-steady simulations of animal flight at
+  moderate Reynolds numbers", arXiv:2302.09602, read in full: the flat wing's lift and drag coefficients (eqs. 10 and 11)
+  and the blade-element forces at the quarter chord (eqs. 3 and 4). Dickinson, Lehmann and Sane (1999) are known through it.
+- The Wikipedia article "Blade element momentum theory", read 2026-11-25: the actuator disk's thrust and wake, and the blade
+  element's forces in the inflow angle.
+- The Wikipedia article "Lifting-line theory", read 2026-11-25: the elliptic wing's induced drag C_L^2 / (pi AR), the bound
+  the tests hold the lattice to, and the finite wing's lift slope.
+- Helmbold's lift slope 2 pi AR / (2 + sqrt(AR^2 + 4)), as the AERO-02 tests already use it.
+- S. F. Hoerner's flat-plate normal force and skin friction (through Katz and Plotkin, as AERO-01 records), here as the
+  separated law of a fixed wing and the profile drag 2 x 0.004.
+
+The flapping wing's own velocity by a central difference of its shape, the mirrored pair as one lattice, the momentum
+term written with the mass flow's magnitude so one bisection finds each annulus's induced velocity in hover, climb and
+descent, the arctangent from arithmetic (`angleOf`), the load held as a force through the step, and the linearly implicit
+load (a finite-difference Jacobian of the force and torque in the body's velocity and spin, then the backward Euler step of
+the load and gravity) are this package's own arrangement. Proof: `packages/physics/tests/flight.test.js`.
+
 ### Sails and flags, a vortex lattice on the cloth (AERO-02, `SailForce` in `@margoengine/physics/soft`, 2026-11-25)
 
 `packages/physics/src/sail.ts` solves a vortex lattice on a cloth's grid every step. Written from M. Klein and others, "Direct

@@ -18,7 +18,7 @@
 // memory of earlier steps), attached flow is potential flow (no viscous drag beyond the flat-plate law of stalled panels),
 // and the sail is one surface (no thickness, no mast in front of it).
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
-import { hypot, sin } from '@margoengine/math/pinned';
+import { add, flatPlate, latticeLoads, scale, sub } from './lattice.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import type { SoftBody } from './soft.js';
@@ -101,13 +101,8 @@ export class SailForce implements PhysicsAttachment {
       nc = chords - 1,
       ns = spans - 1,
       n = nc * ns;
-    // Panels: bound segment ends, collocation point, normal, area, the air relative to the panel there, and density.
-    const boundA: Vec3[] = [],
-      boundB: Vec3[] = [],
-      colloc: Vec3[] = [],
-      normal: Vec3[] = [],
-      area: number[] = [],
-      relative: Vec3[] = [],
+    // The air relative to each panel at its three-quarter-chord point, and its density there.
+    const relative: Vec3[] = [],
       rho: number[] = [];
     for (let s = 0; s < ns; s++)
       for (let c = 0; c < nc; c++) {
@@ -115,85 +110,22 @@ export class SailForce implements PhysicsAttachment {
           p10 = at(c + 1, s),
           p01 = at(c, s + 1),
           p11 = at(c + 1, s + 1),
-          lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
-            a[0] + (b[0] - a[0]) * t,
-            a[1] + (b[1] - a[1]) * t,
-            a[2] + (b[2] - a[2]) * t,
-          ],
-          a = lerp(p00, p10, 0.25),
-          b = lerp(p01, p11, 0.25),
-          q0 = lerp(p00, p10, 0.75),
-          q1 = lerp(p01, p11, 0.75),
-          point: Vec3 = [(q0[0] + q1[0]) / 2, (q0[1] + q1[1]) / 2, (q0[2] + q1[2]) / 2],
-          d1 = sub(p11, p00),
-          d2 = sub(p01, p10),
-          cross = crossOf(d1, d2),
-          length = hypot(cross[0], cross[1], cross[2]),
+          mid = (k: number) => (p00[k]! + 0.75 * (p10[k]! - p00[k]!) + p01[k]! + 0.75 * (p11[k]! - p01[k]!)) / 2,
+          point: Vec3 = [mid(0), mid(1), mid(2)],
           v = scale(
             add(add(velocityAt(c, s), velocityAt(c + 1, s)), add(velocityAt(c, s + 1), velocityAt(c + 1, s + 1))),
             0.25,
           ),
           [air, density] = this.air(point, time);
-        boundA.push(a);
-        boundB.push(b);
-        colloc.push(point);
-        normal.push(length > 0 ? scale(cross, 1 / length) : [0, 0, 0]);
-        area.push(length / 2);
         relative.push(sub(air, v));
         rho.push(density);
       }
-    // The wake leaves along the mean apparent wind.
-    let mean: Vec3 = [0, 0, 0];
-    for (const r of relative) mean = add(mean, r);
-    const meanSpeed = hypot(mean[0], mean[1], mean[2]);
+    const loads = latticeLoads({ nc, ns, corner: at, relative, density: rho }, stall, flatPlate(drag));
+    this.circulation = loads.circulation;
     this.force[0] = this.force[1] = this.force[2] = 0;
-    if (!(meanSpeed > 1e-9)) {
-      this.circulation = new Float64Array(n);
-      return;
-    }
-    const wake = scale(mean, 1 / meanSpeed),
-      trailing = (s: number) => at(chords - 1, s),
-      // The horseshoe of panel m in its segments, unit circulation: from far down the wake to the trailing edge, along the
-      // chord to the bound segment, across it, back along the chord and down the wake.
-      horseshoe = (m: number, point: Vec3): Vec3 => {
-        const s = (m - (m % nc)) / nc,
-          tA = trailing(s),
-          tB = trailing(s + 1);
-        let u = semiInfinite(tA, wake, point, -1);
-        u = add(u, segment(tA, boundA[m]!, point));
-        u = add(u, segment(boundA[m]!, boundB[m]!, point));
-        u = add(u, segment(boundB[m]!, tB, point));
-        return add(u, semiInfinite(tB, wake, point, 1));
-      };
-    // a_km Gamma_m = -V_k . n_k
-    const matrix = new Float64Array(n * n),
-      rhs = new Float64Array(n);
-    for (let k = 0; k < n; k++) {
-      for (let m = 0; m < n; m++) matrix[k * n + m] = dot(horseshoe(m, colloc[k]!), normal[k]!);
-      rhs[k] = -dot(relative[k]!, normal[k]!);
-    }
-    const gamma = solve(matrix, rhs, n);
-    this.circulation = gamma;
     for (let m = 0; m < n; m++) {
-      const v = relative[m]!,
-        speed = hypot(v[0], v[1], v[2]);
-      if (!(speed > 1e-9)) continue;
-      const nm = normal[m]!,
-        vn = dot(v, nm),
-        sinA = (vn < 0 ? -vn : vn) / speed;
-      let f: Vec3;
-      if (sinA > sin(stall)) {
-        // Separated: the flat plate's normal force, pushed downwind across the panel.
-        f = scale(nm, 0.5 * rho[m]! * area[m]! * drag * speed * vn);
-      } else {
-        // Attached: Kutta-Joukowski on the bound segment, with the air there and every vortex's induced velocity.
-        const mid = scale(add(boundA[m]!, boundB[m]!), 0.5);
-        let induced: Vec3 = [0, 0, 0];
-        for (let j = 0; j < n; j++) induced = add(induced, scale(horseshoe(j, mid), gamma[j]!));
-        const local = add(v, induced),
-          l = sub(boundB[m]!, boundA[m]!);
-        f = scale(crossOf(local, l), rho[m]! * gamma[m]!);
-      }
+      const f = loads.forces[m]!;
+      if (f[0] === 0 && f[1] === 0 && f[2] === 0) continue;
       this.force[0] += f[0];
       this.force[1] += f[1];
       this.force[2] += f[2];
@@ -234,91 +166,4 @@ export class SailForce implements PhysicsAttachment {
   }
 }
 
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const crossOf = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-
 const HALF_PI = 1.5707963267948966;
-const FOUR_PI = 12.566370614359172;
-
-/** A core: closer to a segment's line than this share of its length, the point takes no velocity from it. */
-const CORE = 1e-6;
-
-/**
- * The velocity a straight vortex segment from r0 to r1 of unit circulation induces at m (Biot-Savart's closed form;
- * Klein et al. 2015, eq. 2): (r1 - r0) . ((r1 - m)/|r1 - m| - (r0 - m)/|r0 - m|) (r0 - m) x (r1 - r0) / (4 pi |(r0 - m) x (r1 - r0)|^2).
- */
-function segment(r0: Vec3, r1: Vec3, m: Vec3): Vec3 {
-  const d = sub(r1, r0),
-    a = sub(r0, m),
-    b = sub(r1, m),
-    c = crossOf(a, d),
-    cc = dot(c, c),
-    dd = dot(d, d);
-  if (!(cc > CORE * CORE * dd * dd)) return [0, 0, 0];
-  const la = hypot(a[0], a[1], a[2]),
-    lb = hypot(b[0], b[1], b[2]),
-    k = (dot(d, b) / lb - dot(d, a) / la) / (FOUR_PI * cc);
-  return scale(c, k);
-}
-
-/**
- * The velocity of a straight vortex leg of unit circulation from `start` to infinity along the unit `direction` at m (the
- * limit of the closed form, Klein et al. 2015, eq. 3), `sense` -1 for the leg that comes in from infinity.
- */
-function semiInfinite(start: Vec3, direction: Vec3, m: Vec3, sense: number): Vec3 {
-  const a = sub(start, m),
-    c = crossOf(a, direction),
-    cc = dot(c, c);
-  if (!(cc > CORE * CORE)) return [0, 0, 0];
-  const la = hypot(a[0], a[1], a[2]),
-    k = (sense * (1 - dot(direction, a) / la)) / (FOUR_PI * cc);
-  return scale(c, k);
-}
-
-/** Solves `matrix` x = `rhs` (n by n, row-major) by Gaussian elimination with partial pivoting, in a fixed order. */
-function solve(matrix: Float64Array, rhs: Float64Array, n: number): Float64Array {
-  const a = matrix.slice(),
-    b = rhs.slice();
-  for (let col = 0; col < n; col++) {
-    let pivot = col,
-      best = a[col * n + col]! < 0 ? -a[col * n + col]! : a[col * n + col]!;
-    for (let row = col + 1; row < n; row++) {
-      const v = a[row * n + col]! < 0 ? -a[row * n + col]! : a[row * n + col]!;
-      if (v > best) {
-        best = v;
-        pivot = row;
-      }
-    }
-    if (!(best > 0)) continue;
-    if (pivot !== col) {
-      for (let k = 0; k < n; k++) {
-        const t = a[col * n + k]!;
-        a[col * n + k] = a[pivot * n + k]!;
-        a[pivot * n + k] = t;
-      }
-      const t = b[col]!;
-      b[col] = b[pivot]!;
-      b[pivot] = t;
-    }
-    for (let row = col + 1; row < n; row++) {
-      const f = a[row * n + col]! / a[col * n + col]!;
-      if (f === 0) continue;
-      for (let k = col; k < n; k++) a[row * n + k]! -= f * a[col * n + k]!;
-      b[row]! -= f * b[col]!;
-    }
-  }
-  const x = new Float64Array(n);
-  for (let row = n - 1; row >= 0; row--) {
-    let s = b[row]!;
-    for (let k = row + 1; k < n; k++) s -= a[row * n + k]! * x[k]!;
-    x[row] = a[row * n + row]! !== 0 ? s / a[row * n + row]! : 0;
-  }
-  return x;
-}

@@ -25,6 +25,9 @@ const stepFiles = [
   'aero.ts',
   // The vortex-lattice load on a sail, every step (AERO-02).
   'sail.ts',
+  // The vortex lattice shared by sails and wings, and the wings, rotors and lifting gas of flight (AERO-03).
+  'lattice.ts',
+  'flight.ts',
 ];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 

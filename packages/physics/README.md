@@ -238,6 +238,38 @@ for (let i = 0; i < 60; i++) physics.step();
 console.log(big.angularVelocity[2], small.angularVelocity[2]);
 ```
 
+## Flight: wings, rotors and lifting gas
+
+Three loads of `@margoengine/physics/flight` make a rigid body fly from its shape and its motion through the air (AERO-03). Each is solved again every step and held on the body as a force through the step (`addForce`), taken implicitly in the body's motion, so a light body with a large wing stays stable at 60 steps a second.
+
+- **`new WingForce(physics, body, {sections, forward = [0, 0, 1], up = [0, 1, 0], mirror = true, panels = [2, 4], wind, density, stall = 0.26, profileDrag = 0.008, separation, flap})`**: a wing as a vortex lattice (the method of `SailForce`). `sections` run from root to tip in the body's frame, each a `leadingEdge`, a `chord` and a nose-up `twist` (radians). With `mirror` the wing is a pair, mirrored across the plane of `forward` and `up`. So lift, induced drag, the moment about the centre of mass and the downwash between panels come from the planform and the attitude: a rectangular wing of aspect ratio 6 has the lift slope of a finite wing within 4 percent. Panels the air meets beyond `stall` separate: by default a fixed wing takes the flat plate's law and loses lift, and a flapping wing (`separation: 'flapping'`) takes the quasi-steady coefficients of Su et al. (`flatWingCoefficients`), whose leading-edge vortex keeps its lift. `flap(time)` returns `{stroke, pitch}` in radians: a rotation about the forward axis at the root, tip up, and a pitch of every section. The wing's own motion is part of the air each panel meets, so a downstroke pitched nose down pushes the body forward. `wing.force` and `wing.torque` are the last step's load, and `wing.circulation` each panel's circulation.
+- **`new RotorForce(physics, body, {radius, chord, pitch, speed, hub, axis = [0, 1, 0], blades = 2, hubRadius, liftSlope = 2 pi, profileDrag = 0.008, stall, stations = 16, wind, density})`**: a rotor or propeller by blade-element momentum theory. Each annulus's induced velocity balances its blades' thrust against the momentum it gives the air. Thrust acts along `axis` for a positive `speed` (rad/s, or a function of time), and the rotor's torque turns the body the other way. `chord` and `pitch` are numbers or functions of radius. `rotor.evaluate(omega, inflow, density)` gives thrust, torque and power without stepping, and `rotor.thrust`, `rotor.torque` and `rotor.power` hold the last step's.
+- **`new LiftingGas(physics, body, {volume, gas = 'helium', temperature = 373.15, centre, altitude, seaLevelTemperature})`**: buoyancy (rho_air - rho_gas) V g at the body's height in the standard atmosphere. `gas` is `'helium'`, `'hydrogen'` or `'hotAir'` (at `temperature`), so a balloon rises to the height where it floats. `gas.liftAt(height, g)` is the net lift there.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {LiftingGas, RotorForce, WingForce} from 'margoengine/physics/flight';
+
+await Physics.load();
+const physics = new Physics(null);
+// A glider (held level), a drone and a helium balloon.
+const glider = physics.addBody(null, {linearVelocity: [0, 0, 15], lockRotations: true, colliders: {shape: 'box', halfExtents: [0.2, 0.1, 0.5], mass: 20}});
+new WingForce(physics, glider, {
+  sections: [
+    {leadingEdge: [0, 0, 0.3], chord: 0.6, twist: 0.08},
+    {leadingEdge: [3, 0, 0.2], chord: 0.4, twist: 0.06},
+  ],
+});
+const drone = physics.addBody(null, {position: [10, 5, 0], colliders: {shape: 'box', halfExtents: [0.3, 0.05, 0.3], mass: 2}});
+const rotor = new RotorForce(physics, drone, {radius: 0.3, blades: 2, chord: 0.03, pitch: 0.2, speed: 400});
+const balloon = physics.addBody(null, {position: [-10, 2, 0], colliders: {shape: 'sphere', radius: 1, mass: 2}});
+const gas = new LiftingGas(physics, balloon, {volume: 4});
+for (let i = 0; i < 600; i++) physics.step(); // ten seconds
+const [, vy, vz] = glider.linearVelocity;
+console.log((vz / -vy).toFixed(1)); // 40.1: the glide ratio, metres forward for each metre down
+console.log(rotor.thrust.toFixed(1), gas.lift.toFixed(1)); // 19.6 39.3: the drone climbs at its weight's thrust; the balloon rises
+```
+
 ## Soft bodies
 
 Ropes, cloth and particle meshes live in their own entry, `margoengine/physics/soft`, so a game that never imports it pays nothing: the root entry does not load it, and its kernel (a small Rust program compiled to Wasm) is a chunk of its own. Particles are held by compliant distance constraints (XPBD, Macklin, Müller and Chentanez 2016) solved in many small steps (Macklin et al. 2019); they collide with every shape of the rigid world (balls, boxes, capsules, cylinders, cones, hulls, meshes, height fields, voxels, compounds and half spaces; the rigid world is asked once a step for up to four planes each particle may meet, each collider swept along its own motion so a fast paddle cannot pass a particle, a deformable mesh's vertex speeds counted for friction, and sensors left out), and the bodies they press on take the impulse back, shared by the body's inverse mass and inertia, so a light crate on cloth sinks it and a heavy one sinks it more. The motion a contact gives a body reaches the body with its timing (what stops it at once, what holds it up over the step), and a body smaller than the gap between particles meets the triangles under it: a bead of a gram stays on a cloth of kilogram particles instead of sinking into them.

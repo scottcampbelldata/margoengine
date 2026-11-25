@@ -34,6 +34,7 @@ await build({
         world: resolve(root, 'src/world/index.ts'),
         earth: resolve(root, 'src/earth/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
+        flight: resolve(root, 'src/flight.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

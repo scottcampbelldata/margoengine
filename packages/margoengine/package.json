@@ -3123,6 +3123,10 @@
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
     },
+    "./physics/flight": {
+      "types": "./dist/physics/flight.d.ts",
+      "import": "./dist/physics/flight.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

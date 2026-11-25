@@ -63,6 +63,10 @@
     "./clouds": {
       "types": "./dist/clouds/index.d.ts",
       "import": "./dist/clouds.js"
+    },
+    "./flight": {
+      "types": "./dist/flight.d.ts",
+      "import": "./dist/flight.js"
     }
   },
   "files": [

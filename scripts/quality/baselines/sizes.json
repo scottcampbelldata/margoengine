@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18973806,
+  "total": 18980834,
   "history": [
     {
       "date": "2026-10-24",
@@ -12249,6 +12249,12 @@
       "commit": "04c936b47f",
       "reason": "a7ab55ea49: packages/shared/display.js rewrite error names its fix, bundled into post/image (+7 B), post/blur (+27 B) and post/material-decals (+38 B)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "473d11b22",
+      "reason": "physics/flight is a new optional entry (AERO-03): WingForce, RotorForce and LiftingGas on the shared vortex lattice; its own entry so scenes that do not fly pay nothing, and the physics base stays as it was. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13041,6 +13047,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
+    "@margoengine/physics/flight": 7028,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/soft": 92985,
