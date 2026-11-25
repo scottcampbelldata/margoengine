@@ -428,6 +428,12 @@ impl World {
         None
     }
 
+    /// The island of a coupling that is live (both its bodies, and for coordinates their parents, exist: a dead slot's bodies are no
+    /// rows to read), or None.
+    fn island_of_live_coupling(&self, c: &Coupling) -> Option<usize> {
+        if self.coupling_live(c) { self.island_of_coupling(c) } else { None }
+    }
+
     /// Lists the couplings' slots in runs, one run an island and each in slot order (a stable counting sort), those of no island
     /// last, and notes where each island's run starts and how long it is. A dead slot is listed too and skipped where it is read.
     pub fn order_couplings_by_island(&mut self) {
@@ -437,7 +443,7 @@ impl World {
         }
         for k in 0..rows {
             let c = self.coupling(k);
-            if let (true, Some(island)) = (self.coupling_live(&c), self.island_of_coupling(&c)) {
+            if let Some(island) = self.island_of_live_coupling(&c) {
                 self.set_u(ISLAND_COUPLING_COUNT, island, self.uu(ISLAND_COUPLING_COUNT, island) + 1);
             }
         }
@@ -450,13 +456,13 @@ impl World {
         let mut loose_at = start;
         for k in 0..rows {
             let c = self.coupling(k);
-            let at = match (self.coupling_live(&c), self.island_of_coupling(&c)) {
-                (true, Some(island)) => {
+            let at = match self.island_of_live_coupling(&c) {
+                Some(island) => {
                     let at = self.uu(ISLAND_COUPLING_CURSOR, island);
                     self.set_u(ISLAND_COUPLING_CURSOR, island, at + 1);
                     at
                 }
-                _ => {
+                None => {
                     loose_at += 1;
                     loose_at - 1
                 }
