@@ -782,6 +782,21 @@ impl World {
         h[0].min(h[1]).min(h[2]).min(h[3]) <= high && h[0].max(h[1]).max(h[2]).max(h[3]) >= low
     }
 
+    /// The deepest the solver lets a resting shape sink into the surface it rests on: the slop and one substep of gravity.
+    ///
+    /// Within the slop a contact row is rigid and speculative: each substep it closes the gap to exactly the slop's depth
+    /// (`solver.rs`, `normal_rows`), so a shape at rest ends every substep that deep, under any load the pass converges for.
+    /// Between those ends gravity acts for one substep of length h, from rest: the speed it gives, g h, carries the shape a
+    /// further g h^2 at most before the next solve takes it back (semi-implicit Euler moves by the new speed). So a resting
+    /// shape is never deeper than slop + |g| h^2: 0.0002 + 9.81 / 240^2 = 0.00037 m at the defaults (a ball measures
+    /// 0.000217, a box 0.000204). A step in the surface lower than this is climbed by the face's push rather than struck,
+    /// as any depth the solver leaves is.
+    pub(crate) fn held_depth(&self) -> f32 {
+        let g = self.header().gravity;
+        let h = self.header().step_dt / self.header().substeps.max(1) as f32;
+        self.header().contact_slop + sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) * h * h
+    }
+
     /// What collider `other` does past mesh collider `mesh` in the coming step, in the world's frame: how far its centre travels
     /// (the body's velocity and its turn about the centre of mass, less the mesh's own, times the step) and how far a turn
     /// can swing its surface from the centre's path. Gravity is left out: a body that rests on something else is held up, and
@@ -845,7 +860,7 @@ impl World {
             flip(out);
             if out.count > 0 && out.held_count == 0 && self.uu(MESH_FLAGS, mesh) & MESH_FIX_EDGES != 0 {
                 let (p, q) = (pose.unapply(r.p), pose.unapply(r.q));
-                let held = Held { slop: self.header().contact_slop, motion, front, corners };
+                let held = Held { depth: self.held_depth(), motion, front, corners };
                 let radius = held.shrink(r.radius);
                 if held.hovers(&[p, q], radius, pose) && on_open_edges(out, corners, pose, |k| self.mesh_across(mesh, t, k) == NONE) {
                     out.count = 0;
@@ -858,7 +873,7 @@ impl World {
             if out.count > 0 && out.held_count == 0 && shape == SHAPE_BOX && self.uu(MESH_FLAGS, mesh) & MESH_FIX_EDGES != 0 {
                 let rel = pose.relative(self.collider_pose(other));
                 let half = self.v(COLLIDER_A, other);
-                let held = Held { slop: self.header().contact_slop, motion, front, corners };
+                let held = Held { depth: self.held_depth(), motion, front, corners };
                 // The box's reach along the triangle's normal, each half extent held smaller.
                 let along = |u: V3, h: f32| held.shrink(h) * rel.q.rotate(u).dot(front).abs();
                 let radius = along(v3(1.0, 0.0, 0.0), half.x) + along(v3(0.0, 1.0, 0.0), half.y) + along(v3(0.0, 0.0, 1.0), half.z);
@@ -1261,9 +1276,6 @@ pub(crate) fn flip(out: &mut Manifold) {
 /// A closest point this near an edge's line, in metres per metre of its distance from the origin plus one (the rounding of a
 /// coordinate that far out), is on the edge.
 const ON_EDGE: f32 = 1e-5;
-/// How many slops deep a shape may sit in a surface the solver holds it against: a resting ball sits about one slop deep
-/// (measured: 1.1), a soft push under a load somewhat more, and Rapier's allowed error is five of these slops.
-const HELD_SLOPS: f32 = 8.0;
 
 /// What a collider does in the coming step, in the world's frame: how far its centre travels, the rotation vector it turns
 /// through, and the arm that turn swings (a capsule's half length, off the `axis` it lies along; a box's half diagonal, with
@@ -1306,23 +1318,22 @@ fn on_open_edges(out: &Manifold, corners: [V3; 3], pose: Pose, open: impl Fn(usi
 /// A ball rolling over the seam of two coplanar meshes meets the second mesh's open edge from the side before it is over it:
 /// the closest point is the edge, the normal leans back toward the first mesh, and a row along it cancels the approach: a
 /// kick of up to 1.8 m/s up and back, where one mesh gives none (the ghost rule needs the triangle across the edge, and
-/// there is none across a seam between meshes). The shape never leaves the plane it rests on: the solver holds it a slop
-/// deep, a load a few more. A shape whose surface, `HELD_SLOPS` slops smaller, stays clear of the triangle's plane over the
-/// whole step cannot be touching the triangle by more than that depth, whatever the edge says, and its contact with the
-/// edge is dropped. The plane is the triangle's own, so one test serves a triangle of any size. A shape that crosses the
+/// there is none across a seam between meshes). The shape never leaves the plane it rests on, and the solver holds it at a
+/// depth it knows (`World::held_depth`). A shape whose surface, that much smaller, stays clear of the triangle's plane over the
+/// whole step cannot be touching the triangle by more than the solver lets any resting shape sink, whatever the edge says,
+/// and its contact with the edge is dropped. The plane is the triangle's own, so one test serves a triangle of any size. A shape that crosses the
 /// plane, or sinks deeper than that, keeps its contact: an edge struck from the side is a real hit.
 struct Held {
-    slop: f32,
+    depth: f32,
     motion: Motion,
     front: V3,
     corners: [V3; 3],
 }
 
 impl Held {
-    /// A size held smaller by the depth the solver holds a shape at.
+    /// A size held smaller by the depth the solver holds a resting shape at.
     fn shrink(&self, size: f32) -> f32 {
-        let depth = HELD_SLOPS * self.slop;
-        if size > depth { size - depth } else { 0.0 }
+        if size > self.depth { size - self.depth } else { 0.0 }
     }
 
     /// Whether points `from`, at the mesh's frame, with a shape of reach `radius` along the plane's normal around them, stay
