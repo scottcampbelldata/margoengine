@@ -261,6 +261,7 @@ export class Crowd {
   private readonly queue: number[] = [];
   private readonly seen = new Set<number>();
   private readonly spans: number[] = [];
+  private readonly slid = new Float64Array(2);
 
   /**
    * @param navMesh The walkable polygons the agents stay on: a `NavMesh` or a tiled mesh.
@@ -818,6 +819,91 @@ export class Crowd {
     if (d <= reach) agent.wallCount++;
   }
 
+  /**
+   * Moves a point (x, z) in polygon `start` by (dx, dz) along the mesh surface (Snook 2000, "Simplified 3D movement and
+   * pathfinding using navigation meshes", Game Programming Gems: the move walks the polygon corridor and, at a border
+   * edge, keeps only the part of the remaining move along that edge). The ray leaves each polygon through the edge it
+   * crosses first; an edge a portal to open ground covers there is walked through, any other is a wall the rest of the
+   * move is projected onto. At a border corner the projection onto the next wall cancels what is left, so the point
+   * stops on the corner instead of losing a whole axis of the move. Returns the shared scratch (x, z) of the end point.
+   */
+  private slide(
+    mesh: CrowdAgent['surface'],
+    start: number,
+    x: number,
+    z: number,
+    dx: number,
+    dz: number,
+    filter: CrowdAgent['filter'],
+  ): Float64Array {
+    let cur = start;
+    for (let step = 0; step < 16 && dx * dx + dz * dz > 1e-18; step++) {
+      const points = mesh.polygonPoints!(cur),
+        links = mesh.polygonLinks!(cur),
+        n = points.length,
+        a0 = points[0],
+        a1 = points[1],
+        a2 = points[2],
+        winding = (a1[0] - a0[0]) * (a2[2] - a0[2]) - (a1[2] - a0[2]) * (a2[0] - a0[0]) > 0 ? 1 : -1;
+      let hit = -1,
+        hitT = 1;
+      for (let i = 0; i < n; i++) {
+        const a = points[i],
+          b = points[(i + 1) % n],
+          ex = b[0] - a[0],
+          ez = b[2] - a[2],
+          cross = dx * ez - dz * ex;
+        // Only an edge the move goes out through, at the point x + t d = a + u e.
+        if (!(cross * winding > 1e-12)) continue;
+        const t = ((a[0] - x) * ez - (a[2] - z) * ex) / cross,
+          u = ((a[0] - x) * dz - (a[2] - z) * dx) / cross;
+        if (u < -1e-9 || u > 1 + 1e-9 || t > hitT) continue;
+        hit = i;
+        hitT = Math.max(t, 0);
+      }
+      if (hit < 0) break;
+      x += dx * hitT;
+      z += dz * hitT;
+      dx *= 1 - hitT;
+      dz *= 1 - hitT;
+      const a = points[hit],
+        b = points[(hit + 1) % n],
+        ex = b[0] - a[0],
+        ez = b[2] - a[2],
+        length2 = ex * ex + ez * ez,
+        length = Math.sqrt(length2),
+        s = ((x - a[0]) * ex + (z - a[2]) * ez) / length2;
+      let next = -1;
+      for (const link of links) {
+        if (link.offMesh !== undefined || (filter && !((filter[mesh.polygonArea(link.to)] ?? 1) < Infinity))) continue;
+        const l = link.left,
+          r = link.right;
+        if (
+          Math.abs(ex * (l[2] - a[2]) - ez * (l[0] - a[0])) > 1e-6 * length ||
+          Math.abs(ex * (r[2] - a[2]) - ez * (r[0] - a[0])) > 1e-6 * length
+        )
+          continue;
+        const s1 = ((l[0] - a[0]) * ex + (l[2] - a[2]) * ez) / length2,
+          s2 = ((r[0] - a[0]) * ex + (r[2] - a[2]) * ez) / length2;
+        if (s >= Math.min(s1, s2) - 1e-6 && s <= Math.max(s1, s2) + 1e-6) {
+          next = link.to;
+          break;
+        }
+      }
+      if (next >= 0) {
+        cur = next;
+        continue;
+      }
+      // A wall: keep the part of the rest of the move along it.
+      const along = (dx * ex + dz * ez) / length2;
+      dx = along * ex;
+      dz = along * ez;
+    }
+    this.slid[0] = x + dx;
+    this.slid[1] = z + dz;
+    return this.slid;
+  }
+
   private move(agent: CrowdAgent, vx: number, vz: number, dt: number): void {
     const p = agent.position,
       mesh = agent.surface,
@@ -844,26 +930,39 @@ export class Crowd {
       }
       return;
     }
-    // Try the full move; then along the walls it touches (rounding can still carry a step that grazes a wall off the
-    // mesh); on a surface without walls, each axis alone; else stay.
+    // Try the full move; where it leaves the mesh, slide along the border it meets (corners included); on a surface
+    // without polygon data, each axis alone; else stay.
     let nx = p[0] + vx * dt,
       nz = p[2] + vz * dt,
       polygon = stand(nx, nz);
-    if (polygon < 0 && agent.wallCount) {
-      const w = agent.walls,
-        step = Math.hypot(vx, vz) * dt;
-      for (let k = 0; k < agent.wallCount; k++) {
-        const into = w[3 * k] * vx + w[3 * k + 1] * vz;
-        if (into < 0 && -w[3 * k + 2] * agent.wallHorizon <= step + 1e-6) {
-          vx -= into * w[3 * k];
-          vz -= into * w[3 * k + 1];
+    if (polygon < 0) {
+      // A step that ends within a micrometre of the mesh (grazing a border corner, as a route through one does) ends on it.
+      const near = mesh.closestPoint([nx, p[1], nz]);
+      if (near && Math.hypot(near.point[0] - nx, near.point[2] - nz) <= 1e-6) {
+        const snapped = stand(near.point[0], near.point[2]);
+        if (snapped >= 0) {
+          nx = near.point[0];
+          nz = near.point[2];
+          polygon = snapped;
         }
       }
-      nx = p[0] + vx * dt;
-      nz = p[2] + vz * dt;
-      polygon = stand(nx, nz);
     }
-    if (polygon < 0) {
+    if (polygon < 0 && mesh.polygonPoints && mesh.polygonLinks) {
+      const from = agent.polygon >= 0 ? agent.polygon : mesh.locate([p[0], p[1], p[2]]);
+      if (from >= 0) {
+        const end = this.slide(mesh, from, p[0], p[2], nx - p[0], nz - p[2], filter);
+        nx = end[0];
+        nz = end[1];
+        polygon = stand(nx, nz);
+      }
+      if (polygon < 0) {
+        nx = p[0];
+        nz = p[2];
+        polygon = agent.polygon;
+      }
+      vx = (nx - p[0]) / dt;
+      vz = (nz - p[2]) / dt;
+    } else if (polygon < 0) {
       polygon = stand(nx, p[2]);
       if (polygon >= 0) {
         nz = p[2];

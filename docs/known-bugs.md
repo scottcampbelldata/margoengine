@@ -205,16 +205,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `tests/step-path.test.js` lists `fields.ts`, and `npm run check:pinned-math` (in verify) refuses host transcendentals
   and `**` in the world, its solvers and their fields. Regression: `packages/physics/tests/step-path.test.js`.
 
-### Open: a crowd agent heading straight through a corner of the navmesh border is still caught by the axis-split move (KB-CROWD-WALLEND1, navmesh)
+### Fixed 2026-11-25: a crowd agent heading straight through a corner of the navmesh border crept toward it and never passed (KB-CROWD-WALLEND1, navmesh)
 
-- **Repro:** a Crowd on a mesh whose border has a convex corner (the end of a wall, such as a door post); send an
-  agent on a path that clips the corner at speed. The step that would cross the corner leaves the mesh, and `move()`
-  cuts it to one axis, so the agent checks or stalls at the post. Found while fixing KB-CROWD-WALL1; the regression
-  test belongs in `packages/navmesh/test/crowd-walls.test.js`.
-- **Cause:** walls enter ORCA as half-planes from border edges, but a border vertex (a wall's end) gives no constraint,
-  so nothing keeps the agent's disc off the corner and the fallback move still decides there. A correct version adds
-  a constraint for convex border vertices (van den Berg et al. 2011, section 5.4, treats obstacle vertices with the
-  velocity-obstacle cone), so the fallback never runs on a valid mesh.
+- **Repro:** `packages/navmesh/test/crowd-walls.test.js` "an agent aimed at a border corner passes it": a 2 m pillar in a
+  10 m yard, a route along the line of its bottom wall that bends at its corner, an agent at 8 m/s. Before the fix the
+  agent walked 0.5 m and then crept toward the corner at a falling speed for the whole 12 s.
+- **Cause:** `wallLine` took a wall whenever the agent stood in front of it, ends included to 1e-9. An agent on the line
+  of the corner's other wall stood level with the end of this one, so the wall held it to a closing speed of
+  distance / horizon, which falls as it nears: it never reached the corner. A step that then grazed the corner left
+  the mesh by float noise and `move()` cut it to one axis, which also left it on the post.
+- **Fix:** fix(navmesh): the end of a wall (within a micrometre) gives no half-plane, a step that ends within a
+  micrometre of the mesh ends on it, and a step that leaves the mesh moves along the surface (Snook 2000, "Simplified
+  3D movement and pathfinding using navigation meshes", Game Programming Gems: walk the polygon corridor, keep the part
+  of the move along the wall it meets, stop at the corner where the next wall cancels the rest) instead of one axis at
+  a time.
 
 ### Fixed 2026-11-25: walkCrowd turned a person round on the spot when the crowd pushed them back (KB-CROWD-HEADING1, humans)
 

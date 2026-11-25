@@ -336,7 +336,10 @@ export function wallLine(
   const ex = bx - ax,
     ez = bz - az,
     t = ((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez);
-  if (t < -1e-9 || t > 1 + 1e-9) return Infinity;
+  // An agent level with an end of the wall (within a micrometre, as a route running along the wall's line is) is past
+  // it: the end is a corner, and closing on it more slowly the nearer the agent comes would never let it round it.
+  const slack = 1e-6 / Math.sqrt(ex * ex + ez * ez);
+  if (t < slack || t > 1 - slack) return Infinity;
   const dx = px - ax - t * ex,
     dz = pz - az - t * ez,
     d = Math.hypot(dx, dz);

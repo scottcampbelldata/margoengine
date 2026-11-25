@@ -123,3 +123,35 @@ test('an agent pressed toward a diagonal wall by a group slides along it instead
     assert.ok(s.arrived !== null, `agent ${i} arrives`);
   }
 });
+
+test('an agent aimed at a border corner passes it and ends on the mesh, from several approach angles (KB-CROWD-WALLEND1)', () => {
+  // A 2 m pillar in a 10 m yard; its corner (5, 3) is a convex border vertex. The route runs along the line of the
+  // pillar's bottom wall (z 3) and bends at the corner, so the agent heads straight at the end of the wall at 8 m/s.
+  // The end of a wall gives no ORCA half-plane, but the wall it stood level with held the agent to a slower and slower
+  // approach (the closing speed allowed falls with its distance), and a step that grazed the corner was cut to one axis:
+  // the agent crept toward the post and never passed it.
+  const nav = grid(10, 10, (c, r) => c >= 3 && c < 5 && r >= 3 && r < 5);
+  for (const [approach, turn] of [
+    [0, 30],
+    [0, 60],
+    [0, 90],
+    [20, 120],
+    [40, 90],
+  ]) {
+    const a = (approach * Math.PI) / 180,
+      b = ((approach + turn) * Math.PI) / 180,
+      crowd = new Crowd(nav),
+      agent = crowd.addAgent({
+        position: [5 - 2.5 * Math.cos(a), 0, 3 - 2.5 * Math.sin(a)],
+        radius: 0.25,
+        maxSpeed: 8,
+      });
+    agent.setTarget([5 + 2.5 * Math.cos(b), 0, 3 + 2.5 * Math.sin(b)]);
+    crowd.update(1 / 60);
+    const route = length(agent.path),
+      [m] = measure(crowd, [agent], 12),
+      label = `approach ${approach}, turn ${turn}`;
+    assert.equal(agent.state, 'arrived', `${label}: arrives`);
+    assert.ok(m.arrived <= route / agent.maxSpeed + 6, `${label}: arrived after ${m.arrived} s`);
+  }
+});
