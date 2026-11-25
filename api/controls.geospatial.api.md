@@ -39,6 +39,7 @@ export class GeospatialControls extends Controls {
     readonly maxRange: number;
     clipPlanes: boolean;
     readonly zUp: boolean;
+    readonly origin: GeospatialOrigin | null;
     scene: boolean;
     colliders: readonly (Mesh | ModelLike)[] | null;
     raycast: SurfaceRaycast | undefined;
@@ -146,6 +147,7 @@ export interface GeospatialOptions {
     zUp?: boolean;
     frame?: GeospatialFrame;
     ground?: WorldGround;
+    origin?: GeospatialOrigin;
     scene?: boolean;
     colliders?: readonly (Mesh | ModelLike)[] | null;
     raycast?: SurfaceRaycast;
@@ -162,6 +164,11 @@ export interface GeospatialOptions {
     hash?: boolean;
     gamepad?: boolean;
     reducedMotion?: boolean;
+}
+
+export interface GeospatialOrigin {
+    toLocal(world: ArrayLike<number>): ArrayLike<number>;
+    toWorld(local: ArrayLike<number>): ArrayLike<number>;
 }
 
 export interface GeospatialPick {

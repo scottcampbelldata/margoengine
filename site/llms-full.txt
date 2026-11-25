@@ -11796,8 +11796,8 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   `raycast` and a march over `heightAt`; only a miss of all of them falls back to the ellipsoid at the centre height.
   The `heightAt` march takes at most 512 steps of half the height above the ground, so a slope steeper than about 63
   degrees across one step can be crossed unseen, and a grazing ray past 512 steps misses; pass an exact `raycast`
-  (terrain/query) for cliffs. Scene picks are float32 in core: about 0.5 m at Earth-centred coordinates until the
-  floating origin row lands. Zoom keeps the cursor point to a tenth of a pixel (the view re-levels at its new centre).
+  (terrain/query) for cliffs. Scene picks are float32 in core: about 0.5 m at Earth-centred coordinates unless the
+  scene is in a local `frame` or under a floating `origin`, where they are as exact as near the world origin. Zoom keeps the cursor point to a tenth of a pixel (the view re-levels at its new centre).
 - Flights follow van Wijk and Nuij's path in the plane of the geodesic: the pan u runs along the ground geodesic and the
   path width becomes the range (range = w / (2 tan(fov / 2))), so the climb ignores the globe's curvature (a hop of
   thousands of km climbs a little less than the paper's flat-plane optimum would over a sphere). Height, heading and
@@ -11828,6 +11828,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   flat ground and the curved Earth part by d^2 / 2R (8 m at 10 km), which is the world's own flat-earth error.
   `tilesHeightQuery` hits only the tiles drawn now: where a tile is not loaded yet it answers undefined and the
   camera falls back to the ellipsoid floor; each call is one bvh ray over the drawn tile models.
+- Planet scale: near is 1% of the eye's height above the `heightAt` ground (at least 5 mm; the ellipsoid without
+  `heightAt`, so a camera low over a scene mesh with no `heightAt` gets a near plane from its height above the
+  ellipsoid), far is the eye's horizon plus the horizon of 9,000 m ground. Core's reversed float32 depth carries that
+  ratio (up to about 10^7). With `origin`, controls math stays float64 and only the camera written to core is local;
+  `raycast` and scene queries then work in local coordinates. Without `frame` or `origin` the camera sits at
+  Earth-centred coordinates and core's float32 view matrix collapses near the ground (docs/large-coordinates.md).
 - Sea level: `geoid` defaults to `'egm96'`, the EGM96 15-minute grid of `@margoengine/controls/geoid`, fetched (2,077,922
   bytes) the first time `heights` is read; `heights.seaLevel` is null until it is in, and stays null with a
   `geoid-error` event when the packed file is not installed (it is made by `scripts/geoid/pack-egm96.mjs` from NGA's

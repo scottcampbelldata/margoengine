@@ -12189,6 +12189,12 @@
       "commit": "d0628d7a85",
       "reason": "FG-17 piece 5c new entry scatter/read 1,159 B gzip: readScatter (one copy and map of the frame cull's three ring buffers and commands, fade-band copies kept once) and instanceMatrix (the vertex stage's yaw and ground-tilt placement as a 4 x 4); optional, only voxel-pathtracer/from-engine's scatter source reads its result, structurally",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial planet scale (origin, near and far)",
+      "grew": 1
     }
   ],
   "items": {
