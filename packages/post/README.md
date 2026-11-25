@@ -962,7 +962,7 @@ streaks.options.tint = [1, 0.8, 0.6]; // warm streaks: options are read every fr
 
 ## Blur: `Blur`
 
-`@margoengine/post/blur` (5,947 B min+gzip, its own entry; it carries the stack) blurs the frame, all of it or one
+`@margoengine/post/blur` (8,249 B min+gzip, its own entry; it carries the stack) blurs the frame, all of it or one
 rectangle: frosted glass behind a menu, a focus pull, or a step in your own chain of effects. An HDR `PostStack` effect.
 
 ```ts
@@ -991,6 +991,43 @@ glass.radius = 4; // a focus pull: options are read every frame
   `region` the top half, the bottom half equals the unblurred frame to the bit; radius 0 equals disabled exactly.
 - **Limits.** Cost grows with the radius (2 radius + 1 reads a pixel a pass); the region has a hard edge; a bright
   frame border bleeds inward. One or two full-size `rgba16float` targets. GPU cost not measured yet. WebGPU only.
+
+### Zoom and spin (radial blur)
+
+`kind: 'zoom'` streaks the frame towards `center`, for speed and impact shots; `kind: 'spin'` smears it around
+`center`. One pass; `region` and `enabled` work as above, `radius` is not used.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {Blur} from 'margoengine/post/blur';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const rush = new Blur({kind: 'zoom', center: [0.5, 0.45], strength: 0.25, innerRadius: 0.15});
+PostStack.attach(stage.engine, [rush, new Tonemap()]);
+rush.options.strength = 0.05; // live: every option is read each frame
+// Light rays from a sun at the top right: the frame stays sharp, light above `threshold` streaks away from it.
+Object.assign(rush.options, {center: [0.8, 0.15], strength: 0.9, samples: 96, decay: 0.97, rays: 1.5, innerRadius: 0});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `center` | `[0.5, 0.5]` | The sharp point, 0..1 of the view, y down; -10 to 10, so it may be off screen |
+| `strength` | `0.1` | 0 to 1; 0 passes the frame. Zoom: share of the way to the centre. Spin: arc in radians |
+| `samples` | `32` | Taps per pixel, a whole number 2 to 128 |
+| `innerRadius` | `0` | Radius around the centre kept sharp, 0 to 10 view heights |
+| `falloff` | `0.2` | Distance past `innerRadius` over which the blur grows to full, 0 to 10 view heights |
+| `decay` | `1` | Weight of each tap as a share of its neighbour's nearer the pixel, 0 to 1 |
+| `rays` | `0` | 0 to 8. Above 0, adds the streaks of the light above `threshold`, times `rays`, to the sharp frame |
+| `threshold` | `1` | With `rays`: linear light per channel below this casts no ray, 0 to 64 |
+
+- **Method.** `samples` bilinear taps: zoom along the straight line from the pixel towards the centre, spin along the
+  arc centred on the pixel, in units of view height so circles stay round; taps past the view edge read its nearest
+  pixel. `rays` is the screen-space radial sum of K. Mitchell, "Volumetric Light Scattering as a Post-Process",
+  [GPU Gems 3, 2007, chapter 13](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-13-volumetric-light-scattering-post-process),
+  without its occlusion pre-pass: `threshold` picks the light.
+- **Limits.** A long streak with few samples shows steps. Rays come from any bright pixel, in front of the light or
+  not. GPU cost not measured yet. WebGPU and the WebGL2 layer.
 
 ## Lens model: `Lens`
 

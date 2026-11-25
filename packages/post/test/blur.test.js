@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Blur, MAX_BLUR_RADIUS } from '@margoengine/post/blur';
+import { Blur, MAX_BLUR_RADIUS, MAX_BLUR_SAMPLES } from '@margoengine/post/blur';
 import { PostStack } from '../dist/index.js';
 import { harness, modules } from './support.js';
 
@@ -59,6 +59,18 @@ test('Blur runs one pass across and one down, with the kind, radius and region o
 test('Blur checks its options now, on radius and every frame, and needs a stack', () => {
   for (const bad of [
     { kind: 'disc' },
+    { strength: 1.1 },
+    { strength: Number.NaN },
+    { samples: 1 },
+    { samples: 2.5 },
+    { samples: MAX_BLUR_SAMPLES + 1 },
+    { center: [0.5] },
+    { center: [0.5, 11] },
+    { innerRadius: -1 },
+    { falloff: 11 },
+    { decay: 1.5 },
+    { rays: 9 },
+    { threshold: -1 },
     { radius: -1 },
     { radius: MAX_BLUR_RADIUS + 1 },
     { radius: Number.NaN },
@@ -82,4 +94,49 @@ test('Blur checks its options now, on radius and every frame, and needs a stack'
   effect.dispose();
   assert.ok(!h.engine.hasPlugin('post:stack'));
   assert.throws(() => effect.setup({ gpu: {} }), /disposed/);
+});
+
+test('Blur zoom and spin draw one pass with the centre, view and defaults, and live options', async () => {
+  const h = harness(),
+    effect = new Blur({ kind: 'zoom' });
+  const values = (log) => {
+    const e = log.find((entry) => entry[0] === 'writeBuffer' && entry[3].length === 160),
+      b = Buffer.from(e[3], 'hex');
+    return [
+      [...new Float32Array(b.buffer, b.byteOffset, 18)].map((v) => Math.round(v * 1000) / 1000),
+      [...new Int32Array(b.buffer, b.byteOffset + 72, 2)],
+    ];
+  };
+  const log = h.gpu.record(() => {
+    h.engine.use(new PostStack([effect]));
+    h.frame();
+  });
+  assert.equal(passes(log), 1);
+  // view rect, region, centre, target size, strength, inner radius, falloff, decay, rays, threshold; samples, spin.
+  const rest = [0, 0, 1280, 720, 0, 0, 1, 1, 0.5, 0.5, 1280, 720, 0.1, 0, 0.2, 1, 0, 1];
+  assert.deepEqual(values(log), [rest, [32, 0]]);
+  assert.ok(modules(log).some((c) => c.includes('textureSampleLevel') && c.includes('toDisplay')));
+  Object.assign(effect.options, {
+    kind: 'spin',
+    center: [0.25, 0.75],
+    samples: 8,
+    strength: 0.5,
+    rays: 2,
+  });
+  const spin = h.gpu.record(() => h.frame());
+  assert.deepEqual(values(spin)[0].slice(8, 17), [0.25, 0.75, 1280, 720, 0.5, 0, 0.2, 1, 2]);
+  assert.deepEqual(values(spin)[1], [8, 1]);
+  const steady = h.gpu.record(() => h.frame());
+  assert.equal(steady.filter((e) => ['module', 'createTexture', 'group', 'sampler'].includes(e[0])).length, 0);
+  // Strength 0 is the one-tap pass-through; a gaussian after a zoom still works.
+  effect.options.strength = 0;
+  assert.equal(passes(h.gpu.record(() => h.frame())), 1);
+  effect.options.kind = 'gaussian';
+  assert.equal(passes(h.gpu.record(() => h.frame())), 2);
+  Object.assign(effect.options, { kind: 'zoom', strength: 0.2 });
+  const fresh = h.lose();
+  assert.equal(passes(fresh.record(() => h.frame())), 1);
+  h.engine.removePlugin('post:stack');
+  await null;
+  assert.deepEqual(h.live(), [], 'disposal releases every GPU resource');
 });

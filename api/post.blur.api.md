@@ -22,11 +22,21 @@ export class Blur implements EnginePlugin {
 }
 
 export interface BlurOptions {
-    kind?: 'gaussian' | 'box';
+    kind?: 'gaussian' | 'box' | 'zoom' | 'spin';
     radius?: number;
     region?: readonly [number, number, number, number];
+    center?: readonly [number, number];
+    strength?: number;
+    samples?: number;
+    innerRadius?: number;
+    falloff?: number;
+    decay?: number;
+    rays?: number;
+    threshold?: number;
     enabled?: boolean;
 }
 
 export const MAX_BLUR_RADIUS = 64;
+
+export const MAX_BLUR_SAMPLES = 128;
 ```

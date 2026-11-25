@@ -8466,3 +8466,13 @@ Entry size: 0 to 8,976 B min+gzip (ceiling 9,246 B); core plus stage unchanged a
 ## Culling occlusion queries (`@margoengine/culling/occlusion`)
 
 `OcclusionQueries` queries at most `capacity` objects a frame, 1 to 65,536 (default 1,024; WebGPU caps a query set at 4,096 queries, so each 4,096 take their own query set and render pass). GPU memory: 8 bytes a query for the resolve buffer and for each of three readback buffers (plus 8 bytes each), 24 bytes an object of box data, a 432-byte cube and a 64-byte camera uniform: about 56 bytes an object, 57 KiB at the default. Results land one to three frames after their query (three readbacks in flight; a fourth frame waits and its objects keep their last result), so an object uncovered this frame reads occluded for up to three frames unless `retries` and `strategy` force it. `samples` is a flag, not a pixel count: WebGPU promises only zero or nonzero and D3D12 and the WebGL2 compatibility layer (`ANY_SAMPLES_PASSED`) report 1, so Babylon's accurate/conservative choice has no counterpart (every result is an exact per-sample test; WebGPU offers no conservative query). Boxes are axis-aligned world boxes grown by 0.1% of their largest side; a mesh uses its geometry's bind-pose box, so skinned or morphed vertices outside it can read occluded while showing. One view is queried per frame (`view`, default the canvas's first view). Depth written by passes after `order` (default 1) does not occlude. Core's WebGL2 preview refuses the entry (`unsupported`). Core and stage unchanged.
+
+### Zoom and spin blur (`Blur` kinds in `@margoengine/post/blur`, 2026-11-24)
+
+Enforced: `strength` and `decay` 0..1; `samples` a whole number 2..128 (default 32); `center` [x, y] in -10..10;
+`innerRadius` and `falloff` 0..10 view heights; `rays` 0..8; `threshold` 0..64. By method: one pass of `samples`
+bilinear taps per pixel, not jittered, so a streak longer than a few pixels per sample shows steps; taps past the view
+edge read its nearest pixel; `rays` has no occlusion pass, so any pixel above `threshold` casts a ray (Mitchell, GPU
+Gems 3, 2007, chapter 13). `radius` applies to `gaussian` and `box` only. Checked on a real GPU
+(`packages/post/test/radial-blur-browser.mjs`); GPU cost not measured.
+
