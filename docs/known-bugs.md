@@ -210,11 +210,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** extend the speed-dependent surface rise behind the crest, with a narrow outboard trough and a smooth fade toward the stern.
 - **Regression:** `packages/water/test/ships.test.js` and `packages/water/test/ships.browser.mjs` check lift on both sides, outboard drawdown and a quiet surface farther from the hull.
 
-### Open: standalone PostProcessing grades and presents the whole canvas for every view (KB-CREATIVE-POSTVIEW1, creative)
+### Fixed 2026-11-25: standalone PostProcessing graded and presented the whole canvas for every view (KB-CREATIVE-POSTVIEW1, creative)
 
 - **Repro:** `PostProcessing.attach(engine)` (or `new PostStack([new PostProcessing()])`) and render two views with different scissors (`engine.render({views: [...]})`): the present pass clears the full target and draws a full-canvas triangle, so pixels outside the second view's scissor change (the owner harness reports "no pixel writes outside either view scissor", on both). With atmosphere or focus on, the world position is also rebuilt from a uv over the whole canvas rather than the view's rectangle.
-- **Cause:** `apply()` (standalone and stacked) and the grade shader work on the whole target and ignore `context.view`.
-- **Needs:** the view rectangle in the grade uniform and shader (uv and clamps relative to it) and the present pass drawn through the view's scissor with `loadOp: 'load'`. Until then PostProcessing is not an owner-lifetime entry (docs/limits.md).
+- **Cause:** `apply()` (standalone and stacked) and the grade shader worked on the whole target and ignored `context.view`; every view of a frame also shared one uniform buffer, and queue writes land before the whole submit, so all views graded with the last view's camera.
+- **Fix:** the grade uniform carries the view's viewport rectangle (uv, blur taps, god-ray taps and loads are relative to it, the dispatch covers only it), each view id has its own uniform buffer and bind group, and the present pass is clipped to the view's scissor (or viewport) with `loadOp: 'load'` for every view after the first. A frame with no view is the whole canvas, as before.
+- **Regression:** `packages/creative/tests/post-views-browser.mjs` (`npm run test:gpu:post-views` in creative): two views of two scenes graded differently, each half read back, on WebGPU and the WebGL2 layer. Adding PostProcessing to the owner-lifetime harness is a separate step.
 
 ### Fixed 2026-11-25: the physics wind force and explosion used the host's Math inside a step (KB-PHYS-FIELDSMATH1, physics)
 

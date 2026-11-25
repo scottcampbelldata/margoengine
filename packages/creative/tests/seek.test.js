@@ -6,11 +6,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PostProcessing } from '../dist/post.js';
 
+globalThis.GPUBufferUsage ??= { UNIFORM: 64, COPY_DST: 8 };
 const FPS = 60,
   identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-  device = { queue: { writeBuffer() {} } },
+  device = { queue: { writeBuffer() {} }, createBuffer: () => ({ destroy() {} }) },
   draw = (post, delta) =>
-    post['update']({ delta, device, camera: { matrix: identity(), position: new Float32Array(3), near: 0.1, far: 100 } });
+    post['update']({
+      delta,
+      device,
+      camera: { matrix: identity(), position: new Float32Array(3), near: 0.1, far: 100 },
+    });
 
 for (const n of [1, 600, 54000])
   test(`creative post grain replayed ${n} steps equals a continuous run`, () => {

@@ -6,9 +6,17 @@ import { MargoError } from '@margoengine/math/errors';
 import { HDRRenderTarget } from './targets.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { displayShader, linearShader } from '../../shared/display.js';
+import { ViewStates, viewLoadOp } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+// One uniform buffer and bind group per view id: queue writes land before the whole submit, so views sharing one
+// buffer would all grade with the last view's camera and rectangle.
+interface Slot {
+  buffer: GPUBuffer;
+  group?: GPUBindGroup;
+}
+const uniformSize = 288;
 const atmosphere: AtmosphereOptions = {},
   sun: Vec3 = [0.3, 0.6, -0.7],
   color: Vec3 = [0.45, 0.62, 0.8],
@@ -23,7 +31,7 @@ function vectorRange(value: Vec3, min: number, max: number): boolean {
 const vectorFinite = (value: Vec3) => value.length === 3 && value.every(finite);
 const vertex = `struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out{let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Out;o.clip=vec4f(p[i],0,1);o.uv=p[i]*vec2f(0.5,-0.5)+0.5;return o;}`;
-const frame = `struct Frame {inverse:mat4x4f,eye:vec4f,sun:vec4f,fog:vec4f,color:vec4f,grade:vec4f,lens:vec4f,settings:vec4f,gain:vec4f,lift:vec4f,camera:mat4x4f}
+const frame = `struct Frame {inverse:mat4x4f,eye:vec4f,sun:vec4f,fog:vec4f,color:vec4f,grade:vec4f,lens:vec4f,settings:vec4f,gain:vec4f,lift:vec4f,camera:mat4x4f,rect:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
 fn world(uv:vec2f,depth:f32)->vec3f{let p=f.inverse*vec4f(uv*vec2f(2,-2)+vec2f(-1,1),depth,1);return p.xyz/p.w;}`;
 // Height fog: closed-form integral of an exponential height density along the ray (Wenzel, "Real-time Atmospheric
@@ -44,12 +52,12 @@ ${displayShader}
 // Film grain: the PCG hash (Jarzynski and Olano, JCGT 9(3), 2020) nested over the pixel and the frame time's bits, so
 // each frame draws a fresh, structure-free pattern; the top 24 bits map to [-0.5, 0.5).
 fn grainPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
-@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let size=textureDimensions(output);if(any(id.xy>=size)){return;}let p=vec2i(id.xy);let uv=(vec2f(id.xy)+0.5)/vec2f(size);let d=textureLoad(depth,p,0);let w=world(uv,d);let distance=length(w-f.eye.xyz);var c=textureLoad(scene,p,0).xyz;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let size=vec2i(f.rect.zw);if(any(vec2i(id.xy)>=size)){return;}let local=vec2i(id.xy);let origin=vec2i(f.rect.xy);let p=origin+local;let uv=(vec2f(id.xy)+0.5)/vec2f(size);let d=textureLoad(depth,p,0);let w=world(uv,d);let distance=length(w-f.eye.xyz);var c=textureLoad(scene,p,0).xyz;
  let radius=min(8.0,abs(distance-f.lens.x)/max(distance,0.001)*f.lens.y);
- if(radius>0.5){var blurred=vec3f(0);var weights=0.0;for(var y=-2;y<=2;y++){for(var x=-2;x<=2;x++){let q=clamp(p+vec2i(round(vec2f(f32(x),f32(y))*radius*0.5)),vec2i(0),vec2i(size)-1);let neighbor=length(world((vec2f(q)+0.5)/vec2f(size),textureLoad(depth,q,0))-f.eye.xyz);let weight=exp(-f32(x*x+y*y)*0.25)*select(0.0,1.0,neighbor>=distance-radius);blurred+=textureLoad(scene,q,0).xyz*weight;weights+=weight;}}c=blurred/max(weights,0.001);}
+ if(radius>0.5){var blurred=vec3f(0);var weights=0.0;for(var y=-2;y<=2;y++){for(var x=-2;x<=2;x++){let q=clamp(local+vec2i(round(vec2f(f32(x),f32(y))*radius*0.5)),vec2i(0),size-1);let neighbor=length(world((vec2f(q)+0.5)/vec2f(size),textureLoad(depth,origin+q,0))-f.eye.xyz);let weight=exp(-f32(x*x+y*y)*0.25)*select(0.0,1.0,neighbor>=distance-radius);blurred+=textureLoad(scene,origin+q,0).xyz*weight;weights+=weight;}}c=blurred/max(weights,0.001);}
  let density=f.fog.x*exp(clamp(-f.eye.y*f.fog.y,-20.0,20.0));let dy=(w.y-f.eye.y)*f.fog.y;let integral=select((1-exp(clamp(-dy,-20.0,20.0)))/select(dy,1.0,abs(dy)<0.001),1.0,abs(dy)<0.001);let visibility=exp(-max(0.0,density*distance*integral));c=mix(f.color.xyz,c,visibility);
  let sunWorld=f.eye.xyz+f.sun.xyz*f.settings.y;let ray=normalize(sunWorld-f.eye.xyz);let farRay=normalize(w-f.eye.xyz);let alignment=pow(max(dot(ray,farRay),0.0),16.0);var shafts=0.0;
- let sunClip=f.camera*vec4f(sunWorld,1);if(sunClip.w>0&&f.fog.z>0){let sunUV=sunClip.xy/sunClip.w*vec2f(0.5,-0.5)+0.5;for(var i=1;i<=16;i++){let q=clamp(vec2i(mix(uv,sunUV,f32(i)*0.05)*vec2f(size)),vec2i(0),vec2i(size)-1);shafts+=select(0.0,1.0,textureLoad(depth,q,0)<0.000001)*pow(0.95,f32(i))/16.0;}}c+=vec3f(1,0.8,0.5)*shafts*alignment*f.fog.z;
+ let sunClip=f.camera*vec4f(sunWorld,1);if(sunClip.w>0&&f.fog.z>0){let sunUV=sunClip.xy/sunClip.w*vec2f(0.5,-0.5)+0.5;for(var i=1;i<=16;i++){let q=clamp(vec2i(mix(uv,sunUV,f32(i)*0.05)*vec2f(size)),vec2i(0),size-1);shafts+=select(0.0,1.0,textureLoad(depth,origin+q,0)<0.000001)*pow(0.95,f32(i))/16.0;}}c+=vec3f(1,0.8,0.5)*shafts*alignment*f.fog.z;
  c=max(vec3f(0),c*exp2(f.grade.x)*f.gain.xyz+f.lift.xyz);let luminance=dot(c,vec3f(0.2126,0.7152,0.0722));c=mix(vec3f(luminance),c,f.grade.z);c=max(c,vec3f(0));if(f.grade.y==0.0){c=vec3f(0.18);}else if(f.grade.y!=1.0){c=0.18*pow(c/0.18,vec3f(f.grade.y));}
  c=toDisplay(c);let noise=f32(grainPcg(id.x+grainPcg(id.y+grainPcg(bitcast<u32>(f.lens.w))))>>8u)*5.9604645e-8-0.5;textureStore(output,p,vec4f(clamp(c+noise*f.lens.z,vec3f(0),vec3f(1)),1));}`;
 const present =
@@ -104,12 +112,11 @@ export class PostProcessing implements EnginePlugin {
   target?: HDRRenderTarget;
   private engine?: Engine;
   private device?: GPUDevice;
-  private uniform?: GPUBuffer;
   private output?: GPUTexture;
   private resolve?: GPUComputePipeline;
   private present?: GPURenderPipeline;
   private original?: GPUTextureView;
-  private readonly values = new Float32Array(68);
+  private readonly values = new Float32Array(72);
   private clock = 0;
   private updated = false;
   private ready = false;
@@ -120,7 +127,17 @@ export class PostProcessing implements EnginePlugin {
   private linearShader = '';
   private colorView?: GPUTextureView;
   private depthView?: GPUTextureView;
-  private resolveGroup?: GPUBindGroup;
+  private readonly views = new ViewStates<Slot>(
+    (c) => ({
+      buffer: (c as Context).device.createBuffer({
+        size: uniformSize,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      }),
+    }),
+    (slot) => slot.buffer.destroy(),
+  );
+  private slot?: Slot;
+  private inputs?: { color: GPUTextureView; depth: GPUTextureView; output: GPUTextureView };
   private presentGroup?: GPUBindGroup;
   private presentPass?: GPURenderPassDescriptor;
   private host?: StackHost;
@@ -198,7 +215,6 @@ export class PostProcessing implements EnginePlugin {
       );
     this.engine = engine;
     this.device = engine.gpu;
-    this.uniform = this.device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.resolve = this.device.createComputePipeline({
       layout: 'auto',
       compute: { module: this.device.createShaderModule({ code: resolve }), entryPoint: 'main' },
@@ -269,15 +285,21 @@ export class PostProcessing implements EnginePlugin {
     this.ready = true;
   }
   private bind(c: Context, color: GPUTextureView, depthOnly: GPUTextureView): void {
-    const output = this.output!.createView(),
-      group = (pipeline: GPUComputePipeline | GPURenderPipeline, entries: GPUBindGroupEntry[]) =>
-        c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries });
-    this.resolveGroup = group(this.resolve!, [
-      { binding: 0, resource: { buffer: this.uniform! } },
-      { binding: 1, resource: color },
-      { binding: 2, resource: depthOnly },
-      { binding: 4, resource: output },
-    ]);
+    this.inputs = { color, depth: depthOnly, output: this.output!.createView() };
+    for (const slot of this.views.values()) slot.group = undefined;
+  }
+  private groupOf(c: Context): GPUBindGroup {
+    const slot = this.slot!,
+      { color, depth, output } = this.inputs!;
+    return (slot.group ??= c.device.createBindGroup({
+      layout: this.resolve!.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: slot.buffer } },
+        { binding: 1, resource: color },
+        { binding: 2, resource: depth },
+        { binding: 4, resource: output },
+      ],
+    }));
   }
   private preparePresent(c: Context, format: GPUTextureFormat, multisample: GPUMultisampleState | undefined): void {
     const key = format + ':' + (multisample?.count ?? 1);
@@ -326,7 +348,10 @@ export class PostProcessing implements EnginePlugin {
     v.set(o.gain ?? gain, 44);
     v.set(o.lift ?? lift, 48);
     v.set(c.camera.matrix, 52);
-    c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    // The view's rectangle in drawing-buffer pixels: the grade reads and writes only inside it.
+    v.set(c.view?.viewport ?? [0, 0, c.width, c.height], 68);
+    const slot = (this.slot = this.views.get(c));
+    c.device.queue.writeBuffer(slot.buffer, 0, v as Float32Array<ArrayBuffer>);
   }
   private dispatch(c: Context, pipeline: GPUComputePipeline, group: GPUBindGroup, width: number, height: number): void {
     const pass = c.encoder.beginComputePass();
@@ -354,13 +379,19 @@ export class PostProcessing implements EnginePlugin {
     }
   }
   private apply(c: Context, view: GPUTextureView): void {
-    this.dispatch(c, this.resolve!, this.resolveGroup!, c.width, c.height);
+    const place = c.view,
+      rect = place?.viewport ?? [0, 0, c.width, c.height];
+    this.dispatch(c, this.resolve!, this.groupOf(c), rect[2], rect[3]);
     const descriptor = (this.presentPass ??= {
       colorAttachments: [{ view, loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store' }],
     });
-    (descriptor.colorAttachments as GPURenderPassColorAttachment[])[0].view = view;
+    const attachment = (descriptor.colorAttachments as GPURenderPassColorAttachment[])[0];
+    attachment.view = view;
+    // A later view keeps what the views before it presented; the first one clears the target.
+    attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(descriptor);
     try {
+      if (place) pass.setScissorRect(...(place.scissor ?? place.viewport));
       pass.setPipeline(this.present!);
       pass.setBindGroup(0, this.presentGroup!);
       pass.draw(3);
@@ -385,6 +416,8 @@ export class PostProcessing implements EnginePlugin {
     if (delta > 0) this.clock += delta;
   }
   onPreUpdate(delta: number): void {
+    // A view no frame since the last update drew has its uniform buffer released.
+    if (delta > 0) this.views.prune();
     this.updated = true;
     this.advanceTime(delta);
   }
@@ -405,8 +438,9 @@ export class PostProcessing implements EnginePlugin {
     this.target?.dispose();
     this.target = undefined;
     this.output?.destroy();
-    this.uniform?.destroy();
-    this.output = this.uniform = undefined;
+    this.views.clear();
+    this.slot = this.inputs = undefined;
+    this.output = undefined;
     this.device = undefined;
     this.ready = false;
     this.presentKey = '';
@@ -414,7 +448,7 @@ export class PostProcessing implements EnginePlugin {
     this.present = undefined;
     this.original = undefined;
     this.colorView = this.depthView = undefined;
-    this.resolveGroup = this.presentGroup = undefined;
+    this.presentGroup = undefined;
     this.presentPass = undefined;
   }
   declare [Symbol.dispose]: () => void;

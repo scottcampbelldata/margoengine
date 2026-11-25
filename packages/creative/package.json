@@ -36,7 +36,8 @@
     "test:gpu:grass-atmosphere": "cd ../.. && node packages/creative/scripts/test-grass-terrain.js && node packages/creative/scripts/test-orbit-atmosphere.js",
     "test:gpu:paint-aniso": "cd ../.. && node packages/creative/scripts/test-paint-aniso.js",
     "test:gpu:post-contrast": "cd ../.. && node packages/creative/tests/post-contrast-browser.mjs",
-    "test:gpu:post-contrast-zero": "cd ../.. && node packages/creative/tests/post-contrast-zero-browser.mjs"
+    "test:gpu:post-contrast-zero": "cd ../.. && node packages/creative/tests/post-contrast-zero-browser.mjs",
+    "test:gpu:post-views": "cd ../.. && node packages/creative/tests/post-views-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

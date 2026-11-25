@@ -188,7 +188,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   `addHorseCrowd`) called from the owner's scene; the baked person is CPU data made once. game is an install profile of generated
   re-exports and is excluded (`tests/owner-exclusions.test.js` fails if it gains anything but `export ... from`). creative's
   `Planet` decodes its maps with `createImageBitmap`, so it is an entry in the browser leaves only; standalone `PostProcessing`
-  (alone or in a `PostStack`) grades the whole canvas for every view and is not an entry until KB-CREATIVE-POSTVIEW1 is fixed
+  (alone or in a `PostStack`) is per view since KB-CREATIVE-POSTVIEW1 was fixed (2026-11-25) and is not yet an owner-lifetime entry
   (docs/known-bugs.md); creative's `/grass-settings` and shaders hold nothing. creative's CPU leaf gives `navigator.gpu` a
   `getPreferredCanvasFormat` (`bgra8unorm`) in creative's fixture when the runtime has none.
 - The CPU model runs the real core scene router and frame graph on the fake GPU of `tests/support/optional-gpu.js`,

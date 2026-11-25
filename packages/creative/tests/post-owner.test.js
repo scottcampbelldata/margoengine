@@ -17,9 +17,9 @@ for (const stacked of [false, true])
       attach(e, primary);
       attach(owner, effect);
       // A restore releases GPU resources, not the plugin's registration or passes.
-      const uniform = effect.uniform;
+      const resolve = effect.resolve;
       effect.onDeviceRestored(e);
-      assert.notEqual(effect.uniform, uniform);
+      assert.notEqual(effect.resolve, resolve);
       assert.equal(e.sceneOf(effect) === owner, true);
       if (remove) owner.removePlugin(effect.name);
       else effect.dispose();
