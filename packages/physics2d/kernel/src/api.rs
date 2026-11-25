@@ -285,8 +285,8 @@ pub extern "C" fn body_remove(handle: i32, body: u32) -> i32 {
 pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| {
         let b = w.bodies.get(body as usize).filter(|b| !b.dead).ok_or(PhysicsError::InvalidHandle)?;
-        let (xf, v, av, mass, awake, center, enabled, cap, extra) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed, b.extra_passes);
-        ensure(14);
+        let (xf, v, av, mass, awake, center, enabled, cap, extra, more) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed, b.extra_passes, b.extra_substeps);
+        ensure(15);
         for (i, value) in [xf.p.x, xf.p.y, xf.q.c, xf.q.s, v.x, v.y, av, mass].into_iter().enumerate() {
             put(i, value);
         }
@@ -296,6 +296,7 @@ pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
         io()[11] = enabled as u32;
         put(12, cap);
         io()[13] = extra;
+        io()[14] = more;
         Ok(0)
     })
 }
@@ -652,6 +653,12 @@ pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
         }
         Ok(hits.len() as i32)
     })
+}
+
+/// Gives a body's island substeps beyond the world's each step (0 for none).
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_extra_substeps(handle: i32, body: u32, substeps: u32) -> i32 {
+    with_world!(handle, |w| w.set_extra_substeps(body, substeps).map(|()| 0))
 }
 
 /// Gives a body's island solver passes beyond the world's each substep (0 for none).

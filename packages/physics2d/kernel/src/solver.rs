@@ -252,17 +252,67 @@ fn inverse(q: Rot) -> Rot {
 /// One step of `dt` over the world's awake bodies and the contacts that touch one.
 pub fn solve(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
     world.validate_step_inputs(dt)?;
-    solve_validated(world, dt)?;
+    solve_islands(world, dt)?;
     world.validate_solver_outputs()
 }
 
+/// The step's solve, island by island where some ask for more substeps (`Body::extra_substeps`, Rapier's additional solver iterations):
+/// an island runs the world's substeps plus the most any of its awake bodies asks for, each shorter, and the others run the world's.
+/// Each count is one solve of the islands that take it, the other islands' bodies held fixed for it (no contact or joint of theirs is
+/// visited, and none joins an island they are not in); a kinematic body, which belongs to no island, starts each solve where the step
+/// began and ends the step where the world's own count leaves it, which is the last solve. With no body asking it is one solve and the
+/// step is what it was.
+pub(crate) fn solve_islands(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
+    let base = world.settings.substeps.max(1);
+    let asks = |b: &crate::world::Body| b.extra_substeps > 0 && b.is_dynamic() && b.awake;
+    if !world.bodies.iter().any(asks) {
+        return solve_validated(world, dt, base);
+    }
+    let mut most = alloc::vec![0u32; world.counts.islands as usize];
+    for (i, body) in world.bodies.iter().enumerate() {
+        if asks(body) {
+            let slot = &mut most[world.island_of[i] as usize];
+            *slot = (*slot).max(body.extra_substeps);
+        }
+    }
+    let class_of = |world: &World, i: usize| base.saturating_add(most[world.island_of[i] as usize]);
+    let mut classes: Vec<u32> = world.bodies.iter().enumerate().filter(|(_, b)| b.is_dynamic() && b.awake).map(|(i, _)| class_of(world, i)).collect();
+    classes.push(base);
+    classes.sort_unstable_by(|a, b| b.cmp(a));
+    classes.dedup();
+    // Where each kinematic body was when the step began.
+    let kinematic: Vec<(usize, crate::math::Xf, [f64; 2])> = world
+        .bodies
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| b.kind == Kind::Kinematic && b.awake)
+        .map(|(i, b)| (i, b.xf, b.exact_center))
+        .collect();
+    for &class in &classes {
+        for &(i, xf, centre) in &kinematic {
+            world.bodies[i].xf = xf;
+            world.bodies[i].exact_center = centre;
+        }
+        // The islands of the other counts are held fixed for this solve.
+        let held: Vec<usize> = (0..world.bodies.len()).filter(|&i| world.bodies[i].is_dynamic() && world.bodies[i].awake && class_of(world, i) != class).collect();
+        for &i in &held {
+            world.bodies[i].kind = Kind::Static;
+        }
+        let result = solve_validated(world, dt, class);
+        for &i in &held {
+            world.bodies[i].kind = Kind::Dynamic;
+        }
+        result?;
+    }
+    Ok(())
+}
+
 // World::step has already checked the same input boundary and checks outputs before sleep.
-pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsError> {
+pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Result<(), PhysicsError> {
     let settings = world.settings;
     if !settings.contact_max_push.is_finite() || settings.contact_max_push < 0.0 {
         return Err(PhysicsError::InvalidParameter);
     }
-    let substeps = settings.substeps.max(1);
     let passes = settings.passes.max(1);
     let h = dt / substeps as f32;
     let inv_h = 1.0 / h;
@@ -1219,7 +1269,7 @@ mod tests {
                 assert_eq!(output_bits(&checked), output_bits(&validated));
                 for _ in 0..4 {
                     solve(&mut checked, scenes::DT).unwrap();
-                    solve_validated(&mut validated, scenes::DT).unwrap();
+                    solve_islands(&mut validated, scenes::DT).unwrap();
                     validated.validate_solver_outputs().unwrap();
                     assert_eq!(output_bits(&checked), output_bits(&validated), "lanes={lanes}");
                 }

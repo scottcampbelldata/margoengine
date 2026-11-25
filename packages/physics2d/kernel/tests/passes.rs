@@ -209,3 +209,74 @@ fn extra_passes_leave_the_trees_and_paths_of_the_other_islands_alone() {
         }
     }
 }
+
+/// `two_columns` with the left column's bodies asking for `left` extra substeps and the world set to `substeps`.
+fn with_substeps(substeps: u32, left: u32) -> (World, Vec<u32>, Vec<u32>) {
+    let (mut w, l, r) = two_columns(Settings { substeps, ..Default::default() }, 0, 0);
+    for &b in &l {
+        w.set_extra_substeps(b, left).unwrap();
+    }
+    for _ in 0..120 {
+        w.step(DT).unwrap();
+    }
+    (w, l, r)
+}
+
+#[test]
+fn an_island_with_extra_substeps_matches_a_world_run_at_that_count_and_the_others_do_not_change_a_bit() {
+    let base = Settings::default().substeps;
+    let (asked, al, ar) = with_substeps(base, 3);
+    // The island that asked is what the whole world is when it runs base + 3 substeps; the other is what the world is at its own count.
+    let (finer, fl, _) = with_substeps(base + 3, 0);
+    let (plain, _, pr) = with_substeps(base, 0);
+    assert_eq!(bits(&asked, &al), bits(&finer, &fl), "the island with extra substeps differs from a world at that substep count");
+    assert_eq!(bits(&asked, &ar), bits(&plain, &pr), "the island that did not ask changed");
+    // And it differs from the island at the world's count: the substeps did something.
+    let (_, pl, _) = with_substeps(base, 0);
+    assert_ne!(bits(&asked, &al), bits(&plain, &pl));
+}
+
+#[test]
+fn the_most_an_island_asks_in_substeps_is_what_it_runs_and_a_kinematic_body_ends_the_step_where_it_would() {
+    // One body asking for 3 in a column is the whole column asking for 3.
+    let base = Settings::default().substeps;
+    let (mut one, l1, _) = two_columns(Settings::default(), 0, 0);
+    one.set_extra_substeps(l1[3], 3).unwrap();
+    let (mut all, la, _) = two_columns(Settings::default(), 0, 0);
+    for &b in &la {
+        all.set_extra_substeps(b, 3).unwrap();
+    }
+    for _ in 0..60 {
+        one.step(DT).unwrap();
+        all.step(DT).unwrap();
+    }
+    assert_eq!(bits(&one, &l1), bits(&all, &la));
+    // A kinematic body moves the same distance in a step whatever the substeps of the islands that touch it.
+    let run = |extra: u32| {
+        let mut w = World::new(Settings { gravity: v2(0.0, -10.0), substeps: base, ..Default::default() });
+        let platform = w.create_body(&BodyDef { kind: Kind::Kinematic, linear_velocity: v2(2.0, 0.0), ..Default::default() }).unwrap();
+        w.create_shape(platform, Core::rect(5.0, 0.25, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        let crate_ = w.create_body(&BodyDef { position: v2(0.0, 0.76), can_sleep: false, ..Default::default() }).unwrap();
+        w.create_shape(crate_, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, ..Default::default() }).unwrap();
+        w.set_extra_substeps(crate_, extra).unwrap();
+        for _ in 0..30 {
+            w.step(DT).unwrap();
+        }
+        (w.bodies[platform as usize].xf.p.x, w.bodies[crate_ as usize].xf.p.x)
+    };
+    let (plain, carried) = run(0);
+    let (finer, carried_finer) = run(4);
+    assert!((plain - 1.0).abs() < 1.0e-4 && (finer - 1.0).abs() < 1.0e-4, "the platform moved {plain} and {finer}, not 2 m/s over half a second");
+    assert!((plain - finer).abs() < 1.0e-6, "the platform's end is the world's own count's: {plain} against {finer}");
+    assert!(carried > 0.5 && carried_finer > 0.5, "the crate rides the platform: {carried} and {carried_finer}");
+}
+
+#[test]
+fn extra_substeps_survive_a_snapshot() {
+    let (mut w, l, r) = two_columns(Settings::default(), 0, 0);
+    w.set_extra_substeps(l[0], 5).unwrap();
+    w.step(DT).unwrap();
+    let copy = World::from_snapshot(&w.snapshot()).unwrap();
+    assert_eq!(copy.bodies[l[0] as usize].extra_substeps, 5);
+    assert_eq!(copy.bodies[r[0] as usize].extra_substeps, 0);
+}

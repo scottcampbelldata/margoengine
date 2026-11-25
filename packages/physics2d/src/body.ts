@@ -417,7 +417,7 @@ export class Body2D {
   private read(): Words {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_read(h, this.handle));
-    return kernel.io(14);
+    return kernel.io(15);
   }
   /** Velocity in world units per second. */
   get linearVelocity(): [number, number] {
@@ -571,6 +571,22 @@ export class Body2D {
   }
   get additionalPgsIterations(): number {
     return this.read().u[13];
+  }
+  /**
+   * Substeps the body's island takes beyond the world's, each step (default 0): Rapier's `additional_solver_iterations`, `num_solver_iterations`
+   * plus the most any body of the island asks for. The island is solved with that many substeps, each shorter, as a world set to that count
+   * would solve it; the other islands are not touched, and a kinematic body ends the step where the world's own count leaves it. (Extra
+   * passes in each substep are {@link Body2D.additionalPgsIterations}.)
+   * @throws RangeError for a number that is not a whole number of 0 or more (up to 4,294,967,295).
+   */
+  set additionalSolverIterations(value: number) {
+    const { x, h, kernel } = this.k;
+    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
+      throw new RangeError(`additionalSolverIterations must be a whole number of 0 or more; got ${value}.`);
+    kernel.ok(x.body_set_extra_substeps(h, this.handle, value));
+  }
+  get additionalSolverIterations(): number {
+    return this.read().u[14];
   }
   /** The centre of mass in world units, as of the last step. */
   get centerOfMass(): [number, number] {

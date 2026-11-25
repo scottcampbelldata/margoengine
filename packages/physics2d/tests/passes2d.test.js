@@ -60,3 +60,34 @@ test('a column with extra passes reaches its resting squash, and the column that
     'the island that asked for nothing changed',
   );
 });
+
+test("additionalSolverIterations is Rapier's extra substeps: the island is solved as a world with that many substeps, the other is untouched", () => {
+  const run = (substeps, extra) => {
+    const { physics, left, right } = columns(0);
+    physics.setSolver({ substeps });
+    for (const body of left) body.additionalSolverIterations = extra;
+    for (let i = 0; i < 120; i++) physics.step();
+    const bits = (column) => column.map((b) => [...b.position, b.rotation]);
+    const result = { left: bits(left), right: bits(right), read: left[3].additionalSolverIterations };
+    physics.dispose();
+    return result;
+  };
+  const asked = run(4, 3),
+    finer = run(7, 0),
+    plain = run(4, 0);
+  assert.equal(asked.read, 3);
+  assert.deepEqual(asked.left, finer.left, 'the island with extra substeps is the world at that count');
+  assert.deepEqual(asked.right, plain.right, 'the other island is untouched');
+  assert.notDeepEqual(asked.left, plain.left, 'and the extra substeps did something');
+  const { physics, left } = columns(0);
+  for (const bad of [-1, 1.5, Number.NaN, 2 ** 32])
+    assert.throws(() => (left[0].additionalSolverIterations = bad), RangeError);
+  const bytes = physics.snapshot();
+  left[0].additionalSolverIterations = 2;
+  physics.restore(bytes);
+  assert.equal(left[0].additionalSolverIterations, 0, 'a snapshot carries it');
+  left[0].additionalSolverIterations = 2;
+  physics.restore(physics.snapshot());
+  assert.equal(left[0].additionalSolverIterations, 2);
+  physics.dispose();
+});

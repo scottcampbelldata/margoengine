@@ -107,6 +107,9 @@ pub struct Body {
     /// Solver passes the body's island takes beyond the world's, each substep (Rapier's additional solver iterations); 0 for none. An
     /// island runs the most any of its awake bodies asks for, on its contacts and joints only.
     pub extra_passes: u32,
+    /// Substeps the body's island takes beyond the world's, each step (Rapier's additional solver iterations); 0 for none. An island runs the
+    /// most any of its awake bodies asks for, finer than the rest of the world.
+    pub extra_substeps: u32,
     pub can_sleep: bool,
     pub fixed_rotation: bool,
     pub ccd: bool,
@@ -719,6 +722,7 @@ impl World {
             gravity_scale: def.gravity_scale,
             max_angular_speed: 0.0,
             extra_passes: 0,
+            extra_substeps: 0,
             can_sleep: def.can_sleep,
             fixed_rotation: def.fixed_rotation,
             ccd: def.ccd,
@@ -1183,6 +1187,13 @@ impl World {
         self.wake(body)
     }
 
+    /// Gives the body's island `substeps` more substeps each step than the world's setting (0 takes them away): the island is solved with
+    /// that many, each shorter, and the other islands are not. The island takes the most any of its awake bodies asks for. The body wakes.
+    pub fn set_extra_substeps(&mut self, body: u32, substeps: u32) -> Result<(), PhysicsError> {
+        self.live_body(body)?.extra_substeps = substeps;
+        self.wake(body)
+    }
+
     /// Changes what kind of body this is: static bodies stop, kinematic ones keep their velocity, and a dynamic body is
     /// weighed again from its shapes. The body wakes.
     pub fn set_body_kind(&mut self, body: u32, kind: Kind) -> Result<(), PhysicsError> {
@@ -1381,7 +1392,7 @@ impl World {
         self.wake_and_join();
         lap(self, 4, &mut stamp);
         let ccd = self.ccd_starts();
-        solver::solve_validated(self, dt)?;
+        solver::solve_islands(self, dt)?;
         lap(self, 5, &mut stamp);
         self.solve_ccd(&ccd, dt)?;
         lap(self, 6, &mut stamp);
