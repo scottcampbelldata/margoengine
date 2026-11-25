@@ -2295,6 +2295,10 @@
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
     },
+    "./video/frames": {
+      "types": "./dist/video/frames.d.ts",
+      "import": "./dist/video/frames.js"
+    },
     "./video/material": {
       "types": "./dist/video/material.d.ts",
       "import": "./dist/video/material.js"

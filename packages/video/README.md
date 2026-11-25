@@ -289,6 +289,66 @@ before npm run test:gpu --workspace @margoengine/video. To regenerate its indepe
 sample-table oracle, run node packages/video/scripts/flower-reference.mjs with the path
 to FFprobe 8.1.2 as its first argument. No movie bytes or FFprobe binary ship in Margo.
 
+## Recorded frames as a texture (Node and film renders)
+
+`FrameVideo` from `margoengine/video/frames` (or `@margoengine/video/frames`, with `@margoengine/materials`) shows
+footage on a mesh where no `<video>` element or `VideoFrame` exists, as in a headless render in Node. You give it plain
+RGBA frames; `await clip.seek(time)` puts the frame of that film time in `clip.texture`, which any material slot takes:
+`map` for a screen that shows the footage, `emissiveMap` for one that glows. The picture depends on the time alone, so
+a seek draws what playing there draws.
+
+This example makes its frames in code:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {UnlitMaterial, createMesh} from 'margoengine/materials';
+import {FrameVideo} from 'margoengine/video/frames';
+
+const clip = new FrameVideo({
+  width: 64, height: 36, fps: 30, frames: 90,
+  read: (frame) => {
+    const pixels = new Uint8Array(64 * 36 * 4).fill(255);
+    for (let i = 0; i < pixels.length; i += 4) pixels[i] = frame * 2;
+    return pixels;
+  },
+});
+const engine = await Engine.create(document.querySelector('canvas')!);
+const material = new UnlitMaterial({map: clip.texture});
+const mesh = createMesh(engine, {
+  positions: [-1.6,-0.9,0, 1.6,-0.9,0, 1.6,0.9,0, -1.6,0.9,0],
+  normals: [0,0,1, 0,0,1, 0,0,1, 0,0,1],
+  uvs: [0,0, 1,0, 1,1, 0,1], indices: [0,1,2, 0,2,3],
+}, material);
+engine.stop();
+await clip.seek(1.5);
+engine.render({delta: 0});
+await engine.gpu!.queue.onSubmittedWorkDone();
+console.log(clip.frame); // 45
+mesh.dispose();
+material.dispose();
+engine.dispose();
+clip.dispose();
+```
+
+In a film render, seek inside the frame loop: `renderFrames(engine, {frames, camera, update: ({time}) => clip.seek(time)})`
+(`@margoengine/headless/video`), or `apply: (state, {time}) => clip.seek(time)` in `renderCutscene`. To read a file in
+Node, decode it once with `ffmpeg -i clip.mp4 -f rawvideo -pix_fmt rgba clip.rgba`; frame `k` is the
+`width * height * 4` bytes at offset `k * width * height * 4`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `width`, `height` | required | Picture size in pixels, 1 to 16384 |
+| `fps` | required | The clip's frame rate (30000 / 1001 works) |
+| `frames` | required | Frames in the clip |
+| `read(frame, signal)` | required | Returns the frame's RGBA bytes, rows from the top; may be async |
+| `start` | 0 | Film time of frame 0, in seconds; before it frame 0 shows |
+| `loop` | false | Start again after the last frame instead of holding it |
+| `flipY` | true | Top row at UV v = 1, as image textures and `videoMaterial` place it; false for glTF UVs |
+
+The texture is transparent black before the first seek. It is mipmapped with anisotropy 8 (`clip.texture.mipmaps` and
+`clip.texture.anisotropy` change that). A later `seek` wins over one still reading; a failed or aborted read keeps the
+picture. Pixels are copied, so `read` may reuse its buffer.
+
 ## Stacked alpha and chroma key
 
 `stackedAlphaMaterial` and `chromaKeyMaterial` from `margoengine/video/alpha` (or

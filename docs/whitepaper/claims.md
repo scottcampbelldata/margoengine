@@ -5383,3 +5383,11 @@ Claim: with `autostep.includeDynamicBodies` on, the own controller climbs a dyna
 Claim: a body with CCD on that passes through a sensor within one step fires the start and end events for it, and a Physics snapshot restores the world so the same steps give the same bits. Proof: `packages/physics/kernel/tests/ccd.rs` `a_fast_ball_through_a_thin_sensor_in_one_step_says_it_entered_and_left`, `tests/next-events.test.js`, `tests/next-physics-snapshot.test.js`. Accepted differences: Rapier 0.21's JavaScript build has none of these, so there is no oracle; a restore needs the same bodies, colliders and joints. Reproduce: `node --test packages/physics/tests/next-physics-snapshot.test.js` and `cargo test --release --test ccd` in `packages/physics/kernel`.
 
 `@margoengine/post/ascii` redraws a frame as characters chosen by cell luminance, with optional edge-direction characters, built-in bitmap glyphs or a CSS font, scene or fixed colours and text readback. Proof: `packages/post/test/ascii.test.js` (options, glyph atlas, restore and release, readback, abort) and `ascii-browser.mjs` on WebGPU and the WebGL2 layer (characters against a CPU reading, edge directions, colour blocks, passthrough, resize). No speed claim.
+
+### Recorded frames as a texture (2026-11-25, GAP-FILM-VIDEOTEX)
+
+Claim: `FrameVideo` from `@margoengine/video/frames` shows caller-decoded RGBA frames on meshes in the browser and in
+Node, as a function of film time: a seek draws the same bytes as the first visit, and frame k reads back within 1 level.
+Proof: `packages/video/test/frames.test.js` (frame choice, rows, one read per frame, latest seek wins, failed and
+aborted reads), `frames-gpu.mjs` (Node, WebGPU) and `frames-check.mjs` (browser, WebGPU and the WebGL2 layer). One GPU
+(NVIDIA RTX A6000); upload cost not measured.

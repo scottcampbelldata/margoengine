@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,058 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,060 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11898,6 +11898,17 @@ the Babylon.js `ColorCurves` API documentation (no source read), 2026,
 https://doc.babylonjs.com/typedoc/classes/BABYLON.ColorCurves; the maths is Margo's own (HSV hexcone, A. R. Smith,
 "Color Gamut Transform Pairs", SIGGRAPH 1978, https://doi.org/10.1145/800248.807361).
 Scene helpers (`@margoengine/scene/helpers`, 2026-11-25): `worldBounds`, `center` and `resize` read every vertex of every mesh under the root on each call (call them when the model loads, not every frame); a mesh with no geometry is skipped, and `center` moves `root.position`, which is in the parent's space (equal to world space under an unrotated, unscaled parent). `resize` scales uniformly and multiplies `root.scale`. `float` writes `position.y` and the three rotation angles from the values the mesh had when it was created, so do not animate those yourself meanwhile. `InteractionPrompt` is timing only: you draw the hint. Accepted difference from drei: functions you call, not React components that re-render.
+
+## Recorded frames as a texture (2026-11-25, GAP-FILM-VIDEOTEX)
+
+`@margoengine/video/frames` `FrameVideo` takes straight-alpha sRGB RGBA8 frames from the caller, 1 to 16384 pixels a
+side (the GPU's `maxTextureDimension2D` also limits it), and puts the frame of a film time in a materials `Texture`.
+One frame is held on the CPU and one texture per device (mip chain included). Each new frame uploads the whole picture
+and regenerates the chain; upload cost is not measured. It decodes no video: ffmpeg or another decoder gives the pixels.
+Materials and glTF PBR meshes only. Measured: `packages/video/test/frames-gpu.mjs` (Node, WebGPU) reads four frames of
+a 64 x 48 clip and a four-frame `renderFrames` sequence back within 1 level of the source, a seek back gives the same
+bytes, and a quarter-size draw of a black and white checker reads 188 (the linear-light average);
+`frames-check.mjs` draws the frames on WebGPU and the WebGL2 layer within 2 levels, as a map and as a glowing screen.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
