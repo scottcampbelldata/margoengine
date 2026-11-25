@@ -95,3 +95,40 @@ test("a sphere's drag coefficient is the accepted 0.78 of the panel law (0.47 me
     cd = force[0] / (0.5 * RHO * 100 * Math.PI * r * r);
   assert.ok(Math.abs(cd - 0.78) < 0.02, `Cd ${cd}`);
 });
+
+test('a body the wind holds up keeps its height: the load acts through the step, not as an impulse at its start', () => {
+  // A plate 2 m square face down in an updraft that carries its weight: an impulse at the start of each step would let
+  // gravity pull back through the step, and the plate would creep up half g dt^2 a step (14 cm in two seconds).
+  const physics = new Physics(null),
+    mass = 10,
+    weight = mass * -physics.gravity[1],
+    // 1/2 rho U^2 A C_N90 = m g.
+    speed = Math.sqrt(weight / (0.5 * RHO * 4 * 1.17)),
+    body = physics.addBody(null, {
+      position: [0, 10, 0],
+      lockRotations: true,
+      colliders: { shape: 'box', halfExtents: [1, 0.005, 1], mass },
+    });
+  new WindForce(physics, { velocity: [0, speed, 0], density: RHO, friction: 0 });
+  for (let i = 0; i < 120; i++) physics.step();
+  assert.ok(Math.abs(body.position[1] - 10) < 2e-3, `height ${body.position[1]}`);
+});
+
+test('a light body in a strong wind stays stable at 60 steps a second (the load is taken implicitly)', () => {
+  // 5 g of paper, 25 cm square, face on to 10 m/s: its drag rate times a 1/60 s step is about 3, past the 2 where an
+  // explicit load overshoots the wind's speed and diverges.
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const sheet = physics.addBody(null, {
+    lockRotations: true,
+    colliders: { shape: 'box', halfExtents: [0.001, 0.125, 0.125], mass: 0.005 },
+  });
+  new WindForce(physics, { velocity: [10, 0, 0], density: RHO });
+  let fastest = 0;
+  for (let i = 0; i < 120; i++) {
+    physics.step();
+    fastest = Math.max(fastest, sheet.linearVelocity[0]);
+  }
+  assert.ok(fastest <= 10 + 1e-9, `never faster than the wind: ${fastest}`);
+  assert.ok(sheet.linearVelocity[0] > 9, `carried along at nearly its speed: ${sheet.linearVelocity[0]}`);
+});

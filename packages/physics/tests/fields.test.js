@@ -77,7 +77,9 @@ test('a wind force takes a shared flow field: velocity and density at each body,
   const run = (density) => {
     const physics = new Physics(null);
     physics.gravity = [0, 0, 0];
-    const leaf = ball(physics, [0, 3, 0], 0.1),
+    // Heavy, so the step barely changes its motion and the load it takes is the wind's at the start (the load is held
+    // implicitly, so a light body's step takes the drag of the speed it ends with).
+    const leaf = ball(physics, [0, 3, 0], 1e4),
       seen = [];
     // Twenty steps in before the wind arrives: it is sampled at the world's time, not the time since it was made.
     for (let i = 0; i < 20; i++) physics.step();
@@ -120,7 +122,8 @@ test("a wind force without a density takes the standard atmosphere's at each bod
   const push = (y, options = {}) => {
     const physics = new Physics(null);
     physics.gravity = [0, 0, 0];
-    const leaf = ball(physics, [0, y, 0], 0.1);
+    // Heavy, as above, so the load is the wind's at the start of the step.
+    const leaf = ball(physics, [0, y, 0], 1e4);
     new WindForce(physics, { velocity: [5, 0, 0], ...options });
     physics.step();
     return leaf.linearVelocity[0];

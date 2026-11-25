@@ -2045,6 +2045,7 @@ export type WindField = WindForce;
 export class WindForce implements PhysicsAttachment {
     constructor(physics: Physics, options: WindOptions);
     beforeStep(dt: number): void;
+    bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
 }

@@ -7,6 +7,7 @@ import { hypot } from '@margoengine/math/pinned';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { colliderSurface, type Surface } from './aero.js';
 import type { PhysicsBody } from './body.js';
+import { HeldLoad, implicitWrench, type Wrench } from './held.js';
 import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment, QueryFilter } from './physics.js';
 
@@ -129,7 +130,8 @@ export class WindForce implements PhysicsAttachment {
       min: Vec3 = region?.min ?? [-1e9, -1e9, -1e9],
       max: Vec3 = region?.max ?? [1e9, 1e9, 1e9],
       time = this.physics.stepCount * this.physics.fixedTimestep,
-      flow = isFlow(velocity) ? velocity : undefined;
+      flow = isFlow(velocity) ? velocity : undefined,
+      loaded = new Set<PhysicsBody>();
     for (const body of this.physics.intersectAabb(min, max, filter)) {
       if (body.type !== 'dynamic') continue;
       const p = body.position;
@@ -150,34 +152,36 @@ export class WindForce implements PhysicsAttachment {
         density = this.options.density ?? standardDensity(p[1]);
       }
       const surface = this.surfaceOf(body);
-      if (!surface) continue;
+      if (!surface) {
+        this.release(body);
+        continue;
+      }
       const { centres, normals, areas } = surface,
         q = body.rotation,
         pos = body.position,
         com = body.worldCenterOfMass,
-        v = body.linearVelocity,
-        w = body.angularVelocity;
-      let fx = 0,
-        fy = 0,
-        fz = 0,
-        tx = 0,
-        ty = 0,
-        tz = 0;
-      for (let i = 0; i < areas.length; i++) {
+        v0 = body.linearVelocity,
+        w0 = body.angularVelocity,
+        count = areas.length,
+        // Each panel's arm from the centre of mass, outward normal and the air at it, once a step.
+        arms = new Float64Array(3 * count),
+        outward = new Float64Array(3 * count),
+        winds = new Float64Array(3 * count),
+        rhos = new Float64Array(count);
+      for (let i = 0; i < count; i++) {
         const local = rotateVec(q, [centres[3 * i]!, centres[3 * i + 1]!, centres[3 * i + 2]!]),
           n = rotateVec(q, [normals[3 * i]!, normals[3 * i + 1]!, normals[3 * i + 2]!]),
           px = pos[0] + local[0],
           py = pos[1] + local[1],
-          pz = pos[2] + local[2],
-          rx = px - com[0],
-          ry = py - com[1],
-          rz = pz - com[2];
-        // The air at the panel and its density: the body's own sample for a constant or functional wind.
+          pz = pos[2] + local[2];
+        arms.set([px - com[0], py - com[1], pz - com[2]], 3 * i);
+        outward.set(n, 3 * i);
+        // The air at the panel and its density: the body's own sample for a constant wind.
         let ax = air[0],
           ay = air[1],
           az = air[2],
           rho = density;
-        if (flow && areas.length > 0) {
+        if (flow) {
           const s = flow.sample(px, py, pz, time, this.sample);
           ax = s.velocity[0];
           ay = s.velocity[1];
@@ -189,36 +193,88 @@ export class WindForce implements PhysicsAttachment {
           ay = at[1];
           az = at[2];
         }
-        // The air relative to the panel, which moves with the body: v + omega x r.
-        const wx = ax - (v[0] + w[1] * rz - w[2] * ry),
-          wy = ay - (v[1] + w[2] * rx - w[0] * rz),
-          wz = az - (v[2] + w[0] * ry - w[1] * rx),
-          speed = hypot(wx, wy, wz);
-        if (!(speed > 1e-9)) continue;
-        const dn = n[0] * wx + n[1] * wy + n[2] * wz,
-          tanx = wx - dn * n[0],
-          tany = wy - dn * n[1],
-          tanz = wz - dn * n[2],
-          tangential = hypot(tanx, tany, tanz),
-          half = 0.5 * rho * areas[i]!,
-          // Windward: the flat-plate normal force C_N90 sin(a) q A along -n, sin(a) = -dn / |w|.
-          normal = dn < 0 ? half * normalCoefficient * speed * dn : 0,
-          friction = half * frictionCoefficient * tangential,
-          f0 = normal * n[0] + friction * tanx,
-          f1 = normal * n[1] + friction * tany,
-          f2 = normal * n[2] + friction * tanz;
-        fx += f0;
-        fy += f1;
-        fz += f2;
-        tx += ry * f2 - rz * f1;
-        ty += rz * f0 - rx * f2;
-        tz += rx * f1 - ry * f0;
+        winds.set([ax, ay, az], 3 * i);
+        rhos[i] = rho;
       }
+      // The load with the body's velocity and spin changed by dv and dw.
+      const wrench: Wrench = (dv, dw) => {
+        const v: Vec3 = [v0[0] + dv[0], v0[1] + dv[1], v0[2] + dv[2]],
+          w: Vec3 = [w0[0] + dw[0], w0[1] + dw[1], w0[2] + dw[2]];
+        let fx = 0,
+          fy = 0,
+          fz = 0,
+          tx = 0,
+          ty = 0,
+          tz = 0;
+        for (let i = 0; i < count; i++) {
+          const rx = arms[3 * i]!,
+            ry = arms[3 * i + 1]!,
+            rz = arms[3 * i + 2]!,
+            n0 = outward[3 * i]!,
+            n1 = outward[3 * i + 1]!,
+            n2 = outward[3 * i + 2]!,
+            // The air relative to the panel, which moves with the body: v + omega x r.
+            wx = winds[3 * i]! - (v[0] + w[1] * rz - w[2] * ry),
+            wy = winds[3 * i + 1]! - (v[1] + w[2] * rx - w[0] * rz),
+            wz = winds[3 * i + 2]! - (v[2] + w[0] * ry - w[1] * rx),
+            speed = hypot(wx, wy, wz);
+          if (!(speed > 1e-9)) continue;
+          const dn = n0 * wx + n1 * wy + n2 * wz,
+            tanx = wx - dn * n0,
+            tany = wy - dn * n1,
+            tanz = wz - dn * n2,
+            tangential = hypot(tanx, tany, tanz),
+            half = 0.5 * rhos[i]! * areas[i]!,
+            // Windward: the flat-plate normal force C_N90 sin(a) q A along -n, sin(a) = -dn / |w|.
+            normal = dn < 0 ? half * normalCoefficient * speed * dn : 0,
+            friction = half * frictionCoefficient * tangential,
+            f0 = normal * n0 + friction * tanx,
+            f1 = normal * n1 + friction * tany,
+            f2 = normal * n2 + friction * tanz;
+          fx += f0;
+          fy += f1;
+          fz += f2;
+          tx += ry * f2 - rz * f1;
+          ty += rz * f0 - rx * f2;
+          tz += rx * f1 - ry * f0;
+        }
+        return [
+          [fx, fy, fz],
+          [tx, ty, tz],
+        ];
+      };
       // A sleeping body is woken only by a wind that would push it a tenth of a metre a second squared.
-      if (body.sleeping && !(hypot(fx, fy, fz) >= 0.1 * body.mass)) continue;
-      body.applyImpulse([fx * dt, fy * dt, fz * dt]);
-      body.applyTorqueImpulse([tx * dt, ty * dt, tz * dt]);
+      if (body.sleeping) {
+        const [f] = wrench([0, 0, 0], [0, 0, 0]);
+        if (!(hypot(f[0], f[1], f[2]) >= 0.1 * body.mass)) {
+          this.release(body, false);
+          continue;
+        }
+      }
+      const [force, torque] = implicitWrench(body, wrench, dt, this.physics.gravity);
+      let load = this.held.get(body);
+      if (!load) this.held.set(body, (load = new HeldLoad()));
+      load.set(body, force, torque);
+      loaded.add(body);
     }
+    // Bodies the wind no longer reaches lose its load.
+    for (const body of [...this.held.keys()]) if (!loaded.has(body)) this.release(body);
+  }
+
+  /** The load held on each body the wind reaches. */
+  private readonly held = new Map<PhysicsBody, HeldLoad>();
+
+  private release(body: PhysicsBody, wakeUp = true): void {
+    const load = this.held.get(body);
+    if (!load) return;
+    load.clear(body, wakeUp);
+    this.held.delete(body);
+  }
+
+  /** @internal */
+  bodyRemoved(body: PhysicsBody): void {
+    this.held.delete(body);
+    this.surfaces.delete(body);
   }
 
   /** Each body's surface as panels in its frame, made again when its colliders change. */
@@ -269,6 +325,7 @@ export class WindForce implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
+    for (const body of [...this.held.keys()]) this.release(body);
     this.physics.detach(this);
   }
 
