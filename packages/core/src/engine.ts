@@ -660,6 +660,11 @@ export class Engine {
       // withOwner throws during a frame before anything changes. Registered before setup, so `sceneOf` works in it.
       scene.frameGraph.withOwner(name, () => {
         plugins.set(name, plugin);
+        for (const [key, other] of [...plugins])
+          if (other.late) {
+            plugins.delete(key);
+            plugins.set(key, other);
+          }
         owners.set(plugin, scene);
         try {
           plugin.setup(this);

@@ -144,6 +144,7 @@ export interface EnginePlugin {
     name: string;
     setup(engine: Engine): void;
     onPreUpdate?(delta: number): void;
+    readonly late?: boolean;
     registerPasses?(graph: FrameGraph): void;
     onDeviceRestored?(engine: Engine): void;
     onPick?(x: number, y: number, view?: RenderView & {

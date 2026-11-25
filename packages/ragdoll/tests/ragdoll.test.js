@@ -280,8 +280,7 @@ rtest('deactivate blends from the ragdoll pose back to the animation over its du
   near(body.hips.matrix[13], 1, 1e-6, 'the drawn hips are the animated ones once the blend has ended');
   frames(engine, ragdoll, 1);
   assert.deepEqual(local(engine, body.spine), animated, 'back on the animation exactly');
-  // The bodies follow the animation again, teleported, not swept: the frame after the blend ends, the step has taken the hips
-  // body to the pose drawn when it ended (the step of a frame runs before that frame's animation; see the README's frame order).
+  // The bodies follow the animation again, teleported, not swept: the hips body is on the animated hips with the pose drawn.
   near(ragdoll.bones[0].body.position[1], 1, 1e-4, 'hips body back at the animated hips');
   ragdoll.deactivate(0.2);
   assert.equal(ragdoll.weight, 0, 'deactivate when not active does nothing');
@@ -313,36 +312,33 @@ rtest('the blend back eases: it leaves the ragdoll and lands on the animation wi
   engine.dispose();
 });
 
-rtest(
-  'a kinematic bone aims at the pose drawn this frame: its body is on it after the next step, not a frame later',
-  async () => {
-    const { engine, physics } = await scene(),
-      body = humanoid(engine);
-    const ragdoll = Ragdoll.attach(physics, { root: body.hips, active: true });
-    ragdoll.bones[0].body.applyImpulse([0, 0, 3]);
-    frames(engine, ragdoll, 20);
-    ragdoll.deactivate(0.5);
-    const drawn = [],
-      bodies = [];
-    for (let i = 0; i < 36; i++) {
-      frames(engine, ragdoll, 1);
-      engine.store.tick(false);
-      drawn.push(Array.from(body.hips.matrix.subarray(12, 15)));
-      bodies.push(ragdoll.bones[0].body.position);
-    }
-    // Regression: the target was read before the frame's pose was written, so the hips (which nothing animates) aimed at the
-    // pose drawn the frame before and their body trailed what was drawn by two frames.
-    for (let i = 2; i < 36; i++)
-      for (let k = 0; k < 3; k++)
-        assert.ok(
-          Math.abs(bodies[i][k] - drawn[i - 1][k]) < 1e-5,
-          `frame ${i}, axis ${k}: body ${bodies[i][k]}, drawn a frame before ${drawn[i - 1][k]}`,
-        );
-    ragdoll.dispose();
-    physics.dispose();
-    engine.dispose();
-  },
-);
+rtest("with Physics added first, a kinematic bone's body is on the pose drawn, on the frame it is drawn", async () => {
+  const { engine, physics } = await scene(),
+    body = humanoid(engine);
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips, active: true });
+  ragdoll.bones[0].body.applyImpulse([0, 0, 3]);
+  frames(engine, ragdoll, 20);
+  ragdoll.deactivate(0.5);
+  const drawn = [],
+    bodies = [];
+  for (let i = 0; i < 36; i++) {
+    frames(engine, ragdoll, 1);
+    engine.store.tick(false);
+    drawn.push(Array.from(body.hips.matrix.subarray(12, 15)));
+    bodies.push(ragdoll.bones[0].body.position);
+  }
+  // Regression: the target was read before the frame's pose was written, so the hips (which nothing animates) aimed at the
+  // pose drawn the frame before and their body trailed what was drawn by two frames.
+  for (let i = 2; i < 36; i++)
+    for (let k = 0; k < 3; k++)
+      assert.ok(
+        Math.abs(bodies[i][k] - drawn[i][k]) < 1e-5,
+        `frame ${i}, axis ${k}: body ${bodies[i][k]}, drawn ${drawn[i][k]}`,
+      );
+  ragdoll.dispose();
+  physics.dispose();
+  engine.dispose();
+});
 
 rtest('without an animation, blending back returns to the pose the bones had before going limp', async () => {
   const { engine, physics } = await scene(),

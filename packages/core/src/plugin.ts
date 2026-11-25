@@ -119,6 +119,12 @@ export interface EnginePlugin {
   name: string;
   setup(engine: Engine): void;
   onPreUpdate?(delta: number): void;
+  /**
+   * Runs its `onPreUpdate` after every plugin without it, whichever was added first, and among late plugins in the order they
+   * were added: physics steps after the frame's animation, so a body the animation moves is where the picture is
+   * (KB-PHYS-FRAMEORDER1). Settled once when a plugin is added; no cost a frame.
+   */
+  readonly late?: boolean;
   registerPasses?(graph: FrameGraph): void;
   onDeviceRestored?(engine: Engine): void;
   /**

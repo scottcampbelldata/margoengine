@@ -1073,6 +1073,7 @@ class Physics implements EnginePlugin, BodyOwner {
     get colliderCount(): number;
     get bodyCount(): number;
     setup(engine: EngineKernel): void;
+    readonly late = true;
     onPreUpdate(delta: number): void;
     update(delta: number): number;
     advance(frame: number, rate: number | {

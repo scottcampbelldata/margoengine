@@ -868,6 +868,8 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new MargoError('attached', 'Physics is attached to another engine; create one Physics per engine.');
     this.engine = engine;
   }
+  /** Steps after the frame's animation and the plugins that move bodies from it (core's `late`): a hit box is on the pose drawn. */
+  readonly late = true;
   onPreUpdate(delta: number): void {
     this.update(delta);
   }
