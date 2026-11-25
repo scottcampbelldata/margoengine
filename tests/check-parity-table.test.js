@@ -63,6 +63,17 @@ test('a row added without updating the summary fails; a not-planned row is its o
   assert.ok(checkParity(planned).some((p) => /Summary table has no NOT PLANNED row/.test(p)));
 });
 
+// A row that lost its empty cell still counted here, while port_to_margo (packages/mcp) dropped it.
+test('a row with a missing or an extra cell is rejected; an escaped pipe is cell text', () => {
+  const counted = { ...good, total: 5, covered: 3 };
+  for (const row of ['| e | COVERED | x |\n', '| e | COVERED | x | y | z |\n'])
+    assert.ok(
+      checkParity(doc(counted, row)).some((p) => /malformed row: "e" has [35] cells; its table has 4/.test(p)),
+      row,
+    );
+  assert.deepEqual(checkParity(doc(counted, '| e | COVERED | x \\| z | y |\n')), []);
+});
+
 test('an unknown status is rejected', () => {
   assert.ok(checkParity(doc(good, '| e | PARTIALLY | x | y |\n')).some((p) => /unknown status/.test(p)));
 });

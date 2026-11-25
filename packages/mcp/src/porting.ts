@@ -96,7 +96,7 @@ export function headingAnchor(heading: string): string {
 /**
  * Reads a porting guide from a parity matrix page and, optionally, its "Coming from" guide page. Matrix rows are the
  * table rows under `### N. Area` headings of the `## Matrix` section whose header is `| <library> | Status | Margo |
- * Shows it | Notes |`. Guide sections are the `##` and `###` headings; a section's first `js` block is the other
+ * Shows it | Notes |`; a row with more or fewer cells throws a RangeError that names its line. Guide sections are the `##` and `###` headings; a section's first `js` block is the other
  * library's code and its first `ts` block the Margo code.
  */
 export function parsePortingGuide(matrix: string, guide = '', sources: PortingSources = {}): PortingGuide {
@@ -111,14 +111,21 @@ export function parsePortingGuide(matrix: string, guide = '', sources: PortingSo
   const rows: PortingRow[] = [];
   let area = '',
     inMatrix = false;
-  for (const line of matrix.split(/\r?\n/)) {
+  for (const [index, line] of matrix.split(/\r?\n/).entries()) {
     if (/^##\s/.test(line)) inMatrix = /^##\s+Matrix\s*$/.test(line);
     const heading = /^###\s+(?:\d+\.\s*)?(.+)$/.exec(line);
     if (heading) area = heading[1].trim();
     if (!inMatrix || !area || !line.startsWith('|')) continue;
-    const [from, status, margo, shows, notes] = cells(line);
-    if (notes === undefined || from === name || /^-+$/.test(from)) continue;
-    const page = /\]\((https?:[^)\s]+)\)/.exec(shows ?? '')?.[1];
+    const row = cells(line);
+    const [from, status, margo, shows, notes] = row;
+    if (from === name || /^:?-+:?$/.test(from)) continue;
+    // A dropped or extra cell would lose the row or move its notes into another column, so it is refused.
+    if (row.length !== MATRIX_COLUMNS.length + 1)
+      throw rangeError(
+        `Matrix line ${index + 1} ("${from}") has ${row.length} cells; a row has ${MATRIX_COLUMNS.length + 1}`,
+        'mcp',
+      );
+    const page = /\]\((https?:[^)\s]+)\)/.exec(shows)?.[1];
     rows.push({
       area,
       from,

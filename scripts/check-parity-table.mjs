@@ -20,13 +20,22 @@ export function parseParity(text) {
   if (end < 0) end = lines.length;
   const counts = Object.fromEntries(CLASSES.map((c) => [c, 0]));
   const unknown = [];
+  const malformed = [];
   let rows = 0,
-    daggers = 0;
+    daggers = 0,
+    columns = 0;
   for (const line of lines.slice(start + 1, end)) {
     if (!line.startsWith('|')) continue;
-    const cells = line.split('|').map((c) => c.trim());
+    // A pipe escaped with a backslash is cell text, as in GitHub Flavored Markdown.
+    const cells = line.split(/(?<!\\)\|/).map((c) => c.trim());
     const status = cells[2];
-    if (status === undefined || /^:?-+:?$/.test(status) || /^status$/i.test(status)) continue;
+    if (status === undefined || /^:?-+:?$/.test(status)) continue;
+    if (/^status$/i.test(status)) {
+      columns = cells.length;
+      continue;
+    }
+    if (cells.length !== columns)
+      malformed.push(`"${cells[1].slice(0, 60)}" has ${cells.length - 2} cells; its table has ${columns - 2}`);
     rows++;
     const name = status.replace(/\s*†\s*$/, '').toUpperCase();
     if (status.includes('†')) daggers++;
@@ -43,7 +52,7 @@ export function parseParity(text) {
   const todo = lines.find((l) => /^Recounted from the rows/.test(l));
   const tm = todo && /: (\d+) PARTIAL, (\d+) MISSING/.exec(todo);
   if (tm) summary.todo = { PARTIAL: Number(tm[1]), MISSING: Number(tm[2]) };
-  return { rows, counts, daggers, unknown, summary };
+  return { rows, counts, daggers, unknown, malformed, summary };
 }
 
 /**
@@ -52,8 +61,9 @@ export function parseParity(text) {
  * @param {string} [explainer] contents of docs/three-parity-matrix.md, whose bold line quotes the counts
  */
 export function checkParity(text, explainer) {
-  const { rows, counts, daggers, unknown, summary } = parseParity(text);
+  const { rows, counts, daggers, unknown, malformed, summary } = parseParity(text);
   const problems = unknown.map((u) => `unknown status: ${u}; use one of ${CLASSES.join(', ')}`);
+  problems.push(...malformed.map((m) => `malformed row: ${m} (an empty cell is "| |")`));
   const sum = CLASSES.reduce((n, c) => n + counts[c], 0);
   if (sum !== rows) problems.push(`status classes add up to ${sum} but the Matrix has ${rows} rows`);
   const tally = CLASSES.map((c) => `${counts[c]} ${c}`).join(', ');

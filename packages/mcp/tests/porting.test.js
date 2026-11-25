@@ -106,6 +106,22 @@ test('parsePortingGuide reads the library, the Matrix rows by area and the guide
   assert.throws(() => parsePortingGuide('# no table'), { name: 'RangeError', message: /Status, Margo, Shows it/ });
 });
 
+// A shipped row once lost its empty "Shows it" cell and was dropped without a word.
+test('parsePortingGuide refuses a matrix row with a missing or an extra cell and names its line', () => {
+  for (const [broken, count] of [
+    ['| ArcballControls | COVERED † | controls `ArcballControls` | |', 4],
+    ['| ArcballControls | COVERED † | controls `ArcballControls` | | | |', 6],
+  ]) {
+    const text = matrix.replace('| ArcballControls | COVERED † | controls `ArcballControls` | | |', broken);
+    assert.notEqual(text, matrix);
+    const line = text.split('\n').indexOf(broken) + 1;
+    assert.throws(() => parsePortingGuide(text), {
+      name: 'RangeError',
+      message: new RegExp(`Matrix line ${line} \\("ArcballControls"\\) has ${count} cells; a row has 5.*errors#mcp`),
+    });
+  }
+});
+
 test('portingGuidesFromCorpus finds each matrix page and joins its "Coming from" guide', () => {
   const docs = [
     { path: 'docs/notes.md', title: 'Notes', text: '# Notes\n\n## Matrix\n\nNo table here.\n' },

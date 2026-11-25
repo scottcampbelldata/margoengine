@@ -75,7 +75,8 @@ project without the packages fails with `unsupported`.
 `port_to_margo` reads the parity matrix in the repository's `docs/` (one row per
 feature, copied into the package at build time), so a lookup gets the Margo package, the calls and the status
 in one answer. A docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
-Notes` is a guide. A page titled `Coming from <library>` adds code sections when that page is in the docs. The lookup is also an entry
+Notes` is a guide. Every row has all five cells (an empty cell is `| |`); a row with more or fewer throws a
+`RangeError` that names its line, at package build and in `parsePortingGuide`. A page titled `Coming from <library>` adds code sections when that page is in the docs. The lookup is also an entry
 of its own, `@margoengine/mcp/porting`:
 
 ```ts
