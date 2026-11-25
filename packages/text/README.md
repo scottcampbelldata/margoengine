@@ -235,7 +235,8 @@ integer in 0..64 (default 3); 0 and 1 produce a flat chamfer. Collapsing or inte
 
 Contours use nonzero winding: overlapping and nested contours with the same winding stay filled. Zero-area paths
 are discarded without an absolute world-size cutoff. Fonts use Unicode cmap format 4 or 12, unhinted TrueType
-outlines, name-keyed CFF Type 2 outlines or CFF2 outlines; CID-keyed CFF is not read. Shaping comes from `shapedRuns`.
+outlines, name-keyed or CID-keyed CFF Type 2 outlines or CFF2 outlines; unpack a WOFF or WOFF2 file with `decodeWOFF`
+of `@margoengine/loaders/font-woff` first. Shaping comes from `shapedRuns`.
 The parser's budgets apply (composites nest at most 16 levels with 4,096 components and 1,000,000 points per glyph;
 Type 2 uses the specification's 48 operands, 96 stems and 10 nested subroutine calls, plus a 100,000-operation
 execution budget). Contour filling accepts at most 16,384 flattened vertices per glyph; mesh allocation has a
@@ -265,7 +266,7 @@ try {
   font = new VectorFont(bytes, {family: 'Inter'});
   text = VectorTextRenderer.attach(engine);
 } catch {
-  // Fallback for a file the parser does not read (WOFF, WOFF2, bitmap-only fonts): SDF text drawn by the browser.
+  // Fallback for a file the parser does not read (bitmap-only fonts, or WOFF2 bytes not yet decoded): browser SDF text.
   font = new Font({family: 'Inter, sans-serif'});
   text = TextRenderer.attach(engine);
 }
@@ -350,7 +351,7 @@ engine.dispose();
 | --- | --- | --- |
 | `size` | `64` | Pixels per em of the stored fields, an integer from 8 to 512. Captions and lower thirds at 58 to 80 px per em draw near 1:1 at 64; titles of 150 to 300 px want 128 or 256. A 256 px glyph fills about a ninth of a 1,024 px atlas page. |
 | `radius` | `size / 4` | Field range in pixels, above 0 and at most `size / 2`. The default leaves 0.17 em for outline plus shadow blur together; `size / 2` doubles that at half the edge precision. |
-| `variations` | `{}` | Axis values of a variable font, for example `{ wght: 650 }`. A varied instance gets no kerning. |
+| `variations` | `{}` | Axis values of a variable font, for example `{ wght: 650 }`. Kerning follows the instance. |
 | `family` | a unique name | A name for errors and logs; nothing is registered. |
 | `openType` | none | The CFF, CFF2 and variation readers, `openType` from `@margoengine/loaders/font-opentype`: needed for a `.otf` (CFF) file or a `variations` instance. `GlyphFieldFont.load` and `VectorFont.load` import them on their own when the file or options need them, so pages that use only TrueType fonts never load them. |
 
@@ -364,7 +365,17 @@ engine.dispose();
 - **Kerning and ligatures.** Pair kerning is read from GPOS (lookup type 2, formats 1 and 2, through extension lookups) for the `kern` feature of the character's script (Latin, Greek, Cyrillic, else the default script), or from the legacy `kern` table when GPOS has none; the value is the first glyph's XAdvance. It equals what Chromium's own shaper measures on the 20 test pairs of Source Sans 3 TTF and OTF. With `ligatures: true` on a `Text`, each Latin word is one shaped run: GSUB `liga` ligatures (lookup type 4) replace their components and the run's field is built as one bitmap (`office` draws the ffi ligature, as HarfBuzz shapes it).
 - **Speed.** Measured on the development PC in Node, one core: 88 Latin glyphs of Source Sans 3 at 64 px build in 22 to 33 ms (about 65,000 distance evaluations each), and 13 glyphs at 256 px in 38 ms. A film's glyph set costs well under a second once, and nothing in a fresh process that imports the cache.
 
-**Limits.** No Arabic or Indic shaping, mark attachment (GPOS type 4) or contextual substitutions; no colour fonts or emoji; WOFF and WOFF2 files must be unpacked first; no hinting; variable kerning deltas are not applied, so a varied instance has none. Very large titles keep rounded corners, as every single-channel field does: multi-channel fields are a later step. Caps are in [docs/limits.md](../../docs/limits.md).
+**Web fonts.** `GlyphFieldFont.load` and `VectorFont.load` take `.woff` and `.woff2` files as they are, importing
+`@margoengine/loaders/font-woff` only for them. The constructors take OpenType bytes: pass `decodeWOFF(bytes)`.
+
+```ts
+import {GlyphFieldFont} from 'margoengine/text/outline';
+
+const web = await GlyphFieldFont.load('/fonts/SourceSans3.woff2');
+console.log(web.advance('Title') > 0); // true
+```
+
+**Limits.** No Arabic or Indic shaping, mark attachment (GPOS type 4) or contextual substitutions; no colour fonts or emoji; no hinting. Very large titles keep rounded corners, as every single-channel field does: multi-channel fields are a later step. Caps are in [docs/limits.md](../../docs/limits.md).
 
 **Clean-room record.** Built from these sources, without reading any implementation (full record in docs/clean-room.md, "Text outline SDF"):
 

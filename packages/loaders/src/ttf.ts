@@ -4,6 +4,7 @@ import type { OutlineCommand } from './outline.js';
 import { OutlineFont, type OutlineFontSource, type OutlineGlyph } from './outline-font.js';
 import { BinaryReader } from './sfnt-reader.js';
 import type { FontVariationAxis } from './sfnt-variation.js';
+import { gposKerning, type VariationDelta } from './sfnt-layout.js';
 
 const F = 'TTF';
 /** Nested composite glyphs deeper than this throw (the OpenType maxp table allows at most 16 levels in practice). */
@@ -41,15 +42,32 @@ export interface VariationState {
   readonly coordinates: number[];
   readonly hasGlyphVariations: boolean;
   advance(glyph: number): number | undefined;
-  deltas(glyph: number, points: readonly (readonly number[])[], ends: readonly number[], composite?: boolean): [number[], number[]];
+  deltas(
+    glyph: number,
+    points: readonly (readonly number[])[],
+    ends: readonly number[],
+    composite?: boolean,
+  ): [number[], number[]];
 }
 
 /** What `openType` holds (internal: only `@margoengine/loaders/font-opentype` builds it). */
 export interface OpenTypeReaderSet extends OpenTypeReaders {
-  cff(table: BinaryReader, cff2: boolean, glyphCount: number, unitsPerEm: number, coordinates: readonly number[]): {
+  cff(
+    table: BinaryReader,
+    cff2: boolean,
+    glyphCount: number,
+    unitsPerEm: number,
+    coordinates: readonly number[],
+  ): {
     commands(glyph: number): OutlineCommand[];
   };
-  variations(tables: Map<string, BinaryReader>, glyphCount: number, values: Readonly<Record<string, number>>): VariationState;
+  variations(
+    tables: Map<string, BinaryReader>,
+    glyphCount: number,
+    values: Readonly<Record<string, number>>,
+  ): VariationState;
+  /** The deltas of GDEF's item variation store at `coordinates`; undefined when GDEF holds none. */
+  layoutDeltas(gdef: BinaryReader, coordinates: readonly number[]): VariationDelta | undefined;
 }
 
 /** What `parseTTFSource` reads: an `OutlineFontSource` plus the font's variation state and raw tables. */
@@ -60,6 +78,11 @@ export interface TTFFontSource extends OutlineFontSource {
   readonly variationCoordinates: readonly number[];
   /** The bytes of an sfnt table by tag, such as `'GPOS'`, `'GSUB'` or `'kern'`, or undefined when the font has none. */
   table(tag: string): Uint8Array | undefined;
+  /**
+   * Kerning between two glyph indices in font units: the GPOS `kern` feature of `script` (default 'latn'; then DFLT,
+   * then latn), with its variation deltas on a variable instance, else the `kern` table's pair; 0 when neither has it.
+   */
+  kerning(left: number, right: number, script?: string): number;
 }
 
 interface Table {
@@ -360,10 +383,11 @@ function contourCommands(points: Points, out: OutlineCommand[]): void {
  * glyphs with offsets, scales, 2x2 transforms, point matching and ROUND_XY_TO_GRID) or CFF (`'CFF '`, Type 2
  * charstrings with subroutines and `endchar` accents) and CFF2 outlines (Font DICT selection and blends); variable
  * fonts through `fvar`, `avar`, `gvar` (with interpolation of untouched points and phantom-point advances), `HVAR`
- * and the CFF2 ItemVariationStore; `cmap` formats 4 and 12; `kern` format 0 pairs; and the family and style names.
+ * and the CFF2 ItemVariationStore; `cmap` formats 4 and 12; GPOS pair kerning (the `kern` feature, with its variation
+ * deltas) or `kern` format 0 pairs; and the family and style names.
  * Glyphs decode lazily. `parseTTF` wraps the result in an `OutlineFont`; use this function when only the parser is
- * needed. WOFF and WOFF2 throw a `LoaderError` with code `'unsupported'`; malformed tables throw `'header'`,
- * `'truncated'`, `'range'` or `'limit'`.
+ * needed. WOFF and WOFF2 throw a `LoaderError` with code `'unsupported'` naming `@margoengine/loaders/font-woff`,
+ * which decodes them; malformed tables throw `'header'`, `'truncated'`, `'range'` or `'limit'`.
  */
 export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}): TTFFontSource {
   const r = new Reader(toBytes(input, F));
@@ -383,7 +407,11 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
   }
   const version = r.u32(base, 'font header');
   if (version === 0x774f4646 || version === 0x774f4632)
-    throw new LoaderError(F, 'unsupported', 'WOFF and WOFF2 fonts are compressed; decompress the font to .ttf first');
+    throw new LoaderError(
+      F,
+      'unsupported',
+      "WOFF and WOFF2 fonts are compressed; pass decodeWOFF(bytes) from '@margoengine/loaders/font-woff' (or call its parseWOFF)",
+    );
   if (version !== 0x00010000 && version !== 0x74727565 && version !== 0x4f54544f)
     throw new LoaderError(
       F,
@@ -445,7 +473,10 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
       deltas: () => [[], []],
     };
   }
-  const cff = kind === 'glyf' ? undefined : readers!.cff(view(all.get(kind)!), kind === 'CFF2', glyphCount, unitsPerEm, variations.coordinates);
+  const cff =
+    kind === 'glyf'
+      ? undefined
+      : readers!.cff(view(all.get(kind)!), kind === 'CFF2', glyphCount, unitsPerEm, variations.coordinates);
   const glyf = kind === 'glyf' ? need(all, 'glyf', 0) : undefined,
     loca = kind === 'glyf' ? need(all, 'loca', 2) : undefined;
   if (loca && loca.length < (glyphCount + 1) * (longOffsets ? 4 : 2))
@@ -455,6 +486,15 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
   const glyphIndex = cmapLookup(r, cmap),
     kerning = kernPairs(r, all.get('kern')),
     { family, style } = names(r, all.get('name'));
+
+  // GPOS is read at the first pair asked for, so a font used for outlines alone never parses it.
+  const pairs = new Map<string, number>();
+  let gpos: ReturnType<typeof gposKerning> | undefined;
+  const layoutKerning = (bytes: Uint8Array) => {
+    const gdef = all.get('GDEF'),
+      varied = variations.coordinates.some((c) => c !== 0);
+    return gposKerning(bytes, varied && gdef ? readers!.layoutDeltas(view(gdef), variations.coordinates) : undefined);
+  };
 
   const decode = (index: number, depth: number, work: { components: number }): Points => {
     if (depth > MAX_DEPTH)
@@ -545,7 +585,8 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
     }
     // Composite: components, each with a transform and an offset or matched points. All are read first, because a
     // variable font's gvar moves each component's offset by one delta per component.
-    const parts: { flags: number; glyph: number; arg1: number; arg2: number; m: [number, number, number, number] }[] = [];
+    const parts: { flags: number; glyph: number; arg1: number; arg2: number; m: [number, number, number, number] }[] =
+      [];
     let p = at + 10,
       flags: number;
     do {
@@ -673,15 +714,27 @@ export function parseTTFSource(input: BinaryInput, options: TTFParseOptions = {}
       const advance = r.u16(hmtx.offset + Math.min(metricsGlyph, metrics - 1) * 4) + (varied ?? delta ?? 0);
       return { index, advance, commands };
     },
-    kerning: (left, right) => kerning.get(left * 65536 + right) ?? 0,
+    kerning(left, right, script = 'latn') {
+      const legacy = kerning.get(left * 65536 + right) ?? 0,
+        t = all.get('GPOS');
+      if (!t) return legacy;
+      const key = `${script}|${left}|${right}`;
+      let value = pairs.get(key);
+      if (value === undefined) {
+        gpos ??= layoutKerning(r.bytes.subarray(t.offset, t.offset + t.length));
+        pairs.set(key, (value = gpos(left, right, script) ?? legacy));
+      }
+      return value;
+    },
   };
 }
 
 /**
  * Parses an OpenType font (`.ttf`, `.otf`, or one font of a `.ttc` collection) into an `OutlineFont`: TrueType or
- * CFF/CFF2 outlines, variable fonts at `options.variations`, `cmap` formats 4 and 12, `kern` pairs and the family and
- * style names (see `parseTTFSource` for the tables read). Glyphs decode lazily. WOFF and WOFF2 throw a `LoaderError`
- * with code `'unsupported'`; malformed tables throw `'header'`, `'truncated'`, `'range'` or `'limit'`.
+ * CFF/CFF2 outlines, variable fonts at `options.variations`, `cmap` formats 4 and 12, GPOS or `kern` pair kerning and
+ * the family and style names (see `parseTTFSource` for the tables read). Glyphs decode lazily. WOFF and WOFF2 throw a
+ * `LoaderError` with code `'unsupported'` (`parseWOFF` of `@margoengine/loaders/font-woff` reads them); malformed
+ * tables throw `'header'`, `'truncated'`, `'range'` or `'limit'`.
  */
 export function parseTTF(input: BinaryInput, options: TTFParseOptions = {}): OutlineFont {
   return new OutlineFont(parseTTFSource(input, options));

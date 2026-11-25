@@ -11235,3 +11235,19 @@ Built from the papers and specification below; no path tracer source (three-gpu-
 - E. Veach, *Robust Monte Carlo Methods for Light Transport Simulation*, PhD thesis, Stanford, 1997, chapter 9 (the light-point emission is the coverage expectation, so the existing power-heuristic weights stay valid).
 
 Combined: Pharr et al.'s in-traversal test with Wyman and McGuire's point keying, the point being the hit distance rounded to 13 mantissa bits, hashed with the ray's current random state, which is read but not advanced.
+
+## Web fonts, CID-keyed CFF and GPOS kerning (2026-11-24)
+
+`packages/loaders/src/font-woff.ts`, `woff-glyf.ts`, `sfnt-layout.ts` and the CID paths of `sfnt-cff.ts`, written from
+these public specifications alone; no font library or engine source was read:
+
+- J. Kew, T. Leming, E. van Blokland, "WOFF File Format 1.0", W3C Recommendation, 13 December 2012, https://www.w3.org/TR/WOFF/
+- V. Levantovsky (ed.), "WOFF File Format 2.0", W3C Recommendation, 8 August 2024, https://www.w3.org/TR/WOFF2/
+- Adobe, "The Compact Font Format Specification", Technical Note #5176, 2003, https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf
+- Adobe, "The Type 2 Charstring Format", Technical Note #5177, 2006, https://adobe-type-tools.github.io/font-tech-notes/pdfs/5177.Type2.pdf
+- Microsoft and Adobe, "OpenType Specification" 1.9.1, 2024, https://learn.microsoft.com/en-us/typography/opentype/spec/ (GPOS, GDEF, common layout tables, font variations)
+- J. Alakuijala, Z. Szabadka, "Brotli Compressed Data Format", RFC 7932, 2016, https://www.rfc-editor.org/rfc/rfc7932 (the decoder already in `@margoengine/decoders`)
+- P. Deutsch, J-L. Gailly, "ZLIB Compressed Data Format Specification", RFC 1950, 1996, https://www.rfc-editor.org/rfc/rfc1950 ; P. Deutsch, "DEFLATE Compressed Data Format Specification", RFC 1951, 1996, https://www.rfc-editor.org/rfc/rfc1951 (`packages/shared/inflate.js`)
+
+Proof: `packages/loaders/tests/font-woff.test.js` (including a .woff2 made by an independent encoder) and
+`font-cid-gpos.test.js`; kerning against Chromium and HarfBuzz references in the text fixtures.

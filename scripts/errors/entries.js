@@ -2622,7 +2622,7 @@ export const entries = [
     messages: [],
     cause:
       'The file is valid but uses a feature, encoding, compression or version the loader does not implement, or an optional dependency such as `web-ifc` is missing. A font with CFF or CFF2 outlines (`.otf`), or a `variations` instance of a variable font, needs the opt-in OpenType readers, which `parseTTF` does not load by itself.',
-    fix: 'Export the file again without that feature (for example uncompressed, or as a simpler version of the format), or load it with a package that reads it. For a CFF font or a variable instance, pass `{ openType }` from `@margoengine/loaders/font-opentype` (or call its `parseOpenType`), or load the font with `GlyphFieldFont.load` or `VectorFont.load` of `@margoengine/text`, which load the readers for you. Branch on `error.code === "unsupported"`.',
+    fix: 'Export the file again without that feature (for example uncompressed, or as a simpler version of the format), or load it with a package that reads it. For a CFF font or a variable instance, pass `{ openType }` from `@margoengine/loaders/font-opentype` (or call its `parseOpenType`), or load the font with `GlyphFieldFont.load` or `VectorFont.load` of `@margoengine/text`, which load the readers for you. Decode a WOFF or WOFF2 font with `decodeWOFF` or `parseWOFF` of `@margoengine/loaders/font-woff`. Branch on `error.code === "unsupported"`.',
   },
   {
     id: 'loader-zip',

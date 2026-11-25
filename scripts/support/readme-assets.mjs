@@ -65,6 +65,7 @@ export const README_FILES = {
   '/fonts/Inter.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',
   '/fonts/InterVariable.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3VF-Upright.ttf',
   '/fonts/SourceSans3-Regular.otf': 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.otf',
+  '/fonts/SourceSans3.woff2': 'site/fonts/SourceSans3-latin.woff2',
   '/fonts/source-sans.json': 'packages/text/tests/fixtures/fonts/readme/source-sans.json',
   '/fonts/source-sans.png': 'packages/text/tests/fixtures/fonts/readme/source-sans.png',
   '/scans/site.las': 'packages/points/tests/fixtures/laz/point-time-color.las',

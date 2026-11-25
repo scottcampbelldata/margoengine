@@ -38,7 +38,7 @@ await build({
       },
       formats: ['es'],
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/png'] },
+    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/png', '@margoengine/loaders/font-woff'] },
   },
 });
 execFileSync(

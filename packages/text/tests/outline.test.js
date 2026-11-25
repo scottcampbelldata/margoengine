@@ -7,6 +7,7 @@ import test from 'node:test';
 import { Font, Text, layoutText } from '@margoengine/text';
 import { GlyphFieldFont as GlyphFieldFontLean, outlineSdf, windingAt, flattenOutline } from '@margoengine/text/outline';
 import { openType } from '@margoengine/loaders/font-opentype';
+import { VectorFont } from '@margoengine/text/vector';
 // These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
 // lean TrueType path without them.
 class GlyphFieldFont extends GlyphFieldFontLean {
@@ -119,19 +120,38 @@ test('glyph fields are within one level of a 4,096-sample brute-force reference 
 });
 
 // Two unit squares overlapping by half, both counter-clockwise: one shape whose inside edges must leave no seam.
-const square = (x, y, s) => [[x, y, x + s, y], [x + s, y, x + s, y + s], [x + s, y + s, x, y + s], [x, y + s, x, y]];
+const square = (x, y, s) => [
+  [x, y, x + s, y],
+  [x + s, y, x + s, y + s],
+  [x + s, y + s, x, y + s],
+  [x, y + s, x, y],
+];
 
 test('overlapping contours leave no seam: the field equals that of the union outline', () => {
   const p = params(64),
     overlapped = outlineSdf([square(0, 0, 0.5), square(0.25, 0.25, 0.5)], p),
     // The union of the two squares as one outline (an octagon-like L pair), drawn once.
-    union = outlineSdf([[
-      [0, 0, 0.5, 0], [0.5, 0, 0.5, 0.25], [0.5, 0.25, 0.75, 0.25], [0.75, 0.25, 0.75, 0.75],
-      [0.75, 0.75, 0.25, 0.75], [0.25, 0.75, 0.25, 0.5], [0.25, 0.5, 0, 0.5], [0, 0.5, 0, 0],
-    ]], p);
+    union = outlineSdf(
+      [
+        [
+          [0, 0, 0.5, 0],
+          [0.5, 0, 0.5, 0.25],
+          [0.5, 0.25, 0.75, 0.25],
+          [0.75, 0.25, 0.75, 0.75],
+          [0.75, 0.75, 0.25, 0.75],
+          [0.25, 0.75, 0.25, 0.5],
+          [0.25, 0.5, 0, 0.5],
+          [0, 0.5, 0, 0],
+        ],
+      ],
+      p,
+    );
   assert.equal(overlapped.overlapped, true);
   assert.equal(union.overlapped, false);
-  assert.deepEqual([overlapped.width, overlapped.height, overlapped.left, overlapped.top], [union.width, union.height, union.left, union.top]);
+  assert.deepEqual(
+    [overlapped.width, overlapped.height, overlapped.left, overlapped.top],
+    [union.width, union.height, union.left, union.top],
+  );
   let worst = 0;
   for (let k = 0; k < union.data.length; k++) worst = Math.max(worst, Math.abs(overlapped.data[k] - union.data[k]));
   assert.ok(worst <= 1, `worst ${worst} levels from the union`);
@@ -154,7 +174,17 @@ test('winding: a counter-wound hole is outside, a same-wound inner square is fil
   const nested = outlineSdf([square(0, 0, 1), square(0.25, 0.25, 0.5)], p);
   assert.equal(centre(nested), 255, 'same-wound inner square is filled (nonzero rule)');
   const touching = outlineSdf([square(0, 0, 0.5), square(0.5, 0, 0.5)], p),
-    whole = outlineSdf([[[0, 0, 1, 0], [1, 0, 1, 0.5], [1, 0.5, 0, 0.5], [0, 0.5, 0, 0]]], p);
+    whole = outlineSdf(
+      [
+        [
+          [0, 0, 1, 0],
+          [1, 0, 1, 0.5],
+          [1, 0.5, 0, 0.5],
+          [0, 0.5, 0, 0],
+        ],
+      ],
+      p,
+    );
   let worst = 0;
   for (let k = 0; k < whole.data.length; k++) worst = Math.max(worst, Math.abs(touching.data[k] - whole.data[k]));
   assert.ok(worst <= 1, `touching squares match one rectangle within ${worst} levels`);
@@ -180,8 +210,6 @@ test('kerning from GPOS equals what the browser shaper measures, TTF and CFF', (
   // The pen positions of a kerned word follow: AV is narrower than A plus V.
   const font = new GlyphFieldFont(bytes('SourceSans3-Regular.ttf'));
   assert.ok(font.advance('AV') < font.advance('A') + font.advance('V'));
-  // A varied instance reads no kerning (variable kerning deltas are not applied, docs/limits.md).
-  assert.equal(new GlyphFieldFont(bytes('SourceSans3VF-Upright.ttf'), { variations: { wght: 650 } }).kerning('A', 'V'), 0);
 });
 
 test('ligatures and advances match HarfBuzz for "office AV" (Source Sans 3 VF at weight 650)', () => {
@@ -189,17 +217,37 @@ test('ligatures and advances match HarfBuzz for "office AV" (Source Sans 3 VF at
   const font = new GlyphFieldFont(bytes(entry.font), { variations: entry.variations });
   const glyphs = entry.shapedRuns[0].glyphs;
   const word = font.shape('office');
-  assert.deepEqual(word.glyphs, glyphs.filter((g) => g.cluster < 6).map((g) => g.glyphIndex));
-  // HarfBuzz applies GPOS kerning with its variation deltas, which GlyphFieldFont does not read on a varied instance
-  // (docs/limits.md), so the glyphs it kerned (o before the ligature, e before the space, A before V) are left out; the
-  // rest agree within the half unit HarfBuzz rounds to.
-  for (const k of [1, 2, 4, 5, 7])
-    assert.ok(Math.abs(font.outlines.glyphAdvance(glyphs[k].glyphIndex) - glyphs[k].xAdvance) <= 0.0005 + 1e-12, `advance of glyph ${k}`);
+  assert.deepEqual(
+    word.glyphs,
+    glyphs.filter((g) => g.cluster < 6).map((g) => g.glyphIndex),
+  );
+  // HarfBuzz applies GPOS kerning with its variation deltas to the advance of the left glyph. Every advance plus kern
+  // agrees within the units HarfBuzz rounds the advance and the delta to.
+  assert.ok(font.kerning('A', 'V') < 0, 'a varied instance is kerned');
+  for (let k = 0; k < glyphs.length; k++) {
+    const kern = k + 1 < glyphs.length ? font.glyphKerning(glyphs[k].glyphIndex, glyphs[k + 1].glyphIndex) : 0;
+    const advance = font.outlines.glyphAdvance(glyphs[k].glyphIndex) + kern;
+    assert.ok(
+      Math.abs(advance - glyphs[k].xAdvance) <= 0.001 + 1e-12,
+      `advance of glyph ${k}: ${advance} against ${glyphs[k].xAdvance}`,
+    );
+  }
   // A Text laid out with ligatures draws the word as one run, one field holding the ffi ligature.
   const layout = layoutText('office', { ligatures: true }, font);
   assert.equal(layout.glyphs.length, 1);
   assert.ok(font.glyph(layout.glyphs[0].cluster).width > font.glyph('o').width * 2);
   assert.equal(layoutText('office', {}, font).glyphs.length, 6);
+});
+
+test('load takes a WOFF2 web font through its decoder, in Node as in a page', async () => {
+  const woff2 = readFileSync(new URL('../../../site/fonts/SourceSans3-latin.woff2', import.meta.url));
+  const url = 'data:font/woff2;base64,' + woff2.toString('base64');
+  for (const Type of [GlyphFieldFont, VectorFont]) {
+    const font = await Type.load(url);
+    assert.ok(font.kerning('T', 'o') < 0, 'GPOS kerning from the web font');
+    assert.ok(font.advance('Title') > 1);
+  }
+  assert.ok((await GlyphFieldFont.load(url, { variations: { wght: 700 } })).glyph('A').width > 0);
 });
 
 test('the glyph cache round trip rebuilds nothing; a stale or broken cache is refused', () => {
@@ -215,9 +263,15 @@ test('the glyph cache round trip rebuilds nothing; a stale or broken cache is re
   // Another size, another font file or another variation is another key.
   assert.equal(new GlyphFieldFont(bytes('SourceSans3-Regular.ttf'), { size: 32 }).importGlyphs(cache), false);
   assert.equal(new GlyphFieldFont(bytes('SourceSans3-Regular.otf')).importGlyphs(cache), false);
-  assert.equal(new GlyphFieldFont(bytes('SourceSans3VF-Upright.ttf'), { variations: { wght: 500 } }).importGlyphs(cache), false);
+  assert.equal(
+    new GlyphFieldFont(bytes('SourceSans3VF-Upright.ttf'), { variations: { wght: 500 } }).importGlyphs(cache),
+    false,
+  );
   assert.equal(two.importGlyphs(new Uint8Array(4)), false);
-  assert.throws(() => new GlyphFieldFont(bytes('SourceSans3-Regular.ttf')).importGlyphs(cache.subarray(0, cache.length - 3)), { code: 'failed' });
+  assert.throws(
+    () => new GlyphFieldFont(bytes('SourceSans3-Regular.ttf')).importGlyphs(cache.subarray(0, cache.length - 3)),
+    { code: 'failed' },
+  );
 });
 
 test('work count: distance evaluations per 64 px glyph stay bounded (piece boxes grown by the field reach)', () => {
@@ -230,7 +284,10 @@ test('work count: distance evaluations per 64 px glyph stay bounded (piece boxes
 });
 
 test('in Node: Font refuses with a message naming GlyphFieldFont; GlyphFieldFont lays out, measures and builds glyphs', () => {
-  assert.throws(() => layoutText('Hi', {}, new Font()), (error) => error.code === 'unsupported' && /GlyphFieldFont/.test(error.message));
+  assert.throws(
+    () => layoutText('Hi', {}, new Font()),
+    (error) => error.code === 'unsupported' && /GlyphFieldFont/.test(error.message),
+  );
   const font = new GlyphFieldFont(bytes('SourceSans3-Regular.ttf'));
   assert.equal(font.loaded, true);
   const text = new Text({ text: 'When It Forms', font, fontSize: 0.5 });

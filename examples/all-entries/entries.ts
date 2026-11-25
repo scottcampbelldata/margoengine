@@ -793,6 +793,7 @@ export * as e_margoengine_game_loaders_common from '@margoengine/game/loaders/co
 export * as e_margoengine_game_loaders_usd from '@margoengine/game/loaders/usd';
 export * as e_margoengine_game_loaders_font from '@margoengine/game/loaders/font';
 export * as e_margoengine_game_loaders_font_opentype from '@margoengine/game/loaders/font-opentype';
+export * as e_margoengine_game_loaders_font_woff from '@margoengine/game/loaders/font-woff';
 export * as e_margoengine_game_loaders_svg from '@margoengine/game/loaders/svg';
 export * as e_margoengine_game_loaders_mtl from '@margoengine/game/loaders/mtl';
 export * as e_margoengine_game_loaders_render from '@margoengine/game/loaders/render';
@@ -1716,6 +1717,7 @@ export * as e_margoengine_kit_react_loaders_common from '@margoengine/kit-react/
 export * as e_margoengine_kit_react_loaders_usd from '@margoengine/kit-react/loaders/usd';
 export * as e_margoengine_kit_react_loaders_font from '@margoengine/kit-react/loaders/font';
 export * as e_margoengine_kit_react_loaders_font_opentype from '@margoengine/kit-react/loaders/font-opentype';
+export * as e_margoengine_kit_react_loaders_font_woff from '@margoengine/kit-react/loaders/font-woff';
 export * as e_margoengine_kit_react_loaders_svg from '@margoengine/kit-react/loaders/svg';
 export * as e_margoengine_kit_react_loaders_mtl from '@margoengine/kit-react/loaders/mtl';
 export * as e_margoengine_kit_react_loaders_render from '@margoengine/kit-react/loaders/render';
@@ -2294,6 +2296,7 @@ export * as e_margoengine_kit_viz_loaders_common from '@margoengine/kit-viz/load
 export * as e_margoengine_kit_viz_loaders_usd from '@margoengine/kit-viz/loaders/usd';
 export * as e_margoengine_kit_viz_loaders_font from '@margoengine/kit-viz/loaders/font';
 export * as e_margoengine_kit_viz_loaders_font_opentype from '@margoengine/kit-viz/loaders/font-opentype';
+export * as e_margoengine_kit_viz_loaders_font_woff from '@margoengine/kit-viz/loaders/font-woff';
 export * as e_margoengine_kit_viz_loaders_svg from '@margoengine/kit-viz/loaders/svg';
 export * as e_margoengine_kit_viz_loaders_mtl from '@margoengine/kit-viz/loaders/mtl';
 export * as e_margoengine_kit_viz_loaders_render from '@margoengine/kit-viz/loaders/render';
@@ -2798,6 +2801,7 @@ export * as e_margoengine_kit_web_loaders_common from '@margoengine/kit-web/load
 export * as e_margoengine_kit_web_loaders_usd from '@margoengine/kit-web/loaders/usd';
 export * as e_margoengine_kit_web_loaders_font from '@margoengine/kit-web/loaders/font';
 export * as e_margoengine_kit_web_loaders_font_opentype from '@margoengine/kit-web/loaders/font-opentype';
+export * as e_margoengine_kit_web_loaders_font_woff from '@margoengine/kit-web/loaders/font-woff';
 export * as e_margoengine_kit_web_loaders_svg from '@margoengine/kit-web/loaders/svg';
 export * as e_margoengine_kit_web_loaders_mtl from '@margoengine/kit-web/loaders/mtl';
 export * as e_margoengine_kit_web_loaders_render from '@margoengine/kit-web/loaders/render';
@@ -3069,6 +3073,7 @@ export * as e_margoengine_loaders_common from '@margoengine/loaders/common';
 export * as e_margoengine_loaders_usd from '@margoengine/loaders/usd';
 export * as e_margoengine_loaders_font from '@margoengine/loaders/font';
 export * as e_margoengine_loaders_font_opentype from '@margoengine/loaders/font-opentype';
+export * as e_margoengine_loaders_font_woff from '@margoengine/loaders/font-woff';
 export * as e_margoengine_loaders_svg from '@margoengine/loaders/svg';
 export * as e_margoengine_loaders_mtl from '@margoengine/loaders/mtl';
 export * as e_margoengine_loaders_render from '@margoengine/loaders/render';
@@ -3677,6 +3682,7 @@ export * as e_margoengine_loaders_common_2 from 'margoengine/loaders/common';
 export * as e_margoengine_loaders_usd_2 from 'margoengine/loaders/usd';
 export * as e_margoengine_loaders_font_2 from 'margoengine/loaders/font';
 export * as e_margoengine_loaders_font_opentype_2 from 'margoengine/loaders/font-opentype';
+export * as e_margoengine_loaders_font_woff_2 from 'margoengine/loaders/font-woff';
 export * as e_margoengine_loaders_svg_2 from 'margoengine/loaders/svg';
 export * as e_margoengine_loaders_mtl_2 from 'margoengine/loaders/mtl';
 export * as e_margoengine_loaders_render_2 from 'margoengine/loaders/render';

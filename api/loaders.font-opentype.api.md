@@ -56,7 +56,7 @@ interface OutlineFontSource {
     styleName?: string;
     glyphIndex(codePoint: number): number | undefined;
     glyph(index: number): OutlineGlyph;
-    kerning?(left: number, right: number): number;
+    kerning?(left: number, right: number, script?: string): number;
     missingGlyph?: number;
     fillRule?: OutlineFillRule;
     variationAxes?: readonly FontVariationAxis[];
@@ -72,6 +72,7 @@ interface TTFFontSource extends OutlineFontSource {
     readonly variationAxes: readonly FontVariationAxis[];
     readonly variationCoordinates: readonly number[];
     table(tag: string): Uint8Array | undefined;
+    kerning(left: number, right: number, script?: string): number;
 }
 
 interface TTFParseOptions {

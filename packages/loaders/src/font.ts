@@ -8,6 +8,9 @@ export type { OutlineCommand, OutlineFillRule } from './outline.js';
 export { parseTTF, parseTTFSource } from './ttf.js';
 export type { OpenTypeReaders, TTFFontSource, TTFParseOptions } from './ttf.js';
 export type { FontVariationAxis } from './sfnt-variation.js';
+export { coverageIndex, openTypeLayout, scriptTag } from './sfnt-layout.js';
+export type { OpenTypeLayout, VariationDelta } from './sfnt-layout.js';
+export type { BinaryReader } from './sfnt-reader.js';
 
 /** Options of `textGeometry`. Lengths are in `size` units. */
 export interface TextGeometryOptions extends TextShapeOptions {

@@ -71,6 +71,10 @@
       "types": "./dist/font-opentype.d.ts",
       "import": "./dist/font-opentype.js"
     },
+    "./font-woff": {
+      "types": "./dist/font-woff.d.ts",
+      "import": "./dist/font-woff.js"
+    },
     "./svg": {
       "types": "./dist/svg.d.ts",
       "import": "./dist/svg.js"

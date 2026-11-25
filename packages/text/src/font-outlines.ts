@@ -62,6 +62,10 @@ export class FontOutlines {
   get varied(): boolean {
     return this.source.variationCoordinates.some((c) => c !== 0);
   }
+  /** Kerning between two glyph ids in font units under a script tag (GPOS or `kern`, variation deltas applied). */
+  kerning(left: number, right: number, script = 'latn'): number {
+    return this.source.kerning(left, right, script);
+  }
   /** Supported variation axes in user units. */
   get variationAxes(): readonly FontVariationAxis[] {
     return this.source.variationAxes;
@@ -182,7 +186,10 @@ export class FontOutlines {
 }
 
 /** Parses font binary data into a reusable FontOutlines object. */
-export function parseFontOutlines(fontData: ArrayBuffer | ArrayBufferView, options: FontVariationOptions = {}): FontOutlines {
+export function parseFontOutlines(
+  fontData: ArrayBuffer | ArrayBufferView,
+  options: FontVariationOptions = {},
+): FontOutlines {
   if (!fontData || (!(fontData instanceof ArrayBuffer) && !ArrayBuffer.isView(fontData))) {
     throw new TypeError(
       'parseFontOutlines requires an ArrayBuffer or TypedArray view of font bytes; pass a valid buffer',

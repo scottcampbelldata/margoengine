@@ -117,8 +117,16 @@ const EXECUTION_BUDGET = 100_000;
 const validMatrix = (m: unknown): m is number[] =>
   Array.isArray(m) && m.length === 6 && m.every((v) => Number.isFinite(v));
 
+/** Local subroutines all the Font DICTs of one CID-keyed font may list (they may share one INDEX). */
+const MAX_LOCAL_SUBRS = 1 << 20;
+
+/** The affine matrix `outer(inner(point))`. */
+function concat([a, b, c, d, x, y]: readonly number[], [e, f, g, h, u, v]: readonly number[]): number[] {
+  return [a * e + c * f, b * e + d * f, a * g + c * h, b * g + d * h, a * u + c * v + x, b * u + d * v + y];
+}
+
 /**
- * The CFF (`'CFF '`) or CFF2 outlines of one font. `commands(glyph)` runs the glyph's Type 2 charstring (blends at the
+ * The CFF (`'CFF '`, name-keyed or CID-keyed) or CFF2 outlines of one font. `commands(glyph)` runs the glyph's Type 2 charstring (blends at the
  * font's variation coordinates for CFF2) into move, line and cubic commands in font units: the FontMatrix (and a
  * CFF2 Font DICT's own matrix) times units per em.
  */
@@ -129,6 +137,7 @@ export class CFFOutlines {
   private charset: number[] = [];
   private matrix: number[] = DEFAULT_MATRIX;
   private store?: FontItemStore;
+  private cid = false;
   private fontDicts: FontDict[] = [];
   private select: number[] = [];
 
@@ -177,48 +186,15 @@ export class CFFOutlines {
     if (!dicts.length) fontError('the CFF2 Font DICT INDEX is empty');
     this.fontDicts = dicts.map((bytes) => {
       const dict = this.parseDict(bytes),
-        priv = dict.get(18);
-      let subrs: Uint8Array[] = [],
-        vsindex = 0;
-      if (priv !== undefined) {
-        if (!Array.isArray(priv) || priv.length !== 2) fontError('a CFF2 Private DICT range is invalid');
-        const [length, start] = priv,
-          p = this.parseDict(r.slice(start, length).bytes);
-        vsindex = Number(p.get(22) ?? 0);
-        if (p.has(19)) {
-          r.seek(start + offset(p, 19));
-          subrs = this.readIndex(r);
-        }
-      }
-      let combined = matrix;
-      const local = dict.get(0x0c07);
-      if (local !== undefined) {
-        if (!validMatrix(local)) fontError('a CFF2 Font DICT matrix is invalid');
-        const [a, b, c, d, x, y] = matrix,
-          [e, f, g, h, u, v] = local;
-        combined = [a * e + c * f, b * e + d * f, a * g + c * h, b * g + d * h, a * u + c * v + x, b * u + d * v + y];
-      }
-      return { subrs, vsindex, matrix: this.scaled(combined) };
+        own = this.privateDict(r, dict),
+        local = dict.get(0x0c07);
+      if (local !== undefined && !validMatrix(local)) fontError('a CFF2 Font DICT matrix is invalid');
+      const combined = local === undefined ? matrix : concat(matrix, local);
+      return { ...own, matrix: this.scaled(combined) };
     });
-    this.select = new Array<number>(this.glyphCount).fill(0);
-    if (top.has(0x0c25)) {
-      r.seek(offset(top, 0x0c25));
-      const format = r.u8();
-      if (format === 0) for (let i = 0; i < this.glyphCount; i++) this.select[i] = r.u8();
-      else if (format === 3 || format === 4) {
-        const wide = format === 4,
-          n = wide ? r.u32() : r.u16();
-        const ranges = Array.from({ length: n }, () => ({ first: wide ? r.u32() : r.u16(), fd: wide ? r.u16() : r.u8() }));
-        const sentinel = wide ? r.u32() : r.u16();
-        if (!n || ranges[0].first !== 0 || sentinel !== this.glyphCount) fontError('the CFF2 FDSelect range is invalid');
-        for (let i = 0; i < n; i++) {
-          const end = i + 1 < n ? ranges[i + 1].first : sentinel;
-          if (end <= ranges[i].first || end > this.glyphCount) fontError('the CFF2 FDSelect ranges are out of order');
-          this.select.fill(ranges[i].fd, ranges[i].first, end);
-        }
-      } else fontError(`CFF2 FDSelect format ${format} is unknown`, 'unsupported');
-    } else if (dicts.length !== 1) fontError('the CFF2 font has several Font DICTs and no FDSelect');
-    if (this.select.some((i) => i >= dicts.length)) fontError('the CFF2 FDSelect refers to a missing Font DICT');
+    if (top.has(0x0c25)) this.readFDSelect(r, offset(top, 0x0c25), dicts.length, true);
+    else if (dicts.length !== 1) fontError('the CFF2 font has several Font DICTs and no FDSelect');
+    else this.select = new Array<number>(this.glyphCount).fill(0);
     return { charStrings, globalSubrs };
   }
 
@@ -233,13 +209,16 @@ export class CFFOutlines {
       topItems = this.readIndex(r);
     if (names.length !== 1 || topItems.length !== 1) fontError('the CFF FontSet holds more or fewer than one font');
     const top = this.parseDict(topItems[0]);
-    if (top.has(0x0c1e) || top.has(0x0c24) || top.has(0x0c25))
-      fontError('the font has CID-keyed CFF outlines, which are not read', 'unsupported');
+    // A CIDFont names its registry (ROS) and splits Private DICTs over an FDArray chosen per glyph by FDSelect
+    // (TN #5176, sections 18 and 19).
+    const cid = top.has(0x0c1e);
+    if (!cid && (top.has(0x0c24) || top.has(0x0c25))) fontError('a CFF font holds an FDArray without a ROS operator');
     if (top.has(0x0c14)) fontError('the font has synthetic CFF outlines, which are not read', 'unsupported');
     if (top.has(0x0c06) && top.get(0x0c06) !== 2) fontError('the CFF CharstringType is not 2', 'unsupported');
     const matrix = top.get(0x0c07) ?? DEFAULT_MATRIX;
     if (!validMatrix(matrix)) fontError('the CFF FontMatrix is invalid');
     this.matrix = this.scaled(matrix);
+    this.cid = cid;
     this.readIndex(r);
     const globalSubrs = this.readIndex(r);
     const charOffset = top.get(17);
@@ -273,19 +252,74 @@ export class CFFOutlines {
       }
     }
     if (new Set(this.charset).size !== this.charset.length) fontError('the CFF charset repeats a SID');
-    const priv = top.get(18);
-    if (priv !== undefined) {
-      if (!Array.isArray(priv) || priv.length !== 2) fontError('the CFF Private DICT range is invalid');
-      const [length, offset] = priv;
-      const dict = this.parseDict(r.slice(offset, length).bytes);
-      if (dict.has(19)) {
-        const rel = dict.get(19);
-        if (typeof rel !== 'number') fontError('the CFF Subrs offset is invalid');
-        r.seek(offset + rel);
-        this.localSubrs = this.readIndex(r);
-      }
+    if (!cid) this.localSubrs = this.privateDict(r, top).subrs;
+    else {
+      const at = (op: number): number => {
+        const v = top.get(op);
+        if (!Number.isInteger(v) || (v as number) <= 0)
+          fontError(`the CID-keyed CFF lacks the offset of operator ${op}`);
+        return v as number;
+      };
+      r.seek(at(0x0c24));
+      const dicts = this.readIndex(r);
+      if (!dicts.length || dicts.length > 256) fontError('a CID-keyed CFF holds 1 to 256 Font DICTs');
+      let subrs = 0;
+      this.fontDicts = dicts.map((bytes) => {
+        const dict = this.parseDict(bytes),
+          own = this.privateDict(r, dict);
+        if ((subrs += own.subrs.length) > MAX_LOCAL_SUBRS)
+          fontError(`the Font DICTs list more than ${MAX_LOCAL_SUBRS} subroutines`, 'limit');
+        const local = dict.get(0x0c07);
+        if (local !== undefined && !validMatrix(local)) fontError('a CFF Font DICT matrix is invalid');
+        // Both matrices apply, the Font DICT's first; one that is absent is the identity (both absent: the default).
+        const combined = local === undefined ? matrix : top.has(0x0c07) ? concat(matrix, local) : local;
+        return { subrs: own.subrs, vsindex: 0, matrix: this.scaled(combined) };
+      });
+      this.readFDSelect(r, at(0x0c25), dicts.length, false);
     }
     return { charStrings, globalSubrs };
+  }
+
+  /** The local subroutines and default `vsindex` of the Private DICT a Top or Font DICT points to, if any. */
+  private privateDict(r: BinaryReader, from: Dict): { subrs: Uint8Array[]; vsindex: number } {
+    const priv = from.get(18);
+    if (priv === undefined) return { subrs: [], vsindex: 0 };
+    if (!Array.isArray(priv) || priv.length !== 2) fontError('a CFF Private DICT range is invalid');
+    const [length, start] = priv,
+      dict = this.parseDict(r.slice(start, length).bytes);
+    let subrs: Uint8Array[] = [];
+    if (dict.has(19)) {
+      const rel = dict.get(19);
+      if (typeof rel !== 'number') fontError('a CFF Subrs offset is invalid');
+      r.seek(start + rel);
+      subrs = this.readIndex(r);
+    }
+    return { subrs, vsindex: Number(dict.get(22) ?? 0) };
+  }
+
+  /** The Font DICT of every glyph: FDSelect formats 0 and 3, and CFF2's 32-bit format 4. */
+  private readFDSelect(r: BinaryReader, offset: number, dicts: number, cff2: boolean): void {
+    this.select = new Array<number>(this.glyphCount).fill(0);
+    r.seek(offset);
+    const format = r.u8();
+    if (format === 0) for (let i = 0; i < this.glyphCount; i++) this.select[i] = r.u8();
+    else if (format === 3 || (cff2 && format === 4)) {
+      const wide = format === 4,
+        n = wide ? r.u32() : r.u16();
+      r.check(r.pos, n * (wide ? 6 : 3));
+      const ranges = Array.from({ length: n }, () => ({
+        first: wide ? r.u32() : r.u16(),
+        fd: wide ? r.u16() : r.u8(),
+      }));
+      const sentinel = wide ? r.u32() : r.u16();
+      if (!n || ranges[0].first !== 0 || sentinel !== this.glyphCount) fontError('the CFF FDSelect range is invalid');
+      for (let i = 0; i < n; i++) {
+        const end = i + 1 < n ? ranges[i + 1].first : sentinel;
+        if (end <= ranges[i].first || end > this.glyphCount) fontError('the CFF FDSelect ranges are out of order');
+        this.select.fill(ranges[i].fd, ranges[i].first, end);
+      }
+    } else fontError(`CFF FDSelect format ${format} is unknown`, 'unsupported');
+    if (this.select.some((i) => i >= dicts)) fontError('the CFF FDSelect refers to a missing Font DICT');
   }
 
   private readIndex(r: BinaryReader): Uint8Array[] {
@@ -317,11 +351,13 @@ export class CFFOutlines {
       const b = r.u8();
       if (cff2 && b === 23) {
         const n = stack.pop()!;
-        const weights = this.store?.weights(Number(dict.get(22) ?? 0)) ?? fontError('a CFF2 DICT blends with no variation store');
+        const weights =
+          this.store?.weights(Number(dict.get(22) ?? 0)) ?? fontError('a CFF2 DICT blends with no variation store');
         const start = stack.length - n * (weights.length + 1);
         if (!Number.isInteger(n) || n < 1 || start < 0) fontError('a CFF2 DICT blend operand count is invalid');
         for (let i = 0; i < n; i++)
-          for (let j = 0; j < weights.length; j++) stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
+          for (let j = 0; j < weights.length; j++)
+            stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
         stack.length = start + n;
       } else if (b <= (cff2 ? 25 : 21)) {
         const op = b === 12 ? 0x0c00 + r.u8() : b;
@@ -358,7 +394,7 @@ export class CFFOutlines {
 
   /** The glyph's outline in font units: one `'M'` per contour, `'L'` and `'C'` segments, `'Z'` at each close. */
   commands(glyph: number): OutlineCommand[] {
-    const [a, b, c, d, tx, ty] = this.cff2 ? this.fontDicts[this.select[glyph]].matrix : this.matrix;
+    const [a, b, c, d, tx, ty] = this.fontDicts.length ? this.fontDicts[this.select[glyph]].matrix : this.matrix;
     const at = (x: number, y: number): [number, number] => [a * x + c * y + tx, b * x + d * y + ty];
     return this.raw(glyph, false).map((cmd): OutlineCommand => {
       if (cmd[0] === 'M' || cmd[0] === 'L') return [cmd[0], ...at(cmd[1], cmd[2])];
@@ -373,7 +409,7 @@ export class CFFOutlines {
       out: OutlineCommand[] = [];
     if (!charString) return out;
     const cff2 = this.cff2,
-      fontDict = cff2 ? this.fontDicts[this.select[glyphIndex]] : undefined,
+      fontDict = this.fontDicts.length ? this.fontDicts[this.select[glyphIndex]] : undefined,
       stack: number[] = [],
       transient = new Array<number>(32).fill(0);
     let x = 0,
@@ -443,7 +479,8 @@ export class CFFOutlines {
           const start = stack.length - n * (weights.length + 1);
           if (!Number.isInteger(n) || n < 1 || start < 0) fontError('a CFF2 blend operand count is invalid');
           for (let i = 0; i < n; i++)
-            for (let j = 0; j < weights.length; j++) stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
+            for (let j = 0; j < weights.length; j++)
+              stack[start + i] += weights[j] * stack[start + n + i * weights.length + j];
           stack.length = start + n;
         } else if (b === 10 || b === 29) {
           const subrs = (b === 10 ? (fontDict ? fontDict.subrs : this.localSubrs) : this.globalSubrs) ?? [];
@@ -477,6 +514,7 @@ export class CFFOutlines {
           if (stack.length === 4) {
             // endchar with four operands: an accented character from two standard-encoding glyphs (TN #5177, Appendix C).
             if (component || out.length) fontError('a Type 2 endchar composite is nested or follows a path');
+            if (this.cid) fontError('a CID-keyed font has no standard-encoding glyphs for an endchar composite');
             const [dx, dy, base, accent] = stack;
             const resolve = (code: number) => {
               const sid = standardSID(code),
@@ -489,7 +527,9 @@ export class CFFOutlines {
             out.push(...first);
             for (const cmd of second)
               out.push(
-                cmd[0] === 'Z' ? cmd : (cmd.map((v, i) => (i === 0 ? v : (v as number) + (i % 2 ? dx : dy))) as OutlineCommand),
+                cmd[0] === 'Z'
+                  ? cmd
+                  : (cmd.map((v, i) => (i === 0 ? v : (v as number) + (i % 2 ? dx : dy))) as OutlineCommand),
               );
           } else if (stack.length) fontError('a Type 2 endchar has the wrong operand count');
           close();
@@ -556,7 +596,8 @@ export class CFFOutlines {
             }
           } else if (op === 20 || op === 21) {
             const i = pop();
-            if (!Number.isInteger(i) || i < 0 || i >= 32) fontError('a Type 2 transient array index is outside 0 to 31');
+            if (!Number.isInteger(i) || i < 0 || i >= 32)
+              fontError('a Type 2 transient array index is outside 0 to 31');
             if (op === 20) transient[i] = pop();
             else stack.push(transient[i]);
           } else if (op === 22) {
@@ -603,7 +644,8 @@ export class CFFOutlines {
             for (let i = 0; i < n; i += 2) line(v[i], v[i + 1]);
           } else if (b === 6 || b === 7) {
             valid(n >= 1);
-            for (let i = 0; i < n; i++) line((i % 2 === 0) === (b === 6) ? v[i] : 0, (i % 2 === 0) === (b === 7) ? v[i] : 0);
+            for (let i = 0; i < n; i++)
+              line((i % 2 === 0) === (b === 6) ? v[i] : 0, (i % 2 === 0) === (b === 7) ? v[i] : 0);
           } else if (b === 8) {
             valid(n >= 6 && n % 6 === 0);
             for (let i = 0; i < n; i += 6) curve(...(v.slice(i, i + 6) as Six));
@@ -638,7 +680,12 @@ export class CFFOutlines {
             }
           } else fontError(`Type 2 operator ${b} is unknown`, 'unsupported');
         }
-        if (stack.length > (cff2 ? 513 : 48) || stack.some((v) => !Number.isFinite(v)) || !Number.isFinite(x) || !Number.isFinite(y))
+        if (
+          stack.length > (cff2 ? 513 : 48) ||
+          stack.some((v) => !Number.isFinite(v)) ||
+          !Number.isFinite(x) ||
+          !Number.isFinite(y)
+        )
           fontError(`a Type 2 operand is not finite, or the stack exceeds ${cff2 ? 513 : 48}`);
       }
       if (cff2) {

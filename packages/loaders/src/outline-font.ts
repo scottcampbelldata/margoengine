@@ -1,5 +1,6 @@
 import type { Shape } from '@margoengine/geometry/shapes';
 import { type OutlineCommand, type OutlineFillRule, outlineShapes } from './outline.js';
+import { scriptTag } from './sfnt-layout.js';
 import type { FontVariationAxis } from './sfnt-variation.js';
 
 /** One glyph in font units: y up, origin on the baseline at the pen position. */
@@ -30,8 +31,11 @@ export interface OutlineFontSource {
   glyphIndex(codePoint: number): number | undefined;
   /** The glyph at `index` (0 <= index < glyphCount). */
   glyph(index: number): OutlineGlyph;
-  /** Extra advance between two glyph indices, in font units; 0 when the pair has none. */
-  kerning?(left: number, right: number): number;
+  /**
+   * Extra advance between two glyph indices, in font units; 0 when the pair has none. `script` is the OpenType script
+   * tag of the right character ('latn', 'grek', 'cyrl' or 'DFLT').
+   */
+  kerning?(left: number, right: number, script?: string): number;
   /** Glyph drawn for characters the font lacks (TrueType: 0, .notdef). Undefined skips such characters. */
   missingGlyph?: number;
   /** Fill rule of the outlines. Default 'nonzero'. */
@@ -124,7 +128,7 @@ export class OutlineFont {
     const l = this.glyphIndex(left),
       r = this.glyphIndex(right);
     if (l === undefined || r === undefined || !this.source.kerning) return 0;
-    return this.source.kerning(l, r);
+    return this.source.kerning(l, r, scriptTag(String.fromCodePoint(toCodePoint(right))));
   }
 
   /**
@@ -163,8 +167,7 @@ export class OutlineFont {
       for (const char of lines[row]) {
         const index = source.glyphIndex(char.codePointAt(0) as number) ?? source.missingGlyph;
         if (index === undefined) continue;
-        if (kern && previous !== undefined)
-          pen += (source.kerning as (l: number, r: number) => number)(previous, index) * scale;
+        if (kern && previous !== undefined) pen += source.kerning!(previous, index, scriptTag(char)) * scale;
         const glyph = this.decoded(index);
         placed.push({ glyph, x: pen });
         pen += glyph.advance * scale + gap;

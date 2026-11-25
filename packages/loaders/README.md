@@ -398,7 +398,7 @@ const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per
 
 ## Fonts and 3D text
 
-`@margoengine/loaders/font` reads OpenType fonts (TrueType `.ttf`, CFF and CFF2 `.otf`, `.ttc` collections and variable fonts) into an `OutlineFont` and extrudes text with `@margoengine/geometry`. It is Margo's one font outline parser: `@margoengine/text` builds its extruded, vector and outline-field text on it. TrueType fonts read with this entry alone; the CFF, CFF2 and variation readers are a separate entry, `@margoengine/loaders/font-opentype`, so an app that ships only `.ttf` files does not download them (7.6 KB gzip against 14.3 KB with the readers).
+`@margoengine/loaders/font` reads OpenType fonts (TrueType `.ttf`, CFF and CFF2 `.otf`, `.ttc` collections and variable fonts) into an `OutlineFont` and extrudes text with `@margoengine/geometry`. It is Margo's one font outline parser: `@margoengine/text` builds its extruded, vector and outline-field text on it. TrueType fonts read with this entry alone; the CFF, CFF2 and variation readers are a separate entry, `@margoengine/loaders/font-opentype`, so an app that ships only `.ttf` files does not download them (9.1 KB gzip against 16.0 KB with the readers).
 
 ```ts
 import {parseTTF, textGeometry} from 'margoengine/loaders/font';
@@ -421,14 +421,29 @@ const bold = weight ? parseTTF(bytes, {variations: {wght: Math.min(700, weight.m
 const cff = parseOpenType(await (await fetch('/fonts/SourceSans3-Regular.otf')).arrayBuffer()); // CFF outlines
 ```
 
-- `parseTTF(bytes, {fontIndex, variations})` follows the OpenType specification: `head`, `hhea`, `maxp`, `hmtx`, `loca` (short and long), `glyf` simple and composite glyphs (offsets, scale, x/y scale, 2x2 transforms, point matching, ROUND_XY_TO_GRID, nesting), CFF outlines (Type 2 charstrings with local and global subroutines, hint masks, flex and `endchar` accented characters; Adobe TN #5176 and #5177) and CFF2 outlines (Font DICT selection, `blend` and `vsindex`), `cmap` formats 4 and 12 (Unicode, and symbol fonts at U+F000), `kern` format 0 pairs (Microsoft and Apple headers) and the family and style names. `fontIndex` picks one font of a `.ttc` collection. Glyphs decode on first use: TrueType glyphs as quadratic commands, CFF glyphs as cubic ones, all in font units.
+WOFF and WOFF2 web fonts decode with `@margoengine/loaders/font-woff`, which uses the Brotli decoder of
+`@margoengine/decoders` (an optional peer: install it for this entry):
+
+```ts
+import {decodeWOFF, parseWOFF} from 'margoengine/loaders/font-woff';
+
+const woff2 = await (await fetch('/fonts/SourceSans3.woff2')).arrayBuffer();
+const web = parseWOFF(woff2, {variations: {wght: 700}}); // an OutlineFont, like parseTTF's
+console.log(web.generateShapes('Web', 10).length > 0, web.kerning('T', 'o') < 0); // true true
+const sfnt = decodeWOFF(woff2, {maxBytes: 16 * 1024 * 1024}); // the .ttf or .otf bytes, for any other reader
+console.log(sfnt.length > woff2.byteLength); // true
+```
+
+- `decodeWOFF(bytes, {maxBytes})` follows W3C WOFF 1.0 (zlib table data) and WOFF2 (one Brotli stream, the `glyf`, `loca` and `hmtx` transforms and font collections, which come out as `.ttc` bytes), recomputes table checksums and is synchronous. `maxBytes` (default 256 MiB) bounds the decompressed tables and the rebuilt font; a damaged file throws a `LoaderError` with format `WOFF`. WOFF metadata and private blocks are dropped. `parseWOFF(bytes, options)` is `parseOpenType(decodeWOFF(bytes), options)`.
+
+- `parseTTF(bytes, {fontIndex, variations})` follows the OpenType specification: `head`, `hhea`, `maxp`, `hmtx`, `loca` (short and long), `glyf` simple and composite glyphs (offsets, scale, x/y scale, 2x2 transforms, point matching, ROUND_XY_TO_GRID, nesting), CFF outlines, name-keyed or CID-keyed with FDArray and FDSelect (Type 2 charstrings with local and global subroutines, hint masks, flex and, in name-keyed fonts, `endchar` accented characters; Adobe TN #5176 and #5177) and CFF2 outlines (Font DICT selection, `blend` and `vsindex`), `cmap` formats 4 and 12 (Unicode, and symbol fonts at U+F000), pair kerning from GPOS (the `kern` feature of the character's script: lookup type 2, formats 1 and 2, through extension lookups, the first glyph's XAdvance, with its variation deltas on a variable instance) or, when GPOS has no `kern` feature, `kern` format 0 pairs (Microsoft and Apple headers), and the family and style names. `fontIndex` picks one font of a `.ttc` collection. Glyphs decode on first use: TrueType glyphs as quadratic commands, CFF glyphs as cubic ones, all in font units.
 - Variable fonts: `variations` (default `{}`) maps axis tags to values in the font's `fvar` user units, clamped to each axis; an unknown tag throws a `LoaderError` with code `range`. Normalization follows the specification (16.16, `avar` segment maps, then F2DOT14); `gvar` moves points (untouched points interpolated) and composite offsets, `HVAR` or the `gvar` phantom points move advances, and CFF2 charstrings blend through the ItemVariationStore. `font.variationAxes` lists the axes (empty for a static font).
 - `openType` (default none) carries the CFF, CFF2 and variation readers from `@margoengine/loaders/font-opentype`; `parseOpenType(bytes, options)` and `parseOpenTypeSource(bytes, options)` there are `parseTTF` and `parseTTFSource` with them passed. Without them, TrueType fonts and the default instance of a variable TrueType font read in full (`variationAxes` included, since every delta is 0 there), and a CFF font or a `variations` instance throws a `LoaderError` with code `unsupported` that names the entry.
 - `parseTTFSource(bytes, options)` returns the parser's `OutlineFontSource` without building an `OutlineFont`: glyphs by index, the instance's `variationCoordinates`, and `table(tag)` for raw tables such as `GPOS` and `GSUB`. Use it to drive your own layout or shaper.
 - Budgets: composites nest at most 16 levels and visit at most 4,096 components and 1,000,000 points per glyph; a Type 2 charstring runs at most 100,000 operations, 10 subroutine levels and 96 stem hints. Past one the glyph throws a `LoaderError` with code `limit`.
 - `font.generateShapes(text, size, {letterSpacing, lineHeight, align, kerning})` lays out text with one em = `size`: baseline at y = 0, `\n` for new lines, kerning on by default, `letterSpacing` in ems. Holes come from nesting and the winding rule, not from one fixed contour direction, so fonts written either way round work. Missing characters draw the font's `.notdef` glyph.
 - `textGeometry(text, {font, size, depth, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments, steps})` defaults to size 100, depth 50 and no bevel, and returns `GeometryData` with groups 0 (caps) and 1 (sides).
-- Limits: WOFF and WOFF2, CID-keyed CFF and synthetic CFF fonts throw a `LoaderError` with code `unsupported` (convert them to `.ttf` or plain `.otf`); kerning comes from the `kern` table only (GPOS kerning is not applied); no hinting, ligatures, right-to-left or complex-script shaping (`@margoengine/text` draws screen text).
+- Limits: synthetic CFF fonts throw a `LoaderError` with code `unsupported`, and so do WOFF and WOFF2 bytes given to `parseTTF` (use `parseWOFF`); kerning is pair adjustment only, applied to the first glyph's XAdvance (no GPOS placement, contextual kerning or lookup flags), and a GPOS or GSUB table may list at most 16,384 subtables in the lookups used; no hinting, ligatures, right-to-left or complex-script shaping (`@margoengine/text` draws screen text).
 
 ## SVG
 

@@ -2267,6 +2267,10 @@
       "types": "./dist/loaders/font-opentype.d.ts",
       "import": "./dist/loaders/font-opentype.js"
     },
+    "./loaders/font-woff": {
+      "types": "./dist/loaders/font-woff.d.ts",
+      "import": "./dist/loaders/font-woff.js"
+    },
     "./loaders/svg": {
       "types": "./dist/loaders/svg.d.ts",
       "import": "./dist/loaders/svg.js"

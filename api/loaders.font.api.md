@@ -5,11 +5,37 @@
 ```ts
 import { GeometryData, Shape } from "@margoengine/geometry";
 
+export class BinaryReader {
+    readonly view: DataView;
+    readonly bytes: Uint8Array;
+    pos: number;
+    constructor(bytes: Uint8Array);
+    get length(): number;
+    check(pos: number, length: number): void;
+    slice(pos: number, length: number): BinaryReader;
+    tail(offset: number): BinaryReader;
+    seek(pos: number): void;
+    skip(bytes: number): void;
+    u8(): number;
+    i8(): number;
+    u16(): number;
+    i16(): number;
+    u32(): number;
+    i32(): number;
+    f2(): number;
+    tag(): string;
+}
+
 export interface FontVariationAxis {
     tag: string;
     min: number;
     default: number;
     max: number;
+}
+
+export interface OpenTypeLayout {
+    lookups(script: string, feature: string): readonly number[];
+    subtables(index: number): readonly (readonly [number, BinaryReader])[];
 }
 
 export interface OpenTypeReaders {
@@ -46,7 +72,7 @@ export interface OutlineFontSource {
     styleName?: string;
     glyphIndex(codePoint: number): number | undefined;
     glyph(index: number): OutlineGlyph;
-    kerning?(left: number, right: number): number;
+    kerning?(left: number, right: number, script?: string): number;
     missingGlyph?: number;
     fillRule?: OutlineFillRule;
     variationAxes?: readonly FontVariationAxis[];
@@ -62,6 +88,7 @@ export interface TTFFontSource extends OutlineFontSource {
     readonly variationAxes: readonly FontVariationAxis[];
     readonly variationCoordinates: readonly number[];
     table(tag: string): Uint8Array | undefined;
+    kerning(left: number, right: number, script?: string): number;
 }
 
 export interface TTFParseOptions {
@@ -90,9 +117,17 @@ export interface TextShapeOptions {
     kerning?: boolean;
 }
 
+export type VariationDelta = (outer: number, inner: number) => number;
+
+export function coverageIndex(r: BinaryReader, at: number, glyph: number): number;
+
+export function openTypeLayout(bytes: Uint8Array, extension: number): OpenTypeLayout;
+
 export function parseTTF(input: BinaryInput, options?: TTFParseOptions): OutlineFont;
 
 export function parseTTFSource(input: BinaryInput, options?: TTFParseOptions): TTFFontSource;
+
+export function scriptTag(char: string): string;
 
 export function textGeometry(text: string, options: TextGeometryOptions): GeometryData;
 

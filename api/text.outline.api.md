@@ -140,6 +140,7 @@ class FontOutlines {
     get glyphCount(): number;
     tableBytes(tag: string): Uint8Array | undefined;
     get varied(): boolean;
+    kerning(left: number, right: number, script?: string): number;
     get variationAxes(): readonly FontVariationAxis[];
     withVariations(variations: Readonly<Record<string, number>>): FontOutlines;
     glyphIndex(charOrCode: string | number): number;
