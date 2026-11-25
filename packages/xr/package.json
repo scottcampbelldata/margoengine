@@ -60,6 +60,10 @@
       "types": "./dist/occlusion.d.ts",
       "import": "./dist/occlusion.js"
     },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.js"
+    },
     "./reflection": {
       "types": "./dist/reflection.d.ts",
       "import": "./dist/reflection.js"

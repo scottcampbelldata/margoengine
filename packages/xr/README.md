@@ -245,6 +245,7 @@ Tested with stand-in sessions on real GPUs (`npm run test:gpu:reflection`); not 
 `@margoengine/xr/layers` adds WebXR composition layers, controller vibration and teleport movement. Layers are drawn by the headset's compositor at their own resolution, so text and video stay sharp. Ask for `optionalFeatures: ['layers']`.
 
 - `XRLayers.attach(xr)` then `quad`, `cylinder`, `equirect`, `cube` or `video(element)`: each takes `pixels`, a placement and `content` (an image, a `{left, right}` pair, six cube faces, or a function that draws into each eye's texture). Quads, cylinders and video sit above the scene, equirect and cube skies below it; `isStatic: true` draws once until `redraw()` or the compositor asks. A video or `VideoFrame` as `content` in a browser that takes no video as a copy source (Firefox) is drawn on a canvas each frame and copied from there.
+- Every layer also takes `quality` (`'default'`, `'text-optimized'` or `'graphics-optimized'`, what the compositor favours when it resamples), `blendTextureSourceAlpha` (default true), `chromaticAberrationCorrection` and `mipLevels` (default 1); each is left to the browser when you do not pass it. Use `quality: 'text-optimized'` for menus and captions.
 - `pulse(controller, intensity, milliseconds)` vibrates a controller and resolves false when it has no actuator.
 - `teleportArc(origin, direction, options)` samples the parabola a teleport pointer draws and where it lands; `Locomotion.attach(xr)` moves the player there with `teleport(point, yaw)` and turns with `turn(yaw)`, by offsetting the reference space.
 
@@ -273,6 +274,36 @@ enter.onclick=async()=>{
 ```
 
 Without the browser's layer support `XRLayers.attach` and each layer throw a coded error that names the feature to ask for.
+
+## Session state: blend mode, frame rate, visibility and play area
+
+`@margoengine/xr/session` reads and follows what the WebXR session says about the display and the room, with no rendering of its own.
+
+- `XRSessionState.attach(xr, { signal })` gives `environmentBlendMode` (`'opaque'`, `'additive'` or `'alpha-blend'`), `interactionMode`, `visibility` (`'visible'`, `'visible-blurred'` while a system menu is up, `'hidden'`) with `onVisibilityChange(callback)`, and `frameRate`.
+- `supportedFrameRates` lists the rates the device accepts and `await setFrameRate(rate)` asks for one; a rate not in the list throws a `RangeError`, and a browser without frame rate control rejects with an `unsupported` error.
+- `bounds` is the play area of a `referenceSpace: 'bounded-floor'` session as x and z metres per corner (null otherwise), and `onReset(callback)` runs when the space resets, so you can read `bounds` again.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
+import {XRSessionState} from 'margoengine/xr/session';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=async()=>{
+  await xr.requestSession('immersive-vr',{referenceSpace:'bounded-floor',optionalFeatures:['bounded-floor']});
+  const state=XRSessionState.attach(xr);
+  const fastest=state.supportedFrameRates.at(-1);
+  if(fastest&&fastest!==state.frameRate)await state.setFrameRate(fastest);
+  state.onVisibilityChange((visibility)=>console.log('session is',visibility));
+  console.log(state.environmentBlendMode,state.frameRate,state.bounds);
+  // state.dispose() stops it.
+};
+```
+
+Tested with stand-in sessions; not yet run on a headset.
 
 ## Smooth movement, skinned hands, AR extras and performance
 

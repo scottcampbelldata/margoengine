@@ -44,6 +44,9 @@ export interface XRCompositionLayer {
   readonly layout?: string;
   readonly needsRedraw?: boolean;
   opacity?: number;
+  quality?: string;
+  blendTextureSourceAlpha?: boolean;
+  chromaticAberrationCorrection?: boolean;
   space?: XRSpace;
   destroy(): void;
 }
@@ -89,6 +92,14 @@ interface Common extends LayerPlacement {
   isStatic?: boolean;
   /** Layer opacity 0 to 1. Default 1. */
   opacity?: number;
+  /** What the compositor favours when it resamples the layer: 'default', 'text-optimized' or 'graphics-optimized'. Default the browser's. */
+  quality?: 'default' | 'text-optimized' | 'graphics-optimized';
+  /** Blend the texture's alpha over what is behind it. Default true (the browser's). */
+  blendTextureSourceAlpha?: boolean;
+  /** Ask the compositor to correct chromatic aberration for this layer. Default the browser's. */
+  chromaticAberrationCorrection?: boolean;
+  /** Mip levels of the layer texture, 1 or more; above 1 the compositor filters it at a distance. Default 1. */
+  mipLevels?: number;
 }
 /** Options for {@link XRLayers.quad}. */
 export interface QuadLayerOptions extends Common {
@@ -315,10 +326,24 @@ export class XRLayers {
         isStatic: options.isStatic ?? false,
         ...extra,
       };
+    const { quality, mipLevels } = options;
+    if (quality !== undefined && !['default', 'text-optimized', 'graphics-optimized'].includes(quality))
+      throw new RangeError(
+        `layer quality is 'default', 'text-optimized' or 'graphics-optimized', got ${String(quality)}`,
+      );
+    if (mipLevels !== undefined) {
+      if (!(Number.isInteger(mipLevels) && mipLevels >= 1))
+        throw new RangeError(`layer mipLevels is a whole number from 1, got ${String(mipLevels)}; pass 1 for none`);
+      init.mipLevels = mipLevels;
+    }
     if (cube) init.orientation = point(options.orientation ?? [0, 0, 0, 1]);
     else init.transform = rigid((options as Common).position ?? position, options.orientation);
     const layer = binding[create]!(init);
     if (options.opacity !== undefined) layer.opacity = Math.min(1, Math.max(0, options.opacity));
+    if (quality !== undefined) layer.quality = quality;
+    if (options.blendTextureSourceAlpha !== undefined) layer.blendTextureSourceAlpha = options.blendTextureSourceAlpha;
+    if (options.chromaticAberrationCorrection !== undefined)
+      layer.chromaticAberrationCorrection = options.chromaticAberrationCorrection;
     return this.track(
       layer,
       options.content as LayerContent,
@@ -425,12 +450,10 @@ export class XRLayers {
             const { x, y, width, height } = viewport,
               size = imageSize(source);
             // A video in a browser that refuses one as the source (Firefox) goes through a canvas.
-            copyExternal(
-              host.device,
-              { source },
-              { texture: image.colorTexture, origin: [x, y, base + face] },
-              [Math.min(width, size[0]), Math.min(height, size[1])],
-            );
+            copyExternal(host.device, { source }, { texture: image.colorTexture, origin: [x, y, base + face] }, [
+              Math.min(width, size[0]),
+              Math.min(height, size[1]),
+            ]);
           }
         }
       }

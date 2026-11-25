@@ -400,3 +400,26 @@ test('a packed stereo layer copies its one image for both eyes over the whole te
     assert.deepEqual(targets, [{ x: 0, y: 0, width: texture[0], height: texture[1] }], layout);
   }
 });
+
+test('layer quality, alpha blending, chromatic aberration correction and mip levels reach the compositor layer', () => {
+  const { xr, created } = host(),
+    layers = XRLayers.attach(xr),
+    base = { pixels: [64, 64], content: image(64, 64) };
+  layers.quad({
+    ...base,
+    quality: 'text-optimized',
+    blendTextureSourceAlpha: false,
+    chromaticAberrationCorrection: true,
+    mipLevels: 4,
+  });
+  layers.cylinder(base);
+  assert.equal(created[0].quality, 'text-optimized');
+  assert.equal(created[0].blendTextureSourceAlpha, false);
+  assert.equal(created[0].chromaticAberrationCorrection, true);
+  assert.equal(created[0].init.mipLevels, 4);
+  assert.equal('quality' in created[1], false, 'unset options leave the browser defaults');
+  assert.equal('mipLevels' in created[1].init, false);
+  assert.throws(() => layers.quad({ ...base, quality: 'fast' }), RangeError);
+  assert.throws(() => layers.quad({ ...base, mipLevels: 0 }), RangeError);
+  assert.equal(created.length, 2, 'a refused option creates no layer');
+});
