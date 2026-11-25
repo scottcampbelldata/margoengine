@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-25: two bodies that never touch change each other's paths through a shared floor (KB-PHYS-LOCALITY1, physics kernel, islands)
+
+- **Repro:** `packages/physics/tests/locality.test.js`. A fixed floor, box A (0.6 m) resting on it at the origin and box B (0.4 by 0.8 by 0.4 m) dropped two metres away with a spin; pushing A by 0.05 N s along x before each step moves B's position after 30 steps by 2.2 cm (1.4 cm without B's spin). After 10 or 20 steps, before both boxes are on the floor, B is the same bits; with no floor B is the same bits after 30 steps. For a film this means an unrelated object anywhere on the same ground changes how a shot plays.
+- **Cause:** not yet found. Islands are not the link: fixed bodies insulate them (`kernel/src/island.rs`), so A and B are separate islands. Each island's step must therefore read something shared across the world. The likeliest candidates are a world-wide setting derived from all contacts (the substep count or pass count the world steps every island at), or state indexed by the shared floor's solver row (its contact pairs, warm starts or constraint batches). Each island stepping on its own settings and state is the fix: per-island substeps, with KB-PHYS-SPINFRICTION1.
+- **Owner:** the dynamics lane, with SPINFRICTION1. The test above is marked `todo` (a known failure) and passes when islands step independently; the `todo` comes off with the fix.
+
 ### Open 2026-11-25: a 30-row pyramid at one pass a substep creeps instead of resting (KB-PHYS-PILECREEP1, physics kernel, contact solver)
 
 - **Repro:** `packages/physics/kernel/tests/solver.rs`, `a_pyramid_of_thirty_rows_settles_at_one_pass_a_substep` (465 metre cubes, 4 substeps of one pass, sleeping off, 30 s). With gravity 9.80665 m/s^2 its fastest cube moves at 5.6 mm/s at 30 s (bound 1 mm/s) and the pile has moved 8.9 cm; at 9.81 it passed at 0.59 mm/s, but the 26- and 28-row piles of the same test helper already crept at 1.1 mm/s. Gravity is the only change: the old code with gravity set explicitly to 9.80665 gives the same bits (fastest 3bb76fa9, moved 3db5bae7 as f32 words).
