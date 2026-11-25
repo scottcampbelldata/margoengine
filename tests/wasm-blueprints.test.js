@@ -18,8 +18,19 @@ import {
 
 test('every Rust crate under packages/ is listed as a shipped blueprint or as not shipped', () => {
   assert.deepEqual(unlistedCrates(), []);
-  const crates = [...BLUEPRINTS.map((entry) => entry.crate), ...NOT_SHIPPED];
-  assert.equal(new Set(crates).size, crates.length, 'a crate is listed twice');
+  // One crate may build several blueprints (a SIMD and a scalar kernel), but each blueprint and each name once, and no
+  // crate both shipped and not shipped.
+  const shipped = new Set(BLUEPRINTS.map((entry) => entry.crate));
+  for (const key of ['name', 'blueprint']) {
+    const values = BLUEPRINTS.map((entry) => entry[key]);
+    assert.equal(new Set(values).size, values.length, `a blueprint ${key} is listed twice`);
+  }
+  assert.equal(new Set(NOT_SHIPPED).size, NOT_SHIPPED.length, 'a crate is listed twice as not shipped');
+  assert.deepEqual(
+    NOT_SHIPPED.filter((crate) => shipped.has(crate)),
+    [],
+    'a crate is listed both as shipped and as not shipped',
+  );
 });
 
 /** A one-crate repository with a valid blueprint and its record. */

@@ -220,11 +220,7 @@ export const BLUEPRINTS = [
 ];
 
 /** Crates that are Rust but ship no Wasm of their own: a library others reach by path, a test-only kernel, a check. */
-export const NOT_SHIPPED = [
-  'packages/physics/kernel-common',
-  'packages/physics2d/kernel',
-  'packages/physics2d/kernel/wasm-check',
-];
+export const NOT_SHIPPED = ['packages/physics/kernel-common', 'packages/physics2d/kernel/wasm-check'];
 
 /** The repo path of an entry's record. */
 export const recordPath = (entry) => entry.record ?? `${entry.blueprint}.json`;
