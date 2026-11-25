@@ -1,7 +1,7 @@
 // Scene queries: rays, points, overlaps and shape casts against boxes, circles, capsules, rounded boxes and chains, with
 // the filters (groups, kinds, excluded shape and body).
 use margoengine_physics2d_kernel::math::{Rot, V2, Xf, v2};
-use margoengine_physics2d_kernel::query::{EXCLUDE_DYNAMIC, EXCLUDE_FIXED, EXCLUDE_SENSORS, QueryFilter, ray_core};
+use margoengine_physics2d_kernel::query::{CastOptions, EXCLUDE_DYNAMIC, EXCLUDE_FIXED, EXCLUDE_SENSORS, QueryFilter, ray_core};
 use margoengine_physics2d_kernel::shape::Core;
 use margoengine_physics2d_kernel::world::{BodyDef, Kind, ShapeDef, World};
 
@@ -253,4 +253,82 @@ fn a_body_changes_kind_and_is_weighed_or_stopped() {
         world.step(1.0 / 60.0).unwrap();
     }
     assert_eq!(world.bodies[b as usize].xf.p.y, y, "and stops once static");
+}
+
+fn floor_and_ball() -> (World, u32, Core) {
+    let mut world = World::default();
+    let ground = world.create_body(&at(0.0, -1.0)).unwrap();
+    let floor = world.create_shape(ground, Core::rect(10.0, 1.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    (world, floor, Core::circle(V2::ZERO, 0.5).unwrap())
+}
+
+#[test]
+fn a_shape_cast_with_a_target_distance_stops_short_by_that_much_and_reports_the_gap() {
+    let (mut world, _, ball) = floor_and_ball();
+    let f = QueryFilter::default();
+    let from = Xf { p: v2(0.0, 5.0), q: Rot::IDENTITY };
+    let down = v2(0.0, -1.0);
+    // The ball's underside meets the floor's top (y = 0) after 4.5; with a target distance of 0.25 it stops 0.25 short of it.
+    let touch = world.shape_cast_all_with(&ball, from, down, 20.0, &CastOptions::default(), &f).unwrap()[0];
+    assert!(near_loose(touch.t, 4.5) && near_loose(touch.gap, 0.0), "{touch:?}");
+    let short = world.shape_cast_all_with(&ball, from, down, 20.0, &CastOptions { target_distance: 0.25, ..Default::default() }, &f).unwrap()[0];
+    assert!(near_loose(short.t, 4.25) && near_loose(short.gap, 0.25), "{short:?}");
+    // The closest points are those of the two surfaces at the hit: the ball's underside 0.25 above the floor's top.
+    assert!(near_loose(short.point_a.y, 0.25) && near_loose(short.point_b.y, 0.0) && near_loose(short.point_a.x, 0.0), "{short:?}");
+    // A cast too short to get within the target distance finds nothing; one that is within it at the start is met at 0.
+    assert!(world.shape_cast_all_with(&ball, from, down, 4.2, &CastOptions { target_distance: 0.25, ..Default::default() }, &f).unwrap().is_empty());
+    let close = Xf { p: v2(0.0, 0.6), q: Rot::IDENTITY };
+    let at_start = world.shape_cast_all_with(&ball, close, down, 20.0, &CastOptions { target_distance: 0.25, ..Default::default() }, &f).unwrap()[0];
+    assert_eq!(at_start.t, 0.0);
+    assert!(near_loose(at_start.gap, 0.1), "{at_start:?}");
+    assert!(world.shape_cast_all_with(&ball, from, down, 20.0, &CastOptions { target_distance: -1.0, ..Default::default() }, &f).is_err());
+}
+
+#[test]
+fn a_shape_cast_that_does_not_stop_at_penetration_ignores_a_shape_it_overlaps_and_leaves() {
+    let (mut world, floor, ball) = floor_and_ball();
+    let f = QueryFilter::default();
+    // The ball sits 0.3 deep in the floor (its centre 0.2 above the top, its radius 0.5).
+    let sunk = Xf { p: v2(0.0, 0.2), q: Rot::IDENTITY };
+    let (stop, go) = (CastOptions::default(), CastOptions { stop_at_penetration: false, ..Default::default() });
+    // Cast down, deeper: a hit at 0 either way. Cast up, out of it: a hit at 0 when stopping at penetration, nothing when not.
+    for options in [stop, go] {
+        let deeper = world.shape_cast_all_with(&ball, sunk, v2(0.0, -1.0), 20.0, &options, &f).unwrap();
+        assert!(deeper.len() == 1 && deeper[0].t == 0.0 && deeper[0].shape == floor && near_loose(deeper[0].gap, -0.3), "{deeper:?}");
+    }
+    let out = world.shape_cast_all_with(&ball, sunk, v2(0.0, 1.0), 20.0, &stop, &f).unwrap();
+    assert!(out.len() == 1 && out[0].t == 0.0, "{out:?}");
+    assert!(world.shape_cast_all_with(&ball, sunk, v2(0.0, 1.0), 20.0, &go, &f).unwrap().is_empty());
+}
+
+#[test]
+fn projecting_a_point_inside_a_shape_that_is_not_solid_gives_its_nearest_surface_point() {
+    let mut world = World::default();
+    let f = QueryFilter::default();
+    let a = world.create_body(&at(0.0, 0.0)).unwrap();
+    let boxed = world.create_shape(a, Core::rect(2.0, 1.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    // Inside the box at (0.5, 0.2): the top face (y = 1) is 0.8 away, the right face 1.5.
+    let solid = world.project_point_all_with(v2(0.5, 0.2), true, &f).unwrap();
+    assert!(solid[0].inside && solid[0].distance == 0.0 && near(solid[0].point.x, 0.5) && near(solid[0].point.y, 0.2));
+    let hollow = world.project_point_all_with(v2(0.5, 0.2), false, &f).unwrap();
+    assert!(hollow[0].shape == boxed && hollow[0].inside && near(hollow[0].point.x, 0.5) && near(hollow[0].point.y, 1.0) && near(hollow[0].distance, 0.8), "{hollow:?}");
+    // A point outside is the same either way.
+    let outside = world.project_point_all_with(v2(5.0, 0.0), false, &f).unwrap();
+    assert!(!outside[0].inside && near(outside[0].point.x, 2.0) && near(outside[0].distance, 3.0));
+    // A rounded box (radius 0.5) puts the surface out by the radius: the top is at 1.5.
+    let b = world.create_body(&at(20.0, 0.0)).unwrap();
+    world.create_shape(b, Core::rect(2.0, 1.0, V2::ZERO, 1.0, 0.0, 0.5).unwrap(), &ShapeDef::default()).unwrap();
+    let rounded = world.project_point_all_with(v2(20.5, 0.2), false, &f).unwrap();
+    let rounded = rounded.iter().find(|h| h.shape != boxed).unwrap();
+    assert!(near(rounded.point.x, 20.5) && near(rounded.point.y, 1.5) && near(rounded.distance, 1.3), "{rounded:?}");
+    // Inside the radius but outside the core: (22.2, 0) is 0.2 from the core's right face (x = 22), so the surface is at 22.5.
+    let beside = world.project_point_all_with(v2(22.2, 0.0), false, &f).unwrap();
+    let beside = beside.iter().find(|h| h.shape != boxed).unwrap();
+    assert!(near(beside.point.x, 22.5) && near(beside.point.y, 0.0) && beside.inside, "{beside:?}");
+    // A ball: the point (3.5, 0) in a ball of radius 2 about (3, 0) projects to (5, 0).
+    let c = world.create_body(&at(100.0, 0.0)).unwrap();
+    world.create_shape(c, Core::circle(V2::ZERO, 2.0).unwrap(), &ShapeDef::default()).unwrap();
+    let ball = world.project_point_all_with(v2(100.5, 0.0), false, &f).unwrap();
+    let ball = ball.iter().find(|h| h.point.x > 50.0).unwrap();
+    assert!(near(ball.point.x, 102.0) && near(ball.distance, 1.5), "{ball:?}");
 }

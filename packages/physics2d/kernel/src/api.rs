@@ -10,7 +10,7 @@ use crate::decompose::decompose;
 use crate::error::PhysicsError;
 use crate::joint::{JointDef, JointKind, Motor};
 use crate::math::{Rot, V2, Xf, v2};
-use crate::query::QueryFilter;
+use crate::query::{CastOptions, QueryFilter};
 use crate::shape::Core;
 use crate::world::{BodyDef, ContactMod, EventKind, Hook, Kind, Settings, ShapeDef, World};
 
@@ -628,21 +628,22 @@ pub extern "C" fn shape_overlap(handle: i32, kind: u32) -> i32 {
     })
 }
 
-/// io: as `shape_overlap` up to word 7, then the unit direction (words 8 and 9), the distance (10) and the shape from
-/// word 11. Writes each hit as eight words (shape, distance, point on the cast shape x y, point on the hit shape
-/// x y, normal x y), nearest first.
+/// io: as `shape_overlap` up to word 7, then the unit direction (words 8 and 9), the distance (10), the target distance (11),
+/// whether to stop at a penetration (bit 0 of word 12) and the shape from word 13. Writes each hit as nine words (shape, distance, point on the cast shape x y, point on the hit shape
+/// x y, normal x y, the gap between the shapes there), nearest first.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
     with_world!(handle, |w| {
         let (filter, xf) = (filter_at(0), Xf { p: point(4), q: Rot { c: f(6), s: f(7) } });
         let (dir, max) = (point(8), f(10));
-        let core = read_core(kind, 11)?;
-        let hits = w.shape_cast_all(&core, xf, dir, max, &filter)?;
-        ensure(8 * hits.len());
+        let options = CastOptions { target_distance: f(11), stop_at_penetration: io()[12] & 1 != 0 };
+        let core = read_core(kind, 13)?;
+        let hits = w.shape_cast_all_with(&core, xf, dir, max, &options, &filter)?;
+        ensure(9 * hits.len());
         for (i, h) in hits.iter().enumerate() {
-            io()[8 * i] = h.shape;
-            for (k, value) in [h.t, h.point_a.x, h.point_a.y, h.point_b.x, h.point_b.y, h.normal.x, h.normal.y].into_iter().enumerate() {
-                put(8 * i + 1 + k, value);
+            io()[9 * i] = h.shape;
+            for (k, value) in [h.t, h.point_a.x, h.point_a.y, h.point_b.x, h.point_b.y, h.normal.x, h.normal.y, h.gap].into_iter().enumerate() {
+                put(9 * i + 1 + k, value);
             }
         }
         Ok(hits.len() as i32)
@@ -782,13 +783,14 @@ pub extern "C" fn body_set_kind(handle: i32, body: u32, kind: u32) -> i32 {
     with_world!(handle, |w| w.set_body_kind(body, kind_of(kind)?).map(|()| 0))
 }
 
-/// io: the filter (4 words), the point. Writes every accepted shape with its closest point, nearest first, five words each:
+/// io: the filter (4 words), the point, and word 6 whether a point inside a shape projects to itself (1) or to its surface (0). Writes every
+/// accepted shape with its closest point, nearest first, five words each:
 /// shape, point x, point y, distance, inside (u32); returns how many.
 #[unsafe(no_mangle)]
 pub extern "C" fn project_point(handle: i32) -> i32 {
     with_world!(handle, |w| {
-        let (filter, p) = (filter_at(0), point(4));
-        let all = w.project_point_all(p, &filter)?;
+        let (filter, p, solid) = (filter_at(0), point(4), io()[6] != 0);
+        let all = w.project_point_all_with(p, solid, &filter)?;
         ensure(5 * all.len());
         for (i, hit) in all.iter().enumerate() {
             io()[5 * i] = hit.shape;

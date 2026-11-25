@@ -10,7 +10,8 @@ const run = (physics, steps) => {
   for (let i = 0; i < steps; i++) physics.step();
 };
 const fixed = (physics, colliders, position = [0, 0]) => physics.addBody(null, { type: 'fixed', position, colliders });
-const drop = (physics, x, y, radius = 4) => physics.addBody(null, { position: [x, y], colliders: { shape: 'circle', radius } });
+const drop = (physics, x, y, radius = 4) =>
+  physics.addBody(null, { position: [x, y], colliders: { shape: 'circle', radius } });
 
 test('a triangle is a solid collider and a rounded box has round corners', () => {
   const physics = world();
@@ -25,7 +26,10 @@ test('a triangle is a solid collider and a rounded box has round corners', () =>
   fixed(round, { shape: 'box', width: 20, height: 20, borderRadius: 6 });
   assert.equal(round.overlapPoint([15, 0]).length, 1, 'the border grows the box by 6 on a side');
   assert.equal(round.overlapPoint([15.9, 15.9]).length, 0, 'but the corner is round');
-  assert.throws(() => round.addBody(null, { colliders: { shape: 'box', width: 2, height: 2, borderRadius: -1 } }), RangeError);
+  assert.throws(
+    () => round.addBody(null, { colliders: { shape: 'box', width: 2, height: 2, borderRadius: -1 } }),
+    RangeError,
+  );
   round.dispose();
 });
 
@@ -53,10 +57,40 @@ test('a compound collider is one collider of several parts with one mass', () =>
 
 test('a trimesh takes triangles by index and refuses bad ones', () => {
   const physics = world();
-  fixed(physics, { shape: 'trimesh', vertices: [[-50, 0], [50, 0], [50, 20], [-50, 20]], indices: [0, 1, 2, 0, 2, 3] }, [0, 100]);
+  fixed(
+    physics,
+    {
+      shape: 'trimesh',
+      vertices: [
+        [-50, 0],
+        [50, 0],
+        [50, 20],
+        [-50, 20],
+      ],
+      indices: [0, 1, 2, 0, 2, 3],
+    },
+    [0, 100],
+  );
   assert.equal(physics.overlapPoint([0, 110]).length, 1);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh', vertices: [[0, 0]], indices: [0, 1, 2] } }), RangeError);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'trimesh', vertices: [[0, 0], [1, 1], [2, 2]], indices: [0, 1, 2] } }), RangeError);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'trimesh', vertices: [[0, 0]], indices: [0, 1, 2] } }),
+    RangeError,
+  );
+  assert.throws(
+    () =>
+      physics.addBody(null, {
+        colliders: {
+          shape: 'trimesh',
+          vertices: [
+            [0, 0],
+            [1, 1],
+            [2, 2],
+          ],
+          indices: [0, 1, 2],
+        },
+      }),
+    RangeError,
+  );
   const ball = drop(physics, 0, 0);
   run(physics, 240);
   assert.ok(Math.abs(ball.position[1] - 96) < 1, `rests on the mesh at ${ball.position[1]}`);
@@ -67,11 +101,17 @@ test('a heightfield is smooth terrain a ball rolls down', () => {
   const physics = world();
   // A slope from y 100 on the left to y 200 on the right across 400 units.
   fixed(physics, { shape: 'heightfield', heights: [100, 125, 150, 175, 200], width: 400 });
-  const ball = physics.addBody(null, { position: [-190, 80], colliders: { shape: 'circle', radius: 6, friction: 0.2 } });
+  const ball = physics.addBody(null, {
+    position: [-190, 80],
+    colliders: { shape: 'circle', radius: 6, friction: 0.2 },
+  });
   run(physics, 240);
   assert.ok(ball.position[0] > -100, `rolled right to ${ball.position[0]}`);
   assert.ok(physics.raycast([0, 0], [0, 1]).distance > 140 && physics.raycast([0, 0], [0, 1]).distance < 160);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'heightfield', heights: [1], width: 10 } }), TypeError);
+  assert.throws(
+    () => physics.addBody(null, { colliders: { shape: 'heightfield', heights: [1], width: 10 } }),
+    TypeError,
+  );
   physics.dispose();
 });
 
@@ -84,7 +124,11 @@ test('a halfspace holds a body and tilts with its normal', () => {
   assert.ok(Math.abs(ball.position[0] - 5000) < 1);
   // A wall: the solid is to the left of x = 300 when the normal points right.
   fixed(physics, { shape: 'halfspace', normal: [1, 0] }, [300, 0]);
-  const rolling = physics.addBody(null, { position: [400, 0], linearVelocity: [-200, 0], colliders: { shape: 'circle', radius: 4 } });
+  const rolling = physics.addBody(null, {
+    position: [400, 0],
+    linearVelocity: [-200, 0],
+    colliders: { shape: 'circle', radius: 4 },
+  });
   physics.update(0);
   run(physics, 120);
   assert.ok(rolling.position[0] > 300, `stopped by the wall at ${rolling.position[0]}`);
@@ -100,23 +144,51 @@ test('voxels merge into outlines: a cup of cells holds a ball', () => {
   assert.equal(physics.overlapPoint([40, 140]).length, 1, 'inside the floor row');
   assert.equal(physics.overlapPoint([8, 120]).length, 1, 'inside the left wall');
   assert.equal(physics.overlapPoint([40, 110]).length, 0, 'in the cup');
-  assert.equal(physics.overlapShape({ shape: 'circle', radius: 3 }, [40, 130]).length, 1, 'a circle reaching the floor row');
+  assert.equal(
+    physics.overlapShape({ shape: 'circle', radius: 3 }, [40, 130]).length,
+    1,
+    'a circle reaching the floor row',
+  );
   assert.equal(physics.projectPoint([8, 120]).inside, true);
   // Contact is by the merged outlines: a ray down the cup meets the top of the floor row, and one through a wall its edge.
-  assert.ok(Math.abs(physics.raycast([40, 0], [0, 1]).distance - 132) < 0.01, 'the cup is open and its floor is at 132');
+  assert.ok(
+    Math.abs(physics.raycast([40, 0], [0, 1]).distance - 132) < 0.01,
+    'the cup is open and its floor is at 132',
+  );
   assert.ok(Math.abs(physics.raycast([-10, 120], [1, 0]).distance - 10) < 0.01, 'the left wall starts at x = 0');
   const ball = drop(physics, 40, 0, 5);
   run(physics, 300);
-  assert.ok(ball.position[0] > 20 && ball.position[0] < 60 && ball.position[1] > 120 && ball.position[1] < 132, `in the cup at ${ball.position}`);
-  assert.throws(() => physics.addBody(null, { colliders: { shape: 'voxels', cellWidth: 1, cellHeight: 1, columns: 2, rows: 2, solid: [1] } }), RangeError);
+  assert.ok(
+    ball.position[0] > 20 && ball.position[0] < 60 && ball.position[1] > 120 && ball.position[1] < 132,
+    `in the cup at ${ball.position}`,
+  );
+  assert.throws(
+    () =>
+      physics.addBody(null, {
+        colliders: { shape: 'voxels', cellWidth: 1, cellHeight: 1, columns: 2, rows: 2, solid: [1] },
+      }),
+    RangeError,
+  );
   physics.dispose();
 });
 
 test('a one-sided polyline is a platform: up through it, then standing on it', () => {
   const physics = world();
   // Left to right, the solid side is up on screen.
-  fixed(physics, { shape: 'polyline', points: [[-100, 100], [0, 100], [100, 100]], oneSided: true });
-  const ball = physics.addBody(null, { position: [0, 160], linearVelocity: [0, -420], colliders: { shape: 'circle', radius: 5, friction: 0 } });
+  fixed(physics, {
+    shape: 'polyline',
+    points: [
+      [-100, 100],
+      [0, 100],
+      [100, 100],
+    ],
+    oneSided: true,
+  });
+  const ball = physics.addBody(null, {
+    position: [0, 160],
+    linearVelocity: [0, -420],
+    colliders: { shape: 'circle', radius: 5, friction: 0 },
+  });
   let top = Infinity;
   for (let i = 0; i < 300; i++) {
     physics.step();
@@ -131,7 +203,13 @@ test('generic and slot joints hold only what they lock', () => {
   const physics = world({ gravity: [0, 320] });
   const pole = physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: [] });
   const on = (type) => {
-    const body = physics.addBody(null, { position: [0, 100], linearVelocity: [60, 0], angularVelocity: 3, canSleep: false, colliders: { shape: 'box', width: 16, height: 8, collisionGroups: 0 } });
+    const body = physics.addBody(null, {
+      position: [0, 100],
+      linearVelocity: [60, 0],
+      angularVelocity: 3,
+      canSleep: false,
+      colliders: { shape: 'box', width: 16, height: 8, collisionGroups: 0 },
+    });
     physics.addJoint(pole, body, type);
     return body;
   };
@@ -141,8 +219,14 @@ test('generic and slot joints hold only what they lock', () => {
   const hang = on({ type: 'generic', lockAngle: true });
   run(physics, 120);
   assert.ok(Math.abs(slot.position[1] - 100) < 0.5 && slot.position[0] > 60, `slot slides: ${slot.position}`);
-  assert.ok(Math.hypot(pin.position[0], pin.position[1] - 100) < 0.5 && Math.abs(pin.angularVelocity) > 1, 'pin spins in place');
-  assert.ok(Math.abs(weld.rotation) < 0.01 && Math.hypot(weld.position[0], weld.position[1] - 100) < 0.5, 'weld holds both');
+  assert.ok(
+    Math.hypot(pin.position[0], pin.position[1] - 100) < 0.5 && Math.abs(pin.angularVelocity) > 1,
+    'pin spins in place',
+  );
+  assert.ok(
+    Math.abs(weld.rotation) < 0.01 && Math.hypot(weld.position[0], weld.position[1] - 100) < 0.5,
+    'weld holds both',
+  );
   assert.ok(Math.abs(hang.rotation) < 0.01 && hang.position[1] > 200, 'angle lock falls and holds its turn');
   assert.throws(() => physics.addJoint(pole, slot, { type: 'wobble' }), TypeError);
   physics.dispose();
@@ -150,7 +234,11 @@ test('generic and slot joints hold only what they lock', () => {
 
 test('lockTranslation holds an axis, follows a teleport and can be freed', () => {
   const physics = world();
-  const bead = physics.addBody(null, { position: [50, 0], lockTranslation: [true, false], colliders: { shape: 'circle', radius: 4 } });
+  const bead = physics.addBody(null, {
+    position: [50, 0],
+    lockTranslation: [true, false],
+    colliders: { shape: 'circle', radius: 4 },
+  });
   bead.linearVelocity = [40, 0];
   run(physics, 120);
   assert.ok(Math.abs(bead.position[0] - 50) < 0.5, `x held at ${bead.position[0]}`);
@@ -163,10 +251,73 @@ test('lockTranslation holds an axis, follows a teleport and can be freed', () =>
   bead.linearVelocity = [60, 0];
   run(physics, 60);
   assert.ok(bead.position[0] > 230, 'free again');
-  const both = physics.addBody(null, { position: [0, 0], lockTranslation: true, colliders: { shape: 'box', width: 10, height: 10 } });
+  const both = physics.addBody(null, {
+    position: [0, 0],
+    lockTranslation: true,
+    colliders: { shape: 'box', width: 10, height: 10 },
+  });
   both.angularVelocity = 2;
   run(physics, 60);
   assert.ok(Math.hypot(...both.position) < 0.5 && Math.abs(both.rotation) > 0.5, 'a fully locked body still turns');
   assert.throws(() => physics.addBody(null, { type: 'fixed', lockTranslation: true }), TypeError);
+  physics.dispose();
+});
+
+test('a rounded triangle and a rounded convex polygon collide and answer queries at their radius, corners round', () => {
+  const physics = world();
+  // A triangle with a flat top edge at y 0 and its point down, and a pentagon, each grown by its border radius.
+  fixed(physics, { shape: 'triangle', a: [-40, 0], b: [40, 0], c: [0, 60], borderRadius: 6 }, [-200, 0]);
+  const pentagon = [
+    [-30, 0],
+    [30, 0],
+    [45, 40],
+    [0, 70],
+    [-45, 40],
+  ];
+  fixed(physics, { shape: 'polygon', points: pentagon, borderRadius: 5 }, [200, 0]);
+  // Straight down onto each flat top: the surface is the radius above the edge.
+  for (const [x, radius] of [
+    [-200, 6],
+    [200, 5],
+  ]) {
+    const hit = physics.raycast([x, -50], [0, 1]);
+    assert.ok(
+      Math.abs(hit.point[1] + radius) < 1e-2,
+      `the top of the shape at ${x} is ${radius} above its edge: ${hit.point[1]}`,
+    );
+    assert.ok(Math.abs(hit.distance - (50 - radius)) < 1e-2, `distance ${hit.distance}`);
+    assert.equal(physics.overlapPoint([x, -radius + 0.5]).length, 1, 'inside the border');
+    assert.equal(physics.overlapPoint([x, -radius - 0.5]).length, 0, 'outside it');
+  }
+  // Along the bisector into a corner: the rounded corner is a circle of the radius about the corner point, not a mitred point.
+  const corner = (x, y, nx, ny, radius, at) => {
+    const length = Math.hypot(nx, ny),
+      d = [nx / length, ny / length],
+      from = [x + at * d[0], y + at * d[1]],
+      hit = physics.raycast(from, [-d[0], -d[1]]);
+    assert.ok(
+      Math.abs(hit.distance - (at - radius)) < 1e-2,
+      `the corner at ${x} is round: ${hit.distance} against ${at - radius}`,
+    );
+    assert.ok(
+      Math.abs(hit.point[0] - (x + radius * d[0])) < 1e-2 && Math.abs(hit.point[1] - (y + radius * d[1])) < 1e-2,
+      `at ${hit.point}`,
+    );
+  };
+  corner(-200 + 40, 0, 1, -1, 6, 30);
+  // The pentagon's corner at (30, 0): between its top edge (outward normal (0, -1)) and the edge to (45, 40), outward normal (40, -15) / 42.72.
+  corner(200 + 30, 0, 40 / Math.hypot(40, 15), -1 - 15 / Math.hypot(40, 15), 5, 30);
+  // Balls dropped on them come to rest the ball's radius above that surface.
+  const balls = [-200, 200].map((x) => drop(physics, x, -60));
+  run(physics, 400);
+  for (const [ball, radius] of [
+    [balls[0], 6],
+    [balls[1], 5],
+  ]) {
+    assert.ok(
+      Math.abs(ball.position[1] + radius + 4) < 0.5,
+      `the ball rests at ${ball.position[1]}, the surface ${radius} above the edge and its own radius 4 more`,
+    );
+  }
   physics.dispose();
 });

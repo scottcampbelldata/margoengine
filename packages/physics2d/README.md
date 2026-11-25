@@ -114,7 +114,7 @@ moon.dispose();
 
 ## Solver settings
 
-`physics.setSolver(options)` changes the solver and `physics.solver` reads it, with the names the 3D world uses: `substeps` a step (default 4), `iterations` (pushing passes a substep, each followed by as many relaxing ones, default 1), the contact spring `contactHertz` and `contactDamping`, `contactMaxPush` (the fastest a depth is pushed out), `restitutionThreshold` (under this approach speed a contact does not bounce), `sleepThreshold` and `sleepTime` with `canSleep`, `blockSolver` (Rapier's block solver: the two points of a contact solved together as one 2 by 2 problem, on by default; off, one point at a time), and the joint spring `jointHertz`, `jointDamping`, `jointMaxPush` with `jointGeometricStiffness`. Speeds are in world units a second. A name left out keeps its value, and a refused one (a count that is not a whole number from 1 to 65535, a negative or non-finite number) throws a `RangeError` and changes nothing. The settings are part of a snapshot.
+`physics.setSolver(options)` changes the solver and `physics.solver` reads it, with the names the 3D world uses: `substeps` a step (default 4), `iterations` (pushing passes a substep, each followed by as many relaxing ones, default 1), the contact spring `contactHertz` and `contactDamping`, `contactMaxPush` (the fastest a depth is pushed out), `restitutionThreshold` (under this approach speed a contact does not bounce), `sleepThreshold` and `sleepTime` with `canSleep`, `blockSolver` (Rapier's block solver: the two points of a contact solved together as one 2 by 2 problem, on by default; off, one point at a time), the joint spring `jointHertz`, `jointDamping`, `jointMaxPush` with `jointGeometricStiffness`, and `maxCcdSubsteps` (how many impacts continuous collision handles in a step: default 1, 0 for off; see below). Speeds are in world units a second. A name left out keeps its value, and a refused one (a count that is not a whole number from 1 to 65535 (0 to 65535 for `maxCcdSubsteps`), a negative or non-finite number) throws a `RangeError` and changes nothing. The settings are part of a snapshot.
 
 ```ts
 import {Physics2D} from 'margoengine/physics2d';
@@ -128,6 +128,31 @@ for (let i = 0; i < 30; i++) physics.step();
 const {substeps, blockSolver} = physics.solver;
 console.log(substeps, blockSolver, physics.counts.blockSolves); // 8 false 0
 physics.dispose();
+```
+
+## Casts, projections and continuous collision
+
+`castShape(shape, position, direction, maxDistance, filter, rotation, {targetDistance, stopAtPenetration})` slides a shape until it is `targetDistance` from a collider (default 0: touching) and returns the hit with the closest points of both shapes (`witnessA`, `witnessB`), their normals, the `gap` between them and a `status`; with `stopAtPenetration` false, a collider the shape already overlaps and is leaving is not a hit. `projectPoint(point, filter, solid)` puts a point inside a collider on its own spot (`solid`, the default) or on the nearest point of its surface. A body with `ccd` is stopped by what it would pass through in a step; `setSolver({maxCcdSubsteps: n})` lets it bounce off up to `n` impacts inside one step.
+
+```ts
+import {Physics2D} from 'margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, {gravity: [0, 0], pixelsPerMeter: 1});
+physics.addBody(null, {type: 'fixed', position: [0, 0], colliders: {shape: 'box', width: 20, height: 2}});
+const hit = physics.castShape({shape: 'circle', radius: 0.5}, [0, 5], [0, -1], 20, undefined, 0, {targetDistance: 0.25});
+console.log(hit?.distance, hit?.gap); // 3.25 0.25: stopped a quarter above the box's top face
+console.log(physics.projectPoint([0.5, 0.2], undefined, false)?.point); // [0.5, 1]: the top face, not the point itself
+physics.dispose();
+
+// A ball at 1000 m/s between two thin walls 6 m apart: with 4 impacts a step it bounces three times inside the one step.
+const corridor = new Physics2D(null, {gravity: [0, 0], pixelsPerMeter: 1});
+for (const x of [-3, 3]) corridor.addBody(null, {type: 'fixed', position: [x, 0], colliders: {shape: 'box', width: 0.1, height: 10, restitution: 1}});
+corridor.setSolver({maxCcdSubsteps: 4});
+const ball = corridor.addBody(null, {ccd: true, linearVelocity: [1000, 0], colliders: {shape: 'circle', radius: 0.1, restitution: 1}});
+corridor.step();
+console.log(Math.round(ball.position[0] * 10) / 10, ball.linearVelocity[0]); // 0.4 -1000: now going left
+corridor.dispose();
 ```
 
 ## What a step did and how long it took

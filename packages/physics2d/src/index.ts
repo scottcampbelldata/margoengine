@@ -19,6 +19,8 @@ export type {
   RaycastOptions2D,
   Hit2D,
   CastHit2D,
+  ShapeCastHit2D,
+  ShapeCastOptions2D,
 } from './physics.js';
 export { Body2D, Collider2D } from './body.js';
 export type { BodyOptions2D, BodyType2D, SpriteLike } from './body.js';

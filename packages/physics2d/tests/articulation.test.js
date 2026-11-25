@@ -12,7 +12,12 @@ const run = (physics, steps) => {
 };
 const anchorBody = (physics) => physics.addBody(null, { type: 'fixed', position: [0, 0], colliders: [] });
 const bob = (physics, options = {}) =>
-  physics.addBody(null, { position: [0, 0], canSleep: false, colliders: { shape: 'circle', radius: 0.1, collisionGroups: 0 }, ...options });
+  physics.addBody(null, {
+    position: [0, 0],
+    canSleep: false,
+    colliders: { shape: 'circle', radius: 0.1, collisionGroups: 0 },
+    ...options,
+  });
 
 /** Total energy of a body set: kinetic, rotational and gravitational (y points down). */
 function energy(bodies) {
@@ -33,7 +38,9 @@ test('a pendulum swings with the period of the physical pendulum', () => {
   const base = anchorBody(physics);
   const L = 2;
   const weight = bob(physics, { position: [L * Math.sin(0.1), L * Math.cos(0.1)], rotation: 0 });
-  const arm = physics.addArticulation(base, [{ body: weight, joint: { type: 'revolute', anchorParent: [0, 0], anchorChild: [0, -L] } }]);
+  const arm = physics.addArticulation(base, [
+    { body: weight, joint: { type: 'revolute', anchorParent: [0, 0], anchorChild: [0, -L] } },
+  ]);
   // The bob's origin is L from the pivot along its own -y at rotation 0: place it so the joint starts nearly satisfied.
   arm.setPositions([-0.1]);
   const crossings = [];
@@ -73,7 +80,10 @@ test('a double pendulum keeps its energy within 3 percent over four seconds', ()
   // The joint space agrees with the bodies: forward kinematics of the positions gives the links' poses.
   const poses = arm.forwardKinematics();
   [a, b].forEach((body, i) => {
-    assert.ok(Math.hypot(poses[i].position[0] - body.position[0], poses[i].position[1] - body.position[1]) < 0.02, `link ${i} pose`);
+    assert.ok(
+      Math.hypot(poses[i].position[0] - body.position[0], poses[i].position[1] - body.position[1]) < 0.02,
+      `link ${i} pose`,
+    );
   });
   physics.dispose();
 });
@@ -82,7 +92,9 @@ test('joint limits hold and a position motor reaches its target', () => {
   const physics = world({ gravity: [0, 0] });
   const base = anchorBody(physics);
   const link = bob(physics, { position: [1, 0] });
-  const arm = physics.addArticulation(base, [{ body: link, joint: { type: 'revolute', anchorChild: [-1, 0], limits: [-0.5, 0.7] } }]);
+  const arm = physics.addArticulation(base, [
+    { body: link, joint: { type: 'revolute', anchorChild: [-1, 0], limits: [-0.5, 0.7] } },
+  ]);
   link.angularVelocity = 4;
   let high = -Infinity;
   for (let i = 0; i < 120; i++) {
@@ -111,7 +123,9 @@ test('a prismatic joint slides along its axis within limits and reports its posi
   const physics = world({ gravity: [0, 0] });
   const base = anchorBody(physics);
   const slider = bob(physics, { position: [0, 0] });
-  const arm = physics.addArticulation(base, [{ body: slider, joint: { type: 'prismatic', axis: [1, 1], limits: [-1, 3] } }]);
+  const arm = physics.addArticulation(base, [
+    { body: slider, joint: { type: 'prismatic', axis: [1, 1], limits: [-1, 3] } },
+  ]);
   slider.linearVelocity = [5, 5];
   run(physics, 120);
   const q = arm.positions()[0];
@@ -128,17 +142,32 @@ test('inverse kinematics puts the tip of a three-link arm on a target inside its
   const links = [];
   const specs = [];
   for (let i = 0; i < 3; i++) {
-    const body = physics.addBody(null, { position: [1 + i * 2, 0], colliders: { shape: 'box', width: 2, height: 0.2, collisionGroups: 0 } });
+    const body = physics.addBody(null, {
+      position: [1 + i * 2, 0],
+      colliders: { shape: 'box', width: 2, height: 0.2, collisionGroups: 0 },
+    });
     links.push(body);
-    specs.push({ body, parent: i - 1, joint: { type: 'revolute', anchorParent: i ? [1, 0] : [0, 0], anchorChild: [-1, 0], limits: [-2.5, 2.5] } });
+    specs.push({
+      body,
+      parent: i - 1,
+      joint: { type: 'revolute', anchorParent: i ? [1, 0] : [0, 0], anchorChild: [-1, 0], limits: [-2.5, 2.5] },
+    });
   }
   const arm = physics.addArticulation(base, specs);
   assert.equal(arm.dof, 3);
   const tip = [1, 0];
-  for (const target of [[3, 3], [-2, 4], [5, -1], [0.5, 0.5]]) {
+  for (const target of [
+    [3, 3],
+    [-2, 4],
+    [5, -1],
+    [0.5, 0.5],
+  ]) {
     const result = arm.solveIK(2, tip, target, { iterations: 200, tolerance: 0.005 });
     assert.ok(result.reached, `reaches ${target}: error ${result.error}`);
-    assert.ok(result.q.every((v) => Math.abs(v) <= 2.5 + 1e-9), 'inside the limits');
+    assert.ok(
+      result.q.every((v) => Math.abs(v) <= 2.5 + 1e-9),
+      'inside the limits',
+    );
     arm.setPositions(result.q);
     const at = arm.pointAt(2, tip);
     assert.ok(Math.hypot(at[0] - target[0], at[1] - target[1]) < 0.01);
@@ -168,13 +197,21 @@ test('a long chain under a heavy end does not stretch, and the Jacobian matches 
   const n = 20;
   for (let i = 0; i < n; i++) {
     const heavy = i === n - 1;
-    const body = physics.addBody(null, { position: [0, i + 0.5], canSleep: false, colliders: { shape: 'circle', radius: 0.08, density: heavy ? 3000 : 1, collisionGroups: 0 } });
+    const body = physics.addBody(null, {
+      position: [0, i + 0.5],
+      canSleep: false,
+      colliders: { shape: 'circle', radius: 0.08, density: heavy ? 3000 : 1, collisionGroups: 0 },
+    });
     bodies.push(body);
-    specs.push({ body, parent: i - 1, joint: { type: 'revolute', anchorParent: i ? [0, 0.5] : [0, 0], anchorChild: [0, -0.5] } });
+    specs.push({
+      body,
+      parent: i - 1,
+      joint: { type: 'revolute', anchorParent: i ? [0, 0.5] : [0, 0], anchorChild: [0, -0.5] },
+    });
   }
   const arm = physics.addArticulation(base, specs);
   run(physics, 300);
-  const length = Math.hypot(bodies[n - 1].position[0], bodies[n - 1].position[1] + 0.5 - 0) ;
+  const length = Math.hypot(bodies[n - 1].position[0], bodies[n - 1].position[1] + 0.5 - 0);
   void length;
   const tip = arm.pointAt(n - 1, [0, 0.5]);
   const reach = Math.hypot(tip[0], tip[1]);
@@ -186,7 +223,10 @@ test('a long chain under a heavy end does not stretch, and the Jacobian matches 
   const dq = q.slice();
   dq[3] += 1e-3;
   const p1 = arm.pointAt(n - 1, [0, 0.5], dq);
-  assert.ok(Math.abs((p1[0] - p0[0]) / 1e-3 - jx[3]) < 0.02 * (1 + Math.abs(jx[3])) && Math.abs((p1[1] - p0[1]) / 1e-3 - jy[3]) < 0.02 * (1 + Math.abs(jy[3])));
+  assert.ok(
+    Math.abs((p1[0] - p0[0]) / 1e-3 - jx[3]) < 0.02 * (1 + Math.abs(jx[3])) &&
+      Math.abs((p1[1] - p0[1]) / 1e-3 - jy[3]) < 0.02 * (1 + Math.abs(jy[3])),
+  );
   physics.dispose();
 });
 
@@ -209,7 +249,11 @@ test('articulation arguments are checked', () => {
 function humanoid(physics, torsoDensity) {
   const hook = physics.addBody(null, { type: 'fixed', position: [0, -6], colliders: [] });
   const body = (x, y, hx, hy, density) =>
-    physics.addBody(null, { position: [x, -y], canSleep: false, colliders: { shape: 'box', width: 2 * hx, height: 2 * hy, density, collisionGroups: 0 } });
+    physics.addBody(null, {
+      position: [x, -y],
+      canSleep: false,
+      colliders: { shape: 'box', width: 2 * hx, height: 2 * hy, density, collisionGroups: 0 },
+    });
   const specs = [];
   const bodies = [];
   const add = (b, parent, anchorParent, anchorChild) => {
@@ -244,8 +288,53 @@ test('a branched tree with a 1000:1 mass ratio across its branch stays closed: e
     if (i < 60) continue;
     // Forward kinematics of the joint positions, from the root, against where the bodies are: the tree is closed when they agree.
     const poses = arm.forwardKinematics();
-    bodies.forEach((b, k) => (worst = Math.max(worst, Math.hypot(poses[k].position[0] - b.position[0], poses[k].position[1] - b.position[1]))));
+    bodies.forEach(
+      (b, k) =>
+        (worst = Math.max(
+          worst,
+          Math.hypot(poses[k].position[0] - b.position[0], poses[k].position[1] - b.position[1]),
+        )),
+    );
   }
   assert.ok(worst < 0.005, `the tree's joints opened by ${worst} m against links of 0.5 m or more`);
+  physics.dispose();
+});
+
+test('an articulation closed by a joint between its last link and the ground holds a parallelogram linkage: coupler parallel, rocker with the crank', () => {
+  const physics = world();
+  const ground = anchorBody(physics);
+  const pin = physics.addBody(null, { type: 'fixed', position: [4, 0], colliders: [] });
+  // Crank AB (1 m) from A = (0, 0), coupler BC (4 m) parallel to the ground, rocker DC (1 m) from D = (4, 0): the crank's turn is the rocker's.
+  const turn = 0.8,
+    [c, s] = [Math.cos(turn), Math.sin(turn)];
+  const crank = bob(physics, { position: [0, 0], rotation: turn });
+  const coupler = bob(physics, { position: [c, s], rotation: 0 });
+  const rocker = bob(physics, { position: [4, 0], rotation: turn });
+  physics.addArticulation(ground, [
+    { body: crank, joint: { type: 'revolute' } },
+    { body: coupler, parent: 0, joint: { type: 'revolute', anchorParent: [1, 0] } },
+    { body: rocker, parent: 1, joint: { type: 'revolute', anchorParent: [4, 0], anchorChild: [1, 0] } },
+  ]);
+  // The loop: the rocker's foot is pinned to the ground at D by an ordinary joint, closing the ring the articulation left open.
+  physics.addJoint(rocker, pin, { type: 'revolute' });
+  const worst = { parallel: 0, equal: 0, foot: 0, closed: 0 };
+  let swung = 0;
+  for (let i = 0; i < 360; i++) {
+    physics.step();
+    const [a, b, r] = [crank.rotation, coupler.rotation, rocker.rotation];
+    worst.parallel = Math.max(worst.parallel, Math.abs(b));
+    worst.equal = Math.max(worst.equal, Math.abs(r - a));
+    worst.foot = Math.max(worst.foot, Math.hypot(rocker.position[0] - 4, rocker.position[1]));
+    // The coupler's far end (4 m along it) is the rocker's far end (1 m along it).
+    const end = [coupler.position[0] + 4 * Math.cos(b), coupler.position[1] + 4 * Math.sin(b)];
+    const top = [rocker.position[0] + Math.cos(r), rocker.position[1] + Math.sin(r)];
+    worst.closed = Math.max(worst.closed, Math.hypot(end[0] - top[0], end[1] - top[1]));
+    swung = Math.max(swung, Math.abs(a - turn));
+  }
+  assert.ok(swung > 0.3, `gravity swings the linkage: ${swung}`);
+  assert.ok(worst.parallel < 0.02, `the coupler stays parallel to the ground: ${worst.parallel} rad`);
+  assert.ok(worst.equal < 0.02, `the rocker turns with the crank: ${worst.equal} rad`);
+  assert.ok(worst.foot < 0.02, `the rocker's foot stays on its pin: ${worst.foot} m`);
+  assert.ok(worst.closed < 0.02, `the coupler and the rocker stay joined: ${worst.closed} m`);
   physics.dispose();
 });

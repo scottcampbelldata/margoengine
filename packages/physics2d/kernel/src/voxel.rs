@@ -45,6 +45,11 @@ impl Grid {
     }
 
     #[inline]
+    /// Whether cell (c, r) is filled; false outside the grid.
+    pub fn is_filled(&self, c: i64, r: i64) -> bool {
+        self.filled(c, r)
+    }
+
     fn filled(&self, c: i64, r: i64) -> bool {
         c >= 0 && r >= 0 && c < self.cols as i64 && r < self.rows as i64 && self.solid[r as usize * self.cols as usize + c as usize] != 0
     }

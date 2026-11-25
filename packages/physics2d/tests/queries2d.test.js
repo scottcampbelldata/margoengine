@@ -91,3 +91,109 @@ test('raycastAll agrees with Rapier 2D: the same hits in the same order on a ran
     mine.forEach((d, i) => near(d, theirs[i], 1e-3, `distance ${i} of ray ${k}`));
   }
 });
+
+/** A fixed floor (a box 20 by 2, top face at y 1) and a ball of radius 0.5 to cast at it. */
+function floorScene() {
+  const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 0] });
+  const floor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0],
+    colliders: { shape: 'box', width: 20, height: 2 },
+  });
+  return { physics, floor };
+}
+const ball = { shape: 'circle', radius: 0.5 };
+
+test('a shape cast stops targetDistance short, gives the closest points of both shapes and says how it ended', () => {
+  const { physics, floor } = floorScene();
+  const touch = physics.castShape(ball, [0, 5], [0, -1], 20);
+  near(touch.distance, 3.5, 1e-3, 'distance to touch');
+  near(touch.gap, 0, 1e-3, 'gap at touch');
+  assert.equal(touch.status, 'converged');
+  assert.equal(touch.body, floor);
+  const short = physics.castShape(ball, [0, 5], [0, -1], 20, undefined, 0, { targetDistance: 0.25 });
+  near(short.distance, 3.25, 1e-3, 'stops 0.25 short');
+  near(short.gap, 0.25, 1e-3, 'the gap is the target distance');
+  // The closest points: the ball's underside 0.25 over the floor's top face.
+  near(short.witnessA[1], 1.25, 1e-3, 'witness on the ball');
+  near(short.witnessB[1], 1, 1e-3, 'witness on the floor');
+  near(short.witnessA[0], 0, 1e-3, 'straight under it');
+  assert.deepEqual(short.normalA, [0, -1], 'the ball faces down toward the floor');
+  assert.deepEqual(short.normalB, [0, 1], 'the floor faces up toward the ball');
+  assert.deepEqual(short.normal, short.normalB);
+  assert.deepEqual(short.point, short.witnessB, 'point is the witness on the collider met');
+  assert.equal(
+    physics.castShape(ball, [0, 5], [0, -1], 3.2, undefined, 0, { targetDistance: 0.25 }),
+    null,
+    'too short to get that close',
+  );
+  assert.throws(() => physics.castShape(ball, [0, 5], [0, -1], 20, undefined, 0, { targetDistance: -1 }), RangeError);
+  physics.dispose();
+});
+
+test('a cast that does not stop at penetration ignores a collider it overlaps and is leaving', () => {
+  const { physics } = floorScene();
+  // The ball is sunk 0.3 into the floor: centre 1.2 (the top face is at 1, the ball's radius 0.5).
+  const sunk = [0, 1.2];
+  const into = (options) => physics.castShape(ball, sunk, [0, -1], 20, undefined, 0, options);
+  const out = (options) => physics.castShape(ball, sunk, [0, 1], 20, undefined, 0, options);
+  for (const options of [{}, { stopAtPenetration: false }]) {
+    const hit = into(options);
+    assert.equal(hit.distance, 0, 'sinking deeper meets it at once');
+    assert.equal(hit.status, 'penetrating');
+    near(hit.gap, -0.3, 1e-3, 'by how deep it is');
+  }
+  assert.equal(out({}).distance, 0, 'by default it stops at the overlap even leaving it');
+  assert.equal(out({ stopAtPenetration: false }), null, 'with the option off, leaving it is not a hit');
+  physics.dispose();
+});
+
+test('projectPoint with solid off puts a point inside a collider on its nearest surface point', () => {
+  const { physics, floor } = floorScene();
+  const solid = physics.projectPoint([0.5, 0.2]);
+  assert.ok(solid.inside && solid.distance === 0, 'solid by default: a point inside is its own projection');
+  const hollow = physics.projectPoint([0.5, 0.2], undefined, false);
+  assert.ok(hollow.inside && hollow.body === floor, 'still inside');
+  near(hollow.point[0], 0.5, 1e-4, 'x');
+  near(hollow.point[1], 1, 1e-4, 'the top face is 0.8 above the point, the bottom 1.2');
+  near(hollow.distance, 0.8, 1e-4, 'the way to the surface');
+  physics.dispose();
+});
+
+test('shape cast and point projection agree with Rapier 2D: target distance, stop at penetration and a hollow projection', {
+  skip,
+}, () => {
+  const { physics } = floorScene();
+  const world = new R.World({ x: 0, y: 0 });
+  world.createCollider(R.ColliderDesc.cuboid(10, 1), world.createRigidBody(R.RigidBodyDesc.fixed()));
+  world.step();
+  const shape = new R.Ball(0.5);
+  for (const [from, dir, target, stop] of [
+    [[0, 5], [0, -1], 0, true],
+    [[0, 5], [0, -1], 0.25, true],
+    [[3, 4], [-0.6, -0.8], 0.1, true],
+    [[0, 1.2], [0, 1], 0, true],
+    [[0, 1.2], [0, 1], 0, false],
+    [[0, 1.2], [0, -1], 0, false],
+    [[0, 5], [0, 1], 0, true],
+  ]) {
+    const mine = physics.castShape(ball, from, dir, 20, undefined, 0, {
+      targetDistance: target,
+      stopAtPenetration: stop,
+    });
+    const theirs = world.castShape({ x: from[0], y: from[1] }, 0, { x: dir[0], y: dir[1] }, shape, target, 20, stop);
+    const label = `from ${from} along ${dir} target ${target} stop ${stop}`;
+    assert.equal(mine === null, theirs === null, `${label}: a hit or not`);
+    if (mine) near(mine.distance, theirs.time_of_impact, 1e-3, label);
+  }
+  const rapier = new R.World({ x: 0, y: 0 });
+  rapier.createCollider(R.ColliderDesc.cuboid(10, 1), rapier.createRigidBody(R.RigidBodyDesc.fixed()));
+  rapier.step();
+  for (const solid of [true, false]) {
+    const mine = physics.projectPoint([0.5, 0.7], undefined, solid);
+    const theirs = rapier.projectPoint({ x: 0.5, y: 0.7 }, solid);
+    near(mine.point[0], theirs.point.x, 1e-4, `x with solid ${solid}`);
+    near(mine.point[1], theirs.point.y, 1e-4, `y with solid ${solid}`);
+    assert.equal(mine.inside, theirs.isInside);
+  }
+});

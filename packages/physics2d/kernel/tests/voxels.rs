@@ -103,3 +103,19 @@ fn a_grid_touches_nothing_weighs_nothing_and_survives_a_snapshot() {
     assert!(Grid::new(2, 2, v2(0.0, 1.0), V2::ZERO, &[0]).is_none());
     assert!(w.create_voxels(0, Grid::new(2, 2, v2(1.0, 1.0), V2::ZERO, &[0]).unwrap(), &ShapeDef::default()).is_err(), "no cell is filled");
 }
+
+#[test]
+fn a_point_inside_a_grid_that_is_not_solid_goes_to_the_edge_of_the_cells_together() {
+    // The cup's left wall is the column 0..1 over rows 0..3 and its floor the row 2..3: a point in the wall at (0.9, 1.5) is 0.1 from the wall's inner
+    // face at x = 1, and the wall's left face is 0.9 away. The cell edge between the wall and the floor, at y = 2, is not a surface.
+    let (mut w, _) = world_with(cup(), v2(10.0, 20.0));
+    let f = QueryFilter::default();
+    let hollow = w.project_point_all_with(v2(10.9, 21.5), false, &f).unwrap();
+    assert!(hollow[0].inside && near(hollow[0].point.x, 11.0) && near(hollow[0].point.y, 21.5) && near(hollow[0].distance, 0.1), "{hollow:?}");
+    // A point in the floor row's left end, (0.5, 2.9): the bottom face (y = 3) is 0.1 away; the wall above it is part of the same solid.
+    let low = w.project_point_all_with(v2(10.5, 22.9), false, &f).unwrap();
+    assert!(near(low[0].point.y, 23.0) && near(low[0].point.x, 10.5) && near(low[0].distance, 0.1), "{low:?}");
+    // Solid, the same point is its own projection.
+    let solid = w.project_point_all_with(v2(10.9, 21.5), true, &f).unwrap();
+    assert!(solid[0].inside && solid[0].distance == 0.0);
+}

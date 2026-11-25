@@ -457,7 +457,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     get hooks(): Physics2DHooks | null;
     set hooks(value: Physics2DHooks | null);
     retype(body: Body2D, type: BodyType2D): void;
-    projectPoint(point: Vec2D, filter?: QueryFilter2D): ProjectedPoint2D | null;
+    projectPoint(point: Vec2D, filter?: QueryFilter2D, solid?: boolean): ProjectedPoint2D | null;
     intersectionsWithBox(min: Vec2D, max: Vec2D, filter?: QueryFilter2D): Body2D[];
     contactPairs(collider: Collider2D): ContactPair2D[];
     contactPair(a: Collider2D, b: Collider2D): ContactPair2D | null;
@@ -473,8 +473,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     raycastAll(origin: Vec2D, direction: Vec2D, options?: RaycastOptions2D): CastHit2D[];
     overlapPoint(point: Vec2D, filter?: QueryFilter2D): Body2D[];
     overlapShape(shape: ShapeOptions2D, position: Vec2D, rotation?: number, filter?: QueryFilter2D): Body2D[];
-    castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D, rotation?: number): CastHit2D | null;
-    cast(d: Described, x: number, y: number, angle: number, dx: number, dy: number, max: number, filter?: QueryFilter2D): CastHit2D | null;
+    castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D, rotation?: number, options?: ShapeCastOptions2D): ShapeCastHit2D | null;
+    cast(d: Described, x: number, y: number, angle: number, dx: number, dy: number, max: number, filter?: QueryFilter2D, options?: ShapeCastOptions2D): ShapeCastHit2D | null;
     snapshot(): Uint8Array;
     restore(bytes: Uint8Array): void;
     debugRender(options?: {
@@ -580,6 +580,20 @@ export interface QueryFilter2D {
 export interface RaycastOptions2D extends QueryFilter2D {
     maxDistance?: number;
     solid?: boolean;
+}
+
+export interface ShapeCastHit2D extends CastHit2D {
+    witnessA: [number, number];
+    witnessB: [number, number];
+    normalA: [number, number];
+    normalB: [number, number];
+    gap: number;
+    status: 'converged' | 'penetrating';
+}
+
+export interface ShapeCastOptions2D {
+    targetDistance?: number;
+    stopAtPenetration?: boolean;
 }
 
 export type ShapeOptions2D = {

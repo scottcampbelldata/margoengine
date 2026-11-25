@@ -63,6 +63,23 @@ pub struct CastHit {
     pub point_a: V2,
     pub point_b: V2,
     pub normal: V2,
+    /// The distance between the shapes at the hit: the cast's target distance when it stopped short, below 0 for shapes overlapping.
+    pub gap: f32,
+}
+
+/// What a shape cast stops for (Rapier's `ShapeCastOptions`; its maximum time of impact is the cast's `max`).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct CastOptions {
+    /// The cast meets a shape when the distance between the two falls to this much (0 or more, default 0: when they touch).
+    pub target_distance: f32,
+    /// Shapes overlapping at the start are met at 0 (default); off, a pair that overlaps and is moving apart is not a hit at all.
+    pub stop_at_penetration: bool,
+}
+
+impl Default for CastOptions {
+    fn default() -> Self {
+        CastOptions { target_distance: 0.0, stop_at_penetration: true }
+    }
 }
 
 /// The distance from `p` to the core's surface, negative inside; exact outside, and the greatest face distance (a bound
@@ -158,10 +175,12 @@ pub fn ray_core(core: &Core, o: V2, d: V2, max: f32, solid: bool) -> Option<(f32
 }
 
 /// The first touch of `core` slid from `xf` along the unit `direction` for at most `max` with `target` at `target_xf`.
-fn cast_against(core: &Core, xf: Xf, direction: V2, max: f32, target: &Core, target_xf: Xf) -> Result<Option<CastHit>, PhysicsError> {
+fn cast_against(core: &Core, xf: Xf, direction: V2, max: f32, target: &Core, target_xf: Xf, options: &CastOptions) -> Result<Option<CastHit>, PhysicsError> {
     let tolerance = 0.1 * LINEAR_SLOP;
+    // A touch: the shapes this close or closer.
+    let reach = options.target_distance + tolerance;
     let mut t = 0.0f32;
-    for _ in 0..64 {
+    for step in 0..64 {
         let at = Xf { p: xf.p.add(direction.scale(t)), q: xf.q };
         let m = collide(core, at, target, target_xf, 1.0e4)?;
         let Some(nearest) = m.points[..m.count].iter().copied().reduce(|a, b| if b.separation < a.separation { b } else { a }) else {
@@ -169,17 +188,22 @@ fn cast_against(core: &Core, xf: Xf, direction: V2, max: f32, target: &Core, tar
         };
         let gap = nearest.separation;
         let closing = direction.dot(m.normal);
+        let overlapping = gap < -tolerance;
+        // Overlapping at the start and moving apart: not a hit when the cast does not stop at penetration.
+        if step == 0 && overlapping && !options.stop_at_penetration && closing <= 1.0e-6 {
+            return Ok(None);
+        }
         // Touching and not closing (sliding along a face, or moving away) is not a hit: the distance of convex shapes
         // cannot fall from there. Overlapping deeper than the tolerance is.
-        if gap <= tolerance && (closing > 1.0e-6 || gap < -tolerance) {
+        if gap <= reach && (closing > 1.0e-6 || overlapping) {
             let half = m.normal.scale(0.5 * gap);
             // `point` lies midway between the surfaces: take the surface points either side of it.
-            return Ok(Some(CastHit { shape: 0, t, point_a: nearest.point.sub(half), point_b: nearest.point.add(half), normal: m.normal }));
+            return Ok(Some(CastHit { shape: 0, t, point_a: nearest.point.sub(half), point_b: nearest.point.add(half), normal: m.normal, gap }));
         }
         if closing <= 0.0 {
             return Ok(None);
         }
-        t += gap / closing;
+        t += (gap - options.target_distance) / closing;
         if t > max {
             return Ok(None);
         }
@@ -221,6 +245,67 @@ pub fn project_core(core: &Core, p: V2) -> (V2, bool) {
     if d <= r { (p, true) } else { (best.1.add(dir.scale(r)), false) }
 }
 
+/// For a point `p` inside `core` (within its radius), the nearest point of its surface: out along the way from the nearest point of the
+/// core's own boundary to `p` by the radius, or, with no radius, on that boundary; a point on the boundary goes out along its edge's normal.
+pub fn surface_core(core: &Core, p: V2) -> V2 {
+    let r = core.radius;
+    if core.count == 1 {
+        let (dir, d) = p.sub(core.vertices[0]).normalize();
+        let dir = if d > 0.0 { dir } else { v2(1.0, 0.0) };
+        return core.vertices[0].add(dir.scale(r));
+    }
+    // The nearest point of the polygon's (or segment's) boundary and its edge.
+    let mut best = (f32::INFINITY, core.vertices[0], 0usize);
+    for i in 0..core.count.min(if core.count == 2 { 1 } else { core.count }) {
+        let (a, b) = core.edge(i);
+        let ab = b.sub(a);
+        let span = ab.length_squared();
+        let t = if span > 0.0 { (p.sub(a).dot(ab) / span).max(0.0).min(1.0) } else { 0.0 };
+        let q = a.add(ab.scale(t));
+        let d = p.sub(q).length_squared();
+        if d < best.0 {
+            best = (d, q, i);
+        }
+    }
+    let (dir, d) = p.sub(best.1).normalize();
+    let (a, b) = core.edge(best.2);
+    // Outside the polygon proper (or beside a segment) the way out is from the boundary point to `p`; inside it, or on the boundary, it
+    // is the edge's outward normal.
+    let outside = core.count < 3 || (0..core.count).any(|i| core.normals[i].dot(p.sub(core.vertices[i])) > 0.0);
+    let way = if outside && d > 0.0 {
+        dir
+    } else if core.count >= 3 {
+        core.normals[best.2]
+    } else {
+        // A segment: a point on it leaves along its normal.
+        let (n, _) = b.sub(a).normalize();
+        n.left()
+    };
+    best.1.add(way.scale(r))
+}
+
+/// The nearest point of a grid's surface (the boundary of the filled cells together) to `q`, a point inside a filled cell.
+fn surface_grid(grid: &crate::voxel::Grid, q: V2) -> V2 {
+    let mut best = (f32::INFINITY, q);
+    for (c, r) in grid.filled_cells() {
+        let (lo, hi) = (v2(grid.origin.x + c as f32 * grid.cell.x, grid.origin.y + r as f32 * grid.cell.y), v2(grid.origin.x + (c + 1) as f32 * grid.cell.x, grid.origin.y + (r + 1) as f32 * grid.cell.y));
+        // The four sides, each a boundary of the union when the cell across it is empty.
+        for (dc, dr, a, b) in [(-1, 0, lo, v2(lo.x, hi.y)), (1, 0, v2(hi.x, lo.y), hi), (0, -1, lo, v2(hi.x, lo.y)), (0, 1, v2(lo.x, hi.y), hi)] {
+            if grid.is_filled(c + dc, r + dr) {
+                continue;
+            }
+            let ab = b.sub(a);
+            let t = (q.sub(a).dot(ab) / ab.length_squared()).max(0.0).min(1.0);
+            let on = a.add(ab.scale(t));
+            let d = q.sub(on).length_squared();
+            if d < best.0 {
+                best = (d, on);
+            }
+        }
+    }
+    best.1
+}
+
 /// The closest point of a shape to a query point.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Projection {
@@ -235,6 +320,12 @@ impl World {
     /// Every shape the filter accepts with its closest point to `point`, nearest first (ties by shape id): the closest
     /// point, whether `point` is inside it, and the distance (0 inside).
     pub fn project_point_all(&mut self, point: V2, filter: &QueryFilter) -> Result<Vec<Projection>, PhysicsError> {
+        self.project_point_all_with(point, true, filter)
+    }
+
+    /// `project_point_all`, with `solid` choosing what a point inside a shape projects to: itself (solid, distance 0), or the nearest point of the
+    /// shape's surface (not solid, `inside` still true and the distance to that point).
+    pub fn project_point_all_with(&mut self, point: V2, solid: bool, filter: &QueryFilter) -> Result<Vec<Projection>, PhysicsError> {
         if !point.x.is_finite() || !point.y.is_finite() {
             return Err(PhysicsError::NotFinite);
         }
@@ -262,8 +353,16 @@ impl World {
                 }
                 None => project_core(&shape.core, q),
             };
-            let world = if inside { point } else { xf.apply(local) };
-            let distance = if inside { 0.0 } else { point.sub(world).length() };
+            let local = if inside && !solid {
+                match &shape.grid {
+                    Some(grid) => surface_grid(grid, q),
+                    None => surface_core(&shape.core, q),
+                }
+            } else {
+                local
+            };
+            let world = if inside && solid { point } else { xf.apply(local) };
+            let distance = if inside && solid { 0.0 } else { point.sub(world).length() };
             all.push(Projection { shape: id, point: world, inside, distance });
         }
         all.sort_by(|a, b| a.distance.total_cmp(&b.distance).then(a.shape.cmp(&b.shape)));
@@ -417,8 +516,16 @@ impl World {
     /// Every shape `core`, slid from `xf` along the unit `direction` for at most `max`, meets, nearest first. A shape
     /// already overlapping is met at 0.
     pub fn shape_cast_all(&mut self, core: &Core, xf: Xf, direction: V2, max: f32, filter: &QueryFilter) -> Result<Vec<CastHit>, PhysicsError> {
-        if ![direction.x, direction.y, max].into_iter().all(f32::is_finite) {
+        self.shape_cast_all_with(core, xf, direction, max, &CastOptions::default(), filter)
+    }
+
+    /// `shape_cast_all` with a target distance and the choice of stopping at a penetration (`CastOptions`).
+    pub fn shape_cast_all_with(&mut self, core: &Core, xf: Xf, direction: V2, max: f32, options: &CastOptions, filter: &QueryFilter) -> Result<Vec<CastHit>, PhysicsError> {
+        if ![direction.x, direction.y, max, options.target_distance].into_iter().all(f32::is_finite) {
             return Err(PhysicsError::NotFinite);
+        }
+        if options.target_distance < 0.0 {
+            return Err(PhysicsError::InvalidParameter);
         }
         if max < 0.0 || (direction.length() - 1.0).abs() > 1.0e-3 {
             return Err(PhysicsError::InvalidParameter);
@@ -456,10 +563,10 @@ impl World {
                         hi = v2(hi.x.max(p.x), hi.y.max(p.y));
                     }
                     for (c, r) in grid.cells_in(lo, hi) {
-                        consider(cast_against(core, xf, direction, max, &grid.cell_core(c, r), target)?);
+                        consider(cast_against(core, xf, direction, max, &grid.cell_core(c, r), target, options)?);
                     }
                 }
-                None => consider(cast_against(core, xf, direction, max, &shape.core, target)?),
+                None => consider(cast_against(core, xf, direction, max, &shape.core, target, options)?),
             }
             if let Some(h) = best {
                 hits.push(h);

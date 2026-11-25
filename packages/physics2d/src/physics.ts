@@ -102,10 +102,10 @@ export interface Physics2DEventMap {
 
 /** A closest point of a collider to a point. */
 export interface ProjectedPoint2D extends Hit2D {
-  /** The closest point of the collider (the query point itself when it is inside). */
+  /** The closest point of the collider (the query point itself when it is inside, unless the projection was not solid). */
   point: [number, number];
   inside: boolean;
-  /** World units; 0 inside. */
+  /** World units; 0 inside, unless the projection was not solid, then the way to the surface. */
   distance: number;
 }
 /** One contact of a collider as the world holds it. */
@@ -248,6 +248,28 @@ export interface CastHit2D extends Hit2D {
   distance: number;
   point: [number, number];
   normal: [number, number];
+}
+
+/** What a shape cast stops for (Rapier's `ShapeCastOptions`). */
+export interface ShapeCastOptions2D {
+  /** The cast meets a collider when the distance to it falls to this much, in world units (default 0: when they touch). */
+  targetDistance?: number;
+  /** Colliders already overlapping the cast shape are met at distance 0 (default true); off, one that overlaps and is moving apart is not met at all. */
+  stopAtPenetration?: boolean;
+}
+
+/** A shape cast's hit: the hit's closest points on both shapes and how it ended. */
+export interface ShapeCastHit2D extends CastHit2D {
+  /** World-space points where the cast shape and the collider it met are closest at the hit (`point` is `witnessB`). */
+  witnessA: [number, number];
+  witnessB: [number, number];
+  /** World-space unit normals at the witness points: `normalA` on the cast shape's surface and `normalB` on the collider's, each pointing out toward the other (`normal` is `normalB`). */
+  normalA: [number, number];
+  normalB: [number, number];
+  /** The distance between the two shapes at the hit: `targetDistance` when the cast stopped short, below 0 when they overlap. */
+  gap: number;
+  /** `'converged'` for a hit found along the cast, `'penetrating'` for one at distance 0 with the shapes overlapping or within the target distance already. */
+  status: 'converged' | 'penetrating';
 }
 
 const noop = (): void => {};
@@ -972,13 +994,19 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     body.pose.copyWithin(0, 3, 6);
   }
 
-  /** The closest collider to `point`, its closest point and whether `point` is inside it (distance 0), or null. */
-  projectPoint(point: Vec2D, filter?: QueryFilter2D): ProjectedPoint2D | null {
+  /**
+   * The closest collider to `point`, its closest point and whether `point` is inside it, or null. With `solid` (the default) a point inside
+   * a collider projects to itself at distance 0; with `solid` false it projects to the collider's nearest surface point, `inside` still
+   * true and `distance` the way to that point (Rapier's `projectPoint(point, solid)`).
+   */
+  projectPoint(point: Vec2D, filter?: QueryFilter2D, solid = true): ProjectedPoint2D | null {
     this.live();
     this.checkVec(point, 'Point');
     const k = this.scale;
     this.writeFilter(filter);
-    this.kernel.io(8).f.set([point[0] * k, point[1] * k], 4);
+    const words = this.kernel.io(8);
+    words.f.set([point[0] * k, point[1] * k], 4);
+    words.u[6] = solid ? 1 : 0;
     const count = this.kernel.ok(this.kernel.exports.project_point(this.handle));
     const out = this.kernel.io(5 * count);
     for (let i = 0; i < count; i++) {
@@ -1261,10 +1289,13 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     maxDistance: number,
     filter?: QueryFilter2D,
     rotation = 0,
-  ): CastHit2D | null {
+    options: ShapeCastOptions2D = {},
+  ): ShapeCastHit2D | null {
     this.live();
     this.checkVec(position, 'Shape2D position');
     this.checkVec(direction, 'Shape2D direction');
+    if (options.targetDistance !== undefined && !(options.targetDistance >= 0 && options.targetDistance < Infinity))
+      throw new RangeError(`targetDistance must be a finite number of 0 or more; got ${options.targetDistance}.`);
     const length = Math.hypot(direction[0], direction[1]);
     if (!(length > 0)) throw new RangeError('Shape2D direction must not be zero; pass a direction such as [0, 1].');
     const d = this.queryShape(shape);
@@ -1277,6 +1308,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       direction[1] / length,
       maxDistance * this.scale,
       filter,
+      options,
     );
   }
 
@@ -1290,23 +1322,36 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     dy: number,
     max: number,
     filter?: QueryFilter2D,
-  ): CastHit2D | null {
+    options: ShapeCastOptions2D = {},
+  ): ShapeCastHit2D | null {
     this.writeFilter(filter);
-    const io = this.kernel.io(11 + d.geometry.length);
-    io.f.set([x, y, Math.cos(angle), Math.sin(angle), dx, dy, Math.min(max, 3e38)], 4);
-    io.u.set(d.geometry, 11);
+    const io = this.kernel.io(13 + d.geometry.length);
+    io.f.set(
+      [x, y, Math.cos(angle), Math.sin(angle), dx, dy, Math.min(max, 3e38), (options.targetDistance ?? 0) * this.scale],
+      4,
+    );
+    io.u[12] = options.stopAtPenetration === false ? 0 : 1;
+    io.u.set(d.geometry, 13);
     const count = this.kernel.ok(this.kernel.exports.shape_cast(this.handle, d.kind));
-    const out = this.kernel.io(8 * count);
+    const out = this.kernel.io(9 * count);
     const k = 1 / this.scale;
     for (let i = 0; i < count; i++) {
-      const base = this.hitOf(out.u[8 * i], filter);
+      const base = this.hitOf(out.u[9 * i], filter);
       if (!base) continue;
       const f = out.f;
+      const gap = f[9 * i + 8]! * k;
+      const distance = f[9 * i + 1]! * k;
       return {
         ...base,
-        distance: f[8 * i + 1] * k,
-        point: [f[8 * i + 4] * k, f[8 * i + 5] * k],
-        normal: [0 - f[8 * i + 6], 0 - f[8 * i + 7]],
+        distance,
+        point: [f[9 * i + 4]! * k, f[9 * i + 5]! * k],
+        normal: [0 - f[9 * i + 6]!, 0 - f[9 * i + 7]!],
+        witnessA: [f[9 * i + 2]! * k, f[9 * i + 3]! * k],
+        witnessB: [f[9 * i + 4]! * k, f[9 * i + 5]! * k],
+        normalA: [f[9 * i + 6]!, f[9 * i + 7]!],
+        normalB: [0 - f[9 * i + 6]!, 0 - f[9 * i + 7]!],
+        gap,
+        status: distance === 0 ? 'penetrating' : 'converged',
       };
     }
     return null;

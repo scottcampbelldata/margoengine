@@ -17,20 +17,20 @@ Found while auditing: the 2D facade had no way to lock rotation after creation, 
 | R2-05 | `setCanSleep`, `wakeUp`, sleeping | `canSleep`, `wakeUp`, `sleep`, `sleeping` | DONE: `kernel-features.test.js` "forces act every step until reset; impulses at a point spin; sleep and wake" |
 | R2-06 | `setCcdEnabled` / `enableCcd` | `ccd` | DONE: `kernel-features.test.js` "continuous collision stops a fast body at a thin wall" |
 | R2-07 | `setSoftCcdPrediction` | `softCcd` | DONE: `kernel-features.test.js` "soft CCD holds a fast body at a thick wall without a sweep" |
-| R2-08 | `IntegrationParameters.maxCcdSubsteps` (0 turns CCD off) | none | GAP |
+| R2-08 | `IntegrationParameters.maxCcdSubsteps` (0 turns CCD off) | `physics.setSolver({ maxCcdSubsteps })` | DONE: `kernel/tests/ccd.rs` `more_ccd_substeps_carry_a_ball_on_after_each_impact_between_two_walls`, `each_ccd_impact_leaves_the_speed_the_restitution_says`, `a_ccd_impact_gives_the_wall_friction_and_the_ball_its_coulomb_tangential_speed`, `a_ccd_impact_with_a_dynamic_body_conserves_momentum_and_gives_it_the_elastic_speeds`; `ccd2d.test.js` "the limit reads back, defaults to 1, and takes only whole numbers from 0 to 65535", "more impacts a step carry a ball on between two walls: 0 goes through, 1 stops at the first, 4 comes back" |
 | R2-09 | `setNextKinematicTranslation`, `setNextKinematicRotation` | `moveTo(position, rotation)` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, ..." |
 | R2-10 | `addForce`, `addTorque` | `applyForce`, `applyTorque` | DONE: `kernel-features.test.js` "forces act every step until reset; impulses at a point spin; sleep and wake" |
 | R2-11 | `addForceAtPoint` | `applyForceAtPoint` | DONE: `dynamics2d.test.js` "a force at a point pushes by F / m and turns by r x F / I, and resetTorques keeps the push"; against Rapier 2D: `oracle-rapier.test.js` "a force at a point, a reset torque and a locked rotation turn a body as Rapier 2D does" |
 | R2-12 | `applyImpulse`, `applyTorqueImpulse`, `applyImpulseAtPoint` | same names | DONE: `kernel-features.test.js` "forces act every step until reset; impulses at a point spin; sleep and wake" |
 | R2-13 | `resetForces`, `resetTorques` | `resetForces`, `resetTorques` | DONE: `dynamics2d.test.js` "a force at a point pushes by F / m ..." (a torque reset keeps the force), and the Rapier 2D comparison above |
 | R2-14 | `setAdditionalMass` | `additionalMass` | DONE: `kernel-features.test.js` "debugRender gives lines with colour codes; additionalMass adds to the mass" |
-| R2-15 | `setAdditionalMassProperties(mass, centre, inertia)` | none | GAP |
+| R2-15 | `setAdditionalMassProperties(mass, centre, inertia)` | `body.setAdditionalMassProperties(mass, centre, inertia)` | DONE: `mass2d.test.js` "an added solid joins the colliders by the parallel axis theorem about the combined centre"; `kernel/tests/bodies.rs` `an_added_solid_joins_the_shapes_by_the_parallel_axis_theorem` |
 | R2-16 | `lockTranslations(locked)`, `lockRotations(locked)` after creation | `lockTranslation(x, y)`, `lockRotation(locked)`, `rotationLocked`, and the `lockRotation` option | DONE: `shapes-more.test.js` "lockTranslation holds an axis, follows a teleport and can be freed"; `dynamics2d.test.js` "a locked rotation holds the angle against torque and impulse, and frees again"; against Rapier 2D in the comparison above |
 | R2-17 | `setLinearDamping`, `setAngularDamping` | `linearDamping`, `angularDamping` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, ..." |
 | R2-18 | `setDominanceGroup` (-127 to 127) | `dominance` | DONE: `kernel-features.test.js` "a body of higher dominance is not pushed by a lighter one" |
-| R2-19 | `setAdditionalSolverIterations` | none | GAP |
-| R2-20 | allow fast rotation (lifts the angular speed cap) | none | GAP |
-| R2-21 | body enabled flag (`setEnabled`) | none (colliders only) | GAP |
+| R2-19 | `setAdditionalSolverIterations` | `body.additionalSolverIterations` | DONE: `passes2d.test.js` "extra solver passes read back, reject what is not a count, and survive a snapshot", "a column with extra passes reaches its resting squash, and the column that asked for none is the one it was"; `kernel/tests/passes.rs` |
+| R2-20 | allow fast rotation (lifts the angular speed cap) | none to set: no default cap; `body.maxAngularSpeed` caps when asked | DONE by design: `kernel/tests/ccd.rs` `a_bar_spinning_many_turns_a_step_is_stopped_by_a_thin_wall_and_gains_no_energy`, `a_bar_turning_just_under_a_whole_turn_a_step_is_caught_by_a_block_its_tip_crosses`; `mass2d.test.js` "a maximum angular speed caps a body's spin, and the default leaves it free" |
+| R2-21 | body enabled flag (`setEnabled`) | `body.enabled` | DONE: `enabled2d.test.js` "a disabled body ends its contacts, is found by no query, and resumes with its velocity"; `kernel/tests/enabled.rs` |
 | R2-22 | `World.removeCollider(c, wakeUp)`, removal wakes what it touched | `removeCollider`, `removeBody` | DONE: `kernel-features.test.js` "colliders and bodies can be removed, and what they touched wakes" |
 | R2-23 | mass computed from colliders by density, `recomputeMassPropertiesFromColliders` | density and `mass` on colliders, automatic | DONE: `shapes-more.test.js` "a compound collider is one collider of several parts with one mass" |
 
@@ -71,7 +71,7 @@ Found while auditing: the 2D facade had no way to lock rotation after creation, 
 | J2-07 | contacts between jointed bodies on or off | `collide` | PARTIAL: the kernel holds it: `kernel/tests/joints.rs` `joined_bodies_do_not_collide_unless_asked`; the facade's `collide` option has no test of its own GAP |
 | J2-08 | `createImpulseJoint(params, a, b, wakeUp)`, removal | `addJoint`, `removeJoint` | DONE: `physics2d.test.js` "a rope joint stops a falling body at its length; limits and removal work" |
 | J2-09 | multibody joints: tree, exact, `createMultibodyJoint` | `addArticulation`, `multibody: true` | DONE: `articulation.test.js` "a long chain under a heavy end does not stretch, and the Jacobian matches finite motion", "a branched tree with a 1000:1 mass ratio across its branch stays closed" |
-| J2-10 | loop closing: a multibody tree combined with impulse joints | an articulation plus `addJoint` between its links | GAP: no test combines them |
+| J2-10 | loop closing: a multibody tree combined with impulse joints | an articulation plus `addJoint` between its links | DONE: `articulation.test.js` "an articulation closed by a joint between its last link and the ground holds a parallelogram linkage: coupler parallel, rocker with the crank" |
 | J2-11 | multibody inverse kinematics | `inverseKinematics` | DONE: `articulation.test.js` "inverse kinematics puts the tip of a three-link arm on a target inside its reach" |
 
 ## Controllers page
@@ -95,8 +95,8 @@ Found while auditing: the 2D facade had no way to lock rotation after creation, 
 | --- | --- | --- | --- |
 | Q2-01 | `castRay`, `castRayAndGetNormal` (`maxToi`, `solid`) | `raycast` (`maxDistance`, `solid`) with the normal | DONE: `physics2d.test.js` "queries: raycast, point and shape overlaps, shape cast, filters" |
 | Q2-02 | `intersectionsWithRay` (every hit, by callback) | none | GAP |
-| Q2-03 | `castShape` with `targetDistance`, `stopAtPenetration`, `witness1`, `witness2`, `normal1`, `normal2` | `castShape` with `distance`, `point`, `normal` | PARTIAL: first hit DONE (same test); `targetDistance`, `stopAtPenetration`, both witness points and both normals GAP |
-| Q2-04 | `projectPoint(point, solid)` | `projectPoint` | PARTIAL: DONE: `kernel-features.test.js` "body setters, setType, projectPoint, ..."; the `solid` argument GAP |
+| Q2-03 | `castShape` with `targetDistance`, `stopAtPenetration`, `witness1`, `witness2`, `normal1`, `normal2` | `castShape(..., { targetDistance, stopAtPenetration })` giving `distance`, `point`, `normal`, `witnessA`, `witnessB`, `normalA`, `normalB`, `gap`, `status` (world space; Rapier's are in each shape's frame) | DONE: `queries2d.test.js` "a shape cast stops targetDistance short, gives the closest points of both shapes and says how it ended", "a cast that does not stop at penetration ignores a collider it overlaps and is leaving", and against Rapier 2D "shape cast and point projection agree with Rapier 2D: target distance, stop at penetration and a hollow projection"; `kernel/tests/queries.rs` |
+| Q2-04 | `projectPoint(point, solid)` | `projectPoint(point, filter, solid)` | DONE: `queries2d.test.js` "projectPoint with solid off puts a point inside a collider on its nearest surface point" and against Rapier 2D (same test as Q2-03); `kernel/tests/queries.rs`, `kernel/tests/voxels.rs` |
 | Q2-05 | `intersectionsWithPoint` | `overlapPoint` | DONE: `physics2d.test.js` "queries: raycast, point and shape overlaps, shape cast, filters" |
 | Q2-06 | `intersectionsWithShape` | `overlapShape` | DONE: same test |
 | Q2-07 | `collidersWithAabbIntersectingAabb` | `intersectionsWithBox` | DONE: `kernel-features.test.js` "body setters, setType, projectPoint, intersectionsWithBox, ..." |
@@ -109,10 +109,10 @@ Found while auditing: the 2D facade had no way to lock rotation after creation, 
 | E2-01 | `EventQueue`, `drainCollisionEvents(handle1, handle2, started)` | `on('contactstart' / 'contactend' / 'intersectionstart' / 'intersectionend')` | DONE: `physics2d.test.js` "events: contact on landing, intersection with a sensor" |
 | E2-02 | `drainContactForceEvents`, `setContactForceEventThreshold` | `on('contactforce')`, `contactForceThreshold` | DONE: `kernel-features.test.js` "contact force events fire past the threshold and carry the force and normal" |
 | E2-03 | `contactPairsWith(collider, cb)`, `contactPair(c1, c2, cb)` with manifold, flipped, solver contacts | `contactPairs(collider)` (points, normal, impulse, `solverActive`) | PARTIAL: `contactPairs` DONE: `kernel-features.test.js` "body setters, ..., contactPairs and the character's hits"; the two-collider `contactPair` GAP |
-| E2-04 | `intersectionPairsWith(collider, cb)`, `intersectionPair(c1, c2)` | none | GAP |
+| E2-04 | `intersectionPairsWith(collider, cb)`, `intersectionPair(c1, c2)` | `physics.intersectionPair(a, b)`, `physics.intersectionPairsWith(collider)` | DONE: `pairs2d.test.js` "intersectionPair and intersectionPairsWith report what a sensor senses", and against Rapier 2D "the pair queries agree with Rapier 2D on the same scene" |
 | E2-05 | `PhysicsHooks.filterContactPair` (skip, or `SolverFlags.COMPUTE_IMPULSES`) | `hooks.filterPair`, `hooks.modifyContact` (`solverActive`) | DONE: `kernel-features.test.js` "hooks: filterPair vetoes a pair, modifyContact makes a one-way platform and sets friction" |
-| E2-06 | `PhysicsHooks.filterIntersectionPair` | none | GAP |
-| E2-07 | CCD (body flag, `softCcdPrediction`, `maxCcdSubsteps`) | see R2-06 to R2-08 | PARTIAL: R2-08 GAP |
+| E2-06 | `PhysicsHooks.filterIntersectionPair` | `hooks.filterIntersection` (collider option, `setActiveHooks`) | DONE: `hooks2d.test.js`; `kernel/tests/hooks.rs` |
+| E2-07 | CCD (body flag, `softCcdPrediction`, `maxCcdSubsteps`) | see R2-06 to R2-08 | DONE: R2-06 to R2-08 |
 
 ## Debug-renderer, Serialization and Determinism pages
 
