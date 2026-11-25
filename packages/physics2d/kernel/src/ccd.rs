@@ -13,11 +13,13 @@
 // 2 pi minus a little as a little the other way and would let a fast spinner's tip pass through a thin wall unseen. A pair that already touches at the step's start is left to the contact
 // solver: a resting body must not be pinned at time 0.
 //
-// With `Settings::max_ccd_substeps` above 1 an impact before the last is answered as a rigid collision at the mean of the touch points: the
-// impulse of Newton's restitution along the normal and of Coulomb friction along the contact, from the same impulse-based law
-// (Mirtich 1996), shared by the two bodies' masses and inertias; the body then goes on with what leaves for the rest of the step. Rapier's
-// documentation names the setting (`maxCcdSubsteps`, the most substeps the solver performs for continuous collision, default 1) and says
-// no more; this follows that sentence and the sources above only.
+// With `Settings::max_ccd_substeps` above 1 an impact before the last is answered as the contact solver answers a contact: the normal
+// impulse that stops the approach, friction along the contact held to the grip that impulse gives, then the restitution impulse, from the
+// same impulse-based law (Mirtich 1996), shared by the two bodies' masses and inertias; the body then goes on with what leaves for the rest
+// of the step, under gravity, its forces and its damping. The pair's solver groups, a one-sided chain and the world's `modifyContact`
+// hook decide whether the impact pushes, as they do for a solved contact. Rapier's documentation names the setting (`maxCcdSubsteps`, the
+// most substeps the solver performs for continuous collision, default 1) and says no more; this follows that sentence and the sources
+// above only.
 use alloc::vec::Vec;
 use margoengine_physics_kernel_common::broad::Bounds;
 
@@ -25,7 +27,9 @@ use crate::error::PhysicsError;
 use crate::manifold::collide;
 use crate::math::{Rot, V2, Xf, v2};
 use crate::shape::LINEAR_SLOP;
-use crate::world::{Kind, SPECULATIVE, World, bounds_of, pair_allowed};
+use crate::world::{
+    ContactMod, EVENT_COLLISION, EVENT_CONTACT_FORCE, Event, EventKind, ForceEvent, HOOK_CONTACT, Kind, SPECULATIVE, World, bounds_of, groups_meet, pair_allowed,
+};
 
 /// The gap at which a time of impact stops: the shapes rest within the linear slop of each other.
 const TARGET: f32 = LINEAR_SLOP;
@@ -96,7 +100,8 @@ impl World {
                 let (end_center, end_q, local_center) = (body.exact_center, body.xf.q, body.local_center);
                 let shift = v2((end_center[0] - origin[0]) as f32, (end_center[1] - origin[1]) as f32);
                 let turn = turned(q0, end_q, body.angular_velocity * dt * (1.0 - tau0));
-                let travel = shift.length() + turn.abs() * body.extent;
+                let (extent, shapes) = (body.extent, body.shapes.clone());
+                let travel = shift.length() + turn.abs() * extent;
                 if !(travel > 2.0 * SPECULATIVE) {
                     break;
                 }
@@ -111,10 +116,13 @@ impl World {
                 // A point turning through `turn` about the centre leaves the box of its two ends by at most extent (1 - cos(turn / 2)) <=
                 // extent turn^2 / 8, the sagitta of its arc (the chord between the ends is inside the box).
                 let whole_circle = turn.abs() >= core::f32::consts::PI;
-                let bulge = (turn * turn * 0.125).min(1.0) * body.extent;
+                let bulge = (turn * turn * 0.125).min(1.0) * extent;
+                // Shapes the sweep goes through because the pair would not push (solver groups, a one-sided chain's back, a hook's answer).
+                let mut skip: Vec<u32> = Vec::new();
+                let found = 'search: loop {
                 let mut earliest = 1.0f32;
                 let mut best: Option<Impact> = None;
-                for &mine in &body.shapes.clone() {
+                for &mine in &shapes {
                     let own = &self.shapes[mine as usize];
                     if own.sensor {
                         continue;
@@ -127,15 +135,15 @@ impl World {
                     };
                     if whole_circle {
                         // Half a turn or more: the shape's points go round the centre, so its path fills the disc of its extent about it.
-                        swept.min = [swept.min[0].min(cx + shift.x.min(0.0) - body.extent), swept.min[1].min(cy + shift.y.min(0.0) - body.extent)];
-                        swept.max = [swept.max[0].max(cx + shift.x.max(0.0) + body.extent), swept.max[1].max(cy + shift.y.max(0.0) + body.extent)];
+                        swept.min = [swept.min[0].min(cx + shift.x.min(0.0) - extent), swept.min[1].min(cy + shift.y.min(0.0) - extent)];
+                        swept.max = [swept.max[0].max(cx + shift.x.max(0.0) + extent), swept.max[1].max(cy + shift.y.max(0.0) + extent)];
                     }
                     self.broad.query(&swept, &mut candidates);
                     crate::world::tick(&mut self.timing, 12, &mut inner);
                     for &other in &candidates {
                         let s = &self.shapes[other as usize];
                         let ob = &self.bodies[s.body as usize];
-                        if s.dead || s.body == start.body || s.sensor {
+                        if s.dead || s.body == start.body || s.sensor || skip.contains(&other) {
                             continue;
                         }
                         if !pair_allowed(&own_bits, Kind::Dynamic, s, ob.kind) {
@@ -204,8 +212,14 @@ impl World {
                     }
                 }
                 crate::world::tick(&mut self.timing, 13, &mut inner);
-                let Some(impact) = best else { break };
-                let t = earliest;
+                let Some(impact) = best else { break 'search None };
+                match self.answer_impact(&impact, pose(earliest), tau_of(earliest))? {
+                    // The pair would not push: the sweep goes through it and looks for the next.
+                    None => skip.push(impact.shape),
+                    Some(law) => break 'search Some((impact, earliest, law)),
+                }
+                };
+                let Some((impact, t, law)) = found else { break };
                 let hit_tau = tau_of(t);
                 // The pose of this body at the impact.
                 let hit_center = [origin[0] + (shift.x * t) as f64, origin[1] + (shift.y * t) as f64];
@@ -233,86 +247,226 @@ impl World {
                     break;
                 }
                 // Not the last impact: the touch is a collision, and each body goes on for the rest of the step with what it leaves.
-                self.collide_at_impact(start.body, &impact, pose(t), hit_tau, origin, shift.scale(t))?;
                 let rest = dt * (1.0 - hit_tau);
-                for id in [Some(start.body), partner].into_iter().flatten() {
-                    let b = &mut self.bodies[id as usize];
-                    b.exact_center = [b.exact_center[0] + (b.linear_velocity.x * rest) as f64, b.exact_center[1] + (b.linear_velocity.y * rest) as f64];
-                    b.xf.q = at(b.xf.q, b.angular_velocity * rest, 1.0);
-                    b.round_pose();
-                }
-                tau0 = hit_tau;
-                origin = hit_center;
-                q0 = hit_q;
+                let (touch_tau, touch_center, touch_q) = self.respond_to_impact(start.body, &impact, &law, pose(t), hit_tau, origin, shift.scale(t), rest, dt, &mut moved)?;
+                tau0 = touch_tau;
+                origin = touch_center;
+                q0 = touch_q;
             }
             crate::world::tick(&mut self.timing, 14, &mut inner);
         }
         Ok(())
     }
 
-    /// The collision of body `id` with the shape it met (and its body `partner` when that moves): one impulse along the contact normal that
-    /// leaves the pair with the restitution of its shapes when it approached faster than the world's restitution threshold, and one
-    /// along the contact that stops sliding as far as the pair's friction allows. `mine` is this body's shape at its pose at the impact
-    /// and `origin` where the sweep's relative positions are measured from; `centre` is this body's centre relative to it.
-    fn collide_at_impact(&mut self, id: u32, impact: &Impact, mine: Xf, tau: f32, origin: [f64; 2], centre: V2) -> Result<(), PhysicsError> {
-        let m = touch(&impact.core, mine, &self.shapes[impact.shape as usize].core, impact.path.at(tau))?;
+    /// Whether an impact pushes, and how. A pair whose solver groups do not meet, the back of a one-sided chain, and a pair a hook's
+    /// `modifyContact` makes inactive (or a one-way platform's closed side) are gone through, as the contact solver would go through
+    /// them; otherwise the pair's restitution and friction, the shapes' or the hook's, and a conveyor's surface speed.
+    fn answer_impact(&mut self, impact: &Impact, mine: Xf, tau: f32) -> Result<Option<Law>, PhysicsError> {
+        let (sa, sb) = (&self.shapes[impact.own as usize], &self.shapes[impact.shape as usize]);
+        if sa.sensor || sb.sensor || !groups_meet(sa.solver_groups, sb.solver_groups) {
+            return Ok(None);
+        }
+        let (one_sided, side, asks) = (sb.one_sided, sb.core.normals[0], (sa.hooks | sb.hooks) & HOOK_CONTACT != 0);
+        let mut law = Law { restitution: sa.restitution.max(sb.restitution), friction: crate::solver::sqrt_product(sa.friction, sb.friction), tangent_speed: 0.0 };
+        let other = impact.path.at(tau);
+        let m = touch(&impact.core, mine, &sb.core, other)?;
         if m.count == 0 {
-            return Ok(());
+            return Ok(None);
         }
         let n = m.normal;
-        let point = m.points[..m.count].iter().fold(V2::ZERO, |sum, p| sum.add(p.point)).scale(1.0 / m.count as f32);
-        let (other_body, other_shape) = (self.shapes[impact.shape as usize].body, impact.shape);
-        let (a, b) = (&self.bodies[id as usize], &self.bodies[other_body as usize]);
-        let other_centre = if impact.path.moves {
-            impact.path.centre(tau)
-        } else {
-            v2((b.exact_center[0] - origin[0]) as f32, (b.exact_center[1] - origin[1]) as f32)
-        };
-        let (ra, rb) = (point.sub(centre), point.sub(other_centre));
-        let cross = |w: f32, r: V2| v2(-w * r.y, w * r.x);
-        let (va, vb) = (a.linear_velocity.add(cross(a.angular_velocity, ra)), b.linear_velocity.add(cross(b.angular_velocity, rb)));
-        let approach = vb.sub(va).dot(n);
-        // Separating or sliding at the touch: nothing to answer.
-        if !(approach < 0.0) {
-            return Ok(());
+        // A one-sided chain is solid on the side its segments' right-hand normals point to; `n` runs from this body to the chain.
+        if one_sided && other.q.apply(side).dot(n.neg()) < 0.0 {
+            return Ok(None);
         }
-        let (ima, iia, imb, iib) = (a.inv_mass, a.inv_inertia, b.inv_mass, b.inv_inertia);
-        let (sa, sb) = (&self.shapes[impact.own as usize], &self.shapes[other_shape as usize]);
-        let friction = crate::solver::sqrt_product(sa.friction, sb.friction);
-        let bounce = if -approach > self.settings.restitution_threshold { sa.restitution.max(sb.restitution) } else { 0.0 };
-        let effective = |dir: V2| {
-            let (ca, cb) = (ra.cross(dir), rb.cross(dir));
-            ima + imb + iia * ca * ca + iib * cb * cb
-        };
-        let kn = effective(n);
-        if !(kn > 0.0) {
-            return Ok(());
-        }
-        let jn = -(1.0 + bounce) * approach / kn;
-        let apply = |world: &mut World, impulse: V2| {
-            let (ba, bb) = (id, other_body);
-            let a = &mut world.bodies[ba as usize];
-            a.linear_velocity = a.linear_velocity.sub(impulse.scale(a.inv_mass));
-            a.angular_velocity -= a.inv_inertia * ra.cross(impulse);
-            let b = &mut world.bodies[bb as usize];
-            if b.kind == Kind::Dynamic {
-                b.linear_velocity = b.linear_velocity.add(impulse.scale(b.inv_mass));
-                b.angular_velocity += b.inv_inertia * rb.cross(impulse);
+        if asks {
+            if let Some(mut hook) = self.hook.take() {
+                // The hook sees the pair in shape id order with the normal from the first to the second, as the contact solver's.
+                let (a, b, normal) = if impact.own < impact.shape { (impact.own, impact.shape, n) } else { (impact.shape, impact.own, n.neg()) };
+                let mut change = ContactMod { a, b, normal, points: m.count, solver_active: true, friction: None, restitution: None, one_way: None, tangent_speed: 0.0 };
+                hook.contact(&mut change);
+                self.hook = Some(hook);
+                if !change.solver_active || change.one_way.is_some_and(|way| normal.dot(way) <= 0.0) {
+                    return Ok(None);
+                }
+                if let Some(f) = change.friction.filter(|f| f.is_finite() && *f >= 0.0) {
+                    law.friction = f;
+                }
+                if let Some(r) = change.restitution.filter(|r| r.is_finite() && *r >= 0.0) {
+                    law.restitution = r;
+                }
+                if change.tangent_speed.is_finite() {
+                    law.tangent_speed = change.tangent_speed;
+                }
             }
-        };
-        apply(self, n.scale(jn));
-        // Friction: stop the sliding at the point, within what the normal impulse lets the pair grip.
-        let (a, b) = (&self.bodies[id as usize], &self.bodies[other_body as usize]);
-        let (va, vb) = (a.linear_velocity.add(cross(a.angular_velocity, ra)), b.linear_velocity.add(cross(b.angular_velocity, rb)));
-        let tangent = v2(-n.y, n.x);
-        let slide = vb.sub(va).dot(tangent);
-        let kt = effective(tangent);
-        if kt > 0.0 {
-            let grip = friction * jn;
-            let jt = (-slide / kt).max(-grip).min(grip);
-            apply(self, tangent.scale(jt));
         }
-        Ok(())
+        Ok(Some(law))
+    }
+
+    /// The acceleration a dynamic body is under when the step is not solving it: gravity and its scale, and the forces and torques set on it.
+    fn free_acceleration(&self, id: u32) -> (V2, f32) {
+        let b = &self.bodies[id as usize];
+        if b.kind != Kind::Dynamic {
+            return (V2::ZERO, 0.0);
+        }
+        (self.settings.gravity.scale(b.gravity_scale).add(b.force.scale(b.inv_mass)), b.inv_inertia * b.torque)
+    }
+
+    /// Takes off the velocity the rest of the step (`rest` seconds) gave a body, one integrator step of it: gravity, forces and damping.
+    fn velocity_at_impact(&mut self, id: u32, rest: f32) {
+        let (a, alpha) = self.free_acceleration(id);
+        let b = &mut self.bodies[id as usize];
+        if b.kind != Kind::Dynamic {
+            return;
+        }
+        b.linear_velocity = b.linear_velocity.scale(1.0 + rest * b.linear_damping).sub(a.scale(rest));
+        b.angular_velocity = b.angular_velocity * (1.0 + rest * b.angular_damping) - alpha * rest;
+    }
+
+    /// Carries a body from its pose at an impact through the `rest` seconds of the step left, under gravity, its forces and its damping.
+    fn carry_on(&mut self, id: u32, rest: f32) {
+        let (a, alpha) = self.free_acceleration(id);
+        let b = &mut self.bodies[id as usize];
+        if b.kind != Kind::Dynamic {
+            return;
+        }
+        let (v, w) = (b.linear_velocity, b.angular_velocity);
+        let step = v.scale(rest).add(a.scale(0.5 * rest * rest));
+        b.exact_center = [b.exact_center[0] + step.x as f64, b.exact_center[1] + step.y as f64];
+        b.xf.q = at(b.xf.q, w * rest + 0.5 * alpha * rest * rest, 1.0);
+        b.linear_velocity = v.add(a.scale(rest)).scale(1.0 / (1.0 + rest * b.linear_damping));
+        b.angular_velocity = (w + alpha * rest) / (1.0 + rest * b.angular_damping);
+        b.round_pose();
+    }
+
+    /// The collision of body `id` with the shape it met (and of the body that shape is on, when it moves), answered as the contact solver
+    /// answers a contact: a normal impulse that stops the approach, friction along the contact within the pair's coefficient times that
+    /// impulse (toward a conveyor's surface speed when a hook set one), then, when the approach was faster than the world's restitution
+    /// threshold, the impulse that leaves the pair at the restitution times the approach. Each body then goes on for the `rest` seconds of
+    /// the step left. The sweep stops the body up to the time-of-impact target short of the surface; the time the approach would take to close
+    /// that gap is spent before the collision, so the arc leaves from where the surfaces meet. Returns when, and where, that was.
+    /// `mine` is this body's shape at the impact, `origin` where the sweep's relative positions are measured from and
+    /// `centre` this body's centre relative to it. The impact is reported as a touch that began and ended, and its impulse as a contact force.
+    fn respond_to_impact(
+        &mut self,
+        id: u32,
+        impact: &Impact,
+        law: &Law,
+        mine: Xf,
+        tau: f32,
+        origin: [f64; 2],
+        centre: V2,
+        rest: f32,
+        dt: f32,
+        moved: &mut Vec<(u32, f32, [f64; 2], Rot)>,
+    ) -> Result<(f32, [f64; 2], Rot), PhysicsError> {
+        let other_body = self.shapes[impact.shape as usize].body;
+        let other = impact.path.at(tau);
+        let m = touch(&impact.core, mine, &self.shapes[impact.shape as usize].core, other)?;
+        let moves = impact.path.moves;
+        // The velocities the two bodies had when they met, not those the step ended with.
+        self.velocity_at_impact(id, rest);
+        if moves {
+            self.velocity_at_impact(other_body, rest);
+        }
+        let mut total = 0.0f32;
+        let mut rest = rest;
+        let mut lost = 0.0f32;
+        if m.count > 0 {
+            let n = m.normal;
+            let point = m.points[..m.count].iter().fold(V2::ZERO, |sum, p| sum.add(p.point)).scale(1.0 / m.count as f32);
+            let b = &self.bodies[other_body as usize];
+            let other_centre = if moves { impact.path.centre(tau) } else { v2((b.exact_center[0] - origin[0]) as f32, (b.exact_center[1] - origin[1]) as f32) };
+            let (ra, rb) = (point.sub(centre), point.sub(other_centre));
+            let (ima, iia, imb, iib) = (self.bodies[id as usize].inv_mass, self.bodies[id as usize].inv_inertia, b.inv_mass, b.inv_inertia);
+            let cross = |w: f32, r: V2| v2(-w * r.y, w * r.x);
+            let relative = |world: &World| {
+                let (a, b) = (&world.bodies[id as usize], &world.bodies[other_body as usize]);
+                b.linear_velocity.add(cross(b.angular_velocity, rb)).sub(a.linear_velocity.add(cross(a.angular_velocity, ra)))
+            };
+            let effective = |dir: V2| {
+                let (ca, cb) = (ra.cross(dir), rb.cross(dir));
+                ima + imb + iia * ca * ca + iib * cb * cb
+            };
+            let apply = |world: &mut World, impulse: V2| {
+                let a = &mut world.bodies[id as usize];
+                a.linear_velocity = a.linear_velocity.sub(impulse.scale(a.inv_mass));
+                a.angular_velocity -= a.inv_inertia * ra.cross(impulse);
+                let b = &mut world.bodies[other_body as usize];
+                if b.kind == Kind::Dynamic {
+                    b.linear_velocity = b.linear_velocity.add(impulse.scale(b.inv_mass));
+                    b.angular_velocity += b.inv_inertia * rb.cross(impulse);
+                }
+            };
+            let approach = relative(self).dot(n);
+            let kn = effective(n);
+            if approach < 0.0 && kn > 0.0 {
+                // Close what is left of the gap at the speed of the approach, then collide.
+                let gap = m.points[..m.count].iter().fold(f32::INFINITY, |least, p| least.min(p.separation)).max(0.0);
+                lost = (gap / -approach).min(rest);
+                if lost > 0.0 {
+                    for body in [Some(id), moves.then_some(other_body)].into_iter().flatten() {
+                        let b = &mut self.bodies[body as usize];
+                        b.exact_center = [b.exact_center[0] + (b.linear_velocity.x * lost) as f64, b.exact_center[1] + (b.linear_velocity.y * lost) as f64];
+                        b.xf.q = at(b.xf.q, b.angular_velocity * lost, 1.0);
+                        b.round_pose();
+                    }
+                    rest -= lost;
+                }
+                // Stop the approach.
+                let stop = -approach / kn;
+                apply(self, n.scale(stop));
+                total += stop;
+                // Friction, within what that impulse lets the pair grip.
+                let tangent = n.right();
+                let kt = effective(tangent);
+                if kt > 0.0 {
+                    let grip = law.friction * stop;
+                    let slide = relative(self).dot(tangent) - law.tangent_speed;
+                    let jt = (-slide / kt).max(-grip).min(grip);
+                    apply(self, tangent.scale(jt));
+                }
+                // Bounce, when it came in fast enough: the normal speed leaves at the restitution times the approach.
+                if -approach > self.settings.restitution_threshold && law.restitution > 0.0 {
+                    let bounce = (-(relative(self).dot(n) + law.restitution * approach) / kn).max(-stop);
+                    apply(self, n.scale(bounce));
+                    total += bounce;
+                }
+                self.report_impact(impact.own, impact.shape, n, total, dt);
+            }
+        }
+        // Where the two are as they collide, for what the sweep goes on from.
+        let touch_tau = tau + lost / dt;
+        let (here, turned_to) = (self.bodies[id as usize].exact_center, self.bodies[id as usize].xf.q);
+        note(moved, id, touch_tau, here, turned_to);
+        if moves {
+            let b = &self.bodies[other_body as usize];
+            let (c, q) = (b.exact_center, b.xf.q);
+            note(moved, other_body, touch_tau, c, q);
+        }
+        self.carry_on(id, rest);
+        if moves {
+            self.carry_on(other_body, rest);
+        }
+        Ok((touch_tau, here, turned_to))
+    }
+
+    /// Reports an answered impact: a touch that began and ended in the step for shapes that ask for collision events, and its impulse as a
+    /// contact force for those that ask for force events, with the thresholds the solver's contacts use.
+    fn report_impact(&mut self, own: u32, other: u32, normal: V2, impulse: f32, dt: f32) {
+        let (a, b, normal) = if own < other { (own, other, normal) } else { (other, own, normal.neg()) };
+        let (sa, sb) = (&self.shapes[a as usize], &self.shapes[b as usize]);
+        let events = sa.events | sb.events;
+        if events & EVENT_COLLISION != 0 {
+            self.events.push(Event { kind: EventKind::Started, a, b, sensor: false });
+            self.events.push(Event { kind: EventKind::Stopped, a, b, sensor: false });
+        }
+        if events & EVENT_CONTACT_FORCE != 0 {
+            let force = impulse / dt;
+            let threshold = if sa.events & EVENT_CONTACT_FORCE != 0 { sa.force_threshold } else { 0.0 }.max(if sb.events & EVENT_CONTACT_FORCE != 0 { sb.force_threshold } else { 0.0 });
+            if force > threshold {
+                self.force_events.push(ForceEvent { a, b, force, normal });
+            }
+        }
     }
 }
 
@@ -321,6 +475,14 @@ impl World {
 #[inline(never)]
 fn touch(a: &crate::shape::Core, xa: Xf, b: &crate::shape::Core, xb: Xf) -> Result<crate::manifold::Manifold, PhysicsError> {
     collide(a, xa, b, xb, 1.0e4)
+}
+
+/// What an impact does when it pushes: the pair's restitution and friction (the shapes', or a hook's) and a conveyor's surface speed.
+#[derive(Clone, Copy)]
+struct Law {
+    restitution: f32,
+    friction: f32,
+    tangent_speed: f32,
 }
 
 /// A body whose pose along the sweep is known at any time: a dynamic one moves from where the step (or an impact) put it to where it

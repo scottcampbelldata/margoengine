@@ -280,7 +280,8 @@ fn each_ccd_impact_leaves_the_speed_the_restitution_says() {
 #[test]
 fn a_ccd_impact_gives_the_wall_friction_and_the_ball_its_coulomb_tangential_speed() {
     // A ball at (1000, 300) m/s into a wall: normal speed 1000 reverses at half restitution to -500, and friction of 0.05 takes
-    // mu (1 + e) vn = 0.05 * 1.5 * 1000 = 75 m/s off the 300 sliding along it (the pair slides: sticking would take 100).
+    // mu vn = 0.05 * 1000 = 50 m/s off the 300 sliding along it, as the contact solver's friction does (it is held to the impulse that
+    // stops the approach; the bounce that follows has none): the pair slides, sticking would take 100.
     let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: 2, ..Default::default() });
     let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(3.0, 0.0), ..Default::default() }).unwrap();
     w.create_shape(wall, Core::rect(0.05, 50.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.05, ..Default::default() }).unwrap();
@@ -289,7 +290,7 @@ fn a_ccd_impact_gives_the_wall_friction_and_the_ball_its_coulomb_tangential_spee
     w.step(DT).unwrap();
     let v = w.bodies[ball as usize].linear_velocity;
     assert!((v.x + 500.0).abs() < 0.5, "normal speed {}", v.x);
-    assert!((v.y - 225.0).abs() < 0.5, "tangential speed {}", v.y);
+    assert!((v.y - 250.0).abs() < 0.5, "tangential speed {}", v.y);
 }
 
 #[test]
@@ -308,4 +309,178 @@ fn a_ccd_impact_with_a_dynamic_body_conserves_momentum_and_gives_it_the_elastic_
     let (vb, vp) = (w.bodies[ball as usize].linear_velocity.x, w.bodies[plate as usize].linear_velocity.x);
     assert!((vb + 150.0).abs() < 0.5 && (vp - 150.0).abs() < 0.5, "ball {vb}, plate {vp}");
     assert!((m_ball * vb + m_plate * vp - 300.0).abs() < 0.5, "momentum {}", m_ball * vb + m_plate * vp);
+}
+
+
+/// A ball at `(20, 6)` m/s into a wall, with friction 0.3 and restitution 0.5: where its velocity and spin are after the step. With
+/// `ccd` it starts 0.15 m from the wall and the sweep answers the impact; without, 0.01 m from it, so the contact solver has it from the start.
+fn impact(ccd: bool) -> (V2, f32) {
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: 2, ..Default::default() });
+    let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(3.0, 0.0), ..Default::default() }).unwrap();
+    w.create_shape(wall, Core::rect(0.05, 50.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.3, ..Default::default() }).unwrap();
+    let x = if ccd { 2.70 } else { 2.84 };
+    let ball = w.create_body(&BodyDef { position: v2(x, 0.0), linear_velocity: v2(20.0, 6.0), ccd, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.3, ..Default::default() }).unwrap();
+    w.step(DT).unwrap();
+    let b = &w.bodies[ball as usize];
+    (b.linear_velocity, b.angular_velocity)
+}
+
+#[test]
+fn a_ccd_impact_leaves_the_velocity_and_spin_the_contact_solver_gives_the_same_pair() {
+    let (swept, swept_spin) = impact(true);
+    let (solved, solved_spin) = impact(false);
+    // The normal speed is the restitution times the approach for both: -0.5 * 20.
+    assert!((swept.x + 10.0).abs() < 1.0e-3 && (solved.x + 10.0).abs() < 1.0e-3, "normal speeds {} and {}", swept.x, solved.x);
+    // The tangential speed and the spin come from the friction at the contact point, which both put midway between the two surfaces, so
+    // a distance rho r from the ball's centre with rho = 1 + (half the gap) / r, the gap at most 0.01 for the solver (the ball starts that
+    // near) and at most the time-of-impact target, 0.005, for the sweep. The 6 m/s that slide is gripped completely (mu * 20 = 6 is more than
+    // the 6 / (1 + 2 rho^2) the grip needs), so by the impulse that takes the slide out of a disc (inertia m r^2 / 2): the speed falls by
+    // 6 / (1 + 2 rho^2) and the spin is -2 rho 6 / (r (1 + 2 rho^2)).
+    let (slow_speed, slow_spin) = speed_and_spin(1.0);
+    let (fast_speed, fast_spin) = speed_and_spin(1.05);
+    for (name, v, w) in [("swept", swept.y, swept_spin), ("solved", solved.y, solved_spin)] {
+        assert!(v >= slow_speed - 1.0e-3 && v <= fast_speed + 1.0e-3, "{name} tangential speed {v} outside {slow_speed} to {fast_speed}");
+        assert!(w >= slow_spin - 1.0e-2 && w <= fast_spin + 1.0e-2, "{name} spin {w} outside {slow_spin} to {fast_spin}");
+    }
+}
+
+/// The tangential speed and the spin a ball of radius 0.1 has after gripping a 6 m/s slide at a contact point rho radii from its centre.
+fn speed_and_spin(rho: f32) -> (f32, f32) {
+    (6.0 - 6.0 / (1.0 + 2.0 * rho * rho), -2.0 * rho * 6.0 / (0.1 * (1.0 + 2.0 * rho * rho)))
+}
+
+/// A ball dropped at 300 m/s onto a floor 1.9 m below it with `substeps` impacts allowed, in gravity of 10 m/s^2 and with a restitution of `e`.
+fn dropped_ball(e: f32, gravity_scale: f32) -> (World, u32) {
+    let mut w = World::new(Settings { gravity: v2(0.0, -10.0), max_ccd_substeps: 2, ..Default::default() });
+    let floor = w.create_body(&BodyDef { kind: Kind::Static, position: v2(0.0, -0.5), ..Default::default() }).unwrap();
+    w.create_shape(floor, Core::rect(10.0, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: e, friction: 0.0, ..Default::default() }).unwrap();
+    let ball = w.create_body(&BodyDef { position: v2(0.0, 2.0), linear_velocity: v2(0.0, -300.0), gravity_scale, ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: e, friction: 0.0, ..Default::default() }).unwrap();
+    (w, ball)
+}
+
+#[test]
+fn after_an_impact_the_ball_goes_on_under_gravity_along_the_closed_form_arc() {
+    for scale in [1.0f32, 0.5] {
+        let g = 10.0 * scale as f64;
+        let (mut w, b) = dropped_ball(0.5, scale);
+        w.step(DT).unwrap();
+        // The ball's underside meets the floor's top when its centre is 0.1 up: 1.9 m down at 300 m/s under g, after t; it leaves at half its
+        // speed and flies the rest of the step.
+        let dt = DT as f64;
+        let t = (-300.0 + (300.0f64 * 300.0 + 2.0 * g * 1.9).sqrt()) / g;
+        let up = 0.5 * (300.0 + g * t);
+        let rest = dt - t;
+        let (y, vy) = (0.1 + up * rest - 0.5 * g * rest * rest, up - g * rest);
+        let body = &w.bodies[b as usize];
+        // The step's own integration is semi-implicit over its 4 substeps, which puts the ball g dt^2 / 8 (0.35 mm at g = 10) ahead of the exact
+        // arc the closed form follows; the sweep's gap is spent before the collision, so nothing else is left.
+        let bound = 0.125 * g * dt * dt + 1.0e-5;
+        assert!((body.xf.p.y as f64 - y).abs() < bound, "gravity scale {scale}: the ball is at {} not {y}", body.xf.p.y);
+        assert!((body.linear_velocity.y as f64 - vy).abs() < 1.0e-3, "gravity scale {scale}: its velocity is {} not {vy}", body.linear_velocity.y);
+    }
+}
+
+#[test]
+fn each_answered_ccd_impact_is_a_touch_and_a_contact_force_like_any_contact() {
+    use margoengine_physics2d_kernel::world::EventKind;
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: 3, ..Default::default() });
+    let mut walls = Vec::new();
+    for x in [-3.0f32, 3.0] {
+        let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(x, 0.0), ..Default::default() }).unwrap();
+        walls.push(w.create_shape(wall, Core::rect(0.05, 5.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.0, events: 3, ..Default::default() }).unwrap());
+    }
+    let ball = w.create_body(&BodyDef { linear_velocity: v2(1000.0, 0.0), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    let shape = w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.0, events: 3, ..Default::default() }).unwrap();
+    let mass = w.bodies[ball as usize].mass;
+    w.step(DT).unwrap();
+    // Three impacts allowed: the first at the right wall, the second at the left one (both answered), the third sweep is the last and meets nothing.
+    let pairs = [(walls[1].min(shape), walls[1].max(shape)), (walls[0].min(shape), walls[0].max(shape))];
+    let seen: Vec<_> = w.events.iter().map(|e| (e.kind, e.a, e.b)).collect();
+    let expected: Vec<_> = pairs.iter().flat_map(|&(a, b)| [(EventKind::Started, a, b), (EventKind::Stopped, a, b)]).collect();
+    assert_eq!(seen, expected, "each answered impact is a touch that began and ended");
+    // The impulse of the first is the mass times (1 + e) times the approach, 1000 m/s; of the second, the speed that is left, 500.
+    assert_eq!(w.force_events.len(), 2);
+    for (event, approach) in w.force_events.iter().zip([1000.0f32, 500.0]) {
+        let expected = mass * 1.5 * approach / DT;
+        assert!((event.force - expected).abs() < 0.01 * expected, "force {} against {expected}", event.force);
+    }
+}
+
+#[test]
+fn the_kinetic_energy_never_rises_across_the_impacts_of_a_step_and_each_answered_impact_keeps_the_restitution_squared() {
+    for e in [1.0f32, 0.5, 0.0] {
+        let mut last = f32::INFINITY;
+        for substeps in 1..=6u32 {
+            let (mut w, b) = corridor(substeps, e);
+            let m = w.bodies[b as usize].mass;
+            let energy = |w: &World| 0.5 * m * w.bodies[b as usize].linear_velocity.length_squared();
+            let before = energy(&w);
+            w.step(DT).unwrap();
+            let after = energy(&w);
+            assert!(after <= before * (1.0 + 1.0e-5), "restitution {e}, {substeps} impacts: the energy rose from {before} to {after}");
+            assert!(after <= last * (1.0 + 1.0e-5), "restitution {e}: more impacts allowed left more energy ({after} over {last})");
+            last = after;
+            // Each impact answered leaves e^2 of the energy: after k of them, e^(2k) of it, a whole k, and none answered at one impact (it stops the ball where it touches).
+            if substeps == 1 {
+                assert!((after / before - 1.0).abs() < 1.0e-5, "the first impact stops the ball with its velocity: {after} of {before}");
+            } else if e == 1.0 {
+                assert!((after / before - 1.0).abs() < 1.0e-4, "elastic impacts keep the energy: {after} of {before}");
+            } else if e == 0.5 {
+                let k = (after / before).ln() / (e * e).ln();
+                assert!((k - k.round()).abs() < 1.0e-3 && k.round() >= 1.0, "{substeps} impacts at restitution {e} leave e^(2k) of the energy for a whole k: k = {k}");
+            } else {
+                assert!(after < 1.0e-6 * before, "restitution 0 leaves nothing: {after}");
+            }
+        }
+    }
+}
+
+/// A one-way platform: solid for a body above it, open to one below. The hook gives the direction the platform's contacts must have a
+/// positive part along, which depends on which of the pair is first (the normal runs from the first to the second).
+struct Platform {
+    shape: u32,
+}
+
+impl margoengine_physics2d_kernel::world::Hook for Platform {
+    fn filter(&mut self, _: u32, _: u32) -> bool {
+        true
+    }
+    fn contact(&mut self, change: &mut margoengine_physics2d_kernel::world::ContactMod) {
+        change.one_way = Some(if change.a == self.shape { v2(0.0, 1.0) } else { v2(0.0, -1.0) });
+    }
+}
+
+/// A fast ball at a one-way platform at y = 0, from `y` going at `vy`, with `substeps` impacts allowed and restitution 1 on both.
+fn one_way(y: f32, vy: f32, substeps: u32) -> (World, u32) {
+    use margoengine_physics2d_kernel::world::HOOK_CONTACT;
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: substeps, ..Default::default() });
+    let platform = w.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+    let shape = w.create_shape(platform, Core::rect(3.0, 0.05, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 1.0, friction: 0.0, hooks: HOOK_CONTACT, ..Default::default() }).unwrap();
+    w.hook = Some(Box::new(Platform { shape }));
+    let ball = w.create_body(&BodyDef { position: v2(0.0, y), linear_velocity: v2(0.0, vy), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: 1.0, friction: 0.0, hooks: HOOK_CONTACT, ..Default::default() }).unwrap();
+    (w, ball)
+}
+
+#[test]
+fn a_fast_ball_goes_through_a_one_way_platform_from_below_and_bounces_off_it_from_above() {
+    for substeps in [1u32, 2] {
+        // From below, 300 m/s up: through, whatever the number of impacts, with nothing taken from its speed.
+        let (mut w, b) = one_way(-2.0, 300.0, substeps);
+        w.step(DT).unwrap();
+        let body = &w.bodies[b as usize];
+        assert!((body.xf.p.y - 3.0).abs() < 1.0e-3 && (body.linear_velocity.y - 300.0).abs() < 1.0e-3, "{substeps} impacts, from below: y {} vy {}", body.xf.p.y, body.linear_velocity.y);
+        assert!(w.events.is_empty() && w.force_events.is_empty());
+    }
+    // From above, 300 m/s down with two impacts: down to the platform's top (0.05) plus the ball's radius, 1.85 m of the 5, then back up for the other 3.15.
+    let (mut w, b) = one_way(2.0, -300.0, 2);
+    w.step(DT).unwrap();
+    let body = &w.bodies[b as usize];
+    assert!((body.xf.p.y - 3.3).abs() < 1.0e-3 && (body.linear_velocity.y - 300.0).abs() < 1.0e-3, "from above: y {} vy {}", body.xf.p.y, body.linear_velocity.y);
+    // With one impact allowed it is stopped on the platform's top, as it always was.
+    let (mut w, b) = one_way(2.0, -300.0, 1);
+    w.step(DT).unwrap();
+    assert!((w.bodies[b as usize].xf.p.y - 0.15).abs() < 0.01, "stopped on top: {}", w.bodies[b as usize].xf.p.y);
 }
