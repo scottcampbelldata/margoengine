@@ -1,5 +1,5 @@
 {
-  "commit": "dd1c45e0d",
+  "commit": "62be86d8b",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -13432,8 +13432,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 940788,
-        "gzip": 581931
+        "raw": 940860,
+        "gzip": 581997
       },
       "./decomposition": {
         "raw": 26661,
@@ -16704,9 +16704,9 @@
       "brotli": 13103
     },
     "packages/physics/dist/index.js": {
-      "raw": 940788,
-      "gzip": 581931,
-      "brotli": 563285
+      "raw": 940860,
+      "gzip": 581997,
+      "brotli": 562099
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -17092,12 +17092,12 @@
       "entry": ".",
       "base": {
         "raw": 264164,
-        "gzip": 83012
+        "gzip": 83010
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 676623,
-        "gzip": 498239,
+        "raw": 676695,
+        "gzip": 498295,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

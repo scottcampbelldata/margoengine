@@ -102,10 +102,10 @@ fn scene() -> Vec<u32> {
 
 /// The scene with the block solver of the manifolds' normal rows on or off.
 fn run(block_solver: bool) -> (Vec<u32>, Vec<u32>) {
-    run_islands(block_solver, false)
+    run_islands(block_solver, true)
 }
 
-/// The scene solved island by island or phase by phase.
+/// The scene solved island by island (what the Wasm build does, whose lists the fixture holds) or phase by phase.
 fn run_islands(block_solver: bool, island_major: bool) -> (Vec<u32>, Vec<u32>) {
     let mut random = Stream(0x4D41_5247);
     let mut w = World::new(1, 1).unwrap();
@@ -303,8 +303,10 @@ fn the_block_solver_leaves_no_manifold_of_the_scene_to_the_sweeps() {
 /// every shape, fixed and kinematic ones, joints of every kind between bodies picked at random, sleeping and waking.
 #[test]
 fn island_by_island_gives_the_state_phase_by_phase_gives() {
-    assert_eq!(run_islands(false, true).0, list("kernel"));
-    assert_eq!(run_islands(true, true).0, list("kernelBlock"));
+    for island_major in [false, true] {
+        assert_eq!(run_islands(false, island_major).0, list("kernel"), "island major {island_major}");
+        assert_eq!(run_islands(true, island_major).0, list("kernelBlock"), "island major {island_major}, block solver");
+    }
 }
 
 #[test]

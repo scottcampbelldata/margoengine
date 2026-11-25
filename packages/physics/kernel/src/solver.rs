@@ -326,6 +326,8 @@ impl World {
         }
         self.header_mut().solving = solving as u32;
         self.order_pairs_by_island(solving);
+        // What a solve called on its own (a test of the warm start, say) works on: the pairs just listed. A step sets its own.
+        self.window = self.whole_window();
     }
 
     /// The island a listed pair belongs to: that of its dynamic body, which is the same for both when both are dynamic. None for a
