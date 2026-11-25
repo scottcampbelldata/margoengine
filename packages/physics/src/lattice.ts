@@ -33,11 +33,16 @@ export interface LatticeSurface {
  */
 export type SeparatedLaw = (v: Vec3, normal: Vec3, area: number, density: number) => Vec3;
 
-/** The loads a lattice gives: each panel's force (N), where it acts (the middle of its bound segment), and its circulation. */
+/**
+ * The loads a lattice gives: each panel's force (N), where it acts (the middle of its bound segment), its circulation, and,
+ * when asked for, its slope: how fast its load along its normal grows with the air's speed through it along its normal
+ * (N per m/s), the aerodynamic damping a solver holding the surface needs to take implicitly.
+ */
 export interface LatticeLoads {
   readonly forces: Vec3[];
   readonly points: Vec3[];
   readonly circulation: Float64Array;
+  readonly slopes?: Float64Array;
 }
 
 /** The flat plate's separated law: the normal force C_N sin(a) q A across the panel, downwind (`drag` C_N, 1.17 square). */
@@ -49,8 +54,16 @@ export function flatPlate(drag: number): SeparatedLaw {
   };
 }
 
-/** Solves the lattice on `surface` and returns every panel's load; panels the air meets beyond `stall` take `separated`. */
-export function latticeLoads(surface: LatticeSurface, stall: number, separated: SeparatedLaw): LatticeLoads {
+/**
+ * Solves the lattice on `surface` and returns every panel's load; panels the air meets beyond `stall` take `separated`.
+ * With `slopes`, each panel's slope too (`LatticeLoads.slopes`), at the cost of a second elimination.
+ */
+export function latticeLoads(
+  surface: LatticeSurface,
+  stall: number,
+  separated: SeparatedLaw,
+  slopes = false,
+): LatticeLoads {
   const { nc, ns, relative, density } = surface,
     n = nc * ns,
     at = (c: number, s: number) => surface.corner(c, s),
@@ -81,7 +94,8 @@ export function latticeLoads(surface: LatticeSurface, stall: number, separated: 
   let mean: Vec3 = [0, 0, 0];
   for (const r of relative) mean = add(mean, r);
   const meanSpeed = hypot(mean[0], mean[1], mean[2]);
-  if (!(meanSpeed > 1e-9)) return { forces, points, circulation: new Float64Array(n) };
+  if (!(meanSpeed > 1e-9))
+    return { forces, points, circulation: new Float64Array(n), ...(slopes ? { slopes: new Float64Array(n) } : {}) };
   const wake = scale(mean, 1 / meanSpeed),
     // The horseshoe of panel m, unit circulation: from far down the wake to the trailing edge, along the chord to the bound
     // segment, across it, back along the chord and down the wake.
@@ -103,7 +117,10 @@ export function latticeLoads(surface: LatticeSurface, stall: number, separated: 
     rhs[k] = -dot(relative[k]!, normal[k]!);
   }
   const gamma = solve(matrix, rhs, n),
-    sinStall = sin(stall);
+    sinStall = sin(stall),
+    // A panel's circulation answers the air's speed through it by row m of the inverse at column m (rhs_m is minus it).
+    answer = slopes ? inverseDiagonal(matrix, n) : null,
+    slope = slopes ? new Float64Array(n) : null;
   for (let m = 0; m < n; m++) {
     const v = relative[m]!,
       speed = hypot(v[0], v[1], v[2]);
@@ -113,14 +130,74 @@ export function latticeLoads(surface: LatticeSurface, stall: number, separated: 
       sinA = (vn < 0 ? -vn : vn) / speed;
     if (sinA > sinStall) {
       forces[m] = separated(v, nm, area[m]!, density[m]!);
+      if (slope) {
+        // Whatever the law: its load along the normal a hair either side of this speed through the panel.
+        const h = 1e-3 * speed,
+          up = dot(separated(add(v, scale(nm, h)), nm, area[m]!, density[m]!), nm),
+          down = dot(separated(sub(v, scale(nm, h)), nm, area[m]!, density[m]!), nm);
+        slope[m] = abs(up - down) / (2 * h);
+      }
       continue;
     }
     // Attached: Kutta-Joukowski on the bound segment, with the air there and every vortex's induced velocity.
     let induced: Vec3 = [0, 0, 0];
     for (let j = 0; j < n; j++) induced = add(induced, scale(horseshoe(j, points[m]!), gamma[j]!));
-    forces[m] = scale(crossOf(add(v, induced), sub(boundB[m]!, boundA[m]!)), density[m]! * gamma[m]!);
+    const lift = crossOf(add(v, induced), sub(boundB[m]!, boundA[m]!));
+    forces[m] = scale(lift, density[m]! * gamma[m]!);
+    if (slope && answer) slope[m] = density[m]! * abs(dot(lift, nm)) * abs(answer[m]!);
   }
-  return { forces, points, circulation: gamma };
+  return { forces, points, circulation: gamma, ...(slope ? { slopes: slope } : {}) };
+}
+
+/** |x|. */
+function abs(x: number): number {
+  return x < 0 ? -x : x;
+}
+
+/** The diagonal of the inverse of `matrix` (n by n, row-major), by one elimination with partial pivoting over every column. */
+function inverseDiagonal(matrix: Float64Array, n: number): Float64Array {
+  const a = matrix.slice(),
+    b = new Float64Array(n * n);
+  for (let k = 0; k < n; k++) b[k * n + k] = 1;
+  for (let col = 0; col < n; col++) {
+    let pivot = col,
+      best = abs(a[col * n + col]!);
+    for (let row = col + 1; row < n; row++) {
+      const v = abs(a[row * n + col]!);
+      if (v > best) {
+        best = v;
+        pivot = row;
+      }
+    }
+    if (!(best > 0)) continue;
+    if (pivot !== col)
+      for (let k = 0; k < n; k++) {
+        let t = a[col * n + k]!;
+        a[col * n + k] = a[pivot * n + k]!;
+        a[pivot * n + k] = t;
+        t = b[col * n + k]!;
+        b[col * n + k] = b[pivot * n + k]!;
+        b[pivot * n + k] = t;
+      }
+    for (let row = col + 1; row < n; row++) {
+      const f = a[row * n + col]! / a[col * n + col]!;
+      if (f === 0) continue;
+      for (let k = col; k < n; k++) a[row * n + k]! -= f * a[col * n + k]!;
+      for (let k = 0; k < n; k++) b[row * n + k]! -= f * b[col * n + k]!;
+    }
+  }
+  // Back substitution of column m alone gives the inverse's column m; its entry m is all that is wanted.
+  const out = new Float64Array(n),
+    x = new Float64Array(n);
+  for (let m = 0; m < n; m++) {
+    for (let row = n - 1; row >= 0; row--) {
+      let s = b[row * n + m]!;
+      for (let k = row + 1; k < n; k++) s -= a[row * n + k]! * x[k]!;
+      x[row] = a[row * n + row]! !== 0 ? s / a[row * n + row]! : 0;
+    }
+    out[m] = x[m]!;
+  }
+  return out;
 }
 
 export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];

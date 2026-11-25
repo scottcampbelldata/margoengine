@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19025114,
+  "total": 19082099,
   "history": [
     {
       "date": "2026-10-24",
@@ -12303,6 +12303,12 @@
       "commit": "8aea6f085",
       "reason": "physics/waves is a new optional entry (SEA-01): WaveSolver, the spectral wave model with its wind input, whitecapping, quadruplets, bottom friction and breaking; its own entry so scenes without a sea pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "3d0d39b6c",
+      "grew": 5,
+      "reason": "Cloth as measured fabric held exactly (KB-SOFT-LOOPSTRETCH1, ATTACHKICK1, FRICTION2X, CUTTHRASH1): the soft kernel gains the exact Newton solve of threads, links and contacts with bodies (MPRGP with two-sided bounds, an Armijo line search, Levenberg-Marquardt row damping, the bounded friction solve) and the entry the KES-F fabric presets, flat-plate air drag and the closed-surface test; the physics kernel the pseudonormal of an oriented mesh at zero distance; flight the lattice slopes SailForce takes implicitly. Measured gzip (Mac build): physics/soft 108605 B (was under 92985), its base 33585 (30217), its lazy kernel 74174 (61340), physics 600156 (599864), physics/flight 7145 (7028). The exact solve is the soft step itself and lives in the kernel, which is already a lazy chunk loaded by SoftBodies.attach, so a split would add a request; the fabric presets are about 1 KB of the base and are what a default cloth is made of. Budgets (measured gzip + 3%): @margoengine/physics 599864 to 618161 B; @margoengine/physics/soft 92985 to 111864 B; @margoengine/physics/flight 7028 to 7401 B; @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)) 30217 to 34593 B; @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table) 61340 to 76400 B."
     }
   ],
   "items": {
@@ -13089,18 +13095,18 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 599864,
+    "@margoengine/physics": 618161,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 90793,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
-    "@margoengine/physics/flight": 7028,
+    "@margoengine/physics/flight": 7401,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/soft": 92985,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 30217,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
+    "@margoengine/physics/soft": 111864,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/waves": 6250,
     "@margoengine/physics/world": 14716,
     "@margoengine/physics2d": 21360,

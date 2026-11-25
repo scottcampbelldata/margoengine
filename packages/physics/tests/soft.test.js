@@ -3,7 +3,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Physics } from '../dist/index.js';
-import { SoftBodies, SoftBodyDesc, SoftBodyMaterial, SoftMeshBinding } from '../dist/soft.js';
+import {
+  FABRICS,
+  fabricTensileStiffness,
+  SoftBodies,
+  SoftBodyDesc,
+  SoftBodyMaterial,
+  SoftMeshBinding,
+} from '../dist/soft.js';
 
 const warn = console.warn;
 console.warn = () => {};
@@ -931,23 +938,48 @@ test('dominance decides who gives way: the soft body holds against a lower group
   assert.throws(() => new SoftBodyDesc([0, 0, 0]).setDominanceGroup(300), RangeError);
 });
 
-test('extra solver iterations stiffen a sheet, a surface collider can be made with the body, and a closed surface is oriented', async () => {
-  const hang = async (extra) => {
+test('an inextensible sheet holds its threads within 0.1 percent at any pass count and load, a surface collider can be made with the body, and a closed surface is oriented', async () => {
+  // Threads held inextensible (no tensile spring) are solved exactly, loops and all, to the strain Goldenthal et al. hold
+  // cloth to: the same at no extra passes and thirty, and with a load a thousand times a particle's mass at the corner. (The
+  // sweep this replaced left a sheet longer the fewer passes it had, which this test once measured as a feature.)
+  const strainOf = async (extra, load) => {
     const { physics, soft } = await create({ gravity: [0, -9.81, 0] });
-    const n = 10;
+    const n = 10,
+      d = 0.1;
+    const material = new SoftBodyMaterial();
+    material.tensile = null;
+    const masses = new Array(n * n).fill(0.2);
+    masses[n * n - 1] = 0.2 * load;
     const cloth = soft.create(
-      SoftBodyDesc.cloth([0, 3, 0], [0.1, 0, 0], [0, -0.1, 0], n, n)
+      SoftBodyDesc.cloth([0, 3, 0], [d, 0, 0], [0, -d, 0], n, n)
+        .setMaterial(material)
         .setPinnedParticles(Array.from({ length: n }, (_, i) => i * n))
-        .setParticleMass(0.2)
+        .setMasses(masses)
         .setLinearDamping(1)
         .setAdditionalSolverIterations(extra),
     );
-    steps(physics, 200);
-    return 3 - cloth.particlePosition((n - 1) * n + n - 1)[1];
+    let worst = 0;
+    for (let s = 0; s < 200; s++) {
+      physics.step();
+      const p = cloth.particlePositions();
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          const a = i * n + j;
+          for (const b of [j + 1 < n ? a + 1 : -1, i + 1 < n ? a + n : -1]) {
+            if (b < 0) continue;
+            const l = Math.hypot(p[a * 3] - p[b * 3], p[a * 3 + 1] - p[b * 3 + 1], p[a * 3 + 2] - p[b * 3 + 2]);
+            worst = Math.max(worst, l / d - 1);
+          }
+        }
+    }
+    return worst;
   };
-  const loose = await hang(0),
-    tight = await hang(30);
-  assert.ok(tight < loose, `more passes hold the sheet shorter: ${tight} against ${loose}`);
+  for (const extra of [0, 30])
+    for (const load of [1, 1000]) {
+      const strain = await strainOf(extra, load);
+      // The tolerance, and what an f32 length of 10 cm holds besides.
+      assert.ok(strain <= 1e-3 + 1e-6, `${extra} extra passes, load ${load}: a thread strains ${strain}`);
+    }
   assert.throws(() => new SoftBodyDesc([0, 0, 0]).setAdditionalSolverIterations(-1), RangeError);
 
   const { physics, soft } = await create({ gravity: [0, 0, 0] });
@@ -1137,13 +1169,21 @@ test('small and thin rigid bodies dropped on a default cloth rest on it for five
   }
 });
 
-test('a cloth draped over a sharp box edge hangs over it, never enters the box and does not pop', async () => {
+// A cloth half over a sharp box edge: does friction hold it? At the edge the cloth turns through 90 degrees, so the edge
+// presses on it with sqrt(2) times the mean of the tensions either side, and its friction can hold the difference: with the
+// hanging half's weight W/2 pulling and the top half's friction mu W/2 holding, it holds while
+//   W/2 - mu W/2 <= mu sqrt(2) (W/2 + mu W/2) / 2,  i.e. mu >= mu_crit = 0.487
+// (the root of 0.354 mu^2 + 0.854 mu - 0.5). The estimate idealises the edge as a point and the cloth as a string with no
+// bending stiffness; a rounded contact, bending and the landing's momentum move the real threshold by tens of percent, so a
+// coefficient near 0.49 (the 0.5 this test once used) cannot be decided either way. These cases sit well clear of it: at
+// twice mu_crit the cloth must hold, at under half of it it must slide off.
+const drape = async (mu) => {
   const { physics, soft } = await create();
   // A box whose top edge runs along x = 0 at y = 1, and a free cloth 55 cm wide falling on it with half its width past the edge.
   physics.addBody(null, {
     type: 'fixed',
     position: [-0.3, 0.5, 0],
-    colliders: { shape: 'box', halfExtents: [0.3, 0.5, 0.3] },
+    colliders: { shape: 'box', halfExtents: [0.3, 0.5, 0.3], friction: mu },
   });
   const n = 12,
     d = 0.05;
@@ -1154,13 +1194,16 @@ test('a cloth draped over a sharp box edge hangs over it, never enters the box a
     const p = cloth.particlePositions(),
       v = cloth.particleVelocities();
     for (let k = 0; k < p.length; k += 3) {
-      const inside = p[k] < -0.001 && p[k] > -0.599 && p[k + 1] < 0.999 && Math.abs(p[k + 2]) < 0.299;
-      assert.ok(!inside, `step ${i}: particle ${k / 3} is inside the box at ${p[k]}, ${p[k + 1]}, ${p[k + 2]}`);
+      // Inside the box: within its footprint and between its bottom (y = 0) and its top (y = 1).
+      const inside =
+        p[k] < -0.001 && p[k] > -0.599 && p[k + 1] < 0.999 && p[k + 1] > 0.001 && Math.abs(p[k + 2]) < 0.299;
+      assert.ok(
+        !inside,
+        `mu ${mu}, step ${i}: particle ${k / 3} is inside the box at ${p[k]}, ${p[k + 1]}, ${p[k + 2]}`,
+      );
       if (i > 40) fastest = Math.max(fastest, Math.hypot(v[k], v[k + 1], v[k + 2]));
     }
   }
-  // Once it has landed nothing jumps (no particle snags on the edge and springs off), and it hangs past the edge.
-  assert.ok(fastest < 1, `no particle pops once the cloth has landed: ${fastest} m/s`);
   const p = cloth.particlePositions();
   let lowest = Infinity,
     highest = -Infinity;
@@ -1168,8 +1211,20 @@ test('a cloth draped over a sharp box edge hangs over it, never enters the box a
     lowest = Math.min(lowest, p[k]);
     highest = Math.max(highest, p[k]);
   }
+  return { fastest, lowest, highest };
+};
+
+test('a cloth over a sharp box edge with friction twice what holds it hangs over the edge, never enters the box and does not pop', async () => {
+  const { fastest, lowest, highest } = await drape(1.0);
+  // Once it has landed nothing jumps (no particle snags on the edge and springs off), and it hangs past the edge.
+  assert.ok(fastest < 1, `no particle pops once the cloth has landed: ${fastest} m/s`);
   assert.ok(highest > 1 && highest < 1.1, `the part on the box lies on its top: ${highest}`);
   assert.ok(lowest < 0.85, `the part past the edge hangs down over it: ${lowest}`);
+});
+
+test('a cloth over a sharp box edge with under half the friction that holds it slides off, never through the box', async () => {
+  const { highest } = await drape(0.2);
+  assert.ok(highest < 0, `it slid off the box and fell: its highest particle is at ${highest}`);
 });
 
 test('a contact is stable at a mass ratio of a thousand either way, and a cloth holds a body or tears, never lets it through', async () => {
@@ -1188,12 +1243,23 @@ test('a contact is stable at a mass ratio of a thousand either way, and a cloth 
       position: [0, 1.4, 0],
       colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: boxMass },
     });
-    let fastest = 0;
+    let fastest = 0,
+      touched = false,
+      clear = 0;
+    const centre = [];
     for (let i = 0; i < 300; i++) {
       physics.step();
       fastest = Math.max(fastest, box.linearVelocity[1]);
       const [x, y, z] = box.position,
-        under = clothHeight(cloth, x, z);
+        under = clothHeight(cloth, x, z),
+        p = cloth.particlePositions();
+      // The sheet's middle: the four particles round its centre.
+      centre.push([5 * n + 5, 5 * n + 6, 6 * n + 5, 6 * n + 6].reduce((sum, k) => sum + p[k * 3 + 1], 0) / 4);
+      // How far the box's underside is above the sheet under it, once it has come down on it.
+      if (under !== null) {
+        if (box.linearVelocity[1] > 0) touched = true;
+        if (touched) clear = Math.max(clear, y - 0.1 - under);
+      }
       // An intact cloth never lets the box between its particles: while the box is over it, its centre stays over the sheet.
       if (!tore && under !== null)
         assert.ok(
@@ -1201,7 +1267,14 @@ test('a contact is stable at a mass ratio of a thousand either way, and a cloth 
           `particles ${particleMass} kg, box ${boxMass} kg: step ${i}: the box passed through the cloth (${y} under ${under})`,
         );
     }
-    return { y: box.position[1], fastest, tore, under: clothHeight(cloth, box.position[0], box.position[2]) };
+    return {
+      y: box.position[1],
+      fastest,
+      tore,
+      under: clothHeight(cloth, box.position[0], box.position[2]),
+      centre,
+      clear,
+    };
   };
   for (const [particleMass, boxMass] of [
     [1, 1000],
@@ -1217,10 +1290,76 @@ test('a contact is stable at a mass ratio of a thousand either way, and a cloth 
       result.under !== null && result.y > result.under,
       `and is held on the cloth: ${result.y} over ${result.under}`,
     );
+    if (boxMass === 0.001) {
+      // The pebble on a sheet of 144 kg must leave it for a while. The sheet rings after its drop: from its middle's own
+      // motion, a crest, the trough after it and the next crest give its amplitude A and period T. A pebble resting on it
+      // leaves it at a crest when the sheet's downward acceleration there, omega^2 A for omega = 2 pi / T, exceeds g. The
+      // sheet then falls away faster than the pebble can follow (contacts push and never pull). So the pebble hops, clear
+      // of every contact's reach (twice the faces' thickness, the circumradius 0.1 / sqrt(2) of a cell's triangle), and comes
+      // back down onto the sheet, never under it and never thrown.
+      const y = result.centre,
+        extremes = [];
+      for (let i = 1; i + 1 < y.length; i++)
+        if ((y[i] > y[i - 1] && y[i] >= y[i + 1]) || (y[i] < y[i - 1] && y[i] <= y[i + 1])) extremes.push(i);
+      // The drop's lowest point is the first extreme; the ringing starts at the crest after it.
+      const [crest, trough, next] = [extremes[1], extremes[2], extremes[3]],
+        period = (next - crest) / 60,
+        amplitude = (y[crest] + y[next] - 2 * y[trough]) / 4,
+        omega = (2 * Math.PI) / period;
+      assert.ok(y[crest] > y[trough] && y[next] > y[trough], 'the ringing is found: a crest, a trough, a crest');
+      assert.ok(
+        omega * omega * amplitude > 9.81,
+        `the sheet's crest outpaces gravity: omega^2 A ${omega * omega * amplitude}`,
+      );
+      assert.ok(result.clear > 2 * (0.1 / Math.SQRT2), `so the pebble leaves it: ${result.clear} m clear`);
+    }
   }
   // A cloth that tears past a strain lets the tonne through by tearing, not by passing it between its particles.
   const torn = await run(1, 1000, 0.05);
   assert.ok(torn.tore, 'a cloth with a tear strain tears under a tonne');
+});
+
+test('a light box pinched between two closing cloths leaves no faster than they close', async () => {
+  // No gravity: two 0.6 m curtains of 1 kg particles 0.3 m apart close on a box 0.1 m across at v each way. Every contact is
+  // inelastic (its velocity pass takes out the speed along its normal), so a wall gives the box no more speed along its
+  // normal than it had, and the most two walls give a box between them is the speed they close at, 2 v. That holds while
+  // they pinch it: until they have closed the 0.2 m between them and the box and as long again, 0.2 / v seconds. (After that,
+  // a 1 g box riding 160 kg of crumpling cloth goes where the cloth whips it.) A light box (1 g) is where it went wrong: its
+  // contacts with the two sides hold it twice over, a singular system whose multipliers ran away until the contacts' rows
+  // were damped (rigid.rs, ROW_DAMPING); the sharper repro of that is the 1 g box on a 144 kg sheet, in the mass-ratio test.
+  for (const [boxMass, v] of [
+    [0.001, 1],
+    [0.001, 3],
+    [1, 1],
+  ]) {
+    const { physics, soft } = await create({ gravity: [0, 0, 0] });
+    const n = 9,
+      d = 0.075;
+    const curtains = [-1, 1].map((side) =>
+      soft.create(SoftBodyDesc.cloth([side * 0.15, -0.3, -0.3], [0, d, 0], [0, 0, d], n, n).setParticleMass(1)),
+    );
+    const box = physics.addBody(null, {
+      position: [0, 0, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.05, 0.05], mass: boxMass },
+    });
+    curtains.forEach((curtain, k) => {
+      for (let p = 0; p < n * n; p++) curtain.applyParticleImpulse(p, [(k === 0 ? 1 : -1) * v, 0, 0]);
+    });
+    const pinch = Math.ceil((0.2 / v) * 60);
+    let fastest = 0;
+    for (let i = 0; i < pinch; i++) {
+      physics.step();
+      fastest = Math.max(fastest, Math.hypot(...box.linearVelocity));
+      assert.ok(
+        box.position.every(Number.isFinite),
+        `box ${boxMass} kg at ${v} m/s: step ${i}: the box stays a number`,
+      );
+    }
+    assert.ok(
+      fastest <= 2 * v,
+      `box ${boxMass} kg, walls at ${v} m/s each: its fastest, ${fastest} m/s, is within ${2 * v}`,
+    );
+  }
 });
 
 test('a soft body is drawn between steps by alpha, as rigid bodies are, and a teleport leaves no trail (PA-06)', async () => {
@@ -1253,4 +1392,93 @@ test('a soft body is drawn between steps by alpha, as rigid bodies are, and a te
   assert.equal(cloth.interpolatedPositions(0.5, out), out);
   assert.throws(() => cloth.interpolatedPositions(0.5, new Float32Array(2)), /three numbers a particle/);
   assert.throws(() => cloth.interpolatedPositions(Number.NaN), /alpha/);
+});
+
+test('a cloth linked to a rigid body keeps its momentum when its free particles are kicked (KB-SOFT-ATTACHKICK1)', async () => {
+  // The repro: no gravity, a 4 by 7 cloth whose first row (seven particles) is linked to a 50 kg box, the 21 others kicked 0.1 N s
+  // along x before each step. The links and the cloth's rigid edges are solved in one system with the box as an unknown, so
+  // the box and the cloth together hold exactly what was applied; with the edges swept apart from the links, and the edge
+  // between two linked particles a redundant row, they held thousands of times it. A woven cloth and a mesh of the same
+  // triangles both; the air is left out, which would rightly take momentum away. The mesh also without shape matching: its
+  // rigid edges then hold its interior twice over in its plane (a flat mesh has more edges than its plane has freedoms), a
+  // singular system whose multipliers ran away until the rows were damped (rigid.rs, ROW_DAMPING); it flew apart in five steps.
+  for (const [mesh, matching] of [
+    [false, true],
+    [true, true],
+    [true, false],
+  ]) {
+    const { physics, soft } = await create({ gravity: [0, 0, 0] });
+    const nu = 4,
+      nv = 7,
+      d = 0.1;
+    const sheet = SoftBodyDesc.cloth([0, 0, 0], [d, 0, 0], [0, 0, d], nu, nv);
+    const desc = (mesh ? SoftBodyDesc.trimesh(sheet.positions, sheet.triangles).setShapeMatching(matching) : sheet)
+      .setParticleMass(1)
+      .setAirDrag(false);
+    const cloth = soft.create(desc);
+    const box = physics.addBody(null, {
+      position: [0.15, 0, -0.2],
+      colliders: { shape: 'box', halfExtents: [0.2, 0.05, 0.05], mass: 50 },
+    });
+    const linked = Array.from({ length: nv }, (_, j) => j);
+    for (const p of linked) cloth.attachParticle(p, box);
+    const free = Array.from({ length: nu * nv }, (_, p) => p).filter((p) => !linked.includes(p));
+    for (let s = 0; s < 30; s++) {
+      for (const p of free) cloth.applyParticleImpulse(p, [0.1, 0, 0]);
+      physics.step();
+    }
+    const v = cloth.particleVelocities(),
+      momentum = [0, 1, 2].map((k) => {
+        let sum = 50 * box.linearVelocity[k];
+        for (let p = 0; p < nu * nv; p++) sum += v[p * 3 + k];
+        return sum;
+      }),
+      applied = 0.1 * free.length * 30;
+    // f32 velocities of 29 particles and a body over 30 steps: a few parts in ten thousand.
+    near(
+      momentum[0],
+      applied,
+      1e-3 * applied,
+      `${mesh ? (matching ? 'mesh' : 'mesh, no shape matching') : 'woven'}: momentum along the kicks`,
+    );
+    near(
+      momentum[1],
+      0,
+      1e-3 * applied,
+      `${mesh ? (matching ? 'mesh' : 'mesh, no shape matching') : 'woven'}: no momentum up`,
+    );
+    near(
+      momentum[2],
+      0,
+      1e-3 * applied,
+      `${mesh ? (matching ? 'mesh' : 'mesh, no shape matching') : 'woven'}: no momentum across`,
+    );
+  }
+});
+
+test("a strip of the default fabric hung between its ends sags as an elastic cable of the fabric's measured stiffness", async () => {
+  // A 1 m strip of cotton shirting (the default: its measured weight and its warp's KES-F stretch) pinned at both ends, its
+  // warp along the span. A shallow elastic cable with no slack sags until the length the sag needs, 8 d^2 / (3 L), is the
+  // stretch its tension H = w L^2 / (8 d) gives, H L / EA (Irvine, *Cable Structures*, 1981, chapter 2), so
+  //   d = L (3 w L / (64 EA))^(1/3), with w / EA = rho_A g / K
+  // per width: the areal density over the fabric's tensile stiffness, the same for every thread. Its error: the shallow-cable
+  // forms neglect terms of (d / L)^2 (0.05 percent here), twenty segments of the curve differ from it by about 1 / N^2 (0.25
+  // percent), and the strip is let settle for ten seconds of yarn and air damping; within 1 percent.
+  const { physics, soft } = await create();
+  const nu = 21,
+    l = 0.05,
+    span = (nu - 1) * l;
+  const cloth = soft.create(
+    SoftBodyDesc.cloth([0, 1, 0], [l, 0, 0], [0, 0, l], nu, 2).setPinnedParticles([
+      0,
+      1,
+      (nu - 1) * 2,
+      (nu - 1) * 2 + 1,
+    ]),
+  );
+  steps(physics, 600);
+  const sag = 1 - cloth.particlePosition(((nu - 1) / 2) * 2)[1];
+  const stiffness = fabricTensileStiffness(FABRICS.cottonShirting.tensile.warp),
+    expected = span * Math.cbrt((3 * FABRICS.cottonShirting.arealDensity * 9.81 * span) / (64 * stiffness));
+  near(sag, expected, 0.01 * expected, 'the mid-span sag');
 });

@@ -96,7 +96,12 @@ impl World {
             let gap = if start.inside { -distance - radius } else { distance - radius };
             if gap <= 1e-5 * (1.0 + radius) {
                 let away = if length > 1e-9 { step.scale(-1.0 / length) } else { v3(0.0, 1.0, 0.0) };
-                let normal = if distance > 1e-9 { offset.scale(if start.inside { -1.0 } else { 1.0 } / distance) } else { away };
+                let touching = distance <= 1e-5 * (1.0 + radius);
+                let normal = match if touching { self.surface_normal(c, start.point) } else { None } {
+                    Some(out) => out,
+                    None if distance > 1e-9 => offset.scale(if start.inside { -1.0 } else { 1.0 } / distance),
+                    None => away,
+                };
                 let depth = radius - end.sub(start.point).dot(normal);
                 // Going into it, or still within reach at the end.
                 if step.dot(normal) < 0.0 || depth > -margin.max(0.0) {
@@ -129,7 +134,12 @@ impl World {
                 if let Some(nearest) = self.project_collider(c, q, false) {
                     let offset = q.sub(nearest.point);
                     let distance = length_of(offset);
-                    let normal = if distance > 1e-9 { offset.scale(if nearest.inside { -1.0 } else { 1.0 } / distance) } else { v3(0.0, 1.0, 0.0) };
+                    let touching = distance <= 1e-5 * (1.0 + radius);
+                    let normal = match if touching { self.surface_normal(c, nearest.point) } else { None } {
+                        Some(out) => out,
+                        None if distance > 1e-9 => offset.scale(if nearest.inside { -1.0 } else { 1.0 } / distance),
+                        None => v3(0.0, 1.0, 0.0),
+                    };
                     let depth = radius - end.sub(nearest.point).dot(normal);
                     return Some(ParticleContact { collider: c as u32, t, normal, point: nearest.point, depth, started: false });
                 }
@@ -157,15 +167,17 @@ impl World {
         let nearest = self.project_collider(c, to, false)?;
         let offset = to.sub(nearest.point);
         let distance = sqrt(offset.dot(offset));
+        let touching = distance <= 1e-5 * (1.0 + radius);
+        let on_surface = if touching { self.surface_normal(c, nearest.point) } else { None };
         if nearest.inside {
             // From inside, out through the nearest face.
-            let normal = if distance > 1e-9 { offset.scale(-1.0 / distance) } else { v3(0.0, 1.0, 0.0) };
+            let normal = on_surface.unwrap_or(if distance > 1e-9 { offset.scale(-1.0 / distance) } else { v3(0.0, 1.0, 0.0) });
             return Some(ParticleContact { collider: c as u32, t: 1.0, normal, point: nearest.point, depth: radius + distance, started: false });
         }
         if distance >= radius + margin.max(0.0) {
             return None;
         }
-        let normal = if distance > 1e-9 { offset.scale(1.0 / distance) } else { v3(0.0, 1.0, 0.0) };
+        let normal = on_surface.unwrap_or(if distance > 1e-9 { offset.scale(1.0 / distance) } else { v3(0.0, 1.0, 0.0) });
         Some(ParticleContact { collider: c as u32, t: 1.0, normal, point: nearest.point, depth: radius - distance, started: false })
     }
 
@@ -187,6 +199,25 @@ impl World {
             }
         }
         (v, triangle)
+    }
+
+    /// The outward normal of collider `c` at a point `at` on its surface, when it is an oriented mesh: the angle-weighted
+    /// pseudonormal of the triangle, edge or corner the point is on (face.rs, `outward_normal`). A particle that touches
+    /// such a mesh at no distance (a cut's two halves, each one's corners on the other's surface) has no offset to take a
+    /// normal from, and the reverse of its own move, the fallback, pushed the two halves of a cut cube along each other.
+    fn surface_normal(&self, c: usize, at: V3) -> Option<V3> {
+        if self.uu(COLLIDER_SHAPE, c) != SHAPE_TRIMESH || self.is_round_triangle(c) {
+            return None;
+        }
+        let mesh = self.uu(COLLIDER_HULL, c) as usize;
+        if self.uu(MESH_FLAGS, mesh) & MESH_ORIENTED == 0 || self.grid_size(mesh).is_some() || self.is_voxels(mesh) {
+            return None;
+        }
+        let pose = self.collider_pose(c);
+        let local = pose.unapply(at);
+        let t = self.nearest_triangle(mesh, local)?;
+        let corners = self.triangle_corners(self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_FIRST_TRIANGLE, mesh) as usize + t);
+        self.outward_normal(mesh, t as u32, crate::face::barycentric(local, corners), pose)
     }
 
     /// The triangle of a mesh nearest a point in the mesh's frame, by walking its tree nearest box first.

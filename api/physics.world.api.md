@@ -6,6 +6,7 @@
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
 import { FilmClock, FrameOffset, FrameRate } from "@margoengine/math/clock";
+import { FlowField } from "@margoengine/math/fields";
 
 export class Aitken {
     readonly start: number;
@@ -769,6 +770,30 @@ interface DynamicCharacterOptions {
         maxHeight: number;
         minDepth?: number;
     };
+}
+
+interface Fabric {
+    readonly name: string;
+    readonly shear: FabricShear;
+    readonly tensile: FabricTensile;
+    readonly arealDensity: number;
+    readonly source: string;
+}
+
+interface FabricShear {
+    readonly rigidity: number;
+    readonly hysteresis: number;
+}
+
+interface FabricTensile {
+    readonly warp: FabricTension;
+    readonly weft: FabricTension;
+}
+
+interface FabricTension {
+    readonly strain: number;
+    readonly energy: number;
+    readonly resilience: number;
 }
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
@@ -2089,6 +2114,7 @@ class SoftBodies implements PhysicsAttachment {
     splitOnTear: 'cells' | 'all' | 'never';
     substeps: number;
     iterations: number;
+    wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null;
     private constructor();
     static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
     debugRender(options?: {
@@ -2193,6 +2219,9 @@ class SoftBody {
     surface: PhysicsBody | null;
     matched: boolean;
     edgeKinds: Uint8Array<ArrayBuffer>;
+    edgeShear: Float32Array<ArrayBuffer>;
+    airDrag: boolean;
+    airLoads: number;
     volumeOn: boolean;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -2287,6 +2316,7 @@ class SoftBodyDesc {
     positions: number[];
     edgePairs: number[];
     edgeKinds: number[];
+    edgeShear: number[];
     bendPairs: number[];
     grid: {
         nu: number;
@@ -2364,6 +2394,7 @@ class SoftBodyDesc {
     addEdges(pairs: ArrayLike<number>): this;
     append(other: SoftBodyDesc): this;
     setPinnedParticles(indices: ArrayLike<number>): this;
+    setFabric(fabric: Fabric): this;
     setParticleMass(mass: number): this;
     setMass(mass: number): this;
     setMasses(masses: ArrayLike<number>): this;
@@ -2373,6 +2404,8 @@ class SoftBodyDesc {
     setEdgeTearResistance(strain: number): this;
     setGravityScale(scale: number): this;
     setLinearDamping(damping: number): this;
+    setAirDrag(on: boolean): this;
+    airDrag: boolean;
     setTranslation(translation: Vec3): this;
 }
 
@@ -2381,6 +2414,9 @@ class SoftBodyMaterial {
     warpSoftness: SoftSoftness | null;
     weftSoftness: SoftSoftness | null;
     shearSoftness: SoftSoftness | null;
+    shear: FabricShear | null;
+    tensile: FabricTensile | null;
+    arealDensity: number | null;
     bendSoftness: SoftSoftness;
     tearStrain: number;
     shapeMatchingSoftness: SoftSoftness;
@@ -2394,6 +2430,7 @@ class SoftBodyMaterial {
     maxTearsPerStep: number;
     minPiece: number;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
+    static fabric(fabric: Fabric): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
 }
 

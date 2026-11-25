@@ -1,7 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Soft bodies: ropes, cloth and particle meshes on their own small Rust kernel (compliant distance constraints, Macklin,
 // Mueller and Chentanez, "XPBD", 2016; many small steps, Macklin et al., 2019), coupled both ways with the rigid world.
+import { standardDensity } from '@margoengine/math/atmosphere';
 import { MargoError } from '@margoengine/math/errors';
+import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsCollider } from './collider.js';
@@ -63,6 +65,21 @@ const TARGETED = 2;
 const TORN = 1;
 /** An edge that resists stretch and not squeeze. */
 const TENSION = 2;
+/** An edge of a sheet (a woven sheet's warp or weft, a triangle mesh's edge): rigid, the kernel holds it exactly, loops and all. */
+const SHEET = 4;
+/** An edge whose `omega` is a spring stiffness in N/m (a fabric's shear), not a natural frequency. */
+const STIFFNESS = 8;
+/** A shear rigidity of 1 gf/(cm deg), Kawabata's unit, in N/m per radian: 9.80665e-3 N / 0.01 m x 180 / pi. */
+const GF_PER_CM_DEGREE = ((9.80665e-3 / 0.01) * 180) / Math.PI;
+/** The shear angle KES-F reads the shear hysteresis 2HG at: 0.5 degrees, in degrees. */
+const HYSTERESIS_ANGLE = 0.5;
+/** A tensile stiffness of 1 gf/cm per unit strain, KES-F's unit of force per width, in N/m. */
+const GF_PER_CM = 9.80665e-3 / 0.01;
+/**
+ * The normal-force coefficient of a flat plate square to the air: 1.17 for a square plate (Hoerner, *Fluid-Dynamic Drag*, 1965,
+ * chapter 3), the value `WindForce` and `SailForce` take for a surface the air meets square.
+ */
+const PLATE_DRAG = 1.17;
 const INTEGER_COLUMNS = new Set([
   'pflags',
   'pbody',
@@ -134,6 +151,173 @@ export interface SoftSoftness {
   dampingRatio: number;
 }
 
+/**
+ * A woven fabric's shear as Kawabata's KES-F shear tester (KES-FB1) measures it: the force per centimetre of width it takes
+ * to shear the cloth by an angle (Kawabata, "The Standardization and Analysis of Hand Evaluation", 1980). Real fabric is
+ * nearly inextensible along its threads and shears easily across them, three orders of magnitude more easily, which is how a
+ * cloth drapes (Goldenthal et al. 2007).
+ */
+export interface FabricShear {
+  /** Shear rigidity G, gf/(cm deg): the slope of the shear force per centimetre of width over the shear angle. */
+  readonly rigidity: number;
+  /** Shear hysteresis 2HG, gf/cm: the width of the force loop at a shear angle of 0.5 degrees, the energy a shear cycle loses. */
+  readonly hysteresis: number;
+}
+
+/**
+ * A woven fabric's stretch along one direction as KES-F's tensile tester (KES-FB1) measures it: the fabric pulled to 500 gf/cm
+ * of width, the strain it reaches there and the energy it took (Kawabata 1980).
+ */
+export interface FabricTension {
+  /** EMT, percent: the strain at 500 gf/cm. */
+  readonly strain: number;
+  /** WT, gf cm/cm^2: the tensile energy per area to that strain. */
+  readonly energy: number;
+  /** RT, percent: the share of that energy the fabric gives back as it is let go (its tensile resilience). */
+  readonly resilience: number;
+}
+
+/** A woven fabric's stretch along its warp and its weft. */
+export interface FabricTensile {
+  readonly warp: FabricTension;
+  readonly weft: FabricTension;
+}
+
+/**
+ * The tensile stiffness of a fabric along one direction, N/m (force per width per unit strain): the linear spring that stores
+ * the energy the fabric was measured to take up to its strain at 500 gf/cm, 2 WT / EMT^2. Real fabric stiffens as it is pulled
+ * (its linearity LT is under 1: slack crimp straightens first), so this one spring is the fabric's average over 0 to EMT and
+ * holds over that range, up to 500 gf/cm (490 N/m): softer than the fabric at its highest loads and stiffer at its lightest. A
+ * thread of a cloth's grid, of rest length l carrying a width s of the cloth (half the way to the thread on each side, so half
+ * a cell at the cloth's edge), is a spring of this times s / l, so the cloth stretches alike at any resolution and width.
+ */
+export function fabricTensileStiffness(tension: FabricTension): number {
+  const strain = tension.strain / 100;
+  return ((2 * tension.energy) / (strain * strain)) * GF_PER_CM;
+}
+
+/**
+ * The damping ratio of a fabric's threads: the viscous damping that loses what the measured tensile cycle loses (Jacobsen,
+ * "Steady forced vibration as influenced by damping", Transactions of the ASME 52, 1930: zeta = dE / (4 pi E)). Pulled to its
+ * strain at 500 gf/cm the fabric takes WT and gives back RT of it, so a cycle to that strain loses (1 - RT) WT against WT
+ * stored: zeta = (1 - RT) / (4 pi). The loss is friction between the yarns, about the same at any strain, so a smaller
+ * stretch is damped more than this and a larger one less.
+ */
+export function fabricTensileDamping(tension: FabricTension): number {
+  return (1 - tension.resilience / 100) / (4 * Math.PI);
+}
+
+/** A woven fabric: its measured shear and stretch and its areal density, with where the numbers come from. */
+export interface Fabric {
+  readonly name: string;
+  readonly shear: FabricShear;
+  readonly tensile: FabricTensile;
+  /** Mass per area, kg/m^2. */
+  readonly arealDensity: number;
+  /** The measurement the numbers come from. */
+  readonly source: string;
+}
+
+/**
+ * The spring a fabric's shear rigidity puts on each diagonal of a cloth's cells, N/m. A cell of sides a and b sheared by a
+ * small angle stores G a b gamma^2 / 2 (G in N/m per radian); each diagonal of length L stretches by a b gamma / L, so its two
+ * diagonals hold that energy with springs of G L^2 / (2 a b) each: G itself for a square cell, whatever its size, so the
+ * cloth shears alike at any resolution.
+ */
+export function fabricShearStiffness(shear: FabricShear): number {
+  return shear.rigidity * GF_PER_CM_DEGREE;
+}
+
+/**
+ * The damping ratio of a fabric's shear: the viscous damping that loses what the measured hysteresis loses at the angle it is
+ * measured at (Jacobsen, "Steady forced vibration as influenced by damping", Transactions of the ASME 52, 1930: zeta =
+ * dE / (4 pi E)). A loop of width 2HG over +-0.5 degrees loses 2HG x 2 x 0.5 deg a cycle against G (0.5 deg)^2 / 2 stored, so
+ * zeta = 2HG / (pi G 0.5 deg). The hysteresis of a fabric is friction between its threads, the same width at any angle, so a
+ * larger shear is damped less than this and a smaller one more.
+ */
+export function fabricShearDamping(shear: FabricShear): number {
+  return shear.hysteresis / (Math.PI * shear.rigidity * HYSTERESIS_ANGLE);
+}
+
+/** Luible's thesis, the source of every preset but where said otherwise. */
+const LUIBLE =
+  'Luible, "Study of mechanical properties in the simulation of 3D garments", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C';
+
+/**
+ * Woven fabrics as measured, for {@link SoftBodyDesc.setFabric} and {@link SoftBodyMaterial.fabric}: each the mean of the
+ * warp and weft values of one fabric of the one published set that measured them all on one instrument (Luible 2008, 42
+ * fabrics on the KES-F). Presets are representative, not exact: the same named fabric measured elsewhere differs by up to ten
+ * times (a cotton broadcloth's G is 3.5 gf/(cm deg) in Seo and Tamura 2017 against 0.34 here; a wool gabardine's 2.8 against
+ * 0.57; JIS silk habutae 0.11 to 0.51 in Miura et al. 2010 and Nakajima and Miura 2013), with weave, finish and humidity.
+ */
+export const FABRICS = Object.freeze({
+  /** Shirt cotton, 100 percent cotton, 120 g/m^2 (sample 2): G 0.367 / 0.321, 2HG 0.258 / 0.196; EMT 5.874 / 5.608 %, WT 9.23 / 9.03, RT 52.03 / 48.48 %. The default cloth. */
+  cottonShirting: Object.freeze({
+    name: 'cotton shirting',
+    shear: Object.freeze({ rigidity: (0.367 + 0.321) / 2, hysteresis: (0.258 + 0.196) / 2 }),
+    tensile: Object.freeze({
+      warp: Object.freeze({ strain: 5.874, energy: 9.23, resilience: 52.03 }),
+      weft: Object.freeze({ strain: 5.608, energy: 9.03, resilience: 48.48 }),
+    }),
+    arealDensity: 0.12,
+    source: `${LUIBLE}, sample 2`,
+  }),
+  /** Wool gabardine, 100 percent wool twill, 175 g/m^2 (sample 5): G 0.588 / 0.545, 2HG 0.197 / 0.129; EMT 4.614 / 5.741 %, WT 8.53 / 10.43, RT 70.68 / 67.16 %. */
+  woolGabardine: Object.freeze({
+    name: 'wool gabardine',
+    shear: Object.freeze({ rigidity: (0.588 + 0.545) / 2, hysteresis: (0.197 + 0.129) / 2 }),
+    tensile: Object.freeze({
+      warp: Object.freeze({ strain: 4.614, energy: 8.53, resilience: 70.68 }),
+      weft: Object.freeze({ strain: 5.741, energy: 10.43, resilience: 67.16 }),
+    }),
+    arealDensity: 0.175,
+    source: `${LUIBLE}, sample 5`,
+  }),
+  /**
+   * Silk, bourette (natural silk) plain weave, 150 g/m^2 (sample 8): G 0.733 / 0.597, 2HG 0.647 / 0.654; EMT 3.372 / 6.913 %, WT 5.78 / 10.38, RT 54.55 / 48.67 %. The thesis's light
+   * 15 g/m^2 silk (sample 7) reads a negative hysteresis, under what the instrument resolves, so it is not used.
+   */
+  silk: Object.freeze({
+    name: 'silk',
+    shear: Object.freeze({ rigidity: (0.733 + 0.597) / 2, hysteresis: (0.647 + 0.654) / 2 }),
+    tensile: Object.freeze({
+      warp: Object.freeze({ strain: 3.372, energy: 5.78, resilience: 54.55 }),
+      weft: Object.freeze({ strain: 6.913, energy: 10.38, resilience: 48.67 }),
+    }),
+    arealDensity: 0.15,
+    source: `${LUIBLE}, sample 8`,
+  }),
+  /**
+   * Canvas. No published KES-F measurement of a cotton duck canvas was found; this is the nearest measured fabric, a jute
+   * plain weave of 300 g/m^2 (sample 10): G 2.516 / 2.203, 2HG 2.995 / 2.584; EMT 1.439 / 0.963 %, WT 2.63 / 2.88, RT 61.10 / 60.30 %.
+   */
+  canvas: Object.freeze({
+    name: 'canvas (from a measured jute plain weave)',
+    shear: Object.freeze({ rigidity: (2.516 + 2.203) / 2, hysteresis: (2.995 + 2.584) / 2 }),
+    tensile: Object.freeze({
+      warp: Object.freeze({ strain: 1.439, energy: 2.63, resilience: 61.1 }),
+      weft: Object.freeze({ strain: 0.963, energy: 2.88, resilience: 60.3 }),
+    }),
+    arealDensity: 0.3,
+    source: `${LUIBLE}, sample 10 (jute plain weave; no canvas measurement was found)`,
+  }),
+  /**
+   * Sailcloth. No published KES-F measurement of a woven polyester sailcloth was found; this is the nearest measured fabric, a
+   * woven polyester plain weave for outdoor wear of 90 g/m^2 (sample 29): G 2.315 / 2.328, 2HG 1.832 / 1.270; EMT 1.977 / 1.882 %, WT 3.88 / 4.075, RT 59.99 / 63.83 %. A real sail is
+   * heavier and resin-finished, so stiffer in shear; give it its own measured values where you have them.
+   */
+  sailcloth: Object.freeze({
+    name: 'sailcloth (from a measured polyester plain weave)',
+    shear: Object.freeze({ rigidity: (2.315 + 2.328) / 2, hysteresis: (1.832 + 1.27) / 2 }),
+    tensile: Object.freeze({
+      warp: Object.freeze({ strain: 1.977, energy: 3.88, resilience: 59.99 }),
+      weft: Object.freeze({ strain: 1.882, energy: 4.075, resilience: 63.83 }),
+    }),
+    arealDensity: 0.09,
+    source: `${LUIBLE}, sample 29 (woven polyester outdoor fabric; no sailcloth measurement was found)`,
+  }),
+} satisfies Record<string, Fabric>);
+
 /** What a soft body is made of (Rapier's `SoftBodyMaterial`, for the elements this entry has). */
 export class SoftBodyMaterial {
   /** Structural and shear edges (default rigid: they do not stretch). */
@@ -147,6 +331,26 @@ export class SoftBodyMaterial {
   warpSoftness: SoftSoftness | null = null;
   weftSoftness: SoftSoftness | null = null;
   shearSoftness: SoftSoftness | null = null;
+  /**
+   * The measured shear of a woven sheet's fabric (default {@link FABRICS} `cottonShirting`): with no `shearSoftness`, the
+   * diagonals of each cell are springs of the fabric's shear rigidity ({@link fabricShearStiffness}) and damping
+   * ({@link fabricShearDamping}), whatever the cloth's resolution and its particles' masses, so the warp and weft hold and the
+   * cloth shears and drapes as the fabric does. Null makes the diagonals edges like any other ({@link edgeSoftness}).
+   */
+  shear: FabricShear | null = FABRICS.cottonShirting.shear;
+  /**
+   * The measured stretch of a woven sheet's fabric (default {@link FABRICS} `cottonShirting`): with no `warpSoftness` or
+   * `weftSoftness`, the threads are springs of the fabric's tensile stiffness ({@link fabricTensileStiffness}) held in the
+   * exact solve, so a cloth stretches and sags as the fabric does, whatever the iterations and the load. Null holds the threads
+   * inextensible (rigid, {@link edgeSoftness}).
+   */
+  tensile: FabricTensile | null = FABRICS.cottonShirting.tensile;
+  /**
+   * The mass per area of a woven sheet's fabric, kg/m^2 (default {@link FABRICS} `cottonShirting`'s 0.12): a woven sheet given
+   * no mass of its own weighs this, each particle a third of the area of the triangles around it, so a default cloth weighs
+   * what the fabric it stretches like weighs. Null gives every particle 1 kg (Rapier's default).
+   */
+  arealDensity: number | null = FABRICS.cottonShirting.arealDensity;
   /** Bend edges, which join a particle to the one two along (default 10 Hz, critically damped). */
   bendSoftness: SoftSoftness = { naturalFrequency: 10, dampingRatio: 1 };
   /**
@@ -188,6 +392,18 @@ export class SoftBodyMaterial {
     const material = new SoftBodyMaterial();
     material.edgeSoftness = { naturalFrequency, dampingRatio };
     material.bendSoftness = { naturalFrequency, dampingRatio };
+    // Every edge one spring: the diagonals and the threads too, and Rapier's particles of a kilogram.
+    material.shear = null;
+    material.tensile = null;
+    material.arealDensity = null;
+    return material;
+  }
+  /** The default material with `fabric`'s measured shear (see {@link FABRICS}). */
+  static fabric(fabric: Fabric): SoftBodyMaterial {
+    const material = new SoftBodyMaterial();
+    material.shear = { ...fabric.shear };
+    material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
+    material.arealDensity = fabric.arealDensity;
     return material;
   }
   /** @internal */
@@ -198,6 +414,9 @@ export class SoftBodyMaterial {
     copy.warpSoftness = this.warpSoftness && { ...this.warpSoftness };
     copy.weftSoftness = this.weftSoftness && { ...this.weftSoftness };
     copy.shearSoftness = this.shearSoftness && { ...this.shearSoftness };
+    copy.shear = this.shear && { ...this.shear };
+    copy.tensile = this.tensile && { warp: { ...this.tensile.warp }, weft: { ...this.tensile.weft } };
+    copy.arealDensity = this.arealDensity;
     copy.tearStrain = this.tearStrain;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
     copy.volumeSoftness = { ...this.volumeSoftness };
@@ -445,6 +664,24 @@ function checkMaterial(material: SoftBodyMaterial): void {
   if (material.warpSoftness) checkSoftness(material.warpSoftness, 'Warp softness');
   if (material.weftSoftness) checkSoftness(material.weftSoftness, 'Weft softness');
   if (material.shearSoftness) checkSoftness(material.shearSoftness, 'Shear softness');
+  if (material.shear) {
+    const { rigidity, hysteresis } = material.shear;
+    if (!(rigidity > 0 && Number.isFinite(rigidity)))
+      throw new RangeError('A fabric shear rigidity is a positive number of gf/(cm deg), as KES-F measures it.');
+    if (!(hysteresis >= 0 && Number.isFinite(hysteresis)))
+      throw new RangeError('A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it.');
+  }
+  if (material.tensile)
+    for (const t of [material.tensile.warp, material.tensile.weft])
+      if (
+        !(t.strain > 0 && Number.isFinite(t.strain) && t.energy > 0 && Number.isFinite(t.energy)) ||
+        !(t.resilience >= 0 && t.resilience <= 100)
+      )
+        throw new RangeError(
+          'A fabric tension is a positive strain (EMT, percent) and energy (WT, gf cm/cm^2) and a resilience (RT) of 0 to 100 percent, as KES-F measures them.',
+        );
+  if (material.arealDensity !== null && !(material.arealDensity > 0 && Number.isFinite(material.arealDensity)))
+    throw new RangeError('A fabric areal density is a positive number of kg/m^2, or null.');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
   checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
@@ -485,6 +722,12 @@ export class SoftBodyDesc {
   /** @internal */ edgePairs: number[] = [];
   /** @internal Which thread each structural edge is (0 for any other), by index as `edgePairs`. */ edgeKinds: number[] =
     [];
+  /**
+   * @internal A thread's or a diagonal's spring per unit of its fabric's stiffness: s / l for a thread of length l carrying a
+   * width s of the cloth (half the way to the thread on each side), L^2 / (2 a b) for a diagonal of length L across a cell
+   * of sides a and b (0 for any other edge).
+   */
+  edgeShear: number[] = [];
   /** @internal */ bendPairs: number[] = [];
   /** @internal The grid a woven sheet was built on (particle (i, j) is i * nv + j), for its texture coordinates. */
   grid: { nu: number; nv: number; wrap: boolean } | null = null;
@@ -686,12 +929,44 @@ export class SoftBodyDesc {
         if (j + 2 < nv) desc.bendPairs.push(at(nu - 1, j), at(nu - 1, j + 2));
       }
     // Which thread each edge is: along the weft (one `u` row), along the warp (one `v` column) or across a cell.
+    const point = (k: number): Vec3 => [points[k * 3]!, points[k * 3 + 1]!, points[k * 3 + 2]!],
+      apart = (k: number, l: number): number => {
+        const [p, q] = [point(k), point(l)];
+        return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+      };
     for (let e = 0; e < desc.edgePairs.length; e += 2) {
       const a = desc.edgePairs[e]!,
-        b = desc.edgePairs[e + 1]!;
-      desc.edgeKinds.push(
-        Math.floor(a / nv) === Math.floor(b / nv) ? THREAD_WEFT : a % nv === b % nv ? THREAD_WARP : THREAD_SHEAR,
-      );
+        b = desc.edgePairs[e + 1]!,
+        kind = Math.floor(a / nv) === Math.floor(b / nv) ? THREAD_WEFT : a % nv === b % nv ? THREAD_WARP : THREAD_SHEAR;
+      desc.edgeKinds.push(kind);
+      // A diagonal's cell: its other two corners share a row with one end and a column with the other. A thread's neighbour
+      // across: the next thread of the same kind, one row (warp) or one column (weft) over, or the previous at the edge.
+      let factor = 0;
+      const [ia, ja, ib, jb] = [Math.floor(a / nv), a % nv, Math.floor(b / nv), b % nv];
+      if (kind === THREAD_SHEAR) {
+        const side1 = apart(a, ia * nv + jb),
+          side2 = apart(a, ib * nv + ja),
+          diagonal = apart(a, b);
+        factor = side1 > 0 && side2 > 0 ? (diagonal * diagonal) / (2 * side1 * side2) : 0;
+      } else if (kind === THREAD_WARP) {
+        // Along u (the rows i), at column j: the cloth's width it carries is half the way to the column on each side, so a
+        // thread at the cloth's edge carries half a cell and the threads' widths add up to the cloth's.
+        const length = apart(a, b),
+          across = ((ja > 0 ? apart(a, ia * nv + ja - 1) : 0) + (ja + 1 < nv ? apart(a, ia * nv + ja + 1) : 0)) / 2;
+        factor = length > 0 ? across / length : 0;
+      } else if (kind === THREAD_WEFT) {
+        // Along v, in row i: half the way to the row on each side (round the tube when it wraps).
+        const rows = points.length / 3 / nv,
+          before = ia > 0 ? ia - 1 : wrap ? rows - 1 : -1,
+          after = ia + 1 < rows ? ia + 1 : wrap ? 0 : -1,
+          length = apart(a, b),
+          across =
+            ((before >= 0 && before !== ia ? apart(a, before * nv + ja) : 0) +
+              (after >= 0 && after !== ia ? apart(a, after * nv + ja) : 0)) /
+            2;
+        factor = length > 0 ? across / length : 0;
+      }
+      desc.edgeShear.push(factor);
     }
     return desc;
   }
@@ -944,8 +1219,8 @@ export class SoftBodyDesc {
 
   /**
    * Whether the surface collider knows its outside (Rapier's `setOriented`), so a point inside a closed surface is found
-   * inside by queries; false makes a shell. Left out, it is oriented when the surface is closed (a body that holds a volume
-   * or has a skin).
+   * inside by queries; false makes a shell. Left out, it is oriented when the surface is closed: a body that holds a volume,
+   * has a skin, or whose triangles close a surface wound one way (a body of cells' surface, and each piece of a cut).
    */
   setOriented(oriented: boolean): this {
     this.oriented = oriented;
@@ -1188,6 +1463,11 @@ export class SoftBodyDesc {
   }
   /** @internal The masses the body is created with: the cells' density where none was given. */
   resolvedMasses(): number[] {
+    if (!this.massGiven && this.cells.length === 0 && this.grid && this.material.arealDensity) {
+      // A woven sheet given no mass weighs what its fabric weighs.
+      const masses = this.areaMasses(this.material.arealDensity);
+      return masses.map((m, i) => (m > 0 ? m : this.masses[i]!));
+    }
     if (this.massGiven || this.cells.length === 0) return this.masses;
     const out = new Array<number>(this.particleCount).fill(0),
       density = this.cellMaterial.density;
@@ -1205,6 +1485,7 @@ export class SoftBodyDesc {
   setEdges(pairs: ArrayLike<number>): this {
     this.edgePairs = this.checkPairs(pairs, 'Edge');
     this.edgeKinds = [];
+    this.edgeShear = [];
     return this;
   }
   /** Replaces the bend edges, as pairs of particle indices. */
@@ -1245,6 +1526,8 @@ export class SoftBodyDesc {
     // The kinds stay in step with the edges: pad what has none with 0 (any other edge).
     while (this.edgeKinds.length < this.edgePairs.length / 2) this.edgeKinds.push(0);
     for (let e = 0; e < other.edgePairs.length / 2; e++) this.edgeKinds.push(other.edgeKinds[e] ?? 0);
+    while (this.edgeShear.length < this.edgePairs.length / 2) this.edgeShear.push(0);
+    for (let e = 0; e < other.edgePairs.length / 2; e++) this.edgeShear.push(other.edgeShear[e] ?? 0);
     for (const p of other.edgePairs) this.edgePairs.push(p + base);
     for (const p of other.bendPairs) this.bendPairs.push(p + base);
     for (const p of other.pinned) this.pinned.add(p + base);
@@ -1266,6 +1549,41 @@ export class SoftBodyDesc {
     }
     this.pinned = next;
     return this;
+  }
+  /**
+   * Makes a woven sheet of `fabric` (see {@link FABRICS}): its material's shear the fabric's, and each particle the fabric's
+   * areal density times a third of the area of the triangles around it.
+   * @throws RangeError for a body with no triangles.
+   */
+  setFabric(fabric: Fabric): this {
+    if (this.triangles.length === 0)
+      throw new RangeError('A fabric is a woven sheet; give it a body of triangles (cloth, clothTube, trimesh).');
+    if (!(fabric.arealDensity > 0 && Number.isFinite(fabric.arealDensity)))
+      throw new RangeError('A fabric has a positive areal density in kg/m^2.');
+    const material = this.material.clone();
+    material.shear = { ...fabric.shear };
+    material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
+    material.arealDensity = fabric.arealDensity;
+    this.setMaterial(material);
+    const masses = this.areaMasses(fabric.arealDensity);
+    if (masses.some((m) => !(m > 0)))
+      throw new RangeError('Every particle of a fabric lies on a triangle with an area.');
+    return this.setMasses(masses);
+  }
+  /** Each particle `density` (kg/m^2) times a third of the area of the triangles around it. */
+  private areaMasses(density: number): number[] {
+    const masses = new Array<number>(this.particleCount).fill(0),
+      p = this.positions;
+    for (let t = 0; t < this.triangles.length; t += 3) {
+      const [a, b, c] = [this.triangles[t]! * 3, this.triangles[t + 1]! * 3, this.triangles[t + 2]! * 3],
+        u = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!],
+        v = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!],
+        area =
+          0.5 * Math.hypot(u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!),
+        share = (density * area) / 3;
+      for (const k of [a, b, c]) masses[k / 3]! += share;
+    }
+    return masses;
   }
   /** Mass of every particle in kilograms (default 1). */
   setParticleMass(mass: number): this {
@@ -1326,6 +1644,16 @@ export class SoftBodyDesc {
     this.damping = damping;
     return this;
   }
+  /**
+   * Whether a body of triangles (a cloth, a trimesh) feels the air (default true): each face takes the drag of a flat plate on
+   * the air moving through it, relative to {@link SoftBodies.wind} (still air when none is set). A `SailForce` on the body
+   * supplies its air loads instead, and turns this off while it is attached.
+   */
+  setAirDrag(on: boolean): this {
+    this.airDrag = on;
+    return this;
+  }
+  /** @internal */ airDrag = true;
   /** Moves every particle by this vector when the body is created. */
   setTranslation(translation: Vec3): this {
     checkVec(translation, 'Translation');
@@ -1391,6 +1719,10 @@ export class SoftBody {
   /** @internal Whether shape matching holds this body. */ matched = false;
   /** @internal Which thread each structural edge is (see SoftBodyDesc.edgeKinds); empty for a body that is not a woven sheet. */
   edgeKinds = new Uint8Array(0);
+  /** @internal A shear edge's spring per unit of shear rigidity (see SoftBodyDesc.edgeShear). */
+  edgeShear = new Float32Array(0);
+  /** @internal Whether its faces feel the air (SoftBodyDesc.setAirDrag). */ airDrag = true;
+  /** @internal How many `SailForce`s supply its air loads: while any does, the default drag leaves it alone. */ airLoads = 0;
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
   /** @internal */ surfaceRest = 0;
   /** @internal */ canSleepFlag = true;
@@ -2168,6 +2500,13 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal Fixed step pieces and passes: change them between steps. */
   substeps: number;
   iterations: number;
+  /**
+   * The air the cloths' faces move through: a velocity in m/s, a function of the point and the time, or a flow field of
+   * `@margoengine/math/fields` (its density too), sampled at each face on the world's clock. Null is still air (the default).
+   * Give it the wind the scene's `WindForce` and `SailForce` blow with, so every body feels one air.
+   */
+  wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null = null;
+  private readonly airSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
   private constructor(
     private readonly physics: Physics,
@@ -2486,6 +2825,8 @@ export class SoftBodies implements PhysicsAttachment {
     body.solverKind = desc.solver;
     body.triangleList = Uint32Array.from(desc.triangles);
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
+    body.edgeShear = Float32Array.from(desc.edgeShear);
+    body.airDrag = desc.airDrag;
     body.grid = desc.grid && { ...desc.grid };
     if (desc.skin) {
       body.skin = desc.skin;
@@ -3006,6 +3347,42 @@ export class SoftBodies implements PhysicsAttachment {
       });
       c.omega[row] = softness.naturalFrequency * 2 * Math.PI;
       c.zeta[row] = softness.dampingRatio;
+      // A woven sheet's warp and weft are threads, held exactly with each other when rigid; its diagonals, with no softness
+      // of their own, are the fabric's shear: a stiffness, so the kernel takes the particles' masses as they are.
+      const kind = bend ? 0 : body.edgeKinds[e],
+        shear = body.material.shear;
+      let flags = c.eflags[row]! & ~(SHEET | STIFFNESS);
+      // A sheet's edges: a woven sheet's threads, or every structural edge of a body of triangles with no cells (a trimesh, a
+      // cloth made of one), which has no redundant edge.
+      const sheet =
+        kind === THREAD_WARP ||
+        kind === THREAD_WEFT ||
+        (!bend && body.edgeKinds.length === 0 && body.triangleList.length > 0 && body.cellRange.count === 0);
+      if (sheet) flags |= SHEET;
+      const tensile = body.material.tensile,
+        tension =
+          tensile && softness === edgeSoftness
+            ? kind === THREAD_WARP && !body.material.warpSoftness
+              ? tensile.warp
+              : kind === THREAD_WEFT && !body.material.weftSoftness
+                ? tensile.weft
+                : null
+            : null;
+      c.elimit[row] = 0;
+      if (tension && (body.edgeShear[e] ?? 0) > 0) {
+        // A thread of the fabric's measured stretch: a stiffness, held in the exact solve with its compliance, and held rigid
+        // past the strain it was measured to (its EMT, at 500 gf/cm), where the linear spring no longer describes it.
+        c.omega[row] = fabricTensileStiffness(tension) * body.edgeShear[e]!;
+        c.zeta[row] = fabricTensileDamping(tension);
+        c.elimit[row] = tension.strain / 100;
+        flags |= STIFFNESS;
+      }
+      if (kind === THREAD_SHEAR && !body.material.shearSoftness && shear && softness === edgeSoftness) {
+        c.omega[row] = fabricShearStiffness(shear) * (body.edgeShear[e] ?? 1);
+        c.zeta[row] = fabricShearDamping(shear);
+        flags |= STIFFNESS;
+      }
+      c.eflags[row] = flags;
       // The cells' module tears and flows the edges (it smooths the load, shields the interior and keeps the pieces), so the
       // solver's own test is off.
       c.tear[row] = 0;
@@ -3771,6 +4148,8 @@ export class SoftBodies implements PhysicsAttachment {
     const group = this.rowGroups[row] ?? 0;
     if (body.dominance > group) for (let k = 0; k < 7; k++) inverse[k] = 0;
     c.dom[row] = group > body.dominance ? 1 : 0;
+    // A soft body's surface or deformable collider follows particles of this world: a contact with it is soft against soft.
+    c.bmesh[row] = this.bodies.some((b) => b.surface === body) || this.bound.some((m) => m.host === body) ? 1 : 0;
     c.wm[row] = inverse[0]!;
     c.gs[row] = body.gravityScale;
     c.iixx[row] = inverse[1]!;
@@ -3802,6 +4181,81 @@ export class SoftBodies implements PhysicsAttachment {
         c.vy[row] = c.vy[row]! + fy * dt;
         c.vz[row] = c.vz[row]! + fz * dt;
       }
+      if (body.airDrag && body.airLoads === 0 && body.triangleList.length > 0) this.airDrag(body, c, dt);
+    }
+  }
+
+  /**
+   * The air on a body of triangles: each face a flat plate, F = -1/2 rho C_N A |u_n| u_n n with u_n the speed of the face
+   * through the air along its normal (its corners' mean velocity less the wind at its middle), C_N the square plate's 1.17
+   * (Hoerner 1965) and rho the flow field's density or the standard atmosphere's at the face's height (ISO 2533). Over the step
+   * the face's normal speed follows the closed form of quadratic drag, u / (1 + k |u| dt) with k = 1/2 rho C_N A w (w the
+   * face's inverse mass at its middle), so a light cloth in a fast wind slows to the air's speed and never past it; each corner
+   * takes a third of the impulse. Air along the face (skin friction) is left out: for a cloth it is a few hundred times less.
+   */
+  private airDrag(body: SoftBody, c: Columns, dt: number): void {
+    const list = body.triangleList,
+      first = body.firstParticle,
+      time = this.physics.stepCount * dt,
+      wind = this.wind,
+      sample = this.airSample;
+    for (let t = 0; t < list.length; t += 3) {
+      const a = first + list[t]!,
+        b = first + list[t + 1]!,
+        d = first + list[t + 2]!,
+        wa = c.w[a]!,
+        wb = c.w[b]!,
+        wd = c.w[d]!,
+        // The face's inverse mass at its middle along any direction: the sum of (1/3)^2 w over its corners.
+        w = (wa + wb + wd) / 9;
+      if (!(w > 0)) continue;
+      const ux = c.x[b]! - c.x[a]!,
+        uy = c.y[b]! - c.y[a]!,
+        uz = c.z[b]! - c.z[a]!,
+        vx = c.x[d]! - c.x[a]!,
+        vy = c.y[d]! - c.y[a]!,
+        vz = c.z[d]! - c.z[a]!,
+        nx = uy * vz - uz * vy,
+        ny = uz * vx - ux * vz,
+        nz = ux * vy - uy * vx,
+        twice = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (!(twice > 0)) continue;
+      const area = twice / 2,
+        n: Vec3 = [nx / twice, ny / twice, nz / twice],
+        middle: Vec3 = [
+          (c.x[a]! + c.x[b]! + c.x[d]!) / 3,
+          (c.y[a]! + c.y[b]! + c.y[d]!) / 3,
+          (c.z[a]! + c.z[b]! + c.z[d]!) / 3,
+        ];
+      let air: Vec3 = [0, 0, 0],
+        rho: number;
+      if (wind !== null && typeof wind === 'object' && 'sample' in wind) {
+        wind.sample(middle[0], middle[1], middle[2], time, sample);
+        air = [sample.velocity[0], sample.velocity[1], sample.velocity[2]];
+        rho = sample.density;
+      } else {
+        if (typeof wind === 'function') air = wind(middle, time);
+        else if (wind !== null) air = wind;
+        rho = standardDensity(middle[1]);
+      }
+      const un =
+        ((c.vx[a]! + c.vx[b]! + c.vx[d]!) / 3 - air[0]) * n[0] +
+        ((c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - air[1]) * n[1] +
+        ((c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - air[2]) * n[2];
+      if (un === 0) continue;
+      const k = 0.5 * rho * PLATE_DRAG * area * w,
+        after = un / (1 + k * Math.abs(un) * dt),
+        // The impulse at the face's middle along n that takes its normal speed from un to after; each corner a third.
+        impulse = (after - un) / w / 3;
+      for (const [row, wr] of [
+        [a, wa],
+        [b, wb],
+        [d, wd],
+      ] as const) {
+        c.vx[row] = c.vx[row]! + wr * impulse * n[0];
+        c.vy[row] = c.vy[row]! + wr * impulse * n[1];
+        c.vz[row] = c.vz[row]! + wr * impulse * n[2];
+      }
     }
   }
 
@@ -3826,7 +4280,7 @@ export class SoftBodies implements PhysicsAttachment {
         vertices: skin ? body.meshVertices() : body.particlePositions(),
         indices: skin ? body.meshIndices() : body.triangleList,
         deformable: true,
-        oriented: body.oriented ?? (body.volumeOn || skin),
+        oriented: body.oriented ?? (body.volumeOn || skin || closedSurface(body.triangleList)),
         ...settings,
       },
     });
@@ -4214,9 +4668,29 @@ function inverseMass(body: PhysicsBody): number[] {
   return out;
 }
 
+/**
+ * Whether triangles (three particle indices each) close a surface wound one way: every edge is met once each way round, by
+ * the two triangles either side of it. A body of cells has such a surface (`setSurface`, and each piece of a cut), so its
+ * surface collider knows its inside.
+ */
+function closedSurface(triangles: ArrayLike<number>): boolean {
+  if (triangles.length === 0) return false;
+  const edges = new Map<string, number>();
+  for (let t = 0; t + 2 < triangles.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const key = `${triangles[t + k]} ${triangles[t + ((k + 1) % 3)]}`;
+      edges.set(key, (edges.get(key) ?? 0) + 1);
+    }
+  for (const [key, count] of edges) {
+    const [a, b] = key.split(' ');
+    if (count !== 1 || edges.get(`${b} ${a}`) !== 1) return false;
+  }
+  return true;
+}
+
 /** The columns of the table of rigid bodies a step's contacts meet, one row each, built afresh at the start of every step. */
 const COLLIDER_COLUMN =
-  /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/;
+  /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|bmesh|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/;
 
 function rowsOf(
   name: string,
@@ -4233,7 +4707,7 @@ function rowsOf(
   if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj|kr)$/.test(name)) return particles * 4;
-  if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
+  if (/^(ea|eb|rest|omega|zeta|lambda|tear|elimit|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (COLLIDER_COLUMN.test(name)) return colliders;
   return particles;

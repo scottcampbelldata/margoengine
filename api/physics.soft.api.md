@@ -30,6 +30,138 @@ export class CellMaterial {
 
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
+export const FABRICS: Readonly<{
+    cottonShirting: Readonly<{
+        name: "cotton shirting";
+        shear: Readonly<{
+            rigidity: number;
+            hysteresis: number;
+        }>;
+        tensile: Readonly<{
+            warp: Readonly<{
+                strain: 5.874;
+                energy: 9.23;
+                resilience: 52.03;
+            }>;
+            weft: Readonly<{
+                strain: 5.608;
+                energy: 9.03;
+                resilience: 48.48;
+            }>;
+        }>;
+        arealDensity: 0.12;
+        source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 2";
+    }>;
+    woolGabardine: Readonly<{
+        name: "wool gabardine";
+        shear: Readonly<{
+            rigidity: number;
+            hysteresis: number;
+        }>;
+        tensile: Readonly<{
+            warp: Readonly<{
+                strain: 4.614;
+                energy: 8.53;
+                resilience: 70.68;
+            }>;
+            weft: Readonly<{
+                strain: 5.741;
+                energy: 10.43;
+                resilience: 67.16;
+            }>;
+        }>;
+        arealDensity: 0.175;
+        source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 5";
+    }>;
+    silk: Readonly<{
+        name: "silk";
+        shear: Readonly<{
+            rigidity: number;
+            hysteresis: number;
+        }>;
+        tensile: Readonly<{
+            warp: Readonly<{
+                strain: 3.372;
+                energy: 5.78;
+                resilience: 54.55;
+            }>;
+            weft: Readonly<{
+                strain: 6.913;
+                energy: 10.38;
+                resilience: 48.67;
+            }>;
+        }>;
+        arealDensity: 0.15;
+        source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 8";
+    }>;
+    canvas: Readonly<{
+        name: "canvas (from a measured jute plain weave)";
+        shear: Readonly<{
+            rigidity: number;
+            hysteresis: number;
+        }>;
+        tensile: Readonly<{
+            warp: Readonly<{
+                strain: 1.439;
+                energy: 2.63;
+                resilience: 61.1;
+            }>;
+            weft: Readonly<{
+                strain: 0.963;
+                energy: 2.88;
+                resilience: 60.3;
+            }>;
+        }>;
+        arealDensity: 0.3;
+        source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 10 (jute plain weave; no canvas measurement was found)";
+    }>;
+    sailcloth: Readonly<{
+        name: "sailcloth (from a measured polyester plain weave)";
+        shear: Readonly<{
+            rigidity: number;
+            hysteresis: number;
+        }>;
+        tensile: Readonly<{
+            warp: Readonly<{
+                strain: 1.977;
+                energy: 3.88;
+                resilience: 59.99;
+            }>;
+            weft: Readonly<{
+                strain: 1.882;
+                energy: 4.075;
+                resilience: 63.83;
+            }>;
+        }>;
+        arealDensity: 0.09;
+        source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 29 (woven polyester outdoor fabric; no sailcloth measurement was found)";
+    }>;
+}>;
+
+export interface Fabric {
+    readonly name: string;
+    readonly shear: FabricShear;
+    readonly tensile: FabricTensile;
+    readonly arealDensity: number;
+    readonly source: string;
+}
+
+export interface FabricShear {
+    readonly rigidity: number;
+    readonly hysteresis: number;
+}
+
+export interface FabricTensile {
+    readonly warp: FabricTension;
+    readonly weft: FabricTension;
+}
+
+export interface FabricTension {
+    readonly strain: number;
+    readonly energy: number;
+    readonly resilience: number;
+}
+
 export class SailForce implements PhysicsAttachment {
     readonly force: [number, number, number];
     circulation: Float64Array;
@@ -58,6 +190,7 @@ export class SoftBodies implements PhysicsAttachment {
     splitOnTear: 'cells' | 'all' | 'never';
     substeps: number;
     iterations: number;
+    wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null;
     private constructor();
     static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
     debugRender(options?: {
@@ -162,6 +295,9 @@ export class SoftBody {
     surface: PhysicsBody | null;
     matched: boolean;
     edgeKinds: Uint8Array<ArrayBuffer>;
+    edgeShear: Float32Array<ArrayBuffer>;
+    airDrag: boolean;
+    airLoads: number;
     volumeOn: boolean;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -256,6 +392,7 @@ export class SoftBodyDesc {
     positions: number[];
     edgePairs: number[];
     edgeKinds: number[];
+    edgeShear: number[];
     bendPairs: number[];
     grid: {
         nu: number;
@@ -333,6 +470,7 @@ export class SoftBodyDesc {
     addEdges(pairs: ArrayLike<number>): this;
     append(other: SoftBodyDesc): this;
     setPinnedParticles(indices: ArrayLike<number>): this;
+    setFabric(fabric: Fabric): this;
     setParticleMass(mass: number): this;
     setMass(mass: number): this;
     setMasses(masses: ArrayLike<number>): this;
@@ -342,6 +480,8 @@ export class SoftBodyDesc {
     setEdgeTearResistance(strain: number): this;
     setGravityScale(scale: number): this;
     setLinearDamping(damping: number): this;
+    setAirDrag(on: boolean): this;
+    airDrag: boolean;
     setTranslation(translation: Vec3): this;
 }
 
@@ -350,6 +490,9 @@ export class SoftBodyMaterial {
     warpSoftness: SoftSoftness | null;
     weftSoftness: SoftSoftness | null;
     shearSoftness: SoftSoftness | null;
+    shear: FabricShear | null;
+    tensile: FabricTensile | null;
+    arealDensity: number | null;
     bendSoftness: SoftSoftness;
     tearStrain: number;
     shapeMatchingSoftness: SoftSoftness;
@@ -363,6 +506,7 @@ export class SoftBodyMaterial {
     maxTearsPerStep: number;
     minPiece: number;
     static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
+    static fabric(fabric: Fabric): SoftBodyMaterial;
     clone(): SoftBodyMaterial;
 }
 
@@ -414,6 +558,14 @@ export interface SoftTearEvent {
     pieces: SoftBody[];
     destination(particle: number): SoftDestination[];
 }
+
+export function fabricShearDamping(shear: FabricShear): number;
+
+export function fabricShearStiffness(shear: FabricShear): number;
+
+export function fabricTensileDamping(tension: FabricTension): number;
+
+export function fabricTensileStiffness(tension: FabricTension): number;
 
 // Not exported from this entry, but used by the exports above:
 

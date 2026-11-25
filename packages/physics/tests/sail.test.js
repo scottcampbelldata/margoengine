@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
-import { SailForce, SoftBodies, SoftBodyDesc } from '../dist/soft.js';
+import { FABRICS, SailForce, SoftBodies, SoftBodyDesc } from '../dist/soft.js';
 
 await Physics.load();
 
@@ -70,8 +70,8 @@ test('past the stall angle a panel takes the flat-plate normal force', async () 
 });
 
 test("a sail's load goes into the cloth whole: a free sail gains exactly the impulse of its load", async () => {
-  // (A sail lashed to a hull hands the load on through the soft body's attachments; that coupling is
-  // KB-SOFT-ATTACHKICK1 in docs/known-bugs.md, so the conservation is checked on a free sail.)
+  // (A sail lashed to a hull hands the load on through the soft body's attachments, whose own conservation is the
+  // KB-SOFT-ATTACHKICK1 test in soft.test.js; here the sail is free.)
   const physics = new Physics(null);
   physics.gravity = [0, 0, 0];
   const soft = await SoftBodies.attach(physics),
@@ -107,9 +107,76 @@ test("a sail's load goes into the cloth whole: a free sail gains exactly the imp
     );
 });
 
+test('a sail of real sailcloth weight stays whole in the wind and gains exactly the impulse of its load', async () => {
+  // The same free sail of 1 m by 6 m, now of sailcloth as measured (FABRICS.sailcloth, a few hundred grams a square metre)
+  // for a second. The lattice's load leans on the cloth's own speed through the air (an aerodynamic damping whose time,
+  // mass over rho A U times the lift slope, is a few milliseconds here, under a step); given whole at the start of each step
+  // it was an explicit damping that the sail outran, and the sail flew apart within ten steps. Taken implicitly, the sail
+  // stays a number and the load still goes in whole.
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const soft = await SoftBodies.attach(physics),
+    chords = 4,
+    spans = 7,
+    alpha = (10 * Math.PI) / 180,
+    body = soft.create(
+      SoftBodyDesc.cloth(
+        [0, 1, 0],
+        [(1 / (chords - 1)) * Math.cos(alpha), (-1 / (chords - 1)) * Math.sin(alpha), 0],
+        [0, 0, 1],
+        chords,
+        spans,
+      ).setFabric(FABRICS.sailcloth),
+    ),
+    sail = new SailForce(physics, body, { wind: [SPEED, 0, 0], grid: [chords, spans], density: RHO }),
+    impulse = [0, 0, 0],
+    dt = physics.fixedTimestep;
+  for (let i = 0; i < 60; i++) {
+    physics.step();
+    for (let k = 0; k < 3; k++) impulse[k] += sail.force[k] * dt;
+    assert.ok(body.particlePositions().every(Number.isFinite), `step ${i}: the sail stays a number`);
+  }
+  const v = body.particleVelocities(),
+    momentum = [0, 0, 0];
+  for (let i = 0; i < body.numParticles(); i++)
+    for (let k = 0; k < 3; k++) momentum[k] += body.masses[i] * v[3 * i + k];
+  for (let k = 0; k < 3; k++)
+    assert.ok(
+      Math.abs(momentum[k] - impulse[k]) <= 1e-3 * Math.hypot(...impulse),
+      `momentum ${momentum} against impulse ${impulse}`,
+    );
+});
+
 test('the same wind and the same sail give the same bits', async () => {
   const a = await flatSail((7 * Math.PI) / 180),
     b = await flatSail((7 * Math.PI) / 180);
   assert.deepEqual(a.force, b.force);
   assert.deepEqual(Array.from(a.sail.circulation), Array.from(b.sail.circulation));
+});
+
+test("a sail's cloth takes its air loads from the sail alone: the cloths' default drag leaves a sail-equipped cloth, and returns when the sail is removed", async () => {
+  // A free sail (pinned along its luff) in a wind, with SoftBodies.wind the same wind: with a SailForce attached, the cloth
+  // steps to the same bits whether its default drag is on or off, so the air is counted once (the sail's). Once the sail is
+  // removed, the default drag acts again.
+  const run = async (airDrag, removeAt = Infinity) => {
+    const physics = new Physics(null);
+    physics.gravity = [0, 0, 0];
+    const soft = await SoftBodies.attach(physics),
+      chords = 5,
+      spans = 7;
+    soft.wind = [SPEED, 0, 0];
+    const body = soft.create(
+      SoftBodyDesc.cloth([0, 0, 0], [0.25 * Math.cos(0.2), -0.25 * Math.sin(0.2), 0], [0, 0, 0.5], chords, spans)
+        .setPinnedParticles(Array.from({ length: spans }, (_, j) => j))
+        .setAirDrag(airDrag),
+    );
+    const sail = new SailForce(physics, body, { wind: [SPEED, 0, 0], grid: [chords, spans], density: RHO });
+    for (let i = 0; i < 30; i++) {
+      if (i === removeAt) sail.remove();
+      physics.step();
+    }
+    return body.particlePositions();
+  };
+  assert.deepEqual(await run(true), await run(false), 'the same bits with the default drag on or off');
+  assert.notDeepEqual(await run(true, 10), await run(false, 10), 'without the sail the default drag acts');
 });

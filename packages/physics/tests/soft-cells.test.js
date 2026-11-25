@@ -941,7 +941,37 @@ test('a soft cube with a surface collider cut in two becomes two bodies, each wi
     1e-6,
     'no volume is lost',
   );
-  steps(physics, 360);
+  // Every step, not only at the end: the two halves start touching along the cut, each one's corners on the other's surface,
+  // and once threw each other about (0.19 m a step at once, up to 1.6 m later, and under the box's top) before settling. The
+  // most a particle may move in a step is what its fall gives it, at most sqrt(2 g h) dt for the 0.5 m drop onto the box,
+  // plus the one separation of the cut faces: each side's whole contact reach, its particles' radius and its faces'
+  // thickness, at most the radius (SoftBody faces), so 2 (r + r) in all.
+  const radius = Math.max(
+      ...soft['columns']().radius.slice(
+        0,
+        event.pieces.reduce((n, p) => n + p.particles, 0),
+      ),
+    ),
+    bound = Math.sqrt(2 * 9.81 * 0.5) / 60 + 4 * radius;
+  const before = event.pieces.map((piece) => piece.particlePositions());
+  for (let i = 0; i < 360; i++) {
+    physics.step();
+    event.pieces.forEach((piece, k) => {
+      const now = piece.particlePositions();
+      let most = 0,
+        lowest = Infinity;
+      for (let j = 0; j < now.length; j += 3) {
+        most = Math.max(
+          most,
+          Math.hypot(now[j] - before[k][j], now[j + 1] - before[k][j + 1], now[j + 2] - before[k][j + 2]),
+        );
+        lowest = Math.min(lowest, now[j + 1]);
+      }
+      assert.ok(most <= bound, `step ${i}: piece ${k} moved ${most} m, past ${bound}`);
+      assert.ok(lowest > 0.1, `step ${i}: piece ${k} is never under the box's top: ${lowest}`);
+      before[k] = now;
+    });
+  }
   for (const piece of event.pieces) {
     const lowest = Math.min(...piece.particlePositions().filter((_, k) => k % 3 === 1));
     assert.ok(lowest > 0.1 - 0.02, `the piece rests on the box: ${lowest}`);

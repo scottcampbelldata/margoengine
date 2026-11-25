@@ -77,6 +77,8 @@ export class SailForce implements PhysicsAttachment {
     if (!(typeof wind === 'function' || (typeof wind === 'object' && wind !== null && 'sample' in wind)))
       checkVec(wind, 'Wind');
     physics.attach(this);
+    // The sail supplies this cloth's air loads: the default drag of SoftBodies leaves it alone while it is attached.
+    sail.airLoads++;
   }
 
   /** @internal */
@@ -120,26 +122,50 @@ export class SailForce implements PhysicsAttachment {
         relative.push(sub(air, v));
         rho.push(density);
       }
-    const loads = latticeLoads({ nc, ns, corner: at, relative, density: rho }, stall, flatPlate(drag));
+    const loads = latticeLoads({ nc, ns, corner: at, relative, density: rho }, stall, flatPlate(drag), true);
     this.circulation = loads.circulation;
     this.force[0] = this.force[1] = this.force[2] = 0;
+    // The load leans on the cloth's own speed through the air (each panel's slope), so given whole at the start of a step it
+    // is an explicit damping, which a light sail (a few hundred grams a square metre) outruns within a step: the sail flew
+    // apart. Each corner takes its panels' loads damped implicitly instead: its velocity change dv = dt (F - K m dv) / m
+    // solved for dv, K its panels' slopes, each shared four ways, over its mass, so its impulse is F dt / (1 + K dt)
+    // (backward Euler on the aerodynamic damping, the closed form the cloth's own drag takes: soft.ts). The slopes are
+    // summed for the motion in which a panel's corners move together, the most damped; a quicker motion is damped no less.
+    // A pinned corner does not move, so its load leans on no speed of its own.
+    const slopes = loads.slopes!,
+      masses = this.sail.masses,
+      gain = new Float64Array(chords * spans),
+      impulse: Vec3[] = Array.from({ length: chords * spans }, () => [0, 0, 0] as Vec3);
     for (let m = 0; m < n; m++) {
       const f = loads.forces[m]!;
       if (f[0] === 0 && f[1] === 0 && f[2] === 0) continue;
-      this.force[0] += f[0];
-      this.force[1] += f[1];
-      this.force[2] += f[2];
       const s = (m - (m % nc)) / nc,
-        c = m - s * nc,
-        share = scale(f, dt / 4);
+        c = m - s * nc;
       for (const [cc, ss] of [
         [c, s],
         [c + 1, s],
         [c, s + 1],
         [c + 1, s + 1],
-      ] as const)
-        this.sail.applyParticleImpulse(index(cc, ss), share);
+      ] as const) {
+        const k = cc * spans + ss;
+        gain[k]! += slopes[m]! / 4;
+        impulse[k] = add(impulse[k]!, scale(f, dt / 4));
+      }
     }
+    for (let cc = 0; cc < chords; cc++)
+      for (let ss = 0; ss < spans; ss++) {
+        const k = cc * spans + ss,
+          particle = index(cc, ss),
+          mass = masses[particle]!,
+          free = mass > 0 && Number.isFinite(mass) && !this.sail.isParticlePinned(particle),
+          given = free ? scale(impulse[k]!, 1 / (1 + (gain[k]! / mass) * dt)) : impulse[k]!;
+        if (given[0] === 0 && given[1] === 0 && given[2] === 0) continue;
+        // What the sail gives: the load that goes into the cloth over the step.
+        this.force[0] += given[0] / dt;
+        this.force[1] += given[1] / dt;
+        this.force[2] += given[2] / dt;
+        this.sail.applyParticleImpulse(particle, given);
+      }
   }
 
   /** The air at `point` and its density. */
@@ -157,11 +183,13 @@ export class SailForce implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
+    this.sail.airLoads--;
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
+    if (!this.released) this.sail.airLoads--;
     this.released = true;
   }
 }

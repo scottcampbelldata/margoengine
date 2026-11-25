@@ -9695,6 +9695,41 @@ regression is in `packages/water/test/browser-root.test.js`.
 
 Soft bodies meet rigid bodies two ways, in the soft step (2026-11-24): the rigid kernel finds each particle's contacts (swept, `probe.rs`) and each triangle's (`face.rs`: conservative advancement on the GJK distance of the moving triangle to each convex piece, then the triangle's contact manifold), once a step, each with what the collider's surface is there (`contact_feature`: a face, told by where the support goes as the direction turns about the normal, or the radius of curvature of a round place, corner or edge). The soft kernel holds them through its pieces as position constraints (Mueller et al. 2007 for the point and triangle, Mueller et al. 2020 for the body's generalized inverse mass and its rotation update, the turn a normalised quaternion), a face by its plane turning with the body and a round place from its centre of curvature, the body's inertia turned with it, then makes the contacts the position pass pushed on inelastic with Coulomb friction. The rigid body takes the push as an impulse at the start of the rigid step and a force over it, solved so the rigid kernel's substeps (semi-implicit Euler) carry a free body to where the soft step took it, and its spin as the change the soft step gave it. Evidence: a 26 g box, a thin rod, a 1 cm bead and a 1 kg box on a ringing default cloth stay on it for 330 steps, each over the sheet under it; boxes at mass ratios of a thousand either way are held, and a cloth with a tear strain tears under a tonne (`tests/soft.test.js`); a ball pressed into a triangle is pushed out along its normal in one solve with momentum kept and no turn, a rod's contact that slid round it gives no spin about its axis, a body's inertia turns with it, and a turn past a tenth of a radian is a rotation (`soft-kernel/tests/face.rs`, `turn.rs`); the face query meets a ball over a triangle's inside, a fast triangle at its first touch, and tells faces, edges, corners and round places apart (`tests/soft-faces.test.js`). Missing: contacts found more than once a step (a body that turns far within a step), and speed (build phase).
 
+Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
+- **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
+  contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is
+  solved by Newton steps, each a bounded conjugate gradient (MPRGP, Dostal and Schoberl 2005, with two-sided bounds:
+  a row with no room is never freed, and a proportioning step stops at the far bound), and each taken as far as an
+  Armijo line search allows, until every row is within its tolerance (0.1 percent strain for a sheet's threads, 1e-5 m
+  otherwise).
+- **Threads.** Fabric threads are compliant rows with their KES-F stiffness (XPBD's alpha over h^2), held rigid past
+  EMT.
+- **Friction.** Friction is a second, box-bounded solve (Kaufman et al. 2008).
+- **Damping.** Rows with no compliance are damped by a share of their diagonal: sqrt(f32 eps) for contacts, the
+  violation squared up to that for edges and links (Levenberg-Marquardt; Yamashita and Fukushima 2001). Without it,
+  redundant rows (a flat mesh's edges, a light body pinched by a sheet) ran their multipliers off and rounding turned
+  them into motion.
+- **Evidence:**
+  - `soft-kernel/tests/threads.rs`: a sheet stays within 0.1 percent at one to one and a thousand to one at any setting,
+    and a damped step lands on the undamped step's bits.
+  - `tests/soft.test.js`: a 1,000 kg box rests on a default cloth; the 1 g pebble's hop is derived from the sheet's
+    ringing; a cotton strip sags as an elastic cable within 1 percent; a linked cloth keeps its momentum, woven or a
+    mesh without shape matching; a pinched box leaves no faster than the sides close.
+  - `tests/sail.test.js`: sailcloth-weight sails stay whole, with the load implicit.
+- **Cost:** 4 to 42 times the sweep's (`docs/limits.md`).
+- **Missing:** a quiet-machine measure of that cost, and contacts with another soft body's surface collider, which stay
+  in the passes.
+
+Soft contacts at no distance (2026-11-25, KB-SOFT-CUTTHRASH1, `kernel/src/probe.rs`, `kernel/src/face.rs`). A particle or
+a soft triangle that touches an oriented mesh at no distance has no offset to take a normal from. It now takes the
+surface's angle-weighted pseudonormal at the triangle, edge or corner it is on (Baerentzen and Aanaes 2005), walking the
+fan of a corner through the triangles across its edges. Before, a particle took the reverse of its move, and a triangle
+the manifold's arbitrary axis, so the two halves of a cut body pushed each other along and into each other.
+- **Evidence:** `kernel/tests/face_sides.rs` (cut face on cut face, a face along an edge, a face at a corner, and
+  particles at each, each failing without the change), and `tests/soft-cells.test.js` (the cut cube, every step within
+  a derived bound and never under the box's top).
+- **Missing:** an unoriented (two-sided) mesh still has no side to give at no distance.
+
 ## Couplings: gears, racks and pulleys in the kernel's substeps (section 5 evidence, 2026-11-24)
 
 A gear, a rack and pinion, a pulley, a distance range and a path are rows of the rigid kernel's solve, in `packages/physics/kernel/src/couplings.rs`: a class of rows that grows with the world like the joints' (so a snapshot carries it), one row each (a speed that must stay zero: angular speeds along two axes at a ratio, a pinion's turn against a rack's slide, or the rate the two rope lengths of a pulley change), warm started at the start of each substep, solved in every pass beside the joint pass, with the error of a gear and a rack followed from the row's own speed substep by substep and a pulley's read from the poses, and a one-sided rope. Before this the three were per-step impulses in TypeScript, which left a nearly balanced Atwood machine (10:9) out by about g dt squared in its fall (3 mm at 60 Hz). Evidence: `kernel/tests/couplings.rs` (a gear holds its ratio rigid and soft, a rack moves a radius a radian, the pulley falls within one percent of the closed form at 3:1, 1.5:1 and 10:9, a slack rope does nothing, a replay gives the same bits) and `packages/physics/tests/mechanisms.test.js`. Missing: speed (build phase), none of the three is open: a coupling joins the islands of its two bodies as a joint does (`kernel/tests/couplings.rs` a resting train of gears sleeps as one and a touch on one end wakes it all; a spinning pair stays awake), and the table grows (a thousand gears in a train fit). A path's points live in the world's own growable column (`PATH_WORD`, a range of words for each path: its points, a box for each span and a box for each block of 16 spans, in the first body's frame, so the index stands still while the bodies move): a path that outgrows its range moves to a larger one at the end, a full column packs the live ranges together first and then grows, and the nearest-point search starts from the span the follower was last on and visits only the boxes nearer than the best found (`kernel/tests/couplings.rs` a bead goes round a closed loop of a thousand points sampling 4 spans a search, and paths grown together and removed keep their points).

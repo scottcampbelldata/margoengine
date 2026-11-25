@@ -17,15 +17,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   or the action limiter, which allows more at low wavenumbers. A first look found the equilibrium height sensitive to the
   quadruplets' strength C_nl4, so the DIA's normalisation is to be checked against Hasselmann et al. (1985) itself.
 
-### Open: a cloth attached to a rigid body blows up when its free particles take impulses (KB-SOFT-ATTACHKICK1, physics soft)
+### Fixed 2026-11-25: a cloth attached to a rigid body blew up when its free particles took impulses (KB-SOFT-ATTACHKICK1, physics soft)
 
-- **Repro:** `SoftBodies.attach(physics)`, gravity 0; a 4 by 7 cloth (`SoftBodyDesc.cloth`) whose first row is
-  `attachParticle`d to a 50 kg box; every step, before `physics.step()`, `applyParticleImpulse(p, [0.1, 0, 0])` on the 21
-  free particles. After 30 steps the box and cloth hold about (-5,743, 4,255, 19,751) kg m/s against the 63 kg m/s applied;
-  the same cloth unattached holds 63.016, and the attached cloth with no impulses stays at rest. Found while testing the
-  sail load (AERO-02), whose own conservation test therefore uses a free sail.
-- **Cause:** not yet traced; the attachment's hand-off of particle motion to the rigid body is the suspect (a kick of
-  a particle next to an attached one is passed to the body without being taken out of the cloth, or repeatedly).
+- **Repro:** `SoftBodies.attach(physics)`, gravity 0; a 4 by 7 cloth whose first row is `attachParticle`d to a 50 kg box;
+  every step, before `physics.step()`, `applyParticleImpulse(p, [0.1, 0, 0])` on the 21 free particles. After 30 steps the
+  box and cloth held about (-5,743, 4,255, 19,751) kg m/s against the 63 kg m/s applied (a mesh of the same triangles too).
+- **Cause:** two parts. The cloth's rigid edges were swept on their own while the links to the box were solved exactly
+  against a ghost of the box per link, so the sweep pulled a linked particle off its anchor every pass and the exact solve
+  handed the correction to the box, over and over; and an edge between two particles linked to one box is held by the box
+  already, a redundant row whose large, cancelling multipliers rounded into the box's impulse one row at a time.
+- **Fixed:** the soft kernel's exact solve (`soft-kernel/src/rigid.rs`) holds a sheet's edges, the links and the contacts
+  with bodies in one system with each body an unknown of six degrees of freedom (Shinar, Schroeder and Fedkiw 2008), leaves
+  out an edge whose ends are both linked to one body (a redundant constraint, Tournier et al. 2015), sums a body's impulse
+  from the rows in f64 before rounding it, and does not let a particle linked to a body also collide with it. Regression:
+  `packages/physics/tests/soft.test.js`, "a cloth linked to a rigid body keeps its momentum when its free particles are
+  kicked", woven and mesh.
 
 ### Corrected 2026-11-25: two boxes on one floor seemed to change each other's paths, but they touched (KB-PHYS-LOCALITY1, physics kernel)
 
@@ -52,11 +58,61 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** a point inside the slop is closed by a rigid speculative row to the slop's depth, and one past it by the soft spring; the resting depth depends on which branch the point settles in, not continuously on the load. A correct contact gives a resting depth continuous in g.
 - **Owner:** the contact solver's rebuild. Blocks moving the engine to standard gravity.
 
-### Open 2026-11-25: a default cloth's rigid edges stretch under a heavy body and spring it off (KB-SOFT-LOOPSTRETCH1, physics soft, rigid edges)
+### Fixed 2026-11-25: a default cloth stretched under a heavy body and sprang it off (KB-SOFT-LOOPSTRETCH1, physics soft)
 
-- **Repro:** `packages/physics/tests/soft.test.js`, "a contact is stable at a mass ratio of a thousand either way, and a cloth holds a body or tears, never lets it through", the case of a 1,000 kg box on a cloth of 1 kg particles (and, the same ratio scaled, 1 kg on 1 g particles). With gravity 9.80665 m/s^2 the box ends at y = -25: it does not pass through the sheet. The default cloth, whose structural edges are rigid ("they do not stretch"), stretches up to 28 percent (mean 3.6 percent) at the bottom of each bounce, stores about 5,000 J and gives it back. The box bounces clear of the sheet for the whole run (10 cm in the air at step 125), tips, lands off the middle and at step 153 walks off a free edge. Total energy falls bounce by bounce (-750, -1,553, -2,481 J at successive peaks), so nothing adds energy: the sheet is a trampoline it should not be. At 9.81 the box happens to be over the sheet at step 300.
-- **Cause:** the exact solve of rigid edges (`soft-kernel/src/rigid.rs`) holds only components without a loop (a rope, a tree). A cloth's edges are all loops, so they stay with the Gauss-Seidel sweep, whose stiffness depends on its iteration count and on the mass ratio (Macklin, Mueller and Chentanez 2016, "XPBD: position-based simulation of compliant constrained dynamics", section 3). At a ratio of a thousand the sweep leaves rigid edges far from their length. The remedy in the literature solves every inextensible edge together, loops included: fast projection (Goldenthal, Harmon, Fattal, Bercovier and Grinspun 2007, "Efficient simulation of inextensible cloth", SIGGRAPH), the conjugate-gradient solve rigid.rs already runs for trees, taken over the cloth's whole system.
-- **Owner:** the dynamics lane. Blocks moving the engine to standard gravity.
+- **Repro:** `packages/physics/tests/soft.test.js`, "a contact is stable at a mass ratio of a thousand either way, and a
+  cloth holds a body or tears, never lets it through": a 1,000 kg box on a cloth of 1 kg particles. The cloth's "rigid"
+  edges stretched up to 28 percent under it and gave the energy back, so the box bounced clear and walked off a free edge.
+- **Cause:** the exact solve held only rigid edges without a loop; a cloth's edges, all loops, were left to the
+  Gauss-Seidel sweep, whose stiffness depends on its iterations and the mass ratio (Macklin, Mueller and Chentanez 2016),
+  and the box's contacts were not in any solve with the edges, so the contact pushed the sheet, the edges pulled it back
+  into the box, and the contact pushed the box out.
+- **Fixed:** a woven sheet's threads (and a triangle mesh's edges) are solved exactly with their loops (fast projection,
+  Goldenthal, Harmon, Fattal, Bercovier and Grinspun 2007), together with the links and the contacts with bodies, the bodies
+  six-degree-of-freedom unknowns and the contacts' multipliers bounded at zero (MPRGP, Dostal and Schoberl 2005), Newton
+  steps taken as far as an Armijo line search allows (Nocedal and Wright 2006) until every row is within its tolerance. The
+  threads are springs of the fabric's measured tensile stiffness (KES-F, Luible 2008), held rigid past the strain they were
+  measured to (Provot 1995), so the cloth stretches as cotton does; a 1,000 kg box now rests on the cloth. Rows with no
+  compliance are damped Levenberg-Marquardt style (contacts by sqrt(f32 epsilon) of their diagonal, edges and links by
+  their violation squared up to that), so redundant ones (a flat mesh's edges, a light body pinched by a sheet) keep
+  bounded multipliers. A default cloth
+  costs more to step: see docs/limits.md. Regression: the test above, `soft-kernel/tests/threads.rs`, and in soft.test.js
+  "an inextensible sheet holds its threads within 0.1 percent at any pass count and load".
+
+### Fixed 2026-11-25: the two halves of a cut soft body threw each other about (KB-SOFT-CUTTHRASH1, physics soft and kernel)
+
+- **Repro:** `packages/physics/tests/soft-cells.test.js`, "a soft cube with a surface collider cut in two ...". The halves
+  start touching along the cut, each one's corners on the other's surface collider. They moved up to 0.19 m in the first
+  step and 1.6 m in later ones, and sank to 0.125 m under the top of the box they fell on. They then came back, so the old
+  test, which looked only at the 360th step, passed.
+- **Cause:** three things together.
+  - A body of cells has a closed surface wound outward, but its surface collider was oriented only for a body that holds a
+    volume or has a skin, so the collider had no inside.
+  - Where a particle or a soft triangle touches a mesh at no distance, the kernel's queries had no offset to take a normal
+    from. A particle took the reverse of its own move, and a triangle took the manifold's arbitrary axis, here -y on a top
+    face (`kernel/src/probe.rs`, `kernel/src/face.rs`). So both halves were pushed along and into each other.
+  - With contacts in the exact solve, the same contacts held a light body twice over.
+- **Fixed:**
+  - A surface collider is oriented when its triangles close a surface wound one way (`closedSurface` in `soft.ts`).
+  - On an oriented mesh, a contact at no distance takes the surface's own normal there: the angle-weighted pseudonormal of
+    the triangle, edge or corner it is on (Baerentzen and Aanaes 2005).
+  - Contacts with a soft body's own surface or deformable collider stay with the contact passes, since that surface moves
+    with particles of the same solve.
+  - The halves now separate once by their contact thickness and settle on the box.
+- **Regression:** the test above now checks every step: no particle moves further in a step than its fall allows plus that
+  one separation, and none goes under the box's top. Also `kernel/tests/face_sides.rs`, where a cut face, a face along an
+  edge and a face at a corner, and particles at each, get the surface's normal, never one into the mesh or along it.
+
+### Fixed 2026-11-25: cloth friction against rigid bodies counted each contact's push twice (KB-SOFT-FRICTION2X, physics soft)
+
+- **Repro:** a 30 cm cloth on a fixed box tilted 35 degrees, friction 0.5: it should slide (tan 35 = 0.70 > 0.5) and held.
+- **Cause:** a contact's position pass held the slide back by up to the coefficient times its push, and the velocity pass
+  after it held it back again by the coefficient times the same push, so a sliding cloth stuck at about twice its friction;
+  and the position pass moved only the particle, so a light cloth was carried along under a heavy box sliding on it.
+- **Fixed:** friction is one bounded solve after the contacts' (staggered projections, Kaufman, Sueda, James and Pai 2008),
+  |lambda_t| <= mu lambda_n over the sheet's rows and the body together, and the velocity pass takes out only the normal
+  speed. The cloth holds at 20 degrees and slides at 35. Regression: `packages/physics/tests/soft.test.js`, the two cloths
+  over a sharp box edge (friction twice and under half the edge-friction threshold).
 
 ### Fixed 2026-11-25: a commit made from a stale working tree undid seven landed commits and no check caught it (KB-STALE-TREE1, scripts)
 

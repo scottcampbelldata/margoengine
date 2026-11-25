@@ -38,12 +38,12 @@ impl World {
     }
 
     /// The three particles of face contact `f` and their weights.
-    fn face_corners(&self, f: usize) -> ([usize; 3], [f32; 3]) {
+    pub(crate) fn face_corners(&self, f: usize) -> ([usize; 3], [f32; 3]) {
         ([self.fc_a[f] as usize, self.fc_b[f] as usize, self.fc_c[f] as usize], [self.fc_wa[f], self.fc_wb[f], self.fc_wc[f]])
     }
 
     /// The point of the triangle a face contact faces: the weighted sum of its corners.
-    fn face_point(&self, corners: [usize; 3], weights: [f32; 3]) -> [f32; 3] {
+    pub(crate) fn face_point(&self, corners: [usize; 3], weights: [f32; 3]) -> [f32; 3] {
         let mut p = [0.0f32; 3];
         for k in 0..3 {
             let i = corners[k];
@@ -55,7 +55,7 @@ impl World {
     }
 
     /// The triangle's generalized inverse mass at the point: sum w_k^2 / m_k; 0 where the soft body dominates the body.
-    fn face_inverse_mass(&self, c: usize, corners: [usize; 3], weights: [f32; 3]) -> f32 {
+    pub(crate) fn face_inverse_mass(&self, c: usize, corners: [usize; 3], weights: [f32; 3]) -> f32 {
         if self.dom[c] > 0.0 {
             return 0.0;
         }
@@ -63,7 +63,7 @@ impl World {
     }
 
     /// The body's inverse mass at the point `q` from its centre along `n`.
-    fn body_inverse_mass(&self, c: usize, q: [f32; 3], n: [f32; 3]) -> f32 {
+    pub(crate) fn body_inverse_mass(&self, c: usize, q: [f32; 3], n: [f32; 3]) -> f32 {
         let a = [q[1] * n[2] - q[2] * n[1], q[2] * n[0] - q[0] * n[2], q[0] * n[1] - q[1] * n[0]];
         let (ix, iy, iz) = self.inverse_inertia(c, a[0], a[1], a[2]);
         self.wm[c] + a[0] * ix + a[1] * iy + a[2] * iz
@@ -115,7 +115,7 @@ impl World {
     /// a box over the inside of the triangle), the triangle is the flat side: the normal is the triangle's own as it is now, and
     /// the point of the triangle is the foot of the body's nearest point on its plane, so the push on both lies on one line.
     #[allow(clippy::too_many_arguments)]
-    fn face_meet(&self, f: usize, c: usize, tau: f32, carried: [f32; 3], spin: [f32; 4], dm: [f32; 3], turn: [f32; 4]) -> Option<([usize; 3], [f32; 3], [f32; 3], [f32; 3], f32)> {
+    pub(crate) fn face_meet(&self, f: usize, c: usize, tau: f32, carried: [f32; 3], spin: [f32; 4], dm: [f32; 3], turn: [f32; 4]) -> Option<([usize; 3], [f32; 3], [f32; 3], [f32; 3], f32)> {
         let found = [self.fc_px[f], self.fc_py[f], self.fc_pz[f]];
         let n0 = [self.fc_nx[f], self.fc_ny[f], self.fc_nz[f]];
         let v = [self.fc_vx[f], self.fc_vy[f], self.fc_vz[f]];
@@ -173,6 +173,9 @@ impl World {
             let turn = [self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]];
             let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
             let Some((corners, weights, n, q, gap)) = self.face_meet(f, c, tau, carried, spin, dm, turn) else { continue };
+            if corners.iter().any(|&k| self.linked_to(k, c)) {
+                continue;
+            }
             let d = gap - self.fc_r[f];
             if d >= 0.0 {
                 continue;
@@ -228,8 +231,8 @@ impl World {
         }
     }
 
-    /// After a piece: the face contacts' speeds along the normal are taken out (an inelastic contact) and friction holds back what
-    /// Coulomb allows across it, the body taking the same impulse back.
+    /// After a piece: the face contacts' speeds along the normal are taken out (an inelastic contact), the body taking the same
+    /// impulse back. Friction is the exact solve's (rigid.rs, `friction_solve`).
     pub(crate) fn face_velocities(&mut self) {
         let tau = self.tau_end;
         for f in 0..self.faces {
@@ -247,6 +250,9 @@ impl World {
             let sv = [self.fc_vx[f], self.fc_vy[f], self.fc_vz[f]];
             let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
             let Some((corners, weights, n, q, gap)) = self.face_meet(f, c, tau, carried, spin, [0.0; 3], [0.0, 0.0, 0.0, 1.0]) else { continue };
+            if corners.iter().any(|&k| self.linked_to(k, c)) {
+                continue;
+            }
             if gap - self.fc_r[f] > 0.002 {
                 continue;
             }
@@ -266,17 +272,9 @@ impl World {
                 continue;
             }
             let jn = vn / (wt + wb);
-            let (tx, ty, tz) = (rel[0] - n[0] * vn, rel[1] - n[1] * vn, rel[2] - n[2] * vn);
-            let tl = sqrt(tx * tx + ty * ty + tz * tz);
-            let mut jt = 0.0;
-            let t = if tl > 1e-9 { [tx / tl, ty / tl, tz / tl] } else { [0.0; 3] };
-            if tl > 1e-9 {
-                let along = wt + self.body_inverse_mass(c, q, t);
-                let limit = self.fc_f[f] * ((if jn < 0.0 { -jn } else { jn }) + self.fc_j[f]);
-                let want = if along > 0.0 { tl / along } else { 0.0 };
-                jt = if want < limit { want } else { limit };
-            }
-            let j = [n[0] * jn + t[0] * jt, n[1] * jn + t[1] * jt, n[2] * jn + t[2] * jt];
+            // Only the normal: friction is the exact solve's (rigid.rs, `friction_solve`), and holding the slide here as well
+            // would count each push twice.
+            let j = [n[0] * jn, n[1] * jn, n[2] * jn];
             if wt > 0.0 {
                 for k in 0..3 {
                     let s = weights[k] * self.w[corners[k]];

@@ -22,6 +22,7 @@ use crate::layout::*;
 use crate::math::*;
 use crate::narrow::Manifold;
 use crate::query::Filter;
+use crate::sat::Pose;
 use crate::smooth::collide_solids;
 use crate::world::{NONE, World};
 
@@ -181,6 +182,64 @@ impl World {
         }
     }
 
+    /// The angle-weighted pseudonormal, in the world, of the feature of triangle `t` of the oriented mesh `mesh` (placed by
+    /// `frame`) under a point of barycentric weights `w`: the triangle's own normal inside it, the sum of the two triangles'
+    /// normals on an edge, and on a corner the normals of the triangles round it, each weighted by its angle there
+    /// (Baerentzen and Aanaes 2005, sections 3 and 4: a point is outside the closed surface when its offset from its nearest
+    /// point makes a non-negative angle with this). None for a sliver; an open edge or corner takes the triangle's own.
+    pub(crate) fn outward_normal(&self, mesh: usize, t: u32, w: [f32; 3], frame: Pose) -> Option<V3> {
+        let (v0, t0) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_FIRST_TRIANGLE, mesh) as usize);
+        let corners = self.triangle_corners(v0, t0 + t as usize);
+        let front = crate::mesh::triangle_normal(corners[0], corners[1], corners[2])?;
+        // A weight within a ten-thousandth of 0 puts the point on the edge across that corner.
+        let on = [w[0] > 1e-4, w[1] > 1e-4, w[2] > 1e-4];
+        let inside = on.iter().filter(|&&x| x).count();
+        let unit = |v: V3| -> V3 {
+            let l = sqrt(v.dot(v));
+            if l > 1e-12 { v.scale(1.0 / l) } else { front }
+        };
+        let local = if inside == 3 {
+            front
+        } else if inside == 2 {
+            // The edge across the corner with no weight: edge e joins corners e and e + 1.
+            let zero = (0..3).find(|&k| !on[k]).unwrap_or(0);
+            let e = (zero + 1) % 3;
+            let across = self.uu(TRIANGLE_ACROSS_0 + e, t0 + t as usize);
+            match if across == NONE { None } else { let o = self.triangle_corners(v0, t0 + across as usize); crate::mesh::triangle_normal(o[0], o[1], o[2]) } {
+                Some(other) => unit(front.add(other)),
+                None => front,
+            }
+        } else {
+            // A corner: round its fan of triangles, out through the edge that leaves the corner (consistent winding meets
+            // that edge from the other side in the next triangle), each normal weighted by the triangle's angle there.
+            let m = (0..3).find(|&k| on[k]).unwrap_or(0);
+            let id = self.uu([TRIANGLE_A, TRIANGLE_B, TRIANGLE_C][m], t0 + t as usize);
+            let (mut sum, mut tri, mut j) = (v3(0.0, 0.0, 0.0), t, m);
+            let mut closed = false;
+            for _ in 0..64 {
+                let c = self.triangle_corners(v0, t0 + tri as usize);
+                if let Some(n) = crate::mesh::triangle_normal(c[0], c[1], c[2]) {
+                    let (a, b) = (c[(j + 1) % 3].sub(c[j]), c[(j + 2) % 3].sub(c[j]));
+                    let x = a.cross(b);
+                    sum = sum.add(n.scale(atan2(sqrt(x.dot(x)), a.dot(b))));
+                }
+                let next = self.uu(TRIANGLE_ACROSS_0 + j, t0 + tri as usize);
+                if next == NONE {
+                    break;
+                }
+                if next == t {
+                    closed = true;
+                    break;
+                }
+                tri = next;
+                let Some(k) = (0..3).find(|&k| self.uu([TRIANGLE_A, TRIANGLE_B, TRIANGLE_C][k], t0 + tri as usize) == id) else { break };
+                j = k;
+            }
+            if closed { unit(sum) } else { front }
+        };
+        Some(frame.q.rotate(local))
+    }
+
     /// The contacts of a triangle of `thickness` moving corner by corner from `from` to `to` with collider `c`, deepest first, at
     /// most `FACE_K`, into `out`; how many. None when the collider stays further than `margin` past the thickness and the move
     /// never brings them within it. A collider whose body moves (`dt` seconds a step) is met in its own frame, as `probe_collider`
@@ -279,11 +338,32 @@ impl World {
         let mut manifold = Manifold::new();
         // A first touch is found to within a millionth of the thickness; the manifold takes it in.
         let limit = reach + 1e-5 * (1.0 + reach);
+        // An oriented mesh has an outside: a normal out of it must point out of the feature it meets (below).
+        let oriented = self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH && !self.is_round_triangle(c) && {
+            let mesh = self.uu(COLLIDER_HULL, c) as usize;
+            self.uu(MESH_FLAGS, mesh) & MESH_ORIENTED != 0 && self.grid_size(mesh).is_none() && !self.is_voxels(mesh)
+        };
+        let placed = self.collider_pose(c);
         self.each_piece_near(c, plo, phi, &mut |piece| {
             collide_solids(&face, piece, limit, &mut manifold);
+            let part = self.part_id.get();
             for k in 0..manifold.count {
                 let point = manifold.points[k];
-                let normal = manifold.normal.scale(-1.0);
+                let mut normal = manifold.normal.scale(-1.0);
+                // Where the triangle touches the mesh at no distance (two surfaces that were one, the faces of a cut, or a
+                // triangle lying against the mesh edge to edge), the manifold has no separation to take a normal from and
+                // the one it gives can point into the mesh: it pushed both halves of a cut cube the wrong way. On an oriented
+                // mesh the surface's own normal at the point is known: the angle-weighted pseudonormal of the triangle, edge
+                // or corner the point is on (Baerentzen and Aanaes, "Signed distance computation using the angle weighted
+                // pseudonormal", IEEE TVCG 11(3), 2005), which lies in that feature's cone of outward normals.
+                let apart = point.on_a.sub(point.on_b);
+                if oriented
+                    && apart.dot(apart) <= (1e-5 * (1.0 + thickness)) * (1e-5 * (1.0 + thickness))
+                    && let Solid::Triangle(corners) = *piece
+                    && let Some(out) = self.outward_normal(self.uu(COLLIDER_HULL, c) as usize, part, barycentric(point.on_b, corners), placed)
+                {
+                    normal = out;
+                }
                 let weights = barycentric(point.on_a, at);
                 let facing = end[0].scale(weights[0]).add(end[1].scale(weights[1])).add(end[2].scale(weights[2]));
                 let depth = thickness - facing.sub(point.on_b).dot(normal);
@@ -345,7 +425,7 @@ fn length(v: V3) -> f32 {
 
 /// The weights of the corners of triangle `t` at a point `p` on it (Ericson 2005, "Real-Time Collision Detection", 3.4), kept
 /// inside the triangle and adding to 1; the nearest corner's for a triangle with no area.
-fn barycentric(p: V3, t: [V3; 3]) -> [f32; 3] {
+pub(crate) fn barycentric(p: V3, t: [V3; 3]) -> [f32; 3] {
     let (e0, e1, d) = (t[1].sub(t[0]), t[2].sub(t[0]), p.sub(t[0]));
     let (d00, d01, d11, d20, d21) = (e0.dot(e0), e0.dot(e1), e1.dot(e1), d.dot(e0), d.dot(e1));
     let denominator = d00 * d11 - d01 * d01;

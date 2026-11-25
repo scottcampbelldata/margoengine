@@ -76,8 +76,21 @@ fn a_ball_pressed_into_a_triangle_is_pushed_out_along_the_triangles_normal_with_
     for v in p {
         assert!(v.abs() < 1e-6, "momentum is kept: {p:?}");
     }
-    assert_eq!([w.tqx[0], w.tqy[0], w.tqz[0]], [0.0, 0.0, 0.0], "the ball takes no turn");
-    assert!(w.dmx[0] == 0.0 && w.dmz[0] == 0.0 && w.dmy[0] > 0.0, "the ball is pushed straight up");
+    // The push runs through the centre, so the ball takes no turn but what f32 rounding of the lever leaves: the solve meets
+    // the triangle again as it tilts, and a lever along a normal that is no longer an axis is not exactly parallel to it. At
+    // most f32 epsilon of the turn the whole push would give at the ball's full radius.
+    let (radius, mass) = (0.01f32, 0.02f32);
+    let push = (w.dmx[0] * w.dmx[0] + w.dmy[0] * w.dmy[0] + w.dmz[0] * w.dmz[0]).sqrt() * mass;
+    let lever_turn = radius * push / (0.4 * mass * radius * radius);
+    let turn = (w.tqx[0] * w.tqx[0] + w.tqy[0] * w.tqy[0] + w.tqz[0] * w.tqz[0]).sqrt() * 2.0;
+    assert!(turn <= f32::EPSILON * lever_turn, "the ball takes no turn: {turn} rad against {lever_turn} for the full lever");
+    // Pushed up along the triangle's normal: straight up but for the tilt the sheet took as its corners gave way by their
+    // weights (the solve meets the triangle as it is now), so the sideways push is at most the tilt times the push up.
+    let (e1, e2) = ([w.x[1] - w.x[0], w.y[1] - w.y[0], w.z[1] - w.z[0]], [w.x[2] - w.x[0], w.y[2] - w.y[0], w.z[2] - w.z[0]]);
+    let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    let tilt = (n[0] * n[0] + n[2] * n[2]).sqrt() / n[1].abs();
+    let sideways = (w.dmx[0] * w.dmx[0] + w.dmz[0] * w.dmz[0]).sqrt();
+    assert!(w.dmy[0] > 0.0 && sideways <= tilt * w.dmy[0] * (1.0 + 8.0 * f32::EPSILON), "the ball is pushed up along the triangle: {sideways} sideways, {tilt} tilt");
 }
 
 #[test]

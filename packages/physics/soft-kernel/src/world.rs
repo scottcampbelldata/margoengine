@@ -14,6 +14,13 @@ pub const TARGETED: u32 = 2;
 pub const TORN: u32 = 1;
 /// An edge that resists stretch and not squeeze (a rope that does not push).
 pub const TENSION: u32 = 2;
+/// An edge of a sheet: a woven sheet's warp or weft thread, or an edge of a triangle mesh. Rigid, it is held by the exact
+/// solve with the sheet's other edges, loops and all (`rigid.rs`), as inextensible cloth is (Goldenthal et al. 2007): a grid
+/// of threads, or a triangulated surface, has no redundant edge, so the solve can hold every one.
+pub const SHEET: u32 = 4;
+/// An edge whose `omega` holds a spring stiffness in N/m, not a natural frequency: its compliance is 1/k whatever its
+/// particles weigh (a fabric's shear rigidity, which a pinned corner must not stiffen), and `zeta` its damping ratio.
+pub const STIFFNESS: u32 = 8;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
 /// Planes held for each particle.
@@ -50,6 +57,9 @@ pub struct World {
     pub zeta: Col<f32>,
     pub lambda: Col<f32>,
     pub tear: Col<f32>,
+    /// The strain an edge of a sheet is held to beyond its spring (0: none): a fabric thread's strain at the end of its measured
+    /// range, past which the solve holds it rigid (`rigid.rs`).
+    pub elimit: Col<f32>,
     pub eflags: Col<u32>,
     // Soft bodies: what applies to all their particles.
     pub gravity_scale: Col<f32>,
@@ -162,6 +172,10 @@ pub struct World {
     pub gs: Col<f32>,
     /// Per body row: 1 when the soft body dominates the body (the particle is immovable to it), else 0.
     pub dom: Col<f32>,
+    /// Per body row: 1 when the body's surface is a mesh that follows particles of this world (a soft body's surface or
+    /// deformable collider), else 0. A contact with it is one soft body against another, which the contact passes take
+    /// (rigid.rs).
+    pub bmesh: Col<f32>,
     /// Per body: 1 while it sleeps, its particles still and left out of the prediction.
     pub bsleep: Col<u32>,
     /// Per body row: where its centre of mass and its velocity were when the step began, so a plane found at the step's start
@@ -180,6 +194,8 @@ pub struct World {
     pub kj: Col<f32>,
     /// How far into the step the last passes of contacts stood, for the velocity pass that follows.
     pub tau_end: f32,
+    /// The pieces this step has begun: the solve's time into the step is the piece's length times this.
+    pub pieces: u32,
     /// Per body row: how far this piece of the step's contacts have moved it, a translation of its centre (`dm`) and a turn
     /// about it (the unit quaternion `tq`, x, y, z, w), so the next contact meets the body where the last one left it
     /// (Gauss-Seidel over a body's contacts, as in Mueller, Macklin, Chentanez, Jeschke and Kim 2020). The velocity change is
@@ -287,7 +303,7 @@ impl World {
         grow(&mut self.vb_count, bodies);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
-        for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear] {
+        for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear, &mut self.elimit] {
             grow(v, edges);
         }
         grow(&mut self.ea, edges);
@@ -301,7 +317,7 @@ impl World {
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
             &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
-            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.tqx, &mut self.tqy, &mut self.tqz, &mut self.tqw, &mut self.rox, &mut self.roy, &mut self.roz, &mut self.rqx, &mut self.rqy, &mut self.rqz, &mut self.rqw, &mut self.sqx, &mut self.sqy, &mut self.sqz, &mut self.sqw,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.bmesh, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.tqx, &mut self.tqy, &mut self.tqz, &mut self.tqw, &mut self.rox, &mut self.roy, &mut self.roz, &mut self.rqx, &mut self.rqy, &mut self.rqz, &mut self.rqw, &mut self.sqx, &mut self.sqy, &mut self.sqz, &mut self.sqw,
         ] {
             grow(v, colliders);
         }
@@ -343,6 +359,7 @@ impl World {
             self.clear_correction(c);
         }
         self.torn = 0;
+        self.pieces = 0;
         self.face_sides();
         // A pinned particle with a target travels to it at a steady speed over the step.
         for i in 0..self.particles {
@@ -475,7 +492,43 @@ impl World {
                 self.vz[i] *= damp;
             }
         }
+        self.thread_damping(h);
         self.contact_velocities();
+    }
+
+    /// The internal damping of a fabric's threads, at velocity level after the piece: each compliant sheet edge's speed of
+    /// stretch decays over the piece as a spring of its stiffness and damping ratio (`zeta`) would, by exp(-2 zeta omega h),
+    /// omega = sqrt(k (w_a + w_b)) the edge's natural frequency, its two particles sharing the change by their inverse masses so
+    /// momentum is kept. A fabric's damping ratio comes from its measured tensile resilience (KES-F RT, the share of the work
+    /// of stretching it gives back, through Jacobsen's equivalent viscous damping: SoftBodyMaterial in soft.ts).
+    fn thread_damping(&mut self, h: f32) {
+        for e in 0..self.edges {
+            if self.eflags[e] & (SHEET | STIFFNESS | TORN) != SHEET | STIFFNESS || !(self.zeta[e] > 0.0) || !(self.omega[e] > 0.0) {
+                continue;
+            }
+            let (a, b) = (self.ea[e] as usize, self.eb[e] as usize);
+            let (wa, wb) = (self.w[a], self.w[b]);
+            let w = wa + wb;
+            if !(w > 0.0) {
+                continue;
+            }
+            let (dx, dy, dz) = (self.x[a] - self.x[b], self.y[a] - self.y[b], self.z[a] - self.z[b]);
+            let len = sqrt(dx * dx + dy * dy + dz * dz);
+            if !(len > 1e-9) {
+                continue;
+            }
+            let n = [dx / len, dy / len, dz / len];
+            let rel = (self.vx[a] - self.vx[b]) * n[0] + (self.vy[a] - self.vy[b]) * n[1] + (self.vz[a] - self.vz[b]) * n[2];
+            let omega = sqrt(self.omega[e] * w);
+            let keep = margoengine_physics_kernel_common::pinned::exp(-2.0 * self.zeta[e] as f64 * omega as f64 * h as f64) as f32;
+            let change = rel * (1.0 - keep) / w;
+            self.vx[a] -= wa * change * n[0];
+            self.vy[a] -= wa * change * n[1];
+            self.vz[a] -= wa * change * n[2];
+            self.vx[b] += wb * change * n[0];
+            self.vy[b] += wb * change * n[1];
+            self.vz[b] += wb * change * n[2];
+        }
     }
 
     /// One compliant distance constraint, C = |a - b| - rest (Macklin et al. 2016, with the damping of its section 4).
@@ -489,8 +542,8 @@ impl World {
         if w == 0.0 {
             return;
         }
-        // A rigid edge (no natural frequency) is held by the exact solve (src/rigid.rs), together with the body links.
-        if self.omega[e] == 0.0 && self.held_exactly(e) {
+        // An edge the exact solve holds (src/rigid.rs: a rigid edge, a sheet's compliant thread) is not swept.
+        if self.held_exactly(e) {
             return;
         }
         let dx = self.x[a] - self.x[b];
@@ -511,7 +564,8 @@ impl World {
             return;
         }
         let (nx, ny, nz) = (dx / len, dy / len, dz / len);
-        let omega = self.omega[e];
+        // A stiffness k is a natural frequency of sqrt(k w) on the constraint's effective mass 1/w, taken from the masses now.
+        let omega = if self.eflags[e] & STIFFNESS != 0 { sqrt(self.omega[e] * w) } else { self.omega[e] };
         let (alpha, gamma) = if omega > 0.0 {
             // alpha_tilde = w_eff / (omega h)^2 and gamma = 2 zeta / (omega h): the spring of a constraint of effective mass 1/w.
             let wh = omega * h;
@@ -578,6 +632,10 @@ impl World {
                     continue;
                 }
                 let c = (c - 1) as usize;
+                // A particle linked to the body is held by the link, not pushed off its surface (rigid.rs).
+                if self.linked_to(i, c) {
+                    continue;
+                }
                 let v = [self.kvx[k], self.kvy[k], self.kvz[k]];
                 let carried = [self.mx[c] + self.lvx[c] * h, self.my[c] + self.lvy[c] * h, self.mz[c] + self.lvz[c] * h];
                 let dm = [self.dmx[c], self.dmy[c], self.dmz[c]];
@@ -671,9 +729,9 @@ impl World {
     }
 
     /// After a piece, the speeds of the particles and the bodies they touch: a contact does not leave them separating faster than
-    /// they met (the pop a position correction would leave is taken out, as an inelastic contact does) and holds back what
-    /// Coulomb friction allows, with the same impulse given to the body (Macklin et al. 2014, section 4; Mueller et al. 2020,
-    /// section 3.5, who solve the velocities of contacts after their positions).
+    /// they met (the pop a position correction would leave is taken out, as an inelastic contact does), with the same impulse
+    /// given to the body (Macklin et al. 2014, section 4; Mueller et al. 2020, section 3.5, who solve the velocities of contacts
+    /// after their positions). Friction is the exact solve's (rigid.rs, `friction_solve`).
     fn contact_velocities(&mut self) {
         let tau = self.tau_end;
         for i in 0..self.particles {
@@ -692,6 +750,9 @@ impl World {
                     continue;
                 }
                 let c = (c - 1) as usize;
+                if self.linked_to(i, c) {
+                    continue;
+                }
                 // A body the soft body dominates meets particles that do not give way: for it the particle has no inverse mass.
                 let wp = if self.dom[c] > 0.0 { 0.0 } else { self.w[i] };
                 let carried = [self.mx[c], self.my[c], self.mz[c]];
@@ -714,20 +775,9 @@ impl World {
                 }
                 // The contact is inelastic: whatever the relative speed along the normal (closing or separating) is taken out.
                 let jn = vn / denominator;
-                let (tx, ty, tz) = (rel[0] - n[0] * vn, rel[1] - n[1] * vn, rel[2] - n[2] * vn);
-                let tl = sqrt(tx * tx + ty * ty + tz * tz);
-                let mut jt = 0.0;
-                let t = if tl > 1e-9 { [tx / tl, ty / tl, tz / tl] } else { [0.0; 3] };
-                if tl > 1e-9 {
-                    // How easily the body gives way along the sliding direction, which its spin changes as much as its mass.
-                    let at = [q[1] * t[2] - q[2] * t[1], q[2] * t[0] - q[0] * t[2], q[0] * t[1] - q[1] * t[0]];
-                    let (jx, jy, jz) = self.inverse_inertia(c, at[0], at[1], at[2]);
-                    let wt = wp + self.wm[c] + at[0] * jx + at[1] * jy + at[2] * jz;
-                    let limit = self.kf[k] * ((if jn < 0.0 { -jn } else { jn }) + self.kj[k]);
-                    let want = if wt > 0.0 { tl / wt } else { 0.0 };
-                    jt = if want < limit { want } else { limit };
-                }
-                let j = [n[0] * jn + t[0] * jt, n[1] * jn + t[1] * jt, n[2] * jn + t[2] * jt];
+                // Only the normal: friction is the exact solve's (rigid.rs, `friction_solve`), and holding the slide here as well
+                // would count each push twice.
+                let j = [n[0] * jn, n[1] * jn, n[2] * jn];
                 self.vx[i] -= wp * j[0];
                 self.vy[i] -= wp * j[1];
                 self.vz[i] -= wp * j[2];
@@ -754,6 +804,11 @@ impl World {
             self.kj[k] = 0.0;
         }
         self.face_velocities();
+    }
+
+    /// Whether particle `i` is linked to body row `c` this piece (`rigid_begin` marks them).
+    pub(crate) fn linked_to(&self, i: usize, c: usize) -> bool {
+        self.rg.is_linked(i, c)
     }
 
     /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
@@ -967,7 +1022,7 @@ fn conj(q: [f32; 4]) -> [f32; 4] {
     [-q[0], -q[1], -q[2], q[3]]
 }
 
-fn rotate(q: [f32; 4], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+pub(crate) fn rotate(q: [f32; 4], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
     let (qx, qy, qz, qw) = (q[0], q[1], q[2], q[3]);
     let tx = 2.0 * (qy * z - qz * y);
     let ty = 2.0 * (qz * x - qx * z);

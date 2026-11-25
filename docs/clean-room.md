@@ -11792,7 +11792,7 @@ in Wikipedia, read 2026-11-25 (collocation at three-quarter chord, the influence
 force per horseshoe, after J. Katz and A. Plotkin, "Low-Speed Aerodynamics", 2001, not read here). The check against H. B.
 Helmbold's low-aspect-ratio lift slope, 2 pi AR / (2 + sqrt(AR^2 + 4)) (1942, known through the textbooks), is the test's.
 Stalled cells take the flat-plate law of AERO-01. The cloth grid as lattice, the mean apparent wind as wake direction, the
-segment core and the fixed-order elimination are this package's own. Proof: `packages/physics/tests/sail.test.js`.
+segment core and the fixed-order elimination are this package's own. The load leans on the cloth's own speed through the air, so each corner takes it damped implicitly, F dt / (1 + K dt) (backward Euler on that aerodynamic damping, K the slope of its panels' loads against their normal speed over its mass: the lattice's own, from the diagonal of the inverse of its influence matrix, or the flat plate's); given explicitly, a sail of real sailcloth weight flew apart within ten steps. Proof: `packages/physics/tests/sail.test.js`.
 
 ## Reflection cone: rough planar and screen-space reflections with contact hardening (2026-11-25)
 
@@ -11809,3 +11809,72 @@ Proofs: packages/environment/tests/reflection-cone.test.js (CPU, against the clo
 Problem: the live Noise node shows another stochastic pattern than Cycles for the same settings. A procedural noise is fixed by its lattice hash and gradient set (K. Perlin, An image synthesizer, SIGGRAPH 1985, https://doi.org/10.1145/325334.325247; K. Perlin, Improving noise, SIGGRAPH 2002, https://doi.org/10.1145/566654.566636; survey: A. Lagae et al., A Survey of Procedural Noise Functions, Computer Graphics Forum 29(8), 2010, https://doi.org/10.1111/j.1467-8659.2010.01827.x). Hashes of this kind are designed so that their outputs look unrelated (M. Jarzynski and M. Olano, Hash Functions for GPU Rendering, Journal of Computer Graphics Techniques 9(3), 2020, https://jcgt.org/published/0009/03/02/), so this one is not fitted from samples, and Blender's source is not read. Coordinator's ruling: record the accepted difference and offer Cycles' own result as texels.
 
 Method: the add-on's existing Cycles bake through Blender's documented Python API (`bpy.ops.object.bake`, https://docs.blender.org/api/current/bpy.ops.object.html#bpy.ops.object.bake). `bake_noise` selects the materials with a Noise Texture on a path to the active output, node groups included. Result: 0 differing texels from an independent Cycles emission bake. Regression: `tools/blender-addon/tests/blender_bake_noise.py`, run by `npm run modern:test:blender`.
+### Cloth as measured fabric, solved exactly (`@margoengine/physics/soft`, 2026-11-25, KB-SOFT-LOOPSTRETCH1)
+
+`packages/physics/soft-kernel/src/rigid.rs` holds a woven sheet's threads, the links to bodies and the contacts with bodies
+in one solve. Each Newton step solves for the rows' multipliers with MPRGP on the Jacobi-scaled system (Z. Dostal and J.
+Schoberl, "Minimizing quadratic functions subject to bound constraints with the rate of convergence and finite
+termination", Comput. Optim. Appl. 30, 2005: the proportioning test, the expansion step of length 1 / ||A||, here the
+Gershgorin bound). The step then goes as far as an Armijo line search on the sum of squared violations allows (J. Nocedal
+and S. J. Wright, *Numerical Optimization*, 2nd ed., 2006, section 3.1), until every row is within its tolerance. That
+tolerance is 0.1 percent strain for a sheet's threads (R. Goldenthal, D. Harmon, R. Fattal, M. Bercovier and E. Grinspun,
+"Efficient simulation of inextensible cloth", SIGGRAPH 2007, Algorithm 1 and figures 4-5).
+
+- **Bodies.** Bodies are six-degree-of-freedom unknowns with their world inverse inertia (T. Shinar, C. Schroeder and R.
+  Fedkiw, "Two-way coupling of rigid and deformable bodies", SCA 2008).
+- **Compliant threads.** A thread is a compliant row, with alpha-tilde = 1 / (k h^2) (M. Macklin, M. Mueller and N.
+  Chentanez, "XPBD", MIG 2016). Past its measured strain it is held rigid (X. Provot, "Deformation constraints in a
+  mass-spring model to describe rigid cloth behavior", Graphics Interface 1995).
+- **Redundant rows.** A row a body's rigidity already holds is left out (J. Tournier, M. Nesme, B. Gilles and F. Faure,
+  "Stable constrained dynamics", SIGGRAPH 2015, section 2).
+- **Friction.** Friction is its own box-bounded solve after the normal one (D. M. Kaufman, S. Sueda, D. L. James and D. K.
+  Pai, "Staggered projections for frictional contact in multibody systems", SIGGRAPH Asia 2008).
+- **Row damping.** A row with no compliance of its own is damped by a share of its own diagonal: K. Levenberg, Q. Appl.
+  Math. 2(2), 1944; D. W. Marquardt, J. SIAM 11(2), 1963, damping scaled by the diagonal.
+  - A contact's row keeps sqrt(f32 epsilon), a regularized contact (C. Lacoursiere, "Ghosts and machines", PhD thesis,
+    Umea 2007, chapter 5), because two contacts that ask for what no motion gives keep asking. The size is the one the rigid
+    kernel's block solve uses, with the same reasoning (N. J. Higham, *Accuracy and Stability of Numerical Algorithms*,
+    2002, section 10.3).
+  - An edge's or a link's damping is the worst violation squared, up to that, so it fades as the rows close (N. Yamashita
+    and M. Fukushima, Computing Suppl. 15, 2001; J. Fan and Y. Yuan, Computing 74, 2005: Levenberg-Marquardt with a damping
+    of the residual squared keeps quadratic convergence without a nonsingular Jacobian). A fixed damping left every
+    piece's last step a tolerance short, and a slack-only rope drifted on the speed that gave.
+  - Without the damping, redundant rows left the system singular: a flat triangle mesh's rigid edges hold its interior
+    twice over in its plane, and a light box is pinched between two sides. The multipliers ran off along the motion that
+    cancels itself, and rounding of the f32 directions turned them into large motions: a kicked mesh flew apart in five
+    steps, and a 1 g box was thrown off a sheet at 10 m/s.
+  - On a system with one answer, a damped step lands on the same bits as an undamped one, and over many steps the two
+    differ no more than a one-ulp nudge of one coordinate makes them differ (`soft-kernel/tests/threads.rs`).
+- **MPRGP with two bounds.** A row with no room between its bounds is never freed, and the proportioning step stops at
+  each freed row's far bound, as the conjugate gradient step does (Dostal and Schoberl 2005 state the method for bounds on
+  one side). A friction row of a contact with no push, bounded at zero both ways, was otherwise freed and spun the body it
+  touched.
+
+The fabric data are from E. Luible's thesis, *Study of mechanical properties in the simulation of 3D garments*, Universite
+de Geneve, 2008, doi 10.13097/archive-ouverte/unige:688, Annex C, the KES-F tables. The presets use samples 2 (shirt
+cotton, 120 g/m^2), 5 (wool gabardine), 8 (silk), 10 (jute plain weave, for canvas) and 29 (polyester plain weave, for
+sailcloth). The conversions are this package's own:
+
+- **Shear stiffness.** G in gf/cm/degree times 56.187 gives N/m per radian. A diagonal of length L across a cell of sides a
+  and b gets G L^2 / (2 a b).
+- **Tensile stiffness.** The linear spring that stores the measured tensile energy WT up to the strain EMT, 2 WT / EMT^2,
+  times 0.980665 for N/m.
+- **Damping from hysteresis.** Shear damping is 2HG / (pi G 0.5 degrees), and thread damping is (1 - RT) / (4 pi). Both use
+  L. S. Jacobsen's equivalent viscous damping ("Steady forced vibration as influenced by damping", Trans. ASME 52, 1930),
+  known through the vibration textbooks and not read here.
+
+Spread across sources, recorded in the README and in `docs/limits.md`:
+
+- **Cotton broadcloth.** Seo and Tamura (Sen'i Seihin Shohi Kagaku 58(8), 2017, doi 10.11419/senshoshi.58.8_686) measured
+  G = 3.50/3.57, against Luible's shirting at 0.367/0.321: ten times apart.
+- **Wool gabardine.** G = 2.93/2.67 there, against Luible's 0.588/0.545.
+- **Silk habutae.** Miura, Tsukada and Sakaguchi (J. Silk Sci. Tech. Jpn 18, 2010, doi 10.11417/silk.18.45) measured
+  G = 0.51, and Nakajima and Miura (JARQ 47(2), 2013, doi 10.6090/jarq.47.175) G = 0.11.
+- **Canvas and sailcloth.** No published KES-F table of either was found, so those presets are the nearest measured
+  fabrics and say so.
+
+The air on a cloth's faces is a flat plate's drag, coefficient 1.17 (S. F. Hoerner, *Fluid-Dynamic Drag*, 1965, chapter
+3, the value `WindForce` uses). Each face's drag is integrated in closed form over the step, u / (1 + k |u| dt), so a
+light face in a strong wind cannot overshoot. Proof: `packages/physics/tests/soft.test.js` (the sag of a cotton strip
+against an elastic cable's, d = L (3 rho_A g L / (64 K))^(1/3); the inextensible sheet at 0.1 percent; ATTACHKICK1; the
+two drape cases) and `soft-kernel/tests/threads.rs`.
