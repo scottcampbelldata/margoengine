@@ -158,7 +158,7 @@ export interface GeospatialOptions {
     keyTarget?: EventTargetLike | null;
     preset?: GeospatialPreset;
     inertia?: Partial<GeospatialInertia>;
-    geoid?: GeoidQuery;
+    geoid?: GeoidQuery | 'egm96' | null;
     hash?: boolean;
     gamepad?: boolean;
     reducedMotion?: boolean;

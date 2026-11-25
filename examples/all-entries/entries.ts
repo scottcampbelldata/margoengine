@@ -215,6 +215,7 @@ export * as e_margoengine_controls_collide from '@margoengine/controls/collide';
 export * as e_margoengine_controls_box_gizmo from '@margoengine/controls/box-gizmo';
 export * as e_margoengine_controls_presentation from '@margoengine/controls/presentation';
 export * as e_margoengine_controls_device_orientation from '@margoengine/controls/device-orientation';
+export * as e_margoengine_controls_geoid from '@margoengine/controls/geoid';
 export * as e_margoengine_core from '@margoengine/core';
 export * as e_margoengine_core_extension from '@margoengine/core/extension';
 export * as e_margoengine_creative_paint from '@margoengine/creative/paint';
@@ -597,6 +598,7 @@ export * as e_margoengine_game_controls_collide from '@margoengine/game/controls
 export * as e_margoengine_game_controls_box_gizmo from '@margoengine/game/controls/box-gizmo';
 export * as e_margoengine_game_controls_presentation from '@margoengine/game/controls/presentation';
 export * as e_margoengine_game_controls_device_orientation from '@margoengine/game/controls/device-orientation';
+export * as e_margoengine_game_controls_geoid from '@margoengine/game/controls/geoid';
 export * as e_margoengine_game_core from '@margoengine/game/core';
 export * as e_margoengine_game_core_extension from '@margoengine/game/core/extension';
 export * as e_margoengine_game_creative_paint from '@margoengine/game/creative/paint';
@@ -1545,6 +1547,7 @@ export * as e_margoengine_kit_react_controls_collide from '@margoengine/kit-reac
 export * as e_margoengine_kit_react_controls_box_gizmo from '@margoengine/kit-react/controls/box-gizmo';
 export * as e_margoengine_kit_react_controls_presentation from '@margoengine/kit-react/controls/presentation';
 export * as e_margoengine_kit_react_controls_device_orientation from '@margoengine/kit-react/controls/device-orientation';
+export * as e_margoengine_kit_react_controls_geoid from '@margoengine/kit-react/controls/geoid';
 export * as e_margoengine_kit_react_core from '@margoengine/kit-react/core';
 export * as e_margoengine_kit_react_core_extension from '@margoengine/kit-react/core/extension';
 export * as e_margoengine_kit_react_culling from '@margoengine/kit-react/culling';
@@ -2131,6 +2134,7 @@ export * as e_margoengine_kit_viz_controls_collide from '@margoengine/kit-viz/co
 export * as e_margoengine_kit_viz_controls_box_gizmo from '@margoengine/kit-viz/controls/box-gizmo';
 export * as e_margoengine_kit_viz_controls_presentation from '@margoengine/kit-viz/controls/presentation';
 export * as e_margoengine_kit_viz_controls_device_orientation from '@margoengine/kit-viz/controls/device-orientation';
+export * as e_margoengine_kit_viz_controls_geoid from '@margoengine/kit-viz/controls/geoid';
 export * as e_margoengine_kit_viz_core from '@margoengine/kit-viz/core';
 export * as e_margoengine_kit_viz_core_extension from '@margoengine/kit-viz/core/extension';
 export * as e_margoengine_kit_viz_culling from '@margoengine/kit-viz/culling';
@@ -2646,6 +2650,7 @@ export * as e_margoengine_kit_web_controls_collide from '@margoengine/kit-web/co
 export * as e_margoengine_kit_web_controls_box_gizmo from '@margoengine/kit-web/controls/box-gizmo';
 export * as e_margoengine_kit_web_controls_presentation from '@margoengine/kit-web/controls/presentation';
 export * as e_margoengine_kit_web_controls_device_orientation from '@margoengine/kit-web/controls/device-orientation';
+export * as e_margoengine_kit_web_controls_geoid from '@margoengine/kit-web/controls/geoid';
 export * as e_margoengine_kit_web_core from '@margoengine/kit-web/core';
 export * as e_margoengine_kit_web_core_extension from '@margoengine/kit-web/core/extension';
 export * as e_margoengine_kit_web_culling from '@margoengine/kit-web/culling';
@@ -3390,6 +3395,7 @@ export * as e_margoengine_controls_collide_2 from 'margoengine/controls/collide'
 export * as e_margoengine_controls_box_gizmo_2 from 'margoengine/controls/box-gizmo';
 export * as e_margoengine_controls_presentation_2 from 'margoengine/controls/presentation';
 export * as e_margoengine_controls_device_orientation_2 from 'margoengine/controls/device-orientation';
+export * as e_margoengine_controls_geoid_2 from 'margoengine/controls/geoid';
 export * as e_margoengine_core_2 from 'margoengine/core';
 export * as e_margoengine_core_extension_2 from 'margoengine/core/extension';
 export * as e_margoengine_creative_paint_2 from 'margoengine/creative/paint';

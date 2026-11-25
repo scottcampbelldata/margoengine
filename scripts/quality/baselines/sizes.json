@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18927349,
+  "total": 18930530,
   "history": [
     {
       "date": "2026-10-24",
@@ -12177,6 +12177,12 @@
       "commit": "9577948b6",
       "reason": "SailForce (AERO-02), the vortex-lattice sail and flag load on a cloth with its stalled-panel law, in @margoengine/physics/soft (88,860 to 90,276 B gzip; base 27,968 to 29,336): it lives with the cloth it loads, so a split would add an entry every sail scene loads anyway",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial geoid option; new entry controls/geoid (EGM96 lookup and loader)",
+      "grew": 2
     }
   ],
   "items": {
@@ -12393,7 +12399,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 14533,
+    "@margoengine/controls/geospatial": 15903,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
@@ -13994,6 +14000,6 @@
     "margoengine/game": 946,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/materials/plugins": 4715
+    "@margoengine/controls/geoid": 1811
   }
 }
