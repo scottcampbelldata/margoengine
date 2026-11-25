@@ -11260,3 +11260,13 @@ Proof: `packages/loaders/tests/font-woff.test.js` (including a .woff2 made by an
 ### Deterministic radix sort (`kernel-common`, 2026-11-25, K03)
 
 `kernel-common/src/sort.rs` is the least significant digit radix sort the graph colouring already used, moved out so every solver shares it and run over all eight bytes of a `key << 32 | id` entry, so that the order is the entries' order as numbers (key, then id) whatever order they arrive in. The method is the counting sort of H. H. Seward, "Information sorting in the application of electronic digital computers to business operations", MIT Report R-232, 1954, applied a byte at a time as in T. Cormen, C. Leiserson, R. Rivest and C. Stein, "Introduction to Algorithms", chapter 8. The colouring's order is unchanged (its entries arrive in id order).
+
+### Snapshot, restore and state hash of the framework's solvers (`@margoengine/physics/world`, 2026-11-25)
+
+`packages/physics/src/world/snapshot.ts` takes, restores and hashes the regions each solver names as its state and its extra
+history (docs/physics-framework.md, section 8), in canonical order (solvers by id, regions as listed), with no memory
+offsets in the stream. The hash is two lanes of MurmurHash3's 32-bit function with different seeds, written from the
+algorithm's published description: A. Appleby, "MurmurHash3", 2011, public domain, https://github.com/aappleby/smhasher/wiki/MurmurHash3
+(the description page; no source file of it was read). It is checked against the function's published vectors ("" seed 0:
+0, "hello" seed 0: 0x248bfa47, "The quick brown fox jumps over the lazy dog" seed 0: 0x2e4ff723), fed whole and in
+three-byte pieces. Proof: `packages/physics/tests/world-snapshot.test.js`.

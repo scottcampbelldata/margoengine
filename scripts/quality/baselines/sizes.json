@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18628489,
+  "total": 18630454,
   "history": [
     {
       "date": "2026-10-24",
@@ -11829,6 +11829,12 @@
       "commit": "d1ae4841b",
       "reason": "xr/reflection: new optional entry, AR reflection cube from the room's light (2360 B gzip)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "physics-world-snapshot",
+      "reason": "@margoengine/physics/world: 299 to 2,264 B gzip for snapshot, restore and the state hash of the framework's solvers (section 8): the manifest encoder and decoder with every refusal, and two MurmurHash3 lanes; it is the entry every solver lane imports for snapshots, so a split would only move the bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12599,7 +12605,7 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/world": 555,
+    "@margoengine/physics/world": 2520,
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,

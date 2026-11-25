@@ -1,5 +1,5 @@
-// `@margoengine/physics/world`: the physics framework (docs/physics-framework.md). Today the solver contract; the world,
-// the field registry, the scheduler, snapshot and hash follow on it.
+// `@margoengine/physics/world`: the physics framework (docs/physics-framework.md): the solver contract, and the snapshot,
+// restore and state hash of a set of solvers. The world, the field registry and the scheduler follow on it.
 export {
   BASE_RATE,
   RATE_LEVELS,
@@ -20,3 +20,11 @@ export {
   type SolverHost,
   type StepContext,
 } from './solver.js';
+export {
+  SNAPSHOT_VERSION,
+  restoreSnapshot,
+  stateHash,
+  takeSnapshot,
+  type Snapshot,
+  type SnapshotSolver,
+} from './snapshot.js';

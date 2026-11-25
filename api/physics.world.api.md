@@ -44,6 +44,15 @@ export interface Region {
     readonly layout: number;
 }
 
+export const SNAPSHOT_VERSION = 1;
+
+export interface Snapshot {
+    readonly bytes: Uint8Array;
+    readonly hash: string;
+}
+
+export type SnapshotSolver = Pick<Solver, 'describe' | 'stateRegions' | 'extraState'>;
+
 export interface Solver<Params = unknown> {
     describe(): SolverDescription;
     init(host: SolverHost, params: Params): void;
@@ -81,5 +90,11 @@ export function isRateLevel(value: unknown): value is RateLevel;
 
 export function rateOf(level: RateLevel): number;
 
+export function restoreSnapshot(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[], bytes: Uint8Array): void;
+
+export function stateHash(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): string;
+
 export function substepsBetween(fast: RateLevel, slow: RateLevel): number;
+
+export function takeSnapshot(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): Snapshot;
 ```

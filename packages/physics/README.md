@@ -1571,6 +1571,27 @@ for (let tick = 0; tick < rateOf(level); tick++) fall.step({tick, level, seed: 1
 console.log(rateOf(level), substepsBetween(level, 0), fall.height().toFixed(2)); // 240 4 5.07
 ```
 
+`stateHash(memory, solvers)`, `takeSnapshot(memory, solvers)` and `restoreSnapshot(memory, solvers, bytes)` work on any set of solvers through the regions they name ([docs/physics-framework.md](../../docs/physics-framework.md), section 8). The hash is 16 hex digits over every byte of each solver's state and extra regions with their names, element types, layout versions and lengths, solvers taken by id and regions in the order listed, so equal states hash equal wherever their regions lie and however the world holds its solvers, and scratch a solver does not name never counts. A snapshot is those bytes under a versioned manifest with the hash, and has no memory offsets in it: it restores into the same solvers laid out anywhere. Restoring checks the encoding version, the solver ids, every region's name, type, layout version and length, and the bytes against the hash before writing anything, and refuses with a coded `MargoError` (`version`, `state` or `failed`) leaving the state as it was.
+
+```ts
+import {restoreSnapshot, stateHash, takeSnapshot, type Region} from 'margoengine/physics/world';
+
+// One solver's state: a single f64 in the world's memory.
+const memory = new WebAssembly.Memory({initial: 1});
+const height: Region = {name: 'height', byteOffset: 0, byteLength: 8, type: 'f64', layout: 1};
+const ball = {
+  describe: () => ({id: 'ball', fields: [], rate: 0, stableRate: () => 0}) as const,
+  stateRegions: () => [height],
+  extraState: () => [],
+};
+const value = new Float64Array(memory.buffer, 0, 1);
+value[0] = 10;
+const saved = takeSnapshot(memory, [ball]);
+value[0] = 3; // the run goes on
+restoreSnapshot(memory, [ball], saved.bytes);
+console.log(value[0], stateHash(memory, [ball]) === saved.hash); // 10 true
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
