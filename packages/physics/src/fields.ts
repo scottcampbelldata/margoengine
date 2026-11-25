@@ -1,5 +1,6 @@
-// Fields that act on the rigid bodies of a world: an explosion (one radial impulse) and a wind (a drag every step). Each is sampled
-// per body, at the body's centre, so it costs a query and a loop over the bodies it reaches.
+// Fields that act on the rigid bodies of a world: an explosion (one radial impulse) and a wind force (a drag every step). Each
+// is sampled per body, at the body's centre, so it costs a query and a loop over the bodies it reaches.
+import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import type { PhysicsBody } from './body.js';
 import { checkVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment, QueryFilter } from './physics.js';
@@ -53,11 +54,15 @@ export function explosion(physics: Physics, center: Vec3, options: ExplosionOpti
   return pushed;
 }
 
-/** Options of {@link WindField}. */
+/** Options of {@link WindForce}. */
 export interface WindOptions {
-  /** The air's velocity in m/s, a vector, or a function of the point and the time in seconds (for gusts and swirls). */
-  velocity: Vec3 | ((point: Vec3, time: number) => Vec3);
-  /** Air density in kg/m3 (default 1.2). */
+  /**
+   * The air: its velocity in m/s as a vector, a function of the point and the time in seconds (for gusts and swirls), or a
+   * flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere's), sampled at each body's centre on the
+   * world's clock, whose density it also takes. A flow field's coordinates must be in the world's frame (cell [0, 0, 0]).
+   */
+  velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
+  /** Air density in kg/m3 (default the flow field's at each body, or 1.2). */
   density?: number;
   /** Drag coefficient (default 1). */
   drag?: number;
@@ -68,13 +73,15 @@ export interface WindOptions {
 }
 
 /**
- * A wind: every step each dynamic body in the field feels the drag of the air moving past it, F = 1/2 rho Cd A |u| u for the air's
- * velocity relative to the body u, with A the area the body presents, taken from the box of its colliders (the faces of the box
- * the wind meets, in proportion to how square they face it). Sleeping bodies are woken only by a wind strong enough to move them.
+ * A wind force: every step each dynamic body in the field feels the drag of the air moving past it, F = 1/2 rho Cd A |u| u
+ * for the air's velocity relative to the body u, with A the area the body presents, taken from the box of its colliders (the
+ * faces of the box the wind meets, in proportion to how square they face it). The air is sampled at the body's centre at the
+ * world's time (its steps times the fixed step), so a wind shared with the rest of a scene is felt where and when the rest
+ * feels it. Sleeping bodies are woken only by a wind strong enough to move them.
  */
-export class WindField implements PhysicsAttachment {
-  private time = 0;
+export class WindForce implements PhysicsAttachment {
   private released = false;
+  private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   constructor(
     private readonly physics: Physics,
     private readonly options: WindOptions,
@@ -84,21 +91,44 @@ export class WindField implements PhysicsAttachment {
       throw new RangeError('Air density is a positive number of kg/m3; pass options.density above 0.');
     if (!(drag >= 0 && Number.isFinite(drag)))
       throw new RangeError('Drag coefficient is 0 or more; pass options.drag of 0 or above.');
-    if (typeof velocity !== 'function') checkVec(velocity, 'Wind velocity');
+    if (isFlow(velocity)) {
+      const c = velocity.cell;
+      if (!c || c[0] !== 0 || c[1] !== 0 || c[2] !== 0)
+        throw new RangeError(
+          "A wind force samples its flow field in the physics world's frame; pass a field whose cell is [0, 0, 0].",
+        );
+    } else if (typeof velocity !== 'function') checkVec(velocity, 'Wind velocity');
     physics.attach(this);
   }
 
   /** @internal */
   beforeStep(dt: number): void {
     if (this.released) return;
-    const { density = 1.2, drag = 1, velocity, region, filter } = this.options,
+    const { drag = 1, velocity, region, filter } = this.options,
       min: Vec3 = region?.min ?? [-1e9, -1e9, -1e9],
-      max: Vec3 = region?.max ?? [1e9, 1e9, 1e9];
+      max: Vec3 = region?.max ?? [1e9, 1e9, 1e9],
+      time = this.physics.stepCount * this.physics.fixedTimestep,
+      flow = isFlow(velocity) ? velocity : undefined;
     for (const body of this.physics.intersectAabb(min, max, filter)) {
       if (body.type !== 'dynamic') continue;
-      const p = body.position,
-        air = typeof velocity === 'function' ? velocity([p[0], p[1], p[2]], this.time) : velocity,
-        v = body.linearVelocity,
+      const p = body.position;
+      let air: Vec3, density: number;
+      if (flow) {
+        const s = flow.sample(p[0], p[1], p[2], time, this.sample);
+        air = s.velocity;
+        density = this.options.density ?? s.density;
+        if (!(density > 0 && Number.isFinite(density)))
+          throw new RangeError(
+            `The wind's flow field gave a density of ${density} at (${p[0]}, ${p[1]}, ${p[2]}); a flow field's density is kg/m3 above 0.`,
+          );
+      } else {
+        air =
+          typeof velocity === 'function'
+            ? (velocity as (point: Vec3, time: number) => Vec3)([p[0], p[1], p[2]], time)
+            : (velocity as Vec3);
+        density = this.options.density ?? 1.2;
+      }
+      const v = body.linearVelocity,
         u: Vec3 = [air[0] - v[0], air[1] - v[1], air[2] - v[2]],
         speed = Math.hypot(u[0], u[1], u[2]);
       if (!(speed > 1e-6)) continue;
@@ -123,7 +153,6 @@ export class WindField implements PhysicsAttachment {
       if (body.sleeping && !(force * speed >= 0.1 * body.mass)) continue;
       body.applyImpulse([u[0] * force * dt, u[1] * force * dt, u[2] * force * dt]);
     }
-    this.time += dt;
   }
 
   /** Stops the wind. */
@@ -137,4 +166,17 @@ export class WindField implements PhysicsAttachment {
   dispose(): void {
     this.released = true;
   }
+}
+
+/**
+ * The wind force under its old name.
+ * @deprecated Use {@link WindForce}. Renamed so it no longer clashes with `@margoengine/weather`'s `WindField`, the wind
+ * itself, which a `WindForce` takes as its `velocity`.
+ */
+export const WindField = WindForce;
+/** @deprecated Use {@link WindForce}. */
+export type WindField = WindForce;
+
+function isFlow(velocity: WindOptions['velocity']): velocity is FlowField {
+  return typeof velocity === 'object' && velocity !== null && typeof (velocity as FlowField).sample === 'function';
 }

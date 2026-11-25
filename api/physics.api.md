@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
+import { FlowField } from "@margoengine/math/fields";
 
 export interface AxleOptions {
     wheels: readonly [number, number];
@@ -2031,7 +2032,10 @@ export interface WheelState {
     load: number;
 }
 
-export class WindField implements PhysicsAttachment {
+export const WindField: typeof WindForce;
+export type WindField = WindForce;
+
+export class WindForce implements PhysicsAttachment {
     constructor(physics: Physics, options: WindOptions);
     beforeStep(dt: number): void;
     remove(): void;
@@ -2039,7 +2043,7 @@ export class WindField implements PhysicsAttachment {
 }
 
 export interface WindOptions {
-    velocity: Vec3 | ((point: Vec3, time: number) => Vec3);
+    velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
     density?: number;
     drag?: number;
     region?: {

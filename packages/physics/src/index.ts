@@ -67,7 +67,7 @@ export type { TrackOptions, TrackedVehicleOptions } from './tracked.js';
 export type { DrivetrainOptions, AxleOptions, DifferentialOptions, DrivenWheel } from './drivetrain.js';
 export type { TyreModel, TyreSample, TyreForces, MagicCurve, PacejkaOptions, BrushOptions } from './tyres.js';
 export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
-export { explosion, WindField } from './fields.js';
+export { explosion, WindField, WindForce } from './fields.js';
 export type { ExplosionOptions, WindOptions } from './fields.js';
 export { DragJoint } from './drag.js';
 export type { DragOptions } from './drag.js';

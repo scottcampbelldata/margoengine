@@ -194,17 +194,17 @@ drag.remove();
 
 ## Explosions and wind
 
-`explosion(physics, center, {impulse, radius, falloff = 'linear', lift = 0, filter})` gives every dynamic body within `radius` an impulse away from `center` at its centre of mass, scaled by the falloff (`'linear'` to nothing at the radius, `'inverse-square'` or `'none'`), with `lift` adding an upward share; it returns the bodies it pushed. `new WindField(physics, {velocity, density = 1.2, drag = 1, region, filter})` drags every dynamic body in `region` each step by F = 1/2 rho Cd A |u| u for the air's velocity relative to the body u, with A the area the box of its colliders shows the stream: `velocity` is a vector or a function of the point and the time (gusts, swirls), a heavy body is slower to follow than a light one, a sleeping body is woken only by a wind that would push it a tenth of a metre a second squared, and `remove()` stops it.
+`explosion(physics, center, {impulse, radius, falloff = 'linear', lift = 0, filter})` gives every dynamic body within `radius` an impulse away from `center` at its centre of mass, scaled by the falloff (`'linear'` to nothing at the radius, `'inverse-square'` or `'none'`), with `lift` adding an upward share; it returns the bodies it pushed. `new WindForce(physics, {velocity, density, drag = 1, region, filter})` drags every dynamic body in `region` each step by F = 1/2 rho Cd A |u| u for the air's velocity relative to the body u, with A the area the box of its colliders shows the stream: `velocity` is a vector, a function of the point and the time (gusts, swirls), or a shared flow field of `@margoengine/math/fields` (a `Wind`, such as the atmosphere solver's), sampled at each body's centre at the world's time (`stepCount * fixedTimestep`, the clock the rest of a scene shares) and in the world's frame (a field whose `cell` is `[0, 0, 0]`). `density` defaults to the flow field's at each body, or 1.2 kg/m3. A heavy body is slower to follow than a light one, a sleeping body is woken only by a wind that would push it a tenth of a metre a second squared, and `remove()` stops it. It was called `WindField` until 2026-11-25; that name still works and is deprecated, since `WindField` is the wind itself in `@margoengine/weather`.
 
 ```ts
-import {explosion, Physics, WindField} from 'margoengine/physics';
+import {explosion, Physics, WindForce} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null);
 physics.gravity = [0, 0, 0];
 const crate = physics.addBody(null, {position: [1, 0, 0], colliders: {shape: 'box', halfExtents: [0.3, 0.3, 0.3], mass: 2}});
 explosion(physics, [0, 0, 0], {impulse: 8, radius: 4});
-const wind = new WindField(physics, {velocity: (_point, time) => [0, 0, 4 + 2 * Math.sin(time)]});
+const wind = new WindForce(physics, {velocity: (_point, time) => [0, 0, 4 + 2 * Math.sin(time)]});
 for (let i = 0; i < 60; i++) physics.step();
 console.log(crate.linearVelocity);
 wind.remove();

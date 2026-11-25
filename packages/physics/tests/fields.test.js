@@ -1,7 +1,7 @@
 // An explosion and a wind on rigid bodies.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { explosion, Physics, WindField } from '../dist/index.js';
+import { explosion, Physics, WindField, WindForce } from '../dist/index.js';
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -38,7 +38,7 @@ test('a wind drags bodies toward its speed, a light one faster, and only inside 
   const light = ball(physics, [0, 0, 0], 0.2),
     heavy = ball(physics, [0, 2, 0], 20),
     outside = ball(physics, [0, 0, 30], 0.2);
-  const wind = new WindField(physics, { velocity: [10, 0, 0], region: { min: [-5, -5, -5], max: [5, 5, 5] } });
+  const wind = new WindForce(physics, { velocity: [10, 0, 0], region: { min: [-5, -5, -5], max: [5, 5, 5] } });
   for (let i = 0; i < 180; i++) physics.step();
   assert.ok(
     light.linearVelocity[0] > 5 && light.linearVelocity[0] < 10.01,
@@ -59,11 +59,58 @@ test('a wind may be a function of the point and the time, and is checked', () =>
   const physics = new Physics(null);
   physics.gravity = [0, 0, 0];
   const leaf = ball(physics, [0, 0, 0], 0.1);
-  new WindField(physics, { velocity: (_point, time) => [0, time < 0.5 ? 0 : 8, 0] });
+  new WindForce(physics, { velocity: (_point, time) => [0, time < 0.5 ? 0 : 8, 0] });
   for (let i = 0; i < 20; i++) physics.step();
   assert.equal(leaf.linearVelocity[1], 0, 'calm before the gust');
   for (let i = 0; i < 120; i++) physics.step();
   assert.ok(leaf.linearVelocity[1] > 3, `the gust carries it: ${leaf.linearVelocity[1]}`);
-  assert.throws(() => new WindField(physics, { velocity: [1, 0, 0], density: 0 }), RangeError);
-  assert.throws(() => new WindField(physics, { velocity: [1, 0] }), RangeError);
+  assert.throws(() => new WindForce(physics, { velocity: [1, 0, 0], density: 0 }), RangeError);
+  assert.throws(() => new WindForce(physics, { velocity: [1, 0] }), RangeError);
 });
+
+test('the old name WindField is the same class, kept for old code', () => {
+  assert.equal(WindField, WindForce);
+});
+
+test('a wind force takes a shared flow field: velocity and density at each body, on the world clock', () => {
+  const run = (density) => {
+    const physics = new Physics(null);
+    physics.gravity = [0, 0, 0];
+    const leaf = ball(physics, [0, 3, 0], 0.1),
+      seen = [];
+    // Twenty steps in before the wind arrives: it is sampled at the world's time, not the time since it was made.
+    for (let i = 0; i < 20; i++) physics.step();
+    const wind = {
+      medium: 'air',
+      cell: [0, 0, 0],
+      sample(x, y, z, t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) {
+        seen.push([x, y, z, t]);
+        out.velocity = [4, 0, 0];
+        out.density = density;
+        out.temperature = 288.15;
+        return out;
+      },
+    };
+    new WindForce(physics, { velocity: wind });
+    physics.step();
+    return { push: leaf.linearVelocity[0], seen };
+  };
+  const air = run(1.2),
+    water = run(2.4);
+  assert.deepEqual(air.seen[0], [0, 3, 0, 20 / 60], "sampled at the body's centre and the world's time");
+  near(water.push, 2 * air.push, 1e-9, "the drag follows the field's density");
+  assert.throws(
+    () => new WindForce(new Physics(null), { velocity: { ...wind0(), cell: [1, 0, 0] } }),
+    /cell is \[0, 0, 0\]/,
+  );
+  const bad = new Physics(null);
+  ball(bad, [0, 0, 0], 0.1);
+  new WindForce(bad, {
+    velocity: { ...wind0(), sample: (_x, _y, _z, _t, out) => Object.assign(out, { velocity: [1, 0, 0], density: 0 }) },
+  });
+  assert.throws(() => bad.step(), /density of 0/);
+});
+
+function wind0() {
+  return { medium: 'air', cell: [0, 0, 0], sample: (_x, _y, _z, _t, out) => out };
+}

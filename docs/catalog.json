@@ -2826,6 +2826,7 @@
       "TrackedVehicle",
       "Vehicle",
       "WindField",
+      "WindForce",
       "addUniversalJoint",
       "addWheelJoint",
       "brushTyre",
