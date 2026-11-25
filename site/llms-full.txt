@@ -11827,8 +11827,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   flat ground and the curved Earth part by d^2 / 2R (8 m at 10 km), which is the world's own flat-earth error.
   `tilesHeightQuery` hits only the tiles drawn now: where a tile is not loaded yet it answers undefined and the
   camera falls back to the ellipsoid floor; each call is one bvh ray over the drawn tile models.
-- Heights are above the WGS84 ellipsoid unless you pass `geoid`: Margo ships no geoid model, so `heights.seaLevel` is
-  null without one (EGM96 departs from the ellipsoid by -107 to +85 m). `orientation` is in the eye's ENU frame, so an
+- Sea level: `geoid` defaults to `'egm96'`, the EGM96 15-minute grid of `@margoengine/controls/geoid`, fetched (2,077,922
+  bytes) the first time `heights` is read; `heights.seaLevel` is null until it is in, and stays null with a
+  `geoid-error` event when the packed file is not installed (it is made by `scripts/geoid/pack-egm96.mjs` from NGA's
+  WW15MGH.GRD, which the repository does not download for you). The lookup is bilinear between 15' nodes, within about
+  0.1 m of NGA's own spline interpolation; heights are stored to 1 cm. EGM96 is a degree-360 model (about 55 km
+  resolution): it misses short geoid features that EGM2008 resolves, by up to a metre or two in mountains. `orientation` is in the eye's ENU frame, so an
   orbit camera that is level at its centre shows a roll of about range / Earth radius (5e-4 rad at 3 km). The `compass`
   event follows the view heading. The hash keeps 7 decimal places of degrees (about 1 cm) and 0.01 m.
   `parseHash` treats a hash as untrusted: a field that is not finite or is out of range (latitude +-90, longitude and
