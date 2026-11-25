@@ -154,9 +154,9 @@ pub extern "C" fn world_timing(handle: i32, phase: u32) -> f32 {
 /// 3 contact damping ratio, 4 contact max push (m/s), 5 restitution threshold (m/s), 6 sleep threshold (m/s), 7 sleep time
 /// (s), 8 sleeping allowed (0 or 1), 9 block solver (0 or 1), 10 joint hertz, 11 joint damping ratio, 12 joint max push
 /// (m/s), 13 joint geometric stiffness (0 or 1).
-const SETTINGS: usize = 14;
+const SETTINGS: usize = 15;
 
-/// Sets one solver setting. A count must be a whole number from 1 to 65535, a flag 0 or 1, and every other value finite and
+/// Sets one solver setting. A count must be a whole number from 1 to 65535 (the continuous collision limit from 0), a flag 0 or 1, and every other value finite and
 /// not below 0. Nothing changes for a value that fails.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_set_setting(handle: i32, which: u32, value: f32) -> i32 {
@@ -169,6 +169,9 @@ pub extern "C" fn world_set_setting(handle: i32, which: u32, value: f32) -> i32 
         };
         let flag = |v: f32| -> Result<bool, PhysicsError> {
             if v == 0.0 { Ok(false) } else if v == 1.0 { Ok(true) } else { Err(PhysicsError::InvalidParameter) }
+        };
+        let ccd = |v: f32| -> Result<u32, PhysicsError> {
+            if (0.0..=65535.0).contains(&v) && (v as u32) as f32 == v { Ok(v as u32) } else { Err(PhysicsError::InvalidParameter) }
         };
         let amount = |v: f32| -> Result<f32, PhysicsError> { if v >= 0.0 { Ok(v) } else { Err(PhysicsError::InvalidParameter) } };
         let s = &mut w.settings;
@@ -187,6 +190,7 @@ pub extern "C" fn world_set_setting(handle: i32, which: u32, value: f32) -> i32 
             11 => s.joint_damping = amount(value)?,
             12 => s.joint_max_push = amount(value)?,
             13 => s.joint_geometric_stiffness = flag(value)?,
+            14 => s.max_ccd_substeps = ccd(value)?,
             _ => return Err(PhysicsError::InvalidParameter),
         }
         Ok(0)
@@ -201,7 +205,7 @@ pub extern "C" fn world_settings(handle: i32) -> i32 {
         let all: [f32; SETTINGS] = [
             s.substeps as f32, s.passes as f32, s.contact_hertz, s.contact_damping, s.contact_max_push, s.restitution_threshold,
             s.sleep_threshold, s.sleep_time, s.sleep as u32 as f32, s.block_solver as u32 as f32, s.joint_hertz, s.joint_damping,
-            s.joint_max_push, s.joint_geometric_stiffness as u32 as f32,
+            s.joint_max_push, s.joint_geometric_stiffness as u32 as f32, s.max_ccd_substeps as f32,
         ];
         ensure(SETTINGS);
         for (i, value) in all.into_iter().enumerate() {

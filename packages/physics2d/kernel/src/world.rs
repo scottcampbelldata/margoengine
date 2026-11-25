@@ -436,6 +436,9 @@ pub struct Settings {
     /// Contacts solved four at a time in SIMD lanes (the default); off, one at a time, every bit the same. Native builds
     /// only: the Wasm build always solves in lanes.
     pub contact_lanes: bool,
+    /// How many impacts continuous collision handles in a step (0: continuous collision is off for the world). The first stops a body where
+    /// it touches; each more answers the touch with a collision and sweeps the rest of the step with what it leaves. Default 1.
+    pub max_ccd_substeps: u32,
 }
 
 /// The broad phase. Both give the same pairs in the same order, so the same step to the bit; they differ in work.
@@ -511,6 +514,7 @@ impl Default for Settings {
             joint_geometric_stiffness: true,
             broad_phase: BroadPhase::Tree,
             contact_lanes: true,
+            max_ccd_substeps: 1,
         }
     }
 }

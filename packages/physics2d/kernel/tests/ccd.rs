@@ -229,3 +229,83 @@ fn a_rotation_by_any_angle_matches_sine_and_cosine() {
     let q = Rot::from_angle(f32::NAN);
     assert_eq!((q.c, q.s), (1.0, 0.0));
 }
+
+/// A ball fired along a corridor between two thin walls, 5.9 m apart inside, at 1000 m/s: a step takes it 16.67 m, three times along the
+/// corridor and back, with `substeps` impacts handled.
+fn corridor(substeps: u32, restitution: f32) -> (World, u32) {
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: substeps, ..Default::default() });
+    for x in [-3.0f32, 3.0] {
+        let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(x, 0.0), ..Default::default() }).unwrap();
+        w.create_shape(wall, Core::rect(0.05, 5.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution, friction: 0.0, ..Default::default() }).unwrap();
+    }
+    let ball = w.create_body(&BodyDef { linear_velocity: v2(1000.0, 0.0), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution, friction: 0.0, ..Default::default() }).unwrap();
+    (w, ball)
+}
+
+#[test]
+fn more_ccd_substeps_carry_a_ball_on_after_each_impact_between_two_walls() {
+    // The ball's centre travels between -2.85 and 2.85 (the walls' faces at +-2.95 less its radius), 5.7 m a leg, from 0 going right, 16.667
+    // m in the step: 2.85 to the first wall, 5.7 to the second, 5.7 back to the first, then 2.417 of the way left again from it, at 0.433.
+    // Each impact turns the ball round up to the time-of-impact target (5 mm) before the wall, so it loses up to twice that a leg.
+    let target = 0.005f32;
+    for (substeps, x, vx) in [
+        (0u32, 16.667f32, 1000.0f32), // CCD off: it goes through both walls
+        (1, 2.85, 1000.0),            // the first stops it where it touches, with its velocity: the next step's contact answers it
+        (2, -2.85, -1000.0),          // one impact answered, the second stops it at the far wall
+        (3, 2.85, 1000.0),
+        (4, 0.433, -1000.0),          // three answered, and the fourth sweep meets nothing
+        (9, 0.433, -1000.0),          // more than it needs changes nothing
+    ] {
+        let (mut w, b) = corridor(substeps, 1.0);
+        w.step(DT).unwrap();
+        let body = &w.bodies[b as usize];
+        let legs = substeps.min(4).saturating_sub(1) as f32;
+        let bound = if substeps == 0 { 0.02 } else { 2.0 * target * (1.0 + legs) };
+        assert!((body.xf.p.x - x).abs() <= bound, "{substeps} substeps: the ball is at {} not {x} (bound {bound})", body.xf.p.x);
+        assert!((body.linear_velocity.x - vx).abs() < 1.0, "{substeps} substeps: its velocity is {} not {vx}", body.linear_velocity.x);
+        assert!(body.linear_velocity.y.abs() < 1.0e-3, "{substeps} substeps: it picked up a sideways speed {}", body.linear_velocity.y);
+    }
+}
+
+#[test]
+fn each_ccd_impact_leaves_the_speed_the_restitution_says() {
+    // Half restitution: a ball at 1000 m/s leaves the first wall at 500 and, after a 5.7 m leg, hits the second at 500 and leaves at 250.
+    let (mut w, b) = corridor(3, 0.5);
+    w.step(DT).unwrap();
+    let v = w.bodies[b as usize].linear_velocity.x;
+    assert!((v - 250.0).abs() < 0.5, "two impacts at restitution 0.5 leave 250 m/s: {v}");
+}
+
+#[test]
+fn a_ccd_impact_gives_the_wall_friction_and_the_ball_its_coulomb_tangential_speed() {
+    // A ball at (1000, 300) m/s into a wall: normal speed 1000 reverses at half restitution to -500, and friction of 0.05 takes
+    // mu (1 + e) vn = 0.05 * 1.5 * 1000 = 75 m/s off the 300 sliding along it (the pair slides: sticking would take 100).
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: 2, ..Default::default() });
+    let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(3.0, 0.0), ..Default::default() }).unwrap();
+    w.create_shape(wall, Core::rect(0.05, 50.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.05, ..Default::default() }).unwrap();
+    let ball = w.create_body(&BodyDef { linear_velocity: v2(1000.0, 300.0), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: 0.5, friction: 0.05, ..Default::default() }).unwrap();
+    w.step(DT).unwrap();
+    let v = w.bodies[ball as usize].linear_velocity;
+    assert!((v.x + 500.0).abs() < 0.5, "normal speed {}", v.x);
+    assert!((v.y - 225.0).abs() < 0.5, "tangential speed {}", v.y);
+}
+
+#[test]
+fn a_ccd_impact_with_a_dynamic_body_conserves_momentum_and_gives_it_the_elastic_speeds() {
+    // A 1 kg ball at 300 m/s (5 m a step, so it reaches the plate 3 m ahead) meets a plate of 3 kg standing still: elastic, the ball leaves at (1 - 3) / 4 * 300 = -150 and the plate at 2 / 4 * 300 = 150.
+    let mut w = World::new(Settings { gravity: V2::ZERO, max_ccd_substeps: 2, ..Default::default() });
+    let plate = w.create_body(&BodyDef { position: v2(3.0, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+    // The plate's area is 0.1 x 6 = 0.6 m2: a density of 5 is 3 kg.
+    w.create_shape(plate, Core::rect(0.05, 3.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 5.0, restitution: 1.0, friction: 0.0, ..Default::default() }).unwrap();
+    let ball = w.create_body(&BodyDef { linear_velocity: v2(300.0, 0.0), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    // A disc of radius r has area pi r^2: radius 0.5642 m is 1 m2 and so 1 kg at density 1.
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.564_189_6).unwrap(), &ShapeDef { restitution: 1.0, friction: 0.0, ..Default::default() }).unwrap();
+    let (m_ball, m_plate) = (w.bodies[ball as usize].mass, w.bodies[plate as usize].mass);
+    assert!((m_ball - 1.0).abs() < 1e-3 && (m_plate - 3.0).abs() < 1e-3, "masses {m_ball} and {m_plate}");
+    w.step(DT).unwrap();
+    let (vb, vp) = (w.bodies[ball as usize].linear_velocity.x, w.bodies[plate as usize].linear_velocity.x);
+    assert!((vb + 150.0).abs() < 0.5 && (vp - 150.0).abs() < 0.5, "ball {vb}, plate {vp}");
+    assert!((m_ball * vb + m_plate * vp - 300.0).abs() < 0.5, "momentum {}", m_ball * vb + m_plate * vp);
+}

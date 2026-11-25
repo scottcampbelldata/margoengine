@@ -25,6 +25,7 @@ test('a new world reads its defaults back', () => {
   assert.equal(solver.blockSolver, true);
   assert.equal(solver.canSleep, true);
   assert.equal(solver.jointGeometricStiffness, true);
+  assert.equal(solver.maxCcdSubsteps, 1);
   for (const [name, value] of Object.entries(solver))
     assert.ok(typeof value === 'boolean' || Number.isFinite(value), name);
   physics.dispose();
@@ -47,6 +48,7 @@ test('every setting reads back as it was set, speeds in world units a second', (
     jointDamping: 3,
     jointMaxPush: 200,
     jointGeometricStiffness: false,
+    maxCcdSubsteps: 3,
   };
   physics.setSolver(wanted);
   for (const [name, value] of Object.entries(physics.solver)) {
@@ -156,7 +158,13 @@ test('the kernel refuses what the wrapper would, on its own: a count out of rang
     refused(2, -1) && refused(4, -0.5) && refused(12, Number.NaN) && refused(7, Number.POSITIVE_INFINITY),
     'amounts',
   );
-  assert.ok(refused(14, 1) && refused(99, 1), 'a setting that does not exist');
+  assert.ok(
+    refused(14, -1) && refused(14, 2.5) && refused(14, 65536),
+    'the continuous collision limit is a whole number from 0',
+  );
+  assert.ok(!refused(14, 0), 'and 0 turns it off');
+  physics.setSolver({ maxCcdSubsteps: 1 });
+  assert.ok(refused(15, 1) && refused(99, 1), 'a setting that does not exist');
   assert.deepEqual(physics.solver, before);
   physics.dispose();
 });

@@ -821,7 +821,7 @@ fn run_extra(
 
 /// sqrt(a b): the friction of two materials.
 #[inline]
-fn sqrt_product(a: f32, b: f32) -> f32 {
+pub(crate) fn sqrt_product(a: f32, b: f32) -> f32 {
     let product = a * b;
     if product.is_finite() {
         return crate::math::sqrt(product);

@@ -283,6 +283,7 @@ const SOLVER_SETTINGS = [
   ['jointDamping', 'amount'],
   ['jointMaxPush', 'speed'],
   ['jointGeometricStiffness', 'flag'],
+  ['maxCcdSubsteps', 'whole'],
 ] as const;
 
 /** The settings of the solver that {@link Physics2D.setSolver} changes. */
@@ -311,6 +312,13 @@ export interface Physics2DSolverOptions {
   jointMaxPush?: number;
   /** Joints solve with each body's turning stiffened by the pull of its taut point joints (default true); off, the plain inertia. */
   jointGeometricStiffness?: boolean;
+  /**
+   * Impacts continuous collision handles in a step (default 1; 0 turns it off for the world). The first stops a body that has `ccd` where
+   * it touches, with its velocity, for the next step's contact to answer. Each more answers the touch as a collision (the pair's
+   * restitution and friction, momentum shared with a body that moves) and sweeps the rest of the step with the velocity that leaves,
+   * so a fast ball bouncing between two walls keeps bouncing inside one step. Rapier's `maxCcdSubsteps`.
+   */
+  maxCcdSubsteps?: number;
 }
 
 /**
@@ -549,10 +557,12 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       if (
         kind === 'count'
           ? !(Number.isInteger(value) && value >= 1 && value <= 65535)
-          : !(value >= 0 && value < Infinity)
+          : kind === 'whole'
+            ? !(Number.isInteger(value) && value >= 0 && value <= 65535)
+            : !(value >= 0 && value < Infinity)
       )
         throw new RangeError(
-          `Solver ${name} must be ${kind === 'count' ? 'a whole number from 1 to 65535' : 'a finite number of 0 or more'}; got ${value}. Give ${kind === 'count' ? 'a count such as 4' : '0 for none'}.`,
+          `Solver ${name} must be ${kind === 'count' ? 'a whole number from 1 to 65535' : kind === 'whole' ? 'a whole number from 0 to 65535' : 'a finite number of 0 or more'}; got ${value}. Give ${kind === 'count' ? 'a count such as 4' : '0 for none'}.`,
         );
     }
     SOLVER_SETTINGS.forEach(([name, kind], at) => {
