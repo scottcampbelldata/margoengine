@@ -4,6 +4,7 @@ import {engineRuntime} from '/packages/core/dist/extension.js';
 import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
 import {meshPBR,traceSceneFromGLTF} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
 import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {Animation} from '/packages/animation/dist/index.js';
 window.run=async(compat=false)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
@@ -47,6 +48,30 @@ window.run=async(compat=false)=>{
   engine.render();const gltf=await traceSceneFromGLTF(model,{signal:AbortSignal.timeout(120000)});model.dispose();
   gltf.environment=scene().environment;const im=await render(gltf);
   rows.push({name:'licensed Khronos metadata Box snapshot survives model disposal',finite:im.color.every(Number.isFinite),triangles:gltf.meshes.reduce((n,m)=>n+m.indices.length/3,0),drawn:im.instance.some(id=>id<=-4)});
+  {// A skinned glTF (Khronos Fox, CC BY 4.0) posed by Animation: each pose's snapshot carries the deformed vertices,
+   // setScene swaps it atomically, and returning to a pose gives that pose's image again.
+   const fox=await loadGLTF(engine,'/examples/assets/khronos/Fox/Fox.glb',{signal:AbortSignal.timeout(120000)}),animation=Animation.attach(fox);
+   animation.playing=false;const clip=animation.clips[0],poses=[];
+   for(const part of [.2,.7]){animation.seek(clip.duration*part);engine.render({culling:false});
+    const s=await traceSceneFromGLTF(fox,{signal:AbortSignal.timeout(120000)});
+    s.environment={skyColor:[1,1,1],skyIntensity:1,ground:false,sunIntensity:0};poses.push(s);}
+   const geometry=await fox.readPickingGeometry();animation.dispose?.();fox.dispose();
+   let moved=0;for(let i=0;i<poses[0].meshes[0].positions.length;i++)moved=Math.max(moved,Math.abs(poses[0].meshes[0].positions[i]-poses[1].meshes[0].positions[i]));
+   const pose=geometry[0].vertices,posed=poses[1].meshes[0].positions;let snapshotError=0;
+   for(let i=0;i<posed.length/3;i++)for(let k=0;k<3;k++)snapshotError=Math.max(snapshotError,Math.abs(posed[i*3+k]-pose[i*20+k]));
+   const at=poses[0].meshInstances[0].transform,box=[0,1,2].map(k=>{let lo=Infinity,hi=-Infinity;const p=poses[0].meshes[0].positions;for(let i=k;i<p.length;i+=3){lo=Math.min(lo,p[i]);hi=Math.max(hi,p[i]);}return [lo,hi];});
+   const c=box.map(([lo,hi])=>(lo+hi)/2),size=Math.max(...box.map(([lo,hi])=>hi-lo))*Math.hypot(at[0],at[1],at[2]);
+   const centre=[0,1,2].map(k=>at[k]*c[0]+at[4+k]*c[1]+at[8+k]*c[2]+at[12+k]);
+   const t=await ComposedVoxelPathTracer.create(engine,{scene:poses[0],features:[meshPBR()],denoise:false,maxBounces:1});
+   const ortho=engine.camera.project;engine.camera.project=undefined;engine.camera.far=size*10;engine.camera.near=size/1000;
+   try{await t.ready;engine.camera.position=[centre[0]+size*.8,centre[1]+size*.3,centre[2]+size*.8];engine.camera.target=centre;
+    const shot=()=>t.renderImage({width:8,height:8,samples:4,jitter:false,seed:17,aovs:true,signal:AbortSignal.timeout(120000)});
+    const a=await shot();await t.setScene(poses[1],{signal:AbortSignal.timeout(120000)});const b=await shot();
+    await t.setScene(poses[0],{signal:AbortSignal.timeout(120000)});const again=await shot();
+    let differs=0,repeat=0;for(let i=0;i<a.color.length;i++){differs=Math.max(differs,Math.abs(a.color[i]-b.color[i]));repeat=Math.max(repeat,Math.abs(a.color[i]-again.color[i]));}
+    rows.push({name:'skinned glTF poses trace their deformed vertices and swap atomically',moved,snapshotError,differs,repeat,
+     drawn:a.instance.some(id=>id<=-4),finite:[a,b,again].every(im=>im.color.every(Number.isFinite))});
+   }finally{t.dispose();engine.camera.project=ortho;}}
   await Promise.all(reports);return {rows,errors,messages};
  }finally{engine.dispose();}
 };window.ready=true;

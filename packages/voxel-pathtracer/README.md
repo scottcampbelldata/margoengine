@@ -1273,6 +1273,44 @@ engine.start();
 window.addEventListener('pagehide', () => { tracer.dispose(); engine.dispose(); }, {once: true});
 ```
 
+Skinned and morphing glTF models trace in the pose they were last drawn in: `traceSceneFromGLTF` reads
+the deformed vertices back (`readPickingGeometry`), so a pose is posed by `@margoengine/animation`, drawn
+once and snapshotted. For a film, step the clip and swap the snapshot per frame; meshes whose content did
+not change keep their BLAS and only the deformed ones are rebuilt:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Animation } from 'margoengine/animation';
+import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
+import { meshPBR, traceSceneFromGLTF } from 'margoengine/voxel-pathtracer/mesh-pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [150, 60, 150], target: [0, 40, 0], far: 2000},
+});
+const signal = AbortSignal.timeout(120_000);
+const model = await loadGLTF(engine, 'character.glb', {signal});
+const animation = Animation.attach(model);
+animation.playing = false;
+const environment = {skyColor: [0.7, 0.8, 1] as [number, number, number], sunIntensity: 3};
+const pose = async (time: number) => {
+  animation.seek(time);
+  engine.render(); // runs the skinning for this pose
+  return {...await traceSceneFromGLTF(model, {signal}), environment};
+};
+const tracer = await ComposedVoxelPathTracer.create(engine, {scene: await pose(0), features: [meshPBR()], signal});
+await tracer.ready;
+const frames = [];
+for (let frame = 0; frame < 3; frame++) {
+  await tracer.setScene(await pose(frame / 24), {signal});
+  frames.push(await tracer.renderImage({width: 64, height: 64, samples: 8, signal}));
+}
+console.log(frames.length, tracer.stats.builtMeshBlases); // 3 and the deformed primitives
+tracer.dispose();
+model.dispose();
+engine.dispose();
+```
+
 Material channels, with glTF defaults when left out:
 
 | Field | Default | Notes |
