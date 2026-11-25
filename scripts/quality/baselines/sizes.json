@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18376440,
+  "total": 18377320,
   "history": [
     {
       "date": "2026-10-24",
@@ -11709,6 +11709,12 @@
       "commit": "8bfcaf36c",
       "reason": "vehicle tyre models (Magic Formula, brush), drivetrain, anti-roll bars and shape-cast wheels in the physics entry: physics base 77,941 to 79,955 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "68e20446a",
+      "reason": "physics2d base entry grows from 17,687 B to 18,026 B (+339 B): setSolver and solver, fourteen named settings with their checks and fix messages, which Rapier's integration parameters need; no smaller form keeps the names, ranges and messages",
+      "grew": 1
     }
   ],
   "items": {
@@ -12477,7 +12483,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
     "@margoengine/physics2d": 19911,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17687,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 18567,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
