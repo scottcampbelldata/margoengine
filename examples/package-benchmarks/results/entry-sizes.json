@@ -1,6 +1,6 @@
 {
-  "commit": "4dd7818ec",
-  "dirty": true,
+  "commit": "cc1fc9c6b",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 60994,
@@ -1280,6 +1280,10 @@
       "./objects": {
         "raw": 3406,
         "gzip": 1332
+      },
+      "./scripts": {
+        "raw": 7843,
+        "gzip": 2954
       },
       "./relation-query": {
         "raw": 2269,
@@ -2791,6 +2795,10 @@
         "raw": 38,
         "gzip": 58
       },
+      "./ecs/scripts": {
+        "raw": 38,
+        "gzip": 58
+      },
       "./ecs/relation-query": {
         "raw": 45,
         "gzip": 65
@@ -3862,6 +3870,10 @@
       "./post/curvature": {
         "raw": 41,
         "gzip": 61
+      },
+      "./post/ascii": {
+        "raw": 37,
+        "gzip": 57
       },
       "./post/settings": {
         "raw": 40,
@@ -7317,6 +7329,10 @@
         "raw": 41,
         "gzip": 61
       },
+      "./post/ascii": {
+        "raw": 37,
+        "gzip": 57
+      },
       "./post/settings": {
         "raw": 40,
         "gzip": 60
@@ -9647,6 +9663,10 @@
         "raw": 41,
         "gzip": 61
       },
+      "./post/ascii": {
+        "raw": 37,
+        "gzip": 57
+      },
       "./post/settings": {
         "raw": 40,
         "gzip": 60
@@ -11921,6 +11941,10 @@
         "raw": 41,
         "gzip": 61
       },
+      "./post/ascii": {
+        "raw": 37,
+        "gzip": 57
+      },
       "./post/settings": {
         "raw": 40,
         "gzip": 60
@@ -13388,16 +13412,16 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 895625,
-        "gzip": 550477
+        "raw": 896927,
+        "gzip": 551470
       },
       "./decomposition": {
         "raw": 26661,
         "gzip": 10901
       },
       "./soft": {
-        "raw": 150821,
-        "gzip": 78916
+        "raw": 152219,
+        "gzip": 79646
       },
       "./meshfiles": {
         "raw": 6444,
@@ -13410,8 +13434,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 59445,
-        "gzip": 20128
+        "raw": 60166,
+        "gzip": 20292
       },
       "./outline": {
         "raw": 4782,
@@ -13596,28 +13620,32 @@
         "gzip": 9752
       },
       "./selective-bloom": {
-        "raw": 35128,
-        "gzip": 10899
+        "raw": 35244,
+        "gzip": 10945
       },
       "./mask": {
-        "raw": 19925,
-        "gzip": 6791
+        "raw": 20039,
+        "gzip": 6836
       },
       "./pixelate": {
-        "raw": 30843,
-        "gzip": 10185
+        "raw": 30963,
+        "gzip": 10229
       },
       "./halftone": {
-        "raw": 20459,
-        "gzip": 7089
+        "raw": 20573,
+        "gzip": 7136
       },
       "./stylize": {
-        "raw": 21992,
-        "gzip": 7764
+        "raw": 22106,
+        "gzip": 7810
       },
       "./curvature": {
-        "raw": 31513,
-        "gzip": 10366
+        "raw": 31633,
+        "gzip": 10411
+      },
+      "./ascii": {
+        "raw": 24584,
+        "gzip": 8976
       },
       "./settings": {
         "raw": 13223,
@@ -16656,9 +16684,9 @@
       "brotli": 13103
     },
     "packages/physics/dist/index.js": {
-      "raw": 895625,
-      "gzip": 550477,
-      "brotli": 531155
+      "raw": 896927,
+      "gzip": 551470,
+      "brotli": 533133
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16886,14 +16914,14 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 417250,
-      "gzip": 150255,
-      "brotli": 119638
+      "raw": 419911,
+      "gzip": 152024,
+      "brotli": 121377
     },
     "packages/physics2d/dist/physics2d-scalar.wasm": {
-      "raw": 498277,
-      "gzip": 168439,
-      "brotli": 131558
+      "raw": 500798,
+      "gzip": 169904,
+      "brotli": 132918
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -17044,33 +17072,33 @@
       "entry": ".",
       "base": {
         "raw": 259811,
-        "gzip": 81939
+        "gzip": 81937
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 635813,
-        "gzip": 467858,
+        "raw": 637115,
+        "gzip": 468876,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 79840,
-        "gzip": 25184
+        "raw": 80734,
+        "gzip": 25498
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 70980,
-        "gzip": 53379,
+        "raw": 71484,
+        "gzip": 53744,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 55180,
-        "gzip": 18458
+        "raw": 55901,
+        "gzip": 18624
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",

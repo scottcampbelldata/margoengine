@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18408889,
+  "total": 18423932,
   "history": [
     {
       "date": "2026-10-24",
@@ -11745,6 +11745,12 @@
       "commit": "aaf4973be",
       "reason": "physics2d base entry grows 57 B (18,567 to 18,624) for body.additionalSolverIterations, collider.setActiveHooks and the activeHooks reader: both are single accessors over kernel words, and a lazy split would cost more than the bytes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "cc1fc9c6b",
+      "reason": "physics lazy kernel grows from 467,900 B to 468,876 B (+976 B over both blueprints): the counting sort of the solved pairs by island, three columns of the table",
+      "grew": 1
     }
   ],
   "items": {
@@ -12506,7 +12512,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 564869,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 82354,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 467900,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 482943,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,

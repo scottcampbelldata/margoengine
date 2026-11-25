@@ -321,6 +321,68 @@ impl World {
             solving += 1;
         }
         self.header_mut().solving = solving as u32;
+        self.order_pairs_by_island(solving);
+    }
+
+    /// The island a listed pair belongs to: that of its dynamic body, which is the same for both when both are dynamic. None for a
+    /// pair with no awake dynamic body in an island this step.
+    fn island_of_pair(&self, row: usize) -> Option<usize> {
+        let (a, b) = self.pair_bodies(row as u32);
+        for body in [a, b] {
+            if self.flags(body) & KIND == DYNAMIC && self.is_awake(body) {
+                let id = self.uu(ISLAND_ID, body);
+                if id != crate::world::NONE {
+                    return Some(id as usize);
+                }
+            }
+        }
+        None
+    }
+
+    /// Puts the listed pairs in runs, one run an island and each run in the order it was listed (a stable counting sort), the
+    /// pairs of no island last, and notes where each island's run starts and how long it is. Islands share no body that a solve
+    /// changes, so the order of one island's pairs against another's moves nothing: every body ends where it was, and only
+    /// the lists of what was solved in what order differ.
+    fn order_pairs_by_island(&mut self, solving: usize) {
+        let islands = self.header().islands as usize;
+        for island in 0..islands {
+            self.set_u(ISLAND_PAIR_COUNT, island, 0);
+        }
+        for i in 0..solving {
+            if let Some(island) = self.island_of_pair(self.uu(SOLVE_PAIRS, i) as usize) {
+                self.set_u(ISLAND_PAIR_COUNT, island, self.uu(ISLAND_PAIR_COUNT, island) + 1);
+            }
+        }
+        let mut start = 0;
+        for island in 0..islands {
+            self.set_u(ISLAND_PAIR_START, island, start);
+            start += self.uu(ISLAND_PAIR_COUNT, island);
+        }
+        let mut loose_at = start;
+        // The impacts column is free until the first substep ends: the sorted list goes through it. Filling leaves each
+        // run's count where it was and walks a cursor in the count's place, so the cursor is rebuilt from the start.
+        for island in 0..islands {
+            self.set_u(ISLAND_PAIR_CURSOR, island, self.uu(ISLAND_PAIR_START, island));
+        }
+        for i in 0..solving {
+            let row = self.uu(SOLVE_PAIRS, i);
+            let at = match self.island_of_pair(row as usize) {
+                Some(island) => {
+                    let at = self.uu(ISLAND_PAIR_CURSOR, island);
+                    self.set_u(ISLAND_PAIR_CURSOR, island, at + 1);
+                    at
+                }
+                None => {
+                    loose_at += 1;
+                    loose_at - 1
+                }
+            };
+            self.set_u(IMPACTS, at as usize, row);
+        }
+        debug_assert_eq!(loose_at as usize, solving);
+        for i in 0..solving {
+            self.set_u(SOLVE_PAIRS, i, self.uu(IMPACTS, i));
+        }
     }
 
     /// Each substep: the impulses the points carry, before anything is solved.
