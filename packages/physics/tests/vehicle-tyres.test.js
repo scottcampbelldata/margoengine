@@ -26,8 +26,24 @@ test('the Magic Formula is odd, peaks near a slip of a tenth at the load times t
   // The stiffness at small slip: B C D times the load (the sine form's slope at the origin).
   near(at(1e-5).longitudinal / 1e-5 / (12 * 1.9 * 1.1 * load), 1, 0.01, 'slope at the origin');
   near(at(0, 1e-5).lateral / 1e-5 / (9 * 1.3 * 1.0 * load), 1, 0.01, 'cornering stiffness');
-  // Load sensitivity: a heavier tyre has less friction per newton.
-  assert.ok(at(0.1, 0, 8000).longitudinal / 8000 < at(0.1, 0, 4000).longitudinal / 4000);
+  // Load sensitivity: the peak friction per newton falls by 0.1 for each nominal load more (default sensitivity 0.1): 0.9 D at twice the load, 1.1 D at none to speak of.
+  const peak = (l, which) => {
+    let best = 0;
+    for (let x = 0.002; x < (which === 'longitudinal' ? 0.6 : 0.7); x += 0.002)
+      best = Math.max(best, which === 'longitudinal' ? at(x, 0, l).longitudinal : at(0, x, l).lateral);
+    return best / l;
+  };
+  near(peak(4000, 'longitudinal'), 1.1, 0.01, 'D at the nominal load');
+  near(peak(8000, 'longitudinal') / peak(4000, 'longitudinal'), 0.9, 0.005, 'the peak friction at twice the load is 0.9 of that at the nominal');
+  near(peak(8000, 'lateral') / peak(4000, 'lateral'), 0.9, 0.005, 'the lateral too');
+  near(peak(2000, 'lateral') / peak(4000, 'lateral'), 1.05, 0.005, 'and 1.05 at half the load');
+  const flat = pacejkaTyre({ loadSensitivity: 0 });
+  near(
+    flat.forces({ slipRatio: 0.1, slipAngle: 0, load: 8000 }).longitudinal / 8000,
+    flat.forces({ slipRatio: 0.1, slipAngle: 0, load: 4000 }).longitudinal / 4000,
+    1e-9,
+    'no sensitivity, no change',
+  );
   assert.deepEqual(at(0.1, 0, 0), { longitudinal: 0, lateral: 0 }, 'no load, no force');
 });
 
@@ -99,6 +115,45 @@ test('the brush tyre\'s defaults have the cornering stiffness of the Magic Formu
     magic = pacejkaTyre().forces({ slipRatio: 0, slipAngle: slip, load }).lateral / slip;
   near(brush / magic, 1, 0.01, 'the two tyres corner alike at 4,000 N');
   near(brush, 46800, 468, 'a cornering stiffness 2 c a^2 of 46.8 kN per radian');
+});
+
+test('a locked wheel (a slip ratio of -1) and one turning backward give finite forces at the friction limit, in the direction of the slide', () => {
+  const load = 4000;
+  for (const tyre of [pacejkaTyre(), brushTyre()]) {
+    for (const slipRatio of [-1, -1.5]) {
+      const f = tyre.forces({ slipRatio, slipAngle: 0.1, load });
+      assert.ok(Number.isFinite(f.longitudinal) && Number.isFinite(f.lateral), `finite at ${slipRatio}`);
+      assert.ok(f.longitudinal < 0 && f.lateral > 0, `along the slip at ${slipRatio}: ${f.longitudinal}, ${f.lateral}`);
+      assert.ok(Math.hypot(f.longitudinal, f.lateral) <= 1.15 * load, `inside the cone at ${slipRatio}`);
+    }
+  }
+  const lock = brushTyre().forces({ slipRatio: -1, slipAngle: 0, load });
+  near(lock.longitudinal, -load, 1e-9, 'the brush tyre slides whole at lock-up');
+});
+
+test('the brush tyre measures its slip against the wheel surface speed: the theoretical slip kappa / (1 + kappa)', () => {
+  const c = 4e6,
+    a = 0.1,
+    mu = 1,
+    load = 4000,
+    theta = (2 * c * a * a) / (3 * mu * load),
+    tyre = brushTyre({ stiffness: c, halfLength: a, friction: mu });
+  for (const kappa of [-0.1, -0.05, 0.05, 0.1]) {
+    const sigma = Math.abs(kappa / (1 + kappa)),
+      expected = mu * load * (1 - (1 - theta * sigma) ** 3) * Math.sign(kappa);
+    near(tyre.forces({ slipRatio: kappa, slipAngle: 0, load }).longitudinal, expected, 1e-6, `kappa ${kappa}`);
+  }
+  // Both slips are over the surface speed: at kappa -0.2 and 0.05 rad the patch slips (-0.25, tan(0.05) / 0.8) of its length.
+  const soft = brushTyre({ stiffness: 1e6, halfLength: a, friction: mu }),
+    sx = -0.2 / 0.8,
+    sy = Math.tan(0.05) / 0.8,
+    size = Math.hypot(sx, sy),
+    t = ((2 * 1e6 * a * a) / (3 * mu * load)) * size,
+    force = mu * load * (1 - (1 - t) ** 3),
+    f = soft.forces({ slipRatio: -0.2, slipAngle: 0.05, load });
+  assert.ok(t < 1, 'the case is not saturated, so it tests the slip');
+  near(f.longitudinal, (force * sx) / size, 1e-6, 'longitudinal');
+  near(f.lateral, (force * sy) / size, 1e-6, 'lateral');
 });
 
 /** A 1,000 kg car on a 200 m floor on tyre models: chassis 2 x 0.5 x 4 m, four 0.35 m wheels, the front pair steers, the rear drives. */

@@ -3,8 +3,11 @@
 //
 // `pacejkaTyre` is the Magic Formula of Pacejka and Bakker (1992) in its simple sine form, F = D sin(C atan(B x - E (B x - atan(B x)))), for
 // the longitudinal force against the slip ratio and the lateral against the slip angle, with the load sensitivity of the peak, and the two
-// forces held inside the friction ellipse where they meet. `brushTyre` is the brush model (Pacejka 2012, section 3.3; Svendenius 2007): a
-// row of elastic bristles in a contact patch that stick, then slide, whose combined slip gives one force in the direction of the slip.
+// forces held inside the friction ellipse where they meet (a scaling of both back to the ellipse of the two peaks, not Pacejka's weighting
+// functions G_x_alpha and G_y_kappa of 2012, section 4.3, which also shape one force falling as the other rises). `brushTyre` is the brush
+// model (Pacejka 2012, chapter 3; Svendenius 2007): a row of elastic bristles in a contact patch that stick, then slide, whose combined
+// slip gives one force in the direction of the slip, from the theoretical slips kappa / (1 + kappa) and tan(alpha) / (1 + kappa): the
+// bristles are carried through the patch at the wheel's surface speed, so slip is measured against that, not the ground speed.
 //
 // Slip ratio: `(wheel surface speed - ground speed) / ground speed` along the rolling direction, positive under drive. Slip angle: the angle
 // of the contact point's velocity to the rolling direction, the arc tangent of side speed over forward speed. Forces: longitudinal
@@ -50,7 +53,11 @@ export interface PacejkaOptions {
   nominalLoad?: number;
   /** How much the peak friction falls as load rises: `D` scales by `1 - sensitivity (load / nominalLoad - 1)` (default 0.1; 0 for none). */
   loadSensitivity?: number;
-  /** Hold the two forces inside the friction ellipse of their peaks (default true), Pacejka's combined slip in its simplest form. */
+  /**
+   * Hold the two forces inside the friction ellipse of their peaks (default true): where together they ask for more than the tyre has,
+   * both are scaled back by the same factor. It is not Pacejka's combined slip of 2012, section 4.3 (the weighting functions that
+   * lower each force as the other slip grows), only the limit those functions keep to.
+   */
   combined?: boolean;
 }
 
@@ -121,7 +128,7 @@ export interface BrushOptions {
 /**
  * The brush tyre: bristles of stiffness `stiffness` over a patch of half-length `a` stick to the road and slide where the force there
  * would pass the friction cone. With the practical slip `s = (sx, sy)` (the slip ratio and the tangent of the slip angle) and
- * `theta = 2 c a^2 / (3 mu Fz)`, the force has the size `mu Fz (1 - (1 - theta |s|)^3)` while `theta |s|` is under 1 and `mu Fz` past it, in
+ * `theta = 2 c a^2 / (3 mu Fz)` and the theoretical slip `|s| / (1 + sx)` (the slip over the wheel's surface speed; a locked wheel, `sx = -1`, slides whole), the force has the size `mu Fz (1 - (1 - theta |s| / (1 + sx))^3)` while that is under 1 and `mu Fz` past it, in
  * the direction of the slip: the forces of combined slip come out together, in one cone, with no weighting rule. Its slope at small slip is the
  * cornering stiffness `2 c a^2`.
  * @throws RangeError for a coefficient that is not a finite number above 0.
@@ -144,8 +151,11 @@ export function brushTyre(options: BrushOptions = {}): TyreModel {
         sy = Math.tan(slipAngle),
         size = Math.hypot(sx, sy);
       if (size === 0) return { longitudinal: 0, lateral: 0 };
-      const theta = (2 * c * a * a) / (3 * mu * load),
-        t = theta * size,
+      // The theoretical slip: the practical slips over the wheel's surface speed in ground speeds, 1 + kappa. A wheel turning no
+      // faster than the ground moves backward under it (1 + kappa of 0 or less) slides whole.
+      const surface = 1 + sx,
+        theta = (2 * c * a * a) / (3 * mu * load),
+        t = surface > 0 ? (theta * size) / surface : Infinity,
         force = t >= 1 ? mu * load : mu * load * (1 - (1 - t) ** 3);
       return { longitudinal: (force * sx) / size, lateral: (force * sy) / size };
     },
