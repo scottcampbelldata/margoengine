@@ -665,6 +665,10 @@
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
+    "post:TextureOverlayOptions.source": {
+      "status": "ruled",
+      "source": "packages/post/src/overlays.ts"
+    },
     "procedural:PBRTextureSet.albedo": {
       "status": "exempt",
       "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"

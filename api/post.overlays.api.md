@@ -110,6 +110,8 @@ export interface RampStop {
 export class TextureOverlay extends OverlayEffect<TextureOverlayOptions> {
     readonly name = "texture-overlay";
     constructor(options: TextureOverlayOptions);
+    setSource(source: TextureOverlayOptions['source']): this;
+    setup(engine: Engine): void;
     static attach(engine: EngineKernel, options: TextureOverlayOptions): TextureOverlay;
     protected check(): void;
     protected source(): {

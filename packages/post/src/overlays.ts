@@ -1,10 +1,12 @@
 // Ramp, Grid, DepthView and TextureOverlay: one composite pass each. Every effect computes a colour layer; the shared
 // shader blends it over the frame (W3C Compositing and Blending Level 1) with an opacity and an optional mask.
 import type { EngineKernel } from '@margoengine/core';
+import type { Engine } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math/color';
 import type { StageOutput } from '../../shared/stack.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { copyExternal } from '../../shared/copy-external.js';
+import { TextureOption, type TextureSource2D } from '../../shared/texture-option.js';
 import { orthographic } from '../../shared/projection.js';
 import { ScreenEffect, type ScreenContext } from './screen-effect.js';
 import { PostStack } from './stack.js';
@@ -451,7 +453,9 @@ export class DepthView extends OverlayEffect<DepthViewOptions> {
 /** Options for {@link TextureOverlay}. */
 export interface TextureOverlayOptions extends OverlayOptions {
   /** An ImageBitmap (uploaded once, and again after a device restore), a filterable 2D GPUTexture, or a function
-   * returning one each frame. Colours are straight alpha. While the function returns nothing the frame passes through. */
+   * returning one each frame. Colours are straight alpha. While the function returns nothing the frame passes through.
+   * A GPUTexture belongs to the device it was given on: after a device restore the frame passes through, reported once
+   * through `engine.onError`, until `setSource` (or this option) hands in a new one. Read every frame. */
   source: ImageBitmap | GPUTexture | (() => GPUTexture | undefined);
   /** How the image sits in the frame, as CSS object-fit: 'fill' stretches, 'contain' and 'cover' keep the aspect,
    * 'none' keeps its pixel size. Default 'cover'. */
@@ -465,6 +469,11 @@ export interface TextureOverlayOptions extends OverlayOptions {
   /** Tiles the image over the whole frame. Default false. */
   repeat?: boolean;
 }
+type TextureOverlaySource = TextureOverlayOptions['source'];
+const isSource = (source: unknown): source is TextureOverlaySource =>
+  typeof source === 'function' || (typeof source === 'object' && !!source && (source as { width: number }).width > 0);
+const isBitmap = (source: TextureOverlaySource): source is ImageBitmap =>
+  typeof source !== 'function' && !('createView' in source);
 const imageShader = (slot: number) => ({
   declare: `@group(0) @binding(${slot}) var image:texture_2d<f32>;
 @group(0) @binding(${slot + 1}) var sampling:sampler;`,
@@ -488,9 +497,35 @@ export class TextureOverlay extends OverlayEffect<TextureOverlayOptions> {
   private sampler?: GPUSampler;
   private blank?: GPUTexture;
   private uploaded?: { bitmap: ImageBitmap; texture: GPUTexture };
+  /** A GPUTexture or function `source`, held by the borrowed-object rule (docs/conventions.md). */
+  private held?: TextureOption;
   constructor(options: TextureOverlayOptions) {
     super(options);
     this.check();
+    if (!isBitmap(options.source)) this.hold(options.source, undefined);
+  }
+  /**
+   * Replaces `options.source` from the next frame. Call it from `onDeviceRestored` with a texture of the new device; a
+   * plain texture held at a device restore is dropped (the frame passes through, reported once through
+   * `engine.onError`) while the frame keeps drawing.
+   */
+  setSource(source: TextureOverlayOptions['source']): this {
+    if (!isSource(source))
+      throw new TypeError('Use TextureOverlay source as an open ImageBitmap, a GPUTexture or () => texture');
+    this.options.source = source;
+    if (!isBitmap(source)) this.hold(source, this.engine?.gpu);
+    return this;
+  }
+  override setup(engine: Engine): void {
+    super.setup(engine);
+    this.held?.fix(engine.gpu);
+  }
+  private hold(source: GPUTexture | (() => GPUTexture | undefined), device: GPUDevice | null | undefined): void {
+    if (this.held) this.held.set(source as TextureSource2D, device);
+    else {
+      this.held = new TextureOption(source as TextureSource2D, 'TextureOverlay source', 'setSource');
+      this.held.fix(device);
+    }
   }
   /** Runs alone in an owned PostStack. */
   static attach(engine: EngineKernel, options: TextureOverlayOptions): TextureOverlay {
@@ -500,7 +535,7 @@ export class TextureOverlay extends OverlayEffect<TextureOverlayOptions> {
     super.check();
     const o = this.options,
       source = o?.source;
-    if (typeof source !== 'function' && !(typeof source === 'object' && source && source.width > 0))
+    if (!isSource(source))
       throw new TypeError('Use TextureOverlay source as an open ImageBitmap, a GPUTexture or () => texture');
     need(
       o.fit === undefined || ['fill', 'contain', 'cover', 'none'].includes(o.fit),
@@ -520,8 +555,11 @@ export class TextureOverlay extends OverlayEffect<TextureOverlayOptions> {
   }
   private texture(device: GPUDevice): GPUTexture | undefined {
     const source = this.options.source;
-    if (typeof source === 'function') return source();
-    if ('createView' in source) return source;
+    if (!isBitmap(source)) {
+      // The options object is read every frame: a `source` assigned straight onto it is taken like `setSource`.
+      if (this.held?.value !== source) this.hold(source, device);
+      return this.held!.get(device, this.engine);
+    }
     if (this.uploaded?.bitmap !== source) {
       this.uploaded?.texture.destroy();
       const size = [source.width, source.height],

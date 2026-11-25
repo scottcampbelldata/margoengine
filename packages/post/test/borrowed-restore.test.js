@@ -135,3 +135,38 @@ test('MaterialDecals atlas across a device restore: a plain one applies no decal
   effect.options.atlas = undefined;
   assert.equal(count(g2.record(() => h.frame())), 1, 'the flat default atlas');
 });
+
+test('TextureOverlay source across a device restore: a plain texture is not bound and is reported once, setSource brings it back', async () => {
+  const { TextureOverlay } = await import('@margoengine/post/overlays');
+  const viewed = [],
+    h = harness(),
+    errors = [],
+    plain = watched(h.gpu.device, viewed, 'plain'),
+    effect = TextureOverlay.attach(h.engine, { source: plain });
+  h.engine.onError = (e) => errors.push(e);
+  const opacity = (log) => written(log, 256)[0];
+  assert.equal(opacity(h.gpu.record(() => h.frame())), 1, 'the texture draws before the loss');
+  assert.deepEqual(viewed, ['plain']);
+  const g1 = h.lose();
+  assert.equal(opacity(g1.record(() => h.frame())), 0, 'the frame passes through');
+  h.frame();
+  assert.deepEqual(viewed, ['plain'], 'nothing of the lost texture is bound');
+  assert.equal(lost(errors).length, 1, 'reported once');
+  assert.equal(errors[0].code, 'state');
+  assert.match(errors[0].message, /TextureOverlay source lost with the device; pass a function or call setSource/);
+  assert.equal(plain.destroyed, undefined, 'borrowed, never destroyed');
+  assert.equal(effect.setSource(watched(g1.device, viewed, 'again')), effect);
+  assert.equal(opacity(g1.record(() => h.frame())), 1, 'a new texture brings it back');
+  assert.deepEqual(viewed.slice(-1), ['again']);
+  effect.options.source = watched(g1.device, viewed, 'assigned');
+  assert.equal(opacity(g1.record(() => h.frame())), 1, 'a texture assigned onto the options is taken too');
+  assert.deepEqual(viewed.slice(-1), ['assigned']);
+  let current = watched(g1.device, viewed, 'getter');
+  effect.setSource(() => current);
+  const g2 = h.lose();
+  current = watched(g2.device, viewed, 'getter2');
+  assert.equal(opacity(g2.record(() => h.frame())), 1, 'a function source is read every frame');
+  assert.equal(lost(errors).length, 1, 'no report for the function form');
+  assert.throws(() => effect.setSource({}), TypeError);
+  effect.dispose();
+});

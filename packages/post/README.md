@@ -1430,6 +1430,10 @@ Every effect takes these:
   1994). Gradient colours interpolate as display values, as CSS gradients do.
 - **Depth.** To show a `DepthTexture` (with models you added to it), attach it and pass it:
   `new DepthView({depth: DepthTexture.attach(engine)})`. It is also what `mask: 'depth'` then reads on that effect.
+- **Texture source.** A `GPUTexture` `source` belongs to the device it was made on (docs/conventions.md, "Borrowed GPU
+  objects"): after a device restore it is not bound, the frame passes through, the loss is reported once through
+  `engine.onError` (`'state'`, `#borrowed-lost`), and `label.setSource(texture)` with a texture of the new device brings
+  it back. A `() => texture` source is read every frame, and an `ImageBitmap` is uploaded again by itself.
 
 ## FXAA
 

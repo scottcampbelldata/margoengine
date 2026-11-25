@@ -1,6 +1,6 @@
 // Real-GPU proof of the borrowed-object rule for the post effects that take a caller's texture, across a device restore
-// (KB-RESTORE-BORROWED1): Lens `dirt`, LensFlare element `texture`, Decals `atlas`, MaterialDecals `atlas`. Run from the
-// repository root after building packages, under the lock:
+// (KB-RESTORE-BORROWED1): Lens `dirt`, LensFlare element `texture`, Decals `atlas`, MaterialDecals `atlas`,
+// TextureOverlay `source`. Run from the repository root after building packages, under the lock:
 // node scripts/run-with-timeout.mjs --max=10 -- node packages/post/test/borrowed-restore-browser.mjs
 // (MARGO_COMPAT=1 for the WebGL2 compatibility layer). Per effect: with the image, `engine.rebootDevice()`, then a plain
 // image is dropped (the frame equals the one without the image, no validation error, one 'state' report linking
@@ -178,6 +178,22 @@ await postBrowser(
       without: 'u.md.setDecals([])',
       fresh: 'u.md.options.atlas = u.texture(u.engine.gpu, [218, 128, 218, 255])',
       asFunction: 'u.md.options.atlas = u.fn',
+    });
+
+    // TextureOverlay: a red texture over the frame; the getter source makes its texture once per device.
+    await setup(`
+      const { TextureOverlay } = await import('/packages/post/dist/overlays.js');
+      u.img = u.texture(u.engine.gpu, [255, 40, 40, 255]);
+      u.ov = TextureOverlay.attach(u.engine, { source: u.img });
+      u.fn = () => (u.cache?.device === u.engine.gpu ? u.cache : (u.made++, (u.cache = { device: u.engine.gpu, texture: u.texture(u.engine.gpu, [255, 40, 40, 255]) }))).texture;
+    `);
+    await sequence({
+      name: 'TextureOverlay source',
+      report: /TextureOverlay source lost with the device/,
+      withImage: 'u.ov.options.enabled = true; u.ov.setSource(u.img)',
+      without: 'u.ov.options.enabled = false',
+      fresh: 'u.ov.setSource(u.texture(u.engine.gpu, [255, 40, 40, 255]))',
+      asFunction: 'u.ov.setSource(u.fn)',
     });
   },
   { seconds: 540 },
