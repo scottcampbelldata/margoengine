@@ -229,7 +229,7 @@ const xr=await XR.create(engine);
 const enter=document.createElement('button');enter.textContent='Enter AR';document.body.append(enter);
 enter.onclick=async()=>{
   await xr.requestSession('immersive-ar',{requiredFeatures:['light-estimation']});
-  const reflection=await ARReflection.create(xr,{device:engine.gpu,size:32});
+  const reflection=await ARReflection.create(xr,{device:engine.gpu!,size:32});
   const cube=await reflection.ready;
   const environment=await Environment.create(engine,{texture:cube},{size:cube.width});
   engine.use(environment);

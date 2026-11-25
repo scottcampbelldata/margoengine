@@ -93,7 +93,10 @@ export class XRSessionState {
    */
   async setFrameRate(rate: number): Promise<void> {
     if (!this.session.updateTargetFrameRate)
-      throw margoError('unsupported', 'This browser has no XR frame rate control (updateTargetFrameRate)');
+      throw margoError(
+        'unsupported',
+        'This browser has no XR frame rate control (updateTargetFrameRate); check supportedFrameRates.length before calling setFrameRate',
+      );
     const supported = this.supportedFrameRates;
     if (!supported.includes(rate))
       throw new RangeError(

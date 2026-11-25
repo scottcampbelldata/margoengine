@@ -2,6 +2,7 @@ import { MargoError } from '@margoengine/math/errors';
 
 /** Most particles, and most vertices over all of them (the material mesh's own limit of 1,000,000 vertices). */
 export const MAX_SOLID_PARTICLES = 1_000_000;
+/** Most vertices over all particles of one system: the material mesh's own limit. */
 export const MAX_SOLID_VERTICES = 1_000_000;
 
 type V3 = [number, number, number];
@@ -59,11 +60,13 @@ export interface SolidParticle {
   readonly boundingBox: { min: V3; max: V3 };
 }
 
+/** Options of a new Solid Particle System. */
 export interface SolidOptions {
   /** Called by `setParticles` for each alive particle in its range before it is written (default none). */
   updateParticle?: (particle: SolidParticle) => void;
 }
 
+/** Options of `addShape`: how each new particle of the shape starts. */
 export interface SolidShapeOptions {
   /** Sets each new particle's start (`particle`, its index in the shape, its index in the system). Default none. */
   positionFunction?: (particle: SolidParticle, indexInShape: number, indexInSystem: number) => void;
@@ -79,11 +82,13 @@ export interface SolidDigestOptions extends SolidShapeOptions {
   facetNb?: number;
 }
 
+/** A world-space ray for `pick`; the direction need not be unit length, but must not be zero. */
 export interface SolidRay {
   origin: ArrayLike<number>;
   direction: ArrayLike<number>;
 }
 
+/** Options of `pick`. */
 export interface SolidPickOptions {
   /** Farthest hit in world units (default Infinity). */
   maxDistance?: number;
@@ -91,6 +96,7 @@ export interface SolidPickOptions {
   backFaces?: boolean;
 }
 
+/** The nearest particle a ray hits, from `pick`. */
 export interface SolidPick {
   particleIndex: number;
   shapeId: number;
@@ -419,7 +425,7 @@ export class SolidParticleSystem {
     const max = options.maxDistance ?? Infinity,
       back = options.backFaces ?? true;
     if (typeof max !== 'number' || !(max > 0) || typeof back !== 'boolean')
-      throw new TypeError('Solid pick options: maxDistance a number above 0, backFaces a boolean');
+      throw new TypeError('Solid pick options: pass maxDistance as a number above 0 and backFaces as a boolean');
     const d = [d0[0] / len, d0[1] / len, d0[2] / len];
     let best: SolidPick | null = null,
       limit = max;

@@ -329,7 +329,7 @@ export class XRLayers {
     const { quality, mipLevels } = options;
     if (quality !== undefined && !['default', 'text-optimized', 'graphics-optimized'].includes(quality))
       throw new RangeError(
-        `layer quality is 'default', 'text-optimized' or 'graphics-optimized', got ${String(quality)}`,
+        `layer quality ${String(quality)} is not supported; pass 'default', 'text-optimized' or 'graphics-optimized'`,
       );
     if (mipLevels !== undefined) {
       if (!(Number.isInteger(mipLevels) && mipLevels >= 1))
