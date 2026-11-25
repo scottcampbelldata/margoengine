@@ -782,6 +782,37 @@ impl World {
         h[0].min(h[1]).min(h[2]).min(h[3]) <= high && h[0].max(h[1]).max(h[2]).max(h[3]) >= low
     }
 
+    /// What collider `other` does past mesh collider `mesh` in the coming step, in the world's frame: how far its centre travels
+    /// (the body's velocity and its turn about the centre of mass, less the mesh's own, times the step) and how far a turn
+    /// can swing its surface from the centre's path. Gravity is left out: a body that rests on something else is held up, and
+    /// only a contact says so. Nothing outside a step, and for a shape that is not a ball, capsule or box.
+    fn motion_of(&self, other: usize, mesh: usize) -> Motion {
+        let dt = self.header().step_dt;
+        let shape = self.uu(COLLIDER_SHAPE, other);
+        if !(dt > 0.0) || (shape != SHAPE_BALL && shape != SHAPE_CAPSULE && shape != SHAPE_BOX) {
+            return Motion { travel: v3(0.0, 0.0, 0.0), turn: v3(0.0, 0.0, 0.0), arm: 0.0, axis: v3(0.0, 0.0, 0.0) };
+        }
+        let point = self.collider_pose(other).p;
+        let body = |c: usize| self.uu(COLLIDER_BODY, c) as usize;
+        let velocity = |c: usize| {
+            let at = body(c);
+            let center = self.v(POSITION_X, at).add(self.q(ROTATION_X, at).rotate(self.v(LOCAL_CENTER_X, at)));
+            self.v(LINEAR_X, at).add(self.v(ANGULAR_X, at).cross(point.sub(center)))
+        };
+        let turn = self.v(ANGULAR_X, body(other)).sub(self.v(ANGULAR_X, body(mesh)));
+        // A turn moves a ball's surface nowhere; a capsule's ends swing by half its length, off its axis; a box's corners by its half
+        // diagonal.
+        let (arm, axis) = match shape {
+            SHAPE_BALL => (0.0, v3(0.0, 0.0, 0.0)),
+            SHAPE_CAPSULE => (self.s(COLLIDER_B, other), self.collider_pose(other).q.rotate(v3(0.0, 1.0, 0.0))),
+            _ => {
+                let h = self.v(COLLIDER_A, other);
+                (sqrt(h.dot(h)), v3(0.0, 0.0, 0.0))
+            }
+        };
+        Motion { travel: velocity(other).sub(velocity(mesh)).scale(dt), turn: turn.scale(dt), arm, axis }
+    }
+
     /// The mesh and the other collider of a mesh pair, and whether the other is the pair's A.
     #[inline(always)]
     fn mesh_sides(&self, a: usize, b: usize) -> (usize, usize, bool) {
@@ -791,7 +822,7 @@ impl World {
     /// The manifold of the pair's other collider against triangle `t` of the mesh, counted from its first, normal from
     /// the pair's A to its B. The mesh's MESH_FIX_EDGES bit turns on the ghost rule.
     #[allow(clippy::too_many_arguments)]
-    fn collide_triangle(&self, other: usize, other_is_a: bool, mesh: usize, t: u32, pose: Pose, limit: f32, out: &mut Manifold) {
+    fn collide_triangle(&self, other: usize, other_is_a: bool, mesh: usize, t: u32, pose: Pose, limit: f32, motion: Motion, out: &mut Manifold) {
         out.count = 0;
         if !self.triangle_alive(mesh, t) {
             return;
@@ -812,10 +843,29 @@ impl World {
             let r = self.round_of(other);
             collide_round_poly(r, &tri, pose, limit, out);
             flip(out);
+            if out.count > 0 && out.held_count == 0 && self.uu(MESH_FLAGS, mesh) & MESH_FIX_EDGES != 0 {
+                let (p, q) = (pose.unapply(r.p), pose.unapply(r.q));
+                let held = Held { slop: self.header().contact_slop, motion, front, corners };
+                let radius = held.shrink(r.radius);
+                if held.hovers(&[p, q], radius, pose) && on_open_edges(out, corners, pose, |k| self.mesh_across(mesh, t, k) == NONE) {
+                    out.count = 0;
+                }
+            }
         } else {
             let mut box_data = crate::hull::BoxData::new();
             let poly = self.poly_of(other, &mut box_data);
             collide_polys(&tri, pose, &poly, self.collider_pose(other), limit, out);
+            if out.count > 0 && out.held_count == 0 && shape == SHAPE_BOX && self.uu(MESH_FLAGS, mesh) & MESH_FIX_EDGES != 0 {
+                let rel = pose.relative(self.collider_pose(other));
+                let half = self.v(COLLIDER_A, other);
+                let held = Held { slop: self.header().contact_slop, motion, front, corners };
+                // The box's reach along the triangle's normal, each half extent held smaller.
+                let along = |u: V3, h: f32| held.shrink(h) * rel.q.rotate(u).dot(front).abs();
+                let radius = along(v3(1.0, 0.0, 0.0), half.x) + along(v3(0.0, 1.0, 0.0), half.y) + along(v3(0.0, 0.0, 1.0), half.z);
+                if held.hovers(&[rel.p], radius, pose) && on_open_edges(out, corners, pose, |k| self.mesh_across(mesh, t, k) == NONE) {
+                    out.count = 0;
+                }
+            }
         }
         if out.count > 0 && self.uu(MESH_FLAGS, mesh) & MESH_FIX_EDGES != 0 {
             let n = pose.q.unrotate(out.normal);
@@ -912,6 +962,7 @@ impl World {
         let skin = self.s(COLLIDER_SKIN, mesh_collider) + self.mesh_reach(mesh);
         let (low, high) = (low.sub(v3(skin, skin, skin)), high.add(v3(skin, skin, skin)));
         let mut manifold = Manifold::new();
+        let motion = self.motion_of(other, mesh_collider);
         if let Some((rows, columns)) = self.grid_size(mesh) {
             if let Some([r0, r1, c0, c1]) = self.grid_cells(mesh, rows, columns, low, high) {
                 for c in c0..=c1 {
@@ -921,7 +972,7 @@ impl World {
                         }
                         let cell = 2 * (r + rows * c);
                         for triangle in [cell, cell + 1] {
-                            if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, ratio, bodies, &mut manifold) {
+                            if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, motion, ratio, bodies, &mut manifold) {
                                 return false;
                             }
                         }
@@ -949,7 +1000,7 @@ impl World {
             }
             for place in first..first + count {
                 let triangle = self.uu(TRIANGLE_ORDER, t0 + place as usize);
-                if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, ratio, bodies, &mut manifold) {
+                if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, motion, ratio, bodies, &mut manifold) {
                     return false;
                 }
             }
@@ -976,11 +1027,11 @@ impl World {
     /// the pair's A, the mesh row and the compound child or NONE), stored in the triangle's part, made when it first
     /// touches. False when memory cannot hold a new part.
     #[allow(clippy::too_many_arguments)]
-    fn touch_triangle(&mut self, row: usize, sides: (usize, bool, usize, u32), triangle: u32, pose: Pose, limit: f32, ratio: f32, bodies: (usize, usize), manifold: &mut Manifold) -> bool {
+    fn touch_triangle(&mut self, row: usize, sides: (usize, bool, usize, u32), triangle: u32, pose: Pose, limit: f32, motion: Motion, ratio: f32, bodies: (usize, usize), manifold: &mut Manifold) -> bool {
         let (other, other_is_a, mesh, sub) = sides;
         // A triangle of a compound's mesh child against a compound's child names that child too.
         let third = if sub != NONE && sub & MESH_CHILD != 0 { other as u32 } else { NONE };
-        self.touch_part3(row, (triangle, sub, third), ratio, bodies, manifold, |w, m| w.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, m))
+        self.touch_part3(row, (triangle, sub, third), ratio, bodies, manifold, |w, m| w.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, motion, m))
     }
 
     /// One part of pair `row`, named by `key` (its PAIR_PART and PAIR_SUB): `collide` fills the manifold, which starts
@@ -1055,7 +1106,7 @@ impl World {
         let (low, high) = self.local_box(other, pose);
         let mut manifold = Manifold::new();
         let mut touches = |w: &Self, triangle: u32| {
-            w.collide_triangle(other, other_is_a, mesh, triangle, pose, 0.0, &mut manifold);
+            w.collide_triangle(other, other_is_a, mesh, triangle, pose, 0.0, Motion { travel: v3(0.0, 0.0, 0.0), turn: v3(0.0, 0.0, 0.0), arm: 0.0, axis: v3(0.0, 0.0, 0.0) }, &mut manifold);
             manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
         };
         if let Some((rows, columns)) = self.grid_size(mesh) {
@@ -1204,6 +1255,93 @@ pub(crate) fn flip(out: &mut Manifold) {
     out.normal = out.normal.scale(-1.0);
     for point in out.points.iter_mut().take(out.count) {
         core::mem::swap(&mut point.on_a, &mut point.on_b);
+    }
+}
+
+/// A closest point this near an edge's line, in metres per metre of its distance from the origin plus one (the rounding of a
+/// coordinate that far out), is on the edge.
+const ON_EDGE: f32 = 1e-5;
+/// How many slops deep a shape may sit in a surface the solver holds it against: a resting ball sits about one slop deep
+/// (measured: 1.1), a soft push under a load somewhat more, and Rapier's allowed error is five of these slops.
+const HELD_SLOPS: f32 = 8.0;
+
+/// What a collider does in the coming step, in the world's frame: how far its centre travels, the rotation vector it turns
+/// through, and the arm that turn swings (a capsule's half length, off the `axis` it lies along; a box's half diagonal, with
+/// a zero `axis`; a ball's none).
+#[derive(Clone, Copy)]
+pub(crate) struct Motion {
+    pub travel: V3,
+    pub turn: V3,
+    pub arm: f32,
+    pub axis: V3,
+}
+
+impl Motion {
+    /// How far the turn can move the shape's surface along unit `n`: the height a point at the arm's end gains or loses.
+    fn swing(&self, n: V3) -> f32 {
+        let turned = if self.axis.dot(self.axis) > 0.0 { self.turn.cross(self.axis) } else { self.turn.cross(n) };
+        let along = if self.axis.dot(self.axis) > 0.0 { turned.dot(n) } else { sqrt(turned.dot(turned)) };
+        self.arm * if along < 0.0 { -along } else { along }
+    }
+}
+
+/// Whether every point of `out` (on the triangle, `on_a`, in the world's frame) is on an edge of `corners` with no triangle
+/// across it, or at a corner such an edge ends at: near is within the rounding of a coordinate that far from the origin.
+fn on_open_edges(out: &Manifold, corners: [V3; 3], pose: Pose, open: impl Fn(usize) -> bool) -> bool {
+    out.points.iter().take(out.count).all(|point| {
+        let witness = pose.unapply(point.on_a);
+        let tolerance = ON_EDGE * (1.0 + witness.x.abs().max(witness.y.abs()).max(witness.z.abs()));
+        (0..3).any(|k| {
+            let (a, b) = (corners[k], corners[(k + 1) % 3]);
+            let edge = b.sub(a);
+            let long = sqrt(edge.dot(edge));
+            let off = witness.sub(a).cross(edge);
+            long > 0.0 && sqrt(off.dot(off)) <= tolerance * long && open(k)
+        })
+    })
+}
+
+/// A shape held in the plane of a triangle it is not over, for the ghost contacts a seam makes.
+///
+/// A ball rolling over the seam of two coplanar meshes meets the second mesh's open edge from the side before it is over it:
+/// the closest point is the edge, the normal leans back toward the first mesh, and a row along it cancels the approach: a
+/// kick of up to 1.8 m/s up and back, where one mesh gives none (the ghost rule needs the triangle across the edge, and
+/// there is none across a seam between meshes). The shape never leaves the plane it rests on: the solver holds it a slop
+/// deep, a load a few more. A shape whose surface, `HELD_SLOPS` slops smaller, stays clear of the triangle's plane over the
+/// whole step cannot be touching the triangle by more than that depth, whatever the edge says, and its contact with the
+/// edge is dropped. The plane is the triangle's own, so one test serves a triangle of any size. A shape that crosses the
+/// plane, or sinks deeper than that, keeps its contact: an edge struck from the side is a real hit.
+struct Held {
+    slop: f32,
+    motion: Motion,
+    front: V3,
+    corners: [V3; 3],
+}
+
+impl Held {
+    /// A size held smaller by the depth the solver holds a shape at.
+    fn shrink(&self, size: f32) -> f32 {
+        let depth = HELD_SLOPS * self.slop;
+        if size > depth { size - depth } else { 0.0 }
+    }
+
+    /// Whether points `from`, at the mesh's frame, with a shape of reach `radius` along the plane's normal around them, stay
+    /// strictly on one side of the triangle's plane at the start of the step and at its end.
+    fn hovers(&self, from: &[V3], radius: f32, pose: Pose) -> bool {
+        let travel = pose.q.unrotate(self.motion.travel);
+        let offset = self.front.dot(self.corners[0]);
+        let reach = radius + self.motion.swing(pose.q.rotate(self.front));
+        let mut side = 0.0f32;
+        for at in from {
+            for end in [*at, at.add(travel)] {
+                let height = self.front.dot(end) - offset;
+                if !(height * height > reach * reach) || (side != 0.0 && (height > 0.0) != (side > 0.0)) {
+                    return false;
+                }
+                side = height;
+            }
+        }
+        side != 0.0
     }
 }
 

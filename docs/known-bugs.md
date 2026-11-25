@@ -14794,3 +14794,14 @@ its existing bound (Catto, "Solver2D", 2024, the soft step; Tonge, Benevolenski 
 and Trinkle, "Interactive simulation of rigid body dynamics in computer graphics", Computer Graphics Forum 33(1), 2014, for friction
 against exact normal blocks).
 
+## KB-PHYS-WALL1: a cube stopped by a wall at 6 m/s sinks 2.2 cm into the floor with the sweeps solver
+
+`packages/voxel/tests/physics.test.js`, "a chunk that comes back after edits made out of range leaves no stale seam": a frictionless
+0.4 m cube slides at 6 m/s over a voxel floor into a one-block wall. It stops at the wall face as it should, but its centre goes
+0.0219 m below its rest height for five steps (the test allows 0.02), with floor impulses of 3.8 and 7.3 against 0.005 at rest.
+With `setSolver({blockSolver: true})` the test passes. Cause as understood: the wall's four points take their impulses one after
+the other, the top ones more than the bottom ones in the first passes, which pitches the cube onto its lower front edge and drives
+that edge into the floor until the passes even the load out; the exact block solve gives them together. It is not a seam (the floor
+and wall are voxel grids that meet no other collider at that spot). To fix with the block solver's default (KB-PHYS-BLOCK1): the
+test stays red until then.
+

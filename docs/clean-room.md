@@ -11461,3 +11461,14 @@ International Civil Aviation Organization, Doc 7488, "Manual of the ICAO Standar
 model: layer lapse rates, sea-level 288.15 K and 101,325 Pa, the gas constant 287.05287 J/(kg K), g = 9.80665 m/s^2, and the
 tabulated values the test checks, -1 km to 47 km). Below sea level the first layer continues, as ISO 2533 tabulates to
 -2 km (before the move it held sea-level values there). Proof: `packages/math/test/atmosphere.test.js`.
+
+## Seams between meshes (2026-11-25)
+
+`packages/physics/kernel/src/mesh.rs` (`Held`, `on_open_edges`): a contact of a round shape or a box with an open edge of a
+triangle is dropped when the shape, a few slops smaller, stays on one side of the triangle's plane through the step. The argument is
+plain geometry (a flat triangle lies in its plane, so a shape strictly on one side of it cannot touch it) with the ghost-collision
+problem as Catto states it in "Ghost Collisions" (box2d.org, 2020) and the speculative contact it comes from in Catto, "Solver2D"
+(2024); the cast I tried first, van den Bergen, "Ray casting against general convex objects with application to continuous
+collision detection", Journal of Graphics Tools 9(3), 2004, was dropped because its termination is relative to the size of the
+triangle. Proof: `kernel/tests/mesh.rs`, `tests/next-mesh-seam.test.js`.
+

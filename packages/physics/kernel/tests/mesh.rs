@@ -656,3 +656,81 @@ fn a_shape_beside_a_height_field_touches_no_cell() {
     w.step(DT);
     assert!(parts(&w) >= 1);
 }
+
+// Seams between meshes. A ball, a capsule or a box rolling or sliding over the edge where two coplanar meshes meet meets the
+// second mesh's open edge from the side before it is over it; the ghost rule cannot see across meshes, so the contact with
+// that edge, its normal leaning back, kicked the shape (a ball at 6 m/s went up at 1.3 m/s, a capsule at 0.76) where one
+// mesh gives none.
+
+/// A flat plate from `x0` to `x1` along x and 40 m across, on y = 0, in two triangles.
+fn plate(w: &mut World, x0: f32, x1: f32) {
+    let vertices = [v3(x0, 0.0, -20.0), v3(x1, 0.0, -20.0), v3(x1, 0.0, 20.0), v3(x0, 0.0, 20.0)];
+    let mesh = add_mesh(w, &vertices, &[[0, 3, 1], [1, 3, 2]], MESH_FIX_EDGES);
+    let floor = ground(w, mesh);
+    w.set_s(COLLIDER_FRICTION, floor as usize, 0.0);
+}
+
+/// The most a body rolls or slides up or down, and the speed it keeps, crossing x = 0 at `speed` on a floor of `plates`
+/// plates along x from -20 to 20 (one, or two that meet at the origin).
+fn cross(shape: u32, size: [f32; 3], rest: f32, rotation: [f32; 4], speed: f32, plates: u32) -> (f32, f32) {
+    let mut w = World::new(8, 8).unwrap();
+    if plates == 1 {
+        plate(&mut w, -20.0, 20.0);
+    } else {
+        plate(&mut w, -20.0, 0.0);
+        plate(&mut w, 0.0, 20.0);
+    }
+    let (body, collider) = turned(&mut w, shape, size, v3(-5.0, rest, 0.0), rotation);
+    w.set_s(COLLIDER_FRICTION, collider as usize, 0.0);
+    for _ in 0..30 {
+        w.step(DT);
+    }
+    w.set_v(LINEAR_X, body as usize, v3(speed, 0.0, 0.0));
+    let mut lift = 0.0f32;
+    for _ in 0..120 {
+        w.step(DT);
+        lift = lift.max(w.v(LINEAR_X, body as usize).y.abs());
+    }
+    (lift, w.v(LINEAR_X, body as usize).x)
+}
+
+fn crosses_like_one_plate(shape: u32, size: [f32; 3], rest: f32, rotation: [f32; 4]) {
+    for speed in [2.0f32, 6.0, 9.0] {
+        let (one_lift, one_speed) = cross(shape, size, rest, rotation, speed, 1);
+        let (two_lift, two_speed) = cross(shape, size, rest, rotation, speed, 2);
+        assert!(two_lift <= one_lift + 1e-4, "at {speed} m/s the seam kicked it up at {two_lift}, one plate {one_lift}");
+        assert!((two_speed - one_speed).abs() < 1e-3, "at {speed} m/s it left at {two_speed}, one plate {one_speed}");
+    }
+}
+
+#[test]
+fn a_ball_crosses_the_seam_of_two_meshes_as_one_mesh() {
+    crosses_like_one_plate(SHAPE_BALL, [0.4, 0.0, 0.0], 0.4, [0.0, 0.0, 0.0, 1.0]);
+}
+
+#[test]
+fn a_capsule_crosses_the_seam_of_two_meshes_as_one_mesh() {
+    // Lying along z, rolling across the seam.
+    let h = core::f32::consts::FRAC_1_SQRT_2;
+    crosses_like_one_plate(SHAPE_CAPSULE, [0.3, 0.4, 0.0], 0.4, [h, 0.0, 0.0, h]);
+}
+
+#[test]
+fn a_box_crosses_the_seam_of_two_meshes_as_one_mesh() {
+    crosses_like_one_plate(SHAPE_BOX, [0.4, 0.4, 0.4], 0.4, [0.0, 0.0, 0.0, 1.0]);
+}
+
+#[test]
+fn a_ball_that_strikes_the_rim_of_a_mesh_from_the_side_is_still_stopped_by_it() {
+    // The ball's centre is a quarter of its radius over the plate's plane, far deeper than it rests, so the rim is a real hit.
+    let mut w = World::new(8, 8).unwrap();
+    plate(&mut w, 0.0, 20.0);
+    let (body, collider) = dynamic(&mut w, SHAPE_BALL, [0.4, 0.0, 0.0], v3(-3.0, 0.1, 0.0));
+    w.set_s(COLLIDER_FRICTION, collider as usize, 0.0);
+    w.set_s(GRAVITY_SCALE, body as usize, 0.0);
+    w.set_v(LINEAR_X, body as usize, v3(6.0, 0.0, 0.0));
+    for _ in 0..40 {
+        w.step(DT);
+    }
+    assert!(w.v(POSITION_X, body as usize).x < 0.0, "the rim stopped the ball at x {}", w.v(POSITION_X, body as usize).x);
+}
