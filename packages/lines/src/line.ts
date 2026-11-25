@@ -18,6 +18,9 @@ import type { LineExtension } from './extension.js';
 import { MASK_HEADER, SelectionMasked, writeMaskBits, writeMaskHeader } from '../../shared/selection-mask.js';
 import type { MaskStyle } from '../../shared/selection-mask.js';
 
+/** How per-point colours combine with the material colour: see `LineMaterialOptions.colorMode`. */
+export type LineColorMode = 'multiply' | 'set' | 'add';
+
 /**
  * Style options for `LineMaterial` (and `Line`). Validated on set and every frame: out-of-range numbers throw
  * a RangeError, an unknown join or cap or a non-boolean flag a TypeError.
@@ -52,6 +55,11 @@ export interface LineMaterialOptions {
   dashOffset?: number;
   /** Multiply by the line's per-vertex colors. Default true when the line has colors. */
   vertexColors?: boolean;
+  /**
+   * How a point's colour combines with `color` where the line has per-point colours: 'multiply' (default) multiplies them,
+   * 'set' draws the point's colour alone (opacity still applies), 'add' adds them, clamped to 1. Default 'multiply'.
+   */
+  colorMode?: LineColorMode;
   /** Skip the depth test and draw over the scene. Default false. */
   onTop?: boolean;
   /**
@@ -104,6 +112,7 @@ export class LineMaterial {
   gapSize = 1;
   dashOffset = 0;
   vertexColors?: boolean;
+  colorMode: LineColorMode = 'multiply';
   onTop = false;
   depthWrite = false;
   behind = false;
@@ -157,6 +166,8 @@ export class LineMaterial {
       throw new RangeError('Dash size must be positive and gap size non-negative');
     if (!JOINS.includes(this.join) || !CAPS.includes(this.cap) || !CAPS.includes(this.dashCap))
       throw new TypeError('Unknown line join or cap; use the values listed in the line options');
+    if (!['multiply', 'set', 'add'].includes(this.colorMode))
+      throw new TypeError("Unknown line colorMode; use 'multiply', 'set' or 'add'");
     for (const flag of [
       this.worldUnits,
       this.dashed,

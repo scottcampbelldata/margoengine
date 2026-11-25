@@ -63,6 +63,8 @@ class Line extends SelectionMasked {
 
 type LineCap = 'butt' | 'round' | 'square';
 
+type LineColorMode = 'multiply' | 'set' | 'add';
+
 interface LineExtension {
     readonly key: string;
     readonly entries: GPUBindGroupLayoutEntry[];
@@ -90,6 +92,7 @@ class LineMaterial {
     gapSize: number;
     dashOffset: number;
     vertexColors?: boolean;
+    colorMode: LineColorMode;
     onTop: boolean;
     depthWrite: boolean;
     behind: boolean;
@@ -120,6 +123,7 @@ interface LineMaterialOptions {
     gapSize?: number;
     dashOffset?: number;
     vertexColors?: boolean;
+    colorMode?: LineColorMode;
     onTop?: boolean;
     depthWrite?: boolean;
     behind?: boolean;

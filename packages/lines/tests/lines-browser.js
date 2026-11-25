@@ -208,6 +208,22 @@ window.runLineTests = async () => {
     `Vertex colors misplaced: ${left} / ${right}`,
   );
   assert(middle[0] > 120 && middle[2] > 120, `Vertex colors not interpolated: ${middle}`);
+  // colorMode: 'multiply' against a green material colour blacks red out; 'set' keeps it; 'add' adds green to it.
+  line.material.setColor('#00ff00');
+  line.material.colorMode = 'multiply';
+  image = await frame();
+  const multiplied = image.at(64, 127);
+  assert(multiplied[0] < 40 && multiplied[1] < 40, `colorMode multiply wrong: ${multiplied}`);
+  line.material.colorMode = 'set';
+  image = await frame();
+  const set = image.at(64, 127);
+  assert(set[0] > 200 && set[1] < 40, `colorMode set wrong: ${set}`);
+  line.material.colorMode = 'add';
+  image = await frame();
+  const added = image.at(64, 127);
+  assert(added[0] > 200 && added[1] > 200, `colorMode add wrong: ${added}`);
+  line.material.colorMode = 'multiply';
+  line.material.setColor('#ffffff');
   line.setColors(null);
   line.material.setColor('#00ff00');
   line.material.opacity = 0.5;

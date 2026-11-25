@@ -182,6 +182,8 @@ export class Line extends SelectionMasked {
 
 export type LineCap = 'butt' | 'round' | 'square';
 
+export type LineColorMode = 'multiply' | 'set' | 'add';
+
 export type LineJoin = 'miter' | 'round' | 'bevel';
 
 export class LineMaterial {
@@ -198,6 +200,7 @@ export class LineMaterial {
     gapSize: number;
     dashOffset: number;
     vertexColors?: boolean;
+    colorMode: LineColorMode;
     onTop: boolean;
     depthWrite: boolean;
     behind: boolean;
@@ -228,6 +231,7 @@ export interface LineMaterialOptions {
     gapSize?: number;
     dashOffset?: number;
     vertexColors?: boolean;
+    colorMode?: LineColorMode;
     onTop?: boolean;
     depthWrite?: boolean;
     behind?: boolean;

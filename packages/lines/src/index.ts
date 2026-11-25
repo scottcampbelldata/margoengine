@@ -2,7 +2,7 @@ export { Lines } from './lines.js';
 
 export type { LinesOptions } from './lines.js';
 export { Line, LineMaterial } from './line.js';
-export type { LineOptions, LineMaterialOptions } from './line.js';
+export type { LineOptions, LineMaterialOptions, LineColorMode } from './line.js';
 export {
   GridHelper,
   PolarGridHelper,

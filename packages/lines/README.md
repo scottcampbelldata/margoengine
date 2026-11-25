@@ -105,6 +105,7 @@ not written. See the exporters README, "Lines and point clouds".
 | `dashed`, `dashSize`, `gapSize`, `dashOffset` | `false`, `1`, `1`, `0` | World units |
 | `dashCap` | `'butt'` | The shape of each dash's ends: `'butt'`, `'round'` or `'square'`; see [Dash caps](#dash-caps) |
 | `vertexColors` | when colors exist | |
+| `colorMode` | `'multiply'` | How per-point colors meet `color`: `'multiply'`, `'set'` (the point's color alone) or `'add'` (clamped to 1); needs per-point colors. See [Per-point width and color](#per-point-width-and-color) |
 | `onTop` | `false` | Skip the depth test |
 | `depthWrite` | `false` | Write depth: crossing lines occlude each other and later passes respect them |
 | `alphaToCoverage` | `false` | Turn alpha into MSAA coverage instead of blending; see [Alpha to coverage](#alpha-to-coverage) |
@@ -148,6 +149,24 @@ They combine all primitives on the node and use retained CPU bind-pose positions
 and normals, transformed by the current world matrix. They perform no GPU readback
 and create no core `Geometry`. Hidden ancestors and disposed models suppress the
 helper; animation deformation is not reflected in these synchronous helpers.
+
+## Per-point width and color
+
+A `Line` takes a color per point (`colors` in the options, `setColors(...)`: r, g, b or r, g, b, a, linear 0..1, same-size updates reuse the buffer) and a `Stroke` a width multiplier per point (`widths`, `setWidths(...)`, one finite non-negative number per point, live without a rebuild). `colorMode` on the material decides how the per-point color meets the material `color`: `'multiply'` (default), `'set'` replaces it (opacity still applies) and `'add'` sums them, clamped to 1. Colors and widths interpolate along each segment.
+
+```js
+import { Stroke } from '@margoengine/lines/stroke';
+
+const stroke = new Stroke({
+  positions: [-2, 0, 0, 0, 1, 0, 2, 0, 0],
+  colors: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  widths: [0.2, 1, 3],
+  width: 8,
+  colorMode: 'set',
+});
+stroke.setWidths([3, 1, 0.2]);
+stroke.setColors([1, 1, 0, 1, 0, 1, 0, 1, 1]);
+```
 
 ## Depth writing
 

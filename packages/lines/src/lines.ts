@@ -210,7 +210,8 @@ export class Lines implements EnginePlugin {
   advanceTime(delta: number): void {
     if (!(delta > 0)) return;
     this.elapsed += delta;
-    for (const line of this.members) if (line.visible) (line as { advanceTime?: (delta: number) => void }).advanceTime?.(delta);
+    for (const line of this.members)
+      if (line.visible) (line as { advanceTime?: (delta: number) => void }).advanceTime?.(delta);
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
@@ -517,7 +518,9 @@ export class Lines implements EnginePlugin {
         (CAPS.indexOf(material.cap) << 2) |
         (material.worldUnits ? 16 : 0) |
         (material.dashed && !line['flatNormal'] ? 32 : 0) |
-        (vertexColors ? 64 : 0);
+        (vertexColors ? 64 : 0) |
+        (vertexColors && material.colorMode === 'set' ? 128 : 0) |
+        (vertexColors && material.colorMode === 'add' ? 256 : 0);
       // Clipping planes: count in flags.w (bit 16: intersection), planes from byte 128, unused slots zeroed.
       const planes = material['clipping'];
       u[31] = planes.length / 4 + (material.clipIntersection ? 65536 : 0);

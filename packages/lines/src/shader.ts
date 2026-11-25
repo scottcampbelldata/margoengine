@@ -24,6 +24,12 @@ struct Style{model:mat4x4f,color:vec4f,a:vec4f,b:vec4f,flags:vec4u,planes:array<
 @group(1) @binding(0) var<uniform> style:Style;
 @group(1) @binding(1) var<storage,read> points:array<vec4f>;
 @group(1) @binding(2) var<storage,read> colors:array<vec4f>;
+// Material colour with a point's colour: multiply (default), bit 128 set (the point's colour alone), bit 256 add (clamped).
+fn tinted(p:vec4f,bits:u32,fade:f32)->vec4f{
+  let m=style.color;var rgb=m.rgb*p.rgb;
+  if((bits&128u)!=0u){rgb=p.rgb;}else if((bits&256u)!=0u){rgb=min(m.rgb+p.rgb,vec3f(1.0));}
+  return vec4f(rgb,p.a*m.a*fade);
+}
 ${maskWgsl(1, 7)}
 struct Out{
   @builtin(position) clip:vec4f,
@@ -165,7 +171,7 @@ fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
   if((bits&64u)!=0u){colA=mix(colors[ia],colors[ib],ta);colB=mix(colors[ia],colors[ib],tb);}
   let raw=select(rawA,rawB,cr.atB);
   let fade=select(1.0,min(1.0,2.0*raw),aa>0.0);
-  o.color=select(colA,colB,cr.atB)*vec4f(style.color.rgb,style.color.a*fade);
+  o.color=tinted(select(colA,colB,cr.atB),bits,fade);
   // The selection mask (a zeroed stand-in when the line has none): a segment is selected when both its points are.
   if(margoMaskPresent()){let on=margoMaskOn(ia)&&margoMaskOn(ib);if(margoMaskHidden(on)){o.clip=vec4f(2.0,2.0,0.0,1.0);return o;}o.color=margoMaskColor(o.color,on);}
   var dA=points[ia].w;var dB=points[ib].w;
@@ -274,7 +280,7 @@ export const ribbonShader = (code: string, picking = false): string =>
   o.clip=placed;
   var tint=vec4f(1.0);
   if((style.flags.z&64u)!=0u){tint=colors[k];}
-  o.color=tint*style.color;
+  o.color=tinted(tint,style.flags.z,1.0);
   if(margoMaskPresent()){let on=margoMaskOn(ii)&&margoMaskOn(ii+1u);if(margoMaskHidden(on)){o.clip=vec4f(2.0,2.0,0.0,1.0);return o;}o.color=margoMaskColor(o.color,on);}
   o.world=w;${picking ? 'o.segment=ii;' : ''}
   return o;
