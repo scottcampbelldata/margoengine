@@ -36,6 +36,7 @@ await build({
         clouds: resolve(root, 'src/clouds/index.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
+        sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
       },

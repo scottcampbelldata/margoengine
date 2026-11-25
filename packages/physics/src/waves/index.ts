@@ -6,6 +6,7 @@ export {
   WAVE_LAYOUT,
   WAVE_SPECTRUM_FIELD,
   WaveSolver,
+  bandWidth,
   groupVelocity,
   jonswap,
   peakFrequency,

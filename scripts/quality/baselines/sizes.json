@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19133052,
+  "total": 19136489,
   "history": [
     {
       "date": "2026-10-24",
@@ -12435,6 +12435,12 @@
       "commit": "FG-17e",
       "reason": "FG-17 piece 6a new entry bvh/gpu-scene 7,866 B gzip: GPUSceneBVH (two-level scene tree: pooled bottom trees, CPU binned-SAH top tree with refit and rebuild, instance records with materials, raycast and encodeTrace with per-trace settings uniforms the scene owns and frees) and sceneBvhWGSL; the shared triangle WGSL and node packing moved to gpu-pack.ts so bvh/gpu does not grow; optional, nothing else imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "feat(physics) the sea surface query",
+      "reason": "New optional physics/sea entry: 0 to 3,437 B gzip budget, SpectralSea (the sea-surface query of height, normal, velocity at the surface and at depth, pressure and density) with the wave solver's wavenumber and band widths it shares. Nothing to split: it is one class, and the waves entry it reads is shared.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13233,6 +13239,7 @@
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/sea": 3437,
     "@margoengine/physics/seakeeping": 8962,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,

@@ -1912,6 +1912,43 @@ console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.de
 ```
 
 
+### The sea's surface and the water below it (`@margoengine/physics/sea`)
+
+`SpectralSea` is the sea-surface contract of `@margoengine/math/fields` (`SeaSurface`, SEA-02): a pure, synchronous query
+of the sea, the same bits on every machine, so a hull, a fish, kelp and spray read one sea. It sums one linear wave per
+frequency and direction bin of a wave spectrum (the wave solver's `WaveSpectrumField`, or one spectrum such as `jonswap`
+gives), each with the amplitude its energy gives, a phase from the seed, and the wavenumber of the finite-depth dispersion
+relation.
+
+- `sample(x, z, t)`: the surface's height, normal, velocity (the waves' orbital motion plus the current), the current,
+  the still-water depth and the water's density.
+- `water.sample(x, y, z, t)`: the water's velocity at any depth, falling off as cosh(k (y + D)) / sinh(k D) (e^(k y) in
+  deep water), plus the current; above the surface or below the bottom there is no water (density 0).
+- `elevation(x, z, t)` and `pressure(x, y, z, t)` (hydrostatic plus the waves' dynamic pressure, 0 at the surface): the
+  `SeaQuery` the hull solver reads, so `new HullSolver()` takes `{sea}` as it is.
+- `refresh()` reads the spectrum again as the wave solver grows it; every wave keeps its phase, so the sea changes smoothly.
+- `current`: any flow field of water (a tide, a river) added to the waves; `density` comes with the spectrum (1000 fresh,
+  1025 sea).
+
+```ts
+import {SpectralSea} from 'margoengine/physics/sea';
+import {jonswap} from 'margoengine/physics/waves';
+
+const spectrum = {
+  frequencies: Float64Array.from({length: 34}, (_, i) => 0.04 * 25 ** (i / 33)),
+  directions: Float64Array.from({length: 24}, (_, j) => (2 * Math.PI * j) / 24),
+  energy: new Float64Array(34 * 24),
+  depth: 30,
+  density: 1025,
+};
+jonswap({height: 2, period: 8, direction: 0}, spectrum); // a 2 m sea running toward +x
+const sea = new SpectralSea({waves: spectrum, seed: 1});
+const surface = sea.sample(10, 0, 3.5);
+console.log(Number.isFinite(surface.height), surface.normal[1] > 0); // true true
+console.log(sea.water.sample(10, 6, 0, 3.5).density); // 0: no water 6 m above the still level
+console.log(sea.pressure(10, -20, 0, 3.5) > 1025 * 9.81 * 19); // true: about 20 m of water above
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.

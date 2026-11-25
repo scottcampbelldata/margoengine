@@ -2147,6 +2147,10 @@
       "types": "./dist/physics/waves.d.ts",
       "import": "./dist/physics/waves.js"
     },
+    "./physics/sea": {
+      "types": "./dist/physics/sea.d.ts",
+      "import": "./dist/physics/sea.js"
+    },
     "./physics/seakeeping": {
       "types": "./dist/physics/seakeeping.d.ts",
       "import": "./dist/physics/seakeeping.js"

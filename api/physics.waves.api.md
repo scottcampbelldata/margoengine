@@ -65,6 +65,8 @@ export class WaveSolver implements Solver<WaveParams> {
     peakPeriod(x: number, z: number): number;
 }
 
+export function bandWidth(fs: Float64Array, i: number): number;
+
 export function groupVelocity(f: number, depth: number, g?: number): number;
 
 export function jonswap(state: SeaState, out: WaveSpectrumSample, g?: number): WaveSpectrumSample;

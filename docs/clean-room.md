@@ -11508,6 +11508,22 @@ Written from:
 - Standard gravity 9.80665 m/s^2: the value fixed by the 3rd CGPM (1901) and ISO 80000-3.
 
 Proof: `packages/physics/tests/world.test.js`.
+### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
+
+`packages/physics/src/sea/surface.ts` is written from:
+
+- J. Tessendorf, "Simulating Ocean Water", course notes, 1999-2004 (coursenotes2004.pdf, Clemson University), read pages
+  3-1 to 3-12: the linearised potential flow (eqs. 11 to 21: u = grad phi, Laplace's equation inside the water, d phi /
+  dt = -g h on the surface, and the linearised Bernoulli equation, eq. 14), the dispersion relations for deep water and
+  over a bottom D deep (eqs. 31 and 32), the surface as a sum of waves (eq. 30) and its slope (eq. 37).
+- The depth profile is derived here from those equations, not taken from another source: each wave's potential solves eq.
+  18 (d^2/dy^2 = k^2) with no flow through a flat bottom, so it goes as cosh(k (y + D)); eq. 20 fixes its size, and its
+  gradient with eq. 32 gives u = A omega cosh(k (y + D)) / sinh(k D) cos(theta) along k and w = A omega sinh(k (y + D)) /
+  sinh(k D) sin(theta); eq. 14 gives the pressure rho g (A cosh(k (y + D)) / cosh(k D) cos(theta) - y). The tests check
+  each against these closed forms, the surface moving with the water (w = dh/dt) and the water not compressing.
+- The wavenumbers and band widths are the wave solver's own (`wavenumber`, `bandWidth` of `@margoengine/physics/waves`), so
+  the sea and its spectrum agree on every wave.
+
 ### Solver modules on one memory (`@margoengine/physics/world`, `scripts/physics-modules.mjs`, 2026-11-25)
 
 The module table, the build check and the loader (`packages/physics/src/world/memory.ts`) are written from the linker's and

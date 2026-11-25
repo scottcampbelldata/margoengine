@@ -189,7 +189,7 @@ export function jonswap(
 }
 
 /** The width of frequency bin i of a log-spaced grid, Hz. */
-function bandWidth(fs: Float64Array, i: number): number {
+export function bandWidth(fs: Float64Array, i: number): number {
   const n = fs.length;
   if (n === 1) return fs[0]!;
   const lo = i > 0 ? (fs[i]! + fs[i - 1]!) / 2 : fs[0]! - (fs[1]! - fs[0]!) / 2,
