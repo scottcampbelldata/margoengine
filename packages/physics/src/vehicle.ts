@@ -5,6 +5,8 @@ import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { checkVec, type Vec3 } from './math.js';
+import type { Drivetrain } from './drivetrain.js';
+import type { TyreModel } from './tyres.js';
 
 /** One wheel of a {@link Vehicle}. Positions and directions are in the chassis body's local frame. */
 export interface WheelOptions {
@@ -28,6 +30,21 @@ export interface WheelOptions {
   maxSuspensionTravel?: number;
   /** Strongest suspension force in newtons (default 6000). */
   maxSuspensionForce?: number;
+  /**
+   * How the suspension finds the ground: `'ray'` (default) casts one ray from the mount, as Rapier's vehicle does; `'shape'` sweeps a
+   * cylinder of the wheel's radius and `width` along the suspension, so the wheel meets a kerb, a pothole's edge or the lip of a
+   * slot as the wheel does, where a ray passes between them. Defaults to the vehicle's `wheelCast`.
+   */
+  cast?: 'ray' | 'shape';
+  /** Width of the wheel in metres, the cylinder a `'shape'` cast sweeps (default 0.2). */
+  width?: number;
+  /**
+   * Moment of inertia of the wheel about its axle, kg m squared (default half a 20 kg wheel's `m r^2`). With a `tyre`, the wheel has a
+   * spin of its own that drive torque, brake torque and the tyre's longitudinal force change, and it is what the slip ratio is made of.
+   */
+  inertia?: number;
+  /** A tyre model of this wheel's own, in place of the vehicle's. */
+  tyre?: TyreModel;
   /** Tyre grip along the wheel's rolling direction (default 10.5); lower slides more. */
   frictionSlip?: number;
   /** Tyre grip sideways (default 1). */
@@ -61,6 +78,25 @@ export interface VehicleOptions {
   maxBrakeForce?: number;
   /** Steering angle at full lock, radians (default 0.5, about 29 degrees). */
   maxSteeringAngle?: number;
+  /**
+   * A tyre model for every wheel (`pacejkaTyre()`, `brushTyre()`, or any `{forces(sample)}`): the wheels then keep a spin of their own, the
+   * slip ratio and slip angle come from it and the ground speed, and the tyre's forces replace the friction circle of `frictionSlip` and
+   * `sideFrictionStiffness`. `engineForce` is then the drive force at the contact patch, so the torque on the axle is that times the
+   * radius, and `brake` likewise. Default none: the friction circle.
+   */
+  tyre?: TyreModel;
+  /**
+   * An engine, clutch, gearbox and differentials ({@link Drivetrain}) that give each driven wheel its torque from the throttle in place of
+   * `engineForce`. Its wheels need a tyre model. Default none.
+   */
+  drivetrain?: Drivetrain;
+  /**
+   * Anti-roll bars: each joins two wheels and pushes the more compressed one's side up and the other's down by `stiffness` newtons for each
+   * metre of difference in their suspension compression, which resists the chassis leaning in a bend. Default none.
+   */
+  antiRollBars?: readonly { wheels: readonly [number, number]; stiffness: number }[];
+  /** How wheels find the ground unless a wheel says: `'ray'` (default) or `'shape'` (a swept cylinder), see {@link WheelOptions.cast}. */
+  wheelCast?: 'ray' | 'shape';
   /** Packed interaction groups of the wheel rays, see `collisionGroups` (default all). */
   groups?: number;
   /** Return false to make the wheels ignore a collider (the chassis's own colliders are always ignored). */
@@ -81,6 +117,8 @@ export interface VehicleInput {
   steer?: number;
   /** 0 (off) to 1 (full brake). */
   brake?: number;
+  /** With a `drivetrain`: the clutch pedal, 0 (up, engaged) to 1 (down, out). */
+  clutch?: number;
 }
 
 /** The state of one wheel after the last step. */
@@ -107,6 +145,13 @@ export interface WheelState {
   forwardImpulse: number;
   /** What the tyre pushed the chassis with sideways in the last step (grip), in newton seconds. */
   sideImpulse: number;
+  /** The wheel's spin about its axle in radians a second (with a `tyre`; otherwise 0). */
+  spin: number;
+  /** The slip ratio and slip angle the tyre model was given in the last step (0 without a `tyre`). */
+  slipRatio: number;
+  slipAngle: number;
+  /** The load the tyre carried, newtons. */
+  load: number;
 }
 
 interface WheelSetup {
@@ -139,6 +184,14 @@ interface WheelSetup {
   hard: [number, number, number];
   forwardImpulse: number;
   sideImpulse: number;
+  cast: 'ray' | 'shape';
+  width: number;
+  inertia: number;
+  tyre: TyreModel | null;
+  omega: number;
+  kappa: number;
+  alpha: number;
+  torque: number;
 }
 
 type V = [number, number, number];
@@ -211,6 +264,9 @@ export class Vehicle implements PhysicsAttachment {
   maxBrakeForce: number;
   /** Steering angle at full lock in `setInput`, radians. */
   maxSteeringAngle: number;
+  /** The drivetrain, when the vehicle was made with one. */
+  readonly drivetrain: Drivetrain | null;
+  private readonly bars: { a: number; b: number; stiffness: number }[];
   private readonly wheels: WheelSetup[] = [];
   private readonly groups?: number;
   private readonly facing: [number, number, number];
@@ -277,7 +333,23 @@ export class Vehicle implements PhysicsAttachment {
         hard: [0, 0, 0],
         forwardImpulse: 0,
         sideImpulse: 0,
+        cast: wheel.cast ?? options.wheelCast ?? 'ray',
+        width: wheel.width === undefined ? 0.2 : positive(wheel.width, 'Wheel width'),
+        inertia:
+          wheel.inertia === undefined
+            ? 0.5 * 20 * wheel.radius * wheel.radius
+            : positive(wheel.inertia, 'Wheel inertia'),
+        tyre: wheel.tyre ?? options.tyre ?? null,
+        omega: 0,
+        kappa: 0,
+        alpha: 0,
+        torque: 0,
       });
+      const made = this.wheels[this.wheels.length - 1]!;
+      if (made.cast !== 'ray' && made.cast !== 'shape')
+        throw new RangeError(`Wheel cast must be 'ray' or 'shape'; got ${String(made.cast)}.`);
+      if (made.tyre && typeof made.tyre.forces !== 'function')
+        throw new TypeError('A tyre model is an object with a forces(sample) method: pacejkaTyre() or brushTyre().');
     }
     const mass = chassis.mass;
     this.maxEngineForce = options.maxEngineForce ?? mass;
@@ -292,6 +364,36 @@ export class Vehicle implements PhysicsAttachment {
         throw new RangeError(`Vehicle ${label} must be a finite number of at least 0`);
     this.groups = options.groups;
     this.predicate = options.predicate;
+    this.drivetrain = options.drivetrain ?? null;
+    if (this.drivetrain) {
+      for (const index of this.drivenIndexes()) {
+        if (!Number.isInteger(index) || index >= this.wheels.length)
+          throw new RangeError(`The drivetrain names wheel ${index}, but the vehicle has ${this.wheels.length}.`);
+        if (!this.wheels[index]!.tyre)
+          throw new MargoError(
+            'state',
+            `Wheel ${index} is driven by a drivetrain and needs a tyre model: pass tyre: pacejkaTyre() to the vehicle.`,
+          );
+      }
+    }
+    this.bars = (options.antiRollBars ?? []).map((bar, i) => {
+      const [a, b] = bar?.wheels ?? [];
+      if (
+        !Number.isInteger(a) ||
+        !Number.isInteger(b) ||
+        a! < 0 ||
+        b! < 0 ||
+        a! >= this.wheels.length ||
+        b! >= this.wheels.length ||
+        a === b
+      )
+        throw new RangeError(
+          `Anti-roll bar ${i} joins two different wheels of the vehicle: {wheels: [0, 1], stiffness: 20000}.`,
+        );
+      if (!(bar.stiffness >= 0 && Number.isFinite(bar.stiffness)))
+        throw new RangeError(`Anti-roll bar ${i} stiffness must be a finite number of 0 or more.`);
+      return { a: a!, b: b!, stiffness: bar.stiffness };
+    });
     physics.attach(this);
   }
 
@@ -306,7 +408,15 @@ export class Vehicle implements PhysicsAttachment {
 
   /** Sets `engineForce`, `steering` and `brake` from normalized driver input (keyboard, gamepad or touch). */
   setInput(input: VehicleInput): this {
-    this.engineForce = clamp(input.throttle, -1, 1, 'Vehicle throttle') * this.maxEngineForce;
+    const throttle = clamp(input.throttle, -1, 1, 'Vehicle throttle');
+    if (this.drivetrain) {
+      // Throttle past zero drives forward; pressing back at a standstill selects reverse, and forward again the first gear.
+      const gear = this.drivetrain.gear;
+      if (throttle < 0 && gear >= 0 && Math.abs(this.speed) < 1) this.drivetrain.gear = -1;
+      else if (throttle > 0 && gear < 0 && Math.abs(this.speed) < 1) this.drivetrain.gear = 1;
+      this.drivetrain.pedals(Math.abs(throttle), clamp(input.clutch, 0, 1, 'Vehicle clutch'));
+    }
+    this.engineForce = throttle * this.maxEngineForce;
     this.steering = clamp(input.steer, -1, 1, 'Vehicle steer') * this.maxSteeringAngle;
     this.brake = clamp(input.brake, 0, 1, 'Vehicle brake') * this.maxBrakeForce;
     return this;
@@ -335,6 +445,10 @@ export class Vehicle implements PhysicsAttachment {
       hardPoint: [...w.hard],
       forwardImpulse: w.forwardImpulse,
       sideImpulse: w.sideImpulse,
+      spin: w.tyre ? w.omega : 0,
+      slipRatio: w.kappa,
+      slipAngle: w.alpha,
+      load: w.force,
     };
   }
 
@@ -409,19 +523,68 @@ export class Vehicle implements PhysicsAttachment {
     const own = this.physics;
     const predicate =
       this.predicate && ((_body: PhysicsBody, collider: PhysicsCollider): boolean => this.predicate!(collider));
+    // An engine and a gearbox first: the torque of every driven wheel for this step.
+    if (this.drivetrain) {
+      const indexes = this.drivenIndexes(),
+        torques = this.drivetrain.step(
+          dt,
+          indexes.map((i) => ({ spin: this.wheels[i]!.omega, inertia: this.wheels[i]!.inertia })),
+        );
+      for (const wheel of this.wheels) wheel.torque = 0;
+      indexes.forEach((i, k) => (this.wheels[i]!.torque = torques[k]!));
+    }
     // The springs first, every one seeing the same chassis.
     for (const wheel of this.wheels) {
       const origin = rotate(rotation, wheel.connection).map((c, i) => c + position[i]!) as V,
-        down = rotate(rotation, wheel.direction),
-        reach = wheel.rest + wheel.radius,
+        down = rotate(rotation, wheel.direction);
+      wheel.steering = wheel.steer ? this.steering : 0;
+      let hit: { point: V; normal: V; distance: number; collider: PhysicsCollider } | null;
+      if (wheel.cast === 'shape') {
+        // A cylinder of the wheel's size, its axis along the steered axle, swept from the mount down the suspension to full droop.
+        const steered = wheel.steer
+            ? rotate(
+                [
+                  -wheel.direction[0] * Math.sin(wheel.steering / 2),
+                  -wheel.direction[1] * Math.sin(wheel.steering / 2),
+                  -wheel.direction[2] * Math.sin(wheel.steering / 2),
+                  Math.cos(wheel.steering / 2),
+                ],
+                wheel.axle,
+              )
+            : wheel.axle,
+          a = rotate(rotation, steered),
+          // The shortest turn that takes a cylinder's own axis (y) to the axle.
+          turn: Q = a[1] < -1 + 1e-6 ? [1, 0, 0, 0] : [a[2], 0, -a[0], 1 + a[1]],
+          size = Math.hypot(turn[0], turn[1], turn[2], turn[3]),
+          cast = own.shapeCast(
+            { shape: 'cylinder', halfHeight: wheel.width / 2, radius: wheel.radius },
+            origin,
+            [turn[0] / size, turn[1] / size, turn[2] / size, turn[3] / size],
+            down,
+            {
+              maxDistance: wheel.rest,
+              exclude: chassis,
+              excludeSensors: true,
+              groups: this.groups,
+              predicate,
+              stopAtPenetration: false,
+            },
+          );
+        // The cast gives how far the wheel's centre travelled; the suspension reaches `rest` at the most.
+        hit = cast && {
+          point: cast.point,
+          normal: cast.normal,
+          distance: cast.distance + wheel.radius,
+          collider: cast.collider,
+        };
+      } else
         hit = own.raycast(origin, down, {
-          maxDistance: reach,
+          maxDistance: wheel.rest + wheel.radius,
           exclude: chassis,
           excludeSensors: true,
           groups: this.groups,
           predicate,
         });
-      wheel.steering = wheel.steer ? this.steering : 0;
       wheel.hard = origin;
       wheel.forwardImpulse = wheel.sideImpulse = 0;
       if (!hit) {
@@ -454,12 +617,37 @@ export class Vehicle implements PhysicsAttachment {
       wheel.force = force;
       chassis.applyImpulse([normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt], hit.point, false);
     }
+    // Anti-roll bars: a force on each end of a bar that follows the difference of its two wheels' compression, up where the wheel is more
+    // compressed and down where it is less, so the chassis is resisted in leaning over.
+    for (const bar of this.bars) {
+      const a = this.wheels[bar.a]!,
+        b = this.wheels[bar.b]!,
+        force = bar.stiffness * (a.rest - a.length - (b.rest - b.length)) * dt;
+      if (force === 0) continue;
+      for (const [wheel, sign] of [
+        [a, 1],
+        [b, -1],
+      ] as const) {
+        const up = wheel.contact
+            ? wheel.normal
+            : (rotate(rotation, [-wheel.direction[0], -wheel.direction[1], -wheel.direction[2]]) as V),
+          at = wheel.contact ? wheel.point : wheel.hard;
+        chassis.applyImpulse([up[0] * force * sign, up[1] * force * sign, up[2] * force * sign], at, false);
+      }
+    }
     // Then drive, brake and grip. Every wheel sees the same chassis, so a wheel that cancelled all of a slide or a roll by
     // itself would have it cancelled once for each wheel on the ground: the chassis would rock from side to side at every
     // step, its grip clipped, and a car at rest would not drive at full force. The wheels share it instead.
     const grounded = this.wheels.filter((wheel) => wheel.contact).length;
     for (const wheel of this.wheels) {
-      if (!wheel.contact) continue;
+      if (!wheel.contact) {
+        if (wheel.tyre) {
+          this.driveBrake(wheel, dt);
+          wheel.rotation += wheel.omega * dt;
+          wheel.kappa = wheel.alpha = 0;
+        }
+        continue;
+      }
       const normal = wheel.normal,
         r: V = [wheel.point[0] - centreWorld[0], wheel.point[1] - centreWorld[1], wheel.point[2] - centreWorld[2]],
         pv = pointVelocity(r),
@@ -495,6 +683,66 @@ export class Vehicle implements PhysicsAttachment {
         height = dot(r, up) * (1 - wheel.roll),
         lifted: V = [r[0] - up[0] * height, r[1] - up[1] * height, r[2] - up[2] * height],
         slide = ((-dot(side, pv) / inverseMass(lifted, side)) * wheel.side) / grounded;
+      if (wheel.tyre) {
+        // A tyre model: the wheel keeps its own spin, and the model turns the slips and the load into forces. The forces are those the
+        // step ends with, found implicitly: a force changes the wheel's surface speed and the chassis's speed at the contact, which
+        // changes the slip the force came from, so the step takes the force that agrees with the slip it leaves (bisection on a
+        // force that rises as the slip falls, taken over a few sweeps for the two that act together). A stiff tyre at low speed then
+        // brings the slip to rest, where a force found at the slip the step began with would ring.
+        this.driveBrake(wheel, dt);
+        const radius = wheel.radius,
+          forwardSpeed = dot(forward, pv),
+          sideSpeed = dot(side, pv),
+          surface = wheel.omega * radius - forwardSpeed,
+          reference = Math.max(Math.abs(forwardSpeed), 1),
+          floorSpeed = Math.max(Math.abs(forwardSpeed), 0.5),
+          gainForward = dt * ((radius * radius) / wheel.inertia + inverseMass(r, forward) * grounded),
+          gainSide = dt * inverseMass(lifted, side) * grounded,
+          rolling = Math.sign(surface) || 1,
+          sliding = Math.sign(sideSpeed) || 1,
+          tyre = wheel.tyre;
+        let fx = 0,
+          fy = 0;
+        const slips = (f: number, g: number): [number, number] => [
+          (rolling * (Math.abs(surface) - f * gainForward)) / reference,
+          sliding * Math.atan2(Math.abs(sideSpeed) - g * gainSide, floorSpeed),
+        ];
+        for (let sweep = 0; sweep < 3; sweep++) {
+          for (const which of [0, 1] as const) {
+            let low = 0,
+              high = which === 0 ? Math.abs(surface) / gainForward : Math.abs(sideSpeed) / gainSide;
+            if (!(high > 0)) continue;
+            for (let i = 0; i < 14; i++) {
+              const mid = (low + high) / 2,
+                [kappa, alpha] = which === 0 ? slips(mid, fy) : slips(fx, mid),
+                model = tyre.forces({ slipRatio: kappa, slipAngle: alpha, load: wheel.force }),
+                wanted = which === 0 ? rolling * model.longitudinal : sliding * model.lateral;
+              if (mid < wanted) low = mid;
+              else high = mid;
+            }
+            if (which === 0) fx = (low + high) / 2;
+            else fy = (low + high) / 2;
+          }
+        }
+        [wheel.kappa, wheel.alpha] = slips(fx, fy);
+        const longitudinal = rolling * fx,
+          lateral = sliding * fy;
+        wheel.omega -= (longitudinal * radius * dt) / wheel.inertia;
+        wheel.rotation += wheel.omega * dt;
+        wheel.forwardImpulse = longitudinal * dt;
+        wheel.sideImpulse = -lateral * dt;
+        chassis.applyImpulse(
+          [forward[0] * wheel.forwardImpulse, forward[1] * wheel.forwardImpulse, forward[2] * wheel.forwardImpulse],
+          wheel.point,
+          false,
+        );
+        chassis.applyImpulse(
+          [side[0] * wheel.sideImpulse, side[1] * wheel.sideImpulse, side[2] * wheel.sideImpulse],
+          [centreWorld[0] + lifted[0], centreWorld[1] + lifted[1], centreWorld[2] + lifted[2]],
+          false,
+        );
+        continue;
+      }
       // The friction circle: drive and grip together stay inside what the load can hold.
       let along = drive,
         across = slide;
@@ -513,6 +761,23 @@ export class Vehicle implements PhysicsAttachment {
       );
       wheel.rotation += (rolling / wheel.radius) * dt;
     }
+  }
+
+  /** The wheels a drivetrain drives, as vehicle wheel indexes: the first axle's two, then the second's. */
+  private drivenIndexes(): number[] {
+    return this.drivetrain ? this.drivetrain.drivenWheels : [];
+  }
+
+  /** Drive and brake torque on a wheel with a tyre model, over a step: the brake stops the wheel and does not turn it back. */
+  private driveBrake(wheel: WheelSetup, dt: number): void {
+    let omega = wheel.omega;
+    if (this.drivetrain) omega += (wheel.torque * dt) / wheel.inertia;
+    else if (wheel.drive) omega += (this.engineForce * wheel.radius * dt) / wheel.inertia;
+    if (wheel.brake && this.brake > 0) {
+      const cut = (this.brake * wheel.radius * dt) / wheel.inertia;
+      omega = Math.abs(omega) <= cut ? 0 : omega - Math.sign(omega) * cut;
+    }
+    wheel.omega = omega;
   }
 
   /** @internal disposes the vehicle when its chassis goes. */

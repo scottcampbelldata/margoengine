@@ -58,6 +58,10 @@ export type {
   CompoundPart,
 } from './shapes.js';
 export { Vehicle } from './vehicle.js';
+export { pacejkaTyre, brushTyre } from './tyres.js';
+export { Drivetrain } from './drivetrain.js';
+export type { DrivetrainOptions, AxleOptions, DifferentialOptions, DrivenWheel } from './drivetrain.js';
+export type { TyreModel, TyreSample, TyreForces, MagicCurve, PacejkaOptions, BrushOptions } from './tyres.js';
 export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
 export { explosion, WindField } from './fields.js';
 export type { ExplosionOptions, WindOptions } from './fields.js';

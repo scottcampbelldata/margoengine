@@ -119,6 +119,32 @@ console.log(car.speed, car.wheel(0).inContact, polyline.length);
 - **Convex decomposition.** `convexDecomposition({vertices, indices})` from `margoengine/physics/decomposition` splits a closed concave triangle mesh into convex pieces after CoACD (Wei et al., ACM TOG 2022), and its result is a collider (`body.addCollider(result)`): a dynamic cup stays hollow where a `convexHull` fills it in. `addModel(model, {shape: 'convexDecomposition'})` does it per primitive. It is build-time work, so decompose once and keep the parts; the world never loads it.
 - **Vehicles.** `new Vehicle(physics, chassis, {wheels})` puts a ray-cast vehicle (a spring and damper per wheel, drive and brake force, tyre grip inside a friction circle) on a dynamic chassis. Each wheel casts its suspension along `direction` (default down) from its `position` every fixed step. `engineForce` (driven wheels), `steering` (radians around the chassis up axis, positive turns a +Z-facing car toward +X) and `brake` act on the wheels marked `drive` (default true), `steer` (default false) and `brake` (default true); `setInput({throttle, steer, brake})` maps normalized input onto `maxEngineForce` (default the chassis mass in newtons per driven wheel, so four driven wheels accelerate at 0.4 g), `maxSteeringAngle` (0.5 rad) and `maxBrakeForce` (3 x the mass, newtons per braking wheel). Throttle wakes a sleeping chassis. `speed` is the forward speed in m/s, `wheel(i)` the contact, suspension and spin state, and `wheelLocalPose(i)` the hub pose that wheel `mesh`es (children of the chassis mesh) receive after every sync. Suspension and tyre settings default to a soft road car (stiffness 5.88, compression 0.83, relaxation 0.88, friction slip 10.5). Each wheel's `rollInfluence` (0 to 1, default 0.1) is how much of its height above the ground the sideways grip turns the chassis by: at 0.1 a car with grippy tyres takes a bend without tipping over, at 1 the grip pushes at the tyre and a light car rolls. `wheel(i)` also gives the `ground` collider the wheel stands on, the `hardPoint` where its suspension is mounted in the world, and the `forwardImpulse` and `sideImpulse` it pushed the chassis with in the last step. `forward` in the vehicle's options (default `[0, 0, 1]`) is the direction a chassis faces, in its own frame, so `speed` is the velocity along it for a car that faces another way (give its wheels the matching `axle`, `up x forward`). `vehicle.dispose()` (or removing the chassis) detaches it. Ropes and vehicles step and dispose with their world, and the `Physics` class never imports them, so a bundle that does not use them leaves them out.
 
+Tyres, drivetrain and wheels that sweep a shape (all options of `Vehicle`, off by default):
+
+```ts
+import {Drivetrain, Physics, Vehicle, pacejkaTyre} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [100, 0.5, 100]}});
+const chassis = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'box', halfExtents: [1, 0.25, 2], mass: 1000}});
+const car = new Vehicle(physics, chassis, {
+  tyre: pacejkaTyre(), // or brushTyre(), or {forces({slipRatio, slipAngle, load}) {...}}
+  wheelCast: 'shape', // each wheel sweeps a cylinder of its radius and width, not one ray
+  drivetrain: new Drivetrain({axles: [{wheels: [2, 3], differential: {type: 'limitedSlip'}}]}), // engine, clutch, gearbox, differential
+  antiRollBars: [{wheels: [0, 1], stiffness: 20000}, {wheels: [2, 3], stiffness: 20000}],
+  wheels: [[-0.9, 1.4, true], [0.9, 1.4, true], [-0.9, -1.4, false], [0.9, -1.4, false]].map(([x, z, steer]) =>
+    ({position: [x, -0.1, z], radius: 0.35, steer, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5})),
+});
+for (let i = 0; i < 90; i++) physics.step();
+car.setInput({throttle: 1, steer: 0.1}); // throttle drives the engine; `clutch` (0 to 1) is the pedal
+for (let i = 0; i < 120; i++) physics.step();
+console.log(car.drivetrain.gear, car.drivetrain.rpm > 900, car.speed > 2, car.wheel(2).slipRatio < 1); // 1 true true true
+physics.dispose();
+```
+
+`pacejkaTyre({longitudinal, lateral, nominalLoad, loadSensitivity, combined})` is the Magic Formula of Pacejka and Bakker (1992), `F = D sin(C atan(B x - E (B x - atan(B x))))` against the slip ratio and the slip angle with each curve's `B`, `C`, `D` (the peak friction coefficient) and `E`, the peak falling with load, the two forces held in the friction ellipse where they meet; `brushTyre({friction, stiffness, halfLength})` is the brush model (a patch of bristles that stick and then slide, force `mu Fz (1 - (1 - theta s)^3)` along the combined slip, cornering stiffness `2 c a^2`). With a tyre each wheel has a spin of its own (`inertia`, kg m squared): `engineForce` and `brake` are then forces at the contact patch, the slip ratio and slip angle come from the spin and the ground speed (`wheel(i).slipRatio`, `slipAngle`, `spin`, `load`), and the force a step gives is the one that agrees with the slip the step leaves. A `Drivetrain` takes the throttle in `setInput({throttle, clutch})` (negative at a standstill selects reverse): its torque curve (`torqueCurve`, `[rpm, N m]` points), `idleRpm`, `redlineRpm`, `engineInertia`, `gears`, `finalDrive`, `efficiency`, an automatic gearbox (`automatic`, `upshiftRpm`, `downshiftRpm`, `shiftTime`) or `gear`, `shiftUp()` and `shiftDown()` by hand, a clutch of `clutchTorque` that holds or slips, and per axle a differential (`'open'`, `'locked'`, `'limitedSlip'` with `preload` and `bias`) and between two axles a centre one. `antiRollBars` join two wheels and push the more compressed side up by `stiffness` newtons for each metre of difference. A wheel with `cast: 'shape'` (or the vehicle's `wheelCast`) sweeps a cylinder of its `width` and radius along the suspension, so it meets the lip of a slot or a kerb where one ray passes between them.
+
 ## Drag joint
 
 `new DragJoint(physics, body, point, {frequency = 5, damping = 0.7, maxForce})` grabs a dynamic body at a world point and pulls that point toward a target, as a mouse joint does (the soft constraint of Catto, GDC 2011, as a frequency and a damping ratio, so a light body and a heavy one follow the pointer alike). Move the target with `setTarget(point)`, read the grabbed point with `gripPoint()`, and let go with `remove()` (removing the body lets go too). `maxForce` caps the pull in newtons so a far target cannot hurl a body.
