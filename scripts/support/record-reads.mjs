@@ -10,7 +10,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import childProcess from 'node:child_process';
 import fs from 'node:fs';
-import { registerHooks, syncBuiltinESMExports } from 'node:module';
+import nodeModule, { syncBuiltinESMExports } from 'node:module';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
@@ -220,13 +220,17 @@ function install(dir) {
   // Module loads go through Node's internal reader, so a hook sees them. The kind 'm' also pulls in the nearest
   // package.json at key time, since `exports` and `type` change what a load means.
   // A resolve hook, because a load hook makes Node fetch every source in JavaScript, which costs seconds on tsc.
-  registerHooks({
-    resolve(specifier, context, nextResolve) {
-      const result = nextResolve(specifier, context);
-      if (result.url.startsWith('file:')) noteRead(resolve(fileURLToPath(result.url)), 'm');
-      return result;
-    },
-  });
+  // Read off the default export: a named import fails to load on Node before 22.15, and build:packages imports this
+  // file on every Node the packages support (KB-NODE22-BUILD1).
+  if (typeof nodeModule.registerHooks === 'function')
+    nodeModule.registerHooks({
+      resolve(specifier, context, nextResolve) {
+        const result = nextResolve(specifier, context);
+        if (result.url.startsWith('file:')) noteRead(resolve(fileURLToPath(result.url)), 'm');
+        return result;
+      },
+    });
+  else throw new Error('Recording reads needs module.registerHooks (Node 22.15 or newer); unset MARGO_RECORD_DIR.');
 
   // --- environment ---
   // `{ ...process.env }` and Object.keys touch every key without any code using the values; the child's own reads are

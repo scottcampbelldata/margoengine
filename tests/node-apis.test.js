@@ -3,6 +3,8 @@
 // passes every parse and import check and throws only when the line runs (a server render, a CLI, an exporter).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { API, check, scan } from '../scripts/check-node-apis.mjs';
 
 test('no shipped source uses an API newer than Node 22.12 without a feature test', async () => {
@@ -24,6 +26,25 @@ test('every API in the table is really missing on Node 22.12 and present where t
     );
     t.diagnostic(`Node ${process.version}: ${present.length} of ${API.length} listed APIs present`);
   }
+});
+
+// KB-NODE22-BUILD1: CI builds the packages on Node 22.12, and a named import of an API it lacks fails before a line runs.
+test('build:packages and the scripts it imports use no API newer than Node 22.12 without a feature test', async () => {
+  const root = resolve(import.meta.dirname, '..'),
+    seen = new Set(),
+    todo = [resolve(root, 'scripts/build-modern.js')],
+    found = [];
+  while (todo.length) {
+    const file = todo.pop();
+    if (seen.has(file) || !existsSync(file)) continue;
+    seen.add(file);
+    const source = readFileSync(file, 'utf8');
+    for (const [, spec] of source.matchAll(/^(?:import|export)\s[^;]*?from\s+'(\.[^']+)';/gms))
+      todo.push(resolve(dirname(file), spec));
+    for (const { name, line } of await scan(source, file)) found.push(`${relative(root, file)}:${line} ${name}`);
+  }
+  assert.ok(seen.size > 10, 'the import graph was walked');
+  assert.deepEqual(found, []);
 });
 
 test('unguarded uses are reported with their line', async () => {
