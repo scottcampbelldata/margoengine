@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
-import { hitsInLine, hitsInPath, main, scan, scanRepo } from '../scripts/check-banned-terms.mjs';
+import { hitsInLine, hitsInPath, main, scan, scanRepo, selectFiles } from '../scripts/check-banned-terms.mjs';
 import { pdfText } from '../scripts/pdf-text.mjs';
 
 const word = (...codes) => String.fromCharCode(...codes);
@@ -145,7 +145,8 @@ test('the name of the block game is reported alone, possessive, and inside a hyp
 // read (another process writing it) was skipped unscanned. Every non-zero exit now names its reason on both streams.
 test('every failure of the check names its reason on stdout and stderr; an unreadable file fails, a deleted one is skipped', () => {
   const run = (scanAll) => {
-    const log = [], error = [];
+    const log = [],
+      error = [];
     const code = main({ scanAll, log: (line) => log.push(line), error: (line) => error.push(line) });
     return { code, log: log.join('\n'), error: error.join('\n') };
   };
@@ -173,4 +174,28 @@ test('every failure of the check names its reason on stdout and stderr; an unrea
     ['README.md', 'LICENSE', 'AGENTS.md'],
   );
   assert.deepEqual(found, ['README.md: could not be read (EBUSY); rerun once the process writing it has finished']);
+});
+
+test('--files and --changed select the files to scan; a named file with a banned name is reported', () => {
+  assert.equal(selectFiles([]), undefined);
+  assert.deepEqual(selectFiles(['--files', 'a.md', 'b.md']), ['a.md', 'b.md']);
+  assert.deepEqual(
+    selectFiles(['--changed'], () => ['c.md']),
+    ['c.md'],
+  );
+  assert.deepEqual(
+    selectFiles(['--changed', '--files', 'a.md'], () => ['a.md', 'c.md']),
+    ['a.md', 'c.md'],
+  );
+  assert.throws(() => selectFiles(['--files']), /at least one path/);
+  assert.deepEqual(scanRepo(undefined, ['package.json']), []);
+  assert.notDeepEqual(
+    scanRepo(
+      () =>
+        Buffer.from(`about ${repo}
+`),
+      ['docs/x.md'],
+    ),
+    [],
+  );
 });
