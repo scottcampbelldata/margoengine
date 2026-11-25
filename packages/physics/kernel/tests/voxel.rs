@@ -295,3 +295,70 @@ fn refusals() {
     assert_eq!(w.set_voxel(ball, [0; 3], true), VOXELS_NOT_VOXELS);
     assert_eq!(w.combine_voxels(ball, ball, [0; 3]), VOXELS_NOT_VOXELS);
 }
+
+/// A frictionless cube slid at 6 m/s along the floor of grid `a` into the wall that stands on the floor of its neighbour `b`:
+/// how far it gets and how high it is thrown.
+fn slide_into_wall(a_cells: &[[i32; 3]], b_cells: &[[i32; 3]], block_solver: bool) -> (f32, f32) {
+    let mut w = World::new(4, 8).unwrap();
+    w.header_mut().block_solver = block_solver as u32;
+    let a = fixed_grid(&mut w, a_cells, v3(0.0, 0.0, 0.0));
+    let b = fixed_grid(&mut w, b_cells, v3(32.0, 0.0, 0.0));
+    for c in [a, b] {
+        w.set_s(COLLIDER_FRICTION, c as usize, 0.0);
+    }
+    assert_eq!(w.combine_voxels(a, b, [32, 0, 0]), 1);
+    let cube = crate_at(&mut w, v3(20.0, 0.402, 8.3), 0.4, 0.0);
+    w.set_v(LINEAR_X, cube as usize, v3(6.0, 0.0, 0.0));
+    let (mut reach, mut lift) = (0.0f32, 0.0f32);
+    for _ in 0..150 {
+        w.step(DT);
+        let p = w.v(POSITION_X, cube as usize);
+        reach = reach.max(p.x);
+        lift = lift.max((p.y - 0.4).abs());
+    }
+    (reach, lift)
+}
+
+/// The floor of `n` by 16 cells at y = -1 from x = 0, and a wall of `wall` cells along x one cell high on it.
+fn floor_and_wall(n: i32, wall: std::ops::Range<i32>) -> Vec<[i32; 3]> {
+    let mut cells = vec![];
+    for z in 0..16 {
+        for x in 0..n {
+            cells.push([x, -1, z]);
+            if wall.contains(&x) {
+                cells.push([x, 0, z]);
+            }
+        }
+    }
+    cells
+}
+
+#[test]
+fn a_cube_stopped_by_a_wall_over_the_seam_of_two_grids_is_not_thrown_by_the_cell_under_the_wall() {
+    // The wall stands on the second grid's floor; the first grid's has none. The cell under the wall has one face open, its
+    // bottom, and the cube's front foot grazes it as the wall stops the cube: its normal leans toward hidden faces and away
+    // from the open one, and the rule used to turn it to the open one, pushing the cube along the wrong way (10 m up).
+    for block_solver in [false, true] {
+        let (reach, lift) = slide_into_wall(&floor_and_wall(32, 0..0), &floor_and_wall(32, 0..2), block_solver);
+        assert!((reach - 31.6).abs() < 0.01, "block {block_solver}: stopped at the wall face: {reach}");
+        // The sweeps share a stop among the points of two manifolds unevenly and throw the cube a hand's breadth (0.12 m,
+        // the same on a wall of one grid); the exact block solve throws it 0.02 m (Rapier's, 0.004 m).
+        let allowed = if block_solver { 0.03 } else { 0.2 };
+        assert!(lift < allowed, "block {block_solver}: thrown {lift} m");
+    }
+}
+
+#[test]
+fn the_ghost_rule_drops_a_graze_that_leans_away_from_the_one_open_face_and_keeps_a_body_inside_the_cell() {
+    use margoengine_physics_kernel::narrow::Manifold;
+    // A cell with only its bottom open: a normal up (toward hidden faces, away from the bottom).
+    let byte = CELL_FILLED | 0x7e & !(2 << 3);
+    let mut apart = Manifold::new();
+    apart.count = 1;
+    apart.points[0].separation = 0.0994;
+    assert_eq!(voxel_verdict_of(v3(0.0, 1.0, 0.0), byte, &apart), None, "apart along the normal: a graze of a hidden face");
+    let mut inside = Manifold::new();
+    inside.count = 1;
+    inside.points[0].separation = -0.1;
+    assert_eq!(voxel_verdict_of(v3(0.0, 1.0, 0.0), byte, &inside), Some((true, 3)), "inside the cell: out through the open face");
+}

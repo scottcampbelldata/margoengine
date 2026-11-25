@@ -1,5 +1,5 @@
 {
-  "commit": "b76b611ef",
+  "commit": "9439091b6",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1032,6 +1032,10 @@
       "./depth": {
         "raw": 14432,
         "gzip": 5295
+      },
+      "./occlusion": {
+        "raw": 9076,
+        "gzip": 3834
       }
     },
     "@margoengine/cutscene": {
@@ -2566,6 +2570,10 @@
       "./culling/depth": {
         "raw": 40,
         "gzip": 60
+      },
+      "./culling/occlusion": {
+        "raw": 44,
+        "gzip": 64
       },
       "./cutscene": {
         "raw": 35,
@@ -6225,6 +6233,10 @@
         "raw": 40,
         "gzip": 60
       },
+      "./culling/occlusion": {
+        "raw": 44,
+        "gzip": 64
+      },
       "./decoders/ktx2-hdr6": {
         "raw": 45,
         "gzip": 65
@@ -8514,6 +8526,10 @@
       "./culling/depth": {
         "raw": 40,
         "gzip": 60
+      },
+      "./culling/occlusion": {
+        "raw": 44,
+        "gzip": 64
       },
       "./decoders/ktx2-hdr6": {
         "raw": 45,
@@ -10836,6 +10852,10 @@
       "./culling/depth": {
         "raw": 40,
         "gzip": 60
+      },
+      "./culling/occlusion": {
+        "raw": 44,
+        "gzip": 64
       },
       "./decoders/ktx2-hdr6": {
         "raw": 45,
@@ -13412,16 +13432,16 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 916515,
-        "gzip": 565422
+        "raw": 940912,
+        "gzip": 582013
       },
       "./decomposition": {
         "raw": 26661,
         "gzip": 10901
       },
       "./soft": {
-        "raw": 152219,
-        "gzip": 79646
+        "raw": 163229,
+        "gzip": 86271
       },
       "./meshfiles": {
         "raw": 6444,
@@ -13434,8 +13454,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 61092,
-        "gzip": 20586
+        "raw": 61680,
+        "gzip": 20737
       },
       "./outline": {
         "raw": 4782,
@@ -13822,8 +13842,8 @@
         "gzip": 2163
       },
       "./balance": {
-        "raw": 15709,
-        "gzip": 5985
+        "raw": 15703,
+        "gzip": 5986
       }
     },
     "@margoengine/react": {
@@ -16684,9 +16704,9 @@
       "brotli": 13103
     },
     "packages/physics/dist/index.js": {
-      "raw": 916515,
-      "gzip": 565422,
-      "brotli": 546809
+      "raw": 940912,
+      "gzip": 582013,
+      "brotli": 562248
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16914,14 +16934,14 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 431809,
-      "gzip": 156947,
-      "brotli": 125362
+      "raw": 440758,
+      "gzip": 159902,
+      "brotli": 127621
     },
     "packages/physics2d/dist/physics2d-scalar.wasm": {
-      "raw": 512938,
-      "gzip": 175289,
-      "brotli": 137364
+      "raw": 521942,
+      "gzip": 178036,
+      "brotli": 139157
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -17071,34 +17091,34 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 261107,
-        "gzip": 82356
+        "raw": 264164,
+        "gzip": 83011
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 655407,
-        "gzip": 482372,
+        "raw": 676747,
+        "gzip": 498332,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 80734,
-        "gzip": 25498
+        "raw": 83879,
+        "gzip": 26258
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 71484,
-        "gzip": 53744,
+        "raw": 79349,
+        "gzip": 59553,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 56827,
-        "gzip": 18919
+        "raw": 57415,
+        "gzip": 19070
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",

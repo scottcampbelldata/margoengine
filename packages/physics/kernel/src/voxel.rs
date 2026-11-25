@@ -51,6 +51,18 @@ pub fn voxel_verdict(n: V3, byte: u32) -> Option<(bool, usize)> {
     if face == 6 { None } else { Some((snap, face)) }
 }
 
+/// The ghost rule for a manifold: `voxel_verdict`, but a contact of shapes that are apart, or only touch, along the normal and
+/// whose normal leans away from every exposed face of the cell is no contact at all. Such a normal is that of a hidden face (the
+/// closest feature of a buried cell the shape grazes, as the foot of a wall does the cell under it) and snapping it to the one
+/// exposed face on the far side would push the shape the wrong way; a shape that is inside the cell, along the normal, is still
+/// pushed out through the exposed face it leans toward.
+pub fn voxel_verdict_of(n: V3, byte: u32, out: &Manifold) -> Option<(bool, usize)> {
+    let verdict = voxel_verdict(n, byte)?;
+    let along = [n.x, -n.x, n.y, -n.y, n.z, -n.z];
+    let apart = out.points[..out.count].iter().all(|point| point.separation >= 0.0);
+    if apart && along[verdict.1] <= 0.0 { None } else { Some(verdict) }
+}
+
 impl World {
     /// The cells along x, y and z of grid `mesh`.
     #[inline(always)]
@@ -405,7 +417,7 @@ impl World {
             let cell_solid = crate::cast::Solid::Poly { poly, pose: cell };
             crate::smooth::collide_solids(&cell_solid, &solid, limit, out);
             if out.count > 0 {
-                match voxel_verdict(pose.q.unrotate(out.normal), self.cell_byte(mesh, index)) {
+                match voxel_verdict_of(pose.q.unrotate(out.normal), self.cell_byte(mesh, index), out) {
                     None => out.count = 0,
                     Some((false, _)) => {}
                     Some((true, face)) => {
@@ -435,7 +447,7 @@ impl World {
             collide_polys(&poly, cell, &other_poly, other_pose, limit, out);
         }
         if out.count > 0 {
-            match voxel_verdict(pose.q.unrotate(out.normal), self.cell_byte(mesh, index)) {
+            match voxel_verdict_of(pose.q.unrotate(out.normal), self.cell_byte(mesh, index), out) {
                 None => out.count = 0,
                 Some((false, _)) => {}
                 Some((true, face)) if round => crate::mesh::snap_round(other_round, &poly, face, cell, limit, out),
@@ -461,7 +473,7 @@ impl World {
         if out.count == 0 {
             return;
         }
-        match voxel_verdict(pa.q.unrotate(out.normal), self.cell_byte(ma, ia)) {
+        match voxel_verdict_of(pa.q.unrotate(out.normal), self.cell_byte(ma, ia), out) {
             None => {
                 out.count = 0;
                 return;
@@ -472,7 +484,7 @@ impl World {
         if out.count == 0 {
             return;
         }
-        match voxel_verdict(pb.q.unrotate(out.normal.scale(-1.0)), self.cell_byte(mb, ib)) {
+        match voxel_verdict_of(pb.q.unrotate(out.normal.scale(-1.0)), self.cell_byte(mb, ib), out) {
             None => out.count = 0,
             Some((true, face)) => {
                 snap_poly(&poly_b, cell_b, &poly_a, cell_a, face, limit, out);
