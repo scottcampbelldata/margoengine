@@ -1045,7 +1045,7 @@ console.log(physics.contactPoints(ball).length);  // 1
 physics.dispose();
 ```
 
-A world is one block of memory, so a snapshot is one copy. `world.snapshot()` returns its bytes and `world.restore(bytes)` puts every row, pair and timer back, into a world of any size. A snapshot reads only in the kernel build that wrote it, and it covers the `KernelWorld`: a `Physics` object also holds bodies and meshes, so its restore comes with `/snapshot`.
+A world is one block of memory, so a snapshot is one copy. `world.snapshot()` returns its bytes and `world.restore(bytes)` puts every row, pair and timer back, into a world of any size. A snapshot reads only in the kernel build that wrote it, and it covers the `KernelWorld`; `physics.takeSnapshot()` and `physics.restoreSnapshot()` (see Snapshots) take a whole `Physics` the same way, keeping your handles, `userData` and meshes.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics';
@@ -1115,7 +1115,7 @@ console.log(Math.hypot(...body.linearVelocity).toFixed(2)); // '5.00'
 physics.dispose();
 ```
 
-`lengthUnit` (option and property, default 1) is Rapier's length unit: the number of your units to a metre-scale, 100 for a world in centimetres. The solver's tolerances (the contact reach `predictionDistance`, `allowedPenetration`, the push-out speeds `contactMaxPush` and `jointMaxPush`, and the sleep speed) are scaled by it, so a world built in centimetres with gravity `-981` plays out as the metre world does; give gravity, sizes and masses in the same unit yourself. `maxCcdSubsteps` (default 1) turns continuous collision off for the whole world when 0; the one pass the solver takes resolves a body's whole sweep, so 2 or more is the same as 1. `physics.timing` reads how long the phases of the last step took in milliseconds (`step`, then `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd` and `events`, which add up to `step`); the clock is not part of the world, so a snapshot and the hash do not see it. `physics.forEachActiveBody(visit)` visits the bodies the last step worked on: awake dynamic bodies and moving kinematic ones, never sleepers or fixed bodies. `userData` rides on bodies and colliders (an option and a property), and an event hands the same objects back.
+`lengthUnit` (option and property, default 1) is Rapier's length unit: the number of your units to a metre-scale, 100 for a world in centimetres. The solver's tolerances (the contact reach `predictionDistance`, `allowedPenetration`, the push-out speeds `contactMaxPush` and `jointMaxPush`, and the sleep speed) are scaled by it, so a world built in centimetres with gravity `-981` plays out as the metre world does; give gravity, sizes and masses in the same unit yourself. `maxCcdSubsteps` (default 1) turns continuous collision off for the whole world when 0; the one pass the solver takes resolves a body's whole sweep, so 2 or more is the same as 1. `physics.timing` reads how long the phases of the last step took in milliseconds (`step`, then `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd` and `events`, which add up to `step`); the clock is not part of the world, so a snapshot and the hash do not see it. `physics.counts` reads what work the last step did as whole numbers that do not depend on the machine: `awake`, `islands`, `pairs`, `pairsLookedAt`, `pairsSolved`, `contactsSolved`, `jointsSolved`, `impacts`, `events` and `steps`. `physics.forEachActiveBody(visit)` visits the bodies the last step worked on: awake dynamic bodies and moving kinematic ones, never sleepers or fixed bodies. `userData` rides on bodies and colliders (an option and a property), and an event hands the same objects back.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -1267,7 +1267,7 @@ physics.dispose();
 
 ### Mesh files as colliders
 
-`@margoengine/physics/meshfiles` reads binary and ASCII STL files and Wavefront OBJ files (faces of any size are fanned, indices may be negative) with no other package: `parseSTL(file)` and `parseOBJ(file)` give a welded `{vertices, indices}`, and `meshFileCollider(file, {format, shape})` gives collider options, a `trimesh` by default (for fixed bodies) or the `convexHull` of the points (for dynamic ones). `Physics.kernelBuild` is the hash of the kernel source the loaded solver was made from, to record beside a replay.
+`@margoengine/physics/meshfiles` reads binary and ASCII STL files, Wavefront OBJ files and Collada (DAE) files (faces of any size are fanned, indices may be negative) with no other package: `parseSTL(file)`, `parseOBJ(file)` and `parseDAE(file)` (Collada 1.4: triangles, polylists and polygons, the nodes' matrices, `unit` and `up_axis` applied) give a welded `{vertices, indices}`, and `meshFileCollider(file, {format, shape})` gives collider options, a `trimesh` by default (for fixed bodies) or the `convexHull` of the points (for dynamic ones). `Physics.kernelBuild` is the hash of the kernel source the loaded solver was made from, to record beside a replay.
 
 ```ts
 import {Physics} from 'margoengine/physics';

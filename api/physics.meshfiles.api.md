@@ -13,9 +13,11 @@ export interface MeshFile {
 export type MeshFileShape = 'trimesh' | 'convexHull';
 
 export function meshFileCollider(input: ArrayBuffer | Uint8Array | string, options?: {
-    format?: 'stl' | 'obj';
+    format?: 'stl' | 'obj' | 'dae';
     shape?: MeshFileShape;
 }): ColliderOptions;
+
+export function parseDAE(input: ArrayBuffer | Uint8Array | string): MeshFile;
 
 export function parseOBJ(input: ArrayBuffer | Uint8Array | string): MeshFile;
 

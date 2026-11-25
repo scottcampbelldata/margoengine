@@ -701,6 +701,18 @@ export class KernelWorld {
     setBodyEnabled(body: number, enabled: boolean): void;
     get solver(): Required<KernelSolverOptions>;
     setSolver(options: KernelSolverOptions): this;
+    get counts(): {
+        awake: number;
+        islands: number;
+        pairs: number;
+        pairsLookedAt: number;
+        pairsSolved: number;
+        contactsSolved: number;
+        jointsSolved: number;
+        impacts: number;
+        events: number;
+        steps: number;
+    };
     get solvingPairs(): number;
     get awakeCount(): number;
     get islandCount(): number;
@@ -948,6 +960,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     get substeps(): number;
     set substeps(substeps: number);
     get timing(): KernelWorld['timing'];
+    get counts(): KernelWorld['counts'];
     get maxCcdSubsteps(): number;
     set maxCcdSubsteps(substeps: number);
     get solver(): Required<KernelSolverOptions>;

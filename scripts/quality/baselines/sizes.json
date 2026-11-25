@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17843515,
+  "total": 17847069,
   "history": [
     {
       "date": "2026-10-24",
@@ -11655,6 +11655,12 @@
       "commit": "b1c571c69",
       "reason": "physics gains compound internal edges and height field pseudo normals",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "d2e143db6",
+      "reason": "physics gains Collada colliders and work counts",
+      "grew": 3
     }
   ],
   "items": {
@@ -12416,7 +12422,7 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 75653,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 224757,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/meshfiles": 1249,
+    "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
@@ -13115,8 +13121,8 @@
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 12642,
-    "@margoengine/water/flood-bake": 4334,
+    "@margoengine/water/flood": 14307,
+    "@margoengine/water/flood-bake": 4615,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,

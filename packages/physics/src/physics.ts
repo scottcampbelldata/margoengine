@@ -776,6 +776,10 @@ export class Physics implements EnginePlugin, BodyOwner {
   get timing(): KernelWorld['timing'] {
     return this.kernel.timing;
   }
+  /** What work the last step did (awake bodies, islands, pairs, contact points solved, ...), whole numbers that do not depend on the machine; see {@link KernelWorld.counts}. */
+  get counts(): KernelWorld['counts'] {
+    return this.kernel.counts;
+  }
   /** How many continuous-collision passes a step may make, Rapier's `maxCcdSubsteps`: 0 turns CCD off for the world; see {@link KernelWorld.maxCcdSubsteps}. */
   get maxCcdSubsteps(): number {
     return this.kernel.maxCcdSubsteps;

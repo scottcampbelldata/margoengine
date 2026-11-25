@@ -159,6 +159,27 @@ pub extern "C" fn body_set_enabled(body: u32, enabled: u32) {
 pub extern "C" fn world_solving() -> u32 {
     world().header().solving
 }
+/// A count of the work the last step did, by number: 0 awake bodies, 1 islands, 2 broad-phase pairs, 3 pairs the narrow phase
+/// looked at, 4 pairs solved, 5 contact points solved, 6 joints solved, 7 impacts, 8 events, 9 steps taken. These are the world's own
+/// bookkeeping, read here for nothing; the solver's inner counts are a native-only feature (`counts`). 0 for another number.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_count(which: u32) -> u32 {
+    let w = world();
+    let h = w.header();
+    match which {
+        0 => h.awake,
+        1 => h.islands,
+        2 => h.pairs,
+        3 => h.active_pairs,
+        4 => h.solving,
+        5 => (0..h.solving as usize).map(|i| w.uu(crate::layout::PAIR_CONTACTS, w.uu(crate::layout::SOLVE_PAIRS, i) as usize)).sum(),
+        6 => h.joint_solving,
+        7 => h.impacts,
+        8 => h.events,
+        9 => h.steps,
+        _ => 0,
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn world_pair_rows() -> u32 {
     world().header().pair_rows

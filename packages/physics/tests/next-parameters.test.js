@@ -312,3 +312,32 @@ test('the solver settings do what they say: stiffness, allowed depth, push-out s
   assert.equal(physics.kernel.iterations, 3);
   physics.dispose();
 });
+
+test('the work a step did is read as counts, the same for the same inputs, and a resting stack counts its contacts', async () => {
+  const run = () => {
+    const physics = new Physics(null);
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [10, 0.5, 10] },
+    });
+    for (let k = 0; k < 3; k++)
+      physics.addBody(null, {
+        position: [0, 0.5 + k * 1.0, 0],
+        canSleep: false,
+        colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+      });
+    const before = physics.counts;
+    for (let i = 0; i < 60; i++) physics.step();
+    const counts = physics.counts;
+    physics.dispose();
+    return { before, counts };
+  };
+  const { before, counts } = run();
+  assert.deepEqual(before.steps, 0);
+  assert.equal(counts.steps, 60);
+  assert.equal(counts.awake, 3, 'three boxes awake (the floor is fixed)');
+  assert.equal(counts.pairsSolved, 3, 'floor and box, box and box twice');
+  assert.equal(counts.contactsSolved, 12, 'four points each');
+  assert.deepEqual(run().counts, counts, 'the same inputs, the same counts');
+});

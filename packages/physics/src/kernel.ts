@@ -27,6 +27,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_pairs(): number;
   world_pair_rows(): number;
   world_solving(): number;
+  world_count(which: number): number;
   world_events(): number;
   world_clear_events(): void;
   world_set_filtering(on: number): void;
@@ -1017,6 +1018,38 @@ export class KernelWorld {
       if (options[name] !== undefined) this.api.world_set_solver(index, options[name]);
     });
     return this;
+  }
+  /**
+   * How much work the last step did, as whole numbers the world already keeps: the awake bodies, the islands, the broad phase's
+   * pairs, the pairs the narrow phase looked at, the pairs and contact points the solver solved, the joints it solved, the
+   * impacts and events, and the steps taken in all. They are counts of work, not of time, so they are the same on every machine
+   * for the same inputs.
+   */
+  get counts(): {
+    awake: number;
+    islands: number;
+    pairs: number;
+    pairsLookedAt: number;
+    pairsSolved: number;
+    contactsSolved: number;
+    jointsSolved: number;
+    impacts: number;
+    events: number;
+    steps: number;
+  } {
+    const read = (which: number): number => this.api.world_count(which);
+    return {
+      awake: read(0),
+      islands: read(1),
+      pairs: read(2),
+      pairsLookedAt: read(3),
+      pairsSolved: read(4),
+      contactsSolved: read(5),
+      jointsSolved: read(6),
+      impacts: read(7),
+      events: read(8),
+      steps: read(9),
+    };
   }
   /** Pairs the last step solved: the first this many rows of the `solvePairs` column. */
   get solvingPairs(): number {
