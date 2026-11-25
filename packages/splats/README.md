@@ -257,6 +257,35 @@ first.remove(); // its range is free again
 - Every pool splat is projected and sorted each frame, free ranges too (hidden, culled before drawing), so size
   `capacity` to what you add.
 
+## Editing session (`./session`)
+
+`SplatEditSession` is a splat editor's tool set on the CPU (so it also runs headless): select by brush, rectangle,
+lasso (screen space, from a view-projection matrix), sphere or box (world space), by colour or by opacity, with
+replace/add/subtract modes, invert and clear; hide, unhide and delete the selection; move, turn and scale it (covariances
+and SH follow, optionally about a pivot); adjust its colour; undo and redo (each step keeps only the rows it changed,
+64 steps by default, `maxHistory`); export the result. The tool list follows the public feature lists of SuperSplat;
+selection by region matches `./edit`'s GPU brush, which stays the choice for strokes on a cloud of millions drawn
+this frame.
+
+```ts
+import {parsePly} from 'margoengine/splats/data';
+import {SplatEditSession} from 'margoengine/splats/session';
+const session = new SplatEditSession(parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+session.selectByOpacity(0, 0.05).deleteSelected(); // drop faint floaters
+session.selectSphere([0, 1, 0], 0.5).transformSelected([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.2, 0, 1]);
+session.selectByColor([1, 0, 0], 0.3).adjustColor({hue: 90, saturation: 1.2});
+session.undo(); // the colour change
+const file = await session.encode('ply'); // or 'spz', 'splat', 'sog'; hidden and deleted splats are left out
+```
+
+`SplatEditSession.fromCloud(cloud)` starts from a cloud's data (GPU edits included) and `session.applyTo(cloud)` writes the
+edit back (hidden and deleted splats at opacity 0). Selection by screen region takes
+`{viewProjection, width, height}`: a column-major 4x4 and the pixel size; centres behind the camera are never hit.
+Sources: Kerbl et al. 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering"; Chen et al. 2024,
+"GaussianEditor: Swift and Controllable 3D Editing with Gaussian Splatting" (arXiv:2311.14521) for the edit operations.
+Limits: history holds a full selection mask per selection step (1 byte per splat), so at 3,000,000 splats 64 selection
+steps can take about 190 MB; lower `maxHistory` for that. SH colour adjust changes the base band only.
+
 ## Scene light and shadows (`./lighting`)
 
 `SplatLighting` relights a cloud with the engine's directional light and ambient every frame, and is a
