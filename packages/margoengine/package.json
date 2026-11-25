@@ -2559,6 +2559,10 @@
       "types": "./dist/materials/fur.d.ts",
       "import": "./dist/materials/fur.js"
     },
+    "./materials/fake-shadows": {
+      "types": "./dist/materials/fake-shadows.d.ts",
+      "import": "./dist/materials/fake-shadows.js"
+    },
     "./materials/retroreflection": {
       "types": "./dist/materials/retroreflection.d.ts",
       "import": "./dist/materials/retroreflection.js"

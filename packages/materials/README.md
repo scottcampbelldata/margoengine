@@ -437,6 +437,28 @@ object for picking, shadows and export. A mesh with a material extension, transm
 own draws on its own. Opaque meshes may draw in another order than they were created (as other engines sort opaque
 draws by material); transparent ones keep their back-to-front order.
 
+### Blob and planar shadows (`@margoengine/materials/fake-shadows`)
+
+Cheap ground shadows with no shadow map. `createBlobShadow(engine, { radius, opacity })` is a soft round disc (opaque in
+the middle, clear at the rim) you move under the caster. `createPlanarShadow(engine, geometry, { plane, light })` is a
+`ShadowMesh`: the caster's geometry flattened onto a plane as seen from a directional or point light, drawn as a
+translucent flat colour without depth writes; `update(world, light?)` re-projects it on the CPU when the caster moves.
+`planarShadowMatrix` and `projectGeometry` are the maths on their own.
+
+```ts
+import { createBlobShadow, createPlanarShadow } from '@margoengine/materials/fake-shadows';
+
+declare const engine: import('@margoengine/core').EngineKernel;
+declare const geometry: import('@margoengine/materials').MeshGeometry;
+declare const world: Float32Array;
+
+const blob = createBlobShadow(engine, { radius: 0.6, opacity: 0.45 });
+blob.root.setPosition([0, 0.01, 0]);
+
+const shadow = createPlanarShadow(engine, geometry, { plane: { normal: [0, 1, 0] }, light: { direction: [2, 5, 1] } });
+shadow.update(world); // each frame the caster moves
+```
+
 ### Texture download caps
 
 `loadTexture(url, { maxBytes, maxPixels })` raises or lowers the two caps: 64 MiB downloaded (default

@@ -16,6 +16,7 @@ import {
   transformUVs,
 } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { createBlobShadow, createPlanarShadow, planarShadowMatrix, projectGeometry } from '../dist/fake-shadows.js';
 
 async function scene() {
   const h = optionalGPU(),
@@ -481,6 +482,57 @@ test('loadTexture fetches into an owned ImageBitmap and enforces protocol and si
   } finally {
     globalThis.fetch = fetchBefore;
     globalThis.createImageBitmap = bitmapBefore;
+  }
+});
+
+test('planar shadows flatten points onto the plane along the light, and the blob and planar meshes draw', async () => {
+  const apply = (m, p) => {
+    const w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
+    return [0, 1, 2].map((i) => (m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]) / w);
+  };
+  const near = (a, b) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-5, `${a} vs ${b}`));
+  near(apply(planarShadowMatrix({ normal: [0, 1, 0] }, { direction: [0, 1, 0] }), [1, 2, 3]), [1, 0, 3]);
+  near(apply(planarShadowMatrix({ normal: [0, 1, 0] }, { direction: [1, 1, 0] }), [0, 1, 0]), [-1, 0, 0]);
+  near(apply(planarShadowMatrix({ normal: [0, 2, 0], offset: 2 }, { direction: [0, 1, 0] }), [1, 3, 1]), [1, 1, 1]);
+  near(apply(planarShadowMatrix({ normal: [0, 1, 0] }, { position: [0, 10, 0] }), [1, 5, 0]), [2, 0, 0]);
+  assert.throws(() => planarShadowMatrix({ normal: [0, 0, 0] }, { direction: [0, 1, 0] }), /must not be zero/);
+  assert.throws(() => planarShadowMatrix({ normal: [0, 1, 0] }, { direction: [1, 0, 0] }), /in the plane/);
+  assert.throws(() => planarShadowMatrix({ normal: [0, 1, 0] }, {}), /exactly one/);
+  const geometry = { positions: [0, 2, 0, 1, 2, 0, 0, 2, 1], normals: [0, 1, 0, 0, 1, 0, 0, 1, 0], indices: [0, 1, 2] };
+  const flat = projectGeometry(geometry, { normal: [0, 1, 0] }, { direction: [0, 1, 0] }, { lift: 0.01 });
+  assert.deepEqual(
+    [...flat.positions].map((v) => Math.round(v * 1000) / 1000),
+    [0, 0.01, 0, 1, 0.01, 0, 0, 0.01, 1],
+  );
+  assert.deepEqual([...flat.normals.slice(0, 3)], [0, 1, 0]);
+  assert.equal(flat.indices, geometry.indices);
+  const moved = projectGeometry(
+    geometry,
+    { normal: [0, 1, 0] },
+    { direction: [0, 1, 0] },
+    {
+      world: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1],
+      lift: 0,
+    },
+  );
+  assert.equal(moved.positions[0], 5, 'world places the caster first');
+  const s = await scene();
+  try {
+    const shadow = createPlanarShadow(s.engine, geometry, {
+      plane: { normal: [0, 1, 0] },
+      light: { direction: [1, 4, 0] },
+    });
+    const blob = createBlobShadow(s.engine, { radius: 2, opacity: 0.4 });
+    assert.ok(blob.primitives[0].material, 'the blob is a material mesh');
+    shadow.update([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1], { direction: [0, 1, 0] });
+    s.frame();
+    assert.throws(() => createBlobShadow(s.engine, { radius: -1 }), /radius/);
+    assert.throws(() => createBlobShadow(s.engine, { opacity: 2 }), /opacity/);
+    assert.throws(() => createBlobShadow(s.engine, { segments: 2 }), /segments/);
+    shadow.dispose();
+    blob.destroy();
+  } finally {
+    s.close();
   }
 });
 

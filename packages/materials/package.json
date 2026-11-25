@@ -112,6 +112,10 @@
       "types": "./dist/fur.d.ts",
       "import": "./dist/fur.js"
     },
+    "./fake-shadows": {
+      "types": "./dist/fake-shadows.d.ts",
+      "import": "./dist/fake-shadows.js"
+    },
     "./retroreflection": {
       "types": "./dist/retroreflection.d.ts",
       "import": "./dist/retroreflection.js"
