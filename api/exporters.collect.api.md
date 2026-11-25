@@ -24,6 +24,13 @@ export interface CameraData {
     extras?: Extras;
 }
 
+export interface Drawable {
+    name?: string;
+    geometry: Geo;
+    material?: Mat;
+    world: Float64Array;
+}
+
 export interface ExportNode {
     name?: string;
     translation?: readonly number[];
@@ -203,9 +210,13 @@ export function cameraDefinition(camera: CameraData): GLTFCameraDefinition;
 
 export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels, writes?: readonly ('points' | 'lines')[]): Node[];
 
+export function drawables(nodes: Node[], lines?: boolean): Drawable[];
+
 export function lightDefinition(light: LightData): GLTFLightDefinition;
 
 export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array): number[][];
+
+export function polylines(indices: Uint32Array): number[][];
 
 export function textureFiles(prefix: unknown): {
     files: Map<string, Uint8Array>;

@@ -144,6 +144,10 @@
       "types": "./dist/link.d.ts",
       "import": "./dist/link.js"
     },
+    "./scene-svg": {
+      "types": "./dist/scene-svg.d.ts",
+      "import": "./dist/scene-svg.js"
+    },
     "./export-vector": {
       "types": "./dist/export-vector.d.ts",
       "import": "./dist/export-vector.js"
@@ -369,6 +373,7 @@
   "dependencies": {
     "@margoengine/compute": "^1.0.0",
     "@margoengine/controls": "^1.0.0",
+    "@margoengine/exporters": "^1.0.0",
     "@margoengine/labels": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",

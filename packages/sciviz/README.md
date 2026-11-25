@@ -1119,6 +1119,37 @@ link.download = 'visits.png';
 console.log(png.size, svg.length);
 ```
 
+### An engine scene as SVG
+
+`@margoengine/sciviz/scene-svg` projects what an engine scene draws, its meshes, lines and points, through a camera and writes SVG paths with the hidden surfaces removed. It collects the scene the way every exporter does (`@margoengine/exporters/collect`, loaded on the first call), puts the geometry in world space, shades each triangle and hands the result to `exportVectorScene`, whose binary space partition paints the polygons back to front and splits those that cross. `exportSceneSVG(source, options)` takes an engine or an exporters scene (`{nodes}`) and resolves with `{svg, mode, triangles, fragments}`.
+
+- Options and defaults: `width` and `height` (the engine canvas's size, else 800 by 600), `camera` (a core `Camera`, or `{matrix}` for a column-major view-projection matrix in the WebGPU depth convention; default `engine.camera`), `background` (transparent), `onlyVisible` (true), `root` (the whole scene), `shade` (true: ambient plus the cosine to the viewer, a light at the camera), `ambient` (0.3), `cullBackFaces` (true: a single-sided triangle facing away from a `Camera` is dropped), `lineWidth` (1.5 CSS px), `pointSize` (3 CSS px), and the budget options of `exportVectorScene` (`maxTriangles` 20,000, `maxFragments` 200,000, `colorDepth` 2, `raster` fallback).
+- Material base colours are converted to sRGB; vertex colours, textures and PBR lighting are not used, and a texture is not drawn. A matrix in place of a camera gives no back-face culling and no shading.
+- A scene over its budget throws code `unsupported` unless you pass `raster`. A bad size, ambient or matrix throws `RangeError`.
+
+```ts
+import { Camera } from '@margoengine/core';
+import { exportSceneSVG } from '@margoengine/sciviz/scene-svg';
+
+const square = (z: number, half: number) => ({
+  positions: new Float32Array([-half, -half, z, half, -half, z, half, half, z, -half, half, z]),
+  normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+  indices: [0, 1, 2, 0, 2, 3],
+});
+const { svg, fragments } = await exportSceneSVG(
+  {
+    nodes: [
+      { geometry: square(1, 1), material: { color: [1, 0.2, 0.2, 1] } },
+      { geometry: square(-1, 2), material: { color: [0.2, 0.8, 0.3, 1] } },
+    ],
+  },
+  { width: 400, height: 300, camera: new Camera({ position: [0, 0, 6] }) },
+);
+console.log(svg.length, fragments);
+```
+
+Sources: Newell, Newell and Sancha (1972), Sutherland, Sproull and Schumacker (1974) and Fuchs, Kedem and Naylor (1980), cited in `docs/clean-room.md`.
+
 ## Colour maps
 
 Margo's own maps are computed from their published definitions:

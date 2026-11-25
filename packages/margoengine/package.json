@@ -4123,6 +4123,10 @@
       "types": "./dist/sciviz/link.d.ts",
       "import": "./dist/sciviz/link.js"
     },
+    "./sciviz/scene-svg": {
+      "types": "./dist/sciviz/scene-svg.d.ts",
+      "import": "./dist/sciviz/scene-svg.js"
+    },
     "./sciviz/export-vector": {
       "types": "./dist/sciviz/export-vector.d.ts",
       "import": "./dist/sciviz/export-vector.js"

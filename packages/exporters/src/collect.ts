@@ -1,8 +1,9 @@
 // The scene walk every exporter shares, for writers that live in their own package (`@margoengine/fbx/export`).
-export { collect, polygons, textureFiles } from './scene.js';
+export { collect, drawables, polygons, polylines, textureFiles } from './scene.js';
 export { cameraDefinition, lightDefinition } from './scene-metadata.js';
 export type {
   CameraData,
+  Drawable,
   LightData,
   ExportSource,
   ExportNode,

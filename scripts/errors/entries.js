@@ -822,6 +822,10 @@ export const entries = [
     title: '@margoengine/sciviz: figures, layers and colour maps',
     kind: 'family',
     messages: [
+      'exportSceneSVG needs a finite width and height above 0',
+      'ambient must be from 0 to 1',
+      'exportSceneSVG needs a camera: pass `camera`, or an engine that has one',
+      'camera.matrix must be 16 finite numbers',
       'Geographic flow needs ascending longitude/latitude degrees within the open poles and nonnegative metre heights',
       'Geographic flow exceeds 8000000 samples; reduce dimensions',
       'Geographic flow needs one east/north/up value per grid sample',

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18902518,
+  "total": 18906812,
   "history": [
     {
       "date": "2026-10-24",
@@ -12129,6 +12129,12 @@
       "commit": "5745639a1",
       "reason": "geospatial touch, pen and gamepad",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "sciviz-scene-svg",
+      "reason": "new optional entry sciviz/scene-svg",
+      "grew": 1
     }
   ],
   "items": {
@@ -13217,6 +13223,7 @@
     "@margoengine/sciviz/projections": 2584,
     "@margoengine/sciviz/provenance": 31281,
     "@margoengine/sciviz/query": 7643,
+    "@margoengine/sciviz/scene-svg": 4294,
     "@margoengine/sciviz/series": 14631,
     "@margoengine/sciviz/share": 5550,
     "@margoengine/sciviz/spec": 27920,
