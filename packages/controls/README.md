@@ -746,6 +746,35 @@ camera
   .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
+### Readouts, events and saved views
+
+`heights` gives the eye's height above the ellipsoid, above the ground directly below it (the highest of `heightAt`,
+the scene and `raycast`) and above mean sea level when you pass a `geoid(longitude, latitude)` query (an EGM grid; null
+without one). `orientation` is the camera's heading, pitch and roll in the ENU frame at the eye, for a compass or an
+attitude indicator. `resetNorth()` turns to heading 0 about the centre. Events: `compass` (`heading`) whenever the
+heading changes, `mode` on a mode switch, and `moveend` (`view`) once the view settles after a drag, glide, flight or
+key move. `saveView()` returns the view and mode as plain JSON and `restoreView(state)` flies back to it.
+`toHash()` and `GeospatialControls.parseHash(hash)` give a link form, `#geo=lat,lon,height,range,heading,pitch,mode`
+in degrees and metres (other `&` parameters are kept); `hash: true` starts from the page's hash and rewrites it on
+each `moveend` without adding history entries.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-84.5), latitude: degToRad(45.8), range: 3000, heading: degToRad(120)},
+  geoid: () => -35, // the EGM96 undulation near the Straits of Mackinac, about -35 m
+  hash: true,
+});
+camera.addEventListener('compass', (event) => console.log('heading', event.heading));
+camera.addEventListener('moveend', () => localStorage.setItem('view', JSON.stringify(camera.saveView())));
+console.log(camera.heights, camera.orientation, camera.toHash());
+await camera.resetNorth({duration: 0});
+```
+
 ### Collision
 
 The eye and the four corners of the near plane stay `clearance` metres clear of every surface, so the near plane never
@@ -952,7 +981,7 @@ Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
 (1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
-({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false). Sources: NIMA TR8350.2 (WGS84);
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` (none), `hash` (false). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et

@@ -78,6 +78,24 @@ export interface GeospatialInertia {
   zoom: number;
 }
 
+/** Geoid height (mean sea level) above the WGS84 ellipsoid, metres, at longitude and latitude in RADIANS. */
+export type GeoidQuery = (longitude: number, latitude: number) => number | undefined;
+
+/** Heights of the eye, metres: above the ellipsoid, above the ground below it, and above mean sea level. */
+export interface GeospatialHeights {
+  /** Above the WGS84 ellipsoid. */
+  ellipsoid: number;
+  /** Above the highest of `heightAt`, the scene and `raycast` directly below the eye (the ellipsoid without them). */
+  terrain: number;
+  /** Above the geoid your `geoid` option gives (mean sea level); null without one. */
+  seaLevel: number | null;
+}
+
+/** A saved view: everything {@link GeospatialControls.restoreView} needs, as plain JSON. Radians and metres. */
+export interface GeospatialViewState extends Required<GeospatialView> {
+  mode: GeospatialMode;
+}
+
 /** Options for {@link GeospatialControls.setMode}. */
 export interface ModeSwitchOptions {
   /** Seconds of the move into the new mode when the pose must change (walk lands, map tilts). Default 0.75. */
@@ -154,6 +172,13 @@ export interface GeospatialOptions {
   preset?: GeospatialPreset;
   /** Glide per axis, overriding the preset's. */
   inertia?: Partial<GeospatialInertia>;
+  /** Geoid height above the ellipsoid (an EGM grid), for the sea-level readout. Default none. */
+  geoid?: GeoidQuery;
+  /**
+   * Keep the page's URL hash in step with the view (`#geo=lat,lon,height,range,heading,pitch,mode`, degrees and metres)
+   * and start from it when present: links and reloads return to the same view. Default false.
+   */
+  hash?: boolean;
   /**
    * Read the first connected gamepad each update: left stick pans (or moves in first person), right stick turns and
    * tilts (or looks), the right trigger zooms in (or rises), the left trigger out (or sinks). Default false.
@@ -374,6 +399,13 @@ export class GeospatialControls extends Controls {
   reducedMotion: boolean;
   /** Read the first connected gamepad each update; see the option. */
   gamepad: boolean;
+  /** Geoid height query for {@link GeospatialControls.heights}; assign to change it. */
+  geoid: GeoidQuery | undefined;
+  /** Mirror the view in the URL hash; see the option. */
+  readonly hash: boolean;
+  /** Heading at the last compass event, and whether the view moved since the last `moveend`. */
+  private lastHeading = Number.NaN;
+  private moving = false;
   /** Touches down now, by pointer id, and the two-finger gesture's last midpoint, spread and angle. */
   private readonly touches = new Map<number, { x: number; y: number }>();
   private pinch: { x: number; y: number; spread: number; angle: number } | null = null;
@@ -450,6 +482,8 @@ export class GeospatialControls extends Controls {
     this.keyTarget = options.keyTarget ?? null;
     this.inertia = { ...INERTIA.globe };
     this.gamepad = options.gamepad ?? false;
+    this.geoid = options.geoid;
+    this.hash = options.hash ?? false;
     this.reducedMotion = options.reducedMotion ?? prefersReducedMotion();
     this.applyPreset(options.preset ?? 'globe');
     if (options.inertia) this.setInertia(options.inertia);
@@ -458,7 +492,12 @@ export class GeospatialControls extends Controls {
       longitude: 0,
       latitude: 0,
       ...options.view,
+      ...(this.hash ? GeospatialControls.parseHash(globalThis.location?.hash ?? '') : null),
     } as Required<GeospatialView>);
+    if (this.hash) {
+      const m = GeospatialControls.parseHash(globalThis.location?.hash ?? '')?.mode;
+      if (m) this.m = m;
+    }
     this.commit();
     this.init();
   }
@@ -611,7 +650,14 @@ export class GeospatialControls extends Controls {
       this.camera.far = Math.max(this.camera.near * 2, 2 * Math.sqrt(h * (h + 2 * WGS84_A)) + h);
     }
     this.changed = true;
+    this.moving = true;
     this.dispatchEvent({ type: 'change' });
+    // The view heading, not the eye frame's: a zoom or pan moves the eye frame a little but turns no compass.
+    const heading = this.v.heading;
+    if (!(Math.abs(wrap(heading - this.lastHeading)) < 1e-9)) {
+      this.lastHeading = heading;
+      this.dispatchEvent({ type: 'compass', heading });
+    }
   }
 
   /** Set the view (missing fields keep their value); cancels a flight in progress. Radians and metres. */
@@ -1481,7 +1527,122 @@ export class GeospatialControls extends Controls {
     }
     const changed = this.changed;
     this.changed = false;
+    const g = this.glide;
+    if (
+      this.moving &&
+      !changed &&
+      !this.flight &&
+      !this.dragging &&
+      !this.pinch &&
+      !(g.east || g.north || g.heading || g.pitch || g.zoom)
+    ) {
+      this.moving = false;
+      if (this.hash) this.writeHash();
+      this.dispatchEvent({ type: 'moveend', view: this.saveView() });
+    }
     return changed;
+  }
+  /** The view as plain JSON, mode included, for {@link GeospatialControls.restoreView}. */
+  saveView(): GeospatialViewState {
+    return { ...this.v, mode: this.m };
+  }
+  /**
+   * Go back to a saved view (from {@link GeospatialControls.saveView} or {@link GeospatialControls.parseHash}): its mode
+   * at once, then a flight there (`duration` 0 jumps). Resolves like {@link GeospatialControls.flyTo}.
+   */
+  restoreView(state: Partial<GeospatialViewState>, options: FlightOptions = {}): Promise<boolean> {
+    this.alive();
+    if (state.mode !== undefined && !MODES.includes(state.mode))
+      throw rangeError(
+        `Geospatial mode is one of ${MODES.join(', ')}; got ${String(state.mode)}`,
+        'controls-arguments',
+      );
+    this.cancel();
+    if (state.mode && state.mode !== this.m) {
+      this.m = state.mode;
+      this.dispatchEvent({ type: 'mode', mode: state.mode });
+    }
+    const { mode, ...view } = state;
+    void mode;
+    return this.flyTo({ ...this.v, ...view }, options);
+  }
+  /** The view as a URL hash, `#geo=lat,lon,height,range,heading,pitch,mode` (degrees to 7 places, metres to 0.01). */
+  toHash(): string {
+    const v = this.v,
+      d = (r: number, n: number) => String(+((r * 180) / Math.PI).toFixed(n)),
+      m = (x: number) => String(+x.toFixed(2));
+    return `#geo=${d(v.latitude, 7)},${d(v.longitude, 7)},${m(v.height)},${m(v.range)},${d(v.heading, 2)},${d(v.pitch, 2)},${this.m}`;
+  }
+  /**
+   * Read a `#geo=` hash (from {@link GeospatialControls.toHash}; other hash parameters joined with `&` are ignored) as
+   * a saved view in radians and metres; null when there is none or it is malformed.
+   */
+  static parseHash(hash: string): GeospatialViewState | null {
+    const part = String(hash)
+      .replace(/^#/, '')
+      .split('&')
+      .find((x) => x.startsWith('geo='));
+    if (!part) return null;
+    const f = part.slice(4).split(','),
+      n = f.slice(0, 6).map(Number),
+      mode = (f[6] ?? 'globe') as GeospatialMode;
+    if (n.length < 6 || !n.every(Number.isFinite) || !MODES.includes(mode) || Math.abs(n[0]!) > 90 || !(n[3]! > 0))
+      return null;
+    const r = (x: number) => (x * Math.PI) / 180;
+    return {
+      latitude: r(n[0]!),
+      longitude: r(n[1]!),
+      height: n[2]!,
+      range: n[3]!,
+      heading: r(n[4]!),
+      pitch: r(n[5]!),
+      mode,
+    };
+  }
+  /** Write the view into the page's hash without adding a history entry, keeping other `&` parameters. */
+  private writeHash(): void {
+    const loc = globalThis.location,
+      history = globalThis.history;
+    if (!loc || !history?.replaceState) return;
+    const rest = loc.hash
+      .replace(/^#/, '')
+      .split('&')
+      .filter((x) => x && !x.startsWith('geo='));
+    const next = [this.toHash().slice(1), ...rest].join('&');
+    history.replaceState(history.state, '', `${loc.pathname}${loc.search}#${next}`);
+  }
+  /** Eye heights now: above the ellipsoid, the ground below and mean sea level (with a `geoid`). */
+  get heights(): GeospatialHeights {
+    const e = this.eye,
+      g = this.geoid?.(e.longitude, e.latitude);
+    return {
+      ellipsoid: e.height,
+      terrain: e.height - this.groundAt(e.longitude, e.latitude, e.height),
+      seaLevel: typeof g === 'number' && Number.isFinite(g) ? e.height - g : null,
+    };
+  }
+  /**
+   * The camera's heading (clockwise from north), pitch (below the horizon, positive down) and roll (clockwise seen
+   * from behind) in the ENU frame at the eye, radians: what a compass and an attitude indicator show.
+   */
+  get orientation(): { heading: number; pitch: number; roll: number } {
+    const a = this.eyeAngles(),
+      { up } = this.eyeFrame(),
+      c = ecefToCartographic(a.eye[0], a.eye[1], a.eye[2]),
+      b = enuBasis(c.longitude, c.latitude),
+      sh = Math.sin(a.heading),
+      ch = Math.cos(a.heading),
+      sp = Math.sin(a.pitch),
+      cp = Math.cos(a.pitch),
+      // The level screen-up and screen-right for this heading and pitch; roll is up's turn between them.
+      levelUp = [0, 1, 2].map((i) => (b.east[i]! * sh + b.north[i]! * ch) * sp + b.up[i]! * cp),
+      right = [0, 1, 2].map((i) => b.east[i]! * ch - b.north[i]! * sh);
+    return { heading: a.heading, pitch: a.pitch, roll: Math.atan2(dot3(up, right), dot3(up, levelUp)) };
+  }
+  /** Turn to face north (heading 0) about the centre, smoothly (`duration` default 0.5 s, 0 under reduced motion). */
+  resetNorth(options: FlightOptions = {}): Promise<boolean> {
+    this.alive();
+    return this.flyTo({ ...this.v, heading: 0 }, { duration: this.auto(0.5), ...options });
   }
   override dispose(): void {
     this.cancel();
