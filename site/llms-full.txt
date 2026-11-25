@@ -11836,6 +11836,13 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   ratio (up to about 10^7). With `origin`, controls math stays float64 and only the camera written to core is local;
   `raycast` and scene queries then work in local coordinates. Without `frame` or `origin` the camera sits at
   Earth-centred coordinates and core's float32 view matrix collapses near the ground (docs/large-coordinates.md).
+- Follow camera (`ThirdPersonControls`, 2026-11-25): velocities and accelerations of meshes, models and position
+  functions are measured from their motion (smoothed over 0.1 s), so a teleport reads as a burst of speed for a few
+  frames: call `snap()` after one. A flock is framed by its bounding sphere about the centroid (1.15 x margin), not
+  its projected outline. Chase, side and lock turn only while the ground speed is above 0.5 m/s; below that the arm
+  holds. Bank reads the first subject's roll from its rotation (FollowTarget only; meshes stay level). Ground
+  clearance needs a world y-up `ground` query; the arm sweep against meshes is unchanged. A flyby station is placed
+  without a sweep, so it can sit inside a mesh beside the path. Contract: docs/physics-framework.md, section 4.
 - Sea level: `geoid` defaults to `'egm96'`, the EGM96 15-minute grid of `@margoengine/controls/geoid`, fetched (2,077,922
   bytes) the first time `heights` is read; `heights.seaLevel` is null until it is in, and stays null with a
   `geoid-error` event when the packed file is not installed (it is made by `scripts/geoid/pack-egm96.mjs` from NGA's
