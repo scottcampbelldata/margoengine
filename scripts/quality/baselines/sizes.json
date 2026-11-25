@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19115039,
+  "total": 19115492,
   "history": [
     {
       "date": "2026-10-24",
@@ -12363,6 +12363,12 @@
       "commit": "lane-B",
       "grew": 2,
       "reason": "Deforming mesh motion blur (FG-17 piece 4b): previousPositions on triangle meshes. Measured gzip on main / now: mesh 44880 / 48199 B, mesh-pbr 52342 / 55690 B, sequence 3164 / 3274 B (within its budget), compose 1677 / 1677 B. Most of the growth is the mesh kernel (mesh.wasm 55196 to 60541 B raw, which the measured bundle inlines as base64): it parses the shutter-open positions, keeps a box at each shutter end a node and packs the shutter-open section. The rest is the section pointer and both-end bounds in mesh-instances and the shader that blends node boxes and corners per path. The kernel is fetched only by the mesh entries, on the first build. Budgets (measured gzip + 3%, or 256 B): @margoengine/voxel-pathtracer/mesh 46516 to 49645 B; @margoengine/voxel-pathtracer/mesh-pbr 54228 to 57361 B."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "5ffd9e6da",
+      "reason": "@margoengine/creative/post: 7190 -> 7536 B gzip measured (ceiling 7339 -> 7792 B, measured + 256 B). 5ffd9e6da (KB-CREATIVE-POSTVIEW1) grades and presents each view in its own viewport: the grade uniform carries the view rectangle, each view id gets its own uniform buffer and bind group (pruned when idle), and the present pass is scissored with the view load op. Without it every view of a split screen graded the whole canvas with the last view camera. A split would put the per-view state behind an import() on every frame of every PostProcessing user, since a single-view frame runs the same path. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12601,7 +12607,7 @@
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7519,
     "@margoengine/creative/planet-atmosphere": 3377,
-    "@margoengine/creative/post": 7339,
+    "@margoengine/creative/post": 7792,
     "@margoengine/creative/stars": 2818,
     "@margoengine/creative/targets": 4277,
     "@margoengine/creative/targets-depth": 3723,

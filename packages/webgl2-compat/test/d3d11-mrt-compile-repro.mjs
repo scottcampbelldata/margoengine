@@ -9,6 +9,7 @@
 // --trace records a Chrome trace of the first back end's run (categories gpu, gpu.angle, toplevel and disabled-by-default-gpu.*)
 // and prints every pixel shader D3DCompile in it: its thread, time and the render targets it was compiled for.
 import { chromium } from '@playwright/test';
+import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -78,8 +79,8 @@ for (const [index, angle] of angles.entries()) {
         console.log(`    pixel shader D3DCompile on ${e.thread}: ${e.ms} ms, ${e.targets} target(s)`);
     }
   } finally {
-    // Chrome on Windows can take minutes to close after a GPU-heavy page; Playwright ends what is left at exit.
-    await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 15_000))]);
+    // Bounded teardown (bug 70): closeAll ends the browser within its budget and reports anything left behind.
+    await closeAll({ browser });
   }
 }
 clearTimeout(limit);
