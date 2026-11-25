@@ -47,9 +47,9 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Breakable / fracturing bodies | three.js `physics_ammo_break` | PLANNED: BREAK-01 in [physics-solvers.md](physics-solvers.md) | M |  |
 | Swappable physics plugin (one API over different engines) | Babylon physics v2 plugins | PLANNED: "Other engines as solvers", [physics-framework.md](physics-framework.md) section 5 | M |  |
 | Floating-origin physics regions (large worlds without precision loss) | Babylon | PLANNED: "Large worlds", [physics-framework.md](physics-framework.md) section 2 | M |  |
-| WebXR AR GPU depth occlusion (real objects hide virtual ones; only CPU depth today) | three.js, Babylon | MISSING | M |  |
-| WebXR AR reflection cube map from light estimation, as the environment's specular | three.js, Babylon | MISSING | M |  |
-| WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | PARTIAL | M |  |
+| WebXR AR GPU depth occlusion (real objects hide virtual ones; only CPU depth today) | three.js, Babylon | EXISTS (`packages/xr/src/occlusion.ts`: CPU and `gpu-optimized` depth, `feather` soft edge, `npm run test:gpu:occlusion`; not yet run on a device) | M | 25c4bbbfe |
+| WebXR AR reflection cube map from light estimation, as the environment's specular | three.js, Babylon | DONE (`@margoengine/xr/reflection`; not yet run on a device) | M | dbbd7fc7f |
+| WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | DONE (`@margoengine/xr/session`: blend mode, visibility, frame rate, play-area bounds; layer `quality`, `blendTextureSourceAlpha`, `chromaticAberrationCorrection`, `mipLevels`. Multiview not built, see limits.md; not yet run on a headset) | M | 5f1f6ca25 |
 
 ## Lane C: scene, assets, text and formats
 
