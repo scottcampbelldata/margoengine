@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17866820,
+  "total": 17886201,
   "history": [
     {
       "date": "2026-10-24",
@@ -11679,6 +11679,12 @@
       "commit": "fd5c925a1",
       "reason": "free colliders, kept colliders, body joints, kernel handles (physics base 75,653 to 75,670 B) and the world lists of Physics2D (physics2d 18,716 to 18,729 B, its loader 17,101 to 17,171 B)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "e406829a78",
+      "reason": "new entry exporters/dae-glb: exportDAEOfGLB reads a GLB (sceneOfGLB) and writes it with exportDAE; its own entry keeps exporters/dae the serializer alone",
+      "grew": 1
     }
   ],
   "items": {
@@ -12021,6 +12027,7 @@
     "@margoengine/exporters/capture": 7923,
     "@margoengine/exporters/collect": 13657,
     "@margoengine/exporters/dae": 15626,
+    "@margoengine/exporters/dae-glb": 19390,
     "@margoengine/exporters/draco": 93986,
     "@margoengine/exporters/gltf": 20685,
     "@margoengine/exporters/gltf-to-glb": 2735,
@@ -12899,7 +12906,7 @@
     "@margoengine/terrain": 17067,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 5488,
-    "@margoengine/terrain/displace": 4710,
+    "@margoengine/terrain/displace": 4701,
     "@margoengine/terrain/dunes": 2250,
     "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,
