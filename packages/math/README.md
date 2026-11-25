@@ -235,6 +235,15 @@ const breeze: Wind = {
 console.log(breeze.sample(0, 10, 0, 0).velocity); // [5, 0, 0]
 ```
 
+`@margoengine/math/atmosphere` is the standard atmosphere of ISO 2533:1975 and ICAO Doc 7488, the one the whole engine shares wherever air is not simulated (the physics wind force's default density, the weather's eruption and thermal columns). `standardAtmosphere(z, seaLevel = 288.15, tropopause = 11000)` gives `[temperature K, pressure Pa]` at `z` metres above sea level through its layers (-6.5 K/km to the tropopause, isothermal 9 km, +1 K/km to 32 km, +2.8 K/km to 47 km, isothermal above, and the first layer continued below sea level); `seaLevel` and `tropopause` shift it for a warmer or colder day. `standardDensity(z)` is its density (1.225 kg/m3 at sea level) and `airDensity(T, P)` the ideal-gas density of dry air. Heights are taken as given, without the geopotential correction (under 0.2 percent below 11 km).
+
+```ts
+import {standardAtmosphere, standardDensity} from '@margoengine/math/atmosphere';
+
+const [temperature, pressure] = standardAtmosphere(1000);
+console.log(temperature, Math.round(pressure), standardDensity(0).toFixed(3)); // 281.65 89875 1.225
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). The classes do not validate their numbers, so NaN propagates; the array helpers, `OBB`, `billboardRotation`, the Euler order and the degree functions throw `RangeError`. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()`, `hsl()` (hue as a number of degrees or with `deg`, `grad`, `rad` or `turn`) and `color()`, but not named colors. `SRGBToLinear` and `LinearToSRGB` continue their linear segment below 0 (bit for bit as the copies they replaced); `Color` and `convertColor` mirror the curve there, as the CSS Color 4 sample code does, so an out-of-gamut channel converts as browsers convert it. `Plane` methods accept a normal of any length (`normalize()` makes `distanceToPoint` a true distance). Not included: Matrix2, `Vector3.project` and `unproject` on the base `Vector3` (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, or the `compat` entry below, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Porting and curves: `@margoengine/math/compat` has subclasses of `Matrix4`, `Vector3`, `Quaternion`, `Plane`, `Ray`, `Box3` and `Color` with the extra methods ported code expects (such as `Matrix4.makeBasis`, `extractRotation`, `makeShear`; `Vector3.applyEuler`, `project`, `unproject`; `Ray.distanceSqToSegment`; `Box3.intersectsTriangle`; `Color.getStyle`, `offsetHSL`, `lerpHSL`), so the base entries keep their size. `@margoengine/math/curve` has `Curve` and `CurveSet` (editable keyed curves: linear, step, smoothstep or cubic with natural, flat or wrap ends) and the `Interpolant` classes over sampled data; `CurveSet.type` is the mode last set on the whole set.

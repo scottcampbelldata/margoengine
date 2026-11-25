@@ -2639,6 +2639,10 @@
       "types": "./dist/math/fields.d.ts",
       "import": "./dist/math/fields.js"
     },
+    "./math/atmosphere": {
+      "types": "./dist/math/atmosphere.d.ts",
+      "import": "./dist/math/atmosphere.js"
+    },
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",
       "import": "./dist/math/spherical.js"

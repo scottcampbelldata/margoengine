@@ -45,7 +45,7 @@
 //   plume above it, more as the eruption is stronger.
 // - International Civil Aviation Organization, Manual of the ICAO Standard Atmosphere, Doc 7488, 1993: the
 //   temperature lapse of 6.5 K/km to 11 km, isothermal to 20 km, warming 1 K/km to 32 km and 2.8 K/km to 47 km, and
-//   the pressure that follows from it.
+//   the pressure that follows from it (`standardAtmosphere`, now in @margoengine/math/atmosphere and re-exported here).
 // - H. C. van de Hulst, "Light Scattering by Small Particles", Wiley, 1957: the extinction efficiency of a large
 //   particle is 2, so ash of radius r and mass concentration C has extinction 3 C / (2 rho r).
 //
@@ -53,6 +53,10 @@
 // most 50 m); its top rises over film time at `frontSpeed` of the steady column's speed; the umbrella spreads from the
 // neutral level when the top first reaches it; each grain class of the ash leaves the column where it can no longer be
 // carried, falls through the wind and lands, the erupted mass arriving after its rise and fall times.
+import { standardAtmosphere } from '@margoengine/math/atmosphere';
+
+export { standardAtmosphere };
+
 const G = 9.80665;
 // Costa et al. 2016, Table 4.
 const C_SOLID = 1100;
@@ -60,8 +64,6 @@ const C_VAPOUR = 1810;
 const C_AIR = 1000;
 const R_VAPOUR = 462;
 const R_AIR = 287;
-// ICAO Doc 7488's gas constant of dry air, for the standard atmosphere's pressure.
-const R_ICAO = 287.05287;
 const AIR_VISCOSITY = 1.8e-5;
 const MAGMA = 2500;
 
@@ -283,30 +285,6 @@ export function mastinRate(height: number): number {
 /** Column height above the vent, metres, for a mass eruption rate `rate` kg/s: Mastin et al. (2009) inverted. */
 export function mastinHeight(rate: number): number {
   return 2000 * (rate / MAGMA) ** (1 / 4.15);
-}
-
-/** The ICAO standard atmosphere shifted to a sea-level temperature: [temperature K, pressure Pa] at `z` metres. */
-export function standardAtmosphere(z: number, seaLevel = 288.15, tropopause = 11000): [number, number] {
-  // Layers: lapse to the tropopause, isothermal 9 km, +1 K/km to 32 km, +2.8 K/km to 47 km, isothermal above.
-  const layers: [number, number][] = [
-    [tropopause, -0.0065],
-    [tropopause + 9000, 0],
-    [32000, 0.001],
-    [47000, 0.0028],
-    [Infinity, 0],
-  ];
-  let T = seaLevel,
-    P = 101325,
-    base = 0;
-  for (const [top, lapse] of layers) {
-    const h = Math.min(Math.max(z, base), Math.max(top, base)) - base;
-    const T1 = T + lapse * h;
-    P = lapse === 0 ? P * Math.exp((-G * h) / (R_ICAO * T)) : P * (T1 / T) ** (-G / (lapse * R_ICAO));
-    T = T1;
-    if (z <= top) break;
-    base = Math.max(top, base);
-  }
-  return [T, P];
 }
 
 /**

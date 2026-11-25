@@ -367,7 +367,7 @@ The rows are `ERUPTION_SETTINGS` in `margoengine/weather/settings` (25 rows on t
 `windDirection` null follow the weather and a value overrides it; `height` null takes `massRate`, a value takes
 Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume` and `strongPlume` (Costa et al.
 2016's test eruptions), `collapsing` and `slowMotion`. `mastinRate(height)`, `mastinHeight(rate)`,
-`standardAtmosphere(z)` (ICAO) and `ashFallSpeed(d, rho, air)` are exported too.
+`standardAtmosphere(z)` (ICAO Doc 7488 and ISO 2533, re-exported from `@margoengine/math/atmosphere`, the one implementation the engine shares) and `ashFallSpeed(d, rho, air)` are exported too.
 
 ## Explosion clouds (instantaneous releases)
 

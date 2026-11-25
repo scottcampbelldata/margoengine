@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18672637,
+  "total": 18673335,
   "history": [
     {
       "date": "2026-10-24",
@@ -11895,6 +11895,12 @@
       "commit": "2f9ca5af1",
       "reason": "VFXOptions.clock: fixed 1/120 s ticks owed by a FilmClock (countTicks, the exact tick times, the option's check and its two coded messages). About 250 B gzip on vfx and vfx/base (gate budgets 37,697 to 37,961 and 13,086 to 13,339, measured on the commit before and after). It is the base effect's own stepping, so a split behind import() would load it on every effect that takes a clock and cost a second module for 250 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "9e956daa8",
+      "reason": "@margoengine/math/atmosphere: new entry, 442 B gzip: the ISO 2533 / ICAO standard atmosphere moved out of weather/eruption so physics, weather and the wind contract share one implementation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12559,6 +12565,7 @@
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
     "@margoengine/math/fields": 276,
+    "@margoengine/math/atmosphere": 698,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/geo": 2372,
     "@margoengine/math/gravity": 727,

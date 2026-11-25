@@ -11451,3 +11451,13 @@ Margo's own: the heading follows the velocity as before, except while the veloci
 velocity (the crowd pushes the agent back): then the heading keeps to the preferred direction and the walk cycle runs
 backward by the ground covered. Proof: `packages/humans/test/crowd.test.js` "people sent to packed seats or to one
 meeting point never turn on the spot".
+
+### The standard atmosphere as one shared entry (`@margoengine/math/atmosphere`, 2026-11-25)
+
+`packages/math/src/atmosphere.ts` holds the standard atmosphere `weather/src/eruption.ts` had, moved so the physics wind
+force, the weather and the framework's wind contract share one implementation (docs/physics-solvers.md, K03); weather
+re-exports it. Written from International Organization for Standardization, ISO 2533:1975, "Standard Atmosphere", and
+International Civil Aviation Organization, Doc 7488, "Manual of the ICAO Standard Atmosphere", 3rd edition, 1993 (the same
+model: layer lapse rates, sea-level 288.15 K and 101,325 Pa, the gas constant 287.05287 J/(kg K), g = 9.80665 m/s^2, and the
+tabulated values the test checks, -1 km to 47 km). Below sea level the first layer continues, as ISO 2533 tabulates to
+-2 km (before the move it held sea-level values there). Proof: `packages/math/test/atmosphere.test.js`.

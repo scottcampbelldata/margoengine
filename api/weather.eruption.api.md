@@ -229,7 +229,7 @@ export function mastinHeight(rate: number): number;
 
 export function mastinRate(height: number): number;
 
-export function standardAtmosphere(z: number, seaLevel?: number, tropopause?: number): [number, number];
+export { standardAtmosphere } from "@margoengine/math";
 
 export function thermalTop(B: number, N2: number, entrainment?: number, addedMass?: number, b0?: number): number;
 

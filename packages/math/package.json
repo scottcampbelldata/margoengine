@@ -112,6 +112,10 @@
       "types": "./dist/fields.d.ts",
       "import": "./dist/fields.js"
     },
+    "./atmosphere": {
+      "types": "./dist/atmosphere.d.ts",
+      "import": "./dist/atmosphere.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"
