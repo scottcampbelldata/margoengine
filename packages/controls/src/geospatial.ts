@@ -11,6 +11,7 @@ import {
   cartographicToEcef,
   ecefToCartographic,
   enuBasis,
+  geodeticNormal,
   geodesicDirect,
   geodesicInverse,
   orbitPose,
@@ -90,6 +91,11 @@ export interface GeospatialOptions {
   raycast?: SurfaceRaycast;
   /** Raycaster for scene queries (layers, side, filter). Default a new one. */
   raycaster?: Raycaster;
+  /**
+   * Let the eye go below the terrain and through meshes: no clearance floor and no collision sweeps, for subsurface
+   * and underwater views. Default false.
+   */
+  underground?: boolean;
 }
 
 /** Options for {@link GeospatialControls.flyTo}. */
@@ -182,8 +188,11 @@ export class GeospatialControls extends Controls {
   /** Your own world-space surface ray query. Default none. */
   raycast: SurfaceRaycast | undefined;
   readonly raycaster: Raycaster;
+  /** No clearance floor and no collision: the eye may go below the terrain and through meshes. Default false. */
+  underground: boolean;
   private v: Required<GeospatialView>;
   private lifted = 0;
+  private reachRange = 0;
   private flight: Flight | null = null;
   private dragging: { id: number; x: number; y: number; rotate: boolean; grab: V | null; grabHeight: number } | null = null;
   private dead = false;
@@ -216,6 +225,7 @@ export class GeospatialControls extends Controls {
     this.colliders = options.colliders ?? null;
     this.raycast = options.raycast;
     this.raycaster = options.raycaster ?? new Raycaster();
+    this.underground = options.underground ?? false;
     this.v = this.sanitize({ ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 }, longitude: 0, latitude: 0, ...options.view } as Required<GeospatialView>);
     this.commit();
     this.init();
@@ -228,6 +238,10 @@ export class GeospatialControls extends Controls {
   /** Metres the terrain floor currently lifts the view above the requested one. */
   get terrainLift(): number {
     return this.lifted;
+  }
+  /** The range in use now: the requested one, or shorter while a mesh between the centre and the eye pulls the eye in. */
+  get collisionRange(): number {
+    return this.reachRange;
   }
   /** Eye position as geodetic longitude, latitude (radians) and height (metres). */
   get eye(): { longitude: number; latitude: number; height: number } {
@@ -265,24 +279,82 @@ export class GeospatialControls extends Controls {
     const h = this.heightAt?.(longitude, latitude);
     return (typeof h === 'number' && Number.isFinite(h) ? h : 0) + this.clearance;
   }
-  /** The ECEF pose of a view, its centre lifted until the eye clears the terrain below it, and that lift. */
-  private poseOf(v: Required<GeospatialView>): { pose: Pose; lift: number } {
-    let lift = 0;
-    let pose: Pose = orbitPose(v, v.heading, v.pitch, v.range);
+  /**
+   * The eye and the four near-plane corners of a pose, ECEF: what collision keeps clear, so the near plane never cuts
+   * into the ground or a wall.
+   */
+  private probes(pose: Pose): V[] {
+    const e = pose.position,
+      f = [pose.target[0] - e[0], pose.target[1] - e[1], pose.target[2] - e[2]],
+      l = Math.hypot(...f) || 1,
+      fw: V = [f[0] / l, f[1] / l, f[2] / l],
+      u = pose.up,
+      r: V = [fw[1] * u[2] - fw[2] * u[1], fw[2] * u[0] - fw[0] * u[2], fw[0] * u[1] - fw[1] * u[0]],
+      el = this.element,
+      aspect = el && el.clientWidth > 0 && el.clientHeight > 0 ? el.clientWidth / el.clientHeight : 16 / 9,
+      near = Math.max(0, this.camera.near),
+      h = near * Math.tan(((this.camera.fov ?? 60) * Math.PI) / 360),
+      w = h * aspect,
+      out: V[] = [e];
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1]) out.push([0, 1, 2].map((i) => e[i]! + fw[i]! * near + r[i]! * sx * w + u[i]! * sy * h) as V);
+    return out;
+  }
+  /**
+   * The ECEF pose of a view with collision: the arm from the centre to each probe is swept against the scene and your
+   * raycast (a mesh in between pulls the eye in front of it), then the centre is lifted until every probe clears the
+   * terrain floor and the surface just below it by `clearance`. Returns the pose, the lift and the range used.
+   */
+  private poseOf(v: Required<GeospatialView>, refresh = true): { pose: Pose; lift: number; range: number } {
+    let lift = 0,
+      range = v.range,
+      pose: Pose = orbitPose(v, v.heading, v.pitch, range);
+    if (this.underground) return { pose, lift, range };
+    const surfaces = !!(this.raycast || (this.scene && this.engine)),
+      k = this.clearance,
+      cast = (o: V, d: V, far: number) => {
+        const hit = this.castSurface(o, d, far, false, refresh);
+        refresh = false;
+        return hit;
+      };
+    if (surfaces) {
+      const t = pose.target;
+      for (const p of this.probes(pose)) {
+        const d = [p[0] - t[0], p[1] - t[1], p[2] - t[2]],
+          l = Math.hypot(...d);
+        if (!(l > 0)) continue;
+        // Start a little out from the centre, which often lies on the very surface it was picked from.
+        const dir = d.map((x) => x / l) as V,
+          skip = Math.min(k, l / 2),
+          hit = cast(along(t, dir, skip), dir, l - skip + k);
+        if (hit) range = Math.min(range, Math.max(1e-3, (range * (hit.t + skip - k)) / l));
+      }
+      if (range < v.range) pose = orbitPose(v, v.heading, v.pitch, range);
+    }
     for (let i = 0; i < 6; i++) {
-      const e = ecefToCartographic(pose.position[0], pose.position[1], pose.position[2]),
-        deficit = this.floor(e.longitude, e.latitude) - e.height;
+      let deficit = -Infinity;
+      for (const p of this.probes(pose)) {
+        const e = ecefToCartographic(p[0], p[1], p[2]);
+        deficit = Math.max(deficit, this.floor(e.longitude, e.latitude) - e.height);
+        if (surfaces) {
+          // A roof or tile surface within the clearance below (or just above, when a move went into it).
+          const up = geodeticNormal(p[0], p[1], p[2]),
+            hit = cast(along(p, up, k), [-up[0], -up[1], -up[2]], 2 * k);
+          if (hit) deficit = Math.max(deficit, 2 * k - hit.t);
+        }
+      }
       if (deficit <= 1e-6) break;
       lift += deficit;
-      pose = orbitPose({ ...v, height: v.height + lift }, v.heading, v.pitch, v.range);
+      pose = orbitPose({ ...v, height: v.height + lift }, v.heading, v.pitch, range);
     }
     // The ground can fall away as the lift grows; a lift is only the terrain's demand at the final eye.
-    return { pose, lift };
+    return { pose, lift, range };
   }
   /** Write the camera from the view. */
   private commit(): void {
-    const { pose, lift } = this.poseOf(this.v);
+    const { pose, lift, range } = this.poseOf(this.v);
     this.lifted = lift;
+    this.reachRange = range;
     this.camera.position = this.toWorld(pose.position);
     this.camera.target = this.toWorld(pose.target);
     this.camera.up = this.toWorld(pose.up, true);
@@ -340,7 +412,7 @@ export class GeospatialControls extends Controls {
     return Math.sqrt(h * (h + 2 * WGS84_A)) + 4e5;
   }
   /** The nearest surface along a unit ECEF ray within `far`: scene meshes, your raycast and the heightAt terrain. */
-  private castSurface(o: V, d: V, far: number): { t: number; source: GeospatialPickSource } | null {
+  private castSurface(o: V, d: V, far: number, terrain = true, refresh = true): { t: number; source: GeospatialPickSource } | null {
     let best = far,
       source: GeospatialPickSource | null = null;
     const wo = this.toWorld(o),
@@ -351,14 +423,24 @@ export class GeospatialControls extends Controls {
       r.near = 0;
       r.far = best;
       r.firstHitOnly = true;
-      const [hit] = this.colliders ? r.intersectObjects(this.engine, this.colliders) : r.intersectEngine(this.engine);
+      const options = { refresh },
+        side = r.side;
+      // Collision counts only faces turned toward the ray: from inside a building (a centre under its roof) the arm
+      // passes out through the back of the roof instead of pulling the eye in.
+      if (!terrain) r.side = 'front';
+      let hit;
+      try {
+        [hit] = this.colliders ? r.intersectObjects(this.engine, this.colliders, options) : r.intersectEngine(this.engine, options);
+      } finally {
+        r.side = side;
+      }
       if (hit && hit.distance < best) (best = hit.distance), (source = 'scene');
     }
     if (this.raycast) {
       const t = this.raycast(wo, wd, best);
       if (typeof t === 'number' && t >= 0 && t < best) (best = t), (source = 'raycast');
     }
-    if (this.heightAt) {
+    if (terrain && this.heightAt) {
       const t = this.march(o, d, best);
       if (t !== null && t < best) (best = t), (source = 'terrain');
     }
@@ -477,7 +559,7 @@ export class GeospatialControls extends Controls {
     const g = ecefToCartographic(grab[0], grab[1], grab[2]),
       b = enuBasis(g.longitude, g.latitude),
       miss = (lon: number, lat: number): [number, number] | null => {
-        const { pose } = this.poseOf({ ...this.v, longitude: lon, latitude: lat }),
+        const { pose } = this.poseOf({ ...this.v, longitude: lon, latitude: lat }, false),
           r = this.screenRay(x, y, pose),
           t = r && rayEllipsoid(r.o, r.d, grabHeight);
         if (t === null || !r) return null;

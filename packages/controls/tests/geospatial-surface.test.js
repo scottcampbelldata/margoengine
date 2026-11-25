@@ -112,7 +112,8 @@ test('a raycast option is used, and the nearest of all surfaces wins', () => {
   const control = new GeospatialControls(cam, el, {
     view: down,
     heightAt: () => 100,
-    raycast: (origin, direction, far) => (calls++, Math.min(far, 1000)),
+    // A layer 1000 m along downward rays (world +X is up at longitude 0, latitude 0).
+    raycast: (origin, direction, far) => (calls++, direction[0] < -0.5 && far > 1000 ? 1000 : undefined),
   });
   const hit = control.pick(400, 300);
   assert.ok(calls > 0);

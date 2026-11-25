@@ -746,6 +746,32 @@ camera
   .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
+### Collision
+
+The eye and the four corners of the near plane stay `clearance` metres clear of every surface, so the near plane never
+cuts into a hillside or a wall. Each update the arm from the orbit centre to each of those five points is swept against
+the engine scene (bvh, faces turned toward the centre only) and your `raycast`: a building between the centre and the
+eye pulls the eye in front of it (`collisionRange` reads the range in use). Then the centre is lifted until all five
+points clear the `heightAt` terrain and any roof or tile surface within `clearance` below them. Flights, drags and
+`setView` all pass through it. `underground: true` turns it all off for subsurface and underwater views. No physics:
+only ray and height queries.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine, box} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 200 m tower at longitude 0, latitude 0 (ECEF +X is up there; the world is the Y-up (x, z, -y) of ECEF).
+engine.createMesh().setGeometry(box()).setPosition([6378137 + 100, 0, -300]).setScale([200, 300, 100]);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: 0, latitude: 0, heading: degToRad(-90), pitch: 0.1, range: 600},
+  clearance: 3,
+});
+console.log(camera.collisionRange < 600); // true: the tower stands between the centre and the eye
+camera.underground = true; // look from below the ground: no floor, no sweeps
+```
+
 ### Surface-true picking
 
 Zoom, pan and turn grab the real surface, not the ellipsoid. `pick(x, y)` returns the nearest hit of the engine's
@@ -773,7 +799,7 @@ console.log(hit?.source, hit?.height); // 'terrain' and the ground height there,
 
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
-everything visible), `raycast` (none), `raycaster` (a new one). Sources: NIMA TR8350.2 (WGS84);
+everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
