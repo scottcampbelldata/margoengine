@@ -2,11 +2,11 @@
 // Real-GPU checks of renderAccumulated with Accumulate (FG-17 piece 1). An orthographic camera maps one world unit to
 // one pixel on a 64 x 32 canvas, and an ambient-only white box is flat, so coverage and smear are known exactly.
 import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
-import { createHeadlessCanvas, installGPU, readPixels } from '../src/index.ts';
-import { readTexture } from '../src/formats.ts';
-import { renderAccumulated } from '../src/accumulate.ts';
-import { renderFrames } from '../src/video.ts';
-import { Accumulate } from '../../post/src/accumulate.ts';
+import { createHeadlessCanvas, installGPU, readPixels } from '../dist/index.js';
+import { readTexture } from '../dist/formats.js';
+import { renderAccumulated } from '../dist/accumulate.js';
+import { renderFrames } from '../dist/video.js';
+import { Accumulate } from '../../post/dist/accumulate.js';
 const W = 64, H = 32;
 const ortho = (out, _aspect, webgpu) => {
   const near = 0.1, far = 20;
