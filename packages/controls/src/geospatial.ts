@@ -155,6 +155,11 @@ export interface GeospatialOptions {
   /** Glide per axis, overriding the preset's. */
   inertia?: Partial<GeospatialInertia>;
   /**
+   * Read the first connected gamepad each update: left stick pans (or moves in first person), right stick turns and
+   * tilts (or looks), the right trigger zooms in (or rises), the left trigger out (or sinks). Default false.
+   */
+  gamepad?: boolean;
+  /**
    * No glide, and flights, paths and mode switches without an explicit `duration` jump straight to the end. Default
    * the user's `prefers-reduced-motion: reduce` setting (false where it cannot be read).
    */
@@ -284,6 +289,9 @@ const prefersReducedMotion = (): boolean => {
     return false;
   }
 };
+/** Stick values inside this are rest. */
+const DEADZONE = 0.15;
+const dead = (x: number | undefined) => (typeof x === 'number' && Math.abs(x) > DEADZONE ? x : 0);
 const held = (keys: ReadonlySet<string>, ...codes: string[]) => +codes.some((c) => keys.has(c));
 const smoother = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -364,6 +372,11 @@ export class GeospatialControls extends Controls {
   inertia: GeospatialInertia;
   /** No glide and instant automatic flights; see the option. */
   reducedMotion: boolean;
+  /** Read the first connected gamepad each update; see the option. */
+  gamepad: boolean;
+  /** Touches down now, by pointer id, and the two-finger gesture's last midpoint, spread and angle. */
+  private readonly touches = new Map<number, { x: number; y: number }>();
+  private pinch: { x: number; y: number; spread: number; angle: number } | null = null;
   private p: GeospatialPreset = 'globe';
   /** Glide velocities: pan east and north (m/s), heading and pitch (rad/s), log range (1/s). */
   private glide = { east: 0, north: 0, heading: 0, pitch: 0, zoom: 0 };
@@ -436,6 +449,7 @@ export class GeospatialControls extends Controls {
     this.m = mode;
     this.keyTarget = options.keyTarget ?? null;
     this.inertia = { ...INERTIA.globe };
+    this.gamepad = options.gamepad ?? false;
     this.reducedMotion = options.reducedMotion ?? prefersReducedMotion();
     this.applyPreset(options.preset ?? 'globe');
     if (options.inertia) this.setInertia(options.inertia);
@@ -1050,30 +1064,71 @@ export class GeospatialControls extends Controls {
   }
   /** Held movement keys move the eye in fly and walk. */
   private steer(delta: number): void {
-    const k = this.keys;
-    if (!k.size || !(delta > 0)) return;
-    if (this.m !== 'fly' && this.m !== 'walk') return this.keyOrbit(delta);
-    const f = held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown'),
-      r = held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft'),
-      u = held(k, 'KeyE', 'PageUp') - held(k, 'KeyQ', 'PageDown');
-    if (!f && !r && !(u && this.m === 'fly')) return;
-    const step = this.moveSpeed * delta * (held(k, 'ShiftLeft', 'ShiftRight') ? 4 : 1);
-    this.moveEye(f * step, r * step, u * step);
+    if (!(delta > 0)) return;
+    const a = this.axes();
+    if (!a) return;
+    if (this.m !== 'fly' && this.m !== 'walk') return this.keyOrbit(delta, a);
+    if (a.turn || a.tilt) this.look(a.turn * a.boost * delta * 1.5, a.tilt * a.boost * delta * 1.5);
+    const u = this.m === 'fly' ? a.up : 0;
+    if (!a.f && !a.r && !u) return;
+    const step = this.moveSpeed * delta * a.boost;
+    this.moveEye(a.f * step, a.r * step, u * step);
+  }
+  /**
+   * The held keys and the gamepad as axes in [-1, 1]: forward, right, turn, tilt, zoom (positive zooms out), up
+   * (first person), and the boost; null when nothing is pressed.
+   */
+  private axes(): { f: number; r: number; turn: number; tilt: number; zoom: number; up: number; boost: number } | null {
+    const k = this.keys,
+      first = this.m === 'fly' || this.m === 'walk';
+    let pad: Gamepad | null = null;
+    if (this.gamepad)
+      for (const g of (globalThis.navigator as Navigator | undefined)?.getGamepads?.() ?? [])
+        if (g && g.connected !== false && g.axes.length >= 4) {
+          pad = g;
+          break;
+        }
+    const ax = (i: number) => dead(pad?.axes[i]),
+      trigger = (i: number) => {
+        const b = pad?.buttons[i];
+        return b ? (typeof b.value === 'number' ? b.value : +b.pressed) : 0;
+      },
+      clamp1 = (x: number) => clamp(x, -1, 1),
+      f = clamp1(held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown') - ax(1)),
+      r = clamp1(held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft') + ax(0)),
+      // First person turns with the right stick only; Q/E are its sink and rise keys.
+      turn = clamp1((first ? 0 : held(k, 'KeyE') - held(k, 'KeyQ')) + ax(2)),
+      tilt = clamp1((first ? 0 : held(k, 'KeyR') - held(k, 'KeyF')) + ax(3)),
+      zoom = clamp1(
+        held(k, 'Minus', 'NumpadSubtract', 'PageDown') -
+          held(k, 'Equal', 'NumpadAdd', 'PageUp') +
+          trigger(6) -
+          trigger(7),
+      ),
+      up = clamp1(held(k, 'KeyE', 'PageUp') - held(k, 'KeyQ', 'PageDown') + trigger(7) - trigger(6));
+    if (!f && !r && !turn && !tilt && !zoom && !up) return null;
+    return {
+      f,
+      r,
+      turn,
+      tilt,
+      zoom,
+      up,
+      boost: held(k, 'ShiftLeft', 'ShiftRight') || pad?.buttons[10]?.pressed ? 4 : 1,
+    };
   }
   /**
    * Keys in the orbit modes: W/A/S/D or the arrows pan along the heading at `keyPanSpeed` heights above the ground per
    * second, Q/E turn, R/F tilt (not in map), + and - (or PageUp/PageDown) zoom, Shift 4 x.
    */
-  private keyOrbit(delta: number): void {
-    const k = this.keys,
-      f = held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown'),
-      r = held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft'),
-      turn = held(k, 'KeyE') - held(k, 'KeyQ'),
-      tilt = this.m === 'map' ? 0 : held(k, 'KeyR') - held(k, 'KeyF'),
-      zoom = held(k, 'Minus', 'NumpadSubtract', 'PageDown') - held(k, 'Equal', 'NumpadAdd', 'PageUp');
+  private keyOrbit(
+    delta: number,
+    a: { f: number; r: number; turn: number; tilt: number; zoom: number; boost: number },
+  ): void {
+    const { f, r, turn, zoom, boost } = a,
+      tilt = this.m === 'map' ? 0 : a.tilt;
     if (!f && !r && !turn && !tilt && !zoom) return;
-    const boost = held(k, 'ShiftLeft', 'ShiftRight') ? 4 : 1,
-      e = this.eye,
+    const e = this.eye,
       // Height above what is below the eye, so a pan crosses a valley as fast at street level as at orbit, per height.
       above = Math.max(2, e.height - this.groundAt(e.longitude, e.latitude, e.height)),
       step = this.keyPanSpeed * above * delta * boost,
@@ -1452,6 +1507,8 @@ export class GeospatialControls extends Controls {
   }
   protected override onDisconnect(): void {
     this.dragging = null;
+    this.touches.clear();
+    this.pinch = null;
     this.keys.clear();
   }
   private keyDown = (event: KeyboardEvent): void => {
@@ -1467,6 +1524,21 @@ export class GeospatialControls extends Controls {
   private down = (event: PointerEvent): void => {
     if (!this.enabled) return;
     this.interrupt();
+    if (event.pointerType === 'touch') {
+      this.touches.set(event.pointerId, this.local(event));
+      if (this.touches.size === 2) {
+        // A second finger turns the one-finger drag into pinch, twist and two-finger tilt.
+        if (this.dragging) this.element?.releasePointerCapture?.(this.dragging.id);
+        this.dragging = null;
+        this.stopGlide();
+        this.sample = null;
+        this.pinch = this.spread();
+        this.element?.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+      if (this.touches.size > 2) return;
+    }
     if (this.dragging || event.button > 2) return;
     const first = this.m === 'fly' || this.m === 'walk',
       act = this.action(event, first);
@@ -1504,7 +1576,39 @@ export class GeospatialControls extends Controls {
     const t = (event as { timeStamp?: number }).timeStamp;
     return (typeof t === 'number' && t > 0 ? t : (globalThis.performance?.now() ?? Date.now())) / 1000;
   }
+  /** Midpoint, spread and angle of the first two touches. */
+  private spread(): { x: number; y: number; spread: number; angle: number } {
+    const [a, b] = [...this.touches.values()] as [{ x: number; y: number }, { x: number; y: number }];
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+      spread: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+      angle: Math.atan2(b.y - a.y, b.x - a.x),
+    };
+  }
+  /** Two fingers: the spread zooms about the midpoint, a twist turns the heading, moving both up or down tilts. */
+  private gesture(event: PointerEvent): void {
+    const g = this.pinch,
+      el = this.element;
+    if (!g || !el) return;
+    const before = { ...this.v },
+      n = this.spread(),
+      height = Math.max(1, el.clientHeight);
+    this.pinch = n;
+    if (this.enableZoom && n.spread !== g.spread) this.zoomAt(n.x, n.y, (g.spread / n.spread) ** this.zoomSpeed);
+    if (this.enableRotate) {
+      const twist = wrap(n.angle - g.angle),
+        tilt = this.m === 'map' ? 0 : ((n.y - g.y) * this.rotateSpeed) / height;
+      if (twist || tilt) this.rotate(-twist, tilt);
+    }
+    this.track(GeospatialControls.time(event), before);
+    event.preventDefault();
+  }
   private move = (event: PointerEvent): void => {
+    if (this.touches.has(event.pointerId)) {
+      this.touches.set(event.pointerId, this.local(event));
+      if (this.pinch && this.enabled) return this.gesture(event);
+    }
     const d = this.dragging;
     if (!d || d.id !== event.pointerId || !this.enabled || !this.element) return;
     const before = { ...this.v };
@@ -1534,6 +1638,24 @@ export class GeospatialControls extends Controls {
     event.preventDefault();
   };
   private end = (event: PointerEvent): void => {
+    if (this.touches.delete(event.pointerId) && this.pinch) {
+      // Lifting a finger ends the gesture; a quick release glides on (zoom and turn), a pause stops.
+      if (this.touches.size < 2) {
+        const s = this.sample;
+        if (
+          !s ||
+          event.type === 'pointercancel' ||
+          GeospatialControls.time(event) - s.t > FLING_GAP ||
+          this.reducedMotion
+        )
+          this.stopGlide();
+        this.pinch = null;
+        this.sample = null;
+        this.dispatchEvent({ type: 'end' });
+      }
+      this.element?.releasePointerCapture?.(event.pointerId);
+      return;
+    }
     if (this.dragging?.id !== event.pointerId) return;
     // A pause before release is a stop; a cancel never flings.
     const s = this.sample;

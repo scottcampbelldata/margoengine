@@ -803,6 +803,27 @@ camera.applyPreset('dcc'); // middle-button orbit for a modelling session
 
 Blender and Maya are trademarks of their respective owners; they are named only to describe the button layout.
 
+Touch, pen and gamepad: one finger pans like the left button; two fingers pinch to zoom about their midpoint, twist to
+turn the heading and move up or down together to tilt (no tilt in map), and a quick release glides on. A pen's tip
+pans and its barrel button turns, as the mouse buttons do. With `gamepad: true` the first connected pad is read each
+update: the left stick pans at `keyPanSpeed` heights above the ground per second (moves in first person), the right
+stick turns and tilts (looks), the right trigger zooms in and the left out (rise and sink in fly), the left stick
+press is the 4 x boost; sticks rest inside a 0.15 dead zone.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-105), latitude: degToRad(40), range: 8000, pitch: degToRad(50)},
+  gamepad: true,
+});
+window.addEventListener('gamepadconnected', () => console.log('sticks fly the camera now'));
+camera.gamepad = false; // turn the pad off again, for a menu
+```
+
 ### Navigation modes
 
 `mode` (option, default `'globe'`) picks how input moves the camera, and `setMode(mode, {duration})` switches with a
@@ -931,7 +952,7 @@ Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
 (1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
-({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting). Sources: NIMA TR8350.2 (WGS84);
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
