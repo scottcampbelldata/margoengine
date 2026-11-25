@@ -28,12 +28,6 @@ function reversed(animation, clip, name) {
   animation.clips.push({ ...source, name, tracks });
 }
 
-/*
- * How a limp rig lands is chaotic: which way it lies is not monotonic in the push (a forward push of 20 lands it face down, 60 and 80 face
- * up, and 40 was the edge, where the smallest change to the solver turned it over). The pushes here, 20 forward and 40 backward, land
- * the same way for every push within 4 of them.
- */
-
 /**
  * The rig standing on a floor, turned `yaw` radians about up, with its ragdoll and get-up, thrown over forward (`push` > 0)
  * or backward along where it faces, sliding away from the character's root as it falls.
@@ -72,17 +66,54 @@ rtest('a body on its back gets the face-up clip, a body on its front the face-do
   front.rig.dispose();
 });
 
-for (const [label, push, side] of [
-  ['back', -40, 'faceUp'],
-  ['front', 20, 'faceDown'],
-])
+/** The head's place on each of the 26 frames a get-up starts with, from `state`'s clip played alone on a rig with no ragdoll. */
+async function clipHeadPath(state) {
+  const rig = await realRig(GENERAL, {
+    states: { idle: 'Idle_A', back: 'GetUpBack', front: 'GetUpFront' },
+    prepare(animation) {
+      reversed(animation, 'Death_A', 'GetUpBack');
+      reversed(animation, 'Death_B', 'GetUpFront');
+    },
+  });
+  rig.frames(1);
+  rig.animator.cancelFade();
+  rig.animator.transition(state, 0);
+  rig.engine.store.tick(false);
+  const head = rig.node('head'),
+    hips = rig.node('hips'),
+    path = [];
+  rig.frames(1);
+  path.push(worldPosition(head));
+  const reach = distance(worldPosition(head), worldPosition(hips));
+  rig.frames(25, 1 / 60, () => {
+    rig.engine.store.tick(false);
+    path.push(worldPosition(head));
+  });
+  rig.dispose();
+  return { path, reach };
+}
+const steps = (path) => path.slice(1).map((p, i) => distance(p, path[i]));
+
+// A pop is a jump in the head's path that the clip and the blend do not make. Over the blend the drawn head is, to first order,
+// p = c + w g with g = r - c: c the clip's head, r the ragdoll's (still), w the ragdoll's weight. Differencing twice, frame by
+// frame, d2 p = (1 - w) d2 c + d2w g - 2 dw d c, so |d2 p| <= (1 - w) |d2 c| + |d2w| D + 2 |dw| |d c| + dw^2 D pi: |d c| and |d2 c|
+// are the clip's own step and its change at that frame, dw and d2w the weight's (read each frame), D = 2 * (hips-to-head reach)
+// bounds |g|, and the last term bounds the bend of a blend of rotations, the head swinging on an arc of at most pi between the two
+// poses. A pop breaks this bound on one frame; the clip's own rise (to 10 cm a frame at the end of a get-up from the back) does not.
+// Regression: with a linear fade the weight stopped dead on the blend's last frame (d2w = 1/24 there) and the head's step changed
+// by the pose gap over 24, 2.8 cm at push 40; the eased fade has d2w of at most 6/24^2 and no stop. The positions are f32, so the
+// bound carries their rounding too. Every push is checked: how
+// a limp body lands is chaotic (forward pushes of 20 land it face down, 60 and 80 face up, 40 is the edge), and no landing may pop.
+for (const push of [-40, 20, 40, 60, 80])
   rtest(
-    `from its ${label}: the character comes to the body, and the bones blend into the clip without a pop`,
+    `pushed by ${push}: the character comes to the body, and the bones blend into the clip with no pop`,
     async () => {
       const { rig, ragdoll, getUp } = await fallen(push),
         hips = rig.node('hips'),
         head = rig.node('head'),
-        body = ragdoll.bones[0].body.position;
+        body = ragdoll.bones[0].body.position,
+        side = getUp.pick(),
+        state = side === 'faceUp' ? 'back' : 'front';
       rig.engine.store.tick(false);
       const before = [worldPosition(hips), worldPosition(head)],
         wasRoot = worldPosition(rig.model.root);
@@ -93,29 +124,45 @@ for (const [label, push, side] of [
       );
       const finished = getUp.start();
       assert.equal(ragdoll.active, false, 'the bones are handed back');
-      assert.equal(rig.animator.state, push < 0 ? 'back' : 'front');
+      assert.equal(rig.animator.state, state);
       // The character's root now stands so that the clip's first frame lies on the body.
       rig.engine.store.tick(false);
       assert.ok(Math.abs(rig.model.root.matrix[13]) < 0.02, 'on the ground');
-      // No pop: the drawn bones hold the ragdoll's pose on the first frame of the blend.
+      // The drawn bones hold the ragdoll's pose on the first frame of the blend.
       rig.frames(1);
       assert.ok(distance(worldPosition(hips), before[0]) < 0.06, 'the hips stay put');
       assert.ok(distance(worldPosition(head), before[1]) < 0.12, 'the head stays put');
-      // The blend ends on the clip: the root bone drawn where the clip has it, near the body it left.
-      // The head's step each frame of the blend: the clip's own rise makes it grow smoothly (to 10 cm a frame, 6 m/s, at the end of a
-      // get-up from the back), so a pop is a step that differs from the one before it, not a step that is large.
-      let pop = 0,
-        before2 = 0,
-        last = worldPosition(head);
-      rig.frames(24, 1 / 60, () => {
+      const path = [worldPosition(head)],
+        weights = [ragdoll.weight];
+      rig.frames(25, 1 / 60, () => {
         rig.engine.store.tick(false);
-        const step = distance(worldPosition(head), last);
-        if (before2 > 0) pop = Math.max(pop, Math.abs(step - before2));
-        before2 = step;
-        last = worldPosition(head);
+        path.push(worldPosition(head));
+        weights.push(ragdoll.weight);
       });
       assert.equal(ragdoll.weight, 0, 'the 0.4 s blend is over');
-      assert.ok(pop < 0.03, `no frame jumps: one step differs from the one before by ${pop} m`);
+      const clip = await clipHeadPath(state),
+        drawn = steps(path),
+        own = steps(clip.path),
+        reach = 2 * clip.reach,
+        // Both paths are read from f32 matrices: each position is off by up to half an ulp of its size, and a change of steps
+        // takes four positions from each path, so eight half-ulps of the largest coordinate either path reaches.
+        largest = Math.max(...path.flat().map(Math.abs), ...clip.path.flat().map(Math.abs)),
+        rounding = 8 * 2 ** -24 * largest;
+      for (let k = 1; k < 25; k++) {
+        const dw = weights[k + 1] - weights[k],
+          d2w = dw - (weights[k] - weights[k - 1]),
+          jump = Math.abs(drawn[k] - drawn[k - 1]),
+          bound =
+            (1 - weights[k]) * Math.abs(own[k] - own[k - 1]) +
+            Math.abs(d2w) * reach +
+            2 * Math.abs(dw) * own[k] +
+            dw * dw * reach * Math.PI +
+            rounding;
+        assert.ok(
+          jump <= bound,
+          `push ${push}, frame ${k}: the head's step changed by ${jump} m, past the ${bound} m clip and blend allow`,
+        );
+      }
       assert.ok(across(worldPosition(hips), body) < 0.3, 'the clip goes on from where the body lay');
       let result = null;
       finished.then((value) => (result = value));
