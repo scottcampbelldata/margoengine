@@ -26283,6 +26283,20 @@ No open defect found in the new filter and style evaluation; the CPU suite and b
   percent (the old shader fails: block 0.93; down 0.09 at tau 5); `packages/sky/test/volumetric-clouds.test.js` "the
   deck lights the scene once" pins the light-only map, its sun and moon shares and `groundAlbedo`.
 
+## KB-PHYS-BLOCK1: the exact block solver diverges on a tall pile at one pass a substep
+
+`setSolver({blockSolver: true})` (3D, off by default) solves a manifold's normal rows exactly. On the 465-cube pyramid of 30 rows
+at 4 substeps and 1 pass a substep (`packages/physics/kernel/tests/solver.rs`, `a_pyramid_of_thirty_rows_settles_at_one_pass_a_substep`,
+sleeping off) the apex box's z velocity grows exponentially: 0.003 m/s at 30 s, 0.07 at 60 s, 150 m/s by 90 s (the box leaves the
+pile). It is the same with the block solve in the pushing pass only or in the relaxing pass only, and with a larger diagonal shift;
+rows 3 to 20 hold, and the defaults (8 substeps, 2 passes) hold and rest better with it than with the sweeps (0.0003 against
+0.001 m/s). Cause as understood: the sweeps stop at convergence, a dissipation the exact solve lacks, and the exact normal loads
+meet friction solved afterwards at a point at a time against the load of the pass before, and the 1-pass chain spring
+(`CHAIN_LOAD`), so a sliding mode of the top of the pile is not damped. It is opt-in, and the default stays off until the 30-row case holds at 1 pass under
+its existing bound (Catto, "Solver2D", 2024, the soft step; Tonge, Benevolenski and Voroshilov, SIGGRAPH 2012; Bender, Erleben
+and Trinkle, "Interactive simulation of rigid body dynamics in computer graphics", Computer Graphics Forum 33(1), 2014, for friction
+against exact normal blocks).
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
