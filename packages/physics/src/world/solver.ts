@@ -144,7 +144,11 @@ export interface SolverHost {
   readonly memory: WebAssembly.Memory;
   /** The world's gravity, m/s squared, the one value every solver uses (PA-08). */
   readonly gravity: readonly [number, number, number];
-  /** Assigns the solver a region of `byteLength` bytes of `type` words, zeroed. */
+  /**
+   * Assigns the solver a region of `byteLength` bytes of `type` words, zeroed. Allocating may grow the world's memory, which
+   * detaches every typed-array view over it, its own and every other solver's: a solver takes its views after allocating and
+   * makes them afresh at each use, never holding one across steps (KB-PHYS-REGISTRYGROW1).
+   */
   allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
   /**
    * The port of field `field` at the current coupling tick: the owner's published data for a field the solver reads, and

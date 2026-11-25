@@ -56,3 +56,12 @@ export {
   type CouplingOptions,
   type CouplingScheme,
 } from './scheduler.js';
+export {
+  BODIES_FIELD,
+  BODY_IMPULSES_FIELD,
+  BODY_WORDS,
+  IMPULSE_WORDS,
+  RigidSolver,
+  rateLevelOf,
+  type RigidSolverParams,
+} from './solvers/rigid.js';

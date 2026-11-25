@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18866551,
+  "total": 18868348,
   "history": [
     {
       "date": "2026-10-24",
@@ -12003,6 +12003,12 @@
       "commit": "898f981ee9",
       "reason": "New optional @margoengine/mixer/pcm (offline mix in plain code, GAP-FILM-MIX): new entry measured by this run; no other entry grows, core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "e54a6d61a",
+      "reason": "RigidSolver joins the world entry: the rigid kernel as a framework solver, its bodies and bodyImpulses fields and its state regions (12,919 to 14,287 B gzip); every world with rigid bodies uses it, so a separate entry would only add an import",
+      "grew": 1
     }
   ],
   "items": {
@@ -12794,7 +12800,7 @@
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
-    "@margoengine/physics/world": 12919,
+    "@margoengine/physics/world": 14716,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

@@ -282,8 +282,11 @@ export function restoreSnapshot(
       'state',
       `The snapshot holds ${count} regions and the solvers name ${list.length}; restore it into the solvers it was taken of.`,
     );
-  // Read and check everything before writing anything, so a refused snapshot leaves the state as it was.
-  const copies: [Entry, Uint8Array][] = [];
+  // Read and check everything before writing anything, so a refused snapshot leaves the state as it was. Every mismatch is
+  // collected, so a world laid out otherwise is told all of it: a field's port and a kernel's columns grow with its capacity.
+  const copies: [Entry, Uint8Array][] = [],
+    problems: string[] = [];
+  let versioned = false;
   for (const entry of list) {
     const solver = text();
     const name = text();
@@ -292,23 +295,29 @@ export function restoreSnapshot(
     const layout = word();
     const length = word();
     if (solver !== entry.solver || name !== entry.region.name || extra !== entry.extra)
-      throw new MargoError(
-        'state',
-        `The snapshot has region '${name}' of solver '${solver}' where the solvers have '${entry.region.name}' of '${entry.solver}'.`,
+      problems.push(
+        `the snapshot has region '${name}' of solver '${solver}' where the solvers have '${entry.region.name}' of '${entry.solver}'`,
       );
-    if (layout !== entry.region.layout)
-      throw new MargoError(
-        'version',
-        `Region '${name}' of solver '${solver}' was saved at layout ${layout} and is now at layout ${entry.region.layout}.`,
+    else if (layout !== entry.region.layout) {
+      versioned = true;
+      problems.push(
+        `region '${name}' of solver '${solver}' was saved at layout ${layout} and is now at layout ${entry.region.layout}`,
       );
-    if (type !== entry.region.type || length !== entry.region.byteLength)
-      throw new MargoError(
-        'state',
-        `Region '${name}' of solver '${solver}' was ${length} bytes of ${type} and is now ${entry.region.byteLength} bytes of ${entry.region.type}.`,
+    } else if (type !== entry.region.type || length !== entry.region.byteLength)
+      problems.push(
+        `region '${name}' of solver '${solver}' was ${length} bytes of ${type} and is now ${entry.region.byteLength} bytes of ${entry.region.type}`,
       );
     need(length);
     copies.push([entry, bytes.subarray(at, at + length)]);
     at += length;
+  }
+  if (problems.length) {
+    const shown = problems.slice(0, 8).join('; '),
+      more = problems.length > 8 ? `; and ${problems.length - 8} more` : '';
+    throw new MargoError(
+      versioned ? 'version' : 'state',
+      `The snapshot does not fit these solvers (${problems.length} regions): ${shown}${more}. Restore it into solvers built as they were when it was taken.`,
+    );
   }
   need(16);
   const hash = decoder.decode(bytes.subarray(at, at + 16));
