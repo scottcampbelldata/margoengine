@@ -13,6 +13,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Not yet fixed because:** a fix changes the solver's order or its state (a credit of the work the pushing pass's friction took, which the relaxing pass may return and no more, needs a contact column), which is a design for the lead first; refreshing the arms each substep raised the 100 rad/s case to 1.64 times its energy, and switching friction off in the pushing pass (`setSolver({frictionInBiasPass: false})`) brings this scene to 1.0 but is a different answer for every resting contact, which this entry has not measured.
 - **Fixed already in the same area:** the world inverse inertia and the point masses of a body that has turned were those of the step's first pose, and a spinner gained 3.2 times its energy at 400 rad/s and 3.4 times at 2,000 (`refresh_turned_contacts`, `spin_energy.rs`).
 
+### Open: the sheen albedo test reads a commit the public repository does not have (KB-SHEENPIN-HISTORY1, materials)
+
+- **Repro:** `node --test packages/materials/test/sheen-albedo-fit.test.js` in a clone of the public repository: "the GPU
+  check reference is the pinned closed form the table replaced" fails with `fatal: invalid object name
+  '5cef0a120b9fbbf336c56a476f56ccac2f107960^'`.
+- **Cause:** the test compares `closedFormAlbedoWGSL` (scripts/sheen-albedo-fit.mjs) with `git show` of that commit's
+  parent, which is in the engine's earlier private history only. The shipped shader is not affected.
+
 ### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
 
 - **Repro:** `openWebSocket` a socket (or `dataChannelConnection` two channels), close the connection, count the listeners on the socket or

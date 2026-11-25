@@ -1263,6 +1263,39 @@ Limits: 8 layers and 9 distinct textures per feature (a Texture used twice in th
 are fixed at creation; numbers stay live. Layer normals use the surface's own tangent frame, which comes from the UVs
 when the geometry has no tangents.
 
+### Retroreflection (`@margoengine/materials/retroreflection`)
+
+`retroreflection()` sends part of a surface's light back toward its source, as road signs, safety vests, number plates
+and reflective paint do: brightest where the light sits at the eye (a headlight, a camera flash), dim from the side.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { retroreflection } from 'margoengine/materials/retroreflection';
+import { planeGeometry } from 'margoengine/geometry';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const sheeting = retroreflection({ strength: 0.8, roughness: 0.15 });
+createMesh(engine, planeGeometry(2, 2), new PbrMaterial({ color: [0.8, 0.05, 0.03, 1], features: [sheeting] }));
+sheeting.strength = 0.4; // live
+sheeting.color = [1, 0.9, 0.7]; // live: assign a new array
+```
+
+| Option | Meaning |
+| --- | --- |
+| `strength` | Share of the surface that retroreflects, 0 to 1: the material is `(1 - strength) x base + strength x retro lobe` (default 0.5). Live |
+| `roughness` | Perceptual roughness of the retro lobe, 0 to 1, drawn no lower than 0.045: how widely the return spreads (default 0.2). Live |
+| `color` | Linear reflectance of the retro lobe, three numbers 0 to 1; the material's `color` and `map` multiply it (default `[1, 1, 1]`). Live |
+
+The lobe is the Minimal Retroreflective Microfacet model (Portsmouth, Raab, Belcour and Liu, JCGT 15(1), 2026,
+https://arxiv.org/abs/2606.08739): GGX evaluated with the view direction mirrored about the normal, which gives the
+back-vector lobe Belcour et al. fitted to measured retroreflectors (JOSA A 31(12), 2014,
+https://doi.org/10.1364/JOSAA.31.002561). It is reciprocal and, like the forward lobe, never returns more light than it
+takes, so the mix is bounded too. It follows the surface's normal map, answers the sun, `Clustered` point, spot and
+directional lights and image-based lighting, works on a loaded glTF model through `install(model, {features})`, and is
+saved by `/serialization`. Like `hair()` and `eye()` it needs a `PbrMaterial` without anisotropy or a thin film.
+
 ### Soot and presets (`@margoengine/materials/soot`, `/presets`)
 
 `soot()` darkens a surface where a fire's smoke reaches it and returns a `layered()` layer, so firelight, shadows and

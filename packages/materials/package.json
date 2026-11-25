@@ -112,6 +112,10 @@
       "types": "./dist/fur.d.ts",
       "import": "./dist/fur.js"
     },
+    "./retroreflection": {
+      "types": "./dist/retroreflection.d.ts",
+      "import": "./dist/retroreflection.js"
+    },
     "./soot": {
       "types": "./dist/soot.d.ts",
       "import": "./dist/soot.js"

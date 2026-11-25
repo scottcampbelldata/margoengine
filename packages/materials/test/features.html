@@ -19,6 +19,8 @@ import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {stochasticTiling} from '/packages/materials/dist/stochastic.js';
 import {hair} from '/packages/materials/dist/hair.js';
 import {eye} from '/packages/materials/dist/eye.js';
+import {retroreflection} from '/packages/materials/dist/retroreflection.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
 import {skin,skinTable,skinProfileOf} from '/packages/materials/dist/skin.js';
 import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
@@ -127,6 +129,34 @@ const wrongPixels=(data,keep)=>{
   return wrong;
 };
 window.check={
+  // A flat quad seen 40 degrees off its normal, lit from the eye's side (`side` 1, the light stands where the view
+  // direction points) or from the mirror side (-1), by the sun, one clustered point light or an image bright on that side
+  // only. `steps` are live changes to the feature, one more picture each. The middle pixel, linear.
+  async retro({side=1,light='sun',options,steps=[],normal=false}){
+    const s=Math.sin(40*Math.PI/180),c=Math.cos(40*Math.PI/180),made=await scene({position:[5*s,0,5*c],target:[0,0,0],fov:60}),{engine,errors,render}=made;
+    const toward=[side*s,0,c];
+    engine.lighting.direction.set([...toward,light==='sun'?0.5:0]);engine.lighting.radiance.set([1,1,1,0]);
+    const feature=options&&retroreflection(options),lights=light==='point'?Clustered.attach(engine):undefined;
+    lights?.setLights([{position:toward.map(v=>v*50),color:[1,1,1],intensity:0.5*2500,range:1e6}]);
+    // The normal map tilts the surface to face the camera.
+    const normalMap=normal?new Texture({data:new Uint8Array(Array.from({length:4},()=>[Math.round((s+1)*127.5),128,Math.round((c+1)*127.5),255]).flat()),width:2,height:2},{colorSpace:'linear',mipmaps:false}):undefined;
+    const material=new PbrMaterial({color:[0.8,1,1,1],roughness:0.5,metalness:0,toneMapped:false,normalMap,features:feature?[feature]:[]}),mesh=createMesh(engine,quad(),material);
+    lights?.add(mesh);
+    if(light==='image'){
+      // White in the part of the sphere around the world x axis on `side`, black elsewhere.
+      const width=64,height=32,data=new Float32Array(width*height*4);
+      for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+        const phi=((x+0.5)/width-0.5)*2*Math.PI,theta=(y+0.5)/height*Math.PI,v=Math.sin(theta)*Math.sin(phi)*side>0.3?1:0;
+        data.set([v,v,v,1],(y*width+x)*4);
+      }
+      const environment=await Environment.attach(engine,{width,height,data});EnvironmentLighting.attach(engine,environment).add(mesh);
+    }
+    await render();
+    const read=async()=>at(await pixels(made),size/2,size/2),colors=[await read()];
+    for(const step of steps){Object.assign(feature,step);await render();colors.push(await read());}
+    material.features=[];await render();const removed=await read();engine.dispose();
+    return {colors,removed,errors};
+  },
   // A surface cut by a slanted plane in front of a wall, with the feature and without: the same picture but for edge pixels.
   async clip(){
     const half=5*Math.tan(Math.PI/6),plane=[0.6,0.8,0,-0.3],keep=(x,y)=>plane[0]*x+plane[1]*y+plane[3];

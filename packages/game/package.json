@@ -1803,6 +1803,10 @@
       "types": "./dist/materials/fur.d.ts",
       "import": "./dist/materials/fur.js"
     },
+    "./materials/retroreflection": {
+      "types": "./dist/materials/retroreflection.d.ts",
+      "import": "./dist/materials/retroreflection.js"
+    },
     "./materials/soot": {
       "types": "./dist/materials/soot.d.ts",
       "import": "./dist/materials/soot.js"

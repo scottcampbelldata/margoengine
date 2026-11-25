@@ -85,6 +85,58 @@ async function runFeatures(compat) {
       assert.deepEqual([live.wedge.rasterized, live.wedge.discarded, live.wedge.wrong], [false, true, 0]);
       assert.deepEqual([live.union.rasterized, live.union.wrong], [!compat, 0]);
     },
+    async retro() {
+      const c = Math.cos((40 * Math.PI) / 180),
+        base = [0.8, 1, 1],
+        color = [1, 0.5, 0],
+        options = { strength: 1, roughness: 0.5, color };
+      // The retro lobe with the light at the eye: the back vector is the normal (nh = 1), GGX with a2 = 0.5^4, nl = nv.
+      const lobe = (tint, nv) => {
+        const a2 = 0.5 ** 4,
+          d = 1 / (Math.PI * a2),
+          g = nv / Math.sqrt(a2 + (1 - a2) * nv * nv);
+        return tint.map((v, k) => {
+          const f0 = v * base[k];
+          return ((d * g * (f0 + (1 - f0) * (1 - nv) ** 5)) / (4 * nv * nv)) * nv * 0.5;
+        });
+      };
+      const run = async (args) => {
+        const got = await check('retro', args);
+        console.log(JSON.stringify({ label: 'retro', ...args, ...got }));
+        assert.deepEqual(got.errors, []);
+        return got;
+      };
+      const plain = await run({}),
+        zero = await run({ options: { ...options, strength: 0 } }),
+        full = await run({ options, steps: [{ strength: 0.5 }, { strength: 1, color: [0, 1, 1] }] });
+      near(zero.colors[0], plain.colors[0], 'strength 0 is the material', 0.005);
+      near(full.removed, plain.colors[0], 'a removed feature leaves the material', 0.005);
+      near(full.colors[0], lobe(color, c), 'the lobe toward the eye');
+      const half = lobe(color, c).map((v, k) => (v + plain.colors[0][k]) / 2);
+      near(full.colors[1], half, 'live strength mixes the material and the lobe');
+      near(full.colors[2], lobe([0, 1, 1], c), 'live colour');
+      const mapped = await run({ options, normal: true });
+      near(mapped.colors[0], lobe(color, 1), 'the normal map turns the lobe', 0.03);
+      for (const light of ['sun', 'point', 'image']) {
+        const toward = await run({ light, options }),
+          away = await run({ side: -1, light, options }),
+          near_ = await run({ light }),
+          mirrored = await run({ side: -1, light });
+        // The material mirrors the far side's light into the eye; the retro surface returns the near side's.
+        assert.ok(
+          toward.colors[0][0] > 3 * away.colors[0][0] + 0.02,
+          `${light}: ${toward.colors[0]} ${away.colors[0]}`,
+        );
+        assert.ok(
+          toward.colors[0][0] > near_.colors[0][0] + 0.02,
+          `${light} returned: ${toward.colors[0]} ${near_.colors[0]}`,
+        );
+        assert.ok(
+          away.colors[0][0] < mirrored.colors[0][0],
+          `${light} mirrored: ${away.colors[0]} ${mirrored.colors[0]}`,
+        );
+      }
+    },
     async dithering() {
       const encode = (v) => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
         from = 0.004,
@@ -237,7 +289,10 @@ async function runFeatures(compat) {
       const unfollowed = await check('modelFeatures', { feature: 'hair', turn: Math.PI / 2, follow: false });
       console.log('model features hair unfollowed', JSON.stringify(unfollowed));
       assert.deepEqual(unfollowed.errors, []);
-      assert.ok(unfollowed.same > 8, `hair without follow points the wrong way once the joint turns: ${unfollowed.same}`);
+      assert.ok(
+        unfollowed.same > 8,
+        `hair without follow points the wrong way once the joint turns: ${unfollowed.same}`,
+      );
     },
     async character() {
       // Every model answers a clustered light as it answers the sun, within the 8-bit step around these colours.
@@ -479,7 +534,10 @@ async function runFeatures(compat) {
         sunlit = lidSun.values.map((v, k) => v / bareSun.values[k]);
       console.log('lid over ambient', sky, 'over the sun', sunlit);
       assert.deepEqual([...lidAmbient.errors, ...bareAmbient.errors, ...lidSun.errors, ...bareSun.errors], []);
-      assert.ok(Math.min(...bareAmbient.values, ...bareSun.values) > 0.02, `lit: ${bareAmbient.values} ${bareSun.values}`);
+      assert.ok(
+        Math.min(...bareAmbient.values, ...bareSun.values) > 0.02,
+        `lit: ${bareAmbient.values} ${bareSun.values}`,
+      );
       const lidV = (h) => {
           const q = Math.max(0, 0.375 - h) * 6;
           return 0.2015 + 0.7985 * (1 - 1 / (1 + 0.44 * q + 1.15 * q * q));
@@ -509,7 +567,10 @@ async function runFeatures(compat) {
         lowExpected = lowAmbient.seen.map(lowV);
       console.log('lower lid over ambient', ground, 'over a sun from below', under);
       assert.deepEqual([...lowAmbient.errors, ...noneAmbient.errors, ...lowSun.errors, ...noneSun.errors], []);
-      assert.ok(Math.min(...noneAmbient.values, ...noneSun.values) > 0.02, `lit: ${noneAmbient.values} ${noneSun.values}`);
+      assert.ok(
+        Math.min(...noneAmbient.values, ...noneSun.values) > 0.02,
+        `lit: ${noneAmbient.values} ${noneSun.values}`,
+      );
       assert.ok(
         ground.every((v, k) => Math.abs(v - lowExpected[k]) < 0.03) && lowExpected[0] < 0.9 && lowExpected[2] > 0.97,
         `ambient over the lower lid: ${ground} against ${lowExpected}`,

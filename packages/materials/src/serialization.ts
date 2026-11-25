@@ -10,6 +10,7 @@ import { eye } from './eye.js';
 import { skin } from './skin.js';
 import { layered } from './layered.js';
 import { stochasticTiling } from './stochastic.js';
+import { retroreflection } from './retroreflection.js';
 
 /** Serialized reference or primitive. Non-JSON numeric values retain their exact meaning. */
 export type MaterialValue = null | boolean | string | number | { ref: number } | { special: string };
@@ -50,7 +51,7 @@ const fail = (message: string): never => {
 };
 const classes = { Material, ...kinds };
 const constructors = new Map(Object.entries(classes).map(([name, Class]) => [Class, name]));
-const featureFactories = { alphaHash, objectNormal, hair, eye, skin, layered, stochasticTiling };
+const featureFactories = { alphaHash, objectNormal, hair, eye, skin, layered, stochasticTiling, retroreflection };
 const typed = {
   Uint8Array,
   Uint8ClampedArray,
