@@ -5234,7 +5234,7 @@ See the [clean-room record](../clean-room.md#water-planar-capture-edges-2026-11-
 
 ### Soft bodies on a small Wasm kernel (2026-11-24)
 
-Claim: ropes and cloth in `@margoengine/physics/soft` follow closed forms and replay bit for bit, and a rigid body that a soft body presses on takes the impulse, shared by inverse mass. Proof: `packages/physics/tests/soft.test.js` (catenary sag and per-particle height, cloth hanging length and edge lengths, box on cloth, tearing events, replay hash, removal) and the Rust tests in `packages/physics/soft-kernel/tests`. Not claimed: speed, volumetric or finite-element bodies, and contact with meshes. Sources in the [clean-room record](../clean-room.md#soft-bodies-particles-distance-constraints-and-contacts-physicssoft-2026-11-24).
+Claim: ropes and cloth in `@margoengine/physics/soft` follow closed forms and replay bit for bit, and a rigid body that a soft body presses on takes the impulse, shared by inverse mass. Proof: `packages/physics/tests/soft.test.js` (catenary sag and per-particle height, cloth hanging length and edge lengths, box on cloth, tearing events, replay hash, removal) and the Rust tests in `packages/physics/soft-kernel/tests`. Not claimed: speed, volumetric or finite-element bodies, and contact with meshes. Sources in the [clean-room record](../clean-room.md#soft-bodies-particles-distance-constraints-and-contacts-margoenginephysicssoft-2026-11-24).
 
 ### A rope holds its length under any load and at any solver setting (physics soft, 2026-11-24)
 
