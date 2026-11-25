@@ -2210,6 +2210,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/procedural@1.0.0",
     "imports": "import { Noise } from '@margoengine/procedural';",
     "exports": [
+      "Metaballs",
       "Noise",
       "ROOF_PITCH",
       "SIMPLEX_SCALE",
