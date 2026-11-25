@@ -4,6 +4,7 @@
 // - GPUMeshBVH: uploaded tree, then a raycast (input, output and readback buffers come and go with the call).
 // - GPUMeshBVH.forShader: uploaded with no compute pipeline.
 // - GPUDynamicBVH (build and refit): working buffers and passes over a vertex buffer the caller owns.
+// - GPUSceneBVH: two placements of one tree, a raycast, then a move and update().
 // - SceneBVH: an update over a mesh of the scene.
 // The trees are not engine plugins, so each is created in the owner's scope and tied to a plugin registration that
 // releases it the way a scene or engine disposal does (ownedByEngine); release is safe to repeat.
@@ -18,6 +19,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { MeshBVH } = await load('../dist/index.js');
   const { GPUMeshBVH } = await load('../dist/gpu.js');
   const { GPUDynamicBVH } = await load('../dist/gpu-build.js');
+  const { GPUSceneBVH } = await load('../dist/gpu-scene.js');
   const { SceneBVH } = await load('../dist/scene.js');
   const build = () => MeshBVH.build({ positions, indices });
   return [
@@ -27,6 +29,20 @@ export async function fixtures(load = (entry) => import(entry)) {
         const gpu = await GPUMeshBVH.create(engine, build());
         await gpu.raycast(ray);
         return ownedByEngine(scene, 'GPUMeshBVH', () => gpu.dispose());
+      },
+    },
+    {
+      name: 'GPUSceneBVH',
+      async create({ engine, scene }) {
+        const bvh = build(),
+          placed = await GPUSceneBVH.create(engine, [
+            { bvh },
+            { bvh, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1] },
+          ]);
+        await placed.raycast(ray);
+        placed.setMatrix(1, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -3, 0, 0, 1]);
+        placed.update();
+        return ownedByEngine(scene, 'GPUSceneBVH', () => placed.dispose());
       },
     },
     {

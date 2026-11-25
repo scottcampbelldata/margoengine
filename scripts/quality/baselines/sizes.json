@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19125186,
+  "total": 19132933,
   "history": [
     {
       "date": "2026-10-24",
@@ -12429,6 +12429,12 @@
       "commit": "526cc95c9",
       "reason": "physics/flight ceiling 7,401 to 8,719 B (built 8,463 B): AirSolver, the air's loads as a framework solver through bodyForces, and the hold that sums each body's air loads for one step and takes them off exactly (KB-AERO-FORCERESIDUE1). In the flight entry rather than the world entry, so a world without air loads pays nothing; a split of its own would load with every flight scene that uses a world. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "FG-17e",
+      "reason": "FG-17 piece 6a new entry bvh/gpu-scene 7,747 B gzip: GPUSceneBVH (two-level scene tree: pooled bottom trees, CPU binned-SAH top tree with refit and rebuild, instance records with materials, raycast and encodeTrace) and sceneBvhWGSL; the shared triangle WGSL and node packing moved to gpu-pack.ts so bvh/gpu does not grow; optional, nothing else imports it",
+      "grew": 1
     }
   ],
   "items": {
@@ -12555,6 +12561,7 @@
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/gpu": 5402,
     "@margoengine/bvh/gpu-build": 19505,
+    "@margoengine/bvh/gpu-scene": 7747,
     "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/parallel": 11405,

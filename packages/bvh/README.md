@@ -580,6 +580,56 @@ console.log(code.length);
 
 Queries run in float32, so a `precision: 'float64'` source is rounded on upload. The triangle test is watertight (Woop, Benthin and Wald, JCGT 2013): no ray slips between two triangles that share an edge. Equal distances answer the lowest face index, as `raycastFirst` does. The tree, the rays and the hits must each fit `maxStorageBufferBindingSize`; anything larger throws a RangeError, so request a higher limit or split the work.
 
+## GPU scenes: many placed trees
+
+`@margoengine/bvh/gpu-scene` traces a whole scene on the GPU: placed copies of `MeshBVH` trees under one top tree. Each distinct tree is uploaded once, however many instances place it, and a ray enters each instance through its inverse matrix, so distances stay world lengths. The top tree is built by binned SAH over the instances' world boxes; `setMatrix` and `update()` refit it after moves and rebuild it once it costs more than `rebuildThreshold` times its built cost. Each instance carries a material (`color`, `opacity`, `emissive`, `metalness`, `roughness`) for shaders that light what a ray hits, such as ray-traced reflections and global illumination.
+
+```ts
+import {MeshBVH} from 'margoengine/bvh';
+import {GPUSceneBVH} from 'margoengine/bvh/gpu-scene';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const tile = MeshBVH.build({positions: new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), indices: [0, 1, 2, 0, 2, 3]});
+const at = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1];
+
+using scene = await GPUSceneBVH.create(device, [
+  {bvh: tile, matrix: at(0), material: {color: [0.8, 0.1, 0.1]}},
+  {bvh: tile, matrix: at(3), material: {emissive: [4, 4, 4]}, side: 'front'},
+]);
+const hits = await scene.raycast([{origin: [3, 0, 5], direction: [0, 0, -1]}]);
+console.log(hits.instance[0], hits.distance[0]); // 1 5
+scene.setMatrix(1, at(6));
+console.log(scene.update()); // 'refit'
+```
+
+In your own shader, paste `sceneBvhWGSL({group, binding})` and bind `scene.bindings(binding)` (five bindings). It declares `sceneClosest(origin, direction, near, far)` and `sceneAny(...)`, which answer a `SceneHit` (`instance == SCENE_MISS` for a miss; `distance`, `face`, `barycoord`, `front`), `sceneNormal(hit)` (world geometric normal) and `sceneMaterial(hit.instance)`:
+
+```ts
+import {sceneBvhWGSL} from 'margoengine/bvh/gpu-scene';
+
+const code = `${sceneBvhWGSL({group: 1, binding: 0})}
+@group(0) @binding(0) var<storage, read_write> shade: array<vec4f>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+  let hit = sceneClosest(vec3f(0.0, 0.0, 5.0), vec3f(0.0, 0.0, -1.0), 0.0, 1000.0);
+  if (hit.instance == SCENE_MISS) { shade[id.x] = vec4f(0.0); return; }
+  let m = sceneMaterial(hit.instance);
+  shade[id.x] = vec4f(m.color * max(dot(sceneNormal(hit), vec3f(0.0, 0.0, 1.0)), 0.0) + m.emissive, 1.0);
+}`;
+console.log(code.length);
+```
+
+| Option | Where | Default |
+| --- | --- | --- |
+| `matrix` | instance | identity (16 numbers, column-major, affine and invertible) |
+| `material` | instance | `color` [1, 1, 1], `opacity` 1, `emissive` [0, 0, 0], `metalness` 0, `roughness` 0.5 |
+| `side` | instance | `'double'`; faces are named by the source winding with the normal carried through the matrix, mirrors included |
+| `rebuildThreshold` | `create`, `forShader` | 1.5 |
+| `mode`, `near`, `far`, `signal` | `raycast` | `'closest'`, 0, Infinity, none |
+| `group`, `binding` | `sceneBvhWGSL` | 0, 0 |
+
+`GPUSceneBVH.forShader(device, instances)` uploads at once with no trace pipeline, for your own shaders only. `encodeTrace(encoder, rays, hits, count, {mode})` keeps rays and hits on the GPU (`GPU_SCENE_RAY_FLOATS` floats a ray in, `GPU_SCENE_HIT_WORDS` words a hit out). Equal distances answer the lowest instance, then the lowest face, so every device agrees. Bottom trees are uploaded from CPU `MeshBVH` trees; a tree built on the GPU (`gpu-build`) cannot join a scene yet. Instances, trees and the top tree are fixed in number after `create`; make a new scene to add or remove one.
+
 ## Benchmark
 
 `npm run bench` on Node 22, one core of a shared 2-core container, 1M triangles:

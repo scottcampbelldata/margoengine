@@ -53,6 +53,10 @@
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js"
     },
+    "./gpu-scene": {
+      "types": "./dist/gpu-scene.d.ts",
+      "import": "./dist/gpu-scene.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

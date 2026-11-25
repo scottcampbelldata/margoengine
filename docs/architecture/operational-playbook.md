@@ -286,6 +286,23 @@ bit for bit. CPU: `tests/mesh-deform.test.js` and the `deforming_mesh_blends_box
 kernel test (blended vertices inside blended boxes at 17 times). Missing: blended shading normals and a cost figure for
 large deformations.
 
+Piece 6a (same day): `@margoengine/bvh/gpu-scene` (`GPUSceneBVH`, `sceneBvhWGSL`), the scene tree real-time ray
+tracing builds on. Two levels (Wald, Benthin and Slusallek 2003): each distinct MeshBVH is one bottom tree in a shared
+pool of nodes, triangle slots (three indices and the source face, 16 bytes) and positions; the top tree is built on the
+CPU by 16-bin SAH over the instances' world boxes (Wald 2007), one instance a leaf, depth-first so a parent precedes its
+children, and refitted bottom-up on `update()`, rebuilt past 1.5 times its built SAH cost. A ray enters an instance
+through the world-to-object rows with its direction unnormalized, so the watertight test (Woop, Benthin and Wald 2013,
+now one `triangleWGSL` shared with `bvhWGSL` in `src/gpu-pack.ts`) answers world distances and the face test follows
+the transformed normal (mirrors included). Below depth 40 the top build splits by count, so no tree outgrows the
+64-entry stack. Evidence: `packages/bvh/tests/gpu-scene-browser.js` in `test:browser` (RTX A6000, WebGPU and the WebGL2
+layer, identical figures): 20,000 of 20,000 rays match one float64 CPU tree of the 50 instances (3 meshes, 7 mirrored)
+flattened into world space, any-hit agrees with closest on every ray, 20,000/20,000 after a refit and 3,999/4,000 after
+a rebuild (one shared-edge tie), `sceneNormal` and `sceneMaterial` in a shader of our own give the CPU face normal and
+material on 2,036 hits, front-only faces skip rays from inside a closed mesh, an empty scene misses. CPU:
+`tests/gpu-scene.test.js` (every instance in one leaf, nested boxes, shared bottom trees, depth under 64 for boxes at
+2^(i/4), refit and rebuild, record layout, input checks). Missing: bottom trees built on the GPU, instance add and
+remove after create, and a stackless walk for the compatibility layer (not needed so far: the stack walk runs there).
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object
