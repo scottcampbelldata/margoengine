@@ -154,7 +154,7 @@ pub extern "C" fn world_timing(handle: i32, phase: u32) -> f32 {
 /// 3 contact damping ratio, 4 contact max push (m/s), 5 restitution threshold (m/s), 6 sleep threshold (m/s), 7 sleep time
 /// (s), 8 sleeping allowed (0 or 1), 9 block solver (0 or 1), 10 joint hertz, 11 joint damping ratio, 12 joint max push
 /// (m/s), 13 joint geometric stiffness (0 or 1).
-const SETTINGS: usize = 15;
+const SETTINGS: usize = 18;
 
 /// Sets one solver setting. A count must be a whole number from 1 to 65535 (the continuous collision limit from 0), a flag 0 or 1, and every other value finite and
 /// not below 0. Nothing changes for a value that fails.
@@ -191,6 +191,9 @@ pub extern "C" fn world_set_setting(handle: i32, which: u32, value: f32) -> i32 
             12 => s.joint_max_push = amount(value)?,
             13 => s.joint_geometric_stiffness = flag(value)?,
             14 => s.max_ccd_substeps = ccd(value)?,
+            15 => s.min_ccd_dt = amount(value)?,
+            16 => s.ccd_tolerance = if value >= 1.0e-7 { value } else { return Err(PhysicsError::InvalidParameter) },
+            17 => s.ccd_max_advances = if (0.0..=4096.0).contains(&value) && (value as u32) as f32 == value { value as u32 } else { return Err(PhysicsError::InvalidParameter) },
             _ => return Err(PhysicsError::InvalidParameter),
         }
         Ok(0)
@@ -205,7 +208,8 @@ pub extern "C" fn world_settings(handle: i32) -> i32 {
         let all: [f32; SETTINGS] = [
             s.substeps as f32, s.passes as f32, s.contact_hertz, s.contact_damping, s.contact_max_push, s.restitution_threshold,
             s.sleep_threshold, s.sleep_time, s.sleep as u32 as f32, s.block_solver as u32 as f32, s.joint_hertz, s.joint_damping,
-            s.joint_max_push, s.joint_geometric_stiffness as u32 as f32, s.max_ccd_substeps as f32,
+            s.joint_max_push, s.joint_geometric_stiffness as u32 as f32, s.max_ccd_substeps as f32, s.min_ccd_dt, s.ccd_tolerance,
+            s.ccd_max_advances as f32,
         ];
         ensure(SETTINGS);
         for (i, value) in all.into_iter().enumerate() {

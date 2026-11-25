@@ -180,3 +180,34 @@ test('maxCcdSubsteps agrees with Rapier 2D: a ball at 300 m/s between two walls 
   const [four, fourV] = mine(4);
   assert.ok(Math.abs(four + 0.4) < 0.02 && Math.abs(fourV - 300) < 1e-3, `four: ${four}, ${fourV}`);
 });
+
+test('minCcdDt, ccdTolerance and ccdMaxAdvances change where a sweep stops, by the 3D names and meanings', () => {
+  const run = (options) => {
+    const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 0] });
+    physics.setSolver(options);
+    physics.addBody(null, { type: 'fixed', position: [3, 0], colliders: { shape: 'box', width: 0.1, height: 10 } });
+    const ball = physics.addBody(null, {
+      ccd: true,
+      canSleep: false,
+      position: [0.6, 0],
+      linearVelocity: [300, 0],
+      colliders: { shape: 'circle', radius: 0.1, restitution: 0 },
+    });
+    physics.step();
+    const x = ball.position[0];
+    physics.dispose();
+    return x;
+  };
+  assert.ok(Math.abs(run({}) - 2.85) < 0.01, 'by default it reaches the wall');
+  assert.ok(Math.abs(run({ ccdMaxAdvances: 0 }) - 0.6) < 1e-4, 'with no advance it is held where the sweep began');
+  assert.ok(
+    Math.abs(run({ minCcdDt: 1 }) - 0.6) < 1e-4,
+    'with an advance never worth taking it is held too, and never goes through',
+  );
+  assert.ok(
+    run({ ccdTolerance: 0.001 }) > run({ ccdTolerance: 0.05 }) + 0.01,
+    'a coarser tolerance stops farther from the wall',
+  );
+  for (const bad of [{ ccdTolerance: 0 }, { ccdMaxAdvances: 4097 }, { ccdMaxAdvances: 2.5 }, { minCcdDt: -1 }])
+    assert.throws(() => run(bad), RangeError);
+});

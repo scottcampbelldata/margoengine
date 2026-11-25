@@ -13,8 +13,8 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step.
-const VERSION: u32 = 11;
+/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances.
+const VERSION: u32 = 12;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -159,6 +159,9 @@ impl World {
         w.u8(matches!(s.broad_phase, BroadPhase::Sweep) as u8);
         w.bool(s.contact_lanes);
         w.u32(s.max_ccd_substeps);
+        w.f32(s.min_ccd_dt);
+        w.f32(s.ccd_tolerance);
+        w.u32(s.ccd_max_advances);
         w.u64(self.steps);
         w.u32(self.bodies.len() as u32);
         for b in &self.bodies {
@@ -348,7 +351,8 @@ impl World {
         let broad_phase = if r.u8()? == 1 { BroadPhase::Sweep } else { BroadPhase::Tree };
         let contact_lanes = r.bool()?;
         let max_ccd_substeps = if r.version >= 11 { r.u32()? } else { 1 };
-        let settings = Settings { gravity, substeps, passes, contact_hertz, contact_damping, contact_max_push, restitution_threshold, sleep_threshold, sleep_time, sleep, block_solver, joint_hertz, joint_damping, joint_max_push, joint_geometric_stiffness, broad_phase, contact_lanes, max_ccd_substeps };
+        let (min_ccd_dt, ccd_tolerance, ccd_max_advances) = if r.version >= 12 { (r.f32()?, r.f32()?, r.u32()?) } else { (0.0, crate::shape::LINEAR_SLOP, 32) };
+        let settings = Settings { gravity, substeps, passes, contact_hertz, contact_damping, contact_max_push, restitution_threshold, sleep_threshold, sleep_time, sleep, block_solver, joint_hertz, joint_damping, joint_max_push, joint_geometric_stiffness, broad_phase, contact_lanes, max_ccd_substeps, min_ccd_dt, ccd_tolerance, ccd_max_advances };
         let mut world = World::new(settings);
         world.steps = r.u64()?;
         let n = r.count(60)?;

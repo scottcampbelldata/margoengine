@@ -31,9 +31,6 @@ use crate::world::{
     ContactMod, EVENT_COLLISION, EVENT_CONTACT_FORCE, Event, EventKind, ForceEvent, HOOK_CONTACT, Kind, SPECULATIVE, World, bounds_of, groups_meet, pair_allowed,
 };
 
-/// The gap at which a time of impact stops: the shapes rest within the linear slop of each other.
-const TARGET: f32 = LINEAR_SLOP;
-const MAX_ITERATIONS: usize = 32;
 
 /// Where a body was when the step began: its centre of mass (in doubles) and rotation.
 #[derive(Clone, Copy, Debug)]
@@ -85,6 +82,7 @@ impl World {
         if limit == 0 {
             return Ok(());
         }
+        let (min_dt, tolerance, max_advances) = (self.settings.min_ccd_dt, self.settings.ccd_tolerance, self.settings.ccd_max_advances as usize);
         let mut candidates = Vec::new();
         let mut inner = crate::world::now();
         // Bodies an impact has moved: the fraction of the step they were set to, and their centre of mass and rotation there. A body
@@ -193,14 +191,24 @@ impl World {
                             continue;
                         }
                         let (mut t, mut gap, mut found) = (0.0f32, first, None);
-                        for i in 0..MAX_ITERATIONS {
-                            t += (gap - 0.5 * TARGET) / together;
+                        // No advances at all: the time reached is the step's start, before any touch.
+                        if max_advances == 0 {
+                            found = Some(0.0);
+                        }
+                        for i in 0..max_advances {
+                            let advance = (gap - 0.5 * tolerance) / together;
+                            // An advance shorter than the least time worth taking stops the body at the time reached, before any touch.
+                            if advance * (1.0 - tau0) * dt < min_dt {
+                                found = Some(t);
+                                break;
+                            }
+                            t += advance;
                             if t >= earliest {
                                 break;
                             }
                             gap = gap_at(t)?;
-                            // Out of iterations while still closing: stop at the safe time reached rather than tunnel.
-                            if gap <= TARGET || i + 1 == MAX_ITERATIONS {
+                            // Out of advances while still closing: stop at the safe time reached rather than tunnel.
+                            if gap <= tolerance || i + 1 == max_advances {
                                 found = Some(t);
                                 break;
                             }

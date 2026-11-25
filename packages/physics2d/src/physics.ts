@@ -306,6 +306,9 @@ const SOLVER_SETTINGS = [
   ['jointMaxPush', 'speed'],
   ['jointGeometricStiffness', 'flag'],
   ['maxCcdSubsteps', 'whole'],
+  ['minCcdDt', 'amount'],
+  ['ccdTolerance', 'length'],
+  ['ccdMaxAdvances', 'advances'],
 ] as const;
 
 /** The settings of the solver that {@link Physics2D.setSolver} changes. */
@@ -341,6 +344,15 @@ export interface Physics2DSolverOptions {
    * so a fast ball bouncing between two walls keeps bouncing inside one step. Rapier's `maxCcdSubsteps`.
    */
   maxCcdSubsteps?: number;
+  /**
+   * The least time, in seconds, a continuous-collision advance is worth (default 0: every advance is taken); a sweep whose next advance is
+   * shorter stops the body at the time it has reached, before any touch. The name and meaning of the 3D world's `minCcdDt`.
+   */
+  minCcdDt?: number;
+  /** How close, in world units, the sweep brings a body to what it meets before it stops (default 5 mm; at least 1e-7 m), as the 3D `ccdTolerance`. */
+  ccdTolerance?: number;
+  /** The most advances the sweep takes for a pair of colliders (default 32, 0 to 4096); the time reached after them is before any touch, as the 3D `ccdMaxAdvances`. */
+  ccdMaxAdvances?: number;
 }
 
 /**
@@ -562,7 +574,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const read = kernel.io(kernel.ok(kernel.exports.world_settings(this.handle))).f;
     const out: Record<string, number | boolean> = {};
     SOLVER_SETTINGS.forEach(([name, kind], at) => {
-      out[name] = kind === 'flag' ? read[at] !== 0 : kind === 'speed' ? read[at]! / this.scale : read[at]!;
+      out[name] =
+        kind === 'flag' ? read[at] !== 0 : kind === 'speed' || kind === 'length' ? read[at]! / this.scale : read[at]!;
     });
     return out as Required<Physics2DSolverOptions>;
   }
@@ -576,22 +589,32 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     for (const [name, kind] of SOLVER_SETTINGS) {
       const value = options[name] as number | undefined;
       if (kind === 'flag' || value === undefined) continue;
-      if (
+      const whole = Number.isInteger(value);
+      const [valid, wanted, hint] =
         kind === 'count'
-          ? !(Number.isInteger(value) && value >= 1 && value <= 65535)
+          ? [whole && value >= 1 && value <= 65535, 'a whole number from 1 to 65535', 'a count such as 4']
           : kind === 'whole'
-            ? !(Number.isInteger(value) && value >= 0 && value <= 65535)
-            : !(value >= 0 && value < Infinity)
-      )
-        throw new RangeError(
-          `Solver ${name} must be ${kind === 'count' ? 'a whole number from 1 to 65535' : kind === 'whole' ? 'a whole number from 0 to 65535' : 'a finite number of 0 or more'}; got ${value}. Give ${kind === 'count' ? 'a count such as 4' : '0 for none'}.`,
-        );
+            ? [whole && value >= 0 && value <= 65535, 'a whole number from 0 to 65535', '0 for none']
+            : kind === 'advances'
+              ? [whole && value >= 0 && value <= 4096, 'a whole number from 0 to 4096', 'a count such as 32']
+              : kind === 'length'
+                ? [
+                    value * this.scale >= 1e-7 && value < Infinity,
+                    'a finite number of 1e-7 metres or more',
+                    'a distance such as 0.005',
+                  ]
+                : [value >= 0 && value < Infinity, 'a finite number of 0 or more', '0 for none'];
+      if (!valid) throw new RangeError(`Solver ${name} must be ${wanted}; got ${value}. Give ${hint}.`);
     }
     SOLVER_SETTINGS.forEach(([name, kind], at) => {
       const value = options[name];
       if (value !== undefined)
         kernel.ok(
-          kernel.exports.world_set_setting(this.handle, at, Number(value) * (kind === 'speed' ? this.scale : 1)),
+          kernel.exports.world_set_setting(
+            this.handle,
+            at,
+            Number(value) * (kind === 'speed' || kind === 'length' ? this.scale : 1),
+          ),
         );
     });
     return this;

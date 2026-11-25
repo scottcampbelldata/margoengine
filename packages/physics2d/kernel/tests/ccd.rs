@@ -484,3 +484,45 @@ fn a_fast_ball_goes_through_a_one_way_platform_from_below_and_bounces_off_it_fro
     w.step(DT).unwrap();
     assert!((w.bodies[b as usize].xf.p.y - 0.15).abs() < 0.01, "stopped on top: {}", w.bodies[b as usize].xf.p.y);
 }
+
+/// A ball at 300 m/s, 5 m a step, 2.4 m from a thin wall at x = 3 (its face at 2.95, the ball's radius 0.1): where the step leaves it.
+fn stopped_ball(settings: Settings) -> f32 {
+    let mut w = World::new(Settings { gravity: V2::ZERO, ..settings });
+    let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(3.0, 0.0), ..Default::default() }).unwrap();
+    w.create_shape(wall, Core::rect(0.05, 5.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    let ball = w.create_body(&BodyDef { position: v2(0.6, 0.0), linear_velocity: v2(300.0, 0.0), ccd: true, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(ball, Core::circle(V2::ZERO, 0.1).unwrap(), &ShapeDef { restitution: 0.0, friction: 0.0, ..Default::default() }).unwrap();
+    w.step(DT).unwrap();
+    w.bodies[ball as usize].xf.p.x
+}
+
+#[test]
+fn the_tolerance_sets_how_close_the_sweep_stops_to_the_wall() {
+    // The wall's face is at 2.95: the ball's centre is 0.1 short of it when they touch. The sweep stops within the tolerance of that.
+    let touch = 2.85f32;
+    for tolerance in [0.002f32, 0.005, 0.02, 0.05] {
+        let x = stopped_ball(Settings { ccd_tolerance: tolerance, ..Default::default() });
+        let gap = touch - x;
+        assert!(gap >= -1.0e-4 && gap <= tolerance + 1.0e-4, "tolerance {tolerance}: stopped {gap} from touching");
+        // It aims half the tolerance short and stops at the first advance within the tolerance of it: not further than the tolerance.
+        assert!(gap >= 0.0 || tolerance < 0.003, "tolerance {tolerance}: stopped past the touch ({gap})");
+    }
+    let (fine, coarse) = (stopped_ball(Settings { ccd_tolerance: 0.002, ..Default::default() }), stopped_ball(Settings { ccd_tolerance: 0.05, ..Default::default() }));
+    assert!(fine > coarse + 0.01, "a coarser tolerance stops farther from the wall: {fine} against {coarse}");
+}
+
+#[test]
+fn few_advances_and_a_long_least_advance_stop_the_ball_short_of_the_wall_and_never_through_it() {
+    // With the defaults it reaches the wall (the ball's centre 2.85).
+    assert!((stopped_ball(Settings::default()) - 2.85).abs() < 0.01);
+    // No advances: the time reached is the start, before any touch: the ball is held where it began.
+    assert!((stopped_ball(Settings { ccd_max_advances: 0, ..Default::default() }) - 0.6).abs() < 1.0e-4);
+    // One advance aims half the tolerance short of the wall: from 2.25 m away, closing 300 m/s at the straight line's speed, the first advance lands
+    // at the touch and finds it, so one is enough here and two give the same.
+    let one = stopped_ball(Settings { ccd_max_advances: 1, ..Default::default() });
+    assert!(one <= 2.85 + 1.0e-4 && one > 0.6, "one advance: {one}");
+    // A least advance longer than the step: the first advance is not worth taking, and the ball stays where the sweep started.
+    assert!((stopped_ball(Settings { min_ccd_dt: 1.0, ..Default::default() }) - 0.6).abs() < 1.0e-4);
+    // One shorter than the advances it needs changes nothing.
+    assert!((stopped_ball(Settings { min_ccd_dt: 1.0e-9, ..Default::default() }) - 2.85).abs() < 0.01);
+}

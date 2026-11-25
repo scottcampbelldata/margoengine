@@ -542,6 +542,9 @@ export interface Physics2DSolverOptions {
     jointMaxPush?: number;
     jointGeometricStiffness?: boolean;
     maxCcdSubsteps?: number;
+    minCcdDt?: number;
+    ccdTolerance?: number;
+    ccdMaxAdvances?: number;
 }
 
 export class PidController2D {

@@ -439,6 +439,13 @@ pub struct Settings {
     /// How many impacts continuous collision handles in a step (0: continuous collision is off for the world). The first stops a body where
     /// it touches; each more answers the touch with a collision and sweeps the rest of the step with what it leaves. Default 1.
     pub max_ccd_substeps: u32,
+    /// The least time, in seconds, a continuous-collision advance is worth (default 0: every advance is taken). A sweep whose next advance is
+    /// shorter stops the body at the time it has reached, which is before any touch (the 3D world's `min_ccd_dt`).
+    pub min_ccd_dt: f32,
+    /// How close, in metres, the sweep brings a body to what it meets before it stops (default `LINEAR_SLOP`, 5 mm; at least 1e-7).
+    pub ccd_tolerance: f32,
+    /// The most advances the sweep takes for a pair of shapes (default 32, at most 4096); the time reached after them is before any touch.
+    pub ccd_max_advances: u32,
 }
 
 /// The broad phase. Both give the same pairs in the same order, so the same step to the bit; they differ in work.
@@ -515,6 +522,9 @@ impl Default for Settings {
             broad_phase: BroadPhase::Tree,
             contact_lanes: true,
             max_ccd_substeps: 1,
+            min_ccd_dt: 0.0,
+            ccd_tolerance: crate::shape::LINEAR_SLOP,
+            ccd_max_advances: 32,
         }
     }
 }
