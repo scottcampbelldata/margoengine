@@ -6095,6 +6095,10 @@
       "types": "./dist/xr/session.d.ts",
       "import": "./dist/xr/session.js"
     },
+    "./xr/launch": {
+      "types": "./dist/xr/launch.d.ts",
+      "import": "./dist/xr/launch.js"
+    },
     "./xr/reflection": {
       "types": "./dist/xr/reflection.d.ts",
       "import": "./dist/xr/reflection.js"
