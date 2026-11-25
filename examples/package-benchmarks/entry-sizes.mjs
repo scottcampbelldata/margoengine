@@ -51,7 +51,9 @@ export async function measureEntries({
       if (pkg.name === 'margoengine' && path !== '.') continue;
       const js = typeof target === 'string' ? target : (target.import ?? target.default);
       if (!js?.endsWith('.js') || !existsSync(resolve(root, 'packages', dir, js))) continue;
-      entries[path] = await size(resolve(root, 'packages', dir, js));
+      const measured = await size(resolve(root, 'packages', dir, js));
+      // A types-only entry (its .js is empty, as @margoengine/math/fields) ships no code, so it has no size to record.
+      if (measured.raw) entries[path] = measured;
     }
     const workers = resolve(root, 'packages', dir, 'dist/workers');
     if (existsSync(workers))
