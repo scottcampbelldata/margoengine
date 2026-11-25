@@ -6129,6 +6129,13 @@ tier), so this places the
 "two versions of one MSAA-resolved texture" row (docs/known-bugs.md) in the NVIDIA D3D driver path. Still missing: a
 self-contained replay that fails on the A6000, for the NVIDIA report.
 
+Section 5 evidence, recheck (2026-11-25, same Arc, origin/main 2634e6ac6, Edge 158 and Chrome 157): the dispersion grid on
+the layer (278 of 278 in 8 runs on both browsers, 2 of them beside a concurrent GPU load) and geo-lod restore are still exact, so the layer's resolve
+path is unchanged in behaviour and no layer change was made. New candidate page for the report:
+`docs/upstream-reports/KB5247d/hdr-resolve-repeat.html` (raw WebGL2: 4x RGBA16F resolve into a sampled snapshot, a refraction
+quad, a second resolve, then a pixel-pack read and a direct read of the same texture). Exact on the Arc under ANGLE D3D11 and
+ANGLE Vulkan. Still missing: its run on the A6000.
+
 ### Batch 99 spectral transport and section 5 evidence
 
 The optional voxel-pathtracer/spectral subclass generates its own tracing kernel through the existing

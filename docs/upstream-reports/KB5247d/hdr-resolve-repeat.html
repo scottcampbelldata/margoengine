@@ -1,0 +1,229 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>4x HDR resolve repeat</title>
+<pre id="out">running</pre>
+<script type="module">
+// Raw WebGL2, no engine code. Draws the same 4x RGBA16F frame again and again and reads its single-sample resolve
+// twice per frame, so a texture that returns two versions shows up either between frames or between the two reads.
+// Frame (the shape of the frame that varied on ANGLE D3D11 + RTX A6000, docs/known-bugs.md, "two versions of the same MSAA-resolved HDR texture"):
+//   1. clear the 4x RGBA16F colour and 4x depth renderbuffers;
+//   2. a dense mesh of flat HDR-coloured triangles (pixels on its edges hold samples of different colours);
+//   3. blitFramebuffer 4x -> RGBA16F "snapshot" texture (the resolved copy a later draw samples);
+//   4. a transmissive quad that samples the snapshot three times with a per-channel offset, blended over the scene;
+//   5. blitFramebuffer 4x -> RGBA16F "final" texture (the pass's resolve);
+//   6. read "final" as RGBA FLOAT through a pixel pack buffer and a fence, then at once with a direct readPixels.
+// Query: ?frames=N (120)  ?size=WxH (320x240)  ?invalidate=1 (invalidate the 4x attachments after the resolve)
+//        ?churn=N (create and delete N textures and buffers per frame)  ?wait=ms (idle between frames, 0)
+// Result: window.result = { renderer, frames, sanity, changedFrames, distinctFinal, distinctSnapshot, readPairsDiffer,
+//                           largestStep, example }. Every count must be 0 and every distinct count 1.
+const q = new URLSearchParams(location.search);
+const frames = Number(q.get('frames') ?? 120);
+const [W, H] = (q.get('size') ?? '320x240').split('x').map(Number);
+const invalidate = q.get('invalidate') === '1';
+const churn = Number(q.get('churn') ?? 0);
+const wait = Number(q.get('wait') ?? 0);
+
+const canvas = new OffscreenCanvas(W, H);
+const gl = canvas.getContext('webgl2', { antialias: false });
+if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('EXT_color_buffer_float is required');
+const debug = gl.getExtension('WEBGL_debug_renderer_info');
+const renderer = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+
+function program(vs, fs) {
+  const p = gl.createProgram();
+  for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, '#version 300 es\nprecision highp float;\n' + src);
+    gl.compileShader(s);
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+// Counter-clockwise quads of a warped grid over [-span, span]; edges do not follow pixel rows.
+function mesh(cells, span, warp) {
+  const v = [];
+  const at = (i, j) => {
+    const x = -span + (2 * span * i) / cells, y = -span + (2 * span * j) / cells;
+    return [x + warp * Math.sin(y * 17), y + warp * Math.cos(x * 13)];
+  };
+  for (let i = 0; i < cells; i++)
+    for (let j = 0; j < cells; j++) {
+      const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
+      v.push(...a, ...b, ...c, ...a, ...c, ...d);
+    }
+  return new Float32Array(v);
+}
+const opaque = program(
+  'layout(location=0) in vec2 p; flat out float h;\n' +
+    'void main() { h = float((gl_VertexID / 3) % 7) / 7.0; gl_Position = vec4(p, 0.5 + 0.2 * cos(p.y * 8.0 - p.x * 3.0), 1); }',
+  'flat in float h; out vec4 c;\n' +
+    'void main() { c = vec4(0.1 + 2.6 * h, 0.5 - 0.4 * h, 0.2 + 0.3 * fract(h * 3.0), 1); }',
+);
+const glass = program(
+  'layout(location=0) in vec2 p; out vec2 uv;\n' +
+    'void main() { uv = p * 0.5 + 0.5; gl_Position = vec4(p * 0.55, 0.2, 1); }',
+  'uniform highp sampler2D s; uniform float d; in vec2 uv; out vec4 c;\n' +
+    'void main() {\n' +
+    '  vec2 n = vec2(sin(uv.y * 31.0), cos(uv.x * 23.0)) * 0.04;\n' +
+    '  c = vec4(texture(s, uv + n * (1.0 - d)).r, texture(s, uv + n).g, texture(s, uv + n * (1.0 + d)).b, 0.8);\n' +
+    '}',
+);
+const buffer = (data) => {
+  const b = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  return b;
+};
+const opaqueVertices = mesh(150, 1, 0.004), opaqueBuffer = buffer(opaqueVertices);
+const quadBuffer = buffer(new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]));
+const renderbuffer = (format) => {
+  const r = gl.createRenderbuffer();
+  gl.bindRenderbuffer(gl.RENDERBUFFER, r);
+  gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, format, W, H);
+  return r;
+};
+const texture = () => {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA16F, W, H);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]])
+    gl.texParameteri(gl.TEXTURE_2D, k, v);
+  return t;
+};
+const framebuffer = (attach) => {
+  const f = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  attach();
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('incomplete framebuffer');
+  return f;
+};
+const msColor = renderbuffer(gl.RGBA16F), msDepth = renderbuffer(gl.DEPTH_COMPONENT32F);
+const ms = framebuffer(() => {
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, msColor);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, msDepth);
+});
+const snapshot = texture(), final = texture();
+const single = (t) => framebuffer(() => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0));
+const snapshotFbo = single(snapshot), finalFbo = single(final);
+const glassSampler = gl.getUniformLocation(glass, 's'), glassDispersion = gl.getUniformLocation(glass, 'd');
+const words = W * H * 4;
+
+function draw(p, b, count) {
+  gl.useProgram(p);
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, count);
+}
+function resolveInto(fbo) {
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fbo);
+  gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+}
+function frame() {
+  for (let i = 0; i < churn; i++) {
+    const t = texture(), b = buffer(new Float32Array(64));
+    gl.deleteTexture(t);
+    gl.deleteBuffer(b);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ms);
+  gl.viewport(0, 0, W, H);
+  gl.disable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
+  gl.depthMask(true);
+  gl.clearBufferfv(gl.COLOR, 0, [0.1, 0.12, 0.15, 1]);
+  gl.clearBufferfi(gl.DEPTH_STENCIL, 0, 1, 0);
+  draw(opaque, opaqueBuffer, opaqueVertices.length / 2);
+  resolveInto(snapshotFbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ms);
+  gl.depthMask(false);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, snapshot);
+  gl.useProgram(glass);
+  gl.uniform1i(glassSampler, 0);
+  gl.uniform1f(glassDispersion, 0.35);
+  draw(glass, quadBuffer, 6);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  resolveInto(finalFbo);
+  if (invalidate) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ms);
+    gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR_ATTACHMENT0, gl.DEPTH_ATTACHMENT]);
+  }
+}
+// Read through a pixel pack buffer and a fence (how a WebGPU-on-WebGL2 layer reads a copy), then directly.
+async function readBoth(fbo) {
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fbo);
+  gl.readBuffer(gl.COLOR_ATTACHMENT0);
+  const pack = gl.createBuffer();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, words * 4, gl.STREAM_READ);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  const direct = new Float32Array(words);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, direct);
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.flush();
+  while (gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0) === gl.TIMEOUT_EXPIRED) await new Promise((r) => setTimeout(r, 1));
+  gl.deleteSync(sync);
+  const packed = new Float32Array(words);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, packed);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  gl.deleteBuffer(pack);
+  return [packed, direct];
+}
+const hash = async (a) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', a))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+function compare(a, b) {
+  let channels = 0, largest = 0, at = -1;
+  for (let i = 0; i < a.length; i++)
+    if (a[i] !== b[i]) {
+      channels++;
+      const step = Math.abs(a[i] - b[i]);
+      if (step > largest) (largest = step), (at = i);
+    }
+  return { channels, largest, at: at < 0 ? null : { x: (at >> 2) % W, y: Math.floor((at >> 2) / W), channel: at & 3, values: [a[at], b[at]] } };
+}
+
+const out = document.getElementById('out');
+let first, sanity, changedFrames = 0, readPairsDiffer = 0, largestStep = 0, example = null;
+const finals = new Set(), snapshots = new Set();
+for (let f = 0; f < frames; f++) {
+  frame();
+  const [packed, direct] = await readBoth(finalFbo);
+  const [snapPacked] = await readBoth(snapshotFbo);
+  finals.add(await hash(packed));
+  finals.add(await hash(direct));
+  snapshots.add(await hash(snapPacked));
+  const pair = compare(packed, direct);
+  if (pair.channels) {
+    readPairsDiffer++;
+    example ??= { frame: f, between: 'pixel-pack read and direct read of one texture', ...pair };
+  }
+  if (!first) {
+    first = packed;
+    // Sanity: the frame is HDR (channels above 1) and the glass changed the resolved scene.
+    let hdr = 0;
+    for (const v of packed) hdr += +(v > 1);
+    sanity = { hdrChannels: hdr, channelsTheGlassChanged: compare(snapPacked, packed).channels };
+  } else {
+    const d = compare(first, packed);
+    if (d.channels) {
+      changedFrames++;
+      largestStep = Math.max(largestStep, d.largest);
+      example ??= { frame: f, between: 'frame 0 and this frame', ...d };
+    }
+  }
+  if (wait) await new Promise((r) => setTimeout(r, wait));
+  if (f % 10 === 0) out.textContent = `frame ${f} of ${frames}`;
+}
+window.result = {
+  renderer, frames, size: [W, H], invalidate, churn,
+  sanity, changedFrames, distinctFinal: finals.size, distinctSnapshot: snapshots.size, readPairsDiffer, largestStep, example,
+};
+out.textContent = JSON.stringify(window.result, null, 2);
+</script>

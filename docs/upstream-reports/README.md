@@ -22,7 +22,7 @@ Use the known-bugs ID for the folder and both ID cells in the table. IDs can inc
 | KB3497 | `KB3497` | NVIDIA (via KB3508) | link to KB3508 not proven |
 | KB3508 | `KB3508` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (WebGPU and WebGL2 on ANGLE D3D11); exact on an Intel Arc 140V, ANGLE D3D11 (2026-11-21) |
 | KB5185b | `KB5185b` | ANGLE, NVIDIA | draft only, no standalone repro |
-| KB5247d | `KB5247d` | ANGLE, NVIDIA | draft only, no standalone repro |
+| KB5247d | `KB5247d` | ANGLE, NVIDIA | draft; also holds KB5822a's candidate page `hdr-resolve-repeat.html`: exact on an Intel Arc 140V under ANGLE D3D11 and Vulkan (2026-11-25), not yet run on the RTX A6000 |
 | KB5700f | `KB5700f` | NVIDIA, Dawn, ANGLE | yes, RTX A6000 (fold-blend-repeat.html, D3D12 and ANGLE D3D11); exact on AMD and Apple |
 | KB6171a | `KB6171a` | ANGLE, Apple | draft only, needs a Mac |
 | KBL3c | `KBL3c` | Mozilla (Firefox WebGL) | yes, Firefox 157 |
