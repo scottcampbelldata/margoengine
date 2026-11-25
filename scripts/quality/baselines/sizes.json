@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18625318,
+  "total": 18627934,
   "history": [
     {
       "date": "2026-10-24",
@@ -11823,6 +11823,12 @@
       "commit": "7b7e61643",
       "reason": "WOFF/WOFF2 entry, CID-keyed CFF and GPOS kerning (loaders/font-woff); WOFF2 decodes with the brotli decoder statically because decodeWOFF is synchronous",
       "grew": 8
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "d1ae4841b",
+      "reason": "xr/reflection: new optional entry, AR reflection cube from the room's light (2360 B gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -13370,6 +13376,7 @@
     "@margoengine/xr/occlusion": 3198,
     "@margoengine/xr/performance": 1582,
     "@margoengine/xr/pointer": 2675,
+    "@margoengine/xr/reflection": 2616,
     "leak @margoengine/animation -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/animation/interactivity -> @margoengine/gltf/interactivity": 1,

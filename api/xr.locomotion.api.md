@@ -51,6 +51,7 @@ interface XRBinding {
     projection?(view: XRView): ArrayLike<number>;
     present?(layer: XRProjectionLayer): void;
     getDepthInformation?(view: XRView): XRGPUDepthLike | null;
+    getReflectionCubeMap?(probe: object): GPUTexture | null;
 }
 
 interface XRCompositionLayer {

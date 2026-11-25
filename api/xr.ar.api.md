@@ -20,10 +20,17 @@ export interface ARHost {
 }
 
 export class ARLight {
+    readonly probe: {
+        probeSpace: XRSpace;
+    };
     estimate: LightEstimate | null;
     private constructor();
     static create(xr: ARHost, { lighting }?: {
         lighting?: LightingLike;
+    }): Promise<ARLight>;
+    static withReflection(xr: ARHost, { lighting, reflectionFormat }?: {
+        lighting?: LightingLike;
+        reflectionFormat?: 'srgb8' | 'rgba16f';
     }): Promise<ARLight>;
     update(frame: XRNativeFrame): void;
     dispose(): void;
