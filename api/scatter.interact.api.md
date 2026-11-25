@@ -25,6 +25,7 @@ export class TrampledScatter extends Scatter {
     setInteractors(interactors: readonly Interactor[]): this;
     get field(): GPUBuffer | undefined;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     protected poseCode(code: string, group: number, binding: number): string;
     protected poseEntries(): {
         buffer: GPUBuffer;
@@ -101,6 +102,7 @@ class Scatter implements EnginePlugin {
     get clusters(): number;
     set clusters(value: number);
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     get windTime(): number;
     onPreUpdate(delta: number): void;

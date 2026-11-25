@@ -86,6 +86,7 @@ class Scatter implements EnginePlugin {
     get clusters(): number;
     set clusters(value: number);
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     get windTime(): number;
     onPreUpdate(delta: number): void;

@@ -225,6 +225,19 @@ export class TrampledScatter extends Scatter {
     this.#delta += delta;
   }
 
+  /** Back to time 0 with no grass pressed, as a fresh one (GAP-FILM-RESET): the push field is cleared on the GPU. */
+  override resetTime(): void {
+    super.resetTime();
+    this.#delta = 0;
+    this.#origin = undefined;
+    const field = this.#field;
+    if (field) {
+      const d = this.engine!.gpu!;
+      d.queue.writeBuffer(field, 0, new Float32Array(field.size / 4));
+      d.queue.writeBuffer(field, 0, new Float32Array([0, 0, this.#n / this.#size, this.#n, this.#bend, 0]));
+    }
+  }
+
   protected override poseCode(code: string, group: number, binding: number): string {
     return trampledPoseCode(super.poseCode(code, group, binding), group, binding + super.poseEntries().length);
   }

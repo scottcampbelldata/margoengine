@@ -66,6 +66,7 @@ export class Scatter implements EnginePlugin {
     get clusters(): number;
     set clusters(value: number);
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     get windTime(): number;
     onPreUpdate(delta: number): void;
@@ -148,6 +149,7 @@ export class ScatterInstances implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     drawShadow({ context, pass, matrix, cascade }: {

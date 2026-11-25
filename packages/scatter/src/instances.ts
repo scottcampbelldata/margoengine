@@ -279,6 +279,10 @@ export class ScatterInstances implements EnginePlugin {
   get time(): number {
     return this.seconds;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.seconds = 0;
+  }
   /**
    * Moves the wind clock by `delta` seconds without drawing: all of a frame update. `seek` from
    * `@margoengine/cutscene/seek` replays these steps, so every instance sways where a continuous run has it.
