@@ -5333,6 +5333,14 @@ Proof capture (2026-11-24): the water-ssr current reference advances to 1de24300
 
 Proof capture (2026-11-24, FG-05 and FG-06): the water-ssr --current proof advances to 1c1163117d, whose Water frame uniform carries the far field (setFarField: sea sides, range, sample count, spread and 64 profile samples), 848 B where it was 560 B (864 B since the 2026-11-25 sync restore put the refraction viewport back at floats 140 to 143, ahead of the far field), and whose surface shader reads it (farSea, off while the field is null). With no Flood the field stays null, so the stories draw the same sea; the call logs differ in the uniform buffer's size, its writes' length and the shader module text. packages/water/test/flood-far.browser.mjs shows the output change. Golden captured again with examples/package-benchmarks/proofs/capture.mjs --only=water-ssr.
 
+Proof capture (2026-11-25, restore): the water-ssr --current proof advances to caf466b4cc. The 1c1163117d record was
+taken while the 2026-11-24 sync had removed public water work, so it lacked the refraction viewport row (848 B, now
+864 B), the HDR sky transform and the far quad of `horizon: true`, which caf466b4cc put back; no later commit changes
+these stories' calls (23d87a36ac, 98608e3091, 4688d7b0e2, 778fc1eacd and e406829a78 each record the same calls as their
+predecessor). Against the tree before the sync (ff88a70e7~1) the new record differs only by the far field of FG-05 and
+FG-06: 288 zero bytes after each frame write, the uniform's size (576 to 864 B) and farSea in the shader text, with the
+same 545, 27,675 and 593 calls. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.
