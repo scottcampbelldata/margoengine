@@ -412,6 +412,60 @@ impl World {
         }
     }
 
+    /// The island a coupling belongs to: that of the first awake dynamic body it holds (the two it ties, and for coordinates their
+    /// parents), which `unite_couplings` made one. None when it holds none.
+    fn island_of_coupling(&self, c: &Coupling) -> Option<usize> {
+        let bodies = if c.kind == COORDS { [c.a, c.b, c.coords_parent_a(), c.coords_parent_b()] } else { [c.a, c.b, c.a, c.b] };
+        for body in bodies {
+            let body = body as usize;
+            if self.flags(body) & KIND == DYNAMIC && self.is_awake(body) {
+                let id = self.uu(ISLAND_ID, body);
+                if id != NONE {
+                    return Some(id as usize);
+                }
+            }
+        }
+        None
+    }
+
+    /// Lists the couplings' slots in runs, one run an island and each in slot order (a stable counting sort), those of no island
+    /// last, and notes where each island's run starts and how long it is. A dead slot is listed too and skipped where it is read.
+    pub fn order_couplings_by_island(&mut self) {
+        let (islands, rows) = (self.header().islands as usize, self.header().coupling_rows as usize);
+        for island in 0..islands {
+            self.set_u(ISLAND_COUPLING_COUNT, island, 0);
+        }
+        for k in 0..rows {
+            let c = self.coupling(k);
+            if let (true, Some(island)) = (self.coupling_live(&c), self.island_of_coupling(&c)) {
+                self.set_u(ISLAND_COUPLING_COUNT, island, self.uu(ISLAND_COUPLING_COUNT, island) + 1);
+            }
+        }
+        let mut start = 0;
+        for island in 0..islands {
+            self.set_u(ISLAND_COUPLING_START, island, start);
+            self.set_u(ISLAND_COUPLING_CURSOR, island, start);
+            start += self.uu(ISLAND_COUPLING_COUNT, island);
+        }
+        let mut loose_at = start;
+        for k in 0..rows {
+            let c = self.coupling(k);
+            let at = match (self.coupling_live(&c), self.island_of_coupling(&c)) {
+                (true, Some(island)) => {
+                    let at = self.uu(ISLAND_COUPLING_CURSOR, island);
+                    self.set_u(ISLAND_COUPLING_CURSOR, island, at + 1);
+                    at
+                }
+                _ => {
+                    loose_at += 1;
+                    loose_at - 1
+                }
+            };
+            self.set_u(COUPLING_ORDER, at as usize, k as u32);
+        }
+        debug_assert_eq!(loose_at as usize, rows);
+    }
+
     /// Gives every coupling the impulse it carries, at the start of a substep.
     pub fn warm_start_couplings(&mut self) {
         for k in 0..self.header().coupling_rows as usize {

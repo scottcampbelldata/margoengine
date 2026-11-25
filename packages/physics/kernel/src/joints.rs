@@ -733,6 +733,85 @@ impl World {
             }
             self.set_u(SOLVE_LEAD, i, lead);
         }
+        self.order_joints_by_island(solving);
+    }
+
+    /// The island a path of listed joints belongs to: that of the first awake dynamic body any of its joints holds. A path
+    /// stops at every body that is not awake and dynamic (`linked`), and islands join the bodies of a joint that are, so all
+    /// its joints share one island. None for a path of joints between bodies that cannot move.
+    fn island_of_path(&self, from: usize, to: usize) -> Option<usize> {
+        for i in from..to {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize] {
+                if self.flags(body) & KIND == DYNAMIC && self.is_awake(body) {
+                    let id = self.uu(ISLAND_ID, body);
+                    if id != NONE {
+                        return Some(id as usize);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Puts the listed joints in runs, one run an island, a path whole and each run in the order it was listed (a stable counting
+    /// sort of the paths), the joints of no island last, and notes where each island's run starts and how long it is. The lists
+    /// that go by place in the list (the joint, the joint it goes on through, its share and the lead of its island) move together.
+    fn order_joints_by_island(&mut self, solving: usize) {
+        let islands = self.header().islands as usize;
+        for island in 0..islands {
+            self.set_u(ISLAND_JOINT_COUNT, island, 0);
+        }
+        // A path starts at a joint that goes on through no body.
+        let mut i = 0;
+        while i < solving {
+            let mut end = i + 1;
+            while end < solving && self.uu(SOLVE_VIA, end) != NONE {
+                end += 1;
+            }
+            if let Some(island) = self.island_of_path(i, end) {
+                self.set_u(ISLAND_JOINT_COUNT, island, self.uu(ISLAND_JOINT_COUNT, island) + (end - i) as u32);
+            }
+            i = end;
+        }
+        let mut start = 0;
+        for island in 0..islands {
+            self.set_u(ISLAND_JOINT_START, island, start);
+            self.set_u(ISLAND_JOINT_CURSOR, island, start);
+            start += self.uu(ISLAND_JOINT_COUNT, island);
+        }
+        let mut loose_at = start;
+        let mut i = 0;
+        while i < solving {
+            let mut end = i + 1;
+            while end < solving && self.uu(SOLVE_VIA, end) != NONE {
+                end += 1;
+            }
+            let at = match self.island_of_path(i, end) {
+                Some(island) => {
+                    let at = self.uu(ISLAND_JOINT_CURSOR, island);
+                    self.set_u(ISLAND_JOINT_CURSOR, island, at + (end - i) as u32);
+                    at
+                }
+                None => {
+                    loose_at += (end - i) as u32;
+                    loose_at - (end - i) as u32
+                }
+            };
+            for k in i..end {
+                self.set_u(JOINT_ORDER, k, at + (k - i) as u32);
+            }
+            i = end;
+        }
+        debug_assert_eq!(loose_at as usize, solving);
+        for column in [SOLVE_JOINTS, SOLVE_VIA, SOLVE_SHARE, SOLVE_LEAD] {
+            for k in 0..solving {
+                self.set_u(JOINT_TEMP, self.uu(JOINT_ORDER, k) as usize, self.uu(column, k));
+            }
+            for k in 0..solving {
+                self.set_u(column, k, self.uu(JOINT_TEMP, k));
+            }
+        }
     }
 
     #[inline(always)]

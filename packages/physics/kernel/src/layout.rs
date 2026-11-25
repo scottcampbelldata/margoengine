@@ -534,6 +534,18 @@ columns! {
     SOLVE_VIA u32 JointList,
     // The share of its error each listed joint closes in a biased pass.
     SOLVE_SHARE f32 JointList,
+    // Where each listed joint goes when the list is put in runs by island, and a place to move the lists through.
+    JOINT_ORDER u32 JointList,
+    JOINT_TEMP u32 JointList,
+    // Where each island's run of the solved joints starts and how long it is, and a cursor the list is filled with.
+    ISLAND_JOINT_START u32 BodyList,
+    ISLAND_JOINT_COUNT u32 BodyList,
+    ISLAND_JOINT_CURSOR u32 BodyList,
+    // The couplings' slots in runs by island, and where each island's run starts and how long it is.
+    COUPLING_ORDER u32 Coupling,
+    ISLAND_COUPLING_START u32 BodyList,
+    ISLAND_COUPLING_COUNT u32 BodyList,
+    ISLAND_COUPLING_CURSOR u32 BodyList,
     // Rows, measures and factors of the solving joints.
     JOINT_SCRATCH f32 JointScratch,
     // A pair of a triangle mesh or a compound holds no points itself: each triangle or compound child that touches has a
@@ -932,7 +944,8 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
 /// their list. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 15] = [
+pub const SCRATCH: [usize; 24] = [
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
-    SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR,
+    SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
+    ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR,
 ];

@@ -185,6 +185,7 @@ impl World {
         let mut inner = now();
         self.prepare_contacts();
         self.prepare_joints();
+        self.order_couplings_by_island();
         tick(self, 8, &mut inner);
         // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);

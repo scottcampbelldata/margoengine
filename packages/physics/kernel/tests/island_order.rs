@@ -43,3 +43,81 @@ fn each_islands_pairs_are_listed_together_in_the_order_they_were_found() {
     assert_eq!(seen, solving);
     assert_ne!(w.uu(SOLVE_PAIRS, 0), NONE);
 }
+
+#[test]
+fn each_islands_joints_are_listed_together_with_their_paths_whole() {
+    let mut w = World::new(32, 32).unwrap();
+    // Four chains of four bodies in the air, apart from each other and made link by link, so the joints are found interleaved
+    // across the islands. Each chain is one path of three joints.
+    let mut chains = vec![Vec::new(); 4];
+    for link in 0..4 {
+        for chain in 0..4 {
+            let body = w.add_body(DYNAMIC).unwrap();
+            w.add_collider(body, SHAPE_BALL, [0.2, 0.0, 0.0], [0.0; 3], IDENTITY, 1.0).unwrap();
+            w.set_v(POSITION_X, body as usize, v3(chain as f32 * 10.0 + link as f32 * 0.5, 5.0, 0.0));
+            chains[chain].push(body);
+        }
+    }
+    for link in 0..3 {
+        for chain in &chains {
+            w.add_joint(chain[link], chain[link + 1], 7).unwrap();
+        }
+    }
+    for _ in 0..5 {
+        w.step(1.0 / 60.0);
+    }
+    let (islands, solving) = (w.header().islands as usize, w.header().joint_solving as usize);
+    assert_eq!((islands, solving), (4, 12));
+    let mut seen = 0;
+    for island in 0..islands {
+        let (start, count) = (w.uu(ISLAND_JOINT_START, island) as usize, w.uu(ISLAND_JOINT_COUNT, island) as usize);
+        assert_eq!((start, count), (seen, 3), "island {island}");
+        let mut roots = 0;
+        for i in start..start + count {
+            let row = w.uu(SOLVE_JOINTS, i) as usize;
+            assert_eq!(w.uu(ISLAND_ID, w.uu(JOINT_A, row) as usize) as usize, island, "joint {i} sits in its island's run");
+            roots += (w.uu(SOLVE_VIA, i) == NONE) as usize;
+        }
+        // A chain is one path, so each run holds one joint that goes on through no body: the path is whole.
+        assert_eq!(roots, 1, "island {island} holds one whole path");
+        assert_eq!(w.uu(SOLVE_VIA, start), NONE, "and it starts the run");
+        seen += count;
+    }
+    assert_eq!(seen, solving);
+}
+
+#[test]
+fn each_islands_couplings_are_listed_together_in_slot_order() {
+    use margoengine_physics_kernel::couplings::DISTANCE;
+    let mut w = World::new(32, 32).unwrap();
+    let mut pairs = Vec::new();
+    for _ in 0..2 {
+        pairs.push([0, 1].map(|_| w.add_body(DYNAMIC).unwrap()));
+    }
+    // Two islands of two bodies, made so the couplings are made one island after another and listed interleaved.
+    for (n, pair) in pairs.iter().enumerate() {
+        for (k, &body) in pair.iter().enumerate() {
+            w.add_collider(body, SHAPE_BALL, [0.2, 0.0, 0.0], [0.0; 3], IDENTITY, 1.0).unwrap();
+            w.set_v(POSITION_X, body as usize, v3(n as f32 * 10.0 + k as f32, 5.0, 0.0));
+        }
+    }
+    for _ in 0..2 {
+        for pair in &pairs {
+            w.add_coupling(DISTANCE, pair[0], pair[1]).unwrap();
+        }
+    }
+    for _ in 0..3 {
+        w.step(1.0 / 60.0);
+    }
+    let rows = w.header().coupling_rows as usize;
+    assert_eq!(rows, 4);
+    let mut seen = 0;
+    for island in 0..w.header().islands as usize {
+        let (start, count) = (w.uu(ISLAND_COUPLING_START, island) as usize, w.uu(ISLAND_COUPLING_COUNT, island) as usize);
+        assert_eq!((start, count), (seen, 2), "island {island}");
+        let slots: Vec<u32> = (start..start + count).map(|i| w.uu(COUPLING_ORDER, i)).collect();
+        assert!(slots[0] < slots[1], "slot order within the run: {slots:?}");
+        seen += count;
+    }
+    assert_eq!(seen, rows);
+}
