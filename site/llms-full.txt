@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,046 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,048 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -5247,6 +5247,16 @@ or a Box2D speed-parity claim. CCD remains outside this correction.
 ## 2D light textures and cookies (batch 55)
 
 Optional `@margoengine/lighting2d/cookie` projects 2D textures (cookies / gobos) onto light footprints to shape lights with window patterns and flashlights. Supports scale, offset, rotation, wrapping modes (zero, clamp, repeat, mirror) and blend modes (multiply, alpha, color). WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-593.
+
+## Mixer offline mix (`mixer/pcm`, GAP-FILM-MIX)
+
+`mixPCM` holds the whole mix in memory (one Float32Array per bus and channel, 4 bytes a sample) and does not resample:
+decode every source at the mix's rate (8 to 768 kHz). 1 to 32 channels; `pan` only in two-channel mixes. Ducking is
+keyed by sample peak, not loudness. The limiter measures true peak with the ITU-R BS.1770-5 four-phase interpolator,
+so it holds that estimate (not an ideal reconstruction) at or under the ceiling; where the gain moves inside the
+interpolator's 12 taps, which a look-ahead near 0 makes likely, the last excess is removed by lowering the whole
+signal. One measured run on the workstation (2026-11-25, Node, one thread): one minute of stereo with a ducked bus took
+1.0 s limited and 0.6 s with `limiter: false`. An abort is read between clips and ducks, not inside a loop.
 
 ## Mixer loudness (batch 111)
 
