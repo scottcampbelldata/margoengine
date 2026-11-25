@@ -1,6 +1,6 @@
 // The soft kernel as a framework solver: coupled soft before rigid, a world steps a cloth with a box on it to the bits Physics
-// gives stepped alone, the soft bodies step once a tick (the Physics attachment's own step does nothing in a world), and the
-// held forces it leaves on the bodies are state a snapshot carries.
+// gives stepped alone, the soft bodies step once a tick (the Physics attachment's own step does nothing in a world), its pushes
+// on the bodies go through the `bodyImpulses` and `bodyForces` ports and hold for one step only, and a snapshot restores.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
@@ -55,7 +55,38 @@ test('coupled soft before rigid, a world steps a cloth and a box to the bits Phy
   assert.ok(inWorld.box.position[1] < 1.3, 'the box came down onto the cloth');
 });
 
-test('a snapshot carries the forces the soft step left on the bodies: a restored run goes on bit for bit', async () => {
+test('the push on a body goes through the ports: the cloth holds the box up with a force over each step, none left between', async () => {
+  const s = await scene(),
+    solver = new SoftSolver(),
+    w = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics: s.physics })
+      .add(solver, { soft: s.soft })
+      .couple(['soft', 'rigid'], 'staggered');
+  w.advance(120);
+  const [, forces] = solver.exportPorts(120),
+    words = new Float64Array(
+      forces.region.memory?.buffer ?? w.memory.buffer,
+      forces.region.byteOffset,
+      forces.region.byteLength / 8,
+    ),
+    up = words[s.box.row * 6 + 1];
+  // Resting on the cloth, the 2 kg box is held up by about its weight through the step.
+  assert.ok(up > 0.5 * 2 * 9.81 && up < 2 * 2 * 9.81, `the force holding it up: ${up} N`);
+  const c = s.physics.kernel.columns;
+  assert.equal(c.forceY[s.box.row], 0, 'between ticks no force is left on the body');
+  // Physics stepped alone takes off exactly what its f32 force columns took too: taking off the f64 force left its rounding
+  // behind, a stray force that grew a little every step the cloth held the box.
+  const alone = await scene();
+  for (let i = 0; i < 120; i++) alone.physics.step();
+  const a = alone.physics.kernel.columns;
+  assert.deepEqual(
+    [a.forceX[alone.box.row], a.forceY[alone.box.row], a.forceZ[alone.box.row]],
+    [0, 0, 0],
+    'stepped alone, no force is left on the body either',
+  );
+});
+
+test('a snapshot taken between ticks restores into a run that goes on bit for bit', async () => {
   const continuous = await scene(),
     seeking = await scene();
   const a = world(continuous),

@@ -230,12 +230,14 @@ export class SoftBodies implements PhysicsAttachment {
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
+    afterStep(_dt: number): void;
     drive(): Physics;
     get kernelMemory(): WebAssembly.Memory;
     stateColumns(): [string, Float32Array | Uint32Array][];
-    storeHeld(out: Float64Array): void;
-    loadHeld(words: Float64Array): void;
-    stepOnce(dt: number): void;
+    stepOnce(dt: number, ports?: {
+        readonly impulses: Float64Array;
+        readonly forces: Float64Array;
+    }): void;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     createDeformableCollider(soft: SoftBody, mesh: {
         vertices: ArrayLike<number>;
@@ -1738,6 +1740,7 @@ class Physics implements EnginePlugin, BodyOwner {
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;
+    afterStep?(dt: number): void;
     afterSync?(): void;
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;

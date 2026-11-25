@@ -58,8 +58,10 @@ export {
 } from './scheduler.js';
 export {
   BODIES_FIELD,
+  BODY_FORCES_FIELD,
   BODY_IMPULSES_FIELD,
   BODY_WORDS,
+  FORCE_WORDS,
   IMPULSE_WORDS,
   RigidSolver,
   rateLevelOf,

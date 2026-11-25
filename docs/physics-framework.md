@@ -133,7 +133,7 @@ fields (MOOSE, Gaston et al. 2009; ESMF, Hill et al. 2004).
 | rain | atmosphere | Rain rate in mm/h with a drop-size distribution, per position (PA-23): `Precipitation` of `@margoengine/math/fields`, `sample(x, y, z, t)` giving rain, snow, graupel and hail, each with its rate, exponential size distribution, fall speed, impact rate, energy flux and water content; `PrecipitationField` of `@margoengine/weather/precipitation` is the atmosphere's (ATMO-04). |
 | cloud water | clouds | Cloud water mixing ratio per cell of a cloud box, kg/kg (`cloudWater`, a `uniformGrid`), owned by `CloudSolver` of `@margoengine/physics/clouds` (ATMO-03), whose rain at the ground is a `source` of the precipitation field and whose flow can be added to a wind. |
 | wave spectrum | waves | The sea's directional spectrum E(f, theta) per cell (`waveSpectrum`, a `uniformGrid`, m^2/(Hz rad)) and the `WaveSpectrumField` contract of `@margoengine/math/fields` that samples it with the water's depth and density, owned by `WaveSolver` of `@margoengine/physics/waves` (SEA-01); the sea surface (SEA-02) synthesises from it. |
-| bodies | rigid | Pose, velocity, mass and inertia of every rigid body, the boundary signed-distance field of each, and an accumulator for impulses at points. |
+| bodies | rigid | Pose, velocity, mass and inertia of every rigid body, the boundary signed-distance field of each, an accumulator for impulses at points (`bodyImpulses`, landing at the start of the rigid step) and one for forces held over the rigid step (`bodyForces`, force and torque about the centre of mass, taken off after it). |
 | follow targets | each moving solver | Pose, velocity and acceleration of anything a camera can follow (rigid bodies, vehicles, trains, ships, animals, birds, fish, flock and herd members), interpolated to the frame time on the world clock and expressed in large-world cells, so a following camera never jitters against the simulation. |
 
 **Transfers between representations** are registered operators owned by the framework, not code inside each solver:
@@ -177,6 +177,9 @@ order, ids within a group. The same calls give the same order whatever order the
 
 - **Impulses, not forces.** Solvers exchange impulses (force times dt) into mirrored accumulators, so the sender's
   loss equals the receiver's gain exactly and momentum is conserved at every interface (Gravouil and Combescure 2001).
+  `bodyForces` is the same exchange spread through the step: a force the rigid solver holds over exactly its next step
+  and then takes off, so the body gains force times dt, as an impulse would give, but through the step (a cloth holding a
+  box up must not throw it at the step's start and let it fall through the rest).
 - **Added mass.** For a light body in a dense fluid, plain staggering is unstable whatever the step size (Causin,
   Gerbeau and Nobile 2005). The scheduler tests the mass ratio of each body to the fluid it displaces, and forces the
   implicit or iterated scheme below a threshold.

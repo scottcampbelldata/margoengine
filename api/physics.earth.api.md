@@ -1244,6 +1244,7 @@ class Physics implements EnginePlugin, BodyOwner {
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;
+    afterStep?(dt: number): void;
     afterSync?(): void;
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;

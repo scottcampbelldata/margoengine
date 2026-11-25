@@ -79,6 +79,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   costs more to step: see docs/limits.md. Regression: the test above, `soft-kernel/tests/threads.rs`, and in soft.test.js
   "an inextensible sheet holds its threads within 0.1 percent at any pass count and load".
 
+### Fixed 2026-11-25: a body a cloth held kept a stray force that grew every step (KB-SOFT-FORCERESIDUE1, physics soft)
+
+- **Repro:** `packages/physics/tests/world-soft-solver.test.js`, "the push on a body goes through the ports". A 2 kg box
+  rests on a cloth for 120 steps; between steps, its force column should hold only its own force (0).
+- **Cause:** the soft step held the box up with a force for the rigid step and took the same f64 force off after it. The
+  kernel's force columns are f32, so what they took was the force rounded, and taking off the unrounded force left the
+  rounding behind: a stray force that grew a little every step the cloth held the box.
+- **Fixed:** what the columns took (the difference of two f32 values, which is exact) is what comes off, in
+  `SoftBodies.afterStep` and in the `RigidSolver` for `bodyForces`. The force now comes off at the end of the rigid step in
+  both, so a world and Physics stepped alone stay the same bits.
+- **Regression:** the test above, stepped alone and in a world.
+
 ### Fixed 2026-11-25: the two halves of a cut soft body threw each other about (KB-SOFT-CUTTHRASH1, physics soft and kernel)
 
 - **Repro:** `packages/physics/tests/soft-cells.test.js`, "a soft cube with a surface collider cut in two ...". The halves

@@ -548,6 +548,8 @@ export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'posit
 /** @internal A helper that steps, syncs and is disposed with a world. */
 export interface PhysicsAttachment {
   beforeStep?(dt: number): void;
+  /** After the step, its events and `afterstep` listeners included: what an attachment held for the step comes off here. */
+  afterStep?(dt: number): void;
   afterSync?(): void;
   bodyRemoved?(body: PhysicsBody): void;
   dispose(): void;
@@ -942,7 +944,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.reportBreaks();
     this.reportQuarantine();
     this.emit('afterstep', dt);
+    this.attachments.forEach(this.attachmentAfter);
   }
+  private readonly attachmentAfter = (attachment: PhysicsAttachment): void =>
+    attachment.afterStep?.(this.fixedTimestep);
   /**
    * Finds what touches what in the world as it stands, with no dynamics: the broad and narrow phases run and `contactstart`,
    * `contactend`, `intersectionstart` and `intersectionend` fire for what began or ended, as in Rapier's `CollisionPipeline`. No body

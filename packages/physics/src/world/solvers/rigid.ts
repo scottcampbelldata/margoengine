@@ -10,6 +10,10 @@
 //   (N s) and an angular impulse about the body's centre of mass (N m s), world axes. A load at a point p is the pair
 //   (J, (p - c) x J), c the centre of mass in `bodies`: pairs add, so the world sums the contributions by contributor and then
 //   by element, and the solver applies the sum at the next step. A point and an impulse would not add.
+// - `bodyForces` (a body set, `FORCE_WORDS` words per row): what other solvers hold the bodies with over the next step, as a
+//   force (N) and a torque about the centre of mass (N m), world axes, summed as `bodyImpulses` is. The solver adds the sum to
+//   the bodies' forces for its next step only and takes it off after, so a push held over a step (a soft body holding up a
+//   box, a hull's load) is a force through the step rather than an impulse at its start.
 //
 // State. The kernel's state is the words its own hash covers (`KernelWorld.stateRanges`), named by column and row capacity
 // (`positionX[64]`), in the kernel's own memory until the framework's solvers share one (`Region.memory`, transitional). A
@@ -39,6 +43,8 @@ import {
 export const BODY_WORDS = 24;
 /** f64 words of a body's record in the `bodyImpulses` port: linear impulse then angular impulse about the centre of mass. */
 export const IMPULSE_WORDS = 6;
+/** f64 words of a body's record in the `bodyForces` port: force then torque about the centre of mass. */
+export const FORCE_WORDS = 6;
 /** The layout version of the `bodies` port (contributors to `bodyImpulses` lay out their own regions as `IMPULSE_WORDS` per row). */
 const BODIES_LAYOUT = 1;
 
@@ -56,6 +62,15 @@ export const BODY_IMPULSES_FIELD: FieldDescriptor = {
   kind: 'bodySet',
   quantity: 'impulse',
   unit: 'N s',
+  centring: 'particle',
+};
+
+/** The `bodyForces` field: forces and torques other solvers hold the bodies with over the next step, summed by contributor. */
+export const BODY_FORCES_FIELD: FieldDescriptor = {
+  name: 'bodyForces',
+  kind: 'bodySet',
+  quantity: 'force',
+  unit: 'N',
   centring: 'particle',
 };
 
@@ -100,6 +115,9 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   private bodies: Region | null = null;
   private capacity = 0;
   private layout = 0;
+  /** The forces and torques `importPorts` added for this tick's step, taken off after it (`FORCE_WORDS` a body row). */
+  private held = new Float64Array(0);
+  private holding = false;
 
   constructor(readonly id = 'rigid') {}
 
@@ -110,6 +128,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       fields: [
         { field: BODIES_FIELD, access: 'write' },
         { field: BODY_IMPULSES_FIELD, access: 'write' },
+        { field: BODY_FORCES_FIELD, access: 'write' },
       ],
       rate: level,
       stableRate: () => level,
@@ -145,6 +164,35 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         `RigidSolver steps ${physics.fixedTimestep} s, and the world asked for ${dt} s; keep the Physics's fixedTimestep as it was added.`,
       );
     physics.step();
+    this.letGo();
+  }
+
+  /** Takes the forces of `bodyForces` off the bodies again: they hold for one step. */
+  private letGo(): void {
+    if (!this.holding) return;
+    const c = this.live().kernel.columns,
+      held = this.held,
+      rows = held.length / FORCE_WORDS;
+    for (let row = 0; row < rows; row++) {
+      const at = row * FORCE_WORDS;
+      if (
+        held[at] === 0 &&
+        held[at + 1] === 0 &&
+        held[at + 2] === 0 &&
+        held[at + 3] === 0 &&
+        held[at + 4] === 0 &&
+        held[at + 5] === 0
+      )
+        continue;
+      c.forceX[row] -= held[at]!;
+      c.forceY[row] -= held[at + 1]!;
+      c.forceZ[row] -= held[at + 2]!;
+      c.torqueX[row] -= held[at + 3]!;
+      c.torqueY[row] -= held[at + 4]!;
+      c.torqueZ[row] -= held[at + 5]!;
+    }
+    held.fill(0);
+    this.holding = false;
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -187,6 +235,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   }
 
   importPorts(_tick: number): void {
+    this.importForces();
     const physics = this.live(),
       sum = this.host!.port(BODY_IMPULSES_FIELD.name);
     if (!sum) return;
@@ -206,6 +255,38 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       c.angularImpulseX[row] += words[at + 3]!;
       c.angularImpulseY[row] += words[at + 4]!;
       c.angularImpulseZ[row] += words[at + 5]!;
+    }
+  }
+
+  /** Adds the summed `bodyForces` to the moving bodies' forces and torques for the next step, waking them. */
+  private importForces(): void {
+    const sum = this.host!.port(BODY_FORCES_FIELD.name);
+    if (!sum) return;
+    const kernel = this.live().kernel,
+      words = new Float64Array(this.host!.memory.buffer, sum.region.byteOffset, sum.region.byteLength / 8),
+      c = kernel.columns,
+      rows = Math.min(kernel.capacity, words.length / FORCE_WORDS);
+    if (this.held.length < rows * FORCE_WORDS) {
+      const grown = new Float64Array(rows * FORCE_WORDS);
+      grown.set(this.held);
+      this.held = grown;
+    }
+    for (let row = 0; row < rows; row++) {
+      const at = row * FORCE_WORDS;
+      let any = false;
+      for (let k = 0; k < FORCE_WORDS; k++) any ||= words[at + k] !== 0;
+      if (!any || (c.flags![row]! & (ALIVE | KIND)) !== (ALIVE | DYNAMIC)) continue;
+      kernel.wake(row);
+      // What the f32 columns took is what comes off after: the difference of two f32 values is exact, so the body keeps what
+      // it held before to the bit, where taking off the f64 sum would leave its rounding behind a little more every step.
+      const columns = [c.forceX, c.forceY, c.forceZ, c.torqueX, c.torqueY, c.torqueZ];
+      for (let k = 0; k < FORCE_WORDS; k++) {
+        const column = columns[k]!,
+          before = column[row]!;
+        column[row] = before + words[at + k]!;
+        this.held[at + k]! += column[row]! - before;
+      }
+      this.holding = true;
     }
   }
 

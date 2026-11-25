@@ -2458,8 +2458,6 @@ export class SoftBodies implements PhysicsAttachment {
   private rowGroups: number[] = [];
   private contactHook: ((contact: SoftContact) => void) | null = null;
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
-  /** Every body a step pushed, by kernel row: a world's restore finds the bodies of the held forces it brings back by row. */
-  private readonly pushedByRow = new Map<number, PhysicsBody>();
   /** Stepped by a framework `SoftSolver`: the Physics attachment's own step does nothing then, so nothing steps twice. */
   private driven = false;
   /** @internal Soft steps taken: one a fixed step, whether the Physics or a world's `SoftSolver` ran it. */
@@ -3635,6 +3633,36 @@ export class SoftBodies implements PhysicsAttachment {
     this.stepOnce(dt);
   }
 
+  /**
+   * @internal After the rigid step: the force and torque the bodies were pushed with come off again (the rigid world keeps a
+   * force until it is taken back; the impulse part of a push lands once), as a world's `RigidSolver` lets go of `bodyForces`.
+   */
+  afterStep(_dt: number): void {
+    for (const [body, [force, torque]] of this.pushes) {
+      if (!body.valid) continue;
+      body.addForce([-force[0], -force[1], -force[2]], undefined, false);
+      body.addTorque([-torque[0], -torque[1], -torque[2]], false);
+    }
+    this.pushes.clear();
+  }
+
+  /**
+   * Holds `body` with `force` and `torque` for the coming rigid step, and returns what its f32 force and torque columns took
+   * (the difference of two f32 values is exact): `afterStep` takes off exactly that, so the body keeps its own force to the
+   * bit, where taking off the force itself would leave its rounding behind a little more every step.
+   */
+  private held(body: PhysicsBody, force: Vec3, torque: Vec3): [Vec3, Vec3] {
+    const c = this.physics.kernel.columns,
+      row = body.row,
+      before = [c.forceX[row]!, c.forceY[row]!, c.forceZ[row]!, c.torqueX[row]!, c.torqueY[row]!, c.torqueZ[row]!];
+    body.addForce(force);
+    body.addTorque(torque);
+    return [
+      [c.forceX[row]! - before[0]!, c.forceY[row]! - before[1]!, c.forceZ[row]! - before[2]!],
+      [c.torqueX[row]! - before[3]!, c.torqueY[row]! - before[4]!, c.torqueZ[row]! - before[5]!],
+    ];
+  }
+
   /** @internal Hands the step to a framework `SoftSolver`: from now on only `stepOnce` steps the bodies. */
   drive(): Physics {
     this.driven = true;
@@ -3663,50 +3691,13 @@ export class SoftBodies implements PhysicsAttachment {
   }
 
   /**
-   * @internal Writes the forces and torques the last step left on the rigid bodies (taken off at the start of the next) into
-   * `out`, six words a kernel body row: force then torque. A row past `out` throws.
+   * @internal One soft step of `dt` seconds, before the rigid world's step of the same length. With `ports` (a world's
+   * `SoftSolver`), the pushes on the rigid bodies are written there, six words a kernel body row (the `bodyImpulses` and
+   * `bodyForces` fields: linear then angular), for the world to hand to its `RigidSolver`, which holds the forces for its next
+   * step only; without, they go through the body API, the forces taken off again at the start of the next soft step.
    */
-  storeHeld(out: Float64Array): void {
-    out.fill(0);
-    for (const [body, [force, torque]] of this.pushes) {
-      if (!body.valid) continue;
-      const at = body.row * 6;
-      if (at + 6 > out.length)
-        throw new MargoError(
-          'state',
-          `A soft body pushed body row ${body.row}, past the ${out.length / 6} rows its SoftSolver holds; make the solver with a larger capacity.`,
-        );
-      out.set([...force, ...torque], at);
-    }
-  }
-
-  /** @internal Takes the held forces from `words` (as `storeHeld` wrote them), so a restored world takes off what it left. */
-  loadHeld(words: Float64Array): void {
-    this.pushes.clear();
-    for (let at = 0; at + 6 <= words.length; at += 6) {
-      let any = false;
-      for (let k = 0; k < 6; k++) any ||= words[at + k] !== 0;
-      if (!any) continue;
-      const body = this.pushedByRow.get(at / 6);
-      if (!body?.valid) continue;
-      this.pushes.set(body, [
-        [words[at]!, words[at + 1]!, words[at + 2]!],
-        [words[at + 3]!, words[at + 4]!, words[at + 5]!],
-      ]);
-    }
-  }
-
-  /** @internal One soft step of `dt` seconds, before the rigid world's step of the same length. */
-  stepOnce(dt: number): void {
+  stepOnce(dt: number, ports?: { readonly impulses: Float64Array; readonly forces: Float64Array }): void {
     this.steps++;
-    // The force and torque the bodies were pushed with last step come off (the rigid world keeps a force until it is taken back;
-    // the impulse part of a push lands once).
-    for (const [body, [force, torque]] of this.pushes) {
-      if (!body.valid) continue;
-      body.addForce([-force[0], -force[1], -force[2]], undefined, false);
-      body.addTorque([-torque[0], -torque[1], -torque[2]], false);
-    }
-    this.pushes.clear();
     if (this.particleCount === 0) return;
     // Where every particle starts the step, for drawing between steps.
     for (const body of this.bodies) body.remember();
@@ -3741,9 +3732,10 @@ export class SoftBodies implements PhysicsAttachment {
     // the step and be thrown back out the next), and a push that holds a body up is a force, which neither lifts nor drops it.
     // The spin lands whole at the start: the change of angular velocity the soft step gave the body, which it worked out with the
     // body's inertia turning as the body turned. A body at rest takes no turn from what holds it (gravity has no moment about its
-    // centre of mass), so nothing creeps; and handing over the angular impulse instead would have the rigid world turn it into a
-    // velocity with the inertia of another moment, which on a body of very uneven inertia (a thin rod, whose inertia about its own
-    // axis is tiny) is a spin the soft step never gave.
+    // centre of mass), so nothing creeps. It is handed over as the angular impulse that gives that change through the inertia
+    // the body has where the rigid step starts, the pose this step began from (`spinImpulse`), which is the inertia the rigid
+    // step turns it with: the moment the soft step's own turning inertia ended at would give a body of very uneven inertia (a
+    // thin rod, whose inertia about its own axis is tiny) a spin the soft step never gave.
     // A cluster's proxy is put where its cluster is by giveToProxies; it takes its push as a force and a torque over the step and no
     // motion of its own.
     const hostShare = (this.physics.substeps + 1) / (2 * this.physics.substeps),
@@ -3756,39 +3748,55 @@ export class SoftBodies implements PhysicsAttachment {
       const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
         k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
       if (j[0] === 0 && j[1] === 0 && j[2] === 0 && k[0] === 0 && k[1] === 0 && k[2] === 0) return;
+      const at = body.row * 6;
+      if (ports && at + 6 > ports.impulses.length)
+        throw new MargoError(
+          'state',
+          `A soft body pushed body row ${body.row}, past the ${ports.impulses.length / 6} rows its SoftSolver holds; make the solver with a larger capacity.`,
+        );
       if (proxies.has(body)) {
         const force: Vec3 = [j[0] / dt, j[1] / dt, j[2] / dt],
           torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
-        body.addForce(force);
-        body.addTorque(torque);
+        if (ports) {
+          for (let a = 0; a < 3; a++) {
+            ports.forces[at + a]! += force[a]!;
+            ports.forces[at + 3 + a]! += torque[a]!;
+          }
+          return;
+        }
+        const taken = this.held(body, force, torque);
         const had = this.pushes.get(body);
-        this.pushedByRow.set(body.row, body);
         this.pushes.set(
           body,
           had
             ? [
-                [had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]],
-                [had[1][0] + torque[0], had[1][1] + torque[1], had[1][2] + torque[2]],
+                [had[0][0] + taken[0][0], had[0][1] + taken[0][1], had[0][2] + taken[0][2]],
+                [had[1][0] + taken[1][0], had[1][1] + taken[1][1], had[1][2] + taken[1][2]],
               ]
-            : [force, torque],
+            : taken,
         );
         return;
       }
       const impulse = startOfStep(body, c, row, j, dt, g, hostShare, softShare),
-        force: Vec3 = [(j[0] - impulse[0]) / dt, (j[1] - impulse[1]) / dt, (j[2] - impulse[2]) / dt];
+        force: Vec3 = [(j[0] - impulse[0]) / dt, (j[1] - impulse[1]) / dt, (j[2] - impulse[2]) / dt],
+        // The spin change the soft step gave, as the angular impulse that gives it: the rigid step turns an angular impulse
+        // into a spin at its start, with the inertia the body has there, which is the pose this step began from.
+        turn = spinImpulse(body, [c.avx[row]! - c.a0x[row]!, c.avy[row]! - c.a0y[row]!, c.avz[row]! - c.a0z[row]!]);
+      if (ports) {
+        for (let a = 0; a < 3; a++) {
+          ports.impulses[at + a]! += impulse[a]!;
+          ports.impulses[at + 3 + a]! += turn[a]!;
+          ports.forces[at + a]! += force[a]!;
+        }
+        return;
+      }
       body.applyImpulse(impulse);
-      const spin = body.angularVelocity;
-      body.setAngularVelocity([
-        spin[0] + c.avx[row]! - c.a0x[row]!,
-        spin[1] + c.avy[row]! - c.a0y[row]!,
-        spin[2] + c.avz[row]! - c.a0z[row]!,
-      ]);
-      body.addForce(force);
+      body.applyTorqueImpulse(turn);
+      const [taken] = this.held(body, force, [0, 0, 0]);
       const had = this.pushes.get(body);
-      this.pushedByRow.set(body.row, body);
       this.pushes.set(
         body,
-        had ? [[had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]], had[1]] : [force, [0, 0, 0]],
+        had ? [[had[0][0] + taken[0], had[0][1] + taken[1], had[0][2] + taken[2]], had[1]] : [taken, [0, 0, 0]],
       );
     });
     const cellsTorn = this.exports.soft_fem_torn();
@@ -4581,7 +4589,6 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal */
   bodyRemoved(_body: PhysicsBody): void {
     this.attachments = this.attachments.filter((a) => a.body !== _body);
-    if (this.pushedByRow.get(_body.row) === _body) this.pushedByRow.delete(_body.row);
   }
 
   /** Removes every soft body and leaves the world. */
@@ -4666,6 +4673,29 @@ function inverseMass(body: PhysicsBody): number[] {
     out[6]! += w * a[2] * a[2];
   }
   return out;
+}
+
+/**
+ * The angular impulse (N m s) that changes `body`'s spin by `spin` (rad/s), as the rigid step applies one at its start:
+ * through the body's world inertia there, sum of I_k (a_k . spin) a_k over its principal axes a_k. An axis of no inertia
+ * (a locked turn) takes none.
+ */
+function spinImpulse(body: PhysicsBody, spin: Vec3): Vec3 {
+  if (spin[0] === 0 && spin[1] === 0 && spin[2] === 0) return [0, 0, 0];
+  const q = inertiaAxes(body),
+    inertia = body.principalInertia;
+  let x = 0,
+    y = 0,
+    z = 0;
+  for (let k = 0; k < 3; k++) {
+    if (!(inertia[k]! > 0)) continue;
+    const a = rotate(q, [k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0]),
+      along = inertia[k]! * (a[0] * spin[0] + a[1] * spin[1] + a[2] * spin[2]);
+    x += along * a[0];
+    y += along * a[1];
+    z += along * a[2];
+  }
+  return [x, y, z];
 }
 
 /**
