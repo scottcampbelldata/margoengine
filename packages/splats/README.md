@@ -251,6 +251,9 @@ first.remove(); // its range is free again
   member must have. `add` takes the first free range that holds the cloud and throws a RangeError when none does.
 - A member's `setMatrix(matrix)` rewrites its splats from its own data moved by the matrix (`transformSplats`);
   `remove()` hides them and frees the range, merged with free neighbours.
+- `member.visible = false` hides a part and `member.opacity = 0.5` fades it (0 to 1, times each splat's own opacity),
+  without rewriting its covariances or SH: only its positions and colours (32 of the 128 bytes a splat takes) go to the
+  GPU, and `setMatrix` keeps both settings. `Splats.setOpacities(first, alphas, scale)` is the same for any range.
 - Every pool splat is projected and sorted each frame, free ranges too (hidden, culled before drawing), so size
   `capacity` to what you add.
 

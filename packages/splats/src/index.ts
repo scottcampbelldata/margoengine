@@ -177,6 +177,19 @@ export class Splats implements EnginePlugin {
     for (let i = first; i < first + count; i++) this.positions[i * 4 + 3] = this.colors[i * 4 + 3] = 0;
     return this.upload(first, count, false);
   }
+  /**
+   * Sets the opacity of splats `first` to `first + alphas.length - 1` to `alphas[i] * scale`, uploading only their
+   * positions and colours (32 of the 128 bytes a splat takes), not covariances or SH: a cheap fade or hide of a range
+   * whose own opacities you keep. `scale` 0 hides them (culled before the sort).
+   * @throws RangeError when the range does not fit or `scale` is outside 0 to 1; MargoError `'disposed'` after `dispose()`.
+   */
+  setOpacities(first: number, alphas: Float32Array, scale = 1): this {
+    this.range(first, alphas.length);
+    if (!(scale >= 0 && scale <= 1)) throw new RangeError('Splats.setOpacities scale must be 0 to 1');
+    for (let i = 0; i < alphas.length; i++)
+      this.positions[(first + i) * 4 + 3] = this.colors[(first + i) * 4 + 3] = alphas[i] * scale;
+    return this.upload(first, alphas.length, false);
+  }
   private range(first: number, n: number): void {
     if (this.disposed) throw new MargoError('disposed', 'The splats were disposed; write to a live cloud');
     if (!Number.isInteger(first) || !Number.isInteger(n) || first < 0 || n < 0 || first + n > this.count)

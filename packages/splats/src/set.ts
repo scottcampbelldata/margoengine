@@ -26,6 +26,10 @@ export interface SplatSetMember {
   readonly count: number;
   /** Places the cloud by a column-major 4x4 affine matrix (from its own data, as `transformSplats`). */
   setMatrix(matrix: ArrayLike<number> | null): void;
+  /** Whether the cloud is drawn. Default true. Setting it re-uploads only the cloud's positions and colours. */
+  visible: boolean;
+  /** The cloud's opacity factor, 0 to 1 (default 1), applied to every splat's own opacity. */
+  opacity: number;
   /** Takes the cloud out of the set; its range is free again. */
   remove(): void;
   [Symbol.dispose](): void;
@@ -82,14 +86,41 @@ export class SplatSet {
     this.cloud.write(first, options.matrix ? transformSplats(data, options.matrix) : data);
     if (this.free[at][1] === count) this.free.splice(at, 1);
     else this.free[at] = [first + count, this.free[at][1] - count];
-    const set = this;
-    let live = true;
+    const set = this,
+      alphas = new Float32Array(count).map((_, i) => data.colors[i * 4 + 3]);
+    let live = true,
+      shown = true,
+      factor = 1;
+    const apply = () => set.cloud.setOpacities(first, alphas, shown ? factor : 0),
+      check = () => {
+        if (!live) throw new MargoError('disposed', 'This cloud was removed from its SplatSet; add it again with set.add');
+      };
     const member: SplatSetMember = {
       first,
       count,
       setMatrix(matrix) {
-        if (!live) throw new MargoError('disposed', 'This cloud was removed from its SplatSet; add it again with set.add');
+        check();
         set.cloud.write(first, matrix ? transformSplats(data, matrix) : data);
+        if (!shown || factor !== 1) apply();
+      },
+      get visible() {
+        return shown;
+      },
+      set visible(value: boolean) {
+        check();
+        if (shown !== !!value) {
+          shown = !!value;
+          apply();
+        }
+      },
+      get opacity() {
+        return factor;
+      },
+      set opacity(value: number) {
+        check();
+        if (!(value >= 0 && value <= 1)) throw new RangeError('SplatSetMember.opacity must be 0 to 1');
+        factor = value;
+        if (shown) apply();
       },
       remove() {
         if (!live) return;

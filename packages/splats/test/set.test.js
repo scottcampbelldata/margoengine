@@ -47,3 +47,23 @@ test('SplatSet checks capacity, SH and the matrix', () => {
   assert.equal(set.used, 0);
   set.dispose();
 });
+
+test('SplatSet members hide, fade and keep that across a move', async () => {
+  const set = new SplatSet({ capacity: 6 }),
+    a = set.add(cloud(2)),
+    b = set.add(cloud(2));
+  const alpha = async () => Array.from((await set.cloud.read()).colors).filter((_, i) => i % 4 === 3);
+  assert.deepEqual(await alpha(), [0.5, 0.5, 0.5, 0.5, 0, 0]);
+  a.visible = false;
+  assert.deepEqual(await alpha(), [0, 0, 0.5, 0.5, 0, 0], 'only the hidden part changes');
+  a.setMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]);
+  assert.deepEqual(await alpha(), [0, 0, 0.5, 0.5, 0, 0], 'a moved hidden part stays hidden');
+  a.visible = true;
+  b.opacity = 0.5;
+  assert.deepEqual(await alpha(), [0.5, 0.5, 0.25, 0.25, 0, 0]);
+  assert.equal(b.opacity, 0.5);
+  assert.throws(() => (b.opacity = 2), RangeError);
+  b.remove();
+  assert.throws(() => (b.visible = false), { code: 'disposed' });
+  set.dispose();
+});
