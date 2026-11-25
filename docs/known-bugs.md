@@ -9467,25 +9467,25 @@ family for exact cache/hash failure checks and a full Node GPU integration proof
 this is one exception closure, leaving 48 overall. See
 whitepaper/results/readme-node-basis-20261109.json.
 
-### Open: batch 133 default replacement remains incomplete
+### Fixed 2026-11-25: batch 133 missing decoding rules (recorded as default replacement incomplete)
 
-Lane A current-main audit: the default and native regression command passes
-28 tests; draco.ts still selects the prebuilt wrapper/Wasm. The missing
-specification-derived rules below remain an open replacement build, with the
-existing crafted-input black-box authorization. A passing default decoder
-does not complete or waive any replacement rule, corpus or quality bar.
+The published specification does not define point clouds (encoder type 0),
+generic payloads, no-prediction payloads, uncompressed integers or the KD
+method. Scott's 2026-11-10 ruling authorized crafted-input black-box
+experiments, and commit 71f788362 landed the inferred rules in
+`packages/decoders/native/draco` (E1 to E7, E14 and E15 in the
+[source ledger](clean-room.md#draco-replacement-specification-review-batch-133-2026-11-09)).
+Evidence, rerun on 2026-11-25: `cargo test` passes 22 tests, among them
+281 exact complete files in `tests/sequential.rs` (generic, no-prediction,
+uncompressed integer and sequential point-cloud cases included) and 369 exact
+KD files in `tests/kd.rs`; `packages/decoders/tests/draco-native.test.js`
+(those tests plus six Wasm regressions) and
+`packages/decoders/tests/draco-native-entry.test.js` (7 tests) pass.
 
-This is a replacement prerequisite, not a newly observed failure of the shipped decoder.
-Reproduce the source gap by following the published specification's connectivity
-dispatch for header encoder type 0, or its attribute decoder for generic,
-no-prediction and uncompressed integer payloads. These paths lack complete decoding
-rules; the [source review](clean-room.md#draco-replacement-specification-review-batch-133-2026-11-09)
-records the exact sections. Cause: the permitted specification does not define all
-required behavior. Scott's 2026-11-10 ruling authorizes crafted-input black-box
-experiments to infer the missing rules, with each rule and experiment recorded in
-the source ledger and private plan. No implementation source may be read or used.
-The remedy is the full Rust/Wasm decoder followed by all comparison and quality
-gates. The existing prebuilt files remain and batch 133 stays open.
+This closes the decoding-rule gap only. It is a consolidation of the two
+records, not a replacement pass: the default entries still load the prebuilt,
+and the switch is tracked in
+[batch 133 optional decoder replacement gaps](#open-batch-133-optional-decoder-replacement-gaps).
 
 ### Fixed 2026-11-09: batch 133 prediction-degree seed coverage
 
@@ -13393,6 +13393,10 @@ before test startup. Its failure is retained separately. No competing
 teardown fix or busy-machine exemption was applied in this lane.
 
 ### Open: batch 133 optional decoder replacement gaps
+
+The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
+loads `draco_wasm_wrapper.js` and `draco_decoder.wasm`. The switch has not
+happened and its gates are not all passed; the open items follow.
 
 The optional clean-room decoder retains the warm losses measured in
 whitepaper/results/batch-133-paired-checkpoint.json: full 365 and glTF 288 total
