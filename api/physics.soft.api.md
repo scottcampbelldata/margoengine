@@ -143,6 +143,11 @@ export class SoftBody {
     quiet: number;
     collisionGroups: number | undefined;
     dominance: number;
+    grid: {
+        readonly nu: number;
+        readonly nv: number;
+        readonly wrap: boolean;
+    } | null;
     additionalIterations: number;
     oriented: boolean | undefined;
     selfContacts: boolean;
@@ -152,7 +157,7 @@ export class SoftBody {
     private get c();
     numParticles(): number;
     particlePosition(index: number): Vec3;
-    particlePositions(): Float32Array;
+    particlePositions(target?: Float32Array): Float32Array;
     interpolatedPositions(alpha?: number, out?: Float32Array): Float32Array;
     interpolatedMeshVertices(alpha?: number): Float32Array;
     remember(): void;
@@ -226,6 +231,11 @@ export class SoftBodyDesc {
     edgePairs: number[];
     edgeKinds: number[];
     bendPairs: number[];
+    grid: {
+        nu: number;
+        nv: number;
+        wrap: boolean;
+    } | null;
     masses: number[];
     pinned: Set<number>;
     radius: number | null;
