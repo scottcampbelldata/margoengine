@@ -53,3 +53,5 @@ packages/voxel-pathtracer/mesh-kernel/target/
 
 # Local working notes (work lists, handoffs); never committed.
 /private/
+packages/physics/kernel-common/target/
+packages/physics/kernel-common/Cargo.lock
