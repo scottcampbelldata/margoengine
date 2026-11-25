@@ -1,7 +1,7 @@
 // A tracked vehicle: springs under road wheels, belts that push the ground by their slip, and steering by driving the two belts apart.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics, TrackedVehicle } from '../dist/index.js';
+import { Physics, TrackedVehicle, shearShare } from '../dist/index.js';
 
 await Physics.load();
 
@@ -128,5 +128,44 @@ test('a tank refuses what makes no sense, and a disposed one lets go', () => {
   assert.throws(() => vehicle.track(3), RangeError);
   vehicle.dispose();
   assert.equal(vehicle.valid, false);
+  physics.dispose();
+});
+
+test('the shear curve is 0 at no displacement, 63.2 percent at the shear modulus and 1 far out', () => {
+  assert.equal(shearShare(0, 0.025), 0);
+  near(shearShare(0.025, 0.025), 1 - Math.exp(-1), 1e-12, 'at j = K');
+  near(shearShare(0.025, 0.025), 0.632, 5e-4, 'about 63 percent at j = K');
+  near(shearShare(-0.05, 0.025), 1 - Math.exp(-2), 1e-12, 'the displacement counts by its size');
+  near(shearShare(1, 0.025), 1, 1e-12, 'saturated far out');
+  assert.throws(() => shearShare(1, 0), /modulus/);
+});
+
+test('a sliding tank with its belts stopped is held back by friction along it and across it in the ratio of the two coefficients', () => {
+  const lost = (velocity) => {
+    const { physics, chassis } = tank({ longitudinalFriction: 0.8, lateralFriction: 0.4 });
+    chassis.setLinearVelocity(velocity, true);
+    for (let i = 0; i < 12; i++) physics.step();
+    const speed = Math.hypot(...chassis.linearVelocity);
+    physics.dispose();
+    return 3 - speed;
+  };
+  // 0.2 s at a few m/s: the shear is at its friction after a few centimetres of slide, so the loss is the friction times g times the time.
+  const along = lost([0, 0, 3]),
+    across = lost([3, 0, 0]);
+  near(along / across, 2, 0.25, 'the loss along the belt is twice that across it');
+  near(along, 0.8 * 9.81 * 0.2, 0.4, 'the loss along the belt is mu g t');
+});
+
+test('a belt changes its speed by no more than its acceleration a second', () => {
+  const { physics, vehicle } = tank({ trackAcceleration: 6 });
+  vehicle.setInput({ throttle: 1 });
+  let last = 0;
+  for (let i = 0; i < 60; i++) {
+    physics.step();
+    const speed = vehicle.track(0).speed;
+    assert.ok(speed - last <= 6 / 60 + 1e-9, `step ${i}: the belt gained ${speed - last}`);
+    last = speed;
+  }
+  near(last, 6, 0.01, 'after a second at 6 m/s squared');
   physics.dispose();
 });

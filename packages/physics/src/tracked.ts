@@ -1,10 +1,14 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // A tracked vehicle on a dynamic chassis: two (or more) tracks, each a row of road wheels on springs that find the ground with a ray, and a
 // belt that drives the ground under it at a speed of its own. The ground pushes back along the belt by how fast the belt slips against it,
-// with the shear of Wong, "Theory of Ground Vehicles", 4th ed., Wiley 2008, chapter 3: the shear stress rises with the slip as
-// `1 - exp(-slip / K)` up to the friction the load allows, and a track is held harder against sliding sideways than along its belt (the
-// lateral and longitudinal coefficients of Wong's skid steering), so a vehicle turns by driving its tracks at different speeds and the
-// ground resists the turn as it does a real tank's.
+// with the shear of Wong, "Theory of Ground Vehicles", 4th ed., Wiley 2008, chapter 2 (terramechanics, the shear stress and shear
+// displacement relation): the shear stress rises with the shear displacement `j` as `tau = tau_max (1 - exp(-j / K))` up to the friction the
+// load allows, `K` being the shear deformation modulus in metres. The displacement is the slip speed integrated over the time the belt has
+// been on the ground: a belt moving at `v` through a patch of length `L` renews the ground under it every `L / v`, so the displacement
+// the road wheels see is the slip speed over `2 v / L` (its mean over the patch is `u L / 2 v`, Wong's `j = i x` averaged from the
+// entry); a belt that is stopped keeps adding to it, so a vehicle held by its belts on a slope creeps only until the shear holds it. A track
+// is held harder against sliding sideways than along its belt (the lateral and longitudinal coefficients of Wong's skid steering), so a
+// vehicle turns by driving its tracks at different speeds and the ground resists the turn as it does a real tank's.
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsCollider } from './collider.js';
@@ -44,8 +48,8 @@ export interface TrackedVehicleOptions {
   /** Friction of the belt along itself (default 0.9) and sideways (default 0.5 times that, the skid-steer resistance of Wong). */
   longitudinalFriction?: number;
   lateralFriction?: number;
-  /** The slip speed at which the shear has risen to 63 percent of its friction, m/s (default 0.2): Wong's shear parameter. */
-  shearSlip?: number;
+  /** The shear displacement at which the shear stress has risen to 63 percent of its friction, metres (default 0.025): Wong's shear deformation modulus `K`, centimetres for sand, clay and snow. */
+  shearDisplacement?: number;
   /** The direction the chassis faces, in its own frame (default [0, 0, 1]). */
   forward?: Vec3;
   /** Packed interaction groups of the road wheels' rays (default all). */
@@ -71,6 +75,16 @@ const rotate = (q: readonly number[], v: readonly number[]): V => {
 };
 const clamp = (v: number, low: number, high: number): number => Math.min(high, Math.max(low, v));
 
+/**
+ * The share of its friction the ground gives at a shear displacement (Wong's `tau / tau_max = 1 - exp(-j / K)`): 0 at no displacement,
+ * 0.632 at `j = K`, 1 as the displacement grows.
+ * @throws RangeError for a modulus that is not a finite number above 0.
+ */
+export function shearShare(displacement: number, modulus: number): number {
+  if (!(modulus > 0 && Number.isFinite(modulus))) throw new RangeError('The shear modulus must be a finite number above 0.');
+  return 1 - Math.exp(-Math.abs(displacement) / modulus);
+}
+
 interface Track {
   mount: V;
   length: number;
@@ -88,6 +102,9 @@ interface Track {
   lengths: number[];
   loads: number[];
   contacts: boolean[];
+  /** Per road wheel: the shear displacement of the ground under it along the belt and across it, metres. */
+  alongShear: number[];
+  acrossShear: number[];
 }
 
 /**
@@ -121,13 +138,13 @@ export class TrackedVehicle implements PhysicsAttachment {
     this.accel = options.trackAcceleration ?? 10;
     this.muX = options.longitudinalFriction ?? 0.9;
     this.muY = options.lateralFriction ?? 0.45;
-    this.shear = options.shearSlip ?? 0.2;
+    this.shear = options.shearDisplacement ?? 0.025;
     for (const [value, name] of [
       [this.maxSpeed, 'maxSpeed'],
       [this.accel, 'trackAcceleration'],
       [this.muX, 'longitudinalFriction'],
       [this.muY, 'lateralFriction'],
-      [this.shear, 'shearSlip'],
+      [this.shear, 'shearDisplacement'],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
         throw new RangeError(`Tracked vehicle ${name} must be a finite number above 0.`);
@@ -159,6 +176,8 @@ export class TrackedVehicle implements PhysicsAttachment {
         lengths: new Array<number>(count).fill(rest),
         loads: new Array<number>(count).fill(0),
         contacts: new Array<boolean>(count).fill(false),
+        alongShear: new Array<number>(count).fill(0),
+        acrossShear: new Array<number>(count).fill(0),
       });
     }
     physics.attach(this);
@@ -251,6 +270,8 @@ export class TrackedVehicle implements PhysicsAttachment {
         if (!hit) {
           track.lengths[k] = track.rest;
           track.loads[k] = 0;
+          track.alongShear[k] = 0;
+          track.acrossShear[k] = 0;
           continue;
         }
         const length = Math.min(track.rest, Math.max(0, hit.distance)),
@@ -281,13 +302,20 @@ export class TrackedVehicle implements PhysicsAttachment {
         forward = [forward[0] / size, forward[1] / size, forward[2] / size];
         const side = cross(forward, normal),
           slideAlong = track.speed - dot(forward, pv),
-          slideAcross = -dot(side, pv),
-          slip = Math.hypot(slideAlong, slideAcross);
-        if (slip === 0) continue;
-        // Wong's shear: the share of the friction the slip has mobilised, along the slip's direction, the friction larger along the belt.
-        const share = 1 - Math.exp(-slip / this.shear),
-          fx = this.muX * force * share * (slideAlong / slip),
-          fy = this.muY * force * share * (slideAcross / slip);
+          slideAcross = -dot(side, pv);
+        // The ground's shear displacement under this wheel: the slip speed added up while the belt stays on the same ground, renewed at
+        // the rate the belt carries new surface into the patch (twice the belt speed over its length: the mean of Wong's `j = i x`).
+        const renewal = (2 * Math.abs(track.speed)) / track.length,
+          keep = Math.exp(-renewal * dt),
+          gain = renewal > 0 ? (1 - keep) / renewal : dt;
+        track.alongShear[k] = track.alongShear[k]! * keep + slideAlong * gain;
+        track.acrossShear[k] = track.acrossShear[k]! * keep + slideAcross * gain;
+        const displacement = Math.hypot(track.alongShear[k]!, track.acrossShear[k]!);
+        if (displacement === 0) continue;
+        // Wong's shear: the share of the friction the displacement has mobilised, along the displacement's direction, the friction larger along the belt.
+        const share = shearShare(displacement, this.shear),
+          fx = this.muX * force * share * (track.alongShear[k]! / displacement),
+          fy = this.muY * force * share * (track.acrossShear[k]! / displacement);
         chassis.applyImpulse(
           [
             forward[0] * fx * dt + side[0] * fy * dt,
