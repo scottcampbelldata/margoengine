@@ -47,6 +47,10 @@
     "./meshfiles": {
       "types": "./dist/meshfiles.d.ts",
       "import": "./dist/meshfiles.js"
+    },
+    "./robots": {
+      "types": "./dist/robots.d.ts",
+      "import": "./dist/robots.js"
     }
   },
   "files": [

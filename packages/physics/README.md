@@ -1352,6 +1352,30 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Colliders for a glTF model, one body or one per node | `addModel` | full | `add-model.test.js` |
 | A body that follows a mesh | `follow: true` | full | `nested.test.js` |
 
+### Robots from URDF and MJCF files
+
+`@margoengine/physics/robots` builds the robot of a URDF or MuJoCo MJCF file in a `Physics`. `addURDF(physics, text, options)` and `addMJCF(physics, text, options)` make a body for each link or body (collision shapes or geoms as colliders, the inertial as the body's mass, centre of mass and inertia) and a joint for each joint (fixed, revolute, continuous, prismatic and floating in URDF; hinge, slide, ball and free in MJCF, with their axes, ranges and damping), held as one multibody (the default) or, with `joints: 'impulse'`, as ordinary joints. Both formats are z up, so the robot is turned to y up unless you pass `upAxis: 'y'`; `position`, `rotation`, `scale` (a file in other units), `fixBase`, `friction` and `collisionGroups` place and set it up, and `loadMesh(filename, scale)` turns a mesh geometry into collider options (without it the geometry is left out and listed in `robot.skipped`). It returns the bodies and joints by the names the file gave them, so you can drive a joint's motor by name. Not read: effort and velocity limits, joint friction, `mimic`, planar joints, and in MJCF default classes, actuators, tendons, contacts and sensors; a body with two MJCF joints is refused with what to do.
+
+```js
+import {Physics} from 'margoengine/physics';
+import {addURDF} from 'margoengine/physics/robots';
+
+await Physics.load();
+const physics = new Physics(null);
+const urdf = `<robot name="pendulum">
+  <link name="post"><collision><geometry><box size="0.2 0.2 0.2"/></geometry></collision></link>
+  <link name="arm">
+    <inertial><origin xyz="0 0 -1"/><mass value="1"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    <collision><origin xyz="0 0 -0.5"/><geometry><cylinder radius="0.03" length="1"/></geometry></collision>
+  </link>
+  <joint name="hinge" type="revolute"><parent link="post"/><child link="arm"/><axis xyz="1 0 0"/><limit lower="-3.2" upper="3.2"/></joint>
+</robot>`;
+const robot = addURDF(physics, urdf, {fixBase: true, position: [0, 2, 0]});
+robot.bodies.get('arm').setRotation([0, 0, 0, 1]); // swing it out level
+for (let i = 0; i < 60; i++) physics.step();
+console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post,arm true
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
