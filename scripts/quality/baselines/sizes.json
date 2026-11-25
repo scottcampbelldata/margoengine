@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18445900,
+  "total": 18449990,
   "history": [
     {
       "date": "2026-10-24",
@@ -11757,6 +11757,12 @@
       "commit": "b76b611ef",
       "reason": "physics grows from 564,869 B to 565,422 B (+553 B) and its base by 2 B: the solve by island (windows, group windows, the staged kinematic pose, the kinematic pass) in both Wasm blueprints, the SIMD and the scalar one, whose sizes the figure sums; a page loads one",
       "grew": 5
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "0f6875307",
+      "reason": "New optional entry @margoengine/culling/occlusion (OcclusionQueries: app-facing hardware occlusion queries), 0 -> 4090 B baseline (3834 B measured gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12003,6 +12009,7 @@
     "@margoengine/culling/lod": 4604,
     "@margoengine/culling/meshlets": 18951,
     "@margoengine/culling/models": 9103,
+    "@margoengine/culling/occlusion": 4090,
     "@margoengine/culling/parts": 14017,
     "@margoengine/culling/shadows": 21314,
     "@margoengine/culling/sort": 14158,

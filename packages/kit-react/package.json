@@ -343,6 +343,10 @@
       "types": "./dist/culling/depth.d.ts",
       "import": "./dist/culling/depth.js"
     },
+    "./culling/occlusion": {
+      "types": "./dist/culling/occlusion.d.ts",
+      "import": "./dist/culling/occlusion.js"
+    },
     "./decoders/ktx2-hdr6": {
       "types": "./dist/decoders/ktx2-hdr6.d.ts",
       "import": "./dist/decoders/ktx2-hdr6.js"

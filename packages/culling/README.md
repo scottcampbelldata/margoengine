@@ -392,6 +392,66 @@ against 15.6 and 2.7 ms as core meshes; 18.8 and 2.8 ms at 250,000 against 45.7 
 above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-bugs.md), "DynamicInstances: about
 15-35% more GPU time".
 
+## Occlusion queries for app objects: `OcclusionQueries`
+
+`@margoengine/culling/occlusion` asks the GPU whether boxes or core meshes are hidden behind what the frame drew, as
+Babylon's `mesh.isOccluded` and three.js's occlusion tests do. After core's main pass, each object's bounding box is
+drawn depth-test only (no colour, no depth write) against the frame's own depth buffer inside one WebGPU occlusion
+query. The results resolve into one of three readback buffers read with `mapAsync`, so the CPU never waits on the GPU
+and each object keeps its newest landed result, usually one to three frames old.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {OcclusionQueries} from 'margoengine/culling/occlusion';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 0, 20], target: [0, 0, 0]}});
+const grey = new PbrMaterial({color: '#b0b0b0'});
+engine.createMesh().setGeometry(box(12, 12, 0.5)).setMaterial(grey);              // a wall
+const crate = engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(grey).setPosition([1, 0, -6]);
+const queries = OcclusionQueries.attach(engine, {retries: 10, strategy: 'optimistic'});
+const behind = queries.add(crate);                                                  // a core mesh
+const lamp = queries.add({min: [3, -1, 4], max: [4, 0, 5]}, {strategy: 'strict'}); // or any world box
+engine.start();
+await queries.next({signal: AbortSignal.timeout(5000)});                           // the first results landed
+console.log(behind.isOccluded, lamp.isOccluded, lamp.samples);                     // true false 1
+```
+
+- `isOccluded`: no sample of the box passed in the newest result. Boxes outside the view read occluded and boxes cut
+  by the near or far plane read visible, both decided on the CPU without a query. Before its first result an object
+  reads visible (`hasResult` false).
+- `samples`: the passing sample count of the newest result. WebGPU promises only zero or nonzero (D3D12 and the WebGL2
+  layer report 1), so treat it as a flag.
+- `pendingFrames`: frames since the newest result. With `retries` set (default -1, never), an object waiting longer
+  reads visible (`'optimistic'`, the default) or occluded (`'strict'`), Babylon's occlusionRetryCount and
+  occlusionType; per object through `add(target, {retries, strategy})`.
+- `next({signal})` resolves when the next set of results is applied; it rejects with the signal's reason on abort and
+  with MargoError `disposed` on `dispose()`. `query.dispose()` or `queries.remove(query)` stops one object; the
+  plugin and each query support `using`.
+- Options: `capacity`, objects queried per frame, 1 to 65,536 (default 1,024; one query set and render pass per
+  4,096); `view`, the view id to query in (default the canvas's first view or the plain canvas frame); `order` in the
+  frame graph (default 1, just after core's main pass, so later passes that write depth do not count as occluders);
+  `retries` and `strategy`, the defaults for objects that set none.
+- To hide what is occluded, set `mesh.visible = !query.isOccluded` each frame: the box is still queried while the
+  mesh is hidden, so it comes back when it is uncovered. The box grows by 0.1% of its largest side so an object's own
+  faces never hide it. A mesh's box is its geometry's bind-pose box under its world matrix (Arvo 1990).
+- Runs on WebGPU and the WebGL2 compatibility layer (one `ANY_SAMPLES_PASSED` query per object), at 1x and 4x MSAA;
+  core's small WebGL2 preview refuses it with `unsupported`. Checked by `test/occlusion-queries.test.js` (scheduling,
+  latency, retries, stale frames, chunking) and `test/gpu/occlusion-queries-check.mjs [--compat]` (a box and a mesh
+  behind a wall read occluded, a box in front visible, all visible from the wall's side).
+
+Sources (clean room, from the papers and specs): W3C, "WebGPU", occlusion queries and `resolveQuerySet`
+(https://www.w3.org/TR/webgpu/); Khronos, "OpenGL ES 3.0 specification", occlusion queries `ANY_SAMPLES_PASSED`
+(https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf); D. Sekulic, "Efficient Occlusion Culling", GPU
+Gems ch. 29, 2004
+(https://developer.nvidia.com/gpugems/gpugems/part-v-performance-and-practicalities/chapter-29-efficient-occlusion-culling);
+M. Wimmer and J. Bittner, "Hardware Occlusion Queries Made Useful", GPU Gems 2 ch. 6, 2005
+(https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-6-hardware-occlusion-queries-made-useful);
+J. Bittner, M. Wimmer, H. Piringer and W. Purgathofer, "Coherent Hierarchical Culling: Hardware Occlusion Queries Made
+Useful", Computer Graphics Forum 23(3), 2004 (https://doi.org/10.1111/j.1467-8659.2004.00793.x); O. Mattausch, J.
+Bittner and M. Wimmer, "CHC++: Coherent Hierarchical Culling Revisited", Computer Graphics Forum 27(2), 2008
+(https://doi.org/10.1111/j.1467-8659.2008.01135.x); J. Arvo, "Transforming Axis-Aligned Bounding Boxes", Graphics Gems,
+1990. Taken from them: reuse of the last result and pipelined readback without stalls (CHC, CHC++), and box proxies
+drawn without colour or depth writes, with boxes that touch the near plane counted visible (GPU Gems).
+
 ## Modes
 
 - `'frustum'` (default): bounding spheres against the six frustum planes (the same planes core's kernel uses).

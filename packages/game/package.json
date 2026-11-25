@@ -903,6 +903,10 @@
       "types": "./dist/culling/depth.d.ts",
       "import": "./dist/culling/depth.js"
     },
+    "./culling/occlusion": {
+      "types": "./dist/culling/occlusion.d.ts",
+      "import": "./dist/culling/occlusion.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"
