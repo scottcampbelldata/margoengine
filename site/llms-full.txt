@@ -21967,6 +21967,14 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ## Open defects
 
+### Open 2026-11-25: local CI's GPU package step sat in `vfx test:gpu` until its 120-minute limit (vfx seek check, KB-VFX-SEEKHANG1)
+
+- **Seen:** local CI full run 2026-11-25T13-31-21-828Z, step `check:gpu-packages-no-build`: `packages/vfx/test/seek-check.mjs` printed its n = 600 case and nothing more; the step was killed at 120 minutes. The step started at about 15:56 while other lanes were running GPU tests on the same RTX A6000.
+- **Not reproduced:** on newest main (fe86d1e5e7) the check passes alone (n = 600 in 2.7 s, n = 1800 in 7.0 s; the whole check 14 s) and with four copies running at once (15 s). The log shows no device loss and no wait for a held port.
+- **Cause:** not found. The n = 1800 run waits on `onSubmittedWorkDone` for every one of about 2,100 frames and on two `mapAsync` reads, and before this entry none of those waits and no `page.evaluate` had a limit, so one GPU wait that never settled held the step.
+- **Done so far:** every wait in `seek-check.html` has its own 30 s limit, each `run` 10 minutes, page loads 2 minutes and the port is free-chosen. A stall now fails at once with the phase it was in (for example "the frame GPU work did not finish within 30000 ms (phase A frame 1203 of 1800)"); tried with a 1 ms limit, it failed in 3 s naming phase A frame 300 of 600. Each case prints its time.
+- **Next:** when the check fails on CI with a phase, find the root cause from it and fix it in its owning package with a regression test; then close this entry.
+
 ### Fixed 2026-11-24: small and thin rigid bodies passed through, or were thrown off, a ringing default cloth (physics soft, KB-SOFT-LIGHT1)
 
 - **Was:** a 1 cm bead went through a default cloth after about a second; a 26 g box, a thin rod and a 1 kg box were thrown off it or set spinning, and a box at a mass ratio of a thousand passed between its particles.

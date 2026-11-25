@@ -9,8 +9,10 @@
 // slot's 64 bytes, sorted, are equal (before the fix about none were shared).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-const url = 'http://127.0.0.1:5296/packages/vfx/test/seek-check.html',
-  context = await openBrowser({ startPath: '/packages/vfx/test/seek-check.html', port: 5296 }),
+// A whole n = 1800 run takes about 10 s on the RTX A6000; each run gets 10 minutes, and every GPU wait inside the page
+// 30 s, so a stall fails naming its phase (KB-VFX-SEEKHANG1: one local CI run sat here until the 120-minute step limit).
+const RUN_MS = 10 * 60_000;
+const context = await openBrowser({ startPath: '/packages/vfx/test/seek-check.html', port: 'free' }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -20,9 +22,23 @@ page.on('console', (m) => {
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
   for (const n of [600, 1800]) {
-    await page.goto(url);
+    await page.goto(new URL('/packages/vfx/test/seek-check.html', page.url()).href, { timeout: 120000 });
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
-    const r = await page.evaluate((steps) => window.check.run(steps), n);
+    const started = Date.now();
+    let timer;
+    const r = await Promise.race([
+      page.evaluate((steps) => window.check.run(steps), n),
+      new Promise((_, reject) => {
+        timer = setTimeout(async () => {
+          // The page's main thread is free while it waits on the GPU, so it can still say where it is.
+          const phase = await Promise.race([
+            page.evaluate(() => window.check.phase),
+            new Promise((done) => setTimeout(() => done('unknown (the page did not answer)'), 10000)),
+          ]);
+          reject(new Error(`vfx seek n = ${n} did not finish within ${RUN_MS / 60000} min; it stopped at ${phase}`));
+        }, RUN_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
     assert.deepEqual(r.errors, [], `GPU errors at n = ${n}`);
     assert.deepEqual(r.zero, [0, 0, 0], 'warm-up frames move no clock');
     assert.equal(r.steps, n - 150);
@@ -44,7 +60,7 @@ try {
       `${r.shared} of ${r.keptA} live particles equal after the seek and warm-up (GAP-FILM-VFXSEED)`,
     );
     console.log(
-      `ok vfx seek n = ${n}: births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit`,
+      `ok vfx seek n = ${n} (${((Date.now() - started) / 1000).toFixed(1)} s): births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit`,
     );
   }
   assert.deepEqual(pageErrors, []);
