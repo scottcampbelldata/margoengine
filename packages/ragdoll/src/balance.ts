@@ -259,7 +259,7 @@ export class RagdollBalance {
     this.gravity = within(options.gravity, 9.81, 0.01, 1000, 'gravity');
     const legInertia = LEG_INERTIA * this.total * (left.thigh + left.shin) ** 2;
     const passes = Math.max(0, SOLVER_PASSES - ragdoll.physics.solverIterations);
-    for (const part of bones) part.body.additionalSolverIterations = passes;
+    for (const part of bones) part.body.additionalPgsIterations = passes;
     for (const { foot, lower } of this.legs) for (const part of [foot, lower]) motors.addSteadying(part, legInertia);
     for (const one of this.legs) {
       one.kneeCap = this.total * this.gravity * Math.min(one.thigh, one.shin);
@@ -863,7 +863,7 @@ export class RagdollBalance {
     this.wanted.fill(0);
     this.settle();
     for (const { part, shape } of this.soles) this.ragdoll.setShape(part, shape);
-    for (const part of this.ragdoll.bones) part.body.additionalSolverIterations = 0;
+    for (const part of this.ragdoll.bones) part.body.additionalPgsIterations = 0;
     for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.motors.addSteadying(part);
   }
   declare [Symbol.dispose]: () => void;

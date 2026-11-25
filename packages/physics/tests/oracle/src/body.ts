@@ -321,11 +321,12 @@ export class PhysicsBody {
   get appliedTorque(): [number, number, number] {
     return tuple(this.check().userTorque());
   }
-  /** Solver passes the island of this body takes on top of the world's `solverIterations` (default 0). */
-  get additionalSolverIterations(): number {
+  /** Solver passes the island of this body takes on top of the world's `iterations` (default 0), over the Rapier build's one per-body count. */
+  get additionalPgsIterations(): number {
+    // Rapier's JavaScript build has the one per-body count, and the oracle holds it as Margo's pass count.
     return this.check().additionalSolverIterations();
   }
-  set additionalSolverIterations(passes: number) {
+  set additionalPgsIterations(passes: number) {
     // Rapier keeps the count in 32 bits: a larger one would wrap to a few passes without a word.
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
       throw new RangeError(

@@ -152,7 +152,7 @@ function scene(iterations, extra) {
     second = pile(20),
     bob = physics.addBody(null, { position: [1.5, 2.6, 0], colliders: { shape: 'sphere', radius: 0.2 } });
   physics.addJoint(first[2], bob, { type: 'spherical', anchorA: [0.5, 0.5, 0], anchorB: [-1, 0, 0] });
-  first[0].additionalSolverIterations = extra;
+  first[0].additionalPgsIterations = extra;
   for (let i = 0; i < 90; i++) physics.step();
   const read = (bodies) =>
     bodies.flatMap((body) => [...body.position, ...body.rotation, ...body.linearVelocity, ...body.angularVelocity]);
@@ -180,15 +180,15 @@ test('extra passes give an island what a world of that many passes would, and le
   }
   const physics = new Physics(null),
     body = physics.addBody(null);
-  assert.equal(body.additionalSolverIterations, 0);
-  body.additionalSolverIterations = 4;
-  assert.equal(body.additionalSolverIterations, 4);
-  assert.throws(() => (body.additionalSolverIterations = -1), /whole number from 0 to 4294967295/);
+  assert.equal(body.additionalPgsIterations, 0);
+  body.additionalPgsIterations = 4;
+  assert.equal(body.additionalPgsIterations, 4);
+  assert.throws(() => (body.additionalPgsIterations = -1), /whole number from 0 to 4294967295/);
   // Rapier's 32 bits, not a cap of our own: the largest count is kept, and one past it throws on both entries.
-  body.additionalSolverIterations = 0xffffffff;
-  assert.equal(body.additionalSolverIterations, 0xffffffff);
-  body.additionalSolverIterations = 0;
-  assert.throws(() => (body.additionalSolverIterations = 1.5), RangeError);
+  body.additionalPgsIterations = 0xffffffff;
+  assert.equal(body.additionalPgsIterations, 0xffffffff);
+  body.additionalPgsIterations = 0;
+  assert.throws(() => (body.additionalPgsIterations = 1.5), RangeError);
   physics.dispose();
 });
 

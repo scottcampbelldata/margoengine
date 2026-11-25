@@ -330,7 +330,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   get pendingTime(): number {
     return this.accumulator;
   }
-  /** Solver passes per step for every island; a body can ask for more with `additionalSolverIterations`. */
+  /** Solver passes per step for every island; a body can ask for more with `additionalPgsIterations`. */
   get solverIterations(): number {
     return this.world.numSolverIterations;
   }

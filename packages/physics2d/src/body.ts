@@ -556,20 +556,20 @@ export class Body2D {
     return this.read().f[12];
   }
   /**
-   * Solver passes the body's island takes beyond the world's, each substep (default 0). Rapier's `additionalSolverIterations`: a stack
+   * Solver passes the body's island takes beyond the world's, each substep (default 0). Rapier's `additional_pgs_iterations` (its `additional_solver_iterations` is extra substeps, `additionalSolverIterations` here): a stack
    * that must stay stiff under a heavy load, or a ring of joints that needs to close, asks for more passes without raising every island's
    * cost. The island runs the most any of its awake bodies asks for, over its own contacts and joints only; no other island is touched,
    * and with no body asking the step is bit for bit what it was. The extra passes visit the contacts one at a time. A stack of 20 boxes
    * under a box 100 times as heavy is still creeping to rest after two seconds at one pass; with 16 more it has arrived.
    * @throws RangeError for a number that is not a whole number of 0 or more (up to 4,294,967,295).
    */
-  set additionalSolverIterations(value: number) {
+  set additionalPgsIterations(value: number) {
     const { x, h, kernel } = this.k;
     if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
-      throw new RangeError(`additionalSolverIterations must be a whole number of 0 or more; got ${value}.`);
+      throw new RangeError(`additionalPgsIterations must be a whole number of 0 or more; got ${value}.`);
     kernel.ok(x.body_set_extra_passes(h, this.handle, value));
   }
-  get additionalSolverIterations(): number {
+  get additionalPgsIterations(): number {
     return this.read().u[13];
   }
   /** The centre of mass in world units, as of the last step. */

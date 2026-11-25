@@ -18,7 +18,7 @@ function columns(extra) {
         canSleep: false,
         colliders: { shape: 'box', width: 1, height: 1, density: i === 19 ? 100 : 1 },
       });
-      if (k === 0 && extra) body.additionalSolverIterations = extra;
+      if (k === 0 && extra) body.additionalPgsIterations = extra;
       out[k].push(body);
     }
   });
@@ -29,14 +29,14 @@ const top = (column) => 19.5 - column[19].position[1];
 
 test('extra solver passes read back, reject what is not a count, and survive a snapshot', () => {
   const { physics, left, right } = columns(3);
-  assert.equal(left[5].additionalSolverIterations, 3);
-  assert.equal(right[5].additionalSolverIterations, 0);
+  assert.equal(left[5].additionalPgsIterations, 3);
+  assert.equal(right[5].additionalPgsIterations, 0);
   for (const bad of [-1, 1.5, Number.NaN, 2 ** 32])
-    assert.throws(() => (left[5].additionalSolverIterations = bad), RangeError);
+    assert.throws(() => (left[5].additionalPgsIterations = bad), RangeError);
   const bytes = physics.snapshot();
-  left[5].additionalSolverIterations = 0;
+  left[5].additionalPgsIterations = 0;
   physics.restore(bytes);
-  assert.equal(left[5].additionalSolverIterations, 3, 'a snapshot carries it');
+  assert.equal(left[5].additionalPgsIterations, 3, 'a snapshot carries it');
 });
 
 test('a column with extra passes reaches its resting squash, and the column that asked for none is the one it was', () => {

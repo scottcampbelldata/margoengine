@@ -14947,5 +14947,77 @@
     "reason": "Borrowed GPU objects rule 2: also takes a (device) => object form, made once per device; every existing caller still compiles (KB-RESTORE-BORROWED1)",
     "date": "2026-11-20",
     "approved": "Scott 2026-11-20: \"I said widen our keep it do what's best practices\" (left widen or keep to the agent; widened per rule 2)"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "7cdaaf85",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "ebe5f369",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics/soft",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "7cdaaf85",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics/soft",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "ebe5f369",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics/robots",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "7cdaaf85",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics/robots",
+    "symbol": "PhysicsBody.additionalSolverIterations",
+    "change": "removed",
+    "was": "ebe5f369",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Body2D.additionalSolverIterations",
+    "change": "removed",
+    "was": "fa7f0845",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+  },
+  {
+    "entry": "@margoengine/physics2d",
+    "symbol": "Body2D.additionalSolverIterations",
+    "change": "removed",
+    "was": "7cdaaf85",
+    "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
+    "date": "2026-11-24",
+    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
   }
 ]

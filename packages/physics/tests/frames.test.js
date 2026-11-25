@@ -119,10 +119,10 @@ test('solver passes read and set, for the world and for one island', () => {
   assert.equal(physics.substeps, 8);
   assert.throws(() => (physics.solverIterations = 0), RangeError);
   assert.throws(() => (physics.solverIterations = 1.5), RangeError);
-  assert.equal(body.additionalSolverIterations, 0);
-  body.additionalSolverIterations = 4;
-  assert.equal(body.additionalSolverIterations, 4);
-  assert.throws(() => (body.additionalSolverIterations = -1), RangeError);
+  assert.equal(body.additionalPgsIterations, 0);
+  body.additionalPgsIterations = 4;
+  assert.equal(body.additionalPgsIterations, 4);
+  assert.throws(() => (body.additionalPgsIterations = -1), RangeError);
   physics.dispose();
 });
 

@@ -1592,8 +1592,8 @@ class PhysicsBody {
     copyFrom(other: PhysicsBody): this;
     get gravityScale(): number;
     set gravityScale(value: number);
-    get additionalSolverIterations(): number;
-    set additionalSolverIterations(passes: number);
+    get additionalPgsIterations(): number;
+    set additionalPgsIterations(passes: number);
     get ccd(): boolean;
     set ccd(enabled: boolean);
     get softCcdPrediction(): number;

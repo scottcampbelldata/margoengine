@@ -654,7 +654,7 @@ export class PhysicsBody {
     this.maxAngularSpeed = other.maxAngularSpeed;
     this.columns.sleepLimit[this.row] = other.columns.sleepLimit[other.row];
     this.columns.sleepAfter[this.row] = other.columns.sleepAfter[other.row];
-    this.additionalSolverIterations = other.additionalSolverIterations;
+    this.additionalPgsIterations = other.additionalPgsIterations;
     this.enabledTranslations = other.enabledTranslations;
     this.enabledRotations = other.enabledRotations;
     this.gyroscopicForces = other.gyroscopicForces;
@@ -669,15 +669,16 @@ export class PhysicsBody {
     this.world().wake(this.row);
     this.columns.gravityScale[this.row] = value;
   }
-  /** Solver passes the island of this body takes on top of the world's `solverIterations` (default 0). */
-  get additionalSolverIterations(): number {
+  /**
+   * Solver passes the island of this body takes on top of the world's `iterations`, each substep (default 0): Rapier's
+   * `additional_pgs_iterations`. Rapier's `additional_solver_iterations` is extra substeps, not extra passes.
+   */
+  get additionalPgsIterations(): number {
     return this.columns.extraPasses[this.row];
   }
-  set additionalSolverIterations(passes: number) {
+  set additionalPgsIterations(passes: number) {
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
-      throw new RangeError(
-        'Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.',
-      );
+      throw new RangeError('Additional PGS iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
   }
   /**

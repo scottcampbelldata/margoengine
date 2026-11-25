@@ -112,8 +112,8 @@ export class Body2D {
     set enabled(value: boolean);
     set maxAngularSpeed(value: number);
     get maxAngularSpeed(): number;
-    set additionalSolverIterations(value: number);
-    get additionalSolverIterations(): number;
+    set additionalPgsIterations(value: number);
+    get additionalPgsIterations(): number;
     get centerOfMass(): [number, number];
     setAdditionalMassProperties(mass: number, centre?: Vec2D, inertia?: number): this;
     get sleeping(): boolean;
