@@ -6,8 +6,9 @@ import { fault, rangeError } from '../../shared/errors.js';
 
 /** The packed grid file's name; `scripts/geoid/pack-egm96.mjs` writes it into `packages/controls/data`. */
 export const EGM96_FILE = 'egm96-15.bin';
-/** Rows (90 N to 90 S) and columns (0 to 360 E, both ends kept) of the 15-minute EGM96 grid. */
+/** Rows (90 N to 90 S) of the 15-minute EGM96 grid. */
 export const EGM96_ROWS = 721;
+/** Columns (0 to 360 E, both ends kept) of the 15-minute EGM96 grid. */
 export const EGM96_COLUMNS = 1441;
 
 /** A regular latitude-longitude grid of geoid heights. Angles in degrees, rows north to south, columns west to east. */
