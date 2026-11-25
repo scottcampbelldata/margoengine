@@ -8,17 +8,25 @@
 // registration (it listens to a renderer's tileset, and goes with the renderer here); ionAsset and hostedTileset need a
 // network service.
 const render = 'render';
-// The app's frame loop runs the renderer; content loads after fetches, so the check lets them settle and draws again.
-const streamed = (made) => {
+// Content arrives after fetches and, for the first model of a run, a cold import() of the glTF or points package, so a
+// wait ends on the load itself (or its error, or the hard limit), never after a number of timer turns.
+const STREAM_LIMIT_MS = 30_000;
+const streamUntil = async (made, step, name) => {
+  const end = Date.now() + STREAM_LIMIT_MS;
+  while (!made()) {
+    if (Date.now() > end)
+      throw new Error(`OWNER_FIXTURE: the root tile of ${name} did not stream in within ${STREAM_LIMIT_MS} ms`);
+    await step();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+};
+// The app's frame loop runs the renderer; the check draws until the content is there.
+const streamed = (made, name) => {
   let done = false;
   return async ({ phase, host, views }) => {
     if (phase !== render || done) return;
     done = true;
-    for (let i = 0; i < 40 && !made(); i++) {
-      await host.render(views);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-    if (!made()) throw new Error('OWNER_FIXTURE: the root tile did not stream in');
+    await streamUntil(made, () => host.render(views), name);
   };
 };
 
@@ -56,19 +64,23 @@ export async function fixtures(load = (entry) => import(entry)) {
         more = extra(engine),
         tiles = await TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, ...more.options });
       const loaded = () => memory.requests.includes(uri) && scene.meshes.size > 0;
+      let failure;
+      tiles.tileset.on('error', ({ error }) => {
+        failure = error;
+      });
       // The app streams the root in before its first frame, so both engines hold their tile before anything is drawn.
-      for (let i = 0; i < 40 && !loaded(); i++) {
+      const update = () => {
+        if (failure) throw failure;
         tiles.tileset.update({ position: [0, 0, 10], screenHeight: 64, fov: 60 });
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      if (!loaded()) throw new Error(`OWNER_FIXTURE: the root tile of ${name} did not stream in`);
+      };
+      await streamUntil(loaded, update, name);
       return {
         plugin: tiles,
         dispose: () => {
           tiles.dispose();
           more.dispose?.();
         },
-        check: streamed(loaded),
+        check: streamed(loaded, name),
       };
     },
   });
