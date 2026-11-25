@@ -69,8 +69,8 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Script component system (attributes, lifecycle hooks, hot reload) | PlayCanvas, Needle | DONE | L | b95470338 |
 | Occlusion query API for apps (only internal in voxel-pathtracer; Hi-Z culling exists) | three.js, Babylon | DONE | M | 3a95eb3b7 |
 | Mesh path tracer: instancing, skinning, emissive triangles, alpha blend, `/mesh-pbr` README | three-gpu-pathtracer | PARTIAL | L |  |
-| Raycaster current-pose hits on skinned meshes (sync), Line and Points thresholds | three.js | PARTIAL | M |  |
-| Greased Line: per-point width and colour | Babylon | PARTIAL | S |  |
+| Raycaster current-pose hits on skinned meshes (sync), Line and Points thresholds | three.js | DONE | M | 99d42804c (thresholds EXISTS: packages/bvh/src/scene.ts, packages/bvh/src/points.ts) |
+| Greased Line: per-point width and colour | Babylon | DONE | S | 61f3dcf3f (colorMode; per-point colour and width EXISTS: packages/lines/src/line.ts, packages/lines/src/stroke.ts) |
 | Geospatial camera with terrain collision and geo maths | Babylon | PARTIAL | M |  |
 | Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | PARTIAL | M to L |  |
 | Voice chat and screen share over the netcode WebRTC transport | Needle | MISSING | M |  |
