@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,036 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,038 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11848,6 +11848,7 @@ in each world-horizontal axis from the snapped grid center and covers only rays 
 Depth there is reversed-Z zero, the same as the sky. It supports the existing Water colour and reflection passes.
 It adds four vertices and six indices to the same draw and uses no new buffer, texture, pass or package option.
 The horizon remains a flat ocean approximation. See [GPU evidence](architecture/operational-playbook.md#section-5-evidence-open-ocean-horizon-depth-2026-11-23).
+Blob and planar shadows (`@margoengine/materials/fake-shadows`, 2026-11-25): the planar shadow projects on the CPU in `update` (cost grows with the caster's vertex count, so characters and props, not levels); it flattens onto one plane, does not follow terrain, and overlapping parts of one caster darken twice (translucent blend, no stencil); with a point light, keep the caster between the light and the plane. The blob is a vertex-alpha disc, not a blurred render of the caster's silhouette. Drawn pixels are not yet checked against a rival on a real GPU; the maths and the mesh construction are tested. No core change.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
