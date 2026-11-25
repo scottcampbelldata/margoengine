@@ -67,7 +67,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
 | Script component system (attributes, lifecycle hooks, hot reload) | PlayCanvas, Needle | DONE | L | b95470338 |
-| Occlusion query API for apps (only internal in voxel-pathtracer; Hi-Z culling exists) | three.js, Babylon | MISSING | M |  |
+| Occlusion query API for apps (only internal in voxel-pathtracer; Hi-Z culling exists) | three.js, Babylon | DONE | M | 3a95eb3b7 |
 | Mesh path tracer: instancing, skinning, emissive triangles, alpha blend, `/mesh-pbr` README | three-gpu-pathtracer | PARTIAL | L |  |
 | Raycaster current-pose hits on skinned meshes (sync), Line and Points thresholds | three.js | PARTIAL | M |  |
 | Greased Line: per-point width and colour | Babylon | PARTIAL | S |  |
