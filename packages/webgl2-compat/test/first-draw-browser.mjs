@@ -46,7 +46,7 @@ try {
 @fragment fn f(@builtin(position) q:vec4f)->@location(0) vec4f {
   var c = vec4f(0);
   for (var i = 0u; i < 64u; i++) { c = fract(c * 1.37 + vec4f(f32(i) * 0.011, 0.02, 0.03, 0.04) + q * 0.0); }
-  return vec4f(0.25, 0.5, 0.75, 1) + select(vec4f(0), vec4f(1), c.w * ${k} > 1e30);
+  return vec4f(0.25, 0.4, 0.75, 1) + select(vec4f(0), vec4f(1), c.w * ${k} > 1e30);
 }
 @fragment fn d(@builtin(position) q:vec4f) {
   var c = q;
@@ -123,7 +123,9 @@ try {
   assert.equal(result.plainWarmDraws, 0, 'createRenderPipeline makes no warm draw');
   assert.equal(result.asyncWarmDraws, d3d ? 1 : 0, `a 1-output async pipeline's warm draws on ${result.renderer}`);
   assert.equal(result.depthWarmDraws, d3d ? 1 : 0, `a depth-only async pipeline's warm draws on ${result.renderer}`);
-  assert.deepEqual(result.unwarmed.pixel, [64, 128, 191, 255]);
+  // No channel sits on a rounding tie: 0.5 is 127.5 in unorm8, which Direct3D lets a GPU round either way (the RTX
+  // A6000 gives 127, the Arc 140V 128); 0.25, 0.4 and 0.75 are 63.75, 102 and 191.25.
+  assert.deepEqual(result.unwarmed.pixel, [64, 102, 191, 255]);
   assert.deepEqual(result.warmed.pixel, result.unwarmed.pixel, 'the warm draw changes nothing a draw renders');
   assert.deepEqual(pageErrors, []);
   console.log(
