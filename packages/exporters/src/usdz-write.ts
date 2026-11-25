@@ -3,6 +3,7 @@
 import { num, samplerOf, textureFiles } from './scene.js';
 import type { Geo, Mat, SceneOptions, TextureData } from './scene.js';
 import { crc32 } from '../../shared/crc32.js';
+import type { USDZBehavior } from './usdz-behaviors.js';
 
 /** Options for {@link exportUSDZ}: the scene collector's options and where the archive keeps its images. */
 export interface USDZOptions extends SceneOptions {
@@ -25,6 +26,11 @@ export interface USDZOptions extends SceneOptions {
    * lines (UsdGeomBasisCurves `widths`), which glTF draws one pixel wide and gives no size. Default 0.01 (1 cm).
    */
   lineWidth?: number;
+  /**
+   * Quick Look behaviours: a tap on a mesh that flips it, hides one, waits or runs a group of actions ({@link USDZBehavior}).
+   * Written by `exportUSDZ`; `exportAnimatedUSDZ` ignores them. Default none.
+   */
+  behaviors?: readonly USDZBehavior[];
 }
 
 /** An axis-aligned box in metres. */

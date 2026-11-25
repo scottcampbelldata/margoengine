@@ -6,6 +6,33 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Vec2 } from "@margoengine/math";
 
+export type USDZAction =
+{
+    type: 'emphasize';
+    targets: readonly USDZTarget[];
+    motion?: string;
+    duration?: number;
+}
+ | {
+    type: 'hide';
+    targets: readonly USDZTarget[];
+}
+ | {
+    type: 'wait';
+    duration: number;
+}
+ | {
+    type: 'group';
+    actions: readonly USDZAction[];
+    parallel?: boolean;
+    repeat?: number;
+};
+
+export interface USDZBehavior {
+    triggers: readonly USDZTrigger[];
+    actions: readonly USDZAction[];
+}
+
 export interface USDZBox {
     min: [number, number, number];
     max: [number, number, number];
@@ -23,6 +50,14 @@ export interface USDZOptions extends SceneOptions {
     height?: number;
     ground?: boolean;
     lineWidth?: number;
+    behaviors?: readonly USDZBehavior[];
+}
+
+export type USDZTarget = string | number;
+
+export interface USDZTrigger {
+    type: 'tap';
+    targets: readonly USDZTarget[];
 }
 
 export function exportUSDZ(source: ExportSource | Uint8Array, options?: USDZOptions): Uint8Array;

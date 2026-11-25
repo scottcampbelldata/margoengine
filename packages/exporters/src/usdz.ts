@@ -9,6 +9,7 @@ import {
   type Geo,
   type Mat,
 } from './scene.js';
+import { behaviorLines } from './usdz-behaviors.js';
 import { sceneOfGLB, type GLBSceneSkip } from './glb-scene.js';
 import {
   boxSize,
@@ -33,6 +34,7 @@ import {
 } from './usdz-write.js';
 
 export type { USDZBox, USDZOptions } from './usdz-write.js';
+export type { USDZAction, USDZBehavior, USDZTarget, USDZTrigger } from './usdz-behaviors.js';
 
 /** What {@link measureUSDZ} returns. */
 export interface USDZMeasure {
@@ -207,7 +209,13 @@ export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptio
       );
     else meshPrim(lines, lines, i, item.name, geometry, shape, bound, { transform });
   }
-  lines.push('}');
+  lines.push(
+    ...behaviorLines(
+      options.behaviors ?? [],
+      items.map((item) => item.name),
+    ),
+    '}',
+  );
   const content = new TextEncoder().encode(lines.join('\n') + '\n');
   return storedZIP([['scene.usda', content], ...materials.files]);
 }

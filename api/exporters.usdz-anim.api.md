@@ -261,10 +261,45 @@ interface TextureTransform {
     rotation?: number;
 }
 
+type USDZAction =
+{
+    type: 'emphasize';
+    targets: readonly USDZTarget[];
+    motion?: string;
+    duration?: number;
+}
+ | {
+    type: 'hide';
+    targets: readonly USDZTarget[];
+}
+ | {
+    type: 'wait';
+    duration: number;
+}
+ | {
+    type: 'group';
+    actions: readonly USDZAction[];
+    parallel?: boolean;
+    repeat?: number;
+};
+
+interface USDZBehavior {
+    triggers: readonly USDZTrigger[];
+    actions: readonly USDZAction[];
+}
+
 interface USDZOptions extends SceneOptions {
     texturePrefix?: string;
     height?: number;
     ground?: boolean;
     lineWidth?: number;
+    behaviors?: readonly USDZBehavior[];
+}
+
+type USDZTarget = string | number;
+
+interface USDZTrigger {
+    type: 'tap';
+    targets: readonly USDZTarget[];
 }
 ```

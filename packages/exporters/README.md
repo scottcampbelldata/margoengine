@@ -1195,6 +1195,36 @@ const usdz = exportUSDZ({
 
 Quick Look on a Mac draws the textured kit as intended, apart from `normalScale`, which it ignores; no iPhone or iPad has opened it yet. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
+### Tap behaviours (`behaviors`)
+
+`exportUSDZ(source, {behaviors})` writes AR Quick Look behaviours: a tap on a mesh runs actions on meshes. They are the `Preliminary_Behavior`, `Preliminary_Trigger` and `Preliminary_Action` prims of Apple's USDZ schemas for AR, in the form of Apple's Preliminary_Behavior example (child prims that inherit `TapGestureTrigger`, `EmphasizeAction`, `VisibilityAction`, `WaitAction` and `GroupAction`). A target is a node name (every mesh of that name) or the index of a mesh in the file.
+
+- Trigger: `{type: 'tap', targets}`. Actions: `{type: 'emphasize', targets, motion?, duration?}` (`motion` is Apple's `motionType`, default `'flip'`), `{type: 'hide', targets}`, `{type: 'wait', duration}`, `{type: 'group', actions, parallel?, repeat?}` (in a row unless `parallel`; `repeat` runs the group that many times, 0 for ever, default 1).
+- A behaviour with no trigger or action, a target that names no mesh, a negative duration or a bad token throws `RangeError`. `exportAnimatedUSDZ` ignores `behaviors`.
+- Not yet run on an iPhone; see `docs/limits.md` for the values Apple's pages do not state.
+
+```ts
+import { exportUSDZ } from 'margoengine/exporters/usdz';
+
+const quad = {
+  positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+  normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  indices: [0, 1, 2, 0, 2, 3],
+};
+const usdz = exportUSDZ(
+  { nodes: [{ name: 'Door', geometry: quad }, { name: 'Sign', geometry: { ...quad } }] },
+  {
+    behaviors: [
+      {
+        triggers: [{ type: 'tap', targets: ['Door'] }],
+        actions: [{ type: 'emphasize', targets: ['Door'], motion: 'flip' }, { type: 'wait', duration: 1 }, { type: 'hide', targets: ['Sign'] }],
+      },
+    ],
+  },
+);
+console.log(usdz.length);
+```
+
 ### Animated USDZ (`@margoengine/exporters/usdz-anim`)
 
 `exportAnimatedUSDZ(source, options)` writes one clip of a data scene or of GLB bytes as USDZ, so a character plays in AR Quick Look. Skins become UsdSkel: a `SkelRoot` holding a `Skeleton`, its `SkelAnimation` and the meshes it moves, with `primvars:skel:jointIndices` and `primvars:skel:jointWeights` on each mesh. Any other node a clip moves, or a mesh on a joint, becomes an `Xform` with time samples, in the file's own tree. Materials and shared meshes are the ones `exportUSDZ` writes.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18881356,
+  "total": 18882447,
   "history": [
     {
       "date": "2026-10-24",
@@ -12075,6 +12075,12 @@
       "commit": "4b38c0431",
       "reason": "SoftSolver: SoftBodies can be stepped by a framework world (driven mode, the held forces mirrored into a state region by body row, and its state columns named for snapshots), +107 B gzip on the soft entry's base (27,046 to 27,153 measured); the solver itself lives in the world entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "usdz-behaviors",
+      "reason": "exporters/usdz gains Quick Look tap behaviours",
+      "grew": 1
     }
   ],
   "items": {
@@ -12465,7 +12471,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
-    "@margoengine/exporters/usdz": 21381,
+    "@margoengine/exporters/usdz": 22472,
     "@margoengine/exporters/usdz-anim": 25615,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24529,
