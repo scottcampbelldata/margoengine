@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18996955,
+  "total": 19001316,
   "history": [
     {
       "date": "2026-10-24",
@@ -12273,6 +12273,12 @@
       "commit": "lane-B",
       "reason": "VFX.resetTime (GAP-FILM-RESET): the clock reset of every effect, +36 B measured on vfx and vfx/base",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "519453f01",
+      "reason": "reflection cone with contact hardening (519453f01): environment reflector/refractor, post ssr and water reflector carry the shared cone and capture-ray WGSL (+582 to +1,072 B gzip); a lazy split would add a chunk to every draw path that compiles the surface shader",
+      "grew": 4
     }
   ],
   "items": {
@@ -12611,9 +12617,9 @@
     "@margoengine/environment/main": 33519,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,
-    "@margoengine/environment/reflector": 12251,
+    "@margoengine/environment/reflector": 13336,
     "@margoengine/environment/reflector-pbr": 5166,
-    "@margoengine/environment/refractor": 12206,
+    "@margoengine/environment/refractor": 13172,
     "@margoengine/environment/settings": 4074,
     "@margoengine/environment/studio": 1493,
     "@margoengine/environment/volumetric": 13323,
@@ -13128,7 +13134,7 @@
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10584,
     "@margoengine/post/ssgi": 14202,
-    "@margoengine/post/ssr": 14471,
+    "@margoengine/post/ssr": 15453,
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
@@ -13796,7 +13802,7 @@
     "@margoengine/water/liquid": 18041,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
-    "@margoengine/water/reflector": 2660,
+    "@margoengine/water/reflector": 3988,
     "@margoengine/water/ripples": 3940,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
