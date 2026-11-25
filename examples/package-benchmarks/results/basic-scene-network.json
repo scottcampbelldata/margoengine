@@ -1,16 +1,16 @@
 {
-  "commit": "e25c78fcc",
-  "dirty": false,
-  "browser": "chromium 156.0.8078.4 headless",
+  "commit": "b52e9c50f",
+  "dirty": true,
+  "browser": "msedge 158.0.4370.33 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-lgEBSGC2.js",
+      "file": "assets/dist-by-8gDUO.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_model-DGBgydA8-B3berxMH.js",
+        "_model-DGBgydA8-BUAJypM_.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -77,13 +77,13 @@
       ]
     },
     "../../../packages/gltf/dist/compression-dgiF4rBQ.js": {
-      "file": "assets/compression-dgiF4rBQ-B3LCcNlO.js",
+      "file": "assets/compression-dgiF4rBQ-DXJL9key.js",
       "name": "compression-dgiF4rBQ",
       "src": "../../../packages/gltf/dist/compression-dgiF4rBQ.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-BH-IRRKh-od8eR64P.js"
+        "_asset-BH-IRRKh-D5TzHjGh.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -105,12 +105,12 @@
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist-C48JG6B1.js",
+      "file": "assets/dist-CLs5Stje.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
-        "_geometry-k6Eafjtg.js",
+        "_geometry-BGTjAxRm.js",
         "_extension-Bn1Wm_pY.js",
         "_node-matrix-DeiKheBW-Cj_xL6KP.js",
         "_errors-THVaUwlL-C81vxm_p.js",
@@ -125,14 +125,14 @@
       "isDynamicEntry": true
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-C3LLoxTe.js",
+      "file": "assets/pbr-B-aWkERX.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-DGBgydA8-B3berxMH.js",
-        "_asset-BH-IRRKh-od8eR64P.js",
+        "_model-DGBgydA8-BUAJypM_.js",
+        "_asset-BH-IRRKh-D5TzHjGh.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -152,7 +152,7 @@
       ]
     },
     "../../../packages/gltf/dist/splats.js": {
-      "file": "assets/splats-BZPiidLN.js",
+      "file": "assets/splats-6j0GEbT3.js",
       "name": "splats",
       "src": "../../../packages/gltf/dist/splats.js",
       "isDynamicEntry": true,
@@ -204,7 +204,7 @@
       ]
     },
     "../../../packages/splats/dist/index.js": {
-      "file": "assets/dist-BtMFhvz4.js",
+      "file": "assets/dist-DAYZ641o.js",
       "name": "dist",
       "src": "../../../packages/splats/dist/index.js",
       "isDynamicEntry": true,
@@ -258,8 +258,8 @@
         "_errors-THVaUwlL-C81vxm_p.js"
       ]
     },
-    "_asset-BH-IRRKh-od8eR64P.js": {
-      "file": "assets/asset-BH-IRRKh-od8eR64P.js",
+    "_asset-BH-IRRKh-D5TzHjGh.js": {
+      "file": "assets/asset-BH-IRRKh-D5TzHjGh.js",
       "name": "asset-BH-IRRKh",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
@@ -315,8 +315,8 @@
         "_version-YYhCZP03.js"
       ]
     },
-    "_geometry-k6Eafjtg.js": {
-      "file": "assets/geometry-k6Eafjtg.js",
+    "_geometry-BGTjAxRm.js": {
+      "file": "assets/geometry-BGTjAxRm.js",
       "name": "geometry",
       "imports": [
         "_version-YYhCZP03.js"
@@ -329,8 +329,8 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-DGBgydA8-B3berxMH.js": {
-      "file": "assets/model-DGBgydA8-B3berxMH.js",
+    "_model-DGBgydA8-BUAJypM_.js": {
+      "file": "assets/model-DGBgydA8-BUAJypM_.js",
       "name": "model-DGBgydA8",
       "imports": [
         "_version-YYhCZP03.js",
@@ -340,7 +340,7 @@
         "_errors-THVaUwlL-C81vxm_p.js",
         "_accessor-DuqjpuxI-DJ8jujwr.js",
         "_scene-scope-CZDEkd24-B97nmpn7.js",
-        "_asset-BH-IRRKh-od8eR64P.js",
+        "_asset-BH-IRRKh-D5TzHjGh.js",
         "_shader-BMd5jFDK-Xw8zkatD.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
@@ -395,13 +395,13 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-BbbBHg3E.js",
+      "file": "assets/index-CRSmigUm.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_geometry-k6Eafjtg.js",
+        "_geometry-BGTjAxRm.js",
         "_preload-helper-CRzLMJPS.js"
       ],
       "dynamicImports": [
@@ -411,7 +411,7 @@
       ]
     }
   },
-  "adapter": "apple metal-3",
+  "adapter": "intel xe-2lpg",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
@@ -424,13 +424,13 @@
       "brotli": 2282
     },
     {
-      "path": "assets/dist-C48JG6B1.js",
+      "path": "assets/dist-CLs5Stje.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 5506,
+      "transferred": 5507,
       "raw": 13617,
-      "gzip": 5134,
-      "brotli": 4662
+      "gzip": 5135,
+      "brotli": 4660
     },
     {
       "path": "assets/errors-THVaUwlL-C81vxm_p.js",
@@ -451,22 +451,22 @@
       "brotli": 113
     },
     {
-      "path": "assets/geometry-k6Eafjtg.js",
+      "path": "assets/geometry-BGTjAxRm.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2410,
-      "raw": 3956,
-      "gzip": 2040,
-      "brotli": 1846
+      "transferred": 2420,
+      "raw": 3990,
+      "gzip": 2050,
+      "brotli": 1858
     },
     {
-      "path": "assets/index-BbbBHg3E.js",
+      "path": "assets/index-CRSmigUm.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27117,
-      "raw": 64941,
-      "gzip": 26735,
-      "brotli": 23626
+      "transferred": 27153,
+      "raw": 64929,
+      "gzip": 26771,
+      "brotli": 23631
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -508,10 +508,10 @@
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 955,
-      "raw": 705,
-      "gzip": 402,
-      "brotli": 249
+      "transferred": 969,
+      "raw": 719,
+      "gzip": 411,
+      "brotli": 261
     },
     {
       "path": "model.glb",
@@ -525,14 +525,14 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 45999,
-    "raw": 96029,
-    "gzip": 40456,
-    "brotli": 35757
+    "transferred": 46060,
+    "raw": 96065,
+    "gzip": 40512,
+    "brotli": 35784
   },
   "notFetched": [
     {
-      "path": "assets/asset-BH-IRRKh-od8eR64P.js",
+      "path": "assets/asset-BH-IRRKh-D5TzHjGh.js",
       "raw": 30522
     },
     {
@@ -548,16 +548,16 @@
       "raw": 1134
     },
     {
-      "path": "assets/compression-dgiF4rBQ-B3LCcNlO.js",
+      "path": "assets/compression-dgiF4rBQ-DXJL9key.js",
       "raw": 4289
-    },
-    {
-      "path": "assets/data-DYZnmghD-CnqB9AsR.js",
-      "raw": 21285
     },
     {
       "path": "assets/data-DahV1vVU.js",
       "raw": 335
+    },
+    {
+      "path": "assets/data-DYZnmghD-CnqB9AsR.js",
+      "raw": 21285
     },
     {
       "path": "assets/dds-Dg-e4ZGI.js",
@@ -572,12 +572,12 @@
       "raw": 8699
     },
     {
-      "path": "assets/dist-BtMFhvz4.js",
-      "raw": 27245
+      "path": "assets/dist-by-8gDUO.js",
+      "raw": 79044
     },
     {
-      "path": "assets/dist-lgEBSGC2.js",
-      "raw": 79044
+      "path": "assets/dist-DAYZ641o.js",
+      "raw": 27485
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -624,7 +624,7 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-DGBgydA8-B3berxMH.js",
+      "path": "assets/model-DGBgydA8-BUAJypM_.js",
       "raw": 159780
     },
     {
@@ -632,7 +632,7 @@
       "raw": 3727
     },
     {
-      "path": "assets/pbr-C3LLoxTe.js",
+      "path": "assets/pbr-B-aWkERX.js",
       "raw": 1058
     },
     {
@@ -652,7 +652,7 @@
       "raw": 2872
     },
     {
-      "path": "assets/splats-BZPiidLN.js",
+      "path": "assets/splats-6j0GEbT3.js",
       "raw": 4178
     },
     {

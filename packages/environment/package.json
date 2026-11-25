@@ -140,10 +140,6 @@
       "types": "./dist/exr-codecs.d.ts",
       "import": "./dist/exr-codecs.js"
     },
-    "./main": {
-      "types": "./dist/main.d.ts",
-      "import": "./dist/main.js"
-    },
     "./loaders": {
       "types": "./dist/loaders.d.ts",
       "import": "./dist/loaders.js"

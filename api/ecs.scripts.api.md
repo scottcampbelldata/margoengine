@@ -20,7 +20,7 @@ export interface AttributeSpec {
 
 export type AttributeSpecs = Record<string, AttributeSpec>;
 
-export type AttributeType = "number" | "boolean" | "string" | "enum" | "vec2" | "vec3" | "vec4" | "color" | "entity" | "asset";
+export type AttributeType = 'number' | 'boolean' | 'string' | 'enum' | 'vec2' | 'vec3' | 'vec4' | 'color' | 'entity' | 'asset';
 
 export type AttributeValues = Record<string, any>;
 
