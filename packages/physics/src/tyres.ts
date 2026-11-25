@@ -112,7 +112,7 @@ export function pacejkaTyre(options: PacejkaOptions = {}): TyreModel {
 export interface BrushOptions {
   /** Friction coefficient of the contact (default 1.0). */
   friction?: number;
-  /** Stiffness of the bristles per unit of patch length and slip, newtons per square metre (default 4e6: a passenger tyre's cornering stiffness near 40 kN per radian at a half-length of 0.1 m). */
+  /** Stiffness of the bristles per unit of patch length and slip, newtons per square metre (default 2.34e6: with the default half-length of 0.1 m a cornering stiffness `2 c a^2` of 46.8 kN per radian, what `pacejkaTyre()`'s defaults give at their nominal load of 4,000 N, `B C D` of 11.7 per radian times the load). */
   stiffness?: number;
   /** Half the length of the contact patch, metres (default 0.1). */
   halfLength?: number;
@@ -128,7 +128,7 @@ export interface BrushOptions {
  */
 export function brushTyre(options: BrushOptions = {}): TyreModel {
   const mu = options.friction ?? 1,
-    c = options.stiffness ?? 4e6,
+    c = options.stiffness ?? 2.34e6,
     a = options.halfLength ?? 0.1;
   for (const [value, name] of [
     [mu, 'friction'],

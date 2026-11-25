@@ -92,6 +92,15 @@ test('the brush tyre has the cornering stiffness 2 c a squared, saturates at the
   }
 });
 
+test('the brush tyre\'s defaults have the cornering stiffness of the Magic Formula\'s defaults at their nominal load', () => {
+  const load = 4000,
+    slip = 1e-5,
+    brush = brushTyre().forces({ slipRatio: 0, slipAngle: slip, load }).lateral / slip,
+    magic = pacejkaTyre().forces({ slipRatio: 0, slipAngle: slip, load }).lateral / slip;
+  near(brush / magic, 1, 0.01, 'the two tyres corner alike at 4,000 N');
+  near(brush, 46800, 468, 'a cornering stiffness 2 c a^2 of 46.8 kN per radian');
+});
+
 /** A 1,000 kg car on a 200 m floor on tyre models: chassis 2 x 0.5 x 4 m, four 0.35 m wheels, the front pair steers, the rear drives. */
 function car(options = {}, wheelOptions = {}) {
   const physics = new Physics(null);
