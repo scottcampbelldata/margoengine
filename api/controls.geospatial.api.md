@@ -81,6 +81,7 @@ export class GeospatialControls extends Controls {
     moveEye(forward: number, right: number, up?: number): void;
     get moveSpeed(): number;
     zoomAt(x: number, y: number, factor: number): void;
+    fromCamera(): void;
     flyTo(destination: GeospatialView, options?: FlightOptions): Promise<boolean>;
     get flightTime(): {
         elapsed: number;

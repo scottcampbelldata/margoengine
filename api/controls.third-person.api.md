@@ -35,10 +35,20 @@ export abstract class Controls extends EventDispatcher {
     protected release(id: number): void;
 }
 
-export type FollowSubject = Mesh | ModelLike | (() => readonly number[]);
+export interface FollowOrigin {
+    toLocal(world: ArrayLike<number>): ArrayLike<number>;
+    toWorld(local: ArrayLike<number>): ArrayLike<number>;
+}
+
+export type FollowStyle = 'orbit' | 'chase' | 'side' | 'lock' | 'flyby';
+
+export type FollowSubject = Mesh | ModelLike | (() => readonly number[]) | FollowTarget | (() => FollowTarget);
+
+export { FollowTarget } from "@margoengine/math";
 
 export class ThirdPersonControls extends Controls {
-    subject: FollowSubject;
+    get subject(): FollowSubject;
+    set subject(subject: FollowSubject);
     distance: number;
     minDistance: number;
     maxDistance: number;
@@ -58,12 +68,27 @@ export class ThirdPersonControls extends Controls {
     ignore: readonly ArmCollider[];
     armLength: number;
     readonly raycaster: Raycaster;
-    constructor(engine: EngineKernel, subject: FollowSubject, options?: ThirdPersonControlsOptions);
+    style: FollowStyle;
+    turnLag: number;
+    lookAhead: number;
+    lead: number;
+    bank: number;
+    maxBank: number;
+    flybyAhead: number;
+    cellSize: number;
+    origin: FollowOrigin | null;
+    ground: ((x: number, z: number) => number | undefined) | null;
+    clearance: number;
+    subjects: readonly FollowSubject[];
+    constructor(engine: EngineKernel, subject: FollowSubject | readonly FollowSubject[], options?: ThirdPersonControlsOptions);
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
     rotate(yaw: number, pitch: number): void;
     snap(): void;
+    follow(subject: FollowSubject | readonly FollowSubject[], seconds?: number): void;
+    takeOver(seconds?: number): void;
+    get target(): Readonly<Sample>;
     get heading(): V3;
     update(delta?: number): boolean;
 }
@@ -80,6 +105,17 @@ export interface ThirdPersonControlsOptions {
     ignore?: readonly ArmCollider[];
     raycaster?: Raycaster;
     element?: ControlElement | null;
+    style?: FollowStyle;
+    turnLag?: number;
+    lookAhead?: number;
+    lead?: number;
+    bank?: number;
+    maxBank?: number;
+    flybyAhead?: number;
+    cellSize?: number;
+    origin?: FollowOrigin | null;
+    ground?: ((x: number, z: number) => number | undefined) | null;
+    clearance?: number;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -136,6 +172,14 @@ interface EventTargetLike {
 type InputEventListener = {
     handleEvent(event: Event): void;
 }['handleEvent'];
+
+interface Sample {
+    position: V3;
+    velocity: V3;
+    acceleration: V3;
+    roll: number;
+    radius: number;
+}
 
 type V3 = [number, number, number];
 ```

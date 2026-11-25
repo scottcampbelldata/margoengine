@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18949001,
+  "total": 18950723,
   "history": [
     {
       "date": "2026-10-24",
@@ -12219,6 +12219,12 @@
       "commit": "041638cd2",
       "reason": "physics/clouds is a new optional entry (ATMO-03): CloudSolver, moist convection with Kessler's warm rain in a box of air, a framework solver; its own entry so scenes without clouds pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "follow camera styles on third-person; geospatial fromCamera",
+      "grew": 2
     }
   ],
   "items": {
@@ -12441,7 +12447,7 @@
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
     "@margoengine/controls/profiles": 960,
-    "@margoengine/controls/third-person": 3633,
+    "@margoengine/controls/third-person": 5355,
     "@margoengine/controls/trackball": 4608,
     "@margoengine/controls/transform": 13458,
     "@margoengine/controls/transitions": 14529,
