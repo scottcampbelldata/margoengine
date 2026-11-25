@@ -101,15 +101,15 @@ export class XRaySelection implements EnginePlugin {
       throw new RangeError('Invalid outline pulse; use a positive period in seconds and minimum 0..1.');
     return minimum + (1 - minimum) * (0.5 + 0.5 * Math.cos((time * 2 * Math.PI) / period));
   }
-  /**
-   * Moves the pulse clock by `delta` seconds unless time is manual, without drawing (a delta of 0 or less moves
-   * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
-   */
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.clock = 0;
     this.manual = false;
   }
+  /**
+   * Moves the pulse clock by `delta` seconds unless time is manual, without drawing (a delta of 0 or less moves
+   * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
   advanceTime(delta: number): void {
     if (delta > 0 && !this.manual && !this.disposed) this.clock += delta;
   }

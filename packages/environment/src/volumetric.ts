@@ -775,11 +775,6 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
   get time(): number {
     return this.elapsed;
   }
-  /**
-   * Moves the wind offset of the density noise by `wind` times `delta` seconds, without drawing (a delta of 0 or less
-   * moves nothing). Each frame update runs it once, so `seek` from `@margoengine/cutscene/seek` replays
-   * the drift exactly.
-   */
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.elapsed = this.frameIndex = 0;
@@ -791,6 +786,11 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
       view.valid = false;
     }
   }
+  /**
+   * Moves the wind offset of the density noise by `wind` times `delta` seconds, without drawing (a delta of 0 or less
+   * moves nothing). Each frame update runs it once, so `seek` from `@margoengine/cutscene/seek` replays
+   * the drift exactly.
+   */
   advanceTime(delta: number): void {
     if (!(delta > 0)) return;
     this.elapsed += delta;

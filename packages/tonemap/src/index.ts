@@ -257,6 +257,12 @@ export class Tonemap implements EnginePlugin {
   get time(): number {
     return this.seconds;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.frameCount = this.grainFrame = this.seconds = 0;
+    this.clocked = this.pending = false;
+    this.resetExposure();
+  }
   /**
    * Moves the grain and dither pattern one frame on, and the clock by `delta` seconds: the CPU part of its frame update,
    * which a seek from `@margoengine/cutscene/seek` replays, so the next drawn frame shows the grain a continuous run
@@ -266,12 +272,6 @@ export class Tonemap implements EnginePlugin {
    * first (KB-FILM-TAAPHASE1). Auto exposure is view history: a cut snaps it to the metered scene on its first frame
    * (docs/limits.md, class C).
    */
-  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
-  resetTime(): void {
-    this.frameCount = this.grainFrame = this.seconds = 0;
-    this.clocked = this.pending = false;
-    this.resetExposure();
-  }
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.clocked = true;

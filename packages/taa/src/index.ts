@@ -446,6 +446,12 @@ export class TAA implements EnginePlugin {
   get time(): number {
     return this.seconds;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.steps = this.phase = this.seconds = this.frame = this.front = 0;
+    this.clocked = this.pending = false;
+    this.reset();
+  }
   /**
    * Moves the Halton jitter one phase on, and the clock by `delta` seconds: the CPU part of its frame update, which a
    * seek from `@margoengine/cutscene/seek` replays, so a cut lands on the jitter phase a continuous run has there. With
@@ -456,12 +462,6 @@ export class TAA implements EnginePlugin {
    * history itself is view history: a cut starts it empty and the scene's prewarm settles it, to 1 level of 255 after
    * 53 frames at historyWeight 0.9 (docs/limits.md, class C).
    */
-  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
-  resetTime(): void {
-    this.steps = this.phase = this.seconds = this.frame = this.front = 0;
-    this.clocked = this.pending = false;
-    this.reset();
-  }
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.clocked = true;

@@ -203,15 +203,15 @@ export class Lines implements EnginePlugin {
   get time(): number {
     return this.elapsed;
   }
-  /**
-   * Moves every visible line with a clock of its own (a `Trail`'s fade clock) by `delta` seconds without drawing. Each
-   * frame update runs it once, however many views draw, so `seek` from `@margoengine/cutscene/seek` replays it.
-   */
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.elapsed = 0;
     for (const line of this.members) (line as { resetTime?: () => void }).resetTime?.();
   }
+  /**
+   * Moves every visible line with a clock of its own (a `Trail`'s fade clock) by `delta` seconds without drawing. Each
+   * frame update runs it once, however many views draw, so `seek` from `@margoengine/cutscene/seek` replays it.
+   */
   advanceTime(delta: number): void {
     if (!(delta > 0)) return;
     this.elapsed += delta;

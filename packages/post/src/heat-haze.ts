@@ -257,15 +257,15 @@ export class HeatHaze implements EnginePlugin {
   get time(): number {
     return this.clock;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.clock = 0;
+  }
   /**
    * Moves the effect's clock by `delta` seconds (the CPU part of its frame update, which runs it), so
    * `@margoengine/cutscene/seek` replays it and a haze seeked to film time T ripples as a played one does at T
    * (GAP-FILM-TIME). A draw moves no clock: hidden or disabled haze keeps time, and two views in a frame move it once.
    */
-  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
-  resetTime(): void {
-    this.clock = 0;
-  }
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.clock += delta > 0 ? delta : 0;

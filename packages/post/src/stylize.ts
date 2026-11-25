@@ -94,15 +94,15 @@ export class Stylize extends ScreenEffect {
   get time(): number {
     return this.elapsed;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.elapsed = 0;
+  }
   /**
    * Moves the effect's clock by `delta` seconds, the CPU part of its frame update, so `seek` from
    * `@margoengine/cutscene/seek` replays it and a film rendered scene by scene keeps the wave and scroll across a cut
    * (GAP-FILM-TIME). A draw moves no clock; a delta of 0 or less and a disposed effect move nothing.
    */
-  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
-  resetTime(): void {
-    this.elapsed = 0;
-  }
   advanceTime(delta: number): void {
     if (this.ended || !(delta > 0)) return;
     this.elapsed = Math.min(1e7, this.elapsed + delta);

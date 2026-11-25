@@ -372,15 +372,15 @@ export class PostProcessing implements EnginePlugin {
   get time(): number {
     return this.clock;
   }
-  /**
-   * Moves the film grain clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
-   * runs it, so `seek` from `@margoengine/cutscene/seek` replays the grain exactly.
-   */
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.clock = 0;
     this.updated = false;
   }
+  /**
+   * Moves the film grain clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
+   * runs it, so `seek` from `@margoengine/cutscene/seek` replays the grain exactly.
+   */
   advanceTime(delta: number): void {
     if (delta > 0) this.clock += delta;
   }
