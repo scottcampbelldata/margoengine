@@ -385,8 +385,11 @@ test('the worker and its part files hold one copy of each module, without the di
   // part (3,947 B gzip), loaded only for a relief that asks for it.
   // 40,935 B and 108,708 B raw with region curvature and the far canopy task's graph hook.
   // The evaluator stays in the existing lazy graph part and the task shares the worker's region sampler.
-  assert.ok(gzip <= 41_050, `worker ${gzip} B gzip`);
-  assert.ok(core.length <= 108_900, `worker ${core.length} B raw`);
+  // 41,108 B and 109,131 B raw on 2026-11-25 with each paint layer's own blend width (ec34c7f3be, +173 B gzip and
+  // +423 B raw: the classification's paint feather reads the layer's width and the world keeps the widest for its dirty
+  // reach). Without it a 2 m hedge is spread across the world's 24 m ecotone.
+  assert.ok(gzip <= 41_200, `worker ${gzip} B gzip`);
+  assert.ok(core.length <= 109_300, `worker ${core.length} B raw`);
 });
 
 test('a worker asked for a part whose URL the page did not send rejects the job clearly', async () => {
