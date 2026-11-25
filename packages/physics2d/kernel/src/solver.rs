@@ -268,6 +268,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     if !(h > 0.0 && h.is_finite() && inv_h.is_finite()) {
         return Err(PhysicsError::ArithmeticOverflow);
     }
+    let mut inner = crate::world::now();
     let mut pose_speed = core::mem::take(&mut world.scratch.pose_speed);
     pose_speed.clear();
     pose_speed.resize(world.bodies.len(), 0.0f32);
@@ -506,6 +507,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     // Whether the bodies have moved since the four-lane solve last worked out its gaps (see wide::solve).
     let mut fresh = true;
     let mut substep_pose_speed = alloc::vec![0.0f32;world.bodies.len()];
+    crate::world::tick(&mut world.timing, 8, &mut inner);
     for _ in 0..substeps {
         substep_pose_speed.fill(0.0);
         if let Some(plan) = &mut support_plan {
@@ -521,6 +523,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             body.w += h * source.inv_inertia * source.torque;
             body.w *= 1.0 / (1.0 + h * source.angular_damping);
         }
+        crate::world::tick(&mut world.timing, 10, &mut inner);
         wide::warm_start(&mut bodies, &blocks.blocks);
         for &i in &order[single..] {
             warm_start(&mut bodies, &constraints[i as usize]);
@@ -623,6 +626,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 }
             }
         }
+        crate::world::tick(&mut world.timing, 9, &mut inner);
         for ((body, &id), start) in bodies[..moving].iter_mut().zip(&ids).zip(&start) {
             let target = &mut world.bodies[id as usize];
             let step = body.v.scale(h);
@@ -636,6 +640,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             body.turn = target.xf.q.mul(inverse(*start));
         }
         fresh = true;
+        crate::world::tick(&mut world.timing, 10, &mut inner);
         for _ in 0..passes {
             if joints {
                 write_velocities(world, &bodies, &ids);
@@ -668,6 +673,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 sequential += s;
             }
         }
+        crate::world::tick(&mut world.timing, 9, &mut inner);
         for (observed, &substep) in pose_speed.iter_mut().zip(&substep_pose_speed) {
             *observed = observed.max(substep);
         }
@@ -738,6 +744,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     world.scratch.paths = paths;
     world.scratch.blocks = blocks;
     world.scratch.colouring = colouring;
+    crate::world::tick(&mut world.timing, 11, &mut inner);
     Ok(())
 }
 

@@ -112,6 +112,26 @@ earth.dispose();
 moon.dispose();
 ```
 
+## What a step did and how long it took
+
+`physics.counts` reads the work the last step did as whole numbers that do not depend on the machine: `awake` bodies, `islands` (groups of dynamic bodies with an awake body in them; a fixed body is no island and a sleeping group is no work), `boxesCompared`, `pairs`, `manifolds`, `coldPoints` (manifold points that found no point in the last manifold and start with no impulse), `contactsSolved`, `blockSolves` and `sequentialSolves` (two-point contacts solved together or one point at a time), `colours` and `uncoloured`, `treeJoints`, `events` and `steps`. `physics.timing` reads how long the phases took in milliseconds, Rapier's `timingStep` and its siblings: `step` is the whole of it, then `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd` and `events`, which add up to it; `assembly`, `resolution`, `update` and `writeback` split `solver` and `ccdBroad`, `ccdToi` and `ccdSolver` split `ccd`, as sums over the substeps and the bodies. Everything reads zero before the first step. The clock is not part of the world: a snapshot and the replay hash leave timings out, and two worlds built the same way give the same counts.
+
+```ts
+import {Physics2D} from 'margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null);
+physics.addBody(null, {type: 'fixed', position: [0, 100], colliders: {shape: 'box', width: 1000, height: 20}});
+for (let i = 0; i < 4; i++) {
+  physics.addBody(null, {position: [0, 70 - i * 21], colliders: {shape: 'box', width: 20, height: 20}});
+}
+for (let i = 0; i < 30; i++) physics.step();
+const {awake, islands, contactsSolved, steps} = physics.counts;
+console.log(awake, islands, contactsSolved > 0, steps); // 4 1 true 30
+console.log(physics.timing.step >= physics.timing.solver); // true
+physics.dispose();
+```
+
 ## Forces at a point, locked rotation and collider settings
 
 `body.applyForceAtPoint(force, point)` holds a force that acts every step and turns the body by the arm from its centre of mass, as Rapier's `addForceAtPoint` does; `resetTorques()` clears the turning and keeps the push, `resetForces()` clears both. `body.lockRotation(locked = true)` holds the angle and takes the spin away until `lockRotation(false)`. A collider's `setActiveCollisionTypes(bits)` chooses the pairs it meets (1 dynamic with dynamic, 2 dynamic with kinematic, 4 dynamic with fixed, 8 kinematic with kinematic, 16 kinematic with fixed, 32 fixed with fixed; the default is 7), `setActiveEvents({collision, contactForce})` the events it asks for, and `setContactForceEventThreshold(newtons)` how hard a contact must press to raise `contactforce`.

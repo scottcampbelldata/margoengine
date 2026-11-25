@@ -59,6 +59,7 @@ impl World {
     /// Sets each body in `starts` back to its earliest time of impact, when it has one.
     pub(crate) fn solve_ccd(&mut self, starts: &[Start]) -> Result<(), PhysicsError> {
         let mut candidates = Vec::new();
+        let mut inner = crate::world::now();
         for start in starts.iter().filter(|s| s.ccd) {
             let body = &self.bodies[start.body as usize];
             let (end_center, end_q, local_center) = (body.exact_center, body.xf.q, body.local_center);
@@ -91,6 +92,7 @@ impl World {
                     max: [b0.max[0].max(b1.max[0]) + cx, b0.max[1].max(b1.max[1]) + cy],
                 };
                 self.broad.query(&swept, &mut candidates);
+                crate::world::tick(&mut self.timing, 12, &mut inner);
                 for &other in &candidates {
                     let s = &self.shapes[other as usize];
                     let ob = &self.bodies[s.body as usize];
@@ -154,6 +156,7 @@ impl World {
                     }
                 }
             }
+            crate::world::tick(&mut self.timing, 13, &mut inner);
             if earliest < 1.0 {
                 // A dynamic body it met is put back to the same time, so the two touch where they met and do not overlap.
                 if let Some((other, c0, c1, q0)) = partner {
@@ -169,6 +172,7 @@ impl World {
                 body.xf.q = blend(start.q, end_q, earliest);
                 body.round_pose();
             }
+            crate::world::tick(&mut self.timing, 14, &mut inner);
         }
         Ok(())
     }

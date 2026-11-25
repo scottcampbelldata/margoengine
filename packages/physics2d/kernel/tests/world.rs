@@ -237,6 +237,29 @@ fn the_block_solver_takes_two_point_contacts() {
     assert!(drift < 0.01, "drift {drift}");
 }
 
+#[test]
+fn active_islands_are_the_awake_groups_of_dynamic_bodies_and_no_fixed_body_is_one() {
+    let mut world = World::default();
+    let ground = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+    world.create_shape(ground, Core::rect(100.0, 1.0, v2(0.0, -1.0), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    // Two stacks far apart: two islands, each of two boxes, and the ground is in neither.
+    for x in [-20.0f32, 20.0] {
+        for row in 0..2 {
+            let b = world.create_body(&BodyDef { position: v2(x, 0.5 + row as f32), ..Default::default() }).unwrap();
+            world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        }
+    }
+    world.step(1.0 / 60.0).unwrap();
+    assert_eq!(world.counts.active_islands, 2, "{:?}", world.counts);
+    assert_eq!(world.counts.awake_bodies, 4);
+    // Left alone they fall asleep, and a sleeping island is no work for the step.
+    for _ in 0..600 {
+        world.step(1.0 / 60.0).unwrap();
+    }
+    assert_eq!(world.counts.active_islands, 0, "{:?}", world.counts);
+    assert_eq!(world.counts.awake_bodies, 0);
+}
+
 /// cos and sin by series for the test's set-up only.
 fn cos(x: f32) -> f32 {
     (x as f64).cos() as f32
