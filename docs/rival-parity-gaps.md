@@ -79,7 +79,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Raycaster current-pose hits on skinned meshes (sync), Line and Points thresholds | three.js | DONE | M | 99d42804c (thresholds EXISTS: packages/bvh/src/scene.ts, packages/bvh/src/points.ts) |
 | Greased Line: per-point width and colour | Babylon | DONE | S | 61f3dcf3f (colorMode; per-point colour and width EXISTS: packages/lines/src/line.ts, packages/lines/src/stroke.ts) |
 | Geospatial camera with terrain collision and geo maths | Babylon | DONE | M | 56d8616c4 (WGS84/ECEF/ENU EXISTS: packages/tiles/src/wgs84.ts, now backed by math/geo) |
-| Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | PARTIAL | M to L |  |
+| Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | DONE | M to L | b78b414f5 (SplatEditSession, packages/splats/src/session.ts); compound EXISTS packages/splats/src/set.ts, brush EXISTS packages/splats/src/brush.ts, visibility 5fee46878 |
 | Voice chat and screen share over the netcode WebRTC transport | Needle | DONE | M | 8092aaee6 |
 | WebGL2 layer: voxel and mesh path tracers on ANGLE D3D11 (Safari, Firefox, phones and the integrated-GPU frame budget recorded as not yet measured in [limits.md](limits.md)) | three.js WebGLRenderer, Babylon WebGL2 | DONE | L | 508b6c1cc (warm draw restored), 7144a4fc0 (no synchronous query behind a warm compile); `test:gpu:d3d11` and `test:gpu:mesh-pbr` pass on an Intel Arc 140V, Chrome 157. The serial draw-time fxc compile left is ANGLE's (KB-L5a-10) |
 
