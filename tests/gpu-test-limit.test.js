@@ -108,6 +108,30 @@ test('runLimited resolves after a killed tree is gone, not when the shell has ex
   assert.equal((await running).timedOut, true);
 });
 
+test('runLimited resolves with the survivors when the kill cannot end the tree, not on a close that never comes', {
+  timeout: 60_000,
+}, async () => {
+  // KB-VFX-SEEKHANG1: local CI's GPU step sat in vfx test:gpu for 120 minutes under a 10-minute suite limit. A kill
+  // that ended nothing (taskkillTree answers [pid] when taskkill cannot read the process table) left the shell
+  // running, and runLimited waited for its close for good. Here the kill ends nothing on purpose.
+  let pid;
+  const result = await runLimited(`${node} -e "setInterval(() => {}, 1000)"`, {
+    cwd: tmpdir(),
+    limitMs: 1,
+    label: 'unkillable',
+    end: async (root) => [(pid = root)],
+  });
+  try {
+    assert.equal(result.timedOut, true);
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.survivors, [pid]);
+    assert.match(result.message, new RegExp(`unkillable hung: .*process tree not ended \\(pids ${pid} still run`));
+    assert.equal(alive(pid), true, 'the stand-in kill left the tree running, as a failed taskkill does');
+  } finally {
+    await endTree(pid);
+  }
+});
+
 test('endTree waits for every process taskkill named, and returns the ones past the limit', async () => {
   const seen = [];
   let polls = 0;

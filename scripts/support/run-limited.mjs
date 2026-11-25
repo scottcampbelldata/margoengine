@@ -37,7 +37,7 @@ export function testLimitMs(packageMinutes, env = process.env) {
  * past `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
  * aborts (the heat watch, scripts/support/heat.mjs; a stopped side-by-side run) the tree is killed too and `aborted` is
  * true: the caller states why. A killed tree is gone when this resolves, so its folder, log and ports are free; `survivors`
- * lists any pid that outlived the wait. With `logFile` the output is appended there instead of passed through, so suites
+ * lists any pid that outlived the wait, and this resolves then without waiting for a tree the kill could not end. With `logFile` the output is appended there instead of passed through, so suites
  * running side by side keep their logs apart. `end` and `startLimit` let a test hold the kill and fire the limit itself.
  */
 export function runLimited(
@@ -59,13 +59,20 @@ export function runLimited(
     let timedOut = false,
       aborted = false,
       ended = Promise.resolve([]);
+    // A tree the kill could not end (taskkill fails to read the process table on a loaded PC and ends nothing) never
+    // closes the shell, so the result is given as soon as the kill says what still runs, survivors named: before
+    // KB-VFX-SEEKHANG1 this waited on the shell's close for good, and a 10-minute limit held local CI's step for 120.
+    const stop = () => {
+      ended = end(child.pid);
+      ended.then((left) => left.length > 0 && finish(null));
+    };
     const timer = startLimit(() => {
       timedOut = true;
-      ended = end(child.pid);
+      stop();
     }, limitMs);
     const abort = () => {
       aborted = true;
-      ended = end(child.pid);
+      stop();
     };
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
@@ -81,7 +88,7 @@ export function runLimited(
         seconds,
         ...(survivors.length > 0 && { survivors }),
         ...(timedOut && {
-          message: `${label} hung: no result after ${Math.round(limitMs / 1000)} s, process tree killed; find the stuck step (page, server or await) and fix it, or raise the limit with MARGO_GPU_TEST_TIMEOUT_MIN or "margo.gpuTestTimeoutMinutes" in the package's package.json if the test is genuinely slower`,
+          message: `${label} hung: no result after ${Math.round(limitMs / 1000)} s, ${survivors.length ? `process tree not ended (pids ${survivors.join(', ')} still run; end them by hand)` : 'process tree killed'}; find the stuck step (page, server or await) and fix it, or raise the limit with MARGO_GPU_TEST_TIMEOUT_MIN or "margo.gpuTestTimeoutMinutes" in the package's package.json if the test is genuinely slower`,
         }),
       });
     };
