@@ -11384,7 +11384,7 @@ Ullrich and Taylor 2015, conservative remapping; Farhat, Lesoinne and Le Tallec 
 `packages/physics/tests/world-fields.test.js`.
 ### Counter-based random numbers of the physics framework (`@margoengine/physics/world`, 2026-11-25)
 
-`packages/physics/src/world/random.ts` is Philox4x32-10, the TypeScript twin of the engine's one counter-based generator
+`packages/math/src/random.ts` (`@margoengine/math/random`, until 2026-11-25 in `packages/physics/src/world/random.ts`, which re-exports it) is Philox4x32-10, the TypeScript twin of the engine's one counter-based generator
 (docs/physics-framework.md, section 7; `kernel-common/src/random.rs`, K02), with its key (the seed and the solver's number, each a whole 32-bit word) and counter
 (element, stream, the tick's two words) laid out alike (changed 2026-11-25 from a 64-bit seed and a solver folded to 16 bits, which
 met in about one world in twelve at a hundred solvers); `kernel-common/tests/random-vectors.txt` pins both
@@ -11625,3 +11625,29 @@ of two real halves into one complex sequence, Van Loan section 4.4, is a speed i
 writes and checks `fft-vectors.txt` (37 cases) and checks the transform against a direct DFT and by round trips;
 `packages/math/test/fft.test.js` reproduces every case bit for bit.
 
+### The framework's wind: log-law boundary layer and Mann turbulence (ATMO-01, ATMO-02, `@margoengine/weather/boundary-layer` and `/turbulence`, 2026-11-25)
+
+`packages/weather/src/turbulence.ts` (`MannBox`) synthesises Mann's uniform-shear spectral tensor on a periodic box and
+`packages/weather/src/boundary-layer.ts` (`BoundaryLayerWind`) adds the log-law mean wind and the standard atmosphere, as the
+framework's `Wind`. Written from:
+
+- B. Keith, U. Khristenko and B. Wohlmuth, "Learning the structure of wind: A data-driven nonlocal turbulence model for the
+  atmospheric boundary layer", Physics of Fluids 33, 2021, arXiv:2107.11046, read in full: the von Karman energy spectrum,
+  the isotropic spectral tensor, the rapid-distortion solution (the matrix D, zeta1 to zeta3, C1 and C2) and the IEC eddy
+  lifetime with its hypergeometric function, eqs. 4-5 and 12-17 (its neural eddy lifetime is not used).
+- M. Faccioni, D. Kiehn and P. Vrancken, "Generating high-fidelity wind fields from the wind speed correlation tensor", Wind
+  Energy Science 11, 2093-2101, 2026, https://doi.org/10.5194/wes-11-2093-2026, read in full: the discrete Fourier synthesis
+  C* C = (2 pi)^m / V Phi (eqs. 3-5) and the finite box's loss of the largest eddies (section 4).
+- J. Mann, "The spatial structure of neutral atmospheric surface-layer turbulence", Journal of Fluid Mechanics 273, 1994, and
+  J. Mann, "Wind field simulation", Probabilistic Engineering Mechanics 13(4), 1998: the model and its simulation, not
+  readable here (paywalled); their equations are taken from the two papers above, which restate them.
+- R. B. Stull, "An Introduction to Boundary Layer Meteorology", Kluwer, 1988 (section 9.7: the neutral log law and sigma_u
+  about 2.5 u*), and G. I. Taylor, "The spectrum of turbulence", Proceedings of the Royal Society A 164, 1938 (frozen
+  turbulence): textbook results, known through these references.
+- IEC 61400-1 (length scale 0.8 times 42 m and shear 3.9 for the defaults): known through Keith et al.; the standard was not
+  read.
+
+The factor G = D G0, G0 = sqrt(E / (4 pi)) / k0^2 [k0]x, the Nyquist and mean bins left empty, the scaling of the box to a
+standard deviation, Pfaff's transformation of the hypergeometric function to a series that converges for every argument,
+and an atan from + - * / only are this package's own arrangement. Proof: `packages/weather/tests/turbulence.test.js` (isotropy,
+the IEC ratios 0.68 and 0.51, u'w' < 0, divergence below 1e-12, determinism) and `tests/boundary-layer.test.js`.

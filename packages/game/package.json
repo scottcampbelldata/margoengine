@@ -3743,6 +3743,14 @@
       "types": "./dist/weather/eruption.d.ts",
       "import": "./dist/weather/eruption.js"
     },
+    "./weather/turbulence": {
+      "types": "./dist/weather/turbulence.d.ts",
+      "import": "./dist/weather/turbulence.js"
+    },
+    "./weather/boundary-layer": {
+      "types": "./dist/weather/boundary-layer.d.ts",
+      "import": "./dist/weather/boundary-layer.js"
+    },
     "./weather/lava": {
       "types": "./dist/weather/lava.d.ts",
       "import": "./dist/weather/lava.js"

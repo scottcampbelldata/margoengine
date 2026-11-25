@@ -55,6 +55,14 @@
       "types": "./dist/eruption.d.ts",
       "import": "./dist/eruption.js"
     },
+    "./turbulence": {
+      "types": "./dist/turbulence.d.ts",
+      "import": "./dist/turbulence.js"
+    },
+    "./boundary-layer": {
+      "types": "./dist/boundary-layer.d.ts",
+      "import": "./dist/boundary-layer.js"
+    },
     "./lava": {
       "types": "./dist/lava.d.ts",
       "import": "./dist/lava.js"

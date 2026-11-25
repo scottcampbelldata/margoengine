@@ -262,6 +262,15 @@ new Fft(4).transform(data);
 console.log(Array.from(data)); // [4, 0, 0, 0, 0, 0, 0, 0]: all of it in the zero frequency
 ```
 
+`@margoengine/math/random` is the engine's counter-based random numbers (also re-exported by `@margoengine/physics/world`): Philox4x32-10, word for word the physics kernels' Rust generator (K02). `new RandomStream(seed, solverNumber(id))` draws `uniform(tick, element, stream)`, `unitF64`, `unitF32`, `below` and the raw `block`, each a pure function of the seed, the solver, the tick, the element and the stream, so a draw does not depend on the order or the thread that makes it.
+
+```ts
+import {RandomStream, solverNumber} from '@margoengine/math/random';
+
+const random = new RandomStream(42, solverNumber('rain'));
+console.log(random.uniform(10, 3) === random.uniform(10, 3)); // true: the same tick and element, the same number
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). The classes do not validate their numbers, so NaN propagates; the array helpers, `OBB`, `billboardRotation`, the Euler order and the degree functions throw `RangeError`. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()`, `hsl()` (hue as a number of degrees or with `deg`, `grad`, `rad` or `turn`) and `color()`, but not named colors. `SRGBToLinear` and `LinearToSRGB` continue their linear segment below 0 (bit for bit as the copies they replaced); `Color` and `convertColor` mirror the curve there, as the CSS Color 4 sample code does, so an out-of-gamut channel converts as browsers convert it. `Plane` methods accept a normal of any length (`normalize()` makes `distanceToPoint` a true distance). Not included: Matrix2, `Vector3.project` and `unproject` on the base `Vector3` (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, or the `compat` entry below, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Porting and curves: `@margoengine/math/compat` has subclasses of `Matrix4`, `Vector3`, `Quaternion`, `Plane`, `Ray`, `Box3` and `Color` with the extra methods ported code expects (such as `Matrix4.makeBasis`, `extractRotation`, `makeShear`; `Vector3.applyEuler`, `project`, `unproject`; `Ray.distanceSqToSegment`; `Box3.intersectsTriangle`; `Color.getStyle`, `offsetHSL`, `lerpHSL`), so the base entries keep their size. `@margoengine/math/curve` has `Curve` and `CurveSet` (editable keyed curves: linear, step, smoothstep or cubic with natural, flat or wrap ends) and the `Interpolant` classes over sampled data; `CurveSet.type` is the mode last set on the whole set.

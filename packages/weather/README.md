@@ -369,6 +369,20 @@ Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume`
 2016's test eruptions), `collapsing` and `slowMotion`. `mastinRate(height)`, `mastinHeight(rate)`,
 `standardAtmosphere(z)` (ICAO Doc 7488 and ISO 2533, re-exported from `@margoengine/math/atmosphere`, the one implementation the engine shares) and `ashFallSpeed(d, rho, air)` are exported too.
 
+## Boundary-layer wind and turbulence (the physics framework's wind)
+
+`BoundaryLayerWind` (`@margoengine/weather/boundary-layer`) is the wind every solver of the physics framework reads: one `Wind` of `@margoengine/math/fields`, sampled at any point and time on the world clock with `sample(x, y, z, t, out?)`, which gives the air's velocity (m/s), density and temperature. The mean wind follows the log law of a neutral surface layer, U(h) = (u* / 0.4) ln(h / z0) at height h above `ground`, from `speed` at `referenceHeight` (default 10 m/s at 10 m) over the roughness length `roughness` (default 0.0002 m, open sea; 0.03 grass, 0.5 to 1 forest or town), blowing toward `direction` (radians from +x toward +z); under z0 the air is still. Gusts come from a `MannBox` (`@margoengine/weather/turbulence`): Mann's spectral model of sheared surface-layer turbulence (the IEC 61400-1 wind-turbine model: length scale 33.6 m, shear 3.9), so gusts are stretched along the wind, the across and vertical components are about 0.7 and 0.5 of the along-wind one, upward gusts carry slower air (u'w' < 0), and the flow has no divergence; the box's along-wind standard deviation is 2.5 u* unless `turbulence` gives one, and it is carried along at the reference speed, so a gust that heels a sail reaches the trees downwind of it the right time later. Density and temperature are the standard atmosphere's (`@margoengine/math/atmosphere`) at `altitude` plus the height. Everything is computed with the pinned maths and the pinned FFT, so a wind is the same on every engine; `turbulence: false` gives the mean wind alone.
+
+```ts
+import {BoundaryLayerWind} from '@margoengine/weather/boundary-layer';
+
+const wind = new BoundaryLayerWind({speed: 12, roughness: 0.0002, turbulence: {cells: [64, 16, 16], size: [1024, 256, 256]}});
+const air = wind.sample(0, 30, 0, 5); // 30 m up, 5 s into the shot
+console.log(wind.meanSpeed(30).toFixed(2), air.density.toFixed(3)); // 13.22 1.221
+```
+
+`new MannBox({cells, size, lengthScale, shear, sigma, seed})` synthesises the box on its own (default 512 x 32 x 32 cells over 4,096 x 256 x 256 m; each cell count a product of 2, 3 and 5), `box.u`, `box.v` and `box.w` are its along-wind, across and upward fluctuations, and `box.sample(x, y, z)` reads it trilinearly, repeating past its size. A box should span several length scales (the largest eddies are under-represented in a finite box) and be long enough along the wind that its repeat is not seen: at 12 m/s the default repeats every 5.7 minutes. Making the default box takes under a second.
+
 ## Explosion clouds (instantaneous releases)
 
 `BlastCloud` from `margoengine/weather/eruption` is the mushroom cloud of one or more instantaneous releases (an

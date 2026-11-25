@@ -124,6 +124,10 @@
       "types": "./dist/fft.d.ts",
       "import": "./dist/fft.js"
     },
+    "./random": {
+      "types": "./dist/random.d.ts",
+      "import": "./dist/random.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"
