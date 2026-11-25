@@ -11300,7 +11300,7 @@ was not read). Checked against the published Philox4x32-10 answers for the all-z
 A solver's number is the 32-bit FNV-1a hash of its id's UTF-8 bytes (G. Fowler, L. C. Noll and K.-P. Vo; D. Eastlake, T.
 Hansen, G. Fowler, K.-P. Vo and L. Noll, "The FNV Non-Cryptographic Hash Algorithm", IETF Internet-Draft,
 https://datatracker.ietf.org/doc/draft-eastlake-fnv/), checked against its published values for "", "a" and "foobar", and
-xor-folded to 16 bits as that draft describes for shorter hashes. Proof: `packages/physics/tests/world-random.test.js`.
+used whole (32 bits; it was xor-folded to 16 bits before the layout change). Proof: `packages/physics/tests/world-random.test.js`.
 ### The physics world: clock, coupling order, rate levels and origin cells (`@margoengine/physics/world`, 2026-11-25)
 
 `packages/physics/src/world/world.ts` and `graph.ts` run the framework's solvers on one clock and one memory
