@@ -28,9 +28,12 @@ export function clockState(value, depth = 0, seen = new Set(), ignore = []) {
     if (value instanceof Set) return [...value].map((v) => clockState(v, depth + 1, seen));
     if (value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) return undefined;
     const out = {};
+    // A field set to undefined reads as one never set (a cleared `last` against a fresh one that has none).
     for (const key of Object.keys(value).sort())
-      if (!skipped.has(key) && !(depth === 0 && ignore.includes(key)))
-        out[key] = clockState(value[key], depth + 1, seen);
+      if (!skipped.has(key) && !(depth === 0 && ignore.includes(key))) {
+        const field = clockState(value[key], depth + 1, seen);
+        if (field !== undefined) out[key] = field;
+      }
     return out;
   } finally {
     seen.delete(value);

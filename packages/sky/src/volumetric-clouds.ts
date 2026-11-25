@@ -816,7 +816,6 @@ export class VolumetricClouds implements EnginePlugin {
       },
     });
   }
-  /** Seconds on this layer's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   /**
    * Resolves once what the options draw is loaded: at once without a storm, else when the storm's WGSL and maths have
    * arrived (the layer draws nothing until then, and neither do its `volumetricCloudShadows` and `LightShafts`, which
@@ -826,11 +825,25 @@ export class VolumetricClouds implements EnginePlugin {
     // The storm's options are checked once its code is in; a bad one rejects here and throws in the next draw.
     return wantsStorm(this.options) ? loadStormField().then((f) => void f.of(this.options)) : Promise.resolve();
   }
+  /** Seconds on this layer's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
     return this.seconds;
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
+  }
+  /**
+   * Puts the layer's clocks back to 0 (the wind and evolution drift, the march start counter of `temporal` and its
+   * capture steps), as a fresh layer has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls
+   * it on every clock) gives what a fresh world seeked there gives, and the next draw marches from the first start
+   * (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.seconds = 0;
+    this.frames = 0;
+    this.extra = 0;
+    this.pending = false;
+    this.drift.fill(0);
   }
   /**
    * Moves the layer's clocks by `delta` seconds without drawing: the wind and evolution drift (which cloud shadows and

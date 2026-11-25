@@ -110,6 +110,7 @@ export class VolumetricClouds implements EnginePlugin {
     get ready(): Promise<void>;
     get time(): number;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

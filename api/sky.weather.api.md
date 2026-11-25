@@ -109,6 +109,7 @@ export class Weather implements EnginePlugin {
     onThunder(listener: (strike: LightningStrike) => void): () => void;
     strike(options?: StrikeOptions): LightningStrike;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

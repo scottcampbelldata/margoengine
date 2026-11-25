@@ -18,6 +18,7 @@ export class Aurora extends SkyLayer {
     time: number;
     constructor(options?: AuroraOptions);
     static attach(engine: EngineKernel, options?: AuroraOptions): Aurora;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     protected frame(c: Context): boolean;

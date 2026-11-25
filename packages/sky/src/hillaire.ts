@@ -407,10 +407,13 @@ export class HillaireSky implements EnginePlugin {
   private parameterSource?: AtmosphereParameters | null;
   private disposed = false;
   private seconds = 0;
+  // The `hours` given at construction: advanceTime moves options.hours on, and resetTime puts it back.
+  private readonly startHours: number | undefined;
   private readonly presentation = overlayPass();
   private readonly scratch = new Float64Array(52);
   constructor(readonly options: HillaireSkyOptions = {}) {
     this.validate();
+    this.startHours = options.hours;
     this.place();
   }
   static attach(engine: EngineKernel, options: HillaireSkyOptions = {}): HillaireSky {
@@ -485,6 +488,16 @@ export class HillaireSky implements EnginePlugin {
   /** Seconds on this sky's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
     return this.seconds;
+  }
+  /**
+   * Puts the clock back to 0 and `options.hours` back to the value it was built with (the sun placed there), as a
+   * fresh sky with the same options has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls
+   * it on every clock) gives what a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.seconds = 0;
+    this.options.hours = this.startHours;
+    this.place();
   }
   /**
    * Moves the time of day by `delta` seconds times `timeScale`, without drawing. Each frame update runs it, so `seek`

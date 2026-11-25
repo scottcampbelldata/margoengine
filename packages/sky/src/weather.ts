@@ -1141,6 +1141,37 @@ export class Weather implements EnginePlugin {
   }
 
   /**
+   * Puts the weather's clocks back as a fresh one with the same options has them, so a later `seek` (`resetClocks`
+   * from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there gives
+   * (GAP-FILM-RESET): time, wind drift, fade level, wetness and snow cover to 0, no live strike or flash, and the
+   * lightning schedule back to its seed, so the same strikes fall at the same moments again. Listeners stay.
+   */
+  resetTime(): void {
+    this.idle();
+    this.seconds = 0;
+    this.drift[0] = this.drift[1] = 0;
+    this.level = this.flashLevel = this.lightLevel = 0;
+    this.wet = this.snow = 0;
+    this.last = undefined;
+    this.state = 0x9e3779b9;
+    this.seeded = Number.NaN;
+    this.counter = 0;
+    this.active = [];
+    this.flashValues.fill(0);
+    // The scene lights the strikes moved, dark and where a fresh weather has them.
+    const light = this.lightningLight,
+      cloud = this.cloudFlash;
+    light.position.splice(0, 3, 0, LIGHTNING_LIGHT_HEIGHT, 1000);
+    light.color.splice(0, 3, ...LIGHTNING_COLOR);
+    light.intensity = 0;
+    light.range = 9000;
+    cloud.position.splice(0, 3, 0, LIGHTNING_CLOUD_BASE + LIGHTNING_LIGHT_HEIGHT, 1000);
+    cloud.color.splice(0, 3, ...LIGHTNING_COLOR);
+    cloud.intensity = 0;
+    cloud.radius = 200;
+    this.lineLights.length = 0;
+  }
+  /**
    * Moves the weather by `delta` seconds as a frame update does (fade, wetness, snow cover, wind drift, the lightning
    * schedule and live strikes) but calls no `onLightning` or `onThunder` listener: `seek` from
    * `@margoengine/cutscene/seek` replays a run's steps with it, so a strike falls where and when it fell in the run.

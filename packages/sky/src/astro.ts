@@ -949,6 +949,9 @@ export class AstroSky implements EnginePlugin {
   private engine?: Engine;
   private disposed = false;
   private clock: number;
+  // The moment given at construction (options.date, or the wall clock then): advanceTime consumes options.date, and
+  // resetTime goes back to this moment.
+  private readonly start: number;
   private seconds = 0;
   private night = 0;
   /** The sun, moon and planets of the current moment, updated each frame. */
@@ -958,7 +961,7 @@ export class AstroSky implements EnginePlugin {
 
   constructor(readonly options: AstroSkyOptions) {
     validate(options);
-    this.clock = (options.date ?? new Date()).getTime();
+    this.clock = this.start = (options.date ?? new Date()).getTime();
     this.sun = sunPosition(this.date, options, options);
     this.moon = moonPosition(this.date, options, options);
     this.planets = planetPositions(this.date, options, options);
@@ -984,6 +987,22 @@ export class AstroSky implements EnginePlugin {
     this.advanceTime(delta);
   }
 
+  /**
+   * Puts the frame clock back to 0 and the date back to the moment the sky was built with (the sun, moon and planets
+   * placed there), as a fresh one has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls
+   * it on every clock) gives what a fresh world seeked there gives (GAP-FILM-RESET). The attached sky's sun and moon
+   * follow on the next update.
+   */
+  resetTime(): void {
+    this.seconds = 0;
+    this.night = 0;
+    this.clock = this.start;
+    const date = this.date,
+      o = this.options;
+    this.sun = sunPosition(date, o, o);
+    this.moon = moonPosition(date, o, o);
+    this.planets = planetPositions(date, o, o);
+  }
   /**
    * Moves the date clock by `delta` seconds of frame time (times `timeScale`) and places the sun, moon and planets,
    * writing them to the attached sky's options; no GPU call. Each frame update runs it, so `seek` from

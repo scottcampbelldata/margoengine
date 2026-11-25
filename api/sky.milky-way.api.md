@@ -61,6 +61,7 @@ class AstroSky implements EnginePlugin {
     get date(): Date;
     get time(): number;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

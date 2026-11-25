@@ -356,6 +356,13 @@ export class Aurora extends SkyLayer {
   }
 
   /**
+   * Puts the aurora clock back to 0, as a fresh aurora has it, so a later `seek` (`resetClocks` from
+   * `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.time = 0;
+  }
+  /**
    * Moves the aurora clock by `delta` seconds times `speed`, without drawing; each frame update runs it, so `seek` from
    * `@margoengine/cutscene/seek` replays the curtains exactly.
    * @throws RangeError for a negative or non-finite `delta`, or options out of range.

@@ -105,6 +105,7 @@ export class VolumetricClouds implements EnginePlugin {
     get ready(): Promise<void>;
     get time(): number;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -140,6 +141,7 @@ export class Weather implements EnginePlugin {
     onThunder(listener: (strike: LightningStrike) => void): () => void;
     strike(options?: StrikeOptions): LightningStrike;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

@@ -657,6 +657,8 @@ export class Sky implements EnginePlugin {
   private readonly belowColor: [number, number, number] = [0, 0, 0];
   private disposed = false;
   private cloudTime = 0;
+  // The `hours` given at construction: advanceTime moves options.hours on, and resetTime puts it back.
+  private readonly startHours: number | undefined;
   // The coverage record: [size key, resolved texture, its view, pipeline, multisampled texture view].
   private cover?: [string, GPUTexture, GPUTextureView, GPURenderPipeline, GPUTextureView?, GPUTexture?];
   private reflectionRequested = false;
@@ -723,6 +725,7 @@ export class Sky implements EnginePlugin {
     readonly options: SkyOptions = {},
     private readonly features: SkyFeatures = {},
   ) {
+    this.startHours = options.hours;
     this.model = options.model;
     this.stylized = !!options.night;
     this.extended = !!(options.look || options.atmosphere) && !!features.look;
@@ -918,6 +921,16 @@ export class Sky implements EnginePlugin {
   /** Seconds on this sky's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
     return this.seconds;
+  }
+  /**
+   * Puts the sky's clocks back to 0 (the cloud sheet's drift, the star time) and `options.hours` back to the value it
+   * was built with, as a fresh sky with the same options has them, so a later `seek` (`resetClocks` from
+   * `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.cloudTime = 0;
+    this.seconds = 0;
+    this.options.hours = this.startHours;
   }
   /**
    * Moves the sky's clocks by `delta` seconds without drawing: the cloud sheet's drift, the star time and `hours`.

@@ -1766,6 +1766,12 @@ console.log(sky.time, weather.time, weather.wetness);
   moved it twice and a seek could not move it); the first frame still marches from 0.
 - `AstroSky` defaults its date to the wall clock's now: give a film a `date`. Frames drawn with delta 0 move no clock.
 - `WeatherFX`'s wet lens is history of the view, as TAA is: a cut starts it dry and the scene's warm-up frames wet it.
+- Several cuts in one process: `resetTime()` on `Sky`, `HillaireSky`, `AstroSky`, `Aurora`, `TornadoCloud`,
+  `VolumetricClouds` and `Weather` puts each clock back as a fresh one with the same options has it (`resetClocks` from
+  `@margoengine/cutscene/seek` calls it on every clock), so a later `seek` gives what a fresh world seeked there gives.
+  `Sky` and `HillaireSky` put `options.hours` back to the value they were built with, `AstroSky` its date to the
+  moment it was built with, and `Weather` replays the same strikes from its seed, its lights dark; listeners stay.
+  Evidence: `test/reset-time.test.js` (state of a reset clock equals a fresh one's, before and after a seek).
 
 ## External radiance reference
 

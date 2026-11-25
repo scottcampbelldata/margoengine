@@ -808,6 +808,14 @@ export class TornadoCloud implements EnginePlugin {
     this.seconds = seconds;
     return this;
   }
+  /**
+   * Puts the clock back to 0 (the tornado at the start of its path, not spun up), as a fresh one has it, so a later
+   * `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked
+   * there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.seconds = 0;
+  }
   /** Moves the clock by `delta` seconds: the CPU part of the frame update, which a seek replays. */
   advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
