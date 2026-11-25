@@ -99,12 +99,21 @@ export interface Region {
   readonly layout: number;
 }
 
+/**
+ * An integer origin cell of a large world (docs/physics-framework.md, section 2, large worlds): positions are this cell
+ * plus an f32 offset inside it. The world sets the cells; moving an origin changes only these integers, never a float of
+ * state, and a coupling between solvers in different cells converts through the cell difference, which is exact.
+ */
+export type Cell = readonly [number, number, number];
+
 /** A port: one field's data at a tick, published by its owner or gathered for an accumulator, as a region. */
 export interface Port {
   readonly field: string;
   readonly region: Region;
   /** The tick the data is valid at, on the clock of the solver that published it. */
   readonly tick: number;
+  /** The cell the port's positions are expressed in (set by the world). */
+  readonly cell: Cell;
 }
 
 /** What a solver says about itself, before it is given any state: the coupling graph and the schedule are built from it. */
@@ -148,6 +157,8 @@ export interface StepContext {
   readonly seed: number;
   /** The ports it reads, by field name, valid at the coupling tick. */
   readonly inputs: ReadonlyMap<string, Port>;
+  /** The solver's own origin cell: its state's positions are offsets from it (set by the world). */
+  readonly cell: Cell;
 }
 
 /**
@@ -162,7 +173,10 @@ export interface Solver<Params = unknown> {
   init(host: SolverHost, params: Params): void;
   /** Advances its state by `dt` seconds: a pure function of its state, its input ports, `dt` and its random counter. */
   step(context: StepContext, dt: number): void;
-  /** Publishes the data of every field it owns, valid at `tick`. */
+  /**
+   * Publishes the data of every field it writes or accumulates into, valid at `tick`. A contributor hands its accumulated
+   * contribution over through its own port, which the world sums by contributor id and then by element into the owner's sum.
+   */
   exportPorts(tick: number): readonly Port[];
   /** Reads what other solvers accumulated into the fields it owns for `tick` (impulses, sources), through `SolverHost.port`. */
   importPorts(tick: number): void;

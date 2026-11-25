@@ -5,6 +5,8 @@
 ```ts
 export const BASE_RATE = 60;
 
+export type Cell = readonly [number, number, number];
+
 export type Centring = 'cell' | 'face' | 'vertex' | 'particle';
 
 export type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
@@ -30,6 +32,7 @@ export interface Port {
     readonly field: string;
     readonly region: Region;
     readonly tick: number;
+    readonly cell: Cell;
 }
 
 export const RATE_LEVELS = 8;
@@ -84,6 +87,7 @@ export interface StepContext {
     readonly level: RateLevel;
     readonly seed: number;
     readonly inputs: ReadonlyMap<string, Port>;
+    readonly cell: Cell;
 }
 
 export function isRateLevel(value: unknown): value is RateLevel;

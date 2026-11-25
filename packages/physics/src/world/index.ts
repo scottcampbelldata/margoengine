@@ -6,6 +6,7 @@ export {
   isRateLevel,
   rateOf,
   substepsBetween,
+  type Cell,
   type Centring,
   type ElementType,
   type FieldAccess,

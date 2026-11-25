@@ -61,7 +61,7 @@ test('a solver written to the contract steps through a host and its state is the
   fall.init(host, { height: 10 });
   const level = 2;
   for (let tick = 0; tick < rateOf(level); tick++)
-    fall.step({ tick, level, seed: 1, inputs: new Map() }, 1 / rateOf(level));
+    fall.step({ tick, level, seed: 1, inputs: new Map(), cell: [0, 0, 0] }, 1 / rateOf(level));
   const [region] = fall.stateRegions();
   const [height, speed] = new Float64Array(memory.buffer, region.byteOffset, 2);
   // Semi-implicit Euler over n = 240 steps of h: v = -g n h, x = x0 - g h^2 n (n + 1) / 2.

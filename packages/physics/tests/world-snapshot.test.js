@@ -73,7 +73,7 @@ function make(start = 0, order = ['balls', 'dust']) {
 }
 const run = ({ solvers }, steps) => {
   for (let t = 0; t < steps; t++)
-    for (const s of solvers) s.step({ tick: t, level: 0, seed: 1, inputs: new Map() }, 1 / 60);
+    for (const s of solvers) s.step({ tick: t, level: 0, seed: 1, inputs: new Map(), cell: [0, 0, 0] }, 1 / 60);
 };
 
 test('the hash is a 64-bit fingerprint pinned on a known state, the same wherever the regions lie and in any order of the solvers', () => {

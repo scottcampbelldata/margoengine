@@ -1511,7 +1511,7 @@ console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post
 
 ### The solver contract (`@margoengine/physics/world`)
 
-`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The world, the field registry and the scheduler that drive these come next.
+`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The world, the field registry and the scheduler that drive these come next.
 
 ```ts
 import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
@@ -1538,7 +1538,7 @@ class Fall implements Solver<{height: number}> {
     w[0] += w[1] * dt;
   }
   exportPorts(tick: number) {
-    return [{field: 'ballHeight', region: this.state, tick}];
+    return [{field: 'ballHeight', region: this.state, tick, cell: [0, 0, 0] as const}];
   }
   importPorts() {}
   stateRegions() {
@@ -1567,7 +1567,7 @@ const host: SolverHost = {
 const fall = new Fall();
 fall.init(host, {height: 10});
 const level = fall.describe().rate; // 240 steps a second
-for (let tick = 0; tick < rateOf(level); tick++) fall.step({tick, level, seed: 1, inputs: new Map()}, 1 / rateOf(level));
+for (let tick = 0; tick < rateOf(level); tick++) fall.step({tick, level, seed: 1, inputs: new Map(), cell: [0, 0, 0]}, 1 / rateOf(level));
 console.log(rateOf(level), substepsBetween(level, 0), fall.height().toFixed(2)); // 240 4 5.07
 ```
 
