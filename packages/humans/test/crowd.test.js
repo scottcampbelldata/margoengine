@@ -101,3 +101,53 @@ test('walkCrowd refuses what it cannot drive', () => {
   assert.throws(() => walkCrowd(crowd, recorder(), { stride: 0 }), RangeError);
   assert.throws(() => walkCrowd(crowd, recorder(), { stride: 1.4, walk: 5 }), RangeError);
 });
+
+test('people sent to packed seats or to one meeting point never turn on the spot', () => {
+  // Turning on the spot: over 2 s, the heading turns more than half a circle while the person gets less than 0.25 m
+  // anywhere. Seats 0.5 m apart for people 0.6 m across, and nine people from three sides walking to one point.
+  const spins = (place) => {
+    const crowd = new Crowd(square(12)),
+      drawer = recorder();
+    place(crowd);
+    const walkers = walkCrowd(crowd, drawer, { walk: 0, stand: 1, stride: 1.4 }),
+      dt = 1 / 60,
+      history = crowd.agents.map(() => []),
+      turned = new Float64Array(crowd.agents.length),
+      before = Float64Array.from(walkers.headings);
+    let count = 0;
+    for (let k = 0; k < 20 * 60; k++) {
+      crowd.update(dt);
+      walkers.update(dt);
+      crowd.agents.forEach((a, i) => {
+        let d = walkers.headings[i] - before[i];
+        d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
+        turned[i] += Math.abs(d);
+        before[i] = walkers.headings[i];
+        history[i].push([a.position[0], a.position[2], turned[i]]);
+        if (history[i].length > 120) {
+          const [x, z, t] = history[i].shift();
+          if (Math.hypot(a.position[0] - x, a.position[2] - z) < 0.25 && turned[i] - t > Math.PI) count++;
+        }
+      });
+    }
+    assert.ok(crowd.agents.every((a) => a.state === 'arrived'), 'everyone arrives');
+    return count;
+  };
+  const seats = spins((crowd) => {
+    for (let i = 0; i < 8; i++)
+      crowd
+        .addAgent({ position: [0.5 + (i % 4) * 0.9, 0, 0.5 + Math.floor(i / 4) * 0.9], radius: 0.3, maxSpeed: 1.4 })
+        .setTarget([3 + i * 0.5, 0, 5]);
+  });
+  assert.equal(seats, 0, 'nobody turns on the spot at the seats');
+  const meeting = spins((crowd) => {
+    for (const [x, z, dx, dz] of [
+      [1, 2, 0, 0.7],
+      [11, 2, 0, 0.7],
+      [6, 11, 0.7, 0],
+    ])
+      for (let i = -1; i <= 1; i++)
+        crowd.addAgent({ position: [x + i * dx, 0, z + i * dz], radius: 0.3, maxSpeed: 1.4 }).setTarget([6, 0, 6]);
+  });
+  assert.equal(meeting, 0, 'nobody turns on the spot at the meeting point');
+});

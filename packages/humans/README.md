@@ -23,7 +23,10 @@ console.log(person.clips.length, person.animator?.state); // its clips; the firs
 instance placed and turned with it (at most `turnRate`, 4 radians a second, so avoidance does not snap a head round), and
 its walk cycle moves on by the ground the agent covers divided by `stride`, so feet do not slide at any speed. With
 `new Crowd(nav, {density: true})` those speeds are Weidmann's measured ones: about 0.6 m/s at 2 people a square metre.
-Agents slower than `standBelow` (0.05 m/s) play the `stand` clip. `variants` (atlas regions) give each agent one outfit
+Agents slower than `standBelow` (0.05 m/s) play the `stand` clip. An agent the crowd pushes back against where it means
+to go (its `velocity` against its `preferredVelocity`, which a navmesh `CrowdAgent` has) steps back facing its way, its
+walk cycle running backward, instead of turning round to face the push; without `preferredVelocity` the heading follows
+the velocity. `variants` (atlas regions) give each agent one outfit
 of several by a seeded hash. The entry imports neither package; it reads them by shape.
 
 ```ts

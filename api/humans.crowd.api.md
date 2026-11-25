@@ -49,6 +49,7 @@ export interface WalkerInstance {
 export interface WalkingAgent {
     readonly position: ArrayLike<number>;
     readonly velocity: ArrayLike<number>;
+    readonly preferredVelocity?: ArrayLike<number>;
 }
 
 export interface WalkingCrowd {

@@ -9,6 +9,8 @@
 export interface WalkingAgent {
   readonly position: ArrayLike<number>;
   readonly velocity: ArrayLike<number>;
+  /** Where the agent means to go, before avoidance (a navmesh CrowdAgent has it); without it the heading follows `velocity`. */
+  readonly preferredVelocity?: ArrayLike<number>;
 }
 /** The parts of a `@margoengine/navmesh` Crowd that walkCrowd reads. */
 export interface WalkingCrowd {
@@ -131,15 +133,20 @@ export function walkCrowd(crowd: WalkingCrowd, drawer: WalkerDrawer, options: Wa
           vz = a.velocity[2],
           speed = Math.hypot(vx, vz),
           moving = speed >= standBelow;
+        // Pushed back: the crowd moves the agent against where it means to go. People step back facing their way then
+        // instead of turning round to face the push, so the heading keeps to the way it means to go and the walk cycle
+        // runs backward.
+        const want = a.preferredVelocity,
+          back = moving && !!want && vx * want[0] + vz * want[2] < 0;
         if (moving) {
-          // Turn toward the velocity by at most turnRate * dt, the short way round.
-          let turn = Math.atan2(vx, vz) - headings[i];
+          // Turn toward the velocity (when pushed back, the way it means to go) by at most turnRate * dt, the short way.
+          let turn = (back ? Math.atan2(want![0], want![2]) : Math.atan2(vx, vz)) - headings[i];
           turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
           const most = turnRate * dt;
           headings[i] += Math.max(-most, Math.min(most, turn));
         }
-        // The cycle advances by the ground covered, so feet do not slide (below standBelow the stand clip shows instead).
-        phases[i] += (speed / stride) * dt;
+        // The cycle moves by the ground covered, so feet do not slide (below standBelow the stand clip shows instead).
+        phases[i] += ((back ? -speed : speed) / stride) * dt;
         const c = Math.cos(headings[i]),
           n = Math.sin(headings[i]);
         // Column-major: rotation about +Y (+Z forward turned to (sin, 0, cos)), scale, then translation.

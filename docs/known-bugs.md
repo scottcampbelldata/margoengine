@@ -6,6 +6,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: walkCrowd turned a person round on the spot when the crowd pushed them back (KB-CROWD-HEADING1, humans)
+
+- **Repro:** `packages/humans/test/crowd.test.js` "people sent to packed seats or to one meeting point never turn on the
+  spot": nine people walking at 1.4 m/s to one point; people near it are pushed back by those arriving, and their
+  heading turned more than half a circle within 2 s while they moved less than 0.25 m.
+- **Cause:** the heading followed the velocity whenever it was above `standBelow` (0.05 m/s), so a slow step back made
+  by avoidance turned the body to face the push and back again.
+- **Fix:** fix(humans): a person the crowd pushes back steps back instead of turning round. `CrowdAgent` exposes
+  `preferredVelocity`; while the velocity points against it the heading keeps to it and the walk cycle runs backward.
+
 ### Fixed 2026-11-25: crowd agents at a target others already covered never arrived, circling it or pressing into the people there (KB-CROWD-ARRIVE1, navmesh)
 
 - **Repro:** `packages/navmesh/test/crowd-arrival.test.js`: eight agents (radius 0.3) sent to seats 0.5 m apart, nine

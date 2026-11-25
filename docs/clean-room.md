@@ -11434,3 +11434,20 @@ round standing agents in the way, leaves alone a standing agent that covers the 
 going round it and back. Proof: `packages/navmesh/test/crowd-arrival.test.js` (eight agents to seats 0.5 m apart, nine
 agents from three sides to one point, two agents to one point beside a diagonal wall: all arrive, none turns on the
 spot or circles, and all end apart).
+
+### Walkers pushed back step back (humans `walkCrowd`, navmesh `preferredVelocity`, 2026-11-25)
+
+`packages/humans/src/crowd.ts` (the heading and phase of an agent pushed back) and `CrowdAgent.preferredVelocity` in
+`packages/navmesh/src/crowd.ts`. Sources, abstracts read:
+
+- G. Arechavaleta, J.-P. Laumond, H. Hicheur and A. Berthoz, "On the nonholonomic nature of human locomotion",
+  Autonomous Robots 25(1-2), 25-35, 2008, https://doi.org/10.1007/s10514-007-9075-2. Used: in goal-directed walking the
+  trunk steers like a wheeled vehicle's front wheel, so a walker faces the way it walks to its goal.
+- K. Mombaur, J.-P. Laumond and E. Yoshida, "An Optimal Control-Based Formulation to Determine Natural Locomotor Paths
+  for Humanoid Robots", Advanced Robotics 24, 515-535, 2010. Used: human locomotion has holonomic modes (steps sideways
+  and back) beside the nonholonomic forward walk.
+
+Margo's own: the heading follows the velocity as before, except while the velocity points against the preferred
+velocity (the crowd pushes the agent back): then the heading keeps to the preferred direction and the walk cycle runs
+backward by the ground covered. Proof: `packages/humans/test/crowd.test.js` "people sent to packed seats or to one
+meeting point never turn on the spot".

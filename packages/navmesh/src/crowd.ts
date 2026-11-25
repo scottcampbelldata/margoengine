@@ -105,6 +105,11 @@ export class CrowdAgent {
   readonly position: [number, number, number];
   /** Current velocity (XZ; y is 0). */
   readonly velocity: [number, number, number] = [0, 0, 0];
+  /**
+   * The velocity it wants this frame, toward its next corner before avoidance (XZ; y is 0; zero while it stands). Where
+   * it means to go: a character faces this way when the crowd nudges it back (`velocity` then points against it).
+   */
+  readonly preferredVelocity: [number, number, number] = [0, 0, 0];
   /** Where it is in its journey. */
   state: CrowdAgentState = 'idle';
   /** The target it is walking to, or null. */
@@ -431,6 +436,7 @@ export class Crowd {
     disc.velocity[1] = agent.velocity[2];
     disc.maxSpeed = agent.maxSpeed;
     disc.preferred[0] = disc.preferred[1] = 0;
+    agent.preferredVelocity[0] = agent.preferredVelocity[2] = 0;
     if (agent.state !== 'moving' && agent.state !== 'offmesh') return;
     const path = agent.path,
       last = path.length - 1;
@@ -464,8 +470,8 @@ export class Crowd {
       [ux, uz] = this.detour(agent, ux, uz, d, agent.corner === last ? c : null);
       if (this.density) speed = Math.min(speed, agent.maxSpeed * this.crowding(agent, ux, uz));
     }
-    disc.preferred[0] = ux * speed;
-    disc.preferred[1] = uz * speed;
+    disc.preferred[0] = agent.preferredVelocity[0] = ux * speed;
+    disc.preferred[1] = agent.preferredVelocity[2] = uz * speed;
   }
 
   /**

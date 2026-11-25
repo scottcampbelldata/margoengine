@@ -68,6 +68,7 @@ class CrowdAgent {
     readonly id: number;
     readonly position: [number, number, number];
     readonly velocity: [number, number, number];
+    readonly preferredVelocity: [number, number, number];
     state: CrowdAgentState;
     target: Vec3 | null;
     path: Vec3[];
