@@ -1,5 +1,5 @@
 import type { Body2D } from './body.js';
-import type { Physics2D } from './physics.js';
+import type { Physics2D, QueryFilter2D } from './physics.js';
 import type { Vec2D } from './shapes.js';
 
 /** Options of a character controller; every field has a default. */
@@ -25,6 +25,12 @@ export interface CharacterOptions2D {
   pushDynamic?: boolean;
   /** Mass used when pushing, in kilograms. */
   mass?: number;
+  /**
+   * Which colliders the character meets, like a scene query's filter: `groups`, `excludeFixed`, `excludeKinematic`, `excludeDynamic`,
+   * `predicate`, `excludeCollider` (Rapier's `filterFlags`, `filterGroups` and `filterPredicate`). The character's own body is always
+   * left out, and sensors unless `excludeSensors` is false. A filter given to `move` replaces this one for that move.
+   */
+  filter?: QueryFilter2D;
 }
 
 /** What one `move` did. */
@@ -82,17 +88,31 @@ export class CharacterController2D {
     const collider = this.body.colliders[0];
     if (!collider?.described) throw new TypeError('The character body has no collider; add one with body.addCollider.');
     const angle = this.body.rotation;
-    return this.physics.cast(collider.described, at[0], at[1], angle, dir[0], dir[1], max, {
-      exclude: this.body,
-      excludeSensors: true,
-    });
+    return this.physics.cast(collider.described, at[0], at[1], angle, dir[0], dir[1], max, this.filter);
   }
 
-  /** Computes the movement for `delta` (world units) and sets the body's next position */
-  move(delta: Vec2D): CharacterMoveResult2D {
+  /** The filter of the move under way: the caller's, with the character's own body left out. */
+  private filter: QueryFilter2D = {};
+  private filterFor(given: QueryFilter2D | undefined): QueryFilter2D {
+    const f = given ?? this.options.filter ?? {};
+    const other = f.exclude;
+    return {
+      ...f,
+      exclude: this.body,
+      excludeSensors: f.excludeSensors ?? true,
+      // `exclude` names one body and the character's own is taken: a second body to leave out goes through the predicate.
+      predicate: other
+        ? (body, collider) => body !== other && (f.predicate ? f.predicate(body, collider) : true)
+        : f.predicate,
+    };
+  }
+
+  /** Computes the movement for `delta` (world units) and sets the body's next position; `filter` replaces the controller's for this move. */
+  move(delta: Vec2D, filter?: QueryFilter2D): CharacterMoveResult2D {
     if (this.disposed) throw new TypeError('This character controller was disposed; create a new one.');
     if (!Number.isFinite(delta[0]) || !Number.isFinite(delta[1]))
       throw new TypeError('delta must be two finite numbers [x, y].');
+    this.filter = this.filterFor(filter);
     const k = this.physics.scale,
       inv = 1 / k;
     const start: [number, number] = [this.body.position[0] * k, this.body.position[1] * k];

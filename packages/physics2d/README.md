@@ -87,7 +87,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Joints | generic joint (any mix of the x, y and angle locks, in turned frames), pin-slot | `type: 'generic'`, `type: 'slot'` | full |
 | Joints | multibody joints: joint space, joint motors and limits, kinematics, inverse kinematics | `addArticulation` (`Articulation2D`: positions and velocities, motors, limits, forward and inverse kinematics, Jacobian) over exact maximal-coordinate trees: chains and branched trees solve in one sweep, so a 1000:1 mass ratio across a branch keeps every joint closed | full, see limits |
 | Tools | PID controller | `PidController2D` | full |
-| Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
+| Character | kinematic character controller: slide, autostep (`maxHeight`, `minWidth`, `includeDynamic`), snap to ground, slope climb and slide, push dynamic bodies, up vector, a query filter (`filter` option, `move(delta, filter)`) | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
 | World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |
 | World | debug render data: shapes, joints, contacts, boxes, body axes, solver contacts, a colour style (`rgba` a line) and a body filter | `debugRender({axes, solverContacts, style, filter})` | full |

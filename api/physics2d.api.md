@@ -160,7 +160,7 @@ export interface CastHit2D extends Hit2D {
 export class CharacterController2D {
     readonly body: Body2D;
     constructor(physics: Physics2D, body: Body2D, options: CharacterOptions2D, onDispose: (controller: CharacterController2D) => void);
-    move(delta: Vec2D): CharacterMoveResult2D;
+    move(delta: Vec2D, filter?: QueryFilter2D): CharacterMoveResult2D;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -191,6 +191,7 @@ export interface CharacterOptions2D {
     slide?: boolean;
     pushDynamic?: boolean;
     mass?: number;
+    filter?: QueryFilter2D;
 }
 
 export class Collider2D {

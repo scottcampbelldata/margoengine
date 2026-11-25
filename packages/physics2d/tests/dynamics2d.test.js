@@ -3,7 +3,7 @@
 // are in oracle-rapier.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Physics2D } from '../dist/index.js';
+import { Physics2D, interactionGroups } from '../dist/index.js';
 
 await Physics2D.load();
 const DT = 1 / 60;
@@ -363,4 +363,59 @@ test('autostep needs minWidth of free room across the top of the ledge, and incl
   assert.ok(onto({ maxHeight: 1.5, minWidth: 0.5, includeDynamic: true }).y < 6.5, 'as it does when asked');
   const refused = onto({ maxHeight: 1.5, minWidth: 0.5, includeDynamic: false });
   assert.ok(refused.x < 19 && refused.y > 6.9, `and not when it is told not to: ${refused.x}, ${refused.y}`);
+});
+
+test('a filter on the controller, or on one move, leaves colliders out of what the character meets', () => {
+  const wallAt = (physics, options = {}) =>
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [20, 5],
+      colliders: { shape: 'box', width: 1, height: 10, ...options },
+    });
+  const walk = (build, options, filter, steps = 240) => {
+    const physics = world({ gravity: [0, 0] });
+    physics.addBody(null, { type: 'fixed', position: [50, 10], colliders: { shape: 'box', width: 200, height: 2 } });
+    const wall = build(physics);
+    const hero = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, 6.95],
+      colliders: { shape: 'box', width: 2, height: 4 },
+    });
+    const controller = physics.createCharacterController(hero, { offset: 0.01, ...options });
+    physics.on('beforestep', (dt) => controller.move([6 * dt, 0], filter));
+    run(physics, steps);
+    const x = hero.position[0];
+    physics.dispose();
+    return { x, wall };
+  };
+  assert.ok(walk(wallAt, {}).x < 19, 'a wall stops it');
+  near(
+    walk(wallAt, { filter: { excludeFixed: true } }).x,
+    24,
+    0.2,
+    'excludeFixed: the wall and the floor are not met, so it passes',
+  );
+  near(
+    walk((p) => wallAt(p, { collisionGroups: interactionGroups([2], [2]) }), {
+      filter: { groups: interactionGroups([1], [1]) },
+    }).x,
+    24,
+    0.2,
+    'groups that do not meet pass',
+  );
+  assert.ok(
+    walk((p) => wallAt(p, { collisionGroups: interactionGroups([1], [1]) }), {
+      filter: { groups: interactionGroups([1], [1]) },
+    }).x < 19,
+    'groups that meet stop it',
+  );
+  const byPredicate = walk(wallAt, { filter: { predicate: (body) => body.position[0] !== 20 } });
+  near(byPredicate.x, 24, 0.2, 'a predicate that skips the wall lets it through');
+  // A filter given to one move replaces the controller's: the controller leaves the wall out, the move says to meet it.
+  assert.ok(
+    walk(wallAt, { filter: { excludeFixed: true } }, {}).x < 19,
+    "a filter on the move replaces the controller's",
+  );
+  // The controller's own body is never one of its obstacles, whatever the filter says.
+  near(walk(() => {}, { filter: { excludeDynamic: false } }).x, 24, 0.2, 'it does not block itself');
 });
