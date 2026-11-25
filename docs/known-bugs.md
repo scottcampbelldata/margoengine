@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: a crowd agent heading straight through a corner of the navmesh border is still caught by the axis-split move (KB-CROWD-WALLEND1, navmesh)
+
+- **Repro:** a Crowd on a mesh whose border has a convex corner (the end of a wall, such as a door post); send an
+  agent on a path that clips the corner at speed. The step that would cross the corner leaves the mesh, and `move()`
+  cuts it to one axis, so the agent checks or stalls at the post. Found while fixing KB-CROWD-WALL1; the regression
+  test belongs in `packages/navmesh/test/crowd-walls.test.js`.
+- **Cause:** walls enter ORCA as half-planes from border edges, but a border vertex (a wall's end) gives no constraint,
+  so nothing keeps the agent's disc off the corner and the fallback move still decides there. A correct version adds
+  a constraint for convex border vertices (van den Berg et al. 2011, section 5.4, treats obstacle vertices with the
+  velocity-obstacle cone), so the fallback never runs on a valid mesh.
+
 ### Fixed 2026-11-25: walkCrowd turned a person round on the spot when the crowd pushed them back (KB-CROWD-HEADING1, humans)
 
 - **Repro:** `packages/humans/test/crowd.test.js` "people sent to packed seats or to one meeting point never turn on the
