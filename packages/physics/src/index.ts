@@ -112,6 +112,8 @@ export type {
   KernelParticleContact,
   KernelParticleViews,
   KernelSoftContacts,
+  KernelTriangleViews,
+  KernelFaceContacts,
   KernelProbeOptions,
   KernelShape,
   KernelSolverOptions,

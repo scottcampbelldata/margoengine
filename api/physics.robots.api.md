@@ -609,6 +609,19 @@ interface KernelDistance {
     pointB: [number, number, number];
 }
 
+interface KernelFaceContacts {
+    k: number;
+    collider: Uint32Array;
+    body: Uint32Array;
+    t: Float32Array;
+    normal: Float32Array;
+    depth: Float32Array;
+    point: Float32Array;
+    velocity: Float32Array;
+    weights: Float32Array;
+    curvature: Float32Array;
+}
+
 interface KernelHandle {
     readonly kind: 'body' | 'collider' | 'joint';
     readonly row: number;
@@ -710,6 +723,7 @@ interface KernelSoftContacts {
     velocity: Float32Array;
     started: Uint8Array;
     triangle: Uint32Array;
+    curvature: Float32Array;
 }
 
 interface KernelSolverOptions {
@@ -742,6 +756,14 @@ interface KernelSolverOptions {
     adaptiveChangeDetectionMargin?: boolean;
     blockSolver?: boolean;
     islandMajor?: boolean;
+}
+
+interface KernelTriangleViews {
+    from: ArrayLike<number>;
+    to: ArrayLike<number>;
+    thickness: number | ArrayLike<number>;
+    margin?: number | ArrayLike<number>;
+    groups?: ArrayLike<number>;
 }
 
 interface KernelTrimeshOptions {
@@ -872,6 +894,7 @@ class KernelWorld {
     colliderMass(collider: number): number;
     pairDistance(a: number, b: number): KernelDistance | null;
     softContacts(views: KernelParticleViews, k?: number, options?: KernelProbeOptions): KernelSoftContacts;
+    softFaceContacts(views: KernelTriangleViews, k?: number, options?: KernelProbeOptions): KernelFaceContacts;
     probeParticles(from: ArrayLike<number>, to: ArrayLike<number>, radius: number | ArrayLike<number>, options?: KernelProbeOptions): (KernelParticleContact | null)[];
     get probeDepth(): number;
     get probeCapacity(): number;
@@ -1119,6 +1142,12 @@ class Physics implements EnginePlugin, BodyOwner {
         flags?: number;
         dt?: number;
     }): KernelSoftContacts;
+    softFaceContacts(views: KernelTriangleViews, k?: number, options?: {
+        groups?: number;
+        exclude?: PhysicsBody;
+        flags?: number;
+        dt?: number;
+    }): KernelFaceContacts;
     colliderOf(row: number): PhysicsCollider | undefined;
     colliderIntersectsShape(collider: PhysicsCollider, shape: ShapeOptions, position: Vec3, rotation?: Quat): boolean;
     getColliders(): PhysicsCollider[];

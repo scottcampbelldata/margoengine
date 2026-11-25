@@ -27,7 +27,8 @@ pub const PROBE_IN_WORDS: usize = 12;
 /// Words of an output record, a particle's K contacts each: collider (NONE for no contact), body, then as floats the fraction of
 /// the move at which the touch happens, the unit normal out of the collider (x, y, z), the depth the end of the move is inside
 /// the radius (negative: the gap still open), the point on the surface (x, y, z), the surface's velocity there (x, y, z), a
-/// started flag, the triangle of a mesh it touches (NONE for none).
+/// started flag, the triangle of a mesh it touches (NONE for none), and what the collider's surface is at the point (`face.rs`
+/// `contact_feature`: -1 a flat face, else its radius of curvature).
 pub const PROBE_OUT_WORDS: usize = 16;
 
 /// What a particle's move meets.
@@ -265,7 +266,7 @@ fn length_of(v: V3) -> f32 {
 /// The first fraction of the step in [0, 1] at which `gap` is within `reach`, for a gap that changes by at most `speed` over
 /// the whole step. An interval whose middle is further than reach plus what half the interval can change is dropped, the
 /// others are halved, earliest first, down to a width below rounding (the inclusion search of cloth.rs).
-fn first_within(gap: &dyn Fn(f32) -> f32, speed: f32, reach: f32) -> Option<f32> {
+pub(crate) fn first_within(gap: &dyn Fn(f32) -> f32, speed: f32, reach: f32) -> Option<f32> {
     let mut stack = [(0.0f32, 1.0f32); 80];
     let mut top = 1;
     while top > 0 {
@@ -387,6 +388,7 @@ mod batch {
                 }
                 out[base + 13] = c.started as u32;
                 out[base + 14] = *triangle;
+                out[base + 15] = world.contact_feature(c.collider as usize, c.point, c.normal).to_bits();
                 found += 1;
             }
         }

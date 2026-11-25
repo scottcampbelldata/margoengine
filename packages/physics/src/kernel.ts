@@ -169,6 +169,10 @@ interface KernelExports extends WebAssembly.Exports {
   probe_capacity(): number;
   probe_depth(): number;
   soft_probe(count: number, k: number, flags: number, body: number): number;
+  face_input(): number;
+  face_output(): number;
+  face_capacity(): number;
+  soft_probe_faces(count: number, k: number, flags: number, body: number): number;
   collider_set_shape(collider: number, shape: number, a: number, b: number, c: number): number;
   collider_move(
     collider: number,
@@ -626,6 +630,42 @@ export interface KernelParticleViews {
   /** One packed groups word each (a `Uint32Array` ok), for particles of different groups; else `options.groups` serves all. */
   groups?: ArrayLike<number>;
 }
+/**
+ * The triangles of a soft body for {@link KernelWorld.softFaceContacts}: nine numbers a triangle where its three corners were
+ * (x, y, z each) and nine where they end the step, the sheet's thickness (one for all, or one each), and how far past it a
+ * surface still counts (default 0).
+ */
+export interface KernelTriangleViews {
+  from: ArrayLike<number>;
+  to: ArrayLike<number>;
+  thickness: number | ArrayLike<number>;
+  margin?: number | ArrayLike<number>;
+  /** One packed groups word each (a `Uint32Array` ok); else `options.groups` serves all. */
+  groups?: ArrayLike<number>;
+}
+/**
+ * The answer of {@link KernelWorld.softFaceContacts}: `k` slots for each triangle, in the order of the triangles. A slot with no
+ * contact has `collider` 0xffffffff.
+ */
+export interface KernelFaceContacts {
+  k: number;
+  collider: Uint32Array;
+  body: Uint32Array;
+  /** Fraction of the move at which the triangle first comes within its thickness. */
+  t: Float32Array;
+  /** Three numbers a slot: the unit normal out of the collider, toward the triangle. */
+  normal: Float32Array;
+  /** How far the point of the triangle facing the contact ends the move inside the thickness (negative: still a gap). */
+  depth: Float32Array;
+  /** Three numbers a slot: the point on the collider's surface. */
+  point: Float32Array;
+  /** Three numbers a slot: the velocity of the collider's surface there. */
+  velocity: Float32Array;
+  /** Three numbers a slot: the weights of the triangle's corners at the point facing the contact (they add to 1). */
+  weights: Float32Array;
+  /** The collider's radius of curvature at the point, as {@link KernelSoftContacts.curvature}. */
+  curvature: Float32Array;
+}
 /** The answer of {@link KernelWorld.softContacts}: `k` slots for each particle, in the order of the particles. A slot with no contact has `collider` 0xffffffff. */
 export interface KernelSoftContacts {
   k: number;
@@ -643,6 +683,12 @@ export interface KernelSoftContacts {
   velocity: Float32Array;
   started: Uint8Array;
   triangle: Uint32Array;
+  /**
+   * The collider's radius of curvature at each slot's point: the radius of the sphere that fits its surface there, whose centre
+   * (`point - curvature * normal`) is fixed in the body: a ball's or capsule's radius, the rounding of a rounded shape, the
+   * distance to the axis on the side of a cylinder or cone, 0 on a flat face or a corner.
+   */
+  curvature: Float32Array;
 }
 /** Filter bits of the kernel's queries (`KernelWorld.raycast`), as Rapier's `QueryFilterFlags`. */
 export const QUERY_EXCLUDE_FIXED = 1,
@@ -2714,6 +2760,7 @@ export class KernelWorld {
         velocity: new Float32Array(3 * slots),
         started: new Uint8Array(slots),
         triangle: new Uint32Array(slots),
+        curvature: new Float32Array(slots),
       };
     const { flags = 0, groups: shared, excludeBody = 0xffffffff, dt = 0 } = options;
     if (!(dt >= 0) || !Number.isFinite(dt))
@@ -2759,6 +2806,99 @@ export class KernelWorld {
           out.depth[o] = floats[w + 6]!;
           out.started[o] = answer[w + 13]! ? 1 : 0;
           out.triangle[o] = answer[w + 14]!;
+          out.curvature[o] = floats[w + 15]!;
+        }
+    }
+    return out;
+  }
+  /**
+   * The contacts of a batch of moving soft body triangles with the colliders of this world, for bodies smaller than the spacing
+   * of a cloth's particles or thin ones lying between them: each triangle, thickened by its thickness on both sides, is met as
+   * its corners move over the step (the first touch found by conservative advancement, so a fast triangle does not pass a thin
+   * body), each collider along its own motion when `dt` is given. Up to `k` contacts a triangle, the deepest first, each a point
+   * on the collider's surface with the normal out of it, the corners' weights at the point of the triangle facing it, the depth
+   * and the surface's velocity. Half spaces are left out (their deepest point under a triangle is a corner, which
+   * {@link KernelWorld.softContacts} meets), as are sensors.
+   */
+  softFaceContacts(views: KernelTriangleViews, k = 1, options: KernelProbeOptions = {}): KernelFaceContacts {
+    const { from, to, thickness, margin = 0, groups } = views;
+    const count = from.length / 9;
+    if (!Number.isInteger(count) || to.length !== from.length)
+      throw new RangeError(
+        `softFaceContacts takes nine numbers for each triangle in both arrays, the same number (got ${from.length} and ${to.length}); pass x, y, z of three corners a triangle.`,
+      );
+    for (const [name, value] of [
+      ['thicknesses', thickness],
+      ['margins', margin],
+      ['groups words', groups],
+    ] as const)
+      if (value !== undefined && typeof value !== 'number' && value.length !== count)
+        throw new RangeError(
+          `softFaceContacts got ${value.length} ${name} for ${count} triangles; pass one or one each.`,
+        );
+    if (this.api.world_layout() !== this.layout) this.bind();
+    const depth = this.api.probe_depth();
+    if (!Number.isInteger(k) || k < 1 || k > depth)
+      throw new RangeError(`softFaceContacts gives each triangle 1 to ${depth} contacts; ${k} is out of that range.`);
+    const { flags = 0, groups: shared, excludeBody = 0xffffffff, dt = 0 } = options;
+    if (!(dt >= 0) || !Number.isFinite(dt))
+      throw new RangeError(
+        `softFaceContacts takes a step length of zero or more seconds (got ${dt}); pass the step's dt, or leave it out.`,
+      );
+    const capacity = this.api.face_capacity(),
+      slots = count * k,
+      out: KernelFaceContacts = {
+        k,
+        collider: new Uint32Array(slots),
+        body: new Uint32Array(slots),
+        t: new Float32Array(slots),
+        normal: new Float32Array(3 * slots),
+        depth: new Float32Array(slots),
+        point: new Float32Array(3 * slots),
+        velocity: new Float32Array(3 * slots),
+        weights: new Float32Array(3 * slots),
+        curvature: new Float32Array(slots),
+      },
+      all = shared === undefined ? 0xffffffff : shared >>> 0;
+    for (let start = 0; start < count; start += capacity) {
+      const n = capacity < count - start ? capacity : count - start,
+        input = new Float32Array(this.api.memory.buffer, this.api.face_input(), 24 * n),
+        words = new Uint32Array(input.buffer, input.byteOffset, 24 * n);
+      for (let i = 0; i < n; i++) {
+        const p = start + i,
+          at = 24 * i;
+        for (let j = 0; j < 9; j++) {
+          input[at + j] = from[9 * p + j]!;
+          input[at + 9 + j] = to[9 * p + j]!;
+        }
+        input[at + 18] = typeof thickness === 'number' ? thickness : thickness[p]!;
+        input[at + 19] = typeof margin === 'number' ? margin : margin[p]!;
+        words[at + 20] = groups ? groups[p]! >>> 0 : all;
+        input[at + 21] = dt;
+        input[at + 22] = input[at + 23] = 0;
+        for (let j = 0; j < 20; j++)
+          if (!Number.isFinite(input[at + j]!))
+            throw new RangeError('softFaceContacts needs finite corners, thicknesses and margins.');
+        if (!(input[at + 18]! >= 0)) throw new RangeError('softFaceContacts needs a thickness of 0 or more metres.');
+      }
+      this.api.soft_probe_faces(n, k, flags, excludeBody);
+      const answer = new Uint32Array(this.api.memory.buffer, this.api.face_output(), 20 * k * n),
+        floats = new Float32Array(answer.buffer, answer.byteOffset, answer.length);
+      for (let i = 0; i < n; i++)
+        for (let slot = 0; slot < k; slot++) {
+          const w = 20 * (k * i + slot),
+            o = k * (start + i) + slot;
+          out.collider[o] = answer[w]!;
+          out.body[o] = answer[w + 1]!;
+          out.t[o] = floats[w + 2]!;
+          for (let axis = 0; axis < 3; axis++) {
+            out.normal[3 * o + axis] = floats[w + 3 + axis]!;
+            out.point[3 * o + axis] = floats[w + 7 + axis]!;
+            out.velocity[3 * o + axis] = floats[w + 10 + axis]!;
+            out.weights[3 * o + axis] = floats[w + 13 + axis]!;
+          }
+          out.depth[o] = floats[w + 6]!;
+          out.curvature[o] = floats[w + 16]!;
         }
     }
     return out;

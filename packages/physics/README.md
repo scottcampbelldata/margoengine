@@ -916,6 +916,23 @@ const contacts = physics.softContacts({from: [0, 10, 0], to: [0, -10, 0], radius
 console.log(contacts.t[0], contacts.normal.slice(0, 3), contacts.depth[0], contacts.velocity.slice(0, 3));
 ```
 
+Each slot also has `curvature`, what the collider's surface is at the point: -1 for a flat face, else the radius of the sphere that fits it there (a ball's or a capsule's radius, the rounding of a rounded shape, the distance to the axis on a cylinder's side, 0 at a sharp corner or edge), whose centre `point - curvature * normal` is fixed in the body. A solver that holds a contact through a step while the body turns holds a face by its plane and a round place from that centre, so its push on the body and on the particle lie on one line.
+
+`physics.softFaceContacts({from, to, thickness, margin, groups}, k, options)` is the same question for the triangles of a soft body, for what its particles cannot meet: a body smaller than the spacing of the particles, or a thin one lying between them, touches the inside of a triangle. Each triangle is nine numbers where its three corners were (`from`) and nine where they end (`to`), thickened by `thickness` on both sides (one for all, or one each); up to `k` contacts a triangle, the deepest first, each a `point` on the collider's surface with the `normal` out of it toward the triangle, the corners' `weights` at the point of the triangle facing it, the `depth` past the thickness, the `velocity` of the surface, `curvature` as above and `t`, the first touch of a moving triangle (found by conservative advancement on the GJK distance, Mirtich 1996, so a fast sheet does not pass a thin body). Half spaces are left out (a corner is always the deepest point of a triangle under a plane, which the particles meet), as are sensors; `options` are `softContacts'`.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+// A 1 cm bead 1.5 cm over the middle of a triangle 20 cm across: no corner reaches it, the triangle does.
+physics.addBody(null, {type: 'fixed', position: [0, 0.015, 0], colliders: {shape: 'sphere', radius: 0.01}});
+physics.step();
+const corners = [-0.1, 0, -0.1, 0.1, 0, -0.1, 0, 0, 0.12];
+const faces = physics.softFaceContacts({from: corners, to: corners, thickness: 0.01, margin: 0.01}, 1);
+console.log(faces.normal.slice(0, 3), faces.depth[0], faces.weights.slice(0, 3), faces.curvature[0]);
+```
+
 A `contactFilter` may also answer `'noForces'`: the pair's contacts are found and its `contactstart` and `contactend` events fire, but nothing pushes (Rapier's `filterContactPair` answering with no solver flags). `false` still lets the pair pass through with no events, and `true` solves it.
 
 ```ts

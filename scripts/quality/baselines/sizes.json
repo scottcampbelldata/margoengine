@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18449990,
+  "total": 18480226,
   "history": [
     {
       "date": "2026-10-24",
@@ -11763,6 +11763,12 @@
       "commit": "0f6875307",
       "reason": "New optional entry @margoengine/culling/occlusion (OcclusionQueries: app-facing hardware occlusion queries), 0 -> 4090 B baseline (3834 B measured gzip)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "34ee005b0",
+      "reason": "@margoengine/physics: the rigid kernel's face query for soft body triangles (Physics.softFaceContacts: conservative advancement on the GJK distance of a moving triangle to each convex piece, then the triangle's contact manifold) and the surface feature of every soft contact (a face or a radius of curvature). It is what a cloth needs to hold a body smaller than the spacing of its particles (KB-SOFT-LIGHT1); the query lives in the kernel because it walks the rigid world's shapes and broad phase, and the blueprint is already a lazy chunk, so a split would add a request and a second copy of the shape code. Budgets (measured gzip + 3%): @margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table) 482943 to 513179 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12525,7 +12531,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 582385,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 84827,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 482943,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,

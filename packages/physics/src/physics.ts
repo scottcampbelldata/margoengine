@@ -35,6 +35,8 @@ import {
   type KernelSolverOptions,
   type KernelParticleViews,
   type KernelSoftContacts,
+  type KernelTriangleViews,
+  type KernelFaceContacts,
   combineRule,
 } from './kernel.js';
 import { mixCoefficients } from './combine.js';
@@ -2117,6 +2119,28 @@ export class Physics implements EnginePlugin, BodyOwner {
     options: { groups?: number; exclude?: PhysicsBody; flags?: number; dt?: number } = {},
   ): KernelSoftContacts {
     return this.kernel.softContacts(views, k, {
+      dt: options.dt,
+      flags: options.flags,
+      groups: options.groups,
+      excludeBody: options.exclude ? options.exclude.row : undefined,
+    });
+  }
+  /**
+   * The contacts of a batch of soft body triangles with the colliders of this world, one call a step, for what the particles'
+   * contacts cannot hold: a body smaller than the spacing of the corners, or a thin one lying between them. Each triangle,
+   * thickened by `thickness` on both sides, is met as its corners move from `from` to `to` (nine numbers a triangle each), the
+   * first touch found so a fast triangle never passes a thin body; up to `k` contacts a triangle, the deepest first, each a
+   * point on the collider's surface with the normal out of it, the weights of the triangle's corners at the point facing it,
+   * the depth (negative: a gap still open, listed when within `margin` past the thickness) and the velocity of the surface
+   * there. With `dt` each collider is met along its own motion over the step. Groups, flags and `exclude` work as in
+   * {@link Physics.softContacts}; half spaces and sensors are left out. A slot without a contact has `collider` 0xffffffff.
+   */
+  softFaceContacts(
+    views: KernelTriangleViews,
+    k = 1,
+    options: { groups?: number; exclude?: PhysicsBody; flags?: number; dt?: number } = {},
+  ): KernelFaceContacts {
+    return this.kernel.softFaceContacts(views, k, {
       dt: options.dt,
       flags: options.flags,
       groups: options.groups,

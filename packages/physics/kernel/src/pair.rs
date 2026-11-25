@@ -199,7 +199,7 @@ impl World {
     }
 
     /// The distance between two solids, 0 when they overlap, and the nearest point on each.
-    fn solid_distance(a: &Solid, b: &Solid) -> (f32, V3, V3) {
+    pub(crate) fn solid_distance(a: &Solid, b: &Solid) -> (f32, V3, V3) {
         let (_, on_a, on_b) = touch(a, b);
         if gjk(a, b, ZERO, 0.0).overlap {
             return (0.0, on_a, on_b);

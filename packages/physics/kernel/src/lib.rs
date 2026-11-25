@@ -14,6 +14,7 @@ pub mod contact;
 pub mod couplings;
 pub mod cuts;
 pub mod events;
+pub mod face;
 pub mod gjk;
 pub mod halfspace;
 pub mod hull;
