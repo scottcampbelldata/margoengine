@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { compile } from './rustc.js';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -107,12 +108,7 @@ for line in io::stdin().lock().lines(){let line=line.unwrap();let p=line.split('
 `,
     );
     const binary = resolve(folder, process.platform === 'win32' ? 'codec.exe' : 'codec');
-    const compiled = spawnSync('rustc', ['--edition=2021', resolve(folder, 'main.rs'), '-o', binary], {
-      encoding: 'utf8',
-      timeout: 90000,
-      maxBuffer: 16 << 20,
-    });
-    assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
+    compile(['--edition=2021', resolve(folder, 'main.rs'), '-o', binary], { timeout: 90000 });
     const run = spawnSync(binary, [], {
       input: input.join('\n') + '\n',
       encoding: 'utf8',
@@ -134,8 +130,7 @@ test('generated Rust type-checks with warnings denied', { timeout: 120000 }, () 
   mkdirSync(folder, { recursive: true });
   try {
     writeFileSync(resolve(folder, 'protocol.rs'), generateRust(JSON.parse(JSON.stringify(every.json))));
-    const checked = spawnSync(
-      'rustc',
+    const checked = compile(
       [
         '--edition=2021',
         '--crate-type=lib',
@@ -146,10 +141,8 @@ test('generated Rust type-checks with warnings denied', { timeout: 120000 }, () 
         resolve(folder, 'protocol.rmeta'),
         resolve(folder, 'protocol.rs'),
       ],
-      { encoding: 'utf8', timeout: 90000, maxBuffer: 16 << 20 },
+      { timeout: 90000 },
     );
-    if (checked.error) throw checked.error;
-    assert.equal(checked.status, 0, checked.stdout + checked.stderr);
     assert.equal(checked.stderr, '');
   } finally {
     rmSync(folder, { recursive: true });
@@ -228,12 +221,7 @@ assert_eq!(MsgSelf{f_self:3,f_type:true}.encode().unwrap(),vec![3,1]);}
 `,
     );
     const binary = resolve(folder, process.platform === 'win32' ? 'codec.exe' : 'codec');
-    const compiled = spawnSync('rustc', ['--edition=2021', resolve(folder, 'main.rs'), '-o', binary], {
-      encoding: 'utf8',
-      timeout: 90000,
-      maxBuffer: 16 << 20,
-    });
-    assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
+    compile(['--edition=2021', resolve(folder, 'main.rs'), '-o', binary], { timeout: 90000 });
     const run = spawnSync(binary, [], { encoding: 'utf8', timeout: 20000 });
     assert.equal(run.status, 0, run.stdout + run.stderr);
   } finally {
