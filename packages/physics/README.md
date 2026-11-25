@@ -122,24 +122,26 @@ console.log(car.speed, car.wheel(0).inContact, polyline.length);
 Tyres, drivetrain and wheels that sweep a shape (all options of `Vehicle`, off by default):
 
 ```ts
-import {Drivetrain, Physics, Vehicle, pacejkaTyre} from 'margoengine/physics';
+import {Drivetrain, Physics, Vehicle, pacejkaTyre, type WheelOptions} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null);
 physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [100, 0.5, 100]}});
 const chassis = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'box', halfExtents: [1, 0.25, 2], mass: 1000}});
+const drivetrain = new Drivetrain({axles: [{wheels: [2, 3], differential: {type: 'limitedSlip'}}]}); // engine, clutch, gearbox, differential
+const wheel = (x: number, z: number, steer: boolean): WheelOptions =>
+  ({position: [x, -0.1, z], radius: 0.35, steer, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5});
 const car = new Vehicle(physics, chassis, {
   tyre: pacejkaTyre(), // or brushTyre(), or {forces({slipRatio, slipAngle, load}) {...}}
   wheelCast: 'shape', // each wheel sweeps a cylinder of its radius and width, not one ray
-  drivetrain: new Drivetrain({axles: [{wheels: [2, 3], differential: {type: 'limitedSlip'}}]}), // engine, clutch, gearbox, differential
+  drivetrain,
   antiRollBars: [{wheels: [0, 1], stiffness: 20000}, {wheels: [2, 3], stiffness: 20000}],
-  wheels: [[-0.9, 1.4, true], [0.9, 1.4, true], [-0.9, -1.4, false], [0.9, -1.4, false]].map(([x, z, steer]) =>
-    ({position: [x, -0.1, z], radius: 0.35, steer, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5})),
+  wheels: [wheel(-0.9, 1.4, true), wheel(0.9, 1.4, true), wheel(-0.9, -1.4, false), wheel(0.9, -1.4, false)],
 });
 for (let i = 0; i < 90; i++) physics.step();
 car.setInput({throttle: 1, steer: 0.1}); // throttle drives the engine; `clutch` (0 to 1) is the pedal
 for (let i = 0; i < 120; i++) physics.step();
-console.log(car.drivetrain.gear, car.drivetrain.rpm > 900, car.speed > 2, car.wheel(2).slipRatio < 1); // 1 true true true
+console.log(drivetrain.gear, drivetrain.rpm > 900, car.speed > 2, car.wheel(2).slipRatio < 1); // 1 true true true
 physics.dispose();
 ```
 
@@ -148,7 +150,7 @@ physics.dispose();
 Tracked vehicles and motorcycles:
 
 ```ts
-import {Motorcycle, Physics, TrackedVehicle} from 'margoengine/physics';
+import {Motorcycle, Physics, TrackedVehicle, type WheelOptions} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null);
@@ -160,7 +162,7 @@ const tank = new TrackedVehicle(physics, hull, {
   maxSpeed: 8, // belt speed at full throttle, m/s
 });
 const frame = physics.addBody(null, {position: [10, 0.95, 0], colliders: {shape: 'box', halfExtents: [0.15, 0.3, 0.9], mass: 250}});
-const wheel = (z: number) => ({position: [0, -0.25, z], radius: 0.3, suspensionRestLength: 0.25, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5});
+const wheel = (z: number): WheelOptions => ({position: [0, -0.25, z], radius: 0.3, suspensionRestLength: 0.25, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5});
 const bike = new Motorcycle(physics, frame, {front: wheel(0.7), rear: wheel(-0.7)});
 frame.setLinearVelocity([0, 0, 10]); // a bike stays up by being ridden: start it rolling
 for (let i = 0; i < 120; i++) physics.step();
@@ -1443,7 +1445,7 @@ const urdf = `<robot name="pendulum">
   <joint name="hinge" type="revolute"><parent link="post"/><child link="arm"/><axis xyz="1 0 0"/><limit lower="-3.2" upper="3.2"/></joint>
 </robot>`;
 const robot = addURDF(physics, urdf, {fixBase: true, position: [0, 2, 0]});
-robot.bodies.get('arm').setRotation([0, 0, 0, 1]); // swing it out level
+robot.bodies.get('arm')!.setRotation([0, 0, 0, 1]); // swing it out level
 for (let i = 0; i < 60; i++) physics.step();
 console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post,arm true
 ```
