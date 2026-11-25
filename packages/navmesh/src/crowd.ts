@@ -275,7 +275,7 @@ export class Crowd {
     this.neighborDistance = positive(options.neighborDistance, 5, 'Crowd neighborDistance');
     const density = options.density;
     if (density !== undefined && typeof density !== 'boolean' && (typeof density !== 'object' || density === null))
-      throw new TypeError('Crowd density must be true, false or {gamma, jam, radius}; pass true for Weidmann\'s fit');
+      throw new TypeError("Crowd density must be true, false or {gamma, jam, radius}; pass true for Weidmann's fit");
     if (density) {
       const fit = density === true ? {} : density;
       this.density = {
@@ -889,7 +889,8 @@ export class Crowd {
     agent.velocity[2] = vz;
     if (agent.state === 'moving' && agent.path.length && agent.corner === agent.path.length - 1) {
       const end = agent.path[agent.corner];
-      if (Math.hypot(end[0] - nx, end[2] - nz) <= agent.arrivalDistance || this.joins(agent, end, vx, vz)) this.arrive(agent);
+      if (Math.hypot(end[0] - nx, end[2] - nz) <= agent.arrivalDistance || this.joins(agent, end, vx, vz))
+        this.arrive(agent);
     }
   }
 

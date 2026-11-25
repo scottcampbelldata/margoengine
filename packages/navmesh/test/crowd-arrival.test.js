@@ -74,7 +74,10 @@ function gap(agents) {
     for (let j = i + 1; j < agents.length; j++) {
       const a = agents[i],
         b = agents[j];
-      least = Math.min(least, Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]) - a.radius - b.radius);
+      least = Math.min(
+        least,
+        Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]) - a.radius - b.radius,
+      );
     }
   return least;
 }
@@ -98,7 +101,10 @@ test('agents sent to packed seats all sit down, without circling, and end apart'
     assert.ok(s.reversals <= 2, `agent ${i}: ${s.reversals} velocity reversals`);
     assert.ok(Math.abs(s.winding) <= 2 * Math.PI, `agent ${i} wound ${s.winding} rad: it circled`);
     assert.equal(s.spins, 0, `agent ${i} turned on the spot`);
-    assert.ok(s.walked <= 3 * Math.hypot(3 + i * 0.5 - agents[i].path[0][0], 5 - agents[i].path[0][2]) + 2, `agent ${i} walked ${s.walked} m`);
+    assert.ok(
+      s.walked <= 3 * Math.hypot(3 + i * 0.5 - agents[i].path[0][0], 5 - agents[i].path[0][2]) + 2,
+      `agent ${i} walked ${s.walked} m`,
+    );
   }
   settle(crowd);
   assert.ok(gap(agents) >= -1e-3, `seated people overlap by ${-gap(agents)} m`);
@@ -124,7 +130,10 @@ test('nine agents from three groups sent to one point gather round it, arrive an
     assert.equal(agents[i].state, 'arrived', `agent ${i} arrives`);
     assert.ok(Math.abs(s.winding) <= 2 * Math.PI, `agent ${i} wound ${s.winding} rad: it circled`);
     assert.equal(s.spins, 0, `agent ${i} turned on the spot`);
-    assert.ok(Math.hypot(agents[i].position[0] - 6, agents[i].position[2] - 6) < 2, `agent ${i} gathered near the point`);
+    assert.ok(
+      Math.hypot(agents[i].position[0] - 6, agents[i].position[2] - 6) < 2,
+      `agent ${i} gathered near the point`,
+    );
   }
   settle(crowd);
   assert.ok(gap(agents) >= -1e-3, `gathered agents overlap by ${-gap(agents)} m`);
@@ -186,7 +195,8 @@ test('a crowd gathering at taken targets beside walls runs the same on every run
         ],
       ),
       crowd = new Crowd(nav);
-    for (let i = 0; i < 5; i++) crowd.addAgent({ position: [0.4 + i * 0.7, 0, 0.6], radius: 0.25 }).setTarget([11.5, 0, 4.6]);
+    for (let i = 0; i < 5; i++)
+      crowd.addAgent({ position: [0.4 + i * 0.7, 0, 0.6], radius: 0.25 }).setTarget([11.5, 0, 4.6]);
     for (let k = 0; k < 600; k++) crowd.update(1 / 60);
     return crowd.agents.flatMap((a) => [...a.position, ...a.velocity, a.state]);
   };

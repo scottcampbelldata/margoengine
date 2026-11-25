@@ -11,7 +11,12 @@ function recorder() {
   const instances = [];
   return {
     instances,
-    vat: { clips: [{ name: 'walk', duration: 1.1 }, { name: 'stand', duration: 4 }] },
+    vat: {
+      clips: [
+        { name: 'walk', duration: 1.1 },
+        { name: 'stand', duration: 4 },
+      ],
+    },
     add(instance = {}) {
       instances.push({ ...instance });
       return instances.length - 1;
@@ -37,10 +42,19 @@ test('the walk cycle advances by the ground covered, so feet do not slide, in a 
   const crowd = new Crowd(square(40), { density: true }),
     drawer = recorder();
   for (let k = 0; k < 300; k++) {
-    const agent = crowd.addAgent({ position: [2 + (k % 15) * 0.5, 0, 2 + Math.floor(k / 15) * 0.5], radius: 0.2, maxSpeed: 1.34 });
+    const agent = crowd.addAgent({
+      position: [2 + (k % 15) * 0.5, 0, 2 + Math.floor(k / 15) * 0.5],
+      radius: 0.2,
+      maxSpeed: 1.34,
+    });
     agent.setTarget([38, 0, 2 + Math.floor(k / 15) * 0.5 + 10]);
   }
-  const walkers = walkCrowd(crowd, drawer, { walk: 0, stand: 1, stride: 1.4, variants: [0, 1, 2, 3].map((k) => ({ offset: [k / 4, 0], scale: [0.25, 1] })) });
+  const walkers = walkCrowd(crowd, drawer, {
+    walk: 0,
+    stand: 1,
+    stride: 1.4,
+    variants: [0, 1, 2, 3].map((k) => ({ offset: [k / 4, 0], scale: [0.25, 1] })),
+  });
   assert.equal(drawer.instances.length, 300, 'one instance per agent');
   const dt = 1 / 30;
   for (let k = 0; k < 30; k++) {
@@ -53,7 +67,9 @@ test('the walk cycle advances by the ground covered, so feet do not slide, in a 
     const before = crowd.agents.map((a) => [a.position[0], a.position[2]]);
     crowd.update(dt);
     walkers.update(dt);
-    crowd.agents.forEach((a, i) => (ground[i] += Math.hypot(a.position[0] - before[i][0], a.position[2] - before[i][1])));
+    crowd.agents.forEach(
+      (a, i) => (ground[i] += Math.hypot(a.position[0] - before[i][0], a.position[2] - before[i][1])),
+    );
   }
   let worst = 0;
   // The ground each walked over 2 s against stride times the phase its cycle advanced.
@@ -62,7 +78,10 @@ test('the walk cycle advances by the ground covered, so feet do not slide, in a 
   // Instances sit at their agents.
   const m = drawer.instances[17].matrix,
     p = crowd.agents[17].position;
-  assert.deepEqual([m[12], m[13], m[14]].map((v) => +v.toFixed(4)), [p[0], p[1], p[2]].map((v) => +Math.fround(v).toFixed(4)));
+  assert.deepEqual(
+    [m[12], m[13], m[14]].map((v) => +v.toFixed(4)),
+    [p[0], p[1], p[2]].map((v) => +Math.fround(v).toFixed(4)),
+  );
   // Outfits: several variants in use, each agent keeps its own.
   const used = new Set(drawer.instances.map((d) => d.uvTransform?.offset?.[0]));
   assert.ok(used.size >= 3, `variants in use: ${[...used]}`);
@@ -130,7 +149,10 @@ test('people sent to packed seats or to one meeting point never turn on the spot
         }
       });
     }
-    assert.ok(crowd.agents.every((a) => a.state === 'arrived'), 'everyone arrives');
+    assert.ok(
+      crowd.agents.every((a) => a.state === 'arrived'),
+      'everyone arrives',
+    );
     return count;
   };
   const seats = spins((crowd) => {

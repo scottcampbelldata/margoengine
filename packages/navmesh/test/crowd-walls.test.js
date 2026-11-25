@@ -13,7 +13,8 @@ function grid(columns, rows, skip = () => false) {
   for (let r = 0; r <= rows; r++) for (let c = 0; c <= columns; c++) vertices.push([c, 0, r]);
   const v = (c, r) => r * (columns + 1) + c;
   for (let r = 0; r < rows; r++)
-    for (let c = 0; c < columns; c++) if (!skip(c, r)) polygons.push([v(c, r), v(c + 1, r), v(c + 1, r + 1), v(c, r + 1)]);
+    for (let c = 0; c < columns; c++)
+      if (!skip(c, r)) polygons.push([v(c, r), v(c + 1, r), v(c + 1, r + 1), v(c, r + 1)]);
   return new NavMesh(vertices, polygons);
 }
 /** A corridor 1.2 m wide along X, then 45 degrees up a diagonal (0.85 m wide across), then along X again. */
@@ -60,7 +61,8 @@ function measure(crowd, agents, seconds) {
         vz = a.velocity[2];
       assert.ok(a.surface.locate(a.position) >= 0, `agent ${i} left the mesh at ${a.position}`);
       if (a.state !== 'arrived' && Math.hypot(vx - s.v[0], vz - s.v[1]) > a.maxAcceleration * dt * (1 + 1e-9)) s.hits++;
-      if (Math.hypot(vx, vz) > 0.05 && Math.hypot(s.v[0], s.v[1]) > 0.05 && vx * s.v[0] + vz * s.v[1] < 0) s.reversals++;
+      if (Math.hypot(vx, vz) > 0.05 && Math.hypot(s.v[0], s.v[1]) > 0.05 && vx * s.v[0] + vz * s.v[1] < 0)
+        s.reversals++;
       s.walked += Math.hypot(a.position[0] - s.last[0], a.position[2] - s.last[1]);
       s.last = [a.position[0], a.position[2]];
       s.v = [vx, vz];
