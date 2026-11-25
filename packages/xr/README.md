@@ -240,6 +240,28 @@ enter.onclick=async()=>{
 
 Tested with stand-in sessions on real GPUs (`npm run test:gpu:reflection`); not yet run on an AR device.
 
+## AR where WebXR is absent: Quick Look and Scene Viewer
+
+`@margoengine/xr/launch` opens a model in the phone's own AR viewer when the browser has no `immersive-ar` session. iOS Safari has none, so a USDZ opens in AR Quick Look through an anchor with `rel="ar"` and an image inside; Android Chrome without WebXR opens Google's Scene Viewer through an intent URL. The USDZ comes from `exportUSDZ` (`@margoengine/exporters/usdz`), the GLB from `exportGLB`.
+
+- `chooseARRoute({webxr})` returns `'webxr'` (start an `XR` session instead), `'quick-look'` (the browser answers `relList.supports('ar')`), `'scene-viewer'` (an Android user agent) or `'none'`. Every field of the platform argument defaults to the browser's own value.
+- `launchAR({usdz, glb, ...})` does the opening and returns the route. Call it from a tap. `usdz` is a URL or the bytes (made into a blob URL for a minute); `glb` must be one Scene Viewer can fetch itself (no blob). `fallback(route)` runs where neither viewer exists; a route that needs a model you left out throws code `state`.
+- `quickLookURL(url, {allowsContentScaling, canonicalWebPageURL})` and `sceneViewerURL(url, {mode, title, link, sound, resizable, verticalPlacement, fallbackUrl})` build the two links alone. URLs are checked before they reach a link or intent: each is resolved against `document.baseURI` and only `https:` and `http:` pass (`blob:` too for the USDZ), so `javascript:`, `data:`, `vbscript:` and `file:` throw code `unsupported`; every value is percent-encoded, the `#Intent;...;end;` part is a fixed template, and `mode` must be `ar_preferred`, `3d_preferred` or `3d_only` (else `RangeError`). Defaults: scaling on, `mode` `'ar_preferred'`, `resizable` true, vertical placement off, fallback the current page, `title` cut to 60 characters.
+
+```ts
+import {chooseARRoute, launchAR, quickLookURL, sceneViewerURL} from 'margoengine/xr/launch';
+
+console.log(chooseARRoute({webxr: false, quickLook: true}));
+console.log(quickLookURL('https://example.com/chair.usdz', {allowsContentScaling: false}));
+console.log(sceneViewerURL('https://example.com/chair.glb', {title: 'Chair', fallbackUrl: 'https://example.com/chair'}));
+const button = document.createElement('button');
+button.textContent = 'View in your room';
+button.onclick = () => launchAR({usdz: 'https://example.com/chair.usdz', glb: 'https://example.com/chair.glb', fallback: () => alert('AR is not available here')});
+document.body.append(button);
+```
+
+Tested with stand-in pages and links in Node; not yet run on an iPhone or an Android phone.
+
 ## Layers, haptics, video and locomotion
 
 `@margoengine/xr/layers` adds WebXR composition layers, controller vibration and teleport movement. Layers are drawn by the headset's compositor at their own resolution, so text and video stay sharp. Ask for `optionalFeatures: ['layers']`.

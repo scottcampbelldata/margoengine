@@ -64,6 +64,10 @@
       "types": "./dist/session.d.ts",
       "import": "./dist/session.js"
     },
+    "./launch": {
+      "types": "./dist/launch.d.ts",
+      "import": "./dist/launch.js"
+    },
     "./reflection": {
       "types": "./dist/reflection.d.ts",
       "import": "./dist/reflection.js"
