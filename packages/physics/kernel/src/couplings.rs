@@ -88,6 +88,37 @@ pub struct Coupling {
 }
 
 impl Coupling {
+    // A COORDS coupling keeps its parents and the kinds of its sides in the words a PATH keeps its range in (`path`, `count`, `cap`), which
+    // a coordinates row has no use for: the layout of the table, and so every hash on file, stays as it was. These views are the only
+    // place that reuse is spelt out; nothing else may read those three words of a COORDS row as a path.
+    /// The parent of the first side's child.
+    #[inline]
+    pub fn coords_parent_a(&self) -> u32 {
+        self.path
+    }
+    /// The parent of the second side's child.
+    #[inline]
+    pub fn coords_parent_b(&self) -> u32 {
+        self.count
+    }
+    /// Whether the first side slides (otherwise it turns).
+    #[inline]
+    pub fn coords_slides_a(&self) -> bool {
+        self.cap & 1 != 0
+    }
+    /// Whether the second side slides (otherwise it turns).
+    #[inline]
+    pub fn coords_slides_b(&self) -> bool {
+        self.cap & 2 != 0
+    }
+    /// Sets the two parents and which sides slide (bit 0 the first, bit 1 the second).
+    #[inline]
+    pub fn set_coords(&mut self, parent_a: u32, parent_b: u32, slides: u32) {
+        self.path = parent_a;
+        self.count = parent_b;
+        self.cap = slides & 3;
+    }
+
     pub const NONE: Coupling = Coupling {
         kind: 0,
         a: NONE,
@@ -214,9 +245,7 @@ impl World {
             11 => c.closed = (value[0] != 0.0) as u32,
             // A coordinates coupling's parents and the kinds of its two sides (see COORDS).
             12 => {
-                c.path = value[0] as u32;
-                c.count = value[1] as u32;
-                c.cap = value[2] as u32;
+                c.set_coords(value[0] as u32, value[1] as u32, value[2] as u32);
             }
             _ => {}
         }
@@ -244,7 +273,7 @@ impl World {
 
     /// Whether a coupling's two bodies are both there.
     fn coupling_live(&self, c: &Coupling) -> bool {
-        c.kind != 0 && self.body_alive(c.a) && self.body_alive(c.b) && (c.kind != COORDS || (self.body_alive(c.path) && self.body_alive(c.count)))
+        c.kind != 0 && self.body_alive(c.a) && self.body_alive(c.b) && (c.kind != COORDS || (self.body_alive(c.coords_parent_a()) && self.body_alive(c.coords_parent_b())))
     }
 
     /// Wakes what a moving body is coupled to, as `wake_across_joints` does for joints.
@@ -272,7 +301,7 @@ impl World {
                 continue;
             }
             if c.kind == COORDS {
-                for other in [c.b, c.path, c.count] {
+                for other in [c.b, c.coords_parent_a(), c.coords_parent_b()] {
                     if self.flags(c.a as usize) & KIND == DYNAMIC && self.flags(other as usize) & KIND == DYNAMIC && self.is_awake(c.a as usize) && self.is_awake(other as usize) {
                         self.unite(c.a, other);
                     }
@@ -516,8 +545,8 @@ impl World {
             Side { child, parent, axis: qc.rotate(vec(axis)).scale(weight), slides, arm_child: v3(0.0, 0.0, 0.0), arm_parent }
         };
         [
-            side(c.a, c.path, c.axis_a, c.cap & 1 != 0, 1.0),
-            side(c.b, c.count, c.axis_b, c.cap & 2 != 0, c.ratio),
+            side(c.a, c.coords_parent_a(), c.axis_a, c.coords_slides_a(), 1.0),
+            side(c.b, c.coords_parent_b(), c.axis_b, c.coords_slides_b(), c.ratio),
         ]
     }
 
