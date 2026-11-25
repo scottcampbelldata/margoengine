@@ -41,6 +41,9 @@ function fixture(t) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
   }
+  // A repository, as the real one is: what git ignores is no source of a blueprint.
+  writeFileSync(join(root, '.gitignore'), 'packages/p/common/Cargo.lock\n');
+  execFileSync('git', ['init', '-q'], { cwd: root });
   writeFileSync(join(root, 'packages/p/src.wasm'), Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
   const entry = {
     name: 'k',
@@ -82,6 +85,14 @@ test('line endings, crate tests and build output do not make a record stale; a s
   assert.deepEqual(staleBlueprints(root, [entry]), []);
   writeFileSync(join(root, entry.blueprint), Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, 0]));
   assert.match(staleBlueprints(root, [entry])[0] ?? '', /differs from the build its record names/);
+});
+
+test('a Cargo.lock git ignores (a local cargo test in a library crate) leaves a record fresh; one it keeps does not', (t) => {
+  const { root, entry } = fixture(t);
+  writeFileSync(join(root, 'packages/p/common/Cargo.lock'), '# written by cargo test\nversion = 4\n');
+  assert.deepEqual(staleBlueprints(root, [entry]), [], 'an ignored lockfile in the path dependency');
+  writeFileSync(join(root, 'packages/p/kernel/Cargo.lock'), 'version = 4\n');
+  assert.match(staleBlueprints(root, [entry])[0] ?? '', /changed since/, "the kernel's own lockfile counts");
 });
 
 test('a blueprint that holds a build path is refused', (t) => {

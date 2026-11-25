@@ -260,6 +260,26 @@ export function crateFiles(crate, root = repository, seen = new Set()) {
 const content = (bytes) =>
   bytes.includes(0) ? bytes : Buffer.from(bytes.toString('latin1').replaceAll('\r\n', '\n'), 'latin1');
 
+/**
+ * Which of `files` git ignores in `root`: build leftovers such as the `Cargo.lock` a local `cargo test` writes into a library
+ * crate, which never reach the repository and so cannot decide a committed blueprint. Tracked files are never ignored.
+ * @throws when `root` is not in a git repository.
+ */
+function ignoredFiles(root, files) {
+  const result = spawnSync('git', ['check-ignore', '-z', '--stdin'], {
+    cwd: root,
+    input: files.join('\0'),
+    encoding: 'utf8',
+  });
+  // 0: some are ignored, 1: none are; anything else is a failure of git itself.
+  if (result.status !== 0 && result.status !== 1)
+    throw margoError(
+      'WASM_BLUEPRINT_GIT',
+      `git check-ignore failed in ${root}: ${result.stderr || result.error?.message}`,
+    );
+  return new Set(result.stdout.split('\0').filter(Boolean));
+}
+
 /** Hash of everything that decides an entry's blueprint bytes. */
 export function sourceHash(entry, root = repository) {
   const files = [
@@ -267,8 +287,10 @@ export function sourceHash(entry, root = repository) {
   ]
     .filter((file) => existsSync(join(root, file)))
     .sort();
-  const hash = createHash('sha256');
-  for (const file of files) hash.update(`\0${file}\0`).update(content(readFileSync(join(root, file))));
+  const skip = ignoredFiles(root, files),
+    hash = createHash('sha256');
+  for (const file of files)
+    if (!skip.has(file)) hash.update(`\0${file}\0`).update(content(readFileSync(join(root, file))));
   return hash.digest('hex');
 }
 
