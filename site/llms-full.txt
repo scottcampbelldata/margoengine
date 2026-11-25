@@ -11846,6 +11846,12 @@ The extra bytes keep regional curvature and tile curvature in the same integer u
 the existing graph part on first use. Keeping those calls in another part would still require the same sampler and
 worker dispatch. The graph evaluator stays in its existing optional worker file.
 
+On 2026-11-25 the worker measures 41,108 B gzip and 109,131 B raw, up from 40,935 and 108,708 B, and its test ceilings
+are 41,200 and 109,300 B. The whole difference is each paint layer's own blend width (`PaintLayer.ecotone`,
+`ec34c7f3be`): without it a 2 m painted hedge is averaged across the world's 24 m ecotone and almost vanishes. The
+classification's paint feather runs on every tile a worker makes, so a separate worker file would be loaded by every
+painted world.
+
 ## Terrain relief lighting (2026-11-23)
 
 The optional relief-lighting entry adds 8 bytes per height sample for a filterable RGBA16F bake, about 8 MiB
