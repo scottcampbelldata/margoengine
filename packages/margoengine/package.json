@@ -3939,6 +3939,10 @@
       "types": "./dist/scatter/velocity.d.ts",
       "import": "./dist/scatter/velocity.js"
     },
+    "./scatter/read": {
+      "types": "./dist/scatter/read.d.ts",
+      "import": "./dist/scatter/read.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
@@ -5970,6 +5974,10 @@
     "./weather/boundary-layer": {
       "types": "./dist/weather/boundary-layer.d.ts",
       "import": "./dist/weather/boundary-layer.js"
+    },
+    "./weather/precipitation": {
+      "types": "./dist/weather/precipitation.d.ts",
+      "import": "./dist/weather/precipitation.js"
     },
     "./weather/lava": {
       "types": "./dist/weather/lava.d.ts",

@@ -3763,6 +3763,10 @@
       "types": "./dist/weather/boundary-layer.d.ts",
       "import": "./dist/weather/boundary-layer.js"
     },
+    "./weather/precipitation": {
+      "types": "./dist/weather/precipitation.d.ts",
+      "import": "./dist/weather/precipitation.js"
+    },
     "./weather/lava": {
       "types": "./dist/weather/lava.d.ts",
       "import": "./dist/weather/lava.js"
