@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: a port big enough to grow the world's memory at its first publish crashed the field registry (KB-PHYS-REGISTRYGROW1, physics world)
+
+- **Repro:** a `FieldRegistry` over a memory of one page; publish a 24 KiB port of a field (its two mirrors do not fit), or
+  contribute one (its f64 contribution region does not fit). `publish` threw `TypeError: Cannot perform
+  %TypedArray%.prototype.set on a detached or out-of-bounds ArrayBuffer`. Found by the solver-contract lane.
+- **Cause:** `publish` took a view of the port's words before allocating the mirrors or the contribution region; the
+  allocation grew the memory, which detaches every view over it. The registry, the world, the scheduler and the snapshot
+  were audited for any view held across an allocation or a growth; this was the only one.
+- **Fix:** `publish` allocates every region it needs first and only then takes views, and the registry keeps no view at all
+  (each read goes through `words()`). Regression: `packages/physics/tests/world-fields.test.js`, "a first publish that
+  grows the memory copies the port whole".
 ### Fixed 2026-11-24: a bundle holding EnvironmentLighting imported each image decoder both lazily and eagerly (KB-ENV-LOADCHUNK1, environment)
 
 - **Repro:** bundle `@margoengine/react/lights` alone (packages/react/tests/subpaths.test.js, "lights and fog load the environment entry without image decoders"): the bundler warned `INEFFECTIVE_DYNAMIC_IMPORT` for exr.js, hdr.js and ultrahdr.js, which load.js imports with `import()` while loaders.js and parse-image.js import them statically. Found while restoring the sync loss of ff88a70e71.

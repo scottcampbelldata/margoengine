@@ -16,7 +16,7 @@
 // Mirrors and contribution regions are made at a field's first publish; the world publishes every solver's ports once
 // after `init`, so all of them exist before the first snapshot.
 import { MargoError } from '@margoengine/math/errors';
-import { type Arena, regionWords } from './memory.js';
+import { type Arena, BYTES, regionWords } from './memory.js';
 import type { Cell, Centring, FieldDescriptor, FieldKind, FieldUse, Port, RateLevel, Region } from './solver.js';
 
 /**
@@ -103,7 +103,11 @@ interface Entry {
 
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The fields of one world: declared by the solvers that touch them, one writer each, read in place, added to in a fixed order. */
+/**
+ * The fields of one world: declared by the solvers that touch them, one writer each, read in place, added to in a fixed order.
+ * It keeps no typed-array view: an allocation may grow the world's memory and detach every view over it, so each read takes
+ * a fresh one through `words()` after the last region it needs is allocated.
+ */
 export class FieldRegistry {
   private readonly arena: Arena;
   private readonly fields = new Map<string, Entry>();
@@ -213,7 +217,8 @@ export class FieldRegistry {
       throw new RangeError(
         `Solver "${solver}" published field "${port.field}", which it neither writes nor accumulates into; declare it first.`,
       );
-    const data = regionWords(this.arena.memory, port.region);
+    // Allocate first, then read: an allocation can grow the memory, which detaches every view taken over it before, so no
+    // view in this method is taken until the last region it needs exists (and none is kept past the call).
     if (entry.owner === solver) {
       if (!entry.mirrors) {
         const { byteLength, type, layout } = port.region;
@@ -238,18 +243,20 @@ export class FieldRegistry {
           meta[0] === 1 &&
           (port.tick + 1) * (1 << (TOP_LEVEL - level)) === (meta[1]! + 1) * (1 << (TOP_LEVEL - meta[2]!)),
         next = again ? meta[12]! : meta[0] === 1 ? 1 - meta[12]! : meta[12]!;
-      this.words(entry.mirrors[next]!).set(data);
+      this.words(entry.mirrors[next]!).set(this.words(port.region));
       if (!again) meta.copyWithin(6, 0, 6);
       meta.set([1, port.tick, level, cell[0], cell[1], cell[2]], 0);
       meta[12] = next;
       return;
     }
+    const length = port.region.byteLength / BYTES[port.region.type];
     let mine = entry.from.get(solver);
     if (!mine) {
-      mine = this.arena.allocate(`${port.field}/from/${solver}`, data.length * 8, 'f64', SUM_LAYOUT);
+      mine = this.arena.allocate(`${port.field}/from/${solver}`, length * 8, 'f64', SUM_LAYOUT);
       entry.from.set(solver, mine);
     }
-    const into = this.words(mine);
+    const into = this.words(mine),
+      data = this.words(port.region);
     if (into.length !== data.length)
       throw new RangeError(
         `Solver "${solver}" added ${data.length} words to field "${port.field}" after ${into.length} before; keep a contribution's length.`,
