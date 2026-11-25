@@ -918,7 +918,10 @@ export class GeospatialControls extends Controls {
   setInertia(inertia: Partial<GeospatialInertia>): void {
     const next = { ...this.inertia, ...inertia };
     if (![next.pan, next.rotate, next.zoom].every((x) => x >= 0 && Number.isFinite(x)))
-      throw rangeError('Geospatial inertia is finite seconds >= 0 per axis', 'controls-arguments');
+      throw rangeError(
+        'Geospatial inertia is finite seconds >= 0 per axis; pass 0 to stop an axis at once',
+        'controls-arguments',
+      );
     this.inertia = next;
   }
   /** Stop any glide at once. */
@@ -1401,12 +1404,15 @@ export class GeospatialControls extends Controls {
   followPath(views: readonly GeospatialView[], options: PathOptions = {}): Promise<boolean> {
     this.alive();
     if (!Array.isArray(views) || views.length < 1)
-      throw rangeError('followPath needs an array of one or more views', 'controls-arguments');
+      throw rangeError('followPath needs an array of one or more views; pass [view, ...]', 'controls-arguments');
     const speed = options.speed ?? 0.6;
     if (options.duration !== undefined && (!(options.duration >= 0) || !Number.isFinite(options.duration)))
-      throw rangeError('A path duration is finite seconds >= 0', 'controls-arguments');
+      throw rangeError(
+        'A path duration is finite seconds >= 0; omit it to take one from the length',
+        'controls-arguments',
+      );
     if (!(speed > 0 && Number.isFinite(speed)))
-      throw rangeError('A path speed is finite and above 0', 'controls-arguments');
+      throw rangeError('A path speed is finite and above 0; omit it for the default 0.6', 'controls-arguments');
     this.cancel();
     let prev: Required<GeospatialView> = { ...this.v };
     const stops = [prev];
