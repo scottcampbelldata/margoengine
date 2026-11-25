@@ -11287,6 +11287,19 @@ is the canonical order of the framework's section 7; the mirrors, the meta regio
 package's own arrangement. Transfers are named after the methods that will fill them (Jiang et al. 2015, APIC; Jones 1999 and
 Ullrich and Taylor 2015, conservative remapping; Farhat, Lesoinne and Le Tallec 1998), none implemented yet. Proof:
 `packages/physics/tests/world-fields.test.js`.
+### Counter-based random numbers of the physics framework (`@margoengine/physics/world`, 2026-11-25)
+
+`packages/physics/src/world/random.ts` is Philox4x32-10, the TypeScript twin of the engine's one counter-based generator
+(docs/physics-framework.md, section 7; `kernel-common/src/random.rs`, K02), with its key (the seed's two words) and counter
+(element, solver and stream, the tick's two words) laid out alike; `kernel-common/tests/random-vectors.txt` pins both
+languages to the same words (`random_twin.rs` and `world-random.test.js`). Written from J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel Random Numbers: As Easy as 1, 2, 3",
+SC 2011, https://www.thesalmons.org/john/random123/papers/random123sc11.pdf, read in full (section 4.3: the Philox S-box, the
+Philox-4x32 multipliers 0xD2511F53 and 0xCD9E8D57, the Weyl key increments and the round counts; the paper's companion code
+was not read). Checked against the published Philox4x32-10 answers for the all-zero, all-ones and pi-digit counters and keys.
+A solver's number is the 32-bit FNV-1a hash of its id's UTF-8 bytes (G. Fowler, L. C. Noll and K.-P. Vo; D. Eastlake, T.
+Hansen, G. Fowler, K.-P. Vo and L. Noll, "The FNV Non-Cryptographic Hash Algorithm", IETF Internet-Draft,
+https://datatracker.ietf.org/doc/draft-eastlake-fnv/), checked against its published values for "", "a" and "foobar", and
+xor-folded to 16 bits as that draft describes for shorter hashes. Proof: `packages/physics/tests/world-random.test.js`.
 ### Pinned elementary functions and fixed-order sums (`kernel-common`, 2026-11-25, K01)
 
 `kernel-common/src/pinned.rs` has `exp`, `ln`, `sin`, `cos`, `pow` and a fixed-partition sum over f64, built only from + - * / and integer operations, so every build gives the same bits. The methods are the textbook ones: argument reduction by the leading and trailing parts of ln 2 and of pi / 2 (W. J. Cody and W. Waite, "Software Manual for the Elementary Functions", Prentice-Hall, 1980; the parts are split here with exact arithmetic from the decimal digits of pi and ln 2, not copied) and Taylor series on the reduced interval (J.-M. Muller, "Elementary Functions: Algorithms and Implementation", 3rd ed., Birkhauser, 2016, chapters 4 and 11); `pow` carries ln x and the product y ln x as pairs of doubles (TwoSum, T. J. Dekker's split product, "A floating-point technique for extending the available precision", Numerische Mathematik 18, 1971; Muller 2016, section 4.3). The sum adds blocks of 256 in order and the blocks' sums by a balanced tree over their indices, the fixed-partition idea of J. Demmel and H. D. Nguyen, "Parallel reproducible summation", IEEE Transactions on Computers 64(7), 2015. Accuracy is held against the host's functions by `kernel-common/tests/pinned.rs`: within 2 ulp for exp, ln, sin and cos, within 4 ulp for pow.

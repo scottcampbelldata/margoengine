@@ -1614,6 +1614,17 @@ const total = fields.sum('hullImpulse', 0)!;
 console.log(regionWords(arena.memory, total.region)[0]); // 160.75
 ```
 
+`RandomStream(seed, solverNumber(id))` gives a solver counter-based random numbers: Philox4x32-10 (Salmon et al. 2011), the one generator of the framework and word for word the kernels' Rust `Random` (both are pinned to the same vectors). A draw is a pure function of the world's seed, the solver, the tick, the element and a stream, so a solver gets the same numbers whatever order it visits its elements in, on any number of threads and after a restore. `uniform(tick, element, stream)` is a number in [0, 1) with 53 random bits, `unitF64` two of them, `unitF32` four with 24 bits (exact in f32), `below(tick, element, stream, n)` four whole numbers under `n`, and `block` the four raw words; `philox(c0, c1, c2, c3, k0, k1)` is the function itself. `solverNumber(id)` is the 32-bit FNV-1a hash of the id folded to 16 bits, the same in every world.
+
+```ts
+import {RandomStream, solverNumber} from 'margoengine/physics/world';
+
+const random = new RandomStream(7, solverNumber('spray'));
+const a = random.uniform(120, 3); // tick 120, element 3
+const b = random.uniform(120, 3);
+console.log(a === b, a >= 0 && a < 1); // true true
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

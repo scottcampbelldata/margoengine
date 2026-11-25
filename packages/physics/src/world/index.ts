@@ -38,3 +38,4 @@ export {
   type RegisteredField,
   type Transfer,
 } from './fields.js';
+export { RandomStream, philox, solverNumber } from './random.js';

@@ -66,6 +66,17 @@ export const QUANTITY_UNITS: Readonly<Record<string, string>>;
 
 export const RATE_LEVELS = 8;
 
+export class RandomStream {
+    readonly seed: number;
+    readonly solver: number;
+    constructor(seed: number, solver: number);
+    block(tick: number, element: number, stream?: number, out?: Uint32Array): Uint32Array;
+    unitF64(tick: number, element: number, stream?: number, out?: [number, number]): [number, number];
+    unitF32(tick: number, element: number, stream?: number, out?: Float32Array | number[]): number[] | Float32Array<ArrayBufferLike>;
+    below(tick: number, element: number, stream: number, n: number, out?: Uint32Array): Uint32Array;
+    uniform(tick: number, element: number, stream?: number): number;
+}
+
 export type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface Region {
@@ -145,11 +156,15 @@ export class TransferRegistry {
 
 export function isRateLevel(value: unknown): value is RateLevel;
 
+export function philox(c0: number, c1: number, c2: number, c3: number, k0: number, k1: number, out?: Uint32Array): Uint32Array;
+
 export function rateOf(level: RateLevel): number;
 
 export function regionWords(memory: WebAssembly.Memory, region: Region): RegionWords;
 
 export function restoreSnapshot(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[], bytes: Uint8Array): void;
+
+export function solverNumber(id: string): number;
 
 export function stateHash(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): string;
 
