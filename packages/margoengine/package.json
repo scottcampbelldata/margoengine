@@ -1839,6 +1839,10 @@
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
     },
+    "./headless/frames": {
+      "types": "./dist/headless/frames.d.ts",
+      "import": "./dist/headless/frames.js"
+    },
     "./headless/video": {
       "types": "./dist/headless/video.d.ts",
       "import": "./dist/headless/video.js"

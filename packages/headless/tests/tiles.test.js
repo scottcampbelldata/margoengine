@@ -20,6 +20,7 @@ function fixture(fill = () => [90, 120, 200, 255]) {
       createBuffer({ size }) {
         return {
           mapAsync: async () => {},
+          unmap() {},
           destroy() {},
           getMappedRange() {
             const data = new Uint8Array(size);

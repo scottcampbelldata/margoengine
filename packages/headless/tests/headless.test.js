@@ -19,6 +19,7 @@ function fakeDevice(fill) {
     createBuffer(d) {
       return {
         mapAsync: async () => log.push(['mapAsync']),
+        unmap: () => log.push(['unmap']),
         getMappedRange: () => {
           const bytes = new Uint8Array(d.size);
           for (let y = 0; y < copy.height; y++)
@@ -133,7 +134,7 @@ test('readPixels removes the 256-byte row padding and keeps rows in order', asyn
     device.log.some((e) => e[0] === 'copy' && e[1] === 256 && e[2] === 2),
     'bytesPerRow aligned',
   );
-  assert.equal(device.log.at(-1)[0], 'destroyBuffer');
+  assert.equal(device.log.at(-1)[0], 'unmap', 'the buffer is unmapped and kept for the next read');
 });
 
 test('a row of exactly 256 bytes gets no extra padding', async () => {

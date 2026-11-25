@@ -2653,6 +2653,8 @@ runs with no page. Stages alive at once share one `gpu`, because `installGPU` ch
 `requestAnimationFrame`, so time moves with `step(delta)`. Evidence: `packages/headless/tests/browser-check.mjs`, on a browser's
 WebGPU through the stand-in canvas, and `packages/headless/tests/node-check.mjs`, which runs the README examples in Node on the `webgpu` binding (Dawn), a dev dependency. The stage scene drawn in Node matches the page at changed 0 on the RTX A6000 (D3D12), and the examples run on WARP. Missing: a textured glTF in Node (docs/known-bugs.md); Linux and macOS runs of the binding.
 
+Headless readback (2026-11-24): `packages/headless/tests/readback.test.js` holds the word-wise pixel conversion byte equal to the former byte loop for both formats and alpha modes over every alpha against every channel value, and counts buffers, copies and maps for `readPixels` and the frame reader. The README frame reader example runs on the Node binding in node-check.mjs. Method: several mapped buffers in flight, read oldest first, as in L. Hrabcak and A. Masserann, "Asynchronous Buffer Transfers", OpenGL Insights (CRC Press, 2012), chapter 28, https://openglinsights.com/ , and the ARB_pixel_buffer_object specification (2004), https://registry.khronos.org/OpenGL/extensions/ARB/ARB_pixel_buffer_object.txt , built from the WebGPU specification, https://www.w3.org/TR/webgpu/ .
+
 App-side detection must test both presence of `navigator.gpu` and a non-null adapter. The compatibility layer does not
 silently install itself and changes no globals at import time.
 

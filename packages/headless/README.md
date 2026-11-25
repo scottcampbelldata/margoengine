@@ -30,11 +30,61 @@ engine.dispose();
 | `installGPU({ gpu, globals? })` | Sets `navigator.gpu` and the `GPU*` flag globals a runtime lacks; adds `getPreferredCanvasFormat` (`'rgba8unorm'`) if the binding has none. `globals` defaults to none. `dispose()` or `using` restores everything. |
 | `createHeadlessCanvas({ width, height })` | The canvas to pass to `Engine.create`. Both sizes are required. Set `canvas.width` and `canvas.height` to resize; the next `engine.render()` uses them. |
 | `readPixels(engine, { signal? })` | The last frame as `{ width, height, data }`: RGBA, straight alpha, top row first. |
+| `createFrameReader(engine, { depth?, signal? })` | From `@margoengine/headless/frames`: reads every frame of a film without waiting for each one. See below. |
 | `toPNG(engine, { signal? })` | The last frame as PNG file bytes. |
 | `encodePNG(pixels)` | RGBA pixels as PNG file bytes. Rejects with a `RangeError` when the size is not a whole number from 1 or `data` is not `width * height * 4` bytes; `encodeJPEG` and `encodeWebP` refuse the same. |
 
 Call `engine.render()` yourself: `engine.start()` needs `requestAnimationFrame`, which Node does not have. `createStage`
 needs a page; `createHeadlessStage` below is its server version.
+
+### Reading every frame of a film
+
+`readPixels` waits for the GPU to finish the frame it was given before it returns. `createFrameReader` from
+`@margoengine/headless/frames` keeps up to `depth` copies in flight instead, so the next frame is drawn while earlier
+ones are still being read. Call `push()` once after each `engine.render()`: it copies that frame and resolves to the
+oldest held frame once `depth` are held. `drain()` gives the rest. The frames and their order are the same as
+`readPixels` after every render.
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas, encodePNG, installGPU, type HeadlessPixels } from '@margoengine/headless';
+import { createFrameReader } from '@margoengine/headless/frames';
+import { create } from 'webgpu';
+
+const gpu = create([]);
+using installed = installGPU({ gpu });
+const canvas = createHeadlessCanvas({ width: 320, height: 180 });
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#84d6bd' }));
+
+const frames: HeadlessPixels[] = [];
+{
+  using reader = createFrameReader(engine, { depth: 3 });
+  for (let i = 0; i < 12; i++) {
+    const angle = i / 12;
+    engine.render({ camera: new Camera({ position: [3 * Math.sin(angle), 2, 3 * Math.cos(angle)], target: [0, 0, 0] }) });
+    const frame = await reader.push();
+    if (frame) frames.push(frame);
+  }
+  for await (const frame of reader.drain()) frames.push(frame);
+}
+if (frames.length !== 12) throw new Error(`read ${frames.length} frames`);
+await writeFile('last.png', await encodePNG(frames[11]));
+engine.dispose();
+```
+
+| Option or member | What it does |
+| --- | --- |
+| `depth` | Frames held at once, 1 to 16. Default 3. 1 waits for each frame. Each held frame owns one buffer of `height` rows of `width * 4` bytes rounded up to 256. |
+| `signal` | Disposes the reader; waiting reads reject with the reason. Default none. |
+| `push()` | Copies the frame just rendered. Resolves to the oldest held frame once `depth` are held, else `undefined`. |
+| `drain()` | An async iterator over the frames still held, oldest first. |
+| `pending` | Frames copied and not yet handed out. |
+| `dispose()` | Frees the buffers; held frames are lost. Also `using`. |
+
+A reader makes `depth` buffers for a whole film, and `readPixels` keeps one buffer on the canvas between reads of one
+size; both free them on a resize.
 
 ### The same frames on every run
 

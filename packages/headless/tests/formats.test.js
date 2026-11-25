@@ -167,6 +167,7 @@ function floatDevice(format, rows) {
   return {
     createBuffer: ({ size }) => ({
       mapAsync: async () => {},
+      unmap() {},
       getMappedRange: () => {
         const out = new Uint8Array(size);
         rows.forEach((row, y) => out.set(row, y * (size / rows.length)));

@@ -28,6 +28,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./frames": {
+      "types": "./dist/frames.d.ts",
+      "import": "./dist/frames.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

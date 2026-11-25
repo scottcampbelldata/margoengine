@@ -2,9 +2,9 @@
 // alignment, the GPU*Usage flag values) and the W3C PNG specification. Runs wherever a WebGPU implementation can be
 // passed in: Node with a binding, a browser, a worker. No node: imports and no side effects on import.
 import type { Engine } from '@margoengine/core';
-import { engineRuntime } from '@margoengine/core/extension';
 import { pngParts } from '../../shared/png.js';
-import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { rangeError, typeError } from '../../shared/errors.js';
+import { HeadlessContext, MAP_READ, copyFrame, headlessFrame, unpack } from './readback.js';
 
 /** The flag tables core and the GPU packages read as globals. Values from the WebGPU specification. */
 const CONSTANTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
@@ -25,12 +25,6 @@ const CONSTANTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   GPUShaderStage: { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 },
   GPUColorWrite: { RED: 1, GREEN: 2, BLUE: 4, ALPHA: 8, ALL: 15 },
 };
-const RENDER_ATTACHMENT = 16,
-  TEXTURE_COPY_SRC = 1,
-  MAP_READ = 1,
-  BUFFER_COPY_DST = 8,
-  ROW_ALIGNMENT = 256;
-
 /** The part of a WebGPU implementation {@link installGPU} needs. `getPreferredCanvasFormat` is optional because Node
  * bindings have no canvas to prefer a format for. */
 export interface GPUBinding {
@@ -102,50 +96,6 @@ export function installGPU({ gpu, globals = {} }: InstallGPUOptions): InstalledG
   return { gpu: installed, dispose, [Symbol.dispose]: dispose };
 }
 
-/** Stands in for a canvas's WebGPU context: the frame goes to one texture this package owns, which stays readable after
- * the frame because nothing presents it. */
-class HeadlessContext {
-  #configuration: GPUCanvasConfiguration | null = null;
-  #texture: GPUTexture | null = null;
-  constructor(readonly canvas: { width: number; height: number }) {}
-  configure(configuration: GPUCanvasConfiguration): void {
-    this.#drop();
-    this.#configuration = { ...configuration };
-  }
-  unconfigure(): void {
-    this.#drop();
-    this.#configuration = null;
-  }
-  getConfiguration(): GPUCanvasConfiguration | null {
-    return this.#configuration && { ...this.#configuration };
-  }
-  getCurrentTexture(): GPUTexture {
-    const configuration = this.#configuration;
-    if (!configuration) throw fault('state', 'Headless canvas is not configured', 'headless');
-    const { width, height } = this.canvas;
-    if (this.#texture?.width !== width || this.#texture.height !== height) {
-      this.#drop();
-      this.#texture = configuration.device.createTexture({
-        label: 'headless canvas',
-        size: [width, height],
-        format: configuration.format,
-        // Readback needs COPY_SRC whatever the caller configured (a package may add usages, as on a real canvas).
-        usage: (configuration.usage ?? RENDER_ATTACHMENT) | RENDER_ATTACHMENT | TEXTURE_COPY_SRC,
-        viewFormats: configuration.viewFormats,
-      });
-    }
-    return this.#texture;
-  }
-  /** The last frame's texture, if a frame has asked for one. */
-  get frame(): GPUTexture | null {
-    return this.#texture;
-  }
-  #drop(): void {
-    this.#texture?.destroy();
-    this.#texture = null;
-  }
-}
-
 /** Options of {@link createHeadlessCanvas}. */
 export interface HeadlessCanvasOptions {
   /** Width of the image in pixels, a whole number from 1. Required. */
@@ -190,64 +140,34 @@ export interface HeadlessReadOptions {
 
 /**
  * Reads the last frame of an engine on a {@link createHeadlessCanvas} canvas. Call `engine.render()` first; this draws
- * nothing itself. A context configured `opaque` (the default) reads alpha 255, as a page would show it.
+ * nothing itself. A context configured `opaque` (the default) reads alpha 255, as a page would show it. The readback
+ * buffer stays on the canvas for the next read of the same size. To read every frame of a film without waiting for the
+ * GPU after each one, use `createFrameReader` from `@margoengine/headless/frames`.
  */
 export async function readPixels(engine: Engine, { signal }: HeadlessReadOptions = {}): Promise<HeadlessPixels> {
   signal?.throwIfAborted();
-  const runtime = engineRuntime(engine),
-    context = runtime.canvas.getContext('webgpu') as unknown as HeadlessContext | null,
-    device = runtime.gpu;
-  if (!(context instanceof HeadlessContext))
-    throw fault('unsupported', 'readPixels needs an engine on createHeadlessCanvas', 'headless');
-  if (!device) throw fault('unsupported', 'readPixels needs the WebGPU backend', 'headless');
-  const texture = context.frame,
-    configuration = context.getConfiguration();
-  if (!texture || !configuration) throw fault('state', 'No frame to read: call engine.render() first', 'headless');
-  const format = texture.format;
-  if (format !== 'rgba8unorm' && format !== 'bgra8unorm')
-    throw fault('unsupported', 'readPixels reads rgba8unorm or bgra8unorm only', 'headless');
-  const { width, height } = texture,
-    stride = width * 4,
-    bytesPerRow = Math.ceil(stride / ROW_ALIGNMENT) * ROW_ALIGNMENT,
-    buffer = device.createBuffer({
-      label: 'headless readback',
-      size: bytesPerRow * height,
-      usage: MAP_READ | BUFFER_COPY_DST,
-    }),
+  const frame = headlessFrame(engine, 'readPixels'),
+    taken = frame.context.take(frame.device, frame.size),
+    { buffer } = taken,
     stop = () => buffer.destroy();
   signal?.addEventListener('abort', stop, { once: true });
+  let read = false;
   try {
-    const encoder = device.createCommandEncoder();
-    encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow, rowsPerImage: height }, [width, height]);
-    device.queue.submit([encoder.finish()]);
+    const copy = copyFrame(frame, buffer);
     await buffer.mapAsync(MAP_READ).catch((error: unknown) => {
       signal?.throwIfAborted();
       throw error;
     });
-    const mapped = new Uint8Array(buffer.getMappedRange()),
-      data = new Uint8Array(stride * height);
-    for (let y = 0; y < height; y++) data.set(mapped.subarray(y * bytesPerRow, y * bytesPerRow + stride), y * stride);
-    finishPixels(data, format === 'bgra8unorm', configuration.alphaMode === 'premultiplied');
-    return { width, height, data };
+    // An abort that came after the map finished has destroyed the buffer.
+    signal?.throwIfAborted();
+    const data = unpack(buffer.getMappedRange(), copy);
+    buffer.unmap();
+    read = true;
+    return { width: copy.width, height: copy.height, data };
   } finally {
     signal?.removeEventListener('abort', stop);
-    buffer.destroy();
-  }
-}
-
-/** Swaps blue and red for a BGRA texture, then gives straight alpha: 255 when opaque, else divided out. */
-function finishPixels(data: Uint8Array, swap: boolean, premultiplied: boolean): void {
-  for (let i = 0; i < data.length; i += 4) {
-    if (swap) {
-      const blue = data[i];
-      data[i] = data[i + 2];
-      data[i + 2] = blue;
-    }
-    if (!premultiplied) data[i + 3] = 255;
-    else if (data[i + 3] > 0 && data[i + 3] < 255) {
-      const scale = 255 / data[i + 3];
-      for (let c = 0; c < 3; c++) data[i + c] = Math.min(255, Math.round(data[i + c] * scale));
-    }
+    if (read) frame.context.give(taken);
+    else buffer.destroy();
   }
 }
 

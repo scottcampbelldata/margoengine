@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,030 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,032 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -4868,6 +4868,7 @@ which now drives Chrome through its own DevTools socket and runs the layer's pro
 | Own 2D physics polylines (`packages/physics2d/kernel`, native only until `@margoengine/physics2d/next`, 2026-11-08) (LIM-529) | Enforced: a chain needs 2 points (3 when closed) after points closer than 2.5 mm to the one before are dropped. | Each segment knows its neighbours' far vertices (ghosts), so a shape crossing a join meets one surface, not the next segment's end edge on (Catto, Ghost Collisions, 2020). | By method: a contact's normal tilted toward a join is kept only at a corner that turns away from the shape, and only up to the neighbour's face; at a flat or concave join the contact is the face's. A box and a ball slide at 5 m/s across 50 joins keeping vx at 5 within 1e-4 (Box2D v3's chain: the same; Rapier 2D's polyline catches, vx down to -0.17). Separate segments or tile boxes still catch at their seams, as they do in both references. | Build floors and tile outlines as one chain; `create_chain` with `closed` for a loop. |
 | Own 2D physics joints (`packages/physics2d/kernel`, native only until `@margoengine/physics2d/next`, 2026-11-08) (LIM-534) | Enforced: revolute, prismatic, fixed, rope and spring joints between two bodies; a revolute limit reads the relative angle from -pi to pi, so its limits lie within that range. | Joints are soft constraints on the substeps as contacts are, at `joint_hertz` 60 (held to a quarter of the substep rate) and damping ratio 2, pulling error out at no more than 3 m/s. Runs of joints (a chain, a limb) are solved exactly in one sweep (Baraff 1996); joints at a body with three or more, and the joint that would close a ring, one joint at a time. A taut joint stiffens its bodies' turning by its pull (geometric stiffness, Andrews, Teichmann and Kry 2017), taken implicitly, so a heavily loaded chain holds at 4 substeps. | By method: the stiffness damps only the stiff zigzag a heavy load sets up in a chain; it moves a pendulum's period by 0.007 percent. A 50-link chain under a 1000:1 end mass stretches at most 0.55 percent (Box2D v3 29.88 times, Rapier 2D 22.18 times on the same scene); with `joint_geometric_stiffness` off it flies to 69 times. | `joint_geometric_stiffness: false` gives the plain inertia. |
 | Stage model viewer (`@margoengine/stage/viewer`, 2026-11-05) | A failed `addViewer` puts back what it changed; it does not freeze the camera while it loads, so a visitor who moves it meanwhile keeps that move. WebGPU only, as gltf/pbr. One model per viewer; the model must have geometry. A 'cascaded' floor is a plain box 40 model sizes wide, so its far edge shows as a horizon line against the backdrop; 'contact' has no such line. Lamp, shadow and floor values were picked by eye on one model (flight helmet), not measured against a reference. | One call has to fit any model, so sizes come from `model.bounds` at load. An animated model does not resize them, and the contact shadow is cached (`static`) unless `shadow: {static: false}`. | A model that grows or moves keeps its first shadow and framing; a horizon line with 'cascaded'. | Pass `environment`, `background`, `shadow` and `tonemap` to override, `false` to remove a part. Real-GPU check: `npm run test:gpu --workspace packages/stage`. |
+| Headless readback (`@margoengine/headless`, `/frames`, 2026-11-24) | `createFrameReader` holds 1 to 16 frames (default 3), one buffer of `height` rows of `width * 4` bytes rounded up to 256 for each; `readPixels` keeps one such buffer on the canvas between reads of one size. Work counts on a recording device (tests/readback.test.js): 12 frames at depth 3 make 3 buffers, 12 copies and 12 maps, and a push waits only for the oldest frame. No wall-clock speed claim until the speed phase. | Creating a buffer and waiting for the frame just drawn on every frame holds back a film render. | A frame reader hands each frame out `depth - 1` pushes later. After a lost device its held frames reject. Pixels are converted as 32-bit words, which assumes a little-endian CPU, as every WebGPU platform is. | `readPixels` for one frame at a time, or `depth: 1`. |
 | Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time and runs `onTick` and `engine.onFrame` callbacks. Stages alive at once share one `gpu`. In Node, proved on the `webgpu` binding 0.6.2 on Windows (D3D12 and WARP); a textured glTF does not load there (docs/known-bugs.md). | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, so the stage keeps its own list of `onFrame` callbacks. | A callback registered before the stage exists, on an engine made by hand, does not run. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
@@ -30352,42 +30353,48 @@ engine.dispose();
 | `installGPU({ gpu, globals? })` | Sets `navigator.gpu` and the `GPU*` flag globals a runtime lacks; adds `getPreferredCanvasFormat` (`'rgba8unorm'`) if the binding has none. `globals` defaults to none. `dispose()` or `using` restores everything. |
 | `createHeadlessCanvas({ width, height })` | The canvas to pass to `Engine.create`. Both sizes are required. Set `canvas.width` and `canvas.height` to resize; the next `engine.render()` uses them. |
 | `readPixels(engine, { signal? })` | The last frame as `{ width, height, data }`: RGBA, straight alpha, top row first. |
+| `createFrameReader(engine, { depth?, signal? })` | From `@margoengine/headless/frames`: reads every frame of a film without waiting for each one. See below. |
 | `toPNG(engine, { signal? })` | The last frame as PNG file bytes. |
 | `encodePNG(pixels)` | RGBA pixels as PNG file bytes. Rejects with a `RangeError` when the size is not a whole number from 1 or `data` is not `width * height * 4` bytes; `encodeJPEG` and `encodeWebP` refuse the same. |
 
 Call `engine.render()` yourself: `engine.start()` needs `requestAnimationFrame`, which Node does not have. `createStage`
 needs a page; `createHeadlessStage` below is its server version.
 
-### The same frames on every run
+### Reading every frame of a film
 
-`readPixels` reads the frame texture this package owns, after the GPU has finished it, so a film drawn on
-`createHeadlessCanvas` gives the same bytes on every run from its first frame, alone or beside another process on the
-GPU, on WebGPU and the WebGL2 layer (`packages/sky/test/rain-frames-check.mjs`: a 90-frame rain shot with the
-Bruneton sky, clouds, AgX and shadows, byte for byte in four fresh browsers). A page that reads its real canvas
-instead must read it in the same task as `engine.render()`, as `capture` in `@margoengine/exporters` does: after an
-`await`, `drawImage`, `toDataURL` and `createImageBitmap` of a WebGPU canvas give the last frame the browser showed,
-which lags by a number of frames that differs from run to run (65 of 90 frames differed between two runs read that
-way). On the WebGL2 layer the layer loads its compute part before `requestDevice` answers (KB-COMPAT-FIRSTTASK1 in
-docs/known-bugs.md), so a page canvas read in the task of the first render shows that frame, as on WebGPU.
-
-## A stage without a page
-
-`@margoengine/headless/stage` gives server thumbnails the same short setup as a page. `createHeadlessStage` returns a real
-`Stage`, so its methods and the stage's feature entries work as they do on a page. It needs `@margoengine/stage`, an optional
-peer:
+`readPixels` waits for the GPU to finish the frame it was given before it returns. `createFrameReader` from
+`@margoengine/headless/frames` keeps up to `depth` copies in flight instead, so the next frame is drawn while earlier
+ones are still being read. Call `push()` once after each `engine.render()`: it copies that frame and resolves to the
+oldest held frame once `depth` are held. `drain()` gives the rest. The frames and their order are the same as
+`readPixels` after every render.
 
 ```ts
 import { writeFile } from 'node:fs/promises';
-import { createHeadlessStage } from '@margoengine/headless/stage';
-import { addSky } from '@margoengine/stage/sky';
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas, encodePNG, installGPU, type HeadlessPixels } from '@margoengine/headless';
+import { createFrameReader } from '@margoengine/headless/frames';
 import { create } from 'webgpu';
 
 const gpu = create([]);
-using stage = await createHeadlessStage({ gpu, width: 640, height: 360 });
-stage.box({ color: '#84d6bd' });
-await addSky(stage);
-stage.fit();
-await writeFile('thumbnail.png', await stage.toPNG());
+using installed = installGPU({ gpu });
+const canvas = createHeadlessCanvas({ width: 320, height: 180 });
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#84d6bd' }));
+
+const frames: HeadlessPixels[] = [];
+{
+  using reader = createFrameReader(engine, { depth: 3 });
+  for (let i = 0; i < 12; i++) {
+    const angle = i / 12;
+    engine.render({ camera: new Camera({ position: [3 * Math.sin(angle), 2, 3 * Math.cos(angle)], target: [0, 0, 0] }) });
+    const frame = await reader.push();
+    if (frame) frames.push(frame);
+  }
+  for await (const frame of reader.drain()) frames.push(frame);
+}
+if (frames.length !== 12) throw new Error(`read ${frames.length} frames`);
+await writeFile('last.png', await encodePNG(frames[11]));
+engine.dispose();
 ```
 
 [README continues: https://margoengine.com/llms/packages/headless.md]

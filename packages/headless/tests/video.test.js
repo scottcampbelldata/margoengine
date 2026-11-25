@@ -185,6 +185,7 @@ test('renderFrames steps its own clock and reads each frame', async () => {
     createTexture: (d) => (texture = { width: d.size[0], height: d.size[1], format: d.format, destroy() {} }),
     createBuffer: (d) => ({
       mapAsync: async () => {},
+      unmap() {},
       getMappedRange: () => new ArrayBuffer(d.size),
       destroy() {},
     }),
@@ -233,7 +234,12 @@ test('renderFrames draws nothing ahead of its consumer, and stops on abort', asy
     canvas = createHeadlessCanvas({ width: 1, height: 1 }),
     device = {
       createTexture: (d) => ({ width: 1, height: 1, format: d.format, destroy() {} }),
-      createBuffer: (d) => ({ mapAsync: async () => {}, getMappedRange: () => new ArrayBuffer(d.size), destroy() {} }),
+      createBuffer: (d) => ({
+        mapAsync: async () => {},
+        unmap() {},
+        getMappedRange: () => new ArrayBuffer(d.size),
+        destroy() {},
+      }),
       createCommandEncoder: () => ({ copyTextureToBuffer() {}, finish: () => 'commands' }),
       queue: { submit() {} },
     };
