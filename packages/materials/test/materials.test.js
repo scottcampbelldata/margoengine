@@ -9,6 +9,7 @@ import {
   createMesh,
   createInstancedMesh,
   loadTexture,
+  loadCubeTexture,
   packGeometry,
   materialShader,
   packAtlas,
@@ -420,7 +421,11 @@ test('setMaterialSortModes orders opaque and transparent meshes front to back, b
       s.frame();
       return [...order];
     };
-    assert.deepEqual(draws(), ['s-far', 's-near', 's-mid', 'g-far', 'g-near'], 'defaults: creation order, then back to front');
+    assert.deepEqual(
+      draws(),
+      ['s-far', 's-near', 's-mid', 'g-far', 'g-near'],
+      'defaults: creation order, then back to front',
+    );
     setMaterialSortModes(s.engine, { opaque: 'front-to-back', transparent: 'front-to-back' });
     assert.deepEqual(draws(), ['s-near', 's-mid', 's-far', 'g-near', 'g-far']);
     setMaterialSortModes(s.engine, { opaque: 'back-to-front', transparent: 'manual' });
@@ -473,6 +478,35 @@ test('loadTexture fetches into an owned ImageBitmap and enforces protocol and si
     const closedBefore = closed.length;
     new Texture({ width: 1, height: 1 }).dispose();
     assert.equal(closed.length, closedBefore, 'caller-owned sources stay open');
+  } finally {
+    globalThis.fetch = fetchBefore;
+    globalThis.createImageBitmap = bitmapBefore;
+  }
+});
+
+test('loadCubeTexture applies maxPixels to every face and one maxBytes budget to all six', async () => {
+  const fetchBefore = globalThis.fetch,
+    bitmapBefore = globalThis.createImageBitmap;
+  let fetched = 0,
+    size = [4, 4];
+  globalThis.fetch = async () => {
+    fetched++;
+    return new Response(new Uint8Array(100), { headers: { 'content-type': 'image/png' } });
+  };
+  globalThis.createImageBitmap = async () => ({ width: size[0], height: size[1], close() {} });
+  const faces = ['px', 'nx', 'py', 'ny', 'pz', 'nz'].map((f) => `https://assets.test/${f}.png`);
+  try {
+    await assert.rejects(
+      loadCubeTexture(faces, { maxBytes: 250 }),
+      /Texture download/,
+      'the third 100 B face passes 250 B',
+    );
+    assert.equal(fetched, 3, 'faces download one after another and stop at the one that passes the budget');
+    size = [8192, 4096];
+    await assert.rejects(loadCubeTexture(faces, { maxPixels: 16 }), /size limit/, 'every face obeys maxPixels');
+    await assert.rejects(loadCubeTexture(faces[0], { maxPixels: 16 }), /size limit/, 'so does the equirect path');
+    await assert.rejects(loadCubeTexture(faces[0], { maxBytes: 10 }), /Texture download/);
+    await assert.rejects(loadCubeTexture(faces, { maxBytes: 0 }), /positive integer/);
   } finally {
     globalThis.fetch = fetchBefore;
     globalThis.createImageBitmap = bitmapBefore;

@@ -387,6 +387,8 @@ export async function restoreMaterialLibrary(
           result = data.cube
             ? await loadCubeTexture(source.url, {
                 ...fileTextureOptions(data.options),
+                maxBytes: options.limits?.maxBytes,
+                maxPixels: options.limits?.maxPixels,
                 signal: options.signal,
                 fetch: options.fetch,
               })

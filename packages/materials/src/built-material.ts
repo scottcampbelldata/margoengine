@@ -1168,7 +1168,9 @@ export interface TextureLimits {
 const limit = (value: number | undefined, fallback: number, name: string): number => {
   if (value === undefined) return fallback;
   if (!Number.isSafeInteger(value) || value < 1)
-    throw new RangeError(`Texture ${name} must be a positive integer; pass a number of ${name === 'maxBytes' ? 'bytes' : 'pixels'}`);
+    throw new RangeError(
+      `Texture ${name} must be a positive integer; pass a number of ${name === 'maxBytes' ? 'bytes' : 'pixels'}`,
+    );
   return value;
 };
 /** The bytes at an http(s), blob: or data: `url` (`maxBytes`, default 64 MiB, at most) and the response's content type. */
@@ -1177,12 +1179,18 @@ async function download(
   signal?: AbortSignal,
   get: typeof fetch = globalThis.fetch,
   maxBytes?: number,
+  tally?: { bytes: number },
 ): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:', 'blob:', 'data:'].includes(target.protocol))
     throw new TypeError('Texture URL must use HTTP(S), blob: or data:');
   const response = await get(target, { signal }),
-    bytes = await readResponse(response, { maxBytes: limit(maxBytes, 64 * 1024 * 1024, 'maxBytes'), signal, label: 'Texture download' });
+    bytes = await readResponse(response, {
+      maxBytes: limit(maxBytes, 64 * 1024 * 1024, 'maxBytes'),
+      signal,
+      label: 'Texture download',
+    });
+  if (tally) tally.bytes += bytes.length;
   return [bytes, response.headers.get('content-type') ?? ''];
 }
 /** The image at `url` as an ImageBitmap (4096x4096 pixels at most), pixels as stored (no colour or alpha conversion). */
@@ -1191,9 +1199,10 @@ async function fetchBitmap(
   signal?: AbortSignal,
   get?: typeof fetch,
   limits: TextureLimits = {},
+  tally?: { bytes: number },
 ): Promise<ImageBitmap> {
   const pixels = limit(limits.maxPixels, maxPixels, 'maxPixels'),
-    [bytes, type] = await download(url, signal, get, limits.maxBytes);
+    [bytes, type] = await download(url, signal, get, limits.maxBytes, tally);
   const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>], { type }), {
     colorSpaceConversion: 'none',
     premultiplyAlpha: 'none',
@@ -1332,15 +1341,29 @@ export class CubeTexture extends Texture {
 /**
  * Loads a cube map: six image URLs in the order +X, -X, +Y, -Y, +Z, -Z, or one
  * equirectangular image URL. Images download as `loadTexture` does (through `fetch`, default `globalThis.fetch`); the
- * CubeTexture owns them.
+ * CubeTexture owns them. `maxPixels` (default 4096x4096) caps every face. `maxBytes` caps the download of the whole
+ * cube: six faces share it, taking one after another, and the one that passes it throws. Left out, each face keeps the
+ * default 64 MiB cap and the six download side by side.
  */
 export async function loadCubeTexture(
   urls: string | URL | readonly (string | URL)[],
-  { signal, fetch: get, ...options }: CubeTextureOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
+  {
+    signal,
+    fetch: get,
+    maxBytes,
+    maxPixels: pixels,
+    ...options
+  }: CubeTextureOptions & TextureLimits & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<CubeTexture> {
   if (!Array.isArray(urls)) {
     const { size, ...rest } = options,
-      image = await loadTexture(urls as string | URL, { signal, fetch: get, colorSpace: rest.colorSpace });
+      image = await loadTexture(urls as string | URL, {
+        signal,
+        fetch: get,
+        maxBytes,
+        maxPixels: pixels,
+        colorSpace: rest.colorSpace,
+      });
     try {
       return new CubeTexture(image, { ...rest, colorSpace: undefined, ...(size !== undefined ? { size } : {}) }, true);
     } catch (error) {
@@ -1350,8 +1373,23 @@ export async function loadCubeTexture(
   }
   if (urls.length !== 6)
     throw new TypeError('loadCubeTexture needs six face URLs (+X, -X, +Y, -Y, +Z, -Z) or one equirect URL');
-  const settled = await Promise.allSettled(urls.map((url) => fetchBitmap(url, signal, get))),
-    bitmaps = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  const shared = maxBytes === undefined ? undefined : limit(maxBytes, 0, 'maxBytes'),
+    tally = { bytes: 0 },
+    settled: PromiseSettledResult<ImageBitmap>[] = [];
+  if (shared === undefined)
+    settled.push(
+      ...(await Promise.allSettled(urls.map((url) => fetchBitmap(url, signal, get, { maxPixels: pixels })))),
+    );
+  else
+    for (const url of urls) {
+      // The faces take one budget: each is allowed what the earlier ones left, and the first to pass it fails the load.
+      const [result] = await Promise.allSettled([
+        fetchBitmap(url, signal, get, { maxBytes: Math.max(1, shared - tally.bytes), maxPixels: pixels }, tally),
+      ]);
+      settled.push(result);
+      if (result.status === 'rejected') break;
+    }
+  const bitmaps = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   try {
     const failed = settled.find((r) => r.status === 'rejected');
     if (failed) throw (failed as PromiseRejectedResult).reason;
