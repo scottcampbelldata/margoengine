@@ -12281,3 +12281,14 @@ coefficient is the procedure's.
 The load point in the step is this package's own: a restoring load -k x taken at x + theta v dt, held through a rigid
 step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
 theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force is carried there linearly.
+
+### Point-mass steering (PA-83, LIFE-04)
+
+Craig W. Reynolds, [Steering Behaviors for Autonomous Characters](https://www.red3d.com/cwr/papers/1999/gdc99steer.pdf), GDC 1999,
+uses capped steering force divided by inertial mass. The NASA Glenn [Drag Equation](https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-equation/)
+gives force magnitude `rho Cd A |u|² / 2` for velocity relative to the medium. The drag-only update integrates
+`du/dt = -k |u| u` by preserving direction and replacing the speed `s` with `s / (1 + k s dt)`.
+The lateral acceleration cap follows normal acceleration `s² / R` along a curve, applied in the medium frame.
+Katz et al., [Inferring the structure and dynamics of interactions in schooling fish](https://pmc.ncbi.nlm.nih.gov/articles/PMC3219116/),
+PNAS 108(46), 2011, measured distinct longitudinal and lateral reactions. These tests check longitudinal force divided
+by mass, independently limited lateral acceleration, and the exact drag-only speed law.
