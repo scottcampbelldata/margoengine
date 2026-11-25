@@ -68,6 +68,34 @@ test('saveView and restoreView round trip, mode included; the hash form round tr
   assert.ok(Math.abs(back.latitude - saved.latitude) < 1e-9 && Math.abs(back.range - 3000) < 0.01);
   assert.equal(GeospatialControls.parseHash('#geo=95,0,0,10,0,0'), null, 'latitude past the pole');
   assert.equal(GeospatialControls.parseHash('#zoom=3'), null);
+  // Untrusted links: anything not finite or out of range gives no view.
+  for (const bad of [
+    '#geo=NaN,0,0,10,0,0',
+    '#geo=0,Infinity,0,10,0,0',
+    '#geo=0,0,1e300,10,0,0',
+    '#geo=0,0,-1e7,10,0,0',
+    '#geo=0,0,0,0,0,0',
+    '#geo=0,0,0,-5,0,0',
+    '#geo=0,0,0,1e12,0,0',
+    '#geo=0,0,0,10,1e9,0',
+    '#geo=0,0,0,10,0,500',
+    '#geo=0,0,0,10,0,0,swim',
+    '#geo=0,0,0,10,0',
+    '#geo=0,0,,10,0,0,globe,extra',
+  ])
+    assert.equal(GeospatialControls.parseHash(bad), null, bad);
+  // A valid hash with a range past maxRange is clamped by the controls.
+  const far = GeospatialControls.parseHash('#geo=0,0,0,60000000,0,45');
+  control.restoreView(far, { duration: 0 });
+  assert.equal(control.view.range, 4 * 6378137);
+  // restoreView takes the same checks for objects: a coded RangeError, the view unchanged.
+  const before = control.saveView();
+  for (const bad of [{ height: Infinity }, { height: 1e12 }, { range: Number.NaN }, { latitude: 3 }, { mode: 'swim' }])
+    assert.throws(
+      () => control.restoreView(bad, { duration: 0 }),
+      (e) => e instanceof RangeError && /controls-arguments/.test(e.message),
+    );
+  assert.deepEqual(control.saveView(), before);
   control.dispose();
 });
 

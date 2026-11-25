@@ -299,6 +299,9 @@ type Pose = { position: V; target: V; up: V };
 const MARCH_STEPS = 512;
 /** Steepest look up or down in the first-person modes, radians (just short of straight, where heading is undefined). */
 const LOOK = Math.PI / 2 - 0.01;
+/** Orbit centre heights a view may hold, metres above the ellipsoid: 1000 km below to four equatorial radii above. */
+const MIN_HEIGHT = -1e6;
+const MAX_HEIGHT = 4 * WGS84_A;
 const MODES: readonly GeospatialMode[] = ['globe', 'local', 'map', 'fly', 'walk'];
 const INERTIA: Record<GeospatialPreset, GeospatialInertia> = {
   globe: { pan: 0.3, rotate: 0.25, zoom: 0.2 },
@@ -525,6 +528,11 @@ export class GeospatialControls extends Controls {
     if (Math.abs(v.latitude) > Math.PI / 2 + 1e-12)
       throw rangeError(
         'Geospatial latitude is in radians within [-PI/2, PI/2]; convert degrees with degToRad',
+        'controls-arguments',
+      );
+    if (!(v.height >= MIN_HEIGHT && v.height <= MAX_HEIGHT))
+      throw rangeError(
+        `Geospatial height ${v.height} m is outside [${MIN_HEIGHT}, ${MAX_HEIGHT}] m above the ellipsoid; pass a height in that range`,
         'controls-arguments',
       );
     return {
@@ -1575,7 +1583,10 @@ export class GeospatialControls extends Controls {
   }
   /**
    * Read a `#geo=` hash (from {@link GeospatialControls.toHash}; other hash parameters joined with `&` are ignored) as
-   * a saved view in radians and metres; null when there is none or it is malformed.
+   * a saved view in radians and metres; null when there is none or it is malformed: a field that is not a finite
+   * number, latitude past +-90, longitude or heading past +-360, pitch past +-90 degrees, height outside -1000 km to
+   * four equatorial radii, range not above 0 or past ten equatorial radii, or an unknown mode. The controls then clamp
+   * range and pitch to their own limits.
    */
   static parseHash(hash: string): GeospatialViewState | null {
     const part = String(hash)
@@ -1586,7 +1597,20 @@ export class GeospatialControls extends Controls {
     const f = part.slice(4).split(','),
       n = f.slice(0, 6).map(Number),
       mode = (f[6] ?? 'globe') as GeospatialMode;
-    if (n.length < 6 || !n.every(Number.isFinite) || !MODES.includes(mode) || Math.abs(n[0]!) > 90 || !(n[3]! > 0))
+    // Untrusted input (a link): every field finite and in range, else no view at all.
+    const [lat, lon, height, range, heading, pitch] = n as [number, number, number, number, number, number];
+    if (
+      f.length > 7 ||
+      n.length < 6 ||
+      !n.every(Number.isFinite) ||
+      !MODES.includes(mode) ||
+      Math.abs(lat) > 90 ||
+      Math.abs(lon) > 360 ||
+      !(height >= MIN_HEIGHT && height <= MAX_HEIGHT) ||
+      !(range > 0 && range <= 10 * WGS84_A) ||
+      Math.abs(heading) > 360 ||
+      Math.abs(pitch) > 90
+    )
       return null;
     const r = (x: number) => (x * Math.PI) / 180;
     return {

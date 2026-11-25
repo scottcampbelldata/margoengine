@@ -8691,6 +8691,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   null without one (EGM96 departs from the ellipsoid by -107 to +85 m). `orientation` is in the eye's ENU frame, so an
   orbit camera that is level at its centre shows a roll of about range / Earth radius (5e-4 rad at 3 km). The `compass`
   event follows the view heading. The hash keeps 7 decimal places of degrees (about 1 cm) and 0.01 m.
+  `parseHash` treats a hash as untrusted: a field that is not finite or is out of range (latitude +-90, longitude and
+  heading +-360, pitch +-90 degrees, height -1000 km to 4 equatorial radii, range above 0 up to 10 equatorial radii)
+  gives null; range and pitch are then clamped to the controls' limits. Every view (setView, flyTo, restoreView) rejects
+  a non-finite field, a latitude past +-PI/2 or a height outside that range with a `controls-arguments` RangeError.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)
 
