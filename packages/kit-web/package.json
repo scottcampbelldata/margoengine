@@ -295,6 +295,10 @@
       "types": "./dist/controls/device-orientation.d.ts",
       "import": "./dist/controls/device-orientation.js"
     },
+    "./controls/geoid": {
+      "types": "./dist/controls/geoid.d.ts",
+      "import": "./dist/controls/geoid.js"
+    },
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"

@@ -2763,6 +2763,18 @@ export const entries = [
     fix: 'Pass colours as `#rgb`, `#rrggbb`, `#rrggbbaa` or `[r, g, b]` / `[r, g, b, a]` in 0..1 (null restores the default), a finite positive `size` and `lineWidth`, `offset` as `[x, y, z]`, and attach meshes created by the engine the controls belong to. See the controls package README for each default.',
   },
   {
+    id: 'controls-geoid',
+    title: '@margoengine/controls/geoid: a geoid grid that is malformed or not installed',
+    kind: 'family',
+    messages: [
+      'A geoid grid needs rows * columns heights, rows and columns of 2 or more and a finite step and scale above 0; pass the packed EGM96 grid',
+      'packGeoid needs a finite scale above 0; pass 0.01 for centimetres',
+    ],
+    cause:
+      'The EGM96 15-minute grid (egm96-15.bin, 2,077,922 bytes) is not beside the geoid entry or has the wrong size, the server answered an error for it, or a hand-made grid does not hold rows x columns heights.',
+    fix: 'Make the file with `node scripts/geoid/pack-egm96.mjs path/to/WW15MGH.GRD` (NGA EGM96 15-minute grid, public domain), rebuild the controls package so it lands in dist, and serve it beside the entry; or pass your own `geoid` query.',
+  },
+  {
     id: 'tiles-height',
     title: '@margoengine/tiles/height: tilesHeightQuery options out of range',
     kind: 'family',

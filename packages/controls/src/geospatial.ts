@@ -198,8 +198,11 @@ export interface GeospatialOptions {
   preset?: GeospatialPreset;
   /** Glide per axis, overriding the preset's. */
   inertia?: Partial<GeospatialInertia>;
-  /** Geoid height above the ellipsoid (an EGM grid), for the sea-level readout. Default none. */
-  geoid?: GeoidQuery;
+  /**
+   * Geoid height above the ellipsoid for the sea-level readout: your own query, `'egm96'` (the EGM96 15' grid of
+   * `@margoengine/controls/geoid`, loaded the first time `heights` is read) or null for none. Default `'egm96'`.
+   */
+  geoid?: GeoidQuery | 'egm96' | null;
   /**
    * Keep the page's URL hash in step with the view (`#geo=lat,lon,height,range,heading,pitch,mode`, degrees and metres)
    * and start from it when present: links and reloads return to the same view. Default false.
@@ -480,6 +483,8 @@ export class GeospatialControls extends Controls {
   gamepad: boolean;
   /** Geoid height query for {@link GeospatialControls.heights}; assign to change it. */
   geoid: GeoidQuery | undefined;
+  /** Load EGM96 on the first sea-level read (the `'egm96'` option); cleared once it starts. */
+  private geoidAuto: boolean;
   /** Mirror the view in the URL hash; see the option. */
   readonly hash: boolean;
   /** Heading at the last compass event, and whether the view moved since the last `moveend`. */
@@ -574,7 +579,9 @@ export class GeospatialControls extends Controls {
     this.keyTarget = options.keyTarget ?? null;
     this.inertia = { ...INERTIA.globe };
     this.gamepad = options.gamepad ?? false;
-    this.geoid = options.geoid;
+    const geoid = options.geoid === undefined ? 'egm96' : options.geoid;
+    this.geoid = typeof geoid === 'function' ? geoid : undefined;
+    this.geoidAuto = geoid === 'egm96';
     this.hash = options.hash ?? false;
     this.reducedMotion = options.reducedMotion ?? prefersReducedMotion();
     this.applyPreset(options.preset ?? 'globe');
@@ -1755,6 +1762,20 @@ export class GeospatialControls extends Controls {
   }
   /** Eye heights now: above the ellipsoid, the ground below and mean sea level (with a `geoid`). */
   get heights(): GeospatialHeights {
+    if (this.geoidAuto && !this.geoid) {
+      // Fetched once, in the background: sea level reads null until the grid is in, then a `geoid` event says so.
+      this.geoidAuto = false;
+      import('./geoid.js')
+        .then((m) => m.loadEGM96())
+        .then(
+          (g) => {
+            if (this.dead) return;
+            this.geoid ??= g.query;
+            this.dispatchEvent({ type: 'geoid', source: 'egm96' });
+          },
+          (error: unknown) => this.dispatchEvent({ type: 'geoid-error', error }),
+        );
+    }
     const e = this.eye,
       g = this.geoid?.(e.longitude, e.latitude);
     return {

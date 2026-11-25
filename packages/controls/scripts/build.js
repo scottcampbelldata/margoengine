@@ -1,7 +1,8 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 import { execFileSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { copyFile, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
@@ -40,6 +41,9 @@ await build({
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh'] },
   },
 });
+// The packed EGM96 grid of the geoid entry ships beside it when it has been made (scripts/geoid/pack-egm96.mjs).
+const geoidGrid = resolve(root, 'data/egm96-15.bin');
+if (existsSync(geoidGrid)) await copyFile(geoidGrid, resolve(dist, 'egm96-15.bin'));
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],

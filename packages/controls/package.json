@@ -109,6 +109,10 @@
     "./device-orientation": {
       "types": "./dist/device-orientation.d.ts",
       "import": "./dist/device-orientation.js"
+    },
+    "./geoid": {
+      "types": "./dist/geoid.d.ts",
+      "import": "./dist/geoid.js"
     }
   },
   "files": [

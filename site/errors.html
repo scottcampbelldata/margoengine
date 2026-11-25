@@ -495,6 +495,12 @@
       <p><strong>Cause.</strong> A TransformControls (or PivotControls) option is outside its range, or <code>attach</code> was given a mesh from another engine or an active mesh that is not in the list. <code>axisColors</code> and <code>hoveredColor</code> take CSS hex colours or 0..1 channel arrays; <code>size</code> and <code>lineWidth</code> are finite and above 0; <code>offset</code> is three finite numbers.</p>
       <p><strong>Fix.</strong> Pass colours as <code>#rgb</code>, <code>#rrggbb</code>, <code>#rrggbbaa</code> or <code>[r, g, b]</code> / <code>[r, g, b, a]</code> in 0..1 (null restores the default), a finite positive <code>size</code> and <code>lineWidth</code>, <code>offset</code> as <code>[x, y, z]</code>, and attach meshes created by the engine the controls belong to. See the controls package README for each default.</p>
     </section>
+    <section id="controls-geoid">
+      <h2><a href="#controls-geoid">@margoengine/controls/geoid: a geoid grid that is malformed or not installed</a></h2>
+      <p class="messages"><code>A geoid grid needs rows * columns heights, rows and columns of 2 or more and a finite step and scale above 0; pass the packed EGM96 grid</code> <code>packGeoid needs a finite scale above 0; pass 0.01 for centimetres</code></p>
+      <p><strong>Cause.</strong> The EGM96 15-minute grid (egm96-15.bin, 2,077,922 bytes) is not beside the geoid entry or has the wrong size, the server answered an error for it, or a hand-made grid does not hold rows x columns heights.</p>
+      <p><strong>Fix.</strong> Make the file with <code>node scripts/geoid/pack-egm96.mjs path/to/WW15MGH.GRD</code> (NGA EGM96 15-minute grid, public domain), rebuild the controls package so it lands in dist, and serve it beside the entry; or pass your own <code>geoid</code> query.</p>
+    </section>
     <section id="tiles-height">
       <h2><a href="#tiles-height">@margoengine/tiles/height: tilesHeightQuery options out of range</a></h2>
       <p class="messages"><code>tilesHeightQuery needs a finite top above -bottom and a finite bottom &gt;= 0; use the defaults</code></p>

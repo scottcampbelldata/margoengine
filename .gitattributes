@@ -33,6 +33,8 @@ packages/*/bin/** text eol=lf
 packages/loaders/tests/fixtures/*.ply -text
 packages/mcp/tests/fixtures/** -text
 packages/splats/test/fixtures/*.splat binary
+# The packed EGM96 geoid grid of @margoengine/controls/geoid (scripts/geoid/pack-egm96.mjs).
+packages/controls/data/*.bin binary
 packages/loaders/tests/fixtures/*.pcd -text
 packages/loaders/tests/fixtures/*.xyz -text
 packages/bvh/tests/fixtures/*.obj -text

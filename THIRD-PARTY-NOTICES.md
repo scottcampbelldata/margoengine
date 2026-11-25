@@ -486,3 +486,13 @@ packages/sciviz/tests/fixtures/tensor is a native spatial crop of OpenNeuro ds00
 
 ## RCSB PDB 1CRN molecular coordinates
 packages/sciviz/tests/fixtures/molecule/1crn.pdb and 1crn.cif are byte-preserved standard coordinate files from https://files.rcsb.org/download/1CRN.pdb and https://files.rcsb.org/download/1CRN.cif. W. A. Hendrickson and M. M. Teeter, *Structure of the hydrophobic protein crambin determined directly from the anomalous scattering of sulphur* (1981), https://doi.org/10.1038/290107a0 ; entry https://doi.org/10.2210/pdb1CRN/pdb. PDB archive data are CC0 1.0 (https://www.rcsb.org/pages/policies). Exact source URLs and SHA-256 values are in the adjacent source.json. These standard scientific assets are the documented sample-data exception; no outside implementation code is included.
+
+## EGM96 geoid grid (`@margoengine/controls/geoid`)
+
+`packages/controls/data/egm96-15.bin` (shipped in the controls package's dist when present) is the EGM96 15-minute geoid
+undulation grid of the US National Geospatial-Intelligence Agency (NGA) and NASA, `WW15MGH.GRD` from NGA's EGM96
+interpolation package (https://earth-info.nga.mil/, Office of Geomatics, EGM96), re-packed unchanged in value to
+little-endian int16 centimetres (721 x 1441, 2,077,922 bytes) by `scripts/geoid/pack-egm96.mjs`. US Government work,
+public domain; credit NGA and NASA, no endorsement. Reference: Lemoine et al., "The Development of the Joint NASA GSFC
+and NIMA Geopotential Model EGM96", NASA/TP-1998-206861, 1998. Data only; no NGA interpolation code (INTPT.f) is read
+or used.

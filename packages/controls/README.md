@@ -782,7 +782,9 @@ await camera.setMode('walk', {duration: 0}); // walk the valley floor
 ### Readouts, events and saved views
 
 `heights` gives the eye's height above the ellipsoid, above the ground directly below it (the highest of `heightAt`,
-the scene and `raycast`) and above mean sea level when you pass a `geoid(longitude, latitude)` query (an EGM grid; null
+the scene and `raycast`) and above mean sea level: by default from the EGM96 15' grid of
+`@margoengine/controls/geoid`, loaded the first time `heights` is read (null until then; a `geoid` event says it is
+in, `geoid-error` that it could not load), or your own `geoid(longitude, latitude)` query, or none with `geoid: null` (null
 without one). `orientation` is the camera's heading, pitch and roll in the ENU frame at the eye, for a compass or an
 attitude indicator. `resetNorth()` turns to heading 0 about the centre. Events: `compass` (`heading`) whenever the
 heading changes, `mode` on a mode switch, and `moveend` (`view`) once the view settles after a drag, glide, flight or
@@ -806,6 +808,27 @@ camera.addEventListener('compass', (event) => console.log('heading', event.headi
 camera.addEventListener('moveend', () => localStorage.setItem('view', JSON.stringify(camera.saveView())));
 console.log(camera.heights, camera.orientation, camera.toHash());
 await camera.resetNorth({duration: 0});
+```
+
+### Mean sea level: `@margoengine/controls/geoid`
+
+`loadEGM96({url, signal})` loads the EGM96 15-minute geoid grid of the US National Geospatial-Intelligence Agency
+(public domain), packed as 721 x 1441 little-endian int16 centimetres in `egm96-15.bin` beside the entry (2,077,922
+bytes), and returns a `Geoid`: `undulation(longitude, latitude)` (radians in, metres of mean sea level above the
+ellipsoid out, bilinear) and `query`, the function the camera's `geoid` option takes. `new Geoid(grid)` reads any
+regular latitude-longitude grid, and `packGeoid(metres)` quantises heights to int16 centimetres. The packed file is
+made from NGA's `WW15MGH.GRD` with `node scripts/geoid/pack-egm96.mjs path/to/WW15MGH.GRD`; the controls build copies
+it into `dist`. A missing file rejects with a `failed` MargoError that says how to make it.
+
+```ts
+import {Geoid, loadEGM96, packGeoid} from 'margoengine/controls/geoid';
+import {degToRad} from 'margoengine/math/geo';
+
+// A tiny hand-made grid: 90 degree spacing, heights in metres.
+const coarse = new Geoid({data: packGeoid([10, 10, 10, 10, 10, -20, 0, 20, 40, -20, 5, 5, 5, 5, 5]), rows: 3, columns: 5, step: 90});
+console.log(coarse.undulation(degToRad(45), 0)); // -10, halfway between -20 and 0
+const egm96 = await loadEGM96().catch((error) => (console.warn(error.message), null));
+console.log(egm96?.undulation(degToRad(-84.5), degToRad(45.8))); // about -35 m when the grid is installed
 ```
 
 ### Collision
@@ -1014,7 +1037,7 @@ Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
 (1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
-({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` (none), `hash` (false), `frame` (ECEF, or its Y-up view), `ground` (none). Sources: NIMA TR8350.2 (WGS84);
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` ('egm96'), `hash` (false), `frame` (ECEF, or its Y-up view), `ground` (none). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
