@@ -23,7 +23,8 @@ export async function loadEnvironmentImage(
   if (!response.ok) throw new MargoError('failed', `Failed to load ${url}: HTTP ${response.status}; check the URL`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (isJPEG(bytes)) return (await import('./ultrahdr.js')).decodeUltraHDR(bytes, options);
-  if (isEXR(bytes)) return (await import('./exr.js')).parseEXR(bytes);
-  if (isHDR(bytes)) return (await import('./hdr.js')).parseHDR(bytes);
+  // Through re-exports of the decoders, never the files parseEnvironmentImage imports itself (load-hdr.ts).
+  if (isEXR(bytes)) return (await import('./load-exr.js')).parseEXR(bytes);
+  if (isHDR(bytes)) return (await import('./load-hdr.js')).parseHDR(bytes);
   throw new TypeError(UNKNOWN_ERROR);
 }

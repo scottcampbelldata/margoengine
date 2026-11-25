@@ -18,7 +18,8 @@ await copyLegal(root);
 // One self-contained build per entry, so the optional entries share no chunk with (and never change) the root; the
 // image decoders alone are one file every entry imports (dist/loaders.js), which re-exports each decoder from its own
 // file (dist/hdr.js, exr.js, ultrahdr.js, parse-image.js, load.js) so none is bundled twice. dist/load.js is
-// loadEnvironmentImage alone, importing a decoder on first use, so an app that loads one format downloads one decoder;
+// loadEnvironmentImage alone, importing a decoder on first use (through dist/load-hdr.js and load-exr.js, re-exports
+// of the parsers, so no import() names a file parse-image.js imports), so an app that loads one format downloads one decoder;
 // loaders.js re-exports it and so keeps every decoder in its graph.
 for (const [entry, emptyOutDir] of [
   ['index', true],
@@ -32,6 +33,8 @@ for (const [entry, emptyOutDir] of [
   ['main', false],
   ['loaders', false],
   ['load', false],
+  ['load-hdr', false],
+  ['load-exr', false],
   ['parse-image', false],
   ['hdr', false],
   ['exr', false],
@@ -73,9 +76,15 @@ for (const [entry, emptyOutDir] of [
           id === '@margoengine/environment' ||
           id.startsWith('@margoengine/environment/') ||
           (id === './loaders.js' && entry !== 'loaders') ||
+          // EnvironmentLighting.load imports dist/load.js itself; bundled into main.js it brought its own copy of
+          // every decoder as hashed chunks, one of them both imported and import()ed (KB-ENV-LOADCHUNK2).
+          (id === './load.js' && entry !== 'load') ||
           (['load', 'loaders'].includes(entry) && ['./hdr.js', './exr.js', './ultrahdr.js'].includes(id)) ||
+          (entry === 'load' && ['./load-hdr.js', './load-exr.js'].includes(id)) ||
+          (entry === 'load-hdr' && id === './hdr.js') ||
+          (entry === 'load-exr' && id === './exr.js') ||
           (entry === 'parse-image' && ['./hdr.js', './exr.js'].includes(id)) ||
-          (entry === 'loaders' && ['./load.js', './parse-image.js'].includes(id)) ||
+          (entry === 'loaders' && id === './parse-image.js') ||
           (id === './main.js' && entry === 'index'),
       },
     },

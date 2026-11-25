@@ -18,6 +18,7 @@ async function bundle(t, source) {
   t.after(() => rm(folder, { recursive: true, force: true }));
   const file = join(folder, 'app.js');
   await writeFile(file, source);
+  const warnings = [];
   const out = await build({
     root: folder,
     configFile: false,
@@ -30,11 +31,12 @@ async function bundle(t, source) {
       rollupOptions: {
         input: file,
         external: (id) => id.startsWith('@margoengine/') && !id.startsWith('@margoengine/environment'),
+        onwarn: (warning) => warnings.push(warning.code ?? String(warning.message ?? warning)),
       },
     },
   });
   const chunks = (Array.isArray(out) ? out[0] : out).output.filter((o) => o.type === 'chunk');
-  return { app: chunks.find((c) => c.isEntry), lazy: chunks.filter((c) => !c.isEntry) };
+  return { app: chunks.find((c) => c.isEntry), lazy: chunks.filter((c) => !c.isEntry), warnings };
 }
 
 // One string only its decoder holds.
@@ -57,6 +59,25 @@ test('an app that loads environment files keeps every decoder in its own lazy ch
     const held = Object.entries(markers).filter(([, text]) => chunk.code.includes(text));
     assert.ok(held.length <= 1, `a lazy chunk holds ${held.map(([n]) => n).join(' and ')} together`);
   }
+});
+
+test('an app that parses bytes and loads files keeps the parsers once, with no ineffective dynamic import', async (t) => {
+  // KB-ENV-LOADCHUNK2: loadEnvironmentImage import()ed dist/hdr.js and exr.js, the files parseEnvironmentImage imports
+  // statically, so an app using both built with INEFFECTIVE_DYNAMIC_IMPORT for each.
+  const { app, lazy, warnings } = await bundle(
+    t,
+    "import { loadEnvironmentImage, parseEnvironmentImage } from '@margoengine/environment/loaders';\n" +
+      "console.log(parseEnvironmentImage(new Uint8Array(4)));\nloadEnvironmentImage('a.hdr').then(console.log);\n",
+  );
+  assert.deepEqual(warnings, []);
+  // The synchronous parse needs both parsers in the app's chunk; the UltraHDR decoder stays lazy.
+  assert.ok(app.code.includes(markers.hdr) && app.code.includes(markers.exr), 'the parsers are in the app chunk');
+  assert.ok(!app.code.includes(markers.ultrahdr), 'the UltraHDR decoder is in the app chunk');
+  for (const chunk of lazy)
+    assert.ok(
+      !chunk.code.includes(markers.hdr) && !chunk.code.includes(markers.exr),
+      `${chunk.fileName} copies a parser`,
+    );
 });
 
 test('loadEnvironmentImage decodes by signature and keeps its errors', async () => {

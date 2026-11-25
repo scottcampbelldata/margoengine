@@ -39,11 +39,33 @@ export function relativeImports(filename, code) {
   // Only re-exports: every top-level statement re-exports from another module. A directive prologue ('use client' on
   // the generated react-server entries) is not code and does not make the module an importer.
   const statements = parsed.program.body.filter((node) => !(node.type === 'ExpressionStatement' && node.directive));
+  // `import {a as e} from './x.js'; export {e as a};`, the form Vite's library build writes for a re-export of an
+  // external module, is a re-export too: ECMA-262 ParseModule (16.2.1.6.1) turns a local export of an imported binding
+  // into an indirect export entry, the same as `export {a} from './x.js'`. Only named and default imports qualify (a
+  // namespace import exported again is a local export), and every one must be exported again, nothing else used.
+  const imported = new Set(),
+    exported = new Set();
+  const reexport = (node) => {
+    if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) return true;
+    if (node.type === 'ImportDeclaration' && node.importKind !== 'type' && node.specifiers.length > 0)
+      return node.specifiers.every((s) => {
+        if (s.type === 'ImportNamespaceSpecifier') return false;
+        imported.add(s.local.name);
+        return true;
+      });
+    if (node.type === 'ExportNamedDeclaration' && !node.source && !node.declaration && node.exportKind !== 'type')
+      return node.specifiers.every((s) => {
+        if (s.local.type !== 'Identifier') return false;
+        exported.add(s.local.name);
+        return true;
+      });
+    return false;
+  };
   found.reexportsOnly =
     statements.length > 0 &&
-    statements.every(
-      (node) => (node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source,
-    );
+    statements.every(reexport) &&
+    [...exported].every((name) => imported.has(name)) &&
+    [...imported].every((name) => exported.has(name));
   return found;
 }
 
@@ -88,6 +110,17 @@ test('the check finds a module that is both dynamically and statically imported'
   assert.equal(relativeImports('only.js', "'use client';").reexportsOnly, false);
   // A re-export beside code is still a static import of what it names.
   assert.equal(relativeImports('index.js', "export*from'./b.js';export const c=1;").reexportsOnly, false);
+  // Vite's form of a re-export, an imported binding exported again, counts; anything more does not.
+  const vite = "import{a as e}from'./a.js';import d from'./d.js';export{e as a,d as default};export{f}from'./f.js';";
+  assert.equal(relativeImports('loaders.js', vite).reexportsOnly, true);
+  for (const code of [
+    "import{a as e}from'./a.js';export{e as a};e();", // uses the binding
+    "import{a as e,b}from'./a.js';export{e as a};", // imports a binding it does not export again
+    "import{a as e}from'./a.js';const g=1;export{e as a,g};", // exports a local of its own
+    "import*as n from'./a.js';export{n};", // a namespace object is a local export
+    "import'./a.js';export{f}from'./f.js';", // an import for its side effects
+  ])
+    assert.equal(relativeImports('probe.js', code).reexportsOnly, false, code);
 });
 
 test('no package dist module is both dynamically and statically imported', async () => {
