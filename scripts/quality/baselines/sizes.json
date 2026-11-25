@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18371407,
+  "total": 18372027,
   "history": [
     {
       "date": "2026-10-24",
@@ -11697,6 +11697,12 @@
       "commit": "85d4eb492",
       "reason": "physics kernel and its entry: the tree broad phase with its builds and rotations, contact recycling and clustering, the simplified friction model, quarantine, the collision-only step and the finer timers: physics 526,507 to 531,255 B gzip and the lazy kernel blueprint 447,804 to 454,271 B (both builds, SIMD and scalar)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "0deff1fc7",
+      "reason": "physics2d root entry grows from 19,291 B to 19,331 B (+40 B): Physics2D.counts (fourteen work counts) and seven more timing fields; the kernel Wasm is a file of its own",
+      "grew": 1
     }
   ],
   "items": {
@@ -12464,7 +12470,7 @@
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
-    "@margoengine/physics2d": 19291,
+    "@margoengine/physics2d": 19911,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17687,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,

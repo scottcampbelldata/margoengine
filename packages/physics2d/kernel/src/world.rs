@@ -529,10 +529,19 @@ pub struct Counts {
     pub awake_bodies: u64,
     /// Joints solved as branched trees this step (joint.rs, `tree`).
     pub tree_joints: u64,
+    /// Islands (groups of dynamic bodies that touch or share a joint) the step solved: those with an awake body in them.
+    /// `islands` above counts every body's root, fixed and kinematic bodies and sleepers included, as the sleep pass needs.
+    pub active_islands: u64,
 }
 
-/// The phases `World::timing` holds, in order.
-pub const PHASES: [&str; 8] = ["step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events"];
+/// The phases `World::timing` holds, in order: the whole step, then its phases. The next four split `solver`: `assembly`
+/// builds the contacts' rows, `resolution` is the warm start and the passes, `update` moves velocities and poses and
+/// `writeback` puts the results in the bodies and contacts. The last three split `ccd`: its broad phase, its times of
+/// impact, and the bodies put back at them. The splits are sums over the substeps and the bodies.
+pub const PHASES: [&str; 15] = [
+    "step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events", "assembly", "resolution", "update", "writeback", "ccdBroad",
+    "ccdToi", "ccdSolver",
+];
 
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
@@ -542,13 +551,21 @@ unsafe extern "C" {
 }
 #[cfg(target_arch = "wasm32")]
 #[inline(always)]
-fn now() -> f64 {
+pub(crate) fn now() -> f64 {
     unsafe { clock() }
 }
 #[cfg(not(target_arch = "wasm32"))]
 #[inline(always)]
-fn now() -> f64 {
+pub(crate) fn now() -> f64 {
     0.0
+}
+/// Adds the time since `since` to a slot of the timings and starts the next stretch there: the finer timers of the solver
+/// and the sweep, which are sums over the substeps and the bodies.
+#[inline(always)]
+pub(crate) fn tick(timing: &mut [f32; 15], slot: usize, since: &mut f64) {
+    let at = now();
+    timing[slot] += (at - *since) as f32;
+    *since = at;
 }
 
 pub struct World {
@@ -574,9 +591,9 @@ pub struct World {
     pub(crate) joint_ids: Vec<u32>,
     pub(crate) joint_slot: Vec<u32>,
     pub counts: Counts,
-    /// Milliseconds the phases of the last step took, in `PHASES` order (the step, then begin, broad, narrow, islands, solver, ccd and events). From a
-    /// clock the page gives; not part of the simulation, and zero where there is none.
-    pub timing: [f32; 8],
+    /// Milliseconds the phases of the last step took, in `PHASES` order. From a clock the page gives; not part of the
+    /// simulation (a snapshot and the hash leave it out), and zero where there is none.
+    pub timing: [f32; 15],
     pub steps: u64,
     pub(crate) broad: Broad,
     pairs: Vec<(u32, u32)>,
@@ -645,7 +662,7 @@ impl World {
             joint_ids: Vec::new(),
             joint_slot: Vec::new(),
             counts: Counts::default(),
-            timing: [0.0; 8],
+            timing: [0.0; 15],
             steps: 0,
             broad: if settings.broad_phase == BroadPhase::Sweep { Broad::Sweep(SweepPrune::new()) } else { Broad::Tree(Tree::new()) },
             apart: Vec::new(),
@@ -1295,6 +1312,8 @@ impl World {
         }
         let (begun, mut stamp) = (now(), now());
         self.counts = Counts::default();
+        // The finer timers add up over the step; the phases are set as each ends.
+        self.timing[8..].fill(0.0);
         self.events.clear();
         self.events.append(&mut self.pending_events);
         self.force_events.clear();
@@ -1606,6 +1625,7 @@ impl World {
             awake[self.island_of[b as usize] as usize] = true;
             self.bodies[b as usize].sleep_time = 0.0;
         }
+        self.counts.active_islands = awake.iter().filter(|&&active| active).count() as u64;
         for (i, body) in self.bodies.iter_mut().enumerate() {
             if body.is_dynamic() && body.enabled && !body.awake && awake[self.island_of[i] as usize] {
                 body.awake = true;

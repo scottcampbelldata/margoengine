@@ -35,6 +35,7 @@ interface Exports {
   world_set_gravity(world: number, gx: number, gy: number): number;
   world_step(world: number, dt: number): number;
   world_timing(world: number, phase: number): number;
+  world_counts(world: number): number;
   body_create(world: number, kind: number, flags: number): number;
   body_remove(world: number, body: number): number;
   body_read(world: number, body: number): number;

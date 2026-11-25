@@ -139,14 +139,35 @@ pub extern "C" fn world_step(handle: i32, dt: f32) -> i32 {
     with_world!(handle, |w| w.step(dt).map(|()| 0))
 }
 
-/// Milliseconds a phase of the world's last step took: 0 the whole step, then begin, broad phase, narrow phase, islands, solver, continuous
-/// collision and events; NaN past the last. All zero before the first step.
+/// Milliseconds a phase of the world's last step took, by its place in `world::PHASES`: 0 the whole step, then begin, broad phase, narrow
+/// phase, islands, solver, continuous collision and events, and the finer splits of the solver and the sweep; NaN past the last.
+/// All zero before the first step.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_timing(handle: i32, phase: u32) -> f32 {
     match world(handle) {
         Ok(w) => w.timing.get(phase as usize).copied().unwrap_or(f32::NAN),
         Err(_) => f32::NAN,
     }
+}
+
+/// Writes the work the last step did to the buffer, as whole numbers and in this order: awake bodies, active islands, broad-phase
+/// boxes compared, pairs kept, manifolds built, manifold points that started cold, contacts solved, two-point solves
+/// taken as a block, two-point solves taken one point at a time, colours, contacts in no colour, joints solved as trees,
+/// events, steps taken in all. Returns how many numbers it wrote.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_counts(handle: i32) -> i32 {
+    with_world!(handle, |w| {
+        let c = w.counts;
+        let all = [
+            c.awake_bodies, c.active_islands, c.compared, c.pairs, c.manifolds, c.cold_points, c.constraints, c.block, c.sequential,
+            c.colours, c.overflow, c.tree_joints, w.events.len() as u64, w.steps,
+        ];
+        ensure(all.len());
+        for (i, n) in all.into_iter().enumerate() {
+            io()[i] = n.min(u32::MAX as u64) as u32;
+        }
+        Ok(all.len() as i32)
+    })
 }
 
 fn kind_of(value: u32) -> Result<Kind, PhysicsError> {

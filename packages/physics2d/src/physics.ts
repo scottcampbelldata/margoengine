@@ -328,7 +328,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /**
    * How long the phases of the last step took, in milliseconds, as Rapier's `timingStep` and its siblings do: `step` is the whole of
    * it, then `begin` (kinematic targets are read), `broad` phase, `narrow` phase, `islands`, `solver`, `ccd` and `events`. The phases
-   * add up to `step`, bar the clock's own calls. All zero before the first step. A reading is no part of the world.
+   * add up to `step`, bar the clock's own calls. `assembly` (contact rows built), `resolution` (warm start and passes), `update`
+   * (velocities and poses moved) and `writeback` (results put in the bodies) split `solver`, and `ccdBroad`, `ccdToi` and
+   * `ccdSolver` split `ccd`; those seven are sums over the substeps and the bodies. All zero before the first step. A reading is
+   * no part of the world: a snapshot and the replay hash leave it out.
    */
   get timing(): {
     step: number;
@@ -339,6 +342,13 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     solver: number;
     ccd: number;
     events: number;
+    assembly: number;
+    resolution: number;
+    update: number;
+    writeback: number;
+    ccdBroad: number;
+    ccdToi: number;
+    ccdSolver: number;
   } {
     this.live();
     const { kernel, handle } = this,
@@ -352,6 +362,57 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       solver: read(5),
       ccd: read(6),
       events: read(7),
+      assembly: read(8),
+      resolution: read(9),
+      update: read(10),
+      writeback: read(11),
+      ccdBroad: read(12),
+      ccdToi: read(13),
+      ccdSolver: read(14),
+    };
+  }
+  /**
+   * How much work the last step did, as whole numbers: the awake bodies, the islands with an awake body in them (a fixed body is
+   * no island, and a sleeping one is no work), the broad phase's boxes compared and pairs kept, the manifolds built, the manifold
+   * points that started cold, the contacts solved and how many of their two-point solves took the block or went one point at a
+   * time, the colours the contacts took and the contacts in none, the joints solved as trees, the events, and the steps taken in
+   * all. They are counts of work, not of time, so they are the same on every machine for the same inputs.
+   */
+  get counts(): {
+    awake: number;
+    islands: number;
+    boxesCompared: number;
+    pairs: number;
+    manifolds: number;
+    coldPoints: number;
+    contactsSolved: number;
+    blockSolves: number;
+    sequentialSolves: number;
+    colours: number;
+    uncoloured: number;
+    treeJoints: number;
+    events: number;
+    steps: number;
+  } {
+    this.live();
+    const { kernel } = this;
+    const count = kernel.ok(kernel.exports.world_counts(this.handle));
+    const read = kernel.io(count).u;
+    return {
+      awake: read[0],
+      islands: read[1],
+      boxesCompared: read[2],
+      pairs: read[3],
+      manifolds: read[4],
+      coldPoints: read[5],
+      contactsSolved: read[6],
+      blockSolves: read[7],
+      sequentialSolves: read[8],
+      colours: read[9],
+      uncoloured: read[10],
+      treeJoints: read[11],
+      events: read[12],
+      steps: read[13],
     };
   }
   /** Every body in the world, in the order they were added. */
