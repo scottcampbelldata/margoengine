@@ -6,6 +6,11 @@
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
 
+export interface AxleOptions {
+    wheels: readonly [number, number];
+    differential?: DifferentialOptions;
+}
+
 export interface BodyOptions {
     type?: BodyType;
     position?: Vec3;
@@ -33,6 +38,12 @@ export interface BodyOptions {
 }
 
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
+
+export interface BrushOptions {
+    friction?: number;
+    stiffness?: number;
+    halfLength?: number;
+}
 
 export interface CharacterCollision {
     collider: PhysicsCollider;
@@ -353,6 +364,13 @@ export interface DebugStyle {
     axisLength?: number;
 }
 
+export interface DifferentialOptions {
+    type?: 'open' | 'locked' | 'limitedSlip';
+    preload?: number;
+    bias?: number;
+    split?: number;
+}
+
 export class DistanceJoint extends Mechanism {
     constructor(physics: Physics, bodyA: PhysicsBody, bodyB: PhysicsBody, options?: DistanceOptions);
 }
@@ -380,6 +398,44 @@ export interface DragOptions {
     frequency?: number;
     damping?: number;
     maxForce?: number;
+}
+
+export interface DrivenWheel {
+    spin: number;
+    inertia: number;
+}
+
+export class Drivetrain {
+    gear: number;
+    constructor(options: DrivetrainOptions);
+    get rpm(): number;
+    get torque(): number;
+    get engaged(): boolean;
+    get ratio(): number;
+    get drivenWheels(): number[];
+    shiftUp(): void;
+    shiftDown(): void;
+    pedals(throttle: number, clutch: number): void;
+    step(dt: number, wheels: readonly DrivenWheel[]): number[];
+}
+
+export interface DrivetrainOptions {
+    axles: readonly AxleOptions[];
+    center?: DifferentialOptions;
+    torqueCurve?: readonly (readonly [number, number])[];
+    idleRpm?: number;
+    redlineRpm?: number;
+    engineInertia?: number;
+    engineBraking?: number;
+    gears?: readonly number[];
+    reverse?: number;
+    finalDrive?: number;
+    automatic?: boolean;
+    upshiftRpm?: number;
+    downshiftRpm?: number;
+    shiftTime?: number;
+    clutchTorque?: number;
+    efficiency?: number;
 }
 
 export class DynamicCharacter {
@@ -859,6 +915,13 @@ export class KernelWorld {
     reserve(bodies: number, colliders?: number): this;
 }
 
+export interface MagicCurve {
+    B: number;
+    C: number;
+    D: number;
+    E: number;
+}
+
 export interface MechanismOptions {
     frequency?: number;
     damping?: number;
@@ -959,6 +1022,14 @@ export interface MultibodyLinkOptions {
 }
 
 export type NextJointOptions = JointOptions | ConeJointOptions;
+
+export interface PacejkaOptions {
+    longitudinal?: Partial<MagicCurve>;
+    lateral?: Partial<MagicCurve>;
+    nominalLoad?: number;
+    loadSensitivity?: number;
+    combined?: boolean;
+}
 
 export class PathJoint extends Mechanism {
     constructor(physics: Physics, base: PhysicsBody, follower: PhysicsBody, options: PathOptions);
@@ -1702,6 +1773,21 @@ export type ShapeOptions = {
     normal?: Vec3;
 };
 
+export interface TyreForces {
+    longitudinal: number;
+    lateral: number;
+}
+
+export interface TyreModel {
+    forces(sample: TyreSample): TyreForces;
+}
+
+export interface TyreSample {
+    slipRatio: number;
+    slipAngle: number;
+    load: number;
+}
+
 export interface UniversalJointOptions {
     anchorA?: Vec3;
     anchorB?: Vec3;
@@ -1723,6 +1809,7 @@ export class Vehicle implements PhysicsAttachment {
     maxEngineForce: number;
     maxBrakeForce: number;
     maxSteeringAngle: number;
+    readonly drivetrain: Drivetrain | null;
     constructor(physics: Physics, chassis: PhysicsBody, options: VehicleOptions);
     get wheelCount(): number;
     get valid(): boolean;
@@ -1744,6 +1831,7 @@ export interface VehicleInput {
     throttle?: number;
     steer?: number;
     brake?: number;
+    clutch?: number;
 }
 
 export interface VehicleOptions {
@@ -1751,6 +1839,13 @@ export interface VehicleOptions {
     maxEngineForce?: number;
     maxBrakeForce?: number;
     maxSteeringAngle?: number;
+    tyre?: TyreModel;
+    drivetrain?: Drivetrain;
+    antiRollBars?: readonly {
+        wheels: readonly [number, number];
+        stiffness: number;
+    }[];
+    wheelCast?: 'ray' | 'shape';
     groups?: number;
     predicate?: (collider: PhysicsCollider) => boolean;
     forward?: Vec3;
@@ -1786,6 +1881,10 @@ export interface WheelOptions {
     suspensionRelaxation?: number;
     maxSuspensionTravel?: number;
     maxSuspensionForce?: number;
+    cast?: 'ray' | 'shape';
+    width?: number;
+    inertia?: number;
+    tyre?: TyreModel;
     frictionSlip?: number;
     sideFrictionStiffness?: number;
     rollInfluence?: number;
@@ -1807,6 +1906,10 @@ export interface WheelState {
     hardPoint: [number, number, number];
     forwardImpulse: number;
     sideImpulse: number;
+    spin: number;
+    slipRatio: number;
+    slipAngle: number;
+    load: number;
 }
 
 export class WindField implements PhysicsAttachment {
@@ -1832,6 +1935,8 @@ export function addUniversalJoint(physics: Physics, bodyA: PhysicsBody, bodyB: P
 export function addWheelJoint(physics: Physics, chassis: PhysicsBody, wheel: PhysicsBody, options?: WheelJointOptions & {
     steerable?: boolean;
 }): WheelJoint;
+
+export function brushTyre(options?: BrushOptions): TyreModel;
 
 export function cleanTrimesh(vertices: Float32Array, indices: Uint32Array, options: MeshCleanOptions): {
     vertices: Float32Array;
@@ -1875,6 +1980,8 @@ export function meshConnectedComponents(indices: ArrayLike<number>): {
 };
 
 export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology;
+
+export function pacejkaTyre(options?: PacejkaOptions): TyreModel;
 
 export function trianglesAcross(vertices: ArrayLike<number>, indices: ArrayLike<number>): Int32Array;
 

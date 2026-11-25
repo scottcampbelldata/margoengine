@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18372027,
+  "total": 18376440,
   "history": [
     {
       "date": "2026-10-24",
@@ -11703,6 +11703,12 @@
       "commit": "0deff1fc7",
       "reason": "physics2d root entry grows from 19,291 B to 19,331 B (+40 B): Physics2D.counts (fourteen work counts) and seven more timing fields; the kernel Wasm is a file of its own",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "8bfcaf36c",
+      "reason": "vehicle tyre models (Magic Formula, brush), drivetrain, anti-roll bars and shape-cast wheels in the physics entry: physics base 77,941 to 79,955 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -12462,7 +12468,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 547193,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 77941,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 82354,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 467900,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,

@@ -2807,6 +2807,7 @@
       "ContactPointModification",
       "DistanceJoint",
       "DragJoint",
+      "Drivetrain",
       "DynamicCharacter",
       "GearJoint",
       "HeightfieldCell",
@@ -2825,6 +2826,7 @@
       "WindField",
       "addUniversalJoint",
       "addWheelJoint",
+      "brushTyre",
       "cleanTrimesh",
       "collisionGroups",
       "convertMesh",
@@ -2837,6 +2839,7 @@
       "loadKernel",
       "meshConnectedComponents",
       "meshHalfEdges",
+      "pacejkaTyre",
       "trianglesAcross",
       "voxelizedMesh",
       "voxelsFromPoints"
