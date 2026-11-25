@@ -141,6 +141,8 @@ interface TraceMeshInstance {
     id: string;
     mesh: string;
     transform?: readonly number[] | Float32Array;
+    previousTransform?: readonly number[] | Float32Array;
+    motionInterpolation?: 'matrix' | 'trs';
 }
 
 interface TraceModel {

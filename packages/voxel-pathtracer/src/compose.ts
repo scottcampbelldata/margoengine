@@ -10,6 +10,8 @@ import type {
   TraceVec3,
 } from '@margoengine/voxel-pathtracer';
 import {
+  MotionGate,
+  traceMeshMoving,
   traceMeshStats,
   type TraceGeometryBuilder,
   type TraceMeshStats,
@@ -84,6 +86,7 @@ async function geometry(
 
 class ComposedKernel extends VoxelPathTracer {
   #geometry: Uint32Array;
+  readonly motion = new MotionGate();
   #features: readonly VoxelTraceFeature[];
   protected constructor(options: PreparedOptions) {
     const { geometry, features, ...rest } = options;
@@ -94,7 +97,8 @@ class ComposedKernel extends VoxelPathTracer {
   static override attach(engine: EngineKernel, options: PreparedOptions): ComposedKernel {
     return super.attach(engine, options) as ComposedKernel;
   }
-  replace(scene: VoxelTraceScene, data: Uint32Array): void {
+  replace(scene: VoxelTraceScene, data: Uint32Array, motionError?: RangeError): void {
+    this.motion.check(this.options.shutter, motionError);
     const old = this.#geometry;
     this.#geometry = data;
     try {
@@ -103,9 +107,17 @@ class ComposedKernel extends VoxelPathTracer {
       this.#geometry = old;
       throw error;
     }
+    this.motion.error = motionError;
+  }
+  override setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void {
+    this.motion.check(options?.shutter);
+    super.setOptions(options);
   }
   protected override sceneWordReserve(): number {
     return this.#geometry.length;
+  }
+  protected override geometryMoving(): boolean {
+    return traceMeshMoving(this.#geometry);
   }
   override get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
     return { ...super.stats, ...traceMeshStats(this.#geometry) };
@@ -158,11 +170,10 @@ export class ComposedVoxelPathTracer {
     const builder = selected.find((f) => f.geometry)?.geometry?.();
     const words = await geometry(scene, builder, signal);
     signal?.throwIfAborted();
-    return new ComposedVoxelPathTracer(
-      ComposedKernel.attach(engine, { ...rest, scene, geometry: words, features: selected }),
-      selected,
-      builder,
-    );
+    new MotionGate().check(rest.shutter, builder?.motionError);
+    const kernel = ComposedKernel.attach(engine, { ...rest, scene, geometry: words, features: selected });
+    kernel.motion.error = builder?.motionError;
+    return new ComposedVoxelPathTracer(kernel, selected, builder);
   }
 
   /** Whether the tracer replaces the raster image. Default true. */
@@ -212,7 +223,7 @@ export class ComposedVoxelPathTracer {
     const update = this.#updates.then(async () => {
       const words = await geometry(snapshot, this.#builder, options.signal);
       options.signal?.throwIfAborted();
-      this.#tracer.replace(snapshot, words);
+      this.#tracer.replace(snapshot, words, this.#builder?.motionError);
     });
     this.#updates = update.catch(() => {});
     return update;

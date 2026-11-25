@@ -14,6 +14,14 @@ import type {
   VoxelTraceScene,
 } from './types.js';
 
+/** The fields of a triangle scene's mesh instance that the sequence fills in (see `@margoengine/voxel-pathtracer/mesh`). */
+interface MeshPlacement {
+  readonly id: string;
+  readonly transform?: readonly number[] | Float32Array;
+  readonly previousTransform?: readonly number[] | Float32Array;
+}
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
 /** The tracer calls a sequence makes; `VoxelPathTracer` and `MeshPathTracer` both fit. */
 export interface SequenceTracer<Scene extends VoxelTraceScene = VoxelTraceScene> {
   readonly options: Readonly<DisplaySettings & { shutter: number; previousCamera?: TracePreviousCamera }>;
@@ -70,8 +78,9 @@ export interface TraceFramesOptions<Scene extends VoxelTraceScene = VoxelTraceSc
   /**
    * Called before each frame with its {@link SequenceTiming}; may move the camera and return the frame's scene (or a
    * promise of it). A returned scene is set on the tracer; instances without `previousMatrix` that were in the last
-   * frame's scene (by id) get last frame's `matrix` as `previousMatrix` when `shutter` is above 0. Returning nothing
-   * keeps the scene, still.
+   * frame's scene (by id) get last frame's `matrix` as `previousMatrix` when `shutter` is above 0, and mesh instances
+   * (`meshInstances` of a triangle scene) without `previousTransform` get last frame's `transform` the same way.
+   * Returning nothing keeps the scene, still.
    */
   update?: (timing: SequenceTiming) => Scene | void | Promise<Scene | void>;
   /** Base seed, integer 0 to 4294967295. Default 0. */
@@ -177,6 +186,7 @@ export async function* traceFrames<Scene extends VoxelTraceScene>(
     savedCamera = saved.previousCamera ?? null;
   // Instance matrices at the end of the last update: this frame's shutter opens from them.
   let matrices = new Map<string, readonly number[]>(),
+    transforms = new Map<string, MeshPlacement['transform']>(),
     current: Scene | undefined,
     moved = false;
   const setScene = async (scene: Scene) => {
@@ -212,9 +222,31 @@ export async function* traceFrames<Scene extends VoxelTraceScene>(
                 return { ...instance, previousMatrix: before };
               })
             : instances;
-        await setScene(filled ? ({ ...current, instances: withMotion } as Scene) : current);
-        moved = filled;
+        const placements = (current as { meshInstances?: readonly MeshPlacement[] }).meshInstances;
+        let placed = false;
+        const meshMotion =
+          shutter > 0 && Array.isArray(placements)
+            ? placements.map((instance) => {
+                const before = transforms.get(instance.id);
+                if (instance.previousTransform || !transforms.has(instance.id)) return instance;
+                placed = true;
+                return { ...instance, previousTransform: before ?? IDENTITY };
+              })
+            : placements;
+        await setScene(
+          filled || placed
+            ? ({
+                ...current,
+                ...(filled ? { instances: withMotion } : {}),
+                ...(placed ? { meshInstances: meshMotion } : {}),
+              } as Scene)
+            : current,
+        );
+        moved = filled || placed;
         matrices = new Map(instances.map((instance) => [instance.id, instance.matrix]));
+        transforms = new Map(
+          Array.isArray(placements) ? placements.map((instance) => [instance.id, instance.transform]) : [],
+        );
       } else if (moved && current) {
         // Nothing changed since the last frame: its filled-in motion no longer applies.
         await setScene(current);

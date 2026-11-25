@@ -237,6 +237,7 @@ export class VoxelPathTracer implements EnginePlugin {
     protected tracingSource(): string;
     protected sceneWordReserve(): number;
     protected sceneStorage(words: Uint32Array): Uint32Array;
+    protected geometryMoving(): boolean;
     protected imageInstance(id: number): number;
     get enabled(): boolean;
     set enabled(value: boolean);

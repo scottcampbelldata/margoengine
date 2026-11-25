@@ -15,7 +15,13 @@ export type { TraceSpotLight } from './mesh-lights.js';
 export { parseTraceIES } from './mesh-ies.js';
 export type { TraceIESProfile, TraceIESParseOptions } from './mesh-ies.js';
 import { meshSource } from './mesh-shader.js';
-import { traceMeshStats, type TraceMeshStats, type VoxelTraceFeature } from './compose-types.js';
+import {
+  MotionGate,
+  traceMeshMoving,
+  traceMeshStats,
+  type TraceMeshStats,
+  type VoxelTraceFeature,
+} from './compose-types.js';
 export type { TraceMeshStats } from './compose-types.js';
 
 /** Mixed triangle geometry for a composed tracer. Wasm loads only during create/setScene. */
@@ -51,6 +57,16 @@ export interface TraceMeshInstance {
   mesh: string;
   /** Column-major affine 4x4, finite/invertible in Float32. Default identity. Reflections preserve outside orientation. */
   transform?: readonly number[] | Float32Array;
+  /**
+   * The transform at shutter open (the previous frame's), column-major like `transform`, for motion blur: with the
+   * tracer's `shutter` above 0 each path sees the instance at its own time between the two. Default none (still).
+   * An interval that becomes singular, or has shear or flips handedness under 'trs', is refused only when `shutter`
+   * is above 0, as for voxel instances.
+   */
+  previousTransform?: readonly number[] | Float32Array;
+  /** How the instance moves over the shutter: 'matrix' (default) blends the matrices componentwise, so every point moves
+   * on a straight line; 'trs' blends translation and scale and slerps the rotation, for spinning parts. */
+  motionInterpolation?: 'matrix' | 'trs';
 }
 
 /** Triangles and voxels share all paths, lights and the environment. */
@@ -99,6 +115,7 @@ function copyScene(scene: MeshTraceScene): MeshTraceScene {
 
 class TriangleTracer extends VoxelPathTracer {
   #geometry: Uint32Array;
+  readonly motion = new MotionGate();
   protected constructor(options: PreparedOptions) {
     const { geometry, ...rest } = options;
     super(rest);
@@ -107,7 +124,8 @@ class TriangleTracer extends VoxelPathTracer {
   static override attach(engine: EngineKernel, options: PreparedOptions): TriangleTracer {
     return super.attach(engine, options) as TriangleTracer;
   }
-  replace(scene: VoxelTraceScene, data: Uint32Array): void {
+  replace(scene: VoxelTraceScene, data: Uint32Array, motionError?: RangeError): void {
+    this.motion.check(this.options.shutter, motionError);
     const old = this.#geometry;
     this.#geometry = data;
     try {
@@ -116,9 +134,17 @@ class TriangleTracer extends VoxelPathTracer {
       this.#geometry = old;
       throw error;
     }
+    this.motion.error = motionError;
+  }
+  override setOptions(options: Partial<Omit<VoxelPathTracerOptions, 'scene'>>): void {
+    this.motion.check(options?.shutter);
+    super.setOptions(options);
   }
   protected override sceneWordReserve(): number {
     return this.#geometry.length;
+  }
+  protected override geometryMoving(): boolean {
+    return traceMeshMoving(this.#geometry);
   }
   override get stats(): VoxelPathTracer['stats'] & TraceMeshStats {
     return { ...super.stats, ...traceMeshStats(this.#geometry) };
@@ -158,7 +184,10 @@ export class MeshPathTracer {
     const builder = new MeshLightingBuilder();
     const geometry = await builder.build(scene, signal);
     signal?.throwIfAborted();
-    return new MeshPathTracer(TriangleTracer.attach(engine, { ...rest, scene, geometry }), builder);
+    new MotionGate().check(rest.shutter, builder.motionError);
+    const tracer = TriangleTracer.attach(engine, { ...rest, scene, geometry });
+    tracer.motion.error = builder.motionError;
+    return new MeshPathTracer(tracer, builder);
   }
 
   /** Whether the tracer replaces the raster image. Default true. */
@@ -205,7 +234,7 @@ export class MeshPathTracer {
     const update = this.#updates.then(async () => {
       const geometry = await this.#builder.build(snapshot, options.signal);
       options.signal?.throwIfAborted();
-      this.#tracer.replace(snapshot, geometry);
+      this.#tracer.replace(snapshot, geometry, this.#builder.motionError);
     });
     this.#updates = update.catch(() => {});
     return update;

@@ -245,6 +245,19 @@ the span with the whole film's slice for three framings; `packages/cutscene/test
 of a sub-framed span; the GPU check adds `renderFrames` with samples equal to `renderAccumulated`, byte for byte).
 Piece 3 (same day): `@margoengine/voxel-pathtracer/sequence` `traceFrames` traces one `renderImage` a frame, setting the tracer's `shutter` and `previousCamera` from last frame's camera pose and filling a moved instance's `previousMatrix` from last frame's matrix (Cook, Porter and Carpenter 1984, distributed ray tracing over the shutter); seeds are `frameSeed(seed, i)` per frame or fixed. The display mapping moved to `src/display.ts`, shared by `capture` and `pixels()` (tracer root unchanged). Evidence: `packages/voxel-pathtracer/tests/sequence.test.js` (call order, timing, seeds, motion fill, restore, abort) and `tests/sequence-browser.mjs` (WebGPU and the WebGL2 layer, the same figures): fixed noise bit-identical frames; a bar panned 16 px a frame with shutter 0.5 widens 7 px (8 expected, within 1), centroid 3.98 px (4 expected), energy within 1% of the mid-shutter still; `pixels()` equals the decoded `capture` PNG exactly. Missing: triangle-mesh instance motion (piece 4).
 Piece 5a (same day): `@margoengine/voxel-pathtracer/from-engine` `traceSceneFromEngine` turns core meshes into a `PBRMeshTraceScene` (one trace mesh per geometry and material, one placement per visible mesh at its world matrix, materials from `PbrMaterial.data`; arrays cached per `Geometry`, so BVHs are reused). Evidence: `packages/voxel-pathtracer/tests/from-engine.test.js` and `tests/from-engine-browser.mjs` (raster against traced silhouette, IoU 1.000 over 3,037 px on WebGPU and the WebGL2 layer). Missing: terrain (5b), scatter (5c), engine lighting.
+Piece 4a (same day): `@margoengine/voxel-pathtracer/mesh` mesh instances take `previousTransform` and
+`motionInterpolation`; the Rust kernel takes a moving instance's world box over its whole interval as its TLAS leaf
+(metadata bit 2), record word 31 points at a 32-word interval (shutter-open rows, TRS packet) and header word 11 counts
+moving instances so the tracer samples a time per path only then. The triangle walk builds an instance's model
+transform at the path's time once and the hit keeps it, so shading copies no motion rotation (the surface program stays
+at 3; each triangle walk holds one, as the compatibility-route program counts in `tests/compat-staged.test.js` now
+assert). Evidence: `tests/mesh-motion-browser.mjs` (RTX A6000, WebGPU and the WebGL2 layer on ANGLE Vulkan, both tracer
+entries): a translating quad and a turning, growing quad, each pixel within 5 binomial sigma of the closed-form time
+coverage (worst 3.8 sigma), energy within 0.07 %; shutter 0 and equal transforms render the still bit for bit; a
+singular interval is refused only while the shutter is open. CPU: `tests/mesh-motion.test.js` (swept root bounds,
+interval words, TRS packet, a moving emitter left out of the light table, refusals, the sequence fill) and the
+`moving_instance_keeps_its_interval_bounds_and_inverse` kernel test. Missing: deforming meshes (piece 4b) and a cost
+figure for long sweeps.
 
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 

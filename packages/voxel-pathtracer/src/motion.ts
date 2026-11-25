@@ -16,9 +16,9 @@ export interface InstanceMotion {
   readonly bounds: Float64Array;
 }
 
-const fail = (name: string, reason: string): never => {
+const fail = (name: string, reason: string, field: string): never => {
   throw new RangeError(
-    `VoxelPathTracer ${name} motion interval ${reason}; pass a previousMatrix that stays invertible, or motionInterpolation 'trs' for rotations`,
+    `VoxelPathTracer ${name} motion interval ${reason}; pass a ${field} that stays invertible, or motionInterpolation 'trs' for rotations`,
   );
 };
 const LINEAR = [0, 1, 2, 4, 5, 6, 8, 9, 10];
@@ -35,9 +35,9 @@ const matrix = (r: ArrayLike<number>): Float64Array =>
  * Refuses a componentwise-interpolated interval whose determinant reaches 0 (the inverse would be NaN mid-shutter):
  * det(B + tD) is a cubic in t, so its endpoints and the roots of its derivative bound it on [0, 1].
  */
-function checkMatrix(previous: ArrayLike<number>, current: ArrayLike<number>, name: string): void {
+function checkMatrix(previous: ArrayLike<number>, current: ArrayLike<number>, name: string, field: string): void {
   const scale = Math.max(largest(previous), largest(current));
-  if (!(scale > 0)) fail(name, 'is singular');
+  if (!(scale > 0)) fail(name, 'is singular', field);
   const b = columns(previous, scale),
     d = columns(current, scale).map((c, i) => c.map((v, k) => v - b[i][k]));
   const c0 = determinant(b[0], b[1], b[2]),
@@ -56,31 +56,33 @@ function checkMatrix(previous: ArrayLike<number>, current: ArrayLike<number>, na
   const sign = Math.sign(c0);
   for (const t of times)
     if (t >= 0 && t <= 1 && !(sign * (((c3 * t + c2) * t + c1) * t + c0) > DET_MARGIN))
-      fail(name, 'becomes singular between the two transforms');
+      fail(name, 'becomes singular between the two transforms', field);
 }
 
 /** Splits a transform's linear part into rotation and signed scale, refusing shear. */
-function decompose(rows: ArrayLike<number>, name: string): { q: number[]; scale: number[] } {
+function decompose(rows: ArrayLike<number>, name: string, field: string): { q: number[]; scale: number[] } {
   const magnitude = largest(rows),
     m = matrix(rows);
-  if (!(magnitude > 0)) fail(name, 'has a singular endpoint');
+  if (!(magnitude > 0)) fail(name, 'has a singular endpoint', field);
   for (const c of LINEAR) m[c] /= magnitude;
   m[12] = m[13] = m[14] = 0;
   const parts = decomposeAffine(m, TRS_TOLERANCE);
   if (!parts.lossless || parts.shear.some((v) => !(Math.abs(v) <= TRS_TOLERANCE)))
-    fail(name, "has shear, which motionInterpolation 'trs' does not support");
+    fail(name, "has shear, which motionInterpolation 'trs' does not support", field);
   const scale = parts.scale.map((v) => v * magnitude),
     q = parts.rotation.slice(),
     rebuilt = composeMatrix([0, 0, 0], q, scale, new Float64Array(16)),
     original = matrix(rows);
   for (const i of LINEAR)
-    if (!(Math.abs(rebuilt[i] - original[i]) <= TRS_TOLERANCE * magnitude)) fail(name, 'is not a rotation and scale');
+    if (!(Math.abs(rebuilt[i] - original[i]) <= TRS_TOLERANCE * magnitude))
+      fail(name, 'is not a rotation and scale', field);
   return { q, scale };
 }
 
 /**
  * Checks the interval from `previousRows` (shutter open) to `currentRows` (close), both 3x4 row-major, and returns
- * conservative world bounds over it plus, for 'trs', the packed rotation/scale the shader interpolates.
+ * conservative world bounds over it plus, for 'trs', the packed rotation/scale the shader interpolates. The object box
+ * runs from `origin` to `origin + size` (a voxel model's box starts at 0; a triangle mesh's at its lowest corner).
  * @throws RangeError when the interval becomes singular ('matrix'), or has shear or changes handedness ('trs').
  */
 export function instanceMotion(
@@ -89,13 +91,15 @@ export function instanceMotion(
   size: readonly number[],
   mode: 'matrix' | 'trs',
   name: string,
+  origin: readonly number[] = [0, 0, 0],
+  field = 'previousMatrix',
 ): InstanceMotion {
   const bounds = new Float64Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
   let payload: Float32Array | undefined;
   if (mode === 'trs') {
-    const open = decompose(previousRows, name),
-      close = decompose(currentRows, name);
-    if (open.scale.some((v, i) => Math.sign(v) !== Math.sign(close.scale[i]))) fail(name, 'changes handedness');
+    const open = decompose(previousRows, name, field),
+      close = decompose(currentRows, name, field);
+    if (open.scale.some((v, i) => Math.sign(v) !== Math.sign(close.scale[i]))) fail(name, 'changes handedness', field);
     const q0 = interpolateQuaternions(open.q, open.q, 0, LINEAR_ABOVE),
       q1 = interpolateQuaternions(q0, close.q, 1, LINEAR_ABOVE),
       dot = Math.max(
@@ -113,23 +117,29 @@ export function instanceMotion(
     payload.set(close.scale, 12);
     payload[11] = angle;
     payload[15] = dot > LINEAR_ABOVE ? 0 : 1 / Math.sin(angle);
-    if (!payload.every(Number.isFinite)) fail(name, 'is out of Float32 range');
-    // A rotating box stays within its largest scaled diagonal around the moving origin.
-    const radius = Math.hypot(...size.map((v, i) => v * Math.max(Math.abs(open.scale[i]), Math.abs(close.scale[i]))));
+    if (!payload.every(Number.isFinite)) fail(name, 'is out of Float32 range', field);
+    // A rotating box stays within its farthest scaled corner from the moving origin.
+    const radius = Math.hypot(
+      ...size.map(
+        (v, i) =>
+          Math.max(Math.abs(origin[i]), Math.abs(origin[i] + v)) *
+          Math.max(Math.abs(open.scale[i]), Math.abs(close.scale[i])),
+      ),
+    );
     for (let a = 0; a < 3; a++) {
       bounds[a] = Math.min(previousRows[a * 4 + 3], currentRows[a * 4 + 3]) - radius;
       bounds[a + 3] = Math.max(previousRows[a * 4 + 3], currentRows[a * 4 + 3]) + radius;
     }
-  } else checkMatrix(previousRows, currentRows, name);
+  } else checkMatrix(previousRows, currentRows, name, field);
   // Componentwise interpolation keeps each corner on the segment between its endpoint positions.
   for (const rows of [previousRows, currentRows])
     for (let corner = 0; corner < 8; corner++)
       for (let a = 0; a < 3; a++) {
         const o = a * 4,
           v =
-            rows[o] * (corner & 1 ? size[0] : 0) +
-            rows[o + 1] * (corner & 2 ? size[1] : 0) +
-            rows[o + 2] * (corner & 4 ? size[2] : 0) +
+            rows[o] * (origin[0] + (corner & 1 ? size[0] : 0)) +
+            rows[o + 1] * (origin[1] + (corner & 2 ? size[1] : 0)) +
+            rows[o + 2] * (origin[2] + (corner & 4 ? size[2] : 0)) +
             rows[o + 3];
         bounds[a] = Math.min(bounds[a], v);
         bounds[a + 3] = Math.max(bounds[a + 3], v);

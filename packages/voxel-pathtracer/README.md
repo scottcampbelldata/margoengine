@@ -1103,7 +1103,8 @@ engine.dispose();
   with `frameSeed(seed, i)`; `'fixed'` uses `seed` for every frame), `preRoll` (frames updated before frame 0 but not
   traced, default 0), `denoise`, `aovs`, `transparent` and `signal`.
 - Instances without `previousMatrix` that were in the last frame's scene (matched by `id`) get last frame's `matrix` as
-  `previousMatrix` while `shutter` is above 0; one you set yourself wins. A frame whose `update` returns nothing after a
+  `previousMatrix` while `shutter` is above 0, and mesh instances (`meshInstances`) without `previousTransform` get last
+  frame's `transform` the same way; one you set yourself wins. A frame whose `update` returns nothing after a
   moving frame sets the scene again without that motion, so a stopped object is sharp.
 - The first update has no pose before it, so frame 0 is sharp unless `preRoll` is at least 1 (the pre-roll frame gives
   frame 0 its opening pose).
@@ -1322,8 +1323,9 @@ a promise of exact intersection for all ill-conditioned triangles.
 
 Surfaces are double-sided. Optional per-vertex `normals` shade smoothly and optional `uvs` select
 texels of a palette `texture` (repeat wrapping, nearest sampling). Diffuse, plastic, metal, emission,
-blend and glass use the root BSDFs. `meshInstances` places one mesh many times over a shared BLAS.
-Palette `cutout` and motion blur are not part of this entry; the `/mesh-pbr` entry adds glTF alpha
+blend and glass use the root BSDFs. `meshInstances` places one mesh many times over a shared BLAS, and a
+moving instance blurs (see "Moving mesh instances" below); deforming meshes (vertices that move) do not blur yet.
+Palette `cutout` is not part of this entry; the `/mesh-pbr` entry adds glTF alpha
 coverage, texture channels and glTF snapshots. For glass, supply a closed,
 consistently outward-wound shell of one material, with the camera outside; overlapping/nested mesh
 volumes and mesh media are unsupported. Emissive triangles are light sources: next-event estimation
@@ -1343,6 +1345,56 @@ and captures. `enabled`, `ready`, `status`, `error`, `options`, `stats`, renderi
 reset, disposal and `Symbol.dispose` follow the root lifecycle. `raycast` remains CPU voxel picking.
 With image `aovs`, `instance <= -4` means triangle ordinal `-instance - 4`, in mesh order then index
 triplet order; `palette` is zero for triangles. Sky/ground/area and voxel ids keep their root meanings.
+
+### Moving mesh instances
+
+Give a mesh instance `previousTransform` (column-major, its transform at shutter open, as a frame earlier) and set the
+tracer's `shutter` above 0: every path sees the instance at its own time between `previousTransform` and `transform`
+(distributed ray tracing, Cook, Porter and Carpenter 1984), so the image holds the time-averaged picture.
+`motionInterpolation: 'matrix'` (default) blends the matrices componentwise, so every point moves on a straight line;
+`'trs'` blends translation and scale and slerps the rotation, for wheels and propellers. The instance's TLAS leaf bounds
+its whole sweep; its shared BLAS is unchanged and still instances cost nothing more.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { MeshPathTracer } from 'margoengine/voxel-pathtracer/mesh';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 4], target: [0, 0, 0]},
+});
+const quad = {id: 'quad', material: 1,
+  positions: new Float32Array([-0.25, -0.25, 0, 0.25, -0.25, 0, 0.25, 0.25, 0, -0.25, 0.25, 0]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3])};
+const tracer = await MeshPathTracer.create(engine, {
+  scene: {
+    revision: 1, models: [], instances: [], meshes: [quad],
+    materials: [{id: 1, type: 'emit', color: [1, 0.8, 0.5], emission: 2}],
+    meshInstances: [{id: 'card', mesh: 'quad',
+      previousTransform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.5, 0, 0, 1],
+      transform: [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0.5, 0, 0, 1],
+      motionInterpolation: 'trs'}],
+    environment: {skyIntensity: 0, sunIntensity: 0},
+  },
+  shutter: 1,
+  denoise: false,
+  signal: AbortSignal.timeout(30_000),
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 64, signal: AbortSignal.timeout(30_000)});
+console.log(tracer.stats.meshInstances, image.width); // 1 64
+tracer.dispose();
+engine.dispose();
+```
+
+- With `shutter` 0, or a `previousTransform` equal to `transform`, the instance takes the still path, bit for bit.
+- An interval that becomes singular half way (a mirror blended into its unmirrored self), or that has shear or flips
+  handedness under `'trs'`, is refused with a `RangeError` naming `previousTransform`, but only while the shutter is
+  open: `create`, `setScene` and `setOptions({shutter})` refuse it then, as for voxel instances' `previousMatrix`.
+- A moving emissive instance is left out of next-event estimation (its light records would sit at one pose), so its
+  light reaches surfaces only by path hits: unbiased, but noisier than a still emitter's light (`docs/limits.md`).
+- `traceFrames` (`/sequence`) fills `previousTransform` from each instance's last-frame `transform`.
+- Evidence: `tests/mesh-motion.test.js` (packet, refusals, sequence fill) and `tests/mesh-motion-browser.mjs` (`npm run
+  test:gpu:mesh-motion`: each pixel within 5 binomial sigma of the closed-form time coverage of a translating and of a
+  turning, growing quad, energy within 1 %, both tracer entries, WebGPU and the WebGL2 layer).
 
 Native WebGPU and WebGL2 compatibility execute the same geometry path. Plain WebGL2 returns
 `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer). Generated GPU tests

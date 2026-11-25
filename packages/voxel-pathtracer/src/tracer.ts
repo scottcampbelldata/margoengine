@@ -437,6 +437,11 @@ export class VoxelPathTracer implements EnginePlugin {
     return words;
   }
 
+  /** Whether optional geometry moves over the shutter, so each path samples its own time when `shutter` is above 0. */
+  protected geometryMoving(): boolean {
+    return false;
+  }
+
   /** Decode a non-voxel instance AOV, reserving optional geometry ids for subclasses. */
   protected imageInstance(id: number): number {
     return id === -2 ? -2 : id === -3 ? -3 : -1;
@@ -1412,7 +1417,7 @@ export class VoxelPathTracer implements EnginePlugin {
     if (sunOn) flags |= FLAG_SUN;
     if (e.ground) flags |= FLAG_GROUND;
     if (env) flags |= FLAG_ENV;
-    if ((s.moving || cameraMotion) && o.shutter > 0) flags |= FLAG_MOTION;
+    if ((s.moving || cameraMotion || this.geometryMoving()) && o.shutter > 0) flags |= FLAG_MOTION;
     // Projection: mode (0 camera, 1 panorama, 2 fisheye), fisheye mapping (0 equidistant, 1 equisolid, 2
     // stereographic), distortion on, panorama fit (1: by height); fov and sin(fov / 4), or tan(fov / 4) for the
     // stereographic mapping; the Brown-Conrady coefficients.

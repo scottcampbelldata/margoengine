@@ -149,6 +149,7 @@ interface TraceFog {
 interface TraceGeometryBuilder {
     build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
     dispose(): void;
+    readonly motionError?: RangeError;
 }
 
 interface TraceIESProfile {
@@ -201,6 +202,8 @@ interface TraceMeshInstance {
     id: string;
     mesh: string;
     transform?: readonly number[] | Float32Array;
+    previousTransform?: readonly number[] | Float32Array;
+    motionInterpolation?: 'matrix' | 'trs';
 }
 
 interface TraceModel {

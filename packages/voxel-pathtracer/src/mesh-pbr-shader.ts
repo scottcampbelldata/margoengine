@@ -112,7 +112,7 @@ fn pbrMaterial(h:Hit,l:vec3f,input:Mat)->Mat {
  m.seen=vec4f(0.0);return m;
 }
 fn pbrDirection(h:Hit,v:vec3f)->vec3f {
- let x=meshX(h.mesh);return vec3f(dot(x.r0.xyz,v),dot(x.r1.xyz,v),dot(x.r2.xyz,v));
+ let x=meshWorld(h);return vec3f(dot(x.r0.xyz,v),dot(x.r1.xyz,v),dot(x.r2.xyz,v));
 }
 fn pbrMappedNormal(h:Hit,mapSlot:u32,scale:f32)->vec3f {
  let r=pbrRecord(h);
@@ -127,7 +127,7 @@ fn pbrMapNormal(h:Hit,r:u32,mapSlot:u32,scale:f32,texel:vec4f)->vec3f {
  let info=scene[2]+scene[h.mesh+28u];var t:vec3f;var hand=1.0;
  if(scene[info+2u]!=0u){
   let tangent=pbrAttribute(h,8u);t=pbrDirection(h,tangent.xyz);hand=tangent.w;
-  let x=meshX(h.mesh);hand*=select(1.0,-1.0,dot(cross(x.r0.xyz,x.r1.xyz),x.r2.xyz)<0.0);
+  let x=meshModel(h);hand*=select(1.0,-1.0,dot(cross(x.r0.xyz,x.r1.xyz),x.r2.xyz)<0.0);
  }else{
   let slot=scene[2]+scene[r+16u+mapSlot];let uvSet=scene[slot+3u];
   let a=pbrVertex(h,0u)+(uvSet/2u)*4u;let b=pbrVertex(h,1u)+(uvSet/2u)*4u;let c=pbrVertex(h,2u)+(uvSet/2u)*4u;
@@ -196,7 +196,7 @@ export function meshPBRSource(input: string): string {
   );
   edit(
     '  (*h).t=t;(*h).inst=TRIANGLE;',
-    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back,t)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
+    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.ml=lx;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back,t)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
   );
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');

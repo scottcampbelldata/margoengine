@@ -39,9 +39,11 @@ function harness() {
       return new Proxy(
         {},
         {
-          get: (_, name) => (...args) => {
-            if (name === 'setBindGroup' && args[0] === 2) pass.step = args[2][0] / 256;
-          },
+          get:
+            (_, name) =>
+            (...args) => {
+              if (name === 'setBindGroup' && args[0] === 2) pass.step = args[2][0] / 256;
+            },
         },
       );
     };
@@ -78,7 +80,14 @@ test('a 480 x 300 sample is one part of the route, and parts stay within 1.5 tim
   assert.deepEqual(partPlan(480, 300, 7, bytes), { rows: 300, samples: 1 });
   assert.deepEqual(partPlan(1024, 1024, 1, bytes), { rows: 128, samples: 1 });
   assert.deepEqual(partPlan(96, 64, 16, bytes), { rows: 64, samples: 16 });
-  for (const [w, r, n] of [[480, 300, 7], [1500, 1100, 4], [96, 64, 16], [4096, 3, 9], [7, 5, 3000], [3840, 2160, 1]]) {
+  for (const [w, r, n] of [
+    [480, 300, 7],
+    [1500, 1100, 4],
+    [96, 64, 16],
+    [4096, 3, 9],
+    [7, 5, 3000],
+    [3840, 2160, 1],
+  ]) {
     const p = partPlan(w, r, n, bytes);
     assert.ok(w * p.rows * p.samples <= 1.5 * 2 ** 17, `${w} x ${r} x ${n}: ${JSON.stringify(p)}`);
     assert.ok(w * p.rows * p.samples * bytes <= 307e6, `${w} x ${r} x ${n}: state`);
@@ -94,7 +103,9 @@ test('a 480 x 300 sample is one part of the route, and parts stay within 1.5 tim
 
 // The light kinds a pass draws (sample, shadow and gather passes, by their step slot: kind x pages + page).
 const kindsOf = (passes, pages) =>
-  [...new Set(passes.filter((p) => /(sample|shadow|gather)$/.test(p.label)).map((p) => Math.floor(p.step / pages)))].sort();
+  [
+    ...new Set(passes.filter((p) => /(sample|shadow|gather)$/.test(p.label)).map((p) => Math.floor(p.step / pages))),
+  ].sort();
 const sun = { skyColor: [0.6, 0.7, 1], sunIntensity: 2, sunDirection: [0.3, 0.8, 0.5] };
 
 test('the route draws no pass for a light kind the frame switches off', async () => {
@@ -129,9 +140,16 @@ test('a light kind past every bound the mesh feature sets draws no pass', async 
   const { readFileSync } = await import('node:fs'),
     shader = readFileSync(new URL('../src/mesh-light-shader.ts', import.meta.url), 'utf8'),
     build = readFileSync(new URL('../src/mesh-light-build.ts', import.meta.url), 'utf8'),
-    unset = /fn meshProposalCount\(\)->u32 \{let header=meshLights\(\);if\(header==0u\)\{return (\d+)u;\}return scene\[header\+4u\];\}/.exec(shader),
-    set = [...build.matchAll(/lights\[lights\[12\]!\+4\]=(\d+);/g)];
+    unset =
+      /fn meshProposalCount\(\)->u32 \{let header=meshLights\(\);if\(header==0u\)\{return (\d+)u;\}return scene\[header\+4u\];\}/.exec(
+        shader,
+      ),
+    set = [...build.matchAll(/lights\[lights\[12\]!\s*\+\s*4\]\s*=\s*(\d+);/g)];
   assert.ok(unset && set.length === 1, 'the mesh feature sets its bound in the two places this test reads');
   assert.ok(Number(unset[1]) <= MAX_LIGHT_KINDS && Number(set[0][1]) <= MAX_LIGHT_KINDS);
-  assert.equal(MAX_LIGHT_KINDS, Number(set[0][1]), 'no kind is drawn past the largest bound (8 drew kind 7 for nothing)');
+  assert.equal(
+    MAX_LIGHT_KINDS,
+    Number(set[0][1]),
+    'no kind is drawn past the largest bound (8 drew kind 7 for nothing)',
+  );
 });

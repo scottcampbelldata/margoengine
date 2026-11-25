@@ -445,8 +445,10 @@ fn build(input: &[u32]) -> Result<Vec<u32>, u32> {
 
 // Two-level instancing: transform bounds once, leave shared triangles untouched.
 // Input records: object bounds (8), column-major affine matrix (16), metadata (4).
-// Metadata flags: bit 0 is empty; bit 1 identifies branch()'s one-ULP BLAS padding.
+// Metadata flags: bit 0 is empty; bit 1 identifies branch()'s one-ULP BLAS padding; bit 2 marks a moving instance,
+// whose bounds words already hold its world bounds over the whole motion interval (FG-17 motion blur).
 // Output records: world/local row-major 3x4 (24), metadata (4), padding (4).
+const MOVING_LIMIT: f64 = 1e8 * (1.0 + 1.0 / 32768.0);
 fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
     if input.len() % 28 != 0 || input.len() / 28 > 1_000_000 { return Err(1); }
     let mut bounds = Vec::new();
@@ -467,8 +469,22 @@ fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
         }
         if local.iter().flatten().any(|v| !v.is_finite() || v.abs() > 1e8) { return Err(1); }
         // Empty definitions have no TLAS leaf, but must still validate their placement.
-        if record[27] & !3 != 0 { return Err(1); }
+        if record[27] & !7 != 0 { return Err(1); }
         if record[27] & 1 != 0 { continue; }
+        if record[27] & 4 != 0 {
+            let lo: [f32; 3] = std::array::from_fn(|a| f32::from_bits(record[a]));
+            let hi: [f32; 3] = std::array::from_fn(|a| f32::from_bits(record[4 + a]));
+            // The interval's endpoint geometry is within the public limit; its outward padding may pass it by 2^-15.
+            if (0..3).any(|a| !(lo[a] <= hi[a]) || !(lo[a].abs() as f64 <= MOVING_LIMIT) || !(hi[a].abs() as f64 <= MOVING_LIMIT)) { return Err(1); }
+            bounds.push(Triangle {
+                words: [0;16], attributes: None, indices: [0;3],
+                lo: lo.map(f32::next_down), hi: hi.map(f32::next_up),
+                center: std::array::from_fn(|a| (lo[a] as f64 + hi[a] as f64) * 0.5),
+            });
+            for rows in [world, local] { records.extend(rows.into_iter().flatten().map(|v| (v as f32).to_bits())); }
+            records.extend_from_slice(&record[24..27]); records.push(0); records.extend([0;4]);
+            continue;
+        }
         let object_lo: [f64; 3] = std::array::from_fn(|a| f32::from_bits(record[a]) as f64);
         let object_hi: [f64; 3] = std::array::from_fn(|a| f32::from_bits(record[4+a]) as f64);
         if (0..3).any(|a| !object_lo[a].is_finite() || !object_hi[a].is_finite() || object_lo[a] > object_hi[a]) { return Err(1); }
@@ -555,6 +571,31 @@ mod tests {
             for at in 0..len { both[len+at]^=0x80000000;assert!(!equal_words_slice(&both));both[len+at]^=0x80000000; }
         }
         assert!(!equal_words_slice(&[0]));
+    }
+    #[test]
+    fn moving_instance_keeps_its_interval_bounds_and_inverse() {
+        let mut packet = vec![0u32;28];
+        // World bounds over the interval, as motion.ts packs them, and the shutter-close matrix.
+        for (a, (lo, hi)) in [(-1f32, 9f32), (0., 1.), (2., 3.)].into_iter().enumerate() {
+            packet[a] = lo.to_bits(); packet[4 + a] = hi.to_bits();
+        }
+        let matrix: [f32;16] = [1.,0.,0.,0., 0.,1.,0.,0., 0.,0.,1.,0., 8.,0.,2.,1.];
+        packet[8..24].copy_from_slice(&matrix.map(f32::to_bits));
+        packet[24..28].copy_from_slice(&[100,20,9,6]);
+        let out=build_instance_packet(&packet).unwrap();
+        for (a,(low,high)) in [(-1.,9.),(0.,1.),(2.,3.)].into_iter().enumerate() {
+            assert!(f32::from_bits(out[4+a]) < low && f32::from_bits(out[4+a]) > low - 1e-5);
+            assert!(f32::from_bits(out[8+a]) > high && f32::from_bits(out[8+a]) < high + 1e-5);
+        }
+        // The local rows are the inverse of the shutter-close transform; metadata follows; word 31 is left for TS.
+        assert_eq!(f32::from_bits(out[12+12+3]), -8.0);
+        assert_eq!(&out[12+24..12+32], &[100,20,9,0,0,0,0,0]);
+        // Bounds out of order, not finite or past the padded limit are refused.
+        for bad in [[5f32, 4.], [f32::NAN, 1.], [0., 1.0001e8]] {
+            let mut p = packet.clone(); p[0] = bad[0].to_bits(); p[4] = bad[1].to_bits();
+            assert!(build_instance_packet(&p).is_err());
+        }
+        let mut p = packet.clone(); p[27] = 8; assert!(build_instance_packet(&p).is_err());
     }
     #[test]
     fn instance_bounds_inverse_and_rejections() {
@@ -733,6 +774,8 @@ fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
     let mut lights:Vec<[u32;24]>=Vec::new();let mut lookups=Vec::new();let mut total=0.0f64;
     for i in 0..g[4] as usize {
         let instance=g[5] as usize+i*32;
+        // A moving instance's light records would sit at one pose of its interval: its emission is found by path hits.
+        if g[instance+31]!=0 {continue;}
         let head=g[instance+24] as usize;let start=head+g[head+1] as usize;
         let count=g[head+2] as usize;let table=out.len();out.resize(table+count,0);out[instance+30]=table as u32;
         for j in 0..count {

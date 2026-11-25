@@ -41,6 +41,7 @@ export interface ComposedVoxelPathTracerOptions<Scene extends VoxelTraceScene = 
 export interface TraceGeometryBuilder {
     build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
     dispose(): void;
+    readonly motionError?: RangeError;
 }
 
 export interface TraceMeshStats {
@@ -222,6 +223,7 @@ class VoxelPathTracer implements EnginePlugin {
     protected tracingSource(): string;
     protected sceneWordReserve(): number;
     protected sceneStorage(words: Uint32Array): Uint32Array;
+    protected geometryMoving(): boolean;
     protected imageInstance(id: number): number;
     get enabled(): boolean;
     set enabled(value: boolean);

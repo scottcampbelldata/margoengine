@@ -11898,3 +11898,15 @@ The air on a cloth's faces is a flat plate's drag, coefficient 1.17 (S. F. Hoern
 light face in a strong wind cannot overshoot. Proof: `packages/physics/tests/soft.test.js` (the sag of a cotton strip
 against an elastic cable's, d = L (3 rho_A g L / (64 K))^(1/3); the inextensible sheet at 0.1 percent; ATTACHKICK1; the
 two drape cases) and `soft-kernel/tests/threads.rs`.
+
+### Mesh instance motion blur in the path tracer (FG-17 piece 4a, 2026-11-25)
+
+`packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-shader.ts`, `motion.ts` and `mesh-kernel/src/lib.rs`. A
+moving triangle instance is seen by each path at the path's own time in the shutter, the time-averaged picture of
+distributed ray tracing (Robert L. Cook, Thomas Porter and Loren Carpenter, "Distributed Ray Tracing", SIGGRAPH 1984,
+https://doi.org/10.1145/964965.808590). Its TLAS leaf holds the box swept over the whole interval, the one-box-per-node
+form of a motion BVH (Sven Woop, Attila T. Afra and Carsten Benthin, "STBVH: A Spatial-Temporal BVH for Efficient
+Multi-Segment Motion Blur", HPG 2017, https://doi.org/10.1145/3105762.3105779, section 2 on bounding a linear motion
+by the union of its key-frame boxes; the per-node two-box form of their paper is for piece 4b). The rotation blend is the
+existing voxel 'trs' path (shortest-arc slerp, Ken Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985,
+https://doi.org/10.1145/325165.325242). Written from these papers; no renderer's code was read.

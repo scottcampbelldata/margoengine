@@ -64,6 +64,8 @@ export interface TraceMeshInstance {
     id: string;
     mesh: string;
     transform?: readonly number[] | Float32Array;
+    previousTransform?: readonly number[] | Float32Array;
+    motionInterpolation?: 'matrix' | 'trs';
 }
 
 export interface TraceMeshStats {
@@ -168,6 +170,7 @@ interface TraceFog {
 interface TraceGeometryBuilder {
     build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
     dispose(): void;
+    readonly motionError?: RangeError;
 }
 
 interface TraceGrid {
@@ -267,6 +270,7 @@ class VoxelPathTracer implements EnginePlugin {
     protected tracingSource(): string;
     protected sceneWordReserve(): number;
     protected sceneStorage(words: Uint32Array): Uint32Array;
+    protected geometryMoving(): boolean;
     protected imageInstance(id: number): number;
     get enabled(): boolean;
     set enabled(value: boolean);

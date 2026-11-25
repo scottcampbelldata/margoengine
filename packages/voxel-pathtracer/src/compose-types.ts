@@ -27,6 +27,11 @@ export function traceMeshStats(words: Uint32Array): TraceMeshStats {
   };
 }
 
+/** Whether a mesh packet holds a moving instance (two-level packets count them in word 11). */
+export function traceMeshMoving(words: Uint32Array): boolean {
+  return words[1] === 0 && words[9] === 0x4d494e53 && (words[11] ?? 0) > 0;
+}
+
 /** Validate optional factory settings before selecting defaults or allocating resources. */
 export function validateFeatureOptions(options: unknown, name: string): void {
   if (!options || typeof options !== 'object' || Array.isArray(options))
@@ -42,6 +47,17 @@ export interface TraceGeometryBuilder {
   build(scene: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array>;
   /** Release cached CPU geometry; idempotent. */
   dispose(): void;
+  /** The motion interval error of the last built scene, which the tracer raises only when its shutter opens. */
+  readonly motionError?: RangeError;
+}
+
+/** Holds a scene's motion interval error and raises it whenever the shutter is above 0 (as voxel instances do). */
+export class MotionGate {
+  error: RangeError | undefined;
+  /** Throws `error` when `shutter` opens the shutter. */
+  check(shutter: unknown, error = this.error): void {
+    if (error && typeof shutter === 'number' && shutter > 0) throw error;
+  }
 }
 
 /** A validated feature from an optional entry. Import only the features your scene needs. */

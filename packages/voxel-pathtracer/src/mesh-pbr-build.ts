@@ -59,6 +59,10 @@ function texture(t: TracePBRTexture): void {
 /** Owns the optional PBR packet while retaining the existing geometry cache lifetime. */
 export class PBRMeshBuilder implements TraceGeometryBuilder {
   #mesh = new TraceMeshBuilder();
+  /** The motion interval error of the last built scene. */
+  get motionError(): RangeError | undefined {
+    return this.#mesh.motionError;
+  }
   async build(input: VoxelTraceScene, signal?: AbortSignal): Promise<Uint32Array> {
     signal?.throwIfAborted();
     const s = input as PBRMeshTraceScene;
