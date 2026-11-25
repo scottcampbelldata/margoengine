@@ -214,6 +214,27 @@ const p3 = convertColor([1, 0, 0], SRGBColorSpace, DisplayP3ColorSpace); // abou
 const back = convertColor(p3, DisplayP3ColorSpace, SRGBColorSpace); // about [1, 0, 0]
 ```
 
+`@margoengine/math/fields` holds the contracts of the physics framework's shared fields ([docs/physics-framework.md](../../docs/physics-framework.md), section 4) as types only, so importing it adds no code. `FlowField` is a flow of air or water you can sample anywhere: `sample(x, y, z, t, out?)` gives the velocity (m/s), density (kg/m^3) and temperature (K) at a point `cell` metres from the field's origin cell and at time `t` on the world clock, and it is pure, so any solver samples it at its own rate and a replay sees the same flow. `Wind` is the flow field of air the atmosphere owns; sails, trees, birds and the sea read it, and whatever responds to flow (a tree in the wind, kelp in a current) takes any `FlowField` with its medium's density. `FollowTarget` is the pose, velocity and acceleration of something a camera can follow, at a frame's time, in its origin cell; a `FollowSource` lists them for a frame.
+
+```ts
+import type {FlowSample, Wind} from '@margoengine/math/fields';
+
+// A steady breeze of 5 m/s along +x in sea-level air.
+const breeze: Wind = {
+  medium: 'air',
+  cell: [0, 0, 0],
+  sample(_x, _y, _z, _t, out: FlowSample = {velocity: [0, 0, 0], density: 0, temperature: 0}) {
+    out.velocity[0] = 5;
+    out.velocity[1] = 0;
+    out.velocity[2] = 0;
+    out.density = 1.225;
+    out.temperature = 288.15;
+    return out;
+  },
+};
+console.log(breeze.sample(0, 10, 0, 0).velocity); // [5, 0, 0]
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). The classes do not validate their numbers, so NaN propagates; the array helpers, `OBB`, `billboardRotation`, the Euler order and the degree functions throw `RangeError`. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()`, `hsl()` (hue as a number of degrees or with `deg`, `grad`, `rad` or `turn`) and `color()`, but not named colors. `SRGBToLinear` and `LinearToSRGB` continue their linear segment below 0 (bit for bit as the copies they replaced); `Color` and `convertColor` mirror the curve there, as the CSS Color 4 sample code does, so an out-of-gamut channel converts as browsers convert it. `Plane` methods accept a normal of any length (`normalize()` makes `distanceToPoint` a true distance). Not included: Matrix2, `Vector3.project` and `unproject` on the base `Vector3` (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, or the `compat` entry below, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Porting and curves: `@margoengine/math/compat` has subclasses of `Matrix4`, `Vector3`, `Quaternion`, `Plane`, `Ray`, `Box3` and `Color` with the extra methods ported code expects (such as `Matrix4.makeBasis`, `extractRotation`, `makeShear`; `Vector3.applyEuler`, `project`, `unproject`; `Ray.distanceSqToSegment`; `Box3.intersectsTriangle`; `Color.getStyle`, `offsetHSL`, `lerpHSL`), so the base entries keep their size. `@margoengine/math/curve` has `Curve` and `CurveSet` (editable keyed curves: linear, step, smoothstep or cubic with natural, flat or wrap ends) and the `Interpolant` classes over sampled data; `CurveSet.type` is the mode last set on the whole set.

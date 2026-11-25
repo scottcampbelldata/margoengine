@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18670398,
+  "total": 18670674,
   "history": [
     {
       "date": "2026-10-24",
@@ -11877,6 +11877,12 @@
       "commit": "fce2a245a",
       "reason": "@margoengine/navmesh root 8808 -> 10328 B gzip: the Crowd keeps agents off the navmesh border with hard ORCA wall half-planes, passes route corners by straight view and arrives where it meets a group at a taken target (KB-CROWD-WALL1, KB-CROWD-CORNER1, KB-CROWD-ARRIVE1). The Crowd is exported from the root entry, so a split would move it to a new entry and break the root API; only navmesh grows here.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "49fa63c26",
+      "reason": "@margoengine/math/fields: new entry, 20 B gzip: the shared-field contracts of the physics framework (wind and any flow, follow targets) as types only, an empty module at run time.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12541,6 +12547,7 @@
     "@margoengine/math/euler": 1301,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/geo": 2372,
+    "@margoengine/math/fields": 276,
     "@margoengine/math/line3": 2267,
     "@margoengine/math/mat4": 1934,
     "@margoengine/math/mathutils": 1138,

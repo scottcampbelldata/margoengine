@@ -108,6 +108,10 @@
       "types": "./dist/geo.d.ts",
       "import": "./dist/geo.js"
     },
+    "./fields": {
+      "types": "./dist/fields.d.ts",
+      "import": "./dist/fields.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"
