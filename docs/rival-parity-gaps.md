@@ -73,7 +73,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Greased Line: per-point width and colour | Babylon | DONE | S | 61f3dcf3f (colorMode; per-point colour and width EXISTS: packages/lines/src/line.ts, packages/lines/src/stroke.ts) |
 | Geospatial camera with terrain collision and geo maths | Babylon | PARTIAL | M |  |
 | Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | PARTIAL | M to L |  |
-| Voice chat and screen share over the netcode WebRTC transport | Needle | MISSING | M |  |
+| Voice chat and screen share over the netcode WebRTC transport | Needle | DONE | M | 8092aaee6 |
 
 ## Needs Scott or hardware first
 
