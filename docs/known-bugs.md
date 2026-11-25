@@ -1272,8 +1272,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   field and a delta (`this.elapsed = Math.min(1e7, this.elapsed + delta)`, `this.focus = goal + (this.focus - goal) *
   Math.exp(-rate * delta)`): 14 lines in files with no `advanceTime` that the check passes today, among them
   post/src/stylize.ts:95, cinematic/src/lens.ts:107-108, transitions/src/index.ts:159 and live.ts:283,
-  studio/src/pathtrace.ts:166, tween/src/inertia.ts:138, voxel/src/query.ts:512, ragdoll/src/balance.ts:366,
-  controls/src/walk.ts:453 and presentation.ts:630, ui/src/meters.ts:128, physics2d/src/physics.ts:272 and
+  studio/src/pathtrace.ts:177, tween/src/inertia.ts:196, voxel/src/query.ts:512, ragdoll/src/balance.ts:366,
+  controls/src/walk.ts:453 and presentation.ts:633, ui/src/meters.ts:128, physics2d/src/physics.ts:272 and
   voxel-net/src/client.ts:358.
 - **Cause:** the rule's second form matches only `this.x = (this.x + ... delta`, with the field first inside the
   brackets; a clamp, an ease toward a goal or a decay wraps it and passes. Found while fixing KB-CHECKS-WAITS-FILMTIME1.
@@ -1291,7 +1291,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   0 (packages/armies/test/armies-check.html, creative/tests/grass-settings-browser.mjs,
   environment/tests/sky-occlusion-browser.js, scatter/test/settings.browser.mjs and terrain's ground-change-scatter,
   ground-change-terrain and wet-ground browser tests). `node scripts/check-film-time.mjs` exited 1: two unreviewed
-  `delta` uses, packages/post/src/heat-haze.ts:334 and packages/terrain/src/colors.ts:699.
+  `delta` uses, packages/post/src/heat-haze.ts:347 and packages/terrain/src/colors.ts:706.
 - **Cause:** landings that did not run the two root tests: a428bca814 (armies settle, 3 frames), 77be4e76e4 and
   b9bd0b359e (grass and scatter settings sweeps, their reason two lines above the loop, where the check does not look),
   6b734b9b53 (sky occlusion, 3 renders), e3ee03ea58 and 7fa9424092 (ground change, 3 and 4 frames), b0d0892ae7 (wet
@@ -15044,7 +15044,7 @@ as unsupported by the light loader.
 
 ## Batch 132 audit: sky (fixed and open)
 
-- Fixed: `dispose()` of `Sky` (base.ts:662), `AerialPerspective`, `AstroSky`, `HillaireSky`, `LightShafts`,
+- Fixed: `dispose()` of `Sky` (base.ts:1316), `AerialPerspective`, `AstroSky`, `HillaireSky`, `LightShafts`,
   `VolumetricClouds`, `Weather` and `WeatherFX` called `engine.removePlugin(this.name)`, which acts on the active scene.
   Input: `engine.createScene('other').use(sky); sky.dispose()`. Wrong output: the plugin stayed in `other.plugins`.
   Regressions packages/sky/test/audit-132.test.js.
@@ -15518,7 +15518,7 @@ Repro: `node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/test/ad
 
 ### Fixed 2026-11-11: three fixed waits had no `fixed-wait:` reason, so the fixed-wait gate was red on main (KB-L6b-fw)
 
-- **Repro:** `node --test tests/check-fixed-waits.test.js` failed on main b19009b802: `scripts/check-fixed-waits.mjs` counted one unmarked fixed wait each in packages/materials/test/fur.html:12 (four TAA frames), tests/dev-server-watch.test.js:38 (3 s) and tests/stale-document.test.js:49 (0.5 s) against a baseline of 0.
+- **Repro:** `node --test tests/check-fixed-waits.test.js` failed on main b19009b802: `scripts/check-fixed-waits.mjs` counted one unmarked fixed wait each in packages/materials/test/fur.html:12 (four TAA frames), tests/dev-server-watch.test.js:41 (3 s) and tests/stale-document.test.js:57 (0.5 s) against a baseline of 0.
 - **Cause:** the three checks wait on time on purpose (fur steps its wind time over four frames; the other two prove an absence: no reload, a held GPU promise) and carried no `// fixed-wait:` line saying so; two had a `wall-clock:` note, which the gate does not read.
 - **Fix:** be528236c1 gave each its `fixed-wait:` reason; no wait changed length and the baseline stayed 0. Checked again on 942f0aa120: the gate reports none new and the test passes (14 of 14). Regression: `tests/check-fixed-waits.test.js`, which fails on any unmarked fixed wait.
 

@@ -10,7 +10,7 @@ other engine code). No new runtime dependency. Margo names. Errors per docs/conv
 - Own pipelines: `EnginePlugin` setup/registerPasses/onDeviceRestored/dispose (packages/core/src/plugin.ts:69-77);
   FramePass by `order`, main pass order 0 clears (plugin.ts:58-63, 86-88); PassContext gives device, encoder, color,
   depth, format (plugin.ts:30-52). Reverse-Z depth `greater-equal`, depth format depth32float-stencil8 when available
-  (core/src/renderer.ts:161-165). MSAA 4 or 1 (core/src/quality.ts:5-7). Closest template for a custom pass:
+  (core/src/renderer.ts:396-400). MSAA 4 or 1 (core/src/quality.ts:5-7). Closest template for a custom pass:
   packages/terrain/src/index.ts:254-269, 315-391, 423-446 (prepare at order -6, draw at order 1, drawShadow).
 - Lighting composition: follow VAT, not terrain: `addLighting(effect)` with `pbr(1)` hooks composed by `lightPBR`
   (packages/shared/pbr-hooks.js), `layout: 'auto'`, `getBindGroupLayout(1)` (packages/animation/src/vat.ts:473-482,
