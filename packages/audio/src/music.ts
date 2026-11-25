@@ -30,6 +30,12 @@ export interface MusicTransitionOptions {
   fade?: number;
 }
 
+/** Frames per Web Audio render quantum (Web Audio API 1.0: 128). */
+const RENDER_QUANTUM = 128;
+/** An offline render keeps at least this many seconds, and this many loops, of sources scheduled. */
+const OFFLINE_WINDOW = 8;
+const OFFLINE_LOOPS = 8;
+
 function nonnegative(value: number, name: string): number {
   if (!Number.isFinite(value) || value < 0)
     throw rangeError(`Music ${name} must be finite and nonnegative; use audio-clock seconds`, 'state');
@@ -51,6 +57,10 @@ export class AudioMusic {
   private origin: number | null = null;
   /** Index of the next loop to schedule, counted from origin. */
   private next = 0;
+  /** Audio time of the offline render's next refill (a suspend point), or null when none is pending. */
+  private checkpoint: number | null = null;
+  /** An offline render that cannot refill at suspend points is scheduled whole. */
+  private whole = false;
   private disposed = false;
 
   constructor(
@@ -172,19 +182,34 @@ export class AudioMusic {
     if (!this.disposed && this.origin !== null) this.schedule();
   }
   /**
-   * Schedule loops whose start lies before the horizon: an OfflineAudioContext's whole render (it runs in one go),
-   * otherwise max(1 s, 2 loops) past currentTime + leadTime. A loop whose start already passed (a stalled main
-   * thread) starts now at its matching offset, so the grid holds.
+   * Schedule loops whose start lies before the horizon: max(1 s, 2 loops) past currentTime + leadTime on a live context.
+   * An OfflineAudioContext renders in one go, so main-thread timers cannot refill it. Where it has suspend(time)
+   * (Chromium, Safari) the loops are scheduled a window at a time and refilled at a suspend point: every scheduled
+   * source costs the renderer work on every render quantum until it ends, so scheduling an hour of loops at once made
+   * the render about 40 times slower (KB5029b). Without suspend(time) (Firefox) the whole render is scheduled at once.
+   * A loop whose start already passed (a stalled main thread) starts now at its matching offset, so the grid holds.
    */
   private schedule(): void {
     const context = this.listener.context,
       origin = this.origin!,
       now = context.currentTime;
     const offline = context as Partial<OfflineAudioContext>;
-    const horizon =
-      typeof offline.startRendering === 'function' && typeof offline.length === 'number'
-        ? offline.length / context.sampleRate
-        : now + this.leadTime + Math.max(1, 2 * this.loop);
+    let horizon = now + this.leadTime + Math.max(1, 2 * this.loop);
+    if (typeof offline.startRendering === 'function' && typeof offline.length === 'number') {
+      const end = offline.length / context.sampleRate;
+      horizon = end;
+      if (!this.whole && typeof offline.suspend === 'function') {
+        const window = Math.max(OFFLINE_WINDOW, OFFLINE_LOOPS * this.loop),
+          // Suspend points fall on render-quantum boundaries; the next one is half a window ahead.
+          rate = context.sampleRate,
+          frame = Math.floor(((now + window / 2) * rate) / RENDER_QUANTUM) * RENDER_QUANTUM,
+          at = this.checkpoint ?? Math.max(now + RENDER_QUANTUM / rate, frame / rate);
+        if (at + window / 2 + this.leadTime < end) {
+          horizon = at + window / 2 + this.leadTime;
+          if (this.checkpoint === null) this.refillAt(offline as OfflineAudioContext, at);
+        }
+      }
+    }
     for (let when = origin + this.next * this.loop; when < horizon; when = origin + ++this.next * this.loop) {
       const late = Math.max(0, now - when);
       if (late >= this.loop) continue;
@@ -206,6 +231,24 @@ export class AudioMusic {
         this.sources.add(source);
       });
     }
+  }
+  /** Suspend the offline render at `at`, schedule the next window there and resume it. */
+  private refillAt(context: OfflineAudioContext, at: number): void {
+    this.checkpoint = at;
+    context.suspend(at).then(
+      () => {
+        this.checkpoint = null;
+        this.update();
+        return context.resume();
+      },
+      () => {
+        // The app holds a suspend at this render quantum (only one is allowed per quantum): schedule the rest of the
+        // render now, as without suspend(time). The render is slower then, never wrong.
+        this.checkpoint = null;
+        this.whole = true;
+        this.update();
+      },
+    );
   }
   /** Stop sources, release owned mixer buses, keep shared buffers. Listener teardown also disposes music. */
   dispose(): void {

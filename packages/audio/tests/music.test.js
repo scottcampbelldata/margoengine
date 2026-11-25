@@ -156,3 +156,73 @@ test('a loop whose start passed during a stall starts now at its matching offset
   );
   listener.dispose();
 });
+
+/** An OfflineAudioContext with suspend(time): suspend points wait until the test reaches them. */
+function offlineContext(seconds, { refuse = false } = {}) {
+  const context = new FakeAudioContext({ state: 'running' });
+  context.sampleRate = 48000;
+  context.length = 48000 * seconds;
+  context.startRendering = () => {};
+  context.points = [];
+  context.resumes = 0;
+  context.suspend = (at) => {
+    if (refuse)
+      return Promise.reject(new DOMException('a suspend is already scheduled at this frame', 'InvalidStateError'));
+    return new Promise((resolve) => context.points.push({ at, resolve }));
+  };
+  context.resume = async () => {
+    context.resumes++;
+  };
+  return context;
+}
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test('an offline render with suspend(time) is scheduled a window at a time, refilled at suspend points (KB5029b)', async () => {
+  // One hour at 130 bpm: 1,950 loops of two stems. Scheduling them all at once made Chromium's render about 40 times
+  // slower, as every scheduled source is visited on every render quantum until it ends.
+  const seconds = 3600,
+    loop = (4 * 60) / 130,
+    context = offlineContext(seconds),
+    listener = new AudioListener({ context });
+  const stems = { a: context.createBuffer(1, 96000, 48000), b: context.createBuffer(1, 96000, 48000) };
+  const music = new AudioMusic(listener, stems, { on: { a: 0, b: 0 } }, { bpm: 130, loopBeats: 4, leadTime: 0 });
+  music.start('on', 0);
+  const window = Math.max(8, 8 * loop),
+    most = 2 * Math.ceil((window + loop) / loop + 1);
+  assert.ok(context.bufferSources.length <= most, `${context.bufferSources.length} sources before rendering`);
+  let refills = 0;
+  while (context.points.length) {
+    const { at, resolve } = context.points.shift();
+    assert.ok(
+      Math.abs(Math.round((at * 48000) / 128) * 128 - at * 48000) < 1e-6,
+      'suspend points fall on render quanta',
+    );
+    // Every source the render reaches before the next refill already exists, and only a window of them.
+    const ahead = context.bufferSources.filter((source) => source.started.when >= at);
+    assert.ok(ahead.length > 0 && Math.max(...ahead.map((s) => s.started.when)) >= at + window / 2 - loop);
+    assert.ok(ahead.length <= most, `${ahead.length} sources ahead of ${at}`);
+    context.currentTime = at;
+    resolve();
+    await flush();
+    refills++;
+  }
+  assert.ok(refills > 100, `${refills} refills`);
+  assert.equal(context.resumes, refills, 'the render resumes after every refill');
+  // The same loops as a whole-render schedule: every k * loop before the end, once per stem.
+  const starts = context.bufferSources.map((source) => source.started.when);
+  const expected = [];
+  for (let k = 0; k * loop < seconds; k++) expected.push(k * loop, k * loop);
+  assert.deepEqual(starts, expected);
+  listener.dispose();
+});
+
+test('an offline render whose suspend point is refused is scheduled whole, as without suspend(time)', async () => {
+  const context = offlineContext(600, { refuse: true }),
+    listener = new AudioListener({ context });
+  const music = new AudioMusic(listener, { a: context.createBuffer(1, 96000, 48000) }, { on: { a: 0 } });
+  music.start('on', 0);
+  await flush();
+  assert.equal(context.bufferSources.length, 300, 'every 2 s loop of the 600 s render');
+  assert.equal(context.bufferSources.at(-1).started.when, 598);
+  listener.dispose();
+});

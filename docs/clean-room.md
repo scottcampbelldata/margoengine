@@ -1,5 +1,15 @@
 # Clean room
 
+### Offline music renders refill at suspend points (audio, KB5029b, 2026-11-25)
+
+Read Paul Adenot and Hongchan Choi (editors), W3C Web Audio API 1.0 (2021, https://www.w3.org/TR/webaudio/):
+OfflineAudioContext.suspend(suspendTime) and resume(), the 128-frame render quantum, one suspend per quantum
+(InvalidStateError otherwise), and the rendering loop that processes every node of the graph each quantum. Measured
+in Chromium 158 (one hour at 8 kHz, 1,950 one-shot loops): all scheduled up front 34.9 s, a refilled window 0.86 s, one
+source 65 ms, identical samples. Design: keep max(8 s, 8 loops) of sources scheduled and refill half a window ahead at a
+quantum-aligned suspend point; without suspend(time), or when the app holds that quantum, schedule the whole render. No
+other implementation read.
+
 ### DOM host for UI widgets (ui, GAP-FILM-DOMUI, 2026-11-25)
 
 Read the specifications: W3C WAI-ARIA 1.2 (2023, https://www.w3.org/TR/wai-aria-1.2/) and the ARIA Authoring Practices

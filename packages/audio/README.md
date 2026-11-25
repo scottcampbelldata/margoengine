@@ -354,7 +354,12 @@ omitted stems and `-Infinity` are silent. States are copied at construction. Gai
 must fit finite float32 linear values. This is gain layering of continuously running
 loops: muted stems keep their phase. Every loop is its own source started at
 `origin + k * loop` on the audio clock, so a browser that rounds start or loop points to
-whole frames (Firefox) never drifts off the grid. No tempo analysis, stretching, sequencing of
+whole frames (Firefox) never drifts off the grid. An `OfflineAudioContext` render (a soundtrack bounce)
+is scheduled a window of loops at a time and refilled at `suspend(time)` points, because every scheduled source costs
+the renderer work on each render quantum until it ends: an hour at 130 bpm renders in under a second in Chromium
+instead of 35 s. A browser without `suspend(time)` on offline contexts (Firefox), or an app that already holds a
+suspend at the same render quantum, gets the whole render scheduled at once: the same samples, rendered more slowly.
+No tempo analysis, stretching, sequencing of
 different sections, streaming, or automatic loudness/headroom management.
 
 Options: `bpm=120` positive finite quarter-note beats/minute, `beatsPerBar=4` and

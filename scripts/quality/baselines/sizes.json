@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19103496,
+  "total": 19103825,
   "history": [
     {
       "date": "2026-10-24",
@@ -12345,6 +12345,12 @@
       "commit": "38bb58dfa",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: new entry (SEA-08), the water's load on a hull over its wetted surface and the HullSolver that holds it through bodyForces; measured gzip (Mac build) 2437 B, budget 2693 B (measured + 256 B)."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "0c86a10242",
+      "reason": "KB5029b: AudioMusic schedules an OfflineAudioContext render a window of loops at a time and refills it at suspend(time) points (an hour of loops scheduled at once made Chromium render about 40 times slower: 34.9 s against 0.86 s, identical samples). audio/music measures 1,901 B gzip (budget 1828 B before). Only this entry is recorded here.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12387,7 +12393,7 @@
     "@margoengine/audio/binaural": 2065,
     "@margoengine/audio/doppler": 1346,
     "@margoengine/audio/events": 5687,
-    "@margoengine/audio/music": 1828,
+    "@margoengine/audio/music": 2157,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/audio/pan": 933,
     "@margoengine/audio/resample": 1553,
