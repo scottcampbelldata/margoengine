@@ -11,6 +11,7 @@ type KernelExports = WebAssembly.Exports & {
   school_intent(
     bodies: number,
     count: number,
+    medium: number,
     predators: number,
     predatorCount: number,
     output: number,

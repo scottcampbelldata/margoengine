@@ -44,6 +44,7 @@ export const SCHOOL_INTENT_FIELD: FieldDescriptor = Object.freeze({
 
 const BODY_WORDS = 6;
 const INTENT_WORDS = 3;
+const MEDIUM_WORDS = 4;
 const ORIGIN: Cell = [0, 0, 0];
 
 /** A member or predator positioned within the origin cell. Velocity is in world axes. */
@@ -107,7 +108,7 @@ export interface SchoolParams {
   readonly cruiseSpeed?: number;
   /** Velocity response time for the thrust controller in seconds (default 0.5). */
   readonly responseSeconds?: number;
-  /** Medium contract sampled for drag and relative velocity in point-mass mode. */
+  /** Local medium used for orientation and field of view. Point-mass dynamics also read its drag and velocity. */
   readonly flow?: FlowField;
   /** Fallback medium density, kg/m³, if flow is absent (default 1.225). */
   readonly density?: number;
@@ -197,6 +198,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
   private nextMotion: Region | undefined;
   private nextIntent: Region | undefined;
   private nextPredators: Region | undefined;
+  private nextMedium: Region | undefined;
   private schoolSize = 0;
   private predatorSize = 0;
   private rules: [number, number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0, 0];
@@ -209,6 +211,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
   private readonly flowSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly force: MutableVec3 = [0, 0, 0];
   private readonly velocity: MutableVec3 = [0, 0, 0];
+  private readonly ambient: MutableVec3 = [0, 0, 0];
 
   private constructor(
     private readonly module: WebAssembly.Module,
@@ -315,6 +318,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
     this.nextMotion = host.allocate('school-motion-next', bodyBytes, 'f64', SCHOOL_LAYOUT);
     this.nextIntent = host.allocate('school-intent-next', intentBytes, 'f64', SCHOOL_LAYOUT);
     this.nextPredators = host.allocate('school-predators-next', predatorBytes, 'f64', SCHOOL_LAYOUT);
+    this.nextMedium = host.allocate('school-medium-next', members.length * MEDIUM_WORDS * 8, 'f64', SCHOOL_LAYOUT);
     const initial = words(host, this.motion);
     const predatorWords = words(host, this.predatorState);
     members.forEach((member, i) => writeBody(initial, i * BODY_WORDS, member));
@@ -323,8 +327,18 @@ export class SchoolSolver implements Solver<SchoolParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    const { host, motion, intent, predatorState, nextMotion, nextIntent, nextPredators, stepKernel } = this;
-    if (!host || !motion || !intent || !predatorState || !nextMotion || !nextIntent || !nextPredators || !stepKernel)
+    const { host, motion, intent, predatorState, nextMotion, nextIntent, nextPredators, nextMedium, stepKernel } = this;
+    if (
+      !host ||
+      !motion ||
+      !intent ||
+      !predatorState ||
+      !nextMotion ||
+      !nextIntent ||
+      !nextPredators ||
+      !nextMedium ||
+      !stepKernel
+    )
       throw new MargoError('state', 'Add the school to a PhysicsWorld before stepping.');
     const rows = words(host, nextMotion);
     const predatorRows = words(host, nextPredators);
@@ -350,9 +364,12 @@ export class SchoolSolver implements Solver<SchoolParams> {
       );
     else predatorRows.set(words(host, predatorState));
 
+    const medium = words(host, nextMedium);
+    this.sampleMedium(context, rows, medium);
     const status = stepKernel(
       nextMotion.byteOffset,
       this.schoolSize,
+      nextMedium.byteOffset,
       nextPredators.byteOffset,
       this.predatorSize,
       nextIntent.byteOffset,
@@ -362,7 +379,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
       throw new RangeError('School members do not fit the neighbour grid. Use a consistent simulation scale.');
     const desired = words(host, nextIntent);
     for (let i = 0; i < desired.length; i++) desired[i]! *= this.cruiseSpeed;
-    if (this.options.mode === 'point-mass') this.move(context, dt, rows, desired);
+    if (this.options.mode === 'point-mass') this.move(dt, rows, desired, medium);
     if (!this.options.readPredators) {
       for (let j = 0; j < predatorRows.length; j += BODY_WORDS)
         for (let k = 0; k < 3; k++) predatorRows[j + k]! += predatorRows[j + 3 + k]! * dt;
@@ -372,14 +389,13 @@ export class SchoolSolver implements Solver<SchoolParams> {
     words(host, predatorState).set(predatorRows);
   }
 
-  private move(context: StepContext, dt: number, rows: Float64Array, intent: Float64Array): void {
-    const { flow, response, density, force, velocity, cellSize } = this;
+  private sampleMedium(context: StepContext, rows: Float64Array, medium: Float64Array): void {
+    const { flow, density, cellSize } = this;
     const t = context.tick / rateOf(context.level);
     const shift = flow ? context.cell.map((value, i) => (value - flow.cell[i]!) * cellSize) : ORIGIN;
     for (let i = 0; i < this.schoolSize; i++) {
       const j = i * BODY_WORDS;
-      const k = i * INTENT_WORDS;
-      const { settings, thrust, area } = this.dynamics[i]!;
+      const ambientAt = i * MEDIUM_WORDS;
       const sample = flow?.sample(
         rows[j]! + shift[0]!,
         rows[j + 1]! + shift[1]!,
@@ -389,9 +405,22 @@ export class SchoolSolver implements Solver<SchoolParams> {
       );
       const ambient = sample?.velocity ?? ORIGIN;
       const rho = sample ? nonnegative(sample.density, 'flow density') : density;
-      if (ambient.length !== 3 || !ambient.every(Number.isFinite))
+      if (ambient.length !== 3 || !ambient.every((x) => Number.isFinite(Math.fround(x))))
         throw new RangeError('The school flow sampled a non-finite velocity.');
-      const drag = 0.5 * rho * area;
+      medium.set(ambient, ambientAt);
+      medium[ambientAt + 3] = rho;
+    }
+  }
+
+  private move(dt: number, rows: Float64Array, intent: Float64Array, medium: Float64Array): void {
+    const { response, force, velocity, ambient } = this;
+    for (let i = 0; i < this.schoolSize; i++) {
+      const j = i * BODY_WORDS;
+      const k = i * INTENT_WORDS;
+      const ambientAt = i * MEDIUM_WORDS;
+      const { settings, thrust, area } = this.dynamics[i]!;
+      const drag = 0.5 * medium[ambientAt + 3]! * area;
+      for (let axis = 0; axis < 3; axis++) ambient[axis] = medium[ambientAt + axis]!;
       settings.dragRate = nonnegative(drag / settings.mass, 'specific drag');
       settings.fluidVelocity = ambient;
       const dragAtCruise = drag * hypot(intent[k]!, intent[k + 1]!, intent[k + 2]!);

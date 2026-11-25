@@ -45,6 +45,12 @@ struct Body {
     velocity: V3,
 }
 
+#[repr(C)]
+struct Medium {
+    velocity: V3,
+    density: f64,
+}
+
 struct Zones {
     repulsion: f64,
     orientation: f64,
@@ -162,6 +168,7 @@ fn evade(body: &Body, predators: &[Body], zones: &Zones, row: usize) -> V3 {
 
 fn direction(
     bodies: &[Body],
+    medium: &[Medium],
     predators: &[Body],
     zones: &Zones,
     grid: &NeighbourGrid,
@@ -170,7 +177,7 @@ fn direction(
     closest: &mut Vec<Member>,
 ) -> V3 {
     let body = &bodies[row];
-    let forward = unit(body.velocity);
+    let forward = unit(sub(body.velocity, medium[row].velocity));
     let mut repulsion = [0.0; 3];
     let mut repelling = false;
     closest.clear();
@@ -221,7 +228,10 @@ fn direction(
     for member in closest {
         let neighbour = &bodies[member.index];
         if member.distance <= zones.orientation {
-            align = plus(align, unit(neighbour.velocity));
+            align = plus(
+                align,
+                unit(sub(neighbour.velocity, medium[member.index].velocity)),
+            );
         } else {
             let delta = sub(neighbour.position, body.position);
             attract = plus(attract, scaled(delta, 1.0 / member.distance));
@@ -240,6 +250,7 @@ fn direction(
 pub unsafe extern "C" fn school_intent(
     bodies: *const f64,
     count: usize,
+    medium: *const f64,
     predators: *const f64,
     predator_count: usize,
     output: *mut f64,
@@ -252,6 +263,7 @@ pub unsafe extern "C" fn school_intent(
     prediction: f64,
 ) -> u32 {
     let bodies = unsafe { core::slice::from_raw_parts(bodies.cast::<Body>(), count) };
+    let medium = unsafe { core::slice::from_raw_parts(medium.cast::<Medium>(), count) };
     let predators =
         unsafe { core::slice::from_raw_parts(predators.cast::<Body>(), predator_count) };
     let output = unsafe { core::slice::from_raw_parts_mut(output.cast::<V3>(), count) };
@@ -288,6 +300,7 @@ pub unsafe extern "C" fn school_intent(
     for (row, intent) in output.iter_mut().enumerate() {
         *intent = direction(
             bodies,
+            medium,
             predators,
             &zones,
             &grid,
@@ -319,11 +332,13 @@ mod tests {
                 velocity: [0.0, 1.0, 0.0],
             },
         ];
+        let medium = [[0.0; 4]; 3];
         let mut out = [[0.0; 3]; 3];
         let status = unsafe {
             school_intent(
                 bodies.as_ptr().cast(),
                 bodies.len(),
+                medium.as_ptr().cast(),
                 bodies.as_ptr().cast(),
                 0,
                 out.as_mut_ptr().cast(),

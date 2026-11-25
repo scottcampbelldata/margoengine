@@ -135,6 +135,26 @@ test('uniform current gives the exact quadratic coasting law in the local cell',
   close(school.read(0).velocity[0], 0.5 + u / (1 + specificDrag * u), 192 * Number.EPSILON);
 });
 
+test('a cross-current does not double-count drift as a swimming heading', async () => {
+  const school = await SchoolSolver.load();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+  world.add(school, {
+    members: [
+      { position: origin, velocity: [3, 0, 1] },
+      { position: [0, 0, 1], velocity: [3, 0, 1] },
+    ],
+    flow: {
+      cell: origin,
+      medium: 'water',
+      sample: () => ({ velocity: [3, 0, 0], density: 1000, temperature: 280 }),
+    },
+  });
+  world.advance(60);
+  assert.deepEqual(school.read(0).intent, [0, 0, 1]);
+  assert.deepEqual(school.read(0).velocity, [3, 0, 1]);
+  assert.deepEqual(school.read(1).intent, [0, 0, 1]);
+});
+
 const reef = [still([-0.4, 0, 0]), still([0.4, 0, 0]), still([0, 0, -0.4]), still([0, 0, 0.4])];
 const predator = { position: [0, -3.5, 0], velocity: [0, 8, 0] };
 
