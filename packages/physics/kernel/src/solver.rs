@@ -38,6 +38,10 @@ use crate::world::World;
 /// 2 pi as the nearest f32.
 const TAU: f32 = 6.283_185_5;
 
+/// How far a body may turn in a step, radians, before the contact rows made at its first pose are made again for it: an inertia read at
+/// a pose that far off is wrong by about that much in relative terms.
+const STALE_TURN: f32 = 1e-3;
+
 /// The most sweeps a pair's normal rows take in one pass. A manifold not settled by then is left as it stands. The part that
 /// settled last, the shares four points take of one load among themselves, moves no body and is now solved exactly each sweep
 /// (`normal_rows`), so a pass settles in 3 to 4 sweeps on average where it ran out at 16.
@@ -385,11 +389,19 @@ impl World {
         }
     }
 
-    /// Whether body `at` has turned since the step began, by any amount a float can tell: its inertia in the world's axes is then not the
-    /// one the step's contact rows were made with.
+    /// Whether body `at` has turned since the step began by more than `STALE_TURN`: its inertia in the world's axes is then not the one
+    /// the step's contact rows were made with by more than a part in a thousand. A body that turns less is solved with the rows as they
+    /// are, exactly as before: refreshed at every grain of rounding, a pile of 465 cubes at rest at one pass a substep crept at 4 mm/s
+    /// where it crept at 0.6 mm/s, and a web of joints took another of its chaotic paths (seed 1 opened a joint 72 m, 40 m before).
     #[inline]
     fn has_turned(&self, at: usize) -> bool {
-        self.flags(at) & KIND == DYNAMIC && self.q(ROTATION_X, at) != self.q(PREVIOUS_ROTATION_X, at)
+        if self.flags(at) & KIND != DYNAMIC {
+            return false;
+        }
+        // The rotation since the step began: its vector part is sin(angle / 2) along the axis.
+        let r = self.q(ROTATION_X, at).mul(self.q(PREVIOUS_ROTATION_X, at).conjugate());
+        let half = 0.5 * STALE_TURN;
+        r.x * r.x + r.y * r.y + r.z * r.z > half * half
     }
 
     /// After a substep's poses: the world inverse inertia of every body that has turned, and the effective masses of the contacts it is in,
