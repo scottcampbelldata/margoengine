@@ -41,7 +41,10 @@ const kernels = /* wgsl */ `
 const edits: Record<'generation' | 'ticket' | 'birth' | 'death' | 'collision' | 'list', [string, string]> = {
   // The slot's generation (rotation.w: 1 for a child), read once before the slot stores anything and kept in step with
   // the birth's store below, so no event test reads `particles` back after storing to it.
-  generation: ['let at=i*2;let cold=f.control.x*2+at;', 'let at=i*2;let cold=f.control.x*2+at;var generation=particles[cold+1].w;'],
+  generation: [
+    'let at=i*2;let cold=f.control.x*2+at;',
+    'let at=i*2;let cold=f.control.x*2+at;var generation=particles[cold+1].w;',
+  ],
   // A birth whose ticket is past the emitter's budget takes event (ticket - budget) / count of last frame's list, if any.
   ticket: [
     'if(ticket>=f.control.y){particles[at].w=0;return 0u;}',
@@ -90,7 +93,7 @@ const range = (v: unknown, name: string, min: number, max: number) => {
 };
 
 /**
- * The `events` feature (sub-emitters): a particle that dies, or hits the ground faster than `speed`, raises an event on
+ * The `events` feature (sub-emitters): a particle that is born, dies, or hits the ground faster than `speed`, raises an event on
  * the GPU, and the next frame `count` new particles are born at it into the free slots of the same effect, with their
  * own velocity, life, size and colour. Events and their births are listed in slot order, so the same frames give the
  * same particles. Born particles never raise events. Pass it as `{events}` to `VFX` from `@margoengine/vfx/base`; the
@@ -98,8 +101,8 @@ const range = (v: unknown, name: string, min: number, max: number) => {
  */
 export const events: VFXExtension<VFXEvents> = {
   validate(e) {
-    if (!e || typeof e !== 'object' || (e.on !== 'death' && e.on !== 'collision'))
-      throw new TypeError("VFX events needs on: 'death' or 'collision'; pass e.g. {on: 'death', count: 8}");
+    if (!e || typeof e !== 'object' || (e.on !== 'death' && e.on !== 'collision' && e.on !== 'birth'))
+      throw new TypeError("VFX events needs on: 'birth', 'death' or 'collision'; pass e.g. {on: 'death', count: 8}");
     const count = e.count ?? 8;
     if (!Number.isInteger(count) || count < 1 || count > 64)
       throw new RangeError(`VFX events count is ${count}; pass a whole number of births per event from 1 to 64`);
@@ -120,7 +123,12 @@ export const events: VFXExtension<VFXEvents> = {
   },
   simulation(code, e) {
     let out = code.replace('fn update(', declarations + 'fn update(');
-    for (const key of ['generation', 'ticket', 'birth', e.on, 'list'] as const) out = once(out, edits[key]);
+    for (const key of ['generation', 'ticket', 'birth', 'list'] as const) out = once(out, edits[key]);
+    // An emitter birth (child 0, generation 0) raises its event where it starts; the other triggers have their own edit.
+    out =
+      e.on === 'birth'
+        ? once(out, ['generation=p.rotation.w;', 'generation=p.rotation.w;if(child==0u){raiseEvent(p);}'])
+        : once(out, edits[e.on]);
     return out + kernels;
   },
   create(state: VFXState, e, owned) {

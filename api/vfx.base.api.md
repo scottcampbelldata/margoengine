@@ -103,7 +103,7 @@ export type VFXEmitter = import('./shapes.js').VFXShape | {
 };
 
 export interface VFXEvents {
-    on: 'death' | 'collision';
+    on: 'birth' | 'death' | 'collision';
     count?: number;
     lifetime?: readonly [number, number];
     size?: number;

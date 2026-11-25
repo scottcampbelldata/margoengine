@@ -132,16 +132,19 @@ window.checkMesh=async({samples=1,kind='front'}={})=>{
  * life, size, colour and generation 1. `capacity` below the children wanted gives as many as there are slots. `short`:
  * children live 0.25 s and die in step 7 without children of their own, so every slot is empty after step 8 (where grandchildren would be born). 'collision': a
  * particle falls onto the ground at 5 units/s; where it touches, `count` children start the next step with `inherit` of
- * its velocity plus their own; with `speed` above the impact speed nothing is born.
+ * its velocity plus their own; with `speed` above the impact speed nothing is born. 'birth': the emitter's particle is
+ * born at the origin flying +x and raises its event in the step it is born, so the next step gives `count` children at
+ * the origin with half its velocity reversed plus their own.
  */
 window.checkEvents=async({on='death',capacity=16,short=false,speed=0.5}={})=>{
  const count=4,dt=0.1,size=0.1,color=[0.5,0.25,1,1],life=short?0.25:5,mismatches=[];
  const events={on,count,lifetime:[life,life],size,spread:0,color,speed,...(on==='death'?{velocity:[0,2,0]}:{velocity:[1,0,0],inherit:-0.5})};
  const effect=on==='death'
   ?new VFX({...still,capacity,position:[0,0,0],velocity:[1,0,0],lifetime:[0.35,0.35],intensity:2,events})
+  :on==='birth'?new VFX({...still,capacity,position:[0,0,0],velocity:[1,0,0],lifetime:[100,100],intensity:2,events})
   :new VFX({...still,capacity,position:[0,1,0],velocity:[0,-5,0],ground:0,bounce:0.5,size:0.1,lifetime:[100,100],intensity:2,events});
  effect.burst(1);
- const frames=on==='death'?(short?7:4):2;
+ const frames=on==='death'?(short?7:4):on==='birth'?1:2;
  const {buffers:[p],error}=await run(effect,{frames,dt,route:true,read:()=>[effect.gpuState.particles]});
  effect.dispose();
  const near=(a,b)=>Math.abs(a-b)<=1e-5*Math.max(1,Math.abs(b)),slot=(i)=>({at:[...p.subarray(i*8,i*8+4)],vs:[...p.subarray(i*8+4,i*8+8)],color:[...p.subarray(capacity*8+i*8,capacity*8+i*8+4)],rotation:[...p.subarray(capacity*8+i*8+4,capacity*8+i*8+8)]});
@@ -149,7 +152,7 @@ window.checkEvents=async({on='death',capacity=16,short=false,speed=0.5}={})=>{
  let children=0;
  if(on==='death'&&short){for(let i=0;i<capacity;i++)if(p[i*8+3]>0)mismatches.push({slot:i,what:'empty at the end',life:p[i*8+3]});}
  else{
-  const first=on==='death'?0:1,born=Math.min(count,capacity-first),start=on==='death'?[0.3,0,0]:[0,0.05,0],v=on==='death'?[0,2,0]:[1,2.5,0];
+  const first=on==='death'?0:1,born=Math.min(count,capacity-first),start=on==='death'?[0.3,0,0]:on==='birth'?[0,0,0]:[0,0.05,0],v=on==='death'?[0,2,0]:on==='birth'?[0.5,0,0]:[1,2.5,0];
   if(on==='collision'){const s=slot(0);want(0,'parent after its bounce',s.at,[0,0.3,0,100-3*dt]);}
   for(let i=first;i<capacity;i++){
    const s=slot(i),child=i<first+born&&speed<5;

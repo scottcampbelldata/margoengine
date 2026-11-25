@@ -65,7 +65,7 @@ type VFXEmitter = import('./shapes.js').VFXShape | {
 };
 
 interface VFXEvents {
-    on: 'death' | 'collision';
+    on: 'birth' | 'death' | 'collision';
     count?: number;
     lifetime?: readonly [number, number];
     size?: number;

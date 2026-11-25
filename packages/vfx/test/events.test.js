@@ -32,7 +32,13 @@ test('death events patch the simulation, count free slots every frame and upload
   });
   h.frame();
   const wgsl = code(h);
-  for (const name of ['fn eventScan', 'fn eventCompact', 'raiseEvent(p)', 'storeEvents(id.x)', 'events[4u+eventGroups()*257u+e]'])
+  for (const name of [
+    'fn eventScan',
+    'fn eventCompact',
+    'raiseEvent(p)',
+    'storeEvents(id.x)',
+    'events[4u+eventGroups()*257u+e]',
+  ])
     assert.ok(wgsl.includes(name), name);
   assert.ok(!wgsl.includes('-p.velocitySize.y>bitcast<f32>(ev.control.z)'), 'no collision test for death events');
   const list = h.resources.find((r) => r.size === (4 + 3 * 257 + 600) * 4);
@@ -90,9 +96,27 @@ test('collision events test the impact speed; effects without events compile no 
   plain.effect.dispose();
 });
 
+test("birth events raise at the emitter's own births only, and no other trigger does", () => {
+  const raise = 'if(child==0u){raiseEvent(p);}';
+  const { h, effect } = attach({ capacity: 8, events: { on: 'birth' } }, { events });
+  h.frame();
+  const wgsl = code(h);
+  assert.ok(wgsl.includes(raise), 'the emitter birth raises');
+  assert.ok(
+    !wgsl.includes('-p.velocitySize.y>bitcast<f32>(ev.control.z)') &&
+      !wgsl.includes('&&generation==0){raiseEvent(p);}'),
+    'no death or collision trigger',
+  );
+  effect.dispose();
+  const death = attach({ capacity: 8, events: { on: 'death' } }, { events });
+  death.h.frame();
+  assert.ok(!code(death.h).includes(raise), 'death events do not raise at birth');
+  death.effect.dispose();
+});
+
 test('events are validated, need the feature and keep `on` from attach', () => {
   assert.throws(() => new Base({ events: { on: 'death' } }), /VFX events needs events from @margoengine\/vfx\/events/);
-  for (const bad of [{}, { on: 'birth' }, 3])
+  for (const bad of [{}, { on: 'hatch' }, 3])
     assert.throws(() => new VFX({ events: bad }), TypeError, JSON.stringify(bad));
   for (const bad of [
     { count: 0 },

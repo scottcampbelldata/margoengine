@@ -365,13 +365,13 @@ export interface VFXLit {
   };
 }
 /**
- * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
+ * Sub-emitters: a particle that is born from the emitter (`on: 'birth'`, a trail or a flash at the muzzle), dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
  * raises an event on the GPU, and in the next frame `count` particles are born where it was into free slots of the same
  * effect, with their own life, size, velocity and colour. Children never raise events. `on` is read at attach, the rest
  * every frame. Needs the `events` feature.
  */
 export interface VFXEvents {
-  on: 'death' | 'collision';
+  on: 'birth' | 'death' | 'collision';
   /** Particles born per event, an integer 1..64. Default 8. */
   count?: number;
   /** Random life [min, max] of the children in seconds, 0 < min <= max. Default [0.5, 1]. */

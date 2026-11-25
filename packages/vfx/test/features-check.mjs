@@ -89,6 +89,8 @@ try {
     { on: 'death', short: true },
     { on: 'collision' },
     { on: 'collision', speed: 6 },
+    { on: 'birth' },
+    { on: 'birth', capacity: 3 },
   ]) {
     const name = `events ${JSON.stringify(options)}`,
       r = await page.evaluate((o) => window.checkEvents(o), options);
@@ -207,9 +209,7 @@ try {
         `${name} centre ${sample.center}: got ${sample.got} want ${sample.want}`,
       );
     }
-    console.log(
-      `ok ${name}: ${r.samples.map((sample) => `${sample.center} ${sample.got.toFixed(5)}`).join(' ')}`,
-    );
+    console.log(`ok ${name}: ${r.samples.map((sample) => `${sample.center} ${sample.got.toFixed(5)}`).join(' ')}`);
   }
   {
     const name = 'shadow release',
@@ -236,7 +236,9 @@ try {
     report.results[name] = r;
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
-    console.log(`ok ${name}: ${r.rows.map((row) => `U ${row.U} lean ${row.want.toFixed(2)} worst ${row.worst.toFixed(3)} deg (${row.n})`).join('; ')}`);
+    console.log(
+      `ok ${name}: ${r.rows.map((row) => `U ${row.U} lean ${row.want.toFixed(2)} worst ${row.worst.toFixed(3)} deg (${row.n})`).join('; ')}`,
+    );
   }
   {
     const name = 'node norm',

@@ -328,9 +328,10 @@ velocity.
 
 ### Sub-emitters and GPU events
 
-`events` gives particles children: when a particle dies (`on: 'death'`), or meets the ground faster than `speed` world
-units a second (`on: 'collision'`, default 0.5), it raises an event on the GPU, and in the next frame `count` particles
-(1 to 64, default 8) are born where it was into free slots of the same effect. They start with `inherit` (default 0) of
+`events` gives particles children: when a particle is born from the emitter (`on: 'birth'`: a spark trail, a muzzle
+flash), dies (`on: 'death'`), or meets the ground faster than `speed` world units a second (`on: 'collision'`, default
+0.5), it raises an event on the GPU, and in the next frame `count` particles (1 to 64, default 8) are born where it was
+into free slots of the same effect. They start with `inherit` (default 0) of
 the parent's velocity at that moment plus `velocity` and a random `spread`, and take their own `lifetime`, `size` and
 `color` (times `intensity`). Fireworks that burst where the rocket burns out, sparks where debris strikes the floor,
 splashes where rain lands. Children never raise events of their own, so one event gives one generation.
@@ -346,6 +347,12 @@ const fireworks = VFX.attach(engine, {
   lifetime: [0.9, 1.2], gravity: [0, -4, 0], turbulence: 0, color: [1, 0.8, 0.5, 1], intensity: 4,
   events: {on: 'death', count: 48, lifetime: [1, 1.6], size: 0.08, spread: 6, inherit: 0.3, color: [1, 0.4, 0.8, 1]},
 }, {events});
+// Muzzle sparks: every shot the emitter fires puts 6 sparks where it was born.
+const gun = VFX.attach(engine, {
+  capacity: 2_000, rate: 0, position: [0, 1, 0], velocity: [30, 0, 0], lifetime: [0.4, 0.4], size: 0.02, turbulence: 0,
+  events: {on: 'birth', count: 6, lifetime: [0.1, 0.25], size: 0.04, spread: 3, color: [1, 0.7, 0.3, 1]},
+}, {events});
+gun.burst(1);
 engine.start();
 ```
 
