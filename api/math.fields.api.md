@@ -75,6 +75,33 @@ export interface PrecipitationSample {
     velocity: [number, number, number];
 }
 
+export interface SeaSource {
+    readonly x: number;
+    readonly z: number;
+    readonly radius: number;
+    readonly pressure: number;
+    readonly volume: number;
+}
+
+export interface SeaSurface {
+    readonly cell: FlowCell;
+    sample(x: number, z: number, t: number, out?: SeaSurfaceSample): SeaSurfaceSample;
+    readonly water: SeaWater;
+}
+
+export interface SeaSurfaceSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
+    current: [number, number, number];
+    depth: number;
+    density: number;
+}
+
+export interface SeaWater extends FlowField {
+    readonly medium: 'water';
+}
+
 export interface WaveSpectrumField {
     readonly cell: WaveCell;
     sample(x: number, z: number, out?: WaveSpectrumSample): WaveSpectrumSample;
