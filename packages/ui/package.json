@@ -73,6 +73,10 @@
     "./editor": {
       "types": "./dist/editor.d.ts",
       "import": "./dist/editor.js"
+    },
+    "./dom": {
+      "types": "./dist/dom-host.d.ts",
+      "import": "./dist/dom-host.js"
     }
   },
   "files": [
@@ -109,6 +113,7 @@
     "test:browser:world-gl": "npm run build && node tests/world-gl-browser.mjs",
     "test:browser:keyboard": "npm run build && node tests/keyboard-browser.mjs",
     "test:browser:i18n": "npm run build && node tests/i18n-browser.mjs",
-    "test:browser:editor": "npm run build && node tests/editor-browser.mjs"
+    "test:browser:editor": "npm run build && node tests/editor-browser.mjs",
+    "test:browser:dom": "npm run build && node tests/dom-host-browser.mjs"
   }
 }

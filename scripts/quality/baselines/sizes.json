@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19082858,
+  "total": 19091385,
   "history": [
     {
       "date": "2026-10-24",
@@ -12315,6 +12315,12 @@
       "commit": "655ef5f8a",
       "grew": 1,
       "reason": "@margoengine/physics/world: the bodyForces port (the field, the rigid solver's import of held forces and their exact release after the step, the soft solver's two port regions in place of its held-force state). Measured gzip (Mac build) 15024 B, was under 14716; the port is the framework's own coupling and belongs in the entry every world loads. Budget (measured gzip + 3%): @margoengine/physics/world 14716 to 15475 B."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "8aea6f085e",
+      "reason": "GAP-FILM-DOMUI: new optional entry @margoengine/ui/dom (mountDom: widgets as real HTML with keyed two-way patching, theme as CSS variables in one constructable stylesheet). It measures 8,270 B gzip; it imports the ui root, which every Ui user already holds, so it leaks the text package as every ui entry does. The ui root gains only the exports describeWidget, WIDGET_SKIP and handleKeyDown, moved from mirror.ts and dom.ts. Only these two items are recorded here.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13677,6 +13683,7 @@
     "@margoengine/tween/timeline": 3440,
     "@margoengine/ui": 33896,
     "@margoengine/ui/curved": 1692,
+    "@margoengine/ui/dom": 8526,
     "@margoengine/ui/editor": 4906,
     "@margoengine/ui/forms": 3743,
     "@margoengine/ui/i18n": 1936,
@@ -14113,6 +14120,7 @@
     "leak @margoengine/tiles/height -> @margoengine/bvh": 1,
     "leak @margoengine/ui -> @margoengine/text": 1,
     "leak @margoengine/ui/curved -> @margoengine/text": 1,
+    "leak @margoengine/ui/dom -> @margoengine/text": 1,
     "leak @margoengine/ui/editor -> @margoengine/text": 1,
     "leak @margoengine/ui/forms -> @margoengine/text": 1,
     "leak @margoengine/ui/image -> @margoengine/text": 1,

@@ -3,6 +3,8 @@ export type { UiOptions, ScaleOptions, SafeArea, UiDirection } from './ui.js';
 export { UiRenderer } from './renderer.js';
 export { attachInput } from './dom.js';
 export { attachMirror } from './mirror.js';
+export { describeWidget, SKIP as WIDGET_SKIP } from './dom-spec.js';
+export { handleKeyDown } from './dom.js';
 export type { MirrorOptions } from './mirror.js';
 export type { AttachOptions, Detach } from './dom.js';
 export { uiActions, UI_ACTIONS } from './interaction.js';

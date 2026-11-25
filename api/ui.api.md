@@ -769,6 +769,9 @@ export interface VirtualListOptions extends PanelOptions {
     onSelect?: (event: UiEvent) => void;
 }
 
+export { SKIP as WIDGET_SKIP };
+const SKIP: unique symbol;
+
 export class Widget implements LayoutNode {
     readonly id: string;
     readonly children: Widget[];
@@ -866,7 +869,11 @@ export function contrastRatio(a: string | Rgba, b: string | Rgba): number;
 
 export function createTheme(overrides?: ThemeOverrides, base?: Theme): Theme;
 
+export function describeWidget(w: Widget, prefix: string): Spec | typeof SKIP | null;
+
 export function edges(value: Edges | undefined): Insets;
+
+export function handleKeyDown(ui: Ui, e: KeyboardEvent, skip?: ReadonlySet<string>): boolean;
 
 export function luminance(color: string | Rgba): number;
 
@@ -900,5 +907,15 @@ export function withAlpha(color: Rgba, alpha: number): Rgba;
 
 // Not exported from this entry, but used by the exports above:
 
+type Attrs = Record<string, string | null>;
+
 type Insets = readonly [number, number, number, number];
+
+interface Spec {
+    tag: string;
+    attrs: Attrs;
+    text?: string;
+    container: boolean;
+    value?: string;
+}
 ```

@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="style-src 'self'"><title>DOM host correctness</title><link rel="icon" href="data:,"><main id="app"></main><button id="after">After the UI</button><script type="module">
+import {Ui,Panel,Label,Button,List,Toggle,Slider} from '@margoengine/ui';
+import {Select,Tabs} from '@margoengine/ui/forms';
+import {TextArea} from '@margoengine/ui/input';
+import {mountDom} from '@margoengine/ui/dom';
+// A page shaped like a film studio's review screen: a strip of steps, an answer box, a list of changes and a way back.
+const ui=new Ui({safeArea:[0,0,0,0],reducedMotion:true});
+const make=new Button({id:'make',text:'Make',variant:'primary'}),stills=new Button({id:'stills',text:'Stills'}),cut=new Button({id:'cut',text:'Cut',enabled:false});
+const answer=new TextArea({id:'answer',label:'Change this',placeholder:'Say what to change'});
+const send=new Button({id:'send',text:'Send'});
+const changes=new List({id:'changes',label:'What changed',items:['Sky warmer','Camera lower','Music softer']});
+const back=new Button({id:'back',text:'Go back',variant:'ghost'});
+const sound=new Toggle({id:'sound',text:'Sound'}),volume=new Slider({id:'volume',label:'Volume',min:0,max:10,step:1,value:5});
+const quality=new Select({id:'quality',label:'Quality',options:[{value:'draft',label:'Draft'},{value:'final',label:'Final'}],value:'draft'});
+const tabs=new Tabs({id:'tabs',label:'Views',options:[{value:'shots',label:'Shots',panel:new Label({text:'Shot list'})},{value:'notes',label:'Notes',panel:new Label({text:'Notes view'})}],value:'shots'});
+ui.add(new Panel({gap:12,padding:16,children:[
+  new Panel({id:'strip',label:'Make strip',direction:'row',gap:8,children:[make,stills,cut]}),
+  answer,send,changes,new Panel({direction:'row',gap:8,children:[sound,volume,quality]}),tabs,back]}));
+const log=[];for(const w of [make,stills,send,back])w.on('click',()=>log.push(w.id));changes.on('select',e=>log.push('changes:'+e.index));
+const violations=[];document.addEventListener('securitypolicyviolation',e=>violations.push(e.violatedDirective+' '+e.blockedURI));
+const host=mountDom(ui,document.getElementById('app'),{label:'Review'});
+window.domTest={ui,host,log,violations,widgets:{make,stills,cut,answer,send,changes,back,sound,volume,quality,tabs}};
+</script></html>

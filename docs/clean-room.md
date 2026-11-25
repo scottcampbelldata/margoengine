@@ -1,5 +1,25 @@
 # Clean room
 
+### DOM host for UI widgets (ui, GAP-FILM-DOMUI, 2026-11-25)
+
+Read the specifications: W3C WAI-ARIA 1.2 (2023, https://www.w3.org/TR/wai-aria-1.2/) and the ARIA Authoring Practices
+Guide (https://www.w3.org/WAI/ARIA/apg/patterns/: tabs with automatic activation, listbox with one tab stop, dialog, and
+its note that `role="menu"` is for application menus); the WHATWG HTML Living Standard (forms, the `dialog` element with
+`showModal` and `cancel`, `inert`); W3C WCAG 2.2 (2023, https://www.w3.org/TR/WCAG22/: 2.1.1, 2.4.7, 2.5.8 with its 24 CSS
+px minimum, 4.1.2); W3C CSS Flexible Box Layout Level 1 (https://www.w3.org/TR/css-flexbox-1/) and CSS Grid for stacks
+and grids; W3C CSP Level 3 (https://www.w3.org/TR/CSP3/: CSSOM writes and constructable stylesheets are not inline
+styles). Papers compared for keyed patching: Michael L. Fredman, On computing the length of longest increasing
+subsequences, Discrete Mathematics 11, 1975, https://doi.org/10.1016/0012-365X(75)90103-X (patience sorting finds the
+longest run of children already in order, so only the rest move); Nick ten Veen, Daco Harkes and Eelco Visser, PixieDust,
+WWW '18 Companion, 2018, https://doi.org/10.1145/3184558.3185978 (update from known dependencies rather than diffing whole
+trees); Aiden Bai and others, Million.js, 2022, https://arxiv.org/abs/2202.08409 (the cost of diff plus patch in keyed
+virtual DOM). Combined: every widget keeps its element (the widget is the key, so, as in PixieDust, no tree is diffed),
+attributes, text and CSS properties are compared with the last written values, and a reordered child list keeps its
+longest increasing run in place (Fredman). Rival behaviour from documentation only: lil-gui
+(https://lil-gui.georgealways.com/), Tweakpane (https://tweakpane.github.io/docs/), Babylon GUI (canvas only,
+https://doc.babylonjs.com/features/featuresDeepDive/gui/gui) and three.js CSS2DRenderer and CSS3DRenderer. No rival or
+companion source read or copied. The test pages are original, under the repository licence.
+
 ### Short wind waves and open-water reflection (2026-11-24)
 
 Eric Bruneton, Fabrice Neyret and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless

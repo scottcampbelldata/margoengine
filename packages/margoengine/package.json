@@ -5339,6 +5339,10 @@
       "types": "./dist/ui/editor.d.ts",
       "import": "./dist/ui/editor.js"
     },
+    "./ui/dom": {
+      "types": "./dist/ui/dom.d.ts",
+      "import": "./dist/ui/dom.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

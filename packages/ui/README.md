@@ -404,6 +404,82 @@ export function accessibleUi(engine: EngineKernel): Ui {
 Keep these working in your own widgets: give a `Widget` a `label` (its accessible name; text widgets use their text), a `description`,
 and `focusable = true` with an `activate()` method for anything that reacts to accept.
 
+## Real HTML: the DOM host
+
+The same widgets can also live as real, visible HTML instead of being drawn on the canvas, for pages that are mostly
+text, forms and lists. `mountDom` from `@margoengine/ui/dom` shows a `Ui` (or one widget of it) in an element, so the
+browser's own keyboard handling, screen readers, IME, autofill, spellcheck, zoom and touch work on them, and app code is
+the same as on the canvas: a click on the `<button>` fires the widget's `'click'`, typing fires the text input's
+`'change'`, and setting `label.text` patches only that label's element.
+
+```ts
+import { Button, Label, List, Panel, Ui } from '@margoengine/ui';
+import { TextArea } from '@margoengine/ui/input';
+import { mountDom, type DomHost } from '@margoengine/ui/dom';
+
+export function reviewPage(container: HTMLElement): DomHost {
+  const ui = new Ui();
+  const answer = new TextArea({ label: 'Change this', placeholder: 'Say what to change' });
+  const send = new Button({ text: 'Send', variant: 'primary' });
+  const changes = new List({ label: 'What changed', items: [] });
+  send.on('click', () => {
+    changes.items = [...changes.items, answer.value];
+    ui.toast('Sent');
+  });
+  ui.add(
+    new Panel({ gap: 12, padding: 16, children: [new Label({ text: 'Review', size: 'title' }), answer, send, changes] }),
+  );
+  return mountDom(ui, container, { label: 'Review' }); // dispose it (or `using`) to remove every element and listener
+}
+```
+
+- **Elements:** native first, ARIA only where HTML has none. Buttons are `<button>`, toggles and checkboxes
+  `<input type="checkbox">` (toggles with `role="switch"`), sliders range inputs, `Select` a `<select>`, `RadioGroup` a
+  `<fieldset>` of radios, `TextInput` and `TextArea` `<input>` and `<textarea>`, meters `<progress>`, and dialogs a modal
+  `<dialog>` (`showModal`: focus moves in, the page behind is inert, Escape asks the widget). `Tabs`, `List`,
+  `VirtualList` (with `aria-setsize` and `aria-posinset`) and inventories follow the WAI-ARIA Authoring Practices
+  patterns with one tab stop each. Roles and states come from the same module as the canvas's screen reader mirror, so
+  the two cannot drift. A `Menu` is a group of buttons, not `role="menu"`: the Authoring Practices keep the menu role for
+  application menus, and a game or page menu is navigation.
+- **Two-way, keyed patching:** each widget keeps its element. A change touches only the attributes, text and CSS
+  properties that differ, and children that move are reordered with the fewest moves (the longest run already in order
+  stays), so focus, the caret, an IME composition and scroll positions survive.
+- **Layout:** each widget's layout style becomes CSS flexbox and grid (row, column, stack, grid, gap, align, justify,
+  padding, margin, sizes, grow, wrap, anchors, scroll), so the page reflows at any zoom.
+- **Look:** the theme becomes CSS custom properties on the container (`--mg-primary`, `--mg-surface`, `--mg-radius`,
+  `--mg-target` and the rest) read by one shared constructable stylesheet. No style attribute is written, so a strict
+  `style-src 'self'` Content Security Policy passes (where constructable stylesheets are missing, pass `nonce` for the
+  fallback `<style>`). Focus rings use `:focus-visible`, `prefers-reduced-motion` turns transitions off and forced
+  colours use the system colours. Controls are at least `targetSize` CSS pixels (default 44; 24 is the WCAG 2.2 minimum).
+- **Toasts and announcements** go to the host's live regions, and `update` (on by default) steps `ui.update` on
+  animation frames so toasts time out. Pass `update: false` and `announce: false` when a `UiRenderer` drives the same `Ui`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `theme` | the UI's theme | The look; followed when `ui.theme` changes. |
+| `label` | none | Accessible name of the mounted region. |
+| `targetSize` | `44` | Smallest control size in CSS pixels, 24 or more. |
+| `update` | `true` | Step `ui.update` on animation frames. |
+| `announce` | `true` | Send announcements and toasts to live regions. |
+| `nonce` | none | Nonce of the fallback `<style>` element. |
+| `idPrefix` | `'margo-dom-'` | Start of every element id. |
+| `signal` | none | Unmount when it aborts. |
+
+The handle also has `elementOf(widget)`, `widgetOf(node)` and `flush()`. To place HTML in the 3D scene (like CSS2D and
+CSS3D labels), use `@margoengine/labels` and `@margoengine/html`.
+
+Sources: W3C, [WAI-ARIA 1.2](https://www.w3.org/TR/wai-aria-1.2/), 2023, and the
+[ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/patterns/) (tabs, listbox, menu and dialog patterns);
+WHATWG, [HTML Living Standard](https://html.spec.whatwg.org/multipage/) (forms, the `dialog` element, `inert`); W3C,
+[WCAG 2.2](https://www.w3.org/TR/WCAG22/), 2023 (2.1.1 keyboard, 2.4.7 focus visible, 2.5.8 target size, 4.1.2 name,
+role, value); W3C, [CSS Flexible Box Layout Level 1](https://www.w3.org/TR/css-flexbox-1/); Michael L. Fredman,
+[On computing the length of longest increasing subsequences](https://doi.org/10.1016/0012-365X(75)90103-X), 1975 (the
+fewest moves of a keyed reorder); Nick ten Veen, Daco Harkes and Eelco Visser,
+[PixieDust: Declarative Incremental User Interface Rendering Through Static Dependency Tracking](https://doi.org/10.1145/3184558.3185978),
+2018 (patching from known dependencies instead of diffing whole trees); Aiden Bai and others,
+[Million.js: A Fast Compiler-Augmented Virtual DOM for the Web](https://arxiv.org/abs/2202.08409), 2022 (the costs of
+diffing and patching in keyed virtual DOM reconciliation).
+
 ## React
 
 `@margoengine/ui/react` has thin components for the same widgets. They render no DOM: nest them inside `UiRoot` and they

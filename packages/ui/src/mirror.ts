@@ -1,12 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { Label, Panel } from './basic.js';
-import { Inventory, List, type ListItem } from './collections.js';
-import { Button, Slider, Toggle } from './controls.js';
+import { Slider } from './controls.js';
 import { handleKeyDown, type Detach } from './dom.js';
-import { ProgressBar } from './meters.js';
-import { Dialog, Toast, Tooltip } from './overlays.js';
+import { describeWidget, SKIP, type Attrs } from './dom-spec.js';
 import type { Ui } from './ui.js';
-import { VirtualList } from './virtual.js';
 import type { Widget } from './widget.js';
 
 /** Options for {@link attachMirror}. */
@@ -19,16 +15,6 @@ export interface MirrorOptions {
   signal?: AbortSignal;
 }
 
-type Attrs = Record<string, string | null>;
-interface Spec {
-  tag: string;
-  attrs: Attrs;
-  text?: string;
-  /** Children are mirrored inside this element. */
-  container: boolean;
-  /** `value` property of a range input. */
-  value?: string;
-}
 interface Entry {
   el: HTMLElement;
   widget: Widget;
@@ -40,7 +26,6 @@ interface Entry {
   description?: HTMLElement;
 }
 
-const SKIP = Symbol('skip');
 const HIDDEN_STYLE =
   'position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;';
 
@@ -90,112 +75,7 @@ export function attachMirror(ui: Ui, target: HTMLElement, options: MirrorOptions
   // --- Describing widgets ----------------------------------------------------------------------------------------
 
   const idOf = (w: Widget) => `margo-ui-${w.id}`;
-  const describe = (w: Widget): Spec | typeof SKIP | null => {
-    if (w instanceof Tooltip) return SKIP;
-    if (w instanceof Label) {
-      return w.parent instanceof Toast ? SKIP : { tag: 'p', attrs: {}, text: w.text, container: false };
-    }
-    if (w instanceof Toggle)
-      return {
-        tag: 'button',
-        attrs: { type: 'button', role: w.role, 'aria-checked': String(w.checked), disabled: w.active ? null : '' },
-        text: w.label,
-        container: false,
-      };
-    if (w instanceof Button)
-      return {
-        tag: 'button',
-        attrs: { type: 'button', disabled: w.active ? null : '' },
-        text: w.label,
-        container: false,
-      };
-    if (w instanceof Slider)
-      return {
-        tag: 'input',
-        attrs: {
-          type: 'range',
-          min: String(w.min),
-          max: String(w.max),
-          step: w.step > 0 ? String(w.step) : 'any',
-          'aria-label': w.label || 'Slider',
-          'aria-valuetext': w.valueText,
-          disabled: w.active ? null : '',
-        },
-        value: String(w.value),
-        container: false,
-      };
-    if (w instanceof ProgressBar)
-      return {
-        tag: 'div',
-        attrs: {
-          role: 'progressbar',
-          'aria-label': w.label || 'Progress',
-          'aria-valuemin': '0',
-          'aria-valuemax': String(w.max),
-          'aria-valuenow': String(w.value),
-          'aria-valuetext': w.valueText,
-        },
-        container: false,
-      };
-    if (w instanceof List)
-      return { tag: 'div', attrs: { role: 'listbox', 'aria-label': w.label || 'List' }, container: true };
-    if (w.role === 'option' && w.parent instanceof List)
-      return {
-        tag: 'div',
-        attrs: {
-          role: 'option',
-          tabindex: w.active ? '0' : null,
-          'aria-selected': String(w.parent.children.indexOf(w) === w.parent.selected),
-          'aria-disabled': w.active ? null : 'true',
-        },
-        text: w.label,
-        container: false,
-      };
-    if (w instanceof VirtualList)
-      return { tag: 'div', attrs: { role: 'listbox', 'aria-label': w.label || 'List' }, container: true };
-    // A virtual list mirrors only its built rows; each says where it stands in the whole list (WAI-ARIA 1.2 setsize, posinset).
-    if (w.role === 'option' && w.parent instanceof VirtualList) {
-      const row = w as ListItem;
-      return {
-        tag: 'div',
-        attrs: {
-          role: 'option',
-          tabindex: w.active ? '0' : null,
-          'aria-selected': String(row.selected),
-          'aria-disabled': w.active ? null : 'true',
-          'aria-setsize': String(w.parent.count),
-          'aria-posinset': String(row.index + 1),
-        },
-        text: w.label,
-        container: false,
-      };
-    }
-    if (w instanceof Inventory)
-      return { tag: 'div', attrs: { role: 'group', 'aria-label': w.label || 'Inventory' }, container: true };
-    if (w.parent instanceof Inventory)
-      return {
-        tag: 'button',
-        attrs: { type: 'button', 'aria-pressed': String(w.parent.carried === w.parent.children.indexOf(w)) },
-        text: w.label,
-        container: false,
-      };
-    if (w instanceof Dialog)
-      return {
-        tag: 'div',
-        attrs: {
-          role: 'dialog',
-          'aria-modal': 'true',
-          'aria-label': w.find(`${w.id}-title`) ? null : w.label,
-          'aria-labelledby': w.find(`${w.id}-title`) ? `margo-ui-${w.id}-title` : null,
-          'aria-describedby': w.find(`${w.id}-message`) ? `margo-ui-${w.id}-message` : null,
-        },
-        container: true,
-      };
-    if (w instanceof Toast) return { tag: 'div', attrs: { role: 'group', 'aria-label': w.label }, container: true };
-    if (w instanceof Panel && w.label)
-      return { tag: 'div', attrs: { role: 'group', 'aria-label': w.label }, container: true };
-    return null;
-  };
+  const describe = (w: Widget) => describeWidget(w, 'margo-ui-');
 
   // --- Syncing the tree ------------------------------------------------------------------------------------------
 
