@@ -12,7 +12,10 @@ export interface DifferentialOptions {
   preload?: number;
   /** `limitedSlip`: how much more it may move per N m of input torque (default 0.5). */
   bias?: number;
-  /** For a centre differential, the share of the torque (open) or the speed lead of its first output; the first axle gets this share (default 0.5). */
+  /**
+   * The share of the torque its first output gets (default 0.5): for a centre differential the first axle's. A locked or limited-slip
+   * differential moves torque between its outputs on top of this share, to bring them toward one speed; it has no speed lead of its own.
+   */
   split?: number;
 }
 
@@ -47,7 +50,13 @@ export interface DrivetrainOptions {
   finalDrive?: number;
   /** Shift by itself (default true): up past `upshiftRpm`, down under `downshiftRpm`. */
   automatic?: boolean;
+  /** The speed that makes the automatic gearbox shift up, rpm (default 6,000). */
   upshiftRpm?: number;
+  /**
+   * The speed under which it shifts down, rpm (default 2,200). The gap is the hysteresis: the engine speed after an upshift,
+   * `upshiftRpm` times the ratio of the next gear to this one, must stay above this, or the gearbox would shift up and down.
+   * @throws RangeError from the constructor when it would.
+   */
   downshiftRpm?: number;
   /** Seconds a gear change takes with the clutch out (default 0.25). */
   shiftTime?: number;
@@ -79,6 +88,12 @@ const RPM = 30 / Math.PI;
 /**
  * An engine, clutch, gearbox and differentials. Pass one as a vehicle's `drivetrain` and `setInput({throttle, clutch})` drives it; the
  * vehicle's wheels then take their torque from it, and `engineForce` is no longer used. `gear`, `rpm` and `torque` read its state.
+ *
+ * While the clutch holds, the engine's flywheel turns with the wheels, so it takes a share of the torque to speed up: a mass of
+ * `engineInertia * ratio^2 / radius^2` at the wheels (about 360 kg in first gear on the defaults and 0.35 m wheels, against the car's 1,000).
+ * This model does not take it: the engine turns with the wheels but the wheels' spins do not feel its inertia, so a car accelerates in
+ * the low gears more than that mass allows (`docs/limits.md`, own physics vehicles). The share between two wheels of an open differential
+ * depends on how they move together, and an explicit torque from the last step's acceleration is unstable when the wheels are free.
  */
 export class Drivetrain {
   /** The gear: 0 neutral, a positive number a forward gear (1 first), -1 reverse. Set it to shift by hand (with `automatic: false`). */
@@ -152,6 +167,14 @@ export class Drivetrain {
     if (!(o.efficiency > 0 && o.efficiency <= 1))
       throw new RangeError('Drivetrain efficiency must be above 0 and at most 1.');
     if (!(o.shiftTime >= 0)) throw new RangeError('Drivetrain shiftTime must be 0 or more seconds.');
+    if (!(o.upshiftRpm > 0 && o.downshiftRpm > 0 && Number.isFinite(o.upshiftRpm) && Number.isFinite(o.downshiftRpm)))
+      throw new RangeError('Drivetrain upshiftRpm and downshiftRpm must be finite numbers above 0.');
+    for (let g = 1; g < o.gears.length; g++)
+      if (o.upshiftRpm * (o.gears[g]! / o.gears[g - 1]!) <= o.downshiftRpm)
+        throw new RangeError(
+          `Drivetrain would shift up from gear ${g} at ${o.upshiftRpm} rpm to ${Math.round(o.upshiftRpm * (o.gears[g]! / o.gears[g - 1]!))} rpm, ` +
+            `at or under its downshiftRpm of ${o.downshiftRpm}, and shift back down: raise upshiftRpm's distance from downshiftRpm.`,
+        );
     this.spin = (o.idleRpm * Math.PI) / 30;
   }
 
@@ -175,11 +198,12 @@ export class Drivetrain {
   get drivenWheels(): number[] {
     return this.options.axles.flatMap((axle) => [axle.wheels[0], axle.wheels[1]]);
   }
-  /** Shifts up one forward gear (or into first from neutral); no effect in the last. */
+  /** Shifts up one forward gear; from neutral or reverse it goes into first. No effect in the last gear. */
   shiftUp(): void {
-    if (this.gear < this.options.gears.length) this.change(this.gear + 1 === 0 ? 1 : this.gear + 1);
+    if (this.gear < 1) this.change(1);
+    else if (this.gear < this.options.gears.length) this.change(this.gear + 1);
   }
-  /** Shifts down one gear, to neutral under first. */
+  /** Shifts down one gear, to neutral under first. No effect in neutral or reverse. */
   shiftDown(): void {
     if (this.gear > 0) this.change(this.gear - 1);
   }
@@ -221,15 +245,22 @@ export class Drivetrain {
         drag = -o.engineBraking * Math.min(1.5, speed / redline) * (1 - this.throttle);
       return this.throttle * full + drag;
     };
-    // The gearbox shifts by itself on the engine's speed: up near the top, down when the engine is lugging.
+    // The gearbox shifts by itself on the speed the wheels give the engine in this gear (not the engine's own, which a slipping clutch
+    // or a gear change leaves far from it): up near the top, down when the engine would be lugging.
     if (o.automatic && this.shifting === 0 && this.gear >= 1) {
-      if (this.rpm > o.upshiftRpm && this.throttle > 0 && this.gear < o.gears.length) this.shiftUp();
-      else if (this.rpm < o.downshiftRpm && this.gear > 1) this.shiftDown();
+      const shaftRpm = Math.abs(shaft) * RPM;
+      if (shaftRpm > o.upshiftRpm && this.throttle > 0 && this.gear < o.gears.length) this.shiftUp();
+      else if (shaftRpm < o.downshiftRpm && this.gear > 1) this.shiftDown();
     }
     const clutch = (1 - this.clutchPedal) * (this.shifting > 0 ? 0 : 1),
       capacity = o.clutchTorque * clutch;
     let delivered = 0;
-    if (ratio === 0 || clutch === 0) {
+    if (this.shifting > 0 && ratio !== 0) {
+      // A gear change: the clutch is out and the torque is cut while the synchronisers bring the engine to the speed the new gear asks
+      // of it, over what is left of the change, so the clutch meets it at one speed.
+      this.locked = false;
+      this.spin += (Math.max(idle * 0.9, Math.abs(shaft)) - this.spin) * Math.min(1, dt / Math.max(this.shifting, dt));
+    } else if (ratio === 0 || clutch === 0) {
       // Out of gear or out of clutch: the engine turns freely on its own torque.
       this.locked = false;
       this.spin += (dt * (engineTorque(this.spin) - o.engineBraking * 0.2 * (this.spin / redline))) / o.engineInertia;

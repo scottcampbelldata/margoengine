@@ -249,3 +249,75 @@ test('anti-roll bars resist the roll of a car in a bend', () => {
   assert.ok(none > 0.02, `the car rolls without bars: ${none} rad`);
   assert.ok(barred < none * 0.8, `bars cut the roll: ${barred} against ${none}`);
 });
+
+/** Four driven wheels turning at `spin` rad/s, 1 kg m squared each. */
+const wheels = (n, spin) => Array.from({ length: n }, () => ({ spin, inertia: 1 }));
+
+test('a centre differential with a split of 0.4 sends 0.4 of the torque to the first axle and 0.6 to the second', () => {
+  const drive = new Drivetrain({ axles: [{ wheels: [0, 1] }, { wheels: [2, 3] }], center: { split: 0.4 } });
+  drive.pedals(1, 0);
+  let torques = [];
+  for (let i = 0; i < 10; i++) torques = drive.step(1 / 60, wheels(4, 20));
+  const first = torques[0] + torques[1],
+    second = torques[2] + torques[3];
+  assert.ok(first > 0 && second > 0, 'both axles are driven');
+  near(first / (first + second), 0.4, 1e-9, "the first axle's share");
+  near(torques[0], torques[1], 1e-9, 'each axle splits evenly between its wheels when they turn alike');
+});
+
+test('a clutch that slips carries no more than its torque, whatever the pedal', () => {
+  for (const pedal of [0, 0.2, 0.5, 0.8, 0.95]) {
+    const drive = new Drivetrain({ axles: [{ wheels: [2, 3] }], efficiency: 0.9 }),
+      capacity = 320 * (1 - pedal),
+      limit = capacity * Math.abs(drive.ratio) * 0.9;
+    drive.pedals(1, pedal);
+    for (let i = 0; i < 120; i++) {
+      const torques = drive.step(1 / 60, wheels(2, i / 20)),
+        total = torques[0] + torques[1];
+      assert.ok(total <= limit * (1 + 1e-9) + 1e-9, `pedal ${pedal}, step ${i}: ${total} N m at the wheels over ${limit}`);
+    }
+  }
+});
+
+test('the automatic gearbox does not hunt: it refuses limits that would shift up and straight back down, and a run only goes up', () => {
+  assert.throws(
+    () => new Drivetrain({ axles: [{ wheels: [2, 3] }], upshiftRpm: 3000, downshiftRpm: 2800 }),
+    /shift back down/,
+  );
+  assert.throws(() => new Drivetrain({ axles: [{ wheels: [2, 3] }], upshiftRpm: 0 }), /upshiftRpm/);
+  const { physics, vehicle } = car(rear());
+  vehicle.setInput({ throttle: 1 });
+  const gears = [];
+  for (let i = 0; i < 900; i++) {
+    physics.step();
+    gears.push(vehicle.drivetrain.gear);
+  }
+  assert.ok(gears.at(-1) >= 3, `it climbed to gear ${gears.at(-1)}`);
+  for (let i = 1; i < gears.length; i++) assert.ok(gears[i] >= gears[i - 1], `it shifted down from ${gears[i - 1]} to ${gears[i]} at step ${i}`);
+  physics.dispose();
+});
+
+test('closing the throttle brakes with the engine: a drag at the wheels that grows with the speed, and none with no engine braking', () => {
+  const drag = (engineBraking, spin) => {
+    const drive = new Drivetrain({ axles: [{ wheels: [2, 3] }], engineBraking });
+    drive.pedals(0, 0);
+    let torques = [];
+    for (let i = 0; i < 10; i++) torques = drive.step(1 / 60, wheels(2, spin));
+    return torques[0] + torques[1];
+  };
+  assert.ok(drag(40, 20) < 0, 'a drag at 20 rad/s');
+  assert.ok(drag(40, 40) < drag(40, 20), 'a bigger drag at twice the speed');
+  assert.equal(drag(0, 40), 0, 'none without engine braking');
+});
+
+test('shifting up from reverse or neutral goes into first, and shifting down from reverse does nothing', () => {
+  const drive = rear();
+  drive.gear = -1;
+  drive.shiftDown();
+  assert.equal(drive.gear, -1);
+  drive.shiftUp();
+  assert.equal(drive.gear, 1);
+  drive.gear = 0;
+  drive.shiftUp();
+  assert.equal(drive.gear, 1);
+});
