@@ -35,6 +35,7 @@ pub mod revolve;
 pub mod sat;
 pub mod smooth;
 pub mod solver;
+pub mod tilt;
 pub mod soup;
 pub mod tree;
 pub mod voxel;

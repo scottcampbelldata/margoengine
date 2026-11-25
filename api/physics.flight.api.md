@@ -827,6 +827,7 @@ interface KernelSolverOptions {
     adaptiveChangeDetectionMargin?: boolean;
     blockSolver?: boolean;
     islandMajor?: boolean;
+    adaptiveSubsteps?: boolean;
 }
 
 interface KernelTriangleViews {

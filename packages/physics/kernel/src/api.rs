@@ -310,6 +310,7 @@ pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
         23 => header.tree_optimize = (value != 0.0) as u32,
         24 => header.adaptive_margin = (value != 0.0) as u32,
         25 => header.block_solver = (value != 0.0) as u32,
+        27 => header.adaptive_substeps = (value != 0.0) as u32,
         _ => return 0,
     }
     1
@@ -347,6 +348,7 @@ pub extern "C" fn world_solver(index: u32) -> f32 {
         23 => header.tree_optimize as f32,
         24 => header.adaptive_margin as f32,
         25 => header.block_solver as f32,
+        27 => header.adaptive_substeps as f32,
         _ => f32::NAN,
     }
 }

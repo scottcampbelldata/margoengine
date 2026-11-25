@@ -145,6 +145,9 @@ pub struct Header {
     pub tree_used: u32,
     /// Not zero: a manifold's normal rows are solved exactly in one block (solver.rs, `block_normal`) in place of by sweeps.
     pub block_solver: u32,
+    /// Not zero (the default): each island steps at its own level of substeps, 2^k times the world's (tilt.rs, `island_level`);
+    /// zero holds every island at the world's substeps.
+    pub adaptive_substeps: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -160,6 +163,8 @@ pub struct Window {
     pub joints: (usize, usize),
     pub couplings: (usize, usize),
     pub kin: Option<u32>,
+    /// The substeps this solve's step is cut into (an island's own count, `World::island_level`); 0 for the world's setting.
+    pub substeps: u32,
 }
 
 pub struct World {
@@ -300,6 +305,7 @@ impl World {
                 tree_free: NONE,
                 tree_used: 0,
                 block_solver: 0,
+                adaptive_substeps: 1,
             });
         }
         Some(world)
@@ -892,7 +898,7 @@ impl World {
     /// The window on every list the step solves: all the awake bodies, every listed pair, joint and coupling.
     pub fn whole_window(&self) -> Window {
         let h = self.header();
-        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None }
+        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None, substeps: 0 }
     }
 
     /// FNV-1a over the world's state, the replay proof's fingerprint: the header's scalars and every column but those of `SCRATCH`, which

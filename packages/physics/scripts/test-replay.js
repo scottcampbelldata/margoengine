@@ -45,7 +45,7 @@ try {
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto(`${server.resolvedUrls.local[0]}tests/replay.html`);
       await page.waitForFunction(() => typeof window.runReplay === 'function', null, { timeout: 60_000 });
-      const { kernel, kernelBlock, physics, arena } = await page.evaluate(() => window.runReplay());
+      const { kernel, kernelBlock, physics, physicsAdaptive, arena } = await page.evaluate(() => window.runReplay());
       assert.deepEqual(errors, []);
       assert.deepEqual(kernel, golden.kernel, `${name}: the kernel scene left the hashes on file`);
       assert.deepEqual(
@@ -59,6 +59,11 @@ try {
         `${name}: the order the steps solved in left the arena hashes on file`,
       );
       assert.deepEqual(physics, golden.physics, `${name}: the Physics scene left the hashes on file`);
+      assert.deepEqual(
+        [physicsAdaptive, arena.physicsAdaptive],
+        [golden.physicsAdaptive, golden.physicsAdaptiveArena],
+        `${name}: the Physics scene with each island at its own level left the hashes on file`,
+      );
       report.push({ browser: name, version: browser.version(), steps: golden.steps, last: kernel.at(-1) });
       console.log(
         `${name} ${browser.version()}: ${golden.steps} steps, ${kernel.length + physics.length} hashes equal`,

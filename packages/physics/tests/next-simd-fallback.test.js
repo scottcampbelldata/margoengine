@@ -8,7 +8,7 @@ import test from 'node:test';
 import { inflateRawSync } from 'node:zlib';
 import binaryen from 'binaryen';
 import { KernelWorld, Physics, loadKernel } from '../dist/index.js';
-import { REPLAY_STEPS, kernelScene, physicsScene } from './replay-scene.js';
+import { REPLAY_ADAPTIVE_STEPS, REPLAY_STEPS, kernelScene, physicsScene } from './replay-scene.js';
 
 const golden = JSON.parse(readFileSync(new URL('fixtures/replay-hash.json', import.meta.url), 'utf8'));
 
@@ -46,6 +46,13 @@ for (const simd of [false, true]) {
       'the block solver on',
     );
     assert.deepEqual(physicsScene(Physics, undefined, physicsArena), golden.physics);
+    const adaptiveArena = [];
+    assert.deepEqual(
+      physicsScene(Physics, REPLAY_ADAPTIVE_STEPS, adaptiveArena, true),
+      golden.physicsAdaptive,
+      'levels on',
+    );
+    assert.deepEqual(adaptiveArena, golden.physicsAdaptiveArena);
     assert.deepEqual(
       [arena, blockArena, physicsArena],
       [golden.kernelArena, golden.kernelBlockArena, golden.physicsArena],

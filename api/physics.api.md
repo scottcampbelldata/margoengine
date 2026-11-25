@@ -762,6 +762,7 @@ export interface KernelSolverOptions {
     adaptiveChangeDetectionMargin?: boolean;
     blockSolver?: boolean;
     islandMajor?: boolean;
+    adaptiveSubsteps?: boolean;
 }
 
 export interface KernelTriangleViews {

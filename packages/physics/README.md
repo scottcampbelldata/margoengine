@@ -1490,16 +1490,30 @@ console.log(physics.solver.blockSolver, Math.abs(box.position[1] - 0.5) < 0.01);
 physics.dispose();
 ```
 
-`islandMajor` (default `true`) solves a step island by island, each through all its substeps, in place of all islands phase by phase. The two give the same bits: islands share no body a solve changes, and a kinematic platform that two islands rest on is read by each at the pose of the substep it is at. The switch is kept to prove that, and so that islands can be solved on their own.
+`adaptiveSubsteps` (default `true`) lets each island step at its own level of substeps: 2^k times the world's, k chosen every step from the island's own state, and never finer than 7,680 substeps a second (128 at a 1/60 s step). An island takes the least level at which no body in contact turns more than 0.5054 rad in a substep and the piles standing in it get contacts stiff enough not to tip; the rest of the world steps as before, to the bit. So a 30-row pyramid at one pass a substep rests at either gravity, and a bar spinning at 2,000 rad/s against a wall with friction gains no energy. The cost is that island's work times 2^k: a small body spun to thousands of rad/s while it touches a cluster puts the cluster at the finest level for as long as it spins. `false` holds every island at the world's substeps, the fixed stepping of earlier releases.
 
 ```ts
 import {Physics} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null);
-console.log(physics.solver.islandMajor); // true
-physics.setSolver({islandMajor: false});
-console.log(physics.solver.islandMajor); // false
+console.log(physics.solver.adaptiveSubsteps); // true
+physics.setSolver({adaptiveSubsteps: false});
+console.log(physics.solver.adaptiveSubsteps); // false
+physics.dispose();
+```
+
+`islandMajor` (default `true`, deprecated) solves a step island by island, each through all its substeps, in place of all islands phase by phase. Phase by phase steps every island at the world's substeps, so it has the limits `adaptiveSubsteps` lifts, and it gives the same bits as island by island only with `adaptiveSubsteps: false`: islands share no body a solve changes, and a kinematic platform that two islands rest on is read by each at the pose of the substep it is at.
+
+Migration: `islandMajor: false` is deprecated and phase by phase is removed in `@margoengine/physics` 2.0.0. Leave `islandMajor` unset; for the old fixed stepping set `adaptiveSubsteps: false`, which island by island gives with the same bits phase by phase did.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.setSolver({adaptiveSubsteps: false});
+console.log(physics.solver.islandMajor, physics.solver.adaptiveSubsteps); // true false
 physics.dispose();
 ```
 

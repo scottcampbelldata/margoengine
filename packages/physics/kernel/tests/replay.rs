@@ -102,14 +102,16 @@ fn scene() -> Vec<u32> {
 
 /// The scene with the block solver of the manifolds' normal rows on or off.
 fn run(block_solver: bool) -> (Vec<u32>, Vec<u32>) {
-    run_islands(block_solver, true)
+    run_scene(block_solver, true, true)
 }
 
-/// The scene solved island by island (what the Wasm build does, whose lists the fixture holds) or phase by phase.
-fn run_islands(block_solver: bool, island_major: bool) -> (Vec<u32>, Vec<u32>) {
+/// The scene solved island by island (what the Wasm build does, whose lists the fixture holds) or phase by phase, with each
+/// island at its own level of substeps or all at the world's.
+fn run_scene(block_solver: bool, island_major: bool, adaptive: bool) -> (Vec<u32>, Vec<u32>) {
     let mut random = Stream(0x4D41_5247);
     let mut w = World::new(1, 1).unwrap();
     w.header_mut().block_solver = block_solver as u32;
+    w.header_mut().adaptive_substeps = adaptive as u32;
     w.island_major = island_major;
     let mut rows = Vec::new();
     let (mut hashes, mut arena) = (Vec::new(), Vec::new());
@@ -299,13 +301,15 @@ fn the_block_solver_leaves_no_manifold_of_the_scene_to_the_sweeps() {
     assert!(exact > 1000 && left == 0, "{exact} exact, {left} left to the sweeps");
 }
 
-/// Island by island, the scene's state is what it is phase by phase, to the bit, every hundred steps for ten thousand: bodies of
-/// every shape, fixed and kinematic ones, joints of every kind between bodies picked at random, sleeping and waking.
+/// Island by island, the scene's state is what it is phase by phase, to the bit, every hundred steps for ten thousand, with every
+/// island held at the world's substeps (`adaptive_substeps` zero, which phase by phase always is): bodies of every shape, fixed
+/// and kinematic ones, joints of every kind between bodies picked at random, sleeping and waking. With levels on, island by island
+/// is the fixture's, and it parts from phase by phase where an island needs a finer level.
 #[test]
 fn island_by_island_gives_the_state_phase_by_phase_gives() {
-    for island_major in [false, true] {
-        assert_eq!(run_islands(false, island_major).0, list("kernel"), "island major {island_major}");
-        assert_eq!(run_islands(true, island_major).0, list("kernelBlock"), "island major {island_major}, block solver");
+    for block in [false, true] {
+        let fixed = run_scene(block, true, false).0;
+        assert_eq!(fixed, run_scene(block, false, false).0, "block solver {block}");
     }
 }
 

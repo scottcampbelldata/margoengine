@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { KernelWorld, Physics } from '../dist/index.js';
 import { kernelSourceHash } from '../scripts/build-kernel.mjs';
-import { REPLAY_EVERY, REPLAY_STEPS, kernelScene, physicsScene } from './replay-scene.js';
+import { REPLAY_ADAPTIVE_STEPS, REPLAY_EVERY, REPLAY_STEPS, kernelScene, physicsScene } from './replay-scene.js';
 
 const golden = JSON.parse(readFileSync(new URL('fixtures/replay-hash.json', import.meta.url), 'utf8'));
 await Physics.load();
@@ -37,6 +37,12 @@ test('10,000 steps through Physics give the hashes on file', () => {
   const arena = [];
   assert.deepEqual(physicsScene(Physics, REPLAY_STEPS, arena), golden.physics);
   assert.deepEqual(arena, golden.physicsArena);
+});
+
+test('500 steps through Physics with each island at its own level of substeps give the hashes on file', () => {
+  const arena = [];
+  assert.deepEqual(physicsScene(Physics, REPLAY_ADAPTIVE_STEPS, arena, true), golden.physicsAdaptive);
+  assert.deepEqual(arena, golden.physicsAdaptiveArena);
 });
 
 test('the kernel scene reaches what it claims to cover', () => {

@@ -192,6 +192,20 @@ columns! {
     SOLVE_INERTIA_YY f32 Body,
     SOLVE_INERTIA_YZ f32 Body,
     SOLVE_INERTIA_ZZ f32 Body,
+    // The level the body's island last stepped at: its step was cut into 2^level times the world's substeps (tilt.rs). State: the
+    // impulses the body's contacts and joints carry were made at that substep's length.
+    SUBSTEP_LEVEL u32 Body,
+    // Tipping (tilt.rs), worked out once a step: the mass a body holds up, its count of supports, its conductance to the ground
+    // through them, the tipping stiffness gravity takes from it, the sum that bounds the structure above, and the heights of
+    // the contacts below and above it.
+    TILT_MASS f32 Body,
+    TILT_SUPPORTS u32 Body,
+    TILT_Y f32 Body,
+    TILT_G f32 Body,
+    TILT_A f32 Body,
+    TILT_BASE f32 Body,
+    TILT_TOP f32 Body,
+    TILT_TOPS u32 Body,
     // Colliders: a shape in its body's frame.
     COLLIDER_BODY u32 Collider,
     COLLIDER_NEXT u32 Collider,
@@ -311,6 +325,11 @@ columns! {
     PAIR_SURFACE_Z f32 Pair,
     // The impulse of the simplified friction model's twist about the pair's normal, carried from substep to substep.
     PAIR_TWIST f32 Pair,
+    // How much stiffer than its own soft step a supporting contact is made this step, so the structure on it cannot tip (tilt.rs).
+    PAIR_TILT_GAIN f32 Pair,
+    // Not zero: a supporting contact that needs more turning stiffness than the finest level of substeps gives (tilt.rs,
+    // `island_level`): what tips on it tips as the bodies would, and it asks its island for no shorter substeps.
+    PAIR_TILT_UNHELD u32 Pair,
     // The pose of the second body in the first's frame and the contact normal in the first's frame, as the last full narrow phase
     // found them: a pair may keep its manifold while the poses stay near these (contact recycling). Zero rotation: none kept.
     PAIR_REL_X f32 Pair,
@@ -324,6 +343,9 @@ columns! {
     PAIR_LOCAL_NORMAL_Y f32 Pair,
     PAIR_LOCAL_NORMAL_Z f32 Pair,
     SOLVE_PAIRS u32 Pair,
+    // The supporting pairs of this step, lowest first, and the sort's spare.
+    TILT_PAIRS u32 Pair,
+    TILT_TEMP u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
     // Awake bodies, densely.
@@ -947,8 +969,9 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
 /// their list. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 25] = [
+pub const SCRATCH: [usize; 37] = [
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
+    TILT_MASS, TILT_SUPPORTS, TILT_Y, TILT_G, TILT_A, TILT_BASE, TILT_TOP, TILT_TOPS, PAIR_TILT_GAIN, PAIR_TILT_UNHELD, TILT_PAIRS, TILT_TEMP,
 ];

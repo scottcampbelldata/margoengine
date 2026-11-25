@@ -536,3 +536,71 @@ fn the_same_scene_runs_the_same_twice() {
     };
     assert_eq!(run(), run());
 }
+
+/// The pile of `one_pass_pile`, sleeping off, under gravity `g` and with the block solver if `block`: its fastest box at the end of
+/// each of `windows`, in seconds.
+fn pile_over_time(rows: usize, g: f32, block: bool, windows: &[u32]) -> Vec<f32> {
+    let mut w = world((rows * (rows + 1) / 2 + 1) as u32);
+    w.header_mut().substeps = 4;
+    w.header_mut().iterations = 1;
+    w.header_mut().gravity = [0.0, -g, 0.0];
+    w.header_mut().block_solver = block as u32;
+    floor(&mut w);
+    let mut bodies = vec![];
+    for row in 0..rows {
+        for i in 0..rows - row {
+            let at = v3(i as f32 - (rows - row - 1) as f32 * 0.5, 0.5 + row as f32, 0.0);
+            bodies.push(block_at(&mut w, at));
+        }
+    }
+    let mut fastest = vec![];
+    let mut step = 0;
+    for &end in windows {
+        while step < end * 60 {
+            w.step(DT);
+            step += 1;
+        }
+        fastest.push(bodies.iter().fold(0.0f32, |m, &b| m.max(size(w.v(LINEAR_X, b as usize)))));
+    }
+    fastest
+}
+fn block_at(w: &mut World, at: V3) -> u32 {
+    block(w, [0.5, 0.5, 0.5], at, 1.0, false)
+}
+
+/// A pile at rest stays at rest: its fastest box under 1 mm/s at 30, 60 and 90 s and no faster at 90 than a quarter over what it
+/// was at 30, so a slow growth shows long before it would leave the bound. Before an island took substeps fine enough to hold
+/// its tipping modes (tilt.rs), the 30-row pile crept at 5.6 mm/s at 30 s under 9.80665 m/s^2 while it rested at 9.81, and the
+/// 26- and 28-row piles crept at both (KB-PHYS-PILECREEP1).
+fn holds_still(rows: usize, g: f32, block: bool) {
+    let fastest = pile_over_time(rows, g, block, &[30, 60, 90]);
+    println!("{rows} rows, g {g}, block {block}: fastest {fastest:?} m/s at 30, 60 and 90 s");
+    for (k, &f) in fastest.iter().enumerate() {
+        assert!(f < 1e-3, "{rows} rows, g {g}, block {block}: {f} m/s at {} s", 30 * (k + 1));
+        assert!(f <= 1.25 * fastest[0], "{rows} rows, g {g}, block {block}: {f} m/s at {} s grew from {} at 30 s", 30 * (k + 1), fastest[0]);
+    }
+}
+
+#[test]
+fn a_pile_of_twenty_rows_holds_still_for_ninety_seconds() {
+    for g in [9.81, 9.80665] {
+        holds_still(20, g, false);
+    }
+}
+
+#[test]
+fn a_pile_of_thirty_rows_holds_still_for_ninety_seconds_at_either_gravity() {
+    holds_still(30, 9.80665, false);
+}
+
+#[test]
+fn a_pile_of_thirty_rows_holds_still_for_ninety_seconds_at_the_old_gravity() {
+    holds_still(30, 9.81, false);
+}
+
+#[test]
+fn the_block_solver_holds_a_pile_of_thirty_rows_still_for_ninety_seconds() {
+    // At one pass a substep the exact block solve once let the apex box's z velocity grow from 0.003 m/s at 30 s to 0.07 at 60
+    // and 150 by 90 (KB-PHYS-BLOCK1).
+    holds_still(30, 9.80665, true);
+}

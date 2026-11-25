@@ -645,6 +645,11 @@ impl World {
             if !(limit_force > 0.0 || limit_torque > 0.0) {
                 continue;
             }
+            // The joint's impulses are its island's last substep's: that substep is the world's cut 2^level times finer.
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let body = if self.flags(a) & KIND == DYNAMIC { a } else { b };
+            let level = if self.island_major && self.header().adaptive_substeps != 0 { self.uu(SUBSTEP_LEVEL, body) } else { 0 };
+            let h = h / (1u32 << level) as f32;
             let load = |w: &World, first: usize| {
                 let (x, y, z) = (w.s(JOINT_IMPULSE_0 + first, row), w.s(JOINT_IMPULSE_0 + first + 1, row), w.s(JOINT_IMPULSE_0 + first + 2, row));
                 sqrt(x * x + y * y + z * z) / h

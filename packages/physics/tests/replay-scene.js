@@ -5,6 +5,14 @@
 /** Steps of a full replay, and how often a hash is taken. */
 export const REPLAY_STEPS = 10_000;
 export const REPLAY_EVERY = 100;
+/**
+ * Steps of the Physics scene with each island at its own level of substeps (`adaptiveSubsteps`). Its 10,000 steps run with fixed
+ * substeps, proving that path as before: with levels, the scene's torque impulses spin a 1 to 10 cm body to 1,000 to 3,000 rad/s
+ * while it touches a 16-body cluster, and the cluster rightly steps at the finest level (7,680 Hz) on about 35 percent of the
+ * steps, about 60 times the work (190 s per 1,000 steps in Wasm on the Mac against 3.2 s). 500 steps prove the levels bit for bit
+ * in every build, native, Wasm and browsers alike.
+ */
+export const REPLAY_ADAPTIVE_STEPS = 500;
 
 const DT = 1 / 60;
 const GRAVITY = [
@@ -241,13 +249,14 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {},
 
 /**
  * The same kind of scene through the `Physics` surface, on a world with no engine: every call a game makes on a step, in
- * the browser's own double-precision arithmetic before the kernel rounds it.
+ * the browser's own double-precision arithmetic before the kernel rounds it. `adaptive` sets `adaptiveSubsteps`.
  */
-export function physicsScene(Physics, steps = REPLAY_STEPS, arena = []) {
+export function physicsScene(Physics, steps = REPLAY_STEPS, arena = [], adaptive = false) {
   const random = new Stream(0x4d415248),
     physics = new Physics(null),
     bodies = [],
     hashes = [];
+  physics.setSolver({ adaptiveSubsteps: adaptive });
   const vector = (scale = 1) => [random.value() * scale, random.value() * scale, random.value() * scale];
   const spawn = () => {
     const type = ['dynamic', 'dynamic', 'dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'][random.below(6)],

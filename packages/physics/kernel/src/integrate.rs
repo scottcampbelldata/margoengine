@@ -194,10 +194,21 @@ impl World {
         if self.island_major {
             // Each island by itself, through all its substeps: islands share no body a solve changes. The kinematic bodies' columns
             // keep the pose the step began at while the islands solve, and each substep reads them through the stage it is at.
+            // Each island at its own level (`island_level`): 2^k times the world's substeps, k from its own state alone, so an island
+            // that needs short substeps takes them and the rest of the world does not; all of them meet at the step's end.
             let islands = self.header().islands as usize;
             for group in 0..=islands {
                 self.window = self.group_window(group);
-                self.run_substeps(h, substeps, stiffness, &mut inner, true);
+                let adaptive = self.header().adaptive_substeps != 0;
+                let level = if group < islands && adaptive { self.island_level(dt, substeps) } else { 0 };
+                let count = substeps << level;
+                let hi = dt / count as f32;
+                self.window.substeps = count;
+                self.rescale_warm(level);
+                let raw = self.header().contact_hertz;
+                let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
+                self.run_substeps(hi, count, stiffness, &mut inner, true);
+                self.keep_level(level);
             }
             self.window = self.whole_window();
             self.integrate_kinematics(h, substeps);
@@ -303,6 +314,7 @@ impl World {
                 joints: run(self.uu(ISLAND_JOINT_START, group) as usize, self.uu(ISLAND_JOINT_COUNT, group) as usize),
                 couplings: run(self.uu(ISLAND_COUPLING_START, group) as usize, self.uu(ISLAND_COUPLING_COUNT, group) as usize),
                 kin: None,
+                substeps: 0,
             }
         } else {
             let end = |start: usize, count: usize| start + count;
@@ -314,6 +326,7 @@ impl World {
                 joints: (after(ISLAND_JOINT_START, ISLAND_JOINT_COUNT, h.joint_solving as usize), h.joint_solving as usize),
                 couplings: (after(ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, h.coupling_rows as usize), h.coupling_rows as usize),
                 kin: None,
+                substeps: 0,
             }
         }
     }
@@ -327,7 +340,7 @@ impl World {
         if stage == 0 || (kind != KINEMATIC_POSITION && kind != KINEMATIC_VELOCITY) || !self.is_awake(at) {
             return None;
         }
-        let substeps = self.header().substeps;
+        let substeps = if self.window.substeps > 0 { self.window.substeps } else { self.header().substeps };
         let h = self.header().step_dt / substeps as f32;
         let (linear, angular, local) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at), self.v(LOCAL_CENTER_X, at));
         let (mut position, mut center, mut rotation) = (self.v(POSITION_X, at), self.v(CENTER_X, at), self.q(ROTATION_X, at));

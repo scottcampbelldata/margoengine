@@ -964,11 +964,21 @@ export interface KernelSolverOptions {
    */
   blockSolver?: boolean;
   /**
-   * Solve a step island by island, each through all its substeps (default true), or all islands phase by phase: the same bits either
-   * way, since islands share no body a solve changes, and the kinematic bodies are read at the pose of the substep an island is at.
-   * Island by island is what lets islands be solved on their own; phase by phase is kept to prove the two equal.
+   * Solve a step island by island, each through all its substeps (default true), or all islands phase by phase. Phase by phase steps
+   * every island at the world's substeps, so it has the limits `adaptiveSubsteps` lifts (a tall pile at one pass a substep creeps, a
+   * fast spinner against a wall with friction gains energy), and it gives the same bits as island by island only with
+   * `adaptiveSubsteps: false`.
+   * @deprecated Phase by phase is removed in `@margoengine/physics` 2.0.0. Leave `islandMajor` unset; for the old fixed stepping
+   * set `adaptiveSubsteps: false`.
    */
   islandMajor?: boolean;
+  /**
+   * Let each island step at its own level of substeps (default true): 2^k times the world's, k chosen every step from the island's
+   * own state, no finer than 7,680 substeps a second, so no body in contact turns more than 0.5054 rad in a substep and the piles
+   * standing in it get contacts stiff enough not to tip. The rest of the world steps as before. False holds every island at the
+   * world's substeps, the fixed stepping of earlier releases. Islands solve one at a time for this, so it needs `islandMajor`.
+   */
+  adaptiveSubsteps?: boolean;
 }
 
 /**
@@ -1171,6 +1181,7 @@ export class KernelWorld {
       adaptiveChangeDetectionMargin: read(24) !== 0,
       blockSolver: read(25) !== 0,
       islandMajor: read(26) !== 0,
+      adaptiveSubsteps: read(27) !== 0,
     };
   }
   /**
@@ -1290,6 +1301,7 @@ export class KernelWorld {
       this.api.world_set_solver(24, adaptiveChangeDetectionMargin ? 1 : 0);
     if (options.blockSolver !== undefined) this.api.world_set_solver(25, options.blockSolver ? 1 : 0);
     if (options.islandMajor !== undefined) this.api.world_set_solver(26, options.islandMajor ? 1 : 0);
+    if (options.adaptiveSubsteps !== undefined) this.api.world_set_solver(27, options.adaptiveSubsteps ? 1 : 0);
     if (broadPhase !== undefined) {
       this.api.world_set_solver(21, broadPhase === 'bvh' ? 1 : 0);
       // The switch makes the tree's rows and moves the columns.

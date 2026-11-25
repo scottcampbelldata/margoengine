@@ -576,6 +576,16 @@ impl World {
             } else {
                 step
             };
+            // A contact a structure stands on is made as much stiffer as keeps it from tipping (tilt.rs), in the pushing pass. Only
+            // where islands step at their own levels: the gains are worked out per island just before it solves, and with fixed
+            // substeps (or phase by phase) a gain left from an earlier step would be stale.
+            let gain = if self.island_major && self.header().adaptive_substeps != 0 { self.s(PAIR_TILT_GAIN, row) } else { 1.0 };
+            let step = if biased && gain > 1.0 {
+                let (hertz, damping) = self.pair_hertz(row, a, b, h);
+                soft(hertz * sqrt(gain), damping, h)
+            } else {
+                step
+            };
             let given = if biased {
                 // Friction in the pushing pass is a switch (Rapier's `friction_in_bias_pass`), but with no relaxing pass to
                 // solve it, the pushing one must.
@@ -596,6 +606,24 @@ impl World {
             self.settle(b, &body_b);
         }
         self.header_mut().impacts = impacts as u32;
+    }
+
+    /// The frequency and damping ratio of the soft step pair `row` takes in a pushing pass at substep `h`: the chain spring's eighth
+    /// of the substep rate at one pass, a static contact's own, or the world's, each held under its cap.
+    pub(crate) fn pair_hertz(&self, row: usize, a: usize, b: usize, h: f32) -> (f32, f32) {
+        if self.header().static_hertz > 0.0 && (self.flags(a) & KIND != DYNAMIC || self.flags(b) & KIND != DYNAMIC) {
+            let hertz = self.header().static_hertz;
+            return (if hertz * h > 0.25 { 0.25 / h } else { hertz }, self.header().static_damping);
+        }
+        let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
+        let passes = self.header().iterations;
+        if passes < 2 {
+            let g = v3(self.header().gravity[0], self.header().gravity[1], self.header().gravity[2]);
+            if self.is_chain(row, a, b, passes, CHAIN_LOAD * h * sqrt(g.dot(g))) {
+                return (if hertz * h > 0.125 { 0.125 / h } else { hertz }, damping);
+            }
+        }
+        (if hertz * h > 0.25 { 0.25 / h } else { hertz }, damping)
     }
 
     /// Whether a pair takes the chain spring of `CHAIN_LOAD`: two dynamic bodies, neither dominating, with one pass between

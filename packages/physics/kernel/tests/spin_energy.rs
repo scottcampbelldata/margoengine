@@ -48,15 +48,16 @@ fn a_spinning_bar_through_a_wall_gains_no_energy_without_friction() {
     }
 }
 
-/// Friction on (a coefficient of 0.5): holds at every spin the first row of this file covers except 400 rad/s, where the relaxing
-/// pass gives back more of the friction the pushing pass took than the pushing pass took out (KB-PHYS-SPINFRICTION1, open): there the
-/// bar holds 1.031 times its energy, where before the turned bodies' rows were refreshed it held 3.2 times.
+/// Friction on, from 0.1 to 1, at every spin from 20 to 2,000 rad/s. A step's rows used to keep the levers of its first pose, so a
+/// bar that turned 1.7 rad a substep was pushed with one inertia and relaxed with another, and held up to 1.19 times its energy (250
+/// rad/s, friction 0.5; 1.031 at 400). An island now takes substeps fine enough that a body in contact turns at most 0.5054 rad in
+/// one (tilt.rs, `island_level`), and none gains (KB-PHYS-SPINFRICTION1).
 #[test]
 fn a_spinning_bar_through_a_wall_gains_no_energy_with_friction() {
-    for spin in [20.0, 100.0, 2000.0] {
-        let ratio = peak_ratio(spin, 0.5);
-        assert!(ratio <= 1.001, "spin {spin}: the bar holds {ratio} times the energy it began with");
+    for spin in [20.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0, 600.0, 700.0, 2000.0] {
+        for friction in [0.1, 0.3, 0.5, 0.7, 1.0] {
+            let ratio = peak_ratio(spin, friction);
+            assert!(ratio <= 1.001, "spin {spin}, friction {friction}: the bar holds {ratio} times the energy it began with");
+        }
     }
-    let ratio = peak_ratio(400.0, 0.5);
-    assert!(ratio <= 1.04, "spin 400: the bar holds {ratio} times the energy it began with");
 }
