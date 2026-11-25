@@ -1,0 +1,20 @@
+[package]
+name = "margoengine-proto-reader"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# A test module of the shared-memory layout (docs/physics-framework.md, section 3; scripts/physics-modules.mjs): no
+# allocator and no state in statics, so its only memory is its static window and the regions the world gives it.
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+strip = "symbols"

@@ -29,7 +29,28 @@ export {
   type Snapshot,
   type SnapshotSolver,
 } from './snapshot.js';
-export { Arena, BYTES, regionWords, type RegionWords } from './memory.js';
+export {
+  Arena,
+  BYTES,
+  DYNAMIC_BASE,
+  MAX_MEMORY_PAGES,
+  MODULE_BASE,
+  MODULE_SLOTS,
+  MODULE_WINDOW,
+  STACK_BYTES,
+  canShareMemory,
+  instantiateSolverModule,
+  isShared,
+  loadSolverModule,
+  moduleBase,
+  regionWords,
+  stackRegion,
+  worldMemory,
+  type ModuleBuilds,
+  type ModuleSlot,
+  type RegionWords,
+  type SolverModule,
+} from './memory.js';
 export {
   FieldRegistry,
   QUANTITY_UNITS,

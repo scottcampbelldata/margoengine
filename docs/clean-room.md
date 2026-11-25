@@ -11508,6 +11508,23 @@ Written from:
 - Standard gravity 9.80665 m/s^2: the value fixed by the 3rd CGPM (1901) and ISO 80000-3.
 
 Proof: `packages/physics/tests/world.test.js`.
+### Solver modules on one memory (`@margoengine/physics/world`, `scripts/physics-modules.mjs`, 2026-11-25)
+
+The module table, the build check and the loader (`packages/physics/src/world/memory.ts`) are written from the linker's and
+the standard's documentation and from what the builds were measured to contain; no engine's code was read.
+
+- LLVM Project, "WebAssembly lld port" (lld documentation), https://lld.llvm.org/WebAssembly.html, read: `--global-base`
+  ("Address at which to place global data"), `--stack-first` (the stack at the start of linear memory, not after the data),
+  `--import-memory`, `--max-memory`, `--export`. `--shared-memory` and `-z stack-size` are not on that page; their effect
+  here is what the builds were measured to contain (`inspectModule` in the script: a shared memory import with the declared
+  maximum, data from the slot's base to `__data_end`, a stack pointer at 0 with a stack size of 0).
+- WebAssembly Community Group, "Threading proposal for WebAssembly" (proposals/threads/Overview.md),
+  https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md, read: a linear memory marked shared is
+  shared between the agents of a cluster and must declare a maximum; a `WebAssembly.Memory` posted to a worker is
+  instantiated there as the module's memory, and one agent's writes are seen by the others. The page says data segments are
+  copied again on each instantiation; the shared builds here hold one passive segment that the module copies once at start,
+  and `tests/world-modules.test.js` checks that no later instance or step rewrites a module's window.
+
 ### The coupling scheduler and its harness (`@margoengine/physics/world`, 2026-11-25)
 
 `packages/physics/src/world/scheduler.ts` and the world's `couple()` give a coupling group one of five schemes

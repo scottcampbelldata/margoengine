@@ -17,6 +17,7 @@ packages/machinery/kernel/target/
 packages/sciviz/flow-kernel/target/
 # Written by the sciviz prebuild (scripts/prebuild.mjs) from the workspace manifests; a build must not dirty the tree.
 packages/sciviz/src/provenance-versions.ts
+packages/physics/tests/modules/*/target/
 examples/next/.next/
 examples/next/next-env.d.ts
 *.tsbuildinfo

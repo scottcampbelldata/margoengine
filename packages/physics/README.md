@@ -1971,6 +1971,39 @@ const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
 ```
 
+### Solver modules on one memory
+
+Every solver module of a world (a Rust crate built to WebAssembly) imports the world's one memory, so a solver reads
+another's port where it lies, with no copy ([docs/physics-framework.md](../../docs/physics-framework.md), section 3).
+The memory's low part belongs to the modules: the first 64 KiB is never used, then each module in the module table
+(`scripts/physics-modules.mjs`) has a 64 KiB window at its slot, where the linker put its read-only data
+(`--global-base`). `MODULE_SLOTS` (16) windows sit below `DYNAMIC_BASE`, and every region the `Arena` hands out lies
+above it. A module keeps no state in statics and has no allocator: its state and ports are regions the world gave it,
+so a snapshot of the world holds all of it. Each instance of a module, one per thread, runs on a stack region of its own.
+
+`loadSolverModule(arena, {name, slot}, {shared, plain})` takes the build that fits the memory, checks in a scratch
+memory that its data lies inside its slot's window (a misplaced build is refused with `unsupported` before it writes a
+byte of the world's), then instantiates it with a stack region from the arena. `worldMemory()` makes a shared memory
+where the page may (worker threads step it in parallel) and a plain one elsewhere. A worker makes its own instance with
+`instantiateSolverModule(memory, module, stack)` from the compiled module and a stack region the main thread posts it.
+The tests run two such modules on one memory, read a port in place, snapshot and restore both, and give the same bits on
+1, 2 and 4 threads and on the plain memory (`tests/world-modules.test.js`).
+
+```ts
+import {Arena, DYNAMIC_BASE, loadSolverModule, worldMemory, type ModuleBuilds} from 'margoengine/physics/world';
+
+const arena = new Arena(worldMemory());
+const particles = arena.allocate('particles', 1000 * 24, 'f32', 1);
+console.log(particles.byteOffset >= DYNAMIC_BASE); // true: regions start above the module windows
+
+// A module built by scripts/physics-modules.mjs for slot 0, in its shared and plain builds.
+async function load(builds: ModuleBuilds) {
+  const solver = await loadSolverModule(arena, {name: 'my-solver', slot: 0}, builds);
+  return solver.exports; // its step functions take region offsets, such as particles.byteOffset
+}
+console.log(typeof load); // function
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

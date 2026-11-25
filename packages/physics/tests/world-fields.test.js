@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   Arena,
+  DYNAMIC_BASE,
   FieldRegistry,
   TransferRegistry,
   regionWords,
@@ -209,9 +210,11 @@ test("a port for the tick the current value ends at replaces it; regionsOf lists
 });
 
 test('a first publish that grows the memory copies the port whole (no view detached by the growth)', () => {
-  // One page of memory (64 KiB): a 24 KiB port fits, but its two mirrors (an owner) or its f64 contribution (a
-  // contributor) do not, so the first publish grows the memory, which detaches every view taken before the growth.
-  const memory = new WebAssembly.Memory({ initial: 1, maximum: 16 }),
+  // One page of memory (64 KiB) above the module windows: a 24 KiB port fits, but its two mirrors (an owner) or its f64
+  // contribution (a contributor) do not, so the first publish grows the memory, which detaches every view taken before the
+  // growth.
+  const pages = DYNAMIC_BASE / 65536,
+    memory = new WebAssembly.Memory({ initial: pages + 1, maximum: pages + 16 }),
     arena = new Arena(memory),
     fields = new FieldRegistry(arena),
     big = { ...velocity, name: 'big', kind: 'uniformGrid' },
@@ -221,9 +224,9 @@ test('a first publish that grows the memory copies the port whole (no view detac
   fields.declare('sail', [{ field: push, access: 'accumulate' }]);
   const values = Float64Array.from({ length: 3072 }, (_, i) => i + 0.5),
     owned = port(arena, 'big', 0, values),
-    pages = memory.buffer.byteLength;
+    size = memory.buffer.byteLength;
   fields.publish('atmosphere', owned, 0);
-  assert.ok(memory.buffer.byteLength > pages, 'the mirrors grew the memory');
+  assert.ok(memory.buffer.byteLength > size, 'the mirrors grew the memory');
   assert.deepEqual(words(arena, fields.port('big')), Array.from(values));
   const pushed = port(
       arena,
@@ -238,4 +241,17 @@ test('a first publish that grows the memory copies the port whole (no view detac
   assert.ok(memory.buffer.byteLength > before, 'the contribution region grew the memory');
   const sum = words(arena, fields.sum('push', 0));
   assert.deepEqual([sum.length, sum[0], sum[6143]], [6144, 0, 6143]);
+});
+
+test('a memory that cannot hold the module windows is refused with the fix', () => {
+  // The old default of one page that may grow to 16 cannot reach DYNAMIC_BASE (17 pages): the arena says so instead of
+  // letting grow() fail without a reason.
+  assert.throws(
+    () => new Arena(new WebAssembly.Memory({ initial: 1, maximum: 16 })),
+    (error) => error instanceof RangeError && /module.*windows.*worldMemory\(\)/s.test(error.message),
+  );
+  // A memory that may grow past the windows is grown to them at once, and its first region starts there.
+  const arena = new Arena(new WebAssembly.Memory({ initial: 1, maximum: DYNAMIC_BASE / 65536 + 1 }));
+  assert.equal(arena.memory.buffer.byteLength, DYNAMIC_BASE);
+  assert.equal(arena.allocate('first', 8, 'f64', 1).byteOffset, DYNAMIC_BASE);
 });

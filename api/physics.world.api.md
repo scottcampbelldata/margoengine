@@ -90,6 +90,8 @@ export interface CouplingOptions {
 
 export type CouplingScheme = 'staggered' | 'strang' | 'predicted' | 'implicitPressure' | 'iterated';
 
+export const DYNAMIC_BASE: number;
+
 export type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
 export const FORCE_WORDS = 6;
@@ -127,6 +129,24 @@ export interface FieldUse {
 export const HYPER_PERIOD: number;
 
 export const IMPULSE_WORDS = 6;
+
+export const MAX_MEMORY_PAGES = 65536;
+
+export const MODULE_BASE = 65536;
+
+export const MODULE_SLOTS = 16;
+
+export const MODULE_WINDOW = 65536;
+
+export interface ModuleBuilds {
+    readonly shared: BufferSource | WebAssembly.Module;
+    readonly plain: BufferSource | WebAssembly.Module;
+}
+
+export interface ModuleSlot {
+    readonly name: string;
+    readonly slot: number;
+}
 
 export class PhysicsWorld {
     readonly clock: FilmClock;
@@ -232,6 +252,8 @@ export interface RigidSolverParams {
 
 export const SNAPSHOT_VERSION = 1;
 
+export const STACK_BYTES = 65536;
+
 export interface Snapshot {
     readonly bytes: Uint8Array;
     readonly hash: string;
@@ -282,6 +304,14 @@ export interface SolverHost {
     port(field: string): Port | undefined;
 }
 
+export interface SolverModule {
+    readonly name: string;
+    readonly slot: number;
+    readonly module: WebAssembly.Module;
+    readonly exports: WebAssembly.Exports;
+    readonly stack: Region;
+}
+
 export interface StepContext {
     readonly tick: number;
     readonly level: RateLevel;
@@ -303,11 +333,21 @@ export class TransferRegistry {
     names(): string[];
 }
 
+export function canShareMemory(): boolean;
+
 export function coupling(ids: readonly string[], scheme: CouplingScheme, options?: CouplingOptions): Coupling;
 
 export function couplingGraph(nodes: readonly CouplingNode[], partial?: boolean): CouplingGraph;
 
+export function instantiateSolverModule(memory: WebAssembly.Memory, module: WebAssembly.Module, stack: Region): Promise<WebAssembly.Exports>;
+
 export function isRateLevel(value: unknown): value is RateLevel;
+
+export const isShared: (memory: WebAssembly.Memory) => boolean;
+
+export function loadSolverModule(arena: Arena, slot: ModuleSlot, builds: ModuleBuilds, stackBytes?: number): Promise<SolverModule>;
+
+export function moduleBase(slot: number): number;
 
 export { philox } from "@margoengine/math";
 
@@ -321,6 +361,8 @@ export function restoreSnapshot(memory: WebAssembly.Memory, solvers: readonly Sn
 
 export { solverNumber } from "@margoengine/math";
 
+export function stackRegion(arena: Arena, name: string, stackBytes?: number): Region;
+
 export function staggeringStable(bodyMass: number, addedMass: number, margin?: number): boolean;
 
 export function stateHash(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): string;
@@ -330,6 +372,8 @@ export function stronglyConnected(ids: readonly string[], edges: readonly Coupli
 export function substepsBetween(fast: RateLevel, slow: RateLevel): number;
 
 export function takeSnapshot(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): Snapshot;
+
+export function worldMemory(shared?: boolean): WebAssembly.Memory;
 
 // Not exported from this entry, but used by the exports above:
 

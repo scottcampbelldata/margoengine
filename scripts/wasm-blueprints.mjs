@@ -220,7 +220,14 @@ export const BLUEPRINTS = [
 ];
 
 /** Crates that are Rust but ship no Wasm of their own: a library others reach by path, a test-only kernel, a check. */
-export const NOT_SHIPPED = ['packages/physics/kernel-common', 'packages/physics2d/kernel/wasm-check'];
+// The shared-memory prototype modules are test fixtures: scripts/physics-modules.mjs builds them and checks their committed
+// builds (packages/physics/tests/modules/built.json) against their sources and slots, in packages/physics/tests/world-modules.test.js.
+export const NOT_SHIPPED = [
+  'packages/physics/kernel-common',
+  'packages/physics2d/kernel/wasm-check',
+  'packages/physics/tests/modules/source',
+  'packages/physics/tests/modules/reader',
+];
 
 /** The repo path of an entry's record. */
 export const recordPath = (entry) => entry.record ?? `${entry.blueprint}.json`;

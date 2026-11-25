@@ -99,6 +99,15 @@ place, a snapshot of both, thread-count independence). If the linker cannot give
 module, the fallback is one framework module that statically links the shared kernels, with solver families as lazy
 modules that keep their data only in world-assigned regions.
 
+**Status (2026-11-25): proven, no fallback needed.** Two prototype modules (`packages/physics/tests/modules`) built on
+stable Rust import one memory, each with its data at its own slot's `--global-base` (`scripts/physics-modules.mjs`: 16
+windows of 64 KiB from 64 KiB; regions above `DYNAMIC_BASE`). rustc links `--stack-first`, which puts every module's
+stack at address 0, so stacks are linked at size 0 and each instance, one per thread, gets a stack region of its own
+through its exported `__stack_pointer`. The reader reads the source's port in place; a snapshot of both restores and
+steps on bit for bit; and the reader's results are the same bits on 1, 2 and 4 worker threads and on a plain memory
+(`packages/physics/tests/world-modules.test.js`). A shared memory needs a cross-origin-isolated page, so each module also
+has a plain build of the same layout for one thread. The loader is `loadSolverModule` in `world/memory.ts`.
+
 ## 4. The field registry and ports
 
 Every quantity that crosses a solver boundary is a field in the registry:

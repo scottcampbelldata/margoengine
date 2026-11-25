@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19121740,
+  "total": 19123868,
   "history": [
     {
       "date": "2026-10-24",
@@ -12417,6 +12417,12 @@
       "commit": "gap-lane-d",
       "reason": "Lane D: new optional controls/behaviors 0 to 1156 B (elastic dolly bounce, idle auto-rotation, animated framing); core and stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "feat(physics) solver modules share one memory",
+      "reason": "The shared-memory module loader in physics/world (loadSolverModule, instantiateSolverModule, worldMemory, the layout constants and the placement check with its coded messages): budget 15,475 to 16,490 measured on this Mac: 16,223 with the loader on the base it was written on, the rest the world entry's own growth on main since (its error messages with their fixes), which had fitted the old headroom. It is the framework's memory layer that every solver module loads through; a separate entry would only move the same bytes behind a second import for every world that runs a module.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13220,7 +13226,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 8575,
-    "@margoengine/physics/world": 15518,
+    "@margoengine/physics/world": 16490,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
