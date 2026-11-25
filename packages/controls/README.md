@@ -746,6 +746,33 @@ camera
   .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
+### Planet scale: street level to orbit
+
+Core draws in float32, so a camera written at Earth-centred coordinates (6,370 km out) shakes and then collapses near
+the ground. Pass `origin`, a `FloatingOrigin` from `@margoengine/cameras/origin`: the controls keep every pose in
+float64 world coordinates and write the camera, picks and sweeps in the origin's local coordinates, so street level
+renders as steadily as orbit (under 0.05 px of jitter at any distance, docs/large-coordinates.md). A local `frame`
+does the same for one site. With `clipPlanes` (default true), near is 1% of the eye's height above the ground (from
+`heightAt`; 5 mm at the least), so a walker on a 1,650 m plateau gets centimetres. Far reaches the eye's horizon plus
+the horizon of 9,000 m peaks, so mountains past the horizon still draw. Core's reversed float depth carries the ratio.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const origin = FloatingOrigin.attach(engine);
+const camera = new GeospatialControls(engine, undefined, {
+  origin,
+  heightAt: () => 1650, // Boulder's plateau, or a terrain or tiles height query
+  view: {longitude: degToRad(-105.27), latitude: degToRad(40.02), height: 1655, range: 20, pitch: 0.2},
+});
+console.log(camera.camera.near, camera.camera.far); // centimetres; the horizon plus the far peaks
+// Place your scene through the origin (float64 world, here Earth-centred): origin.place(mesh, worldPosition).
+```
+
 ### Open worlds: terrain, tiles and biomes
 
 A local world (a terrain or a biomes world laid out in metres around a site, a tileset in its east-north-up frame)
@@ -1037,7 +1064,7 @@ Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
 (1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
-({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` ('egm96'), `hash` (false), `frame` (ECEF, or its Y-up view), `ground` (none). Sources: NIMA TR8350.2 (WGS84);
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` ('egm96'), `hash` (false), `frame` (ECEF, or its Y-up view), `ground` (none), `origin` (none). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et

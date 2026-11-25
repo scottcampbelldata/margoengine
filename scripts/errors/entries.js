@@ -2810,6 +2810,7 @@ export const entries = [
       'Bounds need south <= north within [-PI/2, PI/2], in radians',
       'A geospatial frame is 16 finite numbers, column-major ECEF to world; pass tiles.frame or the TilesRenderer',
       'A geospatial frame must be invertible; pass a rigid or scaled ECEF-to-world matrix',
+      'A geospatial origin has toLocal and toWorld; pass a FloatingOrigin',
       'A ground is (x, z) => y or has height(x, z) or heightAt(x, z); pass a TerrainQuery, a biomes world or a function',
       'Geospatial inertia is finite seconds >= 0 per axis; pass 0 to stop an axis at once',
       'followPath needs an array of one or more views; pass [view, ...]',

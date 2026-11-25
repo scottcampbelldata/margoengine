@@ -53,6 +53,15 @@ export type WorldGround =
  */
 export type GeospatialFrame = ArrayLike<number> | { readonly frame: ArrayLike<number> };
 
+/** A floating origin the camera writes through: float64 world to the local coordinates core draws in, and back. */
+export interface GeospatialOrigin {
+  toLocal(world: ArrayLike<number>): ArrayLike<number>;
+  toWorld(local: ArrayLike<number>): ArrayLike<number>;
+}
+
+/** Tallest ground a far plane must reach beyond the horizon, metres above the ellipsoid (Everest is 8,849 m). */
+const HIGHEST_GROUND = 9000;
+
 /** What a {@link GeospatialControls.pick} hit: the engine scene (bvh), your `raycast`, the `heightAt` terrain, or the ellipsoid fallback. */
 export type GeospatialPickSource = 'scene' | 'raycast' | 'terrain' | 'ellipsoid';
 
@@ -168,6 +177,12 @@ export interface GeospatialOptions {
    * that is not given, so clearance, picks and walking follow it with no conversion. Default none.
    */
   ground?: WorldGround;
+  /**
+   * A floating origin (`FloatingOrigin` from `@margoengine/cameras/origin`): the camera and every scene query are kept
+   * in its local coordinates, so street level 6,000 km from the Earth's centre renders without float32 jitter. The
+   * controls work in float64 world coordinates and convert through it each update. Default none.
+   */
+  origin?: GeospatialOrigin;
   /**
    * Pick against the engine's visible meshes and models (terrain meshes, 3D Tiles, glTF) with the bvh `Raycaster`, so
    * zoom, rotate and pan grab the real surface. Needs the controls attached to an engine. Default true.
@@ -455,6 +470,8 @@ export class GeospatialControls extends Controls {
   readonly maxRange: number;
   clipPlanes: boolean;
   readonly zUp: boolean;
+  /** The floating origin the camera and scene queries go through; see the option. */
+  readonly origin: GeospatialOrigin | null;
   /** ECEF to world (column-major 3x4 of the affine frame) and its inverse. */
   private readonly fw: Float64Array;
   private readonly fe: Float64Array;
@@ -566,6 +583,10 @@ export class GeospatialControls extends Controls {
         ? Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
         : Float64Array.of(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0);
     this.fe = invertAffine(this.fw);
+    const o = options.origin ?? null;
+    if (o && (typeof o.toLocal !== 'function' || typeof o.toWorld !== 'function'))
+      throw rangeError('A geospatial origin has toLocal and toWorld; pass a FloatingOrigin', 'controls-arguments');
+    this.origin = o;
     if (options.ground && !options.heightAt) this.heightAt = this.groundQuery(options.ground);
     this.scene = options.scene ?? true;
     this.colliders = options.colliders ?? null;
@@ -651,11 +672,16 @@ export class GeospatialControls extends Controls {
   }
   /** ECEF position (or direction when `dir`) to world. */
   private toWorld(p: readonly number[], dir = false): V {
-    return affine(this.fw, p, dir);
+    const w = affine(this.fw, p, dir);
+    if (dir || !this.origin) return w;
+    const l = this.origin.toLocal(w);
+    return [l[0]!, l[1]!, l[2]!];
   }
-  /** World position (or direction when `dir`) to ECEF. */
+  /** Camera (local) position (or direction when `dir`) to ECEF. */
   private toEcef(p: readonly number[], dir = false): V {
-    return affine(this.fe, p, dir);
+    if (dir || !this.origin) return affine(this.fe, p, dir);
+    const w = this.origin.toWorld(p);
+    return affine(this.fe, [w[0]!, w[1]!, w[2]!], false);
   }
   /** A world-space ground as a geodetic height query: the ground's world point under a place, back to its height. */
   private groundQuery(ground: WorldGround): HeightQuery {
@@ -675,10 +701,10 @@ export class GeospatialControls extends Controls {
         'controls-arguments',
       );
     return (longitude, latitude) => {
-      const w = this.toWorld(cartographicToEcef(longitude, latitude, 0)),
+      const w = affine(this.fw, cartographicToEcef(longitude, latitude, 0), false),
         y = at(w[0], w[2]);
       if (typeof y !== 'number' || !Number.isFinite(y)) return undefined;
-      const e = this.toEcef([w[0], y, w[2]]);
+      const e = affine(this.fe, [w[0], y, w[2]], false);
       return ecefToCartographic(e[0], e[1], e[2]).height;
     };
   }
@@ -772,9 +798,15 @@ export class GeospatialControls extends Controls {
     this.camera.up = this.toWorld(pose.up, true);
     if (this.clipPlanes) {
       const eye = ecefToCartographic(pose.position[0], pose.position[1], pose.position[2]),
-        h = Math.max(1, eye.height);
-      this.camera.near = h * 0.01;
-      this.camera.far = Math.max(this.camera.near * 2, 2 * Math.sqrt(h * (h + 2 * WGS84_A)) + h);
+        h = Math.max(0, eye.height),
+        // Near from the height above the ground below (heightAt, else the ellipsoid), so a walker on a 2,500 m
+        // plateau gets a near plane of centimetres, not tens of metres; core's reversed float depth keeps the ratio.
+        g = this.floor(eye.longitude, eye.latitude) - this.gap,
+        above = Math.max(0.5, h - Math.min(h, g));
+      this.camera.near = Math.max(0.005, above * 0.01);
+      // Far: the eye's horizon plus the horizon of the highest ground, so peaks beyond the horizon still draw.
+      const horizon = (x: number) => Math.sqrt(Math.max(0, x) * (Math.max(0, x) + 2 * WGS84_A));
+      this.camera.far = Math.max(this.camera.near * 2, horizon(h) + horizon(HIGHEST_GROUND) + h);
     }
     this.changed = true;
     this.moving = true;
