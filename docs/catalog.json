@@ -2842,6 +2842,7 @@
       "meshConnectedComponents",
       "meshHalfEdges",
       "pacejkaTyre",
+      "shearShare",
       "trianglesAcross",
       "voxelizedMesh",
       "voxelsFromPoints"

@@ -1850,7 +1850,7 @@ export interface TrackedVehicleOptions {
     trackAcceleration?: number;
     longitudinalFriction?: number;
     lateralFriction?: number;
-    shearSlip?: number;
+    shearDisplacement?: number;
     forward?: Vec3;
     groups?: number;
     predicate?: (collider: PhysicsCollider) => boolean;
@@ -2065,6 +2065,8 @@ export function meshConnectedComponents(indices: ArrayLike<number>): {
 export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology;
 
 export function pacejkaTyre(options?: PacejkaOptions): TyreModel;
+
+export function shearShare(displacement: number, modulus: number): number;
 
 export function trianglesAcross(vertices: ArrayLike<number>, indices: ArrayLike<number>): Int32Array;
 
