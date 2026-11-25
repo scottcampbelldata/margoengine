@@ -147,7 +147,7 @@ in the merge gate.
 | PA-80 | OPEN | P2 | `machinery/src/kinematics.ts:1-60, 109` | Machinery is kinematic ratios with no mass, torque, friction or load, while the kernel's gear, pulley and drivetrain constraints go unused. | Driven mechanisms on the kernel's constraints. | Featherstone (2008); Baraff (1996) |
 | PA-81 | OPEN | P3 | `robot-planning/src/index.ts`, `plan.ts` | Robot planning gives a geometric path with no time parametrisation, torque or payload. URDF inertia and limits are parsed but unused. | Time-optimal path parametrisation, and following the path through the kernel's multibody. | Bobrow, Dubowsky and Gibson (1985); Pham (2014) TOPP-RA |
 | PA-82 | OPEN | P3 | `xr/src/interaction.ts:131-409` | XR grabs are pose-locked and pass through walls, and a throw has no angular velocity. | Hold through a drag joint, and release with v + ω × r from a least-squares velocity. | |
-| PA-83 | OPEN | P3 | `behavior/src/steering.ts:1-30, 598-605` | Steering has no mass, drag or turn-radius limit. | Mass, a lateral-acceleration limit and drag. | Reynolds (1999) |
+| PA-83 | FIXED | P3 | `packages/behavior/src/steering.ts`, `packages/physics/src/schooling/solver.ts` | Steering had no mass, medium-relative drag or turn-radius limit. | Point-mass locomotion uses force divided by inertial mass, exact quadratic coasting and a normal acceleration bounded by the specified limit and speed squared over turn radius. Analytic checks in `steering.test.js` and `tests/coupling/schooling.test.js`. | Reynolds (1999), NASA Glenn drag equation |
 
 ## 8. Pipeline, import and export (P1 and P2)
 

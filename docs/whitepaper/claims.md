@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Collective animal motion (LIFE-04) with mass 2 kg, density 1,000 kg/m³, drag area 0.004 m² and initial
+  velocity 2 m/s in a 0.5 m/s current. A thrust-free member reaches 1.1 m/s at one second within the
+  floating-point error bound for the 120 updates. A one-step turn at 2 m/s with a 10 m minimum radius
+  limits lateral acceleration to 0.4 m/s². The reef fixture scatters in front of a crossing predator and
+  tightens after it passes. Reproduce with `node --test packages/physics/tests/coupling/schooling.test.js`
+  after building packages. The field and point dynamics were tested with synthetic geometry.
+
 - Own physics implicit soft solids (2026-11-24): a cantilever 1 m long, 0.25 m square, E = 3 MPa, on the `'fem'` solver (one
   linear solve a substep, conjugate gradient) sags at its free end to the same 88 percent of the Euler-Bernoulli deflection
   with one substep of one pass as with eight of four (within 3 percent of each other), where the constraints at one pass sag

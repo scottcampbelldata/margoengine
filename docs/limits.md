@@ -8915,3 +8915,22 @@ and opaque depth. The effect samples the displaced colour inside the frame. Off-
 and light paths that require large-angle or multiple refraction are outside this screen-space model. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, ray integration and lifetime management.
 
 The shared sparse solver for stiff heat grids and the original kiln and turbofan scene integrations remain open.
+
+
+## Collective animal motion
+
+`@margoengine/physics/schooling` uses a deterministic grid over local coordinates, with f64 distance and
+field rows. A rank limit applies only to neighbours within the outer radius and the visible sector. The
+model assumes a predator holds velocity over the prediction horizon. Dense groups or very large sensing
+radii increase the number of candidates. The kernel uses world memory and a private per-instance arena region
+for its stack, static data, and grid work. Its capacity grows with the number of configured members.
+Membership and port layout stay fixed for a solver's lifetime. Use a fresh world setup for a different row layout.
+
+The point-mass model represents inertial mass, thrust and quadratic drag. Its local curvature bound concerns
+propulsive acceleration relative to the medium. A spatially varying current can also bend the trajectory.
+Body bending, contact, wing lift, flap power and tail propulsion belong to the body solver. The intent
+fixture verifies the field hand-off and a bank derived from lateral acceleration. The original film shots
+still need playback checks.
+
+The optional entry is 4,642 B gzip plus a separately fetched 4,535 B gzip SIMD kernel (8,923 B raw).
+That budget covers the field adapter and the point-mass mode in one import. Core and stage gain zero bytes.

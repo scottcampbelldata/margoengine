@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19149779,
+  "total": 19154677,
   "history": [
     {
       "date": "2026-10-24",
@@ -12471,6 +12471,12 @@
       "commit": "a1c723996a",
       "reason": "PA-83: physical steering mass, medium-relative drag and turning constraints; steering 3871 to 4736 B gzip, root 8891 to 9791 B gzip; a split duplicates the integration path or adds another required import",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "67f97e34db",
+      "reason": "LIFE-04: new optional schooling entry at 4642 B gzip; on-demand shared-arena grid Wasm 4535 B gzip; zero bytes in the core or stage entry; keeps deterministic group steering and point-mass dynamics together",
+      "grew": 1
     }
   ],
   "items": {
@@ -13269,6 +13275,7 @@
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/schooling": 4898,
     "@margoengine/physics/sea": 3437,
     "@margoengine/physics/seakeeping": 10371,
     "@margoengine/physics/soft": 111864,

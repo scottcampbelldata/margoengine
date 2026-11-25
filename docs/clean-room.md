@@ -12292,3 +12292,25 @@ The lateral acceleration cap follows normal acceleration `s² / R` along a curve
 Katz et al., [Inferring the structure and dynamics of interactions in schooling fish](https://pmc.ncbi.nlm.nih.gov/articles/PMC3219116/),
 PNAS 108(46), 2011, measured distinct longitudinal and lateral reactions. These tests check longitudinal force divided
 by mass, independently limited lateral acceleration, and the exact drag-only speed law.
+
+
+### Collective animal motion (LIFE-04, `@margoengine/physics/schooling`)
+
+- Craig W. Reynolds, [Flocks, Herds, and Schools: A Distributed Behavioral Model](https://www-graphics.stanford.edu/courses/cs448-01-spring/papers/reynolds.pdf)
+  (SIGGRAPH 1987). Local collision avoidance, velocity matching, and flock centering produce motion without a scripted
+  group trajectory. Reynolds (1999), cited above, also motivates steering away from a future threat position. Here
+  closest approach uses both bodies' velocities. For separation vector `r` and relative velocity `v`, minimize
+  `|r + vt|²` by clamping `−(r·v)/(v·v)` to the prediction interval.
+- Iain D. Couzin, Jens Krause, Richard James, Graeme D. Ruxton, and Nigel R. Franks,
+  [Collective Memory and Spatial Sorting in Animal Groups](https://case.edu/affil/sigmaxi/documents/collectiveMemoryAndSpatialSortingInAnimalGroups_CouzinKrauseJamesRuxtonFranks.pdf)
+  (Journal of Theoretical Biology, 2002, equations 1–3). Priority repulsion uses the negative sum of unit displacement
+  vectors. In the visible middle zone orientation uses unit neighbour velocities and in the outer zone attraction
+  uses unit displacements. Each nonzero zone direction is normalized before equal-weight blending. Their angular
+  turn cap serves the same purpose as the solver's velocity-dependent physical normal-acceleration constraint.
+- Michele Ballerini et al., [Interaction ruling animal collective behavior depends on topological rather than metric distance](https://pmc.ncbi.nlm.nih.gov/articles/PMC2234121/)
+  (PNAS, 2008). Their measured starling interaction range was approximately six to seven neighbours, and the paper
+  distinguishes the cited two-dimensional fish estimates. The solver exposes the number of eligible neighbours
+  and uses a configurable physical sensing radius. With no count specified, all visible in-zone peers contribute.
+- Federal Aviation Administration, [Pilot’s Handbook of Aeronautical Knowledge](https://www.faa.gov/sites/faa.gov/files/2022-03/pilot_handbook.pdf)
+  (FAA-H-8083-25B, Figure 5-34). In the level-turn controller fixture, the vertical component of lift balances
+  weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.

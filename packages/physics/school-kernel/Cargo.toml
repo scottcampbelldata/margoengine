@@ -1,0 +1,19 @@
+[package]
+name = "margoengine-school-kernel"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+margoengine-physics-kernel-common = { path = "../kernel-common" }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "z"
+panic = "abort"
+strip = true

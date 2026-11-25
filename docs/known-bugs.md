@@ -10397,6 +10397,16 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 - **Needed to close:** those three suites run to the end on Linux, on a machine that stays cool under a long GPU
   run, and the results recorded here.
 
+### Fixed: steering could turn without a mass, drag or curvature constraint (PA-83, LIFE-04)
+
+- **Repro.** In the old steering point update, the same force moved unequal masses alike. Turning demand could
+  rotate the velocity without a lateral or radius constraint. A member coasting in a medium kept its speed.
+- **Cause.** The update treated steering as an acceleration and only bounded total speed. The physical update
+  applies force to mass, bounds the normal acceleration, and solves drag in the medium frame.
+- **Regression.** `packages/behavior/tests/steering.test.js` and
+  `packages/physics/tests/coupling/schooling.test.js` check force, curvature, relative coasting, and a school
+  responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
+
 ## Open defects
 
 ### Fixed 2026-11-25: local CI's GPU package step sat in `vfx test:gpu` until its 120-minute limit (check runner, vfx seek check, KB-VFX-SEEKHANG1)

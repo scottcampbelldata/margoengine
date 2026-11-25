@@ -2,6 +2,8 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { Line, Lines } from '@margoengine/lines';
 import { Physics } from '@margoengine/physics';
+import { SchoolSolver } from '@margoengine/physics/schooling';
+import { PhysicsWorld } from '@margoengine/physics/world';
 import { SceneTarget } from '../../shared/msaa.js';
 
 const assert = (condition, message) => {
@@ -84,8 +86,24 @@ const project = (m, [x, y, z]) => {
   return [Math.round(((cx / w) * 0.5 + 0.5) * SIZE - 0.5), Math.round((0.5 - (cy / w) * 0.5) * SIZE - 0.5)];
 };
 
+async function schoolRun(fps) {
+  const school = await SchoolSolver.load();
+  const world = new PhysicsWorld({ rate: { num: fps, den: 1 } });
+  world.add(school, {
+    members: [
+      { position: [-0.5, 0, 0], velocity: [0, 0, 1] },
+      { position: [0.5, 0, 0], velocity: [0, 0, 0], maxThrust: 0.5 },
+    ],
+  });
+  for (let i = 1; i <= fps; i++) world.advance(i);
+  const speed = school.read(1).velocity[2];
+  assert(Math.abs(speed - 0.5) <= 64 * Number.EPSILON, 'School follows a half-newton thrust envelope for one second');
+  return world.hash();
+}
+
 window.runPhysicsTests = async () => {
   await Physics.load();
+  assert((await schoolRun(24)) === (await schoolRun(60)), 'School world hash is the same at 24 and 60 fps');
   const canvas = document.querySelector('#view');
   const engine = await Engine.create(canvas, {
     backend: 'webgpu',
@@ -94,6 +112,7 @@ window.runPhysicsTests = async () => {
   const runtime = engineRuntime(engine),
     device = runtime.gpu,
     report = { checks: [], backend: engine.backend };
+  report.checks.push('The on-demand SchoolSolver Wasm loads and produces the same physical hash at 24 and 60 fps');
   const errors = [];
   device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
   device.pushErrorScope('validation');
