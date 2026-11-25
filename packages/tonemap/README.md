@@ -89,15 +89,20 @@ tonemap.options.autoExposure = {metering: 'spot', spot: {x: 0.5, y: 0.4, radius:
 stage.dispose();
 ```
 
-`mask` is a texture you made, or `(device) => texture`, called once per device. A plain texture belongs to the device it was first used on: after a device restore (`engine.rebootDevice()`) it is dropped and reported once through `engine.onError` (`'state'`, linking margoengine.com/errors#borrowed-lost), the frame keeps drawing, the meter keeps its last exposure, and assigning a new `autoExposure.mask` brings it back. The function form needs nothing after a restore:
+`mask` is a texture you made, or a function that returns the texture for the current device (read every frame, so keep one texture per device). A plain texture belongs to the device it was first used on: after a device restore (`engine.rebootDevice()`) it is dropped and reported once through `engine.onError` (`'state'`, linking margoengine.com/errors#borrowed-lost), the frame keeps drawing, the meter keeps its last exposure, and assigning a new `autoExposure.mask` brings it back. The function form needs nothing after a restore:
 
 ```ts
 import {createStage} from 'margoengine';
 import {Tonemap} from 'margoengine/tonemap';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const weights = (device: GPUDevice) => {
+let made: {device?: GPUDevice; texture?: GPUTexture} = {};
+const weights = () => {
+  const device = stage.engine.gpu;
+  if (!device) return undefined;
+  if (made.device === device) return made.texture;
   const texture = device.createTexture({size: [1, 1], format: 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
   device.queue.writeTexture({texture}, new Uint8Array([255]), {bytesPerRow: 256}, [1, 1]); // weight 1 everywhere
+  made = {device, texture};
   return texture;
 };
 const tonemap = Tonemap.attach(stage.engine, {autoExposure: {metering: 'mask', mask: weights}});
