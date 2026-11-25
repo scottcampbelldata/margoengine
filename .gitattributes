@@ -113,3 +113,4 @@ packages/sciviz/tests/fixtures/molecule/** -text
 # Licensed test cases are redistributed verbatim (CC BY-ND 4.0); never translate their bytes.
 packages/ifc/tests/fixtures/bcf/** -text
 packages/ifc/tests/fixtures/ids/** -text
+packages/physics/kernel-common/tests/*-vectors.txt text eol=lf
