@@ -44,6 +44,8 @@ const share = (v: unknown, label: string): number => {
 };
 const direct = /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f \{[^}]*\}/,
   localTerm = `result+=${clusterBrdf}*nl*`;
+// margoRetroSurface is the surface the image light sees through the mirrored view: a metal of the retro lobe's colour
+// and roughness.
 const wgsl = (group: number) => `struct MargoRetroRows {shape:vec4f, color:vec4f}
 @group(${group}) @binding(160) var<uniform> margoRetroRows:MargoRetroRows;
 fn margoRetroLobe(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {
@@ -53,7 +55,6 @@ fn margoRetroLobe(n:vec3f,v:vec3f,l:vec3f,base:vec3f)->vec3f {
   let f0=margoRetroRows.color.rgb*base; let fresnel=f0+(1-f0)*pow(1-vh,5.0);
   return d*g*fresnel/max(4*nl*nv,0.0001);
 }
-// The surface the image light sees through the mirrored view: a metal of the retro lobe's colour and roughness.
 fn margoRetroSurface(under:Surface)->Surface {
   var s=under; s.base=vec4f(margoRetroRows.color.rgb*under.base.rgb,under.base.a); s.metal=1.0;
   s.roughness=max(margoRetroRows.shape.y,0.045); return s;
