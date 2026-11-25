@@ -31,7 +31,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Colour curves in image processing (`Grade` curves and wheels already existed; `ranges` added) | Babylon | DONE | S | 67827878e |
 | Retroreflection material | three.js | DONE | S | 566dabc45 |
 | glTF `KHR_materials_diffuse_roughness` | three.js | DONE | M | f9d753a54 |
-| Material plugins on the stock PBR material (inject code into the built-in shader) | Babylon, three.js `onBeforeCompile` | MISSING | M |  |
+| Material plugins on the stock PBR material (inject code into the built-in shader) | Babylon, three.js `onBeforeCompile` | DONE | M | b2757feeb |
 | IBL shadows (shadows from the environment map) | Babylon | MISSING | M |  |
 | Blurred / rough planar and screen-space reflections | three.js | PARTIAL | M |  |
 | Caustics as a general package (today only inside water, studio, lightmap and the game bundle) | three.js, PlayCanvas | PARTIAL | M |  |
