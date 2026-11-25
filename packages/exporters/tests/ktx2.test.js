@@ -383,7 +383,7 @@ test('compressTextures takes a plain fallback before the image an extension hold
 });
 
 test('compressTextures skips a texture held in AVIF, which has no decoder here', async () => {
-  const avif = new TextEncoder().encode('   ftypavif'),
+  const avif = new TextEncoder().encode('\0\0\0ftypavif'),
     glb = colorOf({ extensions: { EXT_texture_avif: { source: 0 } } }, [{ bytes: avif, mimeType: 'image/avif' }]),
     result = await compressTextures(glb);
   assert.equal(result.compressed, 0);

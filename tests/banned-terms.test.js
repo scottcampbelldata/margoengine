@@ -1,7 +1,8 @@
 // The banned-terms check catches hashed names in public text and in the text of tracked PDFs, and
 // its list never holds them. The words are written here in base64 or character codes, because this file is scanned too.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
 import { hitsInLine, hitsInPath, main, scan, scanRepo, selectFiles } from '../scripts/check-banned-terms.mjs';
@@ -196,6 +197,29 @@ test('--files and --changed select the files to scan; a named file with a banned
 `),
       ['docs/x.md'],
     ),
+    [],
+  );
+});
+
+test('a file named on the command line that does not exist fails; a tracked file deleted in a full scan is skipped', () => {
+  const gone = () => {
+    throw Object.assign(new Error('gone'), { code: 'ENOENT' });
+  };
+  assert.deepEqual(scanRepo(gone, ['docs/deleted.md']), []);
+  const named = scanRepo(gone, ['docs/typo.md'], true);
+  assert.equal(named.length, 1);
+  assert.match(named[0], /^docs\/typo\.md: no such file/);
+});
+
+test('no tracked source file holds a NUL byte (it would make grep and scan() treat the file as binary)', () => {
+  const listed = execFileSync('git', ['ls-files', '-z'], { maxBuffer: 1 << 28 })
+    .toString()
+    .split('\0')
+    .filter(Boolean);
+  const files = listed.filter((f) => /\.[cm]?[jt]s$/.test(f));
+  assert.ok(files.includes('scripts/check-banned-terms.mjs'));
+  assert.deepEqual(
+    files.filter((f) => existsSync(f) && readFileSync(f).includes(0)),
     [],
   );
 });
