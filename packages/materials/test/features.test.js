@@ -175,6 +175,7 @@ test('layered: an empty call, bad numbers, an array map without its layer and to
   assert.throws(() => layered({ layers: [{ color: [1, 1] }] }), /color must be 3 finite/);
   assert.throws(() => layered({ layers: [{ heightContrast: 0 }] }), /heightContrast must be above 0/);
   assert.throws(() => layered({ layers: [{ maskChannel: 'x' }] }), /maskChannel/);
+  assert.throws(() => layered({ layers: [{ blend: 'add' }] }), /blend must be 'mix' or 'multiply'/);
   assert.throws(() => layered({ layers: [{ map: array }] }), /pass \{texture, layer\}/);
   assert.throws(() => layered({ layers: [{ map: { texture: array, layer: 2 } }] }), /layer must be an index/);
   assert.throws(() => layered({ detail: {} }), /needs a map or normalMap/);

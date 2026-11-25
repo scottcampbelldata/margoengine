@@ -30,10 +30,32 @@ export interface ThreeMFTexture {
   filter: string;
 }
 
+/**
+ * One layer of a `multiproperties` stack, in the order its `pids` list them (bottom first). Its per-vertex values are in
+ * `attributes[attribute]`: four numbers per vertex for a colour layer (sRGB red, green, blue and linear alpha), two for a
+ * texture layer (u and v, v = 1 - the file's v as in `uvs`). Vertices outside the group hold zeros.
+ */
+export interface ThreeMFLayer {
+  /** `'color'` for a base material, composite or colour group layer, `'texture'` for a texture group layer. */
+  kind: 'color' | 'texture';
+  /** A texture layer's index into `textures`. */
+  texture?: number;
+  /** `layerColor<k>` or `layerUV<k>`, k the layer's place in the stack. */
+  attribute: string;
+  /**
+   * How the layer goes over the result of the layers below (`blendmethods`): `'mix'` (the default) or `'multiply'`. The
+   * spec blends in linear light: mix is `rgb = new.rgb * new.a + below.rgb * (1 - new.a)`, `a = new.a + below.a * (1 -
+   * new.a)`; multiply is `rgb = new.rgb * below.rgb`, `a = new.a * below.a`. The first layer starts the stack, opaque.
+   */
+  blend: 'mix' | 'multiply';
+}
+
 /** A group of {@link ThreeMFMaterials}: {@link LoadedGroup} with the texture its triangles sample. */
 export interface ThreeMFMaterialGroup extends LoadedGroup {
-  /** Index into `textures`. */
+  /** Index into `textures`: the group's only texture, or the first texture layer of its `layers`. */
   texture?: number;
+  /** The whole layer stack, when the group's triangles use a `multiproperties`; `create3MFMesh` draws it. */
+  layers?: ThreeMFLayer[];
 }
 
 /** What {@link parse3MFMaterials} returns: {@link ThreeMFResult} with textures, and one vertex per triangle corner. */
@@ -51,6 +73,8 @@ interface Multi {
   pids: string[];
   rows: number[][];
   blends: string[];
+  /** The kind of each layer, checked against the spec's rules when the element opens. */
+  kinds: ('color' | 'texture')[];
 }
 interface Composite {
   base: Color[];
@@ -61,6 +85,8 @@ interface Store {
   textures: Map<string, number>;
   groups: Map<string, TextureGroup>;
   multis: Map<string, Multi>;
+  /** Base material and composite groups, which a multiproperties may name once, first. */
+  materials: Set<string>;
 }
 
 function list(value: string | undefined, what: string): number[] {
@@ -112,7 +138,9 @@ export async function read3MFMaterials(
     textures: ThreeMFTexture[] = [],
     uvs = floats(),
     colors = floats(),
-    opacity = floats();
+    opacity = floats(),
+    /** Each layer attribute's values by vertex, written at each corner. */
+    layerData = new Map<string, { size: number; values: Map<number, number[]> }>();
   let group: TextureGroup | undefined,
     multi: Multi | undefined,
     composite: Composite | undefined,
@@ -121,7 +149,8 @@ export async function read3MFMaterials(
     translucent = false;
   const store = (model: ThreeMFModel): Store => {
     let found = stores.get(model);
-    if (!found) stores.set(model, (found = { textures: new Map(), groups: new Map(), multis: new Map() }));
+    if (!found)
+      stores.set(model, (found = { textures: new Map(), groups: new Map(), multis: new Map(), materials: new Set() }));
     return found;
   };
 
@@ -181,6 +210,9 @@ export async function read3MFMaterials(
   };
 
   const extension: ThreeMFExtension = {
+    element(model, name, a) {
+      if (name === 'basematerials' && a.id) store(model).materials.add(a.id);
+    },
     open(model, name, a) {
       switch (name) {
         case 'texture2d': {
@@ -217,7 +249,20 @@ export async function read3MFMaterials(
             blends = a.blendmethods?.trim().split(/\s+/) ?? [];
           if (blends.length >= pids.length || blends.some((b) => b !== 'mix' && b !== 'multiply'))
             throw new LoaderError(F, 'range', 'blendmethods must contain mix/multiply for at most layers minus one');
-          multi = { pids, rows: [], blends };
+          const { groups, multis, materials } = store(model),
+            kinds = pids.map((pid, k) => {
+              if (groups.has(pid)) return 'texture' as const;
+              if (multis.has(pid))
+                throw new LoaderError(F, 'syntax', 'a multiproperties must not name a multiproperties');
+              if (!model.properties.has(pid))
+                throw new LoaderError(F, 'syntax', `property group ${pid.slice(0, 32)} is not defined`);
+              if (materials.has(pid) && k)
+                throw new LoaderError(F, 'syntax', 'a multiproperties names one material group at most, first');
+              return 'color' as const;
+            });
+          if (kinds.filter((kind, k) => kind === 'color' && !materials.has(pids[k])).length > 1)
+            throw new LoaderError(F, 'syntax', 'a multiproperties names one colour group at most');
+          multi = { pids, rows: [], blends, kinds };
           store(model).multis.set(id, multi);
           model.propertyIds.push(id);
           break;
@@ -230,6 +275,7 @@ export async function read3MFMaterials(
             base = model.properties.get(required(a.matid, name, 'matid'));
           if (!base) throw new LoaderError(F, 'syntax', `material group ${a.matid.slice(0, 32)} is not defined`);
           composite = { base, indices: list(a.matindices, 'matindices'), colors: [] };
+          store(model).materials.add(id);
           model.properties.set(id, composite.colors);
           model.propertyIds.push(id);
           break;
@@ -269,9 +315,31 @@ export async function read3MFMaterials(
       for (const texture of textures) texture.data = await read(texture.path);
     },
     bucket(model, object, mesh, t) {
-      return String(at(model, model, object, mesh, t, 0).texture ?? '');
+      const property = cornerProperty(model, object, mesh, t, 0),
+        layered = property && store(model).multis.has(property.id) ? `|m${property.id}` : '';
+      return String(at(model, model, object, mesh, t, 0).texture ?? '') + layered;
     },
     corner(model, object, mesh, t, k) {
+      const property = cornerProperty(model, object, mesh, t, k),
+        layers = property && store(model).multis.get(property.id);
+      if (layers) {
+        const vertex = uvs.length / 2,
+          row = layers.rows[property.index];
+        if (!row)
+          throw new LoaderError(
+            F,
+            'range',
+            `property index ${property.index} is outside multiproperties ${property.id.slice(0, 32)}`,
+          );
+        layers.pids.forEach((pid, layer) => {
+          // A pindex the row leaves out is 0 (spec 5.1).
+          const { color, u, v } = sample(model, pid, row[layer] ?? 0, true),
+            name = `layer${color ? 'Color' : 'UV'}${layer}`;
+          let data = layerData.get(name);
+          if (!data) layerData.set(name, (data = { size: color ? 4 : 2, values: new Map() }));
+          data.values.set(vertex, color ? [...color] : [u ?? 0, v ?? 0]);
+        });
+      }
       const { texture, u, v, color } = at(model, model, object, mesh, t, k);
       if (texture !== undefined) textured = true;
       uvs.push(u ?? 0);
@@ -289,11 +357,27 @@ export async function read3MFMaterials(
     group(target: ThreeMFMaterialGroup, model, object, mesh, t) {
       const { texture } = at(model, model, object, mesh, t, 0);
       if (texture !== undefined) target.texture = texture;
+      const property = cornerProperty(model, object, mesh, t, 0),
+        { multis, groups, textures: known } = store(model),
+        layers = property && multis.get(property.id);
+      if (layers)
+        target.layers = layers.pids.map((pid, k): ThreeMFLayer => {
+          const kind = layers.kinds[k];
+          return {
+            kind,
+            ...(kind === 'texture' ? { texture: known.get(groups.get(pid)!.texture) } : {}),
+            attribute: `layer${kind === 'texture' ? 'UV' : 'Color'}${k}`,
+            blend: k && layers.blends[k - 1] === 'multiply' ? 'multiply' : 'mix',
+          };
+        });
     },
   };
   const hooks: ThreeMFExtension = extra
     ? {
-        element: extra.element,
+        element(model, name, a) {
+          extension.element?.(model, name, a);
+          return extra.element?.(model, name, a);
+        },
         instance: extra.instance,
         hasGeometry: extra.hasGeometry,
         open(model, name, a) {
@@ -327,5 +411,11 @@ export async function read3MFMaterials(
   if (varied) result.colors = colors.result();
   else delete result.colors;
   if (translucent) result.attributes = { ...result.attributes, opacity: opacity.result() };
+  const vertices = result.positions.length / 3;
+  for (const [name, { size, values }] of layerData) {
+    const out = new Float32Array(vertices * size);
+    for (const [vertex, value] of values) out.set(value, vertex * size);
+    result.attributes = { ...result.attributes, [name]: out };
+  }
   return result;
 }

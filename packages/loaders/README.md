@@ -85,6 +85,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
+| `create3MFMesh` (`/threemf-mesh`, async) | Draws that result, layer stacks included; see [Drawing it](#drawing-it-create3mfmesh) |
 | `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
 | `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
 | `parse3DS` (`/3ds`), `parseTDS` (`/tds`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
@@ -99,7 +100,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ## How it works
 
-- **One module per format.** The build is a plain TypeScript emit with `"sideEffects": false`, so importing `parsePLY` pulls in only the PLY reader and its helpers, not the 3MF, ZIP or XML code. In the main entry only `toGeometry`, `pointsToGeometry` and `createMeshes` import core; `/font` and `/svg` import `@margoengine/geometry` (a dependency), and `/mtl` imports `@margoengine/materials` (an optional peer: install it to use that entry).
+- **One module per format.** The build is a plain TypeScript emit with `"sideEffects": false`, so importing `parsePLY` pulls in only the PLY reader and its helpers, not the 3MF, ZIP or XML code. In the main entry only `toGeometry`, `pointsToGeometry` and `createMeshes` import core; `/font` and `/svg` import `@margoengine/geometry` (a dependency), and `/mtl` and `/threemf-mesh` import `@margoengine/materials` (an optional peer: install it to use those entries).
 - **Defensive parsing.** Headers are length-capped, every count is checked against `maxVertices` (default 8,000,000) and `maxTriangles` (default 16,000,000) before allocation, binary reads are bounds-checked before the loop, face and cell indices are validated, and ZIP entries are checked against their declared size while inflating (zip-bomb safe) and against CRC-32 afterwards. Every failure is a `LoaderError` with `format` and a `code` of `header`, `truncated`, `limit`, `range`, `syntax`, `unsupported`, `zip`, `aborted`, `fetch` or `url`. Its message reads `<format>: <what went wrong>; see https://margoengine.com/errors#loader-<code>`: the link is added in one place, the constructor, and each code has an entry on the errors page with its usual causes and what to do (see [Errors](#errors)).
 - **3MF builds are baked.** Component and build item transforms are multiplied into the positions (Margo Engine meshes take position, rotation and scale only, not arbitrary 3x4 matrices). Mirroring transforms flip the winding back. Triangles are grouped by build item, object and color so `createMeshes` gives each its own material. When a `colorgroup` gives one triangle different corner colors, those objects are split per corner and `colors` is filled.
 - **Colors.** Vertex colors are sRGB in [0,1]. `createMeshes` converts group colors to linear for `PbrMaterial`; since core has no vertex colors, meshes with only vertex colors get their average (`vertexColors: 'ignore'` turns that off). The optional [`/render` entry](#optional-vertex-color-and-opacity-rendering) preserves vertex RGB and opacity through the existing PBR renderer.
@@ -765,7 +766,34 @@ console.log(image.width, uvs?.length);
 - **Vertices.** Every triangle corner gets its own vertex, so `uvs` and `colors` can differ across a seam. `uvs` use v = 1 minus the file's v, and a mirrored build item keeps each coordinate on its corner.
 - **Groups.** A group's `texture` indexes `textures`; a triangle without one falls in a separate group. Each texture carries its image bytes, `contentType`, `tileStyleU`, `tileStyleV` and `filter`.
 - **Composites.** `compositematerials` mix their base colours by weight into one colour.
-- **Layers.** In `multiproperties`, colour layers mix by their alpha and the first texture layer sets the group's texture, so draw `colors` as a tint over it. Blend methods other than mix are read as mix.
+- **Layers.** A group whose triangles use a `multiproperties` carries its whole stack in `layers`, bottom first: each layer's `kind` (`'color'` or `'texture'`), a texture layer's `texture`, its `blend` (`'mix'` or `'multiply'`, from `blendmethods`) and the name of its per-vertex values in `attributes` (`layerColor<k>`: sRGB red, green, blue and linear alpha; `layerUV<k>`: u and v). A pindex a row leaves out is 0. `multiproperties` that break the spec's rules (a second colour group, a material group not first or twice, a nested `multiproperties`) are `syntax` errors. For older readers `texture` still names the first texture layer and `colors` the colour layers mixed together.
+
+### Drawing it: `create3MFMesh`
+
+`create3MFMesh` from `@margoengine/loaders/threemf-mesh` draws that result as one `@margoengine/materials` mesh (an optional peer) with a material per group: vertex colours, the texture as the colour map, and a layer stack through `layered()`. The layers blend as the 3MF Materials and Properties Extension 1.2.1 (chapter 5) specifies, in linear light: mix is `new.rgb * new.a + below.rgb * (1 - new.a)`, multiply `new.rgb * below.rgb`, and the bottom layer is opaque.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
+import { create3MFMesh } from '@margoengine/loaders/threemf-mesh';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const bytes = await (await fetch('/prints/multiprop-opaque.3mf')).arrayBuffer();
+const model = await create3MFMesh(engine, await parse3MFMaterials(bytes), { roughness: 0.5 });
+console.log(model.materials.length, model.textures.size);
+model.dispose(); // or `using model = ...`
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `normals` | `'smooth'` | `'smooth'` shares a normal where corners meet at one position; `'flat'` gives each triangle its face normal |
+| `roughness`, `metalness` | 0.6, 0 | Every material's surface numbers |
+| `doubleSided` | true | Draw both faces |
+| `unlit` | false | Draw the colours without light (`shading: 'basic'`) |
+| `renderOrder` | 0 | Draw order of the mesh |
+| `signal` | none | Stops the image decoding (`LoaderError` code `aborted`) |
+
+The colour layers below the first texture layer blend per corner into the vertex colour; every layer from the first texture up is a material layer, a texture mixing by its alpha (the bottom one covers) and a colour layer by its colour's alpha. Limits: a stack's texture layers share UV0 and UV1, so a stack with more than two different coordinate sets, or a colour above a texture layer that changes across the group, is an `unsupported` error; a mix layer does not raise opacity a multiply layer lowered; tile style `none` draws as `clamp`; display properties (`pbmetallicdisplayproperties` and the like) are not read.
 
 ## VTK XML
 

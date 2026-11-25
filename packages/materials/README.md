@@ -458,7 +458,8 @@ Cheap ground shadows with no shadow map. `createBlobShadow(engine, { radius, opa
 the middle, clear at the rim) you move under the caster. `createPlanarShadow(engine, geometry, { plane, light })` is a
 `ShadowMesh`: the caster's geometry flattened onto a plane as seen from a directional or point light, drawn as a
 translucent flat colour without depth writes; `update(world, light?)` re-projects it on the CPU when the caster moves.
-`planarShadowMatrix` and `projectGeometry` are the maths on their own.
+`planarShadowMatrix` and `projectGeometry` are the maths on their own. Both are checked in drawn pixels on WebGPU and
+the WebGL2 layer (`test/features-browser.mjs fakeShadows`): the blob's alpha along each spoke and the planar footprint.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -1341,7 +1342,10 @@ roughness, blue metalness, times `roughness` default 1 and `metalness` default 0
 default [0, 0], `texCoord` default 0. A map may be `{texture, layer}` of a `'2d-array'` Texture, so one array holds many
 layers. `detail` takes `map` (linear, 0.5 grey changes nothing), `normalMap`, `tiling` (default [8, 8]), `texCoord`
 and `strength` (default 1). A tiled map must be a Texture made with `wrapS: 'repeat'` and `wrapT: 'repeat'`; a clamped
-one is refused, because it would smear past its first tile.
+one is refused, because it would smear past its first tile. `blend` (default `'mix'`, fixed at creation) set to
+`'multiply'` multiplies the colour under the layer by `color` times `map`, and its opacity by the map's alpha, by the
+weight: the 3MF `multiproperties` multiply blend, which `create3MFMesh` from `@margoengine/loaders/threemf-mesh` uses.
+Every blend runs in linear light.
 
 Limits: 8 layers and 9 distinct textures per feature (a Texture used twice in the same colour space counts once). Maps
 are fixed at creation; numbers stay live. Layer normals use the surface's own tangent frame, which comes from the UVs

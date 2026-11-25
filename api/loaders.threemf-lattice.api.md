@@ -161,8 +161,16 @@ interface ParseLimits {
     maxTriangles?: number;
 }
 
+interface ThreeMFLayer {
+    kind: 'color' | 'texture';
+    texture?: number;
+    attribute: string;
+    blend: 'mix' | 'multiply';
+}
+
 interface ThreeMFMaterialGroup extends LoadedGroup {
     texture?: number;
+    layers?: ThreeMFLayer[];
 }
 
 interface ThreeMFMaterials extends ThreeMFResult {

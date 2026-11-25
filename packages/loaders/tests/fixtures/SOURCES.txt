@@ -49,3 +49,17 @@ was created with funding from NSF EIA-0196217." Used by tests/acclaim.test.js, t
   cmu/35_01-every-20th.amc: walk 35_01, http://mocap.cs.cmu.edu/subjects/35/35_01.amc (source SHA-256
     0743f4ea48e7e199cd56b2810b5ce81f8ede08d32ff79aa4e363c44cc4fe33aa), frames 1, 21, ..., 121 of the first second
     renumbered 1 to 7, values rounded to 3 decimals.
+
+3MF Consortium samples, BSD-2-Clause (Copyright (c) 2018, 3MF Consortium; 3mf-samples/LICENSE.txt), unchanged from
+https://github.com/3MFConsortium/3mf-samples at 665e20dc4d7777fd4c9702bca86a2d4028440337 (examples/material and
+validation tests/_archive/3mf-Verify), in 3mf-samples/, SHA-256:
+  63bb8a8be03ed48e36422d3845d2a35388798a21f71da1c22a46aa409da5f375 multiprop-opaque.3mf
+  88ed6580cad72fa6fcc34fb839e3e6bd3c986829a26df03c85765eee96813346 multiprop-metallic.3mf
+  15d2fed7af4181fb04e2e7cee54e5d05bdb99cf70cba2362eeb32fb01fcebb4a MUSTFAIL_3MF100_Extension_Chapter5b_MultipleReferenceToBaseAndCompositeMatterials.3mf
+  c5a662c311e0344b2e2bb512d61704fae7b720a6a54e444ac0445aea669c265e MUSTFAIL_3MF100_Extension_Chapter5b_MultipleReferenceToBaseMatterials.3mf
+  63e4a0f7bf33e10dc9dbc564c209567e3ee131da2a6a22bc21634c47507aec5f MUSTFAIL_3MF100_Extension_Chapter5b_ReferToAnotherMultiProperties.3mf
+  352f92106d6bd1251caef30c5354623d6f64906d558cb20d6d5df5215c4d4d82 MUSTFAIL_3MF100_Extension_Chapter5c_MultipleReferenceToColorgroup.3mf
+  d5a138bee60bc6aef7edf8cb15a5c719f62af51e675af819a66ea7782559c93d MUSTFAIL_3MF100_Extension_Chapter5d_MultipleReferenceToCompositeMaterials.3mf
+  f22b9ef59061057e392468f12b2eebf2fed06774857b020498bb2d785b4b2666 MUSTFAIL_3MF100_Extension_Chapter5e_ReferenceToMultiProperties.3mf
+  9c9bcf83f2be06cf089bd0e84a55fe35a9b40224a568ce37f4d763e9a1970504 MUSTPASS_Chapter5.1a_MaterialResources_CompositeAndMultiProperties.3mf
+  c3a7799a75e02c2b559f3ef60f75536d0f20cdaca3e808869721b4e2b3d0b8a1 MUSTPASS_Chapter5.1b_MaterialResources_MultiObjects_CompositeAndMultiProperties.3mf

@@ -2343,6 +2343,10 @@
       "types": "./dist/loaders/threemf-materials.d.ts",
       "import": "./dist/loaders/threemf-materials.js"
     },
+    "./loaders/threemf-mesh": {
+      "types": "./dist/loaders/threemf-mesh.d.ts",
+      "import": "./dist/loaders/threemf-mesh.js"
+    },
     "./loaders/vtk-xml": {
       "types": "./dist/loaders/vtk-xml.d.ts",
       "import": "./dist/loaders/vtk-xml.js"

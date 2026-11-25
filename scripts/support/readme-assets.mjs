@@ -61,6 +61,7 @@ export const README_FILES = {
   '/ifc/web-ifc-api-iife.js': 'node_modules/web-ifc/web-ifc-api-iife.js',
   '/bracket.step': 'packages/cad/test/fixtures/bracket-assembly.step',
   '/parts/bracket.3mf': 'packages/loaders/tests/fixtures/gears.3mf',
+  '/prints/multiprop-opaque.3mf': 'packages/loaders/tests/fixtures/3mf-samples/multiprop-opaque.3mf',
   '/scans/part.ply': 'packages/loaders/tests/fixtures/torus_colored.ply',
   '/fonts/Inter.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',
   '/fonts/InterVariable.ttf': 'packages/text/tests/fixtures/fonts/SourceSans3VF-Upright.ttf',

@@ -40,6 +40,12 @@ export interface MaterialLayer {
   vertexChannel?: LayerChannel;
   /** Multiplies the weight, 0 to 1. Default 1. */
   opacity?: number;
+  /**
+   * How the colour goes over what is under it: `'mix'` (default) moves towards `color` times `map` by the weight;
+   * `'multiply'` multiplies the colour under it, and its opacity by the map's alpha, by that much (the 3MF
+   * `multiproperties` multiply blend at weight 1). Fixed at creation.
+   */
+  blend?: 'mix' | 'multiply';
   /** Height map (red, linear, tiled like `map`): high points of this layer show first as its weight rises. */
   heightMap?: LayerMap;
   /** Width of the blend at a height edge, above 0: small is a hard edge, large a soft one. Default 0.1. */
@@ -128,6 +134,8 @@ function checkLayer(layer: MaterialLayer, k: number): void {
     throw new RangeError(`layered ${label} heightContrast must be above 0; pass a width such as 0.1`);
   if (layer.texCoord !== undefined && layer.texCoord !== 0 && layer.texCoord !== 1)
     throw new TypeError(`layered ${label} texCoord must be 0 or 1; pass a UV set`);
+  if (layer.blend !== undefined && layer.blend !== 'mix' && layer.blend !== 'multiply')
+    throw new TypeError(`layered ${label} blend must be 'mix' or 'multiply'; pass one`);
   if (layer.maskChannel !== undefined) channel(layer.maskChannel, `${label} maskChannel`);
   if (layer.vertexChannel !== undefined) channel(layer.vertexChannel, `${label} vertexChannel`);
 }
@@ -178,7 +186,12 @@ export function layered(options: LayeredOptions = {}): LayeredFeature {
     if (layer.vertexChannel) body += `  ${w}*=i.color.${layer.vertexChannel};\n`;
     if (layer.heightMap)
       body += `  ${w}=clamp((${read(layer.heightMap, false, uv)}.r+${w}*(1.0+${c}.y)-1.0)/${c}.y,0.0,1.0);\n`;
-    body += `  s.base=vec4f(mix(s.base.rgb,${a}.rgb${layer.map ? `*${read(layer.map, true, uv)}.rgb` : ''},${w}),s.base.a);\n`;
+    const map = layer.map ? `margoLayerC${k}` : '';
+    if (map) body += `  let ${map}=${read(layer.map!, true, uv)};\n`;
+    body +=
+      layer.blend === 'multiply'
+        ? `  s.base*=mix(vec4f(1),vec4f(${a}.rgb${map ? `*${map}.rgb,${map}.a` : ',1.0'}),${w});\n`
+        : `  s.base=vec4f(mix(s.base.rgb,${a}.rgb${map ? `*${map}.rgb` : ''},${w}),s.base.a);\n`;
     const mr = layer.metalRoughnessMap ? `margoLayerMR${k}` : '';
     if (mr) body += `  let ${mr}=${read(layer.metalRoughnessMap!, false, uv)};\n`;
     body += `  s.roughness=clamp(mix(s.roughness,${c}.z${mr ? `*${mr}.g` : ''},${w}),0.045,1.0);\n`;

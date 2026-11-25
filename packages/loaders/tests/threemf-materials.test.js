@@ -1,6 +1,7 @@
 // parse3MFMaterials: textures, per-corner coordinates, colour groups, composites, layers, parts and refusals.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { parse3MFMaterials } from '../dist/threemf-materials.js';
 import { parse3MF } from '../dist/index.js';
 import { crc32, LoaderError } from '../dist/common.js';
@@ -169,7 +170,7 @@ test('multiproperties carry a texture and a colour, mixed by alpha over the laye
   const result = await parse3MFMaterials(
     pack(
       model(
-        `${TEXTURE}${COORDS}<m:colorgroup id="3"><m:color color="#FF0000"/></m:colorgroup><m:colorgroup id="6"><m:color color="#0000FF80"/></m:colorgroup><multiproperties id="7" pids="2 3 6"><multi pindices="1 0 0"/></multiproperties>`,
+        `${TEXTURE}${COORDS}<basematerials id="3"><base name="red" displaycolor="#FF0000"/></basematerials><m:colorgroup id="6"><m:color color="#0000FF80"/></m:colorgroup><multiproperties id="7" pids="3 2 6"><multi pindices="0 1 0"/></multiproperties>`,
         '<triangle v1="0" v2="1" v3="2" pid="7" p1="0"/>',
       ),
       { '3D/Texture/a.png': PNG },
@@ -180,6 +181,96 @@ test('multiproperties carry a texture and a colour, mixed by alpha over the laye
   const a = 0x80 / 255;
   const srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
   near(result.colors.subarray(0, 3), [srgb(1 - a), 0, srgb(a)]);
+});
+
+test('a multiproperties keeps its whole stack: every texture layer, colours, blend methods and default indices', async () => {
+  const second =
+    '<texture2d id="4" path="/3D/Texture/b.png" contenttype="image/png"/><texture2dgroup id="5" texid="4"><tex2coord u="0.25" v="0.5"/><tex2coord u="0.75" v="0.125"/></texture2dgroup>';
+  const result = await parse3MFMaterials(
+    pack(
+      model(
+        `${TEXTURE}${COORDS}${second}<colorgroup id="6"><color color="#00FF0080"/><color color="#FF000040"/></colorgroup>` +
+          '<multiproperties id="7" pids="6 2 5" blendmethods="mix multiply"><multi pindices="1 2 1"/><multi pindices="0 3"/></multiproperties>',
+        '<triangle v1="0" v2="1" v3="2" pid="7" p1="0" p2="1" p3="0"/><triangle v1="0" v2="2" v3="3"/>',
+      ),
+      { '3D/Texture/a.png': PNG, '3D/Texture/b.png': PNG },
+    ),
+  );
+  const [layeredGroup, plain] = result.groups;
+  assert.deepEqual(layeredGroup.layers, [
+    { kind: 'color', attribute: 'layerColor0', blend: 'mix' },
+    { kind: 'texture', texture: 0, attribute: 'layerUV1', blend: 'mix' },
+    { kind: 'texture', texture: 1, attribute: 'layerUV2', blend: 'multiply' },
+  ]);
+  assert.equal(layeredGroup.texture, 0);
+  assert.equal(plain.layers, undefined);
+  const { layerColor0, layerUV1, layerUV2 } = result.attributes;
+  // Corners 0 and 2 use row 0 (colour 1, coordinate 2, coordinate 1); corner 1 uses row 1, whose missing index is 0.
+  near(layerColor0.subarray(0, 12), [1, 0, 0, 0x40 / 255, 0, 1, 0, 0x80 / 255, 1, 0, 0, 0x40 / 255]);
+  near(layerUV1.subarray(0, 6), [1, 0, 0, 0, 1, 0]);
+  near(layerUV2.subarray(0, 6), [0.75, 0.875, 0.25, 0.5, 0.75, 0.875]);
+  // The plain triangle's corners hold zeros.
+  near(layerColor0.subarray(12), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  near(layerUV2.subarray(6), [0, 0, 0, 0, 0, 0]);
+});
+
+const SAMPLES = new URL('./fixtures/3mf-samples/', import.meta.url);
+const sample = (name) => readFile(new URL(name, SAMPLES));
+
+test("the 3MF Consortium's multiproperties samples keep a colour under two texture layers", async () => {
+  for (const [file, base] of [
+    ['multiprop-opaque.3mf', [0, 0x90 / 255, 1, 1]],
+    ['multiprop-metallic.3mf', [0xc0 / 255, 0xc0 / 255, 0xc0 / 255, 1]],
+  ]) {
+    const result = await parse3MFMaterials(await sample(file));
+    assert.deepEqual(
+      result.textures.map((t) => t.path),
+      ['/3D/Texture/Star.png', '/3D/Texture/Smiley.png'],
+    );
+    const [front, rest] = result.groups;
+    assert.deepEqual(front.layers, [
+      { kind: 'color', attribute: 'layerColor0', blend: 'mix' },
+      { kind: 'texture', texture: 0, attribute: 'layerUV1', blend: 'mix' },
+      { kind: 'texture', texture: 1, attribute: 'layerUV2', blend: 'mix' },
+    ]);
+    assert.equal(front.count, 6);
+    near(rest.color, base);
+    const { layerColor0, layerUV1, layerUV2 } = result.attributes;
+    for (let v = 0; v < 6; v++) near(layerColor0.subarray(v * 4, v * 4 + 4), base);
+    // Triangles (0 1 4) with rows 0 1 2 and (5 4 1) with rows 3 2 1: tex2coords (0,0) (1,0) (0,1) (1,1), v flipped.
+    const uv = [0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1];
+    near(layerUV1.subarray(0, 12), uv);
+    near(layerUV2.subarray(0, 12), uv);
+  }
+});
+
+test("the 3MF Consortium's validation files: multiproperties rules refuse, valid stacks load", async () => {
+  for (const [file, message] of [
+    ['MUSTFAIL_3MF100_Extension_Chapter5b_MultipleReferenceToBaseAndCompositeMatterials.3mf', /one material group/],
+    ['MUSTFAIL_3MF100_Extension_Chapter5b_MultipleReferenceToBaseMatterials.3mf', /one material group/],
+    ['MUSTFAIL_3MF100_Extension_Chapter5b_ReferToAnotherMultiProperties.3mf', /property group 2 is not defined/],
+    ['MUSTFAIL_3MF100_Extension_Chapter5c_MultipleReferenceToColorgroup.3mf', /one colour group/],
+    ['MUSTFAIL_3MF100_Extension_Chapter5d_MultipleReferenceToCompositeMaterials.3mf', /one material group/],
+    ['MUSTFAIL_3MF100_Extension_Chapter5e_ReferenceToMultiProperties.3mf', /must not name a multiproperties/],
+  ])
+    await assert.rejects(
+      parse3MFMaterials(await sample(file)),
+      (error) => error instanceof LoaderError && error.code === 'syntax' && message.test(error.message),
+      file,
+    );
+  for (const file of [
+    'MUSTPASS_Chapter5.1a_MaterialResources_CompositeAndMultiProperties.3mf',
+    'MUSTPASS_Chapter5.1b_MaterialResources_MultiObjects_CompositeAndMultiProperties.3mf',
+  ]) {
+    const { groups } = await parse3MFMaterials(await sample(file));
+    const stacks = groups.filter((g) => g.layers);
+    assert.ok(stacks.length >= 1, file);
+    for (const g of stacks)
+      assert.deepEqual(
+        g.layers.map((l) => l.kind),
+        ['color', 'color'],
+      );
+  }
 });
 
 test('a texture in a production part is found by that part', async () => {
@@ -244,4 +335,38 @@ test('bad references and values are named errors', async () => {
     ),
     'range',
   );
+});
+
+test('create3MFMesh refuses what one materials mesh cannot draw, before it touches the engine', async () => {
+  const { create3MFMesh } = await import('../dist/threemf-mesh.js');
+  const engine = {},
+    saved = globalThis.createImageBitmap;
+  // Node has no image decoder: a 1 x 1 RGBA image stands in, so the layer checks after decoding run.
+  globalThis.createImageBitmap = async () => ({ data: new Uint8Array(4), width: 1, height: 1 });
+  try {
+    await refuses(
+      create3MFMesh(engine, { kind: 'points', positions: new Float32Array(3), textures: [] }),
+      'unsupported',
+    );
+    const loaded = await parse3MFMaterials(await sample('multiprop-opaque.3mf'));
+    await refuses(create3MFMesh(engine, loaded, { normals: 'faceted' }), 'range');
+    // Three different coordinate sets in one stack: UV0 and UV1 hold two.
+    const three = structuredClone(loaded);
+    three.groups[0].layers.push({ kind: 'texture', texture: 0, attribute: 'layerUV3', blend: 'mix' });
+    three.attributes.layerUV3 = three.attributes.layerUV1.map((v) => v * 0.5);
+    three.attributes.layerUV2 = three.attributes.layerUV1.map((v) => 1 - v);
+    await assert.rejects(create3MFMesh(engine, three), /more than two sets of texture coordinates/);
+    // A colour layer above a texture layer must be one colour across the group.
+    const varied = structuredClone(loaded);
+    varied.groups[0].layers.push({ kind: 'color', attribute: 'layerColor3', blend: 'mix' });
+    varied.attributes.layerColor3 = new Float32Array((varied.positions.length / 3) * 4).map((_, k) =>
+      k > 4 ? 0.5 : 0.25,
+    );
+    await assert.rejects(create3MFMesh(engine, varied), /must hold one colour across the group/);
+    const missing = structuredClone(loaded);
+    delete missing.attributes.layerUV2;
+    await refuses(create3MFMesh(engine, missing), 'range');
+  } finally {
+    globalThis.createImageBitmap = saved;
+  }
 });

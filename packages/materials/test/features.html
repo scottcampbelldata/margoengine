@@ -15,6 +15,7 @@ import {physicalLobes} from '/packages/clustered/dist/physical-lobes.js';
 import {prefilterCube} from '/packages/materials/dist/prefilter.js';
 import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
+import {createBlobShadow,createPlanarShadow} from '/packages/materials/dist/fake-shadows.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {stochasticTiling} from '/packages/materials/dist/stochastic.js';
 import {hair} from '/packages/materials/dist/hair.js';
@@ -627,6 +628,26 @@ window.check={
     }finally{engine.dispose();}
   },
   // Each way of weighing a layer, and what the layer changes: returns linear colours at named points.
+  // Blob and planar shadows (fake-shadows) over a white unlit ground, seen straight down through an orthographic camera
+  // covering x and z from -1.25 to 1.25: x runs right and z down the canvas. Returns the middle row's red bytes, or a
+  // row and a column through the planar shadow, for the check to hold against the geometry it predicts.
+  async fakeShadowsCheck(kind){
+    const made=await scene({position:[0,5,0],target:[0,0,0]}),{engine,errors,render}=made;
+    engine.camera.up=[0,0,-1];
+    engine.camera.project=(out)=>{out.fill(0);out[0]=out[5]=1/1.25;out[10]=1/99.9;out[14]=100/99.9;out[15]=1;};
+    // A square in the XZ plane at height y facing up (counter-clockwise seen from +y).
+    const square=(a,y)=>({positions:[-a,y,-a,-a,y,a,a,y,a,a,y,-a],normals:[0,1,0,0,1,0,0,1,0,0,1,0],indices:[0,1,2,0,2,3]});
+    createMesh(engine,square(2,0),new UnlitMaterial({color:[1,1,1,1]}));
+    let shadow;
+    if(kind==='blob'){const blob=createBlobShadow(engine,{radius:1,opacity:0.5});blob.root.setPosition([0,0.01,0]);}
+    else shadow=createPlanarShadow(engine,square(0.25,1),{plane:{normal:[0,1,0]},light:kind==='point'?{position:[0,2,0]}:{direction:[1,2,0]}});
+    await render();
+    const data=await pixels(made);
+    if(shadow)shadow.dispose();
+    engine.dispose();
+    const row=(y)=>Array.from({length:size},(_,x)=>data[(y*size+x)*4]),column=(x)=>Array.from({length:size},(_,y)=>data[(y*size+x)*4]);
+    return {row:row(size/2),column:column(kind==='point'?size/2:Math.round(size*(1-0.5/1.25)/2)),errors};
+  },
   async layeredCheck(kind){
     const blue=[0,0,1,1],left=96,right=160,middle=128;
     const sampled=async(options,geometry)=>{const {data,errors}=await layerScene(new UnlitMaterial({color:blue,...options}),geometry);return {left:at(data,left,middle),right:at(data,right,middle),errors};};
@@ -634,6 +655,7 @@ window.check={
     if(kind==='mask')return sampled({features:[layered({layers:[{...red,mask:halves([0,0,0,255],[255,255,255,255])}]})]});
     if(kind==='packed')return sampled({features:[layered({layers:[{...red,mask:halves([255,0,0,255],[0,255,0,255]),maskChannel:'g'}]})]});
     if(kind==='opacity')return sampled({features:[layered({layers:[{...red,opacity:0.25}]})]});
+    if(kind==='multiply')return sampled({color:[0.5,1,1,1],features:[layered({layers:[{color:[1,0.5,0.25],blend:'multiply',mask:halves([0,0,0,255],[255,255,255,255])}]})]});
     if(kind==='order')return sampled({features:[layered({layers:[{...red},{color:[0,1,0],mask:halves([0,0,0,255],[255,255,255,255])}]})]});
     if(kind==='vertex')return sampled({features:[layered({layers:[{...red,vertexChannel:'g'}]})]},{...quad(),colors:[1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1].map((v,k)=>k%4===1?(k===1||k===13?0:1):1)});
     if(kind==='height')return Promise.all([0,0.5,1].map(opacity=>sampled({features:[layered({layers:[{...red,opacity,heightMap:halves([0,0,0,255],[255,255,255,255])}]})]})));

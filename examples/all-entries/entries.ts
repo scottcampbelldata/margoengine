@@ -814,6 +814,7 @@ export * as e_margoengine_game_loaders_textures from '@margoengine/game/loaders/
 export * as e_margoengine_game_loaders_nrrd from '@margoengine/game/loaders/nrrd';
 export * as e_margoengine_game_loaders_ldraw from '@margoengine/game/loaders/ldraw';
 export * as e_margoengine_game_loaders_threemf_materials from '@margoengine/game/loaders/threemf-materials';
+export * as e_margoengine_game_loaders_threemf_mesh from '@margoengine/game/loaders/threemf-mesh';
 export * as e_margoengine_game_loaders_vtk_xml from '@margoengine/game/loaders/vtk-xml';
 export * as e_margoengine_game_loaders_3dm from '@margoengine/game/loaders/3dm';
 export * as e_margoengine_game_loaders_3ds from '@margoengine/game/loaders/3ds';
@@ -1759,6 +1760,7 @@ export * as e_margoengine_kit_react_loaders_textures from '@margoengine/kit-reac
 export * as e_margoengine_kit_react_loaders_nrrd from '@margoengine/kit-react/loaders/nrrd';
 export * as e_margoengine_kit_react_loaders_ldraw from '@margoengine/kit-react/loaders/ldraw';
 export * as e_margoengine_kit_react_loaders_threemf_materials from '@margoengine/kit-react/loaders/threemf-materials';
+export * as e_margoengine_kit_react_loaders_threemf_mesh from '@margoengine/kit-react/loaders/threemf-mesh';
 export * as e_margoengine_kit_react_loaders_vtk_xml from '@margoengine/kit-react/loaders/vtk-xml';
 export * as e_margoengine_kit_react_loaders_3dm from '@margoengine/kit-react/loaders/3dm';
 export * as e_margoengine_kit_react_loaders_3ds from '@margoengine/kit-react/loaders/3ds';
@@ -2347,6 +2349,7 @@ export * as e_margoengine_kit_viz_loaders_textures from '@margoengine/kit-viz/lo
 export * as e_margoengine_kit_viz_loaders_nrrd from '@margoengine/kit-viz/loaders/nrrd';
 export * as e_margoengine_kit_viz_loaders_ldraw from '@margoengine/kit-viz/loaders/ldraw';
 export * as e_margoengine_kit_viz_loaders_threemf_materials from '@margoengine/kit-viz/loaders/threemf-materials';
+export * as e_margoengine_kit_viz_loaders_threemf_mesh from '@margoengine/kit-viz/loaders/threemf-mesh';
 export * as e_margoengine_kit_viz_loaders_vtk_xml from '@margoengine/kit-viz/loaders/vtk-xml';
 export * as e_margoengine_kit_viz_loaders_3dm from '@margoengine/kit-viz/loaders/3dm';
 export * as e_margoengine_kit_viz_loaders_3ds from '@margoengine/kit-viz/loaders/3ds';
@@ -2862,6 +2865,7 @@ export * as e_margoengine_kit_web_loaders_textures from '@margoengine/kit-web/lo
 export * as e_margoengine_kit_web_loaders_nrrd from '@margoengine/kit-web/loaders/nrrd';
 export * as e_margoengine_kit_web_loaders_ldraw from '@margoengine/kit-web/loaders/ldraw';
 export * as e_margoengine_kit_web_loaders_threemf_materials from '@margoengine/kit-web/loaders/threemf-materials';
+export * as e_margoengine_kit_web_loaders_threemf_mesh from '@margoengine/kit-web/loaders/threemf-mesh';
 export * as e_margoengine_kit_web_loaders_vtk_xml from '@margoengine/kit-web/loaders/vtk-xml';
 export * as e_margoengine_kit_web_loaders_3dm from '@margoengine/kit-web/loaders/3dm';
 export * as e_margoengine_kit_web_loaders_3ds from '@margoengine/kit-web/loaders/3ds';
@@ -3140,6 +3144,7 @@ export * as e_margoengine_loaders_textures from '@margoengine/loaders/textures';
 export * as e_margoengine_loaders_nrrd from '@margoengine/loaders/nrrd';
 export * as e_margoengine_loaders_ldraw from '@margoengine/loaders/ldraw';
 export * as e_margoengine_loaders_threemf_materials from '@margoengine/loaders/threemf-materials';
+export * as e_margoengine_loaders_threemf_mesh from '@margoengine/loaders/threemf-mesh';
 export * as e_margoengine_loaders_vtk_xml from '@margoengine/loaders/vtk-xml';
 export * as e_margoengine_loaders_3dm from '@margoengine/loaders/3dm';
 export * as e_margoengine_loaders_3ds from '@margoengine/loaders/3ds';
@@ -3757,6 +3762,7 @@ export * as e_margoengine_loaders_textures_2 from 'margoengine/loaders/textures'
 export * as e_margoengine_loaders_nrrd_2 from 'margoengine/loaders/nrrd';
 export * as e_margoengine_loaders_ldraw_2 from 'margoengine/loaders/ldraw';
 export * as e_margoengine_loaders_threemf_materials_2 from 'margoengine/loaders/threemf-materials';
+export * as e_margoengine_loaders_threemf_mesh_2 from 'margoengine/loaders/threemf-mesh';
 export * as e_margoengine_loaders_vtk_xml_2 from 'margoengine/loaders/vtk-xml';
 export * as e_margoengine_loaders_3dm_2 from 'margoengine/loaders/3dm';
 export * as e_margoengine_loaders_3ds_2 from 'margoengine/loaders/3ds';

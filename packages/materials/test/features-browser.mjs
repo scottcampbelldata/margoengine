@@ -851,6 +851,52 @@ async function runFeatures(compat) {
       );
       console.log('mips outside-tool conformance', JSON.stringify({ hardware: context.hardware, ...real }));
     },
+    // fake-shadows on a real GPU: black at opacity 0.5 over white ground, blended as the display blend does (the
+    // encoded value is 1 - alpha). The blob's alpha falls along each spoke as its six rings say, linear between rings;
+    // the planar shadow of a 0.5 m square 1 m up covers exactly the footprint the light projects, at 1 - 0.5.
+    async fakeShadows() {
+      const size = 256,
+        world = (p) => ((p + 0.5) / size - 0.5) * 2.5,
+        smooth = (t) => t * t * (3 - 2 * t);
+      const blob = await check('fakeShadowsCheck', 'blob');
+      assert.deepEqual(blob.errors, []);
+      let worst = 0;
+      blob.row.forEach((got, x) => {
+        const t = Math.abs(world(x)) * 6,
+          r = Math.floor(t),
+          ring = (k) => (k === 0 ? 1 : k >= 6 ? 0 : 1 - smooth(k / 6)),
+          alpha = t >= 6 ? 0 : 0.5 * (ring(r) + (ring(r + 1) - ring(r)) * (t - r)),
+          want = 255 * (1 - alpha);
+        worst = Math.max(worst, Math.abs(got - want));
+        assert.ok(Math.abs(got - want) <= 3, `blob at x ${world(x).toFixed(3)}: ${got} should be ${want.toFixed(1)}`);
+      });
+      assert.ok(
+        Math.min(...blob.row) <= 128 && blob.row[0] === 255,
+        'the blob is dark in the middle and clear past its rim',
+      );
+      for (const [kind, [x0, x1], [z0, z1]] of [
+        ['directional', [-0.75, -0.25], [-0.25, 0.25]],
+        ['point', [-0.5, 0.5], [-0.5, 0.5]],
+      ]) {
+        const out = await check('fakeShadowsCheck', kind);
+        assert.deepEqual(out.errors, []);
+        for (const [line, [a, b]] of [
+          [out.row, [x0, x1]],
+          [out.column, [z0, z1]],
+        ]) {
+          const inside = line.map((_, p) => world(p) >= a && world(p) <= b),
+            shaded = line.map((v) => v < 192);
+          // Rasterization covers a pixel whose centre is inside; allow the one pixel on each edge to go either way.
+          line.forEach((v, p) => {
+            const edge = inside[p] !== inside[p - 1] || inside[p] !== inside[p + 1];
+            if (edge) return;
+            assert.equal(shaded[p], inside[p], `${kind} pixel ${p} (${world(p).toFixed(3)}) shaded ${shaded[p]}`);
+            assert.ok(Math.abs(v - (inside[p] ? 127.5 : 255)) <= 3, `${kind} pixel ${p}: ${v}`);
+          });
+        }
+      }
+      console.log(`fake shadows: blob within ${worst.toFixed(1)} of 255 along a spoke, planar footprints exact`);
+    },
     async layered() {
       const run = async (kind) => {
         const out = await page.evaluate((k) => window.check.layeredCheck(k), kind);
@@ -868,6 +914,9 @@ async function runFeatures(compat) {
       near(r.right, red, 'channel g of a packed mask');
       r = await run('opacity');
       near(r.left, [0.25, 0, 0.75], 'opacity mixes in linear light');
+      r = await run('multiply');
+      near(r.left, [0.5, 1, 1], 'multiply leaves the material where the mask is black');
+      near(r.right, [0.5, 0.5, 0.25], 'multiply scales the colour under it in linear light');
       r = await run('order');
       near(r.left, red, 'lower layer');
       near(r.right, green, 'upper layer covers the lower one');
@@ -916,7 +965,7 @@ async function runFeatures(compat) {
       near(r.before, blue, 'live opacity 0');
       near(r.after, red, 'live opacity 1');
       console.log(
-        'layered: masks, packed channel, order, vertex, height, array, tiling, detail, surface, normals, live',
+        'layered: masks, packed channel, multiply, order, vertex, height, array, tiling, detail, surface, normals, live',
       );
     },
     async alphaHash() {

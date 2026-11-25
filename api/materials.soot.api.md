@@ -100,6 +100,7 @@ interface MaterialLayer {
     maskChannel?: LayerChannel;
     vertexChannel?: LayerChannel;
     opacity?: number;
+    blend?: 'mix' | 'multiply';
     heightMap?: LayerMap;
     heightContrast?: number;
 }

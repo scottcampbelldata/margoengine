@@ -2946,7 +2946,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF7 | MPD packs, `0 FILE` and `0 NOFILE` | loaders/src/ldraw.ts | LDraw.org, "MPD Language Extension" |
 | LF8 | BFC certification, winding and INVERTNEXT | loaders/src/ldraw.ts | LDraw.org, "Language Extension for Back Face Culling" |
 | LF9 | `!COLOUR` lines and the classic colour values | loaders/src/ldraw.ts | LDraw.org, "Colour Definition Language Extension" and the published LDConfig.ldr values |
-| LF10 | `texture2d`, `texture2dgroup`, `compositematerials`, `multiproperties` | loaders/src/threemf-materials.ts | 3MF Consortium, "Materials and Properties Extension" specification |
+| LF10 | `texture2d`, `texture2dgroup`, `compositematerials`, `multiproperties` layer stacks and their mix/multiply blending | loaders/src/threemf-materials.ts, loaders/src/threemf-mesh.ts, materials/src/layered.ts (`blend`) | 3MF Consortium, "3MF Materials and Properties Extension", version 1.2.1, chapters 3 to 6, https://github.com/3MFConsortium/spec_materials (BSD-2-Clause) |
 | LF11 | VTK XML layout, `DataArray` encodings, appended data and block headers | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" (VTK User's Guide) |
 | LF12 | Cell type numbers and point order | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" cell diagrams |
 | LF13 | LZ4 block decoding | loaders/src/vtk-xml.ts | "LZ4 Block Format Description" |

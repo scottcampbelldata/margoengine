@@ -12201,6 +12201,12 @@
       "commit": "fe86d1e5e",
       "reason": "weather/precipitation is a new optional entry (ATMO-04): the framework's precipitation field, rain, snow, graupel and hail fall speeds from each particle's physics and their size distributions; its own entry so scenes without rain pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-c3",
+      "reason": "loaders/threemf-mesh, new optional entry (create3MFMesh draws 3MF layer stacks through @margoengine/materials, its optional peer, as loaders/mtl does; 2352 B). loaders/threemf-materials 12516 to 12722 B and threemf-lattice (which reads it) 16783 to 16870 B for the multiproperties stack: layer kinds, blend methods, per-vertex layer attributes and the spec's pids rules. Splitting the stack reader from the materials reader would duplicate its sampling.",
+      "grew": 6
     }
   ],
   "items": {
@@ -12809,8 +12815,9 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
-    "@margoengine/loaders/threemf-lattice": 16783,
-    "@margoengine/loaders/threemf-materials": 12516,
+    "@margoengine/loaders/threemf-lattice": 17377,
+    "@margoengine/loaders/threemf-materials": 13104,
+    "@margoengine/loaders/threemf-mesh": 2608,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,
     "@margoengine/loaders/vrml": 8854,
@@ -13869,6 +13876,9 @@
     "leak @margoengine/loaders/mtl -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/materials": 1,
     "leak @margoengine/loaders/render -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/loaders/threemf-mesh -> @margoengine/materials": 1,
+    "leak @margoengine/loaders/threemf-mesh -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/loaders/threemf-mesh -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/lod -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/lines": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/text": 1,
