@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { showHelp } from './support/help.mjs';
 import { killChildTreeSync, killOwnTreeSync } from './support/shutdown.mjs';
+import { startFailureNote } from './support/start-failure.mjs';
 
 /** The hard timeout of a command, in minutes, when none is given. */
 export const DEFAULT_MINUTES = 10;
@@ -123,6 +124,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const { code, timedOut } = await running;
       for (const signal of signals) process.off(signal, interrupted);
       if (timedOut) console.error(`TIMEOUT after ${+minutes.toFixed(2)} min: ${command.join(' ')}`);
+      // A command Windows could not start prints nothing of its own, so its code is named here (KB-FILM-HEADLESS1).
+      const note = startFailureNote(code);
+      if (note) console.error(`${command.join(' ')}: ${note}`);
       // Ends by its event loop, never process.exit (KB-OWN-EXIT1: process.exit can hang joining V8's worker threads).
       process.exitCode = code;
     }

@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { changedFiles, planContext, planFiles } from './check-merge.mjs';
 import { TARGETS } from './mutation.mjs';
 import { runWithTimeout } from './run-with-timeout.mjs';
+import { startFailureNote } from './support/start-failure.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 export const DEFAULT_PACKAGE_MINUTES = 15;
@@ -61,6 +62,16 @@ export function testPackages(ctx, files, env = {}, dir = root) {
   };
 }
 
+/**
+ * How a failed step is listed: its name, and why when the exit code says more than a failing test would. A step whose
+ * process Windows could not start (0xC0000142) is named as such with the machine state of the moment
+ * (KB-FILM-HEADLESS1); `note` is startFailureNote.
+ */
+export function failedStep(name, code, timedOut, note = startFailureNote) {
+  const why = timedOut ? 'timed out' : note(code);
+  return why ? `${name} (${why})` : name;
+}
+
 async function main() {
   const args = process.argv.slice(2),
     value = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3),
@@ -78,7 +89,7 @@ async function main() {
     console.log(`
 === node --test ${file} (at most ${minutes} min)`);
     const { code, timedOut } = await runWithTimeout(`node --test ${file}`, { cwd: root, timeoutMs: minutes * 60_000 });
-    if (code !== 0) failed.push(`${file}${timedOut ? ' (timed out)' : ''}`);
+    if (code !== 0) failed.push(failedStep(file, code, timedOut));
   }
   for (const dir of dirs) {
     console.log(`\n=== npm run test (${dir}, at most ${minutes} min)`);
@@ -86,7 +97,7 @@ async function main() {
       cwd: join(root, dir),
       timeoutMs: minutes * 60_000,
     });
-    if (code !== 0) failed.push(`${dir}${timedOut ? ' (timed out)' : ''}`);
+    if (code !== 0) failed.push(failedStep(dir, code, timedOut));
   }
   if (failed.length) console.error(`\ntest:changed FAILED: ${failed.join(', ')}`);
   else console.log(`\ntest:changed: ${dirs.length} package${dirs.length === 1 ? '' : 's'} passed`);

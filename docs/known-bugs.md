@@ -7125,6 +7125,26 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   times will not close by trimming alone, so changing the step's scope or limit on Direct3D 11 is a decision for
   Scott (escalated 2026-11-21).
 
+### Fixed 2026-11-25: a package build that Windows could not start left only "npm error code 3221225794" (KB-FILM-HEADLESS1)
+
+- **Repro:** seen once (2026-11-16 about 05:00 EST, Film Studio lane gate at f9b02fc1bf, other lanes' GPU and CPU
+  jobs running): `npm test --workspace=packages/headless` stopped in its `build` step, `node
+  ../../scripts/build-optional.js headless`, with "npm error code 3221225794" and nothing else. The same suite run alone
+  right after passed 158/158.
+- **Cause:** 0xC0000142 (STATUS_DLL_INIT_FAILED): Windows could not start npm's cmd.exe child or its node, which
+  failed while loading its DLLs, before any of build-optional.js ran; under load that is the session's desktop heap
+  running out (the same class as KB-L5a-6). build-optional.js cannot name it, since it never started, and the runner
+  that saw the code printed it bare, with no cause and no record of how loaded the machine was.
+- **Fix:** `scripts/support/start-failure.mjs` names the code with the machine state of the moment (the running
+  process count from `tasklist` and the session's configured desktop heap, `SharedSection`, from the registry; a probe
+  that cannot start is reported as such). `npm run test:changed` lists such a package as `packages/<dir> (exit
+  0xC0000142, STATUS_DLL_INIT_FAILED: ...)`, and `scripts/run-with-timeout.mjs` prints the same note for its
+  command. Nothing retries the step. If it recurs, the note gives the process count to compare against a normal run.
+- **Sources:** the three Microsoft sources of KB-L5a-6 below (NTSTATUS values; the desktop heap limitation; the
+  winsdk note on 0xc0000142).
+- **Regression:** `tests/start-failure.test.js` (an npm script whose child exits 0xC0000142 reaches the runner with
+  that code, and test:changed and run-with-timeout name it with the process count and SharedSection).
+
 ### Fixed 2026-11-11: a git that Windows could not start stopped the dev server with a bare "Command failed" (KB-L5a-6)
 
 - **Repro:** seen once (2026-11-11 18:58, 4 GPU jobs running, many browsers open): the lifecycle page of
