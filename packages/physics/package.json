@@ -67,6 +67,10 @@
     "./flight": {
       "types": "./dist/flight.d.ts",
       "import": "./dist/flight.js"
+    },
+    "./waves": {
+      "types": "./dist/waves/index.d.ts",
+      "import": "./dist/waves.js"
     }
   },
   "files": [

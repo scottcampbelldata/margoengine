@@ -2135,6 +2135,10 @@
       "types": "./dist/physics/flight.d.ts",
       "import": "./dist/physics/flight.js"
     },
+    "./physics/waves": {
+      "types": "./dist/physics/waves.d.ts",
+      "import": "./dist/physics/waves.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

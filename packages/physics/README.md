@@ -1806,6 +1806,43 @@ console.log(clouds.time, clouds.cloudWater().some((q) => q > 1e-5)); // 120 true
 console.log(clouds.sample(0, 800, 0).velocity[1] > 10); // true: its updraft, over 10 m/s
 ```
 
+### Sea waves: a spectral wave model (`@margoengine/physics/waves`)
+
+`WaveSolver` is the physics framework's sea waves (SEA-01): a third-generation spectral wave model, the energy balance of WAM as SWAN states it, on a grid of the water. Wind seas grow with fetch and duration, swell runs in from the open sea at its group velocity and decays slowly, and waves feel the bottom and break where the water is shallow. The physics: Komen wind input with Cavaleri and Malanotte-Rizzoli's linear growth, Komen whitecapping, the discrete interaction approximation of the quadruplets, JONSWAP bottom friction, Battjes and Janssen depth breaking, and the Hersbach and Janssen action limiter. Its settings:
+
+- the grid: `cells`, default 32 by 32, of `cellSize` metres, default 1000, about `centre`;
+- the water: `depth` (a number or a function of (x, z), 0 or less for land) or a terrain `bed` under `waterLevel`, and `density` (1025 for the sea, `FRESH_WATER_DENSITY` 1000 for a lake);
+- the `wind` over it, any framework `Wind`, sampled 10 m above the water;
+- the spectrum: `frequencies` (default 0.04 to 1 Hz in 34 steps) and `directions` (default 24);
+- the sea: a JONSWAP `swell` coming in over the open edges, a `start` sea, and `periodic` edges for a sea that goes on the same way;
+- time: `interval` (the sea's own step, default 60 s), `timeScale`, and `warmUp`, seconds of sea run before the shot so the sea is already up.
+
+It publishes the spectrum E(f, theta) of every cell as the registry field `waveSpectrum`. `waves.field` is the framework's `WaveSpectrumField`, which the sea surface synthesises its waves from. `significantHeight(x, z)` and `peakPeriod(x, z)` summarise a place. `wavenumber`, `groupVelocity`, `jonswap`, `significantHeight` and `peakFrequency` work on any spectrum.
+
+```ts
+import {FRESH_WATER_DENSITY, WaveSolver} from 'margoengine/physics/waves';
+import {PhysicsWorld} from 'margoengine/physics/world';
+import {BoundaryLayerWind} from 'margoengine/weather/boundary-layer';
+
+// A gale of 18 m/s across a deep lake, from its western shore, ten hours in.
+const wind = new BoundaryLayerWind({speed: 18, turbulence: false});
+const waves = new WaveSolver();
+new PhysicsWorld({rate: {num: 24, den: 1}}).add(waves, {
+  cells: [40, 4],
+  cellSize: 2000,
+  centre: [40000, 0],
+  periodic: ['z'],
+  depth: 60,
+  density: FRESH_WATER_DENSITY,
+  wind,
+  warmUp: 10 * 3600,
+});
+console.log(waves.significantHeight(5000, 0).toFixed(1), waves.significantHeight(75000, 0).toFixed(1)); // 1.4 3.7: higher with fetch
+console.log(waves.peakPeriod(75000, 0).toFixed(1)); // 7.0 s at 75 km
+const spectrum = waves.field.sample(75000, 0); // 34 frequencies by 24 directions, fresh water: what the sea surface reads
+console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.density); // 34 24 1000
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

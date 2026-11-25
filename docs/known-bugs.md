@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-25: a strong wind grows the sea too fast (KB-SEA-GROWTH1, physics waves)
+
+- **Repro:** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind toward +x and
+  `warmUp: 12 * 3600`: the significant height at 6, 14, 30, 62 and 118 km fetch is 1.84, 2.42, 3.16, 4.07 and 5.04 m against
+  JONSWAP's 0.79, 1.21, 1.77, 2.54 and 3.51 m (g^2 E / U^4 = 1.6e-7 chi). At 10 m/s the same model is within 2 to 19 percent
+  beyond 30 km, and the point model reaches 90 percent of Pierson-Moskowitz.
+- **Cause:** not yet traced. The growth is not self-similar in U10, so a source term that scales with U* rather than U10 is
+  the suspect: the drag fit C_D(U10) of SWAN's eq. 2.36 rising with the wind, the linear growth A (U*^4) at short fetches,
+  or the action limiter, which allows more at low wavenumbers. A first look found the equilibrium height sensitive to the
+  quadruplets' strength C_nl4, so the DIA's normalisation is to be checked against Hasselmann et al. (1985) itself.
+
 ### Open: a cloth attached to a rigid body blows up when its free particles take impulses (KB-SOFT-ATTACHKICK1, physics soft)
 
 - **Repro:** `SoftBodies.attach(physics)`, gravity 0; a 4 by 7 cloth (`SoftBodyDesc.cloth`) whose first row is

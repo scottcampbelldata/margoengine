@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19018864,
+  "total": 19025114,
   "history": [
     {
       "date": "2026-10-24",
@@ -12297,6 +12297,12 @@
       "commit": "c162f3e1d1",
       "reason": "c162f3e1d1 (KB-CROWD-WALLEND1): the navmesh root (Crowd) grows from 10,328 to 10,793 B gzip (+465 B, measured at c162f3e1d1~1 and c162f3e1d1 with only packages/navmesh changed) for the surface slide (Snook 2000) and the micrometre snap that let an agent pass a border corner. Crowd.move runs it every step synchronously, so it cannot sit behind import(); NavQuery.moveAlongSurface of navmesh/queries (5,268 B budget) is a disk search to the nearest reachable point, a different move, and importing it would add more bytes than the slide.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "8aea6f085",
+      "reason": "physics/waves is a new optional entry (SEA-01): WaveSolver, the spectral wave model with its wind input, whitecapping, quadruplets, bottom friction and breaking; its own entry so scenes without a sea pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13095,6 +13101,7 @@
     "@margoengine/physics/soft": 92985,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 30217,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
+    "@margoengine/physics/waves": 6250,
     "@margoengine/physics/world": 14716,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,

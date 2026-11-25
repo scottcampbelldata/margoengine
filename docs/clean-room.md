@@ -11729,6 +11729,31 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
+
+`packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`
+(`packages/math/src/fields/waves.ts`). Written from:
+
+- The SWAN Scientific and Technical Documentation (swanmodel.sourceforge.io/online_doc/swantech, read 2026-11-25, nodes 11,
+  12, 14 to 19, 43, 47 and 48), which states the third-generation source terms of WAM (WAMDI Group 1988) and SWAN (Booij,
+  Ris and Holthuijsen 1999): the energy and action balance (eqs. 2.17 and 2.19) and dispersion; wind input (eqs. 2.33 to
+  2.38: Cavaleri and Malanotte-Rizzoli 1981 with Tolman's filter, Komen et al. 1984, the drag fit of eq. 2.36); whitecapping
+  (eqs. 2.44 to 2.49, Komen et al. with delta = 1, SWAN's default since 40.91A); the discrete interaction approximation
+  (Hasselmann et al. 1985, eqs. 2.76 to 2.80); JONSWAP bottom friction (eq. 2.60); Battjes and Janssen breaking (eqs. 2.65
+  to 2.69); the action limiter of Hersbach and Janssen (eq. 3.42). The linear-growth filter's exponent, clipped in the page,
+  is read as exp(-(sigma / sigma*_PM)^-4) from the fragment that shows.
+- The JONSWAP relations (Hasselmann et al. 1973): alpha = 0.076 chi^-0.22 and omega_p = 22 (g / U) chi^(-1/3), as restated
+  in arXiv:2606.28165 and arXiv:2608.27105 (search abstracts read), with gamma = 3.3 and sigma = 0.07 and 0.09; the energy
+  growth g^2 E / U^4 = 1.6e-7 chi the tests compare against is the same paper's, known through these.
+- The Pierson-Moskowitz fully developed sea, H_s = 0.21 U^2 / g and f_p = 0.13 g / U, the tests' bound, and the dispersion
+  relation sigma^2 = g k tanh(k d): textbook results.
+
+First-order upwind fluxes in space in substeps of half a cell, refraction in direction from the depth's gradient, the
+quadruplets' partners spread over their four neighbouring bins so action and energy are both kept, the semi-implicit
+source step (decay implicit, growth and transfer explicit), the breaking fraction by bisection, periodic edges, the
+JONSWAP builder's cos^2 spread, and the arctangent from arithmetic are this package's own arrangement. Proof:
+`packages/physics/tests/waves.test.js` and `tests/coupling/waves.test.js`.
+
 ### Flight: wings, rotors and lifting gas (AERO-03, `WingForce`, `RotorForce` and `LiftingGas` in `@margoengine/physics/flight`, 2026-11-25)
 
 `packages/physics/src/flight.ts`, on the vortex-lattice core `packages/physics/src/lattice.ts` that `SailForce` (AERO-02)

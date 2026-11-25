@@ -75,6 +75,19 @@ export interface PrecipitationSample {
     velocity: [number, number, number];
 }
 
+export interface WaveSpectrumField {
+    readonly cell: WaveCell;
+    sample(x: number, z: number, out?: WaveSpectrumSample): WaveSpectrumSample;
+}
+
+export interface WaveSpectrumSample {
+    readonly frequencies: Float64Array;
+    readonly directions: Float64Array;
+    energy: Float64Array;
+    depth: number;
+    density: number;
+}
+
 export interface Wind extends FlowField {
     readonly medium: 'air';
 }
@@ -84,4 +97,6 @@ export interface Wind extends FlowField {
 type BedCell = readonly [number, number, number];
 
 type PrecipitationCell = readonly [number, number, number];
+
+type WaveCell = readonly [number, number, number];
 ```
