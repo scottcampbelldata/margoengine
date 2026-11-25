@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-11-24. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group on 2026-10-31 and
-recounted on 2026-11-24: **195 features, 186 COVERED, 6 PARTIAL, 0 MISSING**, plus 3 NOT PLANNED by decision. The earlier table
+recounted on 2026-11-25: **195 features, 187 COVERED, 5 PARTIAL, 0 MISSING**, plus 3 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -33,7 +33,8 @@ COVERED by `@margoengine/xr/models`.
 WebGL2 fallback: see above.
 
 Four rows became PARTIAL on 2026-11-24, when their code was found: cloth simulation, particle fluids and soft bodies,
-the triangle-mesh path tracer and real-time caustics. Each row names what exists and what is missing; the wider list is in
+the triangle-mesh path tracer and real-time caustics; real-time caustics became COVERED on 2026-11-25 with
+`SurfaceCaustics` of `@margoengine/post/caustics`. Each row names what exists and what is missing; the wider list is in
 [rival-parity-gaps.md](rival-parity-gaps.md).
 
 Narrower APIs that already have a Margo path: WebXR VR (untested on a headset) and WebXR AR (hit testing, anchors, planes, depth and light estimation, untested on a device).
