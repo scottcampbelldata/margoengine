@@ -114,6 +114,7 @@ class Splats implements EnginePlugin {
     get coefficients(): number;
     write(first: number, data: SplatData): this;
     clear(first: number, count: number): this;
+    setOpacities(first: number, alphas: Float32Array, scale?: number): this;
     get ditherFadeBytes(): number;
     setDitherFade(first: number, count: number, lower?: number, upper?: number): this;
     read(): Promise<SplatData>;
