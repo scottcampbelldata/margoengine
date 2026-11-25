@@ -10024,6 +10024,10 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
      level with its floor, (0.3, 4.4), (5.7, 4.3) and (3, 4.1): 0%, 0% and 2.8% (1.9% to 5.8% before). Cabin Hearth
      (scripts/cabin-hearth-browser-test.mjs, both points added to its shadowed-snow check, bound 0.0005): see the
      playbook entry of 2026-11-21.
+     Test added 2026-11-25 (packages/clustered/test/bounce.test.js, "the snow lights the crests of a log wall"): five
+     crests of seven stacked octagonal logs over lit snow, where the normal codes hide no VPL that a ray cast does not
+     hide (a pairwise crease test over a texel's 3 x 3 neighbours, tried in a rework, hid the crest behind a log facet
+     beside the ray: Cabin Hearth's window bounce at its crest 0.0440 R against 0.0624 R).
   What is left is the depth bias every shadow map has, recorded in docs/limits.md, not a defect: a receiver behind a
   surface thinner than 2 cm and 2% of its distance (the table room's zero-thickness wall: (3, 0.05, 4.05) 5 cm behind
   it, 43%, and (3, 4.1) 10 cm behind, 2.8%) lies within that slack of the texel's depth and is lit; a wall thicker than

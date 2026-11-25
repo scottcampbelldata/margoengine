@@ -876,6 +876,54 @@ test('a log crest past its texel depth keeps the bounce of the snow below it: on
     }
   }
 });
+// KB-BOUNCE-SHADOWSNOW1, the log crest: the snow in front of a wall of stacked logs lights their outward crests, and the
+// bounce's visibility hides no VPL there that a ray cast does not hide (a log facet beside the receiver's ray must not
+// stand in for the crest the ray meets).
+test('the snow lights the crests of a log wall: a log facet beside the ray does not hide them', () => {
+  const a = 0.15,
+    h = a * Math.tan(Math.PI / 8),
+    logs = [];
+  for (let k = 0; k < 7; k++)
+    for (let f = 0; f < 8; f++) {
+      const t = (f * Math.PI) / 4,
+        n = [0, Math.sin(t), Math.cos(t)],
+        c = [0, a + 2 * a * k + a * n[1], 2.5 + a * n[2]];
+      logs.push(rect(c, [3, 0, 0], [0, h * Math.cos(t), -h * Math.sin(t)], [0.5, 0.4, 0.3]));
+    }
+  const scene = [rect([0, 0, 5.25], [3, 0, 0], [0, 0, -2.75], [0.8, 0.8, 0.8]), ...logs],
+    lamp = { kind: 'point', position: [0.4, 2.6, 4.2], range: 0 },
+    res = 32,
+    span = res * res,
+    { vpls, points } = reduceBounce(capture(scene, lamp, 32), lamp, { vpls: 32, near: 0.15 }),
+    occluders = sampleSurfaces(scene.map(asMesh), vpls, { resolution: res, budget: 1e6 }),
+    maps = buildVisibility(vpls, points, { resolution: res, occluders }),
+    texels = vpls.length * span,
+    crestNormal = [0, 0, 1];
+  let lit = 0;
+  for (const x of [
+    [0.3, 1.35, 2.65],
+    [0, 1.05, 2.65],
+    [-0.8, 0.75, 2.65],
+    [1.1, 1.65, 2.65],
+    [-1.6, 0.45, 2.65],
+  ])
+    vpls.forEach((vpl, j) => {
+      const depths = maps.subarray(j * span, (j + 1) * span),
+        one = (full) => {
+          const own = new Float32Array(2 * span);
+          own.set(depths);
+          if (full) own.set(maps.subarray(texels + j * span, texels + (j + 1) * span), span);
+          return bounceIrradiance(packBounce([[1, 1, 1]], [vpl], full ? own : depths, res), x, crestNormal)[0];
+        },
+        [old, now] = [one(false), one(true)];
+      if (now > 0) lit++;
+      assert.ok(
+        now === old || (now === 0 && traced(scene, [vpl], x, crestNormal) === 0),
+        `VPL ${j} at ${x}: ${old} to ${now}, traced ${traced(scene, [vpl], x, crestNormal)}`,
+      );
+    });
+  assert.ok(lit > 20, `the snow's VPLs light the crests (${lit})`);
+});
 test('sampleSurfaces merges small far triangles into covering surfels and leaves out what no VPL faces', () => {
   // A 1 m sheet of 2 x 20 x 20 triangles 20 m from a VPL facing it, and one behind the VPL.
   const sheet = (z) => {
