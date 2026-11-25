@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { reportGLTF, imageHeader } from '@margoengine/gltf/report';
 
@@ -329,4 +330,42 @@ test('zero-area triangles are listed per scene node with their mesh, not only co
   ]);
   const clean = await reportGLTF(cubeGlb(cube(), [{ mesh: 0 }]));
   assert.deepEqual(clean.zeroAreaByNode, []);
+});
+
+// KB-GLTFREPORT-DECODERS: the report built its reader without any way to the Draco decoder, so a Draco file got a
+// `decode` problem and its counts and bounds came from the declared accessors.
+function dracoBox() {
+  const fixture = (name) => readFileSync(new URL(`../../decoders/tests/fixtures/${name}`, import.meta.url));
+  const doc = JSON.parse(fixture('Box.gltf').toString('utf8'));
+  doc.buffers[0].uri = `data:application/octet-stream;base64,${fixture('Box.bin').toString('base64')}`;
+  return JSON.stringify(doc);
+}
+
+test('a Draco file is decoded where the report runs, so its bounds come from the vertices', async () => {
+  const report = await reportGLTF(dracoBox());
+  assert.deepEqual(
+    report.problems.filter((p) => p.code === 'decode' || p.code === 'accessor'),
+    [],
+  );
+  assert.equal(report.counts.triangles, 12);
+  assert.equal(report.counts.vertices, 24);
+  // The accessors declare +-0.5004885; the decoded cube is +-0.5.
+  for (const side of report.bounds.size) assert.ok(Math.abs(side - 1) < 1e-4, `side ${side}`);
+});
+
+test('the report takes decoder hooks, and a failing one is the decode problem', async () => {
+  let calls = 0;
+  const report = await reportGLTF(dracoBox(), {
+    decoders: {
+      draco: {
+        decode: async () => {
+          calls++;
+          throw new Error('no decoder in this host');
+        },
+      },
+    },
+  });
+  assert.equal(calls, 1);
+  assert.ok(report.problems.some((p) => p.code === 'decode' && p.detail.includes('no decoder in this host')));
+  assert.equal(report.counts.triangles, 12);
 });

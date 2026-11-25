@@ -9,9 +9,12 @@
  * of signed tetrahedra (Zhang and Chen 2001, "Efficient feature extraction for 2D/3D objects in mesh representation",
  * ICIP). The rival feature check is in docs/clean-room.md (FE-4).
  */
-import { GLTFAsset, container } from './asset.js';
+import { GLTFAsset, container, type GLTFDecoderHooks } from './asset.js';
+import { withDecoders } from './decoder-default.js';
 import { supportedVersion } from './version.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode, GLTFPrimitive } from '../../shared/gltf.js';
+
+export type { GLTFDecoderHooks } from './asset.js';
 
 /** One problem found, with a stable `code` and a sentence naming where and what. */
 export interface GLTFProblem {
@@ -117,6 +120,11 @@ export interface GLTFReportOptions {
   maxSamples?: number;
   /** Required extensions a later load supports (a decoder hook, a materials entry): not listed as unsupported. */
   supported?: readonly string[];
+  /**
+   * Decoders for compressed files, as `loadGLTF` takes them. Default: the built-in decoders of
+   * `@margoengine/decoders`, imported only for a file that needs one.
+   */
+  decoders?: GLTFDecoderHooks;
 }
 
 const KNOWN = new Set([
@@ -387,7 +395,7 @@ export async function reportGLTF(
   try {
     // Unsupported required extensions are reported above; the reader is built without them so the rest can be read.
     const readable = { ...doc, extensionsRequired: required.filter((name) => !unsupported.includes(name)) };
-    asset = new GLTFAsset(readable, external ? [] : binary ? [binary] : [], binary);
+    asset = new GLTFAsset(readable, external ? [] : binary ? [binary] : [], binary, withDecoders(options).decoders);
   } catch (error) {
     problems.push({ code: 'json', detail: (error as Error).message });
     return done();

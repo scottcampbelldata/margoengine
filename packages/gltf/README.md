@@ -235,8 +235,9 @@ scene node that draws zero-area triangles with its mesh and counts, so a repair 
 throws on a bad file. With `alpha: true` it also decodes the base colour
 textures of MASK and BLEND primitives and returns `cutouts.bounds`, the bounds of what those cards draw where their
 alpha passes the cutoff, so a tree of leaf cards is framed by its leaves rather than its quads' see-through margins.
-Draco geometry that cannot be decoded where the report runs is counted from its accessors' declared counts and
-bounds, with a `decode` problem.
+Draco and meshopt geometry is decoded with the built-in decoders, imported only for a file that needs one;
+`decoders` takes your own, as `loadGLTF` does. Draco geometry that cannot be decoded is counted from its accessors'
+declared counts and bounds, with a `decode` problem.
 
 ```ts
 import {reportGLTF} from 'margoengine/gltf/report';

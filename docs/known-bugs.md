@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: the glTF report could not decode a Draco file (KB-GLTFREPORT-DECODERS, gltf)
+
+- **Repro:** `reportGLTF` on the Khronos Draco Box gave a `decode` problem ("This file needs the Draco decoder") and
+  took its bounds from the accessors' declared min and max (+-0.5004885 against a decoded +-0.5), skipping the
+  zero-area, not-finite and inside-out checks for those primitives. `GLTFReportOptions` had no way to pass a decoder.
+- **Cause:** the report built its `GLTFAsset` without decoder hooks, so no module held the Draco decoder.
+- **Fix:** the report gives the reader the built-in decoders, imported only for a file that needs one, and takes
+  `decoders` as `loadGLTF` does (packages/gltf/src/report.ts).
+- **Regression:** packages/gltf/test/report.test.js, "a Draco file is decoded where the report runs" and "the report
+  takes decoder hooks"; both fail without the fix.
+
 ### Fixed 2026-11-25: one moving caster made Shadows redraw its whole cached still map every frame (GAP-FILM-SHADOWCACHE, shadows)
 
 - **Repro:** `Shadows` with a terrain or road caster and a car added without `static`, the
