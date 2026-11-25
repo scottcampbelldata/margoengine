@@ -8,7 +8,10 @@ export interface CharacterOptions2D {
   offset?: number;
   /** Which way is up. Default [0, -1] (screen up). */
   up?: Vec2D;
-  /** Step over ledges up to `maxHeight` that are at least `minWidth` wide. */
+  /**
+   * Step over ledges up to `maxHeight` high, with at least `minWidth` of free room across the top, and onto dynamic bodies too unless
+   * `includeDynamic` is false (default true, as Rapier's `includeDynamicBodies`).
+   */
   autostep?: { maxHeight: number; minWidth: number; includeDynamic?: boolean };
   /** Steepest slope it can climb, radians (default 45 degrees). */
   maxSlopeClimbAngle?: number;
@@ -85,7 +88,7 @@ export class CharacterController2D {
     });
   }
 
-  /** Computes the movement for `delta` (world units) and sets the body's next position. */
+  /** Computes the movement for `delta` (world units) and sets the body's next position */
   move(delta: Vec2D): CharacterMoveResult2D {
     if (this.disposed) throw new TypeError('This character controller was disposed; create a new one.');
     if (!Number.isFinite(delta[0]) || !Number.isFinite(delta[1]))
@@ -130,7 +133,12 @@ export class CharacterController2D {
         remaining = [0, 0];
         break;
       }
-      if (!walkable && this.options.autostep && cosine > -0.5) {
+      if (
+        !walkable &&
+        this.options.autostep &&
+        cosine > -0.5 &&
+        (this.options.autostep.includeDynamic !== false || hit.body.type !== 'dynamic')
+      ) {
         const stepped = this.step(pos, rest);
         if (stepped) {
           pos[0] = stepped.pos[0];
@@ -203,6 +211,8 @@ export class CharacterController2D {
     // Down onto something to stand on.
     const ground = this.cast(over, [-up[0], -up[1]], lift + this.offset);
     if (!ground || ground.normal[0] * up[0] + ground.normal[1] * up[1] < this.climb - 1e-6) return null;
+    // Not onto a dynamic body when the step is not to include them.
+    if (auto.includeDynamic === false && ground.body.type === 'dynamic') return null;
     const drop = Math.max(0, ground.distance * k - this.offset);
     const landed: [number, number] = [over[0] - up[0] * drop, over[1] - up[1] * drop];
     if (lift - drop < EPS) return null;

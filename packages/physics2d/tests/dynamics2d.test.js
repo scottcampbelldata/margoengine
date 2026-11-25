@@ -158,13 +158,15 @@ test('autostep climbs a ledge that is no higher than its limit, and a taller one
       position: [20, 9 - height / 2],
       colliders: { shape: 'box', width: 4, height },
     });
-  const free = walker(() => {}, {});
-  near(free.x, 9, 0.2, 'on a bare floor it walks the whole 90 steps at 6 per second');
-  const blocked = walker(ledge(1), {});
+  // The hero walks 6 a second: 240 steps take it to x = 24, past the ledge's front face at 19 (its own front edge is 1 ahead of its centre).
+  const free = walker(() => {}, {}, 240);
+  near(free.x, 24, 0.2, 'on a bare floor it walks the whole 240 steps at 6 per second');
+  const blocked = walker(ledge(1), {}, 240);
   assert.ok(blocked.x < 19, `a ledge 1 high stops it without autostep (${blocked.x})`);
-  const stepped = walker(ledge(1), { autostep: { maxHeight: 1.5, minWidth: 0.5 } });
-  assert.ok(stepped.x > 8, `with autostep of 1.5 it is over the ledge and walking on (${stepped.x})`);
-  const tall = walker(ledge(3), { autostep: { maxHeight: 1.5, minWidth: 0.5 } });
+  const stepped = walker(ledge(1), { autostep: { maxHeight: 1.5, minWidth: 0.5 } }, 240);
+  assert.ok(stepped.x > 21, `with autostep of 1.5 it is over the ledge and walking on (${stepped.x})`);
+  near(stepped.y, 5.95, 0.1, 'and standing on top of it, 1 higher');
+  const tall = walker(ledge(3), { autostep: { maxHeight: 1.5, minWidth: 0.5 } }, 240);
   assert.ok(tall.x < 19, `a ledge 3 high is taller than the limit (${tall.x})`);
 });
 
@@ -251,4 +253,114 @@ test('a character pushes a dynamic crate when it is asked to, and is stopped by 
   const blocked = push(false);
   near(blocked.crate, 10, 0.5, 'without it the crate stays');
   assert.ok(blocked.hero < 9, `and the character stops at it (${blocked.hero})`);
+});
+
+test('minSlopeSlideAngle decides whether a slope is slid along or climbed at the walker speed', () => {
+  // A ramp of 40 degrees from x = 20 to x = 40: under the default 45 degree climb limit it is climbable, and past the default 30 degree
+  // slide angle. A character pressed into it either slides along the surface (what is left of its movement after the contact, r, turned
+  // along the slope: r cos(a) along it, r cos^2(a) of it across) or climbs it keeping its horizontal speed (r across).
+  const angle = (40 * Math.PI) / 180;
+  const rise = Math.tan(angle) * 20;
+  const ramp = (physics) =>
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, 0],
+      colliders: {
+        shape: 'polygon',
+        points: [
+          [20, 9],
+          [40, 9 - rise],
+          [40, 9],
+        ],
+      },
+    });
+  const across = (options) => {
+    const physics = world({ gravity: [0, 0] });
+    physics.addBody(null, { type: 'fixed', position: [50, 10], colliders: { shape: 'box', width: 200, height: 2 } });
+    ramp(physics);
+    const hero = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [14, 6.95],
+      colliders: { shape: 'box', width: 2, height: 4 },
+    });
+    const controller = physics.createCharacterController(hero, { offset: 0.01, ...options });
+    // One long move into the foot of the ramp: where it ends says what was done with the movement left after the contact.
+    const result = controller.move([12, 0]);
+    physics.dispose();
+    return result.movement;
+  };
+  const slides = across({});
+  const climbs = across({ minSlopeSlideAngle: (50 * Math.PI) / 180 });
+  // The hero's front edge, 1 ahead of its centre, meets the ramp's foot at x = 20 (its corner there, the offset 0.01 short of it): 4.99
+  // travelled, 7.01 left. Climbing keeps all of it across; sliding keeps cos^2(40 degrees) of it.
+  const left = 12 - 4.99;
+  near(climbs[0], 4.99 + left, 0.3, 'climbing keeps the horizontal movement');
+  near(slides[0], 4.99 + left * Math.cos(angle) ** 2, 0.4, 'sliding keeps cos^2 of it');
+  assert.ok(climbs[0] > slides[0] + 1.5, `the two differ: ${climbs[0]} against ${slides[0]}`);
+});
+
+test('a character with another up walks the floor that is below it that way, grounded, and steps its ledges', () => {
+  // The walker's scene turned a quarter turn: up is +x, the floor is at x = -10 (2 thick) and the hero walks along +y.
+  const turned = (options, ledge, steps = 90) => {
+    const physics = world({ gravity: [0, 0] });
+    physics.addBody(null, { type: 'fixed', position: [-10, 50], colliders: { shape: 'box', width: 2, height: 200 } });
+    if (ledge)
+      physics.addBody(null, {
+        type: 'fixed',
+        position: [-(9 - ledge / 2), 20],
+        colliders: { shape: 'box', width: ledge, height: 4 },
+      });
+    const hero = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [-6.95, 0],
+      colliders: { shape: 'box', width: 4, height: 2 },
+    });
+    const controller = physics.createCharacterController(hero, { offset: 0.01, ...options });
+    let last;
+    physics.on('beforestep', (dt) => {
+      last = controller.move([0, 6 * dt]);
+    });
+    run(physics, steps);
+    const result = { x: hero.position[0], y: hero.position[1], grounded: last.grounded };
+    physics.dispose();
+    return result;
+  };
+  const upright = turned({ up: [1, 0], snapToGround: 0.5 });
+  near(upright.y, 9, 0.2, 'it walks the 90 steps');
+  near(upright.x, -6.95, 0.05, 'and stays on its floor');
+  assert.ok(upright.grounded, 'grounded against a floor below it');
+  assert.ok(
+    !turned({ snapToGround: 0.5 }).grounded,
+    'with the default up the same floor is a wall at its side, not a ground',
+  );
+  assert.ok(turned({ up: [1, 0] }, 1, 240).y < 19, 'a ledge 1 high stops it without autostep');
+  assert.ok(
+    turned({ up: [1, 0], autostep: { maxHeight: 1.5, minWidth: 0.5 } }, 1).y > 8,
+    'and it steps over it with autostep',
+  );
+  assert.throws(() => turned({ up: [0, 0] }), RangeError);
+});
+
+test('autostep needs minWidth of free room across the top of the ledge, and includeDynamic lets it step onto a dynamic body', () => {
+  // A ledge 1 high from x = 20 to 24, with a wall standing on it 0.4 from its front edge: room for a hero of width 2 and offset 0.01 is about 0.4.
+  const ledgeAndWall = (physics) => {
+    physics.addBody(null, { type: 'fixed', position: [22, 8.5], colliders: { shape: 'box', width: 4, height: 1 } });
+    physics.addBody(null, { type: 'fixed', position: [20.45, 5], colliders: { shape: 'box', width: 0.1, height: 6 } });
+  };
+  const roomy = walker(ledgeAndWall, { autostep: { maxHeight: 1.5, minWidth: 0.3 } }, 240);
+  const cramped = walker(ledgeAndWall, { autostep: { maxHeight: 1.5, minWidth: 0.6 } }, 240);
+  assert.ok(roomy.y < 6.5, `with 0.3 of room needed it steps up onto the ledge (${roomy.y})`);
+  near(cramped.y, 6.95, 0.05, 'with 0.6 needed it does not');
+  // A dynamic crate in the same place as the ledge (no gravity, so it stays): stepped onto by default and when asked, not when refused.
+  const crate = (physics) =>
+    physics.addBody(null, {
+      position: [22, 8.5],
+      canSleep: false,
+      colliders: { shape: 'box', width: 4, height: 1, density: 1000 },
+    });
+  const onto = (autostep) => walker(crate, { autostep }, 240);
+  assert.ok(onto({ maxHeight: 1.5, minWidth: 0.5 }).y < 6.5, 'by default it steps onto a dynamic body');
+  assert.ok(onto({ maxHeight: 1.5, minWidth: 0.5, includeDynamic: true }).y < 6.5, 'as it does when asked');
+  const refused = onto({ maxHeight: 1.5, minWidth: 0.5, includeDynamic: false });
+  assert.ok(refused.x < 19 && refused.y > 6.9, `and not when it is told not to: ${refused.x}, ${refused.y}`);
 });
