@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18495860,
+  "total": 18496488,
   "history": [
     {
       "date": "2026-10-24",
@@ -11775,6 +11775,12 @@
       "commit": "a9f1b1dc8",
       "reason": "@margoengine/physics/soft: rigid bodies on a cloth meet its faces (point and triangle constraints solved two-way in the soft step), each contact held as the surface it was found on (a face by its plane, a round place from its centre of curvature), the turn of a body a rotation with its inertia turned, and the push handed to the rigid body with its timing (KB-SOFT-LIGHT1: a bead, a thin rod and a small box now rest on a ringing cloth). The bytes are the soft solver's own contact code; the kernel is already a lazy chunk loaded by SoftBodies.attach, so a split would add a request. Budgets (measured gzip + 3%): @margoengine/physics/soft 80691 to 88860 B; @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)) 25940 to 27046 B; @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table) 54981 to 61340 B.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "46890cca7",
+      "reason": "physics2d entry grows to 20,737 B gzip from 20,732: the setSolver rules for the 3D-named CCD constants and body.additionalSolverIterations, an accessor over one kernel word; the wasm is a separate file",
+      "grew": 1
     }
   ],
   "items": {
@@ -12544,7 +12550,7 @@
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
-    "@margoengine/physics2d": 20732,
+    "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
