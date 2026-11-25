@@ -156,6 +156,36 @@ engine.render({ delta: 1 / 30 });
 - Exact only for state that is a clock. History on the GPU (particles alive, foam, ripples) and history of the view
   (TAA, auto exposure) come from the scene's own warm-up frames; `docs/limits.md` lists each with its bound.
 
+### Several scenes in one process
+
+A render worker that keeps one process for several scenes (fresh processes cost 2 to 3 s each) puts the clocks back
+to 0 with `resetClocks(engine)` and then seeks the next scene's start time (GAP-FILM-RESET):
+
+```ts
+import { Engine } from 'margoengine/core';
+import { resetClocks, seekSync } from 'margoengine/cutscene/seek';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+seekSync(engine, 95, { fps: 30 }); // scene 2
+engine.render({ delta: 1 / 30 });
+// Scene 3 starts at 40 s: back to 0, then the seek a fresh world would make.
+const { clocks, unresettable } = resetClocks(engine);
+seekSync(engine, 40, { fps: 30 });
+engine.render({ delta: 1 / 30 });
+```
+
+- A clock that can go back has `resetTime()`: its time, counters, seeds and history (TAA, auto exposure, fog history)
+  return to what a new one with the same options holds; its options and GPU resources stay. A seek after the reset
+  then gives what a fresh world seeked as far gives.
+- `resetClocks(engine, { scenes, extra })` runs `resetTime` on every clock of the scenes and `extra`, and returns the
+  `clocks` it reset and `unresettable`: clocks with no `resetTime` yet and plugins with a frame update but no clock.
+  Those keep their time, so a seek after the reset refuses the clocks among them; use a fresh process while a scene
+  holds one.
+- Clocks with `resetTime` today: `TAA`, `TAAUpscale`, `Tonemap`, `Shadows`, `VirtualShadows` (and their
+  `lightPattern`), `HeatHaze`, `Stylize`, `Reflector`, `Refractor`, `VolumetricFog`, `Lines` and `Trail`, creative
+  `PostProcessing`, `LODSystem`, `XRaySelection` and `ShaderClock`. The rest are listed in
+  `tests/film-reset-pending.json`, which only shrinks.
+
 ## Film captions and chapter cards
 
 A documentary shows its words on film time: captions under the narration, a chapter card at each chapter ("03 / 13",

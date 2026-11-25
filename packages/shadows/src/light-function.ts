@@ -44,6 +44,8 @@ export interface LightPattern<Context = unknown> extends LightFunction<LightPatt
   readonly time: number;
   /** Moves `time` by a frame delta; the shadows that hold the pattern run it each frame update. */
   advanceTime(delta: number): void;
+  /** Puts `time` back to 0. */
+  resetTime(): void;
 }
 const unit = (value: number, name: string) => {
   if (!(value >= 0 && value <= 1)) throw new RangeError(`Invalid ${name}; use a number from 0 to 1`);
@@ -175,6 +177,9 @@ export function lightPattern<Context extends { device: GPUDevice }>(
     },
     advanceTime(delta) {
       time += delta;
+    },
+    resetTime() {
+      time = 0;
     },
     setTexture(texture) {
       needed(texture);

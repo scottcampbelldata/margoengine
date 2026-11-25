@@ -18,6 +18,7 @@ export class Trail extends Line {
     setColor(color: ColorInput, tailColor?: ColorInput): this;
     moveTo(x: number, y: number, z: number): this;
     reset(): this;
+    resetTime(): void;
     get time(): number;
     advanceTime(delta: number): void;
     update(engine: EngineKernel, delta?: number): void;

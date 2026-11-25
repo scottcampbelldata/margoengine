@@ -48,6 +48,7 @@ interface ShadowEffect<Context = unknown> {
     rebind?(): boolean;
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
     advanceTime?(delta: number): void;
+    resetTime?(): void;
     update?(frame: ShadowEffectFrame<Context>): void;
     dispose?(): void;
 }

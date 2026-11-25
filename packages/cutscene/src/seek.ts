@@ -146,3 +146,43 @@ export function seekSync(engine: Engine, seconds: number, options: Omit<SeekOpti
   for (let step = 0; step < steps; step++) for (const [, clock] of clocks) clock.advanceTime(list ? list[step] : delta);
   return { steps, clocks: clocks.map(([name]) => name), unseekable };
 }
+
+/**
+ * A clock that can go back to its start (GAP-FILM-RESET): `resetTime()` puts its time, counters, seeds and history
+ * (GPU history included: the next frame draws it as a fresh one would) back to what a newly made one holds, so one
+ * process can render several scenes, or seek back, instead of a fresh process per scene. Its options and resources stay.
+ */
+export interface ResettableClock extends Clock {
+  /** Back to time 0 and the state of a fresh clock with the same options; history is dropped. */
+  resetTime(): void;
+}
+
+/** What {@link resetClocks} did. */
+export interface ResetResult {
+  /** Names of the clocks it put back to 0, in step order. */
+  clocks: string[];
+  /**
+   * Clocks with no `resetTime` yet, and plugins with a frame update but no clock: they keep their time and history, so
+   * a seek after the reset refuses the clocks among them (they no longer read 0). Report them; the list only shrinks.
+   */
+  unresettable: string[];
+}
+
+const isResettable = (clock: Clock): clock is ResettableClock =>
+  typeof (clock as { resetTime?: unknown }).resetTime === 'function';
+
+/**
+ * Puts every clock of the engine's scenes (and `extra`) back to its start, so a {@link seek} from 0 can follow in the
+ * same process: a seek to T after a reset draws what a fresh world seeked to T draws, byte for byte, for every clock
+ * listed in `clocks`. Clocks without `resetTime` are left alone and listed in `unresettable`.
+ */
+export function resetClocks(engine: Engine, options: AdvanceTimeOptions = {}): ResetResult {
+  const unresettable: string[] = [],
+    clocks: string[] = [];
+  for (const [name, clock] of collect(engine, options, unresettable))
+    if (isResettable(clock)) {
+      clock.resetTime();
+      clocks.push(name);
+    } else unresettable.push(name);
+  return { clocks, unresettable };
+}

@@ -105,6 +105,11 @@ export class XRaySelection implements EnginePlugin {
    * Moves the pulse clock by `delta` seconds unless time is manual, without drawing (a delta of 0 or less moves
    * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
    */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.clock = 0;
+    this.manual = false;
+  }
   advanceTime(delta: number): void {
     if (delta > 0 && !this.manual && !this.disposed) this.clock += delta;
   }

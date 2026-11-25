@@ -248,6 +248,12 @@ export class TAAUpscale implements EnginePlugin {
   reset(): void {
     this.valid = false;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.steps = this.phase = this.seconds = this.frame = this.front = 0;
+    this.clocked = this.pending = false;
+    this.reset();
+  }
 
   /** Seconds on the jitter clock: the sum of the frame deltas its updates moved it by. */
   get time(): number {

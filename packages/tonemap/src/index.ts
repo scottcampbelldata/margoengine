@@ -266,6 +266,12 @@ export class Tonemap implements EnginePlugin {
    * first (KB-FILM-TAAPHASE1). Auto exposure is view history: a cut snaps it to the metered scene on its first frame
    * (docs/limits.md, class C).
    */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.frameCount = this.grainFrame = this.seconds = 0;
+    this.clocked = this.pending = false;
+    this.resetExposure();
+  }
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.clocked = true;
@@ -670,6 +676,10 @@ export class Tonemap implements EnginePlugin {
       size: 128,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
+  }
+  /** Zeroes the adapted exposure, as a new buffer starts: the next metered frame snaps to the scene. */
+  private resetExposure(): void {
+    if (this.aeBuffer && this.engine?.gpu) this.engine.gpu.queue.writeBuffer(this.aeBuffer, 0, new Float32Array(2));
   }
   private stateBuffer(device: GPUDevice): GPUBuffer {
     return (this.aeBuffer ??= device.createBuffer({

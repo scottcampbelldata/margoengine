@@ -182,6 +182,11 @@ export class Trail extends Line {
     this.stale = true;
     return this;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.reset();
+    this.clock = 0;
+  }
 
   /** The target's world position in `at`, or false when it has none this frame. */
   private follow(engine: EngineKernel): boolean {

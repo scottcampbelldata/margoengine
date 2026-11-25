@@ -31,6 +31,7 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     add(target: FoggedModel | FoggedEffect): () => void;

@@ -18,6 +18,7 @@ export class HeatHaze implements EnginePlugin {
     constructor(options?: HeatHazeOptions);
     static attach(engine: EngineKernel, options?: HeatHazeOptions): HeatHaze;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;

@@ -43,7 +43,6 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
-import { restoreEffect, retireEffect, type LifecycleEffect } from '../../shared/effect-lifecycle.js';
 import { valueNoiseWgsl } from '../../shared/noise-wgsl.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -263,6 +262,10 @@ export class HeatHaze implements EnginePlugin {
    * `@margoengine/cutscene/seek` replays it and a haze seeked to film time T ripples as a played one does at T
    * (GAP-FILM-TIME). A draw moves no clock: hidden or disabled haze keeps time, and two views in a frame move it once.
    */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.clock = 0;
+  }
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.clock += delta > 0 ? delta : 0;

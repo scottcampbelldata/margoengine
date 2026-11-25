@@ -315,6 +315,7 @@ export class ShaderClock implements EnginePlugin {
     static find(engine: Kernel | undefined): ShaderClock | undefined;
     get time(): number;
     get delta(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;

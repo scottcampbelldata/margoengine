@@ -24,6 +24,7 @@ export class XRaySelection implements EnginePlugin {
     get maskTexture(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;

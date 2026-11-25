@@ -15,6 +15,7 @@ export class TAA implements EnginePlugin {
     reset(viewId?: string): void;
     onPreUpdate(delta: number): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

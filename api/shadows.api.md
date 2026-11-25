@@ -23,6 +23,7 @@ export interface ShadowEffect<Context = unknown> {
     rebind?(): boolean;
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
     advanceTime?(delta: number): void;
+    resetTime?(): void;
     update?(frame: ShadowEffectFrame<Context>): void;
     dispose?(): void;
 }
@@ -170,6 +171,7 @@ export class Shadows implements EnginePlugin {
         direct(direct: string, normal?: string): string;
     };
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;

@@ -80,6 +80,7 @@ export abstract class PlanarSurface {
     onDeviceRestored(): void;
     get time(): number;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onPreUpdate(delta: number): void;
     protected abstract aim(main: Camera): boolean;
     protected abstract faces(side: number): boolean;

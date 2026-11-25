@@ -15,6 +15,15 @@ export interface Clock {
     advanceTime(delta: number): void;
 }
 
+export interface ResetResult {
+    clocks: string[];
+    unresettable: string[];
+}
+
+export interface ResettableClock extends Clock {
+    resetTime(): void;
+}
+
 export interface SeekOptions extends AdvanceTimeOptions {
     fps?: number;
     steps?: Iterable<number>;
@@ -29,6 +38,8 @@ export interface SeekResult {
 }
 
 export function advanceTime(engine: Engine, delta: number, options?: AdvanceTimeOptions): void;
+
+export function resetClocks(engine: Engine, options?: AdvanceTimeOptions): ResetResult;
 
 export function seek(engine: Engine, seconds: number, options?: SeekOptions): Promise<SeekResult>;
 

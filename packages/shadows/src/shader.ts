@@ -62,6 +62,8 @@ export interface ShadowEffect<Context = unknown> {
    * update, never in a pass, so two views in a frame move it once and a seek replays it.
    */
   advanceTime?(delta: number): void;
+  /** Puts the effect's clock back to 0 (GAP-FILM-RESET); the shadows that hold it run it in their `resetTime`. */
+  resetTime?(): void;
   /** Runs once per frame after the depth passes. */
   update?(frame: ShadowEffectFrame<Context>): void;
   /** Frees GPU objects. */

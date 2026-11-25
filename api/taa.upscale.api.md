@@ -18,6 +18,7 @@ export class TAAUpscale implements EnginePlugin {
     constructor(options?: TAAUpscaleOptions);
     static attach(engine: EngineKernel, options?: TAAUpscaleOptions): TAAUpscale;
     reset(): void;
+    resetTime(): void;
     get time(): number;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;

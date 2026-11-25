@@ -958,6 +958,11 @@ export class Shadows implements EnginePlugin {
    * Moves the effects' own clocks by `delta` seconds: the CPU part of the frame update, which a seek from
    * `@margoengine/cutscene/seek` replays.
    */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.elapsed = 0;
+    for (const effect of this.effects) effect.resetTime?.();
+  }
   advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid shadow delta; pass finite seconds >= 0');
     this.elapsed += delta;

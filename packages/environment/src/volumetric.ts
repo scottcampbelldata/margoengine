@@ -780,6 +780,17 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
    * moves nothing). Each frame update runs it once, so `seek` from `@margoengine/cutscene/seek` replays
    * the drift exactly.
    */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.elapsed = this.frameIndex = 0;
+    // In place: each view's fog shares this array.
+    this.offset[0] = this.offset[1] = this.offset[2] = 0;
+    this.valid = false;
+    for (const view of this.views.values()) {
+      view.frameIndex = 0;
+      view.valid = false;
+    }
+  }
   advanceTime(delta: number): void {
     if (!(delta > 0)) return;
     this.elapsed += delta;

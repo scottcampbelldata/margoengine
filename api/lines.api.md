@@ -276,6 +276,7 @@ export class Lines implements EnginePlugin {
     remove(line: Line): void;
     clear(): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;

@@ -23,6 +23,7 @@ export class Stylize extends ScreenEffect {
     constructor(options?: StylizeOptions);
     static attach(engine: EngineKernel, options?: StylizeOptions): Stylize;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     explode(time?: number): void;

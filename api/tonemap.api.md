@@ -35,6 +35,7 @@ export class Tonemap implements EnginePlugin {
     constructor(options?: TonemapOptions);
     static attach(instance: EngineKernel, options?: TonemapOptions): Tonemap;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;

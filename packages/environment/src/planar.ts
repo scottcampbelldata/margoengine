@@ -376,6 +376,10 @@ export abstract class PlanarSurface {
   advanceTime(delta: number): void {
     if (delta > 0 && !this.disposed) this.elapsed += delta;
   }
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.elapsed = 0;
+  }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
   }

@@ -58,6 +58,10 @@ export class ShaderClock implements EnginePlugin {
     return this.step;
   }
   /** One frame of the clock without drawing; each frame update runs it, so a `seek` replays it exactly. */
+  /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
+  resetTime(): void {
+    this.seconds = this.step = 0;
+  }
   advanceTime(delta: number): void {
     this.step = delta;
     this.seconds += delta;

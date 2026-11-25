@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { advanceTime, seek } from '@margoengine/cutscene/seek';
+import { advanceTime, resetClocks, seek, seekSync } from '@margoengine/cutscene/seek';
 
 // A clock as a time-driven plugin has one: drift integrates a wind that another clock rewrites each step, and a seeded
 // generator draws one number per step. Neither has a closed form in t, so only a replay of the same steps matches.
@@ -176,4 +176,50 @@ test('seek with explicit steps replays exactly those deltas, as a sub-framed fil
   );
   await assert.rejects(seek(world().engine, 1, { steps: [0.1, -0.1] }), RangeError);
   await assert.rejects(seek(world().engine, 1, { steps: [2] }), RangeError);
+});
+
+test('resetClocks puts every resettable clock back to 0 so a seek in the same process matches a fresh world (GAP-FILM-RESET)', () => {
+  class Resettable extends Drift {
+    resetTime() {
+      this.time = this.drift = this.strikes = 0;
+      this.seed = 12345;
+    }
+  }
+  const world = () => {
+    const wind = {
+      name: 'wind',
+      time: 0,
+      speed: 3,
+      advanceTime(d) {
+        this.time += d;
+      },
+      resetTime() {
+        this.time = 0;
+      },
+    };
+    const drift = new Resettable('drift', wind),
+      plugins = new Map([
+        ['wind', wind],
+        ['drift', drift],
+        ['legacy', new Drift('legacy', wind)],
+        ['frame-only', { onPreUpdate() {} }],
+      ]);
+    return { engine: { scene: { plugins } }, drift, plugins };
+  };
+  const fresh = world(),
+    used = world();
+  fresh.plugins.delete('legacy');
+  used.plugins.delete('legacy');
+  seekSync(used.engine, 7, { fps: 30 });
+  const result = resetClocks(used.engine);
+  assert.deepEqual(result, { clocks: ['wind', 'drift'], unresettable: ['frame-only'] });
+  seekSync(used.engine, 3, { fps: 30 });
+  seekSync(fresh.engine, 3, { fps: 30 });
+  for (const key of ['time', 'drift', 'seed', 'strikes'])
+    assert.equal(used.drift[key], fresh.drift[key], `${key} after reset and seek`);
+  // A clock with no resetTime keeps its time, is listed, and a later seek refuses it.
+  const mixed = world();
+  seekSync(mixed.engine, 1, { fps: 30 });
+  assert.deepEqual(resetClocks(mixed.engine).unresettable, ['frame-only', 'legacy']);
+  assert.throws(() => seekSync(mixed.engine, 1), /legacy already moved/);
 });
