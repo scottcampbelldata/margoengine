@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: the physics wind force and explosion use the host's Math inside a step (KB-PHYS-FIELDSMATH1, physics)
+
+- **Repro:** `packages/physics/src/fields.ts` runs inside `Physics.step()` (an attachment's `beforeStep`) and calls
+  `Math.hypot`, and since 2026-11-25 `standardDensity` (`Math.exp` and `**`) for a `WindForce` without a density.
+  These are not correctly rounded and may differ between JavaScript engines, so a scene with a wind force can part
+  ways by a last bit between browsers, against the framework's rule that a step uses no host Math
+  (docs/physics-framework.md, section 7). `tests/step-path.test.js` does not list `fields.ts`, so nothing catches it.
+- **Cause:** the step-path guard lists only the kernel-facing files, and there is no TypeScript twin yet of the pinned
+  `exp`, `ln`, `pow` and the square root kernel-common has in Rust (K01). A correct version adds that twin (pinned by
+  vectors against the Rust, as the Philox twin is), moves `fields.ts` and `@margoengine/math/atmosphere` onto it, and
+  adds `fields.ts` to the guard.
+
 ### Open: a crowd agent heading straight through a corner of the navmesh border is still caught by the axis-split move (KB-CROWD-WALLEND1, navmesh)
 
 - **Repro:** a Crowd on a mesh whose border has a convex corner (the end of a wall, such as a door post); send an

@@ -1,5 +1,6 @@
 // Fields that act on the rigid bodies of a world: an explosion (one radial impulse) and a wind force (a drag every step). Each
 // is sampled per body, at the body's centre, so it costs a query and a loop over the bodies it reaches.
+import { standardDensity } from '@margoengine/math/atmosphere';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import type { PhysicsBody } from './body.js';
 import { checkVec, type Vec3 } from './math.js';
@@ -62,7 +63,10 @@ export interface WindOptions {
    * world's clock, whose density it also takes. A flow field's coordinates must be in the world's frame (cell [0, 0, 0]).
    */
   velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
-  /** Air density in kg/m3 (default the flow field's at each body, or 1.2). */
+  /**
+   * Air density in kg/m3 (default the flow field's at each body, or the standard atmosphere's at the body's height, y metres
+   * above sea level: 1.225 at 0, ISO 2533).
+   */
   density?: number;
   /** Drag coefficient (default 1). */
   drag?: number;
@@ -86,8 +90,8 @@ export class WindForce implements PhysicsAttachment {
     private readonly physics: Physics,
     private readonly options: WindOptions,
   ) {
-    const { density = 1.2, drag = 1, velocity } = options;
-    if (!(density > 0 && Number.isFinite(density)))
+    const { density, drag = 1, velocity } = options;
+    if (density !== undefined && !(density > 0 && Number.isFinite(density)))
       throw new RangeError('Air density is a positive number of kg/m3; pass options.density above 0.');
     if (!(drag >= 0 && Number.isFinite(drag)))
       throw new RangeError('Drag coefficient is 0 or more; pass options.drag of 0 or above.');
@@ -126,7 +130,7 @@ export class WindForce implements PhysicsAttachment {
           typeof velocity === 'function'
             ? (velocity as (point: Vec3, time: number) => Vec3)([p[0], p[1], p[2]], time)
             : (velocity as Vec3);
-        density = this.options.density ?? 1.2;
+        density = this.options.density ?? standardDensity(p[1]);
       }
       const v = body.linearVelocity,
         u: Vec3 = [air[0] - v[0], air[1] - v[1], air[2] - v[2]],

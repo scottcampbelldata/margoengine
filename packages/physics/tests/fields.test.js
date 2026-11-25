@@ -114,3 +114,17 @@ test('a wind force takes a shared flow field: velocity and density at each body,
 function wind0() {
   return { medium: 'air', cell: [0, 0, 0], sample: (_x, _y, _z, _t, out) => out };
 }
+
+test("a wind force without a density takes the standard atmosphere's at each body's height", () => {
+  const push = (y, options = {}) => {
+    const physics = new Physics(null);
+    physics.gravity = [0, 0, 0];
+    const leaf = ball(physics, [0, y, 0], 0.1);
+    new WindForce(physics, { velocity: [5, 0, 0], ...options });
+    physics.step();
+    return leaf.linearVelocity[0];
+  };
+  // ISO 2533: 1.225 kg/m3 at sea level, 0.73612 at 5 km.
+  near(push(0), push(0, { density: 1.225 }), 1e-12, 'sea level');
+  near(push(5000) / push(0), 0.73612 / 1.225, 1e-4, 'thinner air pushes less');
+});
