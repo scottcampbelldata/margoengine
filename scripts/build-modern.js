@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
-import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
