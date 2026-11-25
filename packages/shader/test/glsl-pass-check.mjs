@@ -73,8 +73,11 @@ try {
     assert.deepEqual(failures, [], name);
     assert.deepEqual(
       plugins,
-      [`attached-${kind}-pass`, 'post:stack'],
-      `${name}.attach adds the pass and its own PostStack`,
+      // NodePass reads the frame clock that shader `time` takes, so it holds ShaderClock (GAP-FILM-TIME).
+      kind === 'node'
+        ? [`attached-${kind}-pass`, 'post:stack', 'shader:clock']
+        : [`attached-${kind}-pass`, 'post:stack'],
+      `${name}.attach adds the pass, its own PostStack and (NodePass) the frame clock`,
     );
     const d = compare(await rgb(), inverted);
     rows.push(`${name}.attach (inverts the scene): max ${d.max}, mean ${d.mean.toFixed(4)}${d.pixel}`);
