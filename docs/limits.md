@@ -8672,6 +8672,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   In walk the collision clearance is at most half `eyeHeight`, so the default 2 m does not lift a walker. The walk height snaps to the ground each frame, without smoothing. A mode switch that must move the camera eases
   the orbit view (centre, height, heading, pitch, log range) over `duration`, so the eye path is a swing, not a straight
   line. Keys move only in fly and walk.
+- `followPath` interpolates the orbit centres in ECEF, so between two views far apart (hundreds of km) the centre dips
+  below the surface along the chord (the range and the collision floor still hold the eye up); add views for long
+  legs. Progress along the path follows the knots (square roots of each leg's length in screen widths), not true arc
+  length, so speed varies a little between legs. One path at a time; it is a flight and cancels like one.
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)

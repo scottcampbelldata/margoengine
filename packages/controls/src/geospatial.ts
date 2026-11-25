@@ -167,7 +167,23 @@ export interface BoundingSphereFlight extends FlightOptions {
   padding?: number;
 }
 
+/** Options for {@link GeospatialControls.followPath}. */
+export interface PathOptions {
+  /** Seconds for the whole path. Default from its length: `length / speed`, at least 1 s. */
+  duration?: number;
+  /** Path length per second when `duration` is not given, in screen heights. Default 0.6 (a slow cinematic move). */
+  speed?: number;
+  /** Progress to eased progress, both in [0, 1]. Default smootherstep (eases in at the first view, out at the last). */
+  easing?: (t: number) => number;
+  /** Cancels the move where it is. */
+  signal?: AbortSignal;
+  /** A pointer press or the wheel cancels the move. Default true. */
+  cancelOnInput?: boolean;
+}
+
 interface Flight {
+  /** A path's view at eased progress e, in place of the zoom-and-pan flight. */
+  at?: (e: number) => Required<GeospatialView>;
   from: Required<GeospatialView>;
   to: Required<GeospatialView>;
   distance: number;
@@ -1081,6 +1097,102 @@ export class GeospatialControls extends Controls {
       ...options,
     });
   }
+  /**
+   * Move through `views` in order on a smooth curve: a centripetal Catmull-Rom spline (Yuksel, Schaefer and Keyser
+   * 2011) through the orbit centres in ECEF, with heading, pitch and log range on the same knots, so it passes every
+   * view exactly and never overshoots into loops at uneven spacing. It starts from the current view when the first
+   * view is not it. Resolves true at the last view, false when cancelled (signal, input, another flight, `setView`).
+   */
+  followPath(views: readonly GeospatialView[], options: PathOptions = {}): Promise<boolean> {
+    this.alive();
+    if (!Array.isArray(views) || views.length < 1)
+      throw rangeError('followPath needs an array of one or more views', 'controls-arguments');
+    const speed = options.speed ?? 0.6;
+    if (options.duration !== undefined && (!(options.duration >= 0) || !Number.isFinite(options.duration)))
+      throw rangeError('A path duration is finite seconds >= 0', 'controls-arguments');
+    if (!(speed > 0 && Number.isFinite(speed)))
+      throw rangeError('A path speed is finite and above 0', 'controls-arguments');
+    this.cancel();
+    let prev: Required<GeospatialView> = { ...this.v };
+    const stops = [prev];
+    for (const view of views) stops.push((prev = this.sanitize({ ...prev, ...view } as Required<GeospatialView>)));
+    if (options.signal?.aborted) return Promise.resolve(false);
+    // Channels: centre ECEF, unwrapped heading, pitch, log range.
+    let heading = stops[0]!.heading;
+    const rows = stops.map((v, i) => {
+      if (i) heading += wrap(v.heading - heading);
+      return [...cartographicToEcef(v.longitude, v.latitude, v.height), heading, v.pitch, Math.log(v.range)];
+    });
+    // Centripetal knots on the centre distance in screen widths (the range sets the scale), so a move at street level
+    // and one across a continent are both even.
+    const scale = 1 / (2 * Math.tan(((this.camera.fov ?? 60) * Math.PI) / 360)),
+      knots = [0];
+    let length = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const a = rows[i - 1]!,
+        b = rows[i]!,
+        w = Math.exp(Math.min(a[5]!, b[5]!)) / scale,
+        d =
+          Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!) / w +
+          Math.abs(b[5]! - a[5]!) +
+          Math.abs(b[3]! - a[3]!) +
+          Math.abs(b[4]! - a[4]!);
+      length += d;
+      knots.push(knots[i - 1]! + Math.sqrt(d) + 1e-9);
+    }
+    const duration = options.duration ?? (length > 1e-9 ? Math.max(1, length / speed) : 0),
+      n = rows.length,
+      end = (i: number) => (i < 0 ? 2 * knots[0]! - knots[1]! : i >= n ? 2 * knots[n - 1]! - knots[n - 2]! : knots[i]!),
+      row = (i: number) =>
+        i < 0
+          ? rows[0]!.map((x, k) => 2 * x - rows[1]![k]!)
+          : i >= n
+            ? rows[n - 1]!.map((x, k) => 2 * x - rows[n - 2]![k]!)
+            : rows[i]!,
+      at = (e: number): Required<GeospatialView> => {
+        const u = clamp(e, 0, 1) * knots[n - 1]!;
+        let i = 0;
+        while (i < n - 2 && u > knots[i + 1]!) i++;
+        const t0 = end(i - 1),
+          t1 = end(i),
+          t2 = end(i + 1),
+          t3 = end(i + 2),
+          [p0, p1, p2, p3] = [row(i - 1), row(i), row(i + 1), row(i + 2)],
+          // Barry and Goldman's pyramid for the Catmull-Rom point at u.
+          lerp = (a: number[], b: number[], ta: number, tb: number) =>
+            a.map((x, k) => (tb - ta > 0 ? ((tb - u) * x + (u - ta) * b[k]!) / (tb - ta) : x)),
+          a1 = lerp(p0, p1, t0, t1),
+          a2 = lerp(p1, p2, t1, t2),
+          a3 = lerp(p2, p3, t2, t3),
+          q = lerp(lerp(a1, a2, t0, t2), lerp(a2, a3, t1, t3), t1, t2),
+          c = ecefToCartographic(q[0]!, q[1]!, q[2]!);
+        return { ...c, heading: q[3]!, pitch: q[4]!, range: Math.exp(q[5]!) };
+      };
+    if (n < 2 || duration === 0) {
+      this.v = stops[n - 1]!;
+      this.commit();
+      return Promise.resolve(true);
+    }
+    return new Promise<boolean>((resolve) => {
+      const abort = () => this.cancel();
+      options.signal?.addEventListener('abort', abort, { once: true });
+      this.flight = {
+        from: stops[0]!,
+        to: stops[n - 1]!,
+        distance: 0,
+        bearing: 0,
+        elapsed: 0,
+        duration,
+        easing: options.easing ?? smoother,
+        path: null,
+        scale,
+        at: (e) => (e >= 1 ? stops[n - 1]! : at(e)),
+        cancelOnInput: options.cancelOnInput ?? true,
+        finish: resolve,
+        off: () => options.signal?.removeEventListener('abort', abort),
+      };
+    });
+  }
   /** Stop a flight where it is; its promise resolves false. */
   cancel(): void {
     const f = this.flight;
@@ -1106,14 +1218,16 @@ export class GeospatialControls extends Controls {
         mid = geodesicDirect(f.from.longitude, f.from.latitude, f.bearing, u),
         range = p ? p.w * f.scale : Math.exp(Math.log(f.from.range) * (1 - e) + Math.log(f.to.range) * e);
       const last = t >= 1;
-      this.v = this.sanitize({
-        longitude: last ? f.to.longitude : mid.longitude,
-        latitude: last ? f.to.latitude : mid.latitude,
-        height: f.from.height + (f.to.height - f.from.height) * e,
-        heading: f.from.heading + wrap(f.to.heading - f.from.heading) * e,
-        pitch: f.from.pitch + (f.to.pitch - f.from.pitch) * e,
-        range: last ? f.to.range : range,
-      });
+      if (f.at) this.v = this.sanitize(f.at(e));
+      else
+        this.v = this.sanitize({
+          longitude: last ? f.to.longitude : mid.longitude,
+          latitude: last ? f.to.latitude : mid.latitude,
+          height: f.from.height + (f.to.height - f.from.height) * e,
+          heading: f.from.heading + wrap(f.to.heading - f.from.heading) * e,
+          pitch: f.from.pitch + (f.to.pitch - f.from.pitch) * e,
+          range: last ? f.to.range : range,
+        });
       this.commit();
       if (last) {
         this.flight = null;

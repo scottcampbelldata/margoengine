@@ -807,6 +807,37 @@ console.log(camera.eye.height); // 1.7 m above the ground under the eye
 camera.setMode('fly').then(() => camera.look(0, degToRad(-10))); // then look a little above the horizon
 ```
 
+### Cinematic paths
+
+`followPath(views, {duration, speed, easing, signal, cancelOnInput})` moves through a list of views on a centripetal
+Catmull-Rom curve (Yuksel, Schaefer and Keyser 2011): it passes every view exactly, does not loop or overshoot when the
+views are unevenly spaced, and carries heading, pitch and range along on the same knots. Fields a view leaves out keep
+the previous view's value. Without `duration` the length sets it (`speed` 0.6 screen heights a second, at least 1 s).
+It eases in and out with smootherstep, and a press or the wheel cancels it unless `cancelOnInput` is false.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-83), latitude: degToRad(42), range: 2000, pitch: degToRad(40)},
+});
+// Along the Detroit River shore, turning toward the lake and climbing.
+camera
+  .followPath(
+    [
+      {longitude: degToRad(-82.98), latitude: degToRad(42.01), heading: degToRad(30), range: 1500},
+      {longitude: degToRad(-82.95), latitude: degToRad(42.03), heading: degToRad(80), pitch: degToRad(25)},
+      {longitude: degToRad(-82.9), latitude: degToRad(42.02), heading: degToRad(170), range: 4000},
+    ],
+    {cancelOnInput: false},
+  )
+  .then((done) => console.log('path done', done));
+console.log(camera.flightTime?.duration); // seconds, from the path length
+```
+
 ### Flights and framing
 
 `flyTo` follows the optimal zoom-and-pan path of van Wijk and Nuij (2003): it climbs, crosses the shortest geodesic and
@@ -874,7 +905,8 @@ Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
 al., "HoverCam", I3D 2005, https://doi.org/10.1145/1053427.1053439 (orbiting about the surface under the view); van Wijk
 and Nuij, "Smooth and efficient zooming and panning", IEEE InfoVis 2003, https://doi.org/10.1109/INFVIS.2003.1249004
-(the flight path, equations 9 to 12). Limits: `docs/limits.md`, "Geospatial camera".
+(the flight path, equations 9 to 12); Yuksel, Schaefer and Keyser, "Parameterization and applications of Catmull-Rom
+curves", Computer-Aided Design 43 (7), 2011, https://doi.org/10.1016/j.cad.2010.08.008 (the cinematic path). Limits: `docs/limits.md`, "Geospatial camera".
 
 ## Globe navigation: `@margoengine/controls/globe`
 
