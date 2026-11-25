@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18500463,
+  "total": 18508230,
   "history": [
     {
       "date": "2026-10-24",
@@ -11793,6 +11793,12 @@
       "commit": "106a539f4",
       "reason": "New optional entry @margoengine/scene/container: 0 to 3,719 B gzip measured (ceiling measured +256 B). Asset containers (load, add, remove, copy and dispose as one unit) with all-or-nothing rollback; it reuses clone and the scene walk, and splitting load or copy out would duplicate member ownership. glTF and animation load lazily as optional peers. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "474d82c29",
+      "reason": "materials/retroreflection is a new optional entry (566dabc45), its own file so apps that do not use it pay nothing; materials/serialization 45,773 to 47,515 B because it restores the retroreflection feature; post/blur 7,238 to 8,249 B budget for the zoom and spin kinds (9d6aa73d9): radial, zoom and light-ray blur in the existing Blur effect, smaller than a second effect with its own lifecycle. Core plus stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -12432,7 +12438,8 @@
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,
-    "@margoengine/materials/serialization": 45773,
+    "@margoengine/materials/retroreflection": 1914,
+    "@margoengine/materials/serialization": 47515,
     "@margoengine/materials/settings": 21363,
     "@margoengine/materials/skin": 16364,
     "@margoengine/materials/soot": 12210,
@@ -12534,8 +12541,8 @@
     "@margoengine/netcode/interpolation-fields": 2936,
     "@margoengine/netcode/interpolation-timeline": 1495,
     "@margoengine/netcode/lobby": 4439,
-    "@margoengine/netcode/migrate": 8607,
     "@margoengine/netcode/media": 3100,
+    "@margoengine/netcode/migrate": 8607,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/presence": 6475,
     "@margoengine/netcode/relay": 3617,
@@ -12591,7 +12598,7 @@
     "@margoengine/post/anamorphic": 7567,
     "@margoengine/post/ascii": 9246,
     "@margoengine/post/bloom": 8078,
-    "@margoengine/post/blur": 7238,
+    "@margoengine/post/blur": 8249,
     "@margoengine/post/contact-shadows": 7636,
     "@margoengine/post/curvature": 10677,
     "@margoengine/post/decals": 5995,
