@@ -11136,6 +11136,14 @@ A cloth meets a rigid body at its particles (the swept particle probe) and at it
 - C. Ericson, "Real-Time Collision Detection", Morgan Kaufmann, 2005, section 3.4 (barycentric coordinates of a point of a triangle).
 - E. Catto, "Fast and Simple Physics using Sequential Impulses", GDC 2006, https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf (read for the first fix of KB-SOFT-LIGHT1, 0a4570d8e, which handed the push to the body as a pose change apart from its velocity, as a split impulse hands a pseudo-velocity; that hand-off is replaced by the impulse and force above, which carry the same change as motion).
 
+### Drawing a soft body (`@margoengine/gltf/soft-mesh`, 2026-11-24)
+
+Vertex normals as the sum of the unnormalised face normals of the triangles around a vertex, each face weighted by its area (the standard smooth-shading normal of any computer graphics text), and tangents with their handedness from the UV gradients of each triangle, made orthogonal to the normal by Gram-Schmidt:
+
+- E. Lengyel, "Computing Tangent Space Basis Vectors for an Arbitrary Mesh", Terathon Software, 2001, https://terathon.com/blog/tangent-space.html (read for the formula; no code was copied).
+
+The rivals were read as feature names only: the cloth example of three.js and the soft-body mesh update of Babylon.js (copy the particle positions into a mesh each frame, recompute its normals).
+
 ### Anisotropic cloth (`@margoengine/physics/soft`, 2026-11-24)
 
 A woven sheet's threads have springs of their own, each an XPBD distance constraint (Macklin et al. 2016) with its own natural frequency and damping ratio: the warp along the builder's `du`, the weft along `dv`, the diagonals of each cell as shear, and bend edges two along; the stretch and the shear are separate terms of an orthotropic sheet as in D. Baraff and A. Witkin, "Large Steps in Cloth Simulation", SIGGRAPH 1998, and B. Thomaszewski, S. Wacker and W. Strasser, "A consistent bending model for cloth simulation with corotational subdivision finite elements", SCA 2006 (for the bend); H. Wang, J. F. O'Brien and R. Ramamoorthi, "Data-driven elastic models for cloth: modeling and measurement", ACM TOG 30(4), 2011, for the anisotropic stretch measured on real cloth.

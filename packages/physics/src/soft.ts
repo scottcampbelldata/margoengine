@@ -486,6 +486,8 @@ export class SoftBodyDesc {
   /** @internal Which thread each structural edge is (0 for any other), by index as `edgePairs`. */ edgeKinds: number[] =
     [];
   /** @internal */ bendPairs: number[] = [];
+  /** @internal The grid a woven sheet was built on (particle (i, j) is i * nv + j), for its texture coordinates. */
+  grid: { nu: number; nv: number; wrap: boolean } | null = null;
   /** @internal */ masses: number[];
   /** @internal */ pinned = new Set<number>();
   /** @internal */ radius: number | null = null;
@@ -664,6 +666,7 @@ export class SoftBodyDesc {
   /** The edges, triangles and threads of an `nu` by `nv` grid of particles, closed around `u` when `wrap`. */
   private static woven(points: number[], nu: number, nv: number, wrap: boolean): SoftBodyDesc {
     const desc = new SoftBodyDesc(points);
+    desc.grid = { nu, nv, wrap };
     const at = (i: number, j: number): number => (((i % nu) + nu) % nu) * nv + j;
     const last = wrap ? nu : nu - 1;
     for (let i = 0; i < last; i++)
@@ -1233,6 +1236,8 @@ export class SoftBodyDesc {
   /** Merges another description in: its particles follow this one's, and its indices are shifted to match. */
   append(other: SoftBodyDesc): this {
     const base = this.particleCount;
+    // Two bodies merged are no longer one grid.
+    if (other.particleCount) this.grid = null;
     this.positions.push(...other.positions);
     for (const t of other.triangles) this.triangles.push(t + base);
     this.shapeMatching = this.shapeMatching || other.shapeMatching;
@@ -1395,6 +1400,12 @@ export class SoftBody {
     | number
     | undefined = undefined;
   /** @internal */ dominance = 0;
+  /**
+   * The grid of a body built by `cloth`, `clothAnisotropic` or `clothTube`: `nu` by `nv` particles, particle (i, j) at
+   * index `i * nv + j`, and whether it closes around `u` (a tube); null for any other body, a merged one included. A
+   * renderer reads its texture coordinates from it (`@margoengine/gltf/soft-mesh`).
+   */
+  grid: { readonly nu: number; readonly nv: number; readonly wrap: boolean } | null = null;
   /** @internal */ additionalIterations = 0;
   /** @internal */ oriented: boolean | undefined = undefined;
   /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
@@ -1424,11 +1435,18 @@ export class SoftBody {
       row = this.firstParticle + index;
     return [x[row]!, y[row]!, z[row]!];
   }
-  /** Every particle's position as flat x, y, z (a copy, so it is safe to keep). */
-  particlePositions(): Float32Array {
+  /**
+   * Every particle's position as flat x, y, z: a copy, so it is safe to keep, written into `target` when one is given
+   * (three numbers a particle), so a frame loop allocates nothing.
+   */
+  particlePositions(target?: Float32Array): Float32Array {
     this.check();
+    if (target !== undefined && (!(target instanceof Float32Array) || target.length !== this.particles * 3))
+      throw new RangeError(
+        `particlePositions needs a Float32Array target of ${this.particles * 3} numbers, three a particle.`,
+      );
     const { x, y, z } = this.c,
-      out = new Float32Array(this.particles * 3);
+      out = target ?? new Float32Array(this.particles * 3);
     for (let i = 0; i < this.particles; i++) {
       const row = this.firstParticle + i;
       out[i * 3] = x[row]!;
@@ -2462,6 +2480,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.solverKind = desc.solver;
     body.triangleList = Uint32Array.from(desc.triangles);
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
+    body.grid = desc.grid && { ...desc.grid };
     if (desc.skin) {
       body.skin = desc.skin;
       body.skinCells = Uint32Array.from(desc.cells);

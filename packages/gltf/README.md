@@ -247,6 +247,36 @@ for (const problem of report.problems) console.log(problem.code, problem.detail)
 for (const {where, mesh, zeroArea} of report.zeroAreaByNode) console.log(`${where} (mesh ${mesh}): ${zeroArea} zero-area triangles`);
 ```
 
+### Drawing a soft body (`@margoengine/gltf/soft-mesh`)
+
+`margoengine/gltf/soft-mesh` draws a cloth, a closed surface or a skinned solid of `margoengine/physics/soft` with one call, as a PBR model that follows the body every frame; the cloth examples of other web engines do this by hand (copy the positions, recompute the normals). It reads the body through its public API, so `margoengine/physics` stays an optional peer of this package and the entry carries no physics code.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Physics} from 'margoengine/physics';
+import {SoftBodies, SoftBodyDesc} from 'margoengine/physics/soft';
+import {drawSoftBody} from 'margoengine/gltf/soft-mesh';
+
+await Physics.load();
+const engine = await Engine.create(document.querySelector('canvas')!);
+const physics = new Physics(engine);
+const soft = await SoftBodies.attach(physics);
+
+// A flag of 20 x 12 particles hung by its two top corners.
+const flag = soft.create(SoftBodyDesc.cloth([-1, 3, 0], [0.1, 0, 0], [0, -0.1, 0], 20, 12).setPinnedParticles([0, 228]));
+const mesh = drawSoftBody(engine, flag, {
+  material: {pbrMetallicRoughness: {baseColorFactor: [0.8, 0.1, 0.1, 1], roughnessFactor: 0.9}},
+});
+engine.start();
+// mesh.dispose() removes it again; `using mesh = drawSoftBody(...)` does so at the end of the block.
+```
+
+- **What follows the body.** Each frame, before the engine draws and after the physics step (make the mesh after `new Physics(engine)`), the vertices are copied from the particles (from the skin, for a body with `setSkin`), and the normals (the area-weighted sum of the triangles' normals) and tangents (from the UVs, Lengyel 2001) are recomputed; the vertices upload in place, the triangles never change. A sleeping body is not copied. A removed body (or one that split on a tear) stops the mesh at its last pose: draw its pieces from `soft.onTear` with `drawSoftBody` again.
+- **Texture coordinates.** A body built by `cloth`, `clothAnisotropic` or `clothTube` takes its grid: particle (i, j) at (i / (nu - 1), j / (nv - 1)), a tube's seam doubled so u runs from 0 to 1 around it (the two seam vertices share their normal and tangent). Any other body lays its shape at creation flat on the plane of its two largest extents, scaled to 0..1, or takes `uvs` (two numbers a particle, or a skin vertex).
+- **Material.** `material` is a glTF 2.0 material (default `{doubleSided: true, pbrMetallicRoughness: {metallicFactor: 0, roughnessFactor: 0.8}}`, a matte sheet seen from both sides; `doubleSided` stays true unless it says false). Its textures name `images` by index (texture `i` is image `i`, an `ImageBitmap` or `{width, height, data}` RGBA8 pixels), so a fabric map with a normal map is `{images: [colour, normals], material: {pbrMetallicRoughness: {baseColorTexture: {index: 0}}, normalTexture: {index: 1}}}`.
+- **The mesh.** `drawSoftBody(engine, body, options)` returns a `SoftBodyMesh`: `model` (the `PBRModel` it draws with, for visibility, picking and the rest of the model API), `surface`, `sync()` (move it to the body now), `dispose()` and `Symbol.dispose`. `new SoftSurface(body, {uvs})` is the CPU half alone: `vertices` (20 floats a vertex: position and 1, normal and 0, tangent and its handedness, two UV sets, colour), `indices`, `uvs`, `vertexCount` and `update()`, for an app that uploads the vertices itself. `body.particlePositions(target)` fills a `Float32Array` of three numbers a particle without allocating.
+- **Errors.** A body with no triangles (a rope, a bare particle set) throws a `TypeError` naming `@margoengine/lines` for ropes; a removed body throws a `MargoError` with code `state`; `uvs` of the wrong length throws a `RangeError`.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
