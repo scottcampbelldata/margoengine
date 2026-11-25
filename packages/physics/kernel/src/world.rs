@@ -870,7 +870,7 @@ impl World {
         true
     }
 
-    /// FNV-1a over the world's state, the replay proof's fingerprint: the header and every column but those of `SCRATCH`, which
+    /// FNV-1a over the world's state, the replay proof's fingerprint: the header's scalars and every column but those of `SCRATCH`, which
     /// hold the order a step happens to solve in (the lists of pairs and joints it solves, the impacts it found, the islands it
     /// numbered). Two worlds with the same bodies, colliders, joints, couplings, manifolds and carried impulses hash alike
     /// whatever order their steps took the independent parts in.
@@ -882,7 +882,10 @@ impl World {
                 hash = (hash ^ unsafe { *data.add(word) }).wrapping_mul(0x0100_0193);
             }
         };
-        take(0, HEADER_BYTES as usize / 4);
+        // The header's scalars, after the words that say where the columns are: the hash covers state, not where state lives.
+        let layout = 2 + ROW_CLASSES + COLUMNS;
+        take(0, 1);
+        take(layout, HEADER_BYTES as usize / 4 - layout);
         for column in 0..COLUMNS {
             if !SCRATCH.contains(&column) {
                 let header = self.header();
