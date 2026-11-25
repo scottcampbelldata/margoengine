@@ -12,6 +12,8 @@ read of every function.
 will hold it, its state today, the best published methods to build from, and the shared kernels it uses. The
 coupling matrix in section 3 lists every pair of solvers that exchange data, and which way.
 
+**Who builds what.** [physics-work-queue.md](physics-work-queue.md) lists each solver's owner and status, and how to claim an open one.
+
 **Citations.** Each solver's owner checks every citation (title, authors, year, venue) against the paper itself
 before building, per the research-first rule, and records the checked list in the package docs. A citation here is
 a starting point, not a verified reference.
