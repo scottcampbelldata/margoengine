@@ -45,6 +45,9 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | MAC (physics: built by Scott's Mac) | L |  |
 | Soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1, plus a cloth render bridge | three.js, Babylon | DONE (KB-SOFT-LIGHT1, KB-SOFT-ITER1, cloth render bridge `@margoengine/gltf/soft-mesh`) | M | 0a4570d8e, d640a7242, 606261f00 |
 | Breakable / fracturing bodies | three.js `physics_ammo_break` | MAC (physics: built by Scott's Mac) | M |  |
+| WebXR AR GPU depth occlusion (real objects hide virtual ones; only CPU depth today) | three.js, Babylon | MISSING | M |  |
+| WebXR AR reflection cube map from light estimation, as the environment's specular | three.js, Babylon | MISSING | M |  |
+| WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | PARTIAL | M |  |
 
 ## Lane C: scene, assets, text and formats
 
