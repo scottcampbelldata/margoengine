@@ -235,7 +235,7 @@ use the workspace or packed local archives until the package is published.
 
 ## Live grading: `Grade`
 
-`@margoengine/tonemap/grade` (1,877 B min+gzip, its own entry) grades the picture live, without a LUT: shadows,
+`@margoengine/tonemap/grade` (2,426 B min+gzip, its own entry) grades the picture live, without a LUT: shadows,
 midtones and highlights wheels, lift, gamma and gain, saturation, tone curves, and saturation against hue. Give it to
 Tonemap's `extensions`; its options are read every frame, so sliders can drive them. White balance (`temperature`,
 `tint`), `contrast`, `exposure` and a LUT (`setLUT`) are Tonemap's own options.
@@ -265,6 +265,40 @@ grade.options.saturation = 1.2;
 | `gamma` | `[1, 1, 1]` | Per channel, 0.1 to 10: above 1 brightens the midtones; black and white stay |
 | `gain` | `[1, 1, 1]` | Per channel, 0 to 4: scales the whites, leaves black |
 | `saturation` | `1` | Saturation about Rec. 709 luma, 0 (grey) to 4 |
+| `ranges` | none | `{global, shadows, midtones, highlights}`, each `{hue, density, saturation, exposure}` |
+
+### Colour curves by tonal range: `ranges`
+
+Each of `global`, `shadows`, `midtones` and `highlights` tints, saturates and exposes its part of the picture. The
+global range multiplies into the other three, which are mixed by the wheels' luminance masks.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {Grade} from 'margoengine/tonemap/grade';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const grade = new Grade({ranges: {
+  global: {saturation: 1.1},
+  shadows: {hue: 210, density: 0.4, exposure: -0.25}, // cool, deeper shadows
+  highlights: {hue: 35, density: 0.25}, // warm highlights
+}});
+Tonemap.attach(stage.engine, {extensions: [grade]});
+grade.options.ranges = {midtones: {saturation: 0.8, exposure: 0.2}}; // read every frame
+```
+
+| Range control | Default | Meaning |
+| --- | --- | --- |
+| `hue` | `0` | Hue of the tint in degrees, 0 to 360 (0 red, 120 green, 240 blue); the opposite tint is 180 away |
+| `density` | `0` | Amount of the tint, 0 to 1; a grey keeps its luminance |
+| `saturation` | `1` | Saturation about Rec. 709 luma, 0 (grey) to 4 |
+| `exposure` | `0` | Stops, -8 to 8 |
+
+After lift, gamma, gain and saturation and before the wheels, each channel is multiplied by
+`2^exposure (1 + density (h - Y(h)))`, with `h` the fully saturated RGB of the hue (the HSV hexcone, A. R. Smith,
+[Color Gamut Transform Pairs](https://doi.org/10.1145/800248.807361), SIGGRAPH 1978) and `Y` Rec. 709 luma, then
+saturated about luma, clamped to 0..1 after each step. `exportCube` and `export3dl` bake it with the rest. Ranges are
+compiled only while one changes something (a hue with density 0 does not), and have no rows in the settings table.
+The units are Margo's own, so values from another engine's colour curves do not carry over.
 
 - **Method.** On display-linear colour after the curve and contrast, before a LUT. Lift, gamma and gain run first,
   `(gain (x + lift (1 - x)))^(1 / gamma)` per channel (the slope, offset and power of the ASC Color Decision List v1.2,

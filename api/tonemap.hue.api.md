@@ -24,6 +24,7 @@ class Grade implements TonemapExtension {
     readonly options: GradeOptions;
     constructor(options?: GradeOptions);
     get key(): string;
+    protected shape(): number;
     protected tone(): boolean;
     patch(shader: string, binding: number): string;
     values(): Float32Array;
@@ -46,6 +47,19 @@ interface GradeOptions {
     gamma?: readonly [number, number, number];
     gain?: readonly [number, number, number];
     saturation?: number;
+    ranges?: {
+        global?: GradeRange;
+        shadows?: GradeRange;
+        midtones?: GradeRange;
+        highlights?: GradeRange;
+    };
+}
+
+interface GradeRange {
+    hue?: number;
+    density?: number;
+    saturation?: number;
+    exposure?: number;
 }
 
 type GradeWheel = readonly [number, number, number];

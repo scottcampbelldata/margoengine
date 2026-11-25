@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18875727,
+  "total": 18877118,
   "history": [
     {
       "date": "2026-10-24",
@@ -12033,6 +12033,30 @@
       "commit": "200b488af",
       "reason": "@margoengine/weather/boundary-layer: new entry, 2,340 B gzip: the framework's wind (ATMO-01), the log-law boundary layer over the Mann box with the standard atmosphere, as the Wind contract.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "200b488af",
+      "reason": "@margoengine/math/random: new entry, 944 B gzip: the engine's counter-based generator (Philox4x32-10, the TypeScript twin of K02), moved from physics/world (which re-exports it) so that weather and other packages draw the same numbers without loading the physics world.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "200b488af",
+      "reason": "@margoengine/weather/turbulence: new entry, 1,709 B gzip: Mann's sheared spectral-tensor turbulence box (ATMO-02) on the pinned FFT and maths.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "200b488af",
+      "reason": "@margoengine/weather/boundary-layer: new entry, 2,340 B gzip: the framework's wind (ATMO-01), the log-law boundary layer over the Mann box with the standard atmosphere, as the Wind contract.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "edad7b6e0",
+      "reason": "tonemap Grade tonal ranges (colour curves: hue, density, saturation, exposure per global, shadows, midtones, highlights)",
+      "grew": 3
     }
   ],
   "items": {
@@ -12706,7 +12730,6 @@
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
     "@margoengine/math/fft": 1802,
-    "@margoengine/math/random": 1200,
     "@margoengine/math/fields": 276,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/geo": 2372,
@@ -12723,6 +12746,7 @@
     "@margoengine/math/project": 1277,
     "@margoengine/math/quat": 1971,
     "@margoengine/math/quaternion": 1886,
+    "@margoengine/math/random": 1200,
     "@margoengine/math/ray": 2468,
     "@margoengine/math/sh": 1614,
     "@margoengine/math/sphere": 2260,
@@ -13352,9 +13376,9 @@
     "@margoengine/tonemap": 15124,
     "@margoengine/tonemap/3dl": 2510,
     "@margoengine/tonemap/custom": 1459,
-    "@margoengine/tonemap/export-cube": 1407,
-    "@margoengine/tonemap/grade": 2133,
-    "@margoengine/tonemap/hue": 2852,
+    "@margoengine/tonemap/export-cube": 1687,
+    "@margoengine/tonemap/grade": 2682,
+    "@margoengine/tonemap/hue": 3414,
     "@margoengine/tonemap/local": 2386,
     "@margoengine/tonemap/settings": 4763,
     "@margoengine/toon": 2411,
@@ -13553,12 +13577,11 @@
     "@margoengine/weather": 8467,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 6984,
+    "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 7011,
     "@margoengine/weather/eruption": 10430,
-    "@margoengine/weather/turbulence": 1965,
-    "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/gltf": 5981,
     "@margoengine/weather/hail": 5136,
     "@margoengine/weather/lava": 12346,
@@ -13569,6 +13592,7 @@
     "@margoengine/weather/settings": 9476,
     "@margoengine/weather/snow": 4616,
     "@margoengine/weather/snow-drift": 5806,
+    "@margoengine/weather/turbulence": 1965,
     "@margoengine/webgl2-compat": 127852,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 95009,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 34020,

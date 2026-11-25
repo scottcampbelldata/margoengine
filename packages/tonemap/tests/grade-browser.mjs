@@ -4,10 +4,20 @@
 // (a CPU oracle) and leaves the dark ones; hue saturation 0 everywhere makes every pixel grey; a flat master curve at
 // 0.5 makes every pixel sRGB 0.5 (188). Lift raises the darks most, gain lowers the brights most,
 // gamma 2 brightens the midtones, saturation 0 greys and 2 deepens colour, and back at their defaults the frame is the
-// default Grade's.
+// default Grade's. Ranges (global, shadows, midtones, highlights), alone and in a HueGrade with the primaries: every
+// pixel is where a CPU oracle written from the README's formula puts the plain frame's pixel, and cleared they leave the
+// default Grade's frame.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from '../../post/test/post-browser.mjs';
+import { rangesOracle } from './support/ranges-oracle.mjs';
+
+const RANGES = {
+  global: { hue: 120, density: 0.15, saturation: 1.1, exposure: 0.2 },
+  shadows: { hue: 240, density: 0.7, exposure: 0.8 },
+  midtones: { saturation: 0.3, exposure: -0.3 },
+  highlights: { hue: 30, density: 0.5, saturation: 1.4, exposure: -0.6 },
+};
 
 await postBrowser(
   'tonemap-grade',
@@ -17,7 +27,8 @@ await postBrowser(
     await page.evaluate(async () => {
       const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
         { Tonemap } = await import('/packages/tonemap/dist/index.js'),
-        { Grade } = await import('/packages/tonemap/dist/grade.js');
+        { Grade } = await import('/packages/tonemap/dist/grade.js'),
+        { HueGrade } = await import('/packages/tonemap/dist/hue.js');
       const canvas = document.querySelector('canvas'),
         engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 5], target: [0, 0, 0] } });
       engine.stop();
@@ -36,6 +47,7 @@ await postBrowser(
         engine,
         tonemap,
         grade,
+        HueGrade,
         frame: () => (engine.render({ delta: 1 / 60 }), engine.gpu.queue.onSubmittedWorkDone()),
       };
     });
@@ -61,7 +73,13 @@ await postBrowser(
       gamma = await frame('(o, g) => { g.options.gain = undefined; g.options.gamma = [2, 2, 2]; }'),
       desaturated = await frame('(o, g) => { g.options.gamma = undefined; g.options.saturation = 0; }'),
       saturated = await frame('(o, g) => { g.options.saturation = 2; }'),
-      reset = await frame('(o, g) => { g.options.saturation = 1; }');
+      reset = await frame('(o, g) => { g.options.saturation = 1; }'),
+      ranged = await frame(`(o, g) => { g.options.ranges = ${JSON.stringify(RANGES)}; }`),
+      cleared = await frame('(o, g) => { g.options.ranges = undefined; }'),
+      // saturation 1 with a gain a hair off 1 compiles the primaries too; HueGrade turns a full circle.
+      rangedHue = await frame(
+        `(o) => { o.extensions = [new window.t.HueGrade({ gain: [1, 1, 1.000001], hueShift: 360, ranges: ${JSON.stringify(RANGES)} })]; }`,
+      );
     const pixels = (img) =>
       Array.from({ length: img.width * img.height }, (_, i) => [...img.data.subarray(4 * i, 4 * i + 3)]);
     const p0 = pixels(plain),
@@ -113,7 +131,24 @@ await postBrowser(
       resetDiff,
       redBox: redBox.length,
     });
+    let rangesDiff = 0,
+      rangesHueDiff = 0,
+      rangesMoved = 0,
+      clearedDiff = 0;
+    for (let i = 0; i < p0.length; i++) {
+      const want = rangesOracle(p0[i].map(decode), RANGES).map(encode);
+      for (let c = 0; c < 3; c++) {
+        rangesDiff = Math.max(rangesDiff, Math.abs(want[c] - ranged.data[4 * i + c]));
+        rangesHueDiff = Math.max(rangesHueDiff, Math.abs(want[c] - rangedHue.data[4 * i + c]));
+        rangesMoved = Math.max(rangesMoved, Math.abs(ranged.data[4 * i + c] - plain.data[4 * i + c]));
+        clearedDiff = Math.max(clearedDiff, Math.abs(cleared.data[4 * i + c] - identity.data[4 * i + c]));
+      }
+    }
     const r = {
+      rangesDiff,
+      rangesHueDiff,
+      rangesMoved,
+      clearedDiff,
       ...r_primaries,
       oracle,
       dark: dark.length,
@@ -151,5 +186,9 @@ await postBrowser(
     assert.ok(r.desaturatedDiff <= 1, `saturation 0 greys every pixel: ${r.desaturatedDiff}`);
     assert.ok(r.saturatedChroma > r.redChroma + 5, `saturation 2 deepens the red: ${JSON.stringify(r)}`);
     assert.ok(r.resetDiff <= 0, `back at the defaults the frame is the default Grade's: ${r.resetDiff}`);
+    assert.ok(rangesMoved > 20, `ranges change the picture: ${rangesMoved}`);
+    assert.ok(rangesDiff <= 2, `every ranged pixel is where the oracle puts it: ${rangesDiff} levels`);
+    assert.ok(rangesHueDiff <= 2, `the same through HueGrade with the primaries: ${rangesHueDiff} levels`);
+    assert.equal(clearedDiff, 0, 'cleared ranges leave the default frame');
   },
 );

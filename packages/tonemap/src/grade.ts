@@ -10,12 +10,28 @@
 // offset and power of the ASC Color Decision List, American Society of Cinematographers, ASC CDL v1.2, 2009, written so
 // each control holds one end of the range); then saturation about Rec. 709 luma (ITU-R BT.709-6, 2015), as the CDL's
 // saturation, out = luma + s (x - luma).
+// Ranges (global, shadows, midtones, highlights), after the primaries and before the wheels, compiled only while one is in
+// use: each a per-channel gain 2^exposure (1 + density (h - Y(h))), h the fully saturated RGB of the hue (the HSV hexcone,
+// A. R. Smith, "Color Gamut Transform Pairs", SIGGRAPH 1978) and Y Rec. 709 luma, so the tint keeps the luminance of a
+// grey; then a saturation about luma. The global range multiplies into the three others on the CPU, and the shader mixes
+// those three (gain and saturation) by the wheels' luminance masks.
 import type { TonemapExtension } from './index.js';
 
 /** Curve control points [input, output] in 0..1, inputs strictly increasing. Two or more points. */
 export type GradeCurve = readonly (readonly [number, number])[];
 /** RGB offset of a grading wheel, each -1 to 1 (a hue and amount on a wheel is an offset like [0.05, 0, -0.05]). */
 export type GradeWheel = readonly [number, number, number];
+/** One range of {@link GradeOptions.ranges}: a tint, a saturation and an exposure. */
+export interface GradeRange {
+  /** Hue of the tint in degrees, 0 to 360 (0 red, 120 green, 240 blue); the opposite tint is 180 away. Default 0. */
+  hue?: number;
+  /** Amount of the tint, 0 (none) to 1. The tint keeps the luminance of a grey. Default 0. */
+  density?: number;
+  /** Saturation about Rec. 709 luma, 0 (grey) to 4. Default 1. */
+  saturation?: number;
+  /** Exposure in stops, -8 to 8. Default 0. */
+  exposure?: number;
+}
 /** Options of {@link Grade}; the object is kept and read every frame. */
 export interface GradeOptions {
   /** Offset added to the shadows. Default [0, 0, 0]. */
@@ -36,6 +52,11 @@ export interface GradeOptions {
   gain?: readonly [number, number, number];
   /** Saturation about Rec. 709 luma, 0 (grey) to 4, after lift, gamma and gain. Default 1. */
   saturation?: number;
+  /**
+   * Tint, saturation and exposure for the whole image (`global`, which multiplies into the other three) and for the
+   * shadows, midtones and highlights (the wheels' luminance masks), after the primaries and before the wheels. Default none.
+   */
+  ranges?: { global?: GradeRange; shadows?: GradeRange; midtones?: GradeRange; highlights?: GradeRange };
 }
 
 const SAMPLES = 33;
@@ -94,8 +115,31 @@ export function sampleCurve(points: GradeCurve | undefined, out = new Float32Arr
 
 // Every name carries the binding, so several Grade and HueGrade extensions in one Tonemap each declare their own and
 // apply in order (KB-OWN-TONE2).
-const code = (b: number, tone: boolean) => `
-struct Grade${b} {shadows:vec4f,midtones:vec4f,highlights:vec4f,hue0:vec4f,hue1:vec4f,curve:array<vec4f,${SAMPLES}>${tone ? ',lift:vec4f,gamma:vec4f,gain:vec4f' : ''}}
+// Key by shape (bit 0 the primaries, bit 1 the ranges): constants, so a frame builds no string.
+const KEYS = ['grade', 'grade:tone', 'grade:ranges', 'grade:tone:ranges'];
+const PLAIN = 20 + 4 * SAMPLES;
+
+const moves = (r: GradeRange | undefined) =>
+  !!r && !((r.density ?? 0) === 0 && (r.saturation ?? 1) === 1 && (r.exposure ?? 0) === 0);
+
+// Multiplies one range into the gain (rgb) and saturation (w) at `at`.
+function applyRange(v: Float32Array, at: number, r: GradeRange | undefined): void {
+  if (!r) return;
+  const h = (r.hue ?? 0) / 60,
+    d = r.density ?? 0,
+    e = 2 ** (r.exposure ?? 0),
+    red = Math.min(1, Math.max(0, Math.abs(h - 3) - 1)),
+    green = Math.min(1, Math.max(0, 2 - Math.abs(h - 2))),
+    blue = Math.min(1, Math.max(0, 2 - Math.abs(h - 4))),
+    y = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  v[at] *= e * (1 + d * (red - y));
+  v[at + 1] *= e * (1 + d * (green - y));
+  v[at + 2] *= e * (1 + d * (blue - y));
+  v[at + 3] *= r.saturation ?? 1;
+}
+
+const code = (b: number, tone: boolean, ranges: boolean) => `
+struct Grade${b} {shadows:vec4f,midtones:vec4f,highlights:vec4f,hue0:vec4f,hue1:vec4f,curve:array<vec4f,${SAMPLES}>${tone ? ',lift:vec4f,gamma:vec4f,gain:vec4f' : ''}${ranges ? ',ranges:array<vec4f,3>' : ''}}
 @group(0) @binding(${b}) var<uniform> grading${b}:Grade${b};${
   tone
     ? `
@@ -105,13 +149,22 @@ fn gradeTone${b}(input:vec3f)->vec3f {
  let y=dot(c,vec3f(0.2126,0.7152,0.0722));return clamp(y+(c-y)*grading${b}.lift.w,vec3f(0),vec3f(1));
 }`
     : ''
+}${
+  ranges
+    ? `
+fn gradeRanges${b}(c:vec3f)->vec3f {
+ let l=dot(c,vec3f(0.2126,0.7152,0.0722));let ws=1.0-smoothstep(0.0,0.5,l);let wh=smoothstep(0.5,1.0,l);
+ let m=grading${b}.ranges[0]*ws+grading${b}.ranges[1]*(1.0-ws-wh)+grading${b}.ranges[2]*wh;
+ let t=clamp(c*m.rgb,vec3f(0),vec3f(1));let y=dot(t,vec3f(0.2126,0.7152,0.0722));return clamp(y+(t-y)*m.w,vec3f(0),vec3f(1));
+}`
+    : ''
 }
 fn gradeCurve${b}(x:f32,channel:i32)->f32 {
  let t=clamp(x,0.0,1.0)*${SAMPLES - 1}.0;let i=min(i32(t),${SAMPLES - 2});
  return mix(grading${b}.curve[i][channel],grading${b}.curve[i+1][channel],t-f32(i));
 }
 fn gradeColor${b}(input:vec3f)->vec3f {
- var c=clamp(input,vec3f(0),vec3f(1));let extra=input-c;${tone ? `c=gradeTone${b}(c);` : ''}
+ var c=clamp(input,vec3f(0),vec3f(1));let extra=input-c;${tone ? `c=gradeTone${b}(c);` : ''}${ranges ? `c=gradeRanges${b}(c);` : ''}
  let l=dot(c,vec3f(0.2126,0.7152,0.0722));let ws=1.0-smoothstep(0.0,0.5,l);let wh=smoothstep(0.5,1.0,l);
  c=clamp(c+grading${b}.shadows.rgb*ws+grading${b}.midtones.rgb*(1.0-ws-wh)+grading${b}.highlights.rgb*wh,vec3f(0),vec3f(1));
  c=vec3f(gradeCurve${b}(gradeCurve${b}(c.r,0),1),gradeCurve${b}(gradeCurve${b}(c.g,0),2),gradeCurve${b}(gradeCurve${b}(c.b,0),3));
@@ -149,16 +202,25 @@ const isCurve = (c: unknown) =>
  * @throws RangeError for a wheel, curve or hue multiplier out of range (checked now and every frame).
  */
 export class Grade implements TonemapExtension {
-  private readonly buffer = new Float32Array(20 + 4 * SAMPLES);
-  // With lift, gamma, gain or saturation in use: the same values and three more vec4s (lift and saturation, gamma, gain).
-  private readonly toneBuffer = new Float32Array(32 + 4 * SAMPLES);
+  // The plain values, then three vec4s for the primaries (lift and saturation, gamma, gain) and three for the ranges
+  // (shadows, midtones, highlights: gain and saturation), each only while in use. One view per length, made once.
+  private readonly buffer = new Float32Array(PLAIN + 24);
+  private readonly views = [0, 12, 24].map((n) => this.buffer.subarray(0, PLAIN + n));
   private readonly column = new Float32Array(SAMPLES);
   constructor(readonly options: GradeOptions = {}) {
     this.check();
   }
-  /** `'grade'`, or `'grade:tone'` while lift, gamma, gain or saturation is away from its default (Tonemap recompiles). */
+  /**
+   * `'grade'`, with `':tone'` while lift, gamma, gain or saturation is away from its default and `':ranges'` while a range
+   * changes something (Tonemap recompiles).
+   */
   get key(): string {
-    return this.tone() ? 'grade:tone' : 'grade';
+    return KEYS[this.shape()];
+  }
+  /** Which optional controls are in use this frame: 1 the primaries, 2 the ranges, 3 both. */
+  protected shape(): number {
+    const r = this.options.ranges;
+    return +this.tone() | (moves(r?.global) || moves(r?.shadows) || moves(r?.midtones) || moves(r?.highlights) ? 2 : 0);
   }
   /** Whether lift, gamma, gain or saturation is away from its default this frame. */
   protected tone(): boolean {
@@ -167,19 +229,21 @@ export class Grade implements TonemapExtension {
     return !(off(o.lift, 0) && off(o.gamma, 1) && off(o.gain, 1) && (o.saturation ?? 1) === 1);
   }
   patch(shader: string, binding: number): string {
+    const shape = this.shape();
     return (
       shader.replace('if(p.grade.w==1.0){color=sampleLUT(', `color=gradeColor${binding}(color);\n  $&`) +
-      code(binding, this.tone())
+      code(binding, (shape & 1) !== 0, shape > 1)
     );
   }
   values(): Float32Array {
     this.check();
     const o = this.options,
-      tone = this.tone(),
-      v = tone ? this.toneBuffer : this.buffer,
+      shape = this.shape(),
+      v = this.views[(shape & 1) + (shape >> 1)],
       c = o.curves ?? {},
       h = o.hueSaturation ?? [1, 1, 1, 1, 1, 1];
     v.fill(0, 0, 20);
+    v.fill(0, PLAIN);
     v.set(o.shadows ?? [0, 0, 0], 0);
     v.set(o.midtones ?? [0, 0, 0], 4);
     v.set(o.highlights ?? [0, 0, 0], 8);
@@ -188,12 +252,20 @@ export class Grade implements TonemapExtension {
       sampleCurve(points, this.column);
       for (let i = 0; i < SAMPLES; i++) v[20 + 4 * i + channel] = this.column[i];
     });
-    if (tone) {
-      const at = 20 + 4 * SAMPLES;
-      v.set(o.lift ?? [0, 0, 0], at);
-      v[at + 3] = o.saturation ?? 1;
-      v.set(o.gamma ?? [1, 1, 1], at + 4);
-      v.set(o.gain ?? [1, 1, 1], at + 8);
+    if (shape & 1) {
+      v.set(o.lift ?? [0, 0, 0], PLAIN);
+      v[PLAIN + 3] = o.saturation ?? 1;
+      v.set(o.gamma ?? [1, 1, 1], PLAIN + 4);
+      v.set(o.gain ?? [1, 1, 1], PLAIN + 8);
+    }
+    if (shape > 1) {
+      const r = o.ranges!,
+        start = PLAIN + 12 * (shape & 1);
+      v.fill(1, start, start + 12);
+      for (let i = 0; i < 3; i++) {
+        applyRange(v, start + 4 * i, r.global);
+        applyRange(v, start + 4 * i, i === 0 ? r.shadows : i === 1 ? r.midtones : r.highlights);
+      }
     }
     return v;
   }
@@ -221,6 +293,28 @@ export class Grade implements TonemapExtension {
     )
       throw new RangeError(
         'Invalid Grade options; lift is three numbers -1 to 1, gamma three from 0.1 to 10, gain three from 0 to 4 and saturation 0 to 4.',
+      );
+    const within = (v: unknown, lo: number, hi: number) =>
+        v === undefined || (typeof v === 'number' && v >= lo && v <= hi),
+      isObject = (v: unknown) => typeof v === 'object' && v !== null,
+      r = o.ranges;
+    if (
+      r !== undefined &&
+      !(
+        isObject(r) &&
+        [r.global, r.shadows, r.midtones, r.highlights].every(
+          (x) =>
+            x === undefined ||
+            (isObject(x) &&
+              within(x.hue, 0, 360) &&
+              within(x.density, 0, 1) &&
+              within(x.saturation, 0, 4) &&
+              within(x.exposure, -8, 8)),
+        )
+      )
+    )
+      throw new RangeError(
+        'Invalid Grade ranges; global, shadows, midtones and highlights each take hue 0 to 360, density 0 to 1, saturation 0 to 4 and exposure -8 to 8.',
       );
   }
 }

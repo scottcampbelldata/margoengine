@@ -8731,3 +8731,17 @@ Depth there is reversed-Z zero, the same as the sky. It supports the existing Wa
 It adds four vertices and six indices to the same draw and uses no new buffer, texture, pass or package option.
 The horizon remains a flat ocean approximation. See [GPU evidence](architecture/operational-playbook.md#section-5-evidence-open-ocean-horizon-depth-2026-11-23).
 Blob and planar shadows (`@margoengine/materials/fake-shadows`, 2026-11-25): the planar shadow projects on the CPU in `update` (cost grows with the caster's vertex count, so characters and props, not levels); it flattens onto one plane, does not follow terrain, and overlapping parts of one caster darken twice (translucent blend, no stencil); with a point light, keep the caster between the light and the plane. The blob is a vertex-alpha disc, not a blurred render of the caster's silhouette. Drawn pixels are not yet checked against a rival on a real GPU; the maths and the mesh construction are tested. No core change.
+
+
+## Grade tonal ranges (`@margoengine/tonemap/grade` `ranges`, 2026-11-25)
+
+Enforced per range (global, shadows, midtones, highlights): hue 0..360, density 0..1, saturation 0..4, exposure -8..8
+stops. Applied to display-linear 0..1 after the primaries and before the wheels, clamped after the gain and after the
+saturation; the three tonal ranges mix by the wheels' luminance masks, which are not adjustable. The tint keeps the
+luminance of a grey before clipping, not of a saturated colour, and a negative density is not accepted (turn the hue by
+180). No settings-table rows. Compiled only while a range changes something. GPU frames are within 1.02 levels of a CPU
+oracle on WebGPU and the WebGL2 layer (`tests/grade-browser.mjs`). Measured min+gzip: grade 1,877 to 2,426 B, hue 2,596
+to 3,158 B, export-cube 1,360 to 1,431 B, 3dl 2,367 to 2,434 B; core and stage source unchanged. Controls as named in
+the Babylon.js `ColorCurves` API documentation (no source read), 2026,
+https://doc.babylonjs.com/typedoc/classes/BABYLON.ColorCurves; the maths is Margo's own (HSV hexcone, A. R. Smith,
+"Color Gamut Transform Pairs", SIGGRAPH 1978, https://doi.org/10.1145/800248.807361).

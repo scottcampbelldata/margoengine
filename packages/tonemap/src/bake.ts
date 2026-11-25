@@ -11,13 +11,24 @@ function smooth(x: number): number {
 // Evaluate the actual uniform snapshot, including Grade's 33-sample curves, rather than resampling the authored
 // cubic at export resolution. That keeps this bake aligned with the live shader's two-stage curve lookup.
 // `tone`: the snapshot holds Grade's primaries (lift and saturation, gamma, gain at 152, 156 and 160), applied first as
-// gradeTone does; `hue`: HueGrade's controls follow, at `base` (152, or 164 after the primaries).
-function evaluate(v: Float32Array, c: number[], tone: boolean, hue: boolean): void {
+// gradeTone does; `ranges`: the three range vec4s (gain and saturation) come next, applied as gradeRanges does; `hue`:
+// HueGrade's controls follow at `base`, after whichever of those are present.
+function evaluate(v: Float32Array, c: number[], tone: boolean, ranges: boolean, hue: boolean): void {
   if (tone) {
     for (let k = 0; k < 3; k++)
       c[k] = clamp(Math.max(0, v[160 + k] * (c[k] + v[152 + k] * (1 - c[k]))) ** (1 / v[156 + k]));
     const y = c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
     for (let k = 0; k < 3; k++) c[k] = clamp(y + (c[k] - y) * v[155]);
+  }
+  if (ranges) {
+    const at = tone ? 164 : 152,
+      before = c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722,
+      low = 1 - smooth(before * 2),
+      high = smooth((before - 0.5) * 2),
+      m = (k: number) => v[at + k] * low + v[at + 4 + k] * (1 - low - high) + v[at + 8 + k] * high;
+    for (let k = 0; k < 3; k++) c[k] = clamp(c[k] * m(k));
+    const y = c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+    for (let k = 0; k < 3; k++) c[k] = clamp(y + (c[k] - y) * m(3));
   }
   const l = c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
   const ws = 1 - smooth(l * 2),
@@ -43,7 +54,7 @@ function evaluate(v: Float32Array, c: number[], tone: boolean, hue: boolean): vo
     for (let k = 0; k < 3; k++) c[k] = clamp(y + (c[k] - y) * s);
   }
   if (!hue) return;
-  const base = tone ? 164 : 152;
+  const base = 152 + (tone ? 12 : 0) + (ranges ? 12 : 0);
   hi = Math.max(...c);
   lo = Math.min(...c);
   d = hi - lo;
@@ -81,12 +92,13 @@ function evaluate(v: Float32Array, c: number[], tone: boolean, hue: boolean): vo
  */
 export function bakeGrade(grade: Grade, size: number): CubeLUT {
   const key = grade && typeof grade.values === 'function' ? grade.key : '',
-    hue = key.startsWith('grade-hue'),
-    tone = key.endsWith(':tone');
-  if (!['grade', 'grade-hue', 'grade:tone', 'grade-hue:tone'].includes(key))
-    throw new TypeError('Unsupported grade; supply a Grade or HueGrade instance');
-  const v = new Float32Array(grade.values());
-  if (v.length !== (tone ? 164 : 152) + (hue ? 260 : 0) || !v.every(Number.isFinite))
+    match = /^grade(-hue)?(:tone)?(:ranges)?$/.exec(key);
+  if (!match) throw new TypeError('Unsupported grade; supply a Grade or HueGrade instance');
+  const hue = !!match[1],
+    tone = !!match[2],
+    ranges = !!match[3],
+    v = new Float32Array(grade.values());
+  if (v.length !== 152 + (tone ? 12 : 0) + (ranges ? 12 : 0) + (hue ? 260 : 0) || !v.every(Number.isFinite))
     throw new TypeError('Unsupported grade uniform; supply an unmodified Grade or HueGrade');
   const data = new Float32Array(size ** 3 * 4),
     c = [0, 0, 0],
@@ -98,7 +110,7 @@ export function bakeGrade(grade: Grade, size: number): CubeLUT {
         c[0] = r / last;
         c[1] = g / last;
         c[2] = b / last;
-        evaluate(v, c, tone, hue);
+        evaluate(v, c, tone, ranges, hue);
         data.set(c, i);
         data[i + 3] = 1;
       }

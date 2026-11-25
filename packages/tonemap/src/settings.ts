@@ -6,7 +6,7 @@
 // and read it each frame into a uniform, so `applyTonemapSettings` writes the options and the next frame draws them.
 // Rows that change which shader program runs (an effect going from 0 to on, the primaries leaving their defaults, the curve
 // going to or from a classic one) are `live: false`: that frame compiles. Everything else is free to key every frame.
-// Not rows: the tone curves of Grade and the hue curve of HueGrade (lists of points, not sliders), the metering mask of
+// Not rows: the ranges and tone curves of Grade and the hue curve of HueGrade (lists of points, not sliders), the metering mask of
 // auto exposure (a texture), the LUT, and `extensions`, `source` and `inputColorSpace` (set at construction).
 import {
   checkSettings,

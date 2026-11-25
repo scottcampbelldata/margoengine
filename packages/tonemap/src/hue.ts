@@ -38,6 +38,8 @@ function checkHue(options: HueGradeOptions): void {
     );
 }
 
+const KEYS = ['grade-hue', 'grade-hue:tone', 'grade-hue:ranges', 'grade-hue:tone:ranges'];
+
 const hueCode = (b: number) => `
 fn shiftGradeHue${b}(c:vec3f)->vec3f {
  let hi=max(c.r,max(c.g,c.b));let lo=min(c.r,min(c.g,c.b));let d=hi-lo;
@@ -66,12 +68,13 @@ fn shiftGradeHue${b}(c:vec3f)->vec3f {
  * @throws RangeError for invalid Grade or hue controls; correct the options before the next frame.
  */
 export class HueGrade extends Grade {
-  // Room for Grade's values with its primaries (lift, gamma, gain), the hue control and the 64 hue points.
-  private readonly hueBuffer = new Float32Array(32 + 4 * 33 + 4 + 4 * 64);
-  // What values() returns, without and with the primaries: the same two views every frame, so a frame allocates nothing.
-  private readonly hueViews = [20, 32].map((n) => this.hueBuffer.subarray(0, n + 4 * 33 + 4 + 4 * 64));
+  // Room for Grade's values with its primaries and ranges, the hue control and the 64 hue points.
+  private readonly hueBuffer = new Float32Array(44 + 4 * 33 + 4 + 4 * 64);
+  // What values() returns, with none, one or both of the primaries and ranges: the same views every frame, so a frame
+  // allocates nothing.
+  private readonly hueViews = [20, 32, 44].map((n) => this.hueBuffer.subarray(0, n + 4 * 33 + 4 + 4 * 64));
   override get key(): string {
-    return this.tone() ? 'grade-hue:tone' : 'grade-hue';
+    return KEYS[this.shape()];
   }
   constructor(override readonly options: HueGradeOptions = {}) {
     super(options);
@@ -86,7 +89,7 @@ export class HueGrade extends Grade {
       patched
         .slice(at)
         .replace(
-          /(curve:array<vec4f,33>(?:,lift:vec4f,gamma:vec4f,gain:vec4f)?)\}/,
+          /(curve:array<vec4f,33>(?:,lift:vec4f,gamma:vec4f,gain:vec4f)?(?:,ranges:array<vec4f,3>)?)\}/,
           '$1,hueControl:vec4f,huePoints:array<vec4f,64>}',
         )
         .replace('return c+extra;', `return shiftGradeHue${binding}(c)+extra;`) +
@@ -103,6 +106,6 @@ export class HueGrade extends Grade {
     v[base.length] = this.options.hueShift ?? 0;
     v[base.length + 1] = points.length;
     points.forEach((p, i) => v.set(p, base.length + 4 + i * 4));
-    return this.hueViews[+(base.length > 20 + 4 * 33)];
+    return this.hueViews[(base.length - 20 - 4 * 33) / 12];
   }
 }
