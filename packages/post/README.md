@@ -1287,6 +1287,59 @@ unshadowed sun gives the old surface nothing (facing away from the sun) a new no
 the atlas has no mipmaps in use (level 0), so a far, dense normal map can shimmer; up to 64 decals, no culling. WebGPU
 only.
 
+## ASCII art: `ASCII`
+
+`@margoengine/post/ascii` (8,976 B min+gzip, its own entry; it carries the stack) redraws the frame as a grid of
+characters, each picked by how bright its cell is, and can hand the same grid back as text. An LDR `PostStack` effect:
+put it last.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {ASCII} from 'margoengine/post/ascii';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const ascii = new ASCII({cellSize: [6, 8], edges: true});
+PostStack.attach(stage.engine, [ascii]);
+ascii.options.color = '#33ff66'; // a green terminal: options are read every frame
+stage.engine.render();
+console.log(await ascii.text()); // the same picture as lines of text
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `characters` | `' .:-+=*%#@'` | Ramp from least to most ink, 2 to 250 characters |
+| `cellSize` | `[12, 16]` | Drawing-buffer pixels per character, one number (square) or `[width, height]`, 4 to 64. Multiples of `[6, 8]` keep the built-in glyphs sharp |
+| `font` | built-in bitmap | A CSS font family, such as `'monospace'`, drawn through `OffscreenCanvas` (page or worker); needed for characters outside printable ASCII, such as `' ░▒▓█'` |
+| `fontSize` | cell height | Size of `font` in pixels, above 0 up to 256 |
+| `color` | `'scene'` | Ink: `'#rgb'`, `'#rrggbb'` or `'scene'`, the cell's average colour |
+| `background` | `'#000000'` | Paper, same forms; `'scene'` paints colour blocks (give `color` a fixed value then) |
+| `invert` | `false` | Dense characters for dark cells, for dark ink on light paper |
+| `edges` | `false` | A cell holding one strong edge draws a character along it |
+| `edgeCharacters` | `'\|/-\\'` | Vertical, rising, horizontal and falling edge characters |
+| `edgeThreshold` | `0.2` | Luminance step, 0 to 1, a straight edge needs to count |
+| `intensity` | `1` | Mix over the scene, 0 to 1 |
+| `enabled` | `true` | False passes frames through |
+
+`text({signal})` resolves to the characters of the last drawn frame, one line per cell row from the top. It rejects with
+`'state'` before a frame has drawn with the effect enabled.
+
+- **Method.** One pass writes a small texture, two texels a cell: the mean colour, and the character. The character is
+  the ramp entry at floor(luminance times length), from Rec. 709 weights on the display-encoded mean. With `edges`, the
+  structure tensor of luminance differences summed over the cell (Bigun and Granlund, "Optimal orientation detection of
+  linear symmetry", ICCV 1987) replaces it by one of four edge characters when the differences reach `edgeThreshold` and
+  at least half of them agree on one direction. A second pass draws the glyphs from an atlas made at the cell size. The
+  built-in 5 x 7 glyphs are Margo's own and need no canvas or font file.
+- **Checked on a real GPU** (`packages/post/test/ascii-browser.mjs`, Intel Arc 140V, Chromium, WebGPU and the WebGL2
+  layer): all 405 characters equal a CPU reading of the unprocessed frame, equal characters draw equal pixels, colour
+  blocks are within 1.5 of 255 of each cell's average, a box draws `|` and `-` on its sides and `/` and `\` when turned
+  45 degrees, and `intensity: 0` and `enabled: false` equal the plain frame to the bit.
+- **Limits.** Characters follow tone and one edge direction, not glyph shape (no shape matching as in Xu, Zhang and
+  Wong, "Structure-based ASCII art", SIGGRAPH 2010). One code point per character, monospaced cells. Load a web font
+  (`await document.fonts.load('16px MyFont')`) before the first frame that uses it: the atlas is rebuilt only when an
+  option changes. Every frame reads each pixel twice (five times that for the character pass with `edges`); GPU cost not
+  measured yet. A cell's alpha is its average coverage on a transparent canvas. WebGPU and the WebGL2 layer.
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

@@ -969,6 +969,8 @@ ssr.enabled = false;                        // toggles without recompiling; SSR.
 - A single effect can also be attached alone, for example `Bloom.attach(engine, {strength: 0.8})`.
 - Custom full-screen effects are `NodePass`es from `@margoengine/shader` (next section).
 - `Tonemap` curves are `'agx'`, `'acescg'` and `'neutral'`, with exposure in stops and `.cube` LUTs (`setLUT`).
+- `AsciiEffect` is `ASCII` in `@margoengine/post/ascii`: `resolution` becomes `cellSize` in pixels, `block` is
+  `background: 'scene'`, and `await ascii.text()` gives the characters.
 - SMAA (`@margoengine/post/smaa`), GTAO, motion blur, glitch (`/glitch`) and afterimage (`/afterimage`) are in post;
   vignette, RGB shift, chromatic aberration, pixelation, halftone, dot screen, Sobel, sepia and posterize are ready-made
   `NodePass` effects in `@margoengine/shader/effects`.

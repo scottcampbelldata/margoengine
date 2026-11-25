@@ -3207,6 +3207,10 @@
       "types": "./dist/post/curvature.d.ts",
       "import": "./dist/post/curvature.js"
     },
+    "./post/ascii": {
+      "types": "./dist/post/ascii.d.ts",
+      "import": "./dist/post/ascii.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

@@ -4236,3 +4236,9 @@ Run natively and with `MARGO_COMPAT=1`: `node packages/sky/test/seek-check.mjs`,
 `node packages/vfx/test/seek-check.mjs`, `node packages/taa/test/seek-check.mjs`,
 `node packages/tonemap/tests/seek-browser.mjs` and `node scripts/env-mirror-gpu-check.js` (zero-delta capture updates:
 "TAA mirror after a move under history equals a fresh history" reads p99 0).
+
+## ASCII post effect (2026-11-24)
+
+After `npm run build:packages`: `node --test --test-timeout=120000 packages/post/test/ascii.test.js`, then
+`node scripts/run-with-timeout.mjs --max=3 -- node packages/post/test/ascii-browser.mjs`, repeated with `--compat`. The
+scene is one lit box on the default background; no external assets.

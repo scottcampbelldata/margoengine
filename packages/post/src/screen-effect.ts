@@ -4,10 +4,17 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { render, group } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
-import { PostStack } from './stack.js';
+import type { PostStack } from './stack.js';
 
 /** GPU frame context for optional screen passes. */
 export type ScreenContext = Extract<PassContext, { backend: 'webgpu' }>;
+
+/** Callers pass a new `{ buffer }` object each frame: the same buffer range is the same binding. */
+function same(a: GPUBindingResource, b: GPUBindingResource): boolean {
+  const x = a as GPUBufferBinding,
+    y = b as GPUBufferBinding;
+  return a === b || (!!x.buffer && x.buffer === y.buffer && x.offset === y.offset && x.size === y.size);
+}
 
 /** Resource ownership for optional screen effects; no import from the post root. */
 export abstract class ScreenEffect implements EnginePlugin {
@@ -60,7 +67,7 @@ export abstract class ScreenEffect implements EnginePlugin {
       this.pipelines.set(key, pipeline);
     }
     let binding = this.groups.get(key);
-    if (!binding || resources.some((r, i) => r !== binding!.resources[i])) {
+    if (!binding || resources.some((r, i) => !same(r, binding!.resources[i]))) {
       binding = { resources, group: group(c.device, pipeline, resources) };
       this.groups.set(key, binding);
     }

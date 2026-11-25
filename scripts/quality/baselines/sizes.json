@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18399027,
+  "total": 18408273,
   "history": [
     {
       "date": "2026-10-24",
@@ -11733,6 +11733,12 @@
       "commit": "4dd7818ec",
       "reason": "New optional entry @margoengine/ecs/scripts (script components), 0 -> 3210 B baseline (2954 B measured gzip)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "b251e06e1",
+      "reason": "New optional post/ascii: 0 to 8976 B gzip. One entry owns the stack, the 95-glyph bitmap font, the canvas atlas, the cell and compose passes and text readback; splitting would duplicate lifecycle code or make the default font asynchronous. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12527,6 +12533,7 @@
     "@margoengine/post": 47098,
     "@margoengine/post/afterimage": 6872,
     "@margoengine/post/anamorphic": 7567,
+    "@margoengine/post/ascii": 9246,
     "@margoengine/post/bloom": 8078,
     "@margoengine/post/blur": 7238,
     "@margoengine/post/contact-shadows": 7636,
