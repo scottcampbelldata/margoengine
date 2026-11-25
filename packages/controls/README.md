@@ -730,7 +730,9 @@ radians and lengths metres everywhere; convert with `degToRad`. The geodesy (geo
 ```ts
 import {GeospatialControls} from 'margoengine/controls/geospatial';
 import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
 const hills = (lon: number, lat: number) => 300 * Math.max(0, Math.sin(lon * 4000) * Math.cos(lat * 4000));
 const camera = new GeospatialControls(engine, undefined, {
   view: {longitude: degToRad(-122.4), latitude: degToRad(37.8), range: 5000, pitch: degToRad(50)},
@@ -738,11 +740,10 @@ const camera = new GeospatialControls(engine, undefined, {
   clearance: 10,
 });
 const controller = new AbortController();
-const arrived = await camera.flyTo(
-  {longitude: degToRad(2.35), latitude: degToRad(48.85), range: 3000, heading: degToRad(30)},
-  {duration: 4, signal: controller.signal},
-); // false if aborted or replaced
-console.log(arrived, camera.terrainLift);
+// The flight advances with the engine's frames; the promise settles when it lands (true) or is cancelled (false).
+camera
+  .flyTo({longitude: degToRad(2.35), latitude: degToRad(48.85), range: 3000, heading: degToRad(30)}, {duration: 1, signal: controller.signal})
+  .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
