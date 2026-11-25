@@ -157,3 +157,68 @@ fn a_bead_pressed_deeper_than_its_radius_takes_no_spin() {
         assert!(v.abs() < 1e-3, "no spin after the piece: {spin:?}");
     }
 }
+
+/// A 5 mm rod along z, `sunk` into the thickness of a triangle of three 10 g particles under it, with one face contact found at
+/// `normal` (out of the rod) from its axis: the world, after the step has begun and its first piece's constraints are solved.
+fn rod_on_a_sheet(r: f32, mass: f32, thickness: f32, sunk: f32, normal: [f32; 3]) -> World {
+    let centre = thickness + r - sunk;
+    let mut w = ball(3, mass, r, [0.0, centre, 0.0]);
+    w.iixx[0] = 1.0 / (mass * 0.25 / 12.0);
+    w.iiyy[0] = 1.0 / (mass * 0.25 / 12.0);
+    w.iizz[0] = 1.0 / (0.5 * mass * r * r);
+    for (i, p) in [[-0.05f32, 0.0, -0.05], [0.05, 0.0, -0.05], [0.0, 0.0, 0.06]].iter().enumerate() {
+        (w.x[i], w.y[i], w.z[i]) = (p[0], p[1], p[2]);
+        w.w[i] = 100.0;
+        w.radius[i] = thickness;
+    }
+    w.reserve_faces(1);
+    w.faces = 1;
+    (w.fc_a[0], w.fc_b[0], w.fc_c[0]) = (0, 1, 2);
+    (w.fc_wa[0], w.fc_wb[0], w.fc_wc[0]) = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0);
+    w.fc_row[0] = 1;
+    (w.fc_px[0], w.fc_py[0], w.fc_pz[0]) = (r * normal[0], centre + r * normal[1], r * normal[2]);
+    (w.fc_nx[0], w.fc_ny[0], w.fc_nz[0]) = (normal[0], normal[1], normal[2]);
+    w.fc_k[0] = r;
+    w.fc_r[0] = thickness;
+    w.begin(1.0 / 60.0);
+    w.substep_pre(1.0 / 480.0, 1, [0.0, 0.0, 0.0]);
+    w
+}
+
+/// The rod is pushed up by at most what it sank, and the sheet gives way downward by less than that.
+fn held_up(w: &World, sunk: f32) {
+    assert!(w.dmy[0] > 0.0 && w.dmy[0] <= sunk, "the rod is pushed up by at most the millimetre it sank: {}", w.dmy[0]);
+    for i in 0..3 {
+        assert!(w.y[i] <= 0.0 && w.y[i] > -sunk, "the sheet gives way downward, by less than the sink: {}", w.y[i]);
+    }
+}
+
+#[test]
+fn a_rod_whose_contact_was_found_beside_it_is_held_on_the_sheets_side() {
+    // The host finds a face contact where the body touches during the step, in the body's frame at the step's start: under a rod
+    // that rolls a radian in the step, the normal found lies almost in the sheet's plane, here tipped 6 degrees up. The rod, whose
+    // axis was above the sheet when the step began, is still met from above: pushed up by the millimetre it sank, never down
+    // through the sheet (the side read from that normal met the sheet from below, KB-SOFT-TUNNEL1).
+    let (r, mass, thickness, sunk) = (0.005f32, 0.016f32, 0.004f32, 0.001f32);
+    let tip = 0.1f32;
+    let mut w = rod_on_a_sheet(r, mass, thickness, sunk, [(1.0 - tip * tip).sqrt(), tip, 0.0]);
+    let h = 1.0 / 480.0;
+    w.apply_faces(h, h);
+    held_up(&w, sunk);
+}
+
+#[test]
+fn a_rod_that_rolled_past_a_quarter_turn_in_a_step_stays_on_the_sheets_side() {
+    // A 5 mm rod along z lies 1 mm into the thickness of a triangle under it, its contact found at its bottom with the normal
+    // down. Since the step began it has rolled 2 rad about its own axis (a rod rolling at 120 rad/s turns that far in a 60 Hz
+    // step): a round body's contact slides round it as it rolls, so the sheet is still below. The rod is pushed up by the
+    // millimetre it sank, never down through the sheet (the found normal turned with the rod pointed up past a quarter turn, the
+    // sheet was met from its other side and the rod was thrown through it, KB-SOFT-TUNNEL1).
+    let (r, mass, thickness, sunk) = (0.005f32, 0.016f32, 0.004f32, 0.001f32);
+    let mut w = rod_on_a_sheet(r, mass, thickness, sunk, [0.0, -1.0, 0.0]);
+    let roll = 2.0f32;
+    (w.sqx[0], w.sqy[0], w.sqz[0], w.sqw[0]) = (0.0, 0.0, (0.5 * roll).sin(), (0.5 * roll).cos());
+    let h = 1.0 / 480.0;
+    w.apply_faces(h, h);
+    held_up(&w, sunk);
+}

@@ -31,7 +31,7 @@ impl World {
         for v in [
             &mut self.fc_wa, &mut self.fc_wb, &mut self.fc_wc, &mut self.fc_nx, &mut self.fc_ny, &mut self.fc_nz, &mut self.fc_px,
             &mut self.fc_py, &mut self.fc_pz, &mut self.fc_vx, &mut self.fc_vy, &mut self.fc_vz, &mut self.fc_f, &mut self.fc_r,
-            &mut self.fc_j, &mut self.fc_k,
+            &mut self.fc_j, &mut self.fc_k, &mut self.fc_side,
         ] {
             v.resize(n);
         }
@@ -69,6 +69,42 @@ impl World {
         self.wm[c] + a[0] * ix + a[1] * iy + a[2] * iz
     }
 
+    /// The side of its triangle each face contact's body is on, where the body is round (a ball, a capsule's side, a rounded
+    /// edge: a radius of curvature above 0), from where both were at the step's start (`begin`), kept for the step: the body's
+    /// centre of curvature then against the triangle's plane then (Bridson, Fedkiw and Anderson 2002, "Robust treatment of
+    /// collisions, contact and friction for cloth animation", and Harmon, Vouga, Tamstorf and Grinspun 2008, "Robust treatment
+    /// of simultaneous collisions", both keep the side a pair was on before the step). The normal a round contact was found with
+    /// cannot say: the host finds it where the body touches during the step, in the body's frame at the step's start, and a
+    /// round body that rolls carries its contact round its surface (Montana 1988, "The kinematics of contact and grasp"), so for
+    /// a rod rolling a radian or two a step the normal found under it came back lying almost in the sheet's plane, or turned
+    /// with the rod past a quarter turn pointed back into it; either way the sheet was met from below and the rod thrown through
+    /// it. A point of a body's own (a corner or an edge, rho 0), and a round body whose centre of curvature lies in the plane
+    /// itself, keep 0: their side is the normal found, turned with the body, as before.
+    pub(crate) fn face_sides(&mut self) {
+        for f in 0..self.faces {
+            self.fc_side[f] = 0.0;
+            let rho = self.fc_k[f];
+            if self.fc_row[f] == NONE || !(rho > 0.0) {
+                continue;
+            }
+            let (corners, _) = self.face_corners(f);
+            let p = |i: usize| [self.x[i], self.y[i], self.z[i]];
+            let (a, b, d) = (p(corners[0]), p(corners[1]), p(corners[2]));
+            let (e1, e2) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [d[0] - a[0], d[1] - a[1], d[2] - a[2]]);
+            let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+            let length = sqrt(dot(n, n));
+            if !(length > 1e-12) {
+                continue;
+            }
+            // The centre of curvature where the contact was found, in the body's pose at the step's start.
+            let n0 = [self.fc_nx[f], self.fc_ny[f], self.fc_nz[f]];
+            let centre = [self.fc_px[f] - rho * n0[0], self.fc_py[f] - rho * n0[1], self.fc_pz[f] - rho * n0[2]];
+            let above = dot([centre[0] - a[0], centre[1] - a[1], centre[2] - a[2]], n) / length;
+            // The normal points out of the body toward the triangle: against the side the centre is on.
+            self.fc_side[f] = if above > 1e-6 { -1.0 } else if above < -1e-6 { 1.0 } else { 0.0 };
+        }
+    }
+
     /// Where face contact `f` with body row `c` stands at `tau` seconds into the step (the body's centre at `carried`, turned by
     /// `spin`, moved by `dm` and turned by `turn`): the triangle's corners and their weights at the point of it the contact holds,
     /// the unit normal out of the body, the point where the body takes the push (from its centre) and the gap from the body's
@@ -89,7 +125,8 @@ impl World {
             let (n, q, gap) = surface.meet(self.face_point(corners, weights));
             return Some((corners, weights, n, q, gap));
         }
-        // The triangle's plane now, its normal turned to face away from the body as the contact's was found.
+        // The triangle's plane now, its normal turned out of the body: by the side a round body was on at the step's start
+        // (`face_sides`), else as the contact's normal was found, turned with the body.
         let p = |i: usize| [self.x[i], self.y[i], self.z[i]];
         let (a, b, d) = (p(corners[0]), p(corners[1]), p(corners[2]));
         let (e1, e2) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [d[0] - a[0], d[1] - a[1], d[2] - a[2]]);
@@ -98,7 +135,7 @@ impl World {
         if !(length > 1e-12) {
             return None;
         }
-        let side = n[0] * surface.normal[0] + n[1] * surface.normal[1] + n[2] * surface.normal[2];
+        let side = if self.fc_side[f] != 0.0 { self.fc_side[f] } else { dot(n, surface.normal) };
         let s = if side < 0.0 { -1.0 / length } else { 1.0 / length };
         n = [n[0] * s, n[1] * s, n[2] * s];
         // The body's point nearest the triangle, and its foot on the triangle's plane.

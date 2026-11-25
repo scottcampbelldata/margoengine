@@ -234,6 +234,10 @@ pub struct World {
     pub fc_j: Col<f32>,
     /// The collider's radius of curvature at each face contact's point, as `kr` is for a particle's.
     pub fc_k: Col<f32>,
+    /// Which way each face contact's triangle normal points out of a round body this step, +1 or -1 on the triangle's own normal
+    /// (the order of its corners), or 0 to go by the normal found; set from the step's start by `face_sides` (not a column the
+    /// host writes).
+    pub fc_side: Col<f32>,
     pub faces: usize,
 }
 
@@ -339,6 +343,7 @@ impl World {
             self.clear_correction(c);
         }
         self.torn = 0;
+        self.face_sides();
         // A pinned particle with a target travels to it at a steady speed over the step.
         for i in 0..self.particles {
             if self.pflags[i] & TARGETED != 0 {

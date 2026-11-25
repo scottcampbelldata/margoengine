@@ -23,7 +23,7 @@ static mut WORLD: World = World {
     dmx: Col::new(), dmy: Col::new(), dmz: Col::new(), a0x: Col::new(), a0y: Col::new(), a0z: Col::new(), kj: Col::new(), tau_end: 0.0, tqx: Col::new(), tqy: Col::new(), tqz: Col::new(), tqw: Col::new(), rox: Col::new(), roy: Col::new(), roz: Col::new(), rqx: Col::new(), rqy: Col::new(), rqz: Col::new(), rqw: Col::new(), sqx: Col::new(), sqy: Col::new(), sqz: Col::new(), sqw: Col::new(),
     fc_a: Col::new(), fc_b: Col::new(), fc_c: Col::new(), fc_wa: Col::new(), fc_wb: Col::new(), fc_wc: Col::new(), fc_row: Col::new(),
     fc_nx: Col::new(), fc_ny: Col::new(), fc_nz: Col::new(), fc_px: Col::new(), fc_py: Col::new(), fc_pz: Col::new(), fc_vx: Col::new(),
-    fc_vy: Col::new(), fc_vz: Col::new(), fc_f: Col::new(), fc_r: Col::new(), fc_j: Col::new(), fc_k: Col::new(), faces: 0,
+    fc_vy: Col::new(), fc_vz: Col::new(), fc_f: Col::new(), fc_r: Col::new(), fc_j: Col::new(), fc_k: Col::new(), fc_side: Col::new(), faces: 0,
 };
 
 #[allow(static_mut_refs)]

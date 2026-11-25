@@ -834,7 +834,6 @@ test('the builders take Rapier signatures: anisotropic cloth springs, a tube by 
 test('a deformable collider bound to a soft body follows it: direct, direct by position and skinned', async () => {
   const { physics, soft } = await create();
   const top = (collider) => collider.aabb().max[1];
-  const bottom = (collider) => collider.aabb().min[1];
   // A free 4 x 4 cloth falling; a thin mesh made of its four corner particles, bound directly.
   const cloth = soft.create(SoftBodyDesc.cloth([0, 5, 0], [0.1, 0, 0], [0, 0, 0.1], 4, 4).setParticleMass(0.05));
   const corners = [0, 3, 12, 15];
@@ -1098,9 +1097,18 @@ test('small and thin rigid bodies dropped on a default cloth rest on it for five
     },
     bead: { position: [0.3, 1.5, 0], colliders: { shape: 'sphere', radius: 0.01, density: 400 } },
     '1 kg box': { position: [0, 1.5, 0.35], colliders: { shape: 'box', halfExtents: [0.05, 0.05, 0.05], mass: 1 } },
+    // The rod under standard gravity rolls down the sagging sheet a radian or two a step; the side of the sheet it met was read
+    // from a normal that rolling carries round the rod, and at step 163 the sheet was met from below and the rod thrown through
+    // it (KB-SOFT-TUNNEL1).
+    'rod at standard gravity': {
+      gravity: [0, -9.80665, 0],
+      position: [-0.3, 1.5, 0.05],
+      rotation: [0.7071068, 0, 0, 0.7071068],
+      colliders: { shape: 'capsule', halfHeight: 0.25, radius: 0.005, density: 400 },
+    },
   };
-  for (const [name, options] of Object.entries(shapes)) {
-    const { physics, soft } = await create();
+  for (const [name, { gravity, ...options }] of Object.entries(shapes)) {
+    const { physics, soft } = await create(gravity ? { gravity } : {});
     // A default cloth: no radius, no surface collider, no damping (it rings for the whole run), only its four corners pinned.
     const cloth = soft.create(
       SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n).setPinnedParticles([
