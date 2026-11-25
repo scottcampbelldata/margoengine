@@ -180,3 +180,52 @@ fn a_bar_spinning_through_a_wall_never_holds_more_energy_than_it_began_with() {
         }
     }
 }
+
+/// A bar turning just under a whole turn a step, whose tip crosses a small block between the pose the step begins at and the one it ends at.
+/// The end rotation reads as a small turn the other way, so a bound taken from it, and a sweep along the short arc to it, miss the block
+/// altogether; the unwrapped turn of the step, which is what the bar swept, does not. The block sits half way between the poses the
+/// substeps pass through, so no contact of theirs holds the bar either.
+fn bar_and_block(ccd: bool) -> (World, u32) {
+    let mut w = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+    let (c, s) = (0.76f32.cos(), 0.76f32.sin());
+    let block = w.create_body(&BodyDef { kind: Kind::Static, position: v2(0.9 * c, 0.9 * s), ..Default::default() }).unwrap();
+    w.create_shape(block, Core::rect(0.05, 0.05, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    // Four substeps turn it through 4 atan(spin dt / 4) = 6.07 rad, 2 pi less 0.21.
+    let b = w.create_body(&BodyDef { angular_velocity: 4560.0, ccd, can_sleep: false, ..Default::default() }).unwrap();
+    w.create_shape(b, Core::rect(1.0, 0.02, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, ..Default::default() }).unwrap();
+    (w, b)
+}
+
+fn angle_of(w: &World, b: u32) -> f32 {
+    let q = w.bodies[b as usize].xf.q;
+    margoengine_physics2d_kernel::math::atan2(q.s, q.c)
+}
+
+#[test]
+fn a_bar_turning_just_under_a_whole_turn_a_step_is_caught_by_a_block_its_tip_crosses() {
+    // Without CCD nothing holds it: it ends the step 0.21 rad the other way, a tip having passed through the block.
+    let (mut w, b) = bar_and_block(false);
+    w.step(DT).unwrap();
+    assert!((angle_of(&w, b) + 0.21).abs() < 0.01, "the bar ends its step at {}", angle_of(&w, b));
+    // With it the bar is set back to where its tip first touches the block: the block spans angles 0.76 +- 0.1 or so at the radii the tip
+    // and the bar's length reach, so the touch comes between 0.55 and 0.8 rad, long before the end rotation (-0.21) the short arc ends at.
+    let (mut w, b) = bar_and_block(true);
+    w.step(DT).unwrap();
+    let angle = angle_of(&w, b);
+    assert!(angle > 0.55 && angle < 0.8, "the bar was held at the block, not carried on to {angle}");
+}
+
+#[test]
+fn a_rotation_by_any_angle_matches_sine_and_cosine() {
+    use margoengine_physics2d_kernel::math::Rot;
+    for angle in [0.0f32, 1.0e-4, 0.1, 0.7, 1.5, 3.0, -2.2, 6.0, 6.28, 12.5, -40.0, 75.1, 300.0] {
+        let q = Rot::from_angle(angle);
+        let (c, s) = ((angle as f64).cos(), (angle as f64).sin());
+        // Each squaring back up carries the float32 rounding of the one before it along, so the error grows with the angle (measured: 1.7e-5 at
+        // 300 rad, 3e-6 at 75, 8e-7 at 6): the bound is 2e-7 per radian, the rounding of one rotation taken once for each radian.
+        let bound = 2.0e-7 * (1.0 + angle.abs() as f64);
+        assert!((q.c as f64 - c).abs() < bound && (q.s as f64 - s).abs() < bound, "angle {angle}: ({}, {}) against ({c}, {s})", q.c, q.s);
+    }
+    let q = Rot::from_angle(f32::NAN);
+    assert_eq!((q.c, q.s), (1.0, 0.0));
+}

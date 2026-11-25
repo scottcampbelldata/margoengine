@@ -1355,7 +1355,7 @@ impl World {
         let ccd = self.ccd_starts();
         solver::solve_validated(self, dt)?;
         lap(self, 5, &mut stamp);
-        self.solve_ccd(&ccd)?;
+        self.solve_ccd(&ccd, dt)?;
         lap(self, 6, &mut stamp);
         for body in self.bodies.iter_mut() {
             // The body ends the step exactly where it was told to be, with the velocity that took it there.

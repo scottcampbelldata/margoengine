@@ -8,8 +8,9 @@
 // systems", PhD thesis, UC Berkeley, 1996; the same bound Erin Catto uses in "Continuous Collision", GDC 2013): the
 // distance between two shapes cannot close faster than the most the pair's points move, here the centre's travel plus the
 // turn times the farthest point of the shape from its centre, so advancing time by gap over that speed never passes
-// the first touch. The pose between the two ends is the centre moved in a straight line and the rotation by normalised
-// linear interpolation along the short arc. A pair that already touches at the step's start is left to the contact
+// the first touch. The pose between the two ends is the centre moved in a straight line and the rotation turned through the
+// angle the step turned it, spin times the step: the whole of it, not the short arc to the end rotation, which reads a turn of
+// 2 pi minus a little as a little the other way and would let a fast spinner's tip pass through a thin wall unseen. A pair that already touches at the step's start is left to the contact
 // solver: a resting body must not be pinned at time 0.
 use alloc::vec::Vec;
 use margoengine_physics_kernel_common::broad::Bounds;
@@ -34,10 +35,19 @@ pub(crate) struct Start {
     pub ccd: bool,
 }
 
-/// Normalised linear interpolation along the short arc.
-fn blend(a: Rot, b: Rot, t: f32) -> Rot {
-    let flip = if a.c * b.c + a.s * b.s < 0.0 { -1.0 } else { 1.0 };
-    Rot::from_pair(a.c + t * (flip * b.c - a.c), a.s + t * (flip * b.s - a.s))
+/// The signed angle a body turned through in a step: the angle from `q0` to `q1`, with whole turns added to land nearest `spin_step`,
+/// the angular velocity times the step. The two rotations alone give it only up to whole turns.
+fn turned(q0: Rot, q1: Rot, spin_step: f32) -> f32 {
+    let r = q0.inverse_mul(q1);
+    let raw = crate::math::atan2(r.s, r.c);
+    let turns = (spin_step - raw) / core::f32::consts::TAU;
+    let whole = if turns >= 0.0 { (turns + 0.5) as i32 } else { -((-turns + 0.5) as i32) };
+    raw + whole as f32 * core::f32::consts::TAU
+}
+
+/// `q0` turned through `fraction` of `turn`.
+fn at(q0: Rot, turn: f32, fraction: f32) -> Rot {
+    q0.mul(Rot::from_angle(turn * fraction))
 }
 
 impl World {
@@ -57,29 +67,30 @@ impl World {
     }
 
     /// Sets each body in `starts` back to its earliest time of impact, when it has one.
-    pub(crate) fn solve_ccd(&mut self, starts: &[Start]) -> Result<(), PhysicsError> {
+    pub(crate) fn solve_ccd(&mut self, starts: &[Start], dt: f32) -> Result<(), PhysicsError> {
         let mut candidates = Vec::new();
         let mut inner = crate::world::now();
         for start in starts.iter().filter(|s| s.ccd) {
             let body = &self.bodies[start.body as usize];
             let (end_center, end_q, local_center) = (body.exact_center, body.xf.q, body.local_center);
             let shift = v2((end_center[0] - start.center[0]) as f32, (end_center[1] - start.center[1]) as f32);
-            let turn = {
-                let r = start.q.inverse_mul(end_q);
-                crate::math::atan2(r.s, r.c).abs()
-            };
-            let travel = shift.length() + turn * body.extent;
+            let turn = turned(start.q, end_q, body.angular_velocity * dt);
+            let travel = shift.length() + turn.abs() * body.extent;
             if !(travel > 2.0 * SPECULATIVE) {
                 continue;
             }
             // All positions are relative to the starting centre, so the sweep does not lose precision far from the origin.
             let pose = |t: f32| -> Xf {
-                let q = blend(start.q, end_q, t);
+                let q = at(start.q, turn, t);
                 Xf { p: shift.scale(t).sub(q.apply(local_center)), q }
             };
             let (cx, cy) = (start.center[0] as f32, start.center[1] as f32);
+            // A point turning through `turn` about the centre leaves the box of its two ends by at most extent (1 - cos(turn / 2)) <= extent
+            // turn^2 / 8, the sagitta of its arc (the chord between the ends is inside the box).
+            let whole_circle = turn.abs() >= core::f32::consts::PI;
+            let bulge = (turn * turn * 0.125).min(1.0) * body.extent;
             let mut earliest = 1.0f32;
-            let mut partner: Option<(u32, [f32; 2], [f32; 2], Rot)> = None;
+            let mut partner: Option<(u32, [f32; 2], [f32; 2], Rot, f32)> = None;
             for &mine in &body.shapes.clone() {
                 let own = &self.shapes[mine as usize];
                 if own.sensor {
@@ -87,10 +98,15 @@ impl World {
                 }
                 let (core, own_bits) = (own.core, own.clone());
                 let (b0, b1) = (bounds_of(&core, pose(0.0))?, bounds_of(&core, pose(1.0))?);
-                let swept = Bounds {
-                    min: [b0.min[0].min(b1.min[0]) + cx, b0.min[1].min(b1.min[1]) + cy],
-                    max: [b0.max[0].max(b1.max[0]) + cx, b0.max[1].max(b1.max[1]) + cy],
+                let mut swept = Bounds {
+                    min: [b0.min[0].min(b1.min[0]) - bulge + cx, b0.min[1].min(b1.min[1]) - bulge + cy],
+                    max: [b0.max[0].max(b1.max[0]) + bulge + cx, b0.max[1].max(b1.max[1]) + bulge + cy],
                 };
+                if whole_circle {
+                    // Half a turn or more: the shape's points go round the centre, so its path fills the disc of its extent about it.
+                    swept.min = [swept.min[0].min(cx + shift.x.min(0.0) - body.extent), swept.min[1].min(cy + shift.y.min(0.0) - body.extent)];
+                    swept.max = [swept.max[0].max(cx + shift.x.max(0.0) + body.extent), swept.max[1].max(cy + shift.y.max(0.0) + body.extent)];
+                }
                 self.broad.query(&swept, &mut candidates);
                 crate::world::tick(&mut self.timing, 12, &mut inner);
                 for &other in &candidates {
@@ -113,20 +129,17 @@ impl World {
                     let rel = |c: [f64; 2]| [(c[0] - start.center[0]) as f32, (c[1] - start.center[1]) as f32];
                     let (c0, c1) = if moves { (rel(o_start), rel(ob.exact_center)) } else { (rel(ob.exact_center), rel(ob.exact_center)) };
                     let (o_q0, o_q1) = if moves { (o_q0, ob.xf.q) } else { (ob.xf.q, ob.xf.q) };
+                    let o_turn = if moves { turned(o_q0, o_q1, ob.angular_velocity * dt) } else { 0.0 };
                     let other_lc = if moves { ob.local_center } else { V2::ZERO };
                     let static_origin = ob.exact_origin();
                     let origin_at = |t: f32| -> Xf {
                         if !moves {
                             return Xf { p: v2((static_origin[0] - start.center[0]) as f32, (static_origin[1] - start.center[1]) as f32), q: ob.xf.q };
                         }
-                        let q = blend(o_q0, o_q1, t);
+                        let q = at(o_q0, o_turn, t);
                         Xf { p: v2(c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t).sub(q.apply(other_lc)), q }
                     };
-                    let other_turn = {
-                        let r = o_q0.inverse_mul(o_q1);
-                        crate::math::atan2(r.s, r.c).abs()
-                    };
-                    let other_travel = if moves { v2(c1[0] - c0[0], c1[1] - c0[1]).length() + other_turn * ob.extent } else { 0.0 };
+                    let other_travel = if moves { v2(c1[0] - c0[0], c1[1] - c0[1]).length() + o_turn.abs() * ob.extent } else { 0.0 };
                     let together = travel + other_travel;
                     let gap_at = |t: f32| -> Result<f32, PhysicsError> {
                         let m = collide(&core, pose(t), &s.core, origin_at(t), 1.0e4)?;
@@ -152,24 +165,23 @@ impl World {
                     }
                     if let Some(t) = found {
                         earliest = t;
-                        partner = moves.then_some((s.body, c0, c1, o_q0)).map(|(b, c0, c1, q0)| (b, c0, c1, q0));
+                        partner = moves.then_some((s.body, c0, c1, o_q0, o_turn));
                     }
                 }
             }
             crate::world::tick(&mut self.timing, 13, &mut inner);
             if earliest < 1.0 {
                 // A dynamic body it met is put back to the same time, so the two touch where they met and do not overlap.
-                if let Some((other, c0, c1, q0)) = partner {
+                if let Some((other, c0, c1, q0, o_turn)) = partner {
                     let t = earliest;
                     let o = &mut self.bodies[other as usize];
-                    let q1 = o.xf.q;
                     o.exact_center = [start.center[0] + (c0[0] + (c1[0] - c0[0]) * t) as f64, start.center[1] + (c0[1] + (c1[1] - c0[1]) * t) as f64];
-                    o.xf.q = blend(q0, q1, t);
+                    o.xf.q = at(q0, o_turn, t);
                     o.round_pose();
                 }
                 let body = &mut self.bodies[start.body as usize];
                 body.exact_center = [start.center[0] + (shift.x * earliest) as f64, start.center[1] + (shift.y * earliest) as f64];
-                body.xf.q = blend(start.q, end_q, earliest);
+                body.xf.q = at(start.q, turn, earliest);
                 body.round_pose();
             }
             crate::world::tick(&mut self.timing, 14, &mut inner);

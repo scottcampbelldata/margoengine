@@ -315,6 +315,26 @@ impl Rot {
     pub fn inverse_mul(self, o: Rot) -> Rot {
         Rot { c: self.c * o.c + self.s * o.s, s: self.c * o.s - self.s * o.c }
     }
+    /// The rotation by `angle` radians, any size: the angle is halved until it is at most 1/8, its cosine and sine come from their
+    /// Taylor series there (the truncation is under 1e-11), and the rotation is squared back up. Only sums and products, so the result is
+    /// the same on every platform. The identity for an angle that is not finite.
+    pub fn from_angle(angle: f32) -> Rot {
+        if !angle.is_finite() {
+            return Rot::IDENTITY;
+        }
+        let (mut x, mut doublings) = (angle, 0u32);
+        while x.abs() > 0.125 {
+            x *= 0.5;
+            doublings += 1;
+        }
+        let x2 = x * x;
+        let mut c = 1.0 + x2 * (-1.0 / 2.0 + x2 * (1.0 / 24.0 + x2 * (-1.0 / 720.0 + x2 * (1.0 / 40320.0))));
+        let mut s = x * (1.0 + x2 * (-1.0 / 6.0 + x2 * (1.0 / 120.0 + x2 * (-1.0 / 5040.0))));
+        for _ in 0..doublings {
+            (c, s) = (c * c - s * s, 2.0 * s * c);
+        }
+        Rot::from_pair(c, s)
+    }
     /// The rotation advanced by angle `h w` to first order, then normalised: (c, s) + h w (-s, c).
     #[inline]
     pub fn integrate(self, delta: f32) -> Rot {
