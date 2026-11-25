@@ -260,7 +260,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | CLAIMED |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Claude | CLAIMED |
-| ATMO-01 | Boundary-layer wind field | stand-in | Claude | CLAIMED |
-| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | CLAIMED |
+| ATMO-01 | Boundary-layer wind field | stand-in | Claude | LANDED c38c25d3d |
+| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | LANDED c38c25d3d |
 | ATMO-03 | Moist convection and cloud dynamics | none | Claude | CLAIMED |
 | ATMO-04 | Precipitation microphysics | stand-in | Claude | CLAIMED |
