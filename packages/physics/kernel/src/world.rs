@@ -882,10 +882,11 @@ impl World {
                 hash = (hash ^ unsafe { *data.add(word) }).wrapping_mul(0x0100_0193);
             }
         };
-        // The header's scalars, after the words that say where the columns are: the hash covers state, not where state lives.
+        // The header's scalars, after the words that say where the columns are and before the padding that rounds the header up to a
+        // multiple of 16 bytes: the hash covers state, not where state lives.
         let layout = 2 + ROW_CLASSES + COLUMNS;
         take(0, 1);
-        take(layout, HEADER_BYTES as usize / 4 - layout);
+        take(layout, core::mem::size_of::<Header>() / 4 - layout);
         for column in 0..COLUMNS {
             if !SCRATCH.contains(&column) {
                 let header = self.header();
