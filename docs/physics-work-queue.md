@@ -247,7 +247,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | LANDED 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Claude | LANDED 2f1860412 |
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | LANDED f9161cc7e |
-| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | CLAIMED |
+| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | LANDED 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | CLAIMED |
 | SEA-04 | Local dispersive free surface | stand-in | Claude | CLAIMED |
 | SEA-08 | Ship seakeeping | stand-in | Claude | CLAIMED |
