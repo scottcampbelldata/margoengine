@@ -1,4 +1,4 @@
-﻿<!doctype html><html><meta charset="utf-8"><title>Mesh PBR correctness</title><canvas width="16" height="16"></canvas><script type="module">
+<!doctype html><html><meta charset="utf-8"><title>Mesh PBR correctness</title><canvas width="16" height="16"></canvas><script type="module">
 import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
@@ -14,9 +14,9 @@ window.run=async(compat=false)=>{
  const quad=()=>({id:'quad',material:1,positions:new Float32Array([-2,-2,0,2,-2,0,2,2,0,-2,2,0]),indices:new Uint32Array([0,1,2,0,2,3]),uvs:new Float32Array([0,0,1,0,1,1,0,1])});
  const scene=()=>({revision:1,models:[],instances:[],materials:[{id:1,type:'metal',color:[1,1,1]}],meshes:[quad()],pbrMaterials:[{id:1,metallicFactor:0}],environment:{ground:false,skyIntensity:0,sunIntensity:Math.PI,sunAngularSize:0,sunDirection:[0,0,1]}});
  const tex=(data)=>({width:1,height:1,data:new Uint8Array(data)});
- const render=async(s)=>{
+ const render=async(s,samples=4)=>{
   const t=await ComposedVoxelPathTracer.create(engine,{scene:s,features:[meshPBR()],denoise:false,maxBounces:2});
-  try{await t.ready;return await t.renderImage({width:8,height:8,samples:4,jitter:false,seed:17,aovs:true,signal:AbortSignal.timeout(120000)});}finally{t.dispose();}
+  try{await t.ready;return await t.renderImage({width:8,height:8,samples,jitter:false,seed:17,aovs:true,signal:AbortSignal.timeout(120000)});}finally{t.dispose();}
  };
  const compare=async(name,left,right)=>{
   const a=await render(left),b=await render(right);let maximumError=0;
@@ -34,6 +34,13 @@ window.run=async(compat=false)=>{
   await compare('emissive texture equals independent radiance factors',a,b);
   a=scene();b=scene();Object.assign(a.pbrMaterials[0],{alphaMode:'MASK',alphaCutoff:.5,baseColorTexture:tex([255,255,255,127])});b.meshes=[];
   await compare('alpha cutout equals empty geometry',a,b);
+  a=scene();b=scene();Object.assign(a.pbrMaterials[0],{alphaMode:'BLEND',baseColorFactor:[1,1,1,0]});b.meshes=[];
+  await compare('alpha blend coverage 0 equals empty geometry',a,b);
+  a=scene();b=scene();Object.assign(a.pbrMaterials[0],{alphaMode:'BLEND',baseColorTexture:tex([255,255,255,255])});b.pbrMaterials[0].baseColorTexture=tex([255,255,255,255]);
+  await compare('alpha blend coverage 1 equals opaque',a,b);
+  {a=scene();b=scene();Object.assign(a.pbrMaterials[0],{alphaMode:'BLEND',baseColorFactor:[1,1,1,.25]});
+   const blend=await render(a,256),opaque=await render(b,16),mean=im=>{let s=0;for(let i=0;i<im.color.length;i+=4)s+=im.color[i]+im.color[i+1]+im.color[i+2];return s;};
+   const ratio=mean(blend)/mean(opaque);rows.push({name:'alpha blend 0.25 coverage passes three quarters of the rays',ratio,ratioError:Math.abs(ratio-.25)/.25,finite:blend.color.every(Number.isFinite)});}
   a=scene();b=scene();a.pbrMaterials[0].normalTexture=tex([255,128,255,255]);const length=Math.hypot(1,1/255,1),n=[1/length,(1/255)/length,1/length];b.meshes[0].normals=new Float32Array([...n,...n,...n,...n]);
   await compare('normal texture equals independent vertex normals',a,b);
   const model=await loadGLTF(engine,'/packages/gltf/test/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});

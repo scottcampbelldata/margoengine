@@ -62,9 +62,9 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       finite(m.iridescenceThicknessMinimum??100,'iridescenceThicknessMinimum',0,1e8);
       finite(m.iridescenceThicknessMaximum??400,'iridescenceThicknessMaximum',m.iridescenceThicknessMinimum??100,1e8);
 
-      if (!['OPAQUE', 'MASK'].includes(m.alphaMode ?? 'OPAQUE') ||
+      if (!['OPAQUE', 'MASK', 'BLEND'].includes(m.alphaMode ?? 'OPAQUE') ||
           (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean'))
-        throw new TypeError('Mesh PBR requires OPAQUE or MASK and a boolean doubleSided');
+        throw new TypeError('Mesh PBR requires alphaMode OPAQUE, MASK or BLEND and a boolean doubleSided');
       for (const name of MAPS) {
         const t = m[name];
         if (t && !textures.has(t)) {
@@ -125,7 +125,7 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       f.set(m.emissiveFactor ?? [0, 0, 0], at + 8);
       f[at + 11] = m.emissiveStrength ?? 1;
       f.set([m.metallicFactor ?? 1, m.roughnessFactor ?? 1, m.normalScale ?? 1, m.alphaCutoff ?? .5], at + 12);
-      out[at + 1] = m.alphaMode === 'MASK' ? 1 : 0;
+      out[at + 1] = m.alphaMode === 'MASK' ? 1 : m.alphaMode === 'BLEND' ? 2 : 0;
       out[at + 2] = m.doubleSided ? 1 : 0;
       f.set([m.clearcoatFactor??0,m.clearcoatRoughnessFactor??0,m.clearcoatNormalScale??1,m.sheenRoughnessFactor??0],at+32);
       f.set(m.sheenColorFactor??[0,0,0],at+36);f[at+39]=m.specularFactor??1;

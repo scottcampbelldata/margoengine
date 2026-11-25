@@ -85,9 +85,9 @@ export interface TracePBRMaterial {
   iridescenceTexture?: TracePBRTexture;
   /** Linear thickness interpolation in green; without a texture maximum is used. */
   iridescenceThicknessTexture?: TracePBRTexture;
-  /** OPAQUE or binary MASK coverage. Default OPAQUE. */
-  alphaMode?: 'OPAQUE' | 'MASK';
-  /** MASK coverage threshold. Default 0.5. */
+  /** OPAQUE, binary MASK coverage, or BLEND: a ray passes with probability 1 - coverage (stochastic transparency). Default OPAQUE. */
+  alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
+  /** MASK coverage threshold. Default 0.5. Unused by OPAQUE and BLEND. */
   alphaCutoff?: number;
   /** Trace both geometric sides. Default false. */
   doubleSided?: boolean;

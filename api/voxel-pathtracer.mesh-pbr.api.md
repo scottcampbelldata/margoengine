@@ -78,7 +78,7 @@ export interface TracePBRMaterial {
     iridescenceThicknessMaximum?: number;
     iridescenceTexture?: TracePBRTexture;
     iridescenceThicknessTexture?: TracePBRTexture;
-    alphaMode?: 'OPAQUE' | 'MASK';
+    alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     doubleSided?: boolean;
 }

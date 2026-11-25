@@ -11222,3 +11222,16 @@ Built: tone ramp selection per cell, with the tensor choosing among four edge ch
 ### Island by island solving (`@margoengine/physics`, 2026-11-24, B-05)
 
 Solving each island of bodies through all its substeps, as apart from the other islands, follows D. Baraff, "Dynamic Simulation of Non-Penetrating Rigid Bodies", PhD thesis, Cornell University, 1992 (a world is split into islands of bodies joined by contacts and joints, which share no unknown), and, for solving independent groups of constraints in parallel, R. Tonge, F. Benevolenski and A. Voroshilov, "Mass Splitting for Jitter-Free Parallel Rigid Body Simulation", ACM Transactions on Graphics 31(4), SIGGRAPH 2012. A kinematic body's pose at each substep is its pose at the start of the step advanced with the arithmetic of the integrator, so it needs no source. No code of any of them was read.
+
+### Mesh path tracer BLEND alpha (`@margoengine/voxel-pathtracer/mesh-pbr`, 2026-11-25)
+
+Built from the papers and specification below; no path tracer source (three-gpu-pathtracer included, feature list only) was read.
+
+- Khronos Group, *glTF 2.0 Specification*, section 3.9.4 "Alpha Coverage", https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#alpha-coverage (BLEND alpha is coverage; MASK uses alphaCutoff).
+- E. Enderton, E. Sintorn, P. Shirley and D. Luebke, "Stochastic Transparency", I3D 2010, https://doi.org/10.1145/1730804.1730817 (coverage as the probability that a surface stops a sample; order independent and unbiased in expectation).
+- C. Wyman and M. McGuire, "Hashed Alpha Testing", I3D 2017, https://doi.org/10.1145/3023368.3023370 (a hash of the surface point instead of a fresh random number, so one surface point takes one decision).
+- M. Pharr, W. Jakob and G. Humphreys, *Physically Based Rendering*, 4th ed., 2023, section 7.1.1 "Geometric Primitives", https://pbr-book.org/4ed/Primitives_and_Intersection_Acceleration/Primitive_Interface_and_Geometric_Primitives (stochastic alpha inside intersection, from a hash of the ray, so every ray kind shares the rule).
+- S. Woop, C. Benthin and I. Wald, "Watertight Ray/Triangle Intersection", JCGT 2(1), 2013, https://jcgt.org/published/0002/01/05/ (why a ray through a shared edge meets both triangles, and so why the decision is keyed on the hit distance, not the triangle).
+- E. Veach, *Robust Monte Carlo Methods for Light Transport Simulation*, PhD thesis, Stanford, 1997, chapter 9 (the light-point emission is the coverage expectation, so the existing power-heuristic weights stay valid).
+
+Combined: Pharr et al.'s in-traversal test with Wyman and McGuire's point keying, the point being the hit distance rounded to 13 mantissa bits, hashed with the ray's current random state, which is read but not advanced.

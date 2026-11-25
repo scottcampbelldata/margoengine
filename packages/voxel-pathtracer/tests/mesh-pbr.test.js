@@ -53,7 +53,7 @@ test('PBR builder owns channel packets over the shared BLAS', async () => {
     assert.equal(t.stats.meshTriangles, 1);
     assert.equal(t.stats.meshInstances, 1);
     const sources = codes.join('\n');
-    assert.match(sources, /if\(!pbrVisible\(candidate,back\)\)\{continue;\}/);
+    assert.match(sources, /if\(!pbrVisible\(candidate,back,t\)\)\{continue;\}/);
     assert.match(sources, /m=pbrMaterial\(h,lp,m\)/);
     assert.doesNotMatch(sources, /fn pbrMaterial[\s\S]*?m=pbrMaterial\(h,lp,m\);return m;/);
     for (const code of codes) checkWGSL(code);
@@ -173,10 +173,70 @@ test('PBR alpha cutoff and sidedness use the same candidate path for all ray kin
       const s = scene();
       Object.assign(s.pbrMaterials[0], { alphaMode: 'MASK', alphaCutoff: 0.5, doubleSided });
       s.pbrMaterials[0].baseColorTexture.data[3] = alpha;
-      const a = await probeScene(s, 'probe[0]=vec4f(f32(pbrVisible(h,false)),f32(pbrVisible(h,true)),0.0,0.0);');
+      const a = await probeScene(
+        s,
+        'probe[0]=vec4f(f32(pbrVisible(h,false,1.0)),f32(pbrVisible(h,true,1.0)),0.0,0.0);',
+      );
       assert.equal(a[0], Number(alpha === 128));
       assert.equal(a[1], Number(alpha === 128 && doubleSided));
     }
+});
+test('PBR BLEND keeps a candidate with probability equal to its coverage (stochastic transparency)', async () => {
+  // 4096 rays (rng states); the kept share follows coverage, both ends exactly. Two layers at t 1 and 2 on one ray
+  // decide apart (both kept c^2 of the time); two edge-sharing triangles a few ulps apart in t decide alike.
+  const body = `var kept=0u;var both=0u;var alike=0u;for(var i=0u;i<4096u;i++){rng=hash(i*2654435761u);
+  let a=pbrVisible(h,false,1.0);if(a){kept++;}if(a&&pbrVisible(h,false,2.0)){both++;}
+  if(pbrVisible(h,false,3.0)==pbrVisible(h,false,bitcast<f32>(bitcast<u32>(3.0)+2u))){alike++;}}
+  probe[0]=vec4f(f32(kept),f32(both),f32(alike),pbrEmitterRadiance(h,vec3f(0.0,0.0,1.0)).x);`;
+  for (const [alpha, factor] of [
+    [0, 1],
+    [255, 0.25],
+    [255, 1],
+    [64, 1],
+  ]) {
+    const s = scene();
+    Object.assign(s.pbrMaterials[0], {
+      alphaMode: 'BLEND',
+      alphaCutoff: 0.99,
+      baseColorFactor: [1, 1, 1, factor],
+      emissiveFactor: [1, 1, 1],
+      doubleSided: true,
+    });
+    s.pbrMaterials[0].baseColorTexture.data[3] = alpha;
+    const coverage = (alpha / 255) * factor,
+      a = await probeScene(s, body, 4);
+    // Binomial: 4 standard deviations of a 4096-ray share is at most 0.032.
+    assert.ok(Math.abs(a[0] / 4096 - coverage) < 0.032, `coverage ${coverage}: kept ${a[0] / 4096}`);
+    if (coverage === 0) assert.equal(a[0], 0);
+    if (coverage === 1) assert.equal(a[0], 4096);
+    assert.ok(Math.abs(a[1] / 4096 - coverage ** 2) < 0.032, `layers ${a[1] / 4096} for ${coverage ** 2}`);
+    assert.equal(a[2], 4096);
+    // A sampled light point emits its expected coverage, not a random part of it.
+    assert.ok(Math.abs(a[3] - coverage) < 1e-6, `emission ${a[3]} for coverage ${coverage}`);
+  }
+});
+test('PBR BLEND is written as mode 2 and glTF BLEND materials load as BLEND', async () => {
+  const s = scene();
+  s.pbrMaterials[0].alphaMode = 'BLEND';
+  const a = await probeScene(s, 'let r=pbrRecord(h);probe[0]=vec4f(f32(scene[r+1u]),0.0,0.0,0.0);', 4);
+  assert.equal(a[0], 2);
+  s.pbrMaterials[0].alphaMode = 'ADD';
+  await assert.rejects(
+    ComposedVoxelPathTracer.create(fakeEngine().engine, { scene: s, features: [meshPBR()] }),
+    /OPAQUE, MASK or BLEND/,
+  );
+  const vertices = new Float32Array(60);
+  for (let i = 0; i < 3; i++) vertices.set([i === 1 ? 1 : 0, i === 2 ? 1 : 0, 0, 1, 0, 0, 1, 0], i * 20);
+  const model = {
+    asset: { doc: { materials: [{ alphaMode: 'BLEND' }] } },
+    primitives: [{ definition: { material: 0 }, material: {} }],
+    image: () => undefined,
+    readPickingGeometry: async () => [
+      { primitiveIndex: 0, vertices, indices: new Uint32Array([0, 1, 2]), matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) },
+    ],
+  };
+  const g = await traceSceneFromGLTF(model);
+  assert.equal(g.pbrMaterials[0].alphaMode, 'BLEND');
 });
 test('PBR UV sets, wrap modes, transforms and linear-light bilinear reconstruction', async () => {
   for (const [wrapS, expected] of [

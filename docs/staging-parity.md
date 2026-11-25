@@ -31,7 +31,7 @@ after actual device replacement on WebGPU and WebGL2 compatibility. These
 are standards-based image oracles, not a numerical rival-renderer comparison
 or a claim about every feature of that renderer. No benchmark or speed claim.
 
-Limits follow mesh-pbr: OPAQUE/MASK only, no alpha BLEND; static snapshots,
+Limits follow mesh-pbr: OPAQUE, MASK and stochastic BLEND alpha; static snapshots,
 no automatic animation tracking; spatial nearest/linear texture sampling,
 no ray-differential mip selection. Compressed/streamed images need the
 adapter's imagePixels decoder. Native WebGL2 preview refuses with linked

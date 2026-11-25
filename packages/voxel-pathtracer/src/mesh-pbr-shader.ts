@@ -66,11 +66,19 @@ fn pbrTexture(h:Hit,record:u32,slot:u32,srgb:bool)->vec4f {
  if(srgb){value=vec4f(select(value.rgb/12.92,pow((value.rgb+0.055)/1.055,vec3f(2.4)),value.rgb>vec3f(0.04045)),value.a);}
  return value;
 }
-fn pbrVisible(h:Hit,back:bool)->bool {
+fn pbrCoverage(h:Hit,r:u32)->f32 {return fl(r+7u)*pbrAttribute(h,12u).a*pbrTexture(h,r,0u,false).a;}
+// Any-hit coverage. MASK (mode 1) compares the cutoff. BLEND (mode 2) is stochastic transparency: the candidate
+// is kept with probability equal to its coverage. The uniform hashes the current rng state (one per traced ray; it
+// is read, never advanced, so scenes without BLEND keep their random sequence) with the hit distance t rounded to
+// 13 mantissa bits: two triangles sharing an edge the ray passes through meet it at one t and so take one decision
+// (an independent draw each would keep the surface 1-(1-c)^2 of the time there), while stacked layers decide apart.
+fn pbrVisible(h:Hit,back:bool,t:f32)->bool {
  let r=pbrRecord(h);if(r==0u){return true;}
  if(back&&scene[r+2u]==0u){return false;}
- if(scene[r+1u]==0u){return true;}
- return fl(r+7u)*pbrAttribute(h,12u).a*pbrTexture(h,r,0u,false).a>=fl(r+15u);
+ let mode=scene[r+1u];if(mode==0u){return true;}
+ let c=pbrCoverage(h,r);if(mode==1u){return c>=fl(r+15u);}
+ let u=f32(hash(rng^hash((bitcast<u32>(t)+512u)>>10u))>>8u)*5.960464477539063e-8;
+ return u<c;
 }
 fn pbrMaterial(h:Hit,l:vec3f,input:Mat)->Mat {
  let r=pbrRecord(h);var m=input;
@@ -142,8 +150,12 @@ fn pbrNormal(h:Hit)->vec3f {let r=pbrRecord(h);return pbrMappedNormal(h,2u,fl(r+
 // Keep reflection-only textures and the complete BSDF out of this call graph.
 fn pbrEmitterRadiance(h:Hit,wo:vec3f)->vec3f {
  let r=pbrRecord(h);if(r==0u){return material(h.value).emission;}
- if(!pbrVisible(h,dot(triangleNormal(h),wo)<0.0)){return vec3f(0.0);}
- let emission=vec3f(fl(r+8u),fl(r+9u),fl(r+10u))*fl(r+11u)*pbrTexture(h,r,3u,true).rgb;
+ if(dot(triangleNormal(h),wo)<0.0&&scene[r+2u]==0u){return vec3f(0.0);}
+ // A sampled light point emits its expected coverage: binary for MASK, the coverage itself for BLEND.
+ var cover=1.0;let mode=scene[r+1u];
+ if(mode!=0u){let c=pbrCoverage(h,r);cover=select(select(0.0,1.0,c>=fl(r+15u)),c,mode==2u);}
+ if(cover==0.0){return vec3f(0.0);}
+ let emission=vec3f(fl(r+8u),fl(r+9u),fl(r+10u))*fl(r+11u)*pbrTexture(h,r,3u,true).rgb*cover;
  let coat=fl(r+32u)*pbrTexture(h,r,4u,false).r;
  if(coat==0.0){return emission;}
  let n=pbrMappedNormal(h,6u,fl(r+34u));
@@ -184,7 +196,7 @@ export function meshPBRSource(input: string): string {
   );
   edit(
     '  (*h).t=t;(*h).inst=TRIANGLE;',
-    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
+    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back,t)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
   );
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');

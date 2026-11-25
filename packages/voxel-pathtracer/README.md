@@ -1282,7 +1282,7 @@ Material channels, with glTF defaults when left out:
 | `normalTexture`, `normalScale` | none, `1` | Tangent space; mesh `tangents` (xyzw) or a frame derived from the UVs. |
 | `emissiveFactor`, `emissiveStrength` | `[0, 0, 0]`, `1` | `emissiveTexture` is sRGB. Emissive triangles are sampled as lights. |
 | `clearcoat*`, `sheen*`, `specular*`, `iridescence*` | Khronos defaults | The `KHR_materials_*` extensions of those names, with their textures. |
-| `alphaMode`, `alphaCutoff` | `'OPAQUE'`, `0.5` | `'MASK'` lets rays and shadows through texels whose coverage is below the cutoff. |
+| `alphaMode`, `alphaCutoff` | `'OPAQUE'`, `0.5` | `'MASK'` lets rays and shadows through texels whose coverage is below the cutoff. `'BLEND'` is stochastic transparency: every ray (camera, bounce and shadow) passes a surface with probability 1 - coverage, so the converged image is the coverage-weighted mix. |
 | `doubleSided` | `false` | One-sided surfaces are invisible from behind, to camera, shadow and light rays. |
 
 Textures are owned RGBA8 images (`width`, `height`, `data`) with `texCoord` 0 to 3 (default 0),

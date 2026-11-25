@@ -130,7 +130,6 @@ export async function traceSceneFromGLTF(model: TraceLoadedGLTF, options: TraceG
       id = materials.length + 1;
       ids.set(primitive.material, id);
       const def = primitive.definition.material === undefined ? undefined : definitions[primitive.definition.material];
-      if (def?.alphaMode === 'BLEND') throw new MargoError('unsupported', 'Mesh PBR supports OPAQUE and MASK; use transmission for volume transparency: https://margoengine.com/errors#voxel-pathtracer');
       const pbr = def?.pbrMetallicRoughness;
       const cc=def?.extensions?.KHR_materials_clearcoat,sh=def?.extensions?.KHR_materials_sheen,
         sp=def?.extensions?.KHR_materials_specular,ir=def?.extensions?.KHR_materials_iridescence;
@@ -140,7 +139,7 @@ export async function traceSceneFromGLTF(model: TraceLoadedGLTF, options: TraceG
         emissiveFactor: (def?.emissiveFactor ?? [0,0,0]) as [number,number,number],
         emissiveStrength: (def?.extensions?.KHR_materials_emissive_strength as {emissiveStrength?: number} | undefined)?.emissiveStrength ?? 1,
         normalScale: def?.normalTexture?.scale ?? 1, doubleSided: def?.doubleSided ?? false,
-        alphaMode: def?.alphaMode === 'MASK' ? 'MASK' : 'OPAQUE', alphaCutoff: def?.alphaCutoff ?? .5,
+        alphaMode: def?.alphaMode === 'MASK' || def?.alphaMode === 'BLEND' ? def.alphaMode : 'OPAQUE', alphaCutoff: def?.alphaCutoff ?? .5,
         baseColorTexture: await image(pbr?.baseColorTexture), metallicRoughnessTexture: await image(pbr?.metallicRoughnessTexture),
         normalTexture: await image(def?.normalTexture), emissiveTexture: await image(def?.emissiveTexture),
         clearcoatFactor:cc?.clearcoatFactor,clearcoatRoughnessFactor:cc?.clearcoatRoughnessFactor,clearcoatNormalScale:cc?.clearcoatNormalTexture?.scale,
