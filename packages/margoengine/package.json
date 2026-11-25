@@ -4607,6 +4607,10 @@
       "types": "./dist/splats/set.d.ts",
       "import": "./dist/splats/set.js"
     },
+    "./splats/session": {
+      "types": "./dist/splats/session.d.ts",
+      "import": "./dist/splats/session.js"
+    },
     "./splats/edit": {
       "types": "./dist/splats/edit.d.ts",
       "import": "./dist/splats/edit.js"
