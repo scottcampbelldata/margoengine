@@ -2,7 +2,7 @@
 import { Camera, Engine } from '@margoengine/core';
 import { Text, TextRenderer } from '../src/index.ts';
 import { GlyphFieldFont } from '../src/outline.ts';
-import { buildScene, fieldHash } from './outline-scene.js';
+import { buildCorner, buildScene, fieldHash } from './outline-scene.js';
 
 window.check = {
   async page(fontUrl) {
@@ -13,6 +13,16 @@ window.check = {
     engine.render({ camera: buildScene(engine, { TextRenderer, Text, Camera }, font) });
     await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
     return { hash: await fieldHash(font), errors, backend: engine.backend ?? 'webgpu' };
+  },
+  /** The corner check's 'L' from one field kind ('mtsdf' or 'sdf') on the canvas #corner-<field>. */
+  async corner(fontUrl, field) {
+    const font = await GlyphFieldFont.load(fontUrl, { field }),
+      engine = await Engine.create(document.querySelector(`#corner-${field}`), { backend: 'webgpu' }),
+      errors = [];
+    engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+    engine.render({ camera: buildCorner(engine, { TextRenderer, Text, Camera }, font) });
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    return { errors };
   },
   /** Kerning of pairs as the browser's own shaper measures it through a FontFace, at 1000 px. */
   async browserKerning(fontUrl, pairs) {

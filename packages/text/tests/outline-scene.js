@@ -60,13 +60,44 @@ export function buildScene(engine, { TextRenderer, Text, Camera }, font) {
   return new Camera({ position: [0, 0, 3.2], target: [0, 0, 0] });
 }
 
+/** Canvas size of the corner check: one 'L' about 360 px tall, white on black, from one field kind. */
+export const CORNER_SIZE = [640, 640];
+
+/** Adds the corner check's 'L' to `engine` and returns its camera. */
+export function buildCorner(engine, { TextRenderer, Text, Camera }, font) {
+  engine.scene.background = '#000000';
+  TextRenderer.attach(engine).add(
+    new Text({ text: 'L', font, fontSize: 2.6, anchorX: 'center', anchorY: 'middle', position: [0, 0, 0], color: '#ffffff' }),
+  );
+  return new Camera({ position: [0, 0, 3.2], target: [0, 0, 0] });
+}
+
+/**
+ * Corner rounding in a screenshot of the corner check: pixels darker than half in the `box` x `box` square at the
+ * bottom-left corner of the ink's bounding box, which is the outer corner of the 'L'. A sharp corner leaves none.
+ */
+export function cornerMisses({ width, height, data }, box = 12) {
+  let left = width,
+    bottom = -1;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (data[4 * (y * width + x)] > 127) {
+        if (x < left) left = x;
+        if (y > bottom) bottom = y;
+      }
+  let misses = 0;
+  for (let y = bottom - box + 1; y <= bottom; y++)
+    for (let x = left; x < left + box; x++) if (data[4 * (y * width + x)] <= 127) misses++;
+  return { misses, left, bottom };
+}
+
 /** SHA-256 (hex) of every field the scene's texts need, in a fixed order; crypto.subtle exists in pages and Node. */
 export async function fieldHash(font) {
   const parts = [];
   for (const text of SCENE_TEXTS)
     for (const char of new Set(text)) {
       const g = font.glyph(char);
-      if (g) parts.push(new TextEncoder().encode(`${char}|${g.width}|${g.height}|${g.left}|${g.top}|`), g.data);
+      if (g) parts.push(new TextEncoder().encode(`${char}|${g.width}|${g.height}|${g.left}|${g.top}|`), g.data, g.msdf ?? new Uint8Array(0));
     }
   let length = 0;
   for (const p of parts) length += p.length;

@@ -32,8 +32,11 @@ export interface OutlineSdf {
   overlapped: boolean;
 }
 
-/** Version of the field bytes {@link outlineSdf} writes; part of every glyph cache key. */
-export const OUTLINE_SDF_VERSION = 1;
+/**
+ * Version of the field bytes {@link outlineSdf} and `outlineMsdf` write; part of every glyph cache key. 2: glyph caches
+ * carry the multi-channel field and its kind.
+ */
+export const OUTLINE_SDF_VERSION = 2;
 
 /** Largest number of pieces one curve is flattened into. */
 const MAX_PIECES = 1024;
@@ -45,21 +48,55 @@ function pieces(second: number, factor: number, tolerance: number): number {
   return n < 1 ? 1 : n > MAX_PIECES ? MAX_PIECES : n;
 }
 
+/** Flattened outline pieces with the outline edge (line or curve) each came from. @internal */
+export interface FlatEdges {
+  /** [ax, ay, bx, by] per piece, in pixels, y up. */
+  pieces: Float64Array;
+  /** Edge index of each piece. */
+  edgeOf: Int32Array;
+  /** Per edge: start tangent (x, y) and end tangent (x, y), in pixels, y up, not normalised. */
+  tangents: Float64Array;
+  /** First edge index of each contour, then the edge count. */
+  contourStarts: Int32Array;
+}
+
+/** The first of `candidates` (pairs of numbers) that is not the zero vector, or [0, 0]. */
+function direction(...candidates: number[]): [number, number] {
+  for (let k = 0; k < candidates.length; k += 2)
+    if (candidates[k] !== 0 || candidates[k + 1] !== 0) return [candidates[k], candidates[k + 1]];
+  return [0, 0];
+}
+
 /**
  * Flattens outline contours (em units, y up; lines [x0,y0,x1,y1], quadratics of 6 and cubics of 8 numbers) to closed
- * pieces in pixels: [ax, ay, bx, by] per piece in one array. Each contour is closed with a line when it is open.
+ * pieces in pixels, recording each piece's edge and each edge's end tangents. Edges that flatten to nothing (a zero
+ * length line, such as the closing line of a contour that is already closed) get no index. @internal
  */
-export function flattenOutline(
+export function flattenEdges(
   contours: readonly (readonly (readonly number[])[])[],
   size: number,
   tolerance: number,
-): Float64Array {
-  const out: number[] = [];
+): FlatEdges {
+  const out: number[] = [],
+    edgeOf: number[] = [],
+    tangents: number[] = [],
+    starts: number[] = [];
+  let edge = 0;
   const push = (ax: number, ay: number, bx: number, by: number) => {
-    if (ax !== bx || ay !== by) out.push(ax, ay, bx, by);
+    if (ax !== bx || ay !== by) {
+      out.push(ax, ay, bx, by);
+      edgeOf.push(edge);
+    }
+  };
+  /** Closes the edge being flattened: it gets an index only when some piece came from it. */
+  const close = (before: number, start: [number, number], end: [number, number]) => {
+    if (edgeOf.length === before) return;
+    tangents.push(start[0], start[1], end[0], end[1]);
+    edge++;
   };
   for (const loop of contours) {
     if (!loop.length) continue;
+    starts.push(edge);
     const first = loop[0],
       sx = first[0] * size,
       sy = first[1] * size;
@@ -67,11 +104,13 @@ export function flattenOutline(
       py = sy;
     for (const s of loop) {
       const x0 = px,
-        y0 = py;
+        y0 = py,
+        before = edgeOf.length;
       if (s.length === 4) {
         const x1 = s[2] * size,
           y1 = s[3] * size;
         push(x0, y0, x1, y1);
+        close(before, [x1 - x0, y1 - y0], [x1 - x0, y1 - y0]);
         px = x1;
         py = y1;
       } else if (s.length === 6) {
@@ -97,6 +136,11 @@ export function flattenOutline(
           ax = bx;
           ay = by;
         }
+        close(
+          before,
+          direction(x1 - x0, y1 - y0, x2 - x0, y2 - y0),
+          direction(x2 - x1, y2 - y1, x2 - x0, y2 - y0),
+        );
         px = x2;
         py = y2;
       } else if (s.length === 8) {
@@ -132,13 +176,38 @@ export function flattenOutline(
           ax = bx;
           ay = by;
         }
+        close(
+          before,
+          direction(x1 - x0, y1 - y0, x2 - x0, y2 - y0, x3 - x0, y3 - y0),
+          direction(x3 - x2, y3 - y2, x3 - x1, y3 - y1, x3 - x0, y3 - y0),
+        );
         px = x3;
         py = y3;
       }
     }
+    const before = edgeOf.length;
     push(px, py, sx, sy);
+    close(before, [sx - px, sy - py], [sx - px, sy - py]);
   }
-  return Float64Array.from(out);
+  starts.push(edge);
+  return {
+    pieces: Float64Array.from(out),
+    edgeOf: Int32Array.from(edgeOf),
+    tangents: Float64Array.from(tangents),
+    contourStarts: Int32Array.from(starts),
+  };
+}
+
+/**
+ * Flattens outline contours (em units, y up; lines [x0,y0,x1,y1], quadratics of 6 and cubics of 8 numbers) to closed
+ * pieces in pixels: [ax, ay, bx, by] per piece in one array. Each contour is closed with a line when it is open.
+ */
+export function flattenOutline(
+  contours: readonly (readonly (readonly number[])[])[],
+  size: number,
+  tolerance: number,
+): Float64Array {
+  return flattenEdges(contours, size, tolerance).pieces;
 }
 
 /** Nonzero winding number of the closed pieces at a point (a ray towards +x, half-open in y). */
@@ -158,19 +227,42 @@ export function windingAt(segments: Float64Array, x: number, y: number): number 
 }
 
 /**
- * The 8-bit signed distance field of a glyph outline: byte = round(255 - 255 * (d / radius + cutoff)) clamped, with d
- * the distance from the texel centre to the outline in pixels, negative inside (the encoding of `alphaToSdf`). Inside
- * is the nonzero winding rule. Where contours overlap or abut (variable fonts, CJK, letters built from parts), edges
- * with ink on both sides are left out, so the interior shows no seam. Returns null when the outline is empty.
+ * The shared part of every outline field: the bitmap box, the pieces in texel space, the winding number at each texel
+ * centre and the pieces with ink on one side only. @internal
  */
-export function outlineSdf(
+export interface FieldSetup {
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+  /** Every piece in texel space (texel (i, j) has its centre at (i, j), rows downward). */
+  segments: Float64Array;
+  /** Index of each piece of `segments` in the flattened pieces. */
+  segmentPiece: Int32Array;
+  /** Winding number at each texel centre. */
+  winding: Int32Array;
+  /** The pieces (or parts of pieces) with ink on one side only, in texel space. */
+  kept: Float64Array;
+  /** Index into `segments` of each kept part. */
+  keptSegment: Int32Array;
+  /** Per kept part: 0 for the whole piece or its first part, 1 for a middle part, 2 for the last, 3 for a lone part. */
+  keptPlace: Uint8Array;
+  /** Per kept part: +1 when the ink is to its left (positive cross product of its direction and the point), else -1. */
+  keptInk: Int8Array;
+  overlapped: boolean;
+  flat: FlatEdges;
+}
+
+/** Box, texel-space pieces, winding and one-sided pieces of an outline. Null when the outline is empty. @internal */
+export function fieldSetup(
   contours: readonly (readonly (readonly number[])[])[],
   options: OutlineSdfOptions,
-): OutlineSdf | null {
-  const { size, radius, cutoff, buffer } = options;
+): FieldSetup | null {
+  const { size, radius, buffer } = options;
   // A quarter of a byte step, at most 1/64 px.
   const tolerance = Math.min(1 / 64, radius / 1020);
-  const flat = flattenOutline(contours, size, tolerance);
+  const flatEdges = flattenEdges(contours, size, tolerance),
+    flat = flatEdges.pieces;
   if (!flat.length) return null;
   let xmin = Infinity,
     xmax = -Infinity,
@@ -195,13 +287,17 @@ export function outlineSdf(
     top = y1 + buffer;
   // Texel space: texel (i, j) has its centre at (i, j), rows downward. A piece whose ends round together there is
   // dropped (its neighbours still meet), so no piece has zero length.
-  const moved: number[] = [];
+  const moved: number[] = [],
+    movedPiece: number[] = [];
   for (let k = 0; k < flat.length; k += 4) {
     const ax = flat[k] - left - 0.5,
       ay = top - 0.5 - flat[k + 1],
       bx = flat[k + 2] - left - 0.5,
       by = top - 0.5 - flat[k + 3];
-    if (ax !== bx || ay !== by) moved.push(ax, ay, bx, by);
+    if (ax !== bx || ay !== by) {
+      moved.push(ax, ay, bx, by);
+      movedPiece.push(k >> 2);
+    }
   }
   const segments = Float64Array.from(moved);
   const count = width * height,
@@ -259,7 +355,10 @@ export function outlineSdf(
     }
     return w;
   };
-  const kept: number[] = [];
+  const kept: number[] = [],
+    keptSegment: number[] = [],
+    keptPlace: number[] = [],
+    keptInk: number[] = [];
   let overlapped = false;
   for (let k = 0; k < segments.length; k += 4) {
     const ax = segments[k],
@@ -272,34 +371,69 @@ export function outlineSdf(
       n = Math.max(1, Math.ceil(length * 4)),
       nx = -dy / length / 32,
       ny = dx / length / 32,
-      start = kept.length;
-    let whole = true;
+      start = kept.length,
+      startMeta = keptSegment.length;
+    let whole = true,
+      firstInk = 0;
     for (let p = 0; p < n; p++) {
       const sx = ax + (dx * p) / n,
         sy = ay + (dy * p) / n,
         ex = p + 1 === n ? bx : ax + (dx * (p + 1)) / n,
         ey = p + 1 === n ? by : ay + (dy * (p + 1)) / n,
         mx = (sx + ex) / 2,
-        my = (sy + ey) / 2;
-      if (windingNear(mx + nx, my + ny) === 0 || windingNear(mx - nx, my - ny) === 0) kept.push(sx, sy, ex, ey);
-      else whole = false;
+        my = (sy + ey) / 2,
+        // (nx, ny) points to the left of the piece: ink is on the left when the winding to the right is 0.
+        outLeft = windingNear(mx + nx, my + ny) === 0,
+        outRight = windingNear(mx - nx, my - ny) === 0;
+      if (outLeft || outRight) {
+        const ink = outRight && !outLeft ? 1 : -1;
+        if (!firstInk) firstInk = ink;
+        kept.push(sx, sy, ex, ey);
+        keptSegment.push(k >> 2);
+        keptPlace.push(n === 1 ? 3 : p === 0 ? 0 : p + 1 === n ? 2 : 1);
+        keptInk.push(ink);
+      } else whole = false;
     }
     // A piece kept whole stays one piece, so outlines without inner edges give the same field either way.
     if (whole) {
       kept.length = start;
+      keptSegment.length = keptPlace.length = keptInk.length = startMeta;
       kept.push(ax, ay, bx, by);
+      keptSegment.push(k >> 2);
+      keptPlace.push(3);
+      keptInk.push(firstInk || -1);
     } else overlapped = true;
   }
-  const distanceSegments = overlapped ? Float64Array.from(kept) : segments;
+  return {
+    width,
+    height,
+    left,
+    top,
+    segments,
+    segmentPiece: Int32Array.from(movedPiece),
+    winding,
+    kept: Float64Array.from(kept),
+    keptSegment: Int32Array.from(keptSegment),
+    keptPlace: Uint8Array.from(keptPlace),
+    keptInk: Int8Array.from(keptInk),
+    overlapped,
+    flat: flatEdges,
+  };
+}
+
+/** The distance pass of {@link outlineSdf}: squared distance to the nearest kept part per texel. @internal */
+export function nearestSquared(setup: FieldSetup, options: OutlineSdfOptions): { best: Float64Array; evaluations: number } {
+  const { radius, cutoff } = options,
+    { width, height, kept } = setup;
   // Exact distance to the nearest piece, each piece only over its box grown by the reach of the byte range.
   const reach = Math.ceil(radius * (1 - cutoff > cutoff ? 1 - cutoff : cutoff)) + 1,
-    best = new Float64Array(count).fill(Infinity);
+    best = new Float64Array(width * height).fill(Infinity);
   let evaluations = 0;
-  for (let k = 0; k < distanceSegments.length; k += 4) {
-    const ax = distanceSegments[k],
-      ay = distanceSegments[k + 1],
-      dx = distanceSegments[k + 2] - ax,
-      dy = distanceSegments[k + 3] - ay,
+  for (let k = 0; k < kept.length; k += 4) {
+    const ax = kept[k],
+      ay = kept[k + 1],
+      dx = kept[k + 2] - ax,
+      dy = kept[k + 3] - ay,
       inverse = 1 / (dx * dx + dy * dy);
     const i0 = Math.max(0, Math.floor((dx < 0 ? ax + dx : ax) - reach)),
       i1 = Math.min(width - 1, Math.ceil((dx < 0 ? ax : ax + dx) + reach)),
@@ -320,17 +454,41 @@ export function outlineSdf(
       evaluations += i1 - i0 + 1;
     }
   }
-  const data = new Uint8Array(count);
+  return { best, evaluations };
+}
+
+/** One field byte: round(255 - 255 * (d / radius + cutoff)) clamped, d in pixels, negative inside. @internal */
+export function fieldByte(d: number, radius: number, cutoff: number): number {
+  const byte = Math.round(255 - 255 * (d / radius + cutoff));
+  return byte < 0 ? 0 : byte > 255 ? 255 : byte;
+}
+
+/** The SDF bytes of a setup from its squared nearest distances. @internal */
+export function sdfBytes(setup: FieldSetup, best: Float64Array, radius: number, cutoff: number): Uint8Array {
+  const count = setup.width * setup.height,
+    data = new Uint8Array(count);
   for (let k = 0; k < count; k++) {
-    const inside = winding[k] !== 0,
+    const inside = setup.winding[k] !== 0,
       squared = best[k];
-    let byte: number;
-    if (squared === Infinity) byte = inside ? 255 : 0;
-    else {
-      const d = inside ? -Math.sqrt(squared) : Math.sqrt(squared);
-      byte = Math.round(255 - 255 * (d / radius + cutoff));
-    }
-    data[k] = byte < 0 ? 0 : byte > 255 ? 255 : byte;
+    if (squared === Infinity) data[k] = inside ? 255 : 0;
+    else data[k] = fieldByte(inside ? -Math.sqrt(squared) : Math.sqrt(squared), radius, cutoff);
   }
-  return { width, height, left, top, data, evaluations, overlapped };
+  return data;
+}
+
+/**
+ * The 8-bit signed distance field of a glyph outline: byte = round(255 - 255 * (d / radius + cutoff)) clamped, with d
+ * the distance from the texel centre to the outline in pixels, negative inside (the encoding of `alphaToSdf`). Inside
+ * is the nonzero winding rule. Where contours overlap or abut (variable fonts, CJK, letters built from parts), edges
+ * with ink on both sides are left out, so the interior shows no seam. Returns null when the outline is empty.
+ */
+export function outlineSdf(
+  contours: readonly (readonly (readonly number[])[])[],
+  options: OutlineSdfOptions,
+): OutlineSdf | null {
+  const setup = fieldSetup(contours, options);
+  if (!setup) return null;
+  const { best, evaluations } = nearestSquared(setup, options);
+  const { width, height, left, top, overlapped } = setup;
+  return { width, height, left, top, data: sdfBytes(setup, best, options.radius, options.cutoff), evaluations, overlapped };
 }

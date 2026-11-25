@@ -34,6 +34,8 @@ export interface GlyphBitmap {
   /** Optional unmodified RGBA multi-channel distance data. TextRenderer samples RGB before taking the median.
    * data remains a scalar fallback for other glyph consumers; alpha is not colour opacity. */
   readonly msdf?: Uint8Array;
+  /** True when `msdf` alpha holds the one-channel distance (MTSDF): the renderer draws outlines and shadows from it. */
+  readonly mtsdf?: boolean;
 }
 
 type Context2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;

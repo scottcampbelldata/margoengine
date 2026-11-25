@@ -368,7 +368,7 @@ export class TextRenderer implements EnginePlugin {
       data[o + 6] = (slot.x + bitmap.width) / size;
       data[o + 7] = (slot.y + bitmap.height) / size;
       uints[o + 8] = slot.page;
-      uints[o + 9] = bitmap.msdf ? 2 : bitmap.color ? 1 : 0;
+      uints[o + 9] = bitmap.msdf ? (bitmap.mtsdf ? 3 : 2) : bitmap.color ? 1 : 0;
       uints[o + 10] = 0;
       uints[o + 11] = 0;
       count++;
