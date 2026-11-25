@@ -154,6 +154,12 @@ export interface PickingGeometry {
     readonly nodeIndex?: number;
 }
 
+export interface PosedPickingSource {
+    readonly root: Mesh;
+    readonly disposed: boolean;
+    posePickingGeometry(): readonly PickingGeometry[];
+}
+
 export interface RaycastAlphaTexture {
     width: number;
     height: number;
@@ -291,6 +297,7 @@ export class Raycaster {
     setFromEngine(engine: Engine, x: number, y: number): this;
     intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[];
     intersectModel(source: DeformedPickingSource, _arg0?: IntersectOptions): Promise<RaycasterHit[]>;
+    intersectPosed(source: PosedPickingSource, _arg1?: IntersectOptions): RaycasterHit[];
     intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, options?: IntersectOptions): RaycasterHit[];
     intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[];
     castCandidates(runtime: RaycastRuntime, candidates: Candidate[]): RaycasterHit[];

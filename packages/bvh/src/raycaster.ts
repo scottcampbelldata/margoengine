@@ -252,13 +252,23 @@ export interface DeformedPickingSource {
   readonly disposed: boolean;
   readPickingGeometry(): Promise<readonly PickingGeometry[]>;
 }
+/**
+ * A skinned mesh that poses its vertices on the CPU, for the synchronous `Raycaster.intersectPosed`. Implemented by
+ * `@margoengine/animation` `Skin.picking`.
+ */
+export interface PosedPickingSource {
+  readonly root: Mesh;
+  readonly disposed: boolean;
+  /** Snapshots at the current pose (stride-20 vertices as for {@link PickingGeometry}); cache them until the pose changes. */
+  posePickingGeometry(): readonly PickingGeometry[];
+}
 interface PoseBVH {
   node: Mesh;
   vertices: Float32Array;
   indices: Uint32Array;
   bvh: MeshBVH;
 }
-const poseCache = new WeakMap<DeformedPickingSource, PoseBVH[]>();
+const poseCache = new WeakMap<object, PoseBVH[]>();
 /**
  * CPU picking against engine meshes. Each geometry gets a cached MeshBVH,
  * meshes are rejected by their world bounding sphere, and the ray is tested in each mesh's local space.
@@ -376,6 +386,76 @@ export class Raycaster {
     )
       return [];
     if (!Array.isArray(geometry)) throw new TypeError('Expected picking geometry snapshots');
+    return this.castPoses(source, root, runtime, geometry, {
+      near,
+      far,
+      side,
+      firstHitOnly,
+      layers,
+      filter,
+      bvhOptions,
+      origin,
+      direction,
+    });
+  }
+
+  /**
+   * Synchronous current-pose hits on a skinned mesh: the same posed-snapshot path as `intersectModel`, but the source
+   * poses its vertices on the CPU (`@margoengine/animation` `Skin.picking`), so there is no GPU readback and no wait.
+   * The source caches its posed vertices per skeleton pose; the BVH here is refitted on every query.
+   */
+  intersectPosed(source: PosedPickingSource, { refresh = true }: IntersectOptions = {}): RaycasterHit[] {
+    if (!source || typeof source.posePickingGeometry !== 'function' || !source.root)
+      throw new TypeError('Expected a posed picking source');
+    const root = source.root as unknown as RuntimeMesh & { engine: RaycastRuntime },
+      runtime = root.engine;
+    if (!runtime || !runtime.meshes || !runtime.store)
+      throw new TypeError('Picking source root has no engine; add the model to an Engine before picking');
+    if (source.disposed || runtime.disposed)
+      throw new MargoError('disposed', 'Picking source or engine is disposed; pick a live model on a live Engine.');
+    if (runtime.meshes.get(root.id) !== root)
+      throw new MargoError(
+        'disposed',
+        'Picking source root is disposed; pick a model whose root is still in the scene.',
+      );
+    const { near, far, side, firstHitOnly, layers, filter } = this;
+    if (!(near >= 0) || !(far >= near)) throw new RangeError('Expected 0 <= near <= far');
+    if (!['material', 'front', 'back', 'double'].includes(side))
+      throw new TypeError('Invalid raycaster side; use material, front, back or double');
+    if (refresh) runtime.store.tick(false);
+    const geometry = source.posePickingGeometry();
+    if (!Array.isArray(geometry)) throw new TypeError('Expected picking geometry snapshots');
+    return this.castPoses(source, root, runtime, geometry, {
+      near,
+      far,
+      side,
+      firstHitOnly,
+      layers,
+      filter,
+      bvhOptions: { ...this.bvhOptions },
+      origin: this.origin.slice(),
+      direction: this.direction.slice(),
+    });
+  }
+
+  private castPoses(
+    source: DeformedPickingSource | PosedPickingSource,
+    root: RuntimeMesh & { engine: RaycastRuntime },
+    runtime: RaycastRuntime,
+    geometry: readonly PickingGeometry[],
+    q: {
+      near: number;
+      far: number;
+      side: RaycasterSide;
+      firstHitOnly: boolean;
+      layers: number;
+      filter: Raycaster['filter'];
+      bvhOptions: BVHBuildOptions;
+      origin: Float64Array;
+      direction: Float64Array;
+    },
+  ): RaycasterHit[] {
+    const { near, far, side, firstHitOnly, layers, filter, bvhOptions, origin, direction } = q;
     const previous = poseCache.get(source) ?? [],
       next: PoseBVH[] = [],
       hits: RaycasterHit[] = [];
@@ -896,7 +976,7 @@ export function deformedNode(node: Mesh): boolean {
 export const deformedError = (): MargoError =>
   new MargoError(
     'unsupported',
-    'Deformed PBR mesh cannot be picked synchronously; use await Raycaster.intersectModel(model) for its current pose.',
+    'Deformed PBR mesh cannot be picked synchronously; use Raycaster.intersectPosed(skin.picking) for a Skin, or await Raycaster.intersectModel(model) for its current pose.',
   );
 
 /**

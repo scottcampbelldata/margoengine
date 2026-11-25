@@ -33,6 +33,7 @@ export type {
   IntersectOptions,
   PickingGeometry,
   DeformedPickingSource,
+  PosedPickingSource,
 } from './raycaster.js';
 export { frustumPlanes } from './math.js';
 export type { Side } from './math.js';

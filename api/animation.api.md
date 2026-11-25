@@ -264,6 +264,11 @@ export class Skin implements EnginePlugin {
         positions: Float32Array;
         normals?: Float32Array;
     };
+    get picking(): {
+        readonly root: PBRModel['root'];
+        readonly disposed: boolean;
+        posePickingGeometry(): readonly PosedSnapshot[];
+    };
     static attach(mesh: PBRModel, skeleton: Skeleton, joints: ArrayLike<number>, weights: ArrayLike<number>): Skin;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -344,6 +349,16 @@ interface PointerPlan {
     bind?: () => KeyframeClip;
     duration: number;
     warnings: string[];
+}
+
+interface PosedSnapshot {
+    readonly node: PBRModel['root'];
+    readonly vertices: Float32Array;
+    readonly indices: Uint32Array;
+    readonly doubleSided: boolean;
+    readonly side: 'front' | 'back' | 'double';
+    readonly matrix: Float32Array;
+    readonly primitiveIndex: number;
 }
 
 interface Track {

@@ -240,6 +240,15 @@ export class Skeleton {
   }
 }
 
+interface PosedSnapshot {
+  readonly node: PBRModel['root'];
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly doubleSided: boolean;
+  readonly side: 'front' | 'back' | 'double';
+  readonly matrix: Float32Array;
+  readonly primitiveIndex: number;
+}
 const pipelines = new WeakMap<GPUDevice, GPUComputePipeline>();
 let serial = 0;
 /**
@@ -256,6 +265,9 @@ export class Skin implements EnginePlugin {
   // The GPU influence layout: per vertex 4 Uint32 bone indices, then 4 Float32 weights.
   private readonly ids: Uint32Array<ArrayBuffer>;
   private readonly weights: Float32Array<ArrayBuffer>;
+  private edits = 0;
+  private pickingSource?: Skin['picking'];
+  private posed?: { key: string; mesh: PBRModel; list: PosedSnapshot[] };
   private dirtyFrom = 0;
   private dirtyTo: number;
   private uploaded = -1;
@@ -318,6 +330,7 @@ export class Skin implements EnginePlugin {
         this.weights[at + 4 + c] = sum > 0 ? weights[v * 4 + c] / sum : +(c === 0);
       }
     }
+    this.edits++;
     this.dirtyFrom = Math.min(this.dirtyFrom, first);
     this.dirtyTo = Math.max(this.dirtyTo, first + n);
     return this;
@@ -357,6 +370,74 @@ export class Skin implements EnginePlugin {
       outNormals[i + 2] = length > 0 ? z / length : 0;
     }
     return outNormals ? { positions: out, normals: outNormals } : { positions: out };
+  }
+  /**
+   * A synchronous picking source for `Raycaster.intersectPosed` (`@margoengine/bvh`): hits on the mesh at the skeleton's
+   * current pose, skinned on the CPU with {@link Skin.pose}. The posed vertices are cached per skeleton `revision` and
+   * influence edit, so many rays in one frame skin once. Needs a skin made by `Skin.attach`.
+   */
+  get picking(): {
+    readonly root: PBRModel['root'];
+    readonly disposed: boolean;
+    posePickingGeometry(): readonly PosedSnapshot[];
+  } {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const skin = this;
+    return (this.pickingSource ??= {
+      get root() {
+        return skin.requireMesh().root;
+      },
+      get disposed() {
+        return skin.disposed || !skin.mesh || skin.mesh.disposed;
+      },
+      posePickingGeometry: () => {
+        const mesh = this.requireMesh(),
+          key = this.skeleton.revision + ':' + this.edits;
+        if (this.posed?.key === key && this.posed.mesh === mesh) {
+          for (const s of this.posed.list) s.matrix.set(s.node.matrix);
+          return this.posed.list;
+        }
+        const bind = mesh.primitives[0].vertices,
+          positions = new Float32Array(this.count * 3),
+          normals = new Float32Array(this.count * 3);
+        for (let v = 0; v < this.count; v++)
+          for (let c = 0; c < 3; c++) {
+            positions[v * 3 + c] = bind[v * 20 + c];
+            normals[v * 3 + c] = bind[v * 20 + 4 + c];
+          }
+        const posed = this.pose(positions, normals),
+          vertices = bind.slice();
+        for (let v = 0; v < this.count; v++)
+          for (let c = 0; c < 3; c++) {
+            vertices[v * 20 + c] = posed.positions[v * 3 + c];
+            vertices[v * 20 + 4 + c] = posed.normals![v * 3 + c];
+          }
+        const list = mesh.primitives.map((p, primitiveIndex) => {
+          const m = p.material,
+            side: 'front' | 'back' | 'double' =
+              m.side ?? (m.settings[2] === 2 ? 'back' : m.settings[2] >= 0.5 ? 'double' : 'front');
+          return {
+            node: p.node,
+            vertices,
+            indices: p.indices instanceof Uint32Array ? p.indices : Uint32Array.from(p.indices),
+            doubleSided: side === 'double',
+            side,
+            matrix: new Float32Array(p.node.matrix),
+            primitiveIndex,
+          };
+        });
+        this.posed = { key, mesh, list };
+        return list;
+      },
+    });
+  }
+  private requireMesh(): PBRModel {
+    if (!this.mesh)
+      throw new MargoError(
+        'state',
+        'Skin is not attached; create it with Skin.attach(mesh, skeleton, joints, weights)',
+      );
+    return this.mesh;
   }
   /**
    * A skin that deforms `mesh` on the GPU from now on, as a plugin of the mesh's engine. `mesh` is a `createMesh` mesh

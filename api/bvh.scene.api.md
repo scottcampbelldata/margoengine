@@ -86,6 +86,12 @@ interface PickingGeometry {
     readonly nodeIndex?: number;
 }
 
+interface PosedPickingSource {
+    readonly root: Mesh;
+    readonly disposed: boolean;
+    posePickingGeometry(): readonly PickingGeometry[];
+}
+
 interface RaycastRuntime {
     store: RuntimeStore;
     meshes: Map<number, RuntimeMesh>;
@@ -111,6 +117,7 @@ class Raycaster {
     setFromEngine(engine: Engine, x: number, y: number): this;
     intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[];
     intersectModel(source: DeformedPickingSource, _arg0?: IntersectOptions): Promise<RaycasterHit[]>;
+    intersectPosed(source: PosedPickingSource, _arg1?: IntersectOptions): RaycasterHit[];
     intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, options?: IntersectOptions): RaycasterHit[];
     intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[];
     castCandidates(runtime: RaycastRuntime, candidates: Candidate[]): RaycasterHit[];
