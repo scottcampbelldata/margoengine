@@ -73,6 +73,10 @@
     "./fade": {
       "types": "./dist/fade.d.ts",
       "import": "./dist/fade.js"
+    },
+    "./height": {
+      "types": "./dist/height.d.ts",
+      "import": "./dist/height.js"
     }
   },
   "files": [
@@ -91,7 +95,8 @@
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/points": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
-    "@margoengine/splats": "^1.0.0"
+    "@margoengine/splats": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -104,6 +109,9 @@
       "optional": true
     },
     "@margoengine/splats": {
+      "optional": true
+    },
+    "@margoengine/bvh": {
       "optional": true
     }
   },

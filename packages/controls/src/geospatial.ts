@@ -38,6 +38,21 @@ export type SurfaceRaycast = (
   far: number,
 ) => number | undefined;
 
+/**
+ * A ground in WORLD coordinates (Y up): world height at world x, z, or undefined off its edge. A function, or an object
+ * with `height(x, z)` (a terrain `TerrainQuery`) or `heightAt(x, z)` (a biomes world).
+ */
+export type WorldGround =
+  | ((x: number, z: number) => number | undefined)
+  | { height(x: number, z: number): number | undefined }
+  | { heightAt(x: number, z: number): number | undefined };
+
+/**
+ * Where the world sits on the globe: a 4x4 ECEF-to-world matrix (16 numbers, column-major, affine), or an object
+ * holding one as `frame` (a tiles `TilesRenderer`, whose `frame` is tileset (ECEF) to world).
+ */
+export type GeospatialFrame = ArrayLike<number> | { readonly frame: ArrayLike<number> };
+
 /** What a {@link GeospatialControls.pick} hit: the engine scene (bvh), your `raycast`, the `heightAt` terrain, or the ellipsoid fallback. */
 export type GeospatialPickSource = 'scene' | 'raycast' | 'terrain' | 'ellipsoid';
 
@@ -142,6 +157,17 @@ export interface GeospatialOptions {
   clipPlanes?: boolean;
   /** World is ECEF (Z up) when true; the engine's Y-up world (x, z, -y of ECEF) when false. Default false. */
   zUp?: boolean;
+  /**
+   * Where the world sits on the globe, for a scene in a local frame such as a tileset's east-north-up frame (pass the
+   * `TilesRenderer` itself): every pose, pick and sweep goes through it. Default from `zUp`: ECEF itself, or its Y-up
+   * `(x, z, -y)`.
+   */
+  frame?: GeospatialFrame;
+  /**
+   * A ground in world coordinates (a terrain `TerrainQuery`, a biomes world, or `(x, z) => y`) used as `heightAt` when
+   * that is not given, so clearance, picks and walking follow it with no conversion. Default none.
+   */
+  ground?: WorldGround;
   /**
    * Pick against the engine's visible meshes and models (terrain meshes, 3D Tiles, glTF) with the bvh `Raycaster`, so
    * zoom, rotate and pan grab the real surface. Needs the controls attached to an engine. Default true.
@@ -335,6 +361,53 @@ const along = (o: readonly number[], d: readonly number[], t: number): V => [
   o[2]! + d[2]! * t,
 ];
 
+/** Apply a column-major 3x4 affine (`dir`: its linear part only). */
+function affine(m: Float64Array, p: readonly number[], dir: boolean): V {
+  const x = p[0]!,
+    y = p[1]!,
+    z = p[2]!,
+    t = dir ? 0 : 1;
+  return [
+    m[0]! * x + m[3]! * y + m[6]! * z + m[9]! * t,
+    m[1]! * x + m[4]! * y + m[7]! * z + m[10]! * t,
+    m[2]! * x + m[5]! * y + m[8]! * z + m[11]! * t,
+  ];
+}
+/** Inverse of a column-major 3x4 affine; a singular frame is a coded RangeError. */
+function invertAffine(m: Float64Array): Float64Array {
+  const [a, b, c, d, e, f, g, h, i] = m as unknown as number[],
+    A = e! * i! - f! * h!,
+    B = f! * g! - d! * i!,
+    C = d! * h! - e! * g!,
+    det = a! * A + b! * B + c! * C;
+  if (!(Math.abs(det) > 1e-300))
+    throw rangeError(
+      'A geospatial frame must be invertible; pass a rigid or scaled ECEF-to-world matrix',
+      'controls-arguments',
+    );
+  const k = 1 / det,
+    r = [
+      A * k,
+      (c! * h! - b! * i!) * k,
+      (b! * f! - c! * e!) * k,
+      B * k,
+      (a! * i! - c! * g!) * k,
+      (c! * d! - a! * f!) * k,
+      C * k,
+      (b! * g! - a! * h!) * k,
+      (a! * e! - b! * d!) * k,
+    ],
+    tx = m[9]!,
+    ty = m[10]!,
+    tz = m[11]!;
+  return Float64Array.of(
+    ...r,
+    -(r[0]! * tx + r[3]! * ty + r[6]! * tz),
+    -(r[1]! * tx + r[4]! * ty + r[7]! * tz),
+    -(r[2]! * tx + r[5]! * ty + r[8]! * tz),
+  );
+}
+
 /** Distance along a unit ECEF ray to the ellipsoid raised by `h` metres (first hit in front), or null on a miss. */
 function rayEllipsoid(o: readonly number[], d: readonly number[], h: number): number | null {
   const ax = WGS84_A + h,
@@ -379,6 +452,9 @@ export class GeospatialControls extends Controls {
   readonly maxRange: number;
   clipPlanes: boolean;
   readonly zUp: boolean;
+  /** ECEF to world (column-major 3x4 of the affine frame) and its inverse. */
+  private readonly fw: Float64Array;
+  private readonly fe: Float64Array;
   /** Pick against the engine scene with the bvh Raycaster. Default true. */
   scene: boolean;
   /** Scene meshes and models picks consider; null is everything visible. */
@@ -473,6 +549,19 @@ export class GeospatialControls extends Controls {
     this.heightAt = options.heightAt;
     this.clipPlanes = options.clipPlanes ?? true;
     this.zUp = options.zUp ?? false;
+    const m = options.frame === undefined ? null : 'frame' in options.frame ? options.frame.frame : options.frame;
+    if (m && !(m.length === 16 && Array.from(m).every(Number.isFinite)))
+      throw rangeError(
+        'A geospatial frame is 16 finite numbers, column-major ECEF to world; pass tiles.frame or the TilesRenderer',
+        'controls-arguments',
+      );
+    this.fw = m
+      ? Float64Array.from([m[0]!, m[1]!, m[2]!, m[4]!, m[5]!, m[6]!, m[8]!, m[9]!, m[10]!, m[12]!, m[13]!, m[14]!])
+      : this.zUp
+        ? Float64Array.of(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+        : Float64Array.of(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0);
+    this.fe = invertAffine(this.fw);
+    if (options.ground && !options.heightAt) this.heightAt = this.groundQuery(options.ground);
     this.scene = options.scene ?? true;
     this.colliders = options.colliders ?? null;
     this.raycast = options.raycast;
@@ -555,13 +644,36 @@ export class GeospatialControls extends Controls {
   }
   /** ECEF position (or direction when `dir`) to world. */
   private toWorld(p: readonly number[], dir = false): V {
-    void dir;
-    return this.zUp ? [p[0]!, p[1]!, p[2]!] : [p[0]!, p[2]!, -p[1]!];
+    return affine(this.fw, p, dir);
   }
   /** World position (or direction when `dir`) to ECEF. */
   private toEcef(p: readonly number[], dir = false): V {
-    void dir;
-    return this.zUp ? [p[0]!, p[1]!, p[2]!] : [p[0]!, -p[2]!, p[1]!];
+    return affine(this.fe, p, dir);
+  }
+  /** A world-space ground as a geodetic height query: the ground's world point under a place, back to its height. */
+  private groundQuery(ground: WorldGround): HeightQuery {
+    const g = ground as { height?: unknown; heightAt?: unknown },
+      at =
+        typeof ground === 'function'
+          ? ground
+          : typeof g?.height === 'function'
+            ? (x: number, z: number) => (ground as { height(x: number, z: number): number | undefined }).height(x, z)
+            : typeof g?.heightAt === 'function'
+              ? (x: number, z: number) =>
+                  (ground as { heightAt(x: number, z: number): number | undefined }).heightAt(x, z)
+              : null;
+    if (!at)
+      throw rangeError(
+        'A ground is (x, z) => y or has height(x, z) or heightAt(x, z); pass a TerrainQuery, a biomes world or a function',
+        'controls-arguments',
+      );
+    return (longitude, latitude) => {
+      const w = this.toWorld(cartographicToEcef(longitude, latitude, 0)),
+        y = at(w[0], w[2]);
+      if (typeof y !== 'number' || !Number.isFinite(y)) return undefined;
+      const e = this.toEcef([w[0], y, w[2]]);
+      return ecefToCartographic(e[0], e[1], e[2]).height;
+    };
   }
   /** Collision clearance in use: in walk at most half the eye height, so it never lifts a walker off the ground. */
   private get gap(): number {

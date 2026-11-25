@@ -31,6 +31,8 @@ export interface TileRenderable {
   visible: boolean;
   /** Frees the content; called on eviction and on `tileset.dispose()`. */
   dispose(): void;
+  /** The engine model drawing this content when it is one (glTF, b3dm): what height and pick queries cast against. */
+  readonly model?: object;
 }
 
 /** Turns parsed content into a renderable. Throw (or reject) to fail the tile; honour `signal`. */

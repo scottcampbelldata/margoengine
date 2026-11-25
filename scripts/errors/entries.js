@@ -2749,6 +2749,15 @@ export const entries = [
     fix: 'Pass colours as `#rgb`, `#rrggbb`, `#rrggbbaa` or `[r, g, b]` / `[r, g, b, a]` in 0..1 (null restores the default), a finite positive `size` and `lineWidth`, `offset` as `[x, y, z]`, and attach meshes created by the engine the controls belong to. See the controls package README for each default.',
   },
   {
+    id: 'tiles-height',
+    title: '@margoengine/tiles/height: tilesHeightQuery options out of range',
+    kind: 'family',
+    messages: ['tilesHeightQuery needs a finite top above -bottom and a finite bottom >= 0; use the defaults'],
+    cause:
+      'The query rays start `top` metres above the ellipsoid and look down to `bottom` metres below it; a top below -bottom, or a non-finite value, leaves no span to search.',
+    fix: 'Leave `top` (9000) and `bottom` (12000) at their defaults, or pass a finite `top` above the highest ground and a finite `bottom` >= 0.',
+  },
+  {
     id: 'controls-arguments',
     title: '@margoengine/controls: an option, input or attached object outside its range',
     kind: 'family',
@@ -2773,6 +2782,9 @@ export const entries = [
       'Flight speed and curve are finite and above 0, maxDuration finite and 0 or more',
       'A bounding sphere needs a radius of 0 or more and a padding above 0',
       'Bounds need south <= north within [-PI/2, PI/2], in radians',
+      'A geospatial frame is 16 finite numbers, column-major ECEF to world; pass tiles.frame or the TilesRenderer',
+      'A geospatial frame must be invertible; pass a rigid or scaled ECEF-to-world matrix',
+      'A ground is (x, z) => y or has height(x, z) or heightAt(x, z); pass a TerrainQuery, a biomes world or a function',
       'Geospatial inertia is finite seconds >= 0 per axis; pass 0 to stop an axis at once',
       'followPath needs an array of one or more views; pass [view, ...]',
       'A path duration is finite seconds >= 0; omit it to take one from the length',

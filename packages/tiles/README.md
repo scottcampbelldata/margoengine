@@ -192,6 +192,33 @@ console.log(terrainFrame(86.925, 27.988).length); // 16
 
 `parseQuantizedMesh(bytes)` decodes a tile (header, vertices, triangles, edges, oct normals, water mask, metadata); a cut tile throws a `RangeError`. Imagery is `EPSG:3857` with `xyz` rows by default (`projection`, `scheme`, `maximumLevel`, `mimeType` change it); each terrain tile takes the deepest imagery tile that holds it whole, at most one level deeper than the terrain. Without `imagery` the terrain draws lit, in grey, with the tile's normals or ones made from its triangles. Pass `fetch` to `terrain` for headers such as an access token.
 
+## Height under a place: `@margoengine/tiles/height`
+
+`tilesHeightQuery(engine, tiles)` returns `(longitude, latitude) => height`: radians in, metres above the WGS84
+ellipsoid out, from a ray straight down the local vertical against the tiles drawn now (the bvh `Raycaster`, an
+optional peer). It reads the current selection on each call, so it follows streaming, and gives undefined where no
+drawn tile lies. Rays start at `top` (9000 m) and look down to `bottom` (12000 m below the ellipsoid). It is the
+`heightAt` the geospatial camera takes for clearance and walking over tiles.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TilesRenderer} from 'margoengine/tiles';
+import {tilesHeightQuery} from 'margoengine/tiles/height';
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json');
+const heightAt = tilesHeightQuery(engine, tiles);
+// The camera works in the tileset's frame and keeps clear of the tiles it stands over.
+const camera = new GeospatialControls(engine, undefined, {
+  frame: tiles,
+  heightAt,
+  view: {longitude: degToRad(-75.6), latitude: degToRad(40.04), range: 800, pitch: degToRad(35)},
+});
+console.log(heightAt(degToRad(-75.6), degToRad(40.04))); // undefined until a tile there is drawn
+```
+
 ## Orthographic cameras
 
 Maps and plan views use an orthographic camera, such as `CameraProjection` from `margoengine/cameras`. The renderer reads it from `engine.camera.matrix` with no extra call: when the clip w row is constant, the screen-space error becomes `geometricError x screenHeight / orthographicHeight`, the world height the view shows (converted to tileset units through the frame), so zooming in refines and moving the camera along its axis does not.

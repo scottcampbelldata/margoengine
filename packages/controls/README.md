@@ -746,6 +746,39 @@ camera
   .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
+### Open worlds: terrain, tiles and biomes
+
+A local world (a terrain or a biomes world laid out in metres around a site, a tileset in its east-north-up frame)
+needs two options. `frame` says where the world sits on the globe: a 4x4 ECEF-to-world matrix, or the `TilesRenderer`
+itself (its `frame`). Poses, picks and sweeps then go through it, and the camera stays near the world origin, so
+nothing jitters. `ground` is the world-space ground: a terrain `TerrainQuery` (`height(x, z)`), a biomes world
+(`heightAt(x, z)`) or a function. It becomes the `heightAt` for clearance, picking, walking and the height readouts,
+with no conversion. Over 3D Tiles, `tilesHeightQuery` from `@margoengine/tiles/height` is the `heightAt`. The scene's
+meshes are hit by the bvh as before.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {cartographicToEcef, degToRad, enuBasis} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A valley laid out in metres around a site in the Rockies: x east, y up, z south.
+const site = {longitude: degToRad(-105.6), latitude: degToRad(40.3), height: 2500};
+const b = enuBasis(site.longitude, site.latitude),
+  c = cartographicToEcef(site.longitude, site.latitude, site.height),
+  rows = [b.east, b.up, b.north.map((v) => -v)],
+  t = rows.map((r) => -(r[0]! * c[0] + r[1]! * c[1] + r[2]! * c[2]));
+const frame = [0, 1, 2].flatMap((k) => [rows[0]![k]!, rows[1]![k]!, rows[2]![k]!, 0]).concat([t[0]!, t[1]!, t[2]!, 1]);
+const valley = (x: number, z: number) => 80 * Math.sin(x / 300) * Math.cos(z / 400); // or a TerrainQuery, a biomes world
+const camera = new GeospatialControls(engine, undefined, {
+  frame,
+  ground: valley,
+  view: {...site, range: 1500, pitch: degToRad(30)},
+});
+console.log(camera.camera.position, camera.heights.terrain); // near the origin, metres above the valley floor
+await camera.setMode('walk', {duration: 0}); // walk the valley floor
+```
+
 ### Readouts, events and saved views
 
 `heights` gives the eye's height above the ellipsoid, above the ground directly below it (the highest of `heightAt`,
@@ -981,7 +1014,7 @@ Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
 (1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
-({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` (none), `hash` (false). Sources: NIMA TR8350.2 (WGS84);
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting), `gamepad` (false), `geoid` (none), `hash` (false), `frame` (ECEF, or its Y-up view), `ground` (none). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et

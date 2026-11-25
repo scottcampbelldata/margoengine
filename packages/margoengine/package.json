@@ -5123,6 +5123,10 @@
       "types": "./dist/tiles/fade.d.ts",
       "import": "./dist/tiles/fade.js"
     },
+    "./tiles/height": {
+      "types": "./dist/tiles/height.d.ts",
+      "import": "./dist/tiles/height.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

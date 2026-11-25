@@ -378,6 +378,7 @@ export class TilesRenderer implements EnginePlugin {
         }
         const renderer = this;
         return {
+          model,
           get bytes() {
             return renderer.measure(model, content.byteLength) + (decoration?.bytes ?? 0);
           },
