@@ -11987,12 +11987,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** fix(navmesh): the mesh border is a hard ORCA constraint for crowd agents (van den Berg et al. 2011, section
   5.4).
 
-### Open 2026-11-25: an animation-driven kinematic body trails the pose drawn by one frame (KB-PHYS-FRAMEORDER1, physics, core plugin order)
+### Fixed 2026-11-25: an animation-driven kinematic body trailed the pose drawn by one frame (KB-PHYS-FRAMEORDER1, physics, core plugin order)
 
-- **Repro:** `packages/ragdoll/tests/ragdoll.test.js`, "a kinematic bone aims at the pose drawn this frame": a ragdoll blending back to its animation; on every frame the hips body is on the pose drawn the frame before, not the one drawn now. The same holds for a body following an animated mesh (`followMesh`). At 10 m/s the hit box is 17 cm behind what is drawn at 60 frames a second, 42 cm at 24.
-- **Cause:** the engine calls its plugins' one hook, `onPreUpdate`, in the order they were added. `Physics` is added first (the ragdoll and the followers need it to exist), so each frame it steps before the animation and the ragdoll have made that frame's pose; the step reaches the target set the frame before. Babylon.js advances its animations before its physics step. A second frame of lag, a ragdoll bone aiming at the pose drawn two frames before because it read its target before writing the frame's pose, is fixed (same test).
-- **Without core (works now):** add `Physics` to the engine after the plugins that make the animated pose: `new Physics(null)`, then the animation, the animator and the ragdoll, then `engine.use(physics)`; the hit box is then on the pose drawn the same frame, to 1e-5 m (checked on the ragdoll test's scene). A plugin added after `Physics` again trails by a frame. The shot tool drives the page's own frame loop (`requestAnimationFrame` on the shot's clock, `tools/shot/driver.js`), not `physics.advance`, so a film has the order its page set up; the Film Studio is not in this repository and was not checked. No other hook runs between the plugins' updates and the frame's transforms: `engine.onFrame` callbacks run before `render` (so before every `onPreUpdate`), and frame-graph passes run after the transforms are ticked.
-- **Fix plan:** a plugin flag in core, `late?: boolean`, moving such plugins after every other at `use()`; prototyped on a local branch, it gives the same-frame result whatever order the plugins were added in, for 21 B gzip on core (22,163 to 22,184 B) and on core and stage (24,811 to 24,832 B), measured on one Mac both ways (the workstation reads 14 B less). A core change: the lead's and Scott's to approve.
+- **Repro:** a ragdoll blending back to its animation, with `Physics` added to the engine first, as most apps do: on every frame the hips body was on the pose drawn the frame before. The same held for a body following an animated mesh. At 10 m/s the hit box was 17 cm behind what was drawn at 60 frames a second, 42 cm at 24.
+- **Cause:** the engine calls its plugins' one hook, `onPreUpdate`, in the order they were added, and `Physics` is added first (the ragdoll and the followers need it to exist), so each frame it stepped before the animation and the ragdoll had made that frame's pose. No package could hold the fix: there is no other hook between the plugins' updates and the frame's transforms (`engine.onFrame` runs before them, frame-graph passes after the transforms are ticked), `removePlugin` disposes a plugin, and `use()` throws during a frame. A second frame of lag, a ragdoll bone reading its target before writing the frame's pose, was fixed in the ragdoll.
+- **Fix:** core's `EnginePlugin` gains `late?: boolean` (Scott, 2026-11-25): `use()` moves every late plugin after the others, once, keeping their own order, and `Physics` is late. Core 22,163 to 22,184 B gzip and core and stage 24,811 to 24,832 B, measured on a Mac (the workstation reads 14 B less).
+- **Regression:** `packages/core/tests/plugin-late.test.js` (late plugins after the others, in their own order) and `packages/ragdoll/tests/ragdoll.test.js` ("with Physics added first, a kinematic bone's body is on the pose drawn, on the frame it is drawn": every frame, to 1e-5 m; a frame behind without the fix).
 
 ### Open 2026-11-24: a fast spinner against a wall with friction holds up to 3 percent more energy than it began with (KB-PHYS-SPINFRICTION1, physics kernel)
 
@@ -27224,16 +27224,17 @@ its existing bound (Catto, "Solver2D", 2024, the soft step; Tonge, Benevolenski 
 and Trinkle, "Interactive simulation of rigid body dynamics in computer graphics", Computer Graphics Forum 33(1), 2014, for friction
 against exact normal blocks).
 
-## KB-PHYS-WALL1: a cube stopped by a wall at 6 m/s sinks 2.2 cm into the floor with the sweeps solver
+## KB-PHYS-SPEC1: the sweeps throw a cube that a wall stops at 6 m/s 0.115 m up, at 8 substeps and 2 passes
 
-`packages/voxel/tests/physics.test.js`, "a chunk that comes back after edits made out of range leaves no stale seam": a frictionless
-0.4 m cube slides at 6 m/s over a voxel floor into a one-block wall. It stops at the wall face as it should, but its centre goes
-0.0219 m below its rest height for five steps (the test allows 0.02), with floor impulses of 3.8 and 7.3 against 0.005 at rest.
-With `setSolver({blockSolver: true})` the test passes. Cause as understood: the wall's four points take their impulses one after
-the other, the top ones more than the bottom ones in the first passes, which pitches the cube onto its lower front edge and drives
-that edge into the floor until the passes even the load out; the exact block solve gives them together. It is not a seam (the floor
-and wall are voxel grids that meet no other collider at that spot). To fix with the block solver's default (KB-PHYS-BLOCK1): the
-test stays red until then.
+`packages/physics/kernel/tests/voxel.rs`, `a_cube_stopped_by_a_wall_over_the_seam_of_two_grids_is_not_thrown_by_the_cell_under_the_wall`:
+a frictionless 0.4 m cube slid at 6 m/s into a one-block wall, with the kernel's defaults (8 substeps, 2 passes) and the sweeps,
+rises 0.115 m and spins at 6.8 rad/s after the stop (2 passes: 0.115 m; 4 passes: 0.22; 1 pass: 0.0005; the block solve:
+0.0005). Cause: the wall's points are speculative rows when the stop begins (the face is still 0.1 m off), and a speculative
+row only bounds a point's approach by its gap over the substep. Points solved one after another can meet that bound with one
+point stopped and the cube turning about it, an equally valid answer of the same inequalities, and more passes settle on it
+more firmly. The exact block solve of each manifold (`blockSolver`) gives the stop to all the points at once. Fixed by the
+block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
+was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

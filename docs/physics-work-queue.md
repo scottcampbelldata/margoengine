@@ -46,6 +46,110 @@ there, add a line below with the solver ID and what is needed, and build against
 
 - (none yet)
 
+## Research notes for open solvers
+
+Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.
+
+### LIFE-03 swimming and LIFE-04 schools (design, no code)
+
+- **Swim solver:** `SwimSolver` implements `Solver` in a new entry, `@margoengine/physics/life`.
+  - Each fish is a 6-DOF body with diagonal added mass (Lamb; strip theory), Kirchhoff terms (Fossen) and
+    Froude-Krylov forces from the water FlowField (Morison).
+  - Friction follows ITTC-57 with a Prandtl-Schlichting laminar blend, plus cross-flow strip drag.
+- **Thrust:** Lighthill's cycle-mean `T = (m/4) a² ω² (1 - (U/c)²)`, with `m = π ρ s² / 4` at the tail span `s`.
+  - Efficiency is `½ (1 + U/c)`, so speed emerges from the tail beat rather than being set.
+  - Test the Strouhal number against 0.2 to 0.4.
+  - Effort sets the beat frequency, and the clip's phase is the integrated beat.
+- **Turning:** fin lift gives a lateral force and a yaw moment, `½ ρ CLmax A (u² + v_fin²)`.
+  - Minimum turning radius is about `2 (m + m_a) / (ρ CL S_lat)`.
+  - Bank angle comes from `tan φ = heel moment / (W GM)`.
+- **Hovering:** drag-based pectoral sculling (Blake 1979), with fin force `½ ρ CD A (a ω)²`.
+  - Yaw rate stays finite against rotational strip drag, `ρ CD h L⁴ ω |ω| / 64`.
+- **Integration:** linearly implicit for drag, with `stableRate()` derived from `|ω| dt`.
+  - Pinned math only, no atan2 (use half-angle square roots).
+  - Follow targets come from an interpolated `targets(frame, part)`.
+- **Schools (LIFE-04):** a separate solver writes a swim-intent field that the swimmers read.
+  - Topological neighbours (Ballerini et al. 2008), plus a predator-avoidance rule.
+  - Mass and turn limits come from the swim solver.
+- **Sources checked:** Lighthill 1971 (Proc R Soc B 179:125-138), Blake 1979 (J Exp Biol 82:255-271).
+- **Sources still to check:** Weihs 2002 (Integr Comp Biol 42:127-134), Lighthill 1960, Bainbridge 1958, Taylor,
+  Nudds and Thomas 2003, Fossen 2011, Lamb 1932, Hoerner 1965, Morison et al. 1950, Domenici and Blake 1997.
+
+### FLUID-01 and FLUID-02 particle liquids (design, no solver code)
+
+- **DFSPH (Bender and Koschier 2015):**
+  - The density factor is `α_i = ρ_i / (|Σ m_j ∇W|² + Σ |m_j ∇W|²)`, with the denominator floored.
+  - Pressure stiffness is `κ_i = (ρ* - ρ0) α_i / dt²` for density and `κ_v = (Dρ/Dt) α_i / dt` for divergence.
+  - Jacobi iterations with a warm start.
+  - The CFL time step is `dt <= 0.4 d / v_max`, and negative pressure is clamped.
+  - Tolerances are 0.01% on density and 0.1% on divergence.
+  - Step order: forces, density solve, positions, grid rebuild, divergence solve.
+- **Rigid boundaries (Akinci et al. 2012):**
+  - Boundary volume `V_b = 1 / Σ W_bk` and `Ψ_b = ρ0 V_b`, so density is `m Σ W + Σ Ψ_b W`.
+  - The boundary pressure force uses the fluid particle's `p / ρ²`, equal and opposite on the body, with force and
+    torque about the centre of mass.
+  - Friction comes through artificial viscosity.
+- **Surface tension and adhesion (Akinci et al. 2013):**
+  - Cohesion kernel `C(r)` with its `32 / (π h⁹)` piecewise form.
+  - Curvature term `-γ m (n_i - n_j)`, with the symmetric factor `K_ij = 2 ρ0 / (ρ_i + ρ_j)`.
+  - Adhesion kernel `A(r) = 0.007 / h^3.25 (-4r²/h + 6r - 2h)^(1/4)` for `h/2 < r <= h`.
+- **Layout:**
+  - One Rust crate; state columns are x, v, κ and κ_v.
+  - Density, α and the grid are derived and rebuilt each step.
+  - Body force and torque accumulate into `bodyImpulses` (lane B's RigidSolver defines the layout; use it).
+- **Not yet read:** Bender and Koschier 2017 on implicit viscosity, Zhu and Bridson 2005, Jiang et al. 2015 (APIC),
+  and Fedkiw, Stam and Jensen 2001 on smoke.
+- **The shared neighbour grid already has a sparse mode** for large domains (sorted 63-bit cell keys, the same
+  candidates in the same order as the dense grid).
+
+### BIO-01 plant sway in wind and water (design, no code)
+
+- **Entry and model:** `@margoengine/physics/vegetation`, class `PlantSway implements Solver`.
+  - Each plant is a tapered, possibly hollow cantilever, described by E, density, base and tip diameters, wall
+    ratio, crown mass, area and start height, Cd, modulus of rupture and anchorage strength.
+- **Modes:** a Ritz basis of the first two uniform clamped-free modes.
+  - β comes from `cos β cosh β = -1` by bisection, using pinned exp, sin and cos.
+  - Solved as a 2x2 generalized eigenproblem, so frequencies come from the geometry and none are fitted.
+- **Loads:** Morison's equation at 3-point Gauss-Legendre nodes on the stem and on the crown.
+  - Drag is `½ ρ Cd A |u_rel| u_rel` on the transverse relative velocity, so aerodynamic damping comes automatically.
+  - Inertia is `ρ (1 + Ca) V du/dt`, with `du/dt` from two FlowField samples, and added mass goes in the mass matrix.
+  - Density comes from the FlowField sample, so one solver serves air and water.
+  - Vogel reconfiguration scales drag by `(U/U_v)^V` above `U_v = sqrt(EI_eq / (ρ A H²))`, where the Cauchy number
+    is 1.
+- **Time stepping:** linearised-drag implicit midpoint (A-stable, a 2x2 solve per axis, deterministic).
+  - Gusts travel as visible fronts because each plant samples the FlowField at its own position and time.
+- **Failure:** base moment `M = EI u'' / H²` from the modes, and stress `M / Z` at 8 stem stations.
+  - The stem snaps at σ >= the modulus of rupture (break height recorded), and the plant uproots at M >= the
+    anchorage strength (Peltola et al. 1999).
+- **Output port `plantSway`:** per-plant modal tip amplitudes, peak load ratio and status.
+  - Wiring it into scatter and the tree shaders needs a deflection grid or texture read in the wind shaders, which
+    is the larger job.
+  - Kelp and anemones add buoyancy as a restoring term in the same solver.
+- **Fields:** `wind` (air) and `current` (water), each as uniformGrid, velocity, m/s, cell-centred.
+- **Sources checked against the publishers' pages:**
+  - de Langre 2008 (Annu Rev Fluid Mech 40:141-168);
+  - Py, de Langre and Moulia 2006 (JFM 568:425-449);
+  - Gosselin, de Langre and Machado-Almeida 2010 (JFM 650:319-341);
+  - Vogel 1989 (J Exp Bot 40:941-948);
+  - Peltola et al. 1999 (Can J For Res 29:647-661);
+  - Gardiner, Peltola and Kellomäki 2000 (Ecol Model 129:1-23);
+  - Stam 1997 (CGF 16(3));
+  - Habel, Kusternig and Wimmer 2009 (CGF 28(2):523-532).
+- **Still to check:** Blevins' cantilever mode constants, Morison et al. 1950, and Raupach, Finnigan and Brunet 1996.
+
+### The terrain bed field, PA-37 (being finished by Claude; for the EARTH and HYDRO solvers that build on it)
+
+- **Contract:** `bed.ts`, types only, in `@margoengine/math/fields`.
+  - `TerrainBed` owns the field `bed`, a vertex grid in the rigid kernel's height-field layout, kept in f64 and
+    published as f32.
+- **Writers:** erosion, slides and craters add metres of change to the accumulator field `bedChange`.
+  - The bed applies the sum each tick, clamps at an optional bedrock, and keeps a ledger of requested and refused
+    volume.
+  - `bedVertexAreas` is exact for the kernel's triangulation, so contributors can conserve mass.
+- **Readers:** `BedSurface` and `bedFromPort` sample elevation and normal on the kernel's own triangles.
+- **Collider:** a fixed body with a deformable trimesh. A native height edit in the rigid kernel is still needed, so
+  that edits don't leak mesh rows.
+
 ## Open
 
 | ID | Solver | State today | Owner | Status |
