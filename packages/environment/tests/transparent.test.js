@@ -88,6 +88,8 @@ test('TransparentCanvas switches the canvas to premultiplied, keeps it across de
     assert.ok(transparency instanceof TransparentCanvas && transparency instanceof ColorBackground);
     engine.render();
     assert.deepEqual(log.uniforms.at(-1), [0, 0, 0, 0, 0, 0, 0, 0], 'empty pixels: premultiplied alpha 0');
+    const mark = Symbol.for('margoengine.premultiplied-canvas');
+    assert.equal(canvas[mark], true, 'Tonemap reads this mark to grade straight colour');
     await engine.rebootDevice();
     engine.render();
     assert.deepEqual(
@@ -99,6 +101,7 @@ test('TransparentCanvas switches the canvas to premultiplied, keeps it across de
     transparency.dispose();
     transparency.dispose();
     assert.deepEqual(log.modes.slice(4), ['opaque'], 'dispose() restores an opaque canvas once');
+    assert.equal(canvas[Symbol.for('margoengine.premultiplied-canvas')], false);
     assert.equal(engine.hasPlugin('transparent-canvas'), false);
     const scoped = TransparentCanvas.attach(engine);
     {

@@ -199,6 +199,15 @@ Standalone capture at order −50 replaces the standard core shader's display ma
 
 Display P3 and HDR canvases: with `ColorOutput` from `@margoengine/environment` active (alone or in a PostStack), Tonemap compiles an output variant of its shader. Below the 0.76 knee the curves are the SDR ones; on an HDR canvas Khronos PBR Neutral's highlight rolloff aims at ColorOutput's `peak` instead of 1 (AgX and ACES are scaled by the same rolloff ratio of the brightest channel), and on a P3 canvas the input is clipped to the P3 gamut instead of sRGB. It writes the 0..1 part to its target as before and the rest (above white; negative components for colours outside sRGB) to ColorOutput's excess texture in a second full-screen pass. Without ColorOutput nothing changes: `examples/package-benchmarks/proofs/color-output.proof.js` records the same GPU calls as before. Details and limits: environment README, "Display P3 and HDR output".
 
+Transparent canvas: with `TransparentCanvas` from `@margoengine/environment` attached (or
+`createHeadlessStage({ transparent: true })`), a partly covered pixel holds its colour times its coverage. Tonemap
+then compiles a variant that divides by the alpha, applies the curve to that straight colour and multiplies back
+(T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
+<https://graphics.pixar.com/library/Compositing/paper.pdf>), so graphics laid over footage have no light rim, and
+grain and dither add nothing to empty pixels. A pixel with light and no coverage (a Bloom halo, additive particles)
+takes its brightest channel as alpha, so it stays in straight alpha. Covered pixels are the same as on an opaque canvas, and an opaque canvas
+keeps its shader. A canvas you configure `premultiplied` yourself is not marked: attach `TransparentCanvas`.
+
 Classic curves: `curve: 'reinhard'` (x / (1 + x) per channel), `'cineon'` (the filmic fit of Hejl and Burgess-Dawson,
 taken back to linear with a 2.2 power before the sRGB encoding) and `'linear'` (a clamp to 0..1 after exposure) match
 the curves of the same names in other engines, so a scene ported with its tone mapping keeps its look. They compile a

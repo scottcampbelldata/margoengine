@@ -228,3 +228,26 @@ test('onError guidance names its type and rejects before GPU installation or eng
   }
   assert.equal(create.mock.calls.length, 0);
 });
+
+test('transparent attaches TransparentCanvas, only when asked, and takes only a boolean', async (t) => {
+  const plugins = [];
+  t.mock.method(Engine, 'create', async (canvas) => {
+    const engine = fakeEngine(canvas);
+    // The real plugin configures the canvas, which the environment tests cover; here only what is attached counts.
+    const use = engine.use;
+    engine.use = (plugin) => {
+      plugins.push(plugin.name);
+      if (plugin.name !== 'transparent-canvas') use.call(engine, plugin);
+    };
+    return engine;
+  });
+  (await createHeadlessStage({ gpu, width: 1, height: 1 })).dispose();
+  assert.deepEqual(plugins.splice(0), ['margoengine-headless', 'margoengine-imports']);
+  (await createHeadlessStage({ gpu, width: 1, height: 1, transparent: true })).dispose();
+  assert.deepEqual(plugins.splice(0), ['margoengine-headless', 'transparent-canvas', 'margoengine-imports']);
+  await assert.rejects(createHeadlessStage({ gpu, width: 1, height: 1, transparent: 'yes' }), {
+    name: 'TypeError',
+    message: /transparent/,
+  });
+  assert.deepEqual(plugins, [], 'nothing is made for a bad value');
+});

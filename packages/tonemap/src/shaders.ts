@@ -170,3 +170,39 @@ export function shapeCurve(x: number, toe = 1, shoulder = 1): number {
     x3 = x2 * x;
   return (x3 - 2 * x2 + x) * toe + (3 * x2 - 2 * x3) + (x3 - x2) * shoulder;
 }
+
+/**
+ * The variant for a premultiplied canvas (`TransparentCanvas` of `@margoengine/environment`), compiled in only there so
+ * an opaque canvas keeps its shader. A partly covered pixel holds colour times coverage, in the multisampled linear
+ * capture too (T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
+ * https://graphics.pixar.com/library/Compositing/paper.pdf), and a curve of that product is brighter than the product
+ * of the curve: the curve takes the colour divided by the alpha, and the encoded result is multiplied by it. A fully
+ * covered pixel is unchanged. A pixel with light and no alpha (a Bloom halo, additive particles) takes its brightest
+ * output channel as alpha, as Bloom alone writes it, so it survives straight alpha; one with neither stays zero, so
+ * grain and dither add nothing to it. Call it after every other patch of the shader.
+ */
+export function premultipliedShader(code: string): string {
+  const input = 'var hdr=clean(source.rgb);';
+  let outputs = 0;
+  // The returns that encode for display; the linear return of the output shader has no pow and keeps its alpha.
+  const out = code
+    .split(input)
+    .join('var hdr=clean(margoStraight(source));')
+    .replace(/return vec4f\((.*pow\(color,.*),(source|o)\.a\);/g, (_, colour: string, from: string) => {
+      outputs++;
+      return `return margoOutput((${colour}),textureLoad(scene,vec2i(pos.xy),0),${from}.a);`;
+    });
+  if (!code.includes(input) || !outputs)
+    throw new RangeError(
+      'Tonemap shader has no input or display output to premultiply; pass tonemapShader or outputShader.',
+    );
+  return `${out}
+fn margoStraight(s:vec4f)->vec3f {if(s.a>0.0&&s.a<1.0){return s.rgb/s.a;}return s.rgb;}
+fn margoOutput(color:vec3f,s:vec4f,alpha:f32)->vec4f {
+  if(s.a>0.0&&s.a<1.0){return vec4f(color*s.a,alpha);}
+  if(s.a>0.0){return vec4f(color,alpha);}
+  if(all(s.rgb<=vec3f(0))){return vec4f(0,0,0,alpha);}
+  return vec4f(color,max(color.r,max(color.g,color.b)));
+}
+`;
+}

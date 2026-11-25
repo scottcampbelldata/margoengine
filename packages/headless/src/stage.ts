@@ -25,6 +25,11 @@ export interface HeadlessStageOptions extends Omit<EngineOptions, 'backend'> {
   globals?: Readonly<Record<string, unknown>>;
   /** Receives engine errors (set as `engine.onError`). */
   onError?: (error: unknown) => void;
+  /**
+   * No background: pixels nothing draws read back with alpha 0, for graphics laid over other pictures. Attaches
+   * `TransparentCanvas` from `@margoengine/environment`, which must be installed. Default false.
+   */
+  transparent?: boolean;
 }
 
 // installGPU changes globals, so stages alive at once share one installation: a stage disposed first must not take
@@ -136,6 +141,17 @@ export class HeadlessStage extends Stage {
   }
 }
 
+/** `@margoengine/environment`, an optional peer loaded on first use. */
+async function transparentCanvas(): Promise<typeof import('@margoengine/environment')> {
+  try {
+    return await import('@margoengine/environment');
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ERR_MODULE_NOT_FOUND')
+      throw Object.assign(fault('state', 'Install @margoengine/environment', 'install'), { cause: error });
+    throw error;
+  }
+}
+
 /**
  * The server version of `createStage`: installs the GPU, creates an engine on a stand-in canvas and wraps it. There
  * are no camera controls and no frame loop. Disposing the stage (or its engine) restores what `installGPU` changed once
@@ -147,6 +163,7 @@ export async function createHeadlessStage({
   gpu = globalThis.navigator?.gpu,
   globals,
   onError,
+  transparent = false,
   ...options
 }: HeadlessStageOptions): Promise<HeadlessStage> {
   if (onError !== undefined && typeof onError !== 'function')
@@ -154,12 +171,19 @@ export async function createHeadlessStage({
       'Invalid stage onError: expected a function or undefined; pass an error callback or omit onError',
       'arguments',
     );
+  if (typeof transparent !== 'boolean')
+    throw typeError(
+      'Invalid stage transparent: expected a boolean; pass true for a transparent background or omit transparent',
+      'arguments',
+    );
+  const environment = transparent ? await transparentCanvas() : undefined;
   const canvas = createHeadlessCanvas({ width, height }),
     release = acquire(gpu, globals);
   try {
     const engine = await Engine.create(canvas, { ...options, backend: 'webgpu' });
     if (onError) engine.onError = onError;
     engine.use({ name: 'margoengine-headless', setup() {}, dispose: release });
+    if (environment) engine.use(new environment.TransparentCanvas());
     return new HeadlessStage(engine);
   } catch (error) {
     release();

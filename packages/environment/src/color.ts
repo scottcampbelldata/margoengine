@@ -16,6 +16,8 @@ import { linearHdr } from '../../shared/hdr-format.js';
 
 /** The marker of a background pass (shared through the global symbol registry, so no module import is needed). */
 const BACKGROUND_PASS = Symbol.for('margoengine.background-pass');
+/** Marks a premultiplied canvas, so a display transform (Tonemap) works on straight colour; no module import needed. */
+const PREMULTIPLIED = Symbol.for('margoengine.premultiplied-canvas');
 
 export type { ColorInput } from '@margoengine/math/color';
 
@@ -309,5 +311,6 @@ export class TransparentCanvas extends ColorBackground {
       format: current?.format ?? navigator.gpu.getPreferredCanvasFormat(),
       alphaMode,
     });
+    (engine.canvas as { [PREMULTIPLIED]?: boolean })[PREMULTIPLIED] = alphaMode === 'premultiplied';
   }
 }

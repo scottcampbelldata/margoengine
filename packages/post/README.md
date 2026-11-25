@@ -1547,10 +1547,13 @@ and after the alpha changes (it writes frames only, no committed result yet).
 - **FXAA** filters alpha with colour (premultiplied), so smoothed silhouettes stay valid.
 - **Bloom** keeps the scene's alpha and raises it to the glow's brightest channel, so glow past an
   object shows over the page as a valid premultiplied veil. In a `PostStack` its linear output
-  carries the scene alpha.
-- **SSAO** and **Tonemap** (`@margoengine/tonemap`) carry the scene alpha, but tone-map the
-  premultiplied colour of partly covered silhouette pixels, so a 1 px rim can be up to ~45/255
-  brighter than its alpha allows (shows as a faint light edge on dark pages).
+  carries the scene alpha, and a Tonemap after it gives glow past an object its brightest channel as alpha.
+- **Tonemap** (`@margoengine/tonemap`) carries the scene alpha and applies its curve to the straight colour of
+  partly covered pixels, so a silhouette keeps the face colour at its coverage
+  (`packages/headless/tests/transparent-gpu.mjs`: within 1.1 of 255, alone and in a stack with FXAA or SMAA).
+- **SSAO** used without a display effect after it carries the scene alpha, but tone-maps the premultiplied colour
+  of partly covered silhouette pixels, so a 1 px rim can be up to ~45/255 brighter than its alpha allows (a faint
+  light edge on dark pages). In a `PostStack` with a Tonemap after it, Tonemap does the curve and there is no rim.
 - **PostStack** adds no pass of its own; its last effect writes the canvas.
 - **SMAA** blends the stored premultiplied colour (alpha valid) and finds edges in alpha too; **Glitch** takes the
   largest alpha of its three reads; **Afterimage** applies its max to alpha too, so trails fade as a premultiplied

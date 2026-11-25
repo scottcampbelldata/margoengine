@@ -211,13 +211,40 @@ await writeFile('thumbnail.png', await stage.toPNG());
 
 | Export | What it does |
 | --- | --- |
-| `createHeadlessStage({ width, height, gpu?, globals?, onError?, ...engineOptions })` | Installs the GPU and creates the engine on a stand-in canvas. `width` and `height` are required. `gpu` defaults to `navigator.gpu`, `globals` to none. The backend is always WebGPU. Stages alive at once must share one `gpu`; the globals are restored when the last is disposed. |
+| `createHeadlessStage({ width, height, gpu?, globals?, onError?, transparent?, ...engineOptions })` | Installs the GPU and creates the engine on a stand-in canvas. `width` and `height` are required. `gpu` defaults to `navigator.gpu`, `globals` to none. `transparent` defaults to false; true leaves the background clear (below). The backend is always WebGPU. Stages alive at once must share one `gpu`; the globals are restored when the last is disposed. |
 | `stage.toPNG({ signal? })`, `stage.readPixels({ signal? })` | Draws a frame and gives it as PNG bytes or RGBA pixels. |
 | `stage.step(delta?)` | Runs `onTick` and `engine.onFrame` callbacks, then draws a frame that advances plugins by `delta` seconds, 0 to 1 (default 0); a delta outside that range, or a step from inside a step, throws before any callback runs. `stage.resize(width, height)` takes whole numbers from 1. Nothing runs by itself: there are no camera controls and no frame loop. |
 | `stage.resize(width, height)` | Sets the image size for the next frame. |
 
 `stage.onTick` and `stage.engine.onFrame` both run on `step`, so a package that drives itself from `onFrame` advances here too. To load a model
 with `addGLTF`, pass an absolute URL, since Node has no page address to resolve against.
+
+### Graphics over footage
+
+`transparent: true` draws no background: `readPixels` gives alpha 0 where nothing was drawn, 255 on the graphics and
+the coverage on their edges, as straight alpha, so titles, maps and lower thirds can be laid over recorded video
+(`encodeVideo` and `encodeWithFFmpeg` keep it with `alpha: true`). It attaches `TransparentCanvas` from
+`@margoengine/environment`, an optional peer. Tonemap, a `PostStack` ending in Tonemap, FXAA or SMAA, and the
+`@margoengine/ui` overlay keep it. DOF, TAA and SceneFade are for opaque frames only; the `@margoengine/post` README
+lists the other effects.
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { createHeadlessStage } from '@margoengine/headless/stage';
+import { Tonemap } from '@margoengine/tonemap';
+import { Panel, Ui, UiRenderer } from '@margoengine/ui';
+import { create } from 'webgpu';
+
+const gpu = create([]);
+using stage = await createHeadlessStage({ gpu, width: 640, height: 360, transparent: true });
+stage.box({ color: '#84d6bd' });
+Tonemap.attach(stage.engine);
+const ui = new Ui();
+ui.add(new Panel({ background: '#101820c0', width: 280, height: 64, anchor: 'bottom-left' }));
+UiRenderer.attach(stage.engine, ui);
+stage.fit();
+await writeFile('overlay.png', await stage.toPNG());
+```
 
 ## Choosing the GPU adapter
 

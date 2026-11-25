@@ -10,7 +10,14 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { parseCube, validateLUT, type CubeLUT } from './cube.js';
-import { outputShader, tonemapShader, sizedLUTShader, classicShader, shapeShader } from './shaders.js';
+import {
+  outputShader,
+  tonemapShader,
+  sizedLUTShader,
+  classicShader,
+  shapeShader,
+  premultipliedShader,
+} from './shaders.js';
 export { shapeCurve } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -27,6 +34,8 @@ import {
 } from './effects.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
 export { parseCube };
+/** Set on the canvas by environment's TransparentCanvas (no import between the packages). */
+const PREMULTIPLIED = Symbol.for('margoengine.premultiplied-canvas');
 export { whiteBalanceMatrix, type AutoExposure };
 export type { CubeLUT };
 
@@ -514,13 +523,15 @@ export class Tonemap implements EnginePlugin {
       exts = o.extensions ?? NO_EXTENSIONS,
       classic = curves.indexOf(o.curve!) > 2,
       shaped = (o.whitePoint ?? 0) > 0 || (o.toe ?? 1) !== 1 || (o.shoulder ?? 1) !== 1,
+      premultiplied = !!(this.engine!.canvas as { [PREMULTIPLIED]?: boolean } | undefined)?.[PREMULTIPLIED],
       flags = exts.length
         ? -1
         : (excess ? 1 : 0) |
           (variableLUT ? 2 : 0) |
           (fxOn ? (auto ? 12 : 4) : 0) |
           (classic ? 16 : 0) |
-          (shaped ? 32 : 0),
+          (shaped ? 32 : 0) |
+          (premultiplied ? 64 : 0),
       // The key string is built only when what it names may have changed (a frame with extensions always builds it):
       // a steady frame builds no string.
       key =
@@ -538,6 +549,7 @@ export class Tonemap implements EnginePlugin {
             (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
             (classic ? ':classic' : '') +
             (shaped ? ':shape' : '') +
+            (premultiplied ? ':premultiplied' : '') +
             (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
     this.keyFlags = flags;
     this.keyFormat = format;
@@ -549,6 +561,7 @@ export class Tonemap implements EnginePlugin {
       if (classic) code = classicShader(code);
       if (shaped) code = shapeShader(code);
       for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i, 16 + 4 * i);
+      if (premultiplied) code = premultipliedShader(code);
       for (const b of this.extBuffers) b?.destroy();
       this.extBuffers = exts.map(
         (e) =>
