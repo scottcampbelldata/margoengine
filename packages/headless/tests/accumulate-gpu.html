@@ -1,0 +1,101 @@
+<!doctype html><html><body><script type="module">
+// Real-GPU checks of renderAccumulated with Accumulate (FG-17 piece 1). An orthographic camera maps one world unit to
+// one pixel on a 64 x 32 canvas, and an ambient-only white box is flat, so coverage and smear are known exactly.
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas, installGPU, readPixels } from '../src/index.ts';
+import { readTexture } from '../src/formats.ts';
+import { renderAccumulated } from '../src/accumulate.ts';
+import { Accumulate } from '../../post/src/accumulate.ts';
+const W = 64, H = 32;
+const ortho = (out, _aspect, webgpu) => {
+  const near = 0.1, far = 20;
+  out[0] = 2 / W; out[5] = 2 / H; out[15] = 1;
+  if (webgpu) { out[10] = -1 / (far - near); out[14] = -near / (far - near); }
+  else { out[10] = -2 / (far - near); out[14] = -(far + near) / (far - near); }
+};
+async function scene() {
+  const installed = installGPU({ gpu: navigator.gpu }), canvas = createHeadlessCanvas({ width: W, height: H });
+  const engine = await Engine.create(canvas, { backend: 'webgpu', exactSize: true }), errors = [];
+  engine.stop();
+  engine.scene.background = '#000000';
+  engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  engine.lighting.direction.set([0, 0, 1, 0]);
+  engine.lighting.radiance.set([1, 1, 1, 1]);
+  const camera = new Camera({ position: [0, 0, 10], target: [0, 0, 0] });
+  camera.project = ortho;
+  const white = new PbrMaterial({ color: '#ffffff', roughness: 1 });
+  return { installed, engine, errors, camera, white };
+}
+// Column means of the linear red channel over the middle rows.
+const columns = (pixels) => {
+  const out = [];
+  for (let x = 0; x < pixels.width; x++) {
+    let s = 0;
+    for (let y = 8; y < 24; y++) s += pixels.data[(y * pixels.width + x) * 4];
+    out.push(s / 16);
+  }
+  return out;
+};
+const collect = async (iterable) => { const frames = []; for await (const f of iterable) frames.push(f); return frames; };
+window.run = async () => {
+  const { installed, engine, errors, camera, white } = await scene();
+  try {
+    // Edge at x = 20.3 px: the box covers world x from -40 to -11.7.
+    const wall = engine.createMesh().setGeometry(box(28.3, 64, 0.1)).setPosition([-25.85, 0, 0]).setMaterial(white);
+    const acc = Accumulate.attach(engine);
+    const linear = (samples, extra = {}) => collect(renderAccumulated(engine,
+      { frames: 1, samples, shutter: 0, filter: 'box', camera, accumulate: acc, output: 'linear', ...extra }));
+    const [one] = await linear(1), [many] = await linear(64), [again] = await linear(64);
+    const oneCols = columns(one), manyCols = columns(many), level = manyCols[5];
+    const identical = many.data.every((v, i) => Object.is(v, again.data[i]));
+    // Display path: the edge pixel at radiance 16 against a still lit to its coverage share.
+    engine.lighting.radiance.set([1, 1, 1, 4 / level]);
+    const [bright] = await collect(renderAccumulated(engine,
+      { frames: 1, samples: 64, shutter: 0, filter: 'box', camera, accumulate: acc }));
+    const [brightLinear] = await linear(64);
+    const share = columns(brightLinear)[20] / columns(brightLinear)[5];
+    engine.lighting.radiance.set([1, 1, 1, (4 / level) * share]);
+    acc.begin();
+    engine.render({ camera, delta: 0 });
+    const still = await readPixels(engine);
+    const at = (p, x) => p.data[(16 * p.width + x) * 4];
+    const display = { edge: at(bright, 20), still: at(still, 5), inside: at(bright, 5), outside: at(bright, 40) };
+    // Motion: an 8 px strip moving 32 px a frame at 30 fps, 180 degree shutter: smeared over 8 + 16 px in frame 1.
+    engine.lighting.radiance.set([1, 1, 1, 1]);
+    wall.setPosition([-200, 0, 0]);
+    const strip = engine.createMesh().setGeometry(box(8, 64, 0.1)).setMaterial(white);
+    const place = (t) => strip.setPosition([-28 + 960 * t, 0, 0]);
+    const moving = await collect(renderAccumulated(engine, { frames: 2, samples: 32, shutter: 0.5, filter: 'box',
+      camera, accumulate: acc, output: 'linear', update: (t) => place(t.time) }));
+    const smear = columns(moving[1]), stillStrip = columns(moving[0]);
+    place(0);
+    const [stillLinear] = await linear(32);
+    const sum = (a) => a.reduce((s, v) => s + v, 0);
+    const support = smear.filter((v) => v > 0.01 * level).length;
+    // centre of mass of the smear, in pixels.
+    const centroid = smear.reduce((s, v, x) => s + v * (x + 0.5), 0) / sum(smear);
+    // Abort between renders.
+    const controller = new AbortController();
+    let aborted;
+    try {
+      await collect(renderAccumulated(engine, { frames: 3, samples: 4, camera, accumulate: acc, signal: controller.signal,
+        update: (t) => { if (t.index === 1) controller.abort(new Error('stop')); } }));
+    } catch (error) { aborted = error.message; }
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return {
+      level, oneEdge: oneCols[20], manyEdge: manyCols[20], before: manyCols[19], after: manyCols[21],
+      oneLevels: [...new Set(oneCols.map((v) => Math.round(v / level * 100) / 100))],
+      identical, display, share,
+      smear: { support, energy: sum(smear) / sum(columns(stillLinear)), centroid, first: sum(stillStrip) / sum(columns(stillLinear)) },
+      aborted, errors,
+    };
+  } finally { engine.dispose(); installed.dispose(); }
+};
+window.compatRun = async () => {
+  const compat = await import('@margoengine/webgl2-compat');
+  await compat.install({ force: true });
+  try { return await window.run(); }
+  finally { compat.uninstall(); }
+};
+window.ready = true;
+</script></body></html>

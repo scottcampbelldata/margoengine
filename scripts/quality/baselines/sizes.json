@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18846825,
+  "total": 18858142,
   "history": [
     {
       "date": "2026-10-24",
@@ -11967,6 +11967,12 @@
       "commit": "527a26ba7",
       "reason": "@margoengine/physics/world: 12,132 to 12,542 B gzip: the world reads film time from a bundled FilmClock (@margoengine/math/clock, exact BigInt frame-to-tick arithmetic) in place of its own copy, so the engine has one implementation of it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-17a",
+      "reason": "FG-17 piece 1 new entries post/accumulate 6,903 B gzip (Accumulate, an HDR PostStack stage: rgba32float ping-pong sum and rgba16float mean in one pass, presents alone through the display curve) and headless/accumulate 4,414 B (subFrames schedule, Owen-scrambled Sobol offsets through the filter inverse CDF, renderAccumulated driver); both optional, nothing else imports them",
+      "grew": 1
     }
   ],
   "items": {
@@ -12434,6 +12440,7 @@
     "@margoengine/gltf/textured": 9808,
     "@margoengine/gltf/worker": 92644,
     "@margoengine/headless": 3309,
+    "@margoengine/headless/accumulate": 4414,
     "@margoengine/headless/compare": 3721,
     "@margoengine/headless/ffmpeg": 5023,
     "@margoengine/headless/ffmpeg-files": 4632,
@@ -12779,6 +12786,7 @@
     "@margoengine/points/style": 14446,
     "@margoengine/points/surfels": 16990,
     "@margoengine/post": 47098,
+    "@margoengine/post/accumulate": 6903,
     "@margoengine/post/afterimage": 6872,
     "@margoengine/post/anamorphic": 7567,
     "@margoengine/post/ascii": 9246,

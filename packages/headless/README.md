@@ -98,6 +98,88 @@ which lags by a number of frames that differs from run to run (65 of 90 frames d
 way). On the WebGL2 layer the layer loads its compute part before `requestDevice` answers (KB-COMPAT-FIRSTTASK1 in
 docs/known-bugs.md), so a page canvas read in the task of the first render shows that frame, as on WebGPU.
 
+### Film frames: anti-aliasing and motion blur from sub-frames
+
+`renderAccumulated` from `@margoengine/headless/accumulate` renders each frame `samples` times, each render at its own
+time inside the open shutter and with its own sub-pixel offset, and averages them in linear light with an `Accumulate`
+stage from `@margoengine/post/accumulate` (an optional peer, loaded on first use when no stage is given). The tone curve
+is applied once, to the average, so a bright edge or a fast highlight keeps its brightness instead of the dark smear
+an average of 8-bit frames gives. Everything that moves blurs, since each render is the scene at its own time:
+cameras, skinned and morphed meshes, particles, wind. Each frame is read back once, after its last render.
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
+import { createHeadlessCanvas, encodePNG, installGPU } from '@margoengine/headless';
+import { renderAccumulated } from '@margoengine/headless/accumulate';
+import { encodeEXR } from '@margoengine/headless/formats';
+import { Accumulate } from '@margoengine/post/accumulate';
+import { PostStack } from '@margoengine/post';
+import { Tonemap } from '@margoengine/tonemap';
+import { create } from 'webgpu';
+
+const gpu = create([]);
+using installed = installGPU({ gpu });
+const engine = await Engine.create(createHeadlessCanvas({ width: 320, height: 180 }), { backend: 'webgpu' });
+const cube = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#84d6bd' }));
+const accumulate = new Accumulate();
+PostStack.attach(engine, [accumulate, new Tonemap()]);
+const camera = new Camera({ position: [0, 1.5, 4], target: [0, 0, 0] });
+
+let frames = 0;
+for await (const frame of renderAccumulated(engine, {
+  frames: 4,
+  fps: 24,
+  samples: 16, // renders per frame
+  shutter: 0.5, // a 180 degree shutter
+  camera,
+  accumulate,
+  update: ({ time }) => {
+    camera.position = [4 * Math.sin(time * 6), 1.5, 4 * Math.cos(time * 6)];
+  },
+})) {
+  if (frame.data.length !== 320 * 180 * 4) throw new Error('wrong frame size');
+  await writeFile(`film_${frame.index}.png`, await encodePNG(frame));
+  frames++;
+}
+// output: 'linear' gives the mean in linear light, for an EXR.
+for await (const frame of renderAccumulated(engine, { frames: 1, samples: 8, camera, accumulate, output: 'linear' }))
+  await encodeEXR(frame);
+if (frames !== 4 || !cube) throw new Error(`rendered ${frames} frames`);
+engine.dispose();
+```
+
+| Option | What it does |
+| --- | --- |
+| `frames` | How many frames, a whole number from 1. Required. |
+| `fps` | Frames per second. Default 30. |
+| `samples` | Renders per frame, 1 to 4096. Default 16. 1 renders each frame once, with no offset. |
+| `shutter` | Share of the frame interval the shutter is open, 0 to 1. Default 0.5 (180 degrees); 0 is a still instant. |
+| `shutterPhase` | `'start'` (open from the frame's time), `'center'` or `'end'`. Default `'start'`. |
+| `filter`, `filterWidth` | Pixel filter the offsets are drawn from: `'blackman-harris'` (default), `'gaussian'` or `'box'`; width in pixels, default 2 (1 for `'box'`). |
+| `seed`, `pattern` | The sample pattern's seed (default 0); `'fixed'` (default) repeats it every frame so still edges do not shimmer, `'per-frame'` draws a new one. |
+| `camera` | Camera to render through; it is never modified. Default the engine's camera. |
+| `update(timing)` | Runs before each render with that render's `time`, `delta`, `index` (frame), `sample` and `samples`. May be async. |
+| `accumulate` | The `Accumulate` stage in your PostStack, before `Tonemap`. Default one attached alone and disposed at the end. |
+| `output` | `'display'` (default): 8-bit RGBA as `readPixels` reads it. `'linear'`: float RGBA of the mean, for `encodeEXR`. |
+| `signal` | Stops between renders or during readback; the iterator rejects with the reason. |
+
+`subFrames(options)` is the same schedule without rendering: each render's `frame`, `sample`, `time`, `delta`, `offset`
+and `last`, pure and repeatable. Times are the middles of `samples` equal slices of the open shutter, in order, so the
+deltas add up to the frame interval; offsets are Owen-scrambled Sobol points (Burley 2020) mapped through the filter
+(filter importance sampling, Ernst, Stamminger and Greiner 2006) and shuffled against the time order.
+
+- **Checked on a real GPU** (`npm run test:gpu:accumulate -w @margoengine/headless`, WebGPU and the WebGL2 layer): an
+  orthographic edge at x = 20.3 px reads 0.297 of the lit level in linear light at 64 box samples (one sample: 0 or 1);
+  at radiance 4 the edge pixel equals a still lit to that share (244 against 244), far from the mean of the two
+  display values (76); two runs are bit-identical; an 8 px strip moving 32 px a frame under a 180 degree shutter
+  spreads over 24 px, keeps its energy (1.000) and centres at 44.03 px against 44 for mid-shutter; an abort rejects
+  with its reason.
+- **Limits.** Effects with their own frame history (TAA's jitter, SSGI multi-bounce) advance once per render, so turn
+  TAA's jitter off (`velocityOnly`). Simulations see the sub-frame deltas, so a film repeats exactly for fixed `fps`,
+  `samples`, `shutter` and phase. Cost is `samples` renders a frame. WebGPU and the WebGL2 layer; on the layer's
+  half-float tier the sum is float16.
+
 ## A stage without a page
 
 `@margoengine/headless/stage` gives server thumbnails the same short setup as a page. `createHeadlessStage` returns a real

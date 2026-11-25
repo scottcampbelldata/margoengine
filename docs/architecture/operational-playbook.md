@@ -192,6 +192,25 @@ texture equal to the reading within 2.4e-7, and a bore run-up of 0.89 m under Sh
 one more dispatch a tick and 32 B a cell; Water's spray now spawns from the breaker at any depth (the coast flow's breaker
 is 0 past 1.8 m, so its spray is unchanged).
 
+### Section 5 evidence: film sub-frame accumulation (post/accumulate and headless/accumulate, FG-17 piece 1, 2026-11-25)
+
+Two new optional entries; core, stage and the PostStack are unchanged. `@margoengine/post/accumulate` (`Accumulate`) is
+an HDR PostStack stage: one fullscreen pass with two targets adds the frame times its weight into one of two
+ping-pong `rgba32float` sums (float32 is not blendable, so the previous sum is read with `textureLoad`) and writes sum
+times the float64 inverse of the total weight to an `rgba16float` mean that Tonemap and the display curve read, so the
+tone curve is applied once to the linear average (Haeberli and Akeley 1990). `@margoengine/headless/accumulate`
+(`subFrames`, `renderAccumulated`) schedules `samples` renders a frame at the middles of equal slices of the open
+shutter (Cook, Porter and Carpenter 1984), with sub-pixel offsets from Owen-scrambled 2D Sobol points (Burley 2020)
+mapped through the pixel filter's inverse CDF (Ernst, Stamminger and Greiner 2006), shuffled against time order; the
+offset is a clip-space shift of a copy of the camera, so the caller's camera and the culling planes are untouched.
+Evidence: `packages/headless/tests/accumulate-gpu.mjs` (WebGPU and the WebGL2 layer, identical figures): 64 box
+samples of an orthographic edge at 20.3 px read 0.297 coverage in linear light; at radiance 4 the edge pixel is the
+tone curve of the linear mean (244 against a still lit to that share, 244), not the mean of display values (76); two
+runs bit-identical; an 8 px strip at 32 px a frame and a 180 degree shutter spreads over 24 px with energy 1.000 and
+centroid 44.03 px (44 expected); abort rejects with its reason. CPU: `packages/headless/tests/accumulate.test.js`
+(times, telescoping deltas, `samples: 1` equal to `renderFrames`, stratified box offsets, filters, seeds, range errors)
+and `packages/post/test/accumulate.test.js` (uniforms, targets, resets, lifecycle). Missing: GPU cost per sub-frame.
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object

@@ -749,6 +749,34 @@ trails.reset();       // drop the trail, e.g. on a camera cut
 - **Limits.** Screen-space trails: a moving camera smears the whole frame. Two full-size `rgba16float` history
   textures. GPU cost not measured yet. WebGPU only.
 
+## Accumulate
+
+`@margoengine/post/accumulate` (its own entry; it carries the stack) averages frames in linear HDR for film output:
+`begin()` starts a sum, every frame drawn after it is added times `weight`, and the effect outputs the running weighted
+mean, so later HDR effects and `Tonemap` see the average of linear light and the tone curve is applied once
+(Haeberli and Akeley, "The Accumulation Buffer", SIGGRAPH 1990). `renderAccumulated` in
+`@margoengine/headless/accumulate` drives it with sub-pixel offsets and shutter times.
+
+```ts
+import {Accumulate} from 'margoengine/post/accumulate';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const accumulate = Accumulate.attach(stage.engine);
+accumulate.begin(); // the next frame starts a new sum
+accumulate.weight = 1; // weight of each frame from now on
+console.log(accumulate.count, accumulate.total); // frames and weight summed so far
+```
+
+- **Targets.** Two full-size `rgba32float` sums ping-pong (float32 is not blendable, so the fold reads one with
+  `textureLoad`), and one pass writes the new sum and the `rgba16float` mean (`texture`, with `COPY_SRC`, for
+  `readTexture`). On the WebGL2 layer's half-float tier the sum is float16: keep to a few hundred frames there.
+- **Resets.** A new sum starts after `begin()`, a resize, a device restore, and when enabled again (disabled frames pass
+  through). Alpha is averaged as it comes, premultiplied.
+- **Checked on a real GPU** through `@margoengine/headless/accumulate` (its README has the figures): linear edge
+  coverage, the tone curve applied once, bit-identical runs and shutter smear, on WebGPU and the WebGL2 layer.
+- **Limits.** Three full-size float targets (40 bytes a pixel). Effects before it that keep history advance once per
+  frame added. GPU cost not measured yet.
+
 ## Outlines: `Outline`
 
 `@margoengine/post/outline` draws lines where a Sobel filter finds a step in scene depth and, when you give it normals,

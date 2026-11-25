@@ -1871,6 +1871,10 @@
       "types": "./dist/headless/tiles.d.ts",
       "import": "./dist/headless/tiles.js"
     },
+    "./headless/accumulate": {
+      "types": "./dist/headless/accumulate.d.ts",
+      "import": "./dist/headless/accumulate.js"
+    },
     "./headless/null": {
       "types": "./dist/headless/null.d.ts",
       "import": "./dist/headless/null.js"
@@ -3222,6 +3226,10 @@
     "./post/afterimage": {
       "types": "./dist/post/afterimage.d.ts",
       "import": "./dist/post/afterimage.js"
+    },
+    "./post/accumulate": {
+      "types": "./dist/post/accumulate.d.ts",
+      "import": "./dist/post/accumulate.js"
     },
     "./post/outline": {
       "types": "./dist/post/outline.d.ts",

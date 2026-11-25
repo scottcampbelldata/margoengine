@@ -60,6 +60,10 @@
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
     },
+    "./accumulate": {
+      "types": "./dist/accumulate.d.ts",
+      "import": "./dist/accumulate.js"
+    },
     "./null": {
       "types": "./dist/null.d.ts",
       "import": "./dist/null.js"
@@ -85,7 +89,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/stage": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
-    "@margoengine/exporters": "^1.0.0"
+    "@margoengine/exporters": "^1.0.0",
+    "@margoengine/post": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
@@ -94,7 +99,8 @@
     "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs && node packages/headless/tests/node-check.mjs",
     "prepack": "npm run build",
     "test:gpu:gif": "cd ../.. && node packages/headless/tests/gif-gpu.mjs",
-    "test:gpu:tiles": "cd ../.. && node packages/headless/tests/tiles-gpu.mjs"
+    "test:gpu:tiles": "cd ../.. && node packages/headless/tests/tiles-gpu.mjs",
+    "test:gpu:accumulate": "cd ../.. && node packages/headless/tests/accumulate-gpu.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/stage": {
@@ -104,6 +110,9 @@
       "optional": true
     },
     "@margoengine/exporters": {
+      "optional": true
+    },
+    "@margoengine/post": {
       "optional": true
     }
   },

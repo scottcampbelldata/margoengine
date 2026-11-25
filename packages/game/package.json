@@ -2191,6 +2191,10 @@
       "types": "./dist/post/afterimage.d.ts",
       "import": "./dist/post/afterimage.js"
     },
+    "./post/accumulate": {
+      "types": "./dist/post/accumulate.d.ts",
+      "import": "./dist/post/accumulate.js"
+    },
     "./post/outline": {
       "types": "./dist/post/outline.d.ts",
       "import": "./dist/post/outline.js"

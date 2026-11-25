@@ -101,6 +101,10 @@
       "types": "./dist/afterimage.d.ts",
       "import": "./dist/afterimage.js"
     },
+    "./accumulate": {
+      "types": "./dist/accumulate.d.ts",
+      "import": "./dist/accumulate.js"
+    },
     "./outline": {
       "types": "./dist/outline.d.ts",
       "import": "./dist/outline.js"
