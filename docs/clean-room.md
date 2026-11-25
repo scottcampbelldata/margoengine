@@ -12081,6 +12081,22 @@ GZ = sin(phi) (GM + BM tan^2(phi) / 2), is the textbook stability result. Proof:
 and `tests/coupling/seakeeping.test.js`. The research summary is kept with the solver's notes, and covers what comes next
 (Cummins radiation in state-space form from strip-theory coefficients, diffraction, drift, green water).
 
+### GPU scene tree for real-time ray tracing (FG-17 piece 6a, 2026-11-25)
+
+`packages/bvh/src/gpu-scene.ts` and `src/gpu-pack.ts`. Two-level hierarchy, a top tree over placed bottom trees with
+rays moved into each instance's space (Ingo Wald, Carsten Benthin and Philipp Slusallek, "Distributed Interactive Ray
+Tracing of Dynamic Scenes", IEEE PVG 2003, https://doi.org/10.1109/PVGS.2003.1249040). Top build by binned SAH with
+16 bins on centroids (Ingo Wald, "On fast Construction of SAH-based Bounding Volume Hierarchies", IEEE RT 2007,
+https://doi.org/10.1109/RT.2007.4342588). Refit with a rebuild once the SAH cost passes a ratio of the built cost, as
+the CPU SceneBVH does. The ray/triangle test is the watertight one already cited for `bvh/gpu` (Woop, Benthin and Wald,
+JCGT 2013, https://jcgt.org/published/0002/01/05/), fed object-space rays with unnormalized directions so distances stay
+world lengths. Compared and not used yet: stackless traversal by parent pointers (Michal Hapala, Tomas Davidovic, Ingo
+Wald, Vlastimil Havran and Philipp Slusallek, "Efficient Stack-less BVH Traversal for Ray Tracing", SCCG 2011,
+https://dcgi.fel.cvut.cz/~havran/ARTICLES/sccg2011.pdf) and constant-time backtracking (Nikolaus Binder and Alexander
+Keller, "Efficient Stackless Hierarchy Traversal on GPUs with Backtracking in Constant Time", HPG 2016,
+https://research.nvidia.com/publication/2016-06_efficient-stackless-hierarchy-traversal-gpus-backtracking-constant-time),
+kept for the compatibility layer if its stack walk proves slow. Written from these papers; no engine's code was read.
+
 ### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
 
 `packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and

@@ -51,6 +51,10 @@
       "types": "./dist/bvh/gpu.d.ts",
       "import": "./dist/bvh/gpu.js"
     },
+    "./bvh/gpu-scene": {
+      "types": "./dist/bvh/gpu-scene.d.ts",
+      "import": "./dist/bvh/gpu-scene.js"
+    },
     "./bvh/scene": {
       "types": "./dist/bvh/scene.d.ts",
       "import": "./dist/bvh/scene.js"

@@ -4,6 +4,7 @@ import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { alphaChecks } from './alpha-browser.js';
 import { gpuBuildChecks } from './gpu-build-browser.js';
 import { gpuChecks } from './gpu-browser.js';
+import { gpuSceneChecks } from './gpu-scene-browser.js';
 import { sdfChecks } from './sdf-browser.js';
 import {
   MeshBVH,
@@ -383,6 +384,7 @@ window.runBVHTests = async () => {
   report.webgpu = await engineChecks('webgpu', report);
   report.webgl2 = await engineChecks('webgl2', report);
   report.gpu = await gpuChecks(report);
+  report.gpuScene = await gpuSceneChecks(report);
   report.sdf = await sdfChecks(report);
   report.gpuBuild = await gpuBuildChecks(report);
   report.alpha = await alphaChecks(report);
