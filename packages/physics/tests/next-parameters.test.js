@@ -290,11 +290,27 @@ test('the solver settings do what they say: stiffness, allowed depth, push-out s
     soft = rest((physics) => physics.setSolver({ contactHertz: 4, contactDamping: 1 })),
     loose = rest((physics) => physics.setSolver({ allowedPenetration: 0.03 })),
     cold = rest((physics) => physics.setSolver({ warmStart: 0 }));
-  assert.ok(normal < 0.002, `a resting box sinks less than 2 mm by default (${normal})`);
+  // A soft contact is a spring per kilogram of effective mass (Catto, "Soft Constraints", GDC 2011): at rest it gives by g over omega
+  // squared past the allowed depth, whatever the mass, with omega = 2 pi f. The implicit scheme keeps the spring's own equilibrium, so
+  // the resting depth is the allowed penetration plus that give: 0.0002 + 17.3 micrometres at the default 120 Hz.
+  const give = (hertz) => 9.81 / (2 * Math.PI * hertz) ** 2;
+  assert.ok(
+    Math.abs(normal - (0.0002 + give(120))) < 0.02 * give(120),
+    `a resting box sinks the allowed 0.0002 plus g / omega^2 = ${give(120)} (${normal})`,
+  );
   assert.ok(soft > normal * 5 && soft > 0.005, `a soft contact lets it sink further (${soft} against ${normal})`);
   assert.ok(
-    loose > normal * 5 && loose <= 0.0301,
-    `a depth left alone is not pushed out, and the box rests there plus the contact's 17 micrometres of give (${loose} against ${normal})`,
+    Math.abs(loose - (0.03 + give(120))) < 0.02 * give(120),
+    `a depth left alone is not pushed out, and the box rests there plus g / omega^2 (${loose} against ${0.03 + give(120)})`,
+  );
+  // At the default damping ratio of 10 the depth falls 0.6 to 1.2 percent short of that value (KB-PHYS-SOFTGIVE1, open), so the two
+  // checks above allow 2 percent of the give, which is under 0.4 micrometres.
+  // At a damping ratio of 1 the resting depth meets the same value to float32 resolution of a position near 0.5 (a few 0.03
+  // micrometres), at 60 Hz where the give is 69 micrometres.
+  const unit = rest((physics) => physics.setSolver({ contactHertz: 60, contactDamping: 1, allowedPenetration: 0.03 }));
+  assert.ok(
+    Math.abs(unit - (0.03 + give(60))) < 2e-7,
+    `at a damping ratio of 1 the box rests at the analytic depth (${unit} against ${0.03 + give(60)})`,
   );
   assert.ok(cold < 0.005, `a cold start still settles it (${cold})`);
 
