@@ -2367,7 +2367,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/fresh-dist.test.js` (fails on the old code: no `fresh-dist.mjs`, and `measureEntries` ignores
   `ensureFresh` and measures at once).
 
-### Fixed 2026-11-19 (one file held under KB-BOULDER-ARMBODY1): other scripts that end with `process.exit` share the exit deadlock of KB-OWN-EXIT1 (KB-OWN-EXIT2, scripts)
+### Fixed 2026-11-19, last file 2026-11-25: other scripts that end with `process.exit` share the exit deadlock of KB-OWN-EXIT1 (KB-OWN-EXIT2, scripts)
 
 - **Repro:** the KB-OWN-EXIT1 fixture's conditions (`--stress-concurrent-allocation`, a 16 MB heap, a worker thread
   that holds the exit) stall plain `node -e "setTimeout(() => process.exit(0), 300)"` 16 runs in 16; in a normal
@@ -2423,9 +2423,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   check, check:gpu-packages (its side-by-side stop ends by the loop, every suite already ended) and the publish
   rehearsal (importing all 1,471 entries leaves no handle). Hard run limits and a SIGTERM keep the call with their
   reason.
-- **Held:** scripts/test-boulder-browser.mjs stays the one row of scripts/support/exit-owed.json: its run fails
-  first on KB-BOULDER-ARMBODY1, and Scott's stop on people work keeps anyone off that script. It comes off the list
-  with that fix.
+- **Last file (2026-11-25, lane D):** scripts/test-boulder-browser.mjs ends by its event loop; only its last line
+  changed, so no people work. Its run still fails first on KB-BOULDER-ARMBODY1, and that failing run, leaving through
+  the same `finally` that closes the browser and preview server, ended by its event loop in 24 s.
+  scripts/support/exit-owed.json is empty, so hygiene now fails on any new unjustified `process.exit(`.
 
 ### Fixed 2026-11-15: a passing leaf exited 1 because its `run` wrapper deadlocked in `process.exit` (KB-OWN-EXIT1, scripts)
 
@@ -10289,8 +10290,10 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   0.00008 off target) but `worst.body` is -0.0408 against the floor `GAP_FLOOR`.
 - **Cause:** not found. The climber rig's arm reach on the green route passes through the torso gap; the route solver
   keeps the end joint on target and the body clearance check is the one that fails. Scott's stop (in the project stop file)
-  forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` stays on the KB-OWN-EXIT2 owed
-  list until this passes.
+  forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` was taken out on 2026-11-25
+  (KB-OWN-EXIT2's last owed file) without waiting for this: its failing run, which leaves through the same `finally`
+  that closes the browser and the preview server, ended by its event loop in 24 s (main 984f88e7f9 plus the change),
+  so the passing run, which adds only a log line after that block, ends the same way.
 
 ### Fixed 2026-11-21: Cabin Hearth's shadowed snow gains the bounce, against its check (clustered bounce, KB-BOUNCE-SHADOWSNOW1, found 2026-11-16)
 

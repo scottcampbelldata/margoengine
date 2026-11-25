@@ -410,4 +410,4 @@ try {
   await closeAll([browser, server]);
 }
 console.log('boulder browser test passed');
-process.exit(0);
+// Ends by its event loop once the browser and server are closed, never process.exit (KB-OWN-EXIT2).
