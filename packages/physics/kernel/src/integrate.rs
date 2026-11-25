@@ -5,8 +5,8 @@
 use crate::joints::Pass;
 use crate::layout::*;
 use crate::math::*;
-use crate::solver::soft;
-use crate::world::{NONE, World};
+use crate::solver::{Soft, soft};
+use crate::world::{NONE, Window, World};
 
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
@@ -191,9 +191,44 @@ impl World {
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
         let stiffness = soft(hertz, damping, h);
+        if self.island_major && !self.multibody_beside_kinematic() {
+            // Each island by itself, through all its substeps: islands share no body a solve changes. The kinematic bodies' columns
+            // keep the pose the step began at while the islands solve, and each substep reads them through the stage it is at.
+            let islands = self.header().islands as usize;
+            for group in 0..=islands {
+                self.window = self.group_window(group);
+                self.run_substeps(h, substeps, stiffness, &mut inner, true);
+            }
+            self.window = self.whole_window();
+            self.integrate_kinematics(h, substeps);
+        } else {
+            self.window = self.whole_window();
+            self.run_substeps(h, substeps, stiffness, &mut inner, false);
+        }
+        self.break_joints(h);
+        tick(self, 11, &mut inner);
+        lap(self, 5);
+        if self.header().ccd_substeps > 0 {
+            self.ccd_pass();
+        }
+        lap(self, 6);
+        self.gather_events();
+        self.land_meshes();
+        lap(self, 7);
+        self.timing[0] = (stamp - begun) as f32;
+        self.header_mut().steps += 1;
+        self.check_range();
+    }
+
+    /// The substeps of a step over the lists in `self.window`: the whole world, or one island. `staged` has the kinematic bodies
+    /// read at the pose of the substep's stage (see `Window`), and leaves moving them to `integrate_kinematics`.
+    fn run_substeps(&mut self, h: f32, substeps: u32, stiffness: Soft, inner: &mut f64, staged: bool) {
         for substep in 0..substeps {
+            if staged {
+                self.window.kin = Some(substep);
+            }
             self.integrate_velocities(h);
-            tick(self, 10, &mut inner);
+            tick(self, 10, inner);
             self.refresh_joints();
             self.warm_start();
             self.warm_start_joints();
@@ -222,14 +257,17 @@ impl World {
                 self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
             }
             self.clamp_speeds();
-            tick(self, 9, &mut inner);
+            tick(self, 9, inner);
             self.integrate_poses(h, substep + 1 == substeps);
+            if staged {
+                self.window.kin = Some(substep + 1);
+            }
             self.refresh_turned_contacts();
             self.track_couplings(h);
             self.fk_multibodies(h);
             self.tally_drift(h);
             self.refresh_joints();
-            tick(self, 10, &mut inner);
+            tick(self, 10, inner);
             // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
             // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra
             // passes relaxes iterations + e times, at least once, so it still runs as a world of iterations + e would: it takes
@@ -244,21 +282,111 @@ impl World {
             self.solve_impacts();
             self.project_multibodies();
             self.clamp_speeds();
-            tick(self, 9, &mut inner);
+            tick(self, 9, inner);
         }
-        self.break_joints(h);
-        tick(self, 11, &mut inner);
-        lap(self, 5);
-        if self.header().ccd_substeps > 0 {
-            self.ccd_pass();
+        if staged {
+            self.window.kin = None;
         }
-        lap(self, 6);
-        self.gather_events();
-        self.land_meshes();
-        lap(self, 7);
-        self.timing[0] = (stamp - begun) as f32;
-        self.header_mut().steps += 1;
-        self.check_range();
+    }
+
+    /// The window on one group of the step's lists: island `group`'s runs of pairs, joints and couplings and its bodies, or, for the
+    /// group after the last island, what no island holds (a pair or a joint of bodies that cannot move), with no bodies.
+    pub fn group_window(&self, group: usize) -> Window {
+        let h = self.header();
+        let islands = h.islands as usize;
+        let run = |start: usize, count: usize| (start, start + count);
+        if group < islands {
+            let (first, count) = (self.uu(ISLAND_START, group) as usize, self.uu(ISLAND_COUNT, group) as usize);
+            Window {
+                bodies: (ISLAND_BODIES, first, first + count),
+                pairs: run(self.uu(ISLAND_PAIR_START, group) as usize, self.uu(ISLAND_PAIR_COUNT, group) as usize),
+                joints: run(self.uu(ISLAND_JOINT_START, group) as usize, self.uu(ISLAND_JOINT_COUNT, group) as usize),
+                couplings: run(self.uu(ISLAND_COUPLING_START, group) as usize, self.uu(ISLAND_COUPLING_COUNT, group) as usize),
+                kin: None,
+            }
+        } else {
+            let end = |start: usize, count: usize| start + count;
+            let last = islands.wrapping_sub(1);
+            let after = |s: usize, c: usize, total: usize| if islands == 0 { 0 } else { end(self.uu(s, last) as usize, self.uu(c, last) as usize) }.min(total);
+            Window {
+                bodies: (ISLAND_BODIES, 0, 0),
+                pairs: (after(ISLAND_PAIR_START, ISLAND_PAIR_COUNT, h.solving as usize), h.solving as usize),
+                joints: (after(ISLAND_JOINT_START, ISLAND_JOINT_COUNT, h.joint_solving as usize), h.joint_solving as usize),
+                couplings: (after(ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, h.coupling_rows as usize), h.coupling_rows as usize),
+                kin: None,
+            }
+        }
+    }
+
+    /// True when a multibody and a moving kinematic body are both awake. The multibody's rows read the poses of its links and their
+    /// parents straight from the columns, so with a kinematic body about a step is solved phase by phase, as the kinematic bodies
+    /// are then moved at each substep, until those rows read the stage too.
+    fn multibody_beside_kinematic(&self) -> bool {
+        let (mut multibody, mut kinematic) = (false, false);
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            multibody |= self.uu(MB_ROLE, at) != 0;
+            kinematic |= self.flags(at) & KIND != DYNAMIC;
+        }
+        multibody && kinematic
+    }
+
+    /// The pose of a kinematic body at the stage of the substep being solved (`Window::kin`): what `integrate_poses` has made of
+    /// it after that many substeps from the pose the step began at, worked out here with the same arithmetic in the same order,
+    /// and written nowhere. A body that is not kinematic and awake, or a solve with no stage, gives None.
+    fn staged_pose(&self, at: usize) -> Option<(V3, V3, Q)> {
+        let stage = self.window.kin?;
+        let kind = self.flags(at) & KIND;
+        if stage == 0 || (kind != KINEMATIC_POSITION && kind != KINEMATIC_VELOCITY) || !self.is_awake(at) {
+            return None;
+        }
+        let substeps = self.header().substeps;
+        let h = self.header().step_dt / substeps as f32;
+        let (linear, angular, local) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at), self.v(LOCAL_CENTER_X, at));
+        let (mut position, mut center, mut rotation) = (self.v(POSITION_X, at), self.v(CENTER_X, at), self.q(ROTATION_X, at));
+        for step in 1..=stage {
+            if step == substeps && kind == KINEMATIC_POSITION {
+                rotation = self.q(TARGET_ROTATION_X, at);
+                position = self.v(TARGET_X, at);
+                center = position.add(rotation.rotate(local));
+                continue;
+            }
+            center = center.add(linear.scale(h));
+            let turn = Q::from_rotation_vector(angular.scale(h));
+            rotation = turn.mul(rotation).normalized();
+            position = center.sub(rotation.rotate(local));
+        }
+        Some((position, center, rotation))
+    }
+
+    /// A body's rotation, centre of mass and origin as the solve reads them: the columns, but for a kinematic body at a stage.
+    #[inline(always)]
+    pub fn pose_rotation(&self, at: usize) -> Q {
+        if self.window.kin.is_none() { return self.q(ROTATION_X, at); }
+        self.staged_pose(at).map_or_else(|| self.q(ROTATION_X, at), |pose| pose.2)
+    }
+    #[inline(always)]
+    pub fn pose_center(&self, at: usize) -> V3 {
+        if self.window.kin.is_none() { return self.v(CENTER_X, at); }
+        self.staged_pose(at).map_or_else(|| self.v(CENTER_X, at), |pose| pose.1)
+    }
+    #[inline(always)]
+    pub fn pose_position(&self, at: usize) -> V3 {
+        if self.window.kin.is_none() { return self.v(POSITION_X, at); }
+        self.staged_pose(at).map_or_else(|| self.v(POSITION_X, at), |pose| pose.0)
+    }
+
+    /// After the islands have solved with the kinematic bodies read at their stages: moves every awake kinematic body through the
+    /// substeps, as `integrate_poses` does in a step that solves phase by phase.
+    fn integrate_kinematics(&mut self, h: f32, substeps: u32) {
+        for substep in 0..substeps {
+            for slot in 0..self.header().awake as usize {
+                let at = self.uu(AWAKE, slot) as usize;
+                if self.flags(at) & KIND != DYNAMIC {
+                    self.integrate_pose(at, h, substep + 1 == substeps);
+                }
+            }
+        }
     }
 
     /// Finds what touches what without moving anything: the broad and narrow phases and the events they give, as Rapier's collision
@@ -364,8 +492,9 @@ impl World {
     pub fn integrate_velocities(&mut self, h: f32) {
         let gravity = self.header().gravity;
         let gravity = v3(gravity[0], gravity[1], gravity[2]);
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
             let flags = self.flags(at);
             if flags & KIND != DYNAMIC {
                 continue;
@@ -402,8 +531,9 @@ impl World {
     /// Cuts the speed of each awake dynamic body to its cap, keeping the direction; a cap of zero is none. The cut is a
     /// scale by cap over speed, so only the length changes.
     pub fn clamp_speeds(&mut self) {
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
             if self.flags(at) & KIND != DYNAMIC {
                 continue;
             }
@@ -427,26 +557,33 @@ impl World {
     /// Semi-implicit Euler's position half, with the velocities just updated, so the velocity a body reports is the one
     /// that moved it. A kinematicPosition body lands exactly on its target on the last substep.
     pub fn integrate_poses(&mut self, h: f32, last: bool) {
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
-            let kind = self.flags(at) & KIND;
-            if last && kind == KINEMATIC_POSITION {
-                let rotation = self.q(TARGET_ROTATION_X, at);
-                let position = self.v(TARGET_X, at);
-                self.set_q(ROTATION_X, at, rotation);
-                self.set_v(POSITION_X, at, position);
-                self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
-                continue;
-            }
-            let center = self.v(CENTER_X, at).add(self.v(LINEAR_X, at).scale(h));
-            let spin = self.v(ANGULAR_X, at).scale(h);
-            self.set_s(TURNED, at, self.s(TURNED, at) + sqrt(spin.dot(spin)));
-            let turn = Q::from_rotation_vector(spin);
-            let rotation = turn.mul(self.q(ROTATION_X, at)).normalized();
-            self.set_v(CENTER_X, at, center);
-            self.set_q(ROTATION_X, at, rotation);
-            self.set_v(POSITION_X, at, center.sub(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            self.integrate_pose(at, h, last);
         }
+    }
+
+    /// One body's pose after a substep's velocities.
+    #[inline(always)]
+    pub fn integrate_pose(&mut self, at: usize, h: f32, last: bool) {
+        let kind = self.flags(at) & KIND;
+        if last && kind == KINEMATIC_POSITION {
+            let rotation = self.q(TARGET_ROTATION_X, at);
+            let position = self.v(TARGET_X, at);
+            self.set_q(ROTATION_X, at, rotation);
+            self.set_v(POSITION_X, at, position);
+            self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+            return;
+        }
+        let center = self.v(CENTER_X, at).add(self.v(LINEAR_X, at).scale(h));
+        let spin = self.v(ANGULAR_X, at).scale(h);
+        self.set_s(TURNED, at, self.s(TURNED, at) + sqrt(spin.dot(spin)));
+        let turn = Q::from_rotation_vector(spin);
+        let rotation = turn.mul(self.q(ROTATION_X, at)).normalized();
+        self.set_v(CENTER_X, at, center);
+        self.set_q(ROTATION_X, at, rotation);
+        self.set_v(POSITION_X, at, center.sub(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
     }
 }
 

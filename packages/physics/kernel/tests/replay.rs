@@ -102,9 +102,15 @@ fn scene() -> Vec<u32> {
 
 /// The scene with the block solver of the manifolds' normal rows on or off.
 fn run(block_solver: bool) -> (Vec<u32>, Vec<u32>) {
+    run_islands(block_solver, false)
+}
+
+/// The scene solved island by island or phase by phase.
+fn run_islands(block_solver: bool, island_major: bool) -> (Vec<u32>, Vec<u32>) {
     let mut random = Stream(0x4D41_5247);
     let mut w = World::new(1, 1).unwrap();
     w.header_mut().block_solver = block_solver as u32;
+    w.island_major = island_major;
     let mut rows = Vec::new();
     let (mut hashes, mut arena) = (Vec::new(), Vec::new());
     let hull = w.add_hull(&OCTAHEDRON, &OCTAHEDRON_FACES) as f32;
@@ -291,6 +297,14 @@ fn the_block_solver_leaves_no_manifold_of_the_scene_to_the_sweeps() {
     let _ = run(true);
     let (exact, left) = (BLOCK_SOLVES[0].load(Relaxed) - before[0], BLOCK_SOLVES[1].load(Relaxed) - before[1]);
     assert!(exact > 1000 && left == 0, "{exact} exact, {left} left to the sweeps");
+}
+
+/// Island by island, the scene's state is what it is phase by phase, to the bit, every hundred steps for ten thousand: bodies of
+/// every shape, fixed and kinematic ones, joints of every kind between bodies picked at random, sleeping and waking.
+#[test]
+fn island_by_island_gives_the_state_phase_by_phase_gives() {
+    assert_eq!(run_islands(false, true).0, list("kernel"));
+    assert_eq!(run_islands(true, true).0, list("kernelBlock"));
 }
 
 #[test]

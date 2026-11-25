@@ -149,8 +149,25 @@ pub struct Header {
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
 
+/// The part of the step's lists a solve works on: all of them, or one island's runs. `bodies` is a column of body rows (`AWAKE`
+/// or `ISLAND_BODIES`) with the range of it; `kin`, when set, is the stage of the substep the kinematic bodies' poses are read at
+/// (`World::pose_center` and the others), which is how an island sees a platform at the pose of its own substep while the platform's
+/// columns still hold the pose the step began at. Not in the arena: a solve sets it and clears it.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Window {
+    pub bodies: (usize, usize, usize),
+    pub pairs: (usize, usize),
+    pub joints: (usize, usize),
+    pub couplings: (usize, usize),
+    pub kin: Option<u32>,
+}
+
 pub struct World {
     pub arena: Arena,
+    /// What the solve is working on now; see `Window`.
+    pub window: Window,
+    /// Solve a step island by island (the default) or all islands phase by phase; the same bits either way.
+    pub island_major: bool,
     /// The contact filter of a native build; Wasm asks its import.
     #[cfg(not(target_arch = "wasm32"))]
     pub filter: Option<fn(u32, u32) -> bool>,
@@ -195,6 +212,8 @@ impl World {
             #[cfg(not(target_arch = "wasm32"))]
             modifier: None,
             timing: [0.0; 15],
+            window: Window::default(),
+            island_major: true,
             query_groups_hi: 0,
             query_motion: [0.0; 9],
             part_id: core::cell::Cell::new(u32::MAX),
@@ -868,6 +887,12 @@ impl World {
         self.retire_collider(collider);
         self.update_mass(body);
         true
+    }
+
+    /// The window on every list the step solves: all the awake bodies, every listed pair, joint and coupling.
+    pub fn whole_window(&self) -> Window {
+        let h = self.header();
+        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None }
     }
 
     /// FNV-1a over the world's state, the replay proof's fingerprint: the header's scalars and every column but those of `SCRATCH`, which

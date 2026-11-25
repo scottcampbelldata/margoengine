@@ -1,5 +1,5 @@
 {
-  "commit": "76c50676a",
+  "commit": "19bae9b75",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -13412,8 +13412,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 900553,
-        "gzip": 554041
+        "raw": 910586,
+        "gzip": 561489
       },
       "./decomposition": {
         "raw": 26661,
@@ -13434,8 +13434,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 60166,
-        "gzip": 20292
+        "raw": 61092,
+        "gzip": 20586
       },
       "./outline": {
         "raw": 4782,
@@ -16684,9 +16684,9 @@
       "brotli": 13103
     },
     "packages/physics/dist/index.js": {
-      "raw": 900553,
-      "gzip": 554041,
-      "brotli": 534531
+      "raw": 910586,
+      "gzip": 561489,
+      "brotli": 541839
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16914,14 +16914,14 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 419911,
-      "gzip": 152024,
-      "brotli": 121377
+      "raw": 427469,
+      "gzip": 155090,
+      "brotli": 123913
     },
     "packages/physics2d/dist/physics2d-scalar.wasm": {
-      "raw": 500798,
-      "gzip": 169904,
-      "brotli": 132918
+      "raw": 508248,
+      "gzip": 173188,
+      "brotli": 135473
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -17071,13 +17071,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 259811,
-        "gzip": 81939
+        "raw": 259904,
+        "gzip": 81960
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 640741,
-        "gzip": 471397,
+        "raw": 650681,
+        "gzip": 478805,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
@@ -17097,8 +17097,8 @@
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 55901,
-        "gzip": 18624
+        "raw": 56827,
+        "gzip": 18919
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",

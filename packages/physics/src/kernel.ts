@@ -915,6 +915,12 @@ export interface KernelSolverOptions {
    * to the sweeps. Friction is still solved a point at a time.
    */
   blockSolver?: boolean;
+  /**
+   * Solve a step island by island, each through all its substeps (default true), or all islands phase by phase: the same bits either
+   * way, since islands share no body a solve changes, and the kinematic bodies are read at the pose of the substep an island is at.
+   * Island by island is what lets islands be solved on their own; phase by phase is kept to prove the two equal.
+   */
+  islandMajor?: boolean;
 }
 
 /**
@@ -1116,6 +1122,7 @@ export class KernelWorld {
       bvhOptimizationStrategy: read(23) === 0 ? 'none' : 'rotations',
       adaptiveChangeDetectionMargin: read(24) !== 0,
       blockSolver: read(25) !== 0,
+      islandMajor: read(26) !== 0,
     };
   }
   /**
@@ -1234,6 +1241,7 @@ export class KernelWorld {
     if (adaptiveChangeDetectionMargin !== undefined)
       this.api.world_set_solver(24, adaptiveChangeDetectionMargin ? 1 : 0);
     if (options.blockSolver !== undefined) this.api.world_set_solver(25, options.blockSolver ? 1 : 0);
+    if (options.islandMajor !== undefined) this.api.world_set_solver(26, options.islandMajor ? 1 : 0);
     if (broadPhase !== undefined) {
       this.api.world_set_solver(21, broadPhase === 'bvh' ? 1 : 0);
       // The switch makes the tree's rows and moves the columns.

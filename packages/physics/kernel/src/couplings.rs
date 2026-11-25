@@ -324,7 +324,7 @@ impl World {
     /// Lays out the row of a coupling at the poses the bodies have now.
     fn coupling_row(&self, c: &Coupling) -> (Row, f32) {
         let (a, b) = (c.a as usize, c.b as usize);
-        let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let (qa, qb) = (self.pose_rotation(a), self.pose_rotation(b));
         let zero = v3(0.0, 0.0, 0.0);
         let mut row = Row { la: zero, lb: zero, ra: zero, rb: zero, ta: zero, tb: zero, db: zero };
         match c.kind {
@@ -339,13 +339,13 @@ impl World {
                 (row, 0.0)
             }
             DISTANCE => {
-                let pa = self.v(POSITION_X, a).add(qa.rotate(vec(c.anchor_a)));
-                let pb = self.v(POSITION_X, b).add(qb.rotate(vec(c.anchor_b)));
+                let pa = self.pose_position(a).add(qa.rotate(vec(c.anchor_a)));
+                let pb = self.pose_position(b).add(qb.rotate(vec(c.anchor_b)));
                 let d = pb.sub(pa);
                 let length = sqrt(d.dot(d));
                 row.la = if length > 1e-9 { d.scale(1.0 / length) } else { v3(1.0, 0.0, 0.0) };
-                row.ra = pa.sub(self.v(CENTER_X, a));
-                row.rb = pb.sub(self.v(CENTER_X, b));
+                row.ra = pa.sub(self.pose_center(a));
+                row.rb = pb.sub(self.pose_center(b));
                 // The distance from the nearest end of the range (positive past the greatest, negative short of the least), and the length.
                 let past = if c.total > 0.0 && length > c.total {
                     length - c.total
@@ -358,14 +358,14 @@ impl World {
                 (row, past)
             }
             _ => {
-                let pa = self.v(POSITION_X, a).add(qa.rotate(vec(c.anchor_a)));
-                let pb = self.v(POSITION_X, b).add(qb.rotate(vec(c.anchor_b)));
+                let pa = self.pose_position(a).add(qa.rotate(vec(c.anchor_a)));
+                let pb = self.pose_position(b).add(qb.rotate(vec(c.anchor_b)));
                 let (da, db) = (pa.sub(vec(c.ground_a)), pb.sub(vec(c.ground_b)));
                 let (la, lb) = (sqrt(da.dot(da)), sqrt(db.dot(db)));
                 row.la = if la > 1e-9 { da.scale(1.0 / la) } else { v3(0.0, -1.0, 0.0) };
                 row.lb = if lb > 1e-9 { db.scale(1.0 / lb) } else { v3(0.0, -1.0, 0.0) };
-                row.ra = pa.sub(self.v(CENTER_X, a));
-                row.rb = pb.sub(self.v(CENTER_X, b));
+                row.ra = pa.sub(self.pose_center(a));
+                row.rb = pb.sub(self.pose_center(b));
                 (row, la + c.ratio * lb - c.total)
             }
         }
@@ -468,7 +468,8 @@ impl World {
 
     /// Gives every coupling the impulse it carries, at the start of a substep.
     pub fn warm_start_couplings(&mut self) {
-        for k in 0..self.header().coupling_rows as usize {
+        for place in self.window.couplings.0..self.window.couplings.1 {
+            let k = self.uu(COUPLING_ORDER, place) as usize;
             let c = self.coupling(k);
             if c.kind == PATH {
                 self.warm_curve(k);
@@ -494,7 +495,8 @@ impl World {
 
     /// One pass over the couplings; `bias` is the pass that also closes the error.
     pub fn solve_couplings(&mut self, h: f32, bias: bool) {
-        for k in 0..self.header().coupling_rows as usize {
+        for place in self.window.couplings.0..self.window.couplings.1 {
+            let k = self.uu(COUPLING_ORDER, place) as usize;
             let c = self.coupling(k);
             if !self.coupling_live(&c) {
                 continue;
@@ -553,7 +555,8 @@ impl World {
 
     /// After a substep's poses: the error a gear and a rack have built up follows from the speed they ended with.
     pub fn track_couplings(&mut self, h: f32) {
-        for k in 0..self.header().coupling_rows as usize {
+        for place in self.window.couplings.0..self.window.couplings.1 {
+            let k = self.uu(COUPLING_ORDER, place) as usize;
             let c = self.coupling(k);
             if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE || c.kind == PATH {
                 continue;
@@ -592,10 +595,10 @@ impl World {
     fn coords_sides(&self, c: &Coupling) -> [Side; 2] {
         let side = |child: u32, parent: u32, axis: [f32; 3], slides: bool, weight: f32| {
             let (child, parent) = (child as usize, parent as usize);
-            let qc = self.q(ROTATION_X, child);
+            let qc = self.pose_rotation(child);
             // A slide's offset is that of the child's centre in the parent's frame, which turns with the parent: its rate is the child's
             // velocity less that of the parent's material point under it, v_c - v_p - w_p x (x_c - x_p).
-            let arm_parent = if slides { self.v(CENTER_X, child).sub(self.v(CENTER_X, parent)) } else { v3(0.0, 0.0, 0.0) };
+            let arm_parent = if slides { self.pose_center(child).sub(self.pose_center(parent)) } else { v3(0.0, 0.0, 0.0) };
             Side { child, parent, axis: qc.rotate(vec(axis)).scale(weight), slides, arm_child: v3(0.0, 0.0, 0.0), arm_parent }
         };
         [
@@ -923,8 +926,8 @@ impl World {
             return None;
         }
         let (a, b) = (c.a as usize, c.b as usize);
-        let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
-        let (pa, pb) = (self.v(POSITION_X, a), self.v(POSITION_X, b));
+        let (qa, qb) = (self.pose_rotation(a), self.pose_rotation(b));
+        let (pa, pb) = (self.pose_position(a), self.pose_position(b));
         self.path_searches.set(self.path_searches.get() + 1);
         let anchor = pb.add(qb.rotate(vec(c.anchor_b)));
         // The search runs in A's frame, where the points and their boxes stand still.
@@ -978,7 +981,7 @@ impl World {
         let n1 = tangent.cross(axis);
         let n1 = n1.scale(1.0 / sqrt(n1.dot(n1)));
         let n2 = tangent.cross(n1);
-        Some(PathState { on, tangent, n1, n2, ra: on.sub(self.v(CENTER_X, a)), rb: anchor.sub(self.v(CENTER_X, b)), error: anchor.sub(on), span: span as u32 })
+        Some(PathState { on, tangent, n1, n2, ra: on.sub(self.pose_center(a)), rb: anchor.sub(self.pose_center(b)), error: anchor.sub(on), span: span as u32 })
     }
 
     fn warm_curve(&mut self, k: usize) {

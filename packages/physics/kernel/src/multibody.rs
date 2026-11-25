@@ -182,8 +182,9 @@ impl World {
     fn mb_roots(&mut self, mut each: impl FnMut(&mut World, usize)) {
         let call = self.header().mb_calls.wrapping_add(1);
         self.header_mut().mb_calls = call;
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
             if self.uu(MB_ROLE, at) == 0 {
                 continue;
             }

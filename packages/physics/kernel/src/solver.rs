@@ -414,8 +414,9 @@ impl World {
     /// keeps anchors fixed over a step), and a lever is exact for every impulse as long as the speed it measures is the speed it applies at.
     pub fn refresh_turned_contacts(&mut self) {
         let mut any = false;
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
             if self.has_turned(at) {
                 self.solver_mass(at);
                 any = true;
@@ -424,7 +425,7 @@ impl World {
         if !any {
             return;
         }
-        for i in 0..self.header().solving as usize {
+        for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             if !(self.has_turned(a) || self.has_turned(b)) {
@@ -451,7 +452,7 @@ impl World {
     /// Each substep: the impulses the points carry, before anything is solved.
     pub fn warm_start(&mut self) {
         let share = self.header().warm_start;
-        for i in 0..self.header().solving as usize {
+        for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
@@ -489,7 +490,7 @@ impl World {
     /// in that pass left them, a slide no pose made, and a resting block would keep a twist in its anchors that eats its
     /// friction (`a_block_slides_only_above_tan_t_equal_to_mu`).
     pub fn tally_drift(&mut self, h: f32) {
-        for i in 0..self.header().solving as usize {
+        for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             let (linear_a, angular_a) = (self.v(LINEAR_X, a), self.v(ANGULAR_X, a));
@@ -528,7 +529,7 @@ impl World {
         } else {
             None
         };
-        for i in 0..self.header().solving as usize {
+        for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             if least > 0 && self.extra_of(a).max(self.extra_of(b)) < least {
@@ -742,8 +743,8 @@ impl World {
         let max_push = self.header().contact_max_push;
         let slop = self.header().contact_slop;
         let threshold = self.bounce_speed(h);
-        let (center_a, center_b) = (self.v(CENTER_X, a), self.v(CENTER_X, b));
-        let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let (center_a, center_b) = (self.pose_center(a), self.pose_center(b));
+        let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
         let normal = self.v(PAIR_NORMAL_X, row);
         let bounce = self.s(PAIR_RESTITUTION, row);
         let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);

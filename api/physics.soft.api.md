@@ -1106,6 +1106,7 @@ interface KernelSolverOptions {
     bvhOptimizationStrategy?: 'none' | 'rotations';
     adaptiveChangeDetectionMargin?: boolean;
     blockSolver?: boolean;
+    islandMajor?: boolean;
 }
 
 interface KernelTrimeshOptions {

@@ -1361,6 +1361,20 @@ console.log(physics.solver.blockSolver, Math.abs(box.position[1] - 0.5) < 0.01);
 physics.dispose();
 ```
 
+`islandMajor` (default `true`) solves a step island by island, each through all its substeps, in place of all islands phase by phase. The two give the same bits: islands share no body a solve changes, and a kinematic platform that two islands rest on is read by each at the pose of the substep it is at. The switch is kept to prove that, and so that islands can be solved on their own.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+console.log(physics.solver.islandMajor); // true
+physics.setSolver({islandMajor: false});
+console.log(physics.solver.islandMajor); // false
+physics.dispose();
+```
+
+
 
 ### Reading a body
 

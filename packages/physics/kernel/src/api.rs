@@ -252,6 +252,11 @@ pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
         }
         return 1;
     }
+    // Not a header word: how a step is solved, not what the world holds.
+    if index == 26 {
+        world().island_major = value != 0.0;
+        return 1;
+    }
     let header = world().header_mut();
     match index {
         0 => header.contact_hertz = value,
@@ -286,6 +291,9 @@ pub extern "C" fn world_set_solver(index: u32, value: f32) -> u32 {
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn world_solver(index: u32) -> f32 {
+    if index == 26 {
+        return world().island_major as u32 as f32;
+    }
     let header = world().header();
     match index {
         0 => header.contact_hertz,

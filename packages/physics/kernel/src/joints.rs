@@ -828,10 +828,10 @@ impl World {
     fn joint_view(&mut self, row: usize) -> View {
         let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
         let flags = self.uu(JOINT_FLAGS, row);
-        let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
         let arm_a = rotation_a.rotate(self.v(JOINT_ANCHOR_A_X, row).sub(self.v(LOCAL_CENTER_X, a)));
         let arm_b = rotation_b.rotate(self.v(JOINT_ANCHOR_B_X, row).sub(self.v(LOCAL_CENTER_X, b)));
-        let gap = self.v(CENTER_X, b).add(arm_b).sub(self.v(CENTER_X, a).add(arm_a));
+        let gap = self.pose_center(b).add(arm_b).sub(self.pose_center(a).add(arm_a));
         let (frame_a, frame_b) = (rotation_a.mul(self.q(JOINT_FRAME_A_X, row)), rotation_b.mul(self.q(JOINT_FRAME_B_X, row)));
         let axes = [frame_a.rotate(AXES[0]), frame_a.rotate(AXES[1]), frame_a.rotate(AXES[2])];
 
@@ -945,10 +945,10 @@ impl World {
     /// end would stretch for seconds before it held. See the head of this file for how the factors are made.
     #[inline(never)]
     pub fn refresh_joints(&mut self) {
-        let solving = self.header().joint_solving as usize;
+        let (from, solving) = self.window.joints;
         let mut handed = Handed { pivots: [[0.0; 6]; 6], taken: 0, carry: [[0.0; 6]; 6], carried: 0 };
         let mut tolerance = DEPENDENT;
-        for i in 0..solving {
+        for i in from..solving {
             if self.uu(SOLVE_VIA, i) == NONE {
                 // Higham 1990's stop (4.3) at n u, n the order of the path's matrix.
                 let mut rows = lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, i) as usize)).0;
@@ -1093,9 +1093,9 @@ impl World {
     /// Each substep: the impulses the joints carry, before anything is solved. Motors first: they are forces, and what the
     /// rest is worth is judged with them applied. See the head of this file.
     pub fn warm_start_joints(&mut self) {
-        let solving = self.header().joint_solving as usize;
+        let (from, solving) = self.window.joints;
         self.carry(JOINT_MOTOR_0);
-        for i in 0..solving {
+        for i in from..solving {
             let lead = self.uu(SOLVE_LEAD, i);
             if lead != NONE {
                 let worth = self.doubles(lead as usize);
@@ -1110,7 +1110,7 @@ impl World {
         self.carry(JOINT_IMPULSE_0);
         self.tally_memory(WORTH + 1);
         let most = self.header().joint_max_push as f64;
-        for i in 0..solving {
+        for i in from..solving {
             let lead = self.uu(SOLVE_LEAD, i);
             if lead == NONE {
                 continue;
@@ -1141,7 +1141,7 @@ impl World {
 
     /// Adds to each island's sum at `slot` what its memory reads against the bodies' speeds now.
     fn tally_memory(&mut self, slot: usize) {
-        for i in 0..self.header().joint_solving as usize {
+        for i in self.window.joints.0..self.window.joints.1 {
             let lead = self.uu(SOLVE_LEAD, i);
             if lead == NONE {
                 continue;
@@ -1172,7 +1172,7 @@ impl World {
 
     /// Applies the impulses in six columns from `column`.
     fn carry(&mut self, column: usize) {
-        for i in 0..self.header().joint_solving as usize {
+        for i in self.window.joints.0..self.window.joints.1 {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let view = self.view(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -1197,8 +1197,8 @@ impl World {
     /// A path joins only when its island asks for at least `least` extra passes and fewer than `below` (see `step`).
     pub fn solve_joints(&mut self, h: f32, stiffness: Soft, pass: Pass, least: u32, below: u32) {
         let most = self.header().joint_max_push;
-        let solving = self.header().joint_solving as usize;
-        let mut first = 0;
+        let (from, solving) = self.window.joints;
+        let mut first = from;
         while first < solving {
             let mut last = first;
             while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
@@ -1231,8 +1231,8 @@ impl World {
     /// read without moving any frame, and it takes the joint's frames out of it: the target is a rotation of body B in body A's
     /// frame, as a spherical joint's is, so a cone's frames (which hold its axis and its rest) do not change what it means.
     fn drive_rows(&self, row: usize, a: usize, b: usize, rows: &mut [Row; 6], at: &mut [f32; 6]) {
-        let target = self.q(ROTATION_X, a).mul(self.q(JOINT_DRIVE_X, row));
-        let mut left = target.conjugate().mul(self.q(ROTATION_X, b));
+        let target = self.pose_rotation(a).mul(self.q(JOINT_DRIVE_X, row));
+        let mut left = target.conjugate().mul(self.pose_rotation(b));
         if left.w < 0.0 {
             left = Q { x: -left.x, y: -left.y, z: -left.z, w: -left.w };
         }
