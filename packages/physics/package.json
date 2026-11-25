@@ -88,6 +88,10 @@
       "types": "./dist/space/index.d.ts",
       "import": "./dist/celestial.js"
     },
+    "./schooling": {
+      "types": "./dist/schooling/index.d.ts",
+      "import": "./dist/schooling.js"
+    },
     "./tracers": {
       "types": "./dist/tracers.d.ts",
       "import": "./dist/tracers.js"

@@ -4242,3 +4242,12 @@ Run natively and with `MARGO_COMPAT=1`: `node packages/sky/test/seek-check.mjs`,
 After `npm run build:packages`: `node --test --test-timeout=120000 packages/post/test/ascii.test.js`, then
 `node scripts/run-with-timeout.mjs --max=3 -- node packages/post/test/ascii-browser.mjs`, repeated with `--compat`. The
 scene is one lit box on the default background; no external assets.
+
+
+## Collective animal motion (LIFE-04)
+
+Build with `npm run build:packages`. Run `node --test packages/physics/tests/coupling/schooling.test.js` for
+the analytical cases, predictive escape, cross-cell ports and replay hashes. Run
+`node scripts/wasm-blueprints.mjs --rebuild --compare --only=school-kernel` with the pinned Rust toolchain
+to check the Wasm bytes. The optional JavaScript and separately fetched Wasm sizes are recorded by
+`node examples/package-benchmarks/entry-sizes.mjs`.

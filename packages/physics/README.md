@@ -2235,3 +2235,53 @@ cell-average stress in [xx, yy, zz, xy, yz, zx] order in Pa, and reactions at us
 x-fastest. Set `relativeTolerance` to control the residual (default 1e-9) and `maxIterations` for the solve
 (default twice the number of free nodal degrees of freedom, at least one). Supply `liquidFractionField` to reject cells that begin
 to melt. The elastic model assumes bonded solid cells and uses one-way coupling from heat to deformation.
+
+
+## Collective animal motion
+
+The optional `@margoengine/physics/schooling` entry simulates schools, flocks, herds and swarms on the world clock.
+Close neighbours trigger priority repulsion. The middle zone aligns with nearby motion, and the outer zone draws
+stragglers toward their peers. The `neighbours` option limits alignment and attraction to that many nearest
+visible members, with ties by input row. The default considers all visible members up to the sensing radius.
+Choose a count for the species and observations. The predator rule checks the closest point along the relative
+trajectory over `predictionSeconds`.
+
+```js
+import { SchoolSolver } from '@margoengine/physics/schooling';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const school = await SchoolSolver.load();
+world.add(school, {
+  members: [
+    { position: [-0.5, 0, 0], velocity: [0, 0, 1], mass: 0.2, dragArea: 0.002, maxThrust: 0.5 },
+    { position: [0.5, 0, 0], velocity: [0, 0, 1], mass: 0.2, dragArea: 0.002, maxThrust: 0.5 },
+  ],
+  predators: [{ position: [0, 0, -3], velocity: [0, 0, 5] }],
+  density: 1000,
+});
+world.advance(60);
+const fish = school.read(0);
+console.log(fish.position, fish.velocity, fish.intent);
+```
+
+- `SchoolSolver.load({ id, level, mode, readPredators, fields, signal })` loads the SIMD kernel on demand.
+  Defaults are id `school`, level 0 (60 Hz), mode `point-mass`, and `readPredators: false`. Use `fields.intent`,
+  `fields.kinematics`, or `fields.predators` to give a group its own registry names. The default names are
+  `schoolIntent`, `schoolKinematics`, and `schoolPredators`.
+- `repulsionRadius`, `orientationRadius`, and `attractionRadius` default to 0.5, 2, and 6 m. `visionDot`
+  defaults to −1 (full view). `predatorRadius` and `predictionSeconds` default to 2 m and 1 s. A zero threat
+  radius disables avoidance. Point masses chase a medium-relative `cruiseSpeed` of 1 m/s with a
+  `responseSeconds` of 0.5 s by default.
+- Each point member defaults to a mass of 1 kg, a peak thrust of 1 N, drag area 0 m², maximum lateral acceleration
+  2 m/s², and minimum turn radius 0.2 m. `dragArea` means coefficient of drag times reference area. Specify a
+  `FlowField` to sample local velocity and density, or use motionless fluid of `density` (1.225 kg/m³ by default).
+  The normal acceleration is bounded by `maxLateralAcceleration` and speed squared divided by `minimumTurnRadius`.
+  A minimum radius of 0 disables the radius constraint. Point masses advance position after updating velocity.
+- A body solver can own locomotion with `mode: 'intent'`. Write `SCHOOL_KINEMATICS_FIELD` and read
+  `SCHOOL_INTENT_FIELD`. The kinematics port holds six f64 words per stable member row (position, then world velocity).
+  The intent port holds three f64 words per row (desired medium-relative velocity on world axes). The member list
+  sets the row count. Use `readPredators: true` and `predatorCount` to read the same six-word layout from
+  `SCHOOL_PREDATORS_FIELD`. Otherwise configured predators move at their initial velocities. All three use
+  `SCHOOL_LAYOUT`. Set `cellSize: world.cellSize` with custom-size cells to bring inputs and flow samples into the
+  correct local frame. `school.read(row, out?)` copies scalar state and intent into ordinary vectors.

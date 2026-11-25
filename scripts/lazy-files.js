@@ -654,6 +654,14 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'First chunks a `VoxelStreamer` with `generator: NoiseTerrainOptions` generates (`@margoengine/voxel/stream`): up to `workers` workers, reused until `dispose()`',
   },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/school-kernel.wasm',
+    label: 'school-kernel.wasm',
+    kind: 'Collective animal motion neighbour kernel (Rust, SIMD)',
+    measure: 'file',
+    when: '`await SchoolSolver.load()` (`@margoengine/physics/schooling`), on demand',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics2d',
