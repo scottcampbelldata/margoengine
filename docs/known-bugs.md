@@ -6,11 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-25: two bodies that never touch change each other's paths through a shared floor (KB-PHYS-LOCALITY1, physics kernel, islands)
+### Corrected 2026-11-25: two boxes on one floor seemed to change each other's paths, but they touched (KB-PHYS-LOCALITY1, physics kernel)
 
-- **Repro:** `packages/physics/tests/locality.test.js`. A fixed floor, box A (0.6 m) resting on it at the origin and box B (0.4 by 0.8 by 0.4 m) dropped two metres away with a spin; pushing A by 0.05 N s along x before each step moves B's position after 30 steps by 2.2 cm (1.4 cm without B's spin). After 10 or 20 steps, before both boxes are on the floor, B is the same bits; with no floor B is the same bits after 30 steps. For a film this means an unrelated object anywhere on the same ground changes how a shot plays.
-- **Cause:** not yet found. Islands are not the link: fixed bodies insulate them (`kernel/src/island.rs`), so A and B are separate islands. Each island's step must therefore read something shared across the world. The likeliest candidates are a world-wide setting derived from all contacts (the substep count or pass count the world steps every island at), or state indexed by the shared floor's solver row (its contact pairs, warm starts or constraint batches). Each island stepping on its own settings and state is the fix: per-island substeps, with KB-PHYS-SPINFRICTION1.
-- **Owner:** the dynamics lane, with SPINFRICTION1. The test above is marked `todo` (a known failure) and passes when islands step independently; the `todo` comes off with the fix.
+- **Repro (as first filed):** `packages/physics/tests/locality.test.js`, a fixed floor, box A (0.6 m) resting at the origin and box
+  B (0.4 by 0.8 by 0.4 m) dropped 2 m away with a spin; pushing A by 0.05 N s along x before each step moved B by 2.2 cm after 30
+  steps, and B was the same bits after 10 or 20.
+- **Cause:** not a leak. A weighs 0.216 kg, so each push adds 0.23 m/s: after 28 steps A is at x 1.45 moving about 4.4 m/s, its
+  face at 1.75 m reaches B's at 1.8 m in step 29, the two boxes become one island with a pair between them (a native trace shows
+  islands 2 and 1 solving pair until step 28, then 1 island and 2 pairs), and B is struck in step 30. That is why 10 and 20 steps
+  matched and 30 did not. Islands already step on their own state: with B 8 m away it was the same bits after 30 and 60 steps.
+- **Fix:** the test's geometry. B is now 20 m away, the test asserts that A never comes within a metre of it, and B is the same
+  bits after 30, 60 and 90 steps with and without the push (also with no floor). It stays as the guard that an island's
+  substep level is a function of its own state alone.
 
 ### Open 2026-11-25: a 30-row pyramid at one pass a substep creeps instead of resting (KB-PHYS-PILECREEP1, physics kernel, contact solver)
 
