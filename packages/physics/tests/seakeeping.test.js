@@ -3,7 +3,16 @@
 // load is the linear Froude-Krylov force of a box, all against closed forms.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GRAVITY, SEA_WATER, wettedLoads } from '../dist/seakeeping.js';
+import {
+  addedMassInfinite,
+  GRAVITY,
+  heaveAddedMassInfinite,
+  hullSections,
+  lewisForm,
+  SEA_WATER,
+  swayAddedMassInfinite,
+  wettedLoads,
+} from '../dist/seakeeping.js';
 
 /**
  * A box of `size` (x, y, z) about its centre, each face a grid of `n` by `n` squares in two triangles, wound outward.
@@ -120,4 +129,75 @@ test('in a small regular wave a box takes the Froude-Krylov load of linear theor
     extra = loads.force[1] - rho * GRAVITY * L * B * T,
     expected = ((rho * GRAVITY * a * B * Math.exp(-k * T) * 2) / k) * Math.sin((k * L) / 2);
   assert.ok(Math.abs(extra - expected) <= 2e-3 * Math.abs(expected), `heave load ${extra} against ${expected}`);
+});
+
+test("a section's Lewis form: the book's container section, and a half circle, which maps to itself", () => {
+  // Journee and Massie (Offshore Hydromechanics, 2001, the table after eq. 7.102): a container ship's midsection of breadth
+  // 25.40 m and draft 9.00 m has the Lewis form M = 12.2400, a1 = 0.1511, a3 = -0.1136. Its area coefficient is the one
+  // those coefficients give (eq. 7.91), so the map must return them.
+  const [a1, a3] = [0.1511, -0.1136],
+    sigma = ((Math.PI / 4) * (1 - a1 * a1 - 3 * a3 * a3)) / ((1 + a3) ** 2 - a1 * a1),
+    form = lewisForm(25.4, 9, sigma * 25.4 * 9);
+  assert.ok(Math.abs(form.a1 - a1) < 1e-4 && Math.abs(form.a3 - a3) < 1e-4, `a1 ${form.a1}, a3 ${form.a3}`);
+  assert.ok(Math.abs(form.scale - 12.24) < 2e-3, `M ${form.scale}`);
+  const circle = lewisForm(2, 1, Math.PI / 2);
+  assert.ok(
+    Math.abs(circle.a1) < 1e-12 && Math.abs(circle.a3) < 1e-12,
+    `a half circle: a1 ${circle.a1}, a3 ${circle.a3}`,
+  );
+});
+
+test('a section moves at high frequency the water of half its mirrored double body: a half circle and the flat plates', () => {
+  // With the potential 0 on the free surface, a half circle of radius R moves rho pi R^2 / 2 in heave and in sway (half the
+  // unbounded circle's rho pi R^2); a flat plate of breadth B on the surface heaves rho pi B^2 / 8 (half the unbounded
+  // plate's rho pi (B/2)^2); a vertical plate of draft T sways rho pi T^2 / 2.
+  const rho = 1025,
+    R = 1.5,
+    circle = lewisForm(2 * R, R, (Math.PI * R * R) / 2);
+  const close = (got, want, tol, what) =>
+    assert.ok(Math.abs(got - want) <= tol * want, `${what}: ${got} against ${want}`);
+  close(heaveAddedMassInfinite(2 * R, circle, rho), (rho * Math.PI * R * R) / 2, 1e-12, 'half circle in heave');
+  close(swayAddedMassInfinite(R, circle, rho), (rho * Math.PI * R * R) / 2, 1e-12, 'half circle in sway');
+  // A plate is a section of breadth to draft 100 (or 1/100), the end of Lewis's range, of area coefficient pi/4: its
+  // coefficient is within a few parts in a hundred of the plate's.
+  const flat = lewisForm(200, 1, (Math.PI / 4) * 200);
+  close(heaveAddedMassInfinite(200, flat, rho), (rho * Math.PI * 200 * 200) / 8, 0.03, 'flat plate in heave');
+  const upright = lewisForm(1, 50, (Math.PI / 4) * 50);
+  close(swayAddedMassInfinite(50, upright, rho), (rho * Math.PI * 50 * 50) / 2, 0.03, 'vertical plate in sway');
+});
+
+test("a hull's sections are its cuts under the waterline, and a half cylinder carries rho pi R^2 L / 2 in heave", () => {
+  // A box 10 by 3 by 4 floating 1.2 deep: every station is a rectangle 4 wide and 1.2 deep.
+  const sections = hullSections(box([10, 3, 4], 4), -1.5 + 1.2, 10);
+  assert.equal(sections.length, 10);
+  for (const s of sections) {
+    assert.ok(
+      Math.abs(s.breadth - 4) < 1e-9 && Math.abs(s.draft - 1.2) < 1e-9,
+      `section ${s.x}: ${s.breadth} by ${s.draft}`,
+    );
+    assert.ok(Math.abs(s.area - 4 * 1.2) < 1e-9, `section ${s.x}: area ${s.area}`);
+  }
+  // A half cylinder of radius 1 and length 8, its flat deck at the waterline, sections of 64-sided half polygons: each a
+  // Lewis half circle, so its heave added mass is rho pi R^2 L / 2 within the polygon's area defect (0.16 percent).
+  const [R, L, n] = [1, 8, 64],
+    vertices = [],
+    indices = [];
+  for (const x of [-L / 2, L / 2])
+    for (let i = 0; i <= n; i++) {
+      const a = (Math.PI * i) / n;
+      vertices.push(x, -R * Math.sin(a), R * Math.cos(a));
+    }
+  const at = (end, i) => end * (n + 1) + i;
+  for (let i = 0; i < n; i++) indices.push(at(0, i), at(1, i + 1), at(1, i), at(0, i), at(0, i + 1), at(1, i + 1));
+  // The deck (y = 0) and the two ends, as fans.
+  indices.push(at(0, 0), at(1, 0), at(1, n), at(0, 0), at(1, n), at(0, n));
+  for (let i = 1; i < n - 1; i++) {
+    indices.push(at(0, 0), at(0, i + 1), at(0, i));
+    indices.push(at(1, 0), at(1, i), at(1, i + 1));
+  }
+  const strips = hullSections({ vertices, indices }, 0, 16),
+    a = addedMassInfinite(strips, [0, 0, 0], 1025),
+    expected = (1025 * Math.PI * R * R * L) / 2;
+  assert.ok(Math.abs(a[1 * 6 + 1] - expected) <= 5e-3 * expected, `heave added mass ${a[7]} against ${expected}`);
+  assert.ok(Math.abs(a[1 * 6 + 5]) <= 1e-9 * expected, 'no heave-pitch coupling for a hull symmetric fore and aft');
 });

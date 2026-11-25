@@ -12,3 +12,12 @@ export {
   wettedLoads,
 } from './wetted.js';
 export { type Hull, type HullParams, HullSolver } from './solver.js';
+export {
+  addedMassInfinite,
+  heaveAddedMassInfinite,
+  hullSections,
+  type LewisForm,
+  lewisForm,
+  type Section,
+  swayAddedMassInfinite,
+} from './strips.js';

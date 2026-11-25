@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19115492,
+  "total": 19117091,
   "history": [
     {
       "date": "2026-10-24",
@@ -12369,6 +12369,12 @@
       "commit": "5ffd9e6da",
       "reason": "@margoengine/creative/post: 7190 -> 7536 B gzip measured (ceiling 7339 -> 7792 B, measured + 256 B). 5ffd9e6da (KB-CREATIVE-POSTVIEW1) grades and presents each view in its own viewport: the grade uniform carries the view rectangle, each view id gets its own uniform buffer and bind group (pruned when idle), and the present pass is scissored with the view load op. Without it every view of a split screen graded the whole canvas with the last view camera. A split would put the per-view state behind an import() on every frame of every PostProcessing user, since a single-view frame runs the same path. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "d253915f3",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: the hull's added mass from its sections (station cuts, Lewis forms, strip integrals) and the six-by-six fold M (M + A)^-1 in HullSolver; measured gzip (Mac build) 4036 B, was under 2693; the added mass is what keeps a light hull's motion right and stable, and the entry is loaded only by scenes with hulls. Budget (measured + 256 B): 2693 to 4292 B."
     }
   ],
   "items": {
@@ -13164,7 +13170,7 @@
     "@margoengine/physics/flight": 7401,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/seakeeping": 2693,
+    "@margoengine/physics/seakeeping": 4292,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,

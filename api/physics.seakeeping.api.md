@@ -20,6 +20,9 @@ export interface HullParams {
     readonly sea: SeaQuery;
     readonly level?: RateLevel;
     readonly capacity?: number;
+    readonly gravity?: Vec3;
+    readonly addedMass?: boolean;
+    readonly stations?: number;
 }
 
 export interface HullPose {
@@ -39,6 +42,13 @@ export class HullSolver implements Solver<HullParams> {
     extraState(): readonly Region[];
 }
 
+export interface LewisForm {
+    readonly scale: number;
+    readonly a1: number;
+    readonly a3: number;
+    readonly sigma: number;
+}
+
 export type Quat = readonly [number, number, number, number];
 
 export const SEA_WATER = 1025;
@@ -49,6 +59,14 @@ export interface SeaQuery {
     readonly density?: number;
 }
 
+export interface Section {
+    readonly x: number;
+    readonly width: number;
+    readonly breadth: number;
+    readonly draft: number;
+    readonly area: number;
+}
+
 export type Vec3 = readonly [number, number, number];
 
 export interface WettedLoads {
@@ -56,6 +74,19 @@ export interface WettedLoads {
     torque: [number, number, number];
     area: number;
 }
+
+export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
+
+export function heaveAddedMassInfinite(breadth: number, form: LewisForm, density: number): number;
+
+export function hullSections(mesh: {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}, waterline: number, count?: number): Section[];
+
+export function lewisForm(breadth: number, draft: number, area: number): LewisForm;
+
+export function swayAddedMassInfinite(draft: number, form: LewisForm, density: number): number;
 
 export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads): WettedLoads;
 

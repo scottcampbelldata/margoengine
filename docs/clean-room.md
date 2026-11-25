@@ -12016,3 +12016,24 @@ each input under rounding, so the blended box still holds the blended corners in
 existing watertight ray-triangle test (Sven Woop, Carsten Benthin and Ingo Wald, "Watertight Ray/Triangle
 Intersection", JCGT 2013, https://jcgt.org/published/0002/01/05/), fed the blended corners, which neighbouring
 triangles compute identically. Written from these papers; no renderer's code was read.
+### A hull's added mass from its sections (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
+
+`packages/physics/src/seakeeping/strips.ts` cuts the hull into stations, maps each section under the waterline to its Lewis
+form and integrates the sections' added mass at infinite frequency over the hull. Written from J. M. J. Journee and
+W. W. Massie, *Offshore Hydromechanics*, TU Delft, 2001, Part 2:
+- the Lewis form (eqs. 7.88-7.95), its range and the clamp of the area coefficient to it;
+- the book's container section (B 25.40 m, D 9.00 m: M 12.2400, a1 0.1511, a3 -0.1136), which the test checks;
+- the strip integrals of the zero-speed coefficients (eq. 8.25: A33, A35 and A55 from the sections' heave added mass, and
+  sway and yaw in the same way).
+
+The heave and sway coefficients at infinite frequency, (rho pi B^2/8)((1+a1)^2 + 3 a3^2)/(1+a1+a3)^2 and
+(rho pi T^2/2)((1-a1)^2 + 3 a3^2)/(1-a1+a3)^2, are Lewis's (F. M. Lewis, "The inertia of the water surrounding a vibrating
+ship", SNAME Trans. 37, 1929; known through the literature, not read here). The tests hold them to the exact limits of
+a half circle and of flat plates on and through the surface: half the unbounded body's rho pi R^2 and rho pi a^2, the
+potential being 0 on the free surface at high frequency.
+
+The added mass enters through the held load M (M + A)^-1 (F + W) - W. That fold is this package's own: a held force cannot
+carry -A a explicitly (unstable once A is about M), as the research summary notes after Kerner 2015, whose game model drops
+the added mass for that reason. The sections are taken from the mesh under the mean waterline in the body's frame each
+step, also this package's own. Proof: `packages/physics/tests/seakeeping.test.js` and `tests/coupling/seakeeping.test.js`
+(a box heaves at 2 pi sqrt((m + a)/(rho g A_wp)) with its added mass, and at the bare period without).

@@ -1887,8 +1887,10 @@ console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.de
   - a box at its draft is held up by the weight of the water it displaces, to f64 rounding;
   - heeled, a box rights itself by the wall-sided righting arm;
   - in a small wave, a box takes the linear Froude-Krylov heave load;
-  - let go above its draft, a box heaves at the period its buoyancy gives it.
-- **Not yet:** the added mass and the radiation damping of the water the hull moves, diffraction, wave drift and green water. A hull rides the waves' pressure but does not yet stir the water: let go, it heaves without settling.
+  - let go above its draft, a box heaves at the period its buoyancy and its added mass give it;
+  - a section's Lewis form matches the book's container section, and its added mass meets the exact limits of a half circle and of flat plates.
+- **The water a hull carries:** its added mass at infinite frequency, from its sections under the waterline it floats at each step (strip theory). Each section is mapped to its Lewis form, and its heave and sway added mass are integrated to the hull's heave, pitch, sway and yaw. The solver holds M (M + A)^-1 (F + W) - W, so the body moves as hull and water together, stable even when the water outweighs a light hull. `addedMass: false` leaves it out; `stations` sets the sections (default 24); `gravity` must be the rigid world's. `hullSections`, `lewisForm` and `addedMassInfinite` are exported to inspect it.
+- **Not yet:** the radiation damping of the water the hull moves (with its memory), surge and roll added mass, diffraction, wave drift and green water. Let go, a hull heaves at a period near its real one but does not yet settle.
 
 ```ts
 import {Physics} from 'margoengine/physics';

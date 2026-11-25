@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { GRAVITY, HullSolver, SEA_WATER } from '../../dist/seakeeping.js';
+import { addedMassInfinite, GRAVITY, HullSolver, hullSections, SEA_WATER } from '../../dist/seakeeping.js';
 import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -65,7 +65,7 @@ const k = (2 * Math.PI) / 20,
   };
 
 /** Two box hulls of the mass that floats them at draft T, on `sea`; the solver loads hull `which` (both for 2, none for -1). */
-function make(rate = { num: 24, den: 1 }, which = 2, sea = wave) {
+function make(rate = { num: 24, den: 1 }, which = 2, sea = wave, options = {}) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
     mass = SEA_WATER * L * B * T,
     boxes = [0, 8].map((x) =>
@@ -77,7 +77,7 @@ function make(rate = { num: 24, den: 1 }, which = 2, sea = wave) {
     mesh = boxMesh([L, D, B]),
     hulls = (which === 2 ? boxes : which < 0 ? [] : [boxes[which]]).map((b) => ({ row: b.row, mesh })),
     world = new PhysicsWorld({ rate }).add(new RigidSolver(), { physics });
-  if (hulls.length) world.add(new HullSolver(), { hulls, sea }).couple(['hull', 'rigid'], 'staggered');
+  if (hulls.length) world.add(new HullSolver(), { hulls, sea, ...options }).couple(['hull', 'rigid'], 'staggered');
   return Object.assign(world, { boxes, physics });
 }
 
@@ -90,25 +90,35 @@ test('HullSolver: the load reaches the hull it names', () => {
   );
 });
 
-test('HullSolver: a box let go above its draft in still water heaves at the period its buoyancy gives it', () => {
-  // A box of mass m on a waterplane of area A: a restoring force rho g A per metre of heave, so a period of
-  // 2 pi sqrt(m / (rho g A)) (Journee and Massie, Offshore Hydromechanics, 2001, section 6.3, without the added mass of the water,
-  // which the hull solver does not take yet). Let go 5 cm high, it oscillates about its draft.
+test('HullSolver: a box let go above its draft heaves at the period its buoyancy and the water it carries give it', () => {
+  // A box of mass m on a waterplane of area A_wp: a restoring force rho g A_wp per metre of heave, and the water it carries,
+  // its heave added mass a (from its sections, at infinite frequency), so a period of 2 pi sqrt((m + a) / (rho g A_wp))
+  // (Journee and Massie, Offshore Hydromechanics, 2001, section 6.3). Without the added mass, 2 pi sqrt(m / (rho g A_wp)).
+  // Let go 5 cm high, it oscillates about its draft.
   const still = { density: SEA_WATER, elevation: () => 0 },
-    world = make({ num: 60, den: 1 }, 0, still),
-    box = world.boxes[0];
-  box.setPosition([0, D / 2 - T + 0.05, 0]);
-  const rest = D / 2 - T,
-    crossings = [];
-  let last = box.position[1] - rest;
-  for (let f = 1; f <= 600; f++) {
-    world.advance(f);
-    const now = box.position[1] - rest;
-    if (last > 0 && now <= 0) crossings.push(f - now / (now - last));
-    last = now;
+    mass = SEA_WATER * L * B * T,
+    added = addedMassInfinite(hullSections(boxMesh([L, D, B]), T - D / 2, 24), [0, 0, 0], SEA_WATER)[7];
+  for (const [carry, expected] of [
+    [true, 2 * Math.PI * Math.sqrt((mass + added) / (SEA_WATER * GRAVITY * L * B))],
+    [false, 2 * Math.PI * Math.sqrt(mass / (SEA_WATER * GRAVITY * L * B))],
+  ]) {
+    const world = make({ num: 60, den: 1 }, 0, still, { addedMass: carry }),
+      box = world.boxes[0];
+    box.setPosition([0, D / 2 - T + 0.05, 0]);
+    const rest = D / 2 - T,
+      crossings = [];
+    let last = box.position[1] - rest;
+    for (let f = 1; f <= 600; f++) {
+      world.advance(f);
+      const now = box.position[1] - rest;
+      if (last > 0 && now <= 0) crossings.push(f - now / (now - last));
+      last = now;
+    }
+    const period = (crossings.at(-1) - crossings[0]) / (crossings.length - 1) / 60;
+    assert.ok(crossings.length >= 3, `it oscillates: ${crossings.length} crossings`);
+    assert.ok(
+      Math.abs(period - expected) <= 0.02 * expected,
+      `${carry ? 'with' : 'without'} its added mass: period ${period} s against ${expected} s`,
+    );
   }
-  const period = (crossings.at(-1) - crossings[0]) / (crossings.length - 1) / 60,
-    expected = 2 * Math.PI * Math.sqrt((SEA_WATER * L * B * T) / (SEA_WATER * GRAVITY * L * B));
-  assert.ok(crossings.length >= 4, `it oscillates: ${crossings.length} crossings`);
-  assert.ok(Math.abs(period - expected) <= 0.02 * expected, `period ${period} s against ${expected} s`);
 });
