@@ -138,7 +138,7 @@ impl World {
     }
 
     /// Writes a collider's fat box when what the step can reach has left it, or it has grown far too big. True when it did.
-    fn refresh(&mut self, c: usize, dt: f32) -> bool {
+    pub(crate) fn refresh(&mut self, c: usize, dt: f32) -> bool {
         let (low, high) = self.reach_fitting(c, dt);
         if self.header().refit != 0 {
             // The prediction changed: every box is fitted again, to the new margin.
@@ -167,7 +167,7 @@ impl World {
     /// What a collider can reach in the step. A compound's children get their fat boxes here, each step its body moves, as
     /// its pairs cull children by them; the compound reaches what they reach together.
     #[inline(always)]
-    fn reach_fitting(&mut self, c: usize, dt: f32) -> (V3, V3) {
+    pub(crate) fn reach_fitting(&mut self, c: usize, dt: f32) -> (V3, V3) {
         if self.uu(COLLIDER_SHAPE, c) != SHAPE_COMPOUND {
             return self.reach(c, dt);
         }
@@ -189,9 +189,19 @@ impl World {
     }
 
     #[inline(always)]
-    fn fit(&mut self, c: usize, low: V3, high: V3) {
-        let prediction = self.header().prediction;
-        let margin = v3(prediction, prediction, prediction);
+    pub(crate) fn fit(&mut self, c: usize, low: V3, high: V3) {
+        let mut reach = self.header().prediction;
+        // An adaptive margin is an eighth of the box's smallest side, at most half a metre: a large shape keeps its pairs over a larger move.
+        if self.header().adaptive_margin != 0 {
+            let side = high.sub(low);
+            let smallest = side.x.min(side.y).min(side.z);
+            let share = 0.125 * smallest;
+            let share = if share > 0.5 { 0.5 } else { share };
+            if share > reach {
+                reach = share;
+            }
+        }
+        let margin = v3(reach, reach, reach);
         self.set_v(FAT_MIN_X, c, low.sub(margin));
         self.set_v(FAT_MAX_X, c, high.add(margin));
     }
@@ -210,6 +220,9 @@ impl World {
 
     /// Finds the world's pairs for this step: removed colliders go, moved boxes walk, new colliders join.
     pub fn broad_update(&mut self, dt: f32) {
+        if self.header().broad_kind == 1 {
+            return self.tree_update(dt);
+        }
         let mut fresh = 0usize;
         let mut moved = 0usize;
         let mut gone = NONE;
@@ -648,7 +661,7 @@ impl World {
     }
 
     /// Removes every pair of a collider.
-    fn drop_pairs(&mut self, collider: u32) {
+    pub(crate) fn drop_pairs(&mut self, collider: u32) {
         let mut row = self.uu(COLLIDER_PAIRS, collider as usize);
         while row != NONE {
             let next = self.next_pair(row, collider);

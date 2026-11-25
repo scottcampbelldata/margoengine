@@ -127,6 +127,22 @@ pub struct Header {
     /// stopping (Rapier's quarantine). How many bodies have been taken out so far.
     pub quarantine: u32,
     pub quarantined: u32,
+    /// How far the poses of a pair may drift from where its manifold was found before the manifold is found again, in metres; 0
+    /// finds it every step (Rapier's `contact_recycling` and `contact_recycle_distance`).
+    pub recycle: f32,
+    /// The cosine two parts' contact normals must have to be one plane for contact clustering, 0 for none (Rapier's `contact_clustering`).
+    pub cluster: f32,
+    /// The broad phase: 0 sweep and prune, 1 the dynamic tree of fat boxes (src/tree.rs); how a batch of new colliders is built into
+    /// the tree (0 one at a time, 1 binned surface area heuristic, 2 Morton order and locally ordered clustering); whether the tree
+    /// rotates nodes as boxes move (1) or leaves its shape to insertion (0); whether a collider's margin is a share of its size.
+    pub broad_kind: u32,
+    pub tree_build: u32,
+    pub tree_optimize: u32,
+    pub adaptive_margin: u32,
+    /// The tree's root, the first free node and the nodes handed out so far.
+    pub tree_root: u32,
+    pub tree_free: u32,
+    pub tree_used: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -153,6 +169,9 @@ pub struct World {
     pub path_samples: core::cell::Cell<u64>,
     /// Nearest-point searches of paths so far, the other half of that count.
     pub path_searches: core::cell::Cell<u64>,
+    /// Pairs the narrow phase worked out in full, and pairs that kept their manifold by recycling, so far (work counts; not part of the world's state).
+    pub narrow_found: core::cell::Cell<u64>,
+    pub narrow_recycled: core::cell::Cell<u64>,
 }
 
 impl World {
@@ -179,6 +198,8 @@ impl World {
             part_id: core::cell::Cell::new(u32::MAX),
             path_samples: core::cell::Cell::new(0),
             path_searches: core::cell::Cell::new(0),
+            narrow_found: core::cell::Cell::new(0),
+            narrow_recycled: core::cell::Cell::new(0),
         };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
@@ -248,6 +269,15 @@ impl World {
                 step_dt: 0.0,
                 quarantine: 0,
                 quarantined: 0,
+                recycle: 0.0,
+                cluster: 0.0,
+                broad_kind: 0,
+                tree_build: 0,
+                tree_optimize: 0,
+                adaptive_margin: 0,
+                tree_root: NONE,
+                tree_free: NONE,
+                tree_used: 0,
             });
         }
         Some(world)
@@ -496,6 +526,7 @@ impl World {
             *self.u(COLLIDER_GROUPS_HI).add(at) = 0;
             *self.u(COLLIDER_SOLVER_GROUPS_HI).add(at) = 0;
             *self.u(COLLIDER_PAIRS).add(at) = NONE;
+            *self.u(COLLIDER_LEAF).add(at) = NONE;
             // At the end of the body's chain, so colliders add up in the order they were given.
             *self.u(COLLIDER_NEXT).add(at) = NONE;
             let first = self.u(FIRST_COLLIDER).add(body as usize);
@@ -783,6 +814,7 @@ impl World {
             }
             *self.f(COLLIDER_DENSITY).add(at) = *self.f(COLLIDER_DENSITY).add(parent);
             *self.u(COLLIDER_PAIRS).add(at) = NONE;
+            *self.u(COLLIDER_LEAF).add(at) = NONE;
             *self.u(COLLIDER_NEXT).add(at) = NONE;
             // At the end of the compound's chain, so children keep the order they were given.
             let first = self.u(COLLIDER_HULL).add(parent);

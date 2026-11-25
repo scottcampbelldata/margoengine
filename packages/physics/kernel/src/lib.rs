@@ -35,6 +35,7 @@ pub mod sat;
 pub mod smooth;
 pub mod solver;
 pub mod soup;
+pub mod tree;
 pub mod voxel;
 pub mod world;
 

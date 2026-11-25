@@ -667,13 +667,24 @@ impl World {
             self.set_u(PAIR_FLAGS, row, flags);
             if compound {
                 self.compound_pair(row, a, b, dt, ratio);
+                if self.header().cluster > 0.0 {
+                    self.cluster_parts(row);
+                }
                 continue;
             }
             let limit = self.contact_limit(a, b, dt);
             if meshed {
                 self.mesh_pair(row, a, b, limit, ratio);
+                if self.header().cluster > 0.0 {
+                    self.cluster_parts(row);
+                }
                 continue;
             }
+            if self.header().recycle > 0.0 && self.uu(PAIR_CONTACTS, row) > 0 && self.recycle_pair(row, a, b, body_a, body_b, limit) {
+                self.narrow_recycled.set(self.narrow_recycled.get() + 1);
+                continue;
+            }
+            self.narrow_found.set(self.narrow_found.get() + 1);
             manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
             for k in 0..manifold.held_count {
                 manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
@@ -683,9 +694,75 @@ impl World {
             self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
             if manifold.count == 0 {
                 self.drop_contacts(row, body_a, body_b);
+                self.set_s(PAIR_REL_ROT_W, row, 0.0);
             }
             self.store_manifold(row, body_a, body_b, &manifold, ratio);
+            if self.header().recycle > 0.0 && manifold.count > 0 {
+                self.remember_poses(row, body_a, body_b);
+            }
         }
         self.sweep_parts();
+    }
+
+    /// The pose of body `b` in body `a`'s frame, and the unit quaternion's dot with another, for contact recycling.
+    fn relative_pose(&self, a: usize, b: usize) -> (V3, Q) {
+        let (qa, qb) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        (qa.unrotate(self.v(POSITION_X, b).sub(self.v(POSITION_X, a))), qa.conjugate().mul(qb))
+    }
+
+    /// Notes the poses a pair's manifold was found at, and its normal in the first body's frame.
+    fn remember_poses(&mut self, row: usize, a: usize, b: usize) {
+        let (p, q) = self.relative_pose(a, b);
+        self.set_v(PAIR_REL_X, row, p);
+        self.set_q(PAIR_REL_ROT_X, row, q);
+        let normal = self.q(ROTATION_X, a).unrotate(self.v(PAIR_NORMAL_X, row));
+        self.set_v(PAIR_LOCAL_NORMAL_X, row, normal);
+    }
+
+    /// Contact recycling (Rapier's `contact_recycling`): a pair whose bodies have kept within `recycle` of the poses its manifold was
+    /// found at keeps the manifold, with the normal turned with the first body and the separations worked out again from the points'
+    /// anchors; the points do not slide along the surfaces, so a contact is stale by up to that drift. False when the manifold has to
+    /// be found again: no poses were kept, the bodies moved or turned further than the drift allows (the turn counts at the reach
+    /// of the two colliders), or a point left the range contacts are made within.
+    fn recycle_pair(&mut self, row: usize, a: usize, b: usize, body_a: usize, body_b: usize, limit: f32) -> bool {
+        let drift = self.header().recycle;
+        if self.s(PAIR_REL_ROT_W, row) == 0.0 {
+            return false;
+        }
+        let (p, q) = self.relative_pose(body_a, body_b);
+        let (kept_p, kept_q) = (self.v(PAIR_REL_X, row), self.q(PAIR_REL_ROT_X, row));
+        let moved = p.sub(kept_p);
+        let dot = q.x * kept_q.x + q.y * kept_q.y + q.z * kept_q.z + q.w * kept_q.w;
+        let dot = if dot < 0.0 { -dot } else { dot };
+        // The turn between the two poses as an angle: twice the arc cosine of the dot, which is 2 sqrt(1 - dot^2) near 1.
+        let turn = 2.0 * sqrt(if dot >= 1.0 { 0.0 } else { 1.0 - dot * dot });
+        let reach = self.collider_reach_of(a).max(self.collider_reach_of(b));
+        if sqrt(moved.dot(moved)) + turn * reach >= drift {
+            return false;
+        }
+        let normal = self.q(ROTATION_X, body_a).rotate(self.v(PAIR_LOCAL_NORMAL_X, row));
+        let (rotation_a, rotation_b) = (self.q(ROTATION_X, body_a), self.q(ROTATION_X, body_b));
+        let center_a = self.v(POSITION_X, body_a).add(rotation_a.rotate(self.v(LOCAL_CENTER_X, body_a)));
+        let center_b = self.v(POSITION_X, body_b).add(rotation_b.rotate(self.v(LOCAL_CENTER_X, body_b)));
+        let count = self.uu(PAIR_CONTACTS, row) as usize;
+        let mut separations = [0.0f32; MANIFOLD];
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            let on_a = center_a.add(rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)));
+            let on_b = center_b.add(rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+            separations[k] = on_b.sub(on_a).dot(normal);
+            if separations[k] > limit {
+                return false;
+            }
+        }
+        self.set_v(PAIR_NORMAL_X, row, normal);
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            let on_a = center_a.add(rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)));
+            let on_b = center_b.add(rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+            self.set_s(CONTACT_SEPARATION, at, separations[k]);
+            self.set_v(CONTACT_X, at, on_a.add(on_b).scale(0.5));
+        }
+        true
     }
 }

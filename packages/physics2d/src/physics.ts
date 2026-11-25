@@ -323,6 +323,35 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   get bodyCount(): number {
     return this.bodies.size;
   }
+  /**
+   * How long the phases of the last step took, in milliseconds, as Rapier's `timingStep` and its siblings do: `step` is the whole of
+   * it, then `begin` (kinematic targets are read), `broad` phase, `narrow` phase, `islands`, `solver`, `ccd` and `events`. The phases
+   * add up to `step`, bar the clock's own calls. All zero before the first step. A reading is no part of the world.
+   */
+  get timing(): {
+    step: number;
+    begin: number;
+    broad: number;
+    narrow: number;
+    islands: number;
+    solver: number;
+    ccd: number;
+    events: number;
+  } {
+    this.live();
+    const { kernel, handle } = this,
+      read = (phase: number): number => kernel.exports.world_timing(handle, phase);
+    return {
+      step: read(0),
+      begin: read(1),
+      broad: read(2),
+      narrow: read(3),
+      islands: read(4),
+      solver: read(5),
+      ccd: read(6),
+      events: read(7),
+    };
+  }
   /** Every body in the world, in the order they were added. */
   getBodies(): Body2D[] {
     return [...this.bodies];

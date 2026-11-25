@@ -34,6 +34,7 @@ interface Exports {
   world_destroy(world: number): number;
   world_set_gravity(world: number, gx: number, gy: number): number;
   world_step(world: number, dt: number): number;
+  world_timing(world: number, phase: number): number;
   body_create(world: number, kind: number, flags: number): number;
   body_remove(world: number, body: number): number;
   body_read(world: number, body: number): number;
@@ -161,6 +162,7 @@ export async function startKernel(source: KernelWasmSource, signal: AbortSignal)
     interface: __KERNEL_INTERFACE__,
     imports: {
       env: {
+        clock: () => performance.now(),
         hook_filter: (a: number, b: number) => (kernel?.hooks ? (kernel.hooks.filter(a, b) ? 1 : 0) : 1),
         hook_contact: (a: number, b: number, nx: number, ny: number, points: number) =>
           kernel?.hooks ? kernel.hooks.contact(a, b, nx, ny, points) : 0,

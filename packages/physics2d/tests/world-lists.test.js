@@ -56,3 +56,21 @@ test('two worlds in one instance step side by side and share nothing', () => {
   assert.ok(a.position[1] > 400, 'the other world goes on after one is disposed');
   fast.dispose();
 });
+
+test('the phases of a step are timed and add up to the step', () => {
+  const physics = new Physics2D(null);
+  assert.deepEqual(Object.values(physics.timing), new Array(8).fill(0), 'nothing has run yet');
+  physics.addBody(null, { type: 'fixed', position: [0, 400], colliders: { shape: 'box', width: 2000, height: 20 } });
+  for (let i = 0; i < 100; i++)
+    physics.addBody(null, { position: [(i % 10) * 12, 300 - Math.floor(i / 10) * 12], colliders: { shape: 'circle', radius: 5 } });
+  for (let i = 0; i < 30; i++) physics.step();
+  const timing = physics.timing,
+    phases = ['begin', 'broad', 'narrow', 'islands', 'solver', 'ccd', 'events'];
+  assert.deepEqual(Object.keys(timing), ['step', ...phases]);
+  for (const value of Object.values(timing)) assert.ok(Number.isFinite(value) && value >= 0);
+  assert.ok(timing.step > 0, 'a step with a pile takes time');
+  const sum = phases.reduce((total, phase) => total + timing[phase], 0);
+  assert.ok(Math.abs(sum - timing.step) <= timing.step * 1e-3 + 1e-6, `the phases tile the step: ${sum} against ${timing.step}`);
+  physics.dispose();
+  assert.throws(() => physics.timing, { code: 'disposed' });
+});

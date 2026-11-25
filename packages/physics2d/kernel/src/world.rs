@@ -531,6 +531,26 @@ pub struct Counts {
     pub tree_joints: u64,
 }
 
+/// The phases `World::timing` holds, in order.
+pub const PHASES: [&str; 8] = ["step", "begin", "broad", "narrow", "islands", "solver", "ccd", "events"];
+
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    /// Milliseconds on a clock that only goes forward; it times the phases of a step and nothing reads it back into one.
+    fn clock() -> f64;
+}
+#[cfg(target_arch = "wasm32")]
+#[inline(always)]
+fn now() -> f64 {
+    unsafe { clock() }
+}
+#[cfg(not(target_arch = "wasm32"))]
+#[inline(always)]
+fn now() -> f64 {
+    0.0
+}
+
 pub struct World {
     pub settings: Settings,
     pub bodies: Vec<Body>,
@@ -554,6 +574,9 @@ pub struct World {
     pub(crate) joint_ids: Vec<u32>,
     pub(crate) joint_slot: Vec<u32>,
     pub counts: Counts,
+    /// Milliseconds the phases of the last step took, in `PHASES` order (the step, then begin, broad, narrow, islands, solver, ccd and events). From a
+    /// clock the page gives; not part of the simulation, and zero where there is none.
+    pub timing: [f32; 8],
     pub steps: u64,
     pub(crate) broad: Broad,
     pairs: Vec<(u32, u32)>,
@@ -622,6 +645,7 @@ impl World {
             joint_ids: Vec::new(),
             joint_slot: Vec::new(),
             counts: Counts::default(),
+            timing: [0.0; 8],
             steps: 0,
             broad: if settings.broad_phase == BroadPhase::Sweep { Broad::Sweep(SweepPrune::new()) } else { Broad::Tree(Tree::new()) },
             apart: Vec::new(),
@@ -1269,6 +1293,7 @@ impl World {
         if !(dt > 0.0) {
             return Ok(());
         }
+        let (begun, mut stamp) = (now(), now());
         self.counts = Counts::default();
         self.events.clear();
         self.events.append(&mut self.pending_events);
@@ -1284,12 +1309,23 @@ impl World {
                 body.sleep_time = 0.0;
             }
         }
+        let lap = |world: &mut World, phase: usize, stamp: &mut f64| {
+            let at = now();
+            world.timing[phase] = (at - *stamp) as f32;
+            *stamp = at;
+        };
+        lap(self, 1, &mut stamp);
         self.broad_phase()?;
+        lap(self, 2, &mut stamp);
         self.narrow_phase()?;
+        lap(self, 3, &mut stamp);
         self.wake_and_join();
+        lap(self, 4, &mut stamp);
         let ccd = self.ccd_starts();
         solver::solve_validated(self, dt)?;
+        lap(self, 5, &mut stamp);
         self.solve_ccd(&ccd)?;
+        lap(self, 6, &mut stamp);
         for body in self.bodies.iter_mut() {
             // The body ends the step exactly where it was told to be, with the velocity that took it there.
             if let Some((target, q)) = body.next_target.take() {
@@ -1305,6 +1341,8 @@ impl World {
         self.force_events(dt);
         self.sleep(dt);
         if self.bodies.iter().any(|body| !finite_body(body) || !nonzero_rotation(body.xf.q)) { return Err(PhysicsError::ArithmeticOverflow); }
+        lap(self, 7, &mut stamp);
+        self.timing[0] = (stamp - begun) as f32;
         Ok(())
     }
 

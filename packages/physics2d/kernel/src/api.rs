@@ -139,6 +139,16 @@ pub extern "C" fn world_step(handle: i32, dt: f32) -> i32 {
     with_world!(handle, |w| w.step(dt).map(|()| 0))
 }
 
+/// Milliseconds a phase of the world's last step took: 0 the whole step, then begin, broad phase, narrow phase, islands, solver, continuous
+/// collision and events; NaN past the last. All zero before the first step.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_timing(handle: i32, phase: u32) -> f32 {
+    match world(handle) {
+        Ok(w) => w.timing.get(phase as usize).copied().unwrap_or(f32::NAN),
+        Err(_) => f32::NAN,
+    }
+}
+
 fn kind_of(value: u32) -> Result<Kind, PhysicsError> {
     match value {
         0 => Ok(Kind::Dynamic),

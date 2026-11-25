@@ -231,3 +231,134 @@ fn a_body_that_leaves_the_numbers_stops_the_world_or_is_quarantined_by_choice() 
     w.step(DT);
     assert_eq!(w.header().steps, before + 1, "and the world steps on");
 }
+
+/// A column of five boxes dropped from a little above rest, stepped for `seconds`: where the boxes end, and how many pairs the narrow
+/// phase worked out in full and how many kept their manifold.
+fn column(recycle: f32, seconds: u32) -> (Vec<V3>, u64, u64) {
+    let mut w = World::new(10, 10).unwrap();
+    floor(&mut w);
+    w.header_mut().recycle = recycle;
+    let bodies: Vec<u32> = (0..5).map(|k| block(&mut w, v3(0.0, 0.3 + 0.52 * k as f32, 0.0))).collect();
+    for _ in 0..seconds * 60 {
+        w.step(DT);
+    }
+    let places = bodies.iter().map(|&b| w.v(POSITION_X, b as usize)).collect();
+    (places, w.narrow_found.get(), w.narrow_recycled.get())
+}
+
+#[test]
+fn recycled_contacts_keep_a_resting_column_standing_and_skip_the_narrow_phase_while_it_rests() {
+    let (full, found, recycled) = column(0.0, 4);
+    assert_eq!(recycled, 0, "off by default: every pair is worked out every step");
+    let (kept, found_kept, recycled_kept) = column(0.05, 4);
+    assert!(recycled_kept > 0, "a resting column recycles");
+    assert!(found_kept < found / 2, "and works out far fewer manifolds: {found_kept} against {found}");
+    assert_eq!(found_kept + recycled_kept, found, "every pair is one or the other");
+    for (k, (a, b)) in full.iter().zip(&kept).enumerate() {
+        let d = a.sub(*b);
+        assert!(d.dot(d).sqrt() < 2e-3, "box {k} ends within 2 mm of where it does without recycling: {} {} {}", d.x, d.y, d.z);
+        assert!((b.y - (0.25 + 0.5 * k as f32)).abs() < 0.02 && b.x.abs() < 0.01, "box {k} stands at {} {}", b.x, b.y);
+    }
+}
+
+#[test]
+fn a_pair_that_moves_further_than_the_drift_finds_its_manifold_again() {
+    // A box pushed along a floor at 2 m/s moves 3 cm a step: with a drift of 1 cm it is never recycled.
+    let mut w = World::new(4, 4).unwrap();
+    floor(&mut w);
+    w.header_mut().recycle = 0.01;
+    let body = block(&mut w, v3(0.0, 0.25, 0.0));
+    for _ in 0..30 {
+        w.step(DT);
+    }
+    w.set_v(LINEAR_X, body as usize, v3(2.0, 0.0, 0.0));
+    // The narrow phase of this step sees the poses the last step left; the next sees the box 3 cm along.
+    w.step(DT);
+    let before = w.narrow_recycled.get();
+    for _ in 0..10 {
+        w.step(DT);
+    }
+    assert_eq!(w.narrow_recycled.get(), before, "a step of 3 cm is past a drift of 1 cm");
+}
+
+/// A floor of `n` by `n` squares of side `cell`, each two triangles in the plane y = 0, centred on the origin, as a mesh collider.
+fn mesh_floor(w: &mut World, n: usize, cell: f32) {
+    let body = w.add_body(FIXED).unwrap();
+    let side = n + 1;
+    let triangles = 2 * n * n;
+    assert!(w.begin_mesh((side * side) as u32, triangles as u32));
+    let [_, v0, t0, _, _] = w.header().mesh_rows;
+    let half = n as f32 * cell / 2.0;
+    for i in 0..side {
+        for j in 0..side {
+            w.set_v(MESH_VERTEX_X, v0 as usize + i * side + j, v3(i as f32 * cell - half, 0.0, j as f32 * cell - half));
+        }
+    }
+    let mut t = 0;
+    for i in 0..n {
+        for j in 0..n {
+            let (a, b, c, d) = ((i * side + j) as u32, ((i + 1) * side + j) as u32, ((i + 1) * side + j + 1) as u32, (i * side + j + 1) as u32);
+            for tri in [[a, c, b], [a, d, c]] {
+                let at = t0 as usize + t;
+                w.set_u(TRIANGLE_A, at, tri[0]);
+                w.set_u(TRIANGLE_B, at, tri[1]);
+                w.set_u(TRIANGLE_C, at, tri[2]);
+                for k in 0..3 {
+                    w.set_u(TRIANGLE_ACROSS_0 + k, at, NONE);
+                }
+                t += 1;
+            }
+        }
+    }
+    let mesh = w.end_mesh((side * side) as u32, triangles as u32, 0);
+    assert!(mesh >= 0);
+    w.add_collider(body, SHAPE_TRIMESH, [mesh as f32, 0.0, 0.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+}
+
+/// Points the solver holds on a world's pairs after the last step.
+fn points_held(w: &World) -> usize {
+    (0..w.header().pair_rows as usize).filter(|&row| w.uu(PAIR_A, row) != NONE).map(|row| w.uu(PAIR_CONTACTS, row) as usize).sum()
+}
+
+#[test]
+fn clustering_solves_four_points_on_a_plane_of_many_triangles_and_the_box_stands() {
+    let run = |cluster: f32| {
+        let mut w = World::new(4, 4).unwrap();
+        mesh_floor(&mut w, 6, 0.4);
+        w.header_mut().cluster = cluster;
+        // A box one metre square lying over nine squares of the floor, 18 triangles.
+        let body = block(&mut w, v3(0.05, 0.26, 0.05));
+        let mut held = 0;
+        for step in 0..240 {
+            w.step(DT);
+            if step == 200 {
+                held = points_held(&w);
+            }
+        }
+        (held, w.v(POSITION_X, body as usize))
+    };
+    let (many, rests) = run(0.0);
+    let (four, stands) = run(0.99);
+    assert!(many > 4, "without clustering the triangles give {many} points");
+    assert!(four <= 4, "with it the plane keeps four: {four}");
+    assert!(four >= 3, "and a plane stays held on at least three: {four}");
+    for (label, p) in [("without", rests), ("with", stands)] {
+        assert!((p.y - 0.25).abs() < 0.01 && p.x.abs() < 0.2 && p.z.abs() < 0.2, "the box rests {label} clustering: {} {} {}", p.x, p.y, p.z);
+    }
+}
+
+#[test]
+fn clustering_keeps_the_deepest_point_so_a_touching_pair_still_touches() {
+    let mut w = World::new(4, 4).unwrap();
+    mesh_floor(&mut w, 6, 0.4);
+    w.header_mut().cluster = 0.99;
+    let body = block(&mut w, v3(0.0, 0.2, 0.0));
+    w.step(DT);
+    let deepest = (0..w.header().pair_rows as usize)
+        .filter(|&row| w.uu(PAIR_A, row) != NONE)
+        .flat_map(|row| (0..w.uu(PAIR_CONTACTS, row) as usize).map(move |k| row * MANIFOLD + k))
+        .map(|at| w.s(CONTACT_SEPARATION, at))
+        .fold(f32::MAX, f32::min);
+    assert!(deepest < 0.0, "the sunk box still has a point that reaches into the floor: {deepest}");
+    let _ = body;
+}

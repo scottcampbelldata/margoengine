@@ -1,4 +1,5 @@
 // The Rust kernel from JavaScript: loads the blueprint and reads the world's columns through typed-array views.
+import { angleOf, cosineOf, QUARTER_TURN } from './cluster-angle.js';
 import { clock } from './clock.js';
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
@@ -871,6 +872,41 @@ export interface KernelSolverOptions {
    * through a contact in that step follow them out.
    */
   quarantine?: boolean;
+  /**
+   * Keep a pair's manifold while its bodies stay within `contactRecycleDistance` of the poses it was found at, in place of finding it
+   * every step (default false), Rapier's `contact_recycling`. A recycled contact is stale by up to that distance: its points do not
+   * slide along the surfaces, and its normal turns with the first body. Pairs of a mesh or a compound are always found afresh.
+   */
+  contactRecycling?: boolean;
+  /** How far a pair's poses may drift before its manifold is found again, in metres (default 0.05, Rapier's). */
+  contactRecycleDistance?: number;
+  /**
+   * Reduce the points of the parts of a mesh or compound pair that lie in one plane to four (default false), Rapier's `contact_clustering`:
+   * the deepest, the farthest from it and two that spread them, so a box on a floor of many triangles is solved on four points.
+   */
+  contactClustering?: boolean;
+  /** How far two parts' contact normals may differ, in radians, to count as one plane (default 0.1). */
+  contactClusteringAngle?: number;
+  /**
+   * The broad phase (default `'sweep'`): `'sweep'` is sweep and prune over the fat boxes, `'bvh'` a dynamic tree of them (Rapier's
+   * `BroadPhaseBvh`). Both find the same pairs; the tree follows the boxes that moved, the sweep walks every moved end along its
+   * axes. Changing it builds the new one from the colliders there are and keeps their pairs.
+   */
+  broadPhase?: 'sweep' | 'bvh';
+  /**
+   * How colliders that join the tree together are built into it (default `'incremental'`, one at a time where each adds the least surface):
+   * `'binned'` builds them top down by the binned surface area heuristic, `'ploc'` bottom up in Morton order by locally ordered clustering
+   * (the build strategies of Rapier's and parry's BVH). Only a batch of two or more is built; the sweep ignores it.
+   */
+  bvhBuildStrategy?: 'incremental' | 'binned' | 'ploc';
+  /** Whether the tree rotates nodes as boxes move (`'rotations'`) or leaves its shape to insertion (`'none'`, the default). */
+  bvhOptimizationStrategy?: 'none' | 'rotations';
+  /**
+   * A fat box's margin is an eighth of its smallest side, at most half a metre, where that is more than `predictionDistance` (default
+   * false), Rapier's `adaptive_change_detection_margin`: a large shape keeps its pairs over a larger move, with fatter boxes and more
+   * candidate pairs for the narrow phase to refuse. Both broad phases use it.
+   */
+  adaptiveChangeDetectionMargin?: boolean;
 }
 
 /**
@@ -884,6 +920,8 @@ export class KernelWorld {
   readonly columns: Record<string, KernelColumn> = {};
   private readonly api: KernelExports;
   private layout = -1;
+  private recycleDistance = 0.05;
+  private clusterAngle = 0.1;
   private stepping = false;
   private filter: ((a: number, b: number) => boolean | 'noForces') | null = null;
   private hullRows = 0;
@@ -1061,6 +1099,14 @@ export class KernelWorld {
       ccdTolerance: read(16),
       ccdMaxAdvances: read(17),
       quarantine: read(18) !== 0,
+      contactRecycling: read(19) > 0,
+      contactRecycleDistance: read(19) > 0 ? read(19) : this.recycleDistance,
+      contactClustering: read(20) > 0,
+      contactClusteringAngle: read(20) > 0 ? angleOf(read(20)) : this.clusterAngle,
+      broadPhase: read(21) === 0 ? 'sweep' : 'bvh',
+      bvhBuildStrategy: (['incremental', 'binned', 'ploc'] as const)[read(22)] ?? 'incremental',
+      bvhOptimizationStrategy: read(23) === 0 ? 'none' : 'rotations',
+      adaptiveChangeDetectionMargin: read(24) !== 0,
     };
   }
   /**
@@ -1157,6 +1203,53 @@ export class KernelWorld {
     if (ccdTolerance !== undefined) this.api.world_set_solver(16, ccdTolerance);
     if (ccdMaxAdvances !== undefined) this.api.world_set_solver(17, ccdMaxAdvances);
     if (options.quarantine !== undefined) this.api.world_set_solver(18, options.quarantine ? 1 : 0);
+    const { broadPhase, bvhBuildStrategy, bvhOptimizationStrategy, adaptiveChangeDetectionMargin } = options;
+    if (broadPhase !== undefined && broadPhase !== 'sweep' && broadPhase !== 'bvh')
+      throw new RangeError(`Solver broadPhase must be 'sweep' or 'bvh'; got ${String(broadPhase)}.`);
+    if (bvhBuildStrategy !== undefined && !['incremental', 'binned', 'ploc'].includes(bvhBuildStrategy))
+      throw new RangeError(
+        `Solver bvhBuildStrategy must be 'incremental', 'binned' or 'ploc'; got ${String(bvhBuildStrategy)}.`,
+      );
+    if (
+      bvhOptimizationStrategy !== undefined &&
+      bvhOptimizationStrategy !== 'none' &&
+      bvhOptimizationStrategy !== 'rotations'
+    )
+      throw new RangeError(
+        `Solver bvhOptimizationStrategy must be 'none' or 'rotations'; got ${String(bvhOptimizationStrategy)}.`,
+      );
+    if (bvhBuildStrategy !== undefined)
+      this.api.world_set_solver(22, ['incremental', 'binned', 'ploc'].indexOf(bvhBuildStrategy));
+    if (bvhOptimizationStrategy !== undefined)
+      this.api.world_set_solver(23, bvhOptimizationStrategy === 'rotations' ? 1 : 0);
+    if (adaptiveChangeDetectionMargin !== undefined)
+      this.api.world_set_solver(24, adaptiveChangeDetectionMargin ? 1 : 0);
+    if (broadPhase !== undefined) {
+      this.api.world_set_solver(21, broadPhase === 'bvh' ? 1 : 0);
+      // The switch makes the tree's rows and moves the columns.
+      if (this.api.world_layout() !== this.layout) this.bind();
+    }
+    const { contactRecycling, contactRecycleDistance, contactClustering, contactClusteringAngle } = options;
+    if (
+      contactRecycleDistance !== undefined &&
+      !(Number.isFinite(contactRecycleDistance) && contactRecycleDistance > 0)
+    )
+      throw new RangeError(
+        `Solver contactRecycleDistance must be a finite number of metres above 0; got ${contactRecycleDistance}.`,
+      );
+    if (contactClusteringAngle !== undefined && !(contactClusteringAngle > 0 && contactClusteringAngle < QUARTER_TURN))
+      throw new RangeError(
+        `Solver contactClusteringAngle must be a number of radians above 0 and under a quarter turn; got ${contactClusteringAngle}.`,
+      );
+    if (contactRecycleDistance !== undefined) this.recycleDistance = contactRecycleDistance;
+    if (contactClusteringAngle !== undefined) this.clusterAngle = contactClusteringAngle;
+    if (contactRecycling !== undefined || contactRecycleDistance !== undefined)
+      this.api.world_set_solver(19, (contactRecycling ?? this.api.world_solver(19) > 0) ? this.recycleDistance : 0);
+    if (contactClustering !== undefined || contactClusteringAngle !== undefined)
+      this.api.world_set_solver(
+        20,
+        (contactClustering ?? this.api.world_solver(20) > 0) ? cosineOf(this.clusterAngle) : 0,
+      );
     return this;
   }
   /**

@@ -9,7 +9,7 @@
 use crate::layout::*;
 use crate::math::*;
 use crate::narrow::{Manifold, Point};
-use crate::world::World;
+use crate::world::{NONE, World};
 
 /// An old point this far from a new one on body A is a different point.
 const SAME_PLACE: f32 = 0.02;
@@ -152,5 +152,142 @@ impl World {
         self.set_s(CONTACT_SEPARATION, at, point.separation);
         self.set_u(CONTACT_ID, at, point.id);
         self.set_v(CONTACT_X, at, point.on_a.add(point.on_b).scale(0.5));
+    }
+
+    /// Contact clustering (Rapier's `contact_clustering`): the parts of a pair (a mesh's triangles, a compound's children) whose contact
+    /// normals are within the angle of one another are one plane, and the plane keeps four points of all those its parts found: the
+    /// deepest, the farthest from it, the one that makes the largest triangle with those two and the one farthest from the middle of
+    /// the three. The others leave their parts, so a box on a floor of many triangles is solved on four points, not on the dozen they
+    /// give, and a point that is kept carries its impulses with it. The deepest point always stays, so what touches still touches.
+    pub fn cluster_parts(&mut self, row: usize) {
+        const MOST: usize = 512;
+        let mut part_of = [0u32; MOST];
+        let mut index_of = [0u8; MOST];
+        let mut at = [v3(0.0, 0.0, 0.0); MOST];
+        let mut depth = [0.0f32; MOST];
+        let mut plane = [u8::MAX; MOST];
+        let mut count = 0;
+        let mut part = self.uu(PAIR_CHILD, row);
+        while part != NONE {
+            let p = part as usize;
+            for k in 0..self.uu(PAIR_CONTACTS, p) as usize {
+                // More points than the table holds: leave the pair as it is.
+                if count == MOST {
+                    return;
+                }
+                part_of[count] = part;
+                index_of[count] = k as u8;
+                at[count] = self.v(CONTACT_X, p * MANIFOLD + k);
+                depth[count] = self.s(CONTACT_SEPARATION, p * MANIFOLD + k);
+                count += 1;
+            }
+            part = self.uu(PAIR_CHILD, p);
+        }
+        if count <= MANIFOLD {
+            return;
+        }
+        // Planes: a point joins the first plane whose seed's part has a normal within the angle of its own part's.
+        let cosine = self.header().cluster;
+        let mut seeds = [0usize; MOST];
+        let mut planes = 0;
+        for i in 0..count {
+            let normal = self.v(PAIR_NORMAL_X, part_of[i] as usize);
+            let mut found = u8::MAX;
+            for (s, &seed) in seeds.iter().enumerate().take(planes) {
+                if normal.dot(self.v(PAIR_NORMAL_X, part_of[seed] as usize)) >= cosine {
+                    found = s as u8;
+                    break;
+                }
+            }
+            if found == u8::MAX {
+                // More planes than a byte names: leave the pair as it is.
+                if planes == 254 {
+                    return;
+                }
+                seeds[planes] = i;
+                found = planes as u8;
+                planes += 1;
+            }
+            plane[i] = found;
+        }
+        let mut keep = [true; MOST];
+        for p in 0..planes as u8 {
+            let members = (0..count).filter(|&i| plane[i] == p).count();
+            if members <= MANIFOLD {
+                continue;
+            }
+            let mut chosen = [usize::MAX; MANIFOLD];
+            let mut taken = [false; MOST];
+            let pick = |taken: &[bool; MOST], score: &dyn Fn(usize) -> f32| {
+                let mut best = usize::MAX;
+                let mut most = -1.0f32;
+                for i in 0..count {
+                    if plane[i] == p && !taken[i] {
+                        let s = score(i);
+                        if s > most {
+                            most = s;
+                            best = i;
+                        }
+                    }
+                }
+                best
+            };
+            chosen[0] = pick(&taken, &|i| -depth[i] + 1e6);
+            taken[chosen[0]] = true;
+            let first = at[chosen[0]];
+            chosen[1] = pick(&taken, &|i| {
+                let d = at[i].sub(first);
+                d.dot(d)
+            });
+            taken[chosen[1]] = true;
+            let edge = at[chosen[1]].sub(first);
+            chosen[2] = pick(&taken, &|i| {
+                let c = at[i].sub(first).cross(edge);
+                c.dot(c)
+            });
+            taken[chosen[2]] = true;
+            let middle = first.add(at[chosen[1]]).add(at[chosen[2]]).scale(1.0 / 3.0);
+            chosen[3] = pick(&taken, &|i| {
+                let d = at[i].sub(middle);
+                d.dot(d)
+            });
+            for i in 0..count {
+                if plane[i] == p {
+                    keep[i] = chosen.contains(&i);
+                }
+            }
+        }
+        // Each part keeps its chosen points, packed from the front with all they carry.
+        let mut part = self.uu(PAIR_CHILD, row);
+        while part != NONE {
+            let p = part as usize;
+            let before = self.uu(PAIR_CONTACTS, p) as usize;
+            let mut kept = 0;
+            for k in 0..before {
+                let wanted = (0..count).any(|i| part_of[i] == part && index_of[i] as usize == k && keep[i]);
+                if wanted {
+                    if kept != k {
+                        self.copy_point(p * MANIFOLD + k, p * MANIFOLD + kept);
+                    }
+                    kept += 1;
+                }
+            }
+            if kept != before {
+                self.set_u(PAIR_CONTACTS, p, kept as u32);
+            }
+            part = self.uu(PAIR_CHILD, p);
+        }
+    }
+
+    /// Copies what a manifold point carries between the carried columns: where it is, its separation and id, and the impulses it holds.
+    fn copy_point(&mut self, from: usize, to: usize) {
+        for column in [
+            CONTACT_ANCHOR_A_X, CONTACT_ANCHOR_A_Y, CONTACT_ANCHOR_A_Z, CONTACT_ANCHOR_B_X, CONTACT_ANCHOR_B_Y, CONTACT_ANCHOR_B_Z,
+            CONTACT_SEPARATION, CONTACT_X, CONTACT_Y, CONTACT_Z, CONTACT_NORMAL_IMPULSE, CONTACT_TANGENT_X, CONTACT_TANGENT_Y,
+            CONTACT_TANGENT_Z, CONTACT_DRIFT_X, CONTACT_DRIFT_Y, CONTACT_DRIFT_Z,
+        ] {
+            self.set_s(column, to, self.s(column, from));
+        }
+        self.set_u(CONTACT_ID, to, self.uu(CONTACT_ID, from));
     }
 }

@@ -37,8 +37,10 @@ pub enum Rows {
     Coupling,
     /// Words of the points of couplings' paths, and the boxes that index them, in ranges a coupling owns (src/couplings.rs).
     PathPoint,
+    /// Two rows a collider, the nodes of the dynamic tree of fat boxes (src/tree.rs).
+    BroadNode,
 }
-pub const ROW_CLASSES: usize = 21;
+pub const ROW_CLASSES: usize = 22;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -241,6 +243,8 @@ columns! {
     COLLIDER_STATE u32 Collider,
     COLLIDER_PENDING u32 Collider,
     COLLIDER_PAIRS u32 Collider,
+    // The leaf of the tree broad phase this collider is, or NONE.
+    COLLIDER_LEAF u32 Collider,
     // The fat box. MAX columns follow MIN columns, so one index picks an end.
     FAT_MIN_X f32 Collider,
     FAT_MIN_Y f32 Collider,
@@ -304,6 +308,18 @@ columns! {
     PAIR_SURFACE_Z f32 Pair,
     // The impulse of the simplified friction model's twist about the pair's normal, carried from substep to substep.
     PAIR_TWIST f32 Pair,
+    // The pose of the second body in the first's frame and the contact normal in the first's frame, as the last full narrow phase
+    // found them: a pair may keep its manifold while the poses stay near these (contact recycling). Zero rotation: none kept.
+    PAIR_REL_X f32 Pair,
+    PAIR_REL_Y f32 Pair,
+    PAIR_REL_Z f32 Pair,
+    PAIR_REL_ROT_X f32 Pair,
+    PAIR_REL_ROT_Y f32 Pair,
+    PAIR_REL_ROT_Z f32 Pair,
+    PAIR_REL_ROT_W f32 Pair,
+    PAIR_LOCAL_NORMAL_X f32 Pair,
+    PAIR_LOCAL_NORMAL_Y f32 Pair,
+    PAIR_LOCAL_NORMAL_Z f32 Pair,
     SOLVE_PAIRS u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
@@ -607,6 +623,19 @@ columns! {
     COUPLINGS f32 Coupling,
     // The points of every path and the boxes of their spans, in ranges of words (src/couplings.rs).
     PATH_WORD f32 PathPoint,
+    // The tree broad phase's nodes: a box, the parent, the two children and, for a leaf, the collider; a free node's parent is the next free.
+    TREE_MIN_X f32 BroadNode,
+    TREE_MIN_Y f32 BroadNode,
+    TREE_MIN_Z f32 BroadNode,
+    TREE_MAX_X f32 BroadNode,
+    TREE_MAX_Y f32 BroadNode,
+    TREE_MAX_Z f32 BroadNode,
+    TREE_PARENT u32 BroadNode,
+    TREE_LEFT u32 BroadNode,
+    TREE_RIGHT u32 BroadNode,
+    TREE_COLLIDER u32 BroadNode,
+    // Scratch for building a batch of leaves into the tree.
+    TREE_SCRATCH u32 BroadNode,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -661,6 +690,8 @@ pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], join
         words,
         couplings,
         paths,
+        // The tree broad phase's nodes: a leaf for each collider and one inner node for each pair of them, with a spare.
+        colliders * 2 + 2,
     ]
 }
 
