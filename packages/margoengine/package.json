@@ -5991,6 +5991,10 @@
       "types": "./dist/xr/occlusion.d.ts",
       "import": "./dist/xr/occlusion.js"
     },
+    "./xr/session": {
+      "types": "./dist/xr/session.d.ts",
+      "import": "./dist/xr/session.js"
+    },
     "./xr/reflection": {
       "types": "./dist/xr/reflection.d.ts",
       "import": "./dist/xr/reflection.js"

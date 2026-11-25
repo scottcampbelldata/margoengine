@@ -89,6 +89,9 @@ export interface XRCompositionLayer {
     readonly layout?: string;
     readonly needsRedraw?: boolean;
     opacity?: number;
+    quality?: string;
+    blendTextureSourceAlpha?: boolean;
+    chromaticAberrationCorrection?: boolean;
     space?: XRSpace;
     destroy(): void;
 }
@@ -154,6 +157,10 @@ interface Common extends LayerPlacement {
     layout?: 'mono' | 'stereo' | 'stereo-left-right' | 'stereo-top-bottom';
     isStatic?: boolean;
     opacity?: number;
+    quality?: 'default' | 'text-optimized' | 'graphics-optimized';
+    blendTextureSourceAlpha?: boolean;
+    chromaticAberrationCorrection?: boolean;
+    mipLevels?: number;
 }
 
 interface XRAnchor {

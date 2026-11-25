@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18630454,
+  "total": 18631921,
   "history": [
     {
       "date": "2026-10-24",
@@ -11835,6 +11835,12 @@
       "commit": "physics-world-snapshot",
       "reason": "@margoengine/physics/world: 299 to 2,264 B gzip for snapshot, restore and the state hash of the framework's solvers (section 8): the manifest encoder and decoder with every refusal, and two MurmurHash3 lanes; it is the entry every solver lane imports for snapshots, so a split would only move the bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "0ba7a18dc",
+      "reason": "xr/session: new optional entry, session state (952 B gzip); xr/layers 4353 to 4612 B budget: quality, blendTextureSourceAlpha, chromaticAberrationCorrection and mipLevels options",
+      "grew": 2
     }
   ],
   "items": {
@@ -12605,10 +12611,10 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/world": 2520,
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
+    "@margoengine/physics/world": 2520,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
@@ -13377,13 +13383,14 @@
     "@margoengine/xr/device-check": 2344,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
-    "@margoengine/xr/layers": 4353,
+    "@margoengine/xr/layers": 4612,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3600,
     "@margoengine/xr/occlusion": 3198,
     "@margoengine/xr/performance": 1582,
     "@margoengine/xr/pointer": 2675,
     "@margoengine/xr/reflection": 2616,
+    "@margoengine/xr/session": 1208,
     "leak @margoengine/animation -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/animation/interactivity -> @margoengine/gltf/interactivity": 1,

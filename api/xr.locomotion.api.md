@@ -58,6 +58,9 @@ interface XRCompositionLayer {
     readonly layout?: string;
     readonly needsRedraw?: boolean;
     opacity?: number;
+    quality?: string;
+    blendTextureSourceAlpha?: boolean;
+    chromaticAberrationCorrection?: boolean;
     space?: XRSpace;
     destroy(): void;
 }
