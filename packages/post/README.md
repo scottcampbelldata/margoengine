@@ -1557,7 +1557,7 @@ and after the alpha changes (it writes frames only, no committed result yet).
   transform to the straight colour of partly covered pixels: `toDisplay(c / a) * a` (T. Porter and T. Duff,
   "Compositing Digital Images", SIGGRAPH 1984). Encoding the premultiplied colour made a 1 px rim about 36 of 255
   brighter than its alpha allowed (KB-POST-ALPHARIM1). `packages/post/test/alpha-rim-browser.mjs` draws a box with
-  each of 12 effects alone, on WebGPU (within 0.7 of 255, Bloom 1.4) and the WebGL2 layer (within 2.3); an opaque
+  each of 12 effects alone, on WebGPU (within 0.7 of 255, Bloom 1.4) and the WebGL2 layer (the same figures); an opaque
   canvas keeps its shaders byte for byte (`packages/post/test/straight-display.test.js`).
 - **PostStack** adds no pass of its own; its last effect writes the canvas.
 - **SMAA** blends the stored premultiplied colour (alpha valid) and finds edges in alpha too; **Glitch** takes the

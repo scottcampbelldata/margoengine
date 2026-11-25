@@ -9741,3 +9741,8 @@ through `displayFor(engine, code)` (`packages/shared/display.js`) and keys the p
 keeps its shaders byte for byte. Evidence: `packages/post/test/alpha-rim-browser.mjs` (12 effects, WebGPU and the WebGL2
 layer), `packages/headless/tests/transparent-gpu.mjs` (Tonemap chains, Node). Missing: DOF and water's screen composites
 still encode premultiplied colour (opaque-canvas only for now).
+
+SSAO's normal reconstruction (`extractShader`, KB-SSAO-SILHOUETTE1, same date): a background neighbour (depth 0) is not
+a surface, so a silhouette pixel takes the depth step to its covered side and a one-pixel tip faces the camera.
+Evidence: `packages/post/test/ssao-silhouette-browser.mjs` (SSAO and GTAO, 12 turns, both backends, no occluded pixel
+on a lone face; 4 pixels down to 0.78 on WebGPU and down to 0.72 on the WebGL2 layer before).

@@ -121,11 +121,9 @@ await postBrowser(
     for (const name of effects) {
       const r = await measure(name);
       assert.ok(r.empty > 20000 && r.full > 5000 && r.edge > 60, `${name}: ${JSON.stringify(r)}`);
-      // The core render alone sets the floor (its multisample resolve in display space); an effect may not add a rim.
-      assert.ok(
-        r.rim <= Math.max(3, base.rim + 1),
-        `${name}: an edge pixel is ${r.rim.toFixed(1)} of 255 from the face`,
-      );
+      // The core render alone sets the floor (its multisample resolve in display space). Alpha and colour each come from
+      // 8-bit shots, so an effect that adds no rim is within one 8-bit step of that floor.
+      assert.ok(r.rim <= base.rim + 1, `${name}: an edge pixel is ${r.rim.toFixed(1)} of 255 from the face`);
       console.log(
         `ok ${name}: ${r.edge} edge pixels within ${r.rim.toFixed(1)} of 255 (no effect ${base.rim.toFixed(1)})`,
       );

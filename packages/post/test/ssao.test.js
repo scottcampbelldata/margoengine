@@ -272,12 +272,19 @@ test('SSAO kernels read view depth from one r32float target the extractor writes
   assert.equal(blurs.length, 2);
   for (const blur of blurs) assert.equal(at(blur, 4), depth, 'both blur passes weigh by it');
   s.ssao.dispose();
-  // At the screen edge the clamped neighbour is the pixel itself; the extractor takes the side that exists.
+  // At the screen edge the clamped neighbour is the pixel itself, and a background neighbour (depth 0) holds no surface
+  // (KB-SSAO-SILHOUETTE1): the extractor takes the side that exists and is covered.
   const gpu = mockGPU(),
     setup = gpu.record(() =>
       new SSAO().setup({ gpu: gpu.device, hasPlugin: () => false, sceneOf: () => undefined, removePlugin() {} }),
     ),
     code = setup.filter((entry) => entry[0] === 'module').map((entry) => entry[2].code);
-  assert.ok(code.some((c) => c.includes('let forwardX=p.x<limit.x&&(p.x==0||')));
-  assert.ok(code.some((c) => c.includes('let forwardY=p.y<limit.y&&(p.y==0||')));
+  assert.ok(code.some((c) => c.includes('let okR=p.x<limit.x&&dr!=0;let okL=p.x>0&&dl!=0;')));
+  assert.ok(code.some((c) => c.includes('let okD=p.y<limit.y&&db!=0;let okU=p.y>0&&dt!=0;')));
+  assert.ok(code.some((c) => c.includes('let forwardX=okR&&(!okL||')));
+  assert.ok(code.some((c) => c.includes('let forwardY=okD&&(!okU||')));
+  assert.ok(
+    code.some((c) => c.includes('(okR||okL)&&(okD||okU)&&dot(n,n)>')),
+    'no covered neighbour on an axis faces the camera',
+  );
 });

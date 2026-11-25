@@ -24,15 +24,20 @@ export const extractShader =
   let c=viewPosition(p,d);let limit=vec2i(size)-1;
   let right=min(p+vec2i(1,0),limit);let left=max(p-vec2i(1,0),vec2i(0));
   let down=min(p+vec2i(0,1),limit);let up=max(p-vec2i(0,1),vec2i(0));
-  let r=viewPosition(right,textureLoad(depth,right,0));let l=viewPosition(left,textureLoad(depth,left,0));
-  let b=viewPosition(down,textureLoad(depth,down,0));let t=viewPosition(up,textureLoad(depth,up,0));
-  // The neighbour with the smaller depth step, among neighbours that exist: at the screen edge the clamped one is the
-  // pixel itself, a zero-length difference that always read as the smaller step (KB1900).
-  let forwardX=p.x<limit.x&&(p.x==0||abs(r.z-c.z)<abs(c.z-l.z));
-  let forwardY=p.y<limit.y&&(p.y==0||abs(b.z-c.z)<abs(c.z-t.z));
+  let dr=textureLoad(depth,right,0);let dl=textureLoad(depth,left,0);let db=textureLoad(depth,down,0);let dt=textureLoad(depth,up,0);
+  let r=viewPosition(right,dr);let l=viewPosition(left,dl);let b=viewPosition(down,db);let t=viewPosition(up,dt);
+  // The neighbour with the smaller depth step, among neighbours that exist and hold a surface: at the screen edge the
+  // clamped one is the pixel itself, a zero-length difference that always read as the smaller step (KB1900), and a
+  // background neighbour (depth 0, reversed Z at infinity) is no surface, so a silhouette pixel takes the step to the
+  // covered side (KB-SSAO-SILHOUETTE1; the closer-neighbour choice of J. Turanszki, "Improved normal reconstruction
+  // from depth", 2019, https://wickedengine.net/2019/09/improved-normal-reconstruction-from-depth/).
+  let okR=p.x<limit.x&&dr!=0;let okL=p.x>0&&dl!=0;let okD=p.y<limit.y&&db!=0;let okU=p.y>0&&dt!=0;
+  let forwardX=okR&&(!okL||abs(r.z-c.z)<abs(c.z-l.z));
+  let forwardY=okD&&(!okU||abs(b.z-c.z)<abs(c.z-t.z));
   let dx=select(c-l,r-c,forwardX);let dy=select(c-t,b-c,forwardY);
-  // Degenerate only if dx and dy are (near) parallel or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.
-  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));
+  // Degenerate if an axis has no surface neighbour (a one-pixel tip of a silhouette), or dx and dy are (near) parallel
+  // or zero: |n|^2 scales with the pixel footprint^4, so a fixed threshold made close surfaces camera-facing.
+  let n=cross(dy,dx);let normal=select(vec3f(0,0,1),normalize(n),(okR||okL)&&(okD||okU)&&dot(n,n)>0.000001*dot(dx,dx)*dot(dy,dy));
   textureStore(output,p,vec4f(normal,-c.z));textureStore(viewDepth,p,vec4f(-c.z));
 }
 `;
