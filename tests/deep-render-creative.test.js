@@ -97,7 +97,10 @@ test('Creative validation and Toon source patches avoid repeated stable-frame sc
   }
   assert.equal(enumerations, 0);
   assert.equal(patches, 0);
+  // post.ts's Frame uniform, 288 B: inverse, nine vec4f, the camera matrix and, since 5ffd9e6da6
+  // (KB-CREATIVE-POSTVIEW1), the view's rect:vec4f at byte 272. Gain and lift keep their offsets.
   const v = new Float32Array(h.resources.find((r) => r.size === 288).data);
+  assert.deepEqual(Array.from(v.slice(68, 72)), [0, 0, h.context.width, h.context.height], 'one view: the canvas');
   assert.deepEqual(Array.from(v.slice(44, 47)), [1, 1, 1]);
   assert.deepEqual(Array.from(v.slice(48, 51)), [0, 0, 0]);
   for (const change of [
