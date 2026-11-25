@@ -56,7 +56,32 @@ export interface TerrainHeightSource {
   readonly heightmap: GPUTexture | undefined;
 }
 
+/** Settings of {@link TerrainQuery.triangles}. */
+export interface TerrainTrianglesOptions {
+  /**
+   * Samples between neighbouring vertices each way, an integer 1 or more. Default 1: one vertex per height sample, so
+   * every vertex lies on the surface `height` answers. A larger step thins the mesh; the last row and column of the
+   * region are always kept, so the mesh still reaches the region's edges.
+   */
+  readonly step?: number;
+  /**
+   * World XZ rectangle to cover, widened to whole cells and clipped to the heightmap. Default the whole heightmap.
+   */
+  readonly region?: { readonly min: readonly [number, number]; readonly max: readonly [number, number] };
+}
+/** A triangle mesh of the terrain in world space, from {@link TerrainQuery.triangles}. */
+export interface TerrainTriangles {
+  /** World positions, xyz per vertex. */
+  readonly positions: Float32Array;
+  /** Unit shading normals, xyz per vertex, as `TerrainQuery.normal` gives them. */
+  readonly normals: Float32Array;
+  /** Three vertex indices per triangle, counter-clockwise seen from above (+Y). Empty when every cell is a hole. */
+  readonly indices: Uint32Array;
+}
+
 const MAX = 16384;
+/** Most vertices one `triangles` call builds (about 400 MB of arrays); a larger grid takes a step or a region. */
+const MAX_TRIANGLE_VERTICES = 2 ** 24;
 
 /**
  * Height, normal and first-hit ray queries on a terrain's heights, for picking, foot placement and game logic. Answers
@@ -280,6 +305,93 @@ export class TerrainQuery {
   normal(x: number, z: number, out: MutableVec3 = [0, 0, 0]): MutableVec3 | undefined {
     if (!(x >= this.ox && x <= this.ox + this.sx && z >= this.oz && z <= this.oz + this.sz) || this.hole(x, z))
       return undefined;
+    return this.slope(x, z, out);
+  }
+
+  /**
+   * The terrain as a world-space triangle mesh, for a path tracer, a collider or an export: vertices on the height
+   * samples (every `step`-th each way), two triangles per cell, normals as `normal` works them out. A cell whose centre
+   * lies in a hole is left out, so the cut follows the mesh's cells (with `step` 1, the heightmap's own cells). The
+   * drawn clipmap triangulates at its own cell spacing; at a step of 1 this mesh holds the surface's exact samples.
+   *
+   * ```ts
+   * const { positions, normals, indices } = query.triangles({ step: 2, region: { min: [-50, -50], max: [50, 50] } });
+   * ```
+   * @throws RangeError for a step that is not an integer 1 or more, a region that is not finite or misses the
+   * heightmap, or a mesh of more than 16,777,216 vertices (pass a larger step or a smaller region).
+   */
+  triangles({ step = 1, region }: TerrainTrianglesOptions = {}): TerrainTriangles {
+    if (!Number.isInteger(step) || step < 1)
+      throw new RangeError(`Invalid terrain triangles step ${step}; pass an integer 1 or more`);
+    let i0 = 0,
+      i1 = this.columns - 1,
+      j0 = 0,
+      j1 = this.rows - 1;
+    if (region !== undefined) {
+      const a = region?.min,
+        b = region?.max;
+      if (!a || !b || ![a[0], a[1], b[0], b[1]].every(Number.isFinite) || !(b[0] > a[0] && b[1] > a[1]))
+        throw new RangeError('Invalid terrain triangles region; pass finite min and max corners with max above min');
+      i0 = Math.max(i0, Math.floor((a[0] - this.ox) / this.dx));
+      i1 = Math.min(i1, Math.ceil((b[0] - this.ox) / this.dx));
+      j0 = Math.max(j0, Math.floor((a[1] - this.oz) / this.dz));
+      j1 = Math.min(j1, Math.ceil((b[1] - this.oz) / this.dz));
+      if (i1 <= i0 || j1 <= j0)
+        throw new RangeError('Invalid terrain triangles region; it does not overlap the heightmap by a cell');
+    }
+    const along = (from: number, to: number) => {
+      const out: number[] = [];
+      for (let k = from; k < to; k += step) out.push(k);
+      out.push(to);
+      return out;
+    };
+    const xs = along(i0, i1),
+      zs = along(j0, j1),
+      w = xs.length,
+      count = w * zs.length;
+    if (count > MAX_TRIANGLE_VERTICES)
+      throw new RangeError(
+        `Terrain triangles would hold ${count} vertices, above ${MAX_TRIANGLE_VERTICES}; pass a larger step or a smaller region`,
+      );
+    const positions = new Float32Array(count * 3),
+      normals = new Float32Array(count * 3),
+      n: MutableVec3 = [0, 0, 0],
+      c = this.columns;
+    for (let b = 0; b < zs.length; b++)
+      for (let a = 0; a < w; a++) {
+        const k = (b * w + a) * 3,
+          x = this.ox + xs[a] * this.dx,
+          z = this.oz + zs[b] * this.dz;
+        positions[k] = x;
+        positions[k + 1] = this.heights[zs[b] * c + xs[a]] * this.scale + this.offset;
+        positions[k + 2] = z;
+        this.slope(x, z, n);
+        normals[k] = n[0];
+        normals[k + 1] = n[1];
+        normals[k + 2] = n[2];
+      }
+    const indices = new Uint32Array((w - 1) * (zs.length - 1) * 6);
+    let t = 0;
+    for (let b = 0; b + 1 < zs.length; b++)
+      for (let a = 0; a + 1 < w; a++) {
+        if (this.hole(this.ox + ((xs[a] + xs[a + 1]) / 2) * this.dx, this.oz + ((zs[b] + zs[b + 1]) / 2) * this.dz))
+          continue;
+        const v00 = b * w + a,
+          v10 = v00 + 1,
+          v01 = v00 + w,
+          v11 = v01 + 1;
+        indices[t++] = v00;
+        indices[t++] = v01;
+        indices[t++] = v10;
+        indices[t++] = v10;
+        indices[t++] = v01;
+        indices[t++] = v11;
+      }
+    return { positions, normals, indices: t === indices.length ? indices : indices.slice(0, t) };
+  }
+
+  /** The shading normal at world (x, z) inside the rectangle, without the bounds and hole checks of `normal`. */
+  private slope(x: number, z: number, out: MutableVec3): MutableVec3 {
     const nx = (this.sample(x - this.dx, z) - this.sample(x + this.dx, z)) / (2 * this.dx),
       nz = (this.sample(x, z - this.dz) - this.sample(x, z + this.dz)) / (2 * this.dz),
       length = Math.hypot(nx, 1, nz);

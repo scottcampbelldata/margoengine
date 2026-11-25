@@ -1159,16 +1159,41 @@ engine.dispose();
 - Options: `scene` (an engine `Scene`, default `engine.scene`), `filter(mesh)` (keep a mesh when it returns true;
   default every mesh) and `base` (a trace scene whose voxel models, instances, palette, environment, lights, meshes and
   mesh materials are kept; new material ids follow the base's; base meshes without `meshInstances` keep their world
-  placement; default an empty scene, revision 1).
+  placement; default an empty scene, revision 1), and `terrain` (a list of `{ query, step?, region?, material? }`:
+  each `query`, a `TerrainQuery` from `@margoengine/terrain/query` made from the drawn terrain's heights and
+  `terrain.options`, becomes one world-space mesh `terrain-<n>` through `query.triangles({ step, region })`, holes
+  left out, with `material` (a trace material without its id; default grey, roughness 1, metalness 0); default none).
+- Terrain triangles are built on every call, since a terrain's heights can change in place: build the scene once and
+  reuse it while they hold. At `step` 1 the traced mesh holds the heightmap's exact samples; the drawn clipmap
+  triangulates at its own cell spacing, so match `cellSize` to the texel spacing for the two to agree.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { TerrainQuery } from '@margoengine/terrain/query';
+import { traceSceneFromEngine } from '@margoengine/voxel-pathtracer/from-engine';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// In a real scene: the heights the drawn Terrain's heightmap was made from, and `terrain.options`.
+const heights = new Float32Array(65 * 65).map((_, i) => 0.1 * Math.sin(i * 0.05));
+const query = new TerrainQuery(heights, 65, 65, { origin: [-32, -32], size: [64, 64], heightScale: 4 });
+const scene = traceSceneFromEngine(engine, {
+  terrain: [{ query, material: { baseColorFactor: [0.35, 0.3, 0.22, 1], roughnessFactor: 0.9 } }],
+});
+console.log(scene.meshes.at(-1)!.id, scene.meshes.at(-1)!.indices.length / 3); // terrain-0 8192
+engine.dispose();
+```
 - Left out: meshes with no geometry or empty geometry, and hidden meshes. Matrices are the ones the last update wrote,
   so call it after `engine.render()` (or a frame) when transforms change, then `setScene` the result. Each geometry's
   arrays are made once per `Geometry` object, so a second call hands the tracer the same arrays and its BVH is reused.
 - Not carried over: the engine's sun and ambient light (give the trace scene its own `environment`), plugin-drawn
-  content (terrain, scatter, particles, skinned or morphed meshes) and textures; core materials have none.
+  content other than terrain given as a `terrain` source (scatter, particles, skinned or morphed meshes), a terrain's
+  layer colours and maps (give it a `material`), and textures; core materials have none.
 - Evidence: `tests/from-engine.test.js` (grouping, materials, geometry split, base merge, filter, errors) and
   `tests/from-engine-browser.mjs` (`npm run test:gpu:from-engine`, WebGPU and the WebGL2 layer): the raster silhouette
   of four placed, scaled and turned meshes (one hidden mesh left out) against the traced one: intersection over union
-  1.000 over 3,037 covered pixels at 128 x 96, the same on both.
+  1.000 over 3,037 covered pixels at 128 x 96, the same on both; and a drawn 33 x 33 `Terrain` with a round hole
+  (`cellSize` on the texel spacing) against its traced `TerrainQuery`: IoU 0.998 over 5,314 covered pixels (3 drawn
+  only, 10 traced only, along the outline), the same on both.
 
 ## Heterogeneous coloured media
 

@@ -35,5 +35,38 @@ window.run=async(compat=false)=>{
   }
   return {errors,iou:both/either,covered:both,rasterOnly,traceOnly,meshes:scene.meshes.length,instances:scene.meshInstances.length,materials:scene.pbrMaterials.length};
  }finally{tracer.dispose();engine.dispose();}
+};
+// A drawn Terrain with a hole against the same heights traced through TerrainQuery.triangles: the silhouettes (outline
+// and the hole's rim) must agree, so the terrain's placement, scale, offset and holes carry over.
+window.runTerrain=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const {Terrain}=await import('/packages/terrain/dist/index.js'),{TerrainQuery}=await import('/packages/terrain/dist/query.js'),{TerrainHoles}=await import('/packages/terrain/dist/holes.js');
+ const W=128,H=96;installGPU({gpu:navigator.gpu});const canvas=createHeadlessCanvas({width:W,height:H});
+ const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[1,11,13],target:[0,0,0],fov:50,near:0.1,far:200}});
+ engine.scene.background='#000000';
+ const errors=[];const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const n=33,heights=new Float32Array(n*n);
+ for(let z=0;z<n;z++)for(let x=0;x<n;x++)heights[z*n+x]=Math.sin(x*0.35)*Math.cos(z*0.27)+0.04*x;
+ const options={origin:[-8,-6],size:[16,12],heightScale:1.5,heightOffset:0.5,cellSize:0.5};
+ const holes=new TerrainHoles(options,n-1).circle(2.5,1,2.2);
+ const terrain=Terrain.attach(engine,{...options,layers:Array.from({length:4},()=>({height:[-1e5,1e5],slope:[0,1],scale:1})),textures:(gpu)=>{
+  const heightmap=gpu.createTexture({size:[n,n],format:'r32float',usage:6});gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:n*4},[n,n]);
+  const layers=gpu.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});gpu.queue.writeTexture({texture:layers},new Uint8Array(16).fill(170),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+  return {heightmap,layers,holes:holes.texture(gpu)};}});
+ engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();engine.render({delta:1/60});
+ const raster=await readPixels(engine,{signal:AbortSignal.timeout(60000)});
+ const query=new TerrainQuery(heights,n,n,{...options,holes});
+ const scene=traceSceneFromEngine(engine,{terrain:[{query}],base:{revision:1,models:[],instances:[],materials:[],environment:{ground:false,skyIntensity:0,sunIntensity:3,sunDirection:[0.4,0.8,0.3]}}});
+ const tracer=await ComposedVoxelPathTracer.create(engine,{scene,features:[meshPBR()],denoise:false,signal:AbortSignal.timeout(120000)});
+ try{
+  await tracer.ready;
+  const image=await tracer.renderImage({width:W,height:H,samples:4,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+  let both=0,either=0,rasterOnly=0,traceOnly=0;
+  for(let i=0;i<W*H;i++){
+   const r=raster.data[i*4]+raster.data[i*4+1]+raster.data[i*4+2]>0,t=image.instance[i]<=-4;
+   if(r&&t)both++;if(r||t)either++;if(r&&!t)rasterOnly++;if(t&&!r)traceOnly++;
+  }
+  return {errors,iou:both/either,covered:both,rasterOnly,traceOnly,meshes:scene.meshes.length,triangles:scene.meshes[0].indices.length/3};
+ }finally{tracer.dispose();terrain.dispose();engine.dispose();}
 };window.ready=true;
 </script></html>

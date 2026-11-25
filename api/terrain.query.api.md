@@ -32,6 +32,7 @@ export class TerrainQuery {
     refresh(x?: number, z?: number, width?: number, depth?: number): void;
     height(x: number, z: number): number | undefined;
     normal(x: number, z: number, out?: MutableVec3): MutableVec3 | undefined;
+    triangles({ step, region }?: TerrainTrianglesOptions): TerrainTriangles;
     raycast(origin: Vec3, direction: Vec3, maxDistance?: number, out?: TerrainHit): TerrainHit | null;
 }
 
@@ -45,5 +46,19 @@ export interface TerrainQueryOptions {
 
 export interface TerrainReadOptions {
     readonly signal?: AbortSignal;
+}
+
+export interface TerrainTriangles {
+    readonly positions: Float32Array;
+    readonly normals: Float32Array;
+    readonly indices: Uint32Array;
+}
+
+export interface TerrainTrianglesOptions {
+    readonly step?: number;
+    readonly region?: {
+        readonly min: readonly [number, number];
+        readonly max: readonly [number, number];
+    };
 }
 ```

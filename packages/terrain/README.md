@@ -458,6 +458,22 @@ console.log(y, up, hit?.position);
 - The clipmap draws the surface as triangles at its own cell spacing, morphing between rings, so a drawn point lies
   within that triangulation's error of the query's answer (none at texels the finest ring's vertices sit on).
 - Memory: the heights you pass plus a min-max tree of two thirds of their count in floats (2.8 MB for a 1,025 x 1,025 map).
+- `triangles({ step?, region? })` returns the surface as a world-space triangle mesh, `{ positions, normals, indices }`
+  (xyz per vertex, three indices per triangle, counter-clockwise seen from above), for a path tracer
+  (`@margoengine/voxel-pathtracer/from-engine` takes it as a `terrain` source), a collider or an export. Vertices sit on
+  the height samples, every `step`-th each way (default 1; the last row and column are always kept), with the normals
+  `normal` gives; `region` (world XZ `min` and `max`) is widened to whole cells and clipped to the heightmap; a cell whose
+  centre lies in a hole is left out. Up to 16,777,216 vertices a call (RangeError past that: pass a larger step or a
+  smaller region). Evidence: `test/query-triangles.test.js`.
+
+```ts
+import { TerrainQuery } from '@margoengine/terrain/query';
+
+const heights = new Float32Array(65 * 65).map((_, i) => Math.sin(i * 0.01));
+const ground = new TerrainQuery(heights, 65, 65, { origin: [-32, -32], size: [64, 64], heightScale: 4 });
+const { positions, normals, indices } = ground.triangles({ step: 2, region: { min: [-16, -16], max: [16, 16] } });
+console.log(positions.length / 3, normals.length / 3, indices.length / 3); // 289 289 512
+```
 
 Checked on the CPU by `test/query.test.js` (rays against a brute-force march, heights and normals against the shader's
 formulas) and on a real GPU by `test/query.browser.mjs` (in `test:gpu`), on real elevation (the Mount Rainier tile in

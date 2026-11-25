@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18915050,
+  "total": 18916260,
   "history": [
     {
       "date": "2026-10-24",
@@ -12159,6 +12159,12 @@
       "commit": "c20d580fd9",
       "reason": "post display effects route through displayFor and premultipliedCanvas on a transparent canvas (KB-POST-ALPHARIM1); SSAO and GTAO extract skips background neighbours (KB-SSAO-SILHOUETTE1)",
       "grew": 13
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "a41b33c360",
+      "reason": "FG-17 piece 5b: terrain/query 3,420 to 3,940 B gzip for TerrainQuery.triangles (world-space mesh of the height samples with a step and region, holes cut by cell centre, normals as normal() gives them); voxel-pathtracer/from-engine 872 to 1,050 B for terrain sources (one mesh and material per TerrainQuery). The reader belongs with the query's private grid; a separate entry would duplicate the bounds, sampling and hole code",
+      "grew": 2
     }
   ],
   "items": {
@@ -13430,7 +13436,7 @@
     "@margoengine/terrain/overlays": 4061,
     "@margoengine/terrain/planet": 7538,
     "@margoengine/terrain/planet-recipes": 3472,
-    "@margoengine/terrain/query": 3420,
+    "@margoengine/terrain/query": 4196,
     "@margoengine/terrain/relief-lighting": 3564,
     "@margoengine/terrain/rock-settings": 2718,
     "@margoengine/terrain/rock-surface": 5056,
@@ -13627,7 +13633,7 @@
     "@margoengine/voxel-pathtracer": 94957,
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/voxel-pathtracer/denoise-ml": 7023,
-    "@margoengine/voxel-pathtracer/from-engine": 872,
+    "@margoengine/voxel-pathtracer/from-engine": 1306,
     "@margoengine/voxel-pathtracer/guiding": 2791,
     "@margoengine/voxel-pathtracer/media": 2210,
     "@margoengine/voxel-pathtracer/mesh": 41562,

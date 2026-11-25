@@ -1,5 +1,5 @@
 // GPU check of @margoengine/voxel-pathtracer/from-engine on WebGPU and the WebGL2 compatibility layer: the raster
-// silhouette of core meshes against the traced one.
+// silhouette of core meshes against the traced one, then a drawn Terrain with a hole against its traced height query.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -28,7 +28,15 @@ for (const compat of [false, true]) {
     );
     assert.ok(r.covered > 2000, `the meshes cover the view (${r.covered} px)`);
     assert.ok(r.iou > 0.99, `raster and traced silhouettes agree: IoU ${r.iou}`);
-    rows.push({ compat, device, hardware: context.hardware, r });
+    const t = await context.page.evaluate((compat) => window.runTerrain(compat), compat);
+    console.log(JSON.stringify({ compat, terrain: t }));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(t.errors, []);
+    assert.equal(t.meshes, 1, 'one terrain mesh');
+    assert.ok(t.triangles < 32 * 32 * 2, `the hole's cells are left out (${t.triangles} triangles)`);
+    assert.ok(t.covered > 3000, `the terrain covers the view (${t.covered} px)`);
+    assert.ok(t.iou > 0.99, `drawn and traced terrain silhouettes agree: IoU ${t.iou}`);
+    rows.push({ compat, device, hardware: context.hardware, r, terrain: t });
   } finally {
     await context.close();
   }

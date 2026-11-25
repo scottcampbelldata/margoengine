@@ -10,6 +10,26 @@ export interface TraceEngineOptions {
     scene?: Scene;
     base?: VoxelTraceScene & Partial<Pick<PBRMeshTraceScene, 'meshes' | 'meshInstances' | 'pbrMaterials'>>;
     filter?: (mesh: Mesh) => boolean;
+    terrain?: readonly TraceTerrainSource[];
+}
+
+export interface TraceTerrainSource {
+    readonly query: {
+        triangles(options?: {
+            step?: number;
+            region?: TraceTerrainSource['region'];
+        }): {
+            readonly positions: Float32Array;
+            readonly normals: Float32Array;
+            readonly indices: Uint32Array;
+        };
+    };
+    readonly step?: number;
+    readonly region?: {
+        readonly min: readonly [number, number];
+        readonly max: readonly [number, number];
+    };
+    readonly material?: Omit<TracePBRMaterial, 'id'>;
 }
 
 export function traceSceneFromEngine(engine: Engine, options?: TraceEngineOptions): PBRMeshTraceScene;

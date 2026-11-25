@@ -1,7 +1,9 @@
 // The engine's own meshes as a path-traced scene: every visible core `Mesh` of a scene becomes a placement of shared
 // triangle geometry with a metallic-roughness material, so a raster scene can be traced without rebuilding it by hand.
 // Geometry is read from `Geometry.vertices` (position and normal interleaved) and `indices`; placements from each mesh's
-// world matrix; materials from `PbrMaterial.data` (linear colour, roughness, metalness, double-sided).
+// world matrix; materials from `PbrMaterial.data` (linear colour, roughness, metalness, double-sided). Terrains come in
+// through their CPU height query (`@margoengine/terrain/query` `TerrainQuery.triangles`), read structurally so this
+// entry does not import the terrain package.
 import type { Engine, Geometry, Mesh, PbrMaterial, Scene } from '@margoengine/core';
 import type { PBRMeshTraceScene, TracePBRMaterial, TracePBRMesh } from './mesh-pbr-types.js';
 import type { TraceMeshInstance } from './mesh.js';
@@ -18,6 +20,31 @@ export interface TraceEngineOptions {
   base?: VoxelTraceScene & Partial<Pick<PBRMeshTraceScene, 'meshes' | 'meshInstances' | 'pbrMaterials'>>;
   /** Keeps a mesh when it returns true. Default: every mesh. */
   filter?: (mesh: Mesh) => boolean;
+  /**
+   * Terrains to trace, each as one world-space mesh from its height query. Default none. A `TerrainQuery` from
+   * `@margoengine/terrain/query` (made from the same heights and `terrain.options` as the drawn `Terrain`, or by
+   * `TerrainQuery.read`) fits `query`.
+   */
+  terrain?: readonly TraceTerrainSource[];
+}
+/** What {@link traceSceneFromEngine} needs of a terrain: `TerrainQuery.triangles` and the settings it takes. */
+export interface TraceTerrainSource {
+  readonly query: {
+    triangles(options?: { step?: number; region?: TraceTerrainSource['region'] }): {
+      readonly positions: Float32Array;
+      readonly normals: Float32Array;
+      readonly indices: Uint32Array;
+    };
+  };
+  /** Samples between vertices, passed to `triangles`. Default 1, the heightmap's own samples. */
+  readonly step?: number;
+  /** World XZ rectangle to trace, passed to `triangles`. Default the whole heightmap. */
+  readonly region?: { readonly min: readonly [number, number]; readonly max: readonly [number, number] };
+  /**
+   * The terrain's surface: a trace material without its id. Default a grey rough dielectric
+   * (`baseColorFactor` [0.5, 0.5, 0.5, 1], roughness 1, metalness 0).
+   */
+  readonly material?: Omit<TracePBRMaterial, 'id'>;
 }
 
 interface Split {
@@ -48,15 +75,18 @@ const split = (geometry: Geometry): Split => {
 
 /**
  * Builds a {@link PBRMeshTraceScene} for `ComposedVoxelPathTracer` with the `meshPBR()` feature from the engine's meshes: one
- * trace mesh per (geometry, material) pair, one placement per visible mesh at its world matrix. Matrices are those of
- * the last update, so call it after `engine.render()` (or a frame) once transforms change.
+ * trace mesh per (geometry, material) pair, one placement per visible mesh at its world matrix, plus one world-space
+ * mesh and material per `terrain` source (ids `terrain-<n>`, holes left out). Matrices are those of the last update,
+ * so call it after `engine.render()` (or a frame) once transforms change. Terrain triangles are built on every call
+ * (a terrain's heights may change in place), so build the scene once and reuse it while the heights hold.
  *
  * ```ts
  * engine.render();
  * const scene = traceSceneFromEngine(engine, { base: { revision: 1, models: [], instances: [], materials: [], environment } });
  * const tracer = await ComposedVoxelPathTracer.create(engine, { scene, features: [meshPBR()] });
  * ```
- * @throws TypeError for an engine, scene, base or filter of the wrong kind.
+ * @throws TypeError for an engine, scene, base, filter or terrain source of the wrong kind; RangeError from the
+ * terrain query for a bad step or region.
  */
 export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions = {}): PBRMeshTraceScene {
   if (!engine || typeof engine !== 'object' || !engine.scene)
@@ -70,6 +100,9 @@ export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions
     throw new TypeError('traceSceneFromEngine filter must be a function');
   if (base !== undefined && (!base || typeof base !== 'object' || !Array.isArray(base.models)))
     throw new TypeError('traceSceneFromEngine base must be a trace scene');
+  const terrain = options.terrain ?? [];
+  if (!Array.isArray(terrain) || terrain.some((t) => typeof t?.query?.triangles !== 'function'))
+    throw new TypeError('traceSceneFromEngine terrain must be a list of { query } with a TerrainQuery');
   const pbrMaterials: TracePBRMaterial[] = [...(base?.pbrMaterials ?? [])],
     meshes: TracePBRMesh[] = [...((base?.meshes ?? []) as TracePBRMesh[])],
     // A base without placements draws each of its meshes once in world space; keep that with identity placements.
@@ -108,6 +141,21 @@ export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions
     }
     meshInstances.push({ id: `engine-mesh-${mesh.id}`, mesh: meshId, transform: Array.from(mesh.matrix) });
   }
+  terrain.forEach((source, n) => {
+    const { positions, normals, indices } = source.query.triangles({ step: source.step, region: source.region });
+    if (indices.length === 0) return;
+    const id = nextMaterial++,
+      meshId = `terrain-${n}`;
+    pbrMaterials.push({
+      baseColorFactor: [0.5, 0.5, 0.5, 1],
+      roughnessFactor: 1,
+      metallicFactor: 0,
+      ...source.material,
+      id,
+    });
+    meshes.push({ id: meshId, positions, normals, indices, material: id });
+    meshInstances.push({ id: `engine-${meshId}`, mesh: meshId });
+  });
   const scene = base ?? { revision: 1, models: [], instances: [], materials: [] };
   return { ...scene, meshes, meshInstances, pbrMaterials };
 }

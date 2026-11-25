@@ -124,3 +124,43 @@ test('filter and scene choose the meshes; wrong kinds throw TypeError', () => {
   assert.throws(() => traceSceneFromEngine(engine, { scene: {} }), TypeError);
   assert.throws(() => traceSceneFromEngine(engine, { base: { revision: 1 } }), TypeError);
 });
+
+test('terrain sources become one world-space mesh each, with their material, step and region passed through', () => {
+  const calls = [],
+    tri = { positions: new Float32Array(9), normals: new Float32Array(9), indices: new Uint32Array([0, 1, 2]) },
+    query = { triangles: (o) => (calls.push(o), tri) },
+    empty = {
+      triangles: () => ({ positions: new Float32Array(0), normals: new Float32Array(0), indices: new Uint32Array(0) }),
+    },
+    red = new PbrMaterial({ color: [1, 0, 0] }),
+    engine = fakeEngine([{ id: 1, geometry: box(1, 1, 1), material: red, visible: true, matrix: translate(0, 0, 0) }]);
+  const region = { min: [0, 0], max: [4, 4] },
+    scene = traceSceneFromEngine(engine, {
+      terrain: [
+        { query, step: 2, region, material: { baseColorFactor: [0.2, 0.4, 0.1, 1], roughnessFactor: 0.8 } },
+        { query: empty },
+        { query },
+      ],
+    });
+  assert.deepEqual(calls, [
+    { step: 2, region },
+    { step: undefined, region: undefined },
+  ]);
+  assert.deepEqual(
+    scene.meshes.map((m) => m.id),
+    ['engine-0', 'terrain-0', 'terrain-2'],
+    'an all-hole terrain adds nothing',
+  );
+  assert.equal(scene.meshes[1].positions, tri.positions, 'the query arrays, not copies');
+  assert.deepEqual(scene.meshInstances.slice(1), [
+    { id: 'engine-terrain-0', mesh: 'terrain-0' },
+    { id: 'engine-terrain-2', mesh: 'terrain-2' },
+  ]);
+  assert.deepEqual(scene.pbrMaterials.slice(1), [
+    { id: 2, baseColorFactor: [0.2, 0.4, 0.1, 1], roughnessFactor: 0.8, metallicFactor: 0 },
+    { id: 3, baseColorFactor: [0.5, 0.5, 0.5, 1], roughnessFactor: 1, metallicFactor: 0 },
+  ]);
+  assert.equal(scene.meshes[1].material, 2);
+  for (const terrain of [{}, [{}], [{ query: {} }], [null]])
+    assert.throws(() => traceSceneFromEngine(engine, { terrain }), TypeError);
+});
