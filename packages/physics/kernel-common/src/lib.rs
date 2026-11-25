@@ -11,4 +11,5 @@ pub mod heap;
 pub mod lanes;
 pub mod island;
 pub mod random;
+pub mod sort;
 pub mod tree;

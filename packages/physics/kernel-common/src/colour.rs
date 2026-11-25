@@ -51,7 +51,7 @@ impl Colouring {
         debug_assert_eq!(writes.len(), keys.len());
         self.sorted.clear();
         self.sorted.extend(keys.iter().enumerate().map(|(i, &k)| (k as u64) << 32 | i as u64));
-        radix_sort(&mut self.sorted, &mut self.spare);
+        crate::sort::radix_sort(&mut self.sorted, &mut self.spare);
 
         self.taken.clear();
         self.taken.resize(bodies, 0);
@@ -101,34 +101,5 @@ impl Colouring {
     /// Constraints in the overflow.
     pub fn overflow(&self) -> u32 {
         self.starts[COLOURS + 1] - self.starts[COLOURS]
-    }
-}
-
-/// Sorts `key << 32 | index` entries by key, stable (least significant digit first, a byte a pass, over the key's four
-/// bytes; a pass whose byte is the same in every entry is skipped).
-fn radix_sort(items: &mut Vec<u64>, spare: &mut Vec<u64>) {
-    spare.clear();
-    spare.resize(items.len(), 0);
-    for byte in 4..8 {
-        let shift = byte * 8;
-        let mut count = [0u32; 256];
-        for &x in items.iter() {
-            count[(x >> shift) as usize & 255] += 1;
-        }
-        if count.iter().any(|&n| n as usize == items.len()) {
-            continue;
-        }
-        let mut at = 0u32;
-        for n in count.iter_mut() {
-            let here = *n;
-            *n = at;
-            at += here;
-        }
-        for &x in items.iter() {
-            let d = (x >> shift) as usize & 255;
-            spare[count[d] as usize] = x;
-            count[d] += 1;
-        }
-        core::mem::swap(items, spare);
     }
 }
