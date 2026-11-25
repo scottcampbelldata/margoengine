@@ -7953,6 +7953,12 @@ The viewer check's captures wait for pipeline and submitted-work readiness, incl
 
 ## Water caustics: limits, scale and the WebGL2 range fix (2026-11-10)
 
+`@margoengine/post/caustics` (`SurfaceCaustics`, 2026-11-25): any surface mesh, copied as six floats per triangle corner;
+`size` 0.1..100,000 m, `resolution` 32..2048 (power of two, 256), `layers` 2..32 (12), `refractiveIndex` 1..3 (1.333),
+`intensity` 0..100 (1), absorption and colour 0..100 per channel. One refracting interface: the receivers are inside the
+medium (a pool floor, a tank bottom), not under a closed glass object, which ProductCaustics of studio traces. The sun only
+(`engine.lighting`), one map square: light that lands outside it is lost. Its beams and projection are the shared shaders
+water/caustics now draws with (the same numbers: water's project, energy, caustics and scale checks pass unchanged).
 `@margoengine/water/caustics`: `size` 0.1..100,000 m (default 100), `resolution` 32..2048 (default 256, power of two),
 `layers` 2..32 (default 12), `heightRange` finite, `refractiveIndex` 1..2 (1.333), `intensity` 0..100 (1), absorption per
 metre [0.38, 0.1, 0.045], `color` [1, 1, 1]. The surface is Water or FFTOcean (Water `segments` up to 512). There is no

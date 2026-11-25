@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18950723,
+  "total": 18962534,
   "history": [
     {
       "date": "2026-10-24",
@@ -12225,6 +12225,12 @@
       "commit": "lane-d",
       "reason": "follow camera styles on third-person; geospatial fromCamera",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-c3",
+      "reason": "post/caustics, new optional entry: SurfaceCaustics (caustics from any surface mesh onto every receiver) and the beam, flux-bound and projection shaders it shares with water/caustics, which now imports them from here instead of holding its own (water/caustics stays within its budget). Splitting the shaders into an entry of their own would leave water importing two post entries for one feature.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13054,6 +13060,7 @@
     "@margoengine/post/blur": 8249,
     "@margoengine/post/contact-shadows": 8001,
     "@margoengine/post/curvature": 10677,
+    "@margoengine/post/caustics": 11810,
     "@margoengine/post/decals": 5995,
     "@margoengine/post/depth": 4763,
     "@margoengine/post/fxaa": 4890,
@@ -14046,6 +14053,7 @@
     "leak @margoengine/water/ice -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/water/ice -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/water/ice -> @margoengine/materials": 1,
+    "leak @margoengine/water/caustics -> @margoengine/post/caustics": 1,
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,

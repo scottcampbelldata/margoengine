@@ -247,6 +247,8 @@ engine.start();
 
 ## Caustics: `@margoengine/lightmap/refracted`
 
+Baked. For live caustics from any surface mesh onto every receiver, use `SurfaceCaustics` of `@margoengine/post/caustics`.
+
 `bakeRefractedLightmap(quads, {glassVolumes, emitters})` traces photons from point lights, finite directional beams and
 rectangle lights through ideal smooth convex glass (Snell refraction, Fresnel reflection, total internal reflection,
 Beer absorption, nested volumes) and deposits them at the first receiver they reach after touching glass. It returns

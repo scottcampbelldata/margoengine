@@ -874,6 +874,48 @@ const engine = await Engine.create(canvas, {backend: 'webgpu'});
 ContactShadows.attach(engine, {distance: 0.3});
 ```
 
+## Caustics from any surface: `SurfaceCaustics`
+
+`@margoengine/post/caustics` throws the sun's light, refracted through any surface mesh you give it (a pool or pond surface,
+the liquid in a tank, a rippled glass sheet), onto every opaque receiver below it, in a `PostStack`. Each surface triangle is
+refracted by Snell's law at its corners' normals and traced down as a beam into horizontal depth slices of a map over the
+receiving square, carrying the light it takes in (its area seen by the sun times the Fresnel transmission) spread over the
+area it lands on, so convex ripples focus into bright lines and the total is kept. A receiver pixel reads the slices at its
+height and adds the flux through its own normal times its own colour. These are the same beams and the same projection
+`@margoengine/water/caustics` draws for `Water` and `FFTOcean`: water hands its waves to the shared shaders this entry
+exports (`causticBeams`, `causticRange`, `causticProject`), so a fix to one is a fix to both.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { SurfaceCaustics } from '@margoengine/post/caustics';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 2 x 2 m pool surface 1 m above its floor, one quad; normals default to the face normals.
+const surface = { positions: [-1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1], indices: [0, 1, 2, 0, 2, 3] };
+const pool = SurfaceCaustics.attach(engine, { geometry: surface, refractiveIndex: 1.333 });
+pool.setGeometry(surface); // each frame the surface moves
+pool.options.intensity = 0.8; // options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `geometry` | required | `{positions, normals?, indices?}`, world space; normals point out of the medium (up for water) |
+| `center`, `size` | the surface's middle, twice its larger extent | The square `[x, z]` and side that receives light, 0.1 to 100000 m |
+| `heightRange` | one `size` below the surface's lowest point up to it | Lowest and highest receiver heights |
+| `resolution`, `layers` | 256, 12 | Map side (a power of two, 32 to 2048) and depth slices (2 to 32); fixed at creation |
+| `refractiveIndex` | 1.333 | Index of the medium under the surface, 1 to 3 (glass 1.5) |
+| `intensity`, `color` | 1, `[1, 1, 1]` | Multiplier and linear tint of the scene's sun (`engine.lighting`) |
+| `absorption` | `[0, 0, 0]` | RGB absorption per metre in the medium |
+| `shadows` | none | A `Shadows` for the light entering the surface and reaching receivers |
+| `enabled` | true | False passes the picture through unchanged |
+
+The surface is one refracting interface: light enters it and the receivers lie inside the medium, as under water. Draw the
+surface itself without writing depth (transparent), or it hides the receivers it lights. For light through a closed glass
+object onto a floor, with its exit face and internal reflections, use `ProductCaustics` of `@margoengine/studio/caustics`,
+which traces photons; for baked light maps, `@margoengine/lightmap`'s refracted caustics. Checked on WebGPU and the WebGL2
+layer (`test/surface-caustics-browser.mjs`): a flat surface passes 1 - Fresnel(0) of the sun to the floor under it within 0.2%
+and nothing past its edge, and ripples of the same footprint focus the light while keeping its total within 1.1%.
+
 ## Heat haze: `HeatHaze`
 
 `@margoengine/post/heat-haze` draws the shimmer of what lies behind the hot plume over a fire, in a `PostStack`. Each pixel's

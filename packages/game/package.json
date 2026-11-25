@@ -2235,6 +2235,10 @@
       "types": "./dist/post/contact-shadows.d.ts",
       "import": "./dist/post/contact-shadows.js"
     },
+    "./post/caustics": {
+      "types": "./dist/post/caustics.d.ts",
+      "import": "./dist/post/caustics.js"
+    },
     "./post/heat-haze": {
       "types": "./dist/post/heat-haze.d.ts",
       "import": "./dist/post/heat-haze.js"

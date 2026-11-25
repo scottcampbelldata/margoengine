@@ -350,6 +350,9 @@ export function Lava() {
 
 ### Caustics
 
+For live caustics from a water or glass surface mesh onto every receiver in view, outside React or beside it, use
+`SurfaceCaustics` of `@margoengine/post/caustics`.
+
 `Caustics` from `@margoengine/react/caustics` is drei's: light focused through its transparent children onto a floor
 beneath them, by the photon-traced catcher of `@margoengine/studio/caustics` (install `@margoengine/studio`). The
 children's world triangles go into a GPU BVH; photons from the light refract in and out of them (`ior` 1.5,

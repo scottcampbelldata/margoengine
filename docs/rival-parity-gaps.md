@@ -34,7 +34,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Material plugins on the stock PBR material (inject code into the built-in shader) | Babylon, three.js `onBeforeCompile` | DONE | M | b2757feeb |
 | IBL shadows (shadows from the environment map) | Babylon | MISSING | M |  |
 | Blurred / rough planar and screen-space reflections | three.js | PARTIAL | M |  |
-| Caustics as a general package (today only inside water, studio, lightmap and the game bundle) | three.js, PlayCanvas | PARTIAL | M |  |
+| Caustics as a general package (today only inside water, studio, lightmap and the game bundle) | three.js, PlayCanvas | DONE: `@margoengine/post/caustics` `SurfaceCaustics` casts sun caustics from any surface mesh onto every opaque receiver; water/caustics draws with its shared beam and projection shaders; lightmap, react and water point at it | M | CAUSTICS3 |
 
 ## Lane B: particles, simulation and physics
 

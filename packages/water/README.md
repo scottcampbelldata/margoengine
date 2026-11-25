@@ -630,7 +630,8 @@ the surface) with the light that the live waves refract. Every wave triangle is 
 directional light, projected onto horizontal depth slices and added as conserved flux, so crests focus into bright
 filaments and troughs spread out, and the pattern moves with the surface. Light is absorbed per metre in red, green
 and blue, the surface entry and the receiver can be shadowed with a `Shadows`, and dry pixels get nothing. It runs before
-the water draw, on `Water` and `FFTOcean`, on WebGPU and the WebGL2 layer.
+the water draw, on `Water` and `FFTOcean`, on WebGPU and the WebGL2 layer. The beams and the projection are the shared
+ones of `@margoengine/post/caustics`, whose `SurfaceCaustics` casts the same light from any surface mesh.
 
 ```ts
 import { Engine } from '@margoengine/core';
