@@ -207,3 +207,72 @@ test('joint damping and dry friction on a hinge follow their closed forms', asyn
   const free = spin((joint) => joint.setDamping(0.2).setDamping(0));
   near(free[1], 4, 0.01, 'off again');
 });
+
+/** A one-metre arm out along X from a fixed pivot on a ball joint with the swing across X held to one angle, as a cone holds it. */
+function shoulder(physics, extra = {}) {
+  const pivot = physics.addBody(null, { type: 'fixed', colliders: [] });
+  const arm = physics.addBody(null, { position: [1, 0, 0], colliders: { shape: 'sphere', radius: 0.05, mass: 1 } });
+  const multibody = physics.addMultibody(pivot, [
+    {
+      body: arm,
+      joint: {
+        type: 'generic',
+        locked: ['linX', 'linY', 'linZ'],
+        anchorA: [0, 0, 0],
+        anchorB: [-1, 0, 0],
+        coupled: ['angY', 'angZ'],
+        limits: { angY: [0, 0.6], ...extra },
+      },
+    },
+  ]);
+  return { arm, multibody };
+}
+/** The angle between the arm's X axis and the world's X: the swing of the joint. */
+const swing = (arm) => {
+  const [x, y, z, w] = arm.rotation;
+  return Math.acos(Math.min(1, 1 - 2 * (y * y + z * z)) + 0 * (x + w));
+};
+
+test('inverse kinematics keeps a ball joint inside its cone: a target outside it is reached as far as the edge, one inside is reached', async () => {
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const { arm, multibody } = shoulder(physics);
+  // The tip is 2 m from the pivot: a target 90 degrees round is far outside a cone of 0.6 rad.
+  const outside = multibody.inverseKinematics(arm, { position: [0, 2, 0] }, { point: [1, 0, 0] });
+  assert.equal(outside.converged, false);
+  near(swing(arm), 0.6, 1e-3, 'the swing stops at the cone edge');
+  // The nearest the tip can come is on the edge in the target's plane: 2 (cos 0.6, sin 0.6).
+  const tip = [2 * Math.cos(0.6), 2 * Math.sin(0.6)];
+  near(
+    outside.positionError,
+    Math.hypot(tip[0], 2 - tip[1]),
+    2e-3,
+    'what is left of the error is the distance to the edge',
+  );
+  const inside = multibody.inverseKinematics(
+    arm,
+    { position: [2 * Math.cos(0.3), 0, 2 * Math.sin(0.3)] },
+    { point: [1, 0, 0] },
+  );
+  assert.equal(inside.converged, true);
+  near(swing(arm), 0.3, 1e-3, 'a target inside is reached');
+  physics.dispose();
+});
+
+test('inverse kinematics keeps the twist of a ball joint inside its range', async () => {
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  // A twist about X of 0.8 rad asked of a joint that twists only within 0.2 either way; with no twist limit it is reached.
+  const wanted = [Math.sin(0.4), 0, 0, Math.cos(0.4)];
+  const twist = (arm) => 2 * Math.asin(arm.rotation[0]);
+  const free = shoulder(physics);
+  free.multibody.inverseKinematics(free.arm, { rotation: wanted });
+  near(twist(free.arm), 0.8, 2e-3, 'with no limit the twist is reached');
+  const held = new Physics(null, { gravity: [0, 0, 0] });
+  const limited = shoulder(held, { angX: [-0.2, 0.2] });
+  const result = limited.multibody.inverseKinematics(limited.arm, { rotation: wanted });
+  assert.equal(result.converged, false);
+  near(twist(limited.arm), 0.2, 2e-3, 'the twist stops at its limit');
+  physics.dispose();
+  held.dispose();
+});

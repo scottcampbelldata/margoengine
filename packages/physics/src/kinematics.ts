@@ -10,7 +10,7 @@ import {
   normalizeQuaternion,
   rotateByQuaternion,
 } from '@margoengine/math/quat';
-import { JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from './kernel.js';
+import { JOINT_CONE, JOINT_LIMIT, JOINT_LOCK, type KernelWorld } from './kernel.js';
 import type { Quat, Vec3 } from './math.js';
 import type { Multibody } from './multibody.js';
 
@@ -77,6 +77,26 @@ function toVector(q: Q): V {
   const k = (2 * Math.atan2(sine, s[3])) / sine;
   return [s[0] * k, s[1] * k, s[2] * k];
 }
+/**
+ * The turn of frame B in frame A held inside a cone: it splits into a swing, taking X to where frame B's X points, and a twist about
+ * X (Dobrowolski 2015), q = swing twist. The swing's rotation vector (0, y, z) is pulled in along its own line to the ellipse
+ * (y / limit_y)^2 + (z / limit_z)^2 <= 1 where it is outside, and the twist's angle into its range.
+ */
+function holdInCone(cone: NonNullable<Link['cone']>, q: Q): Q {
+  const length = Math.hypot(q[0], q[3]),
+    twist: Q = length > 1e-9 ? [q[0] / length, 0, 0, q[3] / length] : [0, 0, 0, 1],
+    swing = toVector(qmul(q, qconj(twist))),
+    [limitY, limitZ] = cone.swing,
+    outside = (swing[1]! / limitY) ** 2 + (swing[2]! / limitZ) ** 2;
+  if (outside > 1) {
+    const scale = 1 / Math.sqrt(outside);
+    swing[1] = swing[1]! * scale;
+    swing[2] = swing[2]! * scale;
+  }
+  let angle = 2 * Math.atan2(twist[0], twist[3]);
+  if (cone.twist) angle = Math.min(cone.twist[1], Math.max(cone.twist[0], angle));
+  return qnorm(qmul(fromVector([0, swing[1]!, swing[2]!]), [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)]));
+}
 const sub = (a: Vec3, b: Vec3): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const cross = (a: Vec3, b: Vec3): V => [
@@ -105,6 +125,8 @@ export interface Link {
   linear: number[];
   angular: number[];
   limits: ([number, number] | null)[];
+  /** A cone's swing ellipse (the widest turn about Y and about Z) and twist range about X, for a joint that holds its swing in one. */
+  cone: { swing: [number, number]; twist: [number, number] | null } | null;
 }
 
 export function describe(kernel: KernelWorld, multibody: Multibody): { links: Link[] } {
@@ -136,6 +158,22 @@ export function describe(kernel: KernelWorld, multibody: Multibody): { links: Li
             ] as [number, number])
           : null,
       ),
+      cone:
+        flags & JOINT_CONE
+          ? {
+              swing: [
+                (c as never as Record<string, Float32Array>)['jointMin5']![row]!,
+                (c as never as Record<string, Float32Array>)['jointMax5']![row]!,
+              ],
+              twist:
+                flags & (JOINT_LIMIT << 3)
+                  ? [
+                      (c as never as Record<string, Float32Array>)['jointMin3']![row]!,
+                      (c as never as Record<string, Float32Array>)['jointMax3']![row]!,
+                    ]
+                  : null,
+            }
+          : null,
     });
   });
   return { links };
@@ -494,6 +532,11 @@ export function inverseKinematics(
         state.rel = qnorm(qmul(fromVector(v), state.rel));
       }
     });
+    // A joint that holds its swing in a cone is pulled back inside it once all of its turns are made.
+    for (const i of path) {
+      const l = links[i - 1]!;
+      if (l.cone) states[i - 1]!.rel = holdInCone(l.cone, states[i - 1]!.rel);
+    }
     now = errors();
   }
   place(kernel, multibody, links, states);
