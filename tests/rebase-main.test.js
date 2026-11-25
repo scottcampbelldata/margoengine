@@ -101,6 +101,32 @@ test('a conflict in a source file stops the rebase, names it, and a second run f
   assert.equal(repo.read('site/llms.txt'), 'a both\nb\n');
 });
 
+test('a conflict in docs/api-surface.md takes upstream, regenerates the changed package and leaves one count line', (t) => {
+  // The stub rewrites only the first count line, as the real writer rewrites the one it finds; a union merge would
+  // leave two count lines behind and one of them stale.
+  const writer = Array(3).fill(
+    "import { readFileSync, writeFileSync } from 'node:fs';\n" +
+      "const text = readFileSync('docs/api-surface.md', 'utf8').replace(/^count \\d+$/m, 'count 3');\n" +
+      "writeFileSync('docs/api-surface.md', text + process.argv.slice(2).join(' ') + '\\n');\n",
+  );
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b\n'],
+    'docs/api-surface.md': ['count 1\nz\n', 'count 2\nupstream row\nz\n', 'count 2\nbranch row\nz\n'],
+    'packages/scene/package.json': ['{}\n', '{}\n', '{ }\n'],
+    'scripts/api-report.js': writer,
+    'scripts/generate-all-entries.mjs': Array(3).fill('\n'),
+    'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  const rows = repo.read('docs/api-surface.md').split('\n');
+  assert.equal(rows.filter((row) => /^count \d+$/.test(row)).length, 1, rows.join('|'));
+  assert.ok(rows.includes('upstream row'), "upstream's rows stay");
+  assert.ok(rows.includes('--update --package=scene'), 'the changed package is regenerated');
+  assert.equal(repo.git('status', '--porcelain'), '');
+});
+
 test('a clean rebase runs no generator and adds no commit', (t) => {
   const stub = (body) => Array(3).fill(`import { appendFileSync } from 'node:fs';\n${body}\n`);
   const repo = repository(t, {
