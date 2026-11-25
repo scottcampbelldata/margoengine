@@ -11256,7 +11256,7 @@ Proof: `packages/loaders/tests/font-woff.test.js` (including a .woff2 made by an
 
 ### Counter-based random numbers (`kernel-common`, 2026-11-25, K02)
 
-`kernel-common/src/random.rs` is Philox 4x32 with ten rounds as specified in J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", Proceedings of SC 2011, section 3.3 and Table 2 (the multipliers 0xD2511F53 and 0xCD9E8D57, the key increments 0x9E3779B9 and 0xBB67AE85, the round structure), written from the paper. Its three known-answer vectors (counter and key of zeros, of ones, and of the digits of pi) are the vectors published for the generator, and the implementation reproduces all three; the code of the authors' library was not read. The streams of (seed, solver, tick, element, stream) are this crate's own layout of the counter and key. The integer range draw is the multiply-shift of D. Lemire, "Fast random integer generation in an interval", ACM Transactions on Modeling and Computer Simulation 29(1), 2019, without the rejection step, so the number of draws never depends on the numbers drawn.
+`kernel-common/src/random.rs` is Philox 4x32 with ten rounds as specified in J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel random numbers: as easy as 1, 2, 3", Proceedings of SC 2011, section 3.3 and Table 2 (the multipliers 0xD2511F53 and 0xCD9E8D57, the key increments 0x9E3779B9 and 0xBB67AE85, the round structure), written from the paper. Its three known-answer vectors (counter and key of zeros, of ones, and of the digits of pi) are the vectors published for the generator, and the implementation reproduces all three; the code of the authors' library was not read. The streams of (seed, solver, tick, element, stream) are this crate's own layout of the counter and key: key [seed, solver number] (two whole 32-bit words; the solver number is the full FNV-1a hash of its id, so a hundred solvers meet in about one world in 900,000, where 16 bits met in about one in twelve), counter [element, stream, tick low word, tick high word] (changed 2026-11-25; the world's seed is one 32-bit word and a larger one is refused). The integer range draw is the multiply-shift of D. Lemire, "Fast random integer generation in an interval", ACM Transactions on Modeling and Computer Simulation 29(1), 2019, without the rejection step, so the number of draws never depends on the numbers drawn.
 
 ### Deterministic radix sort (`kernel-common`, 2026-11-25, K03)
 
@@ -11290,8 +11290,9 @@ Ullrich and Taylor 2015, conservative remapping; Farhat, Lesoinne and Le Tallec 
 ### Counter-based random numbers of the physics framework (`@margoengine/physics/world`, 2026-11-25)
 
 `packages/physics/src/world/random.ts` is Philox4x32-10, the TypeScript twin of the engine's one counter-based generator
-(docs/physics-framework.md, section 7; `kernel-common/src/random.rs`, K02), with its key (the seed's two words) and counter
-(element, solver and stream, the tick's two words) laid out alike; `kernel-common/tests/random-vectors.txt` pins both
+(docs/physics-framework.md, section 7; `kernel-common/src/random.rs`, K02), with its key (the seed and the solver's number, each a whole 32-bit word) and counter
+(element, stream, the tick's two words) laid out alike (changed 2026-11-25 from a 64-bit seed and a solver folded to 16 bits, which
+met in about one world in twelve at a hundred solvers); `kernel-common/tests/random-vectors.txt` pins both
 languages to the same words (`random_twin.rs` and `world-random.test.js`). Written from J. K. Salmon, M. A. Moraes, R. O. Dror and D. E. Shaw, "Parallel Random Numbers: As Easy as 1, 2, 3",
 SC 2011, https://www.thesalmons.org/john/random123/papers/random123sc11.pdf, read in full (section 4.3: the Philox S-box, the
 Philox-4x32 multipliers 0xD2511F53 and 0xCD9E8D57, the Weyl key increments and the round counts; the paper's companion code

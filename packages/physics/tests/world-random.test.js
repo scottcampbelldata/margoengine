@@ -28,7 +28,7 @@ test("a stream gives the Rust generator's words (the vectors kernel-common's ran
     assert.equal(hex(got), words.join(' '), line);
     checked++;
   }
-  assert.equal(checked, 6);
+  assert.equal(checked, 8);
 });
 
 test('a stream is keyed by seed and solver and counted by tick, element and stream', () => {
@@ -55,13 +55,20 @@ test('a stream is keyed by seed and solver and counted by tick, element and stre
   const [w] = r.block(3, 4, 0);
   assert.equal(r.below(3, 4, 0, 0xffffffff)[0], Number((BigInt(w) * 0xffffffffn) >> 32n));
   assert.throws(() => r.uniform(-1, 0), RangeError);
-  assert.throws(() => r.uniform(0, 0, 65536), RangeError);
-  assert.throws(() => new RandomStream(0, 65536), RangeError);
+  assert.throws(() => r.uniform(0, 0, 2 ** 32), RangeError);
+  assert.throws(() => new RandomStream(2 ** 32, 0), RangeError, 'a seed is one 32-bit word');
+  assert.throws(() => new RandomStream(0, 2 ** 32), RangeError);
+  assert.notEqual(
+    new RandomStream(1, 1).uniform(0, 0),
+    new RandomStream(1, 1 + 2 ** 16).uniform(0, 0),
+    'a solver number keeps its high bits',
+  );
+  assert.notEqual(r.uniform(0, 0, 1), r.uniform(0, 0, 1 + 2 ** 16), 'a stream is a whole word');
 });
 
-test("a solver's number is FNV-1a of its id folded to 16 bits, the same in every world", () => {
-  // FNV-1a 32-bit of "", "a" and "foobar" is 811c9dc5, e40c292c and bf9cf968 (the published values), xor-folded.
-  assert.equal(solverNumber(''), 0x811c ^ 0x9dc5);
-  assert.equal(solverNumber('a'), 0xe40c ^ 0x292c);
-  assert.equal(solverNumber('foobar'), 0xbf9c ^ 0xf968);
+test("a solver's number is the whole 32-bit FNV-1a of its id, the same in every world", () => {
+  // FNV-1a 32-bit of "", "a" and "foobar" is 811c9dc5, e40c292c and bf9cf968 (the published values).
+  assert.equal(solverNumber(''), 0x811c9dc5);
+  assert.equal(solverNumber('a'), 0xe40c292c);
+  assert.equal(solverNumber('foobar'), 0xbf9cf968);
 });

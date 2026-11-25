@@ -250,13 +250,13 @@ test('refusals: ids, a field nobody writes, a solver added mid-step', () => {
   world.add(spring('fast', 3), {});
   assert.throws(() => world.add(spring('fast', 0), {}), /already in the world/);
   assert.throws(() => world.add(spring('', 0), {}), /non-empty string/);
-  // solver46 and solver261 share a 16-bit random-stream number.
-  world.add(spring('solver46', 3), {});
+  // solver139599 and solver322382 share a 32-bit random-stream number (the FNV-1a of each is c9553142).
+  world.add(spring('solver139599', 3), {});
   assert.throws(
-    () => world.add(spring('solver261', 3), {}),
-    (e) => e.name === 'MargoError' && e.code === 'state' && /"solver46" and "solver261"/.test(e.message),
+    () => world.add(spring('solver322382', 3), {}),
+    (e) => e.name === 'MargoError' && e.code === 'state' && /"solver139599" and "solver322382"/.test(e.message),
   );
-  world.remove('solver46');
+  world.remove('solver139599');
   world.advance(1, { part: [1, 8] });
   assert.equal(world.tick, 144);
   assert.throws(

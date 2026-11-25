@@ -72,50 +72,42 @@ const TWO_53 = 1.1102230246251565e-16; // 2^-53
 
 /**
  * The random numbers of one (seed, solver, tick, element) and its streams, the same as the kernels' Rust `Random`
- * (`packages/physics/kernel-common/src/random.rs`) bit for bit: the key is the seed's two 32-bit words, the counter is
- * [element, solver << 16 | stream, tick low word, tick high word]. A draw is a pure function of those, never of what was
- * drawn before.
+ * (`packages/physics/kernel-common/src/random.rs`) bit for bit: the key is [seed, solver], each a whole 32-bit word, the
+ * counter is [element, stream, tick low word, tick high word]. A draw is a pure function of those, never of what was drawn
+ * before.
  */
 export class RandomStream {
   private readonly words = new Uint32Array(4);
-  /** The world's seed: a whole number from 0 to 2^53. */
+  /** The world's seed: a whole number from 0 to 2^32 - 1, one word of the key. */
   readonly seed: number;
-  /** The solver's number, 16 bits ({@link solverNumber}). */
+  /** The solver's number, 32 bits ({@link solverNumber}), the other word of the key. */
   readonly solver: number;
   private readonly k0: number;
   private readonly k1: number;
 
-  /** @throws RangeError for a seed outside 0..2^53 or a solver number outside 0..65535. */
+  /** @throws RangeError for a seed or a solver number outside 0..2^32 - 1. */
   constructor(seed: number, solver: number) {
-    if (!(Number.isSafeInteger(seed) && seed >= 0) || !isShort(solver))
+    if (!isWord(seed) || !isWord(solver))
       throw new RangeError(
-        `A random stream takes a seed from 0 to 2^53 and a solver number from 0 to 65535 (got ${seed} and ${solver}); use solverNumber(id).`,
+        `A random stream takes a seed and a solver number from 0 to 4294967295 (got ${seed} and ${solver}); a seed is one 32-bit word, and solverNumber(id) gives the solver's.`,
       );
     this.seed = seed;
     this.solver = solver;
-    this.k0 = seed % TWO_32;
-    this.k1 = Math.floor(seed / TWO_32);
+    this.k0 = seed;
+    this.k1 = solver;
   }
 
   /**
-   * The four random words of (tick, element, stream), into `out`. The tick is a whole number up to 2^53, the element a
-   * 32-bit word, the stream 16 bits.
+   * The four random words of (tick, element, stream), into `out`. The tick is a whole number up to 2^53, the element and the stream
+   * 32-bit words.
    * @throws RangeError for any of them out of range.
    */
   block(tick: number, element: number, stream = 0, out: Uint32Array = new Uint32Array(4)): Uint32Array {
-    if (!(Number.isSafeInteger(tick) && tick >= 0) || !isWord(element) || !isShort(stream))
+    if (!(Number.isSafeInteger(tick) && tick >= 0) || !isWord(element) || !isWord(stream))
       throw new RangeError(
-        `A random draw takes a tick from 0 to 2^53, an element from 0 to 4294967295 and a stream from 0 to 65535 (got ${tick}, ${element}, ${stream}).`,
+        `A random draw takes a tick from 0 to 2^53, an element and a stream from 0 to 4294967295 (got ${tick}, ${element}, ${stream}).`,
       );
-    return philox(
-      element,
-      ((this.solver << 16) | stream) >>> 0,
-      tick % TWO_32,
-      Math.floor(tick / TWO_32),
-      this.k0,
-      this.k1,
-      out,
-    );
+    return philox(element, stream, tick % TWO_32, Math.floor(tick / TWO_32), this.k0, this.k1, out);
   }
 
   /** Two numbers of [0, 1) of (tick, element, stream), 53 random bits each, into `out`: Rust's `unit_f64`. */
@@ -156,20 +148,16 @@ function isWord(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 4294967295;
 }
 
-function isShort(value: number): boolean {
-  return Number.isInteger(value) && value >= 0 && value <= 65535;
-}
-
 const encoder = new TextEncoder();
 
 /**
  * A solver's number for keying its random numbers: the 32-bit FNV-1a hash of its id's UTF-8 bytes (G. Fowler, L. C. Noll and
- * K.-P. Vo; D. Eastlake et al., "The FNV Non-Cryptographic Hash Algorithm", IETF draft) xor-folded to 16 bits as that draft
- * gives for shorter hashes, so it is the same in every world, whatever order solvers were added in. A world refuses two
- * solvers with one number.
+ * K.-P. Vo; D. Eastlake et al., "The FNV Non-Cryptographic Hash Algorithm", IETF draft), whole, so it is the same in every
+ * world, whatever order solvers were added in. A world refuses two solvers with one number (a hundred solvers meet that about
+ * once in 900,000 worlds).
  */
 export function solverNumber(id: string): number {
   let h = 0x811c9dc5;
   for (const byte of encoder.encode(id)) h = Math.imul(h ^ byte, 0x01000193) >>> 0;
-  return ((h >>> 16) ^ (h & 0xffff)) >>> 0;
+  return h;
 }

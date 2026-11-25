@@ -28,12 +28,13 @@ fn seed_solver_tick_element_and_stream_each_change_the_numbers() {
     let base = Random::new(1, 1, 1, 1).block(1);
     for other in [
         Random::new(2, 1, 1, 1).block(1),
-        Random::new(1u64 << 32 | 1, 1, 1, 1).block(1),
+        Random::new(1, 1 << 16 | 1, 1, 1).block(1),
         Random::new(1, 2, 1, 1).block(1),
         Random::new(1, 1, 2, 1).block(1),
         Random::new(1, 1, 1u64 << 32 | 1, 1).block(1),
         Random::new(1, 1, 1, 2).block(1),
         Random::new(1, 1, 1, 1).block(2),
+        Random::new(1, 1, 1, 1).block(1 << 16 | 1),
     ] {
         assert_ne!(base, other);
         // Not a near miss: about half the 128 bits differ.
