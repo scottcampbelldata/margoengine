@@ -19,6 +19,8 @@ const stepFiles = [
   'pid.ts',
   'mesh-clean.ts',
   'multibody.ts',
+  // The wind force and the explosion run inside a step (KB-PHYS-FIELDSMATH1): pinned maths only.
+  'fields.ts',
 ];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 

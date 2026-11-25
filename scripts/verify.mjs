@@ -60,6 +60,7 @@ export const PARALLEL = [
   ['npm run check:xr-runs'],
   ['npm run check:preview-contract'],
   ['npm run check:coupling'],
+  ['npm run check:pinned-math'],
   ['npm run build --workspace examples/gameplay-sandbox', 'npm run test --workspace examples/gameplay-sandbox'],
   ['npm run build --workspace examples/voxel-sandbox', 'npm run test --workspace examples/voxel-sandbox'],
   [

@@ -1,6 +1,9 @@
 // Fields that act on the rigid bodies of a world: an explosion (one radial impulse) and a wind force (a drag every step). Each
-// is sampled per body, at the body's centre, so it costs a query and a loop over the bodies it reaches.
+// is sampled per body, at the body's centre, so it costs a query and a loop over the bodies it reaches. Both run inside a
+// step, so they use no host Math: lengths by the pinned hypot and the standard atmosphere by the pinned exp and pow, the same
+// bits on every engine (tests/step-path.test.js holds this file to it).
 import { standardDensity } from '@margoengine/math/atmosphere';
+import { hypot } from '@margoengine/math/pinned';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import type { PhysicsBody } from './body.js';
 import { checkVec, type Vec3 } from './math.js';
@@ -43,10 +46,10 @@ export function explosion(physics: Physics, center: Vec3, options: ExplosionOpti
     if (body.type !== 'dynamic') continue;
     const [x, y, z] = body.position,
       d: Vec3 = [x - center[0], y - center[1], z - center[2]],
-      distance = Math.hypot(d[0], d[1], d[2]);
+      distance = hypot(d[0], d[1], d[2]);
     if (distance > radius) continue;
     const share =
-      falloff === 'none' ? 1 : falloff === 'linear' ? 1 - distance / radius : 1 / (1 + (2 * distance) / radius) ** 2;
+      falloff === 'none' ? 1 : falloff === 'linear' ? 1 - distance / radius : inverseSquare(distance / radius);
     const unit: Vec3 = distance > 1e-9 ? [d[0] / distance, d[1] / distance, d[2] / distance] : [0, 1, 0],
       size = impulse * share;
     body.applyImpulse([unit[0] * size, unit[1] * size + lift * size, unit[2] * size]);
@@ -134,7 +137,7 @@ export class WindForce implements PhysicsAttachment {
       }
       const v = body.linearVelocity,
         u: Vec3 = [air[0] - v[0], air[1] - v[1], air[2] - v[2]],
-        speed = Math.hypot(u[0], u[1], u[2]);
+        speed = hypot(u[0], u[1], u[2]);
       if (!(speed > 1e-6)) continue;
       // The area the box of the body's colliders shows to the stream.
       let lo = [Infinity, Infinity, Infinity],
@@ -142,16 +145,13 @@ export class WindForce implements PhysicsAttachment {
       for (const collider of body.colliders) {
         if (collider.isSensor()) continue;
         const box = collider.aabb();
-        lo = lo.map((x, k) => Math.min(x, box.min[k]!));
-        hi = hi.map((x, k) => Math.max(x, box.max[k]!));
+        lo = lo.map((x, k) => (box.min[k]! < x ? box.min[k]! : x));
+        hi = hi.map((x, k) => (box.max[k]! > x ? box.max[k]! : x));
       }
       if (!Number.isFinite(lo[0]!)) continue;
       const size = hi.map((x, k) => x - lo[k]!),
         area =
-          (Math.abs(u[0]) * size[1]! * size[2]! +
-            Math.abs(u[1]) * size[0]! * size[2]! +
-            Math.abs(u[2]) * size[0]! * size[1]!) /
-          speed,
+          (abs(u[0]) * size[1]! * size[2]! + abs(u[1]) * size[0]! * size[2]! + abs(u[2]) * size[0]! * size[1]!) / speed,
         force = 0.5 * density * drag * area * speed;
       // A sleeping body is woken only by a wind that would push it a tenth of a metre a second squared.
       if (body.sleeping && !(force * speed >= 0.1 * body.mass)) continue;
@@ -183,4 +183,12 @@ export type WindField = WindForce;
 
 function isFlow(velocity: WindOptions['velocity']): velocity is FlowField {
   return typeof velocity === 'object' && velocity !== null && typeof (velocity as FlowField).sample === 'function';
+}
+
+const abs = (x: number): number => (x < 0 ? -x : x);
+
+/** The inverse-square falloff at a share `s` of the radius: 1 / (1 + 2 s)^2. */
+function inverseSquare(s: number): number {
+  const d = 1 + 2 * s;
+  return 1 / (d * d);
 }

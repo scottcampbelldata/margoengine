@@ -6,7 +6,7 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open: the physics wind force and explosion use the host's Math inside a step (KB-PHYS-FIELDSMATH1, physics)
+### Fixed 2026-11-25: the physics wind force and explosion used the host's Math inside a step (KB-PHYS-FIELDSMATH1, physics)
 
 - **Repro:** `packages/physics/src/fields.ts` runs inside `Physics.step()` (an attachment's `beforeStep`) and calls
   `Math.hypot`, and since 2026-11-25 `standardDensity` (`Math.exp` and `**`) for a `WindForce` without a density.
@@ -17,6 +17,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `exp`, `ln`, `pow` and the square root kernel-common has in Rust (K01). A correct version adds that twin (pinned by
   vectors against the Rust, as the Philox twin is), moves `fields.ts` and `@margoengine/math/atmosphere` onto it, and
   adds `fields.ts` to the guard.
+- **Fixed:** `@margoengine/math/pinned` is that twin, pinned to the Rust by `kernel-common/tests/pinned-vectors.txt`;
+  `fields.ts` uses its `hypot` and no other Math, `@margoengine/math/atmosphere` its `exp` and `pow`;
+  `tests/step-path.test.js` lists `fields.ts`, and `npm run check:pinned-math` (in verify) refuses host transcendentals
+  and `**` in the world, its solvers and their fields. Regression: `packages/physics/tests/step-path.test.js`.
 
 ### Open: a crowd agent heading straight through a corner of the navmesh border is still caught by the axis-split move (KB-CROWD-WALLEND1, navmesh)
 
