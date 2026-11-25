@@ -90,6 +90,10 @@
       "types": "./dist/globe.d.ts",
       "import": "./dist/globe.js"
     },
+    "./geospatial": {
+      "types": "./dist/geospatial.d.ts",
+      "import": "./dist/geospatial.js"
+    },
     "./collide": {
       "types": "./dist/collide.d.ts",
       "import": "./dist/collide.js"

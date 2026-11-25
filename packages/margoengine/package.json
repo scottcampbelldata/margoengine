@@ -871,6 +871,10 @@
       "types": "./dist/controls/globe.d.ts",
       "import": "./dist/controls/globe.js"
     },
+    "./controls/geospatial": {
+      "types": "./dist/controls/geospatial.d.ts",
+      "import": "./dist/controls/geospatial.js"
+    },
     "./controls/collide": {
       "types": "./dist/controls/collide.d.ts",
       "import": "./dist/controls/collide.js"
@@ -2618,6 +2622,10 @@
     "./math/project": {
       "types": "./dist/math/project.d.ts",
       "import": "./dist/math/project.js"
+    },
+    "./math/geo": {
+      "types": "./dist/math/geo.d.ts",
+      "import": "./dist/math/geo.js"
     },
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",

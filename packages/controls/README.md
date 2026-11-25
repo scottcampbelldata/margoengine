@@ -718,6 +718,38 @@ The ordinary attach/dispose example above uses the same lifecycle. The
 scene-owner suite covers all nine camera control classes and both gizmo wrappers,
 including initialization failures and scene/engine disposal.
 
+## Geospatial camera: `@margoengine/controls/geospatial`
+
+`GeospatialControls` orbits a geodetic point on the WGS84 globe by heading, pitch and range. Drag pans along the surface,
+right or modified drag turns and tilts, the wheel zooms toward the cursor, and `flyTo` flies a geodesic with an arc.
+The eye is kept `clearance` metres (default 2) above the ground height your `heightAt(longitude, latitude)` returns; it
+is a height query only (a function over a terrain, a height grid or a raycast), never a physics body. Angles are
+radians and lengths metres everywhere; convert with `degToRad`. The geodesy (geodetic/ECEF, ENU, Vincenty geodesics,
+`orbitPose`) is `@margoengine/math/geo`, also what `@margoengine/tiles` uses.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+
+const hills = (lon: number, lat: number) => 300 * Math.max(0, Math.sin(lon * 4000) * Math.cos(lat * 4000));
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-122.4), latitude: degToRad(37.8), range: 5000, pitch: degToRad(50)},
+  heightAt: hills,
+  clearance: 10,
+});
+const controller = new AbortController();
+const arrived = await camera.flyTo(
+  {longitude: degToRad(2.35), latitude: degToRad(48.85), range: 3000, heading: degToRad(30)},
+  {duration: 4, signal: controller.signal},
+); // false if aborted or replaced
+console.log(arrived, camera.terrainLift);
+```
+
+Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
+`clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF). Sources: NIMA TR8350.2 (WGS84);
+Vincenty, Survey Review 23 (176), 1975; Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
+23 (181), 1976. Limits: `docs/limits.md`, "Geospatial camera".
+
 ## Globe navigation: `@margoengine/controls/globe`
 
 `GlobeControls` grabs an ellipsoid with the left mouse button or one finger, zooms

@@ -275,6 +275,10 @@
       "types": "./dist/controls/globe.d.ts",
       "import": "./dist/controls/globe.js"
     },
+    "./controls/geospatial": {
+      "types": "./dist/controls/geospatial.d.ts",
+      "import": "./dist/controls/geospatial.js"
+    },
     "./controls/collide": {
       "types": "./dist/controls/collide.d.ts",
       "import": "./dist/controls/collide.js"
