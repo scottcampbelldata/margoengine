@@ -89,7 +89,7 @@ limit does not bounce, and turning about the joint never pulls the joint apart.
 | Member | Meaning |
 | --- | --- |
 | `activate(limb?)` | Goes limp: each body becomes dynamic with the velocity its bone had in the last physics step, and physics drives the bones. With a bone or a list, only those limbs. |
-| `deactivate(duration = 0.3, limb?)` | The bodies follow the animation again (they jump to it, without sweeping through the world), and the drawn pose blends from the ragdoll's last pose to the animation over `duration` seconds. With a bone or a list, only those limbs. |
+| `deactivate(duration = 0.3, limb?)` | The bodies follow the animation again (they jump to it, without sweeping through the world), and the drawn pose blends from the ragdoll's last pose to the animation over `duration` seconds, eased (the cubic Hermite step `3u^2 - 2u^3`) so it starts and lands with no jump in speed. With a bone or a list, only those limbs. |
 | `active` | True while physics drives any bone. |
 | `weight` | How much of the drawn pose is the ragdoll's, 0 to 1 (the largest of any bone's). Set it while active for a partial blend of the limp bones. |
 | `rootPosition` | World position of the root bone's body: where to move a character before it gets up. |

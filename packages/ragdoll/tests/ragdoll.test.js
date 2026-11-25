@@ -274,12 +274,41 @@ rtest('deactivate blends from the ragdoll pose back to the animation over its du
   near(halfway, angle(mul(conj(animated), limp)) / 2, 0.03, 'the pose is halfway too');
   frames(engine, ragdoll, 16);
   assert.equal(ragdoll.weight, 0);
+  // Regression: nothing animates the hips here, and when the weight reached 0 the ragdoll stopped writing them, so they kept the
+  // last blended pose; the frame the blend ends writes the animated pose.
+  engine.store.tick(false);
+  near(body.hips.matrix[13], 1, 1e-6, 'the drawn hips are the animated ones once the blend has ended');
   frames(engine, ragdoll, 1);
   assert.deepEqual(local(engine, body.spine), animated, 'back on the animation exactly');
-  // The bodies follow the animation again: teleported, not swept, on the first step.
+  // The bodies follow the animation again, teleported, not swept: a kinematic body's target is the pose drawn the frame
+  // before, which the next step reaches, so the hips body is on the animated hips two frames after the blend has ended.
+  frames(engine, ragdoll, 1);
   near(ragdoll.bones[0].body.position[1], 1, 1e-4, 'hips body back at the animated hips');
   ragdoll.deactivate(0.2);
   assert.equal(ragdoll.weight, 0, 'deactivate when not active does nothing');
+  ragdoll.dispose();
+  physics.dispose();
+  engine.dispose();
+});
+
+rtest('the blend back eases: it leaves the ragdoll and lands on the animation with no jump in speed', async () => {
+  const { engine, physics } = await scene(),
+    body = humanoid(engine);
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips, active: true });
+  frames(engine, ragdoll, 5);
+  ragdoll.deactivate(0.5);
+  const weights = [ragdoll.weight];
+  for (let i = 0; i < 32; i++) {
+    frames(engine, ragdoll, 1);
+    weights.push(ragdoll.weight);
+  }
+  const steps = weights.slice(1).map((w, i) => weights[i] - w),
+    last = steps.findLastIndex((step) => step > 0);
+  // Regression: the weight fell by 1/30 every frame and stopped dead, a jump in the drawn pose's speed on the first and last
+  // frames of the blend. Eased by 3u^2 - 2u^3, the first and last steps are under a tenth of that, and the middle is 1.5 times it.
+  assert.ok(steps[0] < 0.1 / 30 && steps[last] < 0.1 / 30, `first step ${steps[0]}, last ${steps[last]}`);
+  assert.ok(Math.abs(Math.max(...steps) - 1.5 / 30) < 0.002, `largest step ${Math.max(...steps)}`);
+  assert.equal(weights.at(-1), 0);
   ragdoll.dispose();
   physics.dispose();
   engine.dispose();
@@ -371,10 +400,20 @@ const pose = (engine, nodes) => {
 };
 const worst = (a, b) => Math.max(...a.flatMap((m, i) => m.map((v, k) => Math.abs(v - b[i][k]))));
 const turnZ = (angle) => [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
-const allNodes = (body) => [body.hips, body.spine, body.head, body.headEnd, ...body.legs.flatMap((leg) => Object.values(leg))];
+const allNodes = (body) => [
+  body.hips,
+  body.spine,
+  body.head,
+  body.headEnd,
+  ...body.legs.flatMap((leg) => Object.values(leg)),
+];
 
 rtest("any positive bone scale is taken, a real exporter's and a large one", async () => {
-  for (const scale of [[0.9995, 1, 0.9986], [1, 2, 1], [0.1, 3, 40]]) {
+  for (const scale of [
+    [0.9995, 1, 0.9986],
+    [1, 2, 1],
+    [0.1, 3, 40],
+  ]) {
     const { engine, physics } = await scene(),
       body = humanoid(engine);
     body.spine.setScale(scale);
@@ -503,7 +542,10 @@ rtest("a real avatar with exporter scales goes limp: Seed-san's skeleton", async
   const ragdoll = Ragdoll.attach(rig.physics, { root: rig.node('hips'), joint: { type: 'free' }, minLength: 0.001 }),
     nodes = ragdoll.bones.map((part) => part.node),
     before = pose(rig.engine, nodes);
-  assert.ok(nodes.some((node) => uneven.includes(node)), 'and they are bones of this ragdoll');
+  assert.ok(
+    nodes.some((node) => uneven.includes(node)),
+    'and they are bones of this ragdoll',
+  );
   ragdoll.activate();
   rig.frames(30);
   const off = worst(before, pose(rig.engine, nodes));
@@ -538,7 +580,14 @@ rtest('attach and dispose use the physics world scene, not the active one', asyn
   const ragdoll = Ragdoll.attach(physics, { root: body.hips });
   assert.ok(engine.sceneOf(ragdoll) === other, 'the ragdoll joined the active scene');
   assert.equal(engine.scene.plugins.has(ragdoll.name), false);
-  const bystander = { name: ragdoll.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };
+  const bystander = {
+    name: ragdoll.name,
+    disposed: 0,
+    setup() {},
+    dispose() {
+      this.disposed++;
+    },
+  };
   engine.use(bystander);
   ragdoll.dispose();
   assert.equal(other.plugins.has(ragdoll.name), false, 'the ragdoll is still in its scene');

@@ -172,8 +172,13 @@ interface Bone extends RagdollPart {
   limp: boolean;
   weight: number;
   shape: RagdollShape;
-  /** Weight lost per second while blending back. */
+  /** How much of the blend back passes per second (1 / its duration), 0 when not blending. */
   fade: number;
+  /** The weight the blend back started from, and how far through it the bone is, 0 to 1. */
+  fadeFrom: number;
+  fadeAt: number;
+  /** The blend back ended this frame: write the animated pose once, so a bone nothing else animates is left on it. */
+  landed: boolean;
   /** The next kinematic target is a jump, not a sweep. */
   jump: boolean;
 }
@@ -188,7 +193,13 @@ const determinant = (m: ArrayLike<number>): number =>
 /** The rotation of a world matrix into `out`, each axis divided by its own scale. */
 const worldTurn = (m: ArrayLike<number>, out: Float64Array): Float64Array =>
   normalizeQuaternion(
-    rotationToQuaternion(m, out, Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])),
+    rotationToQuaternion(
+      m,
+      out,
+      Math.hypot(m[0], m[1], m[2]),
+      Math.hypot(m[4], m[5], m[6]),
+      Math.hypot(m[8], m[9], m[10]),
+    ),
     out,
   );
 const mul = (a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array, at = 0): Float64Array => {
@@ -592,6 +603,9 @@ export class Ragdoll implements EnginePlugin {
           limp: !!options.active,
           weight: options.active ? 1 : 0,
           fade: 0,
+          fadeFrom: 0,
+          fadeAt: 0,
+          landed: false,
           jump: !options.active,
         };
         this.readLocal(node, bone.animated);
@@ -888,7 +902,9 @@ export class Ragdoll implements EnginePlugin {
       bone.body.setType('kinematicPosition');
       bone.limp = false;
       bone.jump = true;
-      bone.fade = duration > 0 ? bone.weight / duration : 0;
+      bone.fade = duration > 0 ? 1 / duration : 0;
+      bone.fadeFrom = bone.weight;
+      bone.fadeAt = 0;
       if (!duration) bone.weight = 0;
       this.loose--;
     }
@@ -936,8 +952,17 @@ export class Ragdoll implements EnginePlugin {
       t[5] = this.q[2];
       t[6] = this.q[3];
       if (bone.fade > 0) {
-        bone.weight = Math.max(0, bone.weight - bone.fade * delta);
-        if (!bone.weight) bone.fade = 0;
+        // Eased by the cubic Hermite step 3u^2 - 2u^3, whose slope is zero at both ends: the drawn pose leaves the ragdoll's
+        // and lands on the animation with no jump in speed. A linear fade stopped dead on its last frame, and the head of a
+        // body getting up changed its step there by the pose gap over the frames of the blend (2.8 cm a frame at 60 Hz).
+        bone.fadeAt = Math.min(1, bone.fadeAt + bone.fade * delta);
+        const u = bone.fadeAt;
+        bone.weight = bone.fadeFrom * (1 - u * u * (3 - 2 * u));
+        if (u >= 1) {
+          bone.weight = 0;
+          bone.fade = 0;
+          bone.landed = true;
+        }
       }
     }
     if (this.loose) this.physicsLocals();
@@ -1023,9 +1048,12 @@ export class Ragdoll implements EnginePlugin {
         y = world[1] - m[13],
         z = world[2] - m[14],
         size = determinant(m);
-      local[0] = (x * (m[5] * m[10] - m[6] * m[9]) + y * (m[8] * m[6] - m[4] * m[10]) + z * (m[4] * m[9] - m[8] * m[5])) / size;
-      local[1] = (x * (m[9] * m[2] - m[1] * m[10]) + y * (m[0] * m[10] - m[8] * m[2]) + z * (m[8] * m[1] - m[0] * m[9])) / size;
-      local[2] = (x * (m[1] * m[6] - m[5] * m[2]) + y * (m[4] * m[2] - m[0] * m[6]) + z * (m[0] * m[5] - m[4] * m[1])) / size;
+      local[0] =
+        (x * (m[5] * m[10] - m[6] * m[9]) + y * (m[8] * m[6] - m[4] * m[10]) + z * (m[4] * m[9] - m[8] * m[5])) / size;
+      local[1] =
+        (x * (m[9] * m[2] - m[1] * m[10]) + y * (m[0] * m[10] - m[8] * m[2]) + z * (m[8] * m[1] - m[0] * m[9])) / size;
+      local[2] =
+        (x * (m[1] * m[6] - m[5] * m[2]) + y * (m[4] * m[2] - m[0] * m[6]) + z * (m[0] * m[5] - m[4] * m[1])) / size;
     }
   }
 
@@ -1033,7 +1061,11 @@ export class Ragdoll implements EnginePlugin {
   private write(): void {
     for (const bone of this.parts) {
       const { animated, local, written, node, weight } = bone;
-      if (!weight) continue;
+      // A bone at weight 0 is the animation's, and the ragdoll leaves it alone, except on the frame its blend back ends: then
+      // the animated pose is written once. Without it a bone no animation writes (a character's hips on a clip that leaves
+      // them) kept the last blended pose, short of the animated one by the weight of the blend's last frame times the gap.
+      if (!weight && !bone.landed) continue;
+      bone.landed = false;
       slerp(animated, 3, local, 3, weight, written, 3);
       if (bone.parent === -1) for (let k = 0; k < 3; k++) written[k] = animated[k] + (local[k] - animated[k]) * weight;
       else for (let k = 0; k < 3; k++) written[k] = animated[k];
@@ -1145,8 +1177,7 @@ export class Ragdoll implements EnginePlugin {
     }
     if (!any) return;
     for (let i = 0; i < parts.length; i++)
-      if (parts[i].limp)
-        parts[i].body.setAngularVelocity([omega[i * 3], omega[i * 3 + 1], omega[i * 3 + 2]]);
+      if (parts[i].limp) parts[i].body.setAngularVelocity([omega[i * 3], omega[i * 3 + 1], omega[i * 3 + 2]]);
   }
 
   /** Turns `bone`'s body by `angle` radians about the world `axis` through its origin (its joint). */
