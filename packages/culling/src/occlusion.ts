@@ -4,7 +4,7 @@
 // copied into one of three readback buffers and read with mapAsync, so the CPU never waits for the GPU and an object's
 // `isOccluded` is the newest result that has landed (usually one to three frames old). Boxes outside the view are
 // occluded and boxes cut by the near or far plane are visible without a query (the GPU Gems chapters in the README).
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, Mesh } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
@@ -31,10 +31,13 @@ export interface OcclusionMesh {
   readonly matrix: ArrayLike<number>;
   readonly geometry: Geometry | null;
 }
-export type OcclusionTarget = OcclusionBox | OcclusionMesh;
 /**
- * What a query that waited more than `retries` frames reads: `'optimistic'` visible, `'strict'` occluded (Babylon's
- * occlusionType names).
+ * What a query tests: a world box, a core `Mesh` (its runtime object carries the world `matrix`) or anything shaped
+ * like {@link OcclusionMesh}.
+ */
+export type OcclusionTarget = OcclusionBox | OcclusionMesh | Mesh;
+/**
+ * What a query that waited more than `retries` frames reads: `'optimistic'` visible, `'strict'` occluded.
  */
 export type OcclusionStrategy = 'optimistic' | 'strict';
 
@@ -315,12 +318,13 @@ export class OcclusionQueries implements EnginePlugin {
           throw new RangeError('Invalid occlusion box; min and max need three finite numbers with min <= max');
       }
     } else {
-      const g = t.geometry;
+      // A core Mesh's runtime object holds its world matrix view (core's Mesh class); `add` checked both fields.
+      const g = (t as OcclusionMesh).geometry;
       if (!g?.indices.length) return false;
       let local = this.boxes.get(g);
       if (!local) this.boxes.set(g, (local = localBox(g)));
       // Arvo 1990: the world box of a transformed box is the centre moved and the extent through |M|.
-      const m = t.matrix;
+      const m = (t as OcclusionMesh).matrix;
       for (let k = 0; k < 3; k++) {
         let c = m[12 + k],
           e = 0;

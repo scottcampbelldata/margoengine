@@ -77,8 +77,24 @@ corrupt node links throw instead of looping.
 - **Raycaster.** `setFromCamera` inverts `camera.matrix` and unprojects at the backend's clip depths (WebGPU reversed-Z near 1 and far 0, WebGL -1 and 1); `setFromEngine` takes canvas CSS pixels and refreshes the camera first. `intersectEngine` runs the transform kernel (so edits since the last render count), skips meshes that are hidden or under a hidden parent, applies `layers` and `filter`, rejects by the world bounding sphere (built from 12 matrix and 4 sphere values, each read once per mesh and ray), and casts the ray in each mesh's local space against that geometry's BVH from a `WeakMap` cache. World normals use the inverse-transpose. With `side: 'material'` (default) single-sided materials only hit their front side, defined like the renderer does by local winding, so mirrored meshes behave as drawn.
 - **Skinned meshes, synchronously.** `raycaster.intersectPosed(skin.picking)` picks a `@margoengine/animation` `Skin` at the skeleton's current pose with no GPU readback and no `await`: the skin poses the mesh on the CPU (the GPU pass's maths) and caches the posed vertices until the skeleton's `revision` or an influence changes, so many rays in a frame skin once. It shares the posed-snapshot path of `intersectModel`, so side rules, layers, filters, `firstHitOnly`, `uv`, `primitiveIndex` and the BVH refit behave the same. Cost is O(vertices) per pose change; use `intersectModel` for a model deformed by anything but a `Skin` (morph targets, custom deformers). Any object with `root`, `disposed` and `posePickingGeometry()` returning `PickingGeometry` snapshots works (`PosedPickingSource`). Lines and points keep their own world-unit or pixel thresholds: `intersectLines` `tolerance`/`toleranceUnits`, `PointRaycaster` `threshold`/`thresholdUnits`.
 
-```js
+```ts
+import {createStage} from 'margoengine';
+import {boxGeometry} from 'margoengine/geometry';
+import {Material, createMesh} from 'margoengine/materials';
+import {Skeleton, Skin} from 'margoengine/animation';
+import {Raycaster} from 'margoengine/bvh';
+
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const skeleton = new Skeleton([{name: 'upper', parent: -1}, {name: 'forearm', parent: 0, translation: [0, 1, 0]}]);
+const geometry = boxGeometry(1, 2, 1);
+const mesh = createMesh(stage.engine, geometry, new Material({color: '#c08060'}));
+const count = geometry.positions.length / 3, joints = new Uint16Array(count * 4), weights = new Float32Array(count * 4);
+for (let v = 0; v < count; v++) (joints[v * 4] = geometry.positions[v * 3 + 1] > 0 ? 1 : 0), (weights[v * 4] = 1);
+const skin = Skin.attach(mesh, skeleton, joints, weights);
+skeleton.setPose(1, {rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2]}); // bend the top half
+const raycaster = new Raycaster();
 const hits = raycaster.set([0, 0, 10], [0, 0, -1]).intersectPosed(skin.picking); // current bone pose, synchronous
+console.log(hits.length > 0);
 ```
 - **Deformed picking.** `await raycaster.intersectModel(model)` consumes the structural `DeformedPickingSource` interface implemented by gltf/pbr's `PBRModel`. It snapshots the current GPU skin/morph output and local-to-world matrices, builds a separate BVH per primitive and refits it for later poses with unchanged topology. Deformations outside bind-pose bounds remain pickable. Hits have the same side rules, world distances, layer masks and filters as ordinary raycasts, without assigning a core `Geometry` or adding runtime gltf/pbr imports. Each hit carries `uv` (TEXCOORD_0 interpolated from the posed snapshot) and the snapshot's `primitiveIndex` and `nodeIndex`, which `PBRModel` captures before its readback, so they stay right when snapshots are filtered, primitives share a node or the model changes while the readback is pending. A custom `DeformedPickingSource` whose snapshots leave those two out gets hits without them; posed hits carry no `model` or `primitive` object. Ray settings are captured before readback; removed, hidden or disposed meshes are skipped when it finishes. GPU readback and CPU refitting have an explicit cost, so use this query for pointer events. Ordinary mesh queries stay synchronous.
 - **Worker and SSR safety.** `buildAsync` uses `new Worker(new URL('./bvh.worker.js', import.meta.url), {type: 'module'})`, which Vite, webpack 5 and Next.js emit as an asset (the browser test checks a production Vite build). Results come back in transfer lists. Without `Worker` (Node, SSR) it builds synchronously. Importing does not create workers or attach engine state. Engine-bound raycasting resolves the verified core runtime for its compatibility checks; use the separate `/tree` entry for engine-free code.

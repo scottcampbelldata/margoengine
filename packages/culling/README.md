@@ -394,8 +394,8 @@ above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-b
 
 ## Occlusion queries for app objects: `OcclusionQueries`
 
-`@margoengine/culling/occlusion` asks the GPU whether boxes or core meshes are hidden behind what the frame drew, as
-Babylon's `mesh.isOccluded` and three.js's occlusion tests do. After core's main pass, each object's bounding box is
+`@margoengine/culling/occlusion` asks the GPU whether boxes or core meshes are hidden behind what the frame drew, with
+the familiar per-object `isOccluded` flag. After core's main pass, each object's bounding box is
 drawn depth-test only (no colour, no depth write) against the frame's own depth buffer inside one WebGPU occlusion
 query. The results resolve into one of three readback buffers read with `mapAsync`, so the CPU never waits on the GPU
 and each object keeps its newest landed result, usually one to three frames old.
@@ -421,8 +421,7 @@ console.log(behind.isOccluded, lamp.isOccluded, lamp.samples);                  
 - `samples`: the passing sample count of the newest result. WebGPU promises only zero or nonzero (D3D12 and the WebGL2
   layer report 1), so treat it as a flag.
 - `pendingFrames`: frames since the newest result. With `retries` set (default -1, never), an object waiting longer
-  reads visible (`'optimistic'`, the default) or occluded (`'strict'`), Babylon's occlusionRetryCount and
-  occlusionType; per object through `add(target, {retries, strategy})`.
+  reads visible (`'optimistic'`, the default) or occluded (`'strict'`); per object through `add(target, {retries, strategy})`.
 - `next({signal})` resolves when the next set of results is applied; it rejects with the signal's reason on abort and
   with MargoError `disposed` on `dispose()`. `query.dispose()` or `queries.remove(query)` stops one object; the
   plugin and each query support `using`.
