@@ -28,7 +28,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | ASCII effect | three.js, pmndrs | DONE | S | 12d7c41c5 |
 | Radial / zoom blur | three.js | DONE | S | 9d6aa73d9 |
 | Ramp, Grid, Depth view and texture overlay effects (`DepthTexture` already existed; `DepthView` builds on it) | pmndrs | DONE | S each | 7efaf1445 |
-| Colour curves in image processing | Babylon | MISSING | S |  |
+| Colour curves in image processing (`Grade` curves and wheels already existed; `ranges` added) | Babylon | DONE | S | 67827878e |
 | Retroreflection material | three.js | DONE | S | 566dabc45 |
 | glTF `KHR_materials_diffuse_roughness` | three.js | MISSING (only `usdz/materialx`) | M |  |
 | Material plugins on the stock PBR material (inject code into the built-in shader) | Babylon, three.js `onBeforeCompile` | MISSING | M |  |
