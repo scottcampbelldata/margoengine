@@ -128,9 +128,9 @@ test('endOwned on Windows ends a listed child that started before the listing an
 }, async () => {
   const child = await fakeBrowser();
   const before = await fakeBrowser();
-  await new Promise((resolve) => setTimeout(resolve, 50)); // timer: the listing must fall strictly between the starts
+  await new Promise((resolve) => setTimeout(resolve, 50)); // fixed-wait: the listing must fall strictly between the starts
   const listedAt = Date.now();
-  await new Promise((resolve) => setTimeout(resolve, 50)); // timer: the same, after the listing
+  await new Promise((resolve) => setTimeout(resolve, 50)); // fixed-wait: the same, after the listing
   const after = await fakeBrowser(); // stands in for an unrelated process that took a listed pid after the listing
   const { settled } = endOwned({ process: () => child, kill: async () => {} }, [before.pid, after.pid], {
     reapMs: 10_000,
