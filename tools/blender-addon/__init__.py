@@ -59,9 +59,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         default=False,
     )
 
+    bake_noise: bpy.props.BoolProperty(
+        name="Bake noise materials",
+        description="With live node graphs: bake the materials a Noise Texture feeds with Cycles at the bake size, so the pattern is Cycles' own; they stay still",
+        default=False,
+    )
+
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation, lightmap_size=self.lightmap_size, live_nodes=self.live_nodes)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves, object_animation=self.object_animation, lightmap_size=self.lightmap_size, live_nodes=self.live_nodes, bake_noise=self.bake_noise)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

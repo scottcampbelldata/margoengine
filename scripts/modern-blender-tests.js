@@ -305,6 +305,21 @@ if (process.env.MARGO_BLENDER) {
     ],
     { stdio: 'inherit' },
   );
+  // bake_noise (KB5339e): the script fails unless every exported texel equals an independent Cycles emission bake.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      '--background',
+      '--factory-startup',
+      '--python-exit-code',
+      '1',
+      '--python',
+      'tools/blender-addon/tests/blender_bake_noise.py',
+      '--',
+      'test-results/blender/bake-noise',
+    ],
+    { stdio: 'inherit' },
+  );
   // Noise-modified socket curves (KB5339d): the script fails unless the exported keys give Blender's samples back, and the
   // committed export and truth must still be what Blender writes and evaluates.
   execFileSync(

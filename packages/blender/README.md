@@ -94,6 +94,26 @@ window.addEventListener('pagehide', () => { model.dispose(); stage.dispose(); },
 
 `parseMargoPBR(engine, bytes)` does the same from bytes; `margoMaterialExtensions` lists what the add-on writes. The physical shader's WGSL loads only with this entry. A real Blender 5.2.3 LTS export carries Blender's values (LIM-408; `tests/pbr-ext.test.js`), and on the GPU its glass plane shows the backdrop behind it.
 
+## Live node graphs, and Cycles' own noise
+
+With **Live node graphs** on (`live_nodes=True`, off by default) the exporter keeps Mix, Color Ramp, Noise and Math graphs on a Principled BSDF as animatable shaders, which `margoengine/blender/nodes` plays; a graph it cannot keep fails by node name. The live Noise has Blender's controls but its own pattern. **Bake noise materials** (`bake_noise=True`, off by default) bakes each material a Noise Texture feeds with Cycles at `bake_size`, as in the section above, so those texels are Cycles' own; every other material stays live. A baked material is one frame on the mesh's render UV map: an animated one fails by name, and `bake_size` must not be `0`.
+
+```python
+import bpy
+
+# The File > Export > Margo dialog has the same options.
+bpy.ops.export_scene.margo(filepath="//nodes.margo", live_nodes=True, bake_noise=True, bake_size=1024)
+```
+
+```ts
+import {createStage} from 'margoengine';
+import {loadMargoNodes} from 'margoengine/blender/nodes';
+const stage = await createStage('#scene', {backend:'webgpu'});
+const scene = await loadMargoNodes(stage.engine, '/nodes.margo'); // the test scene in tests/fixtures
+scene.seek(0.5); // seconds from the start of the Blender scene range
+window.addEventListener('pagehide', () => { scene.dispose(); stage.dispose(); }, {once:true});
+```
+
 ## Live link: edits in Blender reach a running page
 
 Open the **Margo** tab of the 3D Viewport's sidebar (N) and press **Start live link**. The add-on serves the scene on this machine only (`http://127.0.0.1:8765/` by default; the operator `margo.live_link` takes `port`, and `bake_size`, 256 while live) and exports it again after each edit Blender reports (geometry, transforms, materials or properties), at most four times a second. The `live` entry follows it: each version is fetched, attached, and the one before disposed.
