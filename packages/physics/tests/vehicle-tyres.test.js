@@ -34,7 +34,12 @@ test('the Magic Formula is odd, peaks near a slip of a tenth at the load times t
     return best / l;
   };
   near(peak(4000, 'longitudinal'), 1.1, 0.01, 'D at the nominal load');
-  near(peak(8000, 'longitudinal') / peak(4000, 'longitudinal'), 0.9, 0.005, 'the peak friction at twice the load is 0.9 of that at the nominal');
+  near(
+    peak(8000, 'longitudinal') / peak(4000, 'longitudinal'),
+    0.9,
+    0.005,
+    'the peak friction at twice the load is 0.9 of that at the nominal',
+  );
   near(peak(8000, 'lateral') / peak(4000, 'lateral'), 0.9, 0.005, 'the lateral too');
   near(peak(2000, 'lateral') / peak(4000, 'lateral'), 1.05, 0.005, 'and 1.05 at half the load');
   const flat = pacejkaTyre({ loadSensitivity: 0 });
@@ -108,7 +113,7 @@ test('the brush tyre has the cornering stiffness 2 c a squared, saturates at the
   }
 });
 
-test('the brush tyre\'s defaults have the cornering stiffness of the Magic Formula\'s defaults at their nominal load', () => {
+test("the brush tyre's defaults have the cornering stiffness of the Magic Formula's defaults at their nominal load", () => {
   const load = 4000,
     slip = 1e-5,
     brush = brushTyre().forces({ slipRatio: 0, slipAngle: slip, load }).lateral / slip,

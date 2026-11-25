@@ -76,73 +76,82 @@ for (const [label, push, side] of [
   ['back', -40, 'faceUp'],
   ['front', 20, 'faceDown'],
 ])
-  rtest(`from its ${label}: the character comes to the body, and the bones blend into the clip without a pop`, async () => {
-    const { rig, ragdoll, getUp } = await fallen(push),
-      hips = rig.node('hips'),
-      head = rig.node('head'),
-      body = ragdoll.bones[0].body.position;
-    rig.engine.store.tick(false);
-    const before = [worldPosition(hips), worldPosition(head)],
-      wasRoot = worldPosition(rig.model.root);
-    assert.ok(distance(before[0], body) < 0.05, 'the hips are drawn at their body');
-    assert.ok(across(body, wasRoot) > 0.2, `the body fell away from the character's root (${across(body, wasRoot)} m)`);
-    const finished = getUp.start();
-    assert.equal(ragdoll.active, false, 'the bones are handed back');
-    assert.equal(rig.animator.state, push < 0 ? 'back' : 'front');
-    // The character's root now stands so that the clip's first frame lies on the body.
-    rig.engine.store.tick(false);
-    assert.ok(Math.abs(rig.model.root.matrix[13]) < 0.02, 'on the ground');
-    // No pop: the drawn bones hold the ragdoll's pose on the first frame of the blend.
-    rig.frames(1);
-    assert.ok(distance(worldPosition(hips), before[0]) < 0.06, 'the hips stay put');
-    assert.ok(distance(worldPosition(head), before[1]) < 0.12, 'the head stays put');
-    // The blend ends on the clip: the root bone drawn where the clip has it, near the body it left.
-    // The head's step each frame of the blend: the clip's own rise makes it grow smoothly (to 10 cm a frame, 6 m/s, at the end of a
-    // get-up from the back), so a pop is a step that differs from the one before it, not a step that is large.
-    let pop = 0,
-      before2 = 0,
-      last = worldPosition(head);
-    rig.frames(24, 1 / 60, () => {
+  rtest(
+    `from its ${label}: the character comes to the body, and the bones blend into the clip without a pop`,
+    async () => {
+      const { rig, ragdoll, getUp } = await fallen(push),
+        hips = rig.node('hips'),
+        head = rig.node('head'),
+        body = ragdoll.bones[0].body.position;
       rig.engine.store.tick(false);
-      const step = distance(worldPosition(head), last);
-      if (before2 > 0) pop = Math.max(pop, Math.abs(step - before2));
-      before2 = step;
-      last = worldPosition(head);
-    });
-    assert.equal(ragdoll.weight, 0, 'the 0.4 s blend is over');
-    assert.ok(pop < 0.03, `no frame jumps: one step differs from the one before by ${pop} m`);
-    assert.ok(across(worldPosition(hips), body) < 0.3, 'the clip goes on from where the body lay');
-    let result = null;
-    finished.then((value) => (result = value));
-    for (let i = 0; i < 200 && !result; i++) {
+      const before = [worldPosition(hips), worldPosition(head)],
+        wasRoot = worldPosition(rig.model.root);
+      assert.ok(distance(before[0], body) < 0.05, 'the hips are drawn at their body');
+      assert.ok(
+        across(body, wasRoot) > 0.2,
+        `the body fell away from the character's root (${across(body, wasRoot)} m)`,
+      );
+      const finished = getUp.start();
+      assert.equal(ragdoll.active, false, 'the bones are handed back');
+      assert.equal(rig.animator.state, push < 0 ? 'back' : 'front');
+      // The character's root now stands so that the clip's first frame lies on the body.
+      rig.engine.store.tick(false);
+      assert.ok(Math.abs(rig.model.root.matrix[13]) < 0.02, 'on the ground');
+      // No pop: the drawn bones hold the ragdoll's pose on the first frame of the blend.
       rig.frames(1);
-      await Promise.resolve();
-    }
-    assert.equal(result?.side, side);
-    assert.ok(result.mismatch < 1, `the clip fits the body (${result.mismatch} rad)`);
-    assert.equal(rig.animator.state, 'idle', 'and goes on to the next state');
-    rig.frames(30);
-    assert.ok(worldPosition(head)[1] > 1, `standing (head at ${worldPosition(head)[1]} m)`);
-    assert.equal(ragdoll.bones[0].body.type, 'kinematicPosition', 'hit boxes again');
-    assert.ok(distance(ragdoll.bones[0].body.position, worldPosition(hips)) < 0.1, 'following the drawn hips');
-    rig.dispose();
-  });
+      assert.ok(distance(worldPosition(hips), before[0]) < 0.06, 'the hips stay put');
+      assert.ok(distance(worldPosition(head), before[1]) < 0.12, 'the head stays put');
+      // The blend ends on the clip: the root bone drawn where the clip has it, near the body it left.
+      // The head's step each frame of the blend: the clip's own rise makes it grow smoothly (to 10 cm a frame, 6 m/s, at the end of a
+      // get-up from the back), so a pop is a step that differs from the one before it, not a step that is large.
+      let pop = 0,
+        before2 = 0,
+        last = worldPosition(head);
+      rig.frames(24, 1 / 60, () => {
+        rig.engine.store.tick(false);
+        const step = distance(worldPosition(head), last);
+        if (before2 > 0) pop = Math.max(pop, Math.abs(step - before2));
+        before2 = step;
+        last = worldPosition(head);
+      });
+      assert.equal(ragdoll.weight, 0, 'the 0.4 s blend is over');
+      assert.ok(pop < 0.03, `no frame jumps: one step differs from the one before by ${pop} m`);
+      assert.ok(across(worldPosition(hips), body) < 0.3, 'the clip goes on from where the body lay');
+      let result = null;
+      finished.then((value) => (result = value));
+      for (let i = 0; i < 200 && !result; i++) {
+        rig.frames(1);
+        await Promise.resolve();
+      }
+      assert.equal(result?.side, side);
+      assert.ok(result.mismatch < 1, `the clip fits the body (${result.mismatch} rad)`);
+      assert.equal(rig.animator.state, 'idle', 'and goes on to the next state');
+      rig.frames(30);
+      assert.ok(worldPosition(head)[1] > 1, `standing (head at ${worldPosition(head)[1]} m)`);
+      assert.equal(ragdoll.bones[0].body.type, 'kinematicPosition', 'hit boxes again');
+      assert.ok(distance(ragdoll.bones[0].body.position, worldPosition(hips)) < 0.1, 'following the drawn hips');
+      rig.dispose();
+    },
+  );
 
-rtest('facing does not matter: turned a radian and more, the same clips fit as well, and a side can be forced', async () => {
-  const straight = await fallen(-40),
-    turned = await fallen(-40, { yaw: 2.2 }),
-    fits = straight.getUp.mismatch('faceUp'),
-    wrong = straight.getUp.mismatch('faceDown');
-  // Back and front differ by about half a turn at the hips, less what the fall leaves of the clip's pose.
-  assert.ok(wrong - fits > 1.5, `the other clip is far off (${fits} against ${wrong} rad)`);
-  assert.equal(turned.getUp.pick(), 'faceUp');
-  assert.ok(Math.abs(turned.getUp.mismatch('faceUp') - fits) < 0.3, 'the same fall, turned, fits about the same');
-  void turned.getUp.start({ side: 'faceDown' });
-  assert.equal(turned.rig.animator.state, 'front', 'forced');
-  turned.getUp.dispose();
-  straight.rig.dispose();
-  turned.rig.dispose();
-});
+rtest(
+  'facing does not matter: turned a radian and more, the same clips fit as well, and a side can be forced',
+  async () => {
+    const straight = await fallen(-40),
+      turned = await fallen(-40, { yaw: 2.2 }),
+      fits = straight.getUp.mismatch('faceUp'),
+      wrong = straight.getUp.mismatch('faceDown');
+    // Back and front differ by about half a turn at the hips, less what the fall leaves of the clip's pose.
+    assert.ok(wrong - fits > 1.5, `the other clip is far off (${fits} against ${wrong} rad)`);
+    assert.equal(turned.getUp.pick(), 'faceUp');
+    assert.ok(Math.abs(turned.getUp.mismatch('faceUp') - fits) < 0.3, 'the same fall, turned, fits about the same');
+    void turned.getUp.start({ side: 'faceDown' });
+    assert.equal(turned.rig.animator.state, 'front', 'forced');
+    turned.getUp.dispose();
+    straight.rig.dispose();
+    turned.rig.dispose();
+  },
+);
 
 rtest('sampling the clips leaves the animator as it was', async () => {
   const rig = await realRig(GENERAL, {

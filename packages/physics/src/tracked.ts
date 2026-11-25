@@ -81,7 +81,8 @@ const clamp = (v: number, low: number, high: number): number => Math.min(high, M
  * @throws RangeError for a modulus that is not a finite number above 0.
  */
 export function shearShare(displacement: number, modulus: number): number {
-  if (!(modulus > 0 && Number.isFinite(modulus))) throw new RangeError('The shear modulus must be a finite number above 0.');
+  if (!(modulus > 0 && Number.isFinite(modulus)))
+    throw new RangeError('The shear modulus must be a finite number above 0.');
   return 1 - Math.exp(-Math.abs(displacement) / modulus);
 }
 

@@ -274,7 +274,10 @@ test('a clutch that slips carries no more than its torque, whatever the pedal', 
     for (let i = 0; i < 120; i++) {
       const torques = drive.step(1 / 60, wheels(2, i / 20)),
         total = torques[0] + torques[1];
-      assert.ok(total <= limit * (1 + 1e-9) + 1e-9, `pedal ${pedal}, step ${i}: ${total} N m at the wheels over ${limit}`);
+      assert.ok(
+        total <= limit * (1 + 1e-9) + 1e-9,
+        `pedal ${pedal}, step ${i}: ${total} N m at the wheels over ${limit}`,
+      );
     }
   }
 });
@@ -293,7 +296,8 @@ test('the automatic gearbox does not hunt: it refuses limits that would shift up
     gears.push(vehicle.drivetrain.gear);
   }
   assert.ok(gears.at(-1) >= 3, `it climbed to gear ${gears.at(-1)}`);
-  for (let i = 1; i < gears.length; i++) assert.ok(gears[i] >= gears[i - 1], `it shifted down from ${gears[i - 1]} to ${gears[i]} at step ${i}`);
+  for (let i = 1; i < gears.length; i++)
+    assert.ok(gears[i] >= gears[i - 1], `it shifted down from ${gears[i - 1]} to ${gears[i]} at step ${i}`);
   physics.dispose();
 });
 
