@@ -68,6 +68,7 @@ class NavMesh implements NavSurface {
     get version(): number;
     polygonVertices(index: number): readonly number[];
     polygonLinks(index: number): readonly NavLink[];
+    polygonPoints(index: number): readonly Vec3[];
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
@@ -102,6 +103,8 @@ interface NavSurface {
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     polygonArea(index: number): number;
+    polygonPoints?(index: number): readonly Vec3[];
+    polygonLinks?(index: number): readonly NavLink[];
 }
 
 interface OffMeshLinkOptions {

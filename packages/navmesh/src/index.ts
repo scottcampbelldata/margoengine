@@ -42,12 +42,21 @@ export interface NavSurface {
   /** Optional partial planner accepting an unsnapped goal, used by Crowd when available. */
   partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
   polygonArea(index: number): number;
+  /**
+   * Corners of polygon `index` in winding order. With {@link NavSurface.polygonLinks} it lets a Crowd keep its agents
+   * off the mesh border by avoidance instead of by cutting their moves short; every surface Margo makes has both.
+   */
+  polygonPoints?(index: number): readonly Vec3[];
+  /** The ways out of polygon `index` (shared-edge portals, then off-mesh links), for the Crowd's walls. */
+  polygonLinks?(index: number): readonly NavLink[];
 }
 interface Polygon {
   vertices: readonly number[];
   center: Vec3;
   links: Link[];
   plane: readonly [number, number, number, number];
+  /** The corners themselves, made on first use by `polygonPoints`. */
+  points?: readonly Vec3[];
 }
 /** Convex planar walkable polygons, linked by shared vertex-index edges. */
 export class NavMesh implements NavSurface {
@@ -200,6 +209,11 @@ export class NavMesh implements NavSurface {
   /** The ways out of polygon `index`: shared-edge portals, then off-mesh links. Read only. */
   polygonLinks(index: number): readonly NavLink[] {
     return this.polygon(index).links;
+  }
+  /** Corners of polygon `index` in winding order, the vertices `polygonVertices` names. Read only. */
+  polygonPoints(index: number): readonly Vec3[] {
+    const polygon = this.polygon(index);
+    return (polygon.points ??= polygon.vertices.map((id) => this.vertices[id]));
   }
   /** Centre of polygon `index` (the mean of its vertices). */
   polygonCenter(index: number): Vec3 {

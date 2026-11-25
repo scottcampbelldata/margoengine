@@ -4,7 +4,7 @@
 // app that only queries paths does not bundle it.
 import { MargoError } from '@margoengine/math/errors';
 import type { NavFilter, NavSurface, Vec3 } from './index.js';
-import { avoid, type Agent } from './orca.js';
+import { accelerate, avoidAmong, wallLine, type Agent } from './orca.js';
 
 /** Where a crowd agent is in its journey. */
 export type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
@@ -84,6 +84,14 @@ const positive = (value: number | undefined, fallback: number, label: string, ze
     throw new RangeError(`${label} must be a finite number ${zero ? 'of 0 or more' : 'above 0'}`);
   return v;
 };
+/** XZ distance from (px, pz) to the segment from (ax, az) to (bx, bz). */
+const segmentDistance = (px: number, pz: number, ax: number, az: number, bx: number, bz: number): number => {
+  const ex = bx - ax,
+    ez = bz - az,
+    length2 = ex * ex + ez * ez,
+    t = length2 > 0 ? Math.min(1, Math.max(0, ((px - ax) * ex + (pz - az) * ez) / length2)) : 0;
+  return Math.hypot(px - ax - t * ex, pz - az - t * ez);
+};
 const point = (value: unknown, label: string): Vec3 => {
   const v = value as ArrayLike<number> | null;
   if (!v || v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2]))
@@ -122,6 +130,12 @@ export class CrowdAgent {
   planned = -1;
   /** @internal mesh version the agent last stood on. */
   seen: number;
+  /** @internal this frame's wall half-planes (nx, nz, c), the first `wallCount` of them. */
+  walls = new Float64Array(3 * 16);
+  /** @internal */
+  wallCount = 0;
+  /** @internal seconds ahead the walls are avoided: the time the agent takes to stop from its top speed. */
+  wallHorizon = 1;
   /** The mesh it walks on. */
   readonly surface: NavSurface;
   /** Its cost per area number, if any. */
@@ -238,6 +252,10 @@ export class Crowd {
   private readonly neighbors: Agent[] = [];
   private readonly obstacleDiscs: Agent[] = [];
   private readonly candidates: { agent: Agent; distance: number }[] = [];
+  /** Scratch of gatherWalls: polygons to visit, those already queued, and open spans of one edge. */
+  private readonly queue: number[] = [];
+  private readonly seen = new Set<number>();
+  private readonly spans: number[] = [];
 
   /**
    * @param navMesh The walkable polygons the agents stay on: a `NavMesh` or a tiled mesh.
@@ -361,19 +379,23 @@ export class Crowd {
     }
     // 2. Avoidance: every agent picks its velocity from the same snapshot, then all move.
     const chosen = this.agents.map((agent) => {
+      agent.wallCount = 0;
       if (agent.state === 'offmesh') return [agent.disc.preferred[0], agent.disc.preferred[1]];
       const neighbors = this.near(agent);
-      avoid(agent.disc, neighbors, dt, this.timeHorizon, this.output);
-      // Limit the change of velocity to maxAcceleration.
-      let ax = this.output[0] - agent.velocity[0],
-        az = this.output[1] - agent.velocity[2];
-      const change = Math.hypot(ax, az),
-        most = agent.maxAcceleration * dt;
-      if (change > most) {
-        ax *= most / change;
-        az *= most / change;
-      }
-      return [agent.velocity[0] + ax, agent.velocity[2] + az];
+      this.gatherWalls(agent, dt);
+      avoidAmong(agent.disc, neighbors, agent.walls, agent.wallCount, dt, this.timeHorizon, this.output);
+      // Limit the change of velocity to maxAcceleration, keeping the walls.
+      accelerate(
+        agent.velocity[0],
+        agent.velocity[2],
+        this.output[0],
+        this.output[1],
+        agent.maxAcceleration * dt,
+        agent.walls,
+        agent.wallCount,
+        this.output,
+      );
+      return [this.output[0], this.output[1]];
     });
     // 3. Move, staying on the mesh, and arrive.
     this.agents.forEach((agent, i) => this.move(agent, chosen[i][0], chosen[i][1], dt));
@@ -550,6 +572,127 @@ export class Crowd {
     return out;
   }
 
+  /**
+   * The mesh border near `agent` as hard ORCA half-planes (van den Berg, Guy, Lin and Manocha 2011, section 5.4) in
+   * `agent.walls`: every polygon edge, or part of one, that no portal to walkable ground opens, on the polygons reachable
+   * through portals within reach, facing the agent. Ground the agent's filter forbids is a wall too. The border bounds
+   * the agent's centre, as a navmesh built with the agent's radius means it to. Walls are avoided `wallHorizon` ahead,
+   * the agent's own time to stop from top speed (maxSpeed / maxAcceleration), and at least one step, so a step never
+   * crosses one; nothing further than the agent can close in that time matters. A surface without `polygonPoints` and
+   * `polygonLinks` has no walls here, and the move alone keeps its agents on it.
+   */
+  private gatherWalls(agent: CrowdAgent, dt: number): void {
+    const mesh = agent.surface;
+    if (!mesh.polygonPoints || !mesh.polygonLinks || agent.polygon < 0) return;
+    const horizon = Math.max(agent.maxSpeed / agent.maxAcceleration, dt),
+      reach = agent.maxSpeed * horizon + 1e-6,
+      px = agent.position[0],
+      pz = agent.position[2],
+      filter = agent.filter,
+      queue = this.queue,
+      seen = this.seen,
+      spans = this.spans;
+    agent.wallHorizon = horizon;
+    const open = (to: number) => !filter || (filter[mesh.polygonArea(to)] ?? 1) < Infinity;
+    queue.length = 0;
+    seen.clear();
+    queue.push(agent.polygon);
+    seen.add(agent.polygon);
+    for (let at = 0; at < queue.length; at++) {
+      const p = queue[at],
+        points = mesh.polygonPoints(p),
+        links = mesh.polygonLinks(p),
+        n = points.length;
+      for (const link of links) {
+        if (link.offMesh !== undefined || seen.has(link.to) || !open(link.to)) continue;
+        if (segmentDistance(px, pz, link.left[0], link.left[2], link.right[0], link.right[2]) > reach) continue;
+        seen.add(link.to);
+        queue.push(link.to);
+      }
+      const a0 = points[0],
+        a1 = points[1],
+        a2 = points[2],
+        winding = (a1[0] - a0[0]) * (a2[2] - a0[2]) - (a1[2] - a0[2]) * (a2[0] - a0[0]) > 0 ? 1 : -1;
+      for (let i = 0; i < n; i++) {
+        const a = points[i],
+          b = points[(i + 1) % n],
+          ex = b[0] - a[0],
+          ez = b[2] - a[2],
+          length2 = ex * ex + ez * ez,
+          length = Math.sqrt(length2),
+          inX = (-ez * winding) / length,
+          inZ = (ex * winding) / length;
+        // Only walls the agent stands in front of, and near enough to matter.
+        if ((px - a[0]) * inX + (pz - a[2]) * inZ < -1e-6) continue;
+        if (segmentDistance(px, pz, a[0], a[2], b[0], b[2]) > reach) continue;
+        // The parts of the edge that portals to open ground leave closed (a tile seam may open only part of one).
+        spans.length = 0;
+        for (const link of links) {
+          if (link.offMesh !== undefined || !open(link.to)) continue;
+          const l = link.left,
+            r = link.right;
+          if (
+            Math.abs(ex * (l[2] - a[2]) - ez * (l[0] - a[0])) > 1e-6 * length ||
+            Math.abs(ex * (r[2] - a[2]) - ez * (r[0] - a[0])) > 1e-6 * length
+          )
+            continue;
+          const s = ((l[0] - a[0]) * ex + (l[2] - a[2]) * ez) / length2,
+            e = ((r[0] - a[0]) * ex + (r[2] - a[2]) * ez) / length2,
+            low = Math.max(0, Math.min(s, e)),
+            high = Math.min(1, Math.max(s, e));
+          if (high - low > 1e-9) spans.push(low, high);
+        }
+        let from = 0;
+        while (from < 1 - 1e-9) {
+          // The next open span at or after `from`, by its start (few spans per edge: a linear pick keeps it in order).
+          let next = -1;
+          for (let k = 0; k < spans.length; k += 2)
+            if (spans[k + 1] > from + 1e-9 && (next < 0 || spans[k] < spans[next])) next = k;
+          const to = next < 0 ? 1 : Math.max(from, spans[next]);
+          if (to > from + 1e-9) this.addWall(agent, px, pz, a, ex, ez, from, to, inX, inZ, horizon, reach);
+          if (next < 0) break;
+          from = Math.max(from, spans[next + 1]);
+        }
+      }
+    }
+  }
+
+  private addWall(
+    agent: CrowdAgent,
+    px: number,
+    pz: number,
+    a: Vec3,
+    ex: number,
+    ez: number,
+    from: number,
+    to: number,
+    inX: number,
+    inZ: number,
+    horizon: number,
+    reach: number,
+  ): void {
+    let walls = agent.walls;
+    if (walls.length < 3 * (agent.wallCount + 1)) {
+      walls = new Float64Array(walls.length * 2);
+      walls.set(agent.walls);
+      agent.walls = walls;
+    }
+    const d = wallLine(
+      px,
+      pz,
+      a[0] + ex * from,
+      a[2] + ez * from,
+      a[0] + ex * to,
+      a[2] + ez * to,
+      inX,
+      inZ,
+      horizon,
+      walls,
+      3 * agent.wallCount,
+    );
+    if (d <= reach) agent.wallCount++;
+  }
+
   private move(agent: CrowdAgent, vx: number, vz: number, dt: number): void {
     const p = agent.position,
       mesh = agent.surface,
@@ -576,10 +719,25 @@ export class Crowd {
       }
       return;
     }
-    // Try the full move, then each axis alone (sliding along a wall), else stay.
+    // Try the full move; then along the walls it touches (rounding can still carry a step that grazes a wall off the
+    // mesh); on a surface without walls, each axis alone; else stay.
     let nx = p[0] + vx * dt,
       nz = p[2] + vz * dt,
       polygon = stand(nx, nz);
+    if (polygon < 0 && agent.wallCount) {
+      const w = agent.walls,
+        step = Math.hypot(vx, vz) * dt;
+      for (let k = 0; k < agent.wallCount; k++) {
+        const into = w[3 * k] * vx + w[3 * k + 1] * vz;
+        if (into < 0 && -w[3 * k + 2] * agent.wallHorizon <= step + 1e-6) {
+          vx -= into * w[3 * k];
+          vz -= into * w[3 * k + 1];
+        }
+      }
+      nx = p[0] + vx * dt;
+      nz = p[2] + vz * dt;
+      polygon = stand(nx, nz);
+    }
     if (polygon < 0) {
       polygon = stand(nx, p[2]);
       if (polygon >= 0) {

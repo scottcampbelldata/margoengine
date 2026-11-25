@@ -124,20 +124,23 @@ function solve(set: Float64Array, count: number, radius: number, tx: number, tz:
 }
 
 /**
- * Paper section 5.2: the velocity in the disc that minimises the largest violation c_i - n_i . w over all
+ * Paper section 5.2: the velocity in the disc that minimises the largest violation c_i - n_i . w over the soft
  * constraints, refining the optimum of constraints 0..first-1 incrementally. Where constraint i's violation exceeds
  * the running maximum, the new optimum has i as (one of) the most violated constraints: maximise n_i . w subject to
- * violation_j(w) <= violation_i(w) for every earlier j, i.e. (n_j - n_i) . w >= c_j - c_i, a 2D problem again.
+ * violation_j(w) <= violation_i(w) for every earlier soft j, i.e. (n_j - n_i) . w >= c_j - c_i, a 2D problem again.
+ * The first `hard` constraints (walls; section 5.4: the constraints of obstacles are not relaxed) join every such
+ * problem unchanged.
  */
-function leastViolation(count: number, first: number, radius: number): void {
+function leastViolation(count: number, first: number, radius: number, hard: number): void {
   let worst = 0;
-  for (let i = first; i < count; i++) {
+  for (let i = Math.max(first, hard); i < count; i++) {
     const nx = lines[3 * i],
       nz = lines[3 * i + 1],
       c = lines[3 * i + 2];
     if (c - (nx * bestX + nz * bestZ) <= worst + SLACK) continue;
-    let size = 0;
-    for (let j = 0; j < i; j++) {
+    ridges.set(lines.subarray(0, 3 * hard));
+    let size = hard;
+    for (let j = hard; j < i; j++) {
       const mx = lines[3 * j] - nx,
         mz = lines[3 * j + 1] - nz,
         length = Math.hypot(mx, mz);
@@ -178,6 +181,26 @@ export function avoid(
   horizon = 2,
   output = new Float64Array(2),
 ): Float64Array {
+  return avoidAmong(agent, neighbors, NO_WALLS, 0, delta, horizon, output);
+}
+
+const NO_WALLS = new Float64Array(0);
+
+/**
+ * {@link avoid} with hard half-planes first: `walls` holds `wallCount` triples (nx, nz, c), each meaning n . w >= c
+ * for the chosen velocity w, as {@link wallLine} builds them. They are not relaxed while some velocity meets them all;
+ * the agents' constraints are relaxed instead (paper section 5.4). For the Crowd.
+ * @internal
+ */
+export function avoidAmong(
+  agent: Agent,
+  neighbors: readonly Agent[],
+  walls: Float64Array,
+  wallCount: number,
+  delta: number,
+  horizon: number,
+  output: Float64Array,
+): Float64Array {
   check(agent);
   if (
     !(delta > 0) ||
@@ -192,16 +215,18 @@ export function avoid(
     throw new RangeError(
       'Invalid ORCA timestep or neighbor budget: delta and horizon must be finite seconds > 0, output a length-2 array, and neighbors at most 4096',
     );
-  if (lines.length < 3 * neighbors.length) {
-    const size = 3 * Math.max(neighbors.length, (lines.length / 3) * 2);
+  const total = neighbors.length + wallCount;
+  if (lines.length < 3 * total) {
+    const size = 3 * Math.max(total, (lines.length / 3) * 2);
     lines = new Float64Array(size);
     ridges = new Float64Array(size);
   }
+  lines.set(walls.subarray(0, 3 * wallCount));
   const ax = agent.position[0],
     az = agent.position[1],
     vx = agent.velocity[0],
     vz = agent.velocity[1];
-  let count = 0;
+  let count = wallCount;
   for (let i = 0; i < neighbors.length; i++) {
     const other = neighbors[i];
     check(other);
@@ -274,8 +299,95 @@ export function avoid(
   }
   const speed = agent.maxSpeed,
     failed = solve(lines, count, speed, agent.preferred[0], agent.preferred[1], false);
-  if (failed < count) leastViolation(count, failed, speed);
+  // Walls that leave no velocity at all (an agent wedged into a gap narrower than itself) are relaxed with the rest.
+  if (failed < count) leastViolation(count, failed, speed, failed < wallCount ? 0 : wallCount);
   output[0] = bestX;
   output[1] = bestZ;
+  return output;
+}
+
+/**
+ * The ORCA half-plane of one wall segment from (ax, az) to (bx, bz) for an agent centre at (px, pz) that must stay on
+ * its walkable side (paper section 5.4, equation 11, with radius 0: the navmesh border bounds the centre). The velocity
+ * obstacle within `horizon` seconds is the segment as seen from the agent scaled by 1 / t for every t up to `horizon`;
+ * with the optimisation velocity 0 of obstacles, the permitted half-plane is bounded by the tangent at the point of it
+ * nearest 0, which is the segment's nearest point c scaled by 1 / horizon: the agent may close on c at no more than
+ * d / horizon (d its distance from c) and slides along the wall freely, and 0 is always permitted. Only a wall the
+ * agent stands in front of gives one: where the nearest point is an end of the segment, that end is a corner of the
+ * border, and its half-plane would brake every agent walking at it, as every route corner on the border has it do;
+ * the wall the agent passes in front of next takes over, and in a corner of a room the agent always stands in front
+ * of one of its two walls. `inwardX`/`inwardZ` (unit, toward the walkable side) is the normal for an agent on the
+ * wall. Writes (nx, nz, c), meaning n . w >= c, at `out[at..at+2]` and returns d, or Infinity for no half-plane.
+ * @internal
+ */
+export function wallLine(
+  px: number,
+  pz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  inwardX: number,
+  inwardZ: number,
+  horizon: number,
+  out: Float64Array,
+  at: number,
+): number {
+  const ex = bx - ax,
+    ez = bz - az,
+    t = ((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez);
+  if (t < -1e-9 || t > 1 + 1e-9) return Infinity;
+  const dx = px - ax - t * ex,
+    dz = pz - az - t * ez,
+    d = Math.hypot(dx, dz);
+  // Standing on the corner itself: the walls on either side of it hold the agent once it is in front of them.
+  if (d < 1e-6 && (t < 1e-6 || t > 1 - 1e-6)) return Infinity;
+  out[at] = d > 1e-6 ? dx / d : inwardX;
+  out[at + 1] = d > 1e-6 ? dz / d : inwardZ;
+  out[at + 2] = -d / horizon;
+  return d;
+}
+
+/**
+ * The velocity nearest (tx, tz) within `most` of (vx, vz), the current velocity, that keeps the first `count` wall
+ * half-planes of `walls`: ORCA's choice limited by the agent's acceleration without breaking a wall, the same linear
+ * program in coordinates centred on the current velocity. When no such velocity exists (the walls need a larger change
+ * than the acceleration allows), the walls win: the point of the step toward (tx, tz) nearest the current velocity that
+ * keeps them, or (tx, tz) itself. Writes the velocity to `output`.
+ * @internal
+ */
+export function accelerate(
+  vx: number,
+  vz: number,
+  tx: number,
+  tz: number,
+  most: number,
+  walls: Float64Array,
+  count: number,
+  output: Float64Array,
+): Float64Array {
+  if (ridges.length < 3 * count) ridges = new Float64Array(3 * Math.max(count, (ridges.length / 3) * 2));
+  for (let k = 0; k < count; k++) {
+    const nx = walls[3 * k],
+      nz = walls[3 * k + 1];
+    ridges[3 * k] = nx;
+    ridges[3 * k + 1] = nz;
+    ridges[3 * k + 2] = walls[3 * k + 2] - nx * vx - nz * vz;
+  }
+  if (solve(ridges, count, most, tx - vx, tz - vz, false) === count) {
+    output[0] = vx + bestX;
+    output[1] = vz + bestZ;
+    return output;
+  }
+  let t = 0;
+  const ax = tx - vx,
+    az = tz - vz;
+  for (let k = 0; k < count; k++) {
+    const gain = walls[3 * k] * ax + walls[3 * k + 1] * az,
+      short = ridges[3 * k + 2];
+    if (short > 0) t = gain >= short ? Math.max(t, short / gain) : 1;
+  }
+  output[0] = vx + ax * t;
+  output[1] = vz + az * t;
   return output;
 }

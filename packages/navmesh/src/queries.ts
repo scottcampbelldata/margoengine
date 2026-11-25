@@ -1,5 +1,5 @@
 // Clean-room convex clipping and local portal searches. Sources: docs/clean-room.md, batch 252.
-import type { NavFilter, NavMesh, NavSurface, Vec3 } from './index.js';
+import type { NavFilter, NavLink, NavMesh, NavSurface, Vec3 } from './index.js';
 import { createRandom } from '@margoengine/math/mathutils';
 import { MargoError } from '@margoengine/math/errors';
 import type { TiledNavMesh } from './tiles.js';
@@ -172,6 +172,14 @@ export class NavMeshQuery implements NavSurface {
   /** Area number used by Crowd's filter. */
   polygonArea(polygon: number): number {
     return this.mesh.polygonArea(polygon);
+  }
+  /** Corners of a polygon in winding order, which a Crowd reads for the mesh border. */
+  polygonPoints(polygon: number): readonly Vec3[] {
+    return this.mesh.polygonPoints(polygon);
+  }
+  /** Ways out of a polygon, which a Crowd reads for the mesh border. */
+  polygonLinks(polygon: number): readonly NavLink[] {
+    return this.mesh.polygonLinks(polygon);
   }
   /**
    * Plans a complete path, or a partial path to the nearest reachable point (XZ distance, then vertical distance).

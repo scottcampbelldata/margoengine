@@ -16,6 +16,8 @@ export class NavMeshQuery implements NavSurface {
     } | null;
     heightAt(polygon: number, x: number, z: number): number;
     polygonArea(polygon: number): number;
+    polygonPoints(polygon: number): readonly Vec3[];
+    polygonLinks(polygon: number): readonly NavLink[];
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
     path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
     partialRoute(start: Vec3, end: Vec3, filter?: NavFilter): NavPartialRoute | null;
@@ -137,6 +139,7 @@ class NavMesh implements NavSurface {
     get version(): number;
     polygonVertices(index: number): readonly number[];
     polygonLinks(index: number): readonly NavLink[];
+    polygonPoints(index: number): readonly Vec3[];
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
@@ -176,6 +179,8 @@ interface NavSurface {
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     partialRoute?(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     polygonArea(index: number): number;
+    polygonPoints?(index: number): readonly Vec3[];
+    polygonLinks?(index: number): readonly NavLink[];
 }
 
 interface NavTile {

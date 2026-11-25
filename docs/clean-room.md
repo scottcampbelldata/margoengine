@@ -11364,3 +11364,30 @@ implicit-pressure re-import) is this framework's own arrangement. Proof: `packag
 ### Uniform-grid neighbour search (`kernel-common`, 2026-11-25, K04)
 
 `kernel-common/src/neighbours.rs` bins points into cells of one size with a counting sort and lets a query visit the cells around a point in a fixed order, the points of a cell by id: the linked-cell method of R. W. Hockney and J. W. Eastwood, "Computer Simulation Using Particles", McGraw-Hill, 1981, chapter 8, with binning by counting sort as described in S. Green, "Particle Simulation using CUDA", NVIDIA white paper, 2010. No hash table is used, so no table size or insertion order decides the sequence of candidates. A point set whose bounds would need more than 2^26 cells at the cell size asked for is refused.
+
+### Crowd walls as ORCA constraints (navmesh, 2026-11-25)
+
+`packages/navmesh/src/orca.ts` (`wallLine`, the hard rows of `leastViolation`, `accelerate`) and the wall gathering of
+`packages/navmesh/src/crowd.ts`, written from the paper alone; no crowd library or engine source was read:
+
+- J. van den Berg, S. J. Guy, M. Lin and D. Manocha, "Reciprocal n-Body Collision Avoidance", Robotics Research (ISRR
+  2009), Springer Tracts in Advanced Robotics 70, 2011, pp. 3-19, https://doi.org/10.1007/978-3-642-19457-3_1 (read in
+  full). Used: section 5.4, equation 11: the velocity obstacle of a line-segment obstacle; the optimisation velocity 0
+  for obstacles, so a permitted velocity always exists; full responsibility; a shorter time horizon for obstacles than
+  for agents; obstacle constraints are not relaxed when the linear program of section 5.1 is infeasible, which is the
+  hard rows of section 5.2's three-dimensional program here.
+- D. Helbing and P. Molnar, "Social force model for pedestrian dynamics", Physical Review E 51(5), 4282-4286, 1995,
+  https://doi.org/10.1103/PhysRevE.51.4282. Compared: a wall acts on a pedestrian from the nearest point of the wall,
+  as the half-plane does here; its repulsive potential is not used (a force cannot keep a fast agent off a wall it
+  approaches within one step, a hard constraint can).
+
+Margo's own: the walls are the navmesh border, the edges (or parts of edges at tile seams) that no portal to allowed
+ground opens, gathered through portals within the distance the agent can close in the wall horizon; the wall horizon
+is the agent's time to stop from top speed, `maxSpeed / maxAcceleration` (at least one step), the shortest at which the
+braking the half-plane asks for stays within the acceleration limit; the border bounds the agent's centre (radius 0),
+since the mesh is eroded by the agent radius; only walls whose nearest point to the agent lies inside them give a
+half-plane, because the half-plane of a wall's end, a corner of the border, brakes an agent walking at it, and every
+route corner lies on such a corner; the acceleration limit is applied by solving the same linear program in a disc of
+radius `maxAcceleration * dt` round the current velocity with the walls kept, and gives way to the walls when they need
+more. Proof: `packages/navmesh/test/crowd-walls.test.js` (a Z bend at full speed, a diagonal corridor head on and in a
+group: no frame stopped by a wall, no velocity reversals).
