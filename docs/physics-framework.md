@@ -5,7 +5,8 @@ granular matter, the atmosphere, the ocean, rivers and floods, terrain, destruct
 They must interact as nature does (wind fills a sail that drives a hull that cuts a wake into a sea the wind grew), and
 every film shot must re-render bit for bit on any machine. This file is the contract every solver is built on. The
 findings it answers are in [physics-audit.md](physics-audit.md), and the rigid and soft rows in
-[rapier-parity.md](rapier-parity.md).
+[rapier-parity.md](rapier-parity.md). Every solver built on it, with its methods, kernels and couplings, is in
+[physics-solvers.md](physics-solvers.md).
 
 **Basis.**
 

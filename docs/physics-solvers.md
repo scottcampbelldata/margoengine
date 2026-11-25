@@ -1,0 +1,452 @@
+# Physics solver catalog
+
+Every physical phenomenon Margo's films and scenes need, as one solver each, built on the framework in
+[physics-framework.md](physics-framework.md). The defects that started this work are in
+[physics-audit.md](physics-audit.md); rigid-body parity with Rapier is tracked in [rapier-parity.md](rapier-parity.md).
+
+The catalog covers all 110 packages under `packages/`, the audit (PA-01 to PA-92 and its solver plan) and the Rapier
+parity file. "State" is judged from each package's source headers, file lists and the audit, not from a line-by-line
+read of every function.
+
+**How to read it.** Each solver has an ID (family and number), the phenomenon and model, the packages that hold or
+will hold it, its state today, the best published methods to build from, and the shared kernels it uses. The
+coupling matrix in section 3 lists every pair of solvers that exchange data, and which way.
+
+**Citations.** Each solver's owner checks every citation (title, authors, year, venue) against the paper itself
+before building, per the research-first rule, and records the checked list in the package docs. A citation here is
+a starting point, not a verified reference.
+
+## 0. Scope and conventions
+
+**Packages with no physical phenomenon, and so no solver.** They are pure rendering, tooling, formats, UI or data:
+- Rendering and display: core, stage, shader, materials, post, taa, dof, oit, tonemap, toon, shadows, clustered, lightmap, lighting2d, environment (IBL and lighting parts), voxel-pathtracer, splats, points, lines, text, ui, sprites, pixel, transitions, culling, lod, selection, inspector, stats, quality, viewcube, labels, html, cameras, controls (camera parts).
+- Assets and formats: loaders, decoders, exporters, gltf, usdz, fbx, brep, cad, ifc, tiles, cache, save, geometry, mesh-edit, splines, road, wfc, tilemap, blender, kit-*, margoengine, react, worker, headless, webgl2-compat, xr (the physics part is PA-82), mcp, video, input, netcode (PA-89), ecs, fsm, tween, math, scene, compute (it supplies kernels), bvh (it supplies kernels).
+- Physical appearance that follows from a solver and is not a solver itself: sky and aurora optics, caustics, underwater optics, material lobes.
+
+**Packages that carry or need physics.** physics, physics2d, ragdoll, voxel, voxel-edit, kinematics-constraints, robot-planning, machinery, rigging, animator, animation, humans, horses, armies, navmesh, behavior, water, weather, sky, vfx, creative, scatter, scenes, terrain, biomes, procedural, audio, mixer, sciviz, cutscene, cinematic, environment (fog volumes), game.
+
+**State vocabulary.**
+- none: nothing exists.
+- stand-in: a scripted or kinematic substitute exists. This is the audit's recurring pattern.
+- partial: a real model exists but it is incomplete or uncoupled.
+- sound: a deterministic, source-cited model with tests.
+
+**Shared kernels K01 to K05.** These are the framework layer and every solver uses them, so the table lists only K06 and above.
+
+## 1. Solver table
+
+The first column is the ID. Paths are relative to `packages/`. The last column lists the extra kernels beyond K01 to K05.
+
+### Family DYN: rigid, articulated and contact dynamics (8)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| DYN-01 | 3D rigid body and contact | Newton-Euler, friction, restitution, CCD, joints, queries | physics/src/physics.ts, physics/kernel/src/*.rs, voxel/src/physics.ts, ragdoll | sound: Rapier parity rows 233 DONE, 9 PARTIAL, 6 MISSING of 254. Gaps are PA-01, 02, 05, 06, 36 and 88. | Macklin et al., "Small Steps in Physics Simulation" (SCA 2019). Tonge et al., "Mass splitting for jitter-free parallel rigid body simulation" (2012). Catto, Solver2D soft step (2024). | K06 K07 K08 K09 |
+| DYN-02 | 2D rigid body | Same model in 2D | physics2d, tilemap colliders, sprites | sound (docs/rapier-parity-2d.md) | Catto, Box2D v3 soft step (2024) | K06 K08 K09 |
+| DYN-03 | Articulated bodies, joints, motors, robots | Featherstone ABA/RNEA, joint limits and motors, gears, pulleys, TOPP | physics/kernel/src/multibody.rs; machinery/src/kinematics.ts; robot-planning/src/*; kinematics-constraints | partial. Kernel is sound (X-66, X-67). Machinery is a stand-in (PA-80). Robot planning is geometric only (PA-81). | Featherstone, *Rigid Body Dynamics Algorithms* (2008). Baraff, "Linear-time dynamics using Lagrange multipliers" (1996). Pham and Pham, "Time-optimal path parameterization based on reachability analysis" (2018). | K09 K10 K29 |
+| DYN-04 | Wheeled vehicle dynamics | Tyre forces, suspension, drivetrain, tracks, motorcycle, horse-drawn carts | physics/src/vehicle.ts, tyres.ts, drivetrain.ts, tracked.ts, motorcycle.ts; procedural/src/vehicles.ts | sound (X-45 to X-50). Missing: soil coupling (PA-45), wind drag (PA-26), procedural vehicles carry no mass. | Pacejka, *Tyre and Vehicle Dynamics* (2012). Svendenius, brush tyre model (2007). | K07 K09 K18 |
+| DYN-05 | Rail vehicle dynamics | Wheel-rail creep contact, couplers, bogies | none (needs a new package or a physics entry) | none | Kalker, *Three-Dimensional Elastic Bodies in Rolling Contact* (1990). Polach, "Creep forces in simulations of traction vehicles running on adhesion limit" (2005). Iwnicki, *Handbook of Railway Vehicle Dynamics* (2006). | K07 K09 K18 |
+| DYN-06 | Mass properties and collision geometry | Closed-mesh volume and inertia, open-mesh repair, convex decomposition | physics/kernel/src/mesh.rs, mass.rs; physics/src/decomposition.ts, mesh-clean.ts, mesh-fit.ts; blender/src/components.ts | partial: PA-87 (1 kg/m³ boxes), PA-88 (open meshes), PA-09 (`Date.now` bound) | Mirtich, "Fast and accurate computation of polyhedral mass properties" (1996). Jacobson, Kavan and Sorkine-Hornung, "Generalized winding numbers" (2013). Wei et al., CoACD (SIGGRAPH 2022). | K07 K11 K24 |
+| DYN-07 | Dynamic character, balance, push response | Upright dynamic body, powered ragdoll, get-up, foot contact, physics-driven walking | physics/src/dynamic-character.ts, character.ts; ragdoll/src/*; animator/src/foot-placement.ts, root-motion.ts; controls/src/walk.ts | partial: X-62 to X-65 done. PA-67, 77, 78 open. Characters never enter the world. | Coros, Beaudoin and van de Panne, "Generalized biped walking control" (2010). Geijtenbeek and Pronost, "Interactive character animation using simulated physics" (2012). | K07 K09 K10 K29 |
+| DYN-08 | Large-scale GPU rigid dynamics | 10⁵ to 10⁶ bodies for rubble, debris and avalanches | none (X-73 to X-76 are MISSING) | none | Giles, Diaz and Yuksel, "Augmented Vertex Block Descent" (SIGGRAPH 2025). Macklin et al. (2019). | K06 K08 K09 |
+
+### Family SOFT: deformables (6)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| SOFT-01 | Cloth and thin shells | Stretch, bend, self-collision, friction, tearing, skinned cloth, garments, flags | physics/src/soft.ts, soft-wasm.ts; humans (garments); rigging/src/springs.ts | partial. XPBD cloth is sound. PA-05, 06 and 29 are open. X-27, 28, 30, 31 are MISSING. | Macklin, Müller and Chentanez, "XPBD" (2016). Chen et al., "Vertex Block Descent" (SIGGRAPH 2024). Bridson, Fedkiw and Anderson, "Robust treatment of collisions, contact and friction for cloth animation" (2002). Pfaff et al., "Adaptive tearing and cracking of thin sheets" (2014). | K06 K07 K09 |
+| SOFT-02 | Rods, ropes, cables, chains (Cosserat) | Bend and twist, wrapping, friction, anchor chains, rigging, vines | physics/src/rope.ts; physics/src/soft.ts | partial: XPBD ropes only. X-51, 52, 54, 55 are open. | Bergou et al., "Discrete Elastic Rods" (2008). Kugelstadt and Schömer, "Position and orientation based Cosserat rods" (2016). Sueda, Kaufman and Pai, "Musculotendon simulation for hand animation" (2008) for wrapping. | K06 K09 K24 |
+| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | Strand dynamics against wind and the body | rigging/src/springs.ts; horses/src/model.ts; humans (hair); animation | stand-in: PA-71 (tail is a sinusoid), PA-75 (unitless units), PA-76 (jiggle can blow up) | Bertails et al., "Super-helices for predicting the dynamics of natural hair" (2006). Müller, Kim and Chentanez, "Fast simulation of inextensible hair and fur" (2012). | K06 K09 K18 |
+| SOFT-04 | Volumetric solids (FEM) | Rubber, jelly, bending timber, ice sheets, soft flesh | physics/src/soft.ts, soft-volume.ts (tets and shape matching) | partial. X-32 to X-34 are MISSING. | Smith, De Goes and Kim, "Stable Neo-Hookean flesh simulation" (2018). Bouaziz et al., "Projective Dynamics" (2014). Chen et al., VBD (2024). | K09 K11 K12 K19 K24 |
+| SOFT-05 | Muscle, fat and skin soft tissue | Animals and humans, skin sliding, secondary motion | rigging/src/correctives.ts, autorig.ts; animation; humans; horses | none (shape-only correctives) | Teran et al., "Robust quasistatic finite elements and flesh simulation" (2005). Lee, Sifakis and Terzopoulos, "Comprehensive biomechanical modeling of the upper body" (2009). Smith et al. (2018). | K09 K10 K19 K24 |
+| SOFT-06 | Pressure bodies | Balloons, inflatables, tyres, filled sails, airbags | physics/src/soft.ts | none (X-32 MISSING) | Müller et al., "Position based dynamics" (2007), pressure constraint. Macklin et al., "Unified particle physics" (2014). | K09 K11 |
+
+### Family BREAK: fracture, structures and impact (5)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| BREAK-01 | Brittle and ductile fracture, destruction | Pre-fracture, runtime fracture, damage from impulse, per-material strength, settled rubble | voxel/src/debris.ts, physics.ts, blocks.ts; procedural/src/voronoi.ts; vfx/src/debris.ts | stand-in: PA-40, 41, 44, 50. X-40 to X-43 are MISSING. | Müller, Chentanez and Kim, "Real time dynamic fracture with volumetric approximate convex decompositions" (2013). O'Brien and Hodgins (1999). Wolper et al., CD-MPM (2019) for the high-fidelity mode. | K09 K11 K15 K28 |
+| BREAK-02 | Structural collapse and load path | Masonry, timber, steel frames, bridges, masts, chimneys, walls; wind and blast loads on structures | voxel/src/debris.ts (flood-fill stand-in); scenes/src/fauld-tunnels.ts; procedural/src/buildings.ts | stand-in: PA-40 (a floating slab). PA-31 adds wind-load failure. | Whiting et al., "Procedural modeling of structurally-sound masonry buildings" (2009). Tagel-Din and Meguro, applied element method (2000). Livesley, rigid-block limit analysis (1978). | K09 K12 K19 K28 |
+| BREAK-03 | Hull crushing, collision, grounding, ramming | Ductile plating energy absorption between ships, rocks and ice | none | none (PA-52) | Minorsky, "An analysis of ship collisions" (1959). Pedersen and Zhang, "On impact mechanics in ship collisions" (1998). | K09 K11 K19 |
+| BREAK-04 | Exterior ballistics | Shot, shell, arrow, bullet and fragment flight: Mach-dependent drag, Magnus force, wind, spin | vfx/src/gunfire.ts (`sphereDrag`), vfx/src/debris.ts | partial: PA-62 (debris uses a constant Cd) | McCoy, *Modern Exterior Ballistics* (1999). Hoerner, *Fluid-Dynamic Drag* (1965). | K18 K23 |
+| BREAK-05 | Terminal ballistics and impact damage | Penetration, ricochet, splintering, wood, iron, stone, bodies | vfx/src/gunfire.ts; voxel/src/physics.ts | stand-in: PA-52, 53 (including the shared splinter emitter bug) | Recht and Ipson (1963). Backman and Goldsmith, "The mechanics of penetration of projectiles into targets" (1978). Zukas, *Impact Dynamics* (1982). | K07 K09 K23 |
+
+### Family LIFE: characters, animals, crowds and machines (7)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | Point mass with leg spring, grip-limited turning, lean, slopes, slips, falls | horses/src/index.ts, gaits.ts, model.ts, seat.ts; humans; animator | stand-in: PA-68, 69, 70 (fixed stride, one ground sample) | Alexander and Jayes, "A dynamic similarity hypothesis for the gaits of quadrupedal mammals" (1983). Blickhan, "The spring-mass model for running and hopping" (1989). Geijtenbeek, van de Panne and van der Stappen, "Flexible muscle-based locomotion for bipedal creatures" (2013). | K09 K10 K18 K29 |
+| LIFE-02 | Limbless, insect and small-animal locomotion | Snakes, lizards, crabs, spiders, insects, kinematic templates plus ground contact | none | none | Hu, Nirody, Scott and Shelley, "The mechanics of slithering locomotion" (2009). Holmes et al., "The dynamics of legged locomotion" (2006). | K09 K10 K29 |
+| LIFE-03 | Aquatic locomotion | Fish, whales, dolphins, seals, undulatory swimming, breaching, diving | none | none | Lighthill, "Note on the swimming of slender fish" (1960). Triantafyllou, Triantafyllou and Yue, "Hydrodynamics of fishlike swimming" (2000). Tu and Terzopoulos, "Artificial fishes" (1994). | K09 K10 K22 K29 |
+| LIFE-04 | Collective animal motion | Flocks, schools, herds, swarms | behavior/src/steering.ts and the flocking entries | stand-in: PA-83 (no mass, drag or turn limit) | Reynolds, "Flocks, herds and schools" (1987). Couzin et al. (2002). Ballerini et al., topological interaction in starlings (2008). | K06 K18 |
+| LIFE-05 | Pedestrian and dense-crowd dynamics | Social force, contact forces, crush, walls, doorways | navmesh/src/crowd.ts, orca.ts, agents.ts | partial: ORCA is sound, no body contact (PA-74) | Helbing, Farkas and Vicsek, "Simulating dynamical features of escape panic" (2000). Karamouzas, Skinner and Guy, "Universal power law governing pedestrian interactions" (2014). Narain et al., "Aggregate dynamics for dense crowd simulation" (2009). | K06 K09 |
+| LIFE-06 | Mass formations and cavalry charge | Momentum, impact, knock-down, ragdoll hand-off, riders | navmesh/src/formations.ts; armies/src/*; horses/src/seat.ts | stand-in: PA-72, 73 (masses of 500 and 80, velocity changes instantly) | Helbing and Molnár (1995). Helbing et al. (2000). Rider mass model: Bystroem et al. (2009), Münz et al. (2014) (the audit's sources). | K06 K07 K09 |
+| LIFE-07 | Machine dynamics with actuators | Engines, steam, hydraulics, cranes, trebuchets, clockwork, windlasses, capstans | machinery/src/*; procedural/src/gears.ts; physics/src/mechanisms.ts | stand-in: PA-80 (kinematic ratios, no torque or load) | Featherstone (2008). Merritt, *Hydraulic Control Systems* (1967). | K09 K10 K18 |
+
+### Family AERO: aerodynamics and flight (5)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| AERO-01 | Aerodynamic loads on bodies | Drag, lift and moment from shape and relative wind, with sheltering | physics/src/fields.ts (bounding box, Cd 1) | stand-in: PA-26 | Hoerner, *Fluid-Dynamic Drag* (1965) and *Fluid-Dynamic Lift* (1975). Katz and Plotkin, *Low-Speed Aerodynamics* (2001). | K07 K11 K22 |
+| AERO-02 | Membrane aerodynamics (FSI) | Sails, flags, parachutes, tents, capes: per-triangle pressure, thrust reacting on the hull | physics/src/soft.ts; rigging/src/springs.ts; horses (tail, mane) | none: PA-29 | Fossati, *Aero-Hydrodynamics and the Performance of Sailing Yachts* (2009). Wilson et al. (2014), the audit's source. Baraff and Witkin (1998). | K09 K22 |
+| AERO-03 | Flight dynamics (wings, rotors, bodies) | Aircraft, gliders, birds, bats, insects, balloons, airships, rockets in air | procedural/src/flyer.ts; navmesh/src/volume.ts (kinematic only) | none | Prandtl, lifting line (1918), as in Phillips, *Mechanics of Flight* (2010). Dickinson, Lehmann and Sane, "Wing rotation and the aerodynamic basis of insect flight" (1999). Wu and Popović, "Realistic modeling of bird flight animations" (2003). Pennycuick, *Modelling the Flying Bird* (2008). | K10 K18 K22 |
+| AERO-04 | Turbomachines in flow | Windmills, wind turbines, waterwheels, paddles, propellers, with wakes | procedural/src/gears.ts (geometry only) | none | Glauert, blade-element-momentum theory (1935), in Hansen, *Aerodynamics of Wind Turbines* (2015). | K18 K22 |
+| AERO-05 | Falling and tumbling light bodies | Leaves, paper, ash flakes, snowflakes, seeds, feathers: flutter, tumble | none (hail has a single speed, PA-32) | none | Andersen, Pesavento and Wang, "Analysis of transitions between fluttering, tumbling and steady descent of falling cards" (2005). | K09 K18 K22 |
+
+### Family SEA: ocean, ships and marine (14)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| SEA-01 | Wave spectrum and wave-field evolution | Wind-sea growth by fetch and duration, swell propagation and decay, refraction, finite-depth dispersion | water/src/sea-state.ts, index.ts; weather/src/wind.ts | stand-in: PA-16 (re-tunes instantly, fetch fixed at 100 km) | WAMDI Group, "The WAM model" (1988). Booij, Ris and Holthuijsen, SWAN (1999). Hasselmann et al., JONSWAP (1973). | K17 K25 |
+| SEA-02 | Ocean surface synthesis and query | FFT and Gerstner surface with choppy displacement; pure synchronous `seaSurface(x, z, t)` returning height, normal and velocity | water/src/fft.ts, fft-shaders.ts, swell-wgsl.ts, query.ts | partial: PA-11 (async GPU readback only), PA-16 (`FFTOcean` has no `setWind`) | Tessendorf, "Simulating Ocean Water" (2001). Horvath, "Empirical directional wave spectra for computer graphics" (2015). | K17 K25 |
+| SEA-03 | Nonlinear waves, rogue waves | High-order spectral method, Benjamin-Feir instability, steep Stokes waves | none | none | Dommermuth and Yue, "A high-order spectral method for the study of nonlinear gravity waves" (1987). Dysthe (1979). | K17 K25 |
+| SEA-04 | Local dispersive free surface | Wakes, rain rings, capillary waves, object drops, harbour waves; hull displacement writes into the surface | water/src/ripples.ts, ships.ts (`ShipWakes`), splash.ts | stand-in: PA-13, 17, 23 | Jeschke et al., "Water Surface Wavelets" (SIGGRAPH 2018). Yuksel, House and Keyser, "Wave particles" (2007). Madsen and Sørensen, Boussinesq (1992). | K12 K25 |
+| SEA-05 | Nearshore waves and surf zone | Shoaling, refraction, breaking, wave set-up, undertow, longshore and rip currents, run-up, overtopping | water/src/surf.ts, breaker.ts, coastal.ts | partial: breaker line and shoaling are analytic. PA-20 (no currents). | Longuet-Higgins and Stewart, radiation stress (1964). Battjes and Janssen (1978). Roelvink et al., XBeach (2009). | K12 K14 K25 |
+| SEA-06 | Tsunami and impulse waves | Fault or slide source, long-wave travel, inundation | water/src/flood.ts (SWE core exists) | none: PA-25 | Okada, "Surface deformation due to shear and tensile faults" (1985). LeVeque, George and Berger, GeoClaw (2011). Heller and Hager, "Impulse product parameter in landslide generated impulse waves" (2010). | K12 K14 K20 |
+| SEA-07 | Tides, storm surge and currents | Barotropic shallow water on an ocean grid with tidal potential, wind stress, inverse barometer, tidal races | sky/src/hurricane.ts (profile only); sky/src/ephemeris.ts | none: PA-31 | Jelesnianski et al., SLOSH (1992). Luettich et al., ADCIRC (1992). Pugh and Woodworth, *Sea-Level Science* (2014). | K12 K14 |
+| SEA-08 | Ship seakeeping | 6-DOF hull on waves: hydrostatics over the wetted mesh, Froude-Krylov, diffraction, radiation memory, wave drift, green water | water/src/ships.ts (`Floater`, kinematic) | stand-in: PA-10 | Cummins, "The impulse response function and ship motions" (1962). Salvesen, Tuck and Faltinsen, "Ship motions and sea loads" (1970). Fossen, *Handbook of Marine Craft Hydrodynamics* (2011). Kerner, "Water interaction model for boats in video games" (2015). | K10 K11 K18 K22 |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | Thrust, rudder, turning circle, heel, squat, leeway, keel lift, oars, planing | water/src/ships.ts (caller path) | none: PA-12 | Yasukawa and Yoshimura, MMG standard method (2015). Holtrop and Mennen (1982). Isherwood (1972). Kerwin, velocity prediction program (1978). Caplan and Gardner, oar blade model (2007). | K18 K22 |
+| SEA-10 | Damage, flooding, capsize, sinking | Compartment and progressive flooding, free-surface effect, stability curves | none ("sinking stays a Blender bake") | none: PA-10, 52, 58 | Ruponen, "Progressive flooding of a damaged passenger ship" (2007). Biran and López Pulido, *Ship Hydrostatics and Stability* (2014). | K11 K22 K28 |
+| SEA-11 | Wave impact: slamming, green water | Wagner and von Kármán slam pressure, deck loads | water/src/ships.ts (`ShipSplash`) | stand-in: PA-14 | Wagner (1932). von Kármán (1929). Korobkin (1996). | K16 K22 |
+| SEA-12 | Hydrodynamic loads on arbitrary bodies | Exact submerged-volume buoyancy, added mass, Morison drag, current and flood loads; debris, anchors, animals, bodies in floods | physics (none); water/src/ice.ts (static hydrostatics only) | none: X-35, 36, 39, PA-19 | Morison et al., "The force exerted by surface waves on piles" (1950). Sarpkaya and Isaacson, *Mechanics of Wave Forces on Offshore Structures* (1981). Haehnel and Daly, "Maximum impact force of woody debris on floodplain structures" (2004). | K07 K11 K22 |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | Entrainment, decay, wake foam, whitecap coverage, sea-spray source function | water/src/index.ts:507, liquid-whitewater.ts, spray.ts | stand-in: PA-03, 21 | Ihmsen et al., "Unified spray, foam and bubbles for particle-based fluids" (2012). Monahan et al., whitecap aerosol (1986). Andreas, "A new sea spray generation function" (1998). | K06 K16 |
+| SEA-14 | Water entry and exit | Cavity, crown splash, jets, cannonball, diver, launch, breach | water/src/splash.ts (`ShotSplash`) | stand-in: PA-17 | Duclaux et al., "Air entrainment during impact of droplets on liquid surfaces" (2007), as the audit cites. Wagner (1932). | K16 K22 K25 |
+
+### Family FLUID: general fluid solvers (7)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| FLUID-01 | SPH, divergence-free (accurate mode) | Free-surface liquid, rigid and fluid coupling, surface tension | water/src/liquid.ts (rendering only) | none: PA-22, X-56 to X-59 | Bender and Koschier, "Divergence-free SPH for incompressible and viscous fluids" (2017). Akinci et al., rigid-fluid coupling (2012) and surface tension (2013). | K06 K09 K16 |
+| FLUID-02 | Position based fluids (fast mode) | Interactive and preview liquids | none | none | Macklin and Müller, "Position based fluids" (2013). | K06 K09 |
+| FLUID-03 | FLIP and APIC grid-particle liquids | Large liquid volumes, crashing crests, waterfalls | none | none | Zhu and Bridson, "Animating sand as a fluid" (2005). Jiang et al., "The affine particle-in-cell method" (2015). Ferstl et al., "Narrow band FLIP" (2016). | K12 K13 K15 |
+| FLUID-04 | Eulerian smoke and gas | Buoyant flow, vorticity confinement, gunpowder smoke, steam | vfx/src/smoke.ts (prescribed rise) | stand-in: PA-56 | Fedkiw, Stam and Jensen, "Visual simulation of smoke" (2001). Selle et al., "An unconditionally stable MacCormack method" (2008). Zhang, Bridson and Greif (2015). | K12 K13 |
+| FLUID-05 | Compressible flow, shock and blast | Euler equations, muzzle blast, underwater explosions, sonic effects | none | none: PA-49 | Toro, *Riemann Solvers and Numerical Methods for Fluid Dynamics* (2009). Colella and Woodward, PPM (1984). Cole, *Underwater Explosions* (1948). | K14 |
+| FLUID-06 | Viscoplastic fluids at small scale | Mud, honey, paint, wet concrete: Bingham and Herschel-Bulkley | water/src/flood.ts mud mode (depth-averaged only) | partial: PA-60 | Ram et al., "A material point method for viscoelastic fluids, foams and sponges" (2015). Huang and Garcia (1998). | K12 K15 K24 |
+| FLUID-07 | Thin films and droplets on surfaces | Rain on glass, wet surfaces, drips, puddle filling | weather/src/puddles.ts, surface.ts; terrain/src/wet-ground.ts | stand-in | Oron, Davis and Bankoff, "Long-scale evolution of thin liquid films" (1997). Wang, Mucha and Turk, "Water drops on surfaces" (2005). | K12 K13 |
+
+### Family HYDRO: rivers, floods and hydrology (6)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| HYDRO-01 | Conservative shallow water | Rivers, floods, bores, dam breaks, coastal flow, wet and dry, Manning friction, buildings | water/src/flood.ts, flood-shaders.ts; water/src/rivers.ts, flow.ts, coastal.ts | partial. `flood.ts` is sound (fixed 1/120 s ticks, the in-house pattern). `rivers.ts` is a stand-in (PA-18). PA-19 gives no force on bodies. | Kurganov and Petrova (2007). Audusse et al. (2004). Bates, Horritt and Fewtrell, inertial formulation (2010). | K14 |
+| HYDRO-02 | Rainfall-runoff and infiltration | Catchment hydrographs, soil moisture, channel routing | biomes/src/hydrology.ts, view.ts:1122 | stand-in: PA-23, 24, 47 | Green and Ampt (1911). Beven and Kirkby, TOPMODEL (1979). Lighthill and Whitham, kinematic waves (1955). | K12 K14 K21 |
+| HYDRO-03 | Sediment transport and channel morphodynamics | Exner bed update, bedload, suspended load, scour, deposition, meanders, deltas | water/src/flood-silt.ts (optics only); terrain/src/ground-model.ts (closed forms) | stand-in: PA-19, 38 | Meyer-Peter and Müller (1948). van Rijn (1984). Ikeda, Parker and Sawai, "Bend theory of river meanders" (1981). | K12 K14 K21 |
+| HYDRO-04 | Landscape evolution | Stream-power incision, hillslope diffusion, uplift, thermal erosion | biomes/src/erosion.ts, erosion.wasm, erosion-hook.ts | stand-in: PA-39 (no time axis, D8 routing) | Braun and Willett (2013). Cordonnier et al. (2016, 2017). Schott et al. (2023). | K12 K21 |
+| HYDRO-05 | Dam and levee breach | Overtopping and piping, breach hydrograph, embankment erosion | scenes/src/fauld-blast.ts (constant-discharge source) | stand-in: PA-19, 60 | Froehlich (1995). Visser (1998). | K14 K21 |
+| HYDRO-06 | Groundwater and springs | Darcy flow, water table, baseflow, seepage | none | none | Richards (1931). Harbaugh, MODFLOW-2005 (2005). | K12 |
+
+### Family ATMO: atmosphere and weather (10)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| ATMO-01 | Boundary-layer wind field | Log-law profile, terrain speed-up and shelter, stability, one shared `sample(x, y, z, t)` | weather/src/wind.ts; physics/src/fields.ts; scatter/src/wind.ts; voxel/src/wind.ts | stand-in: PA-26, 27, 28. Value noise only. | Jackson and Hunt (1975). Sherman, mass-consistent model (1978). Forthofer et al., WindNinja (2014). | K12 K13 K17 |
+| ATMO-02 | Atmospheric turbulence and gusts | Spectral divergence-free turbulence, travelling gusts | weather/src/wind.ts | stand-in: PA-28 | Mann (1994, 1998). Kaimal et al. (1972). Bridson, Houriham and Nordenstam, "Curl-noise for procedural fluid flow" (2007). | K17 |
+| ATMO-03 | Moist convection and cloud dynamics | Potential temperature, vapour, cloud and rain water, latent heat, Kessler microphysics | sky/src/volumetric-clouds.ts, clouds.ts (rendering); vfx/src/clouds.ts | none: PA-34 | Kessler (1969). Klemp and Wilhelmson (1978). Hädrich et al., "Stormscapes" (2020). Harris et al., "Simulation of cloud dynamics on graphics hardware" (2003). | K12 K13 K14 |
+| ATMO-04 | Precipitation microphysics | Drop-size distribution, terminal velocity, snow, hail, graupel, melt, rain in mm/h | weather/src/state.ts, hail.ts; water/src/rain.ts; sky/src/weather-fx.ts | stand-in: PA-23 (0 to 1 intensity), PA-32 | Marshall and Palmer (1948). Gunn and Kinzer (1949). Heymsfield and Westbrook (2010). Knight and Heymsfield (1983). | K23 |
+| ATMO-05 | Tropical cyclones and large vortices | Hurricanes, tornadoes, dust devils, waterspouts, fire whirls; wind on debris | sky/src/hurricane.ts, tornado.ts, storm-field.ts | partial. Holland and Rankine/Burgers parametric fields are sound. PA-31: acts on nothing, clamped at 60 m/s. | Holland (1980). Willoughby, Darling and Rahn (2006). Fiedler and Rotunno (1986). Orf et al. (2017) for LES. | K13 |
+| ATMO-06 | Airborne particle transport | Droplets, spray, dust, ash, embers, snow, seeds, small debris: drag, settling, dispersion | vfx/src/shader.ts, base.ts, debris.ts, blown-sand.ts; water/src/spray.ts; weather/src/eruption.ts | stand-in: PA-04, 21, 54, 55, 57, 61, 62 | Clift, Grace and Weber, *Bubbles, Drops and Particles* (1978). Thomson (1987) for turbulent dispersion. Sardoy et al. (2007) for embers. Costa et al. (2006) for ash. | K06 K18 K23 |
+| ATMO-07 | Lightning and atmospheric electricity | Leader branching, return stroke, thunder source | sky/src/lightning-bolt.ts (rendering) | none | Niemeyer, Pietronero and Wiesmann, "Fractal dimension of dielectric breakdown" (1984). Rakov and Uman, *Lightning* (2003). Kim and Lin (2004). | K06 K12 |
+| ATMO-08 | Fog and cold-air drainage | Radiation fog, valley fog, katabatic flow | environment/src/fog-volumes.ts | stand-in: PA-34 | Manins and Sawford (1979). Duynkerke (1991). | K13 K27 |
+| ATMO-09 | Surface energy balance | Insolation, ground temperature, evapotranspiration, fuel and ground wetness | weather/src/fuel-moisture.ts; weather/src/surface.ts; biomes/src/seasons.ts, climate.ts | partial. Fuel moisture is sound (Fosberg and Cohen-Deeming). Degree days are only a proxy. | Monteith (1965). Allen et al., FAO-56 (1998). Liston and Elder, SnowModel (2006). | K27 |
+| ATMO-10 | Synoptic weather | Pressure systems, fronts, geostrophic and gradient wind driving the weather state | weather/src/machine.ts, state.ts (scripted presets and a seeded walk) | stand-in | Charney, Fjørtoft and von Neumann (1950), barotropic vorticity. Holton, *An Introduction to Dynamic Meteorology* (2004). | K12 K13 K17 |
+
+### Family EARTH: granular, terrain and solid earth (10)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| EARTH-01 | MPM continuum | Sand, soil, snow, mud, rubble; landslide near-field | voxel/src/ticks.ts (falling sand automaton) | stand-in: PA-42 | Stomakhin et al. (2013). Klar et al. (2016). Hu et al., MLS-MPM (2018). Dunatunga and Kamrin (2015). | K12 K15 K24 |
+| EARTH-02 | Depth-averaged granular flow | Landslides, rock avalanches, debris flows, lahars, mudflows, dense snow avalanche | weather/src/avalanche.ts; terrain/src/ground-model.ts; scenes/src/fauld-blast.ts | partial. The avalanche is a deterministic Savage-Hutter and Voellmy model. PA-33 (no obstacles). PA-38, 60 for ground and mud. | Savage and Hutter (1989). Pouliquen and Forterre (2002). Iverson and Denlinger (2001). Christen et al., RAMMS (2010). | K14 |
+| EARTH-03 | Particle-laden gravity currents | Powder avalanche, pyroclastic flow, blast base surge, dust fronts | weather/src/avalanche.ts (powder); thermal.ts | partial: PA-59 (tuned shapes) | Benjamin (1968). Huppert and Simpson (1980). Dade and Huppert (1996). Esposti Ongaro et al. (2007). | K13 K14 |
+| EARTH-04 | Discrete-element rubble and boulders | Rockfall, scree, rubble, grain | physics kernel (partial); voxel/src/debris.ts | partial | Cundall and Strack (1979). | K06 K08 K09 |
+| EARTH-05 | Terramechanics | Wheel, track, foot and hoof against soil: pressure-sinkage, shear, ruts, footprints | terrain/src/deform.ts (fixed-depth parallax map) | stand-in: PA-45 | Bekker (1969). Wong, *Theory of Ground Vehicles*. Janosi and Hanamoto (1961). Sumner, O'Brien and Hodgins (1999). | K07 K09 K15 |
+| EARTH-06 | Impact and explosion cratering | Crater size from energy and burial, ejecta curtain, mass balance | terrain/src/ground-change.ts, ground-model.ts, planet-craters.ts; scenes/src/fauld-crater.ts; vfx/src/debris.ts | stand-in: PA-37, 38, 51 | Holsapple (1993). Housen and Holsapple, "Ejecta from impact craters" (2011). Schmidt and Housen (1987). Wünnemann, Collins and Melosh, iSALE (2006). | K07 K23 |
+| EARTH-07 | Aeolian transport | Saltation, dust emission, ripples, dunes | terrain/src/dunes.ts (static); vfx/src/blown-sand.ts | stand-in: PA-46, 63 | Sauermann, Kroy and Herrmann (2001). Werner (1995). Kok et al., "The physics of wind-blown sand and dust" (2012). | K14 |
+| EARTH-08 | Seismic waves and ground shaking | Source, propagation, site amplification, liquefaction, building response | none | none | Virieux (1986). Komatitsch and Tromp (1999). Seed and Idriss (1971). | K12 K19 |
+| EARTH-09 | Volcanic eruption column | Plinian column, collapse, umbrella cloud, ballistics | weather/src/eruption.ts, thermal.ts | partial: sound deterministic analytic model (Woods, Sparks, Morton-Taylor-Turner) | Woods (1988). Sparks (1986). | K13 K18 |
+| EARTH-10 | Lava flow | Viscosity-temperature law, crust, channel and levee, stopping | weather/src/lava.ts | partial: analytic deterministic (Griffiths, Hulme, Jeffreys) | Griffiths (2000). Costa and Macedonio (2005). Harris and Rowland, FLOWGO (2001). | K14 K27 |
+
+### Family ICE: cryosphere (5)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| ICE-01 | Snowpack | Accumulation, wind redistribution, cornices, compaction, melt, slab stability | weather/src/snow.ts, snow-drift.ts, cover.ts | partial: PA-33 (no melt balance) | Lehning et al., SNOWPACK (2002). Lehning et al., drift in steep terrain (2008). | K27 |
+| ICE-02 | Glacier and ice-sheet flow | Shallow-ice flow, calving, crevasses, icefalls | none | none | Greve and Blatter, *Dynamics of Ice Sheets and Glaciers* (2009). van der Veen, crevasse fracture mechanics (1998). Benn, Warren and Mottram (2007). | K12 K21 |
+| ICE-03 | Iceberg rigid-body dynamics and calving | Capsize, roll, melt, impulse waves | water/src/ice.ts (static equilibrium) | stand-in: PA-15 | Burton et al., "Laboratory investigations of iceberg capsize dynamics" (2012). Wagner et al. (2017). | K09 K11 K22 |
+| ICE-04 | Pack ice and floes | Discrete-element floes, rafting, ridging, ship-ice resistance | water/src/ice.ts (`SeaIce`) | stand-in: PA-15, 35 | Hibler (1979). Hopkins (2004). Herman (2016). Lindqvist (1989). | K06 K09 |
+| ICE-05 | Ice thermodynamics | Freezing and melting of lake, river and sea ice, icicles, frost | none | none | Stefan (1891). Maykut and Untersteiner (1971). | K27 |
+
+### Family FIRE: explosions, fire and heat (7)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| FIRE-01 | Wildfire spread | Rothermel rate, wind, slope, fuel moisture, crown fire, fire-atmosphere feedback | vfx/src/fire-front.ts; weather/src/fuel-moisture.ts; biomes/src/fuel.ts, disturbance.ts | partial. Rothermel and Albini are sound in `fire-front.ts`. PA-57 (embers). | Rothermel (1972). Finney, minimum travel time (2002). Linn and Cunningham, FIRETEC (2005). Hädrich et al., "Fire in Paradise" (2021). | K20 |
+| FIRE-02 | Flame and fireball | Reacting buoyant flow, flame heat release | vfx/src/fire.ts, flame.ts (particle rendering) | stand-in | Nguyen, Fedkiw and Jensen, "Physically based modeling and animation of fire" (2002). McGrattan et al., FDS (2013). | K12 K13 |
+| FIRE-03 | Integral plume and thermal model | Entraining plumes and thermals for explosions, eruptions, fires | weather/src/thermal.ts, eruption.ts | partial: analytic, RK4, deterministic | Morton, Taylor and Turner (1956). Briggs (1969). | K18 |
+| FIRE-04 | Explosive blast loading | Overpressure, Friedlander waveform, Mach stem, impulse on bodies and structures | none (`post/src/stylize.ts:9` is an artistic warp) | none: PA-49, 66 | Kingery and Bulmash (1984). UFC 3-340-02. Glasstone and Dolan (1977). | K07 |
+| FIRE-05 | Explosive source and fragments | Gunpowder and high-explosive release, interior ballistics, recoil, fragment sizes and speeds | vfx/src/gunfire.ts, debris.ts; scenes/src/fauld-blast.ts | stand-in: PA-51, 52, 53 | Gurney (1943). Mott (1947). Corner, *Theory of the Interior Ballistics of Guns* (1950). | K18 K23 |
+| FIRE-06 | Heat conduction and phase change | Hot metal, cooling, ground heating, melt and solidify, thermal stress | none | none | Carslaw and Jaeger (1959). Voller and Prakash (1987). | K12 K27 |
+| FIRE-07 | Burning of structures, ships and solids | Pyrolysis, charring, ignition, strength loss, burn-through | vfx/src/gunfire.ts:1620 (constant spread); fire-front.ts (structures) | stand-in: PA-58 | Drysdale, *An Introduction to Fire Dynamics* (2011). Eurocode EN 1995-1-2 and EN 1993-1-2. | K11 K27 K28 |
+
+### Family SOUND: acoustics (5)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| SOUND-01 | Outdoor propagation | Time of flight, spreading, air absorption, ground effect, wind refraction, terrain diffraction, N-wave | audio/src/doppler.ts, occlusion.ts; mixer/src/spatial.ts | stand-in: PA-64 | ISO 9613-1, ISO 9613-2. Salomons, *Computational Atmospheric Acoustics* (2001). Gilbert and White (1989). | K07 K26 |
+| SOUND-02 | Enclosed and urban acoustics | Rooms, tunnels, canyons, caves, hull interiors | mixer/src/reflections.ts (first-order image source); audio/src/zones.ts | partial | Allen and Berkley (1979). Raghuvanshi and Snyder (2014). Hamilton and Bilbao (2017). | K07 K26 |
+| SOUND-03 | Underwater acoustics | Sound-speed profile, ray and beam tracing | none | none | Jensen et al., *Computational Ocean Acoustics* (2011). Porter and Bucker (1987). | K26 |
+| SOUND-04 | Contact and modal sound | Impact, scrape, roll, break, bells, glass, wood, metal | audio/src/events.ts (manual triggers) | none: PA-65 | van den Doel and Pai (1998). van den Doel, Kry and Pai (2001). Zheng and James (2010). | K09 K26 |
+| SOUND-05 | Physics-driven fluid, fire, wind and machine sound | Bubbles, splashes, waves, flames, wind noise, engines, rigging creak, cannon | none | none | Moss et al., "Sounding liquids" (2010). Minnaert (1933). Chadwick and James, "Animating fire with sound" (2011). Dobashi, Yamamoto and Nishita (2003). | K26 |
+
+### Family BIO: vegetation and ecosystems (4)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| BIO-01 | Plant mechanics under wind | Trees, shrubs, grass, crops, reeds, kelp: modal response, breakage, windthrow, felled trees | scatter/src/wind.ts, interact.ts; procedural/src/trees.ts | stand-in: PA-30 | de Langre, "Effects of wind on plants" (2008). Stam, "Stochastic dynamics" (1997). Habel, Kusternig and Wimmer, "Physically guided animation of trees" (2009). Gardiner et al., ForestGALES (2000). | K17 K18 K22 |
+| BIO-02 | Plant growth and morphogenesis | L-system growth, tropisms, competition | procedural/src/lsystem.ts, plants.ts (static) | none (dynamic) | Prusinkiewicz and Lindenmayer (1990). Palubicki et al. (2009). Pirk et al. (2012). | K06 |
+| BIO-03 | Forest ecosystem dynamics | Competition, seeding, mortality, succession | biomes/src/ecosystem.ts | sound (JABOWA and SORTIE style, integer-deterministic) | Botkin, Janak and Wallis (1972). Pacala et al. (1996). Cordonnier et al. (2017). | none beyond K01 to K05 |
+| BIO-04 | Material ageing | Rust, patina, rot, fouling, stone weathering, wreck decay | none | none (low priority, P3) | Dorsey and Hanrahan (1996). Gu et al., time-varying surface appearance (2006). | none beyond K01 to K05 |
+
+### Family SPACE: orbital and celestial (2)
+
+| ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
+|---|---|---|---|---|---|---|
+| SPACE-01 | N-body and orbital dynamics | Kepler and perturbed orbits, SGP4, spacecraft trajectories, re-entry | sciviz/src/geo-sgp4.ts, geo-sgp4-deep.ts | partial. SGP4 is sound. There is no n-body integrator (PA-92). | Hairer, Lubich and Wanner (2006). Wisdom and Holman (1991). Rein and Spiegel, IAS15 (2015). Vallado et al. (2006). | K06 K18 |
+| SPACE-02 | Celestial ephemeris and rotation | Sun, moon, planets, eclipses, tidal drive | sky/src/ephemeris.ts, astro.ts, celestial.ts | partial: low-precision Keplerian elements (Standish) | Meeus, *Astronomical Algorithms* (1998). Bretagnon and Francou, VSOP87 (1988). Espenak and Meeus (2006). | K18 |
+
+## 2. Families and shared kernels
+
+### 2a. Family overview
+
+| Family | Scope | Solvers |
+|---|---|---|
+| DYN | Rigid, articulated and contact dynamics | 8 |
+| SOFT | Deformables | 6 |
+| BREAK | Fracture, structures and impact | 5 |
+| LIFE | Characters, animals, crowds and machines | 7 |
+| AERO | Aerodynamics and flight | 5 |
+| SEA | Ocean, ships and marine | 14 |
+| FLUID | General fluid solvers | 7 |
+| HYDRO | Rivers, floods and hydrology | 6 |
+| ATMO | Atmosphere and weather | 10 |
+| EARTH | Granular, terrain and solid earth | 10 |
+| ICE | Cryosphere | 5 |
+| FIRE | Explosions, fire and heat | 7 |
+| SOUND | Acoustics | 5 |
+| BIO | Vegetation and ecosystems | 4 |
+| SPACE | Orbital and celestial | 2 |
+| **Total** | | **101** |
+
+### 2b. Kernel list
+
+**Framework kernels K01 to K05** are used by every solver:
+
+| ID | Kernel |
+|---|---|
+| K01 | Film clock and fixed-step scheduler (integer tick, never drops time; PA-01, 02, 03, 07) |
+| K02 | Deterministic math and counter-based RNG (same bits on every backend, Philox-style) |
+| K03 | Constants, units, ISA atmosphere and one material database (gravity PA-08, density, friction, strength, viscosity) |
+| K04 | Field bus: one `sample(x, y, z, t)` interface plus grid and tile storage for wind, water surface, bed height, rain, temperature |
+| K05 | Snapshot, restore, bake and keyframe cache (PA-02, 05, 86) |
+
+**Numerical kernels K06 to K29**, with their users from the solver table:
+
+| ID | Kernel | Used by |
+|---|---|---|
+| K06 | Neighbour search (spatial hash, grid) | DYN-01, DYN-02, DYN-08, SOFT-01, SOFT-02, SOFT-03, LIFE-04, LIFE-05, LIFE-06, SEA-13, FLUID-01, FLUID-02, ATMO-06, ATMO-07, EARTH-04, ICE-04, BIO-02, SPACE-01 (18) |
+| K07 | BVH, ray, shape queries, SDF | DYN-01, DYN-04, DYN-05, DYN-06, DYN-07, SOFT-01, BREAK-05, LIFE-06, AERO-01, SEA-12, EARTH-05, EARTH-06, FIRE-04, SOUND-01, SOUND-02 (15) |
+| K08 | Convex shape distance and CCD | DYN-01, DYN-02, DYN-08, EARTH-04 (4) |
+| K09 | Contact and constraint solve (sequential impulse, XPBD, VBD, graph colouring) | 32 solvers: DYN-01 to 05 and 07 to 08; SOFT-01 to 06; BREAK-01 to 03 and 05; LIFE-01 to 03 and 05 to 07; AERO-02, 05; FLUID-01, 02; EARTH-04, 05; ICE-03, 04; SOUND-04 |
+| K10 | Articulated-body algorithms | DYN-03, DYN-07, SOFT-05, LIFE-01, LIFE-02, LIFE-03, LIFE-07, AERO-03, SEA-08 (9) |
+| K11 | Mesh geometry: volume, inertia, clipping against a surface, winding number | DYN-06, SOFT-04, SOFT-06, BREAK-01, BREAK-03, AERO-01, SEA-08, SEA-10, SEA-12, ICE-03, FIRE-07 (11) |
+| K12 | Sparse linear solve (PCG, multigrid, banded) | SOFT-04, BREAK-02, SEA-04 to SEA-07, FLUID-03, FLUID-04, FLUID-06, FLUID-07, HYDRO-02, HYDRO-03, HYDRO-04, HYDRO-06, ATMO-01, ATMO-03, ATMO-07, ATMO-10, EARTH-01, EARTH-08, ICE-02, FIRE-02, FIRE-06 (23) |
+| K13 | Eulerian grid: advection, pressure projection, vorticity confinement | FLUID-03, FLUID-04, FLUID-07, ATMO-01, ATMO-03, ATMO-05, ATMO-08, ATMO-10, EARTH-03, EARTH-09, FIRE-02 (11) |
+| K14 | Finite-volume Riemann solver (hydrostatic reconstruction, wet and dry) | SEA-05, SEA-06, SEA-07, FLUID-05, HYDRO-01, HYDRO-02, HYDRO-03, HYDRO-05, ATMO-03, EARTH-02, EARTH-03, EARTH-07, EARTH-10 (13) |
+| K15 | Particle-grid transfer and sparse paged grids | BREAK-01, FLUID-03, FLUID-06, EARTH-01, EARTH-05 (5) |
+| K16 | SPH kernel summation and iterative density solve | SEA-11, SEA-13, SEA-14, FLUID-01 (4) |
+| K17 | FFT and spectral synthesis | SEA-01, SEA-02, SEA-03, ATMO-01, ATMO-02, ATMO-10, BIO-01 (7) |
+| K18 | ODE integrators (RK4, adaptive, symplectic, closed-form spring) | DYN-04, DYN-05, SOFT-03, BREAK-04, LIFE-01, LIFE-04, LIFE-07, AERO-03, AERO-04, AERO-05, SEA-08, SEA-09, ATMO-06, EARTH-09, FIRE-03, FIRE-05, BIO-01, SPACE-01, SPACE-02 (19) |
+| K19 | FEM and Projective Dynamics | SOFT-04, SOFT-05, BREAK-02, BREAK-03, EARTH-08 (5) |
+| K20 | Eikonal and level-set front solver | SEA-06, FIRE-01 (2) |
+| K21 | Drainage-graph routing | HYDRO-02 to HYDRO-05, ICE-02 (5) |
+| K22 | Surface-integral load integrator (per-triangle pressure, drag, lift, wetted and projected area) | LIFE-03, AERO-01 to AERO-05, SEA-08 to SEA-12, SEA-14, ICE-03, BIO-01 (14) |
+| K23 | Batched particle ballistics with drag and scene collision | BREAK-04, BREAK-05, ATMO-04, ATMO-06, EARTH-06, FIRE-05 (6) |
+| K24 | Small dense linear algebra (3×3 SVD, polar, QR) | DYN-06, SOFT-02, SOFT-04, SOFT-05, FLUID-06, EARTH-01 (6) |
+| K25 | Wave dispersion and wave-action transport | SEA-01 to SEA-05, SEA-14 (6) |
+| K26 | Acoustic kernels (delay lines, FDTD, ray and beam tracing, modal banks) | SOUND-01 to SOUND-05 (5) |
+| K27 | Heat stencil and phase change | ATMO-08, ATMO-09, EARTH-10, ICE-01, ICE-05, FIRE-06, FIRE-07 (7) |
+| K28 | Graph connectivity (union-find, max-flow, load path, compartments) | BREAK-01, BREAK-02, SEA-10, FIRE-07 (4) |
+| K29 | Optimisation and control (QP, LQR, time-optimal parametrisation) | DYN-03, DYN-07, LIFE-01, LIFE-02, LIFE-03 (5) |
+
+**Where these already exist in the repo.**
+- K07, K08, K09 and K10 are in the physics Rust kernel and in `bvh`.
+- K17 is in `compute` and `water/src/fft.ts`.
+- K21 is partly in `biomes/src/hydrology.ts` and `erosion.wasm`.
+- K13 and K14 are partly in `sciviz/src/flow.wasm` and `water/src/flood-shaders.ts`.
+- K26 is partly in the `mixer` and `audio` packages.
+- K01 to K05 do not exist as one framework yet. The audit names five separate clocks, about 25 copies of 9.81 and a second wind field.
+
+## 3. Coupling matrix
+
+In the "Direction" column, "one-way" is written A→B. Everything not listed is not required.
+
+### Atmosphere and wind
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| ATMO-01/02 → AERO-01 | Local air velocity, density | one-way |
+| ATMO-01/02 → AERO-02 (sails, flags) | Relative wind; thrust and heeling force go back to the hull via SEA-08 | two-way (sail to hull) |
+| ATMO-01/02 → BIO-01 (trees, grass) | Wind drag per canopy element | one-way. Added canopy drag feeds back to the boundary-layer roughness in ATMO-01 (two-way at roughness level). |
+| ATMO-01/02 → SOFT-01/03 (cloth, hair) | Wind drag on triangles and strands | one-way |
+| ATMO-01 → SEA-01 | Wind stress, fetch, duration | one-way. Wave-induced roughness feeds back to the wind profile (weak two-way). |
+| ATMO-01 → ATMO-06 (spray, dust, ash, embers) | Air velocity and turbulence for particle dispersion | one-way |
+| ATMO-01 → FLUID-04, FIRE-03, EARTH-09 (smoke, plumes, eruption column) | Ambient wind bends the plume | one-way. Plume entrainment feeds back to local wind (two-way for large fires: FIRE-01). |
+| ATMO-01 ↔ FIRE-01 | Wind and slope set spread; heat release drives fire-induced winds | two-way |
+| ATMO-01 → ATMO-03 (clouds) | Advection of cloud density | one-way |
+| ATMO-03 → ATMO-04 | Condensate mass produces rain, snow, hail | one-way |
+| ATMO-03 → ATMO-01 | Convective downdrafts, outflow gusts | one-way |
+| ATMO-05 (vortices) → BIO-01, BREAK-02, ATMO-06, SEA-07 | Wind field, pressure drop; debris loading; surge forcing | one-way |
+| ATMO-07 → SOUND-01 | Thunder source along the channel | one-way |
+| ATMO-09 → FIRE-01, ICE-01, HYDRO-02 | Fuel moisture, melt energy, evaporation | one-way |
+
+### Water, ships and sea
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| SEA-02 → SEA-08 | `seaSurface` height, normal, orbital velocity at hull triangles | one-way. Hull displacement writes back through SEA-04 (two-way). |
+| SEA-08 ↔ SEA-04 | Hull displaced volume and pressure drive wake; wave-making resistance returns | two-way |
+| SEA-01 ↔ SEA-04/SEA-05 | Swell enters the nearshore domain; reflection and breaking dissipation return | two-way at the boundary |
+| SEA-01 → SEA-02 | Spectrum sets amplitudes | one-way |
+| SEA-05 ↔ HYDRO-01 | Wave radiation stress drives currents; currents refract waves and carry sediment | two-way |
+| SEA-05, SEA-07 → HYDRO-01 | Water level at the river mouth (backwater, surge) | one-way. River discharge feeds the sea outflow plume. |
+| SEA-08 ↔ SEA-09 | Thrust, rudder and resistance forces; motion changes inflow | two-way |
+| SEA-08 ↔ SEA-10 | Flooded mass shifts weight and stability; heel changes flooding | two-way |
+| BREAK-04/05, FIRE-05 → SEA-10, SEA-08 | Hit location, impulse, hole area | one-way into SEA-10 |
+| FIRE-07 → SEA-10 | Burnt-through hull, mass loss | one-way |
+| SEA-08 ↔ BREAK-03 | Contact energy deforms the hull; added flooding and recoil | two-way |
+| SEA-08 ↔ ICE-04 | Ice resistance on the hull; ship breaks or pushes floes | two-way |
+| SEA-08 ↔ DYN-01 (cargo, crew, cannon) | The deck as a moving platform; recoil and shifting loads act back | two-way |
+| SEA-08 ↔ SOFT-02 (rigging, anchor chain) | Tension on the hull; hull motion on the line | two-way |
+| SEA-08 → SEA-14 | Hull entry or launch creates cavity and splash | one-way |
+| SEA-04, SEA-14 → SEA-13 | Breaking and splash set foam and spray source | one-way |
+| SEA-13 → ATMO-06 | Spray droplets enter the air | one-way. Spray evaporation cools air and adds moisture (weak return). |
+| SEA-12 ↔ HYDRO-01 | Flood velocity and depth load bodies (drag, buoyancy); bodies block flow | two-way |
+| SEA-12 ↔ DYN-01 | Hydrodynamic forces on rigid bodies; body motion changes the load | two-way |
+| LIFE-01/03 ↔ SEA-12 | Animals wading, swimming, carried by flow; swimmers displace water | two-way |
+| SEA-06 ← EARTH-02, ICE-03, ICE-02 | Slide, calving or fault volume source | one-way |
+| SEA-07 ← ATMO-05, ATMO-10, SPACE-02 | Wind stress, pressure, tidal potential | one-way |
+| FLUID-01/03 ↔ SEA-04/HYDRO-01 | Particle liquid hand-off to and from the surface solvers (mass and momentum exchange) | two-way |
+| FLUID-01/02 ↔ DYN-01 | Boundary particles and pressure forces on rigid bodies | two-way |
+
+### Rivers, rain, terrain and sediment
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| ATMO-04 → HYDRO-02 | Rain rate (mm/h) and drop energy | one-way |
+| ATMO-04 → SEA-04 | Rain impacts as ring sources; rain damps short waves (Tsimplis 1992) | one-way |
+| ATMO-09 → HYDRO-02 | Evaporation, snow melt | one-way |
+| HYDRO-02 → HYDRO-01 | Runoff discharge into channels (PA-24) | one-way |
+| HYDRO-01 ↔ HYDRO-03 | Flow velocity and depth set sediment transport; the bed update changes flow | two-way |
+| HYDRO-03 → HYDRO-04 | Rates and shear thresholds set long-term incision | one-way. The landscape evolves under a time-averaged flow. |
+| HYDRO-04 ↔ terrain bed height (K04) | The shared bed written by erosion, slides and craters; read by colliders (PA-37) | two-way |
+| HYDRO-05 ↔ HYDRO-01 | Breach hydrograph, then bed and wall erosion as flow overtops | two-way |
+| HYDRO-06 → HYDRO-01 | Baseflow and springs | one-way. Infiltration from HYDRO-02 goes back to groundwater. |
+| ICE-01, ICE-02 → HYDRO-01/02 | Meltwater discharge | one-way |
+| HYDRO-01 ↔ EARTH-02 | Debris flow entrains water; sediment-laden flow changes viscosity | two-way |
+| HYDRO-03 ↔ BIO-03 | Flood disturbance resets vegetation; roots stabilise banks (PA-47) | two-way |
+
+### Fire, blast and debris
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| FIRE-04 → DYN-01, BREAK-01, BREAK-02, BIO-01, SOFT-01 | Overpressure and impulse on bodies, structures, trees, cloth | one-way |
+| FIRE-04 → SOUND-01, cameras (PA-66) | Pressure arrival drives sound and camera shake | one-way |
+| FIRE-05 → BREAK-01, EARTH-06, ATMO-06, FIRE-03 | Ejecta mass and speed from the charge; hot gas source | one-way |
+| FIRE-05 ↔ DYN-01/SEA-08 (cannon, ship) | Recoil impulse on the carrier | two-way |
+| EARTH-06 ↔ HYDRO-04 bed | Crater removes and deposits mass on the shared bed | two-way |
+| FIRE-03/FLUID-04 ↔ FIRE-01 | Plume lofts embers; heat release drives the plume | two-way |
+| FIRE-01 → ATMO-06 | Ember flight and spotting | one-way. A spot fire starts at the landing (back into FIRE-01). |
+| FIRE-01 ↔ BIO-03, ATMO-09 | Fuel load, moisture; burn scar changes fuel | two-way |
+| FIRE-07 ↔ BREAK-02 | Heat reduces strength; collapse changes air supply and spread | two-way |
+| FIRE-07 → SEA-10 | See above | one-way |
+| EARTH-09 → ATMO-06 | Ash and tephra particles; fallout builds a bed layer | one-way |
+| EARTH-09 ↔ ATMO-01 | Column entrains wind; wind bends the plume | two-way |
+| EARTH-10 (lava) ↔ ICE-05, ICE-01, SEA-14, EARTH-02 | Meltwater, steam; lava entering water | one-way into water solvers. Cooling and steam return. |
+| EARTH-03 ↔ EARTH-02 | Dense core produces the powder cloud; the cloud's deposit changes the bed | two-way |
+| EARTH-02/03 → BIO-01, BREAK-02 | Dynamic pressure fells trees and walls; obstacles take momentum from the flow (PA-33) | two-way |
+| EARTH-08 → BREAK-02, EARTH-02, DYN-01, cameras | Ground acceleration shakes bodies, triggers slides and liquefaction | one-way |
+| BREAK-01 ↔ DYN-01/DYN-08 | Fracture creates bodies; contact impulses cause damage | two-way |
+| DYN-01 ↔ EARTH-04, EARTH-05 | Rubble contact, soil reaction on vehicles, feet and hooves | two-way |
+| EARTH-05 ↔ terrain bed | Displaced soil volume | two-way |
+| EARTH-07 ↔ ATMO-01 | Wind stress lifts sand; saltation layer slows wind | two-way |
+| EARTH-07 → ATMO-06 | Dust emission | one-way |
+
+### Characters, animals, crowds and machines
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| LIFE-01/LIFE-06 ↔ DYN-07 | Ragdoll hand-off on hit, knock-down; control back to animation on recovery | two-way |
+| LIFE-06 (rider) ↔ LIFE-01 (horse) | Rider mass, lean, seat spring-damper | two-way (PA-72) |
+| LIFE-01/05/06 ↔ DYN-01, DYN-04 | Hoof, foot and wheel forces on the ground and on moving decks | two-way |
+| LIFE-05 ↔ LIFE-06 | Individuals in a formation: contact forces | two-way |
+| LIFE-05 → DYN-07, BREAK-05 | Crush force; hits from projectiles | one-way |
+| BREAK-04/05 → DYN-07, LIFE-01 | Projectile impulse on a character or horse | one-way |
+| LIFE-07 ↔ DYN-03 | Actuator force and load | two-way |
+| LIFE-07 ↔ AERO-04, SEA-12 | Windmill, waterwheel, oars: shaft torque vs flow | two-way |
+| AERO-04 → ATMO-01 | Wake and momentum deficit behind turbines | one-way (weak two-way for farms) |
+| AERO-03 ↔ ATMO-01/02 | Gust response; wake vortex into the air | two-way for large craft. One-way for birds. |
+| SOFT-01/02/03 ↔ DYN-01 | Cloth, rope and hair against bodies; reaction forces | two-way |
+| SOFT-03 → ATMO-01 | None (the mane sees wind only) | one-way (ATMO → SOFT) |
+| SOFT-05 ↔ DYN-07 | Soft tissue on a moving skeleton | one-way (skeleton drives tissue) |
+
+### Sound
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| DYN-01, BREAK-01, SEA-14, FLUID-01, FIRE-02, ATMO-07 → SOUND-04/05 | Contact impulses, fluid events, flame state, thunder | one-way |
+| ATMO-01, ATMO-09 → SOUND-01 | Wind and temperature gradients refract sound | one-way |
+| SOUND-01/02 → SEA-08 / BREAK-02 | Vibration loading (low priority, ignored) | none |
+| EARTH-02 (surface geometry, K07) → SOUND-02 | Tunnels and canyons as acoustic geometry | one-way |
+
+### Ecology and astronomy
+
+| Pair | Coupling quantity | Direction |
+|---|---|---|
+| SPACE-02 → SEA-07, ATMO-09 | Tidal potential, insolation | one-way |
+| BIO-01 ↔ DYN-01 | Felled trees as rigid bodies; impact felling | two-way |
+| BIO-03 ↔ HYDRO-04, ICE-01 | Roots and cover stabilise slopes; erosion removes soil | two-way |
+
+## 4. State, order and owners
+
+**State across the 101.**
+- Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core), BIO-03 and the SGP4 part of SPACE-01.
+- Partial: about 25. The deterministic analytic models in weather, vfx and sky count here: avalanche, eruption,
+  lava, thermal, fire front, hurricane and tornado, snow drift and fuel moisture.
+- Stand-in: about 40. These are the kinematic or scripted pieces the audit lists.
+- None: about 30.
+
+**Shared kernels.** 29 kernels (K01 to K29). K09 serves 32 solvers, K12 serves 23, K18 serves 19 and K06 serves 18.
+Each kernel is written once and shared; a second copy of a kernel is a defect.
+
+**Build order** (from [physics-framework.md](physics-framework.md)):
+1. Foundation: the film clock and dyadic solver rates, the shared-memory module layout, the world, field registry
+   and scheduler, the solver interface (snapshot, restore, hash), kernels K01 to K05 and the most shared kernels,
+   the coupling-test harness, and worker threads. The rigid and soft kernels move onto the solver interface.
+2. Vertical slice, a ship at sea: SEA ocean surface and hull solvers, ATMO wind, DYN-01 rigid contact, and their
+   couplings, proven end to end on a real shot.
+3. Fan-out: every remaining solver in dependency order (a solver starts once the solvers and kernels it reads are
+   sound).
+
+**Owners by family.**
+- Rigid, granular, terrain and destruction (DYN, EARTH, BREAK), plus the time foundation and threads.
+- Ships, floating bodies, characters, animals and crowds (SEA hull side, LIFE, SOFT-03, SOFT-05), plus gravity.
+- Atmosphere, vegetation and cloth (ATMO, AERO, FIRE, BIO, SOFT-01, SOFT-02, SOFT-04, SOFT-06, SOUND).
+- Ocean, waves, hydrology and particle fluids (SEA surface side, FLUID, HYDRO, ICE, SPACE), plus the film clock.
+
+**Scope decisions.**
+- Rider and mount coupling is a coupling pair, not a separate solver.
+- Water entry (SEA-14) is its own solver.
+- The sailing hull sits inside SEA-09, together with the sail model AERO-02.
+- Lower-priority entries: BIO-04, SOUND-03, DYN-05, ICE-05, HYDRO-06 and SEA-03. Lower priority orders the work; it
+  does not remove a solver.
+- Rendering-only phenomena (aurora, rainbows, caustics, heat-haze optics) are not solvers. They read the temperature
+  and particle fields the solvers above publish.
