@@ -923,6 +923,10 @@
       "types": "./dist/gltf/physics.d.ts",
       "import": "./dist/gltf/physics.js"
     },
+    "./gltf/soft-mesh": {
+      "types": "./dist/gltf/soft-mesh.d.ts",
+      "import": "./dist/gltf/soft-mesh.js"
+    },
     "./gltf/interactivity": {
       "types": "./dist/gltf/interactivity.d.ts",
       "import": "./dist/gltf/interactivity.js"
