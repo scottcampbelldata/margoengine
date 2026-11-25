@@ -204,16 +204,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   affected packages that have tests. A full reason (core, stage, check code and the rest) still runs every package.
   Regression: `tests/check-merge-affected.test.js` ("test:changed picks the changed packages ...").
 
-### Open: parseGLTFAsync of a file in memory fetches its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
+### Fixed 2026-11-24: parseGLTFAsync of a file in memory fetched its external URIs from the page's directory (KB-GLTFA B7, gltf/pbr)
 
-- **Repro:** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
-  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requests `https://app.test/editor/secret/tex.png`
-  and fails with `glTF download request failed: HTTP 404`, which does not say that the file has no location.
-- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolves URIs against `globalThis.location` when no URL is
-  given. This is documented on `parseGLTFAsync` ("resolves external URIs against the page") and matches what loaders
-  people switch from do with an empty path, so it stays; the light loader refuses instead ("needs the file location;
-  use loadGLTF"). Open as an API question: a refusal naming `loadGLTF` and the `buffers` option would change documented
-  behaviour.
+- **Repro (before):** `parseGLTFAsync(engine, docWithImageUri)` from `@margoengine/gltf/pbr` on a page at
+  `https://app.test/editor/` with `images: [{ uri: 'secret/tex.png' }]` requested `https://app.test/editor/secret/tex.png`
+  and failed with `glTF download request failed: HTTP 404`, which did not say that the file has no location.
+- **Cause:** `loadAsset` (`packages/gltf/src/asset.ts`) resolved URIs against `globalThis.location` when no URL was given.
+- **Fix:** `AssetOptions.baseURL` names what a file in memory resolves against; without it an external buffer or image
+  URI (not `data:`) is refused with a coded `state` error that names `baseURL` and `loadGLTF`, and nothing is fetched.
+  `loadGLTF` and the other loaders that fetch the file know its location and ignore the option. This changes the
+  documented "resolves against the page" behaviour on purpose (manager ruling 2026-11-24).
+- **Regression:** packages/gltf/test/in-memory-base.test.js; test/download-budget.test.js now passes `baseURL`.
 
 ### Fixed 2026-11-19: loadAuto held a large file twice while gltf/pbr loaded it (KB-GLTFA B14, gltf)
 
@@ -228,14 +229,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   when loadAuto returns it forgets everything. The same load now holds 104,867,300 B (one copy). Regression:
   `packages/gltf/test/auto.test.js` ("downloaded once and held once"; the declared-length move keeps the redirect URL).
 
-### Open: loadAuto on an engine with no GPU device reports gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
+### Fixed 2026-11-24: loadAuto on an engine with no GPU device reported gltf/pbr's error, not the light loader's reason (KB-GLTFA B17, gltf)
 
-- **Repro (by reading):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour
-  map: `gltf/textured` refuses with `unsupported` (it names `install()` from `@margoengine/webgl2-compat`), `loadAuto`
-  moves to gltf/pbr, which fails with `PBRModel requires WebGPU`, and the first reason is dropped.
-- **Cause:** `loadAuto` moves on any `unsupported` refusal without checking that gltf/pbr can run on the engine. The
-  current test "a texture on WebGL does too" (`packages/gltf/test/auto.test.js`) asserts the move, so changing it is
-  a decision on what loadAuto should do on an engine without a GPU device.
+- **Repro (before):** `loadAuto` on an engine without WebGPU or the WebGL2 layer and a file with a base colour map:
+  `gltf/textured` refused with `unsupported` (naming `install()` from `@margoengine/webgl2-compat`), `loadAuto` moved to
+  gltf/pbr, which failed with `PBRModel requires WebGPU`, and the first reason was dropped.
+- **Cause:** the move to gltf/pbr rethrew its error as it was.
+- **Fix:** when gltf/pbr also refuses with `unsupported`, `loadAuto` throws an `unsupported` MargoError whose message is
+  the light loader's reason followed by `gltf/pbr cannot load it here either: <gltf/pbr's message>`. The move itself is
+  unchanged, so engines with a device still reach gltf/pbr (the existing "a texture on WebGL does too" test holds).
+- **Regression:** packages/gltf/test/auto.test.js ("with no GPU device for gltf/pbr either ...").
 
 ### Fixed 2026-11-19: a node with a zero scale on any axis stopped the whole glTF load, in both loaders (KB-GLTFA B1, core + gltf)
 
@@ -1916,19 +1919,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   that scene, not the default one"), and on a real GPU, natively and with MARGO_COMPAT=1,
   `npm run test:browser:reflections --workspace @margoengine/react -- --mode=scene-fog` (centre green; grey before).
 
-### Open 2026-11-16: react's lazy environment bindings fetch the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
+### Fixed 2026-11-24: react's lazy environment bindings fetched the image decoders they do not use (KB-REACT-ENVDECODERS1, react, environment)
 
-- **Repro:** build an app with Vite from the workspace that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
-  `<Environment>` with children and no `src` (`@margoengine/react/environment`). Vite prints
-  `INEFFECTIVE_DYNAMIC_IMPORT` for `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load holds
-  the Radiance HDR, OpenEXR and UltraHDR decoders (environment `dist/loaders.js`, 36 KB raw) although none of them reads
-  an image file. A packed install prints no warning but builds the same chunk.
-- **Cause:** each binding loads the whole environment root, `import('@margoengine/environment')`, whose `index.js`
-  re-exports `loaders.js` beside `main.js`. Taking the namespace keeps every export, so the decoders join the chunk and
-  `EnvironmentLighting.load`'s own `import('./loaders.js')` split cannot happen. Only `<Environment src>` needs them.
-- **Fix needed:** a path to the environment classes without the decoders for the bindings that read no file (an entry
-  of the environment package, or imports the bundler can trim), then drop the expected warning in react
-  `tests/subpaths.test.js` ("an Environment without children ..."), which fails once the warning is gone.
+- **Repro (before):** build an app with Vite that renders `<AmbientLight>`, `<Fog>`, `<CubeCamera>` or an
+  `<Environment>` with children (`@margoengine/react/environment`). Vite printed `INEFFECTIVE_DYNAMIC_IMPORT` for
+  `packages/environment/dist/loaders.js`, and the lazy chunk these bindings load held the Radiance HDR, OpenEXR and
+  UltraHDR decoders (36 KB raw) although none of them reads an image file.
+- **Cause:** each binding loaded the whole environment root, whose `index.js` re-exports `loaders.js` beside `main.js`;
+  taking the namespace kept every export, so the decoders joined the chunk and `EnvironmentLighting.load`'s own
+  `import('./loaders.js')` split could not happen.
+- **Fix:** `@margoengine/environment/main` is a new entry: everything the root exports except the decoders. The lights,
+  Fog, CubeCamera and children-capture bindings import it; only `<Environment src>` (which decodes a file) takes the root.
+- **Regression:** packages/react/tests/subpaths.test.js ("lights and fog load the environment entry without image
+  decoders"; it fails with the old import) and "an Environment without children ..." no longer expects the warning.
 
 ### Fixed 2026-11-16: an `<Environment>` app bundled CubeCamera, Lightformer and the children capture up front (KB-REACT-PURE1, react)
 
@@ -13690,7 +13693,7 @@ asctime dates were read as local time (RFC 9110 5.6.7, RFC 9111 5.3); `If-Range`
 `Prefetcher.settle()` hung while paused; `AssetBundles.load` kept downloading every file after one failed; HashedAssets
 and AssetBundles dropped a `Request` input's signal and headers; `throttle` left one abort listener per chunk.
 
-### Open: cache findings not fixed in the audit
+### Closed 2026-11-24: cache audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
 
 - Fixed, lane S (2026-11-10): evictionIndex coalesces same-transaction removals, reading and writing totals once for the complete key set. Deleting every Vary entry now leaves exact usage and preserves unrelated files; repeated deletion is harmless. Parent-failing regression: packages/cache/test/eviction.test.js (two and five variants). The real IndexedDB browser gate also deletes five negotiated copies together and checks the remaining bytes and file count.
 - Fixed, lane S (2026-11-10): AssetCache hit bookkeeping reads the current record and updates it in the same readwrite transaction. Missing records stay evicted; current sizes, validators and content type cannot be overwritten by an older hit. A 304 refresh updates freshness only if the stored validators still match, and last-use time never moves backwards. Four parent-failing regressions in packages/cache/test/stale-touch.test.js cover eviction and replacement under plain/indexed bookkeeping. The same proof runs on real browser IndexedDB, retaining the already-read response while respecting the byte budget.
@@ -13744,7 +13747,7 @@ frame; they compare `Math.fround(value)`. A linked Aseprite cel took the z-index
 orders by each cel's own z). A Spine IK key without `mix` kept the setup mix (0 stayed 0; the JSON export format
 says assume 1) and one without `softness` interpolated toward 1 (format: assume 0).
 
-### Open: sprites findings not fixed in the audit
+### Closed 2026-11-24: sprites audit findings (every item below is Fixed, Verified or an Accepted difference with its regression or pinning test)
 
 - Fixed 2026-11-11 (KB6013a): nine-slice parts with squeezed or fractional borders left a one-pixel gap under `snap`,
   because each part's corner was rounded on its own and its size kept. packSprites now rounds both edges of an
