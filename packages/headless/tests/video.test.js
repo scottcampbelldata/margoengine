@@ -286,7 +286,11 @@ test('the default bitrate follows the pixel count and never starves a tiny video
   // 16 x 16 solid colour 6 levels off.
   const rate = async (width, height, options = {}) => {
     const { webCodecs, log } = fakeCodecs({ colorSpace: { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709' } });
-    await encodeVideo([{ width, height, data: new Uint8Array(width * height * 4) }], { fps: 30, webCodecs, ...options });
+    await encodeVideo([{ width, height, data: new Uint8Array(width * height * 4) }], {
+      fps: 30,
+      webCodecs,
+      ...options,
+    });
     return log.configs[0].bitrate;
   };
   assert.equal(await rate(16, 16), 100_000);
