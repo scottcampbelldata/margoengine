@@ -176,6 +176,8 @@ iterate(), rollback() for strong coupling: re-run a tick from a saved start, and
   implicit or iterated scheme below a threshold.
 - **Iteration counts are fixed.** Residual tests use fixed-order sums, so a loop never stops at a different count on
   another machine.
+- **One level per strongly coupled group.** Every member of an iterated (or predicted or implicit-pressure) group steps
+  at the finest rate level any member chooses, so a re-run of the group's tick re-runs one step of each member.
 
 **Other engines as solvers.** The rigid-body contract (the bodies field of section 4 plus the public body, collider,
 joint and query API) does not depend on Margo's kernel. Another engine can stand in for the rigid solver by

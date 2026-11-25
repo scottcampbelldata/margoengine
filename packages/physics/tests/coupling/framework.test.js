@@ -272,3 +272,17 @@ test('added-mass sweep: staggering diverges past the body mass, the iterated sch
   }
   assert.throws(() => new PhysicsWorld().couple([], 'staggered', { bodyMass: 1, addedMass: 2 }), RangeError);
 });
+
+test('a strongly coupled group steps at the finest level any member chooses; a Strang pair one level apart', () => {
+  // The rule is one for every scheme that steps its members together (iterated, predicted, implicit pressure).
+  for (const scheme of ['iterated', 'predicted']) {
+    const { a, b } = springPair(),
+      slow = { ...a, describe: () => ({ ...a.describe(), rate: 0 }) },
+      fast = { ...b, describe: () => ({ ...b.describe(), rate: 2 }) };
+    const world = new PhysicsWorld().add(slow, {}).add(fast, {}).couple(['a', 'b'], scheme);
+    assert.deepEqual([world.levelOf('a'), world.levelOf('b')], [2, 2], scheme);
+  }
+  const { a, b } = springPair({ level: 1 }),
+    world = new PhysicsWorld().add(a, {}).add(b, {}).couple(['a', 'b'], 'strang');
+  assert.deepEqual([world.levelOf('a'), world.levelOf('b')], [2, 1], 'the half-stepped member runs one level above');
+});
