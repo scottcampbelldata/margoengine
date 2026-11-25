@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18901835,
+  "total": 18902518,
   "history": [
     {
       "date": "2026-10-24",
@@ -12123,6 +12123,12 @@
       "commit": "lane-d",
       "reason": "geospatial feel (glide, presets, keys, reduced motion)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "5745639a1",
+      "reason": "geospatial touch, pen and gamepad",
+      "grew": 2
     }
   ],
   "items": {
@@ -12339,7 +12345,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 12100,
+    "@margoengine/controls/geospatial": 12782,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
@@ -13922,6 +13928,7 @@
     "leak @margoengine/usdz -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/usdz/compose -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf/worker": 1,
+    "leak @margoengine/video/frames -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/video/frames -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/video/frames -> @margoengine/materials": 1,
     "leak @margoengine/water/breaking -> @margoengine/gltf/extended-materials": 1,

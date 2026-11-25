@@ -48,6 +48,7 @@ export class GeospatialControls extends Controls {
     keyPanSpeed: number;
     inertia: GeospatialInertia;
     reducedMotion: boolean;
+    gamepad: boolean;
     protected get kind(): string;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: GeospatialOptions);
     get view(): Readonly<Required<GeospatialView>>;
@@ -130,6 +131,7 @@ export interface GeospatialOptions {
     keyTarget?: EventTargetLike | null;
     preset?: GeospatialPreset;
     inertia?: Partial<GeospatialInertia>;
+    gamepad?: boolean;
     reducedMotion?: boolean;
 }
 

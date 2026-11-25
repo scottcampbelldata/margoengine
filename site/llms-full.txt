@@ -11813,6 +11813,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   tilt it; a pause over 80 ms before release, a `pointercancel`, first person and reduced motion give no glide. Pan
   glide follows the geodesic from the centre at the release bearing. Wheel zoom has no glide (each notch is exact).
   Keys pan by the height above the surface below the eye, at least 2 m. The dcc preset drags zoom 2 x per 200 px.
+- Touch: the first two fingers make the gesture and a third is ignored; after a gesture the remaining finger does not
+  pan until it is lifted and pressed again. The gamepad is the first connected pad with four axes in the standard
+  mapping (axes 0 to 3, triggers on buttons 6 and 7, boost on 10); it is read only when `gamepad` is true, and other
+  pads are left to the page.
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)
