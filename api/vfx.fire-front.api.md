@@ -8,6 +8,7 @@ import { LightGroups } from "@margoengine/clustered/groups";
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
+import { FilmClock } from "@margoengine/math/clock";
 
 export const BURNING = 1;
 
@@ -617,6 +618,7 @@ interface VFXOptions {
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
+    clock?: Pick<FilmClock, 'ticks'>;
     obstacles?: readonly VFXObstacle[];
     wrap?: boolean;
     sort?: boolean;

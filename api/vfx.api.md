@@ -6,6 +6,7 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
+import { FilmClock } from "@margoengine/math/clock";
 
 export interface BurstSpawn {
     position?: ArrayLike<number>;
@@ -229,6 +230,7 @@ export interface VFXOptions {
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
+    clock?: Pick<FilmClock, 'ticks'>;
     obstacles?: readonly VFXObstacle[];
     wrap?: boolean;
     sort?: boolean;
@@ -381,6 +383,8 @@ export interface VFXVectorField {
 export type VFXWind = readonly [number, number] | {
     sample(x: number, y: number, z: number, t: number): readonly number[];
 };
+
+export const VFX_TICK_RATE = 120;
 
 // Not exported from this entry, but used by the exports above:
 

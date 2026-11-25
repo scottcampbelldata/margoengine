@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX film clock check</title><style>body{margin:0}canvas{display:inline-block;width:160px;height:120px}</style></head><body><canvas id="f24"></canvas><canvas id="f30"></canvas><canvas id="f60"></canvas><canvas id="f5"></canvas><canvas id="seek"></canvas>
+<script type="module">
+// A VFX given a FilmClock steps in ticks of 1/120 s owed by the clock. Five alike effects: drawn at 24, 30, 60 and 5 fps,
+// and one fresh effect whose clock is set straight to 2 s and drawn once. At 1 s and 2 s every byte of the particle
+// buffer must be equal across them (the same steps put the same particles in the same slots). Driven by
+// film-clock-check.mjs, on WebGPU and on the WebGL2 compatibility layer.
+import {Engine} from '/packages/core/dist/index.js';
+import {VFX} from '/packages/vfx/dist/base.js';
+import {schedule} from '/packages/vfx/dist/schedule.js';
+import {FilmClock} from '/packages/math/dist/clock.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const errors=[];
+const options=clock=>({capacity:4000,initialCount:40,rate:637.3,lifetime:[1,2],spread:2,wind:[1.5,-0.5],clock,schedule:{prewarm:0.25,seed:9,bursts:[{time:0.1,count:25,cycles:4000,interval:0.35,probability:0.7}]}});
+async function world(id,fps){
+ const engine=await Engine.create(document.getElementById(id),{backend:'webgpu',camera:{position:[0,2,8],target:[0,1,0],near:0.1,far:100}}),device=engine.gpu,clock=new FilmClock({fps});
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const vfx=new VFX(options(clock),{schedule});engine.use(vfx);
+ return {engine,device,vfx,clock,fps};
+}
+async function draw(w){w.engine.render({delta:1/w.fps});await w.device.queue.onSubmittedWorkDone();}
+// FNV-1a over every 32-bit word of the particle buffer, and the live count.
+async function state(w){
+ const {device}=w,{particles}=w.vfx.gpuState,staging=device.createBuffer({size:particles.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+ encoder.copyBufferToBuffer(particles,0,staging,0,particles.size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const u=new Uint32Array(staging.getMappedRange().slice(0)),f=new Float32Array(u.buffer);staging.unmap();staging.destroy();
+ let h=0x811c9dc5,live=0;for(const x of u){h^=x;h=Math.imul(h,0x01000193)>>>0;}
+ for(let i=0;i<u.length/16;i++)if(f[i*8+3]>0)live++;
+ return {hash:h.toString(16),live};
+}
+const worlds=[await world('f24',24),await world('f30',30),await world('f60',60),await world('f5',5)],sought=await world('seek',24),all=[...worlds,sought];
+// Pipelines compile on frames at frame 0 (time 0, no tick owed); every world gets the same number of them, so the 0 s
+// steps they take are the same everywhere.
+const counts=[];
+for(const w of all){let n=0;await waitForPipelines(async()=>{n++;await draw(w);});counts.push(n);}
+const most=Math.max(...counts);
+for(const [i,w] of all.entries())for(let k=counts[i];k<most;k++)await draw(w);
+window.check={async run(){
+ const at={1:[],2:[]};
+ for(const w of worlds){
+  for(let frame=1;frame<=2*w.fps;frame++){w.clock.frame=frame;await draw(w);if(frame===w.fps)at[1].push({fps:w.fps,time:w.vfx.time,...await state(w)});}
+  at[2].push({fps:w.fps,time:w.vfx.time,...await state(w)});
+ }
+ sought.clock.frame=48;await draw(sought);
+ at[2].push({fps:'seek',time:sought.vfx.time,...await state(sought)});
+ return {errors,most,at};
+}};
+window.ready=true;
+</script></body></html>

@@ -832,6 +832,33 @@ for (let frame = 0; frame < 60; frame++) engine.render({delta: 1 / 30});
 console.log(sparks.time);
 ```
 
+### A film clock: the same particles at any frame rate
+
+Give the effect a `FilmClock` from `@margoengine/math/clock` as `clock` and it steps in fixed ticks of 1/120 s
+(`VFX_TICK_RATE`), as many as the clock owes since the last drawn frame, instead of one step of the frame's delta. Each
+tick has its exact time (`ticks / 120`), its births and the step number that seeds them, and the features see the tick's
+delta. So the same shot drawn at 24, 30, 60 or 5 fps holds the same particle buffer, every byte, at every time those
+rates share; a seek is setting the clock (the next drawn frame runs every tick owed, and a seek back restarts the effect
+and replays from 0); and no frame, however long, loses time (`test/film-clock.test.js` for the counters and uniforms,
+`test/film-clock-check.mjs` for the particle buffer on WebGPU and the WebGL2 layer). `advanceTime` and `onPreUpdate`
+move nothing while a clock is set; frames closer than a tick take the 0 s step a second view takes. A 60 fps frame runs
+two steps of 1/120 s where it ran one of 1/60 s, a finer integration of the same motion. Every owed tick runs in the
+next drawn frame, so a jump of T seconds costs 120 T simulation passes in that frame.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx';
+import {FilmClock} from 'margoengine/math/clock';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const clock = new FilmClock({fps: 24});
+const sparks = VFX.attach(engine, {capacity: 2000, rate: 600, lifetime: [1, 2], clock});
+for (let frame = 0; frame <= 48; frame++) {
+  clock.frame = frame;
+  engine.render({delta: 1 / 24});
+}
+console.log(sparks.time); // 2: 240 ticks, the same particles a 60 fps render holds at 2 s
+```
+
 `Flame` and `Smoke` are clocks too: each has `advanceTime(delta)` and `time`, and works everything it draws (the
 puffing, the light's flicker, the dither shift, the wind it samples, a smoke column's speed and size curves and its
 puffs' rate and wind) from that clock, so a seek moves them with the effects and a flame or column at a cut draws what a

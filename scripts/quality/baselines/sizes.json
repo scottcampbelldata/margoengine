@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18672430,
+  "total": 18672637,
   "history": [
     {
       "date": "2026-10-24",
@@ -11889,6 +11889,12 @@
       "commit": "9eb122550",
       "reason": "New optional math/clock entry: 0 to 773 B gzip, the film clock (exact frame time over a rational frame rate, integer solver ticks, dyadic solver rates). Pure, no imports; nothing to split.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "2f9ca5af1",
+      "reason": "VFXOptions.clock: fixed 1/120 s ticks owed by a FilmClock (countTicks, the exact tick times, the option's check and its two coded messages). About 250 B gzip on vfx and vfx/base (gate budgets 37,697 to 37,961 and 13,086 to 13,339, measured on the commit before and after). It is the base effect's own stepping, so a split behind import() would load it on every effect that takes a clock and cost a second module for 250 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13239,8 +13245,8 @@
     "@margoengine/usdz/skel": 8356,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13900,
-    "@margoengine/vfx": 37954,
-    "@margoengine/vfx/base": 13139,
+    "@margoengine/vfx": 37961,
+    "@margoengine/vfx/base": 13339,
     "@margoengine/vfx/blown-sand": 10823,
     "@margoengine/vfx/clouds": 8867,
     "@margoengine/vfx/curves": 1816,

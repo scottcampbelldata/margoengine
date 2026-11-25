@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
+import type { FilmClock } from '@margoengine/math/clock';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
 import { simulationShader, billboardShader, multisampled, foggedBillboard, transparentBillboard } from './shader.js';
@@ -97,6 +98,14 @@ export interface VFXOptions {
   emissionExtent?: Vec3;
   /** RGB multiplier for HDR emission, 0 to 65,504 (the largest half float). Default 1. */
   intensity?: number;
+  /**
+   * A film clock (`FilmClock` from `@margoengine/math/clock`). With one, the effect steps in fixed ticks of 1/120 s, as
+   * many as the clock owes since the last drawn frame, instead of one step of the frame's delta: a shot drawn at 24, 30
+   * or 60 fps births and moves the same particles at the times it shares, a frame of any length loses no time, and a
+   * seek is setting the clock (a seek back replays from 0). Every owed tick runs in the next drawn frame; `advanceTime`
+   * and `onPreUpdate` then move nothing. Read every frame. Default none: one step of the frame's delta, as before.
+   */
+  clock?: Pick<FilmClock, 'ticks'>;
   /** Up to 64 spheres/boxes that the flow bends around and particles bounce off. Contents are read each frame; pass an array (even `[]`) before attaching. */
   obstacles?: readonly VFXObstacle[];
   /** Keep particles inside the emission box, re-entering on the opposite face (every extent must be > 0). Read at attach. */
@@ -590,6 +599,8 @@ const extensions = [
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
+/** Ticks a second of an effect stepped by a film clock ({@link VFXOptions.clock}): the dyadic solver rate of level 1. */
+export const VFX_TICK_RATE = 120;
 /** One simulation step's counters, worked out on the CPU by `advanceTime` and uploaded by the simulate pass. */
 interface Tick {
   delta: number;
@@ -741,6 +752,8 @@ export class VFX implements EnginePlugin {
   private remainder = 0;
   private frames = 0;
   private burstCount = 0;
+  /** Ticks of 1/120 s simulated since the start or `reset()`, with a film clock. */
+  private done = 0;
   /** Bursts given a place of their own, in the order asked, born before the frame's step. */
   private spawnQueue: { count: number; spawn: BurstSpawn }[] = [];
   /** This frame's step, set by `advanceTime` and taken by the simulate pass (once, however many views draw). */
@@ -789,6 +802,8 @@ export class VFX implements EnginePlugin {
         if (o.emissionExtent[i] < 0)
           throw new RangeError('Emission extent must be nonnegative; pass half-sizes of 0 or more.');
     }
+    if (o.clock !== undefined && typeof o.clock?.ticks !== 'function')
+      throw new TypeError('A VFX clock needs ticks(rate); pass a FilmClock from @margoengine/math/clock.');
     // Up to the half-float maximum of the HDR target the billboards draw into: a fire's flames as bright as the light
     // they give (`@margoengine/vfx/fire`, about 59) passed the old cap of 16 (KB-FIRE-RECEIVER1).
     if (!Number.isFinite(o.intensity ?? 1) || (o.intensity ?? 1) < 0 || (o.intensity ?? 1) > MAX_INTENSITY)
@@ -917,7 +932,7 @@ export class VFX implements EnginePlugin {
    */
   reset(): this {
     if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to reset it');
-    this.seconds = this.remainder = this.frames = this.burstCount = 0;
+    this.seconds = this.remainder = this.frames = this.burstCount = this.done = 0;
     this.spawnQueue.length = 0;
     this.ticked = false;
     this.warm = [];
@@ -1134,7 +1149,10 @@ export class VFX implements EnginePlugin {
       },
     });
   }
-  /** Seconds on the effect's clock: the sum of its frame deltas since it started or since `reset()`. */
+  /**
+   * Seconds on the effect's clock: the sum of its frame deltas since it started or since `reset()`; with a film clock,
+   * the time of the last tick simulated, exactly `ticks / 120`.
+   */
   get time(): number {
     return this.seconds;
   }
@@ -1150,7 +1168,8 @@ export class VFX implements EnginePlugin {
   advanceTime(delta: number): void {
     if (this.disposed) return;
     this.validate();
-    if (!(delta > 0)) {
+    if (!(delta > 0) || this.options.clock) {
+      // With a film clock the simulate pass counts the ticks it owes; a frame's delta moves nothing.
       this.clocked = true;
       return;
     }
@@ -1171,9 +1190,10 @@ export class VFX implements EnginePlugin {
     this.advanceTime(delta);
   }
   /** One step's counters on the CPU: the same arithmetic for a live frame, a prewarm step and a replayed step. */
-  private countStep(delta: number, into: Tick, still = false): Tick {
+  private countStep(delta: number, into: Tick, still = false, at?: number): Tick {
     const o = this.options;
-    this.seconds += delta;
+    // A tick of a film clock takes its exact time, so no float sum of deltas drifts from the clock.
+    this.seconds = at ?? this.seconds + delta;
     const extraBirths = this.runtimes.reduce((sum, runtime) => sum + (runtime.emission?.(delta) ?? 0), 0);
     const emissions = (o.rate ?? this.capacity / 2) * delta + this.remainder;
     this.remainder = emissions % 1;
@@ -1187,7 +1207,8 @@ export class VFX implements EnginePlugin {
   }
   private simulate(c: Context): void {
     this.validate();
-    if (!this.clocked) {
+    if (this.options.clock) this.countTicks(this.options.clock);
+    else if (!this.clocked) {
       // No frame update reaches this effect (its passes are run directly): each pass counts its own step from the
       // frame delta, prewarm included, as before the counters moved to advanceTime.
       this.warm.length = 0;
@@ -1222,18 +1243,43 @@ export class VFX implements EnginePlugin {
       c.device.queue.submit([encoder.finish()]);
     }
     this.warm.length = 0;
-    if (this.ticked) {
-      this.ticked = false;
-      this.simulateStep(c, this.tick);
-      return;
-    }
-    const delta = c.delta;
-    c.delta = 0;
+    const delta = c.delta,
+      ticked = this.ticked,
+      tick = ticked ? this.tick : this.still;
+    this.ticked = false;
+    // The step's own delta: a tick's with a film clock, 0 for the 0 s step of a second view, else the frame's.
+    if (this.options.clock || !ticked) c.delta = tick.delta;
     try {
-      this.simulateStep(c, this.still);
+      this.simulateStep(c, tick);
     } finally {
       c.delta = delta;
     }
+  }
+  /**
+   * The ticks a film clock owes since the last drawn frame, counted as steps of 1/120 s at their exact times: all but the
+   * last become steps of their own before the frame's, the last is the frame's step. A clock behind the effect (a seek
+   * back) restarts it from 0 and replays; a clock with nothing owed (a second view, or frames faster than 120 a second)
+   * takes the 0 s step.
+   */
+  private countTicks(clock: Pick<FilmClock, 'ticks'>): void {
+    const target = clock.ticks(VFX_TICK_RATE);
+    if (!Number.isSafeInteger(target) || target < 0)
+      throw new RangeError(`A VFX clock gives whole ticks from 0; got ${target}. Pass a FilmClock.`);
+    if (target < this.done) this.reset();
+    this.warm.length = 0;
+    for (const runtime of this.runtimes) runtime.warmup?.((step) => this.warm.push(this.countStep(step, {} as Tick)));
+    this.takeSpawns();
+    if (target === this.done) {
+      this.countStep(0, this.still, true);
+      return;
+    }
+    while (this.done < target - 1) this.warm.push(this.countTick({} as Tick));
+    this.countTick(this.tick);
+    this.ticked = true;
+  }
+  private countTick(into: Tick): Tick {
+    this.done++;
+    return this.countStep(1 / VFX_TICK_RATE, into, false, this.done / VFX_TICK_RATE);
   }
   private simulateStep(c: Context, tick: Tick): void {
     const o = this.options,

@@ -5,6 +5,7 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { Engine, PassContext } from "@margoengine/core/extension";
+import { FilmClock } from "@margoengine/math/clock";
 
 export type VFXShape = {
     shape: 'hemisphere';
@@ -247,6 +248,7 @@ interface VFXOptions {
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
+    clock?: Pick<FilmClock, 'ticks'>;
     obstacles?: readonly VFXObstacle[];
     wrap?: boolean;
     sort?: boolean;

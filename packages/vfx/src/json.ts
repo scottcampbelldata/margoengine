@@ -57,6 +57,7 @@ const keys: Record<keyof VFXOptions, true> = {
   angularVelocity: true,
   emissionExtent: true,
   intensity: true,
+  clock: true,
   obstacles: true,
   wrap: true,
   sort: true,

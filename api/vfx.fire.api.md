@@ -9,6 +9,7 @@ import { LineLight } from "@margoengine/clustered/line";
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
+import { FilmClock } from "@margoengine/math/clock";
 import { KitHearth } from "@margoengine/sky/scene-kits";
 
 export class Fire implements EnginePlugin {
@@ -437,6 +438,7 @@ interface VFXOptions {
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
+    clock?: Pick<FilmClock, 'ticks'>;
     obstacles?: readonly VFXObstacle[];
     wrap?: boolean;
     sort?: boolean;
