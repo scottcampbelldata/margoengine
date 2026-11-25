@@ -83,6 +83,10 @@ try {
       );
     else assert.ok(Math.abs(result.duration - result.expected) < 1 / 30, `duration ${result.duration}`);
     for (const value of result.same) assert.ok(value < MOST_DIFFERENCE, `${name} shows its frames: ${result.same}`);
+    assert.ok(
+      result.other > MOST_DIFFERENCE,
+      `${name}: a wrong frame must differ more than any right one may: ${result.other}`,
+    );
     assert.ok(result.other > Math.max(...result.same), `${name} frames differ: ${result.other}`);
     if (name === 'fmp4' || name === 'webm-stream') {
       // Header, one fragment or cluster per half-second key frame interval (60 frames at 30 fps: 4), and the index.

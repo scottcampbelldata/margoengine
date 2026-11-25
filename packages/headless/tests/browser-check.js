@@ -139,7 +139,9 @@ window.check.video = async (format) => {
   const at = (index) => (index + 0.5) / FPS,
     same = [];
   for (const index of [0, 7, 15, 31, 45, 59]) same.push(difference(await shown(video, at(index)), source[index]));
-  const other = difference(await shown(video, at(31)), source[15]);
+  // A frame that really is wrong: 8 frames (49 degrees) away. A cube looks nearly the same a quarter turn on (15
+  // frames here), and a control near that angle differs by no more than ordinary encoding error.
+  const other = difference(await shown(video, at(31)), source[23]);
   // Media Source Extensions take the pieces as they come: the header, then each fragment, appended one at a time.
   let streamed;
   if (pieces && globalThis.MediaSource?.isTypeSupported(encoded.mimeType)) {
