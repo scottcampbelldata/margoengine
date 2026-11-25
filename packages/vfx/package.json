@@ -33,7 +33,7 @@
     "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:parity": "cd ../.. && node packages/vfx/test/parity.mjs --all && node packages/vfx/test/parity.mjs --all --compat",
-    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs && node packages/vfx/test/flipbook-webgl2.mjs && node packages/vfx/test/shadows-nodes-webgl2.mjs && node packages/vfx/test/seek-check.mjs && node packages/vfx/test/clouds-check.mjs && node packages/vfx/test/blown-sand-check.mjs && node packages/vfx/test/settings-check.mjs && node packages/vfx/test/smoke-check.mjs && node packages/vfx/test/fire-front-check.mjs && node packages/vfx/test/flame-check.mjs && node packages/vfx/test/gunfire-check.mjs"
+    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs && node packages/vfx/test/flipbook-webgl2.mjs && node packages/vfx/test/shadows-nodes-webgl2.mjs && node packages/vfx/test/seek-check.mjs && node packages/vfx/test/clouds-check.mjs && node packages/vfx/test/blown-sand-check.mjs && node packages/vfx/test/settings-check.mjs && node packages/vfx/test/smoke-check.mjs && node packages/vfx/test/fire-front-check.mjs && node packages/vfx/test/flame-check.mjs && node packages/vfx/test/gunfire-check.mjs && node packages/vfx/test/solid-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -168,6 +168,10 @@
     "./fire-front": {
       "types": "./dist/fire-front.d.ts",
       "import": "./dist/fire-front.js"
+    },
+    "./solid": {
+      "types": "./dist/solid.d.ts",
+      "import": "./dist/solid.js"
     },
     "./gunfire": {
       "types": "./dist/gunfire.d.ts",

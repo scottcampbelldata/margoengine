@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Solid particle system check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body>
+<script type="module">
+// SolidParticleSystem on a real GPU (WebGPU, or the WebGL2 layer under MARGO_COMPAT=1), driven by solid-check.mjs:
+// four boxes in one merged mesh (one material, vertex colours red, green, blue, yellow), the fourth hidden:
+// - draw: each visible box shows its own colour at its projected centre, the hidden one shows the background;
+// - pick: a ray straight through each centre picks the particle whose colour is there, and misses the hidden one;
+// - update: moving one box and un-hiding the hidden one through setParticles + setGeometry(range) redraws both.
+import {Engine} from '/packages/core/dist/index.js';
+import {SolidParticleSystem} from '/packages/vfx/dist/solid.js';
+import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const W=256,H=192,FOV=Math.PI/3,CAM={position:[0,0,20],target:[0,0,0],near:0.5,far:100};
+const project=(p)=>{const d=CAM.position[2]-p[2],f=(H/2)/Math.tan(FOV/2);return [Math.round(W/2+p[0]*f/d),Math.round(H/2-p[1]*f/d)];};
+const box={positions:[-.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,.5,.5,.5,-.5,-.5,-.5,-.5,-.5,-.5,.5,-.5,.5,.5,-.5],
+ indices:[0,1,2,0,2,3,1,4,7,1,7,2,4,5,6,4,6,7,5,0,3,5,3,6,3,2,7,3,7,6,5,4,1,5,1,0]};
+const COLORS=[[1,0,0,1],[0,1,0,1],[0,0,1,1],[1,1,0,1]],X=[-3,-1,1,3];
+const name=(r,g,b)=>r>150&&g<90&&b<90?'red':g>150&&r<90&&b<90?'green':b>150&&r<90&&g<90?'blue':r>150&&g>150&&b<90?'yellow':(r<60&&g<60&&b<60?'background':'other');
+window.check=async()=>{
+ const c=document.createElement('canvas');c.width=W;c.height=H;document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:CAM});e.stop();e.scene.background='#101010';
+ const errors=[];e.gpu.addEventListener('uncapturederror',x=>errors.push(x.error.message));
+ const s=new SolidParticleSystem();
+ s.addShape(box,4,{positionFunction:(p,i)=>{p.position=[X[i],0,0];p.scaling=[1.5,1.5,1.5];p.color=COLORS[i];}});
+ const g=s.build();
+ s.particles[3].isVisible=false;s.setParticles(0,3,false);s.takeDirty();
+ const mesh=createMesh(e,g,new UnlitMaterial({}));
+ const shot=new OffscreenCanvas(W,H),ctx=shot.getContext('2d',{willReadFrequently:true});
+ const read=async()=>{e.render({delta:1/60});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();ctx.drawImage(c,0,0);return ctx.getImageData(0,0,W,H).data;};
+ const at=(px,p)=>{const [x,y]=project(p),o=(y*W+x)*4;return name(px[o],px[o+1],px[o+2]);};
+ const out={errors};
+ let px=await read();
+ out.draw=X.map(x=>at(px,[x,0,0.75]));
+ out.pick=X.map(x=>{const h=s.pick({origin:[x,0,20],direction:[0,0,-1]});return h?h.particleIndex:null;});
+ // update: particle 0 up to y = 3, the hidden particle 3 shown, one ranged upload
+ s.particles[0].position=[X[0],3,0];s.particles[3].isVisible=true;s.setParticles(0,3,false);
+ const range=s.takeDirty();mesh.setGeometry(g,range);
+ px=await read();
+ out.range=range;
+ out.after=[[X[0],3],[X[0],0],[X[3],0]].map(([x,y])=>at(px,[x,y,0.75]));
+ out.pickAfter=[s.pick({origin:[X[0],3,20],direction:[0,0,-1]})?.particleIndex??null,s.pick({origin:[X[0],0,20],direction:[0,0,-1]})?.particleIndex??null,s.pick({origin:[X[3],0,20],direction:[0,0,-1]})?.particleIndex??null];
+ out.errors=errors;e.dispose();return out;
+};
+window.ready=true;
+</script></body></html>

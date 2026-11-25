@@ -326,6 +326,79 @@ order-independent pass. Up to 65,536 triangles a mesh; every corner runs for eve
 4x MSAA, a cube turned by its random axis for the shade of the face turned to the camera, and a long box following its
 velocity.
 
+### Solid particle system: many meshes as one mesh
+
+`@margoengine/vfx/solid` is a CPU-driven solid particle system for what the GPU `mesh` feature cannot do: a few
+thousand pieces (bricks of a wall, a shattering vase, a flock, a scatter of props) that each have their own colour,
+scale and rotation, can be hidden or killed, and can be picked with a ray. Many shapes are merged into one vertex and
+index buffer, so the whole system is one draw. Build it from `addShape(shape, count, options?)` (copies of a mesh) or
+`digest(shape, {number | facetNb})` (the mesh split into pieces of whole triangles, `number` winning over `facetNb`,
+default 1 triangle each), call `build()` once, then each frame `setParticles(start?, end?)` runs your `updateParticle(p)`
+over the range and rewrites only those vertices.
+
+| Particle field | Default | Meaning |
+| --- | --- | --- |
+| `position`, `scaling` | `[0,0,0]`, `[1,1,1]` | world position; scale per axis, applied before the rotation |
+| `rotation`, `rotationQuaternion` | `[0,0,0]`, `null` | Euler radians (roll, pitch, then yaw), or a quaternion `[x,y,z,w]` that wins when set |
+| `color` | white | rgba 0 to 1, written to every vertex |
+| `uvs` | `[0,0,1,1]` | the rectangle `[u0,v0,u1,v1]` the shape's uvs map into (a sprite sheet cell) |
+| `alive`, `isVisible` | `true` | dead: not updated, not drawn, not picked; invisible: updated but collapsed to a point, not picked |
+| `boundingBox` | | world box as last written; `getBounds()` joins the drawn particles |
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {SolidParticleSystem} from 'margoengine/vfx/solid';
+import {UnlitMaterial, createMesh} from 'margoengine/materials';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const h = 0.5;
+const cube = {
+  positions: [-h,-h,-h, h,-h,-h, h,h,-h, -h,h,-h, -h,-h,h, h,-h,h, h,h,h, -h,h,h],
+  indices: [4,5,6, 4,6,7, 1,0,3, 1,3,2, 5,1,2, 5,2,6, 0,4,7, 0,7,3, 7,6,2, 7,2,3, 0,1,5, 0,5,4],
+};
+const sps = new SolidParticleSystem({
+  updateParticle(p) { p.rotation[1] += 0.02; p.position[1] = 1 + Math.sin(p.idx + p.rotation[1]); },
+});
+sps.addShape(cube, 200, {
+  positionFunction: (p, i) => { p.position = [(i % 20) * 1.5 - 14, 0, Math.floor(i / 20) * 1.5 - 7]; },
+  color: [0.9, 0.5, 0.2, 1],
+});
+const geometry = sps.build();   // one merged mesh: positions, normals, uvs, colors (rgba), indices
+const mesh = createMesh(engine, geometry, new UnlitMaterial({}));   // vertex colours are on by default
+engine.onFrame(() => {
+  sps.setParticles();   // or setParticles(0, 99) for a range
+  mesh.setGeometry(geometry, sps.takeDirty()!);   // uploads only the vertices written
+});
+// Pick: the nearest drawn triangle along a ray, in world units.
+const hit = sps.pick({origin: [0, 5, 20], direction: [0, -0.2, -1]});
+if (hit) sps.particles[hit.particleIndex].alive = false;   // {particleIndex, shapeId, faceId, localFaceId, distance, point}
+engine.start();
+```
+
+**One merged buffer, not instancing per shape.** Instancing would need a draw per shape and a per-instance colour and
+transform path, and the CPU would still have to transform the geometry to pick it. A merged buffer rebuilt on the CPU
+is one draw however many shapes there are, supports per-particle colour and uvs and any mix of shapes, and picking tests
+exactly the vertices that were uploaded. The price is CPU work in proportion to the vertices written: `setParticles`
+with a range, or the vertex range of `takeDirty()`, keeps a frame to the particles that moved. Colours are in the
+geometry's `colors` stream, which `createMesh` of `@margoengine/materials` reads (`vertexColors` on); the core `Mesh`
+has no vertex colours.
+
+`pick` walks each drawn particle's box (slab test) and then its triangles with the Moller-Trumbore test; the ray
+direction is normalised, so `distance` is in world units. Options: `maxDistance` (default `Infinity`) and `backFaces`
+(default `true`). Hidden and dead particles are never hit.
+
+Errors: a bad shape, count, range, option or non-finite particle value throws `TypeError` or `RangeError` naming the fix;
+`addShape` after `build()`, `setParticles` or `pick` before it, an empty `build()`, or `setParticles` from inside
+`updateParticle` throw `MargoError` `'state'`; any use after `dispose()` throws `'disposed'`. Limits: 1,000,000
+particles and 1,000,000 vertices in all (the material mesh's own limit).
+`node scripts/run-with-timeout.mjs --max=8 -- node packages/vfx/test/solid-check.mjs` (real GPU; `MARGO_COMPAT=1` for
+the WebGL2 layer) draws four coloured boxes from one merged mesh, checks each box's colour at its projected centre, that
+a hidden box shows the background, that rays pick the box drawn there, and a ranged upload after a move.
+
+Sources (clean room, from the papers and the rivals' public feature descriptions, no rival code read): Reeves,
+"Particle Systems - a Technique for Modeling a Class of Fuzzy Objects", ACM TOG 2(2), 1983; Carucci, "Inside Geometry
+Instancing", GPU Gems 2 ch. 3, 2005 (the instancing alternative weighed above); Moller and Trumbore, "Fast, Minimum
+Storage Ray-Triangle Intersection", Journal of Graphics Tools 2(1), 1997.
+
 ### Sub-emitters and GPU events
 
 `events` gives particles children: when a particle is born from the emitter (`on: 'birth'`: a spark trail, a muzzle
