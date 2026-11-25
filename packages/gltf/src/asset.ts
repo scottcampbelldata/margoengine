@@ -153,7 +153,7 @@ export interface GLTFDecoderHooks {
   instancing?: { read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined };
   /**
    * The physical material shader (`extendedMaterials` from @margoengine/gltf/extended-materials): clearcoat, sheen,
-   * transmission, volume, IOR, specular, dispersion, iridescence, anisotropy and diffuse transmission. `loadGLTF` and
+   * transmission, volume, IOR, specular, dispersion, iridescence, anisotropy, diffuse transmission and diffuse roughness. `loadGLTF` and
    * `parseGLTFAsync` import it on their own when a file uses one of those extensions; `false` keeps the base shader
    * (the extensions are then ignored, as glTF allows). Synchronous `parseGLTF` uses it only when passed.
    */
@@ -202,13 +202,13 @@ export interface GLTFExtendedMaterials {
   convert?(material: GLTFMaterial): GLTFMaterial;
   /**
    * A glTF material's `extensions` read for its thin film, anisotropy, diffuse transmission and bump, or undefined when
-   * none is in use (every factor 0): the features, map slots 13-18 (texture infos) and 16 uniform floats (rows iri, aniso,
-   * dtr, bump).
+   * none is in use (every factor 0): the features, map slots 13-20 (texture infos, then slot 21 for a diffuse roughness
+   * texture) and 24 uniform floats (rows iri, aniso, dtr, bump, scatter, extinction).
    */
   parse(
     extensions: GLTFExtensions,
   ): { features: Omit<ExtendedPlan, 'slots'>; maps: (GLTFTextureInfo | undefined)[]; rows: number[] } | undefined;
-  /** The binding plan for a material's 21 map slots (`extendedPlan`). */
+  /** The binding plan for a material's map slots (`extendedPlan`). */
   plan(maps: readonly ({ index: number } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
   /** The extended physical shader for a plan (`extendedShader`). */
   shader(plan: ExtendedPlan): string;
@@ -263,6 +263,7 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_iridescence: 'materials',
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
+  KHR_materials_diffuse_roughness: 'materials',
   EXT_materials_bump: 'materials',
   KHR_materials_volume_scatter: 'materials',
   KHR_gaussian_splatting: 'splats',

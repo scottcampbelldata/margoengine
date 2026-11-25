@@ -1461,6 +1461,13 @@ export interface PhysicalOptions {
   anisotropy?: number;
   anisotropyRotation?: number;
   anisotropyMap?: Texture | null;
+  /**
+   * KHR_materials_diffuse_roughness: roughness of the diffuse lobe, 0-1 (default 0: Lambert), apart from `roughness`.
+   * Shaded with the energy-preserving Oren-Nayar model.
+   */
+  diffuseRoughness?: number;
+  /** Linear R, times `diffuseRoughness`. */
+  diffuseRoughnessMap?: Texture | null;
   /** KHR_materials_iridescence: strength 0-1, film IOR >= 1, thickness range in nanometres. */
   iridescence?: number;
   iridescenceIOR?: number;
@@ -1693,6 +1700,7 @@ export const mapSlots = [
   'iridescenceThicknessMap',
   'anisotropyMap',
   'thicknessMap',
+  'diffuseRoughnessMap',
 ] as const;
 /** Names of the texture maps a material can hold, such as `'map'`, `'normalMap'` or `'aoMap'`. */
 export type MapSlot = (typeof mapSlots)[number];
@@ -1882,6 +1890,8 @@ const extensions: Record<keyof PhysicalOptions, string> = {
   anisotropy: 'anisotropy',
   anisotropyRotation: 'anisotropy',
   anisotropyMap: 'anisotropy',
+  diffuseRoughness: 'diffuse_roughness',
+  diffuseRoughnessMap: 'diffuse_roughness',
   iridescence: 'iridescence',
   iridescenceIOR: 'iridescence',
   iridescenceThicknessRange: 'iridescence',
@@ -2098,7 +2108,8 @@ function materialBuffer(
   field: UniformField = 'buffer',
 ): GPUBuffer {
   const state = mapState(m, owner);
-  if (state.device !== device || !state[field]) {
+  // A map added later may need a longer uniform (diffuseRoughnessMap).
+  if (state.device !== device || !state[field] || state[field].size < size) {
     state[field]?.destroy();
     state.device = device;
     // A new buffer is a new binding: bind groups made with the old one must be made again (`MaterialShading.version`).
@@ -2879,14 +2890,15 @@ export class Material {
   set subsurfaceWrap(v: number) {
     this.setSurface(24, unit(v, 'subsurfaceWrap'));
   }
-  private readonly physicalTextures: (Texture | null)[] = Array(12).fill(null);
+  private readonly physicalTextures: (Texture | null)[] = Array(13).fill(null);
   private setMap(i: number, value: Texture | null): void {
     const key = mapSlots[i + 5] as keyof PhysicalOptions;
     if (value != null) {
       if (!(value instanceof Texture))
         throw new TypeError(`Material ${key} must be a Texture; pass a Texture instance.`);
       this.enable(key);
-      while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
+      // The last slot (diffuseRoughnessMap) takes UV rows only when used.
+      while (this.uvt.length < (i === 12 ? 18 : 17) * 8) this.uvt.push(...this.uvDefault);
     }
     this.physicalTextures[i] = value ?? null;
   }
@@ -3345,7 +3357,7 @@ export class Material {
     if (!self.physical) add(name);
     const physical = (self.physical ??= [0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0]);
     self.ext ??= [0, 1.5, 0, 0];
-    if (name === 'anisotropy' || name === 'iridescence') {
+    if (name === 'anisotropy' || name === 'iridescence' || name === 'diffuse_roughness') {
       if (physical.length <= 12) physical.push(0, 1.3, 100, 400, 0, 1, 0, 0, 0, 1, 1, 1);
       add(name);
     }
@@ -3354,7 +3366,7 @@ export class Material {
       add(name);
       add('transmission');
     }
-    if (mapped(this)) while (this.uvt.length < mapSlots.length * 8) this.uvt.push(...this.uvDefault);
+    if (mapped(this)) while (this.uvt.length < 17 * 8) this.uvt.push(...this.uvDefault);
     return physical;
   }
   private set(i: number, v: number, label: keyof PhysicalOptions): void {
@@ -3412,6 +3424,18 @@ export class Material {
     this.rotation = v;
     p[17] = Math.cos(v);
     p[18] = Math.sin(v);
+  }
+  get diffuseRoughness(): number {
+    return this.physical?.[19] ?? 0;
+  }
+  set diffuseRoughness(v: number) {
+    this.set(19, v, 'diffuseRoughness');
+  }
+  get diffuseRoughnessMap(): Texture | null {
+    return this.physicalTextures[12] ?? null; // snapshots taken before this slot hold 12
+  }
+  set diffuseRoughnessMap(v: Texture | null) {
+    this.setMap(12, v);
   }
   get iridescence(): number {
     return this.physical?.[12] ?? 0;
@@ -3813,11 +3837,12 @@ export class Material {
   bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     if (mapped(this)) {
       const plan = mapPlan(this),
-        buffer = materialBuffer(this, device, engine ?? device, 560);
-      const values = new Float32Array(140);
-      for (let k = 0; k < mapSlots.length; k++)
+        rows = this.diffuseRoughnessMap ? 18 : 17,
+        buffer = materialBuffer(this, device, engine ?? device, rows * 32 + 16);
+      const values = new Float32Array(rows * 8 + 4);
+      for (let k = 0; k < rows; k++)
         values.set(this.uvt.length > k * 8 ? this.uvt.slice(k * 8, k * 8 + 8) : this.uvDefault, k * 8);
-      values.set(this.volume ?? [0, 1, 1, 1], 136);
+      values.set(this.volume ?? [0, 1, 1, 1], rows * 8);
       device.queue.writeBuffer(buffer, 0, values);
       const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer } }];
       // One sampler per texture: it repeats under triplanar when any UV0 slot reads the texture.
@@ -4319,10 +4344,11 @@ function emissionOf(m: Material): number[] {
 function extendedOf(m: Material): PBRMaterial['extended'] {
   if (!m.physical || m.physical.length <= 12) return undefined;
   const iridescence = m.extensions.includes('iridescence'),
-    anisotropy = m.extensions.includes('anisotropy');
+    anisotropy = m.extensions.includes('anisotropy'),
+    diffuseRoughness = m.extensions.includes('diffuse_roughness');
   let f = features.get(m);
-  if (f?.iridescence !== iridescence || f.anisotropy !== anisotropy)
-    features.set(m, (f = { iridescence, anisotropy, diffuseTransmission: false }));
+  if (f?.iridescence !== iridescence || f.anisotropy !== anisotropy || f.diffuseRoughness !== diffuseRoughness)
+    features.set(m, (f = { iridescence, anisotropy, diffuseTransmission: false, diffuseRoughness }));
   return f;
 }
 /** The glTF `extensions` record @margoengine/exporters reads to name the KHR_materials_* in use; one object per list. */

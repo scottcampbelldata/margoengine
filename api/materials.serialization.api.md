@@ -315,6 +315,10 @@ class Material {
     set anisotropy(v: number);
     get anisotropyRotation(): number;
     set anisotropyRotation(v: number);
+    get diffuseRoughness(): number;
+    set diffuseRoughness(v: number);
+    get diffuseRoughnessMap(): Texture | null;
+    set diffuseRoughnessMap(v: Texture | null);
     get iridescence(): number;
     set iridescence(v: number);
     get iridescenceIOR(): number;
@@ -521,6 +525,8 @@ interface PhysicalOptions {
     anisotropy?: number;
     anisotropyRotation?: number;
     anisotropyMap?: Texture | null;
+    diffuseRoughness?: number;
+    diffuseRoughnessMap?: Texture | null;
     iridescence?: number;
     iridescenceIOR?: number;
     iridescenceThicknessRange?: readonly [number, number];
@@ -636,7 +642,7 @@ type Wrap = 'repeat' | 'clamp' | 'mirror';
 
 const featureMaps: readonly ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'];
 
-const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
+const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap', 'diffuseRoughnessMap'];
 
 const surfaceMaps: readonly ['parallaxMap', 'subsurfaceThicknessMap'];
 ```

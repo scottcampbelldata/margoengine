@@ -37,7 +37,7 @@ function specialize(source: string, group: number, slots: readonly (readonly [nu
       samplers.add(slot[1]);
     }
   const declarations =
-    `struct MargoPhysicalMaps {uvt:array<vec4f,34>,volume:vec4f}
+    `struct MargoPhysicalMaps {uvt:array<vec4f,${slots[17] ? 36 : 34}>,volume:vec4f}
 @group(${group}) @binding(200) var<uniform> margoPhysicalMaps:MargoPhysicalMaps;
 ` +
     [...textures]
@@ -81,6 +81,7 @@ fn margoPhysicalFrame(i:Out,n:vec3f,k:u32)->mat3x3f {
     ['f.sheen.w*vec4f(1).a', `f.sheen.w*${sample(10)}.a`],
     ['mix(f.iri.z,f.iri.w,vec4f(1).g)', `mix(f.iri.z,f.iri.w,${sample(14)}.g)`],
     ['f.iri.x*vec4f(1).r', `f.iri.x*${sample(13)}.r`],
+    ['f.aniso.w*vec4f(1).r', `f.aniso.w*${sample(17)}.r`],
     [
       'margoAnisotropy(s.n,t,b,vec4f(1,0.5,1,1).xyz)',
       slots[15]

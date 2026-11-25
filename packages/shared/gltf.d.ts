@@ -82,6 +82,10 @@ export interface GLTFExtensions {
     anisotropyRotation?: number;
     anisotropyTexture?: GLTFTextureInfo;
   };
+  KHR_materials_diffuse_roughness?: {
+    diffuseRoughnessFactor?: number;
+    diffuseRoughnessTexture?: GLTFTextureInfo;
+  };
   KHR_materials_diffuse_transmission?: {
     diffuseTransmissionFactor?: number;
     diffuseTransmissionColorFactor?: number[];

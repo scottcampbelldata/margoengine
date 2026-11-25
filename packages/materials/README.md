@@ -40,6 +40,21 @@ The [Khronos clearcoat specification](https://github.com/KhronosGroup/glTF/tree/
 
 The coat receives directional lighting and its shadow visibility. Clustered lights illuminate the base lobe; `@margoengine/clustered/physical-lobes` adds the coat of a `Material` or a loaded physical surface under them, while this `clearcoat()` extension keeps its coat under the directional light only.
 
+## Diffuse roughness
+
+`new Material({diffuseRoughness})` (0 to 1, default 0: Lambert) roughens the diffuse lobe apart from `roughness`, for sandstone, plaster, clay and cloth; `diffuseRoughnessMap` multiplies it by its linear red channel. It draws with gltf/pbr's energy-preserving Oren-Nayar lobe (glTF README, "Rough diffuse surfaces") and exports as `KHR_materials_diffuse_roughness`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Material, createMesh} from 'margoengine/materials';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const clay = new Material({color: '#b4643c', roughness: 0.8, diffuseRoughness: 0.9});
+createMesh(engine, {positions: [-1, -1, 0, 1, -1, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2]}, clay);
+engine.start();
+clay.diffuseRoughness = 0.5; // live
+```
+
 ## Sheen, specular, anisotropy and iridescence
 
 The four additional glTF lobes share group 3 with clearcoat and transmission.

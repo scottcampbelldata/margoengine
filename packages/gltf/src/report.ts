@@ -144,6 +144,7 @@ const KNOWN = new Set([
   'KHR_materials_variants',
   'KHR_materials_iridescence',
   'KHR_materials_anisotropy',
+  'KHR_materials_diffuse_roughness',
   'KHR_texture_basisu',
   'KHR_draco_mesh_compression',
   'EXT_meshopt_compression',

@@ -16,6 +16,7 @@ const physical = [
   'KHR_materials_iridescence',
   'KHR_materials_anisotropy',
   'KHR_materials_diffuse_transmission',
+  'KHR_materials_diffuse_roughness',
   'EXT_materials_bump',
   'KHR_materials_volume_scatter',
 ];

@@ -121,6 +121,7 @@ interface ExtendedPlan {
     readonly diffuseTransmission: boolean;
     readonly bump?: boolean;
     readonly scatter?: boolean;
+    readonly diffuseRoughness?: boolean;
 }
 
 interface GLTFAccessor extends GLTFProperty {
@@ -342,6 +343,10 @@ interface GLTFExtensions {
     anisotropyStrength?: number;
     anisotropyRotation?: number;
     anisotropyTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_diffuse_roughness?: {
+    diffuseRoughnessFactor?: number;
+    diffuseRoughnessTexture?: GLTFTextureInfo;
   };
   KHR_materials_diffuse_transmission?: {
     diffuseTransmissionFactor?: number;

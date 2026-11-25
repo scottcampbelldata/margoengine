@@ -869,6 +869,35 @@ console.log(model.primitives[0].uvs);
 
 `loadGLTFInWorker`, `loadGLTFProgressive`, Draco, `EXT_mesh_gpu_instancing`, `@margoengine/lod` levels and far meshes, and `@margoengine/exporters` all keep the later sets. `writeGeometry` keeps them too: a write that changes the vertex count passes its own `uvs`. Such primitives stay out of static batches. A `MASK` or `BLEND` base map on set 2 or 3 casts and picks uncut, as the depth passes read the first two sets only, and a `.margo` file holds two sets. A fifth set is refused by name.
 
+#### Rough diffuse surfaces (`KHR_materials_diffuse_roughness`, draft)
+
+`loadGLTF` and `parseGLTFAsync` read `KHR_materials_diffuse_roughness` by themselves through `@margoengine/gltf/extended-materials`, so sandstone, plaster, clay and cloth look flat and back-scattering. `diffuseRoughnessFactor` (default `0`, Lambert, from 0 to 1) times the red channel of `diffuseRoughnessTexture` (linear, with its UV set and `KHR_texture_transform`) roughens the diffuse lobe; specular roughness is separate. A material without the extension, or with factor 0, keeps its shader and buffers. As the extension requires, unlit and specular-glossiness materials ignore it.
+
+```ts
+import {parseGLTFAsync} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// One clay triangle.
+const positions = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
+const model = await parseGLTFAsync(engine, {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_diffuse_roughness'],
+  buffers: [{byteLength: 36}],
+  bufferViews: [{buffer: 0, byteLength: 36}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0]}],
+  materials: [{
+    pbrMetallicRoughness: {baseColorFactor: [0.6, 0.3, 0.2, 1], metallicFactor: 0},
+    extensions: {KHR_materials_diffuse_roughness: {diffuseRoughnessFactor: 0.9}},
+  }],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}],
+}, [positions.buffer]);
+console.log(model.primitives[0].material.extended?.diffuseRoughness); // true
+engine.start();
+```
+
+The lobe is the energy-preserving Oren-Nayar (EON) model that OpenPBR names (Portsmouth, Kutz and Hill, "EON: A practical energy-preserving rough diffuse BRDF", JCGT 14(1), 2025, <https://arxiv.org/abs/2410.18026>): a white surface reflects all light at every roughness, and a coloured one saturates slightly as it roughens. The sun and local lights shade it through the same direct term, the back side of `KHR_materials_diffuse_transmission` included. The ambient, light-probe and image-based terms take the lobe's directional albedo at the view angle in place of the base colour (exact under uniform light), which costs two more evaluations of the ambient hook per pixel. Transmission, sheen and clearcoat layer over it as over Lambert. Real-GPU check on both backends: `npm run test:gpu:diffuse-roughness -w @margoengine/gltf`.
+
 #### Scattering in glTF volumes (`KHR_materials_volume_scatter`, draft)
 
 A material with `KHR_materials_diffuse_transmission` glows from behind under shadows too: its lighting hook's `direct(direct, normal)` gets the side facing the light, so the surface does not shadow its own back. Its shadow casters carry `transmits`, the factor times the colour factor, for `transmission` of `@margoengine/shadows/transmission`.

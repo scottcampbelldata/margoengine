@@ -368,6 +368,11 @@ class Writer extends Bin {
           anisotropyRotation: owner?.anisotropyRotation ?? Math.atan2(P[18], P[17]),
           anisotropyTexture: t(15),
         });
+      if (P && (e.KHR_materials_diffuse_roughness || owner?.diffuseRoughnessMap || (owner && P[19])))
+        ext.KHR_materials_diffuse_roughness = clean({
+          diffuseRoughnessFactor: P[19],
+          diffuseRoughnessTexture: t(owner ? 17 : 21),
+        });
       const v = e.KHR_materials_volume;
       if (v || owner?.thicknessMap || owner?.transmissive)
         ext.KHR_materials_volume = clean({

@@ -364,6 +364,10 @@ export class Material {
     set anisotropy(v: number);
     get anisotropyRotation(): number;
     set anisotropyRotation(v: number);
+    get diffuseRoughness(): number;
+    set diffuseRoughness(v: number);
+    get diffuseRoughnessMap(): Texture | null;
+    set diffuseRoughnessMap(v: Texture | null);
     get iridescence(): number;
     set iridescence(v: number);
     get iridescenceIOR(): number;
@@ -706,6 +710,8 @@ export interface PhysicalOptions {
     anisotropy?: number;
     anisotropyRotation?: number;
     anisotropyMap?: Texture | null;
+    diffuseRoughness?: number;
+    diffuseRoughnessMap?: Texture | null;
     iridescence?: number;
     iridescenceIOR?: number;
     iridescenceThicknessRange?: readonly [number, number];
@@ -1009,7 +1015,7 @@ export function loadTexture(url: string | URL, { signal, fetch: get, maxBytes, m
     fetch?: typeof fetch;
 }): Promise<Texture>;
 
-export const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
+export const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap', 'diffuseRoughnessMap'];
 
 export function materialGraphOutput(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialGraphOutput;
 

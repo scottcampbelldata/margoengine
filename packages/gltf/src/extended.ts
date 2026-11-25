@@ -12,7 +12,8 @@ const number = (value: unknown, fallback: number, min: number, max: number, labe
 };
 
 /**
- * KHR_materials_iridescence, KHR_materials_anisotropy, KHR_materials_diffuse_transmission, EXT_materials_bump (draft)
+ * KHR_materials_iridescence, KHR_materials_anisotropy, KHR_materials_diffuse_transmission,
+ * KHR_materials_diffuse_roughness (draft), EXT_materials_bump (draft)
  * and KHR_materials_volume_scatter (draft)
  * for gltf/pbr, passed like a decoder: `loadGLTF(engine, url, {decoders: {materials: extendedMaterials}})` (also parseGLTF, parseGLTFAsync, the worker
  * and progressive loaders). Without it gltf/pbr ignores those extensions (a file that requires one is rejected), so apps
@@ -25,7 +26,11 @@ export const extendedMaterials: GLTFExtendedMaterials = {
       dt = e.KHR_materials_diffuse_transmission,
       bu = e.EXT_materials_bump,
       vo = e.KHR_materials_volume,
-      sc = e.KHR_materials_volume_scatter;
+      sc = e.KHR_materials_volume_scatter,
+      // KHR_materials_diffuse_roughness excludes unlit and specular-glossiness materials: their shading ignores it.
+      dr =
+        e.KHR_materials_unlit || e.KHR_materials_pbrSpecularGlossiness ? undefined : e.KHR_materials_diffuse_roughness;
+    const rough = number(dr?.diffuseRoughnessFactor, 0, 0, 1, 'diffuse roughness');
     const iridescence = number(ir?.iridescenceFactor, 0, 0, 1, 'iridescence'),
       anisotropy = number(an?.anisotropyStrength, 0, 0, 1, 'anisotropy strength');
     const diffuse = number(dt?.diffuseTransmissionFactor, 0, 0, 1, 'diffuse transmission');
@@ -54,7 +59,7 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         thickness > 0 &&
         extinction.some((c) => c > 0) &&
         (!!diffuse || !!e.KHR_materials_transmission?.transmissionFactor);
-    if (!iridescence && !anisotropy && !diffuse && !bump && !scatter) return undefined;
+    if (!iridescence && !anisotropy && !diffuse && !bump && !scatter && !rough) return undefined;
     const color = dt?.diffuseTransmissionColorFactor ?? [1, 1, 1],
       rotation = number(an?.anisotropyRotation, 0, -Infinity, Infinity, 'anisotropy rotation');
     if (!Array.isArray(color) || color.length !== 3)
@@ -62,8 +67,15 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         'Invalid glTF diffuse transmission color; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
       );
     return {
-      features: { iridescence: !!iridescence, anisotropy: !!anisotropy, diffuseTransmission: !!diffuse, bump, scatter },
-      // Slots 13-20; an extension whose factor is 0 binds nothing.
+      features: {
+        iridescence: !!iridescence,
+        anisotropy: !!anisotropy,
+        diffuseTransmission: !!diffuse,
+        bump,
+        scatter,
+        ...(rough ? { diffuseRoughness: true } : undefined),
+      },
+      // Slots 13-20; an extension whose factor is 0 binds nothing. Slot 21 exists only for a diffuse roughness texture.
       maps: [
         iridescence ? ir!.iridescenceTexture : undefined,
         iridescence ? ir!.iridescenceThicknessTexture : undefined,
@@ -73,8 +85,10 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         bump ? bu!.bumpTexture : undefined,
         scatter ? sc!.multiscatterColorTexture : undefined,
         scatter ? vo!.thicknessTexture : undefined,
+        ...(rough && dr!.diffuseRoughnessTexture ? [dr!.diffuseRoughnessTexture] : []),
       ],
-      // Rows iri (factor, film IOR, thickness min, max in nm), aniso (strength, cos and sin of the rotation), dtr (factor,
+      // Rows iri (factor, film IOR, thickness min, max in nm), aniso (strength, cos and sin of the rotation, then the
+      // diffuse roughness factor), dtr (factor,
       // colour), bump (factor, 1 for heights in the node's space), scatter (multi-scatter colour, anisotropy), extinction
       // (per world unit, thickness).
       rows: [
@@ -85,7 +99,7 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         anisotropy,
         Math.cos(rotation),
         Math.sin(rotation),
-        0,
+        rough,
         diffuse,
         ...color.map((c: unknown) => number(c, 0, 0, 1, 'diffuse transmission color')),
         height,

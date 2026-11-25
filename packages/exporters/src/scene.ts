@@ -589,6 +589,7 @@ export const materialSlots = [
   'iridescenceThicknessMap',
   'anisotropyMap',
   'thicknessMap',
+  'diffuseRoughnessMap',
 ] as const;
 
 // The key gltf/pbr defines on each node it creates, holding its PBRModel (gltf/pbr src/model.ts `cpuSource`).

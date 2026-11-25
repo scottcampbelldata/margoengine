@@ -9725,3 +9725,7 @@ The GPU regression uses an untextured ridge to verify east and west sunlight, op
 zenith visibility, map edges and rebaking. The clipmap render in the same test verifies that the baked terms
 change untextured pixels and that disposing the effect removes the render attachment.
 [GPU regression](../../packages/terrain/test/relief-lighting.browser.mjs)
+
+## Rough diffuse lobe (section 5 evidence, 2026-11-25)
+
+`KHR_materials_diffuse_roughness` compiles `eonWgsl` (`packages/gltf/src/shader.ts`) only into extended shaders of materials whose factor is above 0. It is the EON BRDF of Portsmouth, Kutz and Hill (JCGT 14(1), 2025, https://arxiv.org/abs/2410.18026): Fujii's Oren-Nayar single scatter plus a reciprocal multiple-scatter term, so the directional albedo of a white surface is 1. Evidence: `packages/gltf/test/diffuse-roughness.test.js` runs the shipped WGSL functions on the CPU against an oracle with the exact albedo (values, reciprocity, white furnace, albedo as the integral of the lobe); `packages/gltf/scripts/test-diffuse-roughness-browser.mjs` repeats the values on a GPU and compares pictures under sun, hemisphere and image-based light on WebGPU and the WebGL2 compatibility layer.

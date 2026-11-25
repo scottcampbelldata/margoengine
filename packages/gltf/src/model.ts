@@ -273,6 +273,8 @@ const planOf = (m: PBRMaterial, x: GLTFExtendedMaterials): ExtendedPlan => {
   if (plan?.from !== m.extended) plans.set(m, (plan = { ...x.plan(m.maps, m.extended!), from: m.extended! }));
   return plan!;
 };
+// An extended Frame: 104 floats, two UV rows per map slot (at least 21 slots), then 36 physical and extended floats.
+const extendedFloats = (m: PBRMaterial) => 140 + 8 * Math.max(21, m.maps.length);
 const needsPackedBase = (m: PBRMaterial, hooks: GLTFExtendedMaterials | undefined, source: PBRPrimitive['extension']) =>
   !!(
     !m.shading?.replacesTextures &&
@@ -3143,7 +3145,7 @@ export class PBRModel implements EnginePlugin {
       floats =
         !(r.primitive.extension ?? m.extension)?.replacesPhysical && (m.extendedFrame || m.physical || m.ext?.[0])
           ? m.extended
-            ? 308
+            ? extendedFloats(m)
             : 220
           : 100,
       cache = this.gpuCache;
@@ -4980,7 +4982,7 @@ export class PBRModel implements EnginePlugin {
     }
     const compact =
       !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
-    const floatCount = compact ? 100 : m.extended ? 308 : 220,
+    const floatCount = compact ? 100 : m.extended ? extendedFloats(m) : 220,
       // A third or fourth UV set, which a material of the primitive reads; loading progressively, a placeholder has none.
       laterUV = !!p.uvs;
     if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
@@ -5004,11 +5006,11 @@ export class PBRModel implements EnginePlugin {
       v.set(m.uvt!, 104);
     }
     if (!compact && m.physical) {
-      const offset = m.extended ? 272 : 208;
+      const offset = m.extended ? extendedFloats(m) - 36 : 208;
       v.set(m.physical, offset);
       if (!m.maps[7] && !m.shading?.replacesTextures) v[offset + 2] = 0;
     }
-    // Physical rows follow 26 UV rows (42 for extended materials); factor-only materials (five maps) use the same layout.
+    // Physical rows follow 26 UV rows (42 for extended materials, 44 with a diffuse roughness texture); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
       const volume = surfaceTint(m),

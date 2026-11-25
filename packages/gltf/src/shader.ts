@@ -388,6 +388,7 @@ export const physicalMaps = [
 ];
 // Slots 13-20, extended materials only: iridescence (R), its thickness (G), anisotropy (RG direction, B strength), diffuse
 // transmission (A) and its colour (RGB, sRGB), bump height (R, linear), multi-scatter colour (RGB, sRGB), volume thickness (G).
+// Slot 21, only for a material with a diffuse roughness texture: diffuse roughness (R, linear).
 export const extendedMaps = [
   'iridescence',
   'iridescenceThickness',
@@ -397,6 +398,7 @@ export const extendedMaps = [
   'bump',
   'multiscatter',
   'thickness',
+  'diffuseRoughness',
 ];
 const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,${physicalMaps.indexOf(name) + 5}))`;
 function patch(source: string, edits: [string | RegExp, string][]): string {
@@ -710,11 +712,13 @@ export interface ExtendedPlan {
   readonly diffuseTransmission: boolean;
   readonly bump?: boolean;
   readonly scatter?: boolean;
+  /** KHR_materials_diffuse_roughness in use: the energy-preserving rough diffuse lobe. Defaults to false. */
+  readonly diffuseRoughness?: boolean;
 }
 /** Extension textures an extended material may bind: 5 base + 8 = 13, so shadows, IBL and LocalShadows (3) still fit WebGPU's 16. */
 export const extendedTextureLimit = 8;
 /**
- * Binding plan for an extended material's 21 map slots: slots sharing a glTF texture share one binding (their UV rows
+ * Binding plan for an extended material's 21 map slots (22 with a diffuse roughness texture): slots sharing a glTF texture share one binding (their UV rows
  * stay per slot); at most `extendedTextureLimit` distinct textures, later slots beyond that fall back to their defaults.
  */
 export function extendedPlan(
@@ -722,7 +726,7 @@ export function extendedPlan(
   features: Omit<ExtendedPlan, 'slots'>,
 ): ExtendedPlan {
   const textures: number[] = [],
-    slots = Array.from({ length: 21 }, (_, k) => {
+    slots = Array.from({ length: Math.max(21, maps.length) }, (_, k) => {
       const map = k < 5 ? undefined : maps[k];
       if (!map) return -1;
       const j = textures.indexOf(map.index);
@@ -743,10 +747,27 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
   let b=cross(s.n,s.at.xyz); let bent=normalize(cross(cross(b,v),b)); return normalize(mix(bent,s.n,pow(1-s.at.w*(1-s.roughness),4.0)));
 }
 `;
+// KHR_materials_diffuse_roughness: the energy-preserving Oren-Nayar (EON) BRDF of Portsmouth, Kutz and Hill, "EON: A
+// practical energy-preserving rough diffuse BRDF", JCGT 14(1), 2025, https://arxiv.org/abs/2410.18026, times pi, so
+// roughness 0 returns the albedo (Lambert). margoEONE is the single-scatter directional albedo for white (Eq. 12 with the
+// polynomial of Eq. 14); 0.28779341 = 1/2 - 2/(3 pi) and 0.07248822 = 2/3 - 28/(15 pi) (Eq. 15). The lobe is Fujii's
+// single-scatter term (st is the tangent-plane dot v.l - n.v n.l, divided by max(n.l, n.v) when positive) plus the
+// reciprocal multiple-scatter term (Eq. 16-19). margoEONAlbedo is its integral over the light hemisphere (Eq. 20), the
+// response to a uniform environment, which the ambient and image-based terms use in place of the albedo.
+export const eonWgsl = `fn margoEONE(mu:f32,r:f32)->f32 {let m=1-mu; return (1+r*m*(0.0571085289+m*(0.491881867+m*(-0.332181442+m*0.0714429953))))/(1+0.28779341*r);}
+fn margoEONScatter(rho:vec3f,r:f32)->vec4f {let avg=(1+0.07248822*r)/(1+0.28779341*r); let c=clamp(rho,vec3f(0),vec3f(1)); return vec4f(c*c*avg/(1-c*(1-avg)),avg);}
+fn margoEON(rho:vec3f,r:f32,nl:f32,nv:f32,st:f32)->vec3f {
+  let t=st/select(1.0,max(max(nl,nv),0.0001),st>0.0); let m=margoEONScatter(rho,r);
+  return rho*((1+r*t)/(1+0.28779341*r))+m.rgb*(max(1-margoEONE(nv,r),0.0)*max(1-margoEONE(nl,r),0.0)/max(1-m.a,0.0000001));
+}
+fn margoEONAlbedo(rho:vec3f,r:f32,nv:f32)->vec3f {let e=margoEONE(nv,r); return rho*e+margoEONScatter(rho,r).rgb*(1-e);}
+`;
 /**
  * Direct light: GGX (Burley's anisotropic form when anisotropic, with the height-correlated visibility of the
  * KHR_materials_anisotropy notes), Fresnel mixed with the thin-film Fresnel (diffuse weighted by 1 - its largest channel),
- * diffuse reduced by transmission and split into reflection and back-side transmission (KHR_materials_diffuse_transmission).
+ * diffuse reduced by transmission and split into reflection and back-side transmission (KHR_materials_diffuse_transmission),
+ * both rough (`eonWgsl`) when `rough` (KHR_materials_diffuse_roughness; the transmitted side mirrors the light, which keeps
+ * the tangent-plane dot).
  * Sources: anisotropic D and V: KHR_materials_anisotropy "Implementation" (Burley 2012; Heitz 2014); isotropic
  * height-correlated Smith V = G2 / (4 nl nv) = 0.5 / (nl sqrt(a2 + (1 - a2) nv^2) + nv sqrt(a2 + (1 - a2) nl^2)):
  * Heitz 2014, JCGT 3(2), and glTF 2.0 Appendix B.3.2 (current revision), as `smithGCorrelated` in core's direct light.
@@ -754,6 +775,7 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
 export const directWgsl = (
   anisotropic: boolean,
   scatter = false,
+  rough = false,
 ): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let f0=mix(s.f0,s.base.rgb,s.metal); let schlick=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);
@@ -765,7 +787,7 @@ export const directWgsl = (
   let spec=a2*w2*w2/3.14159265*clamp(0.5/max(nl*length(vec3f(alt*dot(t,v),a*dot(b,v),nv))+nv*length(vec3f(alt*dot(t,l),a*dot(b,l),nl)),1e-6),0.0,1.0);`
       : `let a2=a*a; let spec=${/* @__PURE__ */ ggxDOf('s.n', 'h')}*0.5/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),0.00005);`
   }
-  let diffuse=kd*(1-s.metal)*((1-s.tr)*(s.base.rgb*(1-s.dt.w)*nl+s.dt.rgb*s.dt.w*clamp(-dot(s.n,l),0.0,1.0))${scatter ? '+s.sc*nl' : ''})/3.14159265;
+${rough ? '  let st=dot(v,l)-dot(s.n,v)*dot(s.n,l); let back=clamp(-dot(s.n,l),0.0,1.0);\n' : ''}  let diffuse=kd*(1-s.metal)*((1-s.tr)*(${rough ? 'margoEON(s.base.rgb,s.dr.x,nl,nv,st)' : 's.base.rgb'}*(1-s.dt.w)*nl+${rough ? 'margoEON(s.dt.rgb,s.dr.x,back,nv,st)*s.dt.w*back' : 's.dt.rgb*s.dt.w*clamp(-dot(s.n,l),0.0,1.0)'})${scatter ? '+s.sc*nl' : ''})/3.14159265;
   return diffuse+spec*fr*nl;
 }
 `;
@@ -777,17 +799,22 @@ export const directWgsl = (
 // ponytail: transmission scales the base colour, so partly metallic transmissive texels also lose metal F0, and anisotropy
 // bends the diffuse normal too; an exact split needs hooks that take diffuse colour and F0 separately.
 // The layering above is a Margo derivation; margoSky is the Margo design-choice hemisphere of lightingTerms.
-const ambientWgsl = (
-  plan: ExtendedPlan,
-) => `${plan.diffuseTransmission ? 'fn margoLightSide(n:vec3f,l:vec3f)->vec3f {return select(n,-n,dot(n,l)<0.0);}\n' : ''}fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}
+const ambientWgsl = (plan: ExtendedPlan) => {
+  const albedo = (rho: string) => (plan.diffuseRoughness ? `margoEONAlbedo(${rho},s.dr.x,s.dr.y)` : rho);
+  return `${plan.diffuseTransmission ? 'fn margoLightSide(n:vec3f,l:vec3f)->vec3f {return select(n,-n,dot(n,l)<0.0);}\n' : ''}fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}
 fn margoFront(s:Surface)->Surface {var o=s; o.base=vec4f(s.base.rgb*(1-s.tr)*(1-s.dt.w)${plan.scatter ? '+s.sc' : ''},s.base.a); return o;}
 fn margoHemisphere(s:Surface)->vec3f {
   let f0=mix(mix(s.f0,s.base.rgb,s.metal),s.ir.rgb,s.ir.w); let k=(1-s.metal)*(1-s.tr);
-  return (s.base.rgb*k*(1-s.dt.w)*margoSky(s.n)+s.dt.rgb*k*s.dt.w*margoSky(-s.n)${plan.scatter ? '+s.sc*(1-s.metal)*margoSky(s.n)' : ''}+f0*0.5*margoSky(s.n))*f.radiance.w*s.occlusion;
+  return (${albedo('s.base.rgb')}*k*(1-s.dt.w)*margoSky(s.n)+${albedo('s.dt.rgb')}*k*s.dt.w*margoSky(-s.n)${plan.scatter ? '+s.sc*(1-s.metal)*margoSky(s.n)' : ''}+f0*0.5*margoSky(s.n))*f.radiance.w*s.occlusion;
 }
 fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}
 fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {
   var o=margoFront(s);${plan.anisotropy ? ' o.n=margoBent(s,v);' : ''} var sum=margoAmbientTerm(i,o,v);${
+    plan.diffuseRoughness
+      ? `
+  var d=o; d.metal=0; let lambert=margoAmbientTerm(i,d,v); d.base=vec4f(o.base.rgb+(margoEONAlbedo(s.base.rgb,s.dr.x,s.dr.y)-s.base.rgb)*(1-s.tr)*(1-s.dt.w),o.base.a); sum+=(1-s.metal)*(margoAmbientTerm(i,d,v)-lambert);`
+      : ''
+  }${
     plan.iridescence
       ? `
   var m=o; m.metal=1; m.base=vec4f(s.ir.rgb,1); sum+=s.ir.w*margoAmbientTerm(i,m,v);
@@ -796,13 +823,14 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {
   }${
     plan.diffuseTransmission
       ? `
-  var back=s; back.n=-s.n; back.metal=0; back.base=vec4f(s.dt.rgb,1); let k=s.dt.w*(1-s.metal)*(1-s.tr); sum+=k*margoAmbientTerm(i,back,-v);
+  var back=s; back.n=-s.n; back.metal=0; back.base=vec4f(${albedo('s.dt.rgb')},1); let k=s.dt.w*(1-s.metal)*(1-s.tr); sum+=k*margoAmbientTerm(i,back,-v);
   back.base=vec4f(0,0,0,1); sum-=k*margoAmbientTerm(i,back,-v);`
       : ''
   }
   return sum;
 }
 `;
+};
 // EXT_materials_bump: d = height x factor, a length measured in world space, or in the node's space (heightSpace "object"),
 // where the scale along the surface normal is |transpose(M) n|: a point moved d along the mesh normal moves that far along
 // the world normal. The gradient takes forward differences of the map a pixel away (Mikkelsen 2010), so it changes every
@@ -830,7 +858,7 @@ const extended = new Map<string, string>();
  * Physical variant for an extended material (`ExtendedPlan`), cached per plan: only the extension maps the material uses
  * are bound (shared textures once), the thin-film, anisotropic, diffuse-transmission and bump terms only when used, and
  * a Frame with 21 slots of UV rows and six more factor rows (iri: factor, film IOR, thickness min, max; aniso: strength, cos, sin;
- * dtr: factor, colour; bump: factor, 1 for object space; scatter: multi-scatter colour, anisotropy; extinction: per unit
+ * its w: diffuse roughness; dtr: factor, colour; bump: factor, 1 for object space; scatter: multi-scatter colour, anisotropy; extinction: per unit
  * length, thickness). Hook points and text-patch anchors are those of `physicalShader`.
  */
 export function extendedShader(plan: ExtendedPlan): string {
@@ -841,7 +869,8 @@ export function extendedShader(plan: ExtendedPlan): string {
     +plan.diffuseTransmission +
     +!!plan.bump +
     +!!plan.scatter +
-    +!!plan.packedBase;
+    +!!plan.packedBase +
+    +!!plan.diffuseRoughness;
   let out = extended.get(key);
   if (out !== undefined) return out;
   const names = [...physicalMaps, ...extendedMaps],
@@ -865,18 +894,21 @@ export function extendedShader(plan: ExtendedPlan): string {
   out =
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
-      ['uvt:array<vec4f,26>', 'uvt:array<vec4f,42>'],
+      ['uvt:array<vec4f,26>', `uvt:array<vec4f,${plan.slots.length * 2}>`],
       [
         'sheen:vec4f\n}',
         'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f, scatter:vec4f, extinction:vec4f\n}',
       ],
-      ['sh:vec4f}', `sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f${plan.scatter ? ', sc:vec3f' : ''}}`],
+      [
+        'sh:vec4f}',
+        `sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f${plan.scatter ? ', sc:vec3f' : ''}${plan.diffuseRoughness ? ', dr:vec2f' : ''}}`,
+      ],
       [
         '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',
         `${plan.bump ? bumpEdit(sampleOf) : ''}  s.ir=${plan.iridescence ? `vec4f(margoIridescence(mix(s.f0,s.base.rgb,s.metal),clamp(dot(s.n,normalize(f.eye.xyz-i.position)),0.0,1.0),mix(f.iri.z,f.iri.w,${sampleOf('iridescenceThickness')}.g),f.iri.y),f.iri.x*${sampleOf('iridescence')}.r)` : 'vec4f(0)'};
   s.at=${plan.anisotropy ? `margoAnisotropy(s.n,t,b,${sampleOf('anisotropy')}.xyz)` : 'vec4f(0)'};
   s.dt=${plan.diffuseTransmission ? `vec4f(f.dtr.yzw*${sampleOf('diffuseTransmissionColor')}.rgb,f.dtr.x*${sampleOf('diffuseTransmission')}.a)` : 'vec4f(0)'};
-${plan.scatter ? scatterEdit(sampleOf) : ''}  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
+${plan.scatter ? scatterEdit(sampleOf) : ''}${plan.diffuseRoughness ? `  s.dr=vec2f(f.aniso.w*${sampleOf('diffuseRoughness')}.r,clamp(dot(s.n,normalize(f.eye.xyz-i.position)),0.0001,1.0));\n` : ''}  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
       ],
       [/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return margoHemisphere(s);}'],
       [
@@ -889,7 +921,8 @@ ${plan.scatter ? scatterEdit(sampleOf) : ''}  if(margoFaceTest&&!facing&&f.setti
           (plan.iridescence ? iridescenceWgsl : '') +
           (plan.anisotropy ? anisotropyWgsl : '') +
           (plan.scatter ? volumeScatterWgsl : '') +
-          directWgsl(plan.anisotropy, plan.scatter) +
+          (plan.diffuseRoughness ? eonWgsl : '') +
+          directWgsl(plan.anisotropy, plan.scatter, plan.diffuseRoughness) +
           ambientWgsl(plan) +
           '@fragment fn fragment(',
       ],

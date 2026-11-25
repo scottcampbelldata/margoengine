@@ -17,6 +17,7 @@ export interface ExtendedPlan {
     readonly diffuseTransmission: boolean;
     readonly bump?: boolean;
     readonly scatter?: boolean;
+    readonly diffuseRoughness?: boolean;
 }
 
 export class GLTFAsset {
@@ -1011,6 +1012,10 @@ interface GLTFExtensions {
     anisotropyStrength?: number;
     anisotropyRotation?: number;
     anisotropyTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_diffuse_roughness?: {
+    diffuseRoughnessFactor?: number;
+    diffuseRoughnessTexture?: GLTFTextureInfo;
   };
   KHR_materials_diffuse_transmission?: {
     diffuseTransmissionFactor?: number;

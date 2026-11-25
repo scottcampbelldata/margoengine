@@ -39,6 +39,7 @@
     "test:gpu:dds": "cd ../.. && node packages/gltf/scripts/test-dds-browser.mjs && node packages/gltf/scripts/test-dds-browser.mjs --compat",
     "test:gpu:mask-mips": "cd ../.. && node packages/gltf/scripts/test-mask-mips-browser.mjs && node packages/gltf/scripts/test-mask-mips-browser.mjs --compat",
     "test:gpu:mipmaps": "cd ../.. && node packages/gltf/scripts/test-mipmaps-browser.mjs && node packages/gltf/scripts/test-mipmaps-browser.mjs --compat",
+    "test:gpu:diffuse-roughness": "cd ../.. && node packages/gltf/scripts/test-diffuse-roughness-browser.mjs && node packages/gltf/scripts/test-diffuse-roughness-browser.mjs --compat",
     "test:gpu:parts": "cd ../.. && node packages/gltf/scripts/test-parts-browser.mjs && node packages/gltf/scripts/test-parts-browser.mjs --compat",
     "test:gpu:skinned-parts": "cd ../.. && node packages/gltf/scripts/test-skinned-parts-browser.mjs && node packages/gltf/scripts/test-skinned-parts-browser.mjs --compat",
     "test:gpu:mask-alpha": "cd ../.. && node packages/gltf/scripts/test-mask-alpha-browser.mjs && node packages/gltf/scripts/test-mask-alpha-browser.mjs --compat",
