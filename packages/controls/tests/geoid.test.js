@@ -79,9 +79,17 @@ test('GeospatialControls loads EGM96 on the first sea-level read: a geoid event,
     events = [];
   c.addEventListener('geoid', (e) => events.push(e.type));
   c.addEventListener('geoid-error', (e) => events.push(`${e.type}: ${e.error.message}`));
+  let limit;
+  const loaded = new Promise((resolve, reject) => {
+    limit = setTimeout(() => reject(new Error('no geoid or geoid-error event within 30 s')), 30_000);
+    c.addEventListener('geoid', resolve);
+    c.addEventListener('geoid-error', resolve);
+  });
   assert.equal(c.heights.seaLevel, null, 'null until the grid is in');
   c.heights;
-  await new Promise((done) => setTimeout(done, 200));
+  await loaded.finally(() => clearTimeout(limit));
+  // A second load the second read had started would have begun before this one, so its event is in when this settles.
+  await loadEGM96({ url: new URL(`../dist/${EGM96_FILE}`, import.meta.url) }).catch(() => {});
   assert.equal(events.length, 1, events.join('; '));
   if (installed) assert.ok(typeof c.heights.seaLevel === 'number');
   else assert.match(events[0], /^geoid-error: .*pack-egm96/);

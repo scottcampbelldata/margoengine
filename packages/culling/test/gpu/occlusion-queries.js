@@ -6,14 +6,15 @@ import { OcclusionQueries } from '../../dist/occlusion.js';
 const errors = [];
 let engine, queries, front, behind, hidden, hiddenMesh;
 async function settle() {
-  // Results land one to three frames after their query: render until two sets have landed after the change.
-  for (let n = 0; n < 2; n++) {
-    const landed = queries.next({ signal: AbortSignal.timeout(10000) });
-    for (let i = 0; i < 4; i++) {
-      engine.render();
-      await engine.gpu.queue.onSubmittedWorkDone();
-    }
-    await landed;
+  // Results land one to three frames after their query: render until every query reads a result of a query frame
+  // drawn after the change (`serial` counts the query frames), under a hard limit.
+  const since = queries.serial,
+    all = [front, behind, hidden],
+    limit = performance.now() + 10000;
+  while (!all.every((q) => q.hasResult && q.frame > since)) {
+    if (performance.now() > limit) throw new Error('no occlusion result from after the change within 10 s');
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
   }
 }
 const read = (q) => ({
