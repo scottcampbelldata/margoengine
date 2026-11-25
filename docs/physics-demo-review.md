@@ -5,7 +5,7 @@ Every physical problem found in Margo's demo videos and documentary films, check
 and checked; then it reads FIXED with the commit. The engine-side defects behind these rows are in
 [physics-audit.md](physics-audit.md) and [known-bugs.md](known-bugs.md).
 
-Status: OPEN (not fixed), BUILDING (its solver is being built), FIXED (landed and checked on a re-render).
+Status: OPEN (not fixed), BUILDING (its solver is being built), LANDED (the fix is on main with a test that reproduces the shot's problem), FIXED (the shot was re-rendered and checked).
 
 ## Summary
 
