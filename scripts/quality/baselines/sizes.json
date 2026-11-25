@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18638772,
+  "total": 18665753,
   "history": [
     {
       "date": "2026-10-24",
@@ -11859,6 +11859,12 @@
       "commit": "9f91a2551",
       "reason": "@margoengine/physics/world: 5,780 to 9,098 B gzip for the physics world (PhysicsWorld): the exact frame-to-tick clock, the coupling graph (Tarjan and Kahn), rate levels from stability limits, origin cells, and the world's own state in shared memory; it is the framework's driver, so a split would only move the bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "f6e4ecb1c",
+      "reason": "physics advance() step counting moved to src/film.ts so physics.ts stays free of Math (274b4ad5c): +7 B on @margoengine/physics; also records controls/geospatial and math/geo, new on main and unrecorded",
+      "grew": 4
     }
   ],
   "items": {
@@ -12073,6 +12079,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
+    "@margoengine/controls/geospatial": 7734,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
@@ -12521,6 +12528,7 @@
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
     "@margoengine/math/frustum": 2512,
+    "@margoengine/math/geo": 2372,
     "@margoengine/math/line3": 2267,
     "@margoengine/math/mat4": 1934,
     "@margoengine/math/mathutils": 1138,
@@ -12623,7 +12631,7 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 582385,
+    "@margoengine/physics": 599864,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 84827,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/decomposition": 11130,
@@ -13135,18 +13143,18 @@
     "@margoengine/tilemap/path": 2842,
     "@margoengine/tilemap/plane": 8167,
     "@margoengine/tilemap/tiled": 7482,
-    "@margoengine/tiles": 16880,
+    "@margoengine/tiles": 16680,
     "@margoengine/tiles/fade": 2015,
     "@margoengine/tiles/features": 10268,
     "@margoengine/tiles/i3dm": 1629,
-    "@margoengine/tiles/imagery": 7451,
+    "@margoengine/tiles/imagery": 7387,
     "@margoengine/tiles/ion": 3001,
     "@margoengine/tiles/metadata": 5175,
     "@margoengine/tiles/properties": 7615,
-    "@margoengine/tiles/s2": 3004,
+    "@margoengine/tiles/s2": 2821,
     "@margoengine/tiles/splats": 2654,
     "@margoengine/tiles/style": 10360,
-    "@margoengine/tiles/terrain": 5974,
+    "@margoengine/tiles/terrain": 5816,
     "@margoengine/tonemap": 15124,
     "@margoengine/tonemap/3dl": 2510,
     "@margoengine/tonemap/custom": 1459,
@@ -13433,6 +13441,7 @@
     "leak @margoengine/controls -> @margoengine/bvh": 1,
     "leak @margoengine/controls/collide -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
+    "leak @margoengine/controls/geospatial -> @margoengine/bvh": 1,
     "leak @margoengine/controls/presentation -> @margoengine/bvh": 1,
     "leak @margoengine/controls/third-person -> @margoengine/bvh": 1,
     "leak @margoengine/controls/walk -> @margoengine/bvh": 1,
