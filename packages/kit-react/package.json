@@ -1695,6 +1695,10 @@
       "types": "./dist/scene/clone.d.ts",
       "import": "./dist/scene/clone.js"
     },
+    "./scene/container": {
+      "types": "./dist/scene/container.d.ts",
+      "import": "./dist/scene/container.js"
+    },
     "./scene/tags": {
       "types": "./dist/scene/tags.d.ts",
       "import": "./dist/scene/tags.js"

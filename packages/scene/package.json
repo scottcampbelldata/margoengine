@@ -7,7 +7,8 @@
     "scene-graph",
     "traverse",
     "lookat",
-    "hierarchy"
+    "hierarchy",
+    "asset-container"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -54,6 +55,10 @@
       "types": "./dist/clone.d.ts",
       "import": "./dist/clone.js"
     },
+    "./container": {
+      "types": "./dist/container.d.ts",
+      "import": "./dist/container.js"
+    },
     "./tags": {
       "types": "./dist/tags.d.ts",
       "import": "./dist/tags.js"
@@ -65,9 +70,19 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/animation": {
+      "optional": true
+    },
+    "@margoengine/gltf": {
+      "optional": true
+    }
   }
 }
