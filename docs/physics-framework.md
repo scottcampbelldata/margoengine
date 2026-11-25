@@ -128,7 +128,7 @@ fields (MOOSE, Gaston et al. 2009; ESMF, Hill et al. 2004).
 | --- | --- | --- |
 | gravity | world | One vector in `@margoengine/math`, passed to every solver and shader (PA-08). |
 | wind | atmosphere | `sample(x, y, z, t)`: air velocity, density and temperature anywhere, on the world clock (PA-26 to PA-28). The physics attachment now called `WindField` becomes a wind force that consumes this field, ending the name clash with weather's `WindField`. |
-| sea surface | ocean | Height, normal, orbital velocity and current, plus river and flood depth and velocity, from a pure synchronous query (PA-11). Bodies accumulate pressure and volume sources into it (hull displacement, impacts). |
+| sea surface | ocean | Height, normal, orbital velocity and current, plus river and flood depth and velocity, from a pure synchronous query (PA-11). Bodies accumulate pressure and volume sources into it (hull displacement, impacts). Below the surface the same contract gives the water velocity at any depth (wave orbital motion decaying with depth, plus tides and currents), so fish, kelp, divers, sand and floating debris all feel the swell's surge. |
 | terrain bed | terrain | One bed elevation that erosion, slides and craters write and colliders read (PA-37). |
 | rain | atmosphere | Rain rate in mm/h with a drop-size distribution, per position (PA-23). |
 | bodies | rigid | Pose, velocity, mass and inertia of every rigid body, the boundary signed-distance field of each, and an accumulator for impulses at points. |
