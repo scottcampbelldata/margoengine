@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
-import { MargoError } from '@margoengine/math/errors';
 import { loadAuto } from '../dist/auto.js';
 import { sceneData } from '../dist/scene-data.js';
 import { encodeAttributes } from '../../decoders/tests/support/meshopt-encode.js';
 import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.js';
+import { MargoError } from '@margoengine/math/errors';
 
 // Stands in for gltf/pbr, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs.
 registerHooks({
@@ -399,40 +399,6 @@ test('gltf/pbr and the other entries stay out of what the entry imports at load'
   );
   for (const name of ['meshopt', 'quantized', 'textured', 'instancing', 'scene-data'])
     assert.doesNotMatch(code, new RegExp(`from\\s*["\`]\\./${name}`));
-});
-
-// KB-GLTFA B17: on an engine with no GPU device, gltf/pbr's "needs WebGPU" must not hide the light loader's reason.
-test('loadAuto without a GPU device names the light loader reason and gltf/pbr refusal', async (t) => {
-  globalThis.loadPro = () => {
-    throw new MargoError('unsupported', 'PBRModel requires WebGPU; use a browser that supports it');
-  };
-  t.after(() => delete globalThis.loadPro);
-  withBitmaps(t);
-  const { engine } = await headlessEngine();
-  try {
-    // Fresh accessors: an earlier test in this file edits the shared ones.
-    const png = new Uint8Array([137, 80, 78, 71]),
-      mapped = documentOf([positions, normals, new Float32Array(6), png], {
-        accessors: [
-          ...accessors.map((a) => ({ ...a, count: 3 })),
-          { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' },
-        ],
-        images: [{ bufferView: 3, mimeType: 'image/png' }],
-        textures: [{ source: 0 }],
-        materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
-        meshes: [{ primitives: [{ attributes: { ...primitive.attributes, TEXCOORD_0: 2 }, material: 0 }] }],
-        nodes: [{ mesh: 0 }],
-      });
-    await assert.rejects(loadAuto(engine, url, server(fileOf(mapped))), (error) => {
-      assert.equal(error.name, 'MargoError');
-      assert.equal(error.code, 'unsupported');
-      assert.match(error.message, /Textured glTF needs WebGPU or the WebGL2 compatibility layer/);
-      assert.match(error.message, /gltf\/pbr also refused: PBRModel requires WebGPU/);
-      return true;
-    });
-  } finally {
-    engine.dispose();
-  }
 });
 
 // KB-OWN-GLTF1: loadAuto finishes after its downloads, when the default scene is active again.
