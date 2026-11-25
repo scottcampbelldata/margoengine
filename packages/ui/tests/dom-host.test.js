@@ -45,7 +45,7 @@ test('every widget class maps to its native element and role', () => {
       checkbox: new Checkbox({ text: 'Agree' }),
       slider: new Slider({ label: 'Volume', min: 0, max: 10, value: 4 }),
       progress: new ProgressBar({ label: 'Loading', value: 0.5 }),
-      list: new List({ label: 'Saves', items: ['One', 'Two', 'Three'], selected: 1 }),
+      list: new List({ label: 'Saves', items: ['Dawn', 'Noon', 'Dusk'], selected: 1 }),
       select: new Select({
         label: 'Quality',
         options: [
@@ -99,9 +99,9 @@ test('every widget class maps to its native element and role', () => {
   assert.deepEqual(
     options.map((o) => [o.textContent, o.getAttribute('aria-selected'), o.getAttribute('tabindex')]),
     [
-      ['One', 'false', '-1'],
-      ['Two', 'true', '0'],
-      ['Three', 'false', '-1'],
+      ['Dawn', 'false', '-1'],
+      ['Noon', 'true', '0'],
+      ['Dusk', 'false', '-1'],
     ],
   );
   const select = el(widgets.select);
