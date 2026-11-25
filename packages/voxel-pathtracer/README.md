@@ -94,9 +94,10 @@ Updates copy caller arrays immediately, apply in call order and replace the scen
 | `/mesh` | `triangleMeshes()` | `meshes` on the scene |
 | `/spectral` | `spectralTransport()` | `lensAbbe: 0` or `5..200`, default 0; `focalLength: 1e-6..1e6`, default 0.05 |
 
-Composition retains each feature's documented transport limits. Triangle emission currently uses
-path hits; emissive-triangle light sampling and triangle-bound caustic guiding remain gaps recorded
-in `docs/known-bugs.md`. `tests/compose-browser.mjs` checks all 32 subsets, RGB media with RIS and
+Composition retains each feature's documented transport limits. Emissive triangles are sampled as
+lights (see Triangle meshes beside voxels); triangle-bound caustic guiding remains a gap recorded
+in `docs/known-bugs.md`. `meshPBR()` from `/mesh-pbr` replaces `triangleMeshes()` with full glTF
+materials (see Full PBR meshes). `tests/compose-browser.mjs` checks all 32 subsets, RGB media with RIS and
 triangle markers on native WebGPU and WebGL2 compatibility.
 
 ## Resampled emissive lighting
@@ -1159,12 +1160,16 @@ products before rounding, retaining shared edges under shader arithmetic contrac
 Float32 geometry, without a double-precision coordinate fallback or
 a promise of exact intersection for all ill-conditioned triangles.
 
-Surfaces are flat-shaded and double-sided. Diffuse, plastic, metal, emission, blend and glass use
-the root BSDFs. Meshes have no UV textures, alpha cutouts, vertex normals, instancing, skinning or
-motion blur. For glass, supply a closed, consistently outward-wound shell of one material, with
-the camera outside; overlapping/nested mesh volumes and mesh media are unsupported. Mesh emission
-is reached by path sampling; it has no emissive-triangle light sampler or prism/mirror light guide.
-Finite point lights and zero-angular-size suns behind a specular chain retain that sampling limit.
+Surfaces are double-sided. Optional per-vertex `normals` shade smoothly and optional `uvs` select
+texels of a palette `texture` (repeat wrapping, nearest sampling). Diffuse, plastic, metal, emission,
+blend and glass use the root BSDFs. `meshInstances` places one mesh many times over a shared BLAS.
+Palette `cutout` and motion blur are not part of this entry; the `/mesh-pbr` entry adds glTF alpha
+coverage, texture channels and glTF snapshots. For glass, supply a closed,
+consistently outward-wound shell of one material, with the camera outside; overlapping/nested mesh
+volumes and mesh media are unsupported. Emissive triangles are light sources: next-event estimation
+picks one by world area times emitted power and weighs it against path hits with the power heuristic
+(Veach 1997), and `spotLights` adds delta spot and IES lights. There is no prism/mirror light guide:
+finite point lights and zero-angular-size suns behind a specular chain retain that sampling limit.
 Existing voxel lights, glass, media, environments, capture tiling and bounce limits remain available.
 Diffuse surfaces inside a glass shell receive distant light by path sampling. The voxel-box
 inverse-refraction sampler does not apply to triangle shells; their path weights retain the
@@ -1185,6 +1190,116 @@ assert constant emission, analytic sunlight, mutual shadows and mirror paths, sh
 geometry, glass furnace values, real device replacement and exact raster restoration. They establish
 no outside-renderer equality, arbitrary asset coverage or GPU speed claim. The paired CPU preparation
 driver requires the Rust output to match an independent scalar builder byte for byte.
+
+## Full PBR meshes (`@margoengine/voxel-pathtracer/mesh-pbr`)
+
+`margoengine/voxel-pathtracer/mesh-pbr` (or `@margoengine/voxel-pathtracer/mesh-pbr`) exports
+`meshPBR()`, a `ComposedVoxelPathTracer` feature that replaces `triangleMeshes()` with glTF 2.0
+metallic-roughness materials, and `traceSceneFromGLTF`, which snapshots a loaded glTF model into a
+trace scene. Meshes name an id in `pbrMaterials` (any positive integer, independent of the 255-entry
+voxel palette); the voxel palette stays for voxel models.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
+import { meshPBR, type PBRMeshTraceScene } from 'margoengine/voxel-pathtracer/mesh-pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 1.5, 5], target: [0, 0.5, 0]},
+});
+// A unit quad in the xy plane, facing +z, with UVs.
+const quad = {
+  positions: new Float32Array([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+};
+// A 2 x 2 checker of opaque and see-through (alpha 0) texels, RGBA8 rows from the top.
+const checker = {width: 2, height: 2, filter: 'nearest' as const,
+  data: new Uint8Array([255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255])};
+const placed = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1];
+const scene: PBRMeshTraceScene = {
+  revision: 1, models: [], instances: [], materials: [],
+  pbrMaterials: [
+    {id: 1, baseColorFactor: [0.8, 0.3, 0.2, 1], metallicFactor: 0, roughnessFactor: 0.4,
+      baseColorTexture: checker, alphaMode: 'MASK', doubleSided: true},
+    {id: 2, emissiveFactor: [1, 0.9, 0.7], emissiveStrength: 20, doubleSided: true},
+  ],
+  meshes: [{id: 'panel', material: 1, ...quad}, {id: 'lamp', material: 2, ...quad}],
+  // One BLAS per mesh, any number of affine placements.
+  meshInstances: [
+    {id: 'left', mesh: 'panel', transform: placed(-1)},
+    {id: 'right', mesh: 'panel', transform: placed(1)},
+    // The lamp turned to face down, 2 units up: an emissive triangle light.
+    {id: 'lamp', mesh: 'lamp', transform: [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 2, 0, 1]},
+  ],
+  environment: {skyColor: [0.2, 0.25, 0.3], sunIntensity: 0},
+};
+const tracer = await ComposedVoxelPathTracer.create(engine, {
+  scene, features: [meshPBR()], signal: AbortSignal.timeout(30_000),
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 16, signal: AbortSignal.timeout(30_000)});
+// Move a panel: unchanged meshes keep their BLAS and only the instance tree is rebuilt.
+await tracer.setScene({...scene, revision: 2, meshInstances: [...scene.meshInstances!.slice(0, 2),
+  {id: 'lamp', mesh: 'lamp', transform: [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0.5, 2, 0, 1]}]},
+  {signal: AbortSignal.timeout(30_000)});
+console.log(image.width, tracer.stats.reusedMeshBlases); // 64 2
+tracer.dispose();
+engine.dispose();
+```
+
+Loaded glTF files trace with their materials, textures and node or `EXT_mesh_gpu_instancing` placements:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { ComposedVoxelPathTracer } from 'margoengine/voxel-pathtracer/compose';
+import { meshPBR, traceSceneFromGLTF } from 'margoengine/voxel-pathtracer/mesh-pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 1, 3], target: [0, 0, 0]},
+});
+const signal = AbortSignal.timeout(60_000);
+const model = await loadGLTF(engine, 'model.glb', {signal});
+engine.render();
+// An owned snapshot: geometry, materials and decoded images are copied, so the model can go.
+const scene = await traceSceneFromGLTF(model, {signal});
+model.dispose();
+const tracer = await ComposedVoxelPathTracer.create(engine, {
+  scene: {...scene, environment: {skyColor: [0.7, 0.8, 1], sunIntensity: 3}},
+  features: [meshPBR()], signal,
+});
+engine.start();
+window.addEventListener('pagehide', () => { tracer.dispose(); engine.dispose(); }, {once: true});
+```
+
+Material channels, with glTF defaults when left out:
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `baseColorFactor` | `[1, 1, 1, 1]` | Linear RGBA; alpha is coverage. `baseColorTexture` is sRGB, its alpha linear. |
+| `metallicFactor`, `roughnessFactor` | `1`, `1` | `metallicRoughnessTexture`: roughness in green, metallic in blue. GGX alpha is `roughness^2`. |
+| `normalTexture`, `normalScale` | none, `1` | Tangent space; mesh `tangents` (xyzw) or a frame derived from the UVs. |
+| `emissiveFactor`, `emissiveStrength` | `[0, 0, 0]`, `1` | `emissiveTexture` is sRGB. Emissive triangles are sampled as lights. |
+| `clearcoat*`, `sheen*`, `specular*`, `iridescence*` | Khronos defaults | The `KHR_materials_*` extensions of those names, with their textures. |
+| `alphaMode`, `alphaCutoff` | `'OPAQUE'`, `0.5` | `'MASK'` lets rays and shadows through texels whose coverage is below the cutoff. |
+| `doubleSided` | `false` | One-sided surfaces are invisible from behind, to camera, shadow and light rays. |
+
+Textures are owned RGBA8 images (`width`, `height`, `data`) with `texCoord` 0 to 3 (default 0),
+`wrapS`/`wrapT` `repeat`, `mirror` or `clamp` (default repeat), `filter` `nearest` or `linear`
+(default linear, at the base level) and an optional `transform` (`KHR_texture_transform` rows).
+Meshes take up to four `uvSets` (set 0 defaults to `uvs`), xyzw `tangents` and linear RGBA `colors`
+(default white). Geometry, instance and limit rules are those of the `/mesh` entry above. Light
+sampling, MIS weights and the transport limits are shared with it; emissive maps, alpha coverage and
+one-sided visibility are evaluated at each sampled light point. `traceSceneFromGLTF` takes
+`{signal, scene, imagePixels}`: `scene` is an existing voxel scene to merge into, `imagePixels` decodes
+compressed or streamed images (KTX2, WebP, AVIF) to RGBA8; it rejects merged (static-batched)
+primitives with coded `unsupported`, since the snapshot needs each primitive's material. Native
+WebGPU and the WebGL2 compatibility layer run the same kernel: `npm run test:gpu:mesh-pbr`,
+`test:gpu:mesh-pbr-lobes`, `test:gpu:mesh-instances` and `test:gpu:mesh-lights` check the channels
+against equivalent factor scenes, translated, rotated, sheared and reflected instances against
+world-space copies, and two sampled emissive triangles against an independent area-light integral,
+on both.
 
 ## Spectral transport and chromatic lens (optional)
 
