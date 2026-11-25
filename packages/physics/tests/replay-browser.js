@@ -4,5 +4,9 @@ import { kernelScene, physicsScene } from './replay-scene.js';
 
 window.runReplay = async () => {
   await Physics.load();
-  return { kernel: kernelScene(KernelWorld), physics: physicsScene(Physics) };
+  return {
+    kernel: kernelScene(KernelWorld),
+    kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
+    physics: physicsScene(Physics),
+  };
 };

@@ -20,7 +20,12 @@ const golden = JSON.parse(await readFile(resolve(root, 'tests/fixtures/replay-ha
 const chosen = process.argv.find((arg) => arg.startsWith('--browsers='))?.slice('--browsers='.length);
 const browsers = (chosen ?? process.env.REPLAY_BROWSERS ?? 'chromium,firefox').split(',');
 await mkdir(results, { recursive: true });
-const server = await createServer({ plugins: [noFileWatcher()], configFile: resolve(root, 'vite.config.js'), logLevel: 'error', server: { port: 0 } });
+const server = await createServer({
+  plugins: [noFileWatcher()],
+  configFile: resolve(root, 'vite.config.js'),
+  logLevel: 'error',
+  server: { port: 0 },
+});
 await server.listen();
 const report = [];
 try {
@@ -40,12 +45,19 @@ try {
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto(`${server.resolvedUrls.local[0]}tests/replay.html`);
       await page.waitForFunction(() => typeof window.runReplay === 'function', null, { timeout: 60_000 });
-      const { kernel, physics } = await page.evaluate(() => window.runReplay());
+      const { kernel, kernelBlock, physics } = await page.evaluate(() => window.runReplay());
       assert.deepEqual(errors, []);
       assert.deepEqual(kernel, golden.kernel, `${name}: the kernel scene left the hashes on file`);
+      assert.deepEqual(
+        kernelBlock,
+        golden.kernelBlock,
+        `${name}: the kernel scene with the block solver on left the hashes on file`,
+      );
       assert.deepEqual(physics, golden.physics, `${name}: the Physics scene left the hashes on file`);
       report.push({ browser: name, version: browser.version(), steps: golden.steps, last: kernel.at(-1) });
-      console.log(`${name} ${browser.version()}: ${golden.steps} steps, ${kernel.length + physics.length} hashes equal`);
+      console.log(
+        `${name} ${browser.version()}: ${golden.steps} steps, ${kernel.length + physics.length} hashes equal`,
+      );
     } finally {
       await closeAll({ browser });
     }

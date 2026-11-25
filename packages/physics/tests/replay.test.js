@@ -19,6 +19,13 @@ test('10,000 steps of the kernel give the hashes on file', () => {
   assert.deepEqual(kernelScene(KernelWorld), golden.kernel);
 });
 
+test('10,000 steps of the kernel with the block solver on give the hashes on file', () => {
+  assert.deepEqual(
+    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, { blockSolver: true }),
+    golden.kernelBlock,
+  );
+});
+
 test('10,000 steps through Physics give the hashes on file', () => {
   assert.deepEqual(physicsScene(Physics), golden.physics);
 });

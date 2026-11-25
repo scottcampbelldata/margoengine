@@ -39,6 +39,11 @@ for (const simd of [false, true]) {
     await loadKernel({ simd });
     assert.equal(Physics.kernelVariant, simd ? 'simd' : 'scalar');
     assert.deepEqual(kernelScene(KernelWorld), golden.kernel);
+    assert.deepEqual(
+      kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
+      golden.kernelBlock,
+      'the block solver on',
+    );
     assert.deepEqual(physicsScene(Physics), golden.physics);
     assert.equal(golden.steps, REPLAY_STEPS);
   });

@@ -91,11 +91,15 @@ fn the_block_solver_off_changes_nothing_and_on_changes_the_loads_not_the_rest() 
 
 #[cfg(feature = "counts")]
 #[test]
-fn nearly_every_manifold_of_a_pile_is_answered_exactly() {
+fn no_manifold_of_the_standard_scenes_is_left_to_the_sweeps() {
+    // For a positive definite matrix the complementarity problem has one answer and the enumeration must find it: a miss is a
+    // fault, not a limit. The box on four points, a 12-row pyramid and a 20-row pile of 210 boxes.
     use margoengine_physics_kernel::solver::BLOCK_SOLVES;
     use std::sync::atomic::Ordering::Relaxed;
-    let before = [BLOCK_SOLVES[0].load(Relaxed), BLOCK_SOLVES[1].load(Relaxed)];
-    let _ = pile(8, true, 300);
-    let (exact, left) = (BLOCK_SOLVES[0].load(Relaxed) - before[0], BLOCK_SOLVES[1].load(Relaxed) - before[1]);
-    assert!(exact > 1000 && left * 100 < exact, "{exact} exact, {left} left to the sweeps");
+    for (name, rows, steps) in [("a box", 1, 240), ("a pyramid", 12, 600), ("a pile of 210", 20, 300)] {
+        let before = [BLOCK_SOLVES[0].load(Relaxed), BLOCK_SOLVES[1].load(Relaxed)];
+        let _ = pile(rows, true, steps);
+        let (exact, left) = (BLOCK_SOLVES[0].load(Relaxed) - before[0], BLOCK_SOLVES[1].load(Relaxed) - before[1]);
+        assert!(exact > 100 && left == 0, "{name}: {exact} exact, {left} left to the sweeps");
+    }
 }

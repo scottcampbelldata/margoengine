@@ -63,18 +63,27 @@ class Stream {
  * row, adds and removes bodies, moves fixed ones by hand, drives kinematic ones, sets forces and impulses, changes gravity
  * and substeps, and lets islands sleep and wakes them.
  * @param visit Called after each step with the world and the step's number.
+ * @param solver Solver settings given to the world before the first step, for a scene run another way (`{blockSolver: true}`).
  */
-export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {}) {
+export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {}, solver = undefined) {
   const random = new Stream(0x4d415247),
     world = new KernelWorld(1, 1),
     c = world.columns,
     rows = [],
     hashes = [],
     hull = world.addHull(OCTAHEDRON, OCTAHEDRON_FACES);
+  if (solver) world.setSolver(solver);
   const spawn = () => {
-    const kind = ['dynamic', 'dynamic', 'dynamic', 'dynamic', 'dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'][
-        random.below(8)
-      ],
+    const kind = [
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'dynamic',
+        'fixed',
+        'kinematicPosition',
+        'kinematicVelocity',
+      ][random.below(8)],
       row = world.addBody(kind),
       density = kind === 'dynamic' ? 1 + random.below(8) : 0;
     switch (random.below(5)) {
@@ -263,7 +272,13 @@ export function physicsScene(Physics, steps = REPLAY_STEPS) {
   for (let i = 0; i < 4; i++) {
     const points = [];
     for (let k = 0; k < 40; k++) points.push(...vector(0.6));
-    bodies.push(physics.addBody(null, { position: vector(2), linearVelocity: vector(), colliders: { shape: 'convexHull', points } }));
+    bodies.push(
+      physics.addBody(null, {
+        position: vector(2),
+        linearVelocity: vector(),
+        colliders: { shape: 'convexHull', points },
+      }),
+    );
   }
   for (let i = 0; i < steps; i++) {
     if (i % 512 === 0) {

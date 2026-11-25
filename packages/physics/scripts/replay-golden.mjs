@@ -16,6 +16,7 @@ writeFileSync(
       steps: REPLAY_STEPS,
       every: REPLAY_EVERY,
       kernel: kernelScene(KernelWorld),
+      kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
       physics: physicsScene(Physics),
     },
     null,
