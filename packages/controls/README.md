@@ -772,6 +772,41 @@ console.log(camera.collisionRange < 600); // true: the tower stands between the 
 camera.underground = true; // look from below the ground: no floor, no sweeps
 ```
 
+### Navigation modes
+
+`mode` (option, default `'globe'`) picks how input moves the camera, and `setMode(mode, {duration})` switches with a
+smooth move. `globe`: left drag pans the surface, right or modified drag turns and tilts. `local`: the same orbit about a
+site (a city, a valley) with the buttons swapped, so a left drag turns about the centre. `map`: straight down at
+`maxPitch`; a right drag turns the heading only. `fly`: first person, a drag looks about the eye (grab the world),
+W/A/S/D or the arrows move along the view, E/Q (or PageUp/PageDown) rise and sink, Shift is 4 x; the speed is
+`flySpeed` (1) heights above the ground per second, at least 2 m/s, so it slows near the ground. `walk`: first person on
+the ground, the eye `eyeHeight` (1.7 m) above the higher of `heightAt` and the scene or `raycast` surface below it,
+moving at `walkSpeed` (1.4 m/s; about 15 drives a car). The wheel moves forward in fly and walk. Keys are read on
+`keyTarget` (default the element's document). Entering fly keeps the pose exactly; entering globe or local from first
+person keeps it when the middle of the screen is on the ground; walk lands at the surface in the middle of the screen
+with a level view. `look(heading, pitch)` and `moveEye(forward, right, up)` do the same from code, and every switch
+emits a `mode` event.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-105.6), latitude: degToRad(40.3), range: 4000, pitch: degToRad(40)},
+  heightAt: (lon, lat) => 2500 + 400 * Math.sin(lon * 900) * Math.cos(lat * 700),
+  walkSpeed: 3,
+});
+camera.addEventListener('mode', (event) => console.log('mode', event.mode));
+// Walk down to the trail in the middle of the screen, then take a few steps along it.
+await camera.setMode('walk', {duration: 0});
+camera.moveEye(10, 0);
+console.log(camera.eye.height); // 1.7 m above the ground under the eye
+// Fly from here; the engine's frames run any move a switch needs.
+camera.setMode('fly').then(() => camera.look(0, degToRad(-10))); // then look a little above the horizon
+```
+
 ### Flights and framing
 
 `flyTo` follows the optimal zoom-and-pan path of van Wijk and Nuij (2003): it climbs, crosses the shortest geodesic and
@@ -832,7 +867,8 @@ console.log(hit?.source, hit?.height); // 'terrain' and the ground height there,
 
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
-everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false). Sources: NIMA TR8350.2 (WGS84);
+everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
+(1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et

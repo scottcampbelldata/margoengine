@@ -3,7 +3,13 @@
 // TR8350.2, Karney 2013); surface picks use the bvh Raycaster, your own ray query or a march over `heightAt`.
 import type { Camera, EngineKernel, Mesh } from '@margoengine/core';
 import { Raycaster, type ModelLike } from '@margoengine/bvh';
-import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
+import {
+  Controls,
+  documentOf,
+  type ControlElement,
+  type EventTargetLike,
+  type InputEventListener,
+} from './controls.js';
 import { MargoError } from '@margoengine/math/errors';
 import {
   WGS84_A,
@@ -43,6 +49,25 @@ export interface GeospatialPick {
   /** Metres from the ray origin (the eye) to the hit. */
   distance: number;
   source: GeospatialPickSource;
+}
+
+/**
+ * How {@link GeospatialControls} navigates. `globe`: drag pans the surface, right drag turns and tilts. `local`: the
+ * same orbit about a site (a city, a valley) with the buttons swapped, left drag turns about the centre. `map`: top-down
+ * at `maxPitch`, right drag turns the heading only. `fly`: first person, drag looks, W/A/S/D or the arrows move along
+ * the view, E/Q rise and sink, at a speed scaled by the height above the ground. `walk`: first person on the ground,
+ * the eye `eyeHeight` above the surface under it (walk, or drive with a higher `walkSpeed`).
+ */
+export type GeospatialMode = 'globe' | 'local' | 'map' | 'fly' | 'walk';
+
+/** Options for {@link GeospatialControls.setMode}. */
+export interface ModeSwitchOptions {
+  /** Seconds of the move into the new mode when the pose must change (walk lands, map tilts). Default 0.75. */
+  duration?: number;
+  /** Progress to eased progress, both in [0, 1]. Default smootherstep. */
+  easing?: (t: number) => number;
+  /** Cancels the move where it is; the mode still changes. */
+  signal?: AbortSignal;
 }
 
 /** A geodetic view of the globe. Angles are radians, lengths metres. */
@@ -97,6 +122,16 @@ export interface GeospatialOptions {
    * and underwater views. Default false.
    */
   underground?: boolean;
+  /** Navigation mode to start in. Default `'globe'`. */
+  mode?: GeospatialMode;
+  /** Eye height above the ground in `walk` mode, metres. Default 1.7. */
+  eyeHeight?: number;
+  /** Ground speed in `walk` mode, metres per second (Shift: 4 x). Default 1.4; about 15 drives a car. */
+  walkSpeed?: number;
+  /** `fly` speed in heights above the ground per second (at least 2 m/s; Shift: 4 x). Default 1. */
+  flySpeed?: number;
+  /** Where movement keys are read. Default the element's document. */
+  keyTarget?: EventTargetLike | null;
 }
 
 /** Options for {@link GeospatialControls.flyTo}. */
@@ -189,6 +224,10 @@ type Pose = { position: V; target: V; up: V };
 
 /** Steps of the `heightAt` ray march before a pick gives up (the ellipsoid then stands in). */
 const MARCH_STEPS = 512;
+/** Steepest look up or down in the first-person modes, radians (just short of straight, where heading is undefined). */
+const LOOK = Math.PI / 2 - 0.01;
+const MODES: readonly GeospatialMode[] = ['globe', 'local', 'map', 'fly', 'walk'];
+const held = (keys: ReadonlySet<string>, ...codes: string[]) => +codes.some((c) => keys.has(c));
 const smoother = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
@@ -256,6 +295,17 @@ export class GeospatialControls extends Controls {
   readonly raycaster: Raycaster;
   /** No clearance floor and no collision: the eye may go below the terrain and through meshes. Default false. */
   underground: boolean;
+  /** Eye height above the ground in `walk` mode, metres. */
+  eyeHeight: number;
+  /** Ground speed in `walk` mode, metres per second. */
+  walkSpeed: number;
+  /** `fly` speed in heights above the ground per second. */
+  flySpeed: number;
+  private m: GeospatialMode;
+  /** True while a mode switch moves the camera: pitch may cross both modes' limits. */
+  private loose = false;
+  private readonly keys = new Set<string>();
+  private readonly keyTarget: EventTargetLike | null;
   private v: Required<GeospatialView>;
   private lifted = 0;
   private reachRange = 0;
@@ -273,7 +323,15 @@ export class GeospatialControls extends Controls {
       maxPitch = options.maxPitch ?? Math.PI / 2,
       minRange = options.minRange ?? 1,
       maxRange = options.maxRange ?? 4 * WGS84_A,
-      clearance = options.clearance ?? 2;
+      clearance = options.clearance ?? 2,
+      eyeHeight = options.eyeHeight ?? 1.7,
+      walkSpeed = options.walkSpeed ?? 1.4,
+      flySpeed = options.flySpeed ?? 1,
+      mode = options.mode ?? 'globe';
+    if (!MODES.includes(mode))
+      throw rangeError(`Geospatial mode is one of ${MODES.join(', ')}; got ${String(mode)}`, 'controls-arguments');
+    if (![eyeHeight, walkSpeed, flySpeed].every((x) => x > 0 && Number.isFinite(x)))
+      throw rangeError('Use a finite eyeHeight, walkSpeed and flySpeed above 0', 'controls-arguments');
     if (
       !(minPitch >= 0 && maxPitch <= Math.PI / 2 && minPitch <= maxPitch) ||
       !(minRange > 0 && maxRange >= minRange) ||
@@ -298,6 +356,11 @@ export class GeospatialControls extends Controls {
     this.raycast = options.raycast;
     this.raycaster = options.raycaster ?? new Raycaster();
     this.underground = options.underground ?? false;
+    this.eyeHeight = eyeHeight;
+    this.walkSpeed = walkSpeed;
+    this.flySpeed = flySpeed;
+    this.m = mode;
+    this.keyTarget = options.keyTarget ?? null;
     this.v = this.sanitize({
       ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 },
       longitude: 0,
@@ -338,9 +401,15 @@ export class GeospatialControls extends Controls {
       latitude: clamp(v.latitude, -Math.PI / 2, Math.PI / 2),
       height: v.height,
       heading: wrap(v.heading),
-      pitch: clamp(v.pitch, this.minPitch, this.maxPitch),
+      pitch: clamp(v.pitch, ...this.pitchLimits()),
       range: clamp(v.range, this.minRange, this.maxRange),
     };
+  }
+  /** Pitch range of the mode: the options' in globe and local, `maxPitch` in map, near +-PI/2 in fly and walk. */
+  private pitchLimits(): [number, number] {
+    if (this.loose) return [Math.min(-LOOK, this.minPitch), Math.max(LOOK, this.maxPitch)];
+    if (this.m === 'map') return [this.maxPitch, this.maxPitch];
+    return this.m === 'fly' || this.m === 'walk' ? [-LOOK, LOOK] : [this.minPitch, this.maxPitch];
   }
   private alive(): void {
     if (this.dead) throw new MargoError('disposed', 'Geospatial controls are disposed; create new GeospatialControls');
@@ -355,9 +424,13 @@ export class GeospatialControls extends Controls {
     void dir;
     return this.zUp ? [p[0]!, p[1]!, p[2]!] : [p[0]!, -p[2]!, p[1]!];
   }
+  /** Collision clearance in use: in walk at most half the eye height, so it never lifts a walker off the ground. */
+  private get gap(): number {
+    return this.m === 'walk' ? Math.min(this.clearance, this.eyeHeight / 2) : this.clearance;
+  }
   private floor(longitude: number, latitude: number): number {
     const h = this.heightAt?.(longitude, latitude);
-    return (typeof h === 'number' && Number.isFinite(h) ? h : 0) + this.clearance;
+    return (typeof h === 'number' && Number.isFinite(h) ? h : 0) + this.gap;
   }
   /**
    * The eye and the four near-plane corners of a pose, ECEF: what collision keeps clear, so the near plane never cuts
@@ -392,7 +465,7 @@ export class GeospatialControls extends Controls {
       pose: Pose = orbitPose(v, v.heading, v.pitch, range);
     if (this.underground) return { pose, lift, range };
     const surfaces = !!(this.raycast || (this.scene && this.engine)),
-      k = this.clearance,
+      k = this.gap,
       cast = (o: V, d: V, far: number) => {
         const hit = this.castSurface(o, d, far, false, refresh);
         refresh = false;
@@ -613,6 +686,13 @@ export class GeospatialControls extends Controls {
   }
   /** Re-centre the orbit on ECEF `centre` seen from ECEF `eye`, taking the heading from screen-up `up` at any pitch. */
   private aimAt(eye: V, centre: V, up: V): void {
+    const v = this.viewFrom(eye, centre, up);
+    this.cancel();
+    this.v = this.sanitize(v);
+    this.commit();
+  }
+  /** The view that puts the eye at ECEF `eye` looking at `centre`, heading from screen-up `up` at any pitch. */
+  private viewFrom(eye: V, centre: V, up: V): Required<GeospatialView> {
     const c = ecefToCartographic(centre[0], centre[1], centre[2]),
       b = enuBasis(c.longitude, c.latitude),
       d: V = [centre[0] - eye[0], centre[1] - eye[1], centre[2] - eye[2]],
@@ -623,14 +703,197 @@ export class GeospatialControls extends Controls {
       // orbitPose: view_en * cos(pitch) + up_en * sin(pitch) is (sin, cos) of the heading at every pitch.
       he = dot3(f, b.east) * cp + dot3(up, b.east) * sp,
       hn = dot3(f, b.north) * cp + dot3(up, b.north) * sp;
-    this.cancel();
-    this.v = this.sanitize({
+    return {
       ...c,
       heading: Math.hypot(he, hn) > 1e-12 ? Math.atan2(he, hn) : this.v.heading,
       pitch: Math.asin(clamp(sp, -1, 1)),
       range,
-    });
+    };
+  }
+  /** The camera's eye (ECEF) and its view's heading and pitch in the ENU frame at the eye. */
+  private eyeAngles(): { eye: V; heading: number; pitch: number } {
+    const { eye, forward } = this.eyeFrame(),
+      c = ecefToCartographic(eye[0], eye[1], eye[2]),
+      b = enuBasis(c.longitude, c.latitude);
+    return {
+      eye,
+      heading: Math.atan2(dot3(forward, b.east), dot3(forward, b.north)),
+      pitch: Math.asin(clamp(-dot3(forward, b.up), -1, 1)),
+    };
+  }
+  /** The view with the eye at ECEF `eye` looking along heading and pitch of the eye's ENU frame, centre `range` ahead. */
+  private eyeView(eye: V, heading: number, pitch: number, range: number): Required<GeospatialView> {
+    const c = ecefToCartographic(eye[0], eye[1], eye[2]),
+      b = enuBasis(c.longitude, c.latitude),
+      sh = Math.sin(heading),
+      ch = Math.cos(heading),
+      sp = Math.sin(pitch),
+      cp = Math.cos(pitch),
+      mix = (e: number, n: number, u: number) =>
+        [0, 1, 2].map((i) => b.east[i]! * e + b.north[i]! * n + b.up[i]! * u) as V;
+    return this.viewFrom(eye, along(eye, mix(sh * cp, ch * cp, -sp), range), mix(sh * sp, ch * sp, cp));
+  }
+  /** The orbit range of the first-person modes: the centre sits just ahead of the eye. */
+  private get lookRange(): number {
+    return clamp(1, this.minRange, this.maxRange);
+  }
+  /**
+   * Ground height (metres above the ellipsoid) at a point: the higher of `heightAt` and the first scene or `raycast`
+   * surface below `from` metres, so a walk climbs steps up to `eyeHeight` and onto roofs and tiles.
+   */
+  private groundAt(longitude: number, latitude: number, from: number): number {
+    const h = this.heightAt?.(longitude, latitude);
+    let g = typeof h === 'number' && Number.isFinite(h) ? h : 0;
+    if (this.raycast || (this.scene && this.engine)) {
+      const o = cartographicToEcef(longitude, latitude, from),
+        n = geodeticNormal(o[0], o[1], o[2]),
+        hit = this.castSurface(o, [-n[0], -n[1], -n[2]], Math.max(0, from - g) + 1, false);
+      if (hit) g = Math.max(g, from - hit.t);
+    }
+    return g;
+  }
+
+  /** The navigation mode; change it with {@link GeospatialControls.setMode}. */
+  get mode(): GeospatialMode {
+    return this.m;
+  }
+  /**
+   * Switch the navigation mode. Where the pose can stay (fly from anywhere; globe, local from first person looking at
+   * the ground) the camera does not move; otherwise it moves there over `duration`: walk lands at the surface in the
+   * middle of the screen with a level view, map turns straight down, globe and local tilt into their pitch range.
+   * Resolves true when the camera is in place, false when the move was cancelled (the mode has changed either way).
+   * Emits a `mode` event.
+   */
+  setMode(mode: GeospatialMode, options: ModeSwitchOptions = {}): Promise<boolean> {
+    this.alive();
+    if (!MODES.includes(mode))
+      throw rangeError(`Geospatial mode is one of ${MODES.join(', ')}; got ${String(mode)}`, 'controls-arguments');
+    const duration = options.duration ?? 0.75;
+    if (!(duration >= 0) || !Number.isFinite(duration))
+      throw rangeError('A mode switch duration is finite seconds >= 0', 'controls-arguments');
+    this.cancel();
+    const a = this.eyeAngles(),
+      { eye, forward, up } = this.eyeFrame(),
+      first = mode === 'fly' || mode === 'walk',
+      hit = first ? null : this.hitAlong(eye, forward);
+    let to: Required<GeospatialView>;
+    if (mode === 'fly') to = this.eyeView(eye, a.heading, a.pitch, this.lookRange);
+    else if (mode === 'walk') {
+      // Land where the view is centred: the surface on the view axis, else the orbit centre.
+      const h = this.hitAlong(eye, forward),
+        q = h?.point ?? cartographicToEcef(this.v.longitude, this.v.latitude, this.v.height),
+        g = ecefToCartographic(q[0], q[1], q[2]),
+        ground = this.groundAt(g.longitude, g.latitude, g.height + this.eyeHeight);
+      to = this.eyeView(
+        cartographicToEcef(g.longitude, g.latitude, ground + this.eyeHeight),
+        a.heading,
+        0,
+        this.lookRange,
+      );
+    } else if (hit) to = this.viewFrom(eye, hit.point, up);
+    else to = this.eyeView(eye, a.heading, a.pitch, Math.max(100, 2 * Math.max(0, this.eye.height)));
+    this.m = mode;
+    if (mode === 'map') to = { ...to, pitch: this.maxPitch };
+    this.dispatchEvent({ type: 'mode', mode });
+    const target = this.sanitize(to),
+      pose = orbitPose(target, target.heading, target.pitch, target.range),
+      now = orbitPose(this.v, this.v.heading, this.v.pitch, this.v.range),
+      still =
+        Math.hypot(...pose.position.map((x, i) => x - now.position[i]!)) <
+          1e-6 * (1 + target.range) + 1e-9 * Math.hypot(...now.position) && // ECEF rounding at planet radius
+        dot3(pose.up, now.up) > 1 - 1e-9 &&
+        Math.abs(target.pitch - to.pitch) < 1e-12;
+    if (still || duration === 0) {
+      this.v = target;
+      this.commit();
+      return Promise.resolve(true);
+    }
+    this.loose = true;
+    const settle = (done: boolean) => {
+      this.loose = false;
+      if (!this.dead) {
+        this.v = this.sanitize(this.v);
+        this.commit();
+      }
+      return done;
+    };
+    return this.flyTo(target, {
+      duration,
+      arc: false,
+      cancelOnInput: false,
+      ...(options.easing ? { easing: options.easing } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
+    }).then(settle);
+  }
+  /** Turn the view about the eye by radians of heading and pitch (the first-person look; any mode). */
+  look(heading: number, pitch: number): void {
+    this.alive();
+    num('Geospatial look', heading, pitch);
+    const a = this.eyeAngles(),
+      [lo, hi] = this.pitchLimits();
+    this.cancel();
+    this.v = this.sanitize(
+      this.eyeView(
+        a.eye,
+        a.heading + heading,
+        clamp(a.pitch + pitch, Math.max(lo, -LOOK), Math.min(hi, LOOK)),
+        this.v.range,
+      ),
+    );
     this.commit();
+  }
+  /**
+   * Move the eye by metres forward, right and up: along the view in `fly` (and every orbit mode), along the ground at
+   * `eyeHeight` above it in `walk` (where `up` is ignored). Heading and pitch are kept in the local frame.
+   */
+  moveEye(forward: number, right: number, up = 0): void {
+    this.alive();
+    num('Geospatial moveEye', forward, right, up);
+    const a = this.eyeAngles(),
+      c = ecefToCartographic(a.eye[0], a.eye[1], a.eye[2]),
+      b = enuBasis(c.longitude, c.latitude),
+      sh = Math.sin(a.heading),
+      ch = Math.cos(a.heading),
+      walk = this.m === 'walk',
+      cp = walk ? 1 : Math.cos(a.pitch),
+      sp = walk ? 0 : Math.sin(a.pitch),
+      lift = walk ? 0 : up;
+    let eye = [0, 1, 2].map(
+      (i) =>
+        a.eye[i]! +
+        (b.north[i]! * ch + b.east[i]! * sh) * cp * forward -
+        b.up[i]! * sp * forward +
+        (b.east[i]! * ch - b.north[i]! * sh) * right +
+        b.up[i]! * lift,
+    ) as V;
+    if (walk) {
+      const g = ecefToCartographic(eye[0], eye[1], eye[2]);
+      eye = cartographicToEcef(
+        g.longitude,
+        g.latitude,
+        this.groundAt(g.longitude, g.latitude, c.height) + this.eyeHeight,
+      );
+    }
+    this.cancel();
+    this.v = this.sanitize(this.eyeView(eye, a.heading, a.pitch, this.v.range));
+    this.commit();
+  }
+  /** Metres per second the keys move the eye now: `walkSpeed` in walk, `flySpeed` x the height above the ground in fly. */
+  get moveSpeed(): number {
+    if (this.m === 'walk') return this.walkSpeed;
+    const e = this.eye;
+    return this.flySpeed * Math.max(2, e.height - this.groundAt(e.longitude, e.latitude, e.height));
+  }
+  /** Held movement keys move the eye in fly and walk. */
+  private steer(delta: number): void {
+    const k = this.keys;
+    if (!k.size || !(delta > 0) || (this.m !== 'fly' && this.m !== 'walk')) return;
+    const f = held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown'),
+      r = held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft'),
+      u = held(k, 'KeyE', 'PageUp') - held(k, 'KeyQ', 'PageDown');
+    if (!f && !r && !(u && this.m === 'fly')) return;
+    const step = this.moveSpeed * delta * (held(k, 'ShiftLeft', 'ShiftRight') ? 4 : 1);
+    this.moveEye(f * step, r * step, u * step);
   }
   /** Zoom by `factor` keeping the surface point under CSS pixel (x, y) under the cursor (sky: about the centre). */
   zoomAt(x: number, y: number, factor: number): void {
@@ -827,6 +1090,7 @@ export class GeospatialControls extends Controls {
     f.finish(false);
   }
   override update(delta = 0): boolean {
+    if (!this.flight && !this.dead && this.enabled) this.steer(delta);
     const f = this.flight;
     if (f && !this.dead) {
       f.elapsed += Math.max(0, delta);
@@ -878,11 +1142,20 @@ export class GeospatialControls extends Controls {
       [element, 'pointercancel', this.end],
       [element, 'wheel', this.wheel, { passive: false }],
       [element, 'contextmenu', this.menu],
+      [this.keyTarget ?? documentOf(element), 'keydown', this.keyDown as InputEventListener],
+      [this.keyTarget ?? documentOf(element), 'keyup', this.keyUp as InputEventListener],
     ];
   }
   protected override onDisconnect(): void {
     this.dragging = null;
+    this.keys.clear();
   }
+  private keyDown = (event: KeyboardEvent): void => {
+    if (this.enabled && typeof event.code === 'string') this.keys.add(event.code);
+  };
+  private keyUp = (event: KeyboardEvent): void => {
+    this.keys.delete(event.code);
+  };
   /** A press or the wheel takes the camera back from a flight that allows it. */
   private interrupt(): void {
     if (this.flight?.cancelOnInput) this.cancel();
@@ -891,12 +1164,15 @@ export class GeospatialControls extends Controls {
     if (!this.enabled) return;
     this.interrupt();
     if (this.dragging || event.button > 2) return;
-    const rotate = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey;
+    const first = this.m === 'fly' || this.m === 'walk',
+      alt = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey,
+      // Local orbit swaps the buttons (left turns about the site); first person looks with any button.
+      rotate = first || (this.m === 'local' ? !alt : alt);
     if ((rotate && !this.enableRotate) || (!rotate && !this.enablePan)) return;
     const p = this.local(event),
       r = rotate ? null : this.screenRay(p.x, p.y),
       hit = r && this.hitAlong(r.o, r.d);
-    if (rotate) this.pivotOnAxis();
+    if (rotate && !first) this.pivotOnAxis();
     this.dragging = { id: event.pointerId, ...p, rotate, grab: hit?.point ?? null, grabHeight: hit?.height ?? 0 };
     this.element?.setPointerCapture?.(event.pointerId);
     event.preventDefault();
@@ -911,7 +1187,12 @@ export class GeospatialControls extends Controls {
       height = this.element.clientHeight;
     d.x = p.x;
     d.y = p.y;
-    if (d.rotate) this.rotate((dx * this.rotateSpeed) / height, (dy * this.rotateSpeed) / height);
+    if (d.rotate && (this.m === 'fly' || this.m === 'walk')) {
+      // Grab the world: a field of view per viewport height, so the point under the cursor stays near it.
+      const k = ((this.camera.fov ?? 60) * Math.PI) / 180 / height;
+      this.look(-dx * k, -dy * k);
+    } else if (d.rotate)
+      this.rotate((dx * this.rotateSpeed) / height, this.m === 'map' ? 0 : (dy * this.rotateSpeed) / height);
     else if (!d.grab || !this.dragTo(d.grab, d.grabHeight, p.x, p.y)) {
       // Sky under the cursor: ground metres per pixel at the centre; a tilted view stretches vertical drags by 1 / sin(pitch).
       const fov = ((this.camera.fov ?? 60) * Math.PI) / 180,
@@ -935,7 +1216,10 @@ export class GeospatialControls extends Controls {
     if (!this.enableZoom) return;
     const p = this.local(event),
       px = event.deltaY * (event.deltaMode === 1 ? 100 / 3 : event.deltaMode === 2 ? 800 : 1);
-    this.zoomAt(p.x, p.y, 2 ** clamp((px * this.zoomSpeed) / 500, -32, 32));
+    // First person: a 100 px notch moves one second of walking, or a fifth of the height above the ground in fly.
+    if (this.m === 'walk') this.moveEye((-px * this.zoomSpeed * this.walkSpeed) / 100, 0);
+    else if (this.m === 'fly') this.moveEye((-px * this.zoomSpeed * this.moveSpeed) / 500, 0);
+    else this.zoomAt(p.x, p.y, 2 ** clamp((px * this.zoomSpeed) / 500, -32, 32));
     event.preventDefault();
   };
   private menu = (event: Event): void => {

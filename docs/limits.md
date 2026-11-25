@@ -8666,6 +8666,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   pitch ease linearly with the eased progress, not along the path. The automatic duration is the path length over
   `speed` within [1 s, `maxDuration`]; a press or the wheel cancels a flight unless `cancelOnInput` is false, keys do not.
   `fitBounds` frames a sphere around nine points of the box, so a thin long box is framed looser than its outline.
+- Navigation modes: first person (`fly`, `walk`) looks to within 0.01 rad of straight up or down. `walk` follows the
+  higher of `heightAt` and the first scene or `raycast` surface below the eye, so it climbs steps up to `eyeHeight`
+  and walks through a wall taller than that (no sideways collision beyond the near-plane collision of the view).
+  In walk the collision clearance is at most half `eyeHeight`, so the default 2 m does not lift a walker. The walk height snaps to the ground each frame, without smoothing. A mode switch that must move the camera eases
+  the orbit view (centre, height, heading, pitch, log range) over `duration`, so the eye path is a swing, not a straight
+  line. Keys move only in fly and walk.
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)
