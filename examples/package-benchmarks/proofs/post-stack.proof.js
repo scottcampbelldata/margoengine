@@ -2,7 +2,7 @@
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
-// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1); 26451c21fb (Bloom's temporal firefly budget, KB-CABIN-BLOOM1) before it; 40dcf8a22 (the DOF near-field mip chain, its two levels blended in the shader) before it; before that 74ebb5dab (Tonemap's contrast 0 as flat grey; 149501ed0, its power contrast, before it) against the
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: a7ab55ea49 (the extract shader's comments move out of its WGSL text); 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1); 26451c21fb (Bloom's temporal firefly budget, KB-CABIN-BLOOM1) before it; 40dcf8a22 (the DOF near-field mip chain, its two levels blended in the shader) before it; before that 74ebb5dab (Tonemap's contrast 0 as flat grey; 149501ed0, its power contrast, before it) against the
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
 // creative's PostProcessing is always f044d8ef05 (before PostStack) against ca366457a3 (the last commit before it lost
 // bloom and the sky backdrop): main's 5b1fe66^, and a commit with 3319317's creative and shared sources (between
@@ -12,7 +12,7 @@ import { refs, versions, ignoreAgx, golden, fact, readOnly, coreAt } from './com
 import { mockGPU, context } from './gpu-recorder.js';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', '196bb7feb3'),
+  { ref, pin } = refs(before, '5b1fe66', 'a7ab55ea49'),
   creativeBefore = 'f044d8ef05',
   creativeAfter = 'ca366457a3',
   { wgsl } = await coreAt(pin);
