@@ -262,7 +262,7 @@ hair[Symbol.dispose]();
 
 | Jiggle field | Default | Meaning |
 | --- | --- | --- |
-| `joint` | required | The bone. Its position trails the animated one on a damped spring; steady motion leaves no lag. |
+| `joint` | required | The bone. Its position trails the animated one on a damped spring, solved exactly each step (stable at any frequency and damping); steady motion leaves no lag. |
 | `frequency` | `4` | Wobbles a second, up to 15. |
 | `damping` | `0.35` | Share of critical damping: 1 stops without a wobble. |
 | `limit` | `0.05` | Farthest the bone strays from its animated position. |

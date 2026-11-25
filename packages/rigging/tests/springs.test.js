@@ -91,7 +91,7 @@ test('the same motion looks the same at 30, 60 and 144 frames a second', () => {
       pose.local.set([0, 0, 0, 1], 3);
       for (let b = 1; b < 4; b++) pose.local.set([0, 0, 0, 1], b * 10 + 3);
       springs.stepPose(pose, 1 / rate);
-      if (frame % (rate / 2 | 0 || 1) === 0 && Number.isInteger(time * 2)) samples.push(positions(pose)[3]);
+      if (frame % ((rate / 2) | 0 || 1) === 0 && Number.isInteger(time * 2)) samples.push(positions(pose)[3]);
     }
     return samples;
   };
@@ -367,6 +367,55 @@ test('jiggle lags, wobbles back, stays inside its limit and leaves no lag at a s
   );
 });
 
+test('a stiff jiggle at 1/60 s follows the exact spring at any damping, and never grows (PA-76)', () => {
+  // 15 Hz, the most a jiggle may ring, at damping ratios 0.35 and 1: semi-implicit Euler at 1/60 s is unstable for both (its
+  // step grows past w dt = 2, here 1.57 with damping), so the jiggle drifted off and only its limit held it. The step is now the
+  // spring solved exactly, so it matches a fine integration of the same spring about the same moving bone.
+  const parents = [-1, 0],
+    rate = 60,
+    drive = (t) => 0.3 * Math.sin(5 * t) + (t > 0.5 ? 0.05 : 0.1 * t);
+  for (const damping of [0.35, 1]) {
+    const springs = new SpringBones(parents, { jiggles: [{ joint: 1, frequency: 15, damping, limit: 10 }] }),
+      w = 2 * Math.PI * 15;
+    // The reference: the bone's x moves in a straight line through each frame, the jiggle a damped spring about it, Runge-Kutta
+    // at a thousand steps a frame.
+    let p = drive(0),
+      v = 0,
+      worst = 0;
+    for (let frame = 0; frame <= rate * 2; frame++) {
+      const local = Float64Array.from([0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+      local[0] = drive(frame / rate);
+      springs.stepPose({ parents, local }, 1 / rate);
+      if (frame > 0) {
+        const g0 = drive((frame - 1) / rate),
+          g1 = drive(frame / rate),
+          pace = (g1 - g0) * rate,
+          n = 1000,
+          h = 1 / rate / n,
+          a = (t, x, u) => -w * w * (x - (g0 + pace * t)) - 2 * damping * w * (u - pace);
+        for (let i = 0; i < n; i++) {
+          const t = i * h,
+            k1x = v,
+            k1v = a(t, p, v),
+            k2x = v + (h / 2) * k1v,
+            k2v = a(t + h / 2, p + (h / 2) * k1x, v + (h / 2) * k1v),
+            k3x = v + (h / 2) * k2v,
+            k3v = a(t + h / 2, p + (h / 2) * k2x, v + (h / 2) * k2v),
+            k4x = v + h * k3v,
+            k4v = a(t + h, p + h * k3x, v + h * k3v);
+          p += (h / 6) * (k1x + 2 * k2x + 2 * k3x + k4x);
+          v += (h / 6) * (k1v + 2 * k2v + 2 * k3v + k4v);
+        }
+      }
+      const jiggle = local[10],
+        exact = p - local[0];
+      assert.ok(Number.isFinite(jiggle), `damping ${damping}, frame ${frame}: ${jiggle}`);
+      worst = Math.max(worst, Math.abs(jiggle - exact));
+    }
+    assert.ok(worst < 1e-6, `damping ${damping}: the jiggle is the exact spring, off by at most ${worst} m`);
+  }
+});
+
 test('a scale a little off uniform, as exported rigs have, swings; a mirrored one is refused', () => {
   // Regression: real VRM hair bones carry scales such as 0.9995, 1, 0.9986, and the first version refused them.
   const pose = rope(2);
@@ -414,7 +463,10 @@ test('bad input is refused with a way out', () => {
   assert.throws(() => make({ chains: [{ joints: [0, 1], center: 3 }] }), /center/);
   assert.throws(() => make({ chains: [{ joints: [0, 1], drag: 2 }] }), /drag/);
   assert.throws(() => make({ chains: [{ joints: [0, 1], stiffness: -1 }] }), /stiffness/);
-  assert.throws(() => make({ chains: [{ joints: [0, 1], gravity: 1, gravityDirection: [0, 0, 0] }] }), /gravityDirection/);
+  assert.throws(
+    () => make({ chains: [{ joints: [0, 1], gravity: 1, gravityDirection: [0, 0, 0] }] }),
+    /gravityDirection/,
+  );
   assert.throws(() => make({ chains: [{ joints: [0, 1], colliders: [0] }] }), /collider/);
   assert.throws(() => make({ colliders: [{ radius: 0 }] }), /radius/);
   assert.throws(() => make({ jiggles: [{ joint: 1, frequency: 90 }] }), /frequency/);

@@ -598,10 +598,11 @@ export class SpringBones {
       for (let k = 0; k < 3; k++) {
         const goal = target[k] + (now[k] - target[k]) * alpha;
         pace[k] = (now[k] - target[k]) / delta;
-        // Semi-implicit Euler on a damped spring about the moving bone: steady motion leaves no lag.
-        const stretch = position[k] - (goal - pace[k] * dt);
-        speed[k] += (-omega * omega * stretch - 2 * damping * omega * (speed[k] - pace[k])) * dt;
-        position[k] += speed[k] * dt;
+        // The damped spring about the bone, solved exactly over the step in the bone's frame, which moves at a steady pace
+        // through the frame: steady motion leaves no lag, and no frequency or damping can make the step grow.
+        const [stretch, rate] = settle(position[k] - (goal - pace[k] * dt), speed[k] - pace[k], omega, damping, dt);
+        position[k] = goal + stretch;
+        speed[k] = pace[k] + rate;
         offset[k] = position[k] - goal;
       }
       const far = Math.hypot(offset[0], offset[1], offset[2]);
@@ -775,4 +776,31 @@ export function addSpringBones(animator: Animator, options: SpringBonesOptions):
     remove = null;
   };
   return { springs, reset: () => springs.reset(), dispose, [Symbol.dispose]: dispose };
+}
+
+/**
+ * A damped spring x'' = -w^2 x - 2 zeta w x' started at offset `x` and speed `v`, `t` seconds on: its offset and speed, exactly
+ * (the closed form of free vibration with viscous damping, S. S. Rao, "Mechanical Vibrations", 6th ed., 2017, section 2.6). The
+ * underdamped, critical and overdamped cases are one form, e^(-zeta w t) (x c + (v + zeta w x) s), with c and s the cosine and
+ * sin(wd t) / wd of the damped frequency wd (cosh and sinh(r t) / r past critical, t at it), so it stays exact near zeta = 1; past
+ * critical the two exponentials are taken apart, so a heavily damped spring cannot overflow.
+ */
+function settle(x: number, v: number, w: number, zeta: number, t: number): [number, number] {
+  const a = zeta * w,
+    split = w * w * (1 - zeta * zeta);
+  let c: number, s: number;
+  if (split > 0) {
+    const wd = Math.sqrt(split),
+      e = Math.exp(-a * t),
+      angle = wd * t;
+    c = e * Math.cos(angle);
+    s = e * (angle > 1e-6 ? Math.sin(angle) / wd : t);
+  } else {
+    const r = Math.sqrt(-split),
+      grow = Math.exp((r - a) * t),
+      fall = Math.exp(-(r + a) * t);
+    c = (grow + fall) / 2;
+    s = r * t > 1e-6 ? (grow - fall) / (2 * r) : Math.exp(-a * t) * t;
+  }
+  return [x * c + (v + a * x) * s, v * c - (w * w * x + a * v) * s];
 }
