@@ -42,6 +42,9 @@ export class GeospatialControls extends Controls {
     raycast: SurfaceRaycast | undefined;
     readonly raycaster: Raycaster;
     underground: boolean;
+    eyeHeight: number;
+    walkSpeed: number;
+    flySpeed: number;
     protected get kind(): string;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: GeospatialOptions);
     get view(): Readonly<Required<GeospatialView>>;
@@ -52,11 +55,18 @@ export class GeospatialControls extends Controls {
         latitude: number;
         height: number;
     };
+    private get gap();
     setView(view: Partial<GeospatialView>): void;
     pan(east: number, north: number): void;
     rotate(heading: number, pitch: number): void;
     zoom(factor: number): void;
     pick(x: number, y: number): GeospatialPick | null;
+    private get lookRange();
+    get mode(): GeospatialMode;
+    setMode(mode: GeospatialMode, options?: ModeSwitchOptions): Promise<boolean>;
+    look(heading: number, pitch: number): void;
+    moveEye(forward: number, right: number, up?: number): void;
+    get moveSpeed(): number;
     zoomAt(x: number, y: number, factor: number): void;
     flyTo(destination: GeospatialView, options?: FlightOptions): Promise<boolean>;
     get flightTime(): {
@@ -82,6 +92,8 @@ export class GeospatialControls extends Controls {
     protected onDisconnect(): void;
 }
 
+export type GeospatialMode = 'globe' | 'local' | 'map' | 'fly' | 'walk';
+
 export interface GeospatialOptions {
     view?: GeospatialView;
     heightAt?: HeightQuery;
@@ -97,6 +109,11 @@ export interface GeospatialOptions {
     raycast?: SurfaceRaycast;
     raycaster?: Raycaster;
     underground?: boolean;
+    mode?: GeospatialMode;
+    eyeHeight?: number;
+    walkSpeed?: number;
+    flySpeed?: number;
+    keyTarget?: EventTargetLike | null;
 }
 
 export interface GeospatialPick {
@@ -119,6 +136,12 @@ export interface GeospatialView {
 }
 
 export type HeightQuery = (longitude: number, latitude: number) => number | undefined;
+
+export interface ModeSwitchOptions {
+    duration?: number;
+    easing?: (t: number) => number;
+    signal?: AbortSignal;
+}
 
 export type SurfaceRaycast = (origin: readonly [number, number, number], direction: readonly [number, number, number], far: number) => number | undefined;
 

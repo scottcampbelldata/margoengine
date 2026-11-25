@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18882447,
+  "total": 18884032,
   "history": [
     {
       "date": "2026-10-24",
@@ -12081,6 +12081,12 @@
       "commit": "usdz-behaviors",
       "reason": "exporters/usdz gains Quick Look tap behaviours",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial navigation modes (globe, local, map, fly, walk)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12297,7 +12303,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 8626,
+    "@margoengine/controls/geospatial": 10211,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
