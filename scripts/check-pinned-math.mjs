@@ -5,7 +5,7 @@
 // `@margoengine/math/pinned` (the TypeScript twin of kernel-common's pinned functions, K01) instead. Exact operations
 // (`Math.floor`, `min`, `max`, `abs`, `sqrt`, `imul`, `trunc`, `sign`, `fround`) are allowed.
 //
-// Run: node scripts/check-pinned-math.mjs (exit 1 and every place when one is found).
+// Run: node scripts/check-pinned-math.mjs (exit code 1 and every place when one is found).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -57,7 +57,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(
       `check:pinned-math: ${problems.length} host transcendental(s) or ** where a world's state is computed. Fix: use exp, ln, pow, sin, cos or hypot from @margoengine/math/pinned (or a shift for a power of two):\n  ${problems.join('\n  ')}`,
     );
-    process.exit(1);
-  }
-  console.log(`check:pinned-math: ok, ${files.size} file(s) use only pinned maths.`);
+    // It ends by its event loop with code 1, as every check does (KB-OWN-EXIT2).
+    process.exitCode = 1;
+  } else console.log(`check:pinned-math: ok, ${files.size} file(s) use only pinned maths.`);
 }
