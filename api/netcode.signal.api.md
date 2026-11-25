@@ -5,7 +5,10 @@
 ```ts
 export class PeerMesh {
     readonly connections: Map<number, Connection>;
+    onlink: ((peer: number, connection: RTCPeerConnection) => void) | null;
+    onunlink: ((peer: number, connection: RTCPeerConnection) => void) | null;
     constructor(client: SignalClient, options?: PeerMeshOptions);
+    get peerConnections(): ReadonlyMap<number, RTCPeerConnection>;
     close(): void;
     [Symbol.dispose](): void;
 }

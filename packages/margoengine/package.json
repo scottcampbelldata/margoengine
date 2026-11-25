@@ -2927,6 +2927,10 @@
       "types": "./dist/netcode/lobby.d.ts",
       "import": "./dist/netcode/lobby.js"
     },
+    "./netcode/media": {
+      "types": "./dist/netcode/media.d.ts",
+      "import": "./dist/netcode/media.js"
+    },
     "./netcode/presence": {
       "types": "./dist/netcode/presence.d.ts",
       "import": "./dist/netcode/presence.js"

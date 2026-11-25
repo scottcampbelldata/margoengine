@@ -323,6 +323,10 @@ interface Link {
   queue: Promise<void>;
   /** Candidates found before the description went out: a candidate must not reach the other end ahead of it. */
   held: RTCIceCandidateInit[] | null;
+  /** True while this end sets its own offer (the `makingOffer` flag of the W3C perfect negotiation pattern). */
+  making: boolean;
+  /** True after this end ignored a colliding offer: the candidates that follow it are not errors. */
+  ignoring: boolean;
 }
 
 /**
@@ -342,6 +346,10 @@ interface Link {
 export class PeerMesh {
   /** The open connection of each peer. */
   readonly connections = new Map<number, Connection>();
+  /** Called with a peer's RTCPeerConnection as soon as it exists (before any description), for example to add media tracks. */
+  onlink: ((peer: number, connection: RTCPeerConnection) => void) | null = null;
+  /** Called with a peer's RTCPeerConnection just before it is closed. */
+  onunlink: ((peer: number, connection: RTCPeerConnection) => void) | null = null;
   private readonly links = new Map<number, Link>();
   private readonly Peer: typeof RTCPeerConnection;
   private closed = false;
@@ -362,6 +370,11 @@ export class PeerMesh {
     for (const id of client.peers) this.offer(id);
   }
 
+  /** The RTCPeerConnection of each peer now (also those whose data channels are not open yet). */
+  get peerConnections(): ReadonlyMap<number, RTCPeerConnection> {
+    return new Map([...this.links].map(([id, link]) => [id, link.peer]));
+  }
+
   private report(id: number, error: unknown): void {
     this.options.onerror?.(id, error);
   }
@@ -371,13 +384,19 @@ export class PeerMesh {
     if (known) return known;
     const peer = new this.Peer(this.options.configuration),
       channels = createDataChannels(peer),
-      link: Link = { peer, channels, queue: Promise.resolve(), held: [] };
+      link: Link = { peer, channels, queue: Promise.resolve(), held: [], making: false, ignoring: false };
     this.links.set(id, link);
     peer.addEventListener('icecandidate', (event: RTCPeerConnectionIceEvent) => {
       if (!event.candidate) return;
       const candidate = event.candidate.toJSON();
       if (link.held) link.held.push(candidate);
       else this.client.send(id, { candidate });
+    });
+    // A track added or removed after the first description needs a new offer (the data channels are pre-negotiated, so
+    // they never ask for one). The first offer is made by `offer()`, so an event before any description is ignored.
+    peer.addEventListener('negotiationneeded', () => {
+      if (this.closed || !(peer.localDescription || peer.remoteDescription)) return;
+      this.step(id, link, () => (peer.signalingState === 'stable' ? this.describe(id, link) : Promise.resolve()));
     });
     peer.addEventListener('connectionstatechange', () => {
       if (peer.connectionState !== 'failed') return;
@@ -394,6 +413,7 @@ export class PeerMesh {
       { once: true },
     );
     channels.reliable.addEventListener('close', () => this.drop(id), { once: true });
+    this.onlink?.(id, peer);
     return link;
   }
 
@@ -403,7 +423,12 @@ export class PeerMesh {
 
   /** Sets and sends this end's description, then the candidates that waited for it. */
   private async describe(id: number, link: Link): Promise<void> {
-    await link.peer.setLocalDescription();
+    link.making = true;
+    try {
+      await link.peer.setLocalDescription();
+    } finally {
+      link.making = false;
+    }
     this.client.send(id, { description: link.peer.localDescription });
     for (const candidate of link.held ?? []) this.client.send(id, { candidate });
     link.held = null;
@@ -423,8 +448,23 @@ export class PeerMesh {
     if (description === undefined && candidate === undefined)
       return this.report(from, new TypeError('A peer sent neither a description nor a candidate'));
     const link = this.link(from);
+    // Perfect negotiation (W3C WebRTC 1.0, "Perfect negotiation example"): the peer with the higher room id is polite.
+    // An offer that arrives while this end is making or holding one collides: the impolite end ignores it, the polite
+    // end accepts it, and setRemoteDescription rolls its own offer back.
+    const polite = this.client.id > from;
     this.step(from, link, async () => {
-      if (candidate !== undefined) return link.peer.addIceCandidate(candidate);
+      if (candidate !== undefined) {
+        try {
+          return await link.peer.addIceCandidate(candidate);
+        } catch (error) {
+          if (!link.ignoring) throw error;
+          return;
+        }
+      }
+      const state = link.peer.signalingState;
+      const collision = description?.type === 'offer' && (link.making || (state !== undefined && state !== 'stable'));
+      link.ignoring = !polite && collision;
+      if (link.ignoring) return;
       await link.peer.setRemoteDescription(description as RTCSessionDescriptionInit);
       if (description?.type === 'offer') await this.describe(from, link);
     });
@@ -437,6 +477,7 @@ export class PeerMesh {
     const connection = this.connections.get(id);
     this.connections.delete(id);
     connection?.close(CloseCode.normal, 'peer left');
+    this.onunlink?.(id, link.peer);
     link.peer.close();
   }
 

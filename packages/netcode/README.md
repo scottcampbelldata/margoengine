@@ -1198,6 +1198,41 @@ and schema bytes); 4 snapshot (varint tick, baseline tick or 0, newest input tic
 index into `schema.names`, then its schema bytes). Snapshots, inputs, pings and pongs go unreliable; everything else
 reliable.
 
+## Voice chat and screen share
+
+`@margoengine/netcode/media` adds microphone and screen tracks to the WebRTC links of a `PeerMesh`. Starting or stopping one renegotiates over the same signalling (the mesh runs the W3C "perfect negotiation" pattern: the peer with the higher room id is polite and gives way when both offer at once). A remote stream with video is a screen; one with only audio is a voice. Any number of peers may share a screen at once.
+
+```ts
+import type { PeerMesh } from '@margoengine/netcode/signal';
+import { MediaSession, type MediaSessionEvent } from '@margoengine/netcode/media';
+
+export async function voice(mesh: PeerMesh, context: AudioContext) {
+  const media = new MediaSession(mesh, {
+    audioContext: context,
+    pushToTalk: false, // true: closed until media.talk(true)
+    // Optional: route each voice through your own graph, for example a PannerNode that follows the player.
+    spatial: (peer, volume, ctx) => {
+      const panner = ctx.createPanner();
+      panner.connect(ctx.destination);
+      return panner;
+    },
+  });
+  media.addEventListener('speaking', (event) => {
+    const { peer, speaking } = (event as MediaSessionEvent<'speaking'>).detail;
+    console.log(peer, speaking ? 'talks' : 'is quiet');
+  });
+  await media.startVoice({ signal: AbortSignal.timeout(15_000) }); // echo cancellation, noise suppression, auto gain on
+  media.setMuted(true);
+  media.setVolume(3, 0.5); // peer 3, this end only
+  media.mutePeer(4, true);
+  await media.startScreenShare(); // getDisplayMedia; 'screenended' fires when the user uses the browser's stop button
+  for await (const remote of media.events('remote')) console.log(remote.peer, remote.kind, remote.active);
+  return media; // media.dispose() or `using` stops every track
+}
+```
+
+Options (defaults): `audio` microphone constraints (echo cancellation, noise suppression and automatic gain control on), `pushToTalk` (false), `speakingOn` (0.04 RMS), `speakingOff` (0.02), `speakingHangMs` (250), `pollMs` (50; 0 reads only on `poll()`), `audioContext`, `spatial`, `mediaDevices`, `now`. Speaking is an RMS level through an `AnalyserNode` with hysteresis (`SpeakingDetector` is exported for your own use). Remote streams are on `media.remotes.get(peer)` (`voice`, `screen`, `volume`, `muted`, `speaking`) for your own `<audio>` or `<video>` element.
+
 ## Sources
 
 Clean room, from public descriptions only: Glenn Fiedler's articles "Fix Your Timestep!", "Snapshot Compression" and
@@ -1205,7 +1240,7 @@ Clean room, from public descriptions only: Glenn Fiedler's articles "Fix Your Ti
 interpolation); Yahn Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and
 Optimization" (GDC 2001); Timothy Ford, "Overwatch Gameplay Architecture and Netcode" (GDC 2017); F. Cristian,
 "Probabilistic clock synchronization" (1989); the LEB128 and zigzag encodings as specified for DWARF and Protocol
-Buffers; FNV-1a as published by Fowler, Noll and Vo; the W3C WebTransport Candidate Recommendation, in part. No library's source was read.
+Buffers; FNV-1a as published by Fowler, Noll and Vo; the W3C WebTransport Candidate Recommendation, in part; for media, W3C WebRTC 1.0 (addTrack, removeTrack, negotiationneeded and the perfect negotiation example), W3C Media Capture and Streams (getUserMedia, audio constraints, track `enabled` and `ended`), W3C Screen Capture (getDisplayMedia) and the W3C Web Audio API (MediaStreamAudioSourceNode, AnalyserNode, GainNode). No library's source was read.
 
 Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` only.
 

@@ -83,6 +83,10 @@
       "types": "./dist/lobby.d.ts",
       "import": "./dist/lobby.js"
     },
+    "./media": {
+      "types": "./dist/media.d.ts",
+      "import": "./dist/media.js"
+    },
     "./presence": {
       "types": "./dist/presence.d.ts",
       "import": "./dist/presence.js"

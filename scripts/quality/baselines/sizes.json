@@ -5386,6 +5386,12 @@
       "grew": 2
     },
     {
+      "date": "2026-11-25",
+      "commit": "gap-lane-d",
+      "reason": "New optional netcode/media: 2931 B gzip (ceiling 3100 B), previously absent; voice, screen share, speaking detection and per-peer volume kept in one import. netcode/signal 3230 B, under its 3320 B ceiling. Core and stage unchanged.",
+      "grew": 1
+    },
+    {
       "date": "2026-11-10",
       "commit": "batch-256",
       "reason": "New optional netcode/presence: 6219 B gzip; no previous entry, full feature kept in one import. Core and stage unchanged.",
@@ -12523,6 +12529,7 @@
     "@margoengine/netcode/interpolation-timeline": 1495,
     "@margoengine/netcode/lobby": 4439,
     "@margoengine/netcode/migrate": 8607,
+    "@margoengine/netcode/media": 3100,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/presence": 6475,
     "@margoengine/netcode/relay": 3617,
