@@ -43,12 +43,15 @@ export interface ImageSequenceOptions {
     digits?: number;
 }
 
-export interface RenderFramesOptions {
+export interface RenderFramesOptions extends Pick<SubFrameOptions, 'shutterPhase' | 'filter' | 'filterWidth' | 'seed' | 'pattern' | 'startFrame'> {
     frames: number;
     fps?: number;
     camera?: Camera;
-    update?: (frame: FrameTiming) => unknown;
+    update?: (frame: FrameTiming | SubFrameTiming) => unknown;
     signal?: AbortSignal;
+    samples?: number;
+    shutter?: number;
+    accumulate?: AccumulateTarget;
 }
 
 export interface RenderedFrame extends HeadlessPixels, FrameTiming {
@@ -89,15 +92,43 @@ export function encodeVideo(frames: AsyncIterable<VideoInputFrame> | Iterable<Vi
 
 export function imageSequence(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { prefix, digits }?: ImageSequenceOptions): AsyncGenerator<SequenceFile, void, void>;
 
-export function renderFrames(engine: Engine, { frames, fps, camera, update, signal }: RenderFramesOptions): AsyncGenerator<RenderedFrame, void, void>;
+export function renderFrames(engine: Engine, options: RenderFramesOptions): AsyncGenerator<RenderedFrame, void, void>;
 
 export function streamVideo(frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>, given?: StreamVideoOptions): AsyncGenerator<Uint8Array<ArrayBuffer>, StreamedVideo, void>;
 
 // Not exported from this entry, but used by the exports above:
 
+interface AccumulateTarget {
+    begin(): void;
+    readonly texture?: GPUTexture;
+    readonly count: number;
+}
+
 interface HeadlessPixels {
     width: number;
     height: number;
     data: Uint8Array;
+}
+
+type PixelFilter = 'blackman-harris' | 'gaussian' | 'box';
+
+type ShutterPhase = 'start' | 'center' | 'end';
+
+interface SubFrameOptions {
+    frames: number;
+    fps?: number;
+    samples?: number;
+    shutter?: number;
+    shutterPhase?: ShutterPhase;
+    filter?: PixelFilter;
+    filterWidth?: number;
+    seed?: number;
+    pattern?: 'fixed' | 'per-frame';
+    startFrame?: number;
+}
+
+interface SubFrameTiming extends FrameTiming {
+    sample: number;
+    samples: number;
 }
 ```

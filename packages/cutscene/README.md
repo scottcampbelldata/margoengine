@@ -137,7 +137,9 @@ engine.render({ delta: 1 / 30 });
 
 - A clock is any plugin with `advanceTime(delta)` and a `time` getter (seconds since it started). `advanceTime` is the
   CPU part of its frame update only: no GPU call, no listener call (a replayed lightning strike stays silent).
-- `seek(engine, seconds, { fps = 60, scenes, extra, onStep, signal })` runs `Math.round(seconds * fps)` steps over the
+- `seek(engine, seconds, { fps = 60, steps, scenes, extra, onStep, signal })` runs `Math.round(seconds * fps)` steps
+  of `1 / fps` (or the `steps` you list, each 0 to 1 second: the deltas a sub-framed film's renders gave, from
+  `subFrameSteps` of `@margoengine/headless/accumulate`) over the
   plugins of each scene (default `[engine.scene]`) in attach order, then `extra` (clocks that are not plugins, such as
   an unattached `WeatherMachine`). `onStep(step, time)` runs before each step, so film code can set what the clocks
   read (a wind, a rate) as it did live. It resolves with the steps, the clocks it moved and `unseekable`: plugins with
@@ -147,7 +149,8 @@ engine.render({ delta: 1 / 30 });
 - `advanceTime(engine, delta, { scenes, extra })` runs one step, for a host that runs its own loop.
 - `seekSync(engine, seconds, options)` is the same seek without waiting (no `onStep`), for code that cannot await.
 - `renderCutscene(engine, cutscene, { from })` with `from` after 0 seeks the engine first, in steps of the render's
-  `1 / fps`, so its first frame equals the frame at `from` of a render from 0; `cutsceneFrames(cutscene, { from,
+  `1 / fps` (with `samples` or `shutter`, the sub-frames' own steps), so its first frame equals the frame at `from`
+  of a render from 0; `cutsceneFrames(cutscene, { from,
   engine })` does the same when you pass the engine you draw with. Until 2026-11-16 both started every clock at 0.
 - Cost: steps x clocks calls, CPU only: 15 minutes at 60 fps is 54,000 steps. Rates of 1 or more steps per second.
 - Exact only for state that is a clock. History on the GPU (particles alive, foam, ripples) and history of the view
@@ -361,8 +364,27 @@ const url = URL.createObjectURL(new Blob([video.bytes], { type: video.mimeType }
 | `sampleRate`, `audioBitrate` | Of the sound | `48000`, `128000` |
 | `format`, `codec`, `bitrate`, `keyFrameInterval`, `webCodecs` | As `encodeVideo` of `@margoengine/headless/video` | as there |
 | `tracks` | Custom track types, for a document you pass as data | none |
+| `samples` | Renders per frame, averaged in linear light (`renderFrames` of `@margoengine/headless/video`): anti-aliasing, and motion blur with `shutter` | `1` |
+| `shutter`, `shutterPhase` | Share of the frame interval the shutter is open (0 to 1), and `'start'`, `'center'` or `'end'` of it against the frame's time | `0`, `'start'` |
+| `filter`, `filterWidth`, `seed`, `pattern`, `accumulate` | As `renderAccumulated` of `@margoengine/headless/accumulate`: pixel filter, sample pattern, your `Accumulate` stage | as there |
 | `onProgress(done, total)` | After each frame | none |
 | `signal` | Stops the render; the promise rejects with its reason | none |
+
+With `samples` or `shutter`, `apply` and the camera run before every render at that render's own time inside the
+open shutter, so everything you move blurs, and a player fires each instant at the first render past it. Times before
+the cutscene's start (a `'center'` shutter on frame 0) show its first instant.
+
+```ts
+const film = await renderCutscene(engine, trailer, {
+  fps: 24,
+  samples: 16, // 16 renders a frame
+  shutter: 0.5, // a 180 degree shutter
+  camera: new Camera(),
+  apply(state) {
+    cube.setPosition(state.transforms.cube.position!);
+  },
+});
+```
 
 Pass a `CutscenePlayer` in place of the cutscene and it fires every instant in order as the frames go by, so listeners
 can spawn things and the frames show them. The result is `encodeVideo`'s, with `audioCodec` when the file has sound:

@@ -43,18 +43,23 @@ export interface SubFrameOptions {
   /** `'fixed'` uses one pattern on every frame, so still edges do not shimmer; `'per-frame'` draws a new one each
    * frame. Default `'fixed'`. */
   pattern?: 'fixed' | 'per-frame';
+  /** Number of the first frame, a whole number from 0: a span of a longer film, after {@link subFrameSteps} brought
+   * a fresh world's clocks to it. Its renders, times and deltas are those of the whole film's. Default 0. */
+  startFrame?: number;
 }
 
 /** One render of {@link subFrames}. */
 export interface SubFrame {
-  /** The frame it belongs to, from 0. */
+  /** The frame it belongs to, from `startFrame`. */
   frame: number;
   /** From 0 to `samples - 1`, in time order. */
   sample: number;
   /** Seconds: `frame / fps` plus its place in the open shutter. */
   time: number;
-  /** Seconds since the render before: 0 on the first. Within a frame the step between shutter times, from one frame
-   * to the next the rest of the interval; the steps add up to the frame interval. */
+  /** Seconds the engine's clocks move before this render. Clocks start at 0 and follow `time`: within a frame the
+   * step between shutter times, from one frame to the next the rest of the interval. A render before time 0 (a
+   * `'center'` or `'end'` shutter on frame 0) moves them 0, so they read `max(0, time)`. Frame 0 of `renderFrames`
+   * (one sample, shutter 0) has delta 0 and later frames exactly `1 / fps`. */
   delta: number;
   /** Sub-pixel offset `[x, y]` in pixels, x right and y down, inside the filter's width. */
   offset: readonly [number, number];
@@ -144,6 +149,7 @@ function check(options: SubFrameOptions) {
     filter = 'blackman-harris',
     seed = 0,
     pattern = 'fixed',
+    startFrame = 0,
   } = options;
   const filterWidth = options.filterWidth ?? (filter === 'box' ? 1 : 2);
   if (!Number.isInteger(frames) || frames < 1) throw rangeError('Invalid frame count', 'headless');
@@ -160,7 +166,9 @@ function check(options: SubFrameOptions) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
     throw rangeError('Seed must be a 32-bit unsigned integer', 'headless');
   if (pattern !== 'fixed' && pattern !== 'per-frame') throw typeError("Pattern: 'fixed' or 'per-frame'", 'headless');
-  return { frames, fps, samples, shutter, shutterPhase, filter, filterWidth, seed, pattern };
+  if (!Number.isSafeInteger(startFrame) || startFrame < 0)
+    throw rangeError('startFrame must be a whole number from 0', 'headless');
+  return { frames, fps, samples, shutter, shutterPhase, filter, filterWidth, seed, pattern, startFrame };
 }
 
 /**
@@ -173,17 +181,14 @@ function check(options: SubFrameOptions) {
 export function* subFrames(options: SubFrameOptions): Generator<SubFrame, void, void> {
   const o = check(options),
     invert = inverseCDF(o.filter, o.filterWidth),
-    phase = o.shutterPhase === 'start' ? 0 : o.shutterPhase === 'center' ? -o.shutter / 2 : -o.shutter,
+    within = shutterTimes(o),
     order = new Uint32Array(o.samples),
-    offsets: [number, number][] = [];
-  // Seconds into the frame of sample k, the same for every frame.
-  const within = Float64Array.from({ length: o.samples }, (_, k) =>
-    o.shutter === 0 ? 0 : (phase + (o.shutter * (k + 0.5)) / o.samples) / o.fps,
-  );
-  let previousFrame = -1,
-    previousWithin = 0;
-  for (let frame = 0; frame < o.frames; frame++) {
-    if (frame === 0 || o.pattern === 'per-frame') {
+    offsets: [number, number][] = [],
+    clock = new Clocks(o.fps, within);
+  // A span starts where the whole film's clocks stand after the render before its first.
+  for (let frame = 0; frame < o.startFrame; frame++) for (let k = 0; k < o.samples; k++) clock.step(frame, k);
+  for (let frame = o.startFrame; frame < o.startFrame + o.frames; frame++) {
+    if (frame === o.startFrame || o.pattern === 'per-frame') {
       const seed = o.pattern === 'fixed' ? o.seed : hash(o.seed ^ hash(frame + 1));
       // A shuffle of the points against time (Fisher-Yates on a hashed stream), so offset order and time order are
       // independent; every point is still used once a frame.
@@ -207,20 +212,59 @@ export function* subFrames(options: SubFrameOptions): Generator<SubFrame, void, 
         offsets.push([invert(unit(owen(reverse(i), sx))), invert(unit(owen(sobol2(i), sy)))]);
       }
     }
-    for (let sample = 0; sample < o.samples; sample++) {
-      const delta = previousFrame < 0 ? 0 : (frame - previousFrame) / o.fps + (within[sample] - previousWithin);
-      previousFrame = frame;
-      previousWithin = within[sample];
+    for (let sample = 0; sample < o.samples; sample++)
       yield {
         frame,
         sample,
         time: frame / o.fps + within[sample],
-        delta: delta < 0 ? 0 : delta,
+        delta: clock.step(frame, sample),
         offset: offsets[sample],
         last: sample === o.samples - 1,
       };
-    }
   }
+}
+
+/** Seconds into the frame of each sample, the same for every frame: the middles of equal slices of the open shutter. */
+function shutterTimes(o: ReturnType<typeof check>): Float64Array {
+  const phase = o.shutterPhase === 'start' ? 0 : o.shutterPhase === 'center' ? -o.shutter / 2 : -o.shutter;
+  return Float64Array.from({ length: o.samples }, (_, k) =>
+    o.shutter === 0 ? 0 : (phase + (o.shutter * (k + 0.5)) / o.samples) / o.fps,
+  );
+}
+
+/**
+ * Where the clocks stand, as a frame and seconds into it, and the step to the next render. Kept as a pair, not one
+ * sum, so one sample with shutter 0 steps exactly `1 / fps` (`(i - (i - 1)) / fps`), as `renderFrames` always has.
+ */
+class Clocks {
+  private frame = 0;
+  private within = 0;
+  constructor(
+    private readonly fps: number,
+    private readonly times: Float64Array,
+  ) {}
+  step(frame: number, sample: number): number {
+    const delta = (frame - this.frame) / this.fps + (this.times[sample] - this.within);
+    if (!(delta > 0)) return 0;
+    this.frame = frame;
+    this.within = this.times[sample];
+    return delta;
+  }
+}
+
+/**
+ * The steps that bring a fresh world's clocks to the first render of frame `startFrame` of a sub-framed film: the
+ * deltas of every render before it, for `seek(engine, seconds, { steps })` in `@margoengine/cutscene/seek`, so a span
+ * rendered from that frame equals the same frames of a render from 0, bit for bit. Empty for frame 0.
+ * @throws RangeError or TypeError as {@link subFrames}.
+ */
+export function subFrameSteps(options: Omit<SubFrameOptions, 'frames'> & { startFrame: number }): number[] {
+  const o = check({ ...options, frames: 1 }),
+    clock = new Clocks(o.fps, shutterTimes(o)),
+    steps: number[] = [];
+  for (let frame = 0; frame < o.startFrame; frame++)
+    for (let k = 0; k < o.samples; k++) steps.push(clock.step(frame, k));
+  return steps;
 }
 
 /** The part of an Accumulate stage {@link renderAccumulated} drives; `@margoengine/post/accumulate` has it. */
@@ -233,7 +277,10 @@ export interface AccumulateTarget {
   readonly count: number;
 }
 
-/** What `update` is given before each render: the render's own time, and which frame and sample it is. */
+/**
+ * What `update` is given before each render: `index` the frame from 0, `time` the render's own time in seconds since
+ * the first frame (inside the open shutter), `delta` the seconds the engine's clocks move before it, and the sample.
+ */
 export interface SubFrameTiming extends FrameTiming {
   /** From 0 to `samples - 1`, in time order. */
   sample: number;
@@ -327,11 +374,12 @@ export async function* renderAccumulated(
     for (const sub of subFrames(settings)) {
       signal?.throwIfAborted();
       if (sub.sample === 0) target.begin();
+      const index = sub.frame - settings.startFrame;
       await update?.({
-        index: sub.frame,
-        time: sub.time,
+        index,
+        time: settings.startFrame ? sub.time - settings.startFrame / settings.fps : sub.time,
         delta: sub.delta,
-        progress: sub.frame / settings.frames,
+        progress: index / settings.frames,
         sample: sub.sample,
         samples: settings.samples,
       });
@@ -347,10 +395,10 @@ export async function* renderAccumulated(
       engine.render({ camera: shot, delta: sub.delta });
       if (!sub.last) continue;
       const timing: FrameTiming = {
-        index: sub.frame,
-        time: sub.frame / settings.fps,
-        delta: sub.frame ? 1 / settings.fps : 0,
-        progress: sub.frame / settings.frames,
+        index,
+        time: index / settings.fps,
+        delta: index ? 1 / settings.fps : 0,
+        progress: index / settings.frames,
       };
       if (output === 'display') {
         yield { ...timing, ...(await readPixels(instance, { signal })) };

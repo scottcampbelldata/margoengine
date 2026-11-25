@@ -4,6 +4,7 @@ import type { Camera, Engine } from '@margoengine/core';
 import { encodePNG, readPixels, type HeadlessPixels } from './index.js';
 import { FragmentedMP4, StreamedWebM, muxMP4, muxWebM, type SoundTrack, type VideoSample } from './video-mux.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import type { AccumulateTarget, SubFrameOptions, SubFrameTiming } from '@margoengine/headless/accumulate';
 
 /** Where a frame sits in a sequence. */
 export interface FrameTiming {
@@ -21,17 +22,26 @@ export interface FrameTiming {
 export interface RenderedFrame extends HeadlessPixels, FrameTiming {}
 
 /** Options of {@link renderFrames}. */
-export interface RenderFramesOptions {
+export interface RenderFramesOptions
+  extends Pick<SubFrameOptions, 'shutterPhase' | 'filter' | 'filterWidth' | 'seed' | 'pattern' | 'startFrame'> {
   /** How many frames, a whole number from 1. Required. */
   frames: number;
   /** Frames per second. Default 30. */
   fps?: number;
   /** Camera to render through. Default the engine's camera. */
   camera?: Camera;
-  /** Runs before each frame is drawn; move the scene here. May be async. Default none. */
-  update?: (frame: FrameTiming) => unknown;
+  /** Runs before each frame is drawn; move the scene here. May be async. With `samples` or `shutter` it runs before
+   * every render of a frame, with that render's time (a {@link SubFrameTiming}). Default none. */
+  update?: (frame: FrameTiming | SubFrameTiming) => unknown;
   /** Stops the sequence; the iterator rejects with the signal's reason. Default none. */
   signal?: AbortSignal;
+  /** Renders per frame averaged in linear light, for anti-aliasing and motion blur (`renderAccumulated` from
+   * `@margoengine/headless/accumulate`, loaded on first use). Default 1: one render a frame, as before. */
+  samples?: number;
+  /** Share of the frame interval the shutter is open, 0 to 1, for motion blur. Default 0: no blur. */
+  shutter?: number;
+  /** The Accumulate stage in your PostStack, for `samples` or `shutter`. Default one attached alone. */
+  accumulate?: AccumulateTarget;
 }
 
 // The samples every encoder is given: Margo converts each RGBA frame itself and hands over 4:2:0 planes labelled with
@@ -118,12 +128,21 @@ const checkFps = (fps: number): void => {
 /**
  * Renders a sequence one frame at a time on an engine on a headless canvas, reading each back. Time is the sequence's
  * own, not the wall clock, so a slow machine gives the same frames as a fast one. The next frame is not drawn until
- * the consumer asks for it, so one frame of pixels is alive at a time unless the consumer keeps them.
+ * the consumer asks for it, so one frame of pixels is alive at a time unless the consumer keeps them. With `samples`
+ * above 1 or `shutter` above 0 each frame is `samples` renders over the open shutter averaged in linear light
+ * (`renderAccumulated`; `startFrame`, `shutterPhase`, `filter`, `filterWidth`, `seed` and `pattern` apply then);
+ * otherwise each frame is one render, exactly as before.
  */
 export async function* renderFrames(
   engine: Engine,
-  { frames, fps = 30, camera, update, signal }: RenderFramesOptions,
+  options: RenderFramesOptions,
 ): AsyncGenerator<RenderedFrame, void, void> {
+  const { frames, fps = 30, camera, update, signal, samples = 1, shutter = 0 } = options;
+  if (samples !== 1 || shutter !== 0) {
+    const { renderAccumulated } = await import('@margoengine/headless/accumulate');
+    yield* renderAccumulated(engine, { ...options, samples, shutter, output: 'display' });
+    return;
+  }
   if (!Number.isInteger(frames) || frames < 1) throw rangeError('Invalid frame count', 'headless');
   checkFps(fps);
   for (let index = 0; index < frames; index++) {

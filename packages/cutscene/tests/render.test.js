@@ -192,3 +192,16 @@ test('renderCutscene from after 0 seeks the engine clocks before the first frame
     code: 'state',
   });
 });
+
+test('renderCutscene with sub-frames seeks a span with the sub-frames own steps', async () => {
+  const { subFrameSteps } = await import('@margoengine/headless/accumulate');
+  const c = clock(),
+    engine = { ...world(c), render() {} },
+    framing = { fps: 30, samples: 4, shutter: 0.5 };
+  // The fake engine is no core engine, so the render stops after the seek; the seek is what is checked here.
+  await renderCutscene(engine, doc([]), { ...framing, from: 2, to: 2.2, apply() {} }).catch(() => {});
+  let expected = 0;
+  for (const d of subFrameSteps({ ...framing, startFrame: 60 })) expected += d;
+  assert.ok(Object.is(c.time, expected), `${c.time}: the 240 sub-frame steps before frame 60`);
+  assert.notEqual(c.time, stepped(60, 30), 'not 60 whole-frame steps');
+});

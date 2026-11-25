@@ -29,6 +29,10 @@ export interface AdvanceTimeOptions {
 export interface SeekOptions extends AdvanceTimeOptions {
   /** Steps per second; each step advances every clock by `1 / fps`. Use the rate the film renders at. Default 60. */
   fps?: number;
+  /** The steps themselves, in seconds, in place of `Math.round(seconds * fps)` steps of `1 / fps`: the deltas a
+   * sub-framed film's renders gave its clocks (`subFrameSteps` from `@margoengine/headless/accumulate`). Each is
+   * from 0 to 1. `onStep` then gets the running sum as its film time. Default none. */
+  steps?: Iterable<number>;
   /** Runs before each step with the step number from 0 and its film time, so film code can set what clocks read. */
   onStep?: (step: number, time: number) => unknown;
   /** Stops the seek between steps with the signal's reason. */
@@ -37,7 +41,7 @@ export interface SeekOptions extends AdvanceTimeOptions {
 
 /** What {@link seek} did. */
 export interface SeekResult {
-  /** Steps run: `Math.round(seconds * fps)`. */
+  /** Steps run: `Math.round(seconds * fps)`, or the number of `steps` given. */
   steps: number;
   /** Names of the clocks it moved: plugin names, then `extra[i]` (or the clock's own string `name`). */
   clocks: string[];
@@ -106,7 +110,9 @@ function prepare(engine: Engine, seconds: number, options: SeekOptions) {
     );
   const delta = 1 / fps;
   checkDelta(delta);
-  return { clocks, unseekable, steps: Math.round(seconds * fps), delta, fps };
+  const steps = options.steps ? [...options.steps] : undefined;
+  if (steps) for (const step of steps) checkDelta(step);
+  return { clocks, unseekable, steps: steps?.length ?? Math.round(seconds * fps), list: steps, delta, fps };
 }
 
 /**
@@ -117,10 +123,13 @@ function prepare(engine: Engine, seconds: number, options: SeekOptions) {
  */
 export async function seek(engine: Engine, seconds: number, options: SeekOptions = {}): Promise<SeekResult> {
   const { onStep, signal } = options,
-    { clocks, unseekable, steps, delta, fps } = prepare(engine, seconds, options);
+    { clocks, unseekable, steps, list, delta, fps } = prepare(engine, seconds, options);
+  let time = 0;
   for (let step = 0; step < steps; step++) {
-    if (onStep) await onStep(step, step / fps);
-    for (const [, clock] of clocks) clock.advanceTime(delta);
+    if (onStep) await onStep(step, list ? time : step / fps);
+    const d = list ? list[step] : delta;
+    time += d;
+    for (const [, clock] of clocks) clock.advanceTime(d);
     // Let a timer or an abort run during a long seek: one turn of the event loop per 1,000 steps.
     if (signal && step % 1000 === 999) await new Promise((done) => setTimeout(done, 0));
     signal?.throwIfAborted();
@@ -133,7 +142,7 @@ export async function seek(engine: Engine, seconds: number, options: SeekOptions
  * with no `onStep` and no turn of the event loop; a `signal` is checked before it starts.
  */
 export function seekSync(engine: Engine, seconds: number, options: Omit<SeekOptions, 'onStep'> = {}): SeekResult {
-  const { clocks, unseekable, steps, delta } = prepare(engine, seconds, options);
-  for (let step = 0; step < steps; step++) for (const [, clock] of clocks) clock.advanceTime(delta);
+  const { clocks, unseekable, steps, list, delta } = prepare(engine, seconds, options);
+  for (let step = 0; step < steps; step++) for (const [, clock] of clocks) clock.advanceTime(list ? list[step] : delta);
   return { steps, clocks: clocks.map(([name]) => name), unseekable };
 }

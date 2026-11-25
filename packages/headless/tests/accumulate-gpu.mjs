@@ -20,6 +20,7 @@ const check = (label, r) => {
     `${label}: one sample has two levels: ${r.oneLevels}`,
   );
   assert.ok(r.identical, `${label}: two runs are bit-identical`);
+  assert.ok(r.framesEqual, `${label}: renderFrames with samples is renderAccumulated`);
   assert.ok(
     Math.abs(r.display.edge - r.display.still) <= 2,
     `${label}: tone curve of the linear mean: ${r.display.edge} vs ${r.display.still}`,

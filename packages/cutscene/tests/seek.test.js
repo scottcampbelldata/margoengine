@@ -152,3 +152,28 @@ test('onStep runs before each step with its film time', async () => {
     [4, 0.04, 4],
   ]);
 });
+
+test('seek with explicit steps replays exactly those deltas, as a sub-framed film gave them', async () => {
+  const deltas = [0.004, 0.008, 0.008, 0.0213, 0.008, 0, 0.008],
+    a = world(),
+    b = world();
+  for (const d of deltas) live(a, d);
+  live(a, 0.004);
+  const times = [],
+    result = await seek(b.engine, 0.06, { steps: deltas, extra: [b.machine], onStep: (_, t) => times.push(t) });
+  live(b, 0.004);
+  assert.deepEqual(state(b), state(a));
+  assert.equal(result.steps, deltas.length);
+  let sum = 0;
+  assert.deepEqual(
+    times,
+    deltas.map((d) => {
+      const t = sum;
+      sum += d;
+      return t;
+    }),
+    'onStep gets the running sum',
+  );
+  await assert.rejects(seek(world().engine, 1, { steps: [0.1, -0.1] }), RangeError);
+  await assert.rejects(seek(world().engine, 1, { steps: [2] }), RangeError);
+});

@@ -5,6 +5,7 @@ import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU, readPixels } from '../src/index.ts';
 import { readTexture } from '../src/formats.ts';
 import { renderAccumulated } from '../src/accumulate.ts';
+import { renderFrames } from '../src/video.ts';
 import { Accumulate } from '../../post/src/accumulate.ts';
 const W = 64, H = 32;
 const ortho = (out, _aspect, webgpu) => {
@@ -52,6 +53,9 @@ window.run = async () => {
     engine.lighting.radiance.set([1, 1, 1, 4 / level]);
     const [bright] = await collect(renderAccumulated(engine,
       { frames: 1, samples: 64, shutter: 0, filter: 'box', camera, accumulate: acc }));
+    const [viaFrames] = await collect(renderFrames(engine,
+      { frames: 1, samples: 64, filter: 'box', camera, accumulate: acc }));
+    const framesEqual = viaFrames.data.every((v, i) => v === bright.data[i]);
     const [brightLinear] = await linear(64);
     const share = columns(brightLinear)[20] / columns(brightLinear)[5];
     engine.lighting.radiance.set([1, 1, 1, (4 / level) * share]);
@@ -85,7 +89,7 @@ window.run = async () => {
     return {
       level, oneEdge: oneCols[20], manyEdge: manyCols[20], before: manyCols[19], after: manyCols[21],
       oneLevels: [...new Set(oneCols.map((v) => Math.round(v / level * 100) / 100))],
-      identical, display, share,
+      identical, framesEqual, display, share,
       smear: { support, energy: sum(smear) / sum(columns(stillLinear)), centroid, first: sum(stillStrip) / sum(columns(stillLinear)) },
       aborted, errors,
     };

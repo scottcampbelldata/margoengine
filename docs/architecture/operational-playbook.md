@@ -210,6 +210,13 @@ runs bit-identical; an 8 px strip at 32 px a frame and a 180 degree shutter spre
 centroid 44.03 px (44 expected); abort rejects with its reason. CPU: `packages/headless/tests/accumulate.test.js`
 (times, telescoping deltas, `samples: 1` equal to `renderFrames`, stratified box offsets, filters, seeds, range errors)
 and `packages/post/test/accumulate.test.js` (uniforms, targets, resets, lifecycle). Missing: GPU cost per sub-frame.
+Piece 2 (same day): `renderFrames` takes `samples` and `shutter` and runs `renderAccumulated` (loaded by package name,
+so the video entry stays inside its budget); `renderCutscene` passes them on and calls `apply` and the player at each
+render's time. Clocks start at 0 and each delta is kept as a (frame, seconds into it) pair, so one sample with shutter
+0 still steps exactly `1 / fps`; `subFrameSteps` lists the deltas before a `startFrame`, and `seek` takes them as
+`steps`, so a span equals the whole film's renders bit for bit (`packages/headless/tests/accumulate.test.js` compares
+the span with the whole film's slice for three framings; `packages/cutscene/tests/render.test.js` checks the seek
+of a sub-framed span; the GPU check adds `renderFrames` with samples equal to `renderAccumulated`, byte for byte).
 
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 

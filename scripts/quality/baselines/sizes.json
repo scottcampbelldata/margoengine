@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18863400,
+  "total": 18863606,
   "history": [
     {
       "date": "2026-10-24",
@@ -11985,6 +11985,12 @@
       "commit": "1663c8609",
       "reason": "@margoengine/math/fft: new entry, 1,546 B gzip: the engine's FFT (K17), mixed-radix Stockham on pinned twiddles, the TypeScript twin of kernel-common's fft.rs, for spectral synthesis (turbulence boxes, ocean spectra); its own small entry so only what synthesises spectra pays for it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-17a",
+      "reason": "FG-17 piece 1 new entries post/accumulate 6,903 B gzip (Accumulate, an HDR PostStack stage: rgba32float ping-pong sum and rgba16float mean in one pass, presents alone through the display curve) and headless/accumulate 4,620 B (4,414 B in piece 1; piece 2 adds startFrame, the clock pair and subFrameSteps for seeks) (subFrames schedule, Owen-scrambled Sobol offsets through the filter inverse CDF, renderAccumulated driver); both optional, nothing else imports them",
+      "grew": 1
     }
   ],
   "items": {
@@ -12452,7 +12458,7 @@
     "@margoengine/gltf/textured": 9808,
     "@margoengine/gltf/worker": 92644,
     "@margoengine/headless": 3309,
-    "@margoengine/headless/accumulate": 4414,
+    "@margoengine/headless/accumulate": 4620,
     "@margoengine/headless/compare": 3721,
     "@margoengine/headless/ffmpeg": 5023,
     "@margoengine/headless/ffmpeg-files": 4632,
@@ -12657,6 +12663,7 @@
     "@margoengine/math/cylindrical": 554,
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
+    "@margoengine/math/fft": 1802,
     "@margoengine/math/fields": 276,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/geo": 2372,
@@ -12669,7 +12676,6 @@
     "@margoengine/math/mesh": 515,
     "@margoengine/math/obb": 4464,
     "@margoengine/math/pinned": 1624,
-    "@margoengine/math/fft": 1802,
     "@margoengine/math/plane": 2101,
     "@margoengine/math/project": 1277,
     "@margoengine/math/quat": 1971,

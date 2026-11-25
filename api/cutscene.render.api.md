@@ -4,7 +4,7 @@
 
 ```ts
 import { Camera, Engine, Scene, Vec3 } from "@margoengine/core";
-import { EncodeVideoOptions, EncodedVideo } from "@margoengine/headless/video";
+import { EncodeVideoOptions, EncodedVideo, RenderFramesOptions } from "@margoengine/headless/video";
 import { Quat } from "@margoengine/math";
 
 export interface CutsceneFrame {
@@ -40,7 +40,7 @@ export interface MixSound {
     getChannelData(channel: number): Float32Array;
 }
 
-export interface RenderCutsceneOptions extends Omit<CutsceneFramesOptions, 'engine'>, Pick<EncodeVideoOptions, 'format' | 'codec' | 'bitrate' | 'keyFrameInterval' | 'webCodecs'>, CutsceneOptions {
+export interface RenderCutsceneOptions extends Omit<CutsceneFramesOptions, 'engine'>, Pick<EncodeVideoOptions, 'format' | 'codec' | 'bitrate' | 'keyFrameInterval' | 'webCodecs'>, Pick<RenderFramesOptions, 'samples' | 'shutter' | 'shutterPhase' | 'filter' | 'filterWidth' | 'seed' | 'pattern' | 'accumulate'>, CutsceneOptions {
     apply: (state: CutsceneState, frame: CutsceneFrame) => unknown;
     camera?: Camera;
     sounds?: Readonly<Record<string, MixSound>>;
@@ -278,6 +278,7 @@ interface PropertyTrack {
 
 interface SeekOptions extends AdvanceTimeOptions {
     fps?: number;
+    steps?: Iterable<number>;
     onStep?: (step: number, time: number) => unknown;
     signal?: AbortSignal;
 }

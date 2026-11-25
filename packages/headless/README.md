@@ -157,6 +157,7 @@ engine.dispose();
 | `shutter` | Share of the frame interval the shutter is open, 0 to 1. Default 0.5 (180 degrees); 0 is a still instant. |
 | `shutterPhase` | `'start'` (open from the frame's time), `'center'` or `'end'`. Default `'start'`. |
 | `filter`, `filterWidth` | Pixel filter the offsets are drawn from: `'blackman-harris'` (default), `'gaussian'` or `'box'`; width in pixels, default 2 (1 for `'box'`). |
+| `startFrame` | Number of the first frame, for a span of a longer film after a seek with `subFrameSteps`. Default 0. |
 | `seed`, `pattern` | The sample pattern's seed (default 0); `'fixed'` (default) repeats it every frame so still edges do not shimmer, `'per-frame'` draws a new one. |
 | `camera` | Camera to render through; it is never modified. Default the engine's camera. |
 | `update(timing)` | Runs before each render with that render's `time`, `delta`, `index` (frame), `sample` and `samples`. May be async. |
@@ -164,8 +165,16 @@ engine.dispose();
 | `output` | `'display'` (default): 8-bit RGBA as `readPixels` reads it. `'linear'`: float RGBA of the mean, for `encodeEXR`. |
 | `signal` | Stops between renders or during readback; the iterator rejects with the reason. |
 
+`renderFrames` from `@margoengine/headless/video` takes the same `samples`, `shutter` and filter options and runs
+`renderAccumulated` when `samples` is above 1 or `shutter` above 0, so `renderCutscene` and any film loop get motion
+blur by adding two options; with neither it renders each frame once, exactly as before.
+
 `subFrames(options)` is the same schedule without rendering: each render's `frame`, `sample`, `time`, `delta`, `offset`
-and `last`, pure and repeatable. Times are the middles of `samples` equal slices of the open shutter, in order, so the
+and `last`, pure and repeatable. The engine's clocks start at 0 and the deltas keep them on each render's time (a render
+before 0, with a `'center'` or `'end'` shutter on frame 0, moves them 0). `startFrame` starts a span of a longer film,
+and `subFrameSteps({ ...options, startFrame })` lists the deltas of every render before it, for
+`seek(engine, seconds, { steps })` in `@margoengine/cutscene/seek`: the span then gives the whole film's renders, bit
+for bit. Times are the middles of `samples` equal slices of the open shutter, in order, so the
 deltas add up to the frame interval; offsets are Owen-scrambled Sobol points (Burley 2020) mapped through the filter
 (filter importance sampling, Ernst, Stamminger and Greiner 2006) and shuffled against the time order.
 

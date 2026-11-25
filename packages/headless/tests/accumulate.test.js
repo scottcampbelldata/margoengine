@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { subFrames, renderAccumulated } from '../dist/accumulate.js';
+import { renderAccumulated, subFrameSteps, subFrames } from '../dist/accumulate.js';
 
 const all = (options) => [...subFrames(options)];
 
@@ -16,12 +16,15 @@ test('subFrames: samples per frame, ascending times, deltas that add up to the f
     ],
   );
   for (let i = 1; i < frames.length; i++) assert.ok(frames[i].time > frames[i - 1].time, 'ascending');
-  assert.equal(frames[0].delta, 0);
+  assert.equal(frames[0].delta, frames[0].time, 'fresh clocks move to the first render');
   // Slice k of the open shutter is sampled at its middle: (k + 0.5) / samples of 0.5 / fps.
   for (const f of frames)
     assert.ok(Math.abs(f.time - (f.frame + (0.5 * (f.sample + 0.5)) / 8) / 24) < 1e-12, 'mid-slice times');
-  const sum = frames.slice(0, 9).reduce((s, f) => s + f.delta, 0);
-  assert.ok(Math.abs(sum - (frames[8].time - frames[0].time)) < 1e-12, 'deltas telescope');
+  let clock = 0;
+  for (const f of frames) {
+    clock += f.delta;
+    assert.ok(Math.abs(clock - f.time) < 1e-12, 'the clocks read each render time');
+  }
   assert.ok(Math.abs(frames.slice(1, 9).reduce((s, f) => s + f.delta, 0) - 1 / 24) < 1e-12, 'one frame interval');
 });
 
@@ -114,4 +117,37 @@ test('subFrames and renderAccumulated reject options out of range before any ren
   const controller = new AbortController();
   controller.abort(new Error('early'));
   await assert.rejects(renderAccumulated({}, { frames: 1, signal: controller.signal }).next(), /early/);
+});
+
+test('subFrames: a shutter open before 0 leaves fresh clocks at 0 until time passes 0', () => {
+  for (const shutterPhase of ['center', 'end']) {
+    let clock = 0;
+    for (const f of all({ frames: 3, fps: 24, samples: 4, shutter: 1, shutterPhase })) {
+      clock += f.delta;
+      assert.ok(f.delta >= 0);
+      assert.ok(Math.abs(clock - Math.max(0, f.time)) < 1e-12, `${shutterPhase}: clocks read max(0, time)`);
+    }
+  }
+});
+
+test('subFrames: a span from startFrame after subFrameSteps repeats the whole film, bit for bit', () => {
+  for (const framing of [
+    { fps: 24, samples: 8, shutter: 0.5 },
+    { fps: 30, samples: 3, shutter: 1, shutterPhase: 'center', pattern: 'per-frame', seed: 7 },
+    { fps: 25, samples: 1, shutter: 0 },
+  ]) {
+    const whole = all({ ...framing, frames: 10 }),
+      steps = subFrameSteps({ ...framing, startFrame: 6 }),
+      span = all({ ...framing, frames: 4, startFrame: 6 });
+    assert.equal(steps.length, 6 * (framing.samples ?? 16));
+    assert.deepEqual(
+      steps,
+      whole.slice(0, steps.length).map((f) => f.delta),
+      'the seek replays the deltas',
+    );
+    assert.deepEqual(span, whole.slice(steps.length), 'then the span is the same renders');
+  }
+  assert.deepEqual(subFrameSteps({ startFrame: 0 }), []);
+  assert.throws(() => subFrameSteps({ startFrame: -1 }), /startFrame/);
+  assert.throws(() => all({ frames: 1, startFrame: 0.5 }), /startFrame/);
 });

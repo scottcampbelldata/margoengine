@@ -4,7 +4,7 @@
 // same on every machine, and encoded with the same file. The encoder loads when a render starts, so an app that only
 // mixes sound or steps frames does not load it.
 import type { Camera, Engine } from '@margoengine/core';
-import type { EncodeVideoOptions, EncodedVideo, FrameTiming } from '@margoengine/headless/video';
+import type { EncodeVideoOptions, EncodedVideo, FrameTiming, RenderFramesOptions } from '@margoengine/headless/video';
 import type { CutsceneOptions, CutsceneState } from './cutscene.js';
 import { Cutscene } from './cutscene.js';
 import type { CutsceneDocument } from './document.js';
@@ -70,6 +70,10 @@ export interface CutsceneFramesOptions {
 export interface RenderCutsceneOptions
   extends Omit<CutsceneFramesOptions, 'engine'>,
     Pick<EncodeVideoOptions, 'format' | 'codec' | 'bitrate' | 'keyFrameInterval' | 'webCodecs'>,
+    Pick<
+      RenderFramesOptions,
+      'samples' | 'shutter' | 'shutterPhase' | 'filter' | 'filterWidth' | 'seed' | 'pattern' | 'accumulate'
+    >,
     CutsceneOptions {
   /** Puts a frame's state on your scene: objects, animation, particles. May be async. Required. */
   apply: (state: CutsceneState, frame: CutsceneFrame) => unknown;
@@ -200,7 +204,10 @@ const frameCount = (from: number, to: number, fps: number): number => Math.max(1
  * Renders a cutscene to a WebM or MP4 file with WebCodecs, at a fixed frame rate. The engine must be on a
  * `createHeadlessCanvas` canvas of the video's size. A {@link CutscenePlayer} you pass fires every instant in order as
  * the frames go by, as if it played; listeners may spawn things, and the frames show them. A span from after 0 first
- * seeks the engine's clocks to `from` (`seek` from `@margoengine/cutscene/seek`), so they must be fresh.
+ * seeks the engine's clocks to `from` (`seek` from `@margoengine/cutscene/seek`), so they must be fresh. With `samples`
+ * above 1 or `shutter` above 0 every frame is that many renders over the open shutter, averaged in linear light
+ * (anti-aliasing and motion blur; `renderFrames` in `@margoengine/headless/video`): `apply` and the player run at
+ * each render's own time, and a span's seek replays the sub-frames' own steps, so it still equals a render from 0.
  * @throws RangeError for a bad span or rate, or a sound nobody gave; MargoError `'state'` for a span from after 0 on
  * an engine whose clocks already moved; see `encodeVideo` for what the encoder refuses.
  */
@@ -221,6 +228,14 @@ export async function renderCutscene(
     onProgress,
     signal,
     tracks,
+    samples = 1,
+    shutter = 0,
+    shutterPhase,
+    filter,
+    filterWidth,
+    seed,
+    pattern,
+    accumulate,
     ...video
   } = options;
   if (typeof apply !== 'function')
@@ -234,15 +249,30 @@ export async function renderCutscene(
     [start, end] = span(scene, from, to),
     frames = frameCount(start, end, fps),
     audio = sounds ? mixCutsceneAudio(scene, sounds, { sampleRate, from: start, to: end }) : undefined;
-  // A span from after 0 starts the world where a render from 0 has it: every clock replayed to `start` in steps of the
-  // render's own 1 / fps, so frame 0 here equals that render's frame at `start` (GAP-FILM-TIME).
-  if (start > 0) await seek(engine, start, { fps, signal });
+  // A span from after 0 starts the world where a render from 0 has it: every clock replayed to `start` in the steps the
+  // render's own frames take (1 / fps, or each sub-frame's delta), so frame 0 here equals that render's frame at
+  // `start` (GAP-FILM-TIME).
+  const sub = samples !== 1 || shutter !== 0,
+    framing = { samples, shutter, shutterPhase, filter, filterWidth, seed, pattern, accumulate },
+    startFrame = sub && start > 0 ? Math.round(start * fps) : 0;
+  if (start > 0) {
+    const steps = sub
+      ? (await import('@margoengine/headless/accumulate')).subFrameSteps({ ...framing, fps, startFrame })
+      : undefined;
+    await seek(engine, start, { fps, signal, steps });
+  }
   const { encodeVideo, renderFrames } = await import('@margoengine/headless/video');
   player.seek(start);
   const finished = player.play();
-  const update = async ({ index }: FrameTiming): Promise<void> => {
-    const time = start + index / fps;
-    if (index) player.skip(time);
+  let reached = start;
+  const update = async (timing: FrameTiming & { sample?: number }): Promise<void> => {
+    const { index } = timing,
+      // Each render's own time; a shutter open before the film's start shows its first instant.
+      time = Math.min(end, Math.max(0, start + (sub ? timing.time : index / fps)));
+    if (time > reached) {
+      player.skip(time);
+      reached = time;
+    }
     const state = scene.evaluate(time);
     if (camera && state.camera) {
       camera.position = state.camera.position;
@@ -251,10 +281,11 @@ export async function renderCutscene(
       camera.up = state.camera.up;
     }
     await apply(state, { index, time, state });
-    if (index) onProgress?.(index, frames);
+    if (index && !timing.sample) onProgress?.(index, frames);
   };
   try {
-    const file = await encodeVideo(renderFrames(engine, { frames, fps, camera, update, signal }), {
+    const rendered = renderFrames(engine, { frames, fps, camera, update, signal, ...framing, startFrame });
+    const file = await encodeVideo(rendered, {
       ...video,
       fps,
       signal,

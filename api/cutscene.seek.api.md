@@ -17,6 +17,7 @@ export interface Clock {
 
 export interface SeekOptions extends AdvanceTimeOptions {
     fps?: number;
+    steps?: Iterable<number>;
     onStep?: (step: number, time: number) => unknown;
     signal?: AbortSignal;
 }

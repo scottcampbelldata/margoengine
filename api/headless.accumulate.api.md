@@ -44,6 +44,7 @@ export interface SubFrameOptions {
     filterWidth?: number;
     seed?: number;
     pattern?: 'fixed' | 'per-frame';
+    startFrame?: number;
 }
 
 export interface SubFrameTiming extends FrameTiming {
@@ -57,6 +58,10 @@ export function renderAccumulated(engine: Engine, options: RenderAccumulatedOpti
 export function renderAccumulated(engine: Engine, options: RenderAccumulatedOptions & {
     output?: 'display';
 }): AsyncGenerator<AccumulatedFrame<HeadlessPixels>, void, void>;
+
+export function subFrameSteps(options: Omit<SubFrameOptions, 'frames'> & {
+    startFrame: number;
+}): number[];
 
 export function subFrames(options: SubFrameOptions): Generator<SubFrame, void, void>;
 
