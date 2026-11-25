@@ -57,7 +57,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | MISSING | S |  |
 | Blob shadow and planar `ShadowMesh` | three.js, drei | MISSING | S |  |
 | drei helpers: Float, Center, Resize, ScreenSizer, interaction prompt | drei, model-viewer | MISSING | S each |  |
-| Font formats: WOFF and WOFF2 (throw today), CFF `.otf`, GPOS kerning | three.js TextGeometry, troika | PARTIAL | M |  |
+| Font formats: WOFF and WOFF2, CFF `.otf`, GPOS kerning | three.js TextGeometry, troika | DONE | M | 7479303a3 |
 | AR Quick Look and Scene Viewer launch where WebXR is absent | model-viewer | MISSING | S |  |
 | SVG from an engine scene (sciviz writes SVG from supplied geometry only) | three.js SVGRenderer | PARTIAL | M |  |
 | Configurable `loadTexture` caps (fixed at 16.7 MP and 64 MiB) | three.js | LIMIT | S |  |

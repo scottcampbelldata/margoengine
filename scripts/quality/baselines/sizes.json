@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18597106,
+  "total": 18625318,
   "history": [
     {
       "date": "2026-10-24",
@@ -11817,6 +11817,12 @@
       "commit": "de3d54b48",
       "reason": "New optional post/overlays: 0 to 10454 B gzip. Ramp, Grid, DepthView and TextureOverlay share one composite pass (14 blend modes, masks) and the stack; one entry, a split per effect would repeat the stack and the composite in four chunks.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "7b7e61643",
+      "reason": "WOFF/WOFF2 entry, CID-keyed CFF and GPOS kerning (loaders/font-woff); WOFF2 decodes with the brotli decoder statically because decodeWOFF is synchronous",
+      "grew": 8
     }
   ],
   "items": {
@@ -12392,8 +12398,9 @@
     "@margoengine/loaders/3ds": 3642,
     "@margoengine/loaders/amf": 9826,
     "@margoengine/loaders/common": 5070,
-    "@margoengine/loaders/font": 7865,
-    "@margoengine/loaders/font-opentype": 14751,
+    "@margoengine/loaders/font": 9324,
+    "@margoengine/loaders/font-opentype": 16470,
+    "@margoengine/loaders/font-woff": 22190,
     "@margoengine/loaders/gcode": 2676,
     "@margoengine/loaders/geo": 12301,
     "@margoengine/loaders/kmz": 21773,
@@ -13070,17 +13077,17 @@
     "@margoengine/text/animate": 12826,
     "@margoengine/text/captions": 2638,
     "@margoengine/text/curve": 11401,
-    "@margoengine/text/extrude": 11191,
+    "@margoengine/text/extrude": 12545,
     "@margoengine/text/fit": 11271,
     "@margoengine/text/msdf": 4494,
-    "@margoengine/text/outline": 25106,
+    "@margoengine/text/outline": 25953,
     "@margoengine/text/outline base (without CFF, CFF2 and variation readers)": 18383,
-    "@margoengine/text/outline lazy CFF, CFF2 and variation readers": 7685,
+    "@margoengine/text/outline lazy CFF, CFF2 and variation readers": 8006,
     "@margoengine/text/rich": 12041,
     "@margoengine/text/selection": 958,
     "@margoengine/text/vector": 38300,
     "@margoengine/text/vector base (without CFF, CFF2 and variation readers)": 31713,
-    "@margoengine/text/vector lazy CFF, CFF2 and variation readers": 7685,
+    "@margoengine/text/vector lazy CFF, CFF2 and variation readers": 8006,
     "@margoengine/tilemap": 7923,
     "@margoengine/tilemap/autotile": 2087,
     "@margoengine/tilemap/fov": 1843,
@@ -13427,6 +13434,7 @@
     "leak @margoengine/lightmap/mesh -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/probes -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/refracted -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/loaders/font-woff -> @margoengine/decoders/brotli": 1,
     "leak @margoengine/loaders/las -> @margoengine/points/las": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/materials": 1,
