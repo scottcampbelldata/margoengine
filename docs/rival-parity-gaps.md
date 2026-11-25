@@ -96,7 +96,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | 4. flyTo on the van Wijk and Nuij 2003 optimal path, duration from distance, easing, AbortSignal, cancel on input; flyToBoundingSphere, fit-to-bounds | CesiumJS, MapLibre GL `flyTo`, deck.gl `FlyToInterpolator` | DONE | M | 5467c80bc |
 | 5. Feel: per-axis inertia, height-scaled speed, presets (Cesium-like, map-like, CAD/DCC), touch, keyboard, gamepad, pen, reduced motion | CesiumJS, MapLibre GL, Google 3D map controls | DONE | M | 5624db24f, 5745639a1 |
 | 6. Planet scale: near/far and depth from street level to orbit with the floating origin, no jitter at large coordinates | CesiumJS, 3D Tiles renderer | MISSING | M |  |
-| 7. Heights above terrain, ellipsoid and geoid; ENU heading/pitch/roll; north-up reset; compass and state events; view save/restore with a URL hash | CesiumJS, MapLibre GL hash, Google 3D map controls | MISSING | M |  |
+| 7. Heights above terrain, ellipsoid and geoid; ENU heading/pitch/roll; north-up reset; compass and state events; view save/restore with a URL hash | CesiumJS, MapLibre GL hash, Google 3D map controls | DONE | M | 8b5326f27, 91b0069ac |
 | 8. Works out of the box with terrain, tiles (a tiles height query) and biomes open worlds, zero config | CesiumJS, 3D Tiles renderer | MISSING | M |  |
 | 9. Follow camera for moving targets (chase, orbit-follow, side, flyby, lock-on with lead room, flock framing), critically damped springs, banking, surface clearance, built on third-person | CesiumJS `trackedEntity`, Babylon `FollowCamera` | MISSING | L |  |
 
