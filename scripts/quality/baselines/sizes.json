@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18496488,
+  "total": 18500463,
   "history": [
     {
       "date": "2026-10-24",
@@ -11787,6 +11787,12 @@
       "commit": "46890cca7",
       "reason": "physics2d entry grows to 20,737 B gzip from 20,732: the setSolver rules for the 3D-named CCD constants and body.additionalSolverIterations, an accessor over one kernel word; the wasm is a separate file",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "106a539f4",
+      "reason": "New optional entry @margoengine/scene/container: 0 to 3,719 B gzip measured (ceiling measured +256 B). Asset containers (load, add, remove, copy and dispose as one unit) with all-or-nothing rollback; it reuses clone and the scene walk, and splitting load or copy out would duplicate member ownership. glTF and animation load lazily as optional peers. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12763,6 +12769,7 @@
     "@margoengine/scene": 1974,
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
+    "@margoengine/scene/container": 3975,
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
