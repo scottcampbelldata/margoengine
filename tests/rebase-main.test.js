@@ -101,7 +101,26 @@ test('a conflict in a source file stops the rebase, names it, and a second run f
   assert.equal(repo.read('site/llms.txt'), 'a both\nb\n');
 });
 
-test('a conflict in a later generated-only commit still runs one full api update', (t) => {
+test('a clean rebase runs no generator and adds no commit', (t) => {
+  const stub = (body) => Array(3).fill(`import { appendFileSync } from 'node:fs';\n${body}\n`);
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b work\n'],
+    'docs/api-surface.md': ['base\n', 'base\n', 'base\n'],
+    'scripts/api-report.js': stub("appendFileSync('docs/api-surface.md', 'ran\\n');"),
+    'scripts/generate-all-entries.mjs': stub("appendFileSync('docs/api-surface.md', 'ran\\n');"),
+    'site/llms.txt': ['x\n', 'x\n', 'x\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /done, no conflict markers/);
+  assert.equal(repo.read('docs/api-surface.md'), 'base\n', 'no generator ran');
+  assert.equal(repo.read('docs/a.md'), 'a upstream\n');
+  assert.equal(repo.read('docs/b.md'), 'b work\n');
+  assert.equal(repo.git('log', '--format=%s').trim(), 'work\nupstream\nbase');
+});
+
+test('a conflict in a later generated-only commit regenerates only the package the branch changed', (t) => {
   const stub = (body) =>
     Array(3).fill(`import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';\n${body}\n`);
   const repo = repository(t, {
@@ -117,6 +136,6 @@ test('a conflict in a later generated-only commit still runs one full api update
   repo.git('commit', '-qam', 'generated');
   const result = repo.rebase();
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(repo.read('docs/api-surface.md'), 'upstream\n--update\n');
+  assert.equal(repo.read('docs/api-surface.md'), 'upstream\n--update --package=scene\n');
   assert.equal(repo.git('status', '--porcelain'), '');
 });

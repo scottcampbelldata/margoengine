@@ -104,8 +104,15 @@ function regenerate() {
     });
   if (hit(/^docs\/guides\/imports\.md$/)) script('scripts/umbrella.mjs');
   if (hit(API)) {
-    // One full api:update on the finished tree, never one per package: a dependent's report changes too.
-    script('scripts/api-report.js', '--update');
+    // Only the packages the branch touches, never the whole tree: a full api:update takes 8 to 13 minutes here and
+    // loses the push race (Scott's lanes, 2026-11-25). Upstream's reports for every other package stay as they are.
+    const packages = new Set(
+      touched
+        .map((file) => /^(?:packages\/([^/]+)\/|api\/([^./]+)\.)/.exec(file))
+        .map((match) => match?.[1] ?? match?.[2])
+        .filter((name) => name && existsSync(resolve(root, 'packages', name, 'package.json'))),
+    );
+    for (const name of [...packages].sort()) script('scripts/api-report.js', '--update', `--package=${name}`);
     script('scripts/generate-all-entries.mjs');
   }
   // Last: llms-full.txt is built from the READMEs, api reports and docs settled above.
@@ -148,9 +155,13 @@ function main() {
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
   // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".
-  const mass = run(process.execPath, [resolve(import.meta.dirname, 'check-mass-deletion.mjs'), '--range', 'origin/main..HEAD'], {
-    allowFail: true,
-  });
+  const mass = run(
+    process.execPath,
+    [resolve(import.meta.dirname, 'check-mass-deletion.mjs'), '--range', 'origin/main..HEAD'],
+    {
+      allowFail: true,
+    },
+  );
   if (mass.status !== 0) stop(`${mass.stderr || mass.stdout}Do not push these commits.`);
   console.log(
     'rebase:main: done, no conflict markers. Run your checks, then push at once with git push origin HEAD:main.',
