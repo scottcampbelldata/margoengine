@@ -96,7 +96,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - **Layout:**
   - One Rust crate; state columns are x, v, κ and κ_v.
   - Density, α and the grid are derived and rebuilt each step.
-  - Body force and torque accumulate into `bodyImpulses` (lane B's RigidSolver defines the layout; use it).
+  - Boundary force and torque held over a step go into the `bodyForces` accumulator, and instantaneous impulses into `bodyImpulses`, both owned by `RigidSolver` (`packages/physics/src/world/solvers/rigid.ts`).
 - **Not yet read:** Bender and Koschier 2017 on implicit viscosity, Zhu and Bridson 2005, Jiang et al. 2015 (APIC),
   and Fedkiw, Stam and Jensen 2001 on smoke.
 - **The shared neighbour grid already has a sparse mode** for large domains (sorted 63-bit cell keys, the same
