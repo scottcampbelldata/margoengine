@@ -228,7 +228,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-01 | Wildfire spread | partial | Open | OPEN |
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
 | FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
-| BIO-01 | Plant mechanics under wind and water | stand-in | Open | OPEN |
+| BIO-01 | Plant mechanics under wind and water | stand-in | Codex | BUILDING (codex/physics-lane-3) |
 
 ## Taken
 
