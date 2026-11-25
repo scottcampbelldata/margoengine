@@ -91,6 +91,7 @@
     "test:gpu:white-balance": "cd ../.. && node packages/tonemap/tests/white-balance-browser.mjs",
     "test:gpu:seek": "cd ../.. && node packages/tonemap/tests/seek-browser.mjs",
     "test:settings:browser": "cd ../.. && node packages/tonemap/tests/settings-browser.mjs && node packages/tonemap/tests/settings-browser.mjs --compat && node packages/tonemap/tests/shape-browser.mjs && node packages/tonemap/tests/shape-browser.mjs --compat",
-    "test:gpu:postfx": "cd ../.. && npm run modern:test:postfx:browser"
+    "test:gpu:postfx": "cd ../.. && npm run modern:test:postfx:browser",
+    "test:gpu:reset": "cd ../.. && node packages/tonemap/tests/reset-browser.mjs && node packages/tonemap/tests/reset-browser.mjs --compat"
   }
 }

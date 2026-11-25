@@ -56,7 +56,8 @@
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat && node packages/environment/tests/cube-source-restore-browser.mjs && node packages/environment/tests/cube-source-restore-browser.mjs --compat",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js",
     "test:fog-far:browser": "npm run build && cd ../.. && node packages/environment/tests/volumetric-far.browser.mjs && node packages/environment/tests/volumetric-far.browser.mjs --compat",
-    "test:settings:browser": "npm run build && cd ../.. && node packages/environment/tests/settings.browser.mjs && node packages/environment/tests/settings.browser.mjs --compat"
+    "test:settings:browser": "npm run build && cd ../.. && node packages/environment/tests/settings.browser.mjs && node packages/environment/tests/settings.browser.mjs --compat",
+    "test:gpu:fog-reset": "cd ../.. && node packages/environment/tests/fog-reset-browser.mjs && node packages/environment/tests/fog-reset-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
