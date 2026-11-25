@@ -586,6 +586,14 @@ export function markEquivalent(results, equivalent = []) {
   });
 }
 
+/**
+ * The rows of an `equivalent` table that name no mutant of the source (`all`, from mutantsOf): a source edit or
+ * reformat moved the line. markEquivalent would leave such a mutant counted as survived without a word.
+ */
+export function staleEquivalents(all, equivalent = []) {
+  return equivalent.filter((e) => !all.some((m) => m.line === e.line && m.from === e.from && m.to === e.to));
+}
+
 /** killed / (killed + survived), as a fraction; timeouts and crashes count as killed, equivalent mutants are left out. */
 export function scoreOf(results) {
   const killed = results.filter((r) => r.status === 'killed').length;
@@ -695,6 +703,11 @@ export async function runTarget(
   const root = resolve(repository, 'packages', name);
   const source = await readFile(resolve(root, target.file), 'utf8');
   const all = mutantsOf(source, target.file);
+  const stale = staleEquivalents(all, target.equivalent);
+  if (stale.length)
+    throw new Error(
+      `MUTATION_STALE_EQUIVALENT: ${name}/${targetName} lists ${stale.map((e) => `line ${e.line} ${e.from} -> ${e.to}`).join(', ')}, which ${target.file} no longer has; point each at the line its mutant moved to (KB-MUTATION-PINS1)`,
+    );
   const inRange = lines ? all.filter((m) => m.line >= lines[0] && m.line <= lines[1]) : all;
   const chosen = pickMutants(inRange, cap, seed);
   log(`${name}/${targetName}: ${all.length} mutants, running ${chosen.length}`);

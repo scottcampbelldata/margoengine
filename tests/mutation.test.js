@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   applyMutant,
   markEquivalent,
+  staleEquivalents,
   mutantsOf,
   pickMutants,
   scoreOf,
@@ -97,6 +98,14 @@ test('equivalent mutants are named by line and change, carry a reason and leave 
   const s = scoreOf(marked);
   assert.deepEqual([s.killed, s.survived, s.total], [1, 1, 2]);
   assert.equal(markEquivalent(results).length, 3);
+});
+
+test('a run refuses an equivalent row whose line no longer holds its mutant (KB-MUTATION-PINS1)', () => {
+  const all = mutantsOf('const a = 1;\nif (a > 0) b();\n', 'x.ts');
+  const row = all.find((m) => m.from === '>');
+  assert.deepEqual(staleEquivalents(all, [{ line: row.line, from: '>', to: row.to, reason: 'r' }]), []);
+  const moved = { line: row.line + 1, from: '>', to: row.to, reason: 'r' };
+  assert.deepEqual(staleEquivalents(all, [moved]), [moved]);
 });
 
 test('every listed equivalent mutant exists in its source file and has a reason', () => {
