@@ -5,6 +5,12 @@
 ```ts
 import { EngineKernel, EnginePlugin } from "@margoengine/core";
 
+export interface ActiveHooks2D {
+    filterPair?: boolean;
+    filterIntersection?: boolean;
+    modifyContact?: boolean;
+}
+
 export class Articulation2D {
     readonly root: Body2D;
     readonly joints: Joint2D[];
@@ -198,6 +204,8 @@ export class Collider2D {
     markRemoved(): void;
     isSensor(): boolean;
     setSensor(sensor: boolean): void;
+    setActiveHooks(hooks: ActiveHooks2D): void;
+    get activeHooks(): Required<ActiveHooks2D>;
     setFriction(value: number): void;
     setRestitution(value: number): void;
     setDensity(value: number): void;
@@ -236,10 +244,7 @@ export interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
-    hooks?: {
-        filterPair?: boolean;
-        modifyContact?: boolean;
-    };
+    hooks?: ActiveHooks2D;
 }
 
 export interface CollisionEvent2D {
@@ -499,6 +504,7 @@ export interface Physics2DEventMap {
 
 export interface Physics2DHooks {
     filterPair?(colliderA: Collider2D, colliderB: Collider2D): boolean;
+    filterIntersection?(colliderA: Collider2D, colliderB: Collider2D): boolean;
     modifyContact?(change: ContactChange2D): void;
 }
 

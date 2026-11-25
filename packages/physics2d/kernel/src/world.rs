@@ -185,13 +185,15 @@ pub struct ShapeDef {
     /// For a chain: only the side its segments' right-hand normals point to is solid (a one-way platform or a one-sided
     /// terrain); a body on the other side passes.
     pub one_sided: bool,
-    /// `HOOK_FILTER` and `HOOK_CONTACT`: ask the world's hook about the pairs this shape is in.
+    /// `HOOK_FILTER`, `HOOK_CONTACT` and `HOOK_INTERSECTION`: ask the world's hook about the pairs this shape is in.
     pub hooks: u8,
 }
 
-/// `ShapeDef::hooks` bits: the hook may veto a pair, and may change a pair's contact.
+/// `ShapeDef::hooks` bits: the hook may veto a pair of solids, may change a pair's contact, and may veto a pair with a sensor in it.
 pub const HOOK_FILTER: u8 = 1;
 pub const HOOK_CONTACT: u8 = 2;
+/// The hook may veto a pair that has a sensor in it (Rapier's intersection pair filter); `HOOK_FILTER` is asked of the pairs that have none.
+pub const HOOK_INTERSECTION: u8 = 4;
 
 /// `ShapeDef::events` bits.
 pub const EVENT_COLLISION: u8 = 1;
@@ -1416,7 +1418,9 @@ impl World {
             let (ba, bb) = (sa.body, sb.body);
             let allowed = ba != bb && bodies[ba as usize].enabled && bodies[bb as usize].enabled && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err());
             // A hook is asked only about a pair that would meet, and only when one of its shapes asks for it.
-            if allowed && (sa.hooks | sb.hooks) & HOOK_FILTER != 0 {
+            // A pair with a sensor in it is an intersection: it is the intersection filter that is asked, not the contact filter.
+            let asks = if sa.sensor || sb.sensor { HOOK_INTERSECTION } else { HOOK_FILTER };
+            if allowed && (sa.hooks | sb.hooks) & asks != 0 {
                 if let Some(hook) = hook.as_mut() {
                     return hook.filter(a, b);
                 }

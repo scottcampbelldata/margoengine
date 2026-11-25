@@ -92,6 +92,16 @@ export type ShapeOptions2D =
 /** A part of a compound shape: any shape with its own placement. */
 export type CompoundPart2D = ShapeOptions2D & { offset?: Vec2D; rotation?: number };
 
+/** The questions a collider asks `Physics2D.hooks` about its pairs (Rapier's `ActiveHooks`). */
+export interface ActiveHooks2D {
+  /** The hook's `filterPair` decides whether a pair of solid colliders meets. */
+  filterPair?: boolean;
+  /** The hook's `filterIntersection` decides whether a pair with a sensor in it intersects. */
+  filterIntersection?: boolean;
+  /** The hook's `modifyContact` may change a touching contact for the step. */
+  modifyContact?: boolean;
+}
+
 /** Material, sensor and filtering settings of a collider. */
 export interface ColliderSettings2D {
   /** Position of the collider relative to its body, world units. Default [0, 0]. */
@@ -123,10 +133,11 @@ export interface ColliderSettings2D {
   /** Report `contactforce` events when the contact's total force passes this many newtons. Default: no force events. */
   contactForceThreshold?: number;
   /**
-   * Which questions `Physics2D.hooks` is asked about this collider's pairs: `filterPair` (may the pair meet at all) and
-   * `modifyContact` (change a touching contact). Default: neither; a hook is only called for colliders that ask.
+   * Which questions `Physics2D.hooks` is asked about this collider's pairs: `filterPair` (may a pair of solids meet at all),
+   * `filterIntersection` (may a pair with a sensor in it intersect: Rapier's intersection pair filter) and `modifyContact` (change a
+   * touching contact). Default: none; a hook is only called for colliders that ask.
    */
-  hooks?: { filterPair?: boolean; modifyContact?: boolean };
+  hooks?: ActiveHooks2D;
 }
 
 /** Options for a collider: shape plus settings. */
@@ -167,7 +178,8 @@ const finite = (value: number, what: string, positive = false): number => {
 
 const radiusOf = (value: number | undefined): number => {
   if (value === undefined) return 0;
-  if (!Number.isFinite(value) || value < 0) throw new RangeError(`borderRadius must be a finite number of 0 or more, got ${value}.`);
+  if (!Number.isFinite(value) || value < 0)
+    throw new RangeError(`borderRadius must be a finite number of 0 or more, got ${value}.`);
   return value;
 };
 
@@ -218,7 +230,10 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
   const c = Math.cos(turn),
     s = Math.sin(turn);
   // A point of the collider, turned and moved into the body's frame, in metres.
-  const place = (x: number, y: number): [number, number] => [(c * x - s * y + ox) * scale, (s * x + c * y + oy) * scale];
+  const place = (x: number, y: number): [number, number] => [
+    (c * x - s * y + ox) * scale,
+    (s * x + c * y + oy) * scale,
+  ];
   let kind: number,
     geometry: Buffer32,
     area = 0,
@@ -282,7 +297,11 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
       for (let i = 0; i < n; i++) placed.set(place(flat[2 * i], flat[2 * i + 1]), 2 * i);
       const r = radiusOf(options.borderRadius) * scale;
       let perimeter = 0;
-      for (let i = 0; i < n; i++) perimeter += Math.hypot(placed[2 * i] - placed[2 * ((i + 1) % n)], placed[2 * i + 1] - placed[2 * ((i + 1) % n) + 1]);
+      for (let i = 0; i < n; i++)
+        perimeter += Math.hypot(
+          placed[2 * i] - placed[2 * ((i + 1) % n)],
+          placed[2 * i + 1] - placed[2 * ((i + 1) % n) + 1],
+        );
       area = polygonArea(placed) + perimeter * r + Math.PI * r * r;
       if (!(polygonArea(flat) > 1e-9))
         throw new RangeError('polygon points are degenerate (no area); give at least three points not on a line.');
@@ -311,7 +330,14 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
   settings.u[4] = options.solverGroups ?? 0xffffffff;
   // A sensor also senses fixed and kinematic bodies, so a walking character can enter a trigger.
   const active = options.activeCollisionTypes ?? (sensor ? 63 : 7);
-  settings.u[5] = events | ((active & 0xff) << 8) | (sensor ? 1 << 16 : 0) | (oneSided ? 1 << 17 : 0) | (options.hooks?.filterPair ? 1 << 18 : 0) | (options.hooks?.modifyContact ? 1 << 19 : 0);
+  settings.u[5] =
+    events |
+    ((active & 0xff) << 8) |
+    (sensor ? 1 << 16 : 0) |
+    (oneSided ? 1 << 17 : 0) |
+    (options.hooks?.filterPair ? 1 << 18 : 0) |
+    (options.hooks?.modifyContact ? 1 << 19 : 0) |
+    (options.hooks?.filterIntersection ? 1 << 20 : 0);
   settings.f[6] = options.contactForceThreshold ?? 0;
   return { kind, settings: settings.u, geometry: geometry.u, area, convex };
 }
@@ -367,7 +393,12 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
     ({ ...options, ...shape, offset, rotation }) as ColliderOptions2D;
   switch (options.shape) {
     case 'triangle':
-      return [describeShape(rest({ shape: 'polygon', points: [options.a, options.b, options.c], borderRadius: options.borderRadius }), scale)];
+      return [
+        describeShape(
+          rest({ shape: 'polygon', points: [options.a, options.b, options.c], borderRadius: options.borderRadius }),
+          scale,
+        ),
+      ];
     case 'compound': {
       if (!Array.isArray(options.shapes) || options.shapes.length === 0)
         throw new TypeError('A compound shape needs a non-empty shapes list; pass at least one part.');
@@ -377,7 +408,12 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
       for (const part of options.shapes) {
         const [px, py] = part.offset ?? [0, 0];
         // The part's own placement, then the collider's.
-        out.push(...describePieces(rest(part, [ox + c * px - s * py, oy + s * px + c * py], turn + (part.rotation ?? 0)), scale));
+        out.push(
+          ...describePieces(
+            rest(part, [ox + c * px - s * py, oy + s * px + c * py], turn + (part.rotation ?? 0)),
+            scale,
+          ),
+        );
       }
       return out;
     }
@@ -392,10 +428,13 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
             throw new RangeError(`trimesh index ${k} is outside its ${vertices.length} vertices; fix the indices.`);
           return vertices[k];
         });
-        const area = Math.abs((tri[1][0] - tri[0][0]) * (tri[2][1] - tri[0][1]) - (tri[2][0] - tri[0][0]) * (tri[1][1] - tri[0][1]));
+        const area = Math.abs(
+          (tri[1][0] - tri[0][0]) * (tri[2][1] - tri[0][1]) - (tri[2][0] - tri[0][0]) * (tri[1][1] - tri[0][1]),
+        );
         if (area > 1e-9) out.push(describeShape(rest({ shape: 'polygon', points: tri }), scale));
       }
-      if (!out.length) throw new RangeError('trimesh has no triangle with an area; give it triangles that are not flat.');
+      if (!out.length)
+        throw new RangeError('trimesh has no triangle with an area; give it triangles that are not flat.');
       return out;
     }
     case 'heightfield': {
@@ -404,13 +443,15 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
       if (n < 2) throw new TypeError('A heightfield needs at least two heights.');
       finite(width, 'heightfield width', true);
       const points: Vec2D[] = [];
-      for (let i = 0; i < n; i++) points.push([-width / 2 + (i * width) / (n - 1), finite(heights[i], 'heightfield height')]);
+      for (let i = 0; i < n; i++)
+        points.push([-width / 2 + (i * width) / (n - 1), finite(heights[i], 'heightfield height')]);
       return [describeShape(rest({ shape: 'polyline', points, oneSided: false }), scale)];
     }
     case 'halfspace': {
       const [nx, ny] = options.normal ?? [0, -1];
       const length = Math.hypot(nx, ny);
-      if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('halfspace normal must be a finite vector that is not zero.');
+      if (!(length > 0) || !Number.isFinite(length))
+        throw new RangeError('halfspace normal must be a finite vector that is not zero.');
       const n: Vec2D = [nx / length, ny / length],
         t: Vec2D = [-n[1], n[0]],
         H = HALFSPACE_EXTENT;
@@ -425,7 +466,9 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
       if (!Number.isInteger(columns) || !Number.isInteger(rows) || columns < 1 || rows < 1)
         throw new RangeError(`voxels columns and rows must be positive integers, got ${columns} x ${rows}.`);
       if (!solid || solid.length !== columns * rows)
-        throw new RangeError(`voxels has ${solid?.length} values for ${columns} x ${rows} cells; give columns * rows values.`);
+        throw new RangeError(
+          `voxels has ${solid?.length} values for ${columns} x ${rows} cells; give columns * rows values.`,
+        );
       const grid = new Uint8Array(columns * rows);
       for (let i = 0; i < grid.length; i++) grid[i] = solid[i] ? 1 : 0;
       const loops = cellOutlines(grid, columns, rows);

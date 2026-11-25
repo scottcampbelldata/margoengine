@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Kernel, Words } from './kernel.js';
-import { describeShape, type ColliderOptions2D, type Described, type Vec2D } from './shapes.js';
+import { describeShape, type ActiveHooks2D, type ColliderOptions2D, type Described, type Vec2D } from './shapes.js';
 
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType2D = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
@@ -131,6 +131,25 @@ export class Collider2D {
     this.settings[5] = sensor ? this.settings[5] | (1 << 16) : this.settings[5] & ~(1 << 16);
     this.settings[5] = (this.settings[5] & ~0xff00) | ((sensor ? 63 : 7) << 8);
     this.push();
+  }
+  /**
+   * Which questions `Physics2D.hooks` is asked about this collider's pairs (Rapier's `setActiveHooks`): `filterPair` for a pair of
+   * solids, `filterIntersection` for a pair with a sensor in it, `modifyContact` for a touching contact. An omitted key is turned off.
+   */
+  setActiveHooks(hooks: ActiveHooks2D): void {
+    const bits =
+      (hooks.filterPair ? 1 << 18 : 0) | (hooks.modifyContact ? 1 << 19 : 0) | (hooks.filterIntersection ? 1 << 20 : 0);
+    this.settings[5] = (this.settings[5] & ~(7 << 18)) | bits;
+    this.push();
+  }
+  /** The questions the hooks are asked about this collider's pairs, as {@link Collider2D.setActiveHooks} sets them. */
+  get activeHooks(): Required<ActiveHooks2D> {
+    const bits = this.settings[5];
+    return {
+      filterPair: (bits & (1 << 18)) !== 0,
+      filterIntersection: (bits & (1 << 20)) !== 0,
+      modifyContact: (bits & (1 << 19)) !== 0,
+    };
   }
   setFriction(value: number): void {
     new Float32Array(this.settings.buffer)[1] = encode(value, 'friction');

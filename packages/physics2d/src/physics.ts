@@ -146,8 +146,13 @@ export interface ContactChange2D {
 }
 /** Code the world asks about pairs of colliders that have `hooks` set; it must be fast and must not change the world. */
 export interface Physics2DHooks {
-  /** Whether the pair may meet at all; false removes the contact and its events. */
+  /** Whether a pair of solid colliders may meet at all; false removes the contact and its events. */
   filterPair?(colliderA: Collider2D, colliderB: Collider2D): boolean;
+  /**
+   * Whether a pair with a sensor in it may intersect (Rapier's intersection pair filter); false removes the intersection and its
+   * events. Asked, instead of `filterPair`, of the pairs where either collider is a sensor, for colliders with `hooks.filterIntersection`.
+   */
+  filterIntersection?(colliderA: Collider2D, colliderB: Collider2D): boolean;
   /** Changes a touching contact for this step: one-way platforms, conveyors' friction, sticky or slippery pairs. */
   modifyContact?(change: ContactChange2D): void;
 }
@@ -903,7 +908,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
           filter: (a, b) => {
             const ca = this.byShape.get(a),
               cb = this.byShape.get(b);
-            return !ca || !cb || !this.hookSet?.filterPair || this.hookSet.filterPair(ca, cb) !== false;
+            if (!ca || !cb || !this.hookSet) return true;
+            // A pair with a sensor in it is an intersection: it is that filter that is asked, not the contact one.
+            const ask = ca.isSensor() || cb.isSensor() ? this.hookSet.filterIntersection : this.hookSet.filterPair;
+            return !ask || ask.call(this.hookSet, ca, cb) !== false;
           },
           contact: (a, b, nx, ny, points) => {
             const ca = this.byShape.get(a),

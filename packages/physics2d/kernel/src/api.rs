@@ -391,7 +391,7 @@ fn shape_def() -> ShapeDef {
         sensor: flags & (1 << 16) != 0,
         force_threshold: f(6),
         one_sided: flags & (1 << 17) != 0,
-        hooks: ((flags >> 18) & 3) as u8,
+        hooks: ((flags >> 18) & 7) as u8,
     }
 }
 

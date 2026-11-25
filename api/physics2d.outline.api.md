@@ -32,6 +32,12 @@ export function traceOutlines(image: AlphaImage, options?: TraceOptions): Outlin
 
 // Not exported from this entry, but used by the exports above:
 
+interface ActiveHooks2D {
+    filterPair?: boolean;
+    filterIntersection?: boolean;
+    modifyContact?: boolean;
+}
+
 type ColliderOptions2D = ShapeOptions2D & ColliderSettings2D;
 
 interface ColliderSettings2D {
@@ -47,10 +53,7 @@ interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
-    hooks?: {
-        filterPair?: boolean;
-        modifyContact?: boolean;
-    };
+    hooks?: ActiveHooks2D;
 }
 
 type CompoundPart2D = ShapeOptions2D & {
