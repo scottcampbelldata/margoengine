@@ -11,6 +11,11 @@ export default defineConfig({
     alias: [
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
+      {
+        find: /^@margoengine\/webgl2-compat\/preview$/,
+        replacement: resolve(repository, 'packages/webgl2-compat/dist/preview.js'),
+      },
+      { find: /^@margoengine\/lines$/, replacement: resolve(repository, 'packages/lines/dist/index.js') },
       { find: /^@margoengine\/physics$/, replacement: resolve(root, 'dist/index.js') },
     ],
   },

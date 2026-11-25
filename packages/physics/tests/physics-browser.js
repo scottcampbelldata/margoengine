@@ -1,5 +1,6 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
+import { Line, Lines } from '@margoengine/lines';
 import { Physics } from '@margoengine/physics';
 import { SceneTarget } from '../../shared/msaa.js';
 
@@ -175,6 +176,22 @@ window.runPhysicsTests = async () => {
   report.checks.push(
     'Settled meshes render where the bodies are; readback pixels at projected centers match each box color',
   );
+
+  // The debug buffer of the world drawn by `@margoengine/lines`: the top box's front top edge turns the line's colour.
+  const lines = Lines.attach(engine);
+  const debug = physics.debugRender({ contacts: false });
+  assert(debug.vertices.length > 0 && debug.colors.length > 0, 'debugRender returns line buffers');
+  lines.add(new Line({ mode: 'segments', positions: debug.vertices, colors: debug.colors, width: 4 }));
+  engine.render({ delta: 0 });
+  const outlined = await capture.read();
+  const top = stack[4].body.position,
+    edge = project(engine.camera.matrix, [top[0], top[1] + 0.5, top[2] + 0.5]),
+    near = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => outlined.at(edge[0] + dx, edge[1] + dy))),
+    before = image.at(...edge),
+    drawn = near.some((c) => c[1] > c[0] + 20 && c[1] > c[2] + 10 && Math.abs(c[0] - before[0]) > 40);
+  assert(drawn, `The debug line of the top box's edge at ${edge} is not drawn: ${JSON.stringify(near)} over ${before}`);
+  report.debugEdge = { pixel: edge, near: near[4] };
+  report.checks.push('The physics debugRender buffer drawn by Lines colours the edge of a box in its line colour');
 
   // Raycast from the camera returns the core mesh it hits.
   const hit = physics.raycast(engine.camera.position, [
