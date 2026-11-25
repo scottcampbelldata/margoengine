@@ -13,7 +13,7 @@ import { Engine, TransformStore } from '../../../packages/core/dist/extension.js
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('0ed56b9', '590278e', '8c71da0556');
+const { ref, pin } = refs('0ed56b9', '590278e', 'e2177dc6e5');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin),
   gltf = await entryAt('gltf', 'src/pbr.ts', pin);
 const point = { position: [0, 2, 1], range: 6, color: [1, 0.5, 0.2], intensity: 9 },

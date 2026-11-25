@@ -9,7 +9,7 @@ import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 //   node examples/package-benchmarks/proofs/math-consolidation.proof.js [ref] [pin] [--current] --time   hot-path timings
 //     (fresh process, so each side's type feedback is only its own, as in an app)
 // Pinned: 2484971 (before 1/n) against 4eed254 (9/n, the last step): @margoengine/math and the package files are built at
-// 4eed254 (their own @margoengine/math imports resolve to the working tree's build). --current: 8c3c049935 (before 1/n on main; 2484971 is
+// 4eed254 (their own @margoengine/math imports resolve to the working tree's build). --current: bdfc53b35c (before 1/n on main; 2484971 is
 // its pre-rewrite id, which no clone holds) against the working tree, since the guarantee is that math stays bit-identical to the copies it replaced. In --current runs the
 // old copies are taped (golden.js `tape`): at capture each call ran the copy and a stand-in (today's math called with
 // the copy's signature, below) and required the same effect, and the digest of every effect is stored; a --current run
@@ -21,7 +21,7 @@ import { refs, versions, time, entryAt, fileAt, tape, fact, atRef } from './comp
 import { deterministicMath } from './golden.js';
 
 const timing = process.argv.includes('--time') && !deferSpeed('math consolidation hot-path timings'),
-  { ref, pin } = refs('2484971', '4eed254', '8c3c049935');
+  { ref, pin } = refs('2484971', '4eed254', 'bdfc53b35c');
 // The stored digests are compared on every host, so they may hold only exactly specified results (golden.js tape):
 // Math.sin, Math.cos and Math.hypot become exact stand-ins (old copies and today's math both call them), and the results
 // that go through `**` (the sRGB curves) are stored in the canonical forms below.

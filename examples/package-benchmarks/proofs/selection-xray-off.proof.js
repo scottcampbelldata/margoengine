@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('46f9484', '80d4cfb', '41050c560'),
+const { ref, pin } = refs('46f9484', '80d4cfb', 'e2177dc6e5'),
   { baseline, candidate } = await versions('selection', ref, undefined, pin);
 
 function story(module, samples, xray) {

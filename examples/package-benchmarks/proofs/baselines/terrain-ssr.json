@@ -1,9 +1,9 @@
 {
  "proof": "terrain-ssr",
- "ref": "5038720b8",
- "revision": "5038720b8d688d1b3073a2bb4928e926435aa7ae",
- "capturedAt": "3dbb3a2a297943d0473e7f0e1d05fc4fd7edb443",
- "capturedOn": "Node v26.13.0 (V8 14.6.202.34-node.40) darwin-arm64",
+ "ref": "e2177dc6e5",
+ "revision": "e2177dc6e50e2fce0f654da781dc7c8d495f6c56",
+ "capturedAt": "67f268eb9f31c955b1de04d966c63ca6c5e4a3d8",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
   "clipmapGrid 8": "f58ee7201906f152f51afc93c21e7fbf22c77c42bef0fbf6595983a3eaf3fdae",

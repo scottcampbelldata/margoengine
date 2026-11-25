@@ -14,7 +14,7 @@ import { refs, versions, load as loadAt, commit, announce, atRef, golden } from 
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', 'b4700864', '8c71da0556');
+const { ref, pin } = refs('6c20076d', 'b4700864', 'e2177dc6e5');
 const root = await versions('environment', ref, 'src/index.ts', pin),
   probes = await versions('environment', ref, 'src/probes.ts', pin);
 // gltf/pbr's shaders and the hook composer (packages/shared, inlined into gltf/pbr) from the same refs.

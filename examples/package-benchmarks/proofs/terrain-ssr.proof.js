@@ -3,12 +3,12 @@
 // terrain.proof.js's story (format, sample-count and depth-format switches, lighting added, changed and removed, shadows,
 // device restoration, disposal) for three terrains.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/terrain-ssr.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 5038720b8 (terrain's vertex entry
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: e2177dc6e5 (terrain's vertex entry
 // declares its position @invariant) against the working tree; ba7a0fc89 and 675ee2476e before it (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 
-const { ref, pin } = refs('6c20076d', '49f3e971', '5038720b8');
+const { ref, pin } = refs('6c20076d', '49f3e971', 'e2177dc6e5');
 await coreAt(pin); // terrain imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('terrain', ref, undefined, pin);
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };

@@ -12,7 +12,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('b803d56', '0e02ead', '8c71da0556');
+const { ref, pin } = refs('b803d56', '0e02ead', 'e2177dc6e5');
 const { baseline, candidate } = await versions('gltf', ref, 'src/pbr.ts', pin);
 const materials = [
   {},

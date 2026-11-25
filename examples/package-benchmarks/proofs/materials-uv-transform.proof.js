@@ -23,7 +23,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '8c71da0556');
+  { ref, pin } = refs('1970fda', '700838e', 'e2177dc6e5');
 // A revision this clone lacks is HISTORICAL (history.js); only a file the revision lacks reads the working tree.
 const show = (from, file) => showAt(from, file.slice(slash(root).length + 1));
 /**

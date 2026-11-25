@@ -2,13 +2,13 @@
 // over a story of resizes, option edits, depth-format, sample-count and canvas-format changes, a rejected frame, device
 // restoration and disposal at 1x and 4x, for several effect lists. (The single-effect stories are post-stack.proof.js.)
 // Run: node examples/package-benchmarks/proofs/post-ssr.proof.js [ref] [pin] [--current]   (ref: the commit before SSR, default 7c47a09)
-// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: 206cda6acb (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; 41050c560 before it) against the working tree;
+// Pinned: 7c47a09 against 3cf1453, the commit that made this claim. --current: e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; e2177dc6e5 before it) against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7c47a09', '3cf1453', '8c71da0556'),
+const { ref, pin } = refs('7c47a09', '3cf1453', 'e2177dc6e5'),
   { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 
