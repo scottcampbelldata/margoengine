@@ -10,6 +10,8 @@ Scott's order, 2026-11-07: Margo's own physics must have every feature and every
 
 **What assumes WebGPU today (checked 2026-11-07, origin/main e0e6494da).** Nothing in `packages/physics/src`, `packages/physics/kernel`, `packages/physics2d/src` or `packages/ragdoll/src` touches `navigator.gpu`, a GPU device or WGSL; the Node tests of all three already run against a mesh renderer stub that says `backend: 'webgl2'`. Two gaps: (1) the physics browser test (`packages/physics/tests/physics-browser.js`) reads pixels back through WebGPU only, so no browser test runs physics on the WebGL2 backends; (2) `debugRender()` buffers are drawn with `@margoengine/lines`, which draws on `webgl2-compat`; on the `@margoengine/webgl2-compat/preview` preview backend `Lines` refuses at setup with a linked `unsupported` error and draws nothing (its README, Limits). Both are rows below (W-01, W-02).
 
+Physics elsewhere in the engine (water, wind, weather, terrain, destruction, characters and the film pipeline) is audited and tracked in [physics-audit.md](physics-audit.md).
+
 ## Status key
 
 | Status | Meaning |
