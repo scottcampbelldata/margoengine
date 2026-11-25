@@ -24,9 +24,9 @@ export interface MotorcycleOptions {
   maxSteeringAngle?: number;
   /** The most sideways acceleration a turn may ask for, m/s squared (default 7, about 0.7 g). */
   maxLateralAcceleration?: number;
-  /** Stiffness of the balance: steering angle per radian of lean error (default 1.2, scaled down above 8 m/s). */
+  /** Stiffness of the balance: steering angle per radian of lean error (default 1.2 up to 8 m/s, then falling as the square of the speed over 8). */
   balanceGain?: number;
-  /** Damping of the balance: steering angle per radian a second of roll rate (default 0.35). */
+  /** Damping of the balance: steering angle per radian a second of roll rate (default 0.35 up to 8 m/s, then falling as the speed over 8). */
   balanceDamping?: number;
   /** Keep the bike up (default true). With false the rider lets go: `steering` is the handlebars alone. */
   balance?: boolean;
@@ -170,8 +170,11 @@ export class Motorcycle implements PhysicsAttachment {
     this.target_ = Math.atan2(lateral, 9.81);
     if (!this.balance) return;
     // Steering into the fall: more lean toward the side than asked steers toward it; less steers away (the counter-steer that starts a turn).
-    const scale = 8 / Math.max(Math.abs(speed), 8),
-      steer = this.gain * scale * (this.lean_ - this.target_) + this.damping * scale * rollRate,
+    // The steering's pull on the roll grows with speed, as the square of it for the steering angle and the speed itself for its rate (the
+    // roll equation of the bicycle as an inverted pendulum, Astrom, Klein and Lennartsson 2005), so the gains fall by the same factors
+    // above 8 m/s and the rider's effect on the roll stays what it is at 8; under 8 m/s they are as set.
+    const fall = 8 / Math.max(Math.abs(speed), 8),
+      steer = this.gain * fall * fall * (this.lean_ - this.target_) + this.damping * fall * rollRate,
       // Feed-forward: the steering angle that gives the turn's yaw rate at this speed, wheelbase times the yaw rate over the speed.
       ahead = Math.abs(speed) > 1 ? Math.atan((this.wheelbase * lateral) / (speed * speed)) : 0;
     this.vehicle.steering = clamp(steer + ahead, -this.maxSteer, this.maxSteer);

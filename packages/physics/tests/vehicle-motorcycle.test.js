@@ -6,7 +6,7 @@ import { Motorcycle, Physics } from '../dist/index.js';
 await Physics.load();
 
 /** A 250 kg bike at 10 m/s on a floor, wheels 1.4 m apart, upright (or leaning by `lean` radians toward +X to start with). */
-function bike(options = {}, lean = 0) {
+function bike(options = {}, lean = 0, speed = 10) {
   const physics = new Physics(null);
   physics.addBody(null, {
     type: 'fixed',
@@ -26,7 +26,7 @@ function bike(options = {}, lean = 0) {
       suspensionRelaxation: 5,
     }),
     rider = new Motorcycle(physics, chassis, { front: wheel(0.7), rear: wheel(-0.7), ...options });
-  chassis.setLinearVelocity([0, 0, 10]);
+  chassis.setLinearVelocity([0, 0, speed]);
   // A turn about +Z by an angle tilts the up axis toward -X, so a lean toward +X is a turn by the negative.
   if (lean) chassis.setRotation([0, 0, Math.sin(-lean / 2), Math.cos(-lean / 2)]);
   return { physics, chassis, rider };
@@ -104,4 +104,22 @@ test('a bike with its throttle on keeps going, and a motorcycle refuses what mak
     /balanceGain/,
   );
   world.dispose();
+});
+
+test('the rider keeps a bike that leans up from 4 to 30 m/s, the gains scaled with the speed squared and the speed above 8 m/s', () => {
+  for (const speed of [4, 6, 8, 12, 20, 30]) {
+    for (const sign of [1, -1]) {
+      const { physics, rider } = bike({}, 0.1 * sign, speed);
+      let worst = 0;
+      for (let i = 0; i < 480; i++) {
+        rider.setInput({ throttle: rider.speed < speed ? 0.3 : 0 });
+        physics.step();
+        if (i > 300) worst = Math.max(worst, Math.abs(rider.lean));
+        assert.ok(Math.abs(rider.lean) < 0.6, `speed ${speed}: it fell to ${rider.lean} rad at step ${i}`);
+      }
+      assert.ok(worst < 0.03, `speed ${speed}, lean ${0.1 * sign}: upright after five seconds: ${worst} rad`);
+      assert.ok(rider.speed > 0.6 * speed, `speed ${speed}: still rolling at ${rider.speed}`);
+      physics.dispose();
+    }
+  }
 });
