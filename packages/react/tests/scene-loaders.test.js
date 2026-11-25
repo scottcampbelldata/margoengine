@@ -227,28 +227,34 @@ test('instantiateModel builds the model and its draw plugin in the scene it is g
     },
   };
   const PBRModel = class {
-    constructor(engine, asset) {
-      return model(engine, asset);
+    constructor(engine, asset, images, prepared, scene) {
+      return model(engine, asset, scene);
     }
   };
   const source = () => ({ api: { PBRModel }, asset: { doc: { images: [] } }, images: [], first: null });
   const scene = world(engine, 'item');
   const inScene = await instantiateModel(source(), engine, scene);
-  assert.equal(inScene.scene, scene, 'created while the named scene is active');
+  assert.equal(inScene.scene, scene, 'built in the named scene');
   assert.deepEqual([...scene.plugins.values()], [inScene], 'its draw plugin joins the named scene');
   assert.equal(engine.plugins.size, 0, 'nothing reaches the default scene');
   const atDefault = await instantiateModel(source(), engine);
   assert.equal(atDefault.scene, null, 'no scene given: the default scene');
   assert.deepEqual([...engine.plugins.values()], [atDefault]);
-  // A first model built in the default scene cannot serve a named scene: it is disposed and a new one is built.
+  // A first model built in the default scene cannot serve a named scene: a new one is built there, and the first is
+  // kept for the next default-scene user (the cache disposes it with the source if none comes).
   const first = model(engine, { doc: { images: [] } });
   engine.use(first);
-  const replaced = await instantiateModel({ ...source(), first }, engine, scene);
-  assert.equal(first.disposals, 1, 'the default-scene first model is disposed');
+  const shared = { ...source(), first };
+  const replaced = await instantiateModel(shared, engine, scene);
+  assert.notEqual(replaced, first);
+  assert.equal(first.disposals, 0, 'the default-scene first model is kept');
   assert.equal(replaced.scene, scene);
+  assert.equal(await instantiateModel(shared, engine), first, 'the default scene still reuses it');
+  assert.equal(shared.first, null);
   inScene.dispose();
   replaced.dispose();
   atDefault.dispose();
+  first.dispose();
   scene.dispose();
 });
 
