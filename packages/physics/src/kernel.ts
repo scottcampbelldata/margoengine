@@ -1873,7 +1873,7 @@ export class KernelWorld {
     const touched = this.api.collider_refit(collider, motion);
     if (touched < 0)
       throw new RangeError(
-        `Collider ${collider} cannot be refit (code ${touched}); it must be a trimesh made with deformable: true or a heightfield, with finite vertices.`,
+        `Collider ${collider} cannot be refit (code ${touched}); make it a trimesh with deformable: true or a heightfield, and pass finite vertices.`,
       );
     return touched;
   }

@@ -65,12 +65,16 @@ export function bedVertexCount(shape: BedShape): number {
       `A bed has whole numbers of cells from 1 up along x and z (got ${columns} by ${rows}); pass both.`,
     );
   if (!(width > 0) || !(depth > 0) || !Number.isFinite(width) || !Number.isFinite(depth))
-    throw new RangeError(`A bed's width and depth are finite sizes above zero in metres (got ${width} by ${depth}).`);
+    throw new RangeError(
+      `A bed's width and depth are finite sizes above zero in metres (got ${width} by ${depth}); pass both in metres.`,
+    );
   if (!centre || centre.length !== 2 || !centre.every(Number.isFinite))
     throw new RangeError('A bed centre is [x, z], two finite metres from its cell origin; pass [0, 0] for the middle.');
   const count = (columns + 1) * (rows + 1);
   if (!Number.isSafeInteger(count))
-    throw new RangeError(`A bed of ${columns} by ${rows} cells has more vertices than a whole number can count.`);
+    throw new RangeError(
+      `A bed of ${columns} by ${rows} cells has more vertices than a whole number can count; use fewer cells.`,
+    );
   return count;
 }
 
@@ -182,7 +186,7 @@ export function bedSurface(shape: BedShape, elevations: ArrayLike<number>, cell:
   const count = bedVertexCount(shape);
   if (elevations.length !== count)
     throw new RangeError(
-      `A bed of ${shape.columns} by ${shape.rows} cells has ${count} vertices; got ${elevations.length} elevations.`,
+      `A bed of ${shape.columns} by ${shape.rows} cells has ${count} vertices; got ${elevations.length} elevations, so pass one each.`,
     );
   return new BedSurface(shape, cell, () => elevations);
 }
@@ -197,10 +201,12 @@ export function bedFromPort(memory: WebAssembly.Memory, port: Port, shape: BedSh
   if (port.field !== BED_FIELD.name)
     throw new RangeError(`Port "${port.field}" is not the bed; pass the port of field "bed".`);
   if (port.region.layout !== BED_LAYOUT)
-    throw new RangeError(`The bed port has layout ${port.region.layout}; this reader knows layout ${BED_LAYOUT}.`);
+    throw new RangeError(
+      `The bed port has layout ${port.region.layout}; this reader knows layout ${BED_LAYOUT}, so update the reader or the bed to the same version.`,
+    );
   if (port.region.type !== 'f32' || port.region.byteLength !== count * 4)
     throw new RangeError(
-      `The bed port holds ${port.region.byteLength} bytes of ${port.region.type}; a ${shape.columns} by ${shape.rows} bed is ${count} f32 elevations.`,
+      `The bed port holds ${port.region.byteLength} bytes of ${port.region.type}; a ${shape.columns} by ${shape.rows} bed is ${count} f32 elevations, so pass the shape the bed was made with.`,
     );
   let buffer: ArrayBufferLike | undefined, view: ArrayLike<number> | undefined;
   const region = port.region;
@@ -350,7 +356,7 @@ export class TerrainBed implements Solver<TerrainBedParams> {
     const added = regionWords(this.host.memory, sum.region);
     if (added.length !== this.count)
       throw new RangeError(
-        `Contributions to "bedChange" have ${added.length} values; this bed has ${this.count} vertices.`,
+        `Contributions to "bedChange" have ${added.length} values; this bed has ${this.count} vertices, so make each BedChange on the bed's own grid.`,
       );
     for (let i = 0; i < this.count; i++) {
       if (!Number.isFinite(added[i]!))

@@ -55,7 +55,7 @@ export class BedCollider {
     const elevations = bed.elevations;
     if (elevations.length !== count)
       throw new RangeError(
-        `A bed of ${bed.columns} by ${bed.rows} cells has ${count} vertices; got ${elevations.length} elevations.`,
+        `A bed of ${bed.columns} by ${bed.rows} cells has ${count} vertices; got ${elevations.length} elevations, so pass one each.`,
       );
     this.heights = Float32Array.from(elevations);
     this.body = physics.addBody(null, {
