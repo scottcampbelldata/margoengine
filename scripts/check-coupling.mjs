@@ -53,7 +53,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(
       `check:coupling: ${missing.length} framework solver(s) with no coupling-harness test. Fix: add a test in the package's tests/coupling/ that imports packages/physics/tests/coupling/harness.js and runs the solver through it (docs/physics-framework.md, section 10):\n  ${missing.join('\n  ')}`,
     );
-    process.exit(1);
-  }
-  console.log(`check:coupling: ok, ${count} framework solver(s), each with a coupling-harness test.`);
+    // It ends by its event loop with code 1, as every check does (KB-OWN-EXIT2).
+    process.exitCode = 1;
+  } else console.log(`check:coupling: ok, ${count} framework solver(s), each with a coupling-harness test.`);
 }
