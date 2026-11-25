@@ -734,7 +734,7 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
               });
             if (!network) throw new Error('no network');
             for (const item of network.skipped) skipped.push(item.input);
-            using installed = installNodeMaterial(model, network.graph);
+            using _installed = installNodeMaterial(model, network.graph);
             await gpu.queue.onSubmittedWorkDone();
             compiled++;
             if (frame() !== before) changed++;
@@ -794,7 +794,8 @@ def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
   // surface_unlit has no node material yet (docs/limits.md); it still opens as an unlit glTF material.
   assert.deepEqual(
     networks.refused.map((line) => line.split(': ').at(-1)),
-    ['surface shader surface_unlit is not converted'],
+    // A LoaderError ends with its help link (packages/loaders/src/types.ts).
+    ['surface shader surface_unlit is not converted; see https://margoengine.com/errors#loader-unsupported'],
   );
   assert.equal(networks.compiled, 30);
   // A network of constants may draw as its PBR material does; one with images must not.
