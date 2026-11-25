@@ -132,17 +132,6 @@ test('two hinge coordinates of a tree are coupled: q_a + ratio q_b holds, and th
   assert.ok(Math.abs(qa + 2 * qb) < 1e-3, `q_a + 2 q_b stays 0: ${qa} ${qb}`);
   assert.ok(Math.abs(qa) > 0.5, `and the pair really turned: ${qa}`);
   assert.ok(Math.abs(a.position[0]) < 1e-3 && Math.abs(b.position[0] - 3) < 1e-3, 'each link stays on its hinge');
-  // A link that does not hang from the root has no DOF of its own to couple.
-  const chain = new Physics(null, { gravity: [0, 0, 0] });
-  const base = chain.addBody(null, { type: 'fixed' });
-  const first = chain.addBody(null, { position: [1, 0, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
-  const second = chain.addBody(null, { position: [2, 0, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
-  const tall = chain.addMultibody(base, [
-    { body: first, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-1, 0, 0] } },
-    { body: second, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-1, 0, 0] } },
-  ]);
-  assert.throws(() => coupleDofs(chain, tall, first, second), TypeError);
-  chain.dispose();
   assert.throws(() => coupleDofs(physics, multibody, a, root), TypeError);
   physics.dispose();
 });

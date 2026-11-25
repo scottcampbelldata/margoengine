@@ -23,6 +23,14 @@ pub const DISTANCE: u32 = 4;
 /// A body held to a curve fixed on another: a Catmull-Rom spline through any number of points (in A's frame), open or closed, with a
 /// motor along it. The points live in a shared column, a range each, with an index of boxes over its spans.
 pub const PATH: u32 = 5;
+/// Two joint coordinates held together: side A is a hinge angle or a slide of the body `a` against its parent, side B the same for
+/// `b` against its parent, and the rate of A plus `ratio` times the rate of B stays zero (Baraff, "Linear-Time Dynamics using Lagrange
+/// Multipliers", SIGGRAPH 1996, a row between two joints' coordinates). The row's own fields: `a` and `b` the children, `path` and
+/// `count` their parents, `cap` the sides' kinds (bit 0 set: A slides, bit 1: B slides; clear: it turns), `axis_a` and `axis_b` the axis
+/// in each child's frame. A hinge's rate is the axis dotted with the child's turn less the parent's; a slide's, the axis dotted with the
+/// child's centre's velocity in the parent's frame (less the parent's velocity and its turn about the child's centre). The row's effective inverse mass is the speed the unit impulse gives it, which holds for
+/// two sides that share a parent, where a sum of each side's own would not.
+pub const COORDS: u32 = 6;
 /// Most points of a path.
 pub const MAX_PATH_POINTS: u32 = 1 << 20;
 /// Most words of the path column.
@@ -155,7 +163,7 @@ impl World {
     /// Adds a coupling between two live bodies; its slot, or None when they are one body, one is gone, the kind is not one, or
     /// memory is out.
     pub fn add_coupling(&mut self, kind: u32, a: u32, b: u32) -> Option<usize> {
-        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=PATH).contains(&kind) {
+        if a == b || !self.body_alive(a) || !self.body_alive(b) || !(GEAR..=COORDS).contains(&kind) {
             return None;
         }
         let used = self.header().coupling_rows as usize;
@@ -204,6 +212,12 @@ impl World {
                 c.motor_force = value[1];
             }
             11 => c.closed = (value[0] != 0.0) as u32,
+            // A coordinates coupling's parents and the kinds of its two sides (see COORDS).
+            12 => {
+                c.path = value[0] as u32;
+                c.count = value[1] as u32;
+                c.cap = value[2] as u32;
+            }
             _ => {}
         }
         c.impulse = 0.0;
@@ -230,7 +244,7 @@ impl World {
 
     /// Whether a coupling's two bodies are both there.
     fn coupling_live(&self, c: &Coupling) -> bool {
-        c.kind != 0 && self.body_alive(c.a) && self.body_alive(c.b)
+        c.kind != 0 && self.body_alive(c.a) && self.body_alive(c.b) && (c.kind != COORDS || (self.body_alive(c.path) && self.body_alive(c.count)))
     }
 
     /// Wakes what a moving body is coupled to, as `wake_across_joints` does for joints.
@@ -255,6 +269,14 @@ impl World {
         for k in 0..self.header().coupling_rows as usize {
             let c = self.coupling(k);
             if !self.coupling_live(&c) {
+                continue;
+            }
+            if c.kind == COORDS {
+                for other in [c.b, c.path, c.count] {
+                    if self.flags(c.a as usize) & KIND == DYNAMIC && self.flags(other as usize) & KIND == DYNAMIC && self.is_awake(c.a as usize) && self.is_awake(other as usize) {
+                        self.unite(c.a, other);
+                    }
+                }
                 continue;
             }
             let (a, b) = (c.a as usize, c.b as usize);
@@ -369,6 +391,13 @@ impl World {
                 self.warm_curve(k);
                 continue;
             }
+            if c.kind == COORDS {
+                if self.coupling_live(&c) && c.impulse != 0.0 {
+                    let side = self.coords_sides(&c);
+                    self.coords_push(&c, &side, c.impulse);
+                }
+                continue;
+            }
             if !self.coupling_live(&c) || c.impulse == 0.0 {
                 continue;
             }
@@ -389,6 +418,10 @@ impl World {
             }
             if c.kind == PATH {
                 self.solve_curve(k, h, bias);
+                continue;
+            }
+            if c.kind == COORDS {
+                self.solve_coords(k, h, bias);
                 continue;
             }
             let (row, rope) = self.coupling_row(&c);
@@ -442,6 +475,14 @@ impl World {
             if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE || c.kind == PATH {
                 continue;
             }
+            if c.kind == COORDS {
+                let side = self.coords_sides(&c);
+                let speed = self.coords_speed(&c, &side);
+                let mut kept = self.coupling(k);
+                kept.error = c.error + speed * h;
+                self.put_coupling(k, kept);
+                continue;
+            }
             let (row, _) = self.coupling_row(&c);
             let (a, b) = (self.moving(c.a as usize), self.moving(c.b as usize));
             let (speed, _) = Self::coupling_speed(&c, &row, &a, &b);
@@ -449,6 +490,131 @@ impl World {
             kept.error = c.error + speed * h;
             self.put_coupling(k, kept);
         }
+    }
+}
+
+/// One side of a coordinates coupling at the poses the bodies have now.
+struct Side {
+    child: usize,
+    parent: usize,
+    /// The hinge axis, or the slide direction, in the world, already scaled by the side's weight in the row.
+    axis: V3,
+    slides: bool,
+    /// A slide: no arm on the child (its centre), and the parent's arm to the child's centre. A hinge: both zero.
+    arm_child: V3,
+    arm_parent: V3,
+}
+
+impl World {
+    fn coords_sides(&self, c: &Coupling) -> [Side; 2] {
+        let side = |child: u32, parent: u32, axis: [f32; 3], slides: bool, weight: f32| {
+            let (child, parent) = (child as usize, parent as usize);
+            let qc = self.q(ROTATION_X, child);
+            // A slide's offset is that of the child's centre in the parent's frame, which turns with the parent: its rate is the child's
+            // velocity less that of the parent's material point under it, v_c - v_p - w_p x (x_c - x_p).
+            let arm_parent = if slides { self.v(CENTER_X, child).sub(self.v(CENTER_X, parent)) } else { v3(0.0, 0.0, 0.0) };
+            Side { child, parent, axis: qc.rotate(vec(axis)).scale(weight), slides, arm_child: v3(0.0, 0.0, 0.0), arm_parent }
+        };
+        [
+            side(c.a, c.path, c.axis_a, c.cap & 1 != 0, 1.0),
+            side(c.b, c.count, c.axis_b, c.cap & 2 != 0, c.ratio),
+        ]
+    }
+
+    /// The speed of the row from the bodies' current speeds.
+    fn coords_speed(&self, _c: &Coupling, sides: &[Side; 2]) -> f32 {
+        let mut speed = 0.0;
+        for s in sides {
+            let (child, parent) = (self.moving(s.child), self.moving(s.parent));
+            speed += if s.slides { s.axis.dot(child.at(s.arm_child).sub(parent.at(s.arm_parent))) } else { s.axis.dot(child.angular.sub(parent.angular)) };
+        }
+        speed
+    }
+
+    /// Gives the bodies the push of an impulse `p` along the row, one body at a time so a parent two sides share takes both.
+    fn coords_push(&mut self, _c: &Coupling, sides: &[Side; 2], p: f32) {
+        for s in sides {
+            let mut child = self.moving(s.child);
+            let mut parent = self.moving(s.parent);
+            if s.slides {
+                child.push(s.axis.scale(p), s.arm_child);
+                parent.push(s.axis.scale(-p), s.arm_parent);
+            } else {
+                child.angular = child.angular.add(child.inertia.mul(s.axis).scale(p));
+                parent.angular = parent.angular.sub(parent.inertia.mul(s.axis).scale(p));
+            }
+            self.settle(s.child, &child);
+            self.settle(s.parent, &parent);
+        }
+    }
+
+    /// The speed a unit impulse along the row would give it: J M^-1 J^T by its own response, so two sides that share a parent count
+    /// that parent's response to both pushes together.
+    fn coords_inverse(&self, sides: &[Side; 2]) -> f32 {
+        // At most four distinct bodies; a parent that two sides share is held once.
+        let mut ids = [usize::MAX; 4];
+        let mut states = [self.moving(sides[0].child); 4];
+        let mut count = 0;
+        for s in sides {
+            for id in [s.child, s.parent] {
+                if !ids[..count].contains(&id) {
+                    ids[count] = id;
+                    states[count] = self.moving(id);
+                    count += 1;
+                }
+            }
+        }
+        let at = |id: usize| ids[..count].iter().position(|&k| k == id).unwrap_or(0);
+        let read = |states: &[Moving; 4]| {
+            let mut speed = 0.0;
+            for s in sides {
+                let (child, parent) = (states[at(s.child)], states[at(s.parent)]);
+                speed += if s.slides { s.axis.dot(child.at(s.arm_child).sub(parent.at(s.arm_parent))) } else { s.axis.dot(child.angular.sub(parent.angular)) };
+            }
+            speed
+        };
+        let before = read(&states);
+        for s in sides {
+            let (ci, pi) = (at(s.child), at(s.parent));
+            if s.slides {
+                states[ci].push(s.axis, s.arm_child);
+                states[pi].push(s.axis.scale(-1.0), s.arm_parent);
+            } else {
+                let child = states[ci];
+                states[ci].angular = child.angular.add(child.inertia.mul(s.axis));
+                let parent = states[pi];
+                states[pi].angular = parent.angular.sub(parent.inertia.mul(s.axis));
+            }
+        }
+        read(&states) - before
+    }
+
+    /// One pass of a coordinates coupling, as the other rows' (see `solve_couplings`).
+    fn solve_coords(&mut self, k: usize, h: f32, bias: bool) {
+        let c = self.coupling(k);
+        let sides = self.coords_sides(&c);
+        let inverse = self.coords_inverse(&sides);
+        if !(inverse > 0.0) {
+            return;
+        }
+        let speed = self.coords_speed(&c, &sides);
+        let (beta, gamma) = if c.hertz > 0.0 {
+            let mass = 1.0 / inverse;
+            let omega = 2.0 * core::f32::consts::PI * c.hertz;
+            let d = 2.0 * mass * c.zeta * omega;
+            let spring = mass * omega * omega;
+            (spring / (d + h * spring), 1.0 / (h * (d + h * spring)))
+        } else {
+            (if bias { c.correction / h } else { 0.0 }, 0.0)
+        };
+        let change = -(speed + beta * c.error + gamma * c.impulse) / (inverse + gamma);
+        if change == 0.0 {
+            return;
+        }
+        self.coords_push(&c, &sides, change);
+        let mut kept = self.coupling(k);
+        kept.impulse = c.impulse + change;
+        self.put_coupling(k, kept);
     }
 }
 

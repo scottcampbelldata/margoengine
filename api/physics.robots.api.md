@@ -876,7 +876,7 @@ class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
-    addCoupling(kind: 1 | 2 | 3 | 4 | 5, a: number, b: number): number;
+    addCoupling(kind: 1 | 2 | 3 | 4 | 5 | 6, a: number, b: number): number;
     setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
     removeCoupling(slot: number): boolean;
     couplingState(slot: number): {

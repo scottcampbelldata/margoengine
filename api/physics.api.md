@@ -825,7 +825,7 @@ export class KernelWorld {
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
-    addCoupling(kind: 1 | 2 | 3 | 4 | 5, a: number, b: number): number;
+    addCoupling(kind: 1 | 2 | 3 | 4 | 5 | 6, a: number, b: number): number;
     setCoupling(slot: number, field: number, value: readonly [number, number, number]): void;
     removeCoupling(slot: number): boolean;
     couplingState(slot: number): {
@@ -1857,9 +1857,7 @@ export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<numb
 export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
-export function coupleDofs(physics: Physics, multibody: Multibody, linkA: PhysicsBody, linkB: PhysicsBody, options?: {
-    ratio?: number;
-}): GearJoint;
+export function coupleDofs(physics: Physics, multibody: Multibody, linkA: PhysicsBody, linkB: PhysicsBody, options?: DofCouplingOptions): DofCoupling;
 
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 
@@ -1901,6 +1899,15 @@ interface BodyOwner {
     }): void;
     jointsOf?(body: PhysicsBody): PhysicsJoint[];
     moved(body: PhysicsBody): void;
+}
+
+class DofCoupling extends Mechanism {
+    constructor(physics: Physics, links: readonly [Link, Link], options?: DofCouplingOptions);
+    bodyRemoved(body: PhysicsBody): void;
+}
+
+interface DofCouplingOptions extends MechanismOptions {
+    ratio?: number;
 }
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
@@ -1982,12 +1989,14 @@ interface KernelShapeCastHit {
     started: boolean;
 }
 
+type Link = Multibody['links'][number];
+
 abstract class Mechanism implements PhysicsAttachment {
     protected readonly physics: Physics;
     protected readonly a: PhysicsBody;
     protected readonly b: PhysicsBody;
     protected readonly slot: number;
-    protected constructor(physics: Physics, kind: 1 | 2 | 3 | 4 | 5, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
+    protected constructor(physics: Physics, kind: 1 | 2 | 3 | 4 | 5 | 6, a: PhysicsBody, b: PhysicsBody, options: MechanismOptions);
     state(): {
         error: number;
         impulse: number;

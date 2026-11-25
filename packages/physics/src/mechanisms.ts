@@ -32,6 +32,7 @@ const RACK_AND_PINION = 2;
 const PULLEY = 3;
 const DISTANCE = 4;
 const PATH = 5;
+const COORDS = 6;
 
 abstract class Mechanism implements PhysicsAttachment {
   protected readonly slot: number;
@@ -39,7 +40,7 @@ abstract class Mechanism implements PhysicsAttachment {
 
   protected constructor(
     protected readonly physics: Physics,
-    kind: 1 | 2 | 3 | 4 | 5,
+    kind: 1 | 2 | 3 | 4 | 5 | 6,
     protected readonly a: PhysicsBody,
     protected readonly b: PhysicsBody,
     options: MechanismOptions,
@@ -287,26 +288,68 @@ export class PathJoint extends Mechanism {
   }
 }
 
+/** Options of {@link coupleDofs}. */
+export interface DofCouplingOptions extends MechanismOptions {
+  /** The first coordinate plus `ratio` times the second stays what it was (default 1). A hinge's is in radians, a slider's in metres. */
+  ratio?: number;
+}
+
 /**
- * Couples two joint coordinates of a multibody: the angle of hinge link `linkA` plus `ratio` times the angle of hinge link `linkB` stays
- * what it was (Rapier's multibody DOF couplings, and MuJoCo's tendon-like coupled joints), through a {@link GearJoint} on the two link bodies. A
- * link's coordinate is its body's own angle only where its parent does not turn, so both links must hang from the tree's root.
- * @throws TypeError for a link that is not a hinge link of the tree, or whose parent is not the root.
+ * Two joint coordinates held together, made by {@link coupleDofs}: a row on four bodies, the two links and their parents, whose rate
+ * is the first coordinate's plus `ratio` times the second's.
+ */
+export class DofCoupling extends Mechanism {
+  private readonly parents: [PhysicsBody, PhysicsBody];
+  constructor(physics: Physics, links: readonly [Link, Link], options: DofCouplingOptions = {}) {
+    const ratio = options.ratio ?? 1;
+    if (!Number.isFinite(ratio) || ratio === 0)
+      throw new RangeError('A coupling ratio is a nonzero number; pass options.ratio other than 0.');
+    const [first, second] = links;
+    super(physics, COORDS, first.body, second.body, options);
+    this.parents = [first.parent, second.parent];
+    const kernel = physics.kernel,
+      axis = (link: Link): Vec3 => rotateVec(link.joint.frameB, [1, 0, 0]);
+    kernel.setCoupling(this.slot, 0, axis(first));
+    kernel.setCoupling(this.slot, 1, axis(second));
+    kernel.setCoupling(this.slot, 6, [ratio, 0, 0]);
+    kernel.setCoupling(this.slot, 8, [options.frequency ?? 0, options.damping ?? 1, options.correction ?? 0.2]);
+    kernel.setCoupling(this.slot, 12, [
+      first.parent.row,
+      second.parent.row,
+      (first.joint.type === 'prismatic' ? 1 : 0) | (second.joint.type === 'prismatic' ? 2 : 0),
+    ]);
+  }
+
+  /** @internal */
+  override bodyRemoved(body: PhysicsBody): void {
+    if (this.parents.includes(body)) this.remove();
+    else super.bodyRemoved(body);
+  }
+}
+
+type Link = Multibody['links'][number];
+
+/**
+ * Couples two joint coordinates of a multibody, at any depth: the coordinate of link `linkA` (the angle of a hinge, the offset of a slider)
+ * plus `ratio` times that of link `linkB` stays what it was, Rapier's multibody DOF couplings. The row is on the two links and their
+ * parents, so it holds the joint's own coordinate and not the body's angle, and a link may hang from any other. Hinge links and slider
+ * links may be mixed (a hinge turns `ratio` radians for each metre a slider moves).
+ * @throws TypeError for a body that is not a hinge or slider link of the tree.
  */
 export function coupleDofs(
   physics: Physics,
   multibody: Multibody,
   linkA: PhysicsBody,
   linkB: PhysicsBody,
-  options: { ratio?: number } = {},
-): GearJoint {
-  const hinge = (body: PhysicsBody): Vec3 => {
+  options: DofCouplingOptions = {},
+): DofCoupling {
+  const find = (body: PhysicsBody): Link => {
     const link = multibody.links.find((candidate) => candidate.body === body);
-    if (!link || link.joint.type !== 'revolute' || link.parent !== multibody.root)
+    if (!link || (link.joint.type !== 'revolute' && link.joint.type !== 'prismatic'))
       throw new TypeError(
-        "A DOF coupling takes two hinge links that hang from the multibody's root; pass revolute links whose parent is the root.",
+        'A DOF coupling takes two hinge or slider links of the multibody; pass bodies whose joint to their parent is revolute or prismatic.',
       );
-    return rotateVec(link.joint.frameB, [1, 0, 0]);
+    return link;
   };
-  return new GearJoint(physics, linkA, linkB, { axisA: hinge(linkA), axisB: hinge(linkB), ratio: options.ratio });
+  return new DofCoupling(physics, [find(linkA), find(linkB)], options);
 }

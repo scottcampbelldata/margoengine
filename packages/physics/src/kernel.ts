@@ -2835,7 +2835,7 @@ export class KernelWorld {
    * Adds a coupling between two bodies: `kind` 1 is a gear, 2 a rack and pinion, 3 a pulley, 4 a distance range, 5 a path (see `couplings.rs`). Returns its slot
    * or -1 when the bodies are one, one is gone or memory is out.
    */
-  addCoupling(kind: 1 | 2 | 3 | 4 | 5, a: number, b: number): number {
+  addCoupling(kind: 1 | 2 | 3 | 4 | 5 | 6, a: number, b: number): number {
     const slot = this.api.coupling_add(kind, a, b);
     // The table grows with the world, which moves the columns.
     if (this.api.world_layout() !== this.layout) this.bind();
