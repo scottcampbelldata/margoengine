@@ -120,6 +120,10 @@
       "types": "./dist/pinned.d.ts",
       "import": "./dist/pinned.js"
     },
+    "./fft": {
+      "types": "./dist/fft.d.ts",
+      "import": "./dist/fft.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"

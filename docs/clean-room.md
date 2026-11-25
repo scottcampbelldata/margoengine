@@ -11596,3 +11596,17 @@ triangulated volume worked out as a triangle's area times the mean of its corner
 The bed's layout and triangle split are the kernel's height field's (already recorded). Proof: `tests/earth-bed.test.js` and
 `tests/coupling/earth-bed.test.js`.
 
+### The FFT of the physics framework, Rust and TypeScript twins (K17, `@margoengine/math/fft`, 2026-11-25)
+
+`packages/physics/kernel-common/src/fft.rs` and `packages/math/src/fft.ts` are one mixed-radix FFT written twice with the same
+operations in the same order: decimation in frequency in the autosort (Stockham) form, any length with prime factors 2, 3
+and 5, twiddles w^j = exp(-2 pi i j / n) computed once from the pinned sin and cos (K01) and stored; transforms along x, y
+and z for grids, and a real 2D transform through the complex one with the half spectrum kept (Hermitian symmetry restores
+the rest). Written from J. W. Cooley and J. W. Tukey, "An algorithm for the machine calculation of complex Fourier series",
+Mathematics of Computation 19(90), 1965; T. G. Stockham, "High-speed convolution and correlation", AFIPS Spring Joint
+Computer Conference, 1966; and C. Van Loan, "Computational Frameworks for the Fast Fourier Transform", SIAM, 1992 (sections 1.7
+and 2.3; the stage formula is derived in the files' headers). The real transform does the full complex one (the packing
+of two real halves into one complex sequence, Van Loan section 4.4, is a speed item for later). `kernel-common/tests/fft_twin.rs`
+writes and checks `fft-vectors.txt` (37 cases) and checks the transform against a direct DFT and by round trips;
+`packages/math/test/fft.test.js` reproduces every case bit for bit.
+

@@ -8,6 +8,7 @@ pub mod atmosphere;
 pub mod broad;
 pub mod cloth;
 pub mod colour;
+pub mod fft;
 pub mod heap;
 pub mod lanes;
 pub mod island;

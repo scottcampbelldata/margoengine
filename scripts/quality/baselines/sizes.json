@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18861598,
+  "total": 18863400,
   "history": [
     {
       "date": "2026-10-24",
@@ -11979,6 +11979,12 @@
       "commit": "eed022063",
       "reason": "new entry @margoengine/physics/earth: the terrain bed field (PA-37), TerrainBed, BedSurface and BedCollider",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "1663c8609",
+      "reason": "@margoengine/math/fft: new entry, 1,546 B gzip: the engine's FFT (K17), mixed-radix Stockham on pinned twiddles, the TypeScript twin of kernel-common's fft.rs, for spectral synthesis (turbulence boxes, ocean spectra); its own small entry so only what synthesises spectra pays for it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12663,6 +12669,7 @@
     "@margoengine/math/mesh": 515,
     "@margoengine/math/obb": 4464,
     "@margoengine/math/pinned": 1624,
+    "@margoengine/math/fft": 1802,
     "@margoengine/math/plane": 2101,
     "@margoengine/math/project": 1277,
     "@margoengine/math/quat": 1971,

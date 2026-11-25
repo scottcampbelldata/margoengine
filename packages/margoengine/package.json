@@ -2679,6 +2679,10 @@
       "types": "./dist/math/pinned.d.ts",
       "import": "./dist/math/pinned.js"
     },
+    "./math/fft": {
+      "types": "./dist/math/fft.d.ts",
+      "import": "./dist/math/fft.js"
+    },
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",
       "import": "./dist/math/spherical.js"

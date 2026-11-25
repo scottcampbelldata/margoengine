@@ -252,6 +252,16 @@ import {exp, hypot, pow, sin} from '@margoengine/math/pinned';
 console.log(exp(0), pow(2, 10), hypot(3, 4), Math.abs(sin(Math.PI / 6) - 0.5) < 1e-15); // 1 1024 5 true
 ```
 
+`@margoengine/math/fft` is the engine's FFT (K17 of the physics framework), the same bits on every engine and in the physics kernels' Rust: `new Fft(n)` plans complex transforms of any length whose prime factors are 2, 3 and 5 (mixed-radix Stockham, its twiddles from the pinned `sin` and `cos`), and `fft.transform(data, inverse?, offset?, stride?)` transforms `n` interleaved `[re, im]` values in place (the inverse divides by `n`); `new Fft3(nx, ny, nz)` transforms a grid stored x fastest along each axis in turn; `new RealFft2(nx, ny)` takes a real field to its half spectrum (`(nx / 2 + 1) * ny` complex values) and back, for spectra such as an ocean's or a turbulence box's. `packages/physics/kernel-common/tests/fft-vectors.txt` pins the TypeScript and the Rust to the same bits.
+
+```ts
+import {Fft} from '@margoengine/math/fft';
+
+const data = Float64Array.from([1, 0, 1, 0, 1, 0, 1, 0]); // four ones, as [re, im] pairs
+new Fft(4).transform(data);
+console.log(Array.from(data)); // [4, 0, 0, 0, 0, 0, 0, 0]: all of it in the zero frequency
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). The classes do not validate their numbers, so NaN propagates; the array helpers, `OBB`, `billboardRotation`, the Euler order and the degree functions throw `RangeError`. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()`, `hsl()` (hue as a number of degrees or with `deg`, `grad`, `rad` or `turn`) and `color()`, but not named colors. `SRGBToLinear` and `LinearToSRGB` continue their linear segment below 0 (bit for bit as the copies they replaced); `Color` and `convertColor` mirror the curve there, as the CSS Color 4 sample code does, so an out-of-gamut channel converts as browsers convert it. `Plane` methods accept a normal of any length (`normalize()` makes `distanceToPoint` a true distance). Not included: Matrix2, `Vector3.project` and `unproject` on the base `Vector3` (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, or the `compat` entry below, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Porting and curves: `@margoengine/math/compat` has subclasses of `Matrix4`, `Vector3`, `Quaternion`, `Plane`, `Ray`, `Box3` and `Color` with the extra methods ported code expects (such as `Matrix4.makeBasis`, `extractRotation`, `makeShear`; `Vector3.applyEuler`, `project`, `unproject`; `Ray.distanceSqToSegment`; `Box3.intersectsTriangle`; `Color.getStyle`, `offsetHSL`, `lerpHSL`), so the base entries keep their size. `@margoengine/math/curve` has `Curve` and `CurveSet` (editable keyed curves: linear, step, smoothstep or cubic with natural, flat or wrap ends) and the `Interpolant` classes over sampled data; `CurveSet.type` is the mode last set on the whole set.
