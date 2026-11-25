@@ -195,7 +195,7 @@ test('material primitives share source skin reduction and morph lookups while re
   let skinScratch = 0,
     morphScratch = 0;
   ctx.budget.reserve = (bytes) => {
-    if (bytes === 5000 * 44 + 144) skinScratch++;
+    if (bytes === 5000 * 84 + 144) skinScratch++;
     if (bytes === 5000 * 4 + 128) morphScratch++;
     reserve(bytes);
   };

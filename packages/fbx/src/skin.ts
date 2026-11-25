@@ -17,6 +17,14 @@ type Joint = SkinData['joints'][number];
 /** Per scene, the group each additive skin's skeleton root was moved into, keyed by that root. */
 const groups = new WeakMap<SceneContext, Map<Joint, { name: string; children: Joint[] }>>();
 
+/** Influences kept per control point: the eight of glTF `JOINTS_0` and `JOINTS_1`, which the engine skins. */
+const SLOTS = 8;
+const sumOf = (weights: Float64Array, start: number): number => {
+  let sum = 0;
+  for (let k = 0; k < SLOTS; k++) sum += weights[start + k];
+  return sum;
+};
+
 function insertInfluence(
   jointIds: Uint16Array,
   weights: Float64Array,
@@ -24,13 +32,13 @@ function insertInfluence(
   joint: number,
   weight: number,
 ): void {
-  const start = controlPoint * 4;
-  for (let slot = 0; slot < 4; slot++) {
+  const start = controlPoint * SLOTS;
+  for (let slot = 0; slot < SLOTS; slot++) {
     const at = start + slot;
     // Strict comparison keeps earlier joints first when weights tie. Inserting
-    // shifts weaker influences down and drops the smallest of the five.
+    // shifts weaker influences down and drops the smallest of the nine.
     if (weight <= weights[at]) continue;
-    for (let k = 3; k > slot; k--) {
+    for (let k = SLOTS - 1; k > slot; k--) {
       weights[start + k] = weights[start + k - 1];
       jointIds[start + k] = jointIds[start + k - 1];
     }
@@ -63,10 +71,10 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
     );
   // Reserve control-point scratch once per source, before allocating it. Material
   // groups and instances reuse the same influence reduction and bind matrices.
-  ctx.budget.reserve(cpCount * 44 + clusters.length * 144);
-  ctx.budget.work(cpCount * 8 + clusters.length * 1024);
-  const jointIds = new Uint16Array(cpCount * 4),
-    weights = new Float64Array(cpCount * 4),
+  ctx.budget.reserve(cpCount * 84 + clusters.length * 144);
+  ctx.budget.work(cpCount * 16 + clusters.length * 1024);
+  const jointIds = new Uint16Array(cpCount * SLOTS),
+    weights = new Float64Array(cpCount * SLOTS),
     used = new Uint32Array(cpCount);
   const joints: SkinData['joints'][number][] = [],
     binds = new Float32Array((clusters.length + 1) * 16),
@@ -135,8 +143,7 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
   let stay = false;
   if (additive && meshAtBind)
     for (let cp = 0; cp < cpCount; cp++) {
-      const at = cp * 4,
-        sum = weights[at] + weights[at + 1] + weights[at + 2] + weights[at + 3];
+      const sum = sumOf(weights, cp * SLOTS);
       if (sum <= 0 || sum >= 1) continue;
       insertInfluence(jointIds, weights, cp, joints.length, 1 - sum);
       stay = true;
@@ -185,25 +192,36 @@ export function attachSkin(ctx: SceneContext, mesh: MeshBinding): void {
   }
   if (!data) return;
   const { jointIds, weights, joints, binds } = data;
-  ctx.budget.reserve(mesh.controlPoints.length * 24);
-  ctx.budget.work(mesh.controlPoints.length * 8);
-  const ids = new Uint16Array(mesh.controlPoints.length * 4),
-    out = new Float32Array(ids.length);
-  for (let i = 0; i < mesh.controlPoints.length; i++) {
+  const count = mesh.controlPoints.length;
+  let wide = false;
+  for (let i = 0; i < count && !wide; i++) {
     const point = mesh.controlPoints[i];
     if (!Number.isInteger(point) || point < 0 || point >= data.cpCount)
       throw new RangeError('Invalid FBX skin control point; re-export the file, it looks damaged');
-    const cp = point * 4,
-      sum = weights[cp] + weights[cp + 1] + weights[cp + 2] + weights[cp + 3];
+    wide = weights[point * SLOTS + 4] > 0;
+  }
+  // Four slots unless a vertex has a fifth influence; then the second four are JOINTS_1 and WEIGHTS_1.
+  const sets = wide ? 2 : 1;
+  ctx.budget.reserve(count * 24 * sets);
+  ctx.budget.work(count * 8 * sets);
+  const ids = [new Uint16Array(count * 4), ...(wide ? [new Uint16Array(count * 4)] : [])],
+    out = ids.map(() => new Float32Array(count * 4));
+  for (let i = 0; i < count; i++) {
+    const cp = mesh.controlPoints[i] * SLOTS,
+      sum = sumOf(weights, cp);
     if (!(sum > 0) || !Number.isFinite(sum))
       throw new RangeError('FBX skin vertex has no positive weights; clean up the source model before export');
-    for (let k = 0; k < 4; k++) {
-      ids[i * 4 + k] = jointIds[cp + k];
-      out[i * 4 + k] = weights[cp + k] / sum;
+    for (let k = 0; k < 4 * sets; k++) {
+      ids[k >> 2][i * 4 + (k & 3)] = jointIds[cp + k];
+      out[k >> 2][i * 4 + (k & 3)] = weights[cp + k] / sum;
     }
   }
-  mesh.geometry.joints = ids;
-  mesh.geometry.weights = out;
+  mesh.geometry.joints = ids[0];
+  mesh.geometry.weights = out[0];
+  if (wide) {
+    mesh.geometry.joints1 = ids[1];
+    mesh.geometry.weights1 = out[1];
+  }
   mesh.node.skin = { name: data.name, joints, inverseBindMatrices: binds };
   ctx.extensions
     .find((extension) => extension.skinned)

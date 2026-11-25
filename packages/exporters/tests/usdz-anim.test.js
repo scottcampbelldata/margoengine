@@ -296,6 +296,7 @@ function skinnedByUSD(text, frame, geometry) {
     points = numbers(/point3f\[\] points = (.*)/.exec(text)[1]),
     indices = numbers(/primvars:skel:jointIndices = \[([^\]]*)\]/.exec(text)[1]),
     weights = numbers(/primvars:skel:jointWeights = \[([^\]]*)\]/.exec(text)[1]),
+    size = Number(/jointWeights = \[[^\]]*\] \(\n\s+elementSize = (\d+)/.exec(text)[1]),
     world = [],
     bindInverse = (j) => {
       // Rows of USD's matrix are the columns of the column-major one.
@@ -318,8 +319,8 @@ function skinnedByUSD(text, frame, geometry) {
   for (let v = 0; v < geometry.positions.length / 3; v++) {
     const p = points.slice(v * 3, v * 3 + 3),
       sum = [0, 0, 0];
-    for (let k = 0; k < 4; k++) {
-      const at = v * 4 + k,
+    for (let k = 0; k < size; k++) {
+      const at = v * size + k,
         moved = apply(multiply(world[indices[at]], bindInverse(indices[at])), p);
       for (let r = 0; r < 3; r++) sum[r] += weights[at] * moved[r];
     }
@@ -334,11 +335,16 @@ function skinnedByGLTF(geometry, inverses, jointWorlds) {
   for (let v = 0; v < geometry.positions.length / 3; v++) {
     const p = [...geometry.positions.subarray(v * 3, v * 3 + 3)],
       sum = [0, 0, 0];
-    for (let k = 0; k < 4; k++) {
-      const joint = geometry.joints[v * 4 + k],
-        moved = apply(multiply(jointWorlds[joint], inverses.slice(joint * 16, joint * 16 + 16)), p);
-      for (let r = 0; r < 3; r++) sum[r] += geometry.weights[v * 4 + k] * moved[r];
-    }
+    // A second set of four (glTF JOINTS_1, WEIGHTS_1) adds to the first.
+    for (const [joints, weights] of [
+      [geometry.joints, geometry.weights],
+      [geometry.joints1, geometry.weights1],
+    ])
+      for (let k = 0; joints && k < 4; k++) {
+        const joint = joints[v * 4 + k],
+          moved = apply(multiply(jointWorlds[joint], inverses.slice(joint * 16, joint * 16 + 16)), p);
+        for (let r = 0; r < 3; r++) sum[r] += weights[v * 4 + k] * moved[r];
+      }
     out.push(sum);
   }
   return out;
@@ -371,6 +377,33 @@ test('a skin moves every vertex where glTF puts it, frame by frame, by USD`s own
     want = skinnedByGLTF(geometry, inverses, [lowerWorld, upperWorld]),
     got = skinnedByUSD(text, 2, geometry);
   // Values go through decimal text exact to Float32's 24 bits; sizes here are below 8, so 8 * 2^-23 per step, a few steps.
+  want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 1e-5, `vertex ${v}`)));
+});
+
+test('eight influences a vertex are written as UsdSkel elementSize 8 and move as glTF says', async () => {
+  const { lower, upper, mesh, geometry, inverses } = arm();
+  // The same weights split across the two glTF sets: half of each influence in JOINTS_0, half in JOINTS_1.
+  geometry.weights = geometry.weights.map((w) => w / 2);
+  geometry.joints1 = geometry.joints.slice();
+  geometry.weights1 = geometry.weights.slice();
+  const bent = turn(Math.PI / 3),
+    scene = {
+      nodes: [upper, mesh],
+      animations: [{ channels: [{ node: lower, path: 'rotation', times: [0, 1], values: [...turn(0), ...bent] }] }],
+    },
+    text = await usda(await exportAnimatedUSDZ(scene, { fps: 1 }));
+  // A GLB with JOINTS_1 and WEIGHTS_1 goes in as it is and writes the same skin.
+  const fromGLB = await usda(await exportAnimatedUSDZ(exportGLB(scene), { fps: 1 }));
+  for (const name of ['jointIndices', 'jointWeights']) {
+    const read = (t) => new RegExp(`primvars:skel:${name} = \\[([^\\]]*)\\]`).exec(t)[1];
+    assert.equal(read(fromGLB), read(text), name);
+  }
+  assert.match(text, /primvars:skel:jointIndices = \[.*\] \(\n\s+elementSize = 8\n\s+interpolation = "vertex"\n\s+\)/);
+  assert.match(text, /primvars:skel:jointWeights = \[.*\] \(\n\s+elementSize = 8\n\s+interpolation = "vertex"\n\s+\)/);
+  const upperWorld = trs([0, 0, 0], [0, 0, 0, 1], [1, 1, 1]),
+    lowerWorld = multiply(upperWorld, trs([0, 2, 0], bent, [1, 1, 1])),
+    want = skinnedByGLTF(geometry, inverses, [lowerWorld, upperWorld]),
+    got = skinnedByUSD(text, 1, geometry);
   want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 1e-5, `vertex ${v}`)));
 });
 
@@ -799,12 +832,14 @@ test('a texture that is not PNG or JPEG is named and the material stays', async 
   assert.match(await usda({ usdz }), /diffuseColor = \(1, 0, 0\)/);
 });
 
-test('more than four influences a vertex are refused with what to do', async () => {
+test('more than eight influences a vertex are refused with what to do', async () => {
   await assert.rejects(
     exportAnimatedUSDZ(
-      slidingGLB({ attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2, JOINTS_1: 1, WEIGHTS_1: 2 } }),
+      slidingGLB({
+        attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2, JOINTS_1: 1, WEIGHTS_1: 2, JOINTS_2: 1, WEIGHTS_2: 2 },
+      }),
     ),
-    /more than four skin influences/,
+    /more than eight skin influences/,
   );
 });
 

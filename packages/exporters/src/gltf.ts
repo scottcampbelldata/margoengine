@@ -334,16 +334,21 @@ class Writer {
         );
       // A per-point width multiplier: an application-specific attribute (glTF 2.0 section 3.7.2.1, `_` prefix).
       if (owner.widths) attributes._WIDTH = this.floatAccessor(owner.widths, 1, 'SCALAR');
-      if (owner.joints) {
-        const data = owner.joints;
-        attributes.JOINTS_0 = this.list('accessors', {
+      // A second set of four is JOINTS_1 and WEIGHTS_1 (glTF 2.0 section 3.7.3.3).
+      const sets: [Uint16Array | undefined, Float32Array | undefined][] = [
+        [owner.joints, owner.weights],
+        [owner.joints1, owner.weights1],
+      ];
+      sets.forEach(([data, weights], set) => {
+        if (!data) return;
+        attributes['JOINTS_' + set] = this.list('accessors', {
           bufferView: this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), ARRAY_BUFFER),
           componentType: UNSIGNED_SHORT,
           count: owner.count,
           type: 'VEC4',
         });
-        attributes.WEIGHTS_0 = this.floatAccessor(owner.weights!, 4, 'VEC4');
-      }
+        attributes['WEIGHTS_' + set] = this.floatAccessor(weights!, 4, 'VEC4');
+      });
       shared = { attributes };
       this.attributeCache.set(owner, shared);
     }
@@ -920,7 +925,8 @@ function document(
         if (!node.geometry?.joints) throw new TypeError('Skinned geometry needs joint indices and weights');
         const skin = writer.skin(node.skin, resolve);
         const geometries = node.primitives?.map((primitive) => primitive.geometry) ?? [node.geometry];
-        if (geometries.some((geometry) => geometry.joints!.some((joint) => joint >= node.skin!.joints.length)))
+        const outside = (joints: Uint16Array | undefined) => joints?.some((joint) => joint >= node.skin!.joints.length);
+        if (geometries.some((geometry) => outside(geometry.joints) || outside(geometry.joints1)))
           throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
         json.nodes[resolve(sourceNode)].skin = skin;
       } else if (node.geometry?.joints) throw new TypeError('Joint attributes need a skin on the same node');

@@ -240,6 +240,21 @@ test('skins are kept with skins: true, split with their joints, and checked agai
     name: 'TypeError',
     message: /no root influence/,
   });
+  // Roblox takes four influences a vertex; a fifth in the second set is refused, never dropped.
+  const wide = rig();
+  Object.assign(wide.nodes[1].geometry, {
+    weights: [0, 0.5, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    joints1: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+    weights1: [0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  });
+  assert.throws(() => exportRobloxGLB(wide, { skins: true }), {
+    name: 'RangeError',
+    message: /more than four skin influences/,
+  });
+  // A second set with no weight in it is four influences and is written as one.
+  wide.nodes[1].geometry.weights1 = new Array(12).fill(0);
+  wide.nodes[1].geometry.weights = [0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  assert.doesNotThrow(() => exportRobloxGLB(wide, { skins: true }));
 });
 
 test('units: meters and front: +z wrap the roots in one stud root, leaving skinned meshes as roots', () => {

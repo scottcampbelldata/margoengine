@@ -180,7 +180,7 @@ Live `side: 'back'` triangle materials are saved as ordinary front-only glTF mat
 
 ## How it works
 
-Engine exports recognize primitives loaded by `@margoengine/gltf/pbr` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data. Formats with no skeleton write the shape the model has at its nodes' current pose: morph weights first, then the skin, with weights normalized. STL and PLY write a textured model's shape, and OBJ its shape, UVs and flat colors, plus its base color images [with `textures`](#loaded-models-as-obj-stl-and-ply). The other engine exports refuse PBR textures (a textured `createMesh` mesh included: use `exportModel`) and material extensions. More than four skin influences throws in every format. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+Engine exports recognize primitives loaded by `@margoengine/gltf/pbr` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data. Formats with no skeleton write the shape the model has at its nodes' current pose: morph weights first, then the skin, with weights normalized. STL and PLY write a textured model's shape, and OBJ its shape, UVs and flat colors, plus its base color images [with `textures`](#loaded-models-as-obj-stl-and-ply). The other engine exports refuse PBR textures (a textured `createMesh` mesh included: use `exportModel`) and material extensions. Up to eight skin influences a vertex go through (`joints1` and `weights1` hold the second four); more than eight throws, and Roblox and the Unity bundle, which take four, refuse a second set with the fix. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
 
 Engine export entrypoints also bake back-only optional PBR triangles by reversing winding and negating base and morph normals. This preserves their visible side in glTF, GLB, USDZ, OBJ, PLY and STL, including mirrored world transforms. Front-only and double-sided materials retain their existing geometry behavior.
 
@@ -220,7 +220,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `shareVertices` | OBJ | `true`, faces share the mesh's indexed corners. `false` gives every face its own `v`/`vt`/`vn` corners (not with `mergeVertices`) |
 | `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], finite scales (a 0 on any axis is kept, below) and nonzero quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, joints1?, weights1?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], finite scales (a 0 on any axis is kept, below) and nonzero quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
 
 ### Retaining hidden nodes
 
@@ -242,6 +242,7 @@ const glb = exportGLB({nodes: [{name: 'Helper-colonly', geometry, retainedVisibi
 `exportGLTF` and `exportGLB` accept deformation data on plain scenes and retain bind-pose skin/morph data from loaded PBR engine nodes. Original animation clips are not forwarded from an engine; supply a data scene with `animations` to export clips. Keep the hierarchy when exporting deformation; `flatten: true` rejects skins, morphs and clips.
 
 - A geometry's `joints` and `weights` supply four values per vertex and must appear together. Joint indices are unsigned 16-bit integers within the attached skin's joint list. Weights must be finite and nonnegative with a positive sum per vertex; the writer normalizes them into Float32 `WEIGHTS_0` alongside unsigned-short `JOINTS_0`.
+- `joints1` and `weights1` (default none) add four more influences per vertex, written as `JOINTS_1` and `WEIGHTS_1`; they need `joints` and `weights`, and all eight are normalized together. glTF lets a joint take one nonzero weight per vertex across both sets (glTF 2.0, section 3.7.3.3). glTF/GLB, animated USDZ, FBX and the formats that write the posed shape take them.
 - A mesh node's `skin` is `{name?, joints, inverseBindMatrices}`. `joints` references the actual `ExportNode` objects in the scene, with no duplicates and a common hierarchy root. `inverseBindMatrices` supplies sixteen finite, column-major affine values per joint. A joint skipped by `onlyVisible` or missing from the scene throws.
 - Geometry `morphs` contain `{name?, positions, normals?, tangents?}`. Each array holds dense xyz deltas per base vertex; these deltas are not normalized. Morph tangents require base tangents, whose handedness remains unchanged. Names become `extras.targetNames`. Node `morphWeights` sets finite default weights and must match the target count; omitted weights default to zero.
 - Scene `animations` contain `{name?, channels}`. Each channel is `{node, path, times, values, interpolation?}`, where `node` references an exported node and `path` is `translation`, `rotation`, `scale` or `weights`. Times are nonnegative seconds, strictly increasing after Float32 conversion. Values have three components for translation/scale, four for unit quaternion rotation, or one component per morph target for weights. Interpolation defaults to `LINEAR`; `STEP` and `CUBICSPLINE` are supported. Cubic channels need at least two keys and use in-tangent, value, out-tangent per key; only quaternion values must have unit length, not their tangents. Two channels in a clip cannot target the same node/path.
@@ -266,6 +267,30 @@ const mesh: ExportNode = {
 const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channels: [{
   node: joint, path: 'translation', times: [0, 1], values: [0, 0, 0, 1, 0, 0],
 }]}]});
+```
+
+Five joints on one vertex: the fifth weight goes in the second set of four.
+
+```ts
+import {exportGLB, type ExportNode} from 'margoengine/exporters';
+
+const bones: ExportNode[] = ['a', 'b', 'c', 'd', 'e'].map((name) => ({name}));
+const root: ExportNode = {...bones[0], children: bones.slice(1)}; // a skin's joints share one root
+bones[0] = root;
+const each = (four: number[]) => [...four, ...four, ...four]; // the same four values on all three vertices
+const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const body: ExportNode = {
+  geometry: {
+    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+    joints: each([0, 1, 2, 3]),
+    weights: each([0.3, 0.2, 0.2, 0.2]),
+    joints1: each([4, 0, 0, 0]),
+    weights1: each([0.1, 0, 0, 0]),
+  },
+  skin: {joints: bones, inverseBindMatrices: bones.flatMap(() => identity)},
+};
+const glb = exportGLB({nodes: [body, root]});
 ```
 
 Load these GLBs with `@margoengine/gltf/pbr` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
@@ -1267,7 +1292,7 @@ Morph targets of a skinned mesh become UsdSkel blend shapes (OpenUSD UsdSkel, `B
 
 A skin's points are written where the mesh rests in the world, with that move taken back out of `bindTransforms`, as a glTF skin's vertices can sit in any space. So a model stored lying down or in millimetres reads the right size in a tool that does not run the skeleton, and it plays exactly as before. Each `SkelRoot` has an `extent` for every frame.
 
-A GLB goes in as it is, with its nodes, skins, clips and PBR materials. Decode Draco and meshopt first: run this before `compressDraco` or `compressMeshopt`, or on the uncompressed file. A file with a second set of joints is refused; bake it down to four influences.
+A GLB goes in as it is, with its nodes, skins, clips and PBR materials. Decode Draco and meshopt first: run this before `compressDraco` or `compressMeshopt`, or on the uncompressed file. A second set of joints (`JOINTS_1`) is written with `elementSize = 8`; a third is refused, so bake it down to eight influences.
 
 Tracks are sampled at `fps`, as USD stores them, and the viewer blends between frames: a STEP key turns over one frame instead of at once, and a clip that ends between two frames holds its last pose on the frame after, so it runs up to one frame longer. `SkelAnimation` keeps scales as half floats, 11 bits, so a joint's scale rounds to about 0.05%.
 

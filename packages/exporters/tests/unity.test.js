@@ -331,6 +331,28 @@ test('Unity rejects lossy matrix/instance/default-scene and ambiguous playback p
     await assert.rejects(createUnityImportBundle(modify(glb, change), options()));
 });
 
+test('Unity refuses a second set of skin influences with the fix, as its bundle reads four a vertex', async () => {
+  const { scene } = await fixture();
+  const bone = { name: 'Source bone', extras: { id: 'bone' } };
+  scene.nodes.push(bone);
+  scene.nodes[0].skin = {
+    joints: [bone],
+    skeleton: bone,
+    inverseBindMatrices: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  };
+  scene.nodes[0].geometry = {
+    ...geometry,
+    joints: Array(16).fill(0),
+    weights: Array.from({ length: 4 }, () => [0.5, 0, 0, 0]).flat(),
+    joints1: Array(16).fill(0),
+    weights1: Array.from({ length: 4 }, () => [0.5, 0, 0, 0]).flat(),
+  };
+  await assert.rejects(
+    createUnityImportBundle(exportGLB(scene, { generator: 'Margo Mesh Studio' }), options()),
+    /four skin influences a vertex/,
+  );
+});
+
 test('Unity validates actual encoded skin indices/weights and complete bone identity without rewriting them', async () => {
   const { scene } = await fixture();
   const bone = { name: 'Source bone', extras: { id: 'bone' } };

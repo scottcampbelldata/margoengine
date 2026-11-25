@@ -77,17 +77,18 @@ test('native coordinate conversion scales geometry, morphs, node translations an
   assert.ok(Math.abs(ibm[28] - 0.01) < 1e-7);
 });
 
-test('native skin keeps the four strongest control-point influences and normalizes them', async () => {
+// Two rig clusters (0.1 and 0.2 after the replace below) and one extra cluster for each given weight.
+async function influenceRig(extra) {
   const bind = identity.slice();
   bind[12] = 2;
-  const extraModel = [0.3, 0.4, 0.5]
+  const extraModel = extra
     .map(
       (weight, index) =>
-        `Model: ${5 + index}, "Model::Joint${index + 2}", "LimbNode" {\n}\n Deformer: ${13 + index}, "SubDeformer::Joint${index + 2}", "Cluster" {\n Mode: "Normalize"\n Indexes: *3 {\n a: 0,1,2\n}\n Weights: *3 {\n a: ${weight},${weight},${weight}\n}\n Transform: *16 {\n a: ${bind.join(',')}\n}\n TransformLink: *16 {\n a: ${identity.join(',')}\n}\n}`,
+        `Model: ${100 + index}, "Model::Joint${index + 2}", "LimbNode" {\n}\n Deformer: ${200 + index}, "SubDeformer::Joint${index + 2}", "Cluster" {\n Mode: "Normalize"\n Indexes: *3 {\n a: 0,1,2\n}\n Weights: *3 {\n a: ${weight},${weight},${weight}\n}\n Transform: *16 {\n a: ${bind.join(',')}\n}\n TransformLink: *16 {\n a: ${identity.join(',')}\n}\n}`,
     )
     .join('\n');
-  const extraConnections = [0, 1, 2]
-    .map((index) => `C: "OO",${5 + index},3\n C: "OO",${13 + index},10\n C: "OO",${5 + index},${13 + index}`)
+  const extraConnections = extra
+    .map((_, index) => `C: "OO",${100 + index},3\n C: "OO",${200 + index},10\n C: "OO",${100 + index},${200 + index}`)
     .join('\n');
   const source = rigFixture({ morph: false, animation: false, extraModel, extraConnections })
     .replace('a: 0.5,0.5,0.5', 'a: 0.1,0.1,0.1')
@@ -96,11 +97,37 @@ test('native skin keeps the four strongest control-point influences and normaliz
   await valid(buffer);
   const { doc, accessor } = readGLB(buffer),
     primitive = doc.meshes[0].primitives[0],
-    joints = accessor(primitive.attributes.JOINTS_0),
-    weights = accessor(primitive.attributes.WEIGHTS_0);
+    read = (name) => (primitive.attributes[name] === undefined ? undefined : accessor(primitive.attributes[name]));
+  return {
+    joints: read('JOINTS_0'),
+    weights: read('WEIGHTS_0'),
+    joints1: read('JOINTS_1'),
+    weights1: read('WEIGHTS_1'),
+  };
+}
+
+test('native skin keeps every influence up to eight, the fifth on in JOINTS_1, and normalizes them together', async () => {
+  const { joints, weights, joints1, weights1 } = await influenceRig([0.3, 0.4, 0.5]);
   for (let vertex = 0; vertex < 3; vertex++) {
     close(joints.subarray(vertex * 4, vertex * 4 + 4), [4, 3, 2, 1], 0);
-    close(weights.subarray(vertex * 4, vertex * 4 + 4), [0.5 / 1.4, 0.4 / 1.4, 0.3 / 1.4, 0.2 / 1.4]);
+    close(weights.subarray(vertex * 4, vertex * 4 + 4), [0.5 / 1.5, 0.4 / 1.5, 0.3 / 1.5, 0.2 / 1.5]);
+    close(joints1.subarray(vertex * 4, vertex * 4 + 4), [0, 0, 0, 0], 0);
+    close(weights1.subarray(vertex * 4, vertex * 4 + 4), [0.1 / 1.5, 0, 0, 0]);
+  }
+  // Four influences write no second set, as before.
+  const four = await influenceRig([0.3, 0.4]);
+  assert.equal(four.joints1, undefined);
+  assert.equal(four.weights1, undefined);
+});
+
+test('native skin keeps the eight strongest of nine control-point influences and normalizes them', async () => {
+  const { joints, weights, joints1, weights1 } = await influenceRig([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
+    total = 0.2 + 0.3 + 0.4 + 0.5 + 0.6 + 0.7 + 0.8 + 0.9;
+  for (let vertex = 0; vertex < 3; vertex++) {
+    close(joints.subarray(vertex * 4, vertex * 4 + 4), [8, 7, 6, 5], 0);
+    close(weights.subarray(vertex * 4, vertex * 4 + 4), [0.9 / total, 0.8 / total, 0.7 / total, 0.6 / total]);
+    close(joints1.subarray(vertex * 4, vertex * 4 + 4), [4, 3, 2, 1], 0);
+    close(weights1.subarray(vertex * 4, vertex * 4 + 4), [0.5 / total, 0.4 / total, 0.3 / total, 0.2 / total]);
   }
 });
 

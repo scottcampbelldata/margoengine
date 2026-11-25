@@ -107,7 +107,28 @@ interface Joint {
 }
 
 /** USD's text form takes attribute metadata one per line; a comma between them does not parse. */
-const JOINT_PRIMVAR = '(\n        elementSize = 4\n        interpolation = "vertex"\n    )';
+const jointPrimvar = (size: number) => `(\n        elementSize = ${size}\n        interpolation = "vertex"\n    )`;
+
+/**
+ * A skinned geometry's influences, four or eight a vertex, in one run each: UsdSkel's `elementSize` is any count of
+ * influences a point (UsdSkel BindingAPI, jointIndices), so the second glTF set follows the first in each vertex.
+ */
+function influences(geometry: Geo): { size: number; joints: Uint16Array; weights: Float32Array } {
+  const first = geometry.joints!,
+    second = geometry.joints1;
+  if (!second) return { size: 4, joints: first, weights: geometry.weights! };
+  const count = first.length / 4,
+    joints = new Uint16Array(count * 8),
+    weights = new Float32Array(count * 8);
+  for (let v = 0; v < count; v++)
+    for (let k = 0; k < 4; k++) {
+      joints[v * 8 + k] = first[v * 4 + k];
+      joints[v * 8 + 4 + k] = second[v * 4 + k];
+      weights[v * 8 + k] = geometry.weights![v * 4 + k];
+      weights[v * 8 + 4 + k] = geometry.weights1![v * 4 + k];
+    }
+  return { size: 8, joints, weights };
+}
 
 const PATHS = { translation: 't', rotation: 'r', scale: 's' } as const;
 const WIDTHS = { t: 3, r: 4, s: 3 } as const;
@@ -423,15 +444,14 @@ function shapeIn(space: Float64Array | undefined, { positions, normals, indices 
 /** Grows `box` to hold a skinned geometry under `palette`, by glTF's own skinning sum. */
 function growBoxSkinned(box: USDZBox, geometry: Geo, palette: readonly Float64Array[]): void {
   const { positions } = geometry,
-    joints = geometry.joints!,
-    weights = geometry.weights!,
+    { size, joints, weights } = influences(geometry),
     m = new Float64Array(12);
   for (let v = 0; v < positions.length / 3; v++) {
     m.fill(0);
-    for (let k = 0; k < 4; k++) {
-      const weight = weights[v * 4 + k];
+    for (let k = 0; k < size; k++) {
+      const weight = weights[v * size + k];
       if (!weight) continue;
-      const joint = palette[joints[v * 4 + k]];
+      const joint = palette[joints[v * size + k]];
       for (let c = 0; c < 4; c++) for (let r = 0; r < 3; r++) m[c * 3 + r] += weight * joint[c * 4 + r];
     }
     const x = positions[v * 3],
@@ -914,13 +934,14 @@ export async function exportAnimatedUSDZ(
         geometryShape.users = 1;
         materials.note(geometryShape, material);
         const bound = materials.bind(i, geometry, material),
-          joints = Array.from(geometry.joints!, (joint) => shape.remap[joint]);
+          influence = influences(geometry),
+          joints = Array.from(influence.joints, (joint) => shape.remap[joint]);
         meshPrim(lines, tail, i, node.name, geometry, geometryShape, bound, {
           transform: [],
           schemas: '"MaterialBindingAPI", "SkelBindingAPI"',
           extra: [
-            `    int[] primvars:skel:jointIndices = [${joints.join(', ')}] ${JOINT_PRIMVAR}`,
-            `    float[] primvars:skel:jointWeights = [${Array.from(geometry.weights!, num).join(', ')}] ${JOINT_PRIMVAR}`,
+            `    int[] primvars:skel:jointIndices = [${joints.join(', ')}] ${jointPrimvar(influence.size)}`,
+            `    float[] primvars:skel:jointWeights = [${Array.from(influence.weights, num).join(', ')}] ${jointPrimvar(influence.size)}`,
             `    rel skel:skeleton = </Margo/Skin_${index}/Skeleton>`,
           ],
         });

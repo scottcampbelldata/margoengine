@@ -614,6 +614,8 @@ export function listedVertices(geometry: Geo, order: ArrayLike<number>): Geo {
     count: order.length,
     joints: undefined,
     weights: undefined,
+    joints1: undefined,
+    weights1: undefined,
     morphs: undefined,
     base: undefined,
   };

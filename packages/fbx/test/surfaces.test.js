@@ -400,22 +400,203 @@ test('KB5330b: a skin whose control points give each vertex one weight set skins
     assert.deepEqual(got, { 0: Math.fround(0.4), 1: Math.fround(0.6) });
   }
 });
-test('KB5330b: control-net skin weights that blend within one vertex are refused, never approximated', async () => {
-  const tree = skinned(quadratic(), [
+// Column-major 4x4 helpers for posing the joints a test reads back from the GLB.
+const mul4 = (a, b) =>
+  Array.from({ length: 16 }, (_, i) => {
+    const c = Math.floor(i / 4),
+      r = i % 4;
+    let sum = 0;
+    for (let k = 0; k < 4; k++) sum += a[k * 4 + r] * b[c * 4 + k];
+    return sum;
+  });
+const apply4 = (m, p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+// A rotation by `angle` about the unit `axis` times `scale` (column-major 3x3), by Rodrigues' formula.
+function r9([x, y, z], angle, scale) {
+  const c = Math.cos(angle),
+    s = Math.sin(angle),
+    k = 1 - c;
+  return [
+    c + x * x * k,
+    y * x * k + z * s,
+    z * x * k - y * s,
+    x * y * k - z * s,
+    c + y * y * k,
+    z * y * k + x * s,
+    x * z * k + y * s,
+    y * z * k - x * s,
+    c + z * z * k,
+  ].map((v) => v * scale);
+}
+// A joint world matrix: that rotation and scale, then a move by `t`.
+const worldOf = (axis, angle, scale, t) => {
+  const m = r9(axis, angle, scale);
+  return [...m.slice(0, 3), 0, ...m.slice(3, 6), 0, ...m.slice(6), 0, ...t, 1];
+};
+// glTF's skinning sum (glTF 2.0 section 3.7.3.3) for every vertex, with each source joint at `worlds[name]` and every
+// other joint (the helpers) at its parent's world, which needs it to carry the identity transform.
+function skinGLB({ doc, accessor }, worlds) {
+  const skin = doc.skins[0],
+    ibm = accessor(skin.inverseBindMatrices),
+    parent = new Map();
+  doc.nodes.forEach((node, i) => (node.children ?? []).forEach((child) => parent.set(child, i)));
+  const world = (n) => {
+    const node = doc.nodes[n];
+    if (worlds[node.name]) return worlds[node.name];
+    const rest = { translation: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] };
+    assert.equal(node.matrix, undefined, node.name);
+    for (const key of Object.keys(rest)) assert.deepEqual(node[key] ?? rest[key], rest[key], node.name);
+    return world(parent.get(n));
+  };
+  const palette = skin.joints.map((n, k) => mul4(world(n), Array.from(ibm.subarray(k * 16, k * 16 + 16)))),
+    p = doc.meshes[0].primitives[0],
+    positions = accessor(p.attributes.POSITION),
+    sets = [0, 1]
+      .filter((set) => p.attributes['JOINTS_' + set] !== undefined)
+      .map((set) => [accessor(p.attributes['JOINTS_' + set]), accessor(p.attributes['WEIGHTS_' + set])]);
+  return Array.from({ length: positions.length / 3 }, (_, v) => {
+    const out = [0, 0, 0],
+      at = [positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]];
+    for (const [joints, weights] of sets)
+      for (let k = 0; k < 4; k++) {
+        const w = weights[v * 4 + k];
+        if (!w) continue;
+        apply4(palette[joints[v * 4 + k]], at).forEach((value, r) => (out[r] += w * value));
+      }
+    return out;
+  });
+}
+// The control net skinned point by point (normalized weights, as FBX Normalize clusters), then the surface through it.
+function exactSkin(sets, worlds, names, u, v, place = (p) => p) {
+  const out = [0, 0, 0];
+  for (let cp = 0; cp < 9; cp++) {
+    const row = sets.map(([indexes, weights]) => {
+        const i = indexes.indexOf(cp);
+        return i < 0 ? 0 : weights[i];
+      }),
+      total = row.reduce((a, b) => a + b, 0),
+      point = place(quadNet.slice(cp * 4, cp * 4 + 3)),
+      basis = share(cp, u, v);
+    row.forEach((w, j) => {
+      if (w) apply4(worlds[names[j]], point).forEach((value, r) => (out[r] += basis * (w / total) * value));
+    });
+  }
+  return out;
+}
+const twoJointBlend = [
+  [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
+  ],
+  [
+    [6, 7, 8],
+    [0.5, 0.5, 0.5],
+  ],
+];
+const blendPose = {
+  Root: worldOf([0, 0, 1], 0.7, 1.3, [0.3, -0.2, 0.1]),
+  Tip: worldOf([1, 0, 0], -0.9, 0.8, [-0.4, 0.5, 0.25]),
+};
+test('KB5330c: control-net skin weights that blend within one vertex skin the surface exactly through helper joints', async () => {
+  for (const format of ['ascii', 'binary']) {
+    const tree = skinned(quadratic(), twoJointBlend),
+      buffer = await convertFBX(encoded(tree, format), { extensions: [surfaces] }),
+      report = await validator.validateBytes(new Uint8Array(buffer));
+    assert.equal(report.issues.numErrors, 0, JSON.stringify(report.issues.messages));
+    const result = readGLB(buffer),
+      p = result.doc.meshes[0].primitives[0],
+      g = geometry(result);
+    // Two joints whose weights change across the net: four helpers each, eight influences, the second four in JOINTS_1.
+    assert.ok(p.attributes.JOINTS_1 !== undefined && p.attributes.WEIGHTS_1 !== undefined);
+    assert.equal(result.doc.skins[0].joints.length, 10);
+    const names = result.doc.skins[0].joints.map((n) => result.doc.nodes[n].name).sort();
+    assert.deepEqual(names, [
+      'Root',
+      'Root blend 0',
+      'Root blend 1',
+      'Root blend 2',
+      'Root blend 3',
+      'Tip',
+      'Tip blend 0',
+      'Tip blend 1',
+      'Tip blend 2',
+      'Tip blend 3',
+    ]);
+    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      atBind = skinGLB(result, { Root: identity, Tip: identity }),
+      moved = skinGLB(result, blendPose);
+    parameters(g).forEach(([u, v], i) => {
+      for (let r = 0; r < 3; r++)
+        assert.ok(Math.abs(atBind[i][r] - g.positions[i * 3 + r]) < 2e-6, `${format} bind ${i} ${atBind[i]}`);
+      const exact = exactSkin(twoJointBlend, blendPose, ['Root', 'Tip'], u, v);
+      for (let r = 0; r < 3; r++)
+        assert.ok(Math.abs(moved[i][r] - exact[r]) < 4e-6, `${format} vertex ${i}: ${moved[i]} != ${exact}`);
+    });
+    // The blend reaches the interior, so a polygon mesh skin (one weight set a vertex) could not match it.
+    let off = 0;
+    parameters(g).forEach(([u, v], i) => {
+      const single = [0, 0, 0],
+        s = [share(6, u, v) + share(7, u, v) + share(8, u, v)];
+      ['Root', 'Tip'].forEach((name, j) => {
+        const w = j === 0 ? 1 - s[0] / 2 : s[0] / 2;
+        apply4(blendPose[name], [g.positions[i * 3], g.positions[i * 3 + 1], g.positions[i * 3 + 2]]).forEach(
+          (value, r) => (single[r] += w * value),
+        );
+      });
+      const exact = exactSkin(twoJointBlend, blendPose, ['Root', 'Tip'], u, v);
+      off = Math.max(off, Math.hypot(single[0] - exact[0], single[1] - exact[1], single[2] - exact[2]));
+    });
+    assert.ok(off > 1e-3, `the exact blend differs from one weight set a vertex by ${off}`);
+  }
+});
+test('KB5330c: helper joint offsets follow the geometric transform the vertices are baked with', async () => {
+  const tree = skinned(quadratic(), twoJointBlend),
+    gp = (name, ...values) => ['P', [name, 'Vector3D', '', 'A', ...values]];
+  tree[0][2][1][2] = [['Properties70', [], [gp('GeometricScaling', 2, 1, 0.5), gp('GeometricRotation', 0, 0, 30)]]];
+  const result = await convert(tree),
+    g = geometry(result),
+    c = Math.cos(Math.PI / 6),
+    s = Math.sin(Math.PI / 6),
+    place = ([x, y, z]) => [2 * x * c - y * s, 2 * x * s + y * c, 0.5 * z],
+    moved = skinGLB(result, blendPose);
+  for (let i = 0; i < g.positions.length / 3; i++) {
+    const u = g.uvs[i * 2],
+      v = [g.uvs[i * 2 + 1], 1 - g.uvs[i * 2 + 1]].find((t) => {
+        let x = 0,
+          y = 0;
+        for (let cp = 0; cp < 9; cp++) {
+          const [px, py] = place(quadNet.slice(cp * 4, cp * 4 + 3));
+          x += share(cp, u, t) * px;
+          y += share(cp, u, t) * py;
+        }
+        return Math.abs(x - g.positions[i * 3]) < 1e-5 && Math.abs(y - g.positions[i * 3 + 1]) < 1e-5;
+      });
+    assert.notEqual(v, undefined, `vertex ${i} is on the transformed surface`);
+    const exact = exactSkin(twoJointBlend, blendPose, ['Root', 'Tip'], u, v, place);
+    for (let r = 0; r < 3; r++)
+      assert.ok(Math.abs(moved[i][r] - exact[r]) < 6e-6, `vertex ${i}: ${moved[i]} != ${exact}`);
+  }
+});
+test('KB5330c: control-net blends that need more than eight influences, or a negative share, are refused', async () => {
+  // Three joints whose weights all change across one vertex need twelve influences.
+  const three = skinned(quadratic(), [
     [
       [0, 1, 2, 3, 4, 5, 6, 7, 8],
       [1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5],
     ],
     [
-      [6, 7, 8],
-      [0.5, 0.5, 0.5],
+      [6, 7],
+      [0.5, 0.5],
     ],
+    [[8], [0.5]],
   ]);
+  three[0][2].push(['Model', [L(12), 'Model::Third', 'LimbNode'], []]);
+  three[1][2].push(['C', ['OO', L(12), L(11)]]);
   await assert.rejects(
-    convert(tree),
-    (error) => error.code === 'unsupported' && /blend across the control points of one vertex/.test(error.message),
+    convert(three),
+    (error) => error.code === 'unsupported' && /past eight influences/.test(error.message),
   );
-  // A Cardinal patch mixes neighbours with negative coefficients; a blended skin there is still found.
+  // A Cardinal patch mixes neighbours with negative coefficients, so a joint's share of a vertex can go below zero,
+  // which no glTF weight can hold.
   const cardinal = skinned(
     surfaceTree({ type: 'Patch', u: 4, v: 2, fields: [['PatchType', ['Cardinal', 'Linear']]] }),
     [
@@ -429,5 +610,8 @@ test('KB5330b: control-net skin weights that blend within one vertex are refused
       ],
     ],
   );
-  await assert.rejects(convert(cardinal), (error) => error.code === 'unsupported');
+  await assert.rejects(
+    convert(cardinal),
+    (error) => error.code === 'unsupported' && /negative share/.test(error.message),
+  );
 });

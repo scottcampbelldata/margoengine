@@ -112,6 +112,8 @@ interface GeometryData {
     faceSizes?: ArrayLike<number>;
     joints?: ArrayLike<number>;
     weights?: ArrayLike<number>;
+    joints1?: ArrayLike<number>;
+    weights1?: ArrayLike<number>;
     morphs?: readonly MorphData[];
 }
 

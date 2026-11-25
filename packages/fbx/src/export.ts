@@ -465,9 +465,10 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     firstCorner.forEach(([base, v], control) => {
       if (!base.joints || !base.weights)
         throw new TypeError(`Skinned ${label} has a primitive without joints and weights; add them or remove the skin`);
-      for (let k = 0; k < 4; k++) {
-        const weight = base.weights[v * 4 + k],
-          joint = base.joints[v * 4 + k];
+      // A cluster lists any number of control points, so the second glTF set of four is written as the first.
+      for (let k = 0; k < (base.joints1 ? 8 : 4); k++) {
+        const weight = (k < 4 ? base.weights : base.weights1!)[v * 4 + (k & 3)],
+          joint = (k < 4 ? base.joints : base.joints1!)[v * 4 + (k & 3)];
         if (!weight) continue;
         if (!influences[joint])
           throw new RangeError(`Skin of ${label} names joint ${joint}, past its joint list; fix the vertex joints`);
@@ -571,6 +572,8 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
           for (let k = 0; k < base.colorSize; k++) colors[at * 4 + k] = base.colors[v * base.colorSize + k];
         if (base.joints && base.weights)
           for (let k = 0; k < 4; k++) identity.push(base.joints[v * 4 + k], base.weights[v * 4 + k]);
+        if (base.joints1 && base.weights1)
+          for (let k = 0; k < 4; k++) identity.push(base.joints1[v * 4 + k], base.weights1[v * 4 + k]);
         for (const morph of base.morphs ?? [])
           for (let k = 0; k < 3; k++) identity.push(morph.positions[v * 3 + k], morph.normals?.[v * 3 + k] ?? 0);
         const weldKey = identity.join();

@@ -415,6 +415,8 @@ interface Geo {
     faceSizes?: Uint8Array;
     joints?: Uint16Array;
     weights?: Float32Array;
+    joints1?: Uint16Array;
+    weights1?: Float32Array;
     widths?: Float32Array;
     morphs?: {
         name?: string;
@@ -440,6 +442,8 @@ interface GeometryData {
     faceSizes?: ArrayLike<number>;
     joints?: ArrayLike<number>;
     weights?: ArrayLike<number>;
+    joints1?: ArrayLike<number>;
+    weights1?: ArrayLike<number>;
     morphs?: readonly MorphData[];
 }
 

@@ -39,7 +39,7 @@ function floats(accessor: AccessorValues): Float32Array {
 
 /**
  * Reads a GLB as a scene. What the scene's writers cannot hold goes in `skipped`.
- * @throws TypeError for bytes that are not a GLB, a file that needs Draco or meshopt decoded first, or more than four skin
+ * @throws TypeError for bytes that are not a GLB, a file that needs Draco or meshopt decoded first, or more than eight skin
  * influences; RangeError for data past its buffer.
  */
 export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GLBSceneSkip[] } {
@@ -126,15 +126,15 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
       if (known !== undefined) return known;
       const primitive = json.meshes[mesh].primitives[at],
         attributes = primitive.attributes ?? {},
-        { POSITION, NORMAL, TEXCOORD_0, TEXCOORD_1, COLOR_0, JOINTS_0, WEIGHTS_0, JOINTS_1 } = attributes;
+        { POSITION, NORMAL, TEXCOORD_0, TEXCOORD_1, COLOR_0, JOINTS_0, WEIGHTS_0, JOINTS_1, WEIGHTS_1 } = attributes;
       const mode = primitive.mode ?? 4;
       if (!(Number.isInteger(mode) && mode >= 0 && mode <= 6) || POSITION === undefined) {
         skipped.push({ kind: 'primitive', index: mesh });
         geometries.set(key, null);
         return null;
       }
-      if (JOINTS_1 !== undefined)
-        throw new TypeError('This GLB has more than four skin influences per vertex; bake it down to four first');
+      if (Object.keys(attributes).some((name) => /^(JOINTS|WEIGHTS)_([2-9]|dd)/.test(name)))
+        throw new TypeError('This GLB has more than eight skin influences per vertex; bake it down to eight first');
       const positions = floats(readAccessor(parts, POSITION)),
         count = positions.length / 3,
         // Points, lines, strips and fans keep the file's run; its mode is the primitive's (glTF 2.0 section 3.7.2.1).
@@ -156,6 +156,10 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
       if (JOINTS_0 !== undefined && WEIGHTS_0 !== undefined) {
         data.joints = readAccessor(parts, JOINTS_0).values;
         data.weights = floats(readAccessor(parts, WEIGHTS_0));
+        if (JOINTS_1 !== undefined && WEIGHTS_1 !== undefined) {
+          data.joints1 = readAccessor(parts, JOINTS_1).values;
+          data.weights1 = floats(readAccessor(parts, WEIGHTS_1));
+        }
       }
       if (Array.isArray(primitive.targets) && primitive.targets.length) {
         const names = json.meshes[mesh].extras?.targetNames;

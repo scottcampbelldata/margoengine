@@ -367,6 +367,8 @@ function checkSkin(skin: Json, { nodes, accessors }: Source): void {
 
 /** Every vertex's joints exist in `skin` and its four Float32 weights lie in [0, 1] and sum to 1. */
 function checkSkinWeights(attributes: Json, vertices: unknown, skin: Json, { accessors, readers }: Source): void {
+  if (Object.keys(attributes).some((name) => /^(JOINTS|WEIGHTS)_[1-9]/.test(name)))
+    unsupported('takes four skin influences a vertex (JOINTS_0 alone); bake the skin down to four or keep general GLB');
   const w = accessorAt(accessors, attributes.WEIGHTS_0, 'skin weights'),
     j = accessorAt(accessors, attributes.JOINTS_0, 'skin joint indices'),
     weights = accessors[w],

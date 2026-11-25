@@ -788,6 +788,54 @@ test('data scenes export skins, morph targets and animation compatible with the 
   assert.deepEqual(separate.bin, bin);
 });
 
+test('eight skin influences a vertex: JOINTS_1 and WEIGHTS_1 are written, normalized with the first four, posed and read back', async () => {
+  const { scene, geometry } = deformationScene(),
+    four = exportOBJ(deformationScene().scene);
+  // The same influences, joint 1 moved to the second set: a joint takes one nonzero weight a vertex (glTF 2.0 3.7.3.3).
+  geometry.joints = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  geometry.weights = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  geometry.joints1 = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  geometry.weights1 = [3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0];
+  const glb = exportGLB(scene);
+  await assertValid(glb);
+  const { json, bin } = readGLB(glb),
+    primitive = json.meshes[0].primitives[0];
+  assert.equal(json.accessors[primitive.attributes.JOINTS_1].type, 'VEC4');
+  assert.equal(json.accessors[primitive.attributes.JOINTS_1].componentType, 5123);
+  close(accessor(json, bin, primitive.attributes.WEIGHTS_0), [0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0, 0, 0], 0);
+  close(accessor(json, bin, primitive.attributes.WEIGHTS_1), [0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, 0, 0], 0);
+  close(accessor(json, bin, primitive.attributes.JOINTS_1), geometry.joints1, 0);
+  // A format with no skeleton writes the posed shape: the same as the four-influence skin it equals.
+  assert.equal(exportOBJ(scene).obj, four.obj);
+  // A loaded model keeps both sets when exported again.
+  const engine = await headlessEngine(),
+    model = new PBRModel(engine, new GLTFAsset(json, [bin])),
+    again = readGLB(exportGLB(engine)),
+    back = again.json.meshes[0].primitives[0];
+  close(accessor(again.json, again.bin, back.attributes.WEIGHTS_1), [0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, 0, 0], 0);
+  close(accessor(again.json, again.bin, back.attributes.JOINTS_1), geometry.joints1, 0);
+  model.dispose();
+  engine.dispose();
+  for (const [change, message] of [
+    [(g) => delete g.weights1, /required together/],
+    [(g) => (g.joints1 = g.joints1.slice(0, 8)), /joints1 needs four values per vertex/],
+    [
+      (g) => {
+        delete g.joints;
+        delete g.weights;
+      },
+      /add to joints and weights/,
+    ],
+    [(g) => (g.weights1 = g.weights1.map(() => -1)), /nonnegative/],
+  ]) {
+    const { scene: bad, geometry: g } = deformationScene();
+    g.joints1 = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+    g.weights1 = [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0];
+    change(g);
+    assert.throws(() => exportGLB(bad), message, String(message));
+  }
+});
+
 test('cubic rotation and morph channels preserve value/tangent arity and Float32 timing', async () => {
   const { scene, mesh, tip } = deformationScene(),
     q = Math.SQRT1_2;

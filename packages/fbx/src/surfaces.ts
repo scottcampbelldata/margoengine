@@ -1,8 +1,9 @@
 import { fault } from '../../shared/errors.js';
 // FBX surface schema: Autodesk FbxNurbsSurface/FbxPatch. Basis conversion: Piegl/Tiller and Catmull/Rom.
 import { tessellateNurbsSurface, type NurbsSurface } from '@margoengine/loaders/nurbs';
-import { array, findChild, invalid, type FBXNode, type FBXValue, type ParseBudget } from './document.js';
+import { array, findChild, invalid, objectName, type FBXNode, type FBXValue, type ParseBudget } from './document.js';
 import type { ExtensionHooks, FBXExtension } from './extension.js';
+import { fbxGeometricTransform, multiply, translation } from './math.js';
 
 const record = (name: string, properties: FBXValue[] = [], children: FBXNode[] = []): FBXNode => ({
   name,
@@ -297,10 +298,10 @@ function tessellate(source: FBXNode, control: Net, budget: ParseBudget, withCaps
     ? caps(source, rows, cols, result, indices, budget)
     : { positions: result.positions, normals: result.normals!, uvs: result.uvs!, indices, rings: [] };
 }
-function mesh(source: FBXNode, budget: ParseBudget, deformed?: Deformation): void {
+function mesh(source: FBXNode, budget: ParseBudget, deformed?: Deformation, tree?: Tree): void {
   const control = net(source, budget),
     capped = tessellate(source, control, budget, true);
-  if (deformed) deform(source, control, capped, deformed, budget);
+  if (deformed) deform(source, control, capped, deformed, budget, tree!);
   const layer = (name: string, dataName: string, width: number, data: Float32Array) =>
     record(
       name,
@@ -336,6 +337,21 @@ function derived(control: Net, budget: ParseBudget, fill: (cp: number, out: Floa
 interface Deformation {
   shapes: FBXNode[];
   clusters: FBXNode[];
+  /** The Skin deformer, when there is one. */
+  skin?: FBXNode;
+  /** The joint Model each cluster moves with. */
+  joints: Map<FBXNode, FBXNode>;
+  /** Column-major 3x3 linear part of the geometric transform of the models that draw the surface; null when they differ. */
+  geometric: number[] | null;
+}
+/** Where new objects go: the document's Objects and Connections. */
+interface Tree {
+  /** An object id no other object has. */
+  fresh(): bigint;
+  /** Adds `node` to Objects with an OO connection to `parent`. */
+  add(node: FBXNode, parent: FBXValue): void;
+  /** An OO connection from `child` to `parent`. */
+  link(child: FBXValue, parent: FBXValue): void;
 }
 const unsupported = (what: string): never => {
   throw fault(
@@ -422,9 +438,28 @@ function deformShape(source: FBXNode, control: Net, base: Grid, shape: FBXNode, 
 // A skin moves each control point by the blend of its own weights. A vertex is a fixed affine combination of the
 // control points its basis reaches, so when they all carry one weight set the vertex moves by that same blend, exactly,
 // whatever the joints do: an affine map commutes with affine combinations (Farin, Curves and Surfaces for CAGD, 2002,
-// ch. 3). Where those points carry different sets, the exact result needs each joint at its own bind position, which a
-// glTF skin (one position shared by every joint of a vertex) cannot hold, so it is refused rather than approximated.
-function deformSkin(source: FBXNode, control: Net, base: Grid, clusters: FBXNode[], budget: ParseBudget): void {
+// ch. 3). Where those points carry different sets, linear blend skinning of the net (Magnenat-Thalmann, Laperriere and
+// Thalmann 1988) moves the vertex to sum_j s_j S_j b_j: s_j is the vertex's share of joint j (its basis over the points'
+// normalized weights) and b_j a bind position of its own, the share-weighted mean of those points. A glTF skin
+// (glTF 2.0, section 3.7.3) has one position v a vertex, so each joint whose weight changes across the points gets four
+// helper joints, identity children of it whose inverse binds add the offsets R e_k of a regular tetrahedron. Any
+// d = b_j - v with |d| <= R / (2 sqrt(3)) has the barycentric weights 1/4 + e_k.d / (4R) >= 1/8, as sum_k e_k = 0 and
+// sum_k e_k e_k^T = 4I for these four vectors (Coxeter, Regular Polytopes, 1973), and then
+// sum_k s_j (1/4 + e_k.d / (4R)) S_j (v + R e_k) = s_j S_j b_j: the exact vertex, in eight influences for two such joints.
+const TETRAHEDRON = [
+  [1, 1, 1],
+  [1, -1, -1],
+  [-1, 1, -1],
+  [-1, -1, 1],
+];
+function deformSkin(
+  source: FBXNode,
+  control: Net,
+  base: Grid,
+  { clusters, skin, joints, geometric }: Deformation,
+  budget: ParseBudget,
+  tree: Tree,
+): void {
   const cpCount = control.u * control.v,
     n = clusters.length;
   budget.array(cpCount * n * 8 + cpCount * 8);
@@ -459,8 +494,9 @@ function deformSkin(source: FBXNode, control: Net, base: Grid, clusters: FBXNode
   const count = base.positions.length / 3,
     copies = base.rings.flat(),
     grid = count - copies.length;
-  budget.array(count * 4);
-  const vertexSet = new Int32Array(count).fill(-1);
+  budget.array(count * 8 * (n + 1));
+  budget.work(count * sets.size);
+  const reached: number[][] = Array.from({ length: grid }, () => []);
   // A set reaches a vertex when its points' share of the vertex is not zero. Generic positive values stand in for one,
   // so a Cardinal patch's negative coefficients cannot cancel to an exact zero (Schwartz 1980; Zippel 1979).
   for (let set = 0; set < sets.size; set++) {
@@ -473,25 +509,145 @@ function deformSkin(source: FBXNode, control: Net, base: Grid, clusters: FBXNode
       budget,
       false,
     );
-    for (let v = 0; v < grid; v++) {
-      if (reach.positions[v * 3] === 0) continue;
-      if (vertexSet[v] !== -1) unsupported('skin weights blend across the control points of one vertex');
-      vertexSet[v] = set;
+    for (let v = 0; v < grid; v++) if (reach.positions[v * 3] !== 0) reached[v].push(set);
+  }
+  for (let v = 0; v < grid; v++) if (!reached[v].length) invalid('surface skin coverage');
+  const rows = [...sets.keys()].map((key) => key.split(',').map(Number));
+  // Each cluster's weight at each vertex; helper clusters follow the source ones.
+  const out: Float64Array[] = clusters.map(() => new Float64Array(count)),
+    blended: number[] = [];
+  for (let v = 0; v < grid; v++)
+    if (reached[v].length === 1) for (let c = 0; c < n; c++) out[c][v] = rows[reached[v][0]][c];
+    else blended.push(v);
+  const made: FBXNode[] = [];
+  if (blended.length) {
+    for (const cluster of clusters) {
+      const mode = findChild(cluster, 'Mode')?.properties[0];
+      if (mode !== undefined && mode !== 'Normalize')
+        unsupported(`skin weights blend across the control points of one vertex in a ${String(mode)} cluster`);
+    }
+    // A Normalize cluster set moves a point by its weights over their total, as on a mesh.
+    const shares = rows.map((row) => {
+      const total = row.reduce((a, b) => a + b, 0);
+      if (!(total > 0))
+        throw new RangeError('FBX skin vertex has no positive weights; clean up the source model before export');
+      return row.map((w) => w / total);
+    });
+    const varies = (v: number, c: number) => reached[v].some((set) => shares[set][c] !== shares[reached[v][0]][c]),
+      helpers: { c: number; radius: number; first: number }[] = [],
+      share: Float32Array[] = [],
+      mean: Float32Array[] = [];
+    clusters.forEach((_, c) => {
+      if (!blended.some((v) => varies(v, c))) return;
+      // The vertex's share of the joint and the share-weighted sum of its points, by the surface's own basis.
+      share[c] = tessellate(
+        source,
+        derived(control, budget, (cp, values, at) => {
+          values[at] = shares[setOf[cp]][c];
+          values[at + 1] = values[at + 2] = 0;
+        }),
+        budget,
+        false,
+      ).positions;
+      mean[c] = tessellate(
+        source,
+        derived(control, budget, (cp, values, at) => {
+          for (let k = 0; k < 3; k++) values[at + k] = shares[setOf[cp]][c] * control.points[cp * 4 + k];
+        }),
+        budget,
+        false,
+      ).positions;
+      let reach = 0;
+      for (const v of blended) {
+        if (!varies(v, c)) continue;
+        const s = share[c][v * 3];
+        let length = 0;
+        for (let k = 0; k < 3; k++) length += (mean[c][v * 3 + k] - s * base.positions[v * 3 + k]) ** 2;
+        length = Math.sqrt(length);
+        if (s < 0 || (s === 0 && length > 0))
+          unsupported(
+            'skin weights blend across the control points of one vertex where a joint takes a negative share',
+          );
+        if (s > 0) reach = Math.max(reach, length / s);
+      }
+      if (reach > 0) helpers.push({ c, radius: 2 * Math.sqrt(3) * reach, first: n + helpers.length * 4 });
+    });
+    budget.array(helpers.length * 4 * count * 8);
+    budget.work(blended.length * n * 4);
+    for (let i = 0; i < helpers.length * 4; i++) out.push(new Float64Array(count));
+    const helperOf = new Map(helpers.map((helper) => [helper.c, helper]));
+    for (const v of blended) {
+      let influences = 0;
+      for (let c = 0; c < n; c++) {
+        const helper = helperOf.get(c);
+        if (!helper || !varies(v, c)) {
+          // A joint whose weight holds across the points moves the vertex by that weight.
+          const w = varies(v, c) ? share[c][v * 3] : shares[reached[v][0]][c];
+          out[c][v] = w;
+          if (w > 0) influences++;
+          continue;
+        }
+        const s = share[c][v * 3];
+        if (!(s > 0)) continue;
+        for (let k = 0; k < 4; k++) {
+          let dot = 0;
+          for (let r = 0; r < 3; r++) dot += TETRAHEDRON[k][r] * (mean[c][v * 3 + r] / s - base.positions[v * 3 + r]);
+          out[helper.first + k][v] = s * (0.25 + dot / (4 * helper.radius));
+        }
+        influences += 4;
+      }
+      if (influences > 8)
+        unsupported(
+          'skin weights blend across the control points of one vertex past eight influences, four for each joint whose weight changes there',
+        );
+    }
+    if (helpers.length && geometric === null)
+      unsupported('skin blend on a surface that models with different geometric transforms draw');
+    if (helpers.length && !skin) invalid('surface skin');
+    budget.node(helpers.length * 20);
+    budget.property(helpers.length * 40);
+    for (const { c, radius } of helpers) {
+      const cluster = clusters[c],
+        joint = joints.get(cluster);
+      if (!joint) invalid('surface cluster joint');
+      if (!findChild(cluster, 'Transform') || !findChild(cluster, 'TransformLink'))
+        invalid('surface cluster bind matrix');
+      const transform = array(cluster, 'Transform'),
+        link = array(cluster, 'TransformLink'),
+        mode = findChild(cluster, 'Mode'),
+        g = geometric ?? [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      if (transform.length !== 16 || link.length !== 16) invalid('surface cluster bind matrix');
+      TETRAHEDRON.forEach((e, k) => {
+        // The offset is in the space the inverse bind reads, after the geometric transform.
+        const offset = [0, 1, 2].map((r) => radius * (g[r] * e[0] + g[3 + r] * e[1] + g[6 + r] * e[2])),
+          name = `${objectName(joint!)} blend ${k}`,
+          model = record('Model', [tree.fresh(), `Model::${name}`, 'LimbNode']),
+          helper = record(
+            'Deformer',
+            [tree.fresh(), `SubDeformer::${name}`, 'Cluster'],
+            [
+              record('Version', [100]),
+              ...(mode ? [mode] : []),
+              record('Transform', [multiply(transform, translation(offset))]),
+              record('TransformLink', [Float64Array.from(link)]),
+            ],
+          );
+        tree.add(model, joint!.properties[0]);
+        tree.add(helper, skin!.properties[0]);
+        tree.link(model.properties[0], helper.properties[0]);
+        made.push(helper);
+      });
     }
   }
-  for (let i = 0; i < copies.length; i++) vertexSet[grid + i] = vertexSet[copies[i]];
-  for (let v = 0; v < count; v++) if (vertexSet[v] < 0) invalid('surface skin coverage');
-  const rows = [...sets.keys()].map((key) => key.split(',').map(Number));
-  clusters.forEach((cluster, c) => {
+  for (const weightsOf of out) for (let i = 0; i < copies.length; i++) weightsOf[grid + i] = weightsOf[copies[i]];
+  [...clusters, ...made].forEach((cluster, c) => {
     const indices: number[] = [],
       values: number[] = [];
-    for (let v = 0; v < count; v++) {
-      const weight = rows[vertexSet[v]][c];
-      if (weight > 0) {
+    for (let v = 0; v < count; v++)
+      if (out[c][v] > 0) {
         indices.push(v);
-        values.push(weight);
+        values.push(out[c][v]);
       }
-    }
     budget.array(indices.length * 12);
     const rest = cluster.children.filter((node) => node.name !== 'Indexes' && node.name !== 'Weights');
     cluster.children = indices.length
@@ -499,9 +655,16 @@ function deformSkin(source: FBXNode, control: Net, base: Grid, clusters: FBXNode
       : rest;
   });
 }
-function deform(source: FBXNode, control: Net, base: Grid, deformation: Deformation, budget: ParseBudget): void {
+function deform(
+  source: FBXNode,
+  control: Net,
+  base: Grid,
+  deformation: Deformation,
+  budget: ParseBudget,
+  tree: Tree,
+): void {
   for (const shape of deformation.shapes) deformShape(source, control, base, shape, budget);
-  if (deformation.clusters.length) deformSkin(source, control, base, deformation.clusters, budget);
+  if (deformation.clusters.length) deformSkin(source, control, base, deformation, budget, tree);
 }
 function normalize(roots: FBXNode[], budget: ParseBudget): void {
   const objects = roots.find((n) => n.name === 'Objects');
@@ -511,6 +674,7 @@ function normalize(roots: FBXNode[], budget: ParseBudget): void {
     ),
     byId = new Map(objects.children.map((n) => [String(n.properties[0]), n])),
     parents = new Map<string, number>(),
+    owners = new Map<string, string[]>(),
     kids = new Map<string, FBXNode[]>();
   budget.work(links.length);
   for (const link of links) {
@@ -518,6 +682,9 @@ function normalize(roots: FBXNode[], budget: ParseBudget): void {
       parent = String(link.properties[2]),
       node = byId.get(child);
     parents.set(child, (parents.get(child) ?? 0) + 1);
+    let up = owners.get(child);
+    if (!up) owners.set(child, (up = []));
+    up.push(parent);
     if (!node) continue;
     let list = kids.get(parent);
     if (!list) kids.set(parent, (list = []));
@@ -541,19 +708,58 @@ function normalize(roots: FBXNode[], budget: ParseBudget): void {
       .filter((n) => n.properties[2] === 'BlendShape')
       .flatMap((d) => typed(d.properties[0], 'BlendShapeChannel'))
       .flatMap((c) => typed(c.properties[0], 'Shape'));
-    const clusters = skins.flatMap((d) => typed(d.properties[0], 'Cluster'));
+    const clusters = skins.flatMap((d) => typed(d.properties[0], 'Cluster')),
+      joints = new Map<FBXNode, FBXNode>();
+    for (const cluster of clusters) {
+      const models = (kids.get(String(cluster.properties[0])) ?? []).filter((n) => n.name === 'Model');
+      if (models.length === 1) joints.set(cluster, models[0]);
+    }
+    // The models drawing the surface: one geometric linear part for all of them, or null.
+    let geometric: number[] | null = [1, 0, 0, 0, 1, 0, 0, 0, 1],
+      first = true;
+    for (const owner of owners.get(String(source.properties[0])) ?? []) {
+      const model = byId.get(owner);
+      if (model?.name !== 'Model') continue;
+      const m = fbxGeometricTransform(model),
+        part = [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+      if (first) geometric = part;
+      else if (geometric && part.some((value, i) => value !== geometric![i])) geometric = null;
+      first = false;
+    }
     // Each rewritten node must belong to this surface alone, or another geometry would read surface vertex numbers.
     for (const node of [...deformers, ...shapes, ...clusters])
       if (parents.get(String(node.properties[0])) !== 1) unsupported('deformer shared with other geometry');
-    deformations.set(source, { shapes, clusters });
+    deformations.set(source, { shapes, clusters, skin: skins[0], joints, geometric });
   }
   const used = new Set(objects.children.map((n) => String(n.properties[0])));
   let next = -1n;
   let connections = roots.find((n) => n.name === 'Connections');
+  const tree: Tree = {
+    fresh() {
+      while (used.has(String(next))) next--;
+      used.add(String(next));
+      return next--;
+    },
+    add(node, parent) {
+      budget.node(1);
+      budget.property(3);
+      objects.children.push(node);
+      tree.link(node.properties[0], parent);
+    },
+    link(child, parent) {
+      if (!connections) {
+        connections = record('Connections');
+        roots.push(connections);
+      }
+      budget.node(1);
+      budget.property(3);
+      connections.children.push(record('C', ['OO', child, parent]));
+    },
+  };
   for (const source of [...objects.children]) {
     budget.work();
     if (!surface(source)) continue;
-    if (source.name === 'Geometry') mesh(source, budget, deformations.get(source));
+    if (source.name === 'Geometry') mesh(source, budget, deformations.get(source), tree);
     else if (source.name === 'Model' && findChild(source, 'Points')) {
       while (used.has(String(next))) next--;
       budget.node(1);

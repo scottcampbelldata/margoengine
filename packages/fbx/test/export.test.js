@@ -469,6 +469,46 @@ test('a skin in the bytes: each cluster lists its points and weights and hangs f
   for (const cluster of clusters) assert.ok(links.some((l) => l[1] === cluster.props[0] && l[2] === skin.props[0]));
 });
 
+test('a second set of influences (JOINTS_1) is written into the same clusters as the first', async () => {
+  const bone = { name: 'Bone', translation: [0, 1, 0] },
+    other = { name: 'Other', translation: [0, 2, 0] },
+    geometry = {
+      ...quad(),
+      joints: new Uint16Array([0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      weights: new Float32Array([1, 0, 0, 0, 0.25, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      // Vertex 1 keeps its 0.75 on Other in the second set of four.
+      joints1: new Uint16Array([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      weights1: new Float32Array([0, 0, 0, 0, 0.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    },
+    skinned = {
+      name: 'Skinned',
+      geometry,
+      skin: {
+        joints: [bone, other],
+        inverseBindMatrices: new Float32Array([
+          1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -2, 0, 1,
+        ]),
+      },
+    },
+    { fbx } = await exportFBX({ nodes: [bone, other, skinned] }),
+    top = readRecords(fbx),
+    objects = top.find((c) => c.name === 'Objects'),
+    deformers = named(objects, 'Deformer'),
+    skin = deformers.find((d) => d.props[2] === 'Skin'),
+    clusters = deformers.filter((d) => d.props[2] === 'Cluster'),
+    links = top.find((c) => c.name === 'Connections').children.map((c) => c.props);
+  assert.equal(clusters.length, 2);
+  const gathered = clusters.map((cluster) => ({
+    points: plain(child(cluster, 'Indexes').props[0]),
+    weights: plain(child(cluster, 'Weights').props[0]),
+  }));
+  assert.deepEqual(gathered, [
+    { points: [0, 1], weights: [1, 0.25] },
+    { points: [1, 2, 3], weights: [0.75, 1, 1] },
+  ]);
+  for (const cluster of clusters) assert.ok(links.some((l) => l[1] === cluster.props[0] && l[2] === skin.props[0]));
+});
+
 test('binary layout: header, 7400 records, deflated arrays, footer', async () => {
   const { fbx } = await exportFBX({ nodes: [{ name: 'Big', geometry: quad() }] }),
     text = new TextDecoder('latin1').decode(fbx),

@@ -189,6 +189,11 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
     const owner = geo.base ?? geo;
     if (!owner.joints) return;
     if (!node.skin) throw new TypeError(`${label} has joints but its node has no skin; add the skin`);
+    // Roblox skinned meshes take four bones a vertex (Roblox Creator Hub, "Skinned meshes" requirements).
+    if (owner.joints1?.some((_, slot) => owner.weights1![slot] > 0))
+      throw new RangeError(
+        `${label} has more than four skin influences on a vertex; Roblox takes four, so bake the skin down to four`,
+      );
     const roots = rootsOf(node);
     for (let slot = 0; slot < owner.weights!.length; slot++)
       if (owner.weights![slot] > 0 && roots.has(owner.joints[slot]))

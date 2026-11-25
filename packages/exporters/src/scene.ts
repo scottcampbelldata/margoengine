@@ -49,6 +49,12 @@ export interface GeometryData {
   /** Four joint indices and weights per vertex, required together. */
   joints?: ArrayLike<number>;
   weights?: ArrayLike<number>;
+  /**
+   * Four more joint indices and weights per vertex (glTF `JOINTS_1`, `WEIGHTS_1`), with `joints` and `weights`:
+   * eight influences in all, normalized together. Default none. glTF, USDZ and the pose bake take them; Roblox refuses.
+   */
+  joints1?: ArrayLike<number>;
+  weights1?: ArrayLike<number>;
   /** Dense xyz deltas in base-vertex order. */
   morphs?: readonly MorphData[];
 }
@@ -485,6 +491,9 @@ export interface Geo {
   faceSizes?: Uint8Array;
   joints?: Uint16Array;
   weights?: Float32Array;
+  /** The second four influences of each vertex, normalized with the first four. */
+  joints1?: Uint16Array;
+  weights1?: Float32Array;
   /**
    * A plugin stroke's or cloud's per-point multiplier of its material `width` (a `Stroke`'s `widths`, a cloud's
    * `sizes`): glTF `_WIDTH`, USD vertex `widths`.
@@ -1017,24 +1026,48 @@ export function normalizeGeometry(data: Geometry | GeometryData, topology?: 'poi
   }
   if ((data.joints === undefined) !== (data.weights === undefined))
     fail('Joint indices and weights are required together');
+  if ((data.joints1 === undefined) !== (data.weights1 === undefined))
+    fail('Joint indices and weights are required together');
+  if (data.joints1 !== undefined && data.joints === undefined)
+    fail('joints1 and weights1 add to joints and weights; pass the first four influences in joints and weights');
   if (data.joints !== undefined) {
-    if (!isObject(data.joints) || data.joints.length !== count * 4) fail('Joints need four values per vertex');
-    const joints = new Uint16Array(count * 4),
-      weights = floats(data.weights, count * 4, 'Weights');
-    for (let i = 0; i < joints.length; i++) {
-      const joint = data.joints[i];
-      if (!Number.isInteger(joint) || joint < 0 || joint > 65535)
-        throw new RangeError('Joint indices must be unsigned 16-bit integers');
-      if (weights[i] < 0) throw new RangeError('Skin weights must be nonnegative');
-      joints[i] = joint;
+    const sets = data.joints1 === undefined ? 1 : 2,
+      joints = new Uint16Array(count * 4 * sets),
+      weights = new Float32Array(count * 4 * sets);
+    for (let set = 0; set < sets; set++) {
+      const given = set ? data.joints1 : data.joints;
+      if (!isObject(given) || given!.length !== count * 4)
+        fail(set ? 'joints1 needs four values per vertex' : 'Joints need four values per vertex');
+      const values = floats(set ? data.weights1 : data.weights, count * 4, set ? 'Weights 1' : 'Weights');
+      for (let i = 0; i < count * 4; i++) {
+        const joint = given![i],
+          at = (i >> 2) * 4 * sets + set * 4 + (i & 3);
+        if (!Number.isInteger(joint) || joint < 0 || joint > 65535)
+          throw new RangeError('Joint indices must be unsigned 16-bit integers');
+        if (values[i] < 0) throw new RangeError('Skin weights must be nonnegative');
+        joints[at] = joint;
+        weights[at] = values[i];
+      }
     }
-    for (let i = 0; i < weights.length; i += 4) {
-      const sum = weights[i] + weights[i + 1] + weights[i + 2] + weights[i + 3];
+    // Normalized over every influence of the vertex in double precision, then split back into sets of four.
+    const width = 4 * sets;
+    for (let i = 0; i < weights.length; i += width) {
+      let sum = 0;
+      for (let c = 0; c < width; c++) sum += weights[i + c];
       if (!(sum > 0)) throw new RangeError('Skin weights must have a positive sum');
-      for (let c = 0; c < 4; c++) weights[i + c] /= sum;
+      for (let c = 0; c < width; c++) weights[i + c] /= sum;
     }
-    geo.joints = joints;
-    geo.weights = weights;
+    const split = (from: Uint16Array | Float32Array, set: number) => {
+      const out = new (from.constructor as Uint16ArrayConstructor | Float32ArrayConstructor)(count * 4);
+      for (let v = 0; v < count; v++) for (let c = 0; c < 4; c++) out[v * 4 + c] = from[v * width + set * 4 + c];
+      return out;
+    };
+    geo.joints = sets === 1 ? joints : (split(joints, 0) as Uint16Array);
+    geo.weights = sets === 1 ? weights : (split(weights, 0) as Float32Array);
+    if (sets === 2) {
+      geo.joints1 = split(joints, 1) as Uint16Array;
+      geo.weights1 = split(weights, 1) as Float32Array;
+    }
   }
   if (data.morphs !== undefined) {
     if (!Array.isArray(data.morphs) || !data.morphs.length) fail('Morphs must be a nonempty array');
@@ -1259,6 +1292,7 @@ function attributeBytes(data: Geometry | GeometryData): number {
   if (data.colors !== undefined) perVertex += data.colors?.length === count * 3 ? 12 : 16;
   if (data.colors1 !== undefined) perVertex += data.colors1?.length === count * 3 ? 12 : 16;
   if (data.joints !== undefined) perVertex += 24;
+  if (data.joints1 !== undefined) perVertex += 24;
   for (const morph of Array.isArray(data.morphs) ? data.morphs : [])
     perVertex += 12 + (morph?.normals !== undefined ? 12 : 0) + (morph?.tangents !== undefined ? 12 : 0);
   return count * perVertex;
@@ -1614,10 +1648,13 @@ export function collect(
         data.uvs = base.texCoord === 1 ? data.uvs1 : perVertex(set, 'VEC2', 2).slice();
       }
       if (attrs.COLOR_0 !== undefined) data.colors = attribute(16, 4);
-      if (attrs.JOINTS_1 !== undefined || attrs.WEIGHTS_1 !== undefined)
-        fail('Export supports at most four skin influences per vertex');
+      for (const name of Object.keys(attrs))
+        if (/^(JOINTS|WEIGHTS)_([2-9]|dd)/.test(name))
+          fail('Export supports at most eight skin influences per vertex; keep JOINTS_0 and JOINTS_1');
       if (attrs.JOINTS_0 !== undefined) data.joints = perVertex(attrs.JOINTS_0, 'VEC4', 4);
       if (attrs.WEIGHTS_0 !== undefined) data.weights = perVertex(attrs.WEIGHTS_0, 'VEC4', 4);
+      if (attrs.JOINTS_1 !== undefined) data.joints1 = perVertex(attrs.JOINTS_1, 'VEC4', 4);
+      if (attrs.WEIGHTS_1 !== undefined) data.weights1 = perVertex(attrs.WEIGHTS_1, 'VEC4', 4);
       if (definition.targets?.length)
         data.morphs = definition.targets.map((target: Record<string, number>, i: number) => ({
           name: primitive.targetNames[i],
@@ -2163,15 +2200,18 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
       });
       const m = new Float64Array(16),
         flip = new Uint8Array(count);
+      const sets: [Uint16Array, Float32Array][] = [[geometry.joints!, geometry.weights!]];
+      if (geometry.joints1 && geometry.weights1) sets.push([geometry.joints1, geometry.weights1]);
       for (let v = 0; v < count; v++) {
         let total = 0;
-        for (let k = 0; k < 4; k++) total += geometry.weights![v * 4 + k];
+        for (const [, weights] of sets) for (let k = 0; k < 4; k++) total += weights[v * 4 + k];
         if (!total) continue;
         m.fill(0);
-        for (let k = 0; k < 4; k++) {
-          const w = geometry.weights![v * 4 + k] / total;
+        for (let k = 0; k < 4 * sets.length; k++) {
+          const [joints, weights] = sets[k >> 2],
+            w = weights[v * 4 + (k & 3)] / total;
           if (!w) continue;
-          const joint = palette[geometry.joints![v * 4 + k]];
+          const joint = palette[joints[v * 4 + (k & 3)]];
           if (!joint)
             throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
           for (let i = 0; i < 16; i++) m[i] += w * joint[i];
@@ -2208,6 +2248,8 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
       indices,
       joints: undefined,
       weights: undefined,
+      joints1: undefined,
+      weights1: undefined,
       morphs: undefined,
       base: undefined,
     };
