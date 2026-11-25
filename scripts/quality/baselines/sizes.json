@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18973544,
+  "total": 18973806,
   "history": [
     {
       "date": "2026-10-24",
@@ -12243,6 +12243,12 @@
       "commit": "74fb438785",
       "reason": "new entry @margoengine/materials/texture: Texture, CubeTexture and their loaders apart from Material; video/frames, materials/mips and materials/soot import it and no longer load the Material pipeline or gltf/extended-materials (leak rows removed)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "04c936b47f",
+      "reason": "a7ab55ea49: packages/shared/display.js rewrite error names its fix, bundled into post/image (+7 B), post/blur (+27 B) and post/material-decals (+38 B)",
+      "grew": 3
     }
   ],
   "items": {
@@ -13070,7 +13076,7 @@
     "@margoengine/post/anamorphic": 7857,
     "@margoengine/post/ascii": 9246,
     "@margoengine/post/bloom": 8379,
-    "@margoengine/post/blur": 8249,
+    "@margoengine/post/blur": 8532,
     "@margoengine/post/caustics": 11810,
     "@margoengine/post/contact-shadows": 8001,
     "@margoengine/post/curvature": 10677,
@@ -13078,14 +13084,14 @@
     "@margoengine/post/depth": 4763,
     "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 7455,
-    "@margoengine/post/gtao": 14638,
+    "@margoengine/post/gtao": 14241,
     "@margoengine/post/halftone": 7290,
     "@margoengine/post/heat-haze": 11037,
-    "@margoengine/post/image": 13985,
+    "@margoengine/post/image": 14412,
     "@margoengine/post/lens": 8456,
     "@margoengine/post/lens-flare": 9203,
     "@margoengine/post/mask": 7322,
-    "@margoengine/post/material-decals": 9988,
+    "@margoengine/post/material-decals": 10327,
     "@margoengine/post/motion-blur": 9318,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,
@@ -13095,7 +13101,7 @@
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
     "@margoengine/post/smaa": 6435,
-    "@margoengine/post/ssao": 10974,
+    "@margoengine/post/ssao": 10584,
     "@margoengine/post/ssgi": 14202,
     "@margoengine/post/ssr": 14471,
     "@margoengine/post/sss": 8526,
