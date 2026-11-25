@@ -123,6 +123,7 @@
     "test:gpu:mesh-attributes": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-attributes-browser.mjs",
     "test:gpu:mesh-instances": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs",
     "test:gpu:mesh-motion": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-motion-browser.mjs",
+    "test:gpu:mesh-deform": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-deform-browser.mjs",
     "test:gpu:mesh-pbr": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs",
     "test:gpu:denoise-ml": "cd ../.. && node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs",
     "test:gpu:mesh-lights": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs",

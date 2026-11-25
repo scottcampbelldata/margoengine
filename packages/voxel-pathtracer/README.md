@@ -1324,7 +1324,7 @@ a promise of exact intersection for all ill-conditioned triangles.
 Surfaces are double-sided. Optional per-vertex `normals` shade smoothly and optional `uvs` select
 texels of a palette `texture` (repeat wrapping, nearest sampling). Diffuse, plastic, metal, emission,
 blend and glass use the root BSDFs. `meshInstances` places one mesh many times over a shared BLAS, and a
-moving instance blurs (see "Moving mesh instances" below); deforming meshes (vertices that move) do not blur yet.
+moving instance blurs, and so does a deforming mesh (see "Moving mesh instances" and "Deforming meshes" below).
 Palette `cutout` is not part of this entry; the `/mesh-pbr` entry adds glTF alpha
 coverage, texture channels and glTF snapshots. For glass, supply a closed,
 consistently outward-wound shell of one material, with the camera outside; overlapping/nested mesh
@@ -1391,10 +1391,61 @@ engine.dispose();
   open: `create`, `setScene` and `setOptions({shutter})` refuse it then, as for voxel instances' `previousMatrix`.
 - A moving emissive instance is left out of next-event estimation (its light records would sit at one pose), so its
   light reaches surfaces only by path hits: unbiased, but noisier than a still emitter's light (`docs/limits.md`).
-- `traceFrames` (`/sequence`) fills `previousTransform` from each instance's last-frame `transform`.
+- `traceFrames` (`/sequence`) fills `previousTransform` from each instance's last-frame `transform`, and
+  `previousPositions` from each mesh's last-frame `positions` (see "Deforming meshes").
 - Evidence: `tests/mesh-motion.test.js` (packet, refusals, sequence fill) and `tests/mesh-motion-browser.mjs` (`npm run
   test:gpu:mesh-motion`: each pixel within 5 binomial sigma of the closed-form time coverage of a translating and of a
   turning, growing quad, energy within 1 %, both tracer entries, WebGPU and the WebGL2 layer).
+
+### Deforming meshes
+
+Give a mesh `previousPositions` (one xyz per position, its vertices at shutter open, as a frame earlier) and set
+`shutter` above 0: every vertex moves on a straight line from `previousPositions` to `positions`, and every path sees
+the mesh at its own time, so skinned characters, morphs and cloth blur. The BVH is built once over boxes that hold
+both shutter ends; each node keeps its box at each end and a ray blends the two at its time, which bounds the blended
+triangles (Woop, Afra and Benthin 2017), so shared edges stay watertight at every time. A deforming mesh may also sit
+on a moving instance.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { MeshPathTracer } from 'margoengine/voxel-pathtracer/mesh';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 4], target: [0, 0, 0]},
+});
+const square = (h: number) => new Float32Array([-h, -h, 0, h, -h, 0, h, h, 0, -h, h, 0]);
+const tracer = await MeshPathTracer.create(engine, {
+  scene: {
+    revision: 1, models: [], instances: [],
+    meshes: [{id: 'card', material: 1, positions: square(0.45), previousPositions: square(0.15),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3])}],
+    materials: [{id: 1, type: 'emit', color: [1, 0.8, 0.5], emission: 2}],
+    environment: {skyIntensity: 0, sunIntensity: 0},
+  },
+  shutter: 1,
+  denoise: false,
+  signal: AbortSignal.timeout(30_000),
+});
+await tracer.ready;
+const image = await tracer.renderImage({width: 64, height: 64, samples: 64, signal: AbortSignal.timeout(30_000)});
+console.log(tracer.stats.meshInstances, image.width); // 1 64
+tracer.dispose();
+engine.dispose();
+```
+
+- With `shutter` 0, or `previousPositions` equal to `positions`, the mesh takes the still path, bit for bit.
+- A scene without `meshInstances` that has a deforming mesh is traced as one identity placement per mesh, in mesh order
+  (picking ordinals unchanged), so `stats.meshInstances` counts them.
+- The geometric normal follows the blended triangle; shading `normals`, `uvs` and tangents stay at `positions`
+  (`docs/limits.md`). A triangle is skipped only when it has zero area at both shutter ends.
+- A deforming emissive mesh is left out of next-event estimation as a moving instance is; its light arrives by path
+  hits only.
+- `traceFrames` (`/sequence`) fills `previousPositions` from a mesh's last-frame `positions` (by id, when the vertex
+  count is unchanged), copying them, so an update may rewrite one array in place.
+- Evidence: `tests/mesh-deform.test.js` (section layout, root bounds at 17 times, the lone placement, emitters,
+  refusals, the sequence fill), the `deforming_mesh_blends_boxes_that_hold_its_blended_vertices` kernel test and
+  `tests/mesh-deform-browser.mjs` (`npm run test:gpu:mesh-deform`: a growing quad, a quad sheared across its shared
+  diagonal and a growing quad on a moving instance, each pixel within 5 binomial sigma of the closed-form time coverage,
+  energy within 1 %, both tracer entries, WebGPU and the WebGL2 layer).
 
 Native WebGPU and WebGL2 compatibility execute the same geometry path. Plain WebGL2 returns
 `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer). Generated GPU tests

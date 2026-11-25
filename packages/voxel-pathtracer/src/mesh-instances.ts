@@ -41,8 +41,25 @@ function same(a: TraceTriangleMesh, b: TraceTriangleMesh, k: MeshKernel): boolea
     equal(a.positions, b.positions, k) &&
     equal(a.indices, b.indices, k) &&
     equal(a.normals, b.normals, k) &&
-    equal(a.uvs, b.uvs, k)
+    equal(a.uvs, b.uvs, k) &&
+    equal(a.previousPositions, b.previousPositions, k)
   );
+}
+/**
+ * A deforming BLAS ends with its shutter-open node boxes and vertices (mesh-kernel build): `section` is where they
+ * start, 0 for a still BLAS. `box` bounds the mesh at both shutter ends: the close root box joined with the open one.
+ */
+function deformation(mesh: TraceTriangleMesh, words: Uint32Array): { section: number; box: Float32Array } {
+  const close = new Float32Array(words.buffer, words.byteOffset + 16, 8);
+  if (words[0] === 0 || mesh.previousPositions === undefined) return { section: 0, box: close };
+  const section = words.length - words[0] * 8 - words[2] * 12,
+    open = new Float32Array(words.buffer, words.byteOffset + section * 4, 8),
+    box = new Float32Array(8);
+  for (let a = 0; a < 3; a++) {
+    box[a] = Math.min(close[a], open[a]);
+    box[4 + a] = Math.max(close[4 + a], open[4 + a]);
+  }
+  return { section, box };
 }
 
 /** One bounded cache per tracer. Exact array content, never revision or caller identity, selects a BLAS. */
@@ -65,6 +82,22 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
       materials: structuredClone(input.materials),
       ...(input.meshInstances !== undefined && { meshInstances: structuredClone(input.meshInstances) }),
     };
+    const deforms = () => Array.isArray(scene.meshes) && scene.meshes.some((m) => m?.previousPositions !== undefined);
+    if (deforms()) {
+      // previousPositions equal to positions is still: it takes the static path, bit for bit.
+      const k = await meshKernel(signal);
+      for (const m of scene.meshes)
+        if (
+          m?.previousPositions instanceof Float32Array &&
+          m.positions instanceof Float32Array &&
+          equal(m.previousPositions, m.positions, k)
+        )
+          delete m.previousPositions;
+      // A deforming mesh needs a placement record to point at its shutter-open section: one identity placement a
+      // mesh, in mesh order, keeps the lone packet's picking ordinals.
+      if (scene.meshInstances === undefined && deforms())
+        scene.meshInstances = scene.meshes.map((m) => ({ id: m.id, mesh: m.id }));
+    }
     if (scene.meshInstances === undefined) {
       const words = await buildTraceMeshes(scene, signal);
       this.#cache.clear();
@@ -87,9 +120,14 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
         (mesh.normals !== undefined &&
           (!(mesh.normals instanceof Float32Array) || mesh.normals.length !== mesh.positions.length)) ||
         (mesh.uvs !== undefined &&
-          (!(mesh.uvs instanceof Float32Array) || mesh.uvs.length !== (mesh.positions.length / 3) * 2))
+          (!(mesh.uvs instanceof Float32Array) || mesh.uvs.length !== (mesh.positions.length / 3) * 2)) ||
+        (mesh.previousPositions !== undefined &&
+          (!(mesh.previousPositions instanceof Float32Array) ||
+            mesh.previousPositions.length !== mesh.positions.length))
       )
-        throw new TypeError('MeshPathTracer expects Float32Array positions/normals/uvs and Uint32Array indices');
+        throw new TypeError(
+          'MeshPathTracer expects Float32Array positions/normals/uvs/previousPositions and Uint32Array indices',
+        );
       definitions.set(mesh.id, mesh);
     }
     const ids = new Set<string>();
@@ -136,7 +174,8 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
         mesh.positions.byteLength +
         mesh.indices.byteLength +
         (mesh.normals?.byteLength ?? 0) +
-        (mesh.uvs?.byteLength ?? 0);
+        (mesh.uvs?.byteLength ?? 0) +
+        (mesh.previousPositions?.byteLength ?? 0);
       if (submitted > 1_000_000 || inputBytes > 128 << 20)
         throw new RangeError('MeshPathTracer accepts at most 1,000,000 triangles and 128 MiB of input words');
       const old = this.#cache.get(mesh.id);
@@ -167,8 +206,7 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
     const motions = new Map<number, InstanceMotion>();
     for (const i of active) {
       if (!i.previous) continue;
-      const w = next.get(i.mesh.id)!.words,
-        box = new Float32Array(w.buffer, w.byteOffset + 16, 8),
+      const { box } = deformation(i.mesh, next.get(i.mesh.id)!.words),
         lo = [box[0], box[1], box[2]];
       try {
         motions.set(
@@ -205,7 +243,8 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
     instances.forEach((i, n) => {
       const at = n * 28,
         words = next.get(i.mesh.id)!.words;
-      if (words[0] !== 0) request.set(words.subarray(4, 12), at);
+      // The object box over both shutter ends of a deforming mesh, its close root box otherwise.
+      if (words[0] !== 0) f.set(deformation(i.mesh, words).box, at);
       f.set(i.matrix, at + 8);
       const motion = motions.get(i.index);
       // Bit 2: words 0 to 7 already hold world bounds over the motion interval (padded outward in motion.ts).
@@ -230,12 +269,15 @@ export class TraceMeshBuilder implements TraceGeometryBuilder {
     const result = new Uint32Array(size);
     // Zero triangle offset selects the two-level packet. Legacy four-word packets stay valid.
     result.set([top[0], 0, retained, skipped, active.length, recordOffset, built, reused, nodes, 0x4d494e53]);
-    // Word 11 counts the moving instances, so the tracer samples a time per path only when one moves.
-    result[11] = motions.size;
+    // Word 11 counts the instances that move or deform, so the tracer samples a time per path only when one does.
+    const sections = active.map((i) => deformation(i.mesh, next.get(i.mesh.id)!.words).section);
+    result[11] = active.filter((i, n) => motions.has(i.index) || sections[n] !== 0).length;
     result.set(top.subarray(4), 16);
     const rf = new Float32Array(result.buffer);
     let block = motionOffset;
     active.forEach((i, k) => {
+      // Record word 27: a deforming BLAS's shutter-open section, relative to that BLAS's head (FG-17 piece 4b).
+      result[recordOffset + k * 32 + 27] = sections[k];
       const motion = motions.get(i.index);
       if (!motion) return;
       // Record word 31 points at the interval, relative to the packet head as every record pointer.

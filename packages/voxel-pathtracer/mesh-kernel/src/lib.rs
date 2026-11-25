@@ -7,9 +7,20 @@ struct Triangle {
     words: [u32; 16],
     attributes: Option<[u32; 16]>,
     indices: [usize; 3],
+    // Union of both shutter ends for the SAH; close and open bound each end (equal for a still triangle).
     lo: [f32; 3],
     hi: [f32; 3],
+    close: ([f32; 3], [f32; 3]),
+    open: ([f32; 3], [f32; 3]),
+    // Shutter-open vertices of a deforming mesh (FG-17 piece 4b), xyz per vertex.
+    previous: Option<[u32; 9]>,
     center: [f64; 3],
+}
+impl Triangle {
+    // A TLAS leaf: an instance's world box, the same at both shutter ends.
+    fn leaf(lo: [f32; 3], hi: [f32; 3], center: [f64; 3]) -> Self {
+        Self { words: [0; 16], attributes: None, indices: [0; 3], lo, hi, close: (lo, hi), open: (lo, hi), previous: None, center }
+    }
 }
 thread_local! {
     static OUTPUT: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
@@ -105,6 +116,8 @@ fn oriented_area(points: &[[f64; 3]; 3], x: usize, y: usize) -> f64 {
     if len == 0 { 0.0 } else { expansion[len - 1] }
 }
 
+// A parsed face: mesh, material, face in its mesh, vertex indices, shutter-close corners.
+type Face = (u32, u32, u32, [usize; 3], [u32; 9]);
 fn parse(input: &[u32]) -> Result<(Vec<Triangle>, u32), u32> {
     let Some(&meshes) = input.first() else {
         return Err(1);
@@ -115,6 +128,7 @@ fn parse(input: &[u32]) -> Result<(Vec<Triangle>, u32), u32> {
     let mut ordinal = 0u32;
     let mut skipped = 0u32;
     let mut vertex_counts = Vec::new();
+    let mut faces: Vec<Face> = Vec::new();
     for mesh in 0..meshes {
         if at + 3 > input.len() {
             return Err(1);
@@ -143,60 +157,15 @@ fn parse(input: &[u32]) -> Result<(Vec<Triangle>, u32), u32> {
             if ids.iter().any(|i| *i as usize >= vertices) {
                 return Err(3);
             }
-            let mut words = [0u32; 16];
-            let mut points = [[0.0f64; 3]; 3];
-            for k in 0..3 {
-                for axis in 0..3 {
-                    let v = positions[ids[k] as usize * 3 + axis];
-                    words[k * 4 + axis] = v;
-                    points[k][axis] = f32::from_bits(v) as f64;
-                }
-            }
-            words[3] = material;
-            words[7] = face as u32;
-            words[11] = mesh;
-            words[15] = ordinal;
-            ordinal += 1;
-            let normal = [
-                oriented_area(&points, 1, 2),
-                oriented_area(&points, 2, 0),
-                oriented_area(&points, 0, 1),
-            ];
-            let length = normal.iter().map(|v| v * v).sum::<f64>().sqrt();
-            if length == 0.0 {
-                skipped += 1;
-                continue;
-            }
-            for i in 0..3 {
-                words[12 + i] = ((normal[i] / length) as f32).to_bits();
-            }
-            triangles.push(Triangle {
-                words,
-                attributes: None,
-                indices: [ids[0] as usize, ids[1] as usize, ids[2] as usize],
-                lo: std::array::from_fn(|i| {
-                    points
-                        .iter()
-                        .map(|p| p[i] as f32)
-                        .fold(f32::INFINITY, f32::min)
-                }),
-                hi: std::array::from_fn(|i| {
-                    points
-                        .iter()
-                        .map(|p| p[i] as f32)
-                        .fold(f32::NEG_INFINITY, f32::max)
-                }),
-                center: std::array::from_fn(|i| (points[0][i] + points[1][i] + points[2][i]) / 3.0),
-            });
+            let indices = [ids[0] as usize, ids[1] as usize, ids[2] as usize];
+            let corners = std::array::from_fn(|i| positions[indices[i / 3] * 3 + i % 3]);
+            faces.push((mesh, material, face as u32, indices, corners));
         }
         at = last;
     }
-    if at < input.len() {
-        if input[at] != 0x4d415454 {
-            return Err(1);
-        }
+    let mut attributes = Vec::new();
+    if at < input.len() && input[at] == 0x4d415454 {
         at += 1;
-        let mut attributes = Vec::new();
         for &vertices in &vertex_counts {
             if at + 2 > input.len() {
                 return Err(1);
@@ -224,35 +193,118 @@ fn parse(input: &[u32]) -> Result<(Vec<Triangle>, u32), u32> {
             }
             attributes.push((normals, uvs));
         }
-        for t in &mut triangles {
-            let (normals, uvs) = attributes[t.words[11] as usize];
-            if normals.is_empty() && uvs.is_empty() {
-                continue;
+    }
+    // Shutter-open positions (FG-17 piece 4b): per mesh a count (0, or its position count) and the values.
+    let mut previous = Vec::new();
+    if at < input.len() && input[at] == 0x4d505256 {
+        at += 1;
+        for &vertices in &vertex_counts {
+            let Some(&n) = input.get(at) else {
+                return Err(1);
+            };
+            let n = n as usize;
+            at += 1;
+            if (n != 0 && n != vertices * 3) || at + n > input.len() {
+                return Err(1);
             }
-            let mut a = [0u32; 16];
-            if !normals.is_empty() {
-                a[15] |= 1;
-                for k in 0..3 {
-                    let n = std::array::from_fn::<_, 3, _>(|i| {
-                        f32::from_bits(normals[t.indices[k] * 3 + i]) as f64
-                    });
-                    let len = n.iter().map(|v| v * v).sum::<f64>().sqrt();
-                    for i in 0..3 {
-                        a[k * 4 + i] = ((n[i] / len) as f32).to_bits();
-                    }
-                }
+            if !valid_positions(&input[at..at + n]) {
+                return Err(2);
             }
-            if !uvs.is_empty() {
-                a[15] |= 2;
-                for (k, slot) in [3, 7, 11, 12, 13, 14].into_iter().enumerate() {
-                    a[slot] = uvs[t.indices[k / 2] * 2 + k % 2];
-                }
-            }
-            t.attributes = Some(a);
+            previous.push(&input[at..at + n]);
+            at += n;
         }
     }
     if at != input.len() {
         return Err(1);
+    }
+    let points_of = |c: &[u32; 9]| -> [[f64; 3]; 3] {
+        std::array::from_fn(|k| std::array::from_fn(|a| f32::from_bits(c[k * 3 + a]) as f64))
+    };
+    let unit = |points: &[[f64; 3]; 3]| -> Option<[f64; 3]> {
+        let n = [
+            oriented_area(points, 1, 2),
+            oriented_area(points, 2, 0),
+            oriented_area(points, 0, 1),
+        ];
+        let length = n.iter().map(|v| v * v).sum::<f64>().sqrt();
+        (length != 0.0).then(|| n.map(|v| v / length))
+    };
+    let bounds = |p: &[[f64; 3]; 3]| -> ([f32; 3], [f32; 3]) {
+        (
+            std::array::from_fn(|i| p.iter().map(|v| v[i] as f32).fold(f32::INFINITY, f32::min)),
+            std::array::from_fn(|i| p.iter().map(|v| v[i] as f32).fold(f32::NEG_INFINITY, f32::max)),
+        )
+    };
+    for (mesh, material, face, indices, corners) in faces {
+        let open = previous
+            .get(mesh as usize)
+            .filter(|p| !p.is_empty())
+            .map(|p| std::array::from_fn::<u32, 9, _>(|i| p[indices[i / 3] * 3 + i % 3]));
+        let points = points_of(&corners);
+        let before = open.as_ref().map(points_of);
+        // Every input face keeps its ordinal, skipped ones included (picking ids are input order).
+        let index = ordinal;
+        ordinal += 1;
+        // A deforming triangle is skipped only when it has zero area at both shutter ends.
+        let Some(normal) = unit(&points).or_else(|| before.as_ref().and_then(unit)) else {
+            skipped += 1;
+            continue;
+        };
+        let mut words = [0u32; 16];
+        for k in 0..3 {
+            for axis in 0..3 {
+                words[k * 4 + axis] = corners[k * 3 + axis];
+            }
+        }
+        words[3] = material;
+        words[7] = face;
+        words[11] = mesh;
+        words[15] = index;
+        for i in 0..3 {
+            words[12 + i] = (normal[i] as f32).to_bits();
+        }
+        let close = bounds(&points);
+        let opened = before.as_ref().map_or(close, bounds);
+        let ends = before.unwrap_or(points);
+        triangles.push(Triangle {
+            words,
+            attributes: None,
+            indices,
+            lo: std::array::from_fn(|i| close.0[i].min(opened.0[i])),
+            hi: std::array::from_fn(|i| close.1[i].max(opened.1[i])),
+            close,
+            open: opened,
+            previous: open,
+            center: std::array::from_fn(|i| {
+                (points[0][i] + points[1][i] + points[2][i] + ends[0][i] + ends[1][i] + ends[2][i]) / 6.0
+            }),
+        });
+    }
+    for t in &mut triangles {
+        let Some(&(normals, uvs)) = attributes.get(t.words[11] as usize) else {
+            continue;
+        };
+        if normals.is_empty() && uvs.is_empty() {
+            continue;
+        }
+        let mut a = [0u32; 16];
+        if !normals.is_empty() {
+            a[15] |= 1;
+            for k in 0..3 {
+                let n = std::array::from_fn::<_, 3, _>(|i| f32::from_bits(normals[t.indices[k] * 3 + i]) as f64);
+                let len = n.iter().map(|v| v * v).sum::<f64>().sqrt();
+                for i in 0..3 {
+                    a[k * 4 + i] = ((n[i] / len) as f32).to_bits();
+                }
+            }
+        }
+        if !uvs.is_empty() {
+            a[15] |= 2;
+            for (k, slot) in [3, 7, 11, 12, 13, 14].into_iter().enumerate() {
+                a[slot] = uvs[t.indices[k / 2] * 2 + k % 2];
+            }
+        }
+        t.attributes = Some(a);
     }
     Ok((triangles, skipped))
 }
@@ -377,43 +429,42 @@ fn partition(triangles: &[Triangle], order: &mut [usize], depth: usize) -> usize
     mid
 }
 
-fn branch(triangles: &[Triangle], order: &mut [usize], nodes: &mut Vec<u32>, depth: usize) {
+// A node's box at each shutter end, padded one ULP outward. The shader blends the two at the ray's time: the blend of
+// boxes bounding each end's vertices bounds the blend of the vertices (Woop, Afra and Benthin 2017, section 2).
+fn pad(nodes: &mut [u32], at: usize, order: &[usize], triangles: &[Triangle], end: fn(&Triangle) -> ([f32; 3], [f32; 3])) {
+    for a in 0..3 {
+        let lo = order.iter().map(|i| end(&triangles[*i]).0[a]).fold(f32::INFINITY, f32::min);
+        let hi = order.iter().map(|i| end(&triangles[*i]).1[a]).fold(f32::NEG_INFINITY, f32::max);
+        nodes[at + a] = lo.next_down().to_bits();
+        nodes[at + 4 + a] = hi.next_up().to_bits();
+    }
+}
+fn branch(triangles: &[Triangle], order: &mut [usize], nodes: &mut Vec<u32>, open: &mut Vec<u32>, depth: usize) {
     let at = nodes.len();
     nodes.resize(at + 8, 0);
-    let lo = std::array::from_fn::<_, 3, _>(|a| {
-        order
-            .iter()
-            .map(|i| triangles[*i].lo[a])
-            .fold(f32::INFINITY, f32::min)
-    });
-    let hi = std::array::from_fn::<_, 3, _>(|a| {
-        order
-            .iter()
-            .map(|i| triangles[*i].hi[a])
-            .fold(f32::NEG_INFINITY, f32::max)
-    });
-    for a in 0..3 {
-        nodes[at + a] = lo[a].next_down().to_bits();
-        nodes[at + 4 + a] = hi[a].next_up().to_bits();
-    }
+    open.resize(at + 8, 0);
+    pad(nodes, at, order, triangles, |t| t.close);
+    pad(open, at, order, triangles, |t| t.open);
     if order.len() == 1 {
         nodes[at + 7] = order[0] as u32 + 1;
     } else {
         let mid = partition(triangles, order, depth);
         let (left, right) = order.split_at_mut(mid);
-        branch(triangles, left, nodes, depth + 1);
-        branch(triangles, right, nodes, depth + 1);
+        branch(triangles, left, nodes, open, depth + 1);
+        branch(triangles, right, nodes, open, depth + 1);
     }
     nodes[at + 3] = (nodes.len() / 8) as u32;
 }
 fn build(input: &[u32]) -> Result<Vec<u32>, u32> {
     let (triangles, skipped) = parse(input)?;
     let mut nodes = Vec::new();
+    let mut open = Vec::new();
     if !triangles.is_empty() {
         branch(
             &triangles,
             &mut (0..triangles.len()).collect::<Vec<_>>(),
             &mut nodes,
+            &mut open,
             0,
         );
     }
@@ -438,6 +489,17 @@ fn build(input: &[u32]) -> Result<Vec<u32>, u32> {
     for t in &triangles {
         if let Some(a) = t.attributes {
             result.extend(a);
+        }
+    }
+    // A deforming mesh ends with its shutter-open node boxes (8 words a node) and triangle vertices (12 words a
+    // triangle: xyz and a spare word per vertex), so the section starts nodes * 8 + retained * 12 words before the end.
+    if triangles.iter().any(|t| t.previous.is_some()) {
+        result.extend(open);
+        for t in &triangles {
+            let p = t.previous.unwrap_or(std::array::from_fn(|i| t.words[(i / 3) * 4 + i % 3]));
+            for k in 0..3 {
+                result.extend([p[k * 3], p[k * 3 + 1], p[k * 3 + 2], 0]);
+            }
         }
     }
     Ok(result)
@@ -476,11 +538,8 @@ fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
             let hi: [f32; 3] = std::array::from_fn(|a| f32::from_bits(record[4 + a]));
             // The interval's endpoint geometry is within the public limit; its outward padding may pass it by 2^-15.
             if (0..3).any(|a| !(lo[a] <= hi[a]) || !(lo[a].abs() as f64 <= MOVING_LIMIT) || !(hi[a].abs() as f64 <= MOVING_LIMIT)) { return Err(1); }
-            bounds.push(Triangle {
-                words: [0;16], attributes: None, indices: [0;3],
-                lo: lo.map(f32::next_down), hi: hi.map(f32::next_up),
-                center: std::array::from_fn(|a| (lo[a] as f64 + hi[a] as f64) * 0.5),
-            });
+            bounds.push(Triangle::leaf(lo.map(f32::next_down), hi.map(f32::next_up),
+                std::array::from_fn(|a| (lo[a] as f64 + hi[a] as f64) * 0.5)));
             for rows in [world, local] { records.extend(rows.into_iter().flatten().map(|v| (v as f32).to_bits())); }
             records.extend_from_slice(&record[24..27]); records.push(0); records.extend([0;4]);
             continue;
@@ -512,16 +571,13 @@ fn build_instance_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
                 lo[r] = lo[r].min(v-error); hi[r] = hi[r].max(v+error);
             }
         }
-        bounds.push(Triangle {
-            words: [0;16], attributes: None, indices: [0;3],
-            lo: lo.map(|v| (v as f32).next_down()), hi: hi.map(|v| (v as f32).next_up()),
-            center: std::array::from_fn(|a| (lo[a]+hi[a])*0.5),
-        });
+        bounds.push(Triangle::leaf(lo.map(|v| (v as f32).next_down()), hi.map(|v| (v as f32).next_up()),
+            std::array::from_fn(|a| (lo[a]+hi[a])*0.5)));
         for rows in [world, local] { records.extend(rows.into_iter().flatten().map(|v| (v as f32).to_bits())); }
         records.extend_from_slice(&record[24..27]); records.push(0); records.extend([0;4]);
     }
     let mut nodes = Vec::new();
-    if !bounds.is_empty() { branch(&bounds, &mut (0..bounds.len()).collect::<Vec<_>>(), &mut nodes, 0); }
+    if !bounds.is_empty() { branch(&bounds, &mut (0..bounds.len()).collect::<Vec<_>>(), &mut nodes, &mut Vec::new(), 0); }
     let mut result = vec![(nodes.len()/8) as u32, (nodes.len()+4) as u32, bounds.len() as u32, 0];
     result.extend(nodes); result.extend(records); Ok(result)
 }
@@ -571,6 +627,82 @@ mod tests {
             for at in 0..len { both[len+at]^=0x80000000;assert!(!equal_words_slice(&both));both[len+at]^=0x80000000; }
         }
         assert!(!equal_words_slice(&[0]));
+    }
+    #[test]
+    fn deforming_mesh_blends_boxes_that_hold_its_blended_vertices() {
+        // A strip of 8 triangles over a 3 x 5 grid; every vertex moves differently over the shutter. The last triangle
+        // has zero area at shutter close and a real one at open, so it is kept.
+        let (columns, rows) = (5usize, 3usize);
+        let close: Vec<f32> = (0..rows * columns)
+            .flat_map(|i| [(i % columns) as f32, (i / columns) as f32, ((i * 7) % 3) as f32 * 0.25])
+            .collect();
+        let open: Vec<f32> = close
+            .chunks(3)
+            .enumerate()
+            .flat_map(|(i, p)| [p[0] * 1.5 - 2.0, p[1] + (i % 4) as f32, p[2] - 3.0 + i as f32 * 0.125])
+            .collect();
+        let mut close = close;
+        let mut indices = Vec::new();
+        for r in 0..rows - 1 {
+            for c in 0..columns - 1 {
+                let i = (r * columns + c) as u32;
+                indices.extend([i, i + 1, i + columns as u32]);
+            }
+        }
+        // Collapse the last triangle at close only.
+        let last = indices[indices.len() - 3..].to_vec();
+        for k in 1..3 {
+            for a in 0..3 {
+                close[last[k] as usize * 3 + a] = close[last[0] as usize * 3 + a];
+            }
+        }
+        let triangles = indices.len() / 3;
+        let mut packet = vec![1, (rows * columns) as u32, indices.len() as u32, 1];
+        packet.extend(close.iter().map(|v| v.to_bits()));
+        packet.extend(&indices);
+        packet.push(0x4d505256);
+        packet.push(open.len() as u32);
+        packet.extend(open.iter().map(|v| v.to_bits()));
+        let data = build(&packet).unwrap();
+        let (nodes, start) = (data[0] as usize, data[1] as usize);
+        assert_eq!(data[2] as usize, triangles, "the triangle with area only at open is kept");
+        let section = data.len() - nodes * 8 - triangles * 12;
+        let f = |at: usize| f32::from_bits(data[at]);
+        for k in 0..=16 {
+            let t = k as f32 / 16.0;
+            let blend = |a: f32, b: f32| a * (1.0 - t) + b * t;
+            for node in 0..nodes {
+                let (c, o) = (4 + node * 8, section + node * 8);
+                // The triangles under a node are the leaves between it and its skip index.
+                let end = data[c + 3] as usize;
+                for inner in node..end {
+                    let l = data[4 + inner * 8 + 7] as usize;
+                    if l == 0 {
+                        continue;
+                    }
+                    let (tri, prev) = (start + (l - 1) * 16, section + nodes * 8 + (l - 1) * 12);
+                    for v in 0..3 {
+                        for a in 0..3 {
+                            let p = blend(f(prev + v * 4 + a), f(tri + v * 4 + a));
+                            assert!(blend(f(o + a), f(c + a)) <= p && p <= blend(f(o + 4 + a), f(c + 4 + a)));
+                        }
+                    }
+                }
+            }
+        }
+        // Without the section the same mesh is packed exactly as before.
+        let still = build(&packet[..packet.len() - open.len() - 2]).unwrap();
+        assert_eq!(still[2] as usize, triangles - 1);
+        assert_eq!(still.len(), 4 + still[0] as usize * 8 + (triangles - 1) * 16);
+        // A count other than 0 or the position count, or a value past the limit, is refused.
+        let mut bad = packet.clone();
+        let n = bad.len() - open.len() - 1;
+        bad[n] -= 3;
+        assert_eq!(build(&bad[..bad.len() - 3]), Err(1));
+        let mut far = packet.clone();
+        let last = far.len() - 1;
+        far[last] = 2e8f32.to_bits();
+        assert_eq!(build(&far), Err(2));
     }
     #[test]
     fn moving_instance_keeps_its_interval_bounds_and_inverse() {
@@ -775,7 +907,8 @@ fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
     for i in 0..g[4] as usize {
         let instance=g[5] as usize+i*32;
         // A moving instance's light records would sit at one pose of its interval: its emission is found by path hits.
-        if g[instance+31]!=0 {continue;}
+        // A deforming mesh's emitters likewise (record word 27 points at its shutter-open section, FG-17 piece 4b).
+        if g[instance+31]!=0 || g[instance+27]!=0 {continue;}
         let head=g[instance+24] as usize;let start=head+g[head+1] as usize;
         let count=g[head+2] as usize;let table=out.len();out.resize(table+count,0);out[instance+30]=table as u32;
         for j in 0..count {

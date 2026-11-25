@@ -256,8 +256,21 @@ entries): a translating quad and a turning, growing quad, each pixel within 5 bi
 coverage (worst 3.8 sigma), energy within 0.07 %; shutter 0 and equal transforms render the still bit for bit; a
 singular interval is refused only while the shutter is open. CPU: `tests/mesh-motion.test.js` (swept root bounds,
 interval words, TRS packet, a moving emitter left out of the light table, refusals, the sequence fill) and the
-`moving_instance_keeps_its_interval_bounds_and_inverse` kernel test. Missing: deforming meshes (piece 4b) and a cost
-figure for long sweeps.
+`moving_instance_keeps_its_interval_bounds_and_inverse` kernel test. Missing: a cost figure for long sweeps.
+Piece 4b (same day): meshes take `previousPositions`. The Rust kernel builds one BVH over boxes holding both shutter
+ends (SAH on the union), keeps each node's box at each end and appends a section of shutter-open node boxes (8 words a
+node) and vertices (12 words a triangle); mesh-instances writes that section's offset into record word 27 and counts
+deforming placements in header word 11. meshBlas blends node boxes and corners with one meshBlend at the path's time
+(Woop, Afra and Benthin 2017), so a blended box holds the blended vertices and shared edges stay watertight; the hit
+keeps its object-space geometric normal (Hit.ng), so normal readers need no vertex reads, and triangleHit takes its
+three corners from its one call site (the compatibility-route counts in `tests/compat-staged.test.js` hold). A lone
+deforming scene is traced as identity placements; deforming emitters are left out of the light table. Evidence:
+`tests/mesh-deform-browser.mjs` (RTX A6000, WebGPU and the WebGL2 layer on ANGLE Vulkan, both entries): a growing quad,
+a quad sheared across its shared diagonal and a growing quad on a moving instance, each pixel within 5 binomial sigma of
+the closed-form time coverage (worst 3.5 sigma), energy within 0.04 %; shutter 0 and equal positions render the still
+bit for bit. CPU: `tests/mesh-deform.test.js` and the `deforming_mesh_blends_boxes_that_hold_its_blended_vertices`
+kernel test (blended vertices inside blended boxes at 17 times). Missing: blended shading normals and a cost figure for
+large deformations.
 
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 

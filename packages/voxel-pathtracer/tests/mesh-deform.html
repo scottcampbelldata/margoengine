@@ -1,0 +1,72 @@
+<!doctype html><html><meta charset="utf-8"><title>Deforming mesh motion blur</title><canvas width="64" height="64"></canvas><script type="module">
+// FG-17 piece 4b: a deforming triangle mesh seen through the shutter. The oracle is independent of the engine: the
+// time share of the shutter in which each pixel's centre ray lies inside the quad, from closed-form vertex paths.
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {MeshPathTracer,triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+const W=64,H=64,SAMPLES=1024,BINS=4096;
+const translate=(x,y)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,0,1];
+// Quad corners counterclockwise: (-h,-h), (h,-h), (h+s,h), (-h+s,h); s shears the top edge along x.
+const corners=(h,s=0,x=0)=>new Float32Array([-h+x,-h,0,h+x,-h,0,h+s+x,h,0,-h+s+x,h,0]);
+// Each case: the shutter-open and shutter-close vertices, optional placement, and the closed-form shape at time t.
+const cases=[
+ {name:'scales about its centre',open:corners(0.15),close:corners(0.45),pose:t=>({h:0.15+0.3*t,s:0,x:0})},
+ {name:'top edge slides, shared diagonal moves',open:corners(0.3,0.6),close:corners(0.3),pose:t=>({h:0.3,s:0.6*(1-t),x:0})},
+ {name:'deforms while its instance moves',open:corners(0.2),close:corners(0.35),placed:true,
+  pose:t=>({h:0.2+0.15*t,s:0,x:-0.4+0.8*t})},
+];
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],rows=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);device.createShaderModule=d=>{const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(v=>v.type==='error').map(v=>v.message))));return m;};
+ // Orthographic: view x and y in [-1, 1] fill the square image.
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=.01;out[14]=1;out[15]=1;};engine.render();
+ const mesh=(positions,previousPositions)=>({id:'quad',material:1,positions,indices:new Uint32Array([0,1,2,0,2,3]),...(previousPositions&&{previousPositions})});
+ const scene=(m,revision,placed,moving)=>({revision,models:[],instances:[],materials:[{id:1,type:'emit',color:[1,1,1],emission:1}],meshes:[m],
+  ...(placed&&{meshInstances:[{id:'q',mesh:'quad',transform:translate(0.4,0),...(moving&&{previousTransform:translate(-0.4,0)})}]}),
+  environment:{ground:false,skyIntensity:0,sunIntensity:0}});
+ const image=t=>t.renderImage({width:W,height:H,samples:SAMPLES,jitter:false,seed:29,denoise:false,signal:AbortSignal.timeout(120000)});
+ // Pixel centre (px, py) in world x, y; row 0 is the top of the image.
+ const centre=(px,py)=>[(px+0.5)/W*2-1,1-(py+0.5)/H*2];
+ const inside=(p,{h,s,x})=>Math.abs(p[1])<=h&&Math.abs(p[0]-x-s*(p[1]+h)/(2*h))<=h;
+ const compare=(actual,expected)=>{
+  let zMax=0,zSquares=0,actualSum=0,expectedSum=0,finite=true,lit=0;
+  for(let i=0;i<W*H;i++){const a=actual.color[i*3],e=expected[i];if(!Number.isFinite(a))finite=false;
+   // Binomial spread of SAMPLES time draws, floored at one sample and the oracle's own bin width.
+   const sigma=Math.sqrt(Math.max(e*(1-e),1/SAMPLES)/SAMPLES)+1/BINS;const z=Math.abs(a-e)/sigma;
+   zMax=Math.max(zMax,z);zSquares+=z*z;actualSum+=a;expectedSum+=e;if(e>0)lit++;}
+  return {zMax,zRms:Math.sqrt(zSquares/(W*H)),energyRatio:actualSum/expectedSum,finite,lit};
+ };
+ const equal=(a,b)=>a.color.every((v,i)=>Object.is(v,b.color[i]));
+ try{
+  for(const composed of [false,true]){
+   let revision=1;
+   const make=(s,o)=>composed?ComposedVoxelPathTracer.create(engine,{scene:s,features:[triangleMeshes()],...o}):MeshPathTracer.create(engine,{scene:s,...o});
+   const t=await make(scene(mesh(corners(0.3)),revision),{denoise:false,maxBounces:1});
+   try{
+    await t.ready;
+    for(const c of cases){
+     t.setOptions({shutter:1});
+     await t.setScene(scene(mesh(c.close,c.open),++revision,c.placed,true));
+     const actual=await image(t),expected=new Float64Array(W*H);
+     for(let py=0;py<H;py++)for(let px=0;px<W;px++){const p=centre(px,py);let n=0;for(let b=0;b<BINS;b++)if(inside(p,c.pose((b+0.5)/BINS)))n++;expected[py*W+px]=n/BINS;}
+     const moved=compare(actual,expected);
+     // Shutter 0: the mesh at its positions, bit for bit the image of the same scene with no previousPositions.
+     t.setOptions({shutter:0});
+     await t.setScene(scene(mesh(c.close,c.open),++revision,c.placed,false));const closed=await image(t);
+     await t.setScene(scene(mesh(c.close),++revision,c.placed,false));const still=await image(t);
+     rows.push({name:c.name,composed,...moved,shutterZeroEqualsStill:equal(closed,still)});
+    }
+    // previousPositions equal to positions takes the static path: shutter 1 renders the still image bit for bit.
+    t.setOptions({shutter:0});await t.setScene(scene(mesh(corners(0.3,0.2)),++revision));const still=await image(t);
+    t.setOptions({shutter:1});await t.setScene(scene(mesh(corners(0.3,0.2),corners(0.3,0.2)),++revision));
+    rows.push({name:'equal positions are still',composed,equal:equal(await image(t),still)});
+   }finally{t.dispose();}
+  }
+  await Promise.all(reports);return {rows,errors,messages};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>

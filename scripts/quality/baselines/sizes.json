@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19108777,
+  "total": 19115039,
   "history": [
     {
       "date": "2026-10-24",
@@ -12357,6 +12357,12 @@
       "commit": "e6f74c4bb",
       "reason": "physics/tracers is a new optional entry (SEA-15): TracerSolver, dye, sediment and cargo plumes and oil slicks as particles carried by the water; its own entry so scenes without tracers pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-B",
+      "grew": 2,
+      "reason": "Deforming mesh motion blur (FG-17 piece 4b): previousPositions on triangle meshes. Measured gzip on main / now: mesh 44880 / 48199 B, mesh-pbr 52342 / 55690 B, sequence 3164 / 3274 B (within its budget), compose 1677 / 1677 B. Most of the growth is the mesh kernel (mesh.wasm 55196 to 60541 B raw, which the measured bundle inlines as base64): it parses the shutter-open positions, keeps a box at each shutter end a node and packs the shutter-open section. The rest is the section pointer and both-end bounds in mesh-instances and the shader that blends node boxes and corners per path. The kernel is fetched only by the mesh entries, on the first build. Budgets (measured gzip + 3%, or 256 B): @margoengine/voxel-pathtracer/mesh 46516 to 49645 B; @margoengine/voxel-pathtracer/mesh-pbr 54228 to 57361 B."
     }
   ],
   "items": {
@@ -13841,8 +13847,8 @@
     "@margoengine/voxel-pathtracer/from-engine": 1306,
     "@margoengine/voxel-pathtracer/guiding": 2791,
     "@margoengine/voxel-pathtracer/media": 2210,
-    "@margoengine/voxel-pathtracer/mesh": 46516,
-    "@margoengine/voxel-pathtracer/mesh-pbr": 54228,
+    "@margoengine/voxel-pathtracer/mesh": 49645,
+    "@margoengine/voxel-pathtracer/mesh-pbr": 57361,
     "@margoengine/voxel-pathtracer/resampled": 2190,
     "@margoengine/voxel-pathtracer/sequence": 3420,
     "@margoengine/voxel-pathtracer/sky": 468,

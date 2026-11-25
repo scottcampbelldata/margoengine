@@ -21,6 +21,12 @@ interface MeshPlacement {
   readonly previousTransform?: readonly number[] | Float32Array;
 }
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+/** A triangle mesh of a traced scene, as far as the shutter fill reads it. */
+interface MeshShape {
+  readonly id: string;
+  readonly positions: Float32Array;
+  readonly previousPositions?: Float32Array;
+}
 
 /** The tracer calls a sequence makes; `VoxelPathTracer` and `MeshPathTracer` both fit. */
 export interface SequenceTracer<Scene extends VoxelTraceScene = VoxelTraceScene> {
@@ -79,7 +85,8 @@ export interface TraceFramesOptions<Scene extends VoxelTraceScene = VoxelTraceSc
    * Called before each frame with its {@link SequenceTiming}; may move the camera and return the frame's scene (or a
    * promise of it). A returned scene is set on the tracer; instances without `previousMatrix` that were in the last
    * frame's scene (by id) get last frame's `matrix` as `previousMatrix` when `shutter` is above 0, and mesh instances
-   * (`meshInstances` of a triangle scene) without `previousTransform` get last frame's `transform` the same way.
+   * (`meshInstances` of a triangle scene) without `previousTransform` get last frame's `transform` the same way, and
+   * meshes (`meshes`) without `previousPositions` get last frame's `positions` when the vertex count is unchanged.
    * Returning nothing keeps the scene, still.
    */
   update?: (timing: SequenceTiming) => Scene | void | Promise<Scene | void>;
@@ -187,6 +194,7 @@ export async function* traceFrames<Scene extends VoxelTraceScene>(
   // Instance matrices at the end of the last update: this frame's shutter opens from them.
   let matrices = new Map<string, readonly number[]>(),
     transforms = new Map<string, MeshPlacement['transform']>(),
+    shapes = new Map<string, Float32Array>(),
     current: Scene | undefined,
     moved = false;
   const setScene = async (scene: Scene) => {
@@ -233,19 +241,40 @@ export async function* traceFrames<Scene extends VoxelTraceScene>(
                 return { ...instance, previousTransform: before ?? IDENTITY };
               })
             : placements;
+        // A mesh with the same id and vertex count as last frame deforms from last frame's positions (FG-17 piece 4b).
+        const meshes = (current as { meshes?: readonly MeshShape[] }).meshes;
+        let shaped = false;
+        const meshShapes =
+          shutter > 0 && Array.isArray(meshes)
+            ? meshes.map((mesh) => {
+                const before = shapes.get(mesh.id);
+                if (mesh.previousPositions || !before || before.length !== mesh.positions?.length) return mesh;
+                shaped = true;
+                return { ...mesh, previousPositions: before };
+              })
+            : meshes;
         await setScene(
-          filled || placed
+          filled || placed || shaped
             ? ({
                 ...current,
                 ...(filled ? { instances: withMotion } : {}),
                 ...(placed ? { meshInstances: meshMotion } : {}),
+                ...(shaped ? { meshes: meshShapes } : {}),
               } as Scene)
             : current,
         );
-        moved = filled || placed;
+        moved = filled || placed || shaped;
         matrices = new Map(instances.map((instance) => [instance.id, instance.matrix]));
         transforms = new Map(
           Array.isArray(placements) ? placements.map((instance) => [instance.id, instance.transform]) : [],
+        );
+        // Copied: an update may write the next frame's positions into the same array.
+        shapes = new Map(
+          shutter > 0 && Array.isArray(meshes)
+            ? meshes
+                .filter((mesh) => mesh.positions instanceof Float32Array)
+                .map((mesh) => [mesh.id, new Float32Array(mesh.positions)])
+            : [],
         );
       } else if (moved && current) {
         // Nothing changed since the last frame: its filled-in motion no longer applies.

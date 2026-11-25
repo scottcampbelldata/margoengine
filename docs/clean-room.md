@@ -11958,3 +11958,18 @@ GZ = sin(phi) (GM + BM tan^2(phi) / 2), is the textbook stability result. Proof:
 (a box's buoyancy to f64 rounding, the righting arm to 1e-9, the linear Froude-Krylov heave load of a box in a small wave)
 and `tests/coupling/seakeeping.test.js`. The research summary is kept with the solver's notes, and covers what comes next
 (Cummins radiation in state-space form from strip-theory coefficients, diffraction, drift, green water).
+
+### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
+
+`packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and
+`mesh-kernel/src/lib.rs`. Each vertex of a deforming mesh moves on a straight line over the shutter and each path sees
+the mesh at its own time (Cook, Porter and Carpenter 1984, as above). The BVH topology is built once over boxes holding
+both shutter ends, and each node keeps a box at each end that a ray blends at its time: the linear blend of boxes
+bounding each end's vertices bounds the blended vertices (Woop, Afra and Benthin, STBVH, HPG 2017, section 2, as above;
+Leonhard Grunschloss, Martin Stich, Sehera Nawaz and Alexander Keller, "MSBVH: An Efficient Acceleration Data Structure
+for Ray Traced Motion Blur", HPG 2011, https://doi.org/10.1145/2018323.2018334, on per-node key-frame boxes interpolated
+at ray time). Both the boxes and the corners are blended by the same expression a(1 - t) + bt, which is monotone in
+each input under rounding, so the blended box still holds the blended corners in float. The shared-edge predicate is the
+existing watertight ray-triangle test (Sven Woop, Carsten Benthin and Ingo Wald, "Watertight Ray/Triangle
+Intersection", JCGT 2013, https://jcgt.org/published/0002/01/05/), fed the blended corners, which neighbouring
+triangles compute identically. Written from these papers; no renderer's code was read.

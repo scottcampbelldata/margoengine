@@ -249,6 +249,7 @@ interface TraceTriangleMesh {
     indices: Uint32Array;
     normals?: Float32Array;
     uvs?: Float32Array;
+    previousPositions?: Float32Array;
     material: number;
 }
 

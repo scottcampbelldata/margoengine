@@ -9,10 +9,21 @@ import { MargoError } from '@margoengine/math/errors';
 // at 4..15, the TRS packet of motionRotation at 16..31); the path's time 'motion' runs from 0 (open) to 1 (transform).
 // meshClosest's one meshLocal call builds an instance's model transform at that time and a hit keeps it (Hit.ml), so no
 // shading call site copies the motion rotation again (KB-L5a-10); meshModel and meshWorld read a still hit's record.
+// Deforming meshes (FG-17 piece 4b): record word 27 points at the BLAS's shutter-open section (node boxes, then 12
+// words of vertices a triangle). meshBlas blends each node box and triangle at the path's time, both ends with the one
+// meshBlend so the blended box holds the blended vertices (Woop, Afra and Benthin 2017); a hit keeps its object-space
+// geometric normal (Hit.ng), read by triangleNormal for a deforming hit (a still hit reads its record). meshVertex gives a hit's blended corner.
 const GEOMETRY = /* wgsl */ `
 const TRIANGLE=0xfffffffcu;
 var<private> meshGeometric:vec3f;
 fn triangleBase(h:Hit)->u32 {return h.tri;}
+fn meshCorner(b:u32)->vec3f {return vec3f(fl(b),fl(b+1u),fl(b+2u));}
+fn meshBlend(open:vec3f,close:vec3f)->vec3f {return open*(1.0-motion)+close*motion;}
+fn meshVertex(h:Hit,k:u32)->vec3f {
+ let c=meshCorner(h.tri+k*4u);if(!meshDeforms(h)){return c;}
+ let i=(h.tri-h.meshHead-scene[h.meshHead+1u])/16u;
+ return meshBlend(meshCorner(h.meshHead+scene[h.mesh+27u]+scene[h.meshHead]*8u+i*12u+k*4u),c);
+}
 fn meshX(b:u32)->Xform {return Xform(vec4f(fl(b),fl(b+1u),fl(b+2u),fl(b+3u)),vec4f(fl(b+4u),fl(b+5u),fl(b+6u),fl(b+7u)),vec4f(fl(b+8u),fl(b+9u),fl(b+10u),fl(b+11u)));}
 fn meshMotion(i:u32)->u32 {if(i==0u||motion>=1.0){return 0u;}let r=scene[i+31u];if(r==0u){return 0u;}return scene[2]+r;}
 fn meshLocal(i:u32)->Xform {
@@ -32,7 +43,8 @@ fn meshWorldNormal(h:Hit,n:vec3f)->vec3f {
  if(h.mesh==0u){return n;}let lx=meshModel(h);
  return normalize(n.x*lx.r0.xyz+n.y*lx.r1.xyz+n.z*lx.r2.xyz);
 }
-fn triangleNormal(h:Hit)->vec3f {let b=triangleBase(h);return meshWorldNormal(h,vec3f(fl(b+12u),fl(b+13u),fl(b+14u)));}
+fn meshDeforms(h:Hit)->bool {return h.mesh!=0u&&motion<1.0&&scene[h.mesh+27u]!=0u;}
+fn triangleNormal(h:Hit)->vec3f {if(!meshDeforms(h)){return meshWorldNormal(h,meshCorner(h.tri+12u));}return meshWorldNormal(h,h.ng);}
 fn triangleShadingNormal(h:Hit)->vec3f {
  let ng=triangleNormal(h);let a=scene[triangleBase(h)+7u];if(a==0u){return h.sgn*ng;}
  let b=h.meshHead+a;if((scene[b+15u]&1u)==0u){return h.sgn*ng;}
@@ -67,10 +79,10 @@ fn hitOffset(h:Hit,p:vec3f)->vec3f {
 // Exact zero directions stay parallel. Division also handles nonzero directions
 // whose reciprocal would overflow. Outward-rounded node bounds plus arithmetic
 // slack keep a flat surface or a shared edge in the candidate set.
-fn meshBox(b:u32,o:vec3f,d:vec3f,tMax:f32)->bool {
+fn meshBox(bl:vec3f,bh:vec3f,o:vec3f,d:vec3f,tMax:f32)->bool {
  var lo=0.0;var hi=tMax;
  for(var a=0u;a<3u;a++){
-  let mn=fl(b+a);let mx=fl(b+4u+a);
+  let mn=bl[a];let mx=bh[a];
   if(d[a]==0.0){if(o[a]<mn||o[a]>mx){return false;}}
   else{let t0=(mn-o[a])/d[a];let t1=(mx-o[a])/d[a];
    let near=min(t0,t1);let far=max(t0,t1);
@@ -115,14 +127,12 @@ fn meshEdge(a:vec2f,b:vec2f)->f32 {
  let value=ldexp(f32(hi)*4294967296.0+f32(lo),i32(base)-300);
  return select(value,-value,(x.w!=0u)!=less);
 }
-fn triangleHit(b:u32,o:vec3f,d:vec3f,tMax:f32)->vec3f {
+fn triangleHit(p0:vec3f,p1:vec3f,p2:vec3f,o:vec3f,d:vec3f,tMax:f32)->vec3f {
  var kz=0u;if(abs(d.y)>abs(d.x)){kz=1u;}if(abs(d.z)>abs(d[kz])){kz=2u;}
  var kx=(kz+1u)%3u;var ky=(kx+1u)%3u;
  if(d[kz]<0.0){let t=kx;kx=ky;ky=t;}
  let sx=d[kx]/d[kz];let sy=d[ky]/d[kz];let sz=1.0/d[kz];
- let a=vec3f(fl(b),fl(b+1u),fl(b+2u))-o;
- let c=vec3f(fl(b+8u),fl(b+9u),fl(b+10u))-o;
- let v=vec3f(fl(b+4u),fl(b+5u),fl(b+6u))-o;
+ let a=p0-o;let c=p2-o;let v=p1-o;
  let ax=a[kx]-sx*a[kz];let ay=a[ky]-sy*a[kz];
  let bx=v[kx]-sx*v[kz];let by=v[ky]-sy*v[kz];
  let cx=c[kx]-sx*c[kz];let cy=c[ky]-sy*c[kz];
@@ -132,19 +142,25 @@ fn triangleHit(b:u32,o:vec3f,d:vec3f,tMax:f32)->vec3f {
  let t=(u*a[kz]+q*v[kz]+w*c[kz])*sz/det;
  if(t>0.0&&t<tMax){return vec3f(t,q/det,w/det);}return vec3f(-1.0);
 }
-fn meshBlas(head:u32,instance:u32,lx:Xform,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>){
+fn meshBlas(head:u32,instance:u32,lx:Xform,section:u32,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>){
  let count=scene[head];let triangles=head+scene[head+1u];
  var node=0u;
  loop{
   if(node>=count){break;}
-  let b=head+4u+node*8u;
-  if(!meshBox(b,o,d,(*h).t)){node=scene[b+3u];continue;}
+  let b=head+4u+node*8u;var bl=meshCorner(b);var bh=meshCorner(b+4u);
+  if(section!=0u){let q=section+node*8u;bl=meshBlend(meshCorner(q),bl);bh=meshBlend(meshCorner(q+4u),bh);}
+  if(!meshBox(bl,bh,o,d,(*h).t)){node=scene[b+3u];continue;}
   let leaf=scene[b+7u];node++;
   if(leaf==0u){continue;}
-  let tb=triangles+(leaf-1u)*16u;let hit=triangleHit(tb,o,d,(*h).t);let t=hit.x;
+  let tb=triangles+(leaf-1u)*16u;var p0=meshCorner(tb);var p1=meshCorner(tb+4u);var p2=meshCorner(tb+8u);var n=meshCorner(tb+12u);
+  if(section!=0u){
+   let q=section+count*8u+(leaf-1u)*12u;p0=meshBlend(meshCorner(q),p0);p1=meshBlend(meshCorner(q+4u),p1);p2=meshBlend(meshCorner(q+8u),p2);
+   let c=cross(p1-p0,p2-p0);if(dot(c,c)>1e-30){n=normalize(c);}
+  }
+  let hit=triangleHit(p0,p1,p2,o,d,(*h).t);let t=hit.x;
   if(t<=0.0){continue;}
-  let n=vec3f(fl(tb+12u),fl(tb+13u),fl(tb+14u));let back=dot(n,d)>0.0;
-  (*h).t=t;(*h).inst=TRIANGLE;(*h).tri=tb;(*h).meshHead=head;(*h).mesh=instance;(*h).ml=lx;(*h).axis=0u;(*h).cell=vec3i(0);
+  let back=dot(n,d)>0.0;
+  (*h).t=t;(*h).inst=TRIANGLE;(*h).tri=tb;(*h).meshHead=head;(*h).mesh=instance;(*h).ml=lx;(*h).ng=n;(*h).axis=0u;(*h).cell=vec3i(0);
   (*h).sgn=select(1.0,-1.0,back);(*h).bary=hit.yz;
   (*h).value=select(scene[tb+3u],0u,back&&mInst==TRIANGLE&&medium==scene[tb+3u]);
  }
@@ -155,19 +171,20 @@ fn meshClosest(o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>){
  let count=select(scene[head],1u,lone);var node=0u;
  loop{
   if(node>=count){break;}
-  var blas=head;var instance=0u;var lo=o;var ld=d;var lx=Xform(vec4f(1,0,0,0),vec4f(0,1,0,0),vec4f(0,0,1,0));
+  var blas=head;var instance=0u;var section=0u;var lo=o;var ld=d;var lx=Xform(vec4f(1,0,0,0),vec4f(0,1,0,0),vec4f(0,0,1,0));
   if(lone){node++;}
   else{
    let b=head+16u+node*8u;
-   if(!meshBox(b,o,d,(*h).t)){node=scene[b+3u];continue;}
+   if(!meshBox(meshCorner(b),meshCorner(b+4u),o,d,(*h).t)){node=scene[b+3u];continue;}
    let leaf=scene[b+7u];node++;if(leaf==0u){continue;}
    instance=head+scene[head+5u]+(leaf-1u)*32u;lx=meshLocal(instance);
    lo=vec3f(dot(lx.r0,vec4f(o,1.0)),dot(lx.r1,vec4f(o,1.0)),dot(lx.r2,vec4f(o,1.0)));
    // Do not normalize: the transformed ray must retain the world-space t.
    ld=vec3f(dot(lx.r0.xyz,d),dot(lx.r1.xyz,d),dot(lx.r2.xyz,d));
    blas=head+scene[instance+24u];
+   if(motion<1.0&&scene[instance+27u]!=0u){section=blas+scene[instance+27u];}
   }
-  meshBlas(blas,instance,lx,lo,ld,medium,mInst,h);
+  meshBlas(blas,instance,lx,section,lo,ld,medium,mInst,h);
  }
 }
 fn meshOccludes(o:vec3f,d:vec3f,tMax:f32)->bool {
@@ -183,7 +200,7 @@ export function meshSource(input: string): string {
       throw new MargoError('state', 'Mesh kernel mismatch; rebuild: https://margoengine.com/errors#voxel-pathtracer');
     source = source.replace(from, to);
   };
-  edit('sgn:f32,cell:vec3i}', 'sgn:f32,cell:vec3i,tri:u32,bary:vec2f,mesh:u32,meshHead:u32,ml:Xform}');
+  edit('sgn:f32,cell:vec3i}', 'sgn:f32,cell:vec3i,tri:u32,bary:vec2f,mesh:u32,meshHead:u32,ml:Xform,ng:vec3f}');
   edit('fn closest(', GEOMETRY + '\nfn closest(');
   edit('if(f.scene.w==0u){return h;}', 'meshClosest(o,d,medium,mInst,&h);\n if(f.scene.w==0u){return h;}');
   edit(

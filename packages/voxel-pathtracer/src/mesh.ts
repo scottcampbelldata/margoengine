@@ -45,6 +45,12 @@ export interface TraceTriangleMesh {
   normals?: Float32Array;
   /** Optional UV pairs, one per position. Required for textured materials. Repeat wrapping, nearest sampling. */
   uvs?: Float32Array;
+  /**
+   * Optional shutter-open positions of a deforming mesh, one xyz per position (motion blur, FG-17). Each vertex moves
+   * on a straight line from here to `positions` over the shutter; shading normals and UVs stay at `positions`. Equal
+   * to `positions`, or with `shutter` 0, the mesh renders as without it. Default none: a still mesh.
+   */
+  previousPositions?: Float32Array;
   /** Scene palette id, 1..255. Surface materials; a texture index uses interpolated UVs. */
   material: number;
 }

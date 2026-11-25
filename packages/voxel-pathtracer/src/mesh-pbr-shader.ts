@@ -135,9 +135,7 @@ fn pbrMapNormal(h:Hit,r:u32,mapSlot:u32,scale:f32,texel:vec4f)->vec3f {
   let u1=vec2f(fl(b+offset),fl(b+offset+1u))-u0;let u2=vec2f(fl(c+offset),fl(c+offset+1u))-u0;
   let det=u1.x*u2.y-u1.y*u2.x;
   if(det==0.0){return n;}
-  let q=triangleBase(h);let p0=vec3f(fl(q),fl(q+1u),fl(q+2u));
-  let e1=vec3f(fl(q+4u),fl(q+5u),fl(q+6u))-p0;
-  let e2=vec3f(fl(q+8u),fl(q+9u),fl(q+10u))-p0;
+  let p0=meshVertex(h,0u);let e1=meshVertex(h,1u)-p0;let e2=meshVertex(h,2u)-p0;
   t=pbrDirection(h,(e1*u2.y-e2*u1.y)/det);
   let bitangent=pbrDirection(h,(e2*u1.x-e1*u2.x)/det);
   hand=select(1.0,-1.0,dot(cross(n,t),bitangent)<0.0);
@@ -196,7 +194,7 @@ export function meshPBRSource(input: string): string {
   );
   edit(
     '  (*h).t=t;(*h).inst=TRIANGLE;',
-    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.ml=lx;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back,t)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
+    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.ml=lx;candidate.ng=n;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back,t)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
   );
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');
   edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');

@@ -72,6 +72,11 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
       throw new TypeError('MeshPathTracer normals must be Float32Array xyz values, one per position');
     if (m.uvs !== undefined && (!(m.uvs instanceof Float32Array) || m.uvs.length !== (m.positions.length / 3) * 2))
       throw new TypeError('MeshPathTracer uvs must be Float32Array pairs, one per position');
+    if (
+      m.previousPositions !== undefined &&
+      (!(m.previousPositions instanceof Float32Array) || m.previousPositions.length !== m.positions.length)
+    )
+      throw new TypeError('MeshPathTracer previousPositions must be Float32Array xyz values, one per position');
     triangles += m.indices.length / 3;
     size += 3 + m.positions.length + m.indices.length;
   }
@@ -81,6 +86,8 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
     );
   const attributes = scene.meshes.some((m) => m.normals !== undefined || m.uvs !== undefined);
   if (attributes) size += 1 + scene.meshes.reduce((n, m) => n + 2 + (m.normals?.length ?? 0) + (m.uvs?.length ?? 0), 0);
+  const deforming = scene.meshes.some((m) => m.previousPositions !== undefined);
+  if (deforming) size += 1 + scene.meshes.reduce((n, m) => n + 1 + (m.previousPositions?.length ?? 0), 0);
   if (size > (128 << 20) / 4) throw new RangeError('MeshPathTracer accepts at most 128 MiB of input words');
   const input = new Uint32Array(size);
   input[0] = scene.meshes.length;
@@ -105,6 +112,18 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
         }
     }
   }
+  // Shutter-open positions: per mesh a count (0 or its position count) and the values (FG-17 piece 4b).
+  if (deforming) {
+    input[at++] = 0x4d505256;
+    for (const m of scene.meshes) {
+      const p = m.previousPositions;
+      input[at++] = p?.length ?? 0;
+      if (p) {
+        input.set(new Uint32Array(p.buffer, p.byteOffset, p.length), at);
+        at += p.length;
+      }
+    }
+  }
   const k = await meshKernel(signal),
     p = k.allocate(size);
   try {
@@ -112,7 +131,7 @@ export async function buildTraceMeshes(scene: MeshTraceScene, signal?: AbortSign
     const code = k.build_mesh(p, size);
     if (code)
       throw new RangeError(
-        `MeshPathTracer ${['', 'invalid mesh packet', 'positions must be finite within +/-1e8 world units', 'index outside positions', 'normals must be finite and nonzero', 'UVs must be finite within +/-1e8'][code] ?? 'invalid mesh'}; check scene.meshes`,
+        `MeshPathTracer ${['', 'invalid mesh packet', 'positions must be finite within +/-1e8 world units, previousPositions too', 'index outside positions', 'normals must be finite and nonzero', 'UVs must be finite within +/-1e8'][code] ?? 'invalid mesh'}; check scene.meshes`,
       );
     signal?.throwIfAborted();
     return new Uint32Array(k.memory.buffer, k.output_ptr(), k.output_len()).slice();
