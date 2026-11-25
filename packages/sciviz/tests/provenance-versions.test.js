@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile, copyFile, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 test('build version generation preserves an equivalent CRLF checkout without dirtying it', async () => {
   const root = resolve(`test-results/sciviz-provenance/versions-${process.pid}`);
@@ -35,4 +36,14 @@ test('build version generation preserves an equivalent CRLF checkout without dir
   execFileSync(process.execPath, [script], { timeout: 10000, windowsHide: true });
   assert.equal(await readFile(output, 'utf8'), crlf);
   assert.match(crlf, /"@margoengine\/core": "1.0.0"/);
+});
+
+test("regression: the build's version step leaves git status clean", () => {
+  const repository = fileURLToPath(new URL('../../..', import.meta.url)),
+    output = 'packages/sciviz/src/provenance-versions.ts',
+    run = (command, args) =>
+      execFileSync(command, args, { cwd: repository, encoding: 'utf8', timeout: 10000, windowsHide: true });
+  run(process.execPath, ['packages/sciviz/scripts/prebuild.mjs']);
+  assert.equal(run('git', ['status', '--porcelain', '--', output]), '');
+  assert.equal(run('git', ['ls-files', '--', output]), '', 'a generated file is never tracked');
 });
