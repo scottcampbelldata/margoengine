@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18926672,
+  "total": 18930595,
   "history": [
     {
       "date": "2026-10-24",
@@ -12195,6 +12195,12 @@
       "commit": "lane-d",
       "reason": "geospatial planet scale (origin, near and far)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "fe86d1e5e",
+      "reason": "weather/precipitation is a new optional entry (ATMO-04): the framework's precipitation field, rain, snow, graupel and hail fall speeds from each particle's physics and their size distributions; its own entry so scenes without rain pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13734,6 +13740,7 @@
     "@margoengine/weather/lava": 12346,
     "@margoengine/weather/lava-settings": 4046,
     "@margoengine/weather/lens": 4125,
+    "@margoengine/weather/precipitation": 3923,
     "@margoengine/weather/puddles": 3984,
     "@margoengine/weather/regions": 2864,
     "@margoengine/weather/settings": 9476,

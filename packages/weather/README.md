@@ -383,6 +383,29 @@ console.log(wind.meanSpeed(30).toFixed(2), air.density.toFixed(3)); // 13.22 1.2
 
 `new MannBox({cells, size, lengthScale, shear, sigma, seed})` synthesises the box on its own (default 512 x 32 x 32 cells over 4,096 x 256 x 256 m; each cell count a product of 2, 3 and 5), `box.u`, `box.v` and `box.w` are its along-wind, across and upward fluctuations, and `box.sample(x, y, z)` reads it trilinearly, repeating past its size. A box should span several length scales (the largest eddies are under-represented in a finite box) and be long enough along the wind that its repeat is not seen: at 12 m/s the default repeats every 5.7 minutes. Making the default box takes under a second.
 
+## Rain, snow, graupel and hail (the physics framework's precipitation)
+
+`PrecipitationField` (`@margoengine/weather/precipitation`) is the precipitation every solver of the physics framework reads: one `Precipitation` of `@margoengine/math/fields`, sampled at any point and time on the world clock with `sample(x, y, z, t, out?)`. It gives the total `rate` in mm/h of liquid water and, for each of `rain`, `snow`, `graupel` and `hail`, its own `rate`, its exponential size distribution N(D) = `intercept` exp(-`slope` D) (particles per m^3 per m of size), its mass-weighted `fallSpeed` relative to the air, the `impactRate` (particles per m^2 per s on level ground, for rings and splashes), the `energyFlux` it brings down (W/m^2) and its `waterContent` (kg/m^3), plus the `velocity` of the falling water over the ground. Fall speeds come from each particle's physics in the air at that height: a raindrop's from its weight against the drag of an oblate drop (Loftus and Wordsworth 2021), a snow aggregate's from the Best-number method of Heymsfield and Westbrook (2010), graupel's and hail's from Heymsfield and Wright (2014); raindrops follow Marshall and Palmer's sizes and carry exactly the rate asked for, and snow carries the mass and number of the drops it melts into. The share falling as snow follows the air temperature (half at 1.0 C, `snowTemperature`), so the snow line moves with the weather and with height. The rain is set at cloud base (`base`, default 1500 m above `ground`) as a `rate` everywhere (default 4 mm/h, moderate rain, when there are no cells) plus moving exponential `cells` (`centre`, e-folding `radius`, peak `rate`, `velocity`); what reaches a point fell from upwind, carried by `wind` (any `Wind`, such as `BoundaryLayerWind`) for its fall time, so a shaft slants with the wind, gusts bend it, and it stays anchored in the world while its cell drifts. `graupel` and `hail` take a `fraction` of the rate and an e-folding size `scale` (hail from 5 mm, density 900 kg/m^3 unless given). Air density and temperature come from the wind, or from the standard atmosphere at `altitude` plus the height without one.
+
+```ts
+import {BoundaryLayerWind} from '@margoengine/weather/boundary-layer';
+import {PrecipitationField, rainFallSpeed} from '@margoengine/weather/precipitation';
+
+const wind = new BoundaryLayerWind({speed: 12, turbulence: false});
+const rain = new PrecipitationField({
+  cells: [{centre: [0, 0], radius: 800, rate: 25, velocity: [6, 0]}],
+  rate: 1,
+  wind,
+  seaLevelTemperature: 280,
+});
+const deck = rain.sample(1500, 2, 0, 60); // 2 m up, 1.5 km downwind, a minute in
+console.log(deck.rate.toFixed(1), Math.round(deck.rain.impactRate)); // 4.4 2924 (mm/h, drops per m^2 per s)
+console.log(deck.velocity.map((v) => v.toFixed(1))); // ['10.2', '-4.5', '0.0']: blown along x as it falls
+console.log(rainFallSpeed(0.002).toFixed(2)); // 6.24 m/s for a 2 mm drop at sea level
+```
+
+`rainFallSpeed(d, air?)`, `snowFallSpeed`, `graupelFallSpeed` and `hailFallSpeed(d, air?, density?)` give one particle's terminal speed (size in m, `air` as `{density, temperature, gravity}`, default the sea-level standard atmosphere), `largestRaindrop(air?)` the largest stable drop (7.2 mm at sea level), and `snowFraction(T)` the share of snow at a temperature. A sample costs about a millisecond (each species integrates its size distribution over 64 sizes), so sample a coarse grid and interpolate rather than every particle.
+
 ## Explosion clouds (instantaneous releases)
 
 `BlastCloud` from `margoengine/weather/eruption` is the mushroom cloud of one or more instantaneous releases (an

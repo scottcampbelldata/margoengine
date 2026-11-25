@@ -21,6 +21,9 @@ export const ALWAYS = [
   'packages/physics/src/aero.ts',
   'packages/physics/src/sail.ts',
   'packages/math/src/atmosphere.ts',
+  'packages/weather/src/boundary-layer.ts',
+  'packages/weather/src/turbulence.ts',
+  'packages/weather/src/precipitation.ts',
 ];
 
 const BANNED =

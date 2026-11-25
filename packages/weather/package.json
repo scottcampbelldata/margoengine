@@ -63,6 +63,10 @@
       "types": "./dist/boundary-layer.d.ts",
       "import": "./dist/boundary-layer.js"
     },
+    "./precipitation": {
+      "types": "./dist/precipitation.d.ts",
+      "import": "./dist/precipitation.js"
+    },
     "./lava": {
       "types": "./dist/lava.d.ts",
       "import": "./dist/lava.js"

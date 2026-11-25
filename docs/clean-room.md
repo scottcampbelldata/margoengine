@@ -11654,6 +11654,42 @@ standard deviation, Pfaff's transformation of the hypergeometric function to a s
 and an atan from + - * / only are this package's own arrangement. Proof: `packages/weather/tests/turbulence.test.js` (isotropy,
 the IEC ratios 0.68 and 0.51, u'w' < 0, divergence below 1e-12, determinism) and `tests/boundary-layer.test.js`.
 
+### The framework's precipitation: rain, snow, graupel and hail (ATMO-04, `@margoengine/weather/precipitation`, 2026-11-25)
+
+`packages/weather/src/precipitation.ts` (`PrecipitationField`, the fall-speed functions) is the framework's `Precipitation`
+(`packages/math/src/fields/precipitation.ts`). Written from:
+
+- K. Loftus and R. D. Wordsworth, "The physics of falling raindrops in diverse planetary atmospheres", JGR Planets 126,
+  2021, arXiv:2102.09570, read (sections 2.1, 2.2 and 3.4): Green's shape balance (eq. 2), the Clift and Gauvin drag law
+  with Loth's shape factor (eqs. 6 and 7), the terminal speed of an oblate drop (eq. 8) and the Rayleigh-Taylor size limit
+  (eq. 21). Green (1975), Clift and Gauvin (1970), Loth (2008) and Komabayasi et al. (1964) are known through it.
+- A. Heymsfield and R. Wright, "Graupel and hail terminal velocities: does a 'supercritical' Reynolds number apply?",
+  J. Atmos. Sci. 71, 2014, read in full: the Best number (eq. 5), the Re-X fit (eq. 6), the graupel density law (eq. 3),
+  hail's 0.9 g/cm^3 (after List et al. 1970) and the power laws used as checks (eqs. 7 and 8).
+- A. J. Heymsfield and C. D. Westbrook, "Advances in the estimation of ice particle fall speeds using laboratory and field
+  measurements", J. Atmos. Sci. 67, 2010: not readable here; its modified Best number X* = X Ar^1/2 with delta0 = 8.0 and
+  C0 = 0.35 is taken from S. Vazquez-Martin, T. Kuhn and S. Eliasson, "Mass of different snow crystal shapes derived from
+  fall speed measurements", ACP 21, 2021 (read, section 3.1), and M. W. McCorquodale and C. D. Westbrook, "TRAIL part 2"
+  (read, section 2.2.1), which both restate it.
+- A. Seifert and F. Jakub, "On the geometry of aggregate snowflakes", Tellus A (read in part): the asymptotic area ratio of
+  large aggregates, about 0.33 of the circumscribing ellipse, and its aspect ratio 0.74.
+- Brown and Francis (1995), m = 0.0185 D^1.9 (SI): not read; known through Hogan et al. (2006, J. Appl. Meteor. Climatol.)
+  and Heymsfield et al. (2010, J. Atmos. Sci.), which cite it as matching observations in the mean.
+- Marshall and Palmer (1948): N0 = 8000 per m^3 per mm and Lambda = 4.1 R^-0.21 per mm, as restated by T. J. Garrett et al.,
+  "Analytical solutions for precipitation size distributions at steady state", arXiv:1901.02163 (read).
+- K. S. Jennings, T. S. Winchell, B. Livneh and N. P. Molotch, "Spatial variation of the rain-snow temperature threshold
+  across the Northern Hemisphere", Nature Communications 9, 1148, 2018 (read): the 1.0 C mean threshold. A. Dai,
+  "Temperature and pressure dependence of the rain-snow phase transition over land and ocean", GRL 35, 2008: the land slope
+  of about 0.7 per K, from its abstract.
+- Gunn and Kinzer (1949), the measured raindrop speeds the tests check against, known through Loftus and Wordsworth.
+- IAPWS, "Revised release on surface tension of ordinary water substance", 2014, and the U.S. Standard Atmosphere (1976)
+  Sutherland constants: standards, known from their published formulas.
+
+Snow that carries the mass flux and the number flux of the drops it melts into (one slope found by bisection), the rain
+intercept set so the drops carry exactly the rate, the drift of a shaft by the median drop's fall time and the wind at the
+middle of its fall, and the 64-point Gauss-Legendre integrals in units of the slope are this package's own arrangement.
+Proof: `packages/weather/tests/precipitation.test.js`.
+
 ### Aerodynamic loads from shape (AERO-01, `WindForce` in `@margoengine/physics`, 2026-11-25)
 
 `packages/physics/src/aero.ts` cuts each collider's surface into panels and `fields.ts` loads them: on each windward panel the

@@ -51,6 +51,30 @@ export interface FollowTarget {
     readonly angularVelocity: readonly [number, number, number];
 }
 
+export interface HydrometeorSample {
+    rate: number;
+    intercept: number;
+    slope: number;
+    fallSpeed: number;
+    impactRate: number;
+    energyFlux: number;
+    waterContent: number;
+}
+
+export interface Precipitation {
+    readonly cell: PrecipitationCell;
+    sample(x: number, y: number, z: number, t: number, out?: PrecipitationSample): PrecipitationSample;
+}
+
+export interface PrecipitationSample {
+    rate: number;
+    rain: HydrometeorSample;
+    snow: HydrometeorSample;
+    graupel: HydrometeorSample;
+    hail: HydrometeorSample;
+    velocity: [number, number, number];
+}
+
 export interface Wind extends FlowField {
     readonly medium: 'air';
 }
@@ -58,4 +82,6 @@ export interface Wind extends FlowField {
 // Not exported from this entry, but used by the exports above:
 
 type BedCell = readonly [number, number, number];
+
+type PrecipitationCell = readonly [number, number, number];
 ```
