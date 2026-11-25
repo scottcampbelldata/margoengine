@@ -25,7 +25,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| ASCII effect | three.js, pmndrs | MISSING | S |  |
+| ASCII effect | three.js, pmndrs | DONE | S | 12d7c41c5 |
 | Radial / zoom blur | three.js | MISSING | S |  |
 | Ramp, Grid, Depth view and texture overlay effects | pmndrs | MISSING | S each |  |
 | Colour curves in image processing | Babylon | MISSING | S |  |
