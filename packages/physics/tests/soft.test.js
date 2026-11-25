@@ -1214,3 +1214,35 @@ test('a contact is stable at a mass ratio of a thousand either way, and a cloth 
   const torn = await run(1, 1000, 0.05);
   assert.ok(torn.tore, 'a cloth with a tear strain tears under a tonne');
 });
+
+test('a soft body is drawn between steps by alpha, as rigid bodies are, and a teleport leaves no trail (PA-06)', async () => {
+  const { physics, soft } = await create();
+  const cloth = soft.create(SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, 0, 0.1], 4, 4).setPinnedParticles([0]));
+  steps(physics, 10);
+  const before = cloth.particlePositions();
+  // A frame of 2.5 steps: two steps run and half a step is left, so the world's alpha is a half.
+  const dt = 1 / 60;
+  assert.equal(physics.update(dt * 2.5), 2);
+  const mid = cloth.particlePositions();
+  physics.step();
+  const after = cloth.particlePositions();
+  near(physics.alpha, 0.5, 1e-9, 'alpha');
+  // Drawn now (after one more step), between where the last step began (`mid`) and where it ended.
+  const drawn = cloth.interpolatedPositions(0.25);
+  for (let k = 0; k < drawn.length; k++) near(drawn[k], mid[k] + 0.25 * (after[k] - mid[k]), 1e-6, `coordinate ${k}`);
+  assert.deepEqual(cloth.interpolatedPositions(1), after, 'alpha 1 is the stepped state');
+  assert.deepEqual(cloth.interpolatedPositions(0), mid, 'alpha 0 is where the step began');
+  assert.deepEqual(cloth.interpolatedPositions(7), after, 'alpha is held to 0..1');
+  assert.ok(
+    before.some((v, k) => v !== mid[k]),
+    'the cloth moved',
+  );
+  // A teleport is drawn where it went, at any alpha.
+  cloth.setParticlePosition(5, [10, 10, 10]);
+  for (const a of [0, 0.5, 1]) assert.deepEqual(Array.from(cloth.interpolatedPositions(a).slice(15, 18)), [10, 10, 10]);
+  // Into a buffer of one's own, and refused with the wrong length or a bad alpha.
+  const out = new Float32Array(cloth.numParticles() * 3);
+  assert.equal(cloth.interpolatedPositions(0.5, out), out);
+  assert.throws(() => cloth.interpolatedPositions(0.5, new Float32Array(2)), /three numbers a particle/);
+  assert.throws(() => cloth.interpolatedPositions(Number.NaN), /alpha/);
+});

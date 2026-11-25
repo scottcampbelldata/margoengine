@@ -1026,3 +1026,20 @@ test('the volume constraint and the skin go with the pieces of a body that is cu
   const skinned = event.pieces.reduce((sum, piece) => sum + piece.meshVertices().length / 3, 0);
   assert.equal(skinned, vertices.length / 3, 'every skin vertex went to a piece');
 });
+
+test('a skin is drawn between steps by alpha, carried by the interpolated cells (PA-06)', async () => {
+  const { physics, soft } = await create([0, -9.81, 0], 8, 4);
+  const { vertices, indices } = boxMesh();
+  const body = soft.create(SoftBodyDesc.volumetric(vertices, indices, 0.25, true));
+  physics.step();
+  const start = body.meshVertices();
+  physics.step();
+  const end = body.meshVertices(),
+    half = body.interpolatedMeshVertices(0.5);
+  assert.deepEqual(body.interpolatedMeshVertices(1), end, 'alpha 1 is the stepped skin');
+  for (let k = 0; k < half.length; k++) near(half[k], (start[k] + end[k]) / 2, 1e-5, `skin coordinate ${k}`);
+  assert.ok(
+    end.some((v, k) => v !== start[k]),
+    'the skin moved',
+  );
+});

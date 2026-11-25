@@ -50,6 +50,7 @@ export class SoftBodies implements PhysicsAttachment {
         vertices: Float32Array;
         colors: Float32Array;
     };
+    get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
     hash(): number;
@@ -124,6 +125,7 @@ export class SoftBody {
     cellsTornSeen: Set<number>;
     skin: Skin | null;
     skinCells: Uint32Array<ArrayBuffer>;
+    previous: Float32Array<ArrayBuffer>;
     clusterInfo: ClusterInfo[];
     solverKind: SoftSolver;
     rootCluster: number;
@@ -151,6 +153,9 @@ export class SoftBody {
     numParticles(): number;
     particlePosition(index: number): Vec3;
     particlePositions(): Float32Array;
+    interpolatedPositions(alpha?: number, out?: Float32Array): Float32Array;
+    interpolatedMeshVertices(alpha?: number): Float32Array;
+    remember(): void;
     particleVelocity(index: number): Vec3;
     particleVelocities(): Float32Array;
     setParticlePosition(index: number, position: Vec3): this;

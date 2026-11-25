@@ -1372,6 +1372,8 @@ export class SoftBody {
   /** @internal */ cellsTornSeen = new Set<number>();
   /** @internal The skin, and the cells (four particle indices each) it was bound against. */ skin: Skin | null = null;
   /** @internal */ skinCells = new Uint32Array(0);
+  /** @internal Where each particle stood when the last step began (x, y, z), for drawing between steps. */ previous =
+    new Float32Array(0);
   /** @internal */ clusterInfo: ClusterInfo[] = [];
   /** @internal */ solverKind: SoftSolver = 'constraints';
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
@@ -1435,6 +1437,73 @@ export class SoftBody {
     }
     return out;
   }
+  /**
+   * Every particle's position between the last two steps, as flat x, y, z: where it stood when the last step began, moved by
+   * `alpha` of the way to where the step left it (the rigid bodies' {@link Physics.sync} does the same), so a body drawn each
+   * frame moves smoothly when the frame rate and the step rate differ, and inside a motion-blur shutter. `alpha` defaults to the
+   * world's {@link Physics.alpha} and is held to 0..1; at 1 it is {@link SoftBody.particlePositions}. A teleport
+   * (`setParticlePosition`) leaves no trail. Writes into `out` when given (three numbers a particle).
+   * @throws RangeError for an alpha that is not a number, or an `out` of the wrong length.
+   */
+  interpolatedPositions(
+    alpha: number = this.owner.alpha,
+    out: Float32Array = new Float32Array(this.particles * 3),
+  ): Float32Array {
+    this.check();
+    if (!Number.isFinite(alpha))
+      throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
+    if (out.length !== this.particles * 3)
+      throw new RangeError(
+        `out holds ${out.length} numbers for ${this.particles} particles; pass three numbers a particle.`,
+      );
+    const a = alpha > 1 ? 1 : alpha < 0 ? 0 : alpha,
+      { x, y, z } = this.c,
+      before = this.previous;
+    for (let i = 0; i < this.particles; i++) {
+      const row = this.firstParticle + i,
+        o = i * 3;
+      out[o] = before[o]! + a * (x[row]! - before[o]!);
+      out[o + 1] = before[o + 1]! + a * (y[row]! - before[o + 1]!);
+      out[o + 2] = before[o + 2]! + a * (z[row]! - before[o + 2]!);
+    }
+    return out;
+  }
+  /**
+   * The skin's vertices between the last two steps (see {@link SoftBody.interpolatedPositions}): the skin of
+   * {@link SoftBody.meshVertices} carried by the interpolated particles. Empty for a body with no skin.
+   * @throws RangeError for an alpha that is not a number.
+   */
+  interpolatedMeshVertices(alpha: number = this.owner.alpha): Float32Array {
+    const skin = this.skin;
+    if (!skin) {
+      this.check();
+      return new Float32Array(0);
+    }
+    const at = this.interpolatedPositions(alpha),
+      out = new Float32Array(skin.cell.length * 3);
+    for (let i = 0; i < skin.cell.length; i++) {
+      const cell = skin.cell[i]!;
+      for (let k = 0; k < 4; k++) {
+        const p = this.skinCells[cell * 4 + k]! * 3,
+          w = skin.weight[i * 4 + k]!;
+        out[i * 3] = out[i * 3]! + w * at[p]!;
+        out[i * 3 + 1] = out[i * 3 + 1]! + w * at[p + 1]!;
+        out[i * 3 + 2] = out[i * 3 + 2]! + w * at[p + 2]!;
+      }
+    }
+    return out;
+  }
+  /** @internal Keeps where every particle stands now, as the start of the next step. */
+  remember(): void {
+    const { x, y, z } = this.c;
+    if (this.previous.length !== this.particles * 3) this.previous = new Float32Array(this.particles * 3);
+    for (let i = 0; i < this.particles; i++) {
+      const row = this.firstParticle + i;
+      this.previous[i * 3] = x[row]!;
+      this.previous[i * 3 + 1] = y[row]!;
+      this.previous[i * 3 + 2] = z[row]!;
+    }
+  }
   particleVelocity(index: number): Vec3 {
     this.check(index);
     const { vx, vy, vz } = this.c,
@@ -1463,6 +1532,8 @@ export class SoftBody {
     x[row] = px[row] = position[0];
     y[row] = py[row] = position[1];
     z[row] = pz[row] = position[2];
+    // A teleport leaves no trail between steps.
+    if (this.previous.length === this.particles * 3) this.previous.set(position, index * 3);
     return this;
   }
   setParticleVelocity(index: number, velocity: Vec3): this {
@@ -2150,6 +2221,10 @@ export class SoftBodies implements PhysicsAttachment {
     }
     return { vertices: new Float32Array(positions), colors: new Float32Array(colors) };
   }
+  /** The world's interpolation factor between the last two steps ({@link Physics.alpha}), which drawing soft bodies reads. */
+  get alpha(): number {
+    return this.physics.alpha;
+  }
   /** Every live soft body, oldest first. */
   list(): readonly SoftBody[] {
     return this.bodies;
@@ -2444,6 +2519,7 @@ export class SoftBodies implements PhysicsAttachment {
       });
     }
     this.bodies.push(body);
+    body.remember();
     this.writeMaterial(body);
     this.writeCellMaterial(body);
     this.syncCloth();
@@ -3161,6 +3237,8 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.pushes.clear();
     if (this.particleCount === 0) return;
+    // Where every particle starts the step, for drawing between steps.
+    for (const body of this.bodies) body.remember();
     this.applyForces(this.columns(), dt);
     const h = dt / this.substeps,
       g = this.physics.gravity,
