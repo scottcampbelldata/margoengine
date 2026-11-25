@@ -30,7 +30,10 @@ function reversed(animation, clip, name) {
 
 /**
  * The rig standing on a floor, turned `yaw` radians about up, with its ragdoll and get-up, thrown over forward (`push` > 0)
- * or backward along where it faces, sliding away from the character's root as it falls.
+ * or backward along where it faces, sliding away from the character's root as it falls. How it lands is chaotic, so each push
+ * used here lands the same way for every push within 4 of it on the solver as it stands: backward 30 does, from 26 to 34, by
+ * at least 2.05 rad between the two clips' fits, straight or turned. Backward 40 did not: one kernel turned it onto its side
+ * at 40 and 44 (0.74 rad against 2.11), the one before at 37.
  */
 async function fallen(push, { yaw = 0, ...options } = {}) {
   const rig = await realRig(GENERAL, {
@@ -58,7 +61,7 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const across = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
 rtest('a body on its back gets the face-up clip, a body on its front the face-down clip', async () => {
-  const back = await fallen(-40),
+  const back = await fallen(-30),
     front = await fallen(20);
   assert.equal(back.getUp.pick(), 'faceUp');
   assert.equal(front.getUp.pick(), 'faceDown');
@@ -104,7 +107,7 @@ const steps = (path) => path.slice(1).map((p, i) => distance(p, path[i]));
 // by the pose gap over 24, 2.8 cm at push 40; the eased fade has d2w of at most 6/24^2 and no stop. The positions are f32, so the
 // bound carries their rounding too. Every push is checked: how
 // a limp body lands is chaotic (forward pushes of 20 land it face down, 60 and 80 face up, 40 is the edge), and no landing may pop.
-for (const push of [-40, 20, 40, 60, 80])
+for (const push of [-30, 20, 40, 60, 80])
   rtest(
     `pushed by ${push}: the character comes to the body, and the bones blend into the clip with no pop`,
     async () => {
@@ -184,8 +187,8 @@ for (const push of [-40, 20, 40, 60, 80])
 rtest(
   'facing does not matter: turned a radian and more, the same clips fit as well, and a side can be forced',
   async () => {
-    const straight = await fallen(-40),
-      turned = await fallen(-40, { yaw: 2.2 }),
+    const straight = await fallen(-30),
+      turned = await fallen(-30, { yaw: 2.2 }),
       fits = straight.getUp.mismatch('faceUp'),
       wrong = straight.getUp.mismatch('faceDown');
     // Back and front differ by about half a turn at the hips, less what the fall leaves of the clip's pose.
@@ -213,7 +216,7 @@ rtest('sampling the clips leaves the animator as it was', async () => {
 });
 
 rtest('states are checked, there must be something to get up from, and an abort rejects', async () => {
-  const { rig, ragdoll, getUp } = await fallen(-40);
+  const { rig, ragdoll, getUp } = await fallen(-30);
   assert.throws(() => addGetUp(ragdoll, rig.animator, { faceUp: 'nope', faceDown: 'front' }), {
     name: 'RangeError',
     message: /Unknown animator state/,
