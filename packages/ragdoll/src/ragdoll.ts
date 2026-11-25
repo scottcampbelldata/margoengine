@@ -940,17 +940,6 @@ export class Ragdoll implements EnginePlugin {
     for (const bone of this.parts) {
       this.track(bone);
       if (bone.limp) continue;
-      // Kinematic: the animated world pose is the next target.
-      const m = bone.node.matrix,
-        t = bone.target;
-      worldTurn(m, this.q);
-      t[0] = m[12];
-      t[1] = m[13];
-      t[2] = m[14];
-      t[3] = this.q[0];
-      t[4] = this.q[1];
-      t[5] = this.q[2];
-      t[6] = this.q[3];
       if (bone.fade > 0) {
         // Eased by the cubic Hermite step 3u^2 - 2u^3, whose slope is zero at both ends: the drawn pose leaves the ragdoll's
         // and lands on the animation with no jump in speed. A linear fade stopped dead on its last frame, and the head of a
@@ -967,6 +956,22 @@ export class Ragdoll implements EnginePlugin {
     }
     if (this.loose) this.physicsLocals();
     this.write();
+    // Kinematic bones: the next target is the pose drawn this frame, read after it is written. Read before, a bone no animation
+    // writes (or one still blending back) aimed at the pose drawn the frame before, a frame behind what is seen.
+    store.tick(false);
+    for (const bone of this.parts) {
+      if (bone.limp) continue;
+      const m = bone.node.matrix,
+        t = bone.target;
+      worldTurn(m, this.q);
+      t[0] = m[12];
+      t[1] = m[13];
+      t[2] = m[14];
+      t[3] = this.q[0];
+      t[4] = this.q[1];
+      t[5] = this.q[2];
+      t[6] = this.q[3];
+    }
   }
 
   /**

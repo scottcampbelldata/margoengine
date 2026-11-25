@@ -96,6 +96,8 @@ limit does not bounce, and turning about the joint never pulls the joint apart.
 | `part(node)` | The part of a node, or undefined. |
 | `dispose()` | Removes the bodies and joints and the plugin; the bones keep their last pose. `using` works. |
 
+Frame order: a bone that is not limp aims its body (a kinematic hit box) at the pose drawn this frame, read after the ragdoll writes it, and the physics step reaches it. The engine runs plugins in the order they were added, and `Physics` is added before the animation and the ragdoll, so the step of a frame runs before that frame's animation: the hit box is on the pose drawn the frame before (`tests/ragdoll.test.js`, "a kinematic bone aims at the pose drawn this frame"). A ray or a contact against a hit box therefore meets the body a frame behind what is drawn (at 10 m/s and 60 frames a second, 17 cm), an open defect (`docs/known-bugs.md`, KB-PHYS-FRAMEORDER1) until the engine can run physics after the animation.
+
 The ragdoll is an engine plugin that runs each frame after the plugins attached before it: create it after the
 Animator. It reads the bones' animated pose, sets the kinematic targets, and writes the blended pose. A bone's pose
 blends in its parent's frame (rotations for every bone, position for the root bone only), so limbs keep their lengths.

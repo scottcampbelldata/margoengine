@@ -71,6 +71,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** fix(navmesh): the mesh border is a hard ORCA constraint for crowd agents (van den Berg et al. 2011, section
   5.4).
 
+### Open 2026-11-25: an animation-driven kinematic body trails the pose drawn by one frame (KB-PHYS-FRAMEORDER1, physics, core plugin order)
+
+- **Repro:** `packages/ragdoll/tests/ragdoll.test.js`, "a kinematic bone aims at the pose drawn this frame": a ragdoll blending back to its animation; on every frame the hips body is on the pose drawn the frame before, not the one drawn now. The same holds for a body following an animated mesh (`followMesh`). At 10 m/s the hit box is 17 cm behind what is drawn at 60 frames a second, 42 cm at 24.
+- **Cause:** the engine calls its plugins' one hook, `onPreUpdate`, in the order they were added. `Physics` is added first (the ragdoll and the followers need it to exist), so each frame it steps before the animation and the ragdoll have made that frame's pose; the step reaches the target set the frame before. Babylon.js advances its animations before its physics step. A second frame of lag, a ragdoll bone aiming at the pose drawn two frames before because it read its target before writing the frame's pose, is fixed (same test).
+- **Fix plan:** physics steps after the frame's animation. That needs the engine to order plugins by phase (input, animation, simulation, output) or let a plugin be placed after another, which is a core change (frozen: for the lead and Scott). With it, a kinematic body's target for a step is the animated pose at the step's time on the shared tick grid, and the collision body and the drawn pose agree to rounding on the frame drawn.
+
 ### Open 2026-11-24: a fast spinner against a wall with friction holds up to 3 percent more energy than it began with (KB-PHYS-SPINFRICTION1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/spin_energy.rs` (a 2 x 0.04 x 0.04 m bar, 3.2 kg, turning in place about z with its tips through a wall 0.02 m thick at x 0.9, no gravity, 120 steps of 1/60 s). With friction 0.5 the bar's energy peaks at 1.031 times its start at 400 rad/s, in the first step (88,016 J against 85,367 J); across spins up to 700 rad/s and frictions 0.1 to 1 it rises at several spins (1.19 times at 250 rad/s with friction 0.5 when a substep turns it 0.6 rad). The test holds the 400 rad/s case to 1.04 until the fix lands.
