@@ -80,6 +80,23 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | PARTIAL | M to L |  |
 | Voice chat and screen share over the netcode WebRTC transport | Needle | DONE | M | 8092aaee6 |
 
+### Geospatial camera: best in open source
+
+Scott, 2026-11-25: most demos are open world, so `@margoengine/controls/geospatial` must beat every open-source
+geospatial camera. Rivals are judged by their public docs and feature lists only.
+
+| Gap | Rival | Status | Size | Landed |
+| --- | --- | --- | --- | --- |
+| 1. Surface-true picking: zoom-to-cursor, rotate-around and pan grab the real surface hit (BVH on terrain, tiles, meshes), anchored drag | CesiumJS, 3D Tiles renderer GlobeControls, Google 3D map controls | MISSING | M |  |
+| 2. Collision of the whole near plane against terrain, tiles and meshes; minimum clearance; underground mode; collision while flying and during flyTo | CesiumJS, Babylon geospatial camera | MISSING | M |  |
+| 3. Navigation modes with smooth switches: globe orbit, local orbit, first-person fly, walk/drive with ground following, top-down map, cinematic path | CesiumJS, deck.gl views, Google 3D map controls | MISSING | L |  |
+| 4. flyTo on the van Wijk and Nuij 2003 optimal path, duration from distance, easing, AbortSignal, cancel on input; flyToBoundingSphere, fit-to-bounds | CesiumJS, MapLibre GL `flyTo`, deck.gl `FlyToInterpolator` | MISSING | M |  |
+| 5. Feel: per-axis inertia, height-scaled speed, presets (Cesium-like, map-like, CAD/DCC), touch, keyboard, gamepad, pen, reduced motion | CesiumJS, MapLibre GL, Google 3D map controls | MISSING | M |  |
+| 6. Planet scale: near/far and depth from street level to orbit with the floating origin, no jitter at large coordinates | CesiumJS, 3D Tiles renderer | MISSING | M |  |
+| 7. Heights above terrain, ellipsoid and geoid; ENU heading/pitch/roll; north-up reset; compass and state events; view save/restore with a URL hash | CesiumJS, MapLibre GL hash, Google 3D map controls | MISSING | M |  |
+| 8. Works out of the box with terrain, tiles (a tiles height query) and biomes open worlds, zero config | CesiumJS, 3D Tiles renderer | MISSING | M |  |
+| 9. Follow camera for moving targets (chase, orbit-follow, side, flyby, lock-on with lead room, flock framing), critically damped springs, banking, surface clearance, built on third-person | CesiumJS `trackedEntity`, Babylon `FollowCamera` | MISSING | L |  |
+
 ## Needs Scott or hardware first
 
 | Gap | Why it waits | Size |
