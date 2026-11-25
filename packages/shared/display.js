@@ -54,7 +54,10 @@ export function straightDisplay(code) {
     outputs++;
     return `vec4f(toDisplayStraight(${colour},${alpha}),${alpha})`;
   });
-  if (!outputs && !code.includes('toDisplayStraight(')) throw new RangeError('display shader has no toDisplay output');
+  if (!outputs && !code.includes('toDisplayStraight('))
+    throw new RangeError(
+      'display shader has no vec4f(toDisplay(colour),alpha) output to convert; write the display output in that form or call toDisplayStraight(colour,alpha) itself',
+    );
   return `${out}
 fn toDisplayStraight(c:vec3f,a:f32)->vec3f {if(a>0.0&&a<1.0){return toDisplay(c/a)*a;}return toDisplay(c);}
 `;

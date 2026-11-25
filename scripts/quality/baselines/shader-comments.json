@@ -1,7 +1,7 @@
 {
   "gate": "shader-comments",
   "about": "comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one",
-  "total": 552,
+  "total": 549,
   "history": [
     {
       "date": "2026-11-12",
@@ -21,7 +21,7 @@
     "@margoengine/environment": 35,
     "@margoengine/gltf": 25,
     "@margoengine/materials": 47,
-    "@margoengine/post": 31,
+    "@margoengine/post": 28,
     "@margoengine/scatter": 13,
     "@margoengine/sciviz": 47,
     "@margoengine/sprites": 3,
