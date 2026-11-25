@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18769746,
+  "total": 18770188,
   "history": [
     {
       "date": "2026-10-24",
@@ -11925,6 +11925,12 @@
       "commit": "b52e9c50f",
       "reason": "restore of the public work that sync ff88a70e7 undid (2026-11-20 to 24): animator/ccd, biomes/treeline, procedural coral and fir sprays, lines/flow, rigging contact, joint limits and swim, environment load/loaders, terrain relief lighting, horse gait and grounding and the other restored fixes come back, so these entries return to their pre-sync size",
       "grew": 36
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "efc136466",
+      "reason": "post/overlays: TextureOverlay holds its source by the borrowed-object rule (TextureOption, setSource), +115 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -12757,7 +12763,7 @@
     "@margoengine/post/motion-blur": 9027,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,
-    "@margoengine/post/overlays": 10768,
+    "@margoengine/post/overlays": 11210,
     "@margoengine/post/pixelate": 10491,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11160,
