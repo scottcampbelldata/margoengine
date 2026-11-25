@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18668878,
+  "total": 18670398,
   "history": [
     {
       "date": "2026-10-24",
@@ -11871,6 +11871,12 @@
       "commit": "f6e4ecb1c",
       "reason": "@margoengine/physics/world: 9,098 to 12,132 B gzip for the coupling scheduler (section 5): Strang, predicted, implicit-pressure and iterated schemes, Anderson and Aitken acceleration, the added-mass test and every refusal; it is part of the world every solver lane drives, so a split would only move the bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "fce2a245a",
+      "reason": "@margoengine/navmesh root 8808 -> 10328 B gzip: the Crowd keeps agents off the navmesh border with hard ORCA wall half-planes, passes route corners by straight view and arrives where it meets a group at a taken target (KB-CROWD-WALL1, KB-CROWD-CORNER1, KB-CROWD-ARRIVE1). The Crowd is exported from the root entry, so a split would move it to a new entry and break the root API; only navmesh grows here.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12590,7 +12596,7 @@
     "@margoengine/mixer/snapshots": 1956,
     "@margoengine/mixer/stereo": 1071,
     "@margoengine/mixer/worklet": 2825,
-    "@margoengine/navmesh": 8808,
+    "@margoengine/navmesh": 10328,
     "@margoengine/navmesh dist/workers/navmesh-build.js": 18911,
     "@margoengine/navmesh/agents": 17055,
     "@margoengine/navmesh/build": 13637,
