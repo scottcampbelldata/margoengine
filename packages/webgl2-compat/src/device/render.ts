@@ -595,6 +595,10 @@ export class CompatRenderPipeline {
           sharedStorage: (group, binding) =>
             !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
           uniformBlockSize: device.adapter.capabilities.limits.MAX_UNIFORM_BLOCK_SIZE,
+          textureUnits: {
+            vertex: device.adapter.capabilities.limits.MAX_VERTEX_TEXTURE_IMAGE_UNITS,
+            fragment: device.adapter.capabilities.limits.MAX_TEXTURE_IMAGE_UNITS,
+          },
           accurateInverseTrig: device.adapter.accurateInverseTrig,
         });
     } catch (error) {
@@ -3239,6 +3243,12 @@ export class Replayer {
       gl.deleteShader(shader);
     }
     gl.linkProgram(program);
+    // On a lost context nothing links: that is the device's loss (its webglcontextlost event comes in a later task),
+    // never the layer's own program. Every later GL call is a no-op, so the unlinked program is returned, uncached.
+    if (gl.isContextLost()) {
+      this.device.lose('unknown', 'The WebGL2 context was lost');
+      return { program, offset: null, value: null };
+    }
     if (!gl.getProgramParameter(program, gl.LINK_STATUS))
       throw fault(
         'failed',

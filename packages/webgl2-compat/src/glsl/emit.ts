@@ -170,6 +170,12 @@ interface EmitOptions {
   /** Bytes a uniform block may hold (MAX_UNIFORM_BLOCK_SIZE); a larger uniform buffer reads from a data texture. */
   readonly uniformBlockSize?: number;
   /**
+   * The stage's texture units (MAX_TEXTURE_IMAGE_UNITS, or MAX_VERTEX_TEXTURE_IMAGE_UNITS for the vertex stage).
+   * Default 16. Past it, textures and uniform blocks together switch the blocks to their struct form
+   * (see `fitShaderResources`).
+   */
+  readonly textureUnits?: number;
+  /**
    * acos, asin, atan and atan2 call the layer's own (helpers `_acos`, `_asin`, `_atan`, `_atan2`), for a driver whose
    * built-ins miss 1e-5 (src/device/inverse-trig.ts). Default false: GLSL's built-ins. atan joined on 2026-11-12: the
    * Radeon 680M's one-argument atan under ANGLE D3D11 is 1.16e-5 off over [-8, 8] (native WebGPU 1.4e-7).
@@ -393,7 +399,8 @@ export class StageEmitter {
   private readonly bodies: string[] = [];
   private readonly instances = new Map<string, FnInstance>();
   private readonly pending: FnInstance[] = [];
-  private readonly uniforms = new Map<IRGlobalVar, GLSLUniform & { array: string }>();
+  /** Uniform blocks: `array` names the block's rows, `decl` is the index of its declaration in `globals`. */
+  private readonly uniforms = new Map<IRGlobalVar, GLSLUniform & { array: string; decl: number }>();
   private readonly storages = new Map<IRGlobalVar, GLSLStorage & { array: string }>();
   /** Row fetch functions of storage buffers, which take the row as an argument instead of an index. */
   private readonly fetchers = new Set<string>();
@@ -440,6 +447,7 @@ export class StageEmitter {
     const main = this.instance(this.entry.function, new Map());
     while (this.pending.length) this.emitFunction(this.pending.shift() as FnInstance);
     const io = this.mainFunction(main);
+    this.fitShaderResources();
     const precision = ['float', 'int', ...new Set([...this.textures.values()].map((t) => t.glslType))].map(
       (t) => `precision highp ${t};`,
     );
@@ -459,7 +467,7 @@ export class StageEmitter {
     return {
       stage: this.stage,
       source,
-      uniforms: [...this.uniforms.values()].map(({ array: _, ...u }) => u),
+      uniforms: [...this.uniforms.values()].map(({ array: _, decl: _d, ...u }) => u),
       textures: [...this.textures.values()],
       storage: [...this.storages.values()].map(({ array: _, ...b }) => b),
       inputs: io.inputs,
@@ -470,6 +478,29 @@ export class StageEmitter {
       fragDepth: io.fragDepth,
       notes: [...this.notes],
     };
+  }
+
+  /**
+   * ANGLE's Direct3D 11 back end turns a uniform block that holds one array of 50 or more rows into a shader resource
+   * (a StructuredBuffer) placed after the stage's textures. When textures and such blocks together pass the stage's
+   * 16 slots, the browser's GPU process crashes at the program's first draw and every WebGL context is lost
+   * (KB-BOUNCE-COMPATUNITS1; packages/webgl2-compat/test/d3d11-srv-crash-repro.mjs). So when the stage's texture
+   * units and uniform blocks together pass its texture unit limit, each block holds its array inside a struct: the
+   * same std140 layout (offset 0, 16-byte rows), which every back end reads as a constant buffer. A `#define` keeps
+   * every `_u<tag>[row]` read as it is. Stages that fit are left exactly as they were.
+   */
+  private fitShaderResources(): void {
+    const units = this.textures.size + new Set([...this.storages.values()].map((b) => b.texture)).size;
+    if (units + this.uniforms.size <= (this.options.textureUnits ?? 16)) return;
+    for (const u of this.uniforms.values()) {
+      const words = u.size / 16,
+        tag = u.array.slice(2);
+      this.globals[u.decl] = [
+        `struct _W${tag} { highp uvec4 r[${words}]; };`,
+        `layout(std140) uniform ${u.block} { _W${tag} _w${tag}; };`,
+        `#define ${u.array} _w${tag}.r`,
+      ].join('\n');
+    }
   }
 
   // ---------------------------------------------------------------- names and types
@@ -703,6 +734,7 @@ export class StageEmitter {
       size: words * 16,
       minSize,
       array: `_u${tag}`,
+      decl: this.globals.length,
     };
     this.uniforms.set(v, u);
     this.globals.push(`layout(std140) uniform ${u.block} { highp uvec4 ${u.array}[${words}]; };`);

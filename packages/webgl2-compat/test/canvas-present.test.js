@@ -23,7 +23,7 @@ test('canvas presentation keeps its context mode when devices change between XR 
   const source = (offscreen) => (offscreen ? new Offscreen(4, 3) : { width: 4, height: 3 });
   const device = (source) =>
     Object.assign(Object.create(CompatDevice.prototype), {
-      gl: { canvas: source },
+      gl: { canvas: source, isContextLost: () => false },
       replayer: { presentTexture() {} },
       shown: new Set(),
       validationError: (message) => assert.fail(message),
@@ -81,6 +81,7 @@ async function recordingDevice() {
     TEXTURE_MAX_LEVEL: 0x813d,
     canvas: { width: 1, height: 1 },
     getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
+    isContextLost: () => false,
     getParameter: () => 4096,
     getShaderPrecisionFormat: () => ({ precision: 23, rangeMin: 127, rangeMax: 127 }),
   };

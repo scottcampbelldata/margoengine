@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19120680,
+  "total": 19122042,
   "history": [
     {
       "date": "2026-10-24",
@@ -12381,6 +12381,12 @@
       "commit": "dd83fb427",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: the hull's radiation (Ursell-Tasai sections with the exponential integral and the least-squares fit, the strip-integrated damping, Cummins' kernel and its convolution over the motion history), the load at the step's middle and the estimate of the body's other loads; measured gzip (Mac build) 7625 B, was under 4292; the damping is what lets a hull settle, and the entry is loaded only by scenes with hulls. Budget (measured + 3%): 4292 to 7881 B."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-A",
+      "reason": "KB-BOUNCE-COMPATUNITS1: the GLSL back end counts a stage's texture units and uniform blocks together and, past the stage's limit, declares the blocks inside a struct of the same std140 layout, because ANGLE Direct3D 11 makes a 50-row block a shader resource after the textures and its GPU process crashed past 16 (glsl/emit.ts fitShaderResources, translateWGSL textureUnits). webgl2-compat/glsl measured 44,860 -> 45,022 B (+162 B, needed: without it the gltf physical scene with image light, both shadow kinds and LightBounce cannot draw on Direct3D 11); budget 45,011 -> 46,373. device 125,794 -> 126,126 and the root entry 125,736 -> 126,049 B (the same code plus the lost-context guards) stay within their budgets.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13944,7 +13950,7 @@
     "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 127003,
-    "@margoengine/webgl2-compat/glsl": 45011,
+    "@margoengine/webgl2-compat/glsl": 46373,
     "@margoengine/webgl2-compat/pick": 5054,
     "@margoengine/webgl2-compat/preview": 3699,
     "@margoengine/webgl2-compat/restore": 1106,

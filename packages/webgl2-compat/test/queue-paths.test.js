@@ -14,6 +14,7 @@ async function device() {
       FRAMEBUFFER_COMPLETE: 0x8cd5,
       checkFramebufferStatus: () => 0x8cd5,
       getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
+      isContextLost: () => false,
       getParameter: (p) => values.get(p) ?? '',
       getShaderPrecisionFormat: (_s, type) =>
         type === 0x8df2

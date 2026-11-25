@@ -1,3 +1,17 @@
+### Section 5 evidence: shader resources on the WebGL2 layer over ANGLE Direct3D 11 (2026-11-25)
+
+The WebGL2 layer's GLSL back end now counts a stage's texture units and uniform blocks together: ANGLE's Direct3D 11
+back end turns a uniform block of 50 or more rows into a shader resource after the textures, and past 16 the browser's
+GPU process crashed at the first draw (KB-BOUNCE-COMPATUNITS1). Past the stage's texture unit limit the blocks are
+declared inside a struct of the same std140 layout (glsl/emit.ts `fitShaderResources`); stages within it are byte for
+byte unchanged. A lost WebGL2 context now loses the device instead of surfacing as a layer bug or a validation error.
+Evidence: a raw WebGL2 repro with no Margo code (packages/webgl2-compat/test/d3d11-srv-crash-repro.mjs: the crash
+needs 17 resources and a 50-row block, ANGLE Vulkan draws every case), CPU checks of the GLSL per stage
+(glsl.test.js), a lost-context browser check, and a real scene (scripts/compat-units-gpu-check.js: gltf physical with
+13 maps, image light, both shadow kinds and LightBounce) on native WebGPU, ANGLE Direct3D 11 and ANGLE Vulkan, RTX
+A6000. Missing: other Direct3D 11 GPUs (Intel Arc, Radeon) not run; the 50-row threshold is measured, not documented
+by ANGLE, so the layer switches on the count of all blocks, not only large ones.
+
 ### Section 5 evidence: rough reflections with contact hardening (2026-11-25)
 
 Planar reflectors (environment's Reflector, Refractor and PBRReflector with `contactHardening`), water's planar

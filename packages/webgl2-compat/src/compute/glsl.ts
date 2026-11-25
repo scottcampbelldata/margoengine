@@ -48,6 +48,8 @@ interface ComputeEmitOptions {
   readonly sharedStorage?: (group: number, binding: number) => boolean;
   /** Bytes a GLSL uniform block holds; a larger uniform buffer reads from a data texture. */
   readonly uniformBlockSize?: number;
+  /** Texture units of the stage the program runs as (MAX_TEXTURE_IMAGE_UNITS for the fragment tier, else the vertex one). */
+  readonly textureUnits?: number;
   /** The layer's own acos, asin and atan2 (as the render emitter's option of the same name). */
   readonly accurateInverseTrig?: boolean;
 }
@@ -132,6 +134,7 @@ class ComputeEmitter extends StageEmitter {
         prefix: 'c',
         sharedStorage: options.sharedStorage,
         uniformBlockSize: options.uniformBlockSize,
+        textureUnits: options.textureUnits,
         accurateInverseTrig: options.accurateInverseTrig,
       },
       tier === 'fragment' ? 'fragment' : 'vertex',

@@ -34,6 +34,9 @@ function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = 
     FRAMEBUFFER_COMPLETE: 0x8cd5,
     checkFramebufferStatus: () => 0x8cd5,
     lost: false,
+    isContextLost() {
+      return this.lost;
+    },
     getExtension(name) {
       if (name === 'WEBGL_lose_context') return { loseContext: () => (this.lost = true) };
       return extensions.includes(name) ? {} : null;

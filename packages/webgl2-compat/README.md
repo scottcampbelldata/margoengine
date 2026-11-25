@@ -190,7 +190,12 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   read from an RGBA32UI data texture, one 16-byte row per texel, in WGSL's layout; reads are clamped into the binding
   and `arrayLength` comes from its size. The device mirrors each buffer into its data texture on the GPU when the
   contents change, and the storage bindings of a bind group share one texture, so a pipeline spends one texture unit
-  per group on them. `textureGather` and `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
+  per group on them. Uniform blocks are not texture units to GL, but ANGLE's Direct3D 11 back end turns a block of
+  50 or more rows into a shader resource after the textures, and past 16 the browser's GPU process crashes; so a
+  stage whose texture units and uniform blocks together pass its limit (`textureUnits: { vertex, fragment }`, default
+  16 each; the device passes MAX_VERTEX_TEXTURE_IMAGE_UNITS and MAX_TEXTURE_IMAGE_UNITS) declares each block's rows
+  inside a struct of the same std140 layout, which stays a constant buffer. `textureGather` and
+  `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
   the four texels by hand with the sampler's address modes (2D and 2D-array textures; a cube gather is refused).
 - **Compute** (`margoengine/webgl2-compat/compute`, milestone M5): compute pipelines and passes, with
   `dispatchWorkgroups` and `dispatchWorkgroupsIndirect`. `requestDevice` loads this entry before it answers, so

@@ -557,6 +557,12 @@ export class CompatDevice extends EventTarget {
     }
   }
   private report(filter: ErrorFilter, error: CompatError, now = false): void {
+    // On a lost context every link fails and every framebuffer is incomplete: that is the device's loss (its
+    // webglcontextlost event comes in a later task), and a lost device raises no errors, as WebGPU's does.
+    if (this.gl.isContextLost()) {
+      this.lose('unknown', 'The WebGL2 context was lost');
+      return;
+    }
     // An allocation made before the call that raised this error reports first.
     this.checkAllocations(false);
     for (let i = this.scopes.length - 1; i >= 0; i--)
@@ -775,7 +781,8 @@ export class CompatDevice extends EventTarget {
       return Promise.reject(error);
     }
     return pipeline.whenLinked().then(() => {
-      if (pipeline.failure)
+      // A lost device raises no errors (WebGPU): the pipeline resolves, and draws with it do nothing.
+      if (pipeline.failure && !this.destroyed)
         throw Object.assign(new DOMException(pipeline.failure, 'GPUPipelineError'), {
           reason: 'validation',
         });

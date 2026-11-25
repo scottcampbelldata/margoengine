@@ -644,3 +644,71 @@ test('a derivative inside select() is evaluated eagerly, never in a per-pixel te
   assert.doesNotMatch(f, /\?[^;:]*dFdx/);
   assert.match(f, /_g\d+\(-2\.0, _g\d+\(dFdx\(/);
 });
+
+// KB-BOUNCE-COMPATUNITS1: ANGLE's Direct3D 11 back end turns a uniform block of one 50-row-or-longer array into a shader
+// resource after the stage's textures, and past 16 the GPU process crashes at the first draw. A stage whose texture
+// units and uniform blocks together pass its limit declares the rows inside a struct (the same std140 layout); a stage
+// that fits keeps the plain array, byte for byte.
+function unitsSource(textures, blocks, stage = 'fragment') {
+  const decl = [],
+    reads = [];
+  for (let i = 0; i < textures; i++) {
+    decl.push(`@group(0) @binding(${i}) var t${i}: texture_2d<f32>;`);
+    reads.push(`textureSampleLevel(t${i}, s, vec2f(0.5), 0.0)`);
+  }
+  for (let i = 0; i < blocks; i++) {
+    decl.push(`@group(1) @binding(${i}) var<uniform> u${i}: array<vec4f, 64>;`);
+    reads.push(`u${i}[k]`);
+  }
+  const sum = reads.length ? reads.join(' + ') : 'vec4f(0.0)';
+  return stage === 'fragment'
+    ? `${V}\n@group(2) @binding(0) var s: sampler;\n${decl.join('\n')}
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { let k = u32(p.x) % 64u; return ${sum}; }`
+    : `@group(2) @binding(0) var s: sampler;\n${decl.join('\n')}
+@vertex fn v(@builtin(vertex_index) k: u32) -> @builtin(position) vec4f { return ${sum}; }
+@fragment fn f() -> @location(0) vec4f { return vec4f(1.0); }`;
+}
+
+test('a stage within its texture units keeps each uniform block a plain uvec4 array', () => {
+  const source = unitsSource(14, 2);
+  const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  assert.equal(f.textures.length + f.uniforms.length, 16);
+  assert.match(f.source, /uniform _Bf1_0 \{ highp uvec4 _uf1_0\[64\]; \};/);
+  assert.doesNotMatch(f.source, /struct _W|#define/);
+  // The default limit is 16, so passing it explicitly changes nothing.
+  const same = translateWGSL({ vertex: { source }, fragment: { source }, textureUnits: { fragment: 16 } }).fragment;
+  assert.equal(same.source, f.source);
+});
+
+test('a stage past its texture units holds every uniform block array in a struct of the same layout', () => {
+  const source = unitsSource(15, 2);
+  const f = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  for (const tag of ['f1_0', 'f1_1']) {
+    assert.match(f.source, new RegExp(String.raw`struct _W${tag} \{ highp uvec4 r\[64\]; \};`));
+    assert.match(f.source, new RegExp(String.raw`layout\(std140\) uniform _B${tag} \{ _W${tag} _w${tag}; \};`));
+    assert.match(f.source, new RegExp(String.raw`#define _u${tag} _w${tag}\.r\n`));
+    assert.doesNotMatch(f.source, new RegExp(String.raw`highp uvec4 _u${tag}\[`));
+  }
+  // The device binds the same blocks with the same sizes either way.
+  assert.deepEqual(
+    f.uniforms.map((u) => [u.block, u.size]),
+    [
+      ['_Bf1_0', 1024],
+      ['_Bf1_1', 1024],
+    ],
+  );
+  // Every row is still read through the block's name, which the #define maps into the struct.
+  assert.match(f.source, /_uf1_0\[/);
+  // A context with more units keeps the plain arrays.
+  const wide = translateWGSL({ vertex: { source }, fragment: { source }, textureUnits: { fragment: 32 } }).fragment;
+  assert.doesNotMatch(wide.source, /struct _W|#define/);
+});
+
+test('the vertex stage counts against its own texture unit limit', () => {
+  const source = unitsSource(15, 2, 'vertex');
+  const plain = translateWGSL({ vertex: { source }, fragment: { source }, textureUnits: { vertex: 17 } }).vertex;
+  assert.doesNotMatch(plain.source, /struct _W/);
+  const over = translateWGSL({ vertex: { source }, fragment: { source }, textureUnits: { vertex: 16 } }).vertex;
+  assert.match(over.source, /struct _Wv1_0 \{ highp uvec4 r\[64\]; \};/);
+  assert.match(over.source, /#define _uv1_0 _wv1_0\.r/);
+});

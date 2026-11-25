@@ -64,6 +64,13 @@ export interface TranslateOptions {
    */
   readonly uniformBlockSize?: number;
   /**
+   * The context's texture units per stage: `fragment` is MAX_TEXTURE_IMAGE_UNITS, `vertex` is
+   * MAX_VERTEX_TEXTURE_IMAGE_UNITS. Default 16 each (the GLSL ES 3.00 minimum). A stage whose texture units and uniform
+   * blocks together pass its limit declares each block's rows inside a struct, which ANGLE's Direct3D 11 back end keeps
+   * as a constant buffer instead of a shader resource after the textures (KB-BOUNCE-COMPATUNITS1).
+   */
+  readonly textureUnits?: { readonly vertex?: number; readonly fragment?: number };
+  /**
    * acos, asin and atan2 call the layer's own float32 versions (error under 1e-6) instead of GLSL's built-ins. The
    * device sets it where a startup probe finds the driver's built-ins more than 1e-5 off (ANGLE Direct3D 11: acos(0)
    * is 1.5707288; Apple silicon Metal: atan2(1, -0) is -pi / 2). Default false.
@@ -154,13 +161,19 @@ export function translateWGSL(options: TranslateOptions): GLSLProgram {
   let fragment = EMPTY_FRAGMENT;
   if (options.fragment) {
     const f = entry(options.fragment, 'fragment');
-    fragment = emitStage(f.module, f.entry, { ...common, constants: options.fragment.constants, prefix: 'f' });
+    fragment = emitStage(f.module, f.entry, {
+      ...common,
+      constants: options.fragment.constants,
+      prefix: 'f',
+      textureUnits: options.textureUnits?.fragment,
+    });
   }
   const v = entry(options.vertex, 'vertex');
   const vertex = emitStage(v.module, v.entry, {
     ...common,
     constants: options.vertex.constants,
     prefix: 'v',
+    textureUnits: options.textureUnits?.vertex,
     varyingsRead: options.fragment ? new Set(fragment.varyings.map((x) => x.location)) : undefined,
   });
   for (const read of fragment.varyings) {

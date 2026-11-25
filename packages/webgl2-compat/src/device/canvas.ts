@@ -100,6 +100,12 @@ export class CompatCanvasContext {
     if (!t || !c || t.destroyed || c.device.destroyed) return;
     const device = c.device,
       gl = device.gl;
+    // A lost context has no frame to show (transferToImageBitmap throws): the device is lost, the page keeps its last
+    // frame, as WebGPU's does.
+    if (gl.isContextLost()) {
+      device.lose('unknown', 'The WebGL2 context was lost');
+      return;
+    }
     const source = gl.canvas as Canvas;
     if (source.width !== t.width || source.height !== t.height) {
       source.width = t.width;

@@ -6,6 +6,42 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: on ANGLE Direct3D 11 a lit glTF scene with image light, both shadow kinds and LightBounce crashed the GPU process (KB-BOUNCE-COMPATUNITS1, webgl2-compat)
+
+- **Repro:** `node scripts/run-with-timeout.mjs -- node scripts/compat-units-gpu-check.js --compat` (Edge, default
+  ANGLE Direct3D 11, RTX A6000): a gltf physical material with all 13 maps (or the 5 + 5 peak) under Environment
+  lighting, Shadows `soft`, a shadowed Clustered spot (LocalShadows) and LightBounce. Every WebGL context was lost at
+  the first lit draw, shown as "The compatibility layer's own present program did not link (a bug: report it)". The
+  same scene drew on ANGLE Vulkan and GL, and on Direct3D 11 with one texture unit fewer.
+- **Cause:** ANGLE's Direct3D 11 back end gives a std140 uniform block that holds one array of 50 or more rows a shader
+  resource after the stage's textures (a StructuredBuffer, its HLSL `register(t15)` and `register(t16)` here); the lit
+  fragment program had 15 texture units and two such blocks, 17 resources, and past 16 the browser's GPU process ends
+  at the program's first draw (exit 0xC000001D). A raw WebGL2 page shows it with no Margo code:
+  `packages/webgl2-compat/test/d3d11-srv-crash-repro.mjs` (16 samplers and one `uvec4[50]` block crash, `uvec4[49]`
+  does not; 14 samplers and 3 blocks crash, 13 do not; ANGLE Vulkan draws every case). The layer's unit count (15 of
+  16) was right; the blocks are not texture units to GL. Second defect: a lost context surfaced as a layer bug (the
+  present program "did not link"), as a validation error (a framebuffer "not complete") or as a thrown
+  transferToImageBitmap, because the context is lost at once and its webglcontextlost event comes a task later.
+- **Fix:** the GLSL back end (glsl/emit.ts `fitShaderResources`) counts a stage's texture units and uniform blocks
+  together; past the stage's limit (`translateWGSL` `textureUnits`, from MAX_TEXTURE_IMAGE_UNITS and
+  MAX_VERTEX_TEXTURE_IMAGE_UNITS) each block declares its rows inside a struct, the same std140 layout, which ANGLE
+  keeps as a constant buffer. Stages that fit are byte for byte as before. A lost context now loses the device
+  (`device.lost`, reason 'unknown'): errors are not raised after it, the present stops, and the layer's helper
+  programs return unlinked instead of throwing.
+- **Regression:** `packages/webgl2-compat/test/glsl.test.js` (the struct form past the limit, per stage, and the plain
+  form within it), `packages/webgl2-compat/test/lost-context-browser.mjs` and `scripts/compat-units-gpu-check.js
+  --compat` (both in webgl2-compat's test:gpu; the check passes on native WebGPU, ANGLE Direct3D 11 and Vulkan).
+  Still open from the same row: the room the plan in the row asks for (shared glTF bindings, packing by the device
+  limit, a coded count before linking); a scene that needs more than 16 units still gets the layer's coded
+  `unsupported`.
+- **Sources:** Direct3D 11 has 128 shader resource slots, 16 sampler slots and 14 constant buffer slots per stage, so
+  the 16 is ANGLE's own table, not the API's (Microsoft, "Direct3D 11.3 Functional Specification", 2015, section 21
+  limits, https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm). A struct member of a
+  std140 block holding one uvec4 array keeps offset 0 and a 16-byte stride, so the layout is unchanged (Khronos, "OpenGL
+  ES Version 3.0.6", 2019, section 2.12.6.4, https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf), and a
+  `#define` maps each row read onto it (Khronos, "The OpenGL ES Shading Language 3.00", 2016, section 3.4,
+  https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf). ANGLE's source was not read; its
+  behaviour comes from the raw repro.
 ### Fixed 2026-11-25: fsm's equivalent mutants named lines that had moved (KB-MUTATION-PINS1, scripts, mutation)
 
 - **Repro:** `node --test tests/mutation.test.js` on main at caf466b4c: "every listed equivalent mutant exists" failed on

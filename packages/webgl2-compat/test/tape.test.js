@@ -13,6 +13,7 @@ async function device() {
       FRAMEBUFFER_COMPLETE: 0x8cd5,
       checkFramebufferStatus: () => 0x8cd5,
       getExtension: (name) => (name === 'EXT_color_buffer_float' ? {} : null),
+      isContextLost: () => false,
       getParameter: (p) => values.get(p) ?? '',
       getShaderPrecisionFormat: (_s, type) =>
         type === 0x8df2
@@ -215,7 +216,7 @@ test('a render bundle keeps its own tape and replays in every pass that executes
 });
 
 test('a command encoder finished twice reports it and the second command buffer is empty', async () => {
-  const { d, log, group, desc } = await scene(),
+  const { d, log, desc } = await scene(),
     errors = [];
   d.addEventListener('uncapturederror', (e) => (e.preventDefault(), errors.push(e.error.message)));
   const encoder = d.createCommandEncoder(),

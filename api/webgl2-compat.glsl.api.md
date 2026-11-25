@@ -543,6 +543,10 @@ export interface TranslateOptions {
     readonly points?: boolean;
     readonly sharedStorage?: (group: number, binding: number) => boolean;
     readonly uniformBlockSize?: number;
+    readonly textureUnits?: {
+        readonly vertex?: number;
+        readonly fragment?: number;
+    };
     readonly accurateInverseTrig?: boolean;
 }
 
