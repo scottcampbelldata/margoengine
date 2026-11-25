@@ -322,14 +322,6 @@ async function loadAccumulate(engine: Engine): Promise<AccumulateTarget & { disp
   return module.Accumulate.attach(engine);
 }
 
-export function renderAccumulated(
-  engine: Engine,
-  options: RenderAccumulatedOptions & { output: 'linear' },
-): AsyncGenerator<AccumulatedFrame<HDRPixels>, void, void>;
-export function renderAccumulated(
-  engine: Engine,
-  options: RenderAccumulatedOptions & { output?: 'display' },
-): AsyncGenerator<AccumulatedFrame<HeadlessPixels>, void, void>;
 /**
  * Renders a film sequence on a headless engine, `samples` renders a frame averaged in linear light: antialiased
  * by the pixel filter and motion-blurred over the open shutter, for everything that moves (cameras, skinned and
@@ -341,6 +333,14 @@ export function renderAccumulated(
  * accumulated or tiled render runs on this engine, or with `output: 'linear'` before the stage has a texture,
  * `'unsupported'` without WebGPU.
  */
+export function renderAccumulated(
+  engine: Engine,
+  options: RenderAccumulatedOptions & { output: 'linear' },
+): AsyncGenerator<AccumulatedFrame<HDRPixels>, void, void>;
+export function renderAccumulated(
+  engine: Engine,
+  options: RenderAccumulatedOptions & { output?: 'display' },
+): AsyncGenerator<AccumulatedFrame<HeadlessPixels>, void, void>;
 export async function* renderAccumulated(
   instance: Engine,
   options: RenderAccumulatedOptions,
