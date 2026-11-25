@@ -33,7 +33,8 @@ export function reflectionConeLevel(roughness, distance, pixelsPerUnit, maxLevel
 // `height` texels tall one world unit spans there (row 1 of m is the vertical scale, unchanged by an oblique near plane).
 // margoNearestDepth: the nearest (largest reversed-Z) depth of the 2x2 texels a bilinear lookup at uv reads, so the
 // level at an object's silhouette follows the object, not the background beside it, and does not flip with rounding.
-export const reflectionConeShader = `fn margoConeTangent(rough:f32)->f32 {
+// SSR reads the level alone (reflectionConeLevelShader), so it does not ship the capture functions it never calls.
+export const reflectionConeLevelShader = `fn margoConeTangent(rough:f32)->f32 {
 let alpha=rough*rough;let a2=alpha*alpha;let x=${(2 * lobe).toFixed(7)}*a2/(2.0-a2);
 let m=select(1.0-exp(x),-x*(1.0+x*(0.5+x/6.0)),x>-0.01);
 return tan(min(2.0*atan(sqrt(m/exp(x))),${coneLimit}));
@@ -41,7 +42,8 @@ return tan(min(2.0*atan(sqrt(m/exp(x))),${coneLimit}));
 fn margoConeLevel(rough:f32,distance:f32,pixelsPerUnit:f32,maxLevel:f32)->f32 {
 return clamp(log2(max(2.0*distance*margoConeTangent(rough)*pixelsPerUnit,1.0)),0.0,maxLevel);
 }
-fn margoCaptureRay(m:mat4x4f,p:vec3f,d:f32,height:f32)->vec2f {
+`;
+export const reflectionCaptureShader = `fn margoCaptureRay(m:mat4x4f,p:vec3f,d:f32,height:f32)->vec2f {
 let c=m*vec4f(p,1.0);let ndc=c.xy/c.w;
 let r0=vec4f(m[0].x,m[1].x,m[2].x,m[3].x);let r1=vec4f(m[0].y,m[1].y,m[2].y,m[3].y);let r3=vec4f(m[0].w,m[1].w,m[2].w,m[3].w);
 var dir=normalize(cross((r0-ndc.x*r3).xyz,(r1-ndc.y*r3).xyz));var dz=m*vec4f(dir,0.0);
@@ -58,3 +60,4 @@ let c=textureLoad(t,clamp(p+vec2i(0,1),vec2i(0),last),0);let d=textureLoad(t,cla
 return max(max(a,b),max(c,d));
 }
 `;
+export const reflectionConeShader = reflectionConeLevelShader + reflectionCaptureShader;

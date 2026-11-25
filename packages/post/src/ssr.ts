@@ -9,7 +9,7 @@ import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
-import { reflectionConeShader } from '../../shared/reflection-cone.js';
+import { reflectionConeLevelShader } from '../../shared/reflection-cone.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -115,7 +115,7 @@ struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f}
 @group(0) @binding(6) var specular:texture_2d<f32>;
 @group(0) @binding(7) var weight:texture_2d<f32>;
 @group(0) @binding(8) var normals:texture_2d<f32>;
-${traceFunctions}${displayShader}${reflectionConeShader}
+${traceFunctions}${displayShader}${reflectionConeLevelShader}
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let q=vec2i(frag.xy);let s=textureLoad(scene,q,0);var c=s.rgb;
 let m=textureLoad(weight,q,0);let e=textureLoad(specular,q,0);let rough=e.a;let d=textureLoad(depth,q,0);

@@ -121,6 +121,9 @@ for (const samples of [4, 1])
     // Composite: one fullscreen pass into the frame target (SSR is the stack's last effect, so it tone maps).
     const composite = modules(log).find((code) => code.includes('fn closest('));
     assert.match(composite, /return vec4f\(toDisplay\(c\),s\.a\);/);
+    // The cone level is all SSR calls of shared/reflection-cone.js; the planar capture functions stay out of it.
+    assert.match(composite, /fn margoConeLevel\(/);
+    assert.doesNotMatch(composite, /fn margoCaptureRay\(|fn margoNearestDepth\(/);
     // Steady frames create no GPU objects.
     await null; // the next frame
     const steady = h.gpu.record(() => h.frame([taa, env]));

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19101187,
+  "total": 19100803,
   "history": [
     {
       "date": "2026-10-24",
@@ -12327,6 +12327,12 @@
       "commit": "2634e6ac6",
       "grew": 4,
       "reason": "Mesh instance motion blur (FG-17 piece 4a): previousTransform and motionInterpolation on mesh instances. Measured gzip on main / now: mesh 41373 / 45141 B, mesh-pbr 49038 / 52611 B, compose 1521 / 1677 B, sequence 3058 / 3164 B. 1.6 KB of the mesh growth is the interval checker (motion.ts: the singular-determinant bound, the TRS split and the swept bounds), the same code voxel instances use, bundled into the mesh entry because the root entry does not export it; sharing it would add a public root export, and leaving it out would let a mirror blended into its unmirrored self give NaN mid-shutter. The rest is the interval packing and the shader that blends an instance per path. Budgets (measured gzip + 3%, or 256 B): @margoengine/voxel-pathtracer/mesh 41562 to 46516 B; @margoengine/voxel-pathtracer/mesh-pbr 50086 to 54228 B; @margoengine/voxel-pathtracer/compose 1589 to 1933 B; @margoengine/voxel-pathtracer/sequence 3058 to 3420 B."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-A",
+      "reason": "post/ssr takes only the cone level WGSL from shared/reflection-cone.js (margoConeTangent, margoConeLevel), not the planar capture functions it never calls (margoCaptureRay, margoNearestDepth): budget 15,453 -> 15,069 B",
+      "grew": 0
     }
   ],
   "items": {
@@ -13183,7 +13189,7 @@
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10584,
     "@margoengine/post/ssgi": 14202,
-    "@margoengine/post/ssr": 15453,
+    "@margoengine/post/ssr": 15069,
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,

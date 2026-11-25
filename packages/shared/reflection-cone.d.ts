@@ -9,5 +9,9 @@ export function reflectionConeLevel(
   pixelsPerUnit: number,
   maxLevel: number,
 ): number;
-/** WGSL: margoConeTangent, margoConeLevel and margoCaptureRay. */
+/** WGSL: margoConeTangent and margoConeLevel. */
+export const reflectionConeLevelShader: string;
+/** WGSL: margoCaptureRay and margoNearestDepth. */
+export const reflectionCaptureShader: string;
+/** WGSL: reflectionConeLevelShader then reflectionCaptureShader. */
 export const reflectionConeShader: string;
