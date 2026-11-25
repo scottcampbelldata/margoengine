@@ -58,3 +58,59 @@ test('a snapshot carries the switch (a version 6 snapshot, which has none, resto
   physics.restore(bytes);
   assert.equal(a.enabled, false, 'restored off');
 });
+
+const path = process.env.RAPIER2D_MODULE;
+test('disabling a body does what Rapier 2D does: its colliders read disabled, a ball falls through, a moving body keeps its velocity', {
+  skip: path ? false : 'not run: RAPIER2D_MODULE names no Rapier 2D module',
+}, async () => {
+  const { pathToFileURL } = await import('node:url');
+  const { resolve } = await import('node:path');
+  const R = (await import(pathToFileURL(resolve(path)).href)).default;
+  await R.init();
+  for (const kind of ['rapier', 'own']) {
+    let floorEnabled, colliderEnabled, ballY, probeX, probeVx, resumedX;
+    if (kind === 'rapier') {
+      const w = new R.World({ x: 0, y: -10 });
+      const floor = w.createRigidBody(R.RigidBodyDesc.fixed());
+      const collider = w.createCollider(R.ColliderDesc.cuboid(10, 0.5), floor);
+      const ball = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(0, 3));
+      w.createCollider(R.ColliderDesc.ball(0.5), ball);
+      floor.setEnabled(false);
+      for (let i = 0; i < 120; i++) w.step();
+      [floorEnabled, colliderEnabled, ballY] = [floor.isEnabled(), collider.isEnabled(), ball.translation().y];
+      const probe = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(0, 20).setLinvel(3, 0));
+      w.createCollider(R.ColliderDesc.ball(0.5), probe);
+      probe.setEnabled(false);
+      for (let i = 0; i < 60; i++) w.step();
+      [probeX, probeVx] = [probe.translation().x, probe.linvel().x];
+      probe.setEnabled(true);
+      for (let i = 0; i < 60; i++) w.step();
+      resumedX = probe.translation().x;
+    } else {
+      const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, -10] });
+      const floor = physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', width: 20, height: 1 } });
+      const ball = physics.addBody(null, { position: [0, 3], colliders: { shape: 'circle', radius: 0.5 } });
+      floor.enabled = false;
+      for (let i = 0; i < 120; i++) physics.step();
+      [floorEnabled, colliderEnabled, ballY] = [
+        floor.enabled,
+        floor.colliders?.[0]?.isEnabled ?? false,
+        ball.position[1],
+      ];
+      const probe = physics.addBody(null, { position: [0, 20], colliders: { shape: 'circle', radius: 0.5 } });
+      probe.linearVelocity = [3, 0];
+      probe.enabled = false;
+      for (let i = 0; i < 60; i++) physics.step();
+      [probeX, probeVx] = [probe.position[0], probe.linearVelocity[0]];
+      probe.enabled = true;
+      for (let i = 0; i < 60; i++) physics.step();
+      resumedX = probe.position[0];
+    }
+    assert.equal(floorEnabled, false, `${kind}: the body reads disabled`);
+    assert.equal(colliderEnabled, false, `${kind}: so does its collider`);
+    assert.ok(ballY < -1, `${kind}: a ball falls through (${ballY})`);
+    near(probeX, 0, 1e-6, `${kind}: a disabled body does not move`);
+    near(probeVx, 3, 1e-6, `${kind}: and keeps its velocity`);
+    near(resumedX, 3, 0.06, `${kind}: and goes on at it once enabled`);
+  }
+});

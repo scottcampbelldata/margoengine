@@ -208,7 +208,7 @@ export class Collider2D {
     this.push();
   }
   get isEnabled(): boolean {
-    return this.enabled;
+    return this.enabled && this.body.enabled;
   }
   /** The collider's centre in world units, at the body's latest step. */
   translation(): [number, number] {
@@ -510,7 +510,9 @@ export class Body2D {
   /**
    * Whether the body is in the simulation (default true). Disabled, it keeps its pose and velocity, moves and wakes nothing, touches
    * nothing (its contacts end), is found by no query, and its joints rest; enabled again, it goes on with the velocity it had. Rapier's
-   * `setEnabled`; its published guide does not describe the effect, so this matches what the 3D kernel's disabled body does.
+   * `setEnabled`: its API reference says only that a collider disabled is "excluded from all collision detection and physics", and
+   * says nothing of a body's, so this follows what Rapier 2D does when run (the body's colliders read disabled, nothing touches
+   * them, the pose and velocity stay, the body goes on at that velocity when enabled), and what the 3D kernel's disabled body does.
    */
   get enabled(): boolean {
     return this.read().u[11] !== 0;
