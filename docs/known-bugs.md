@@ -103,6 +103,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   costs more to step: see docs/limits.md. Regression: the test above, `soft-kernel/tests/threads.rs`, and in soft.test.js
   "an inextensible sheet holds its threads within 0.1 percent at any pass count and load".
 
+### Fixed 2026-11-25: a world stepped every rigid and soft solver at 60 Hz (KB-PHYS-WORLDLEVEL1, physics world)
+
+- **Repro:** `packages/physics/tests/world-rigid-solver.test.js`, "a Physics stepped 240 times a second steps at level 2 in
+  a world". A `Physics` at 1/240 s added to a `PhysicsWorld` threw "the world asked for 0.0166 s".
+- **Cause:** a world asks a solver its `stableRate()` after `init`, but `RigidSolver` and `SoftSolver` gave it a closure
+  over the level `describe()` saw, which runs before `init` (when the Physics is not known yet): 0, always.
+- **Fixed:** `stableRate()` reads the level `init` set, in both (and in `HullSolver`). Regression: the test above.
+
 ### Fixed 2026-11-25: a body a cloth held kept a stray force that grew every step (KB-SOFT-FORCERESIDUE1, physics soft)
 
 - **Repro:** `packages/physics/tests/world-soft-solver.test.js`, "the push on a body goes through the ports". A 2 kg box

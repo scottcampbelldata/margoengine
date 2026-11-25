@@ -131,7 +131,8 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         { field: BODY_FORCES_FIELD, access: 'write' },
       ],
       rate: level,
-      stableRate: () => level,
+      // Asked after init, which sets the level (describe comes first, before the Physics is known).
+      stableRate: () => (this.physics ? this.level : 0),
     };
   }
 

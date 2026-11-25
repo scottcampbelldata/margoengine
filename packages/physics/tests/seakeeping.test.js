@@ -7,6 +7,7 @@ import {
   addedMassInfinite,
   GRAVITY,
   heaveAddedMassInfinite,
+  heaveSection,
   hullSections,
   lewisForm,
   SEA_WATER,
@@ -200,4 +201,48 @@ test("a hull's sections are its cuts under the waterline, and a half cylinder ca
     expected = (1025 * Math.PI * R * R * L) / 2;
   assert.ok(Math.abs(a[1 * 6 + 1] - expected) <= 5e-3 * expected, `heave added mass ${a[7]} against ${expected}`);
   assert.ok(Math.abs(a[1 * 6 + 5]) <= 1e-9 * expected, 'no heave-pitch coupling for a hull symmetric fore and aft');
+});
+
+test('a heaving half circle: the pressure and the waves give the same damping, and the added mass and damping meet their limits', () => {
+  // Ursell-Tasai (radiation.ts). The damping from the pressure on the hull must equal the energy the waves carry away,
+  // rho g^2 Abar^2 / w^3 (two independent results of one solution; their gap is the least-squares fit's), at every frequency.
+  // Coefficients a = A / (rho pi R^2 / 2) and b = B / ((rho pi R^2 / 2) w), xi = w^2 R / g: at high frequency a -> 1 (the
+  // free surface holds the potential at 0) and b -> 0; at low frequency b -> 8 / pi (the waves' amplitude ratio tends to
+  // k B: b = 2 Abar^2 / (pi xi^2) -> 8 / pi) and a grows without bound (a two-dimensional section's).
+  const rho = 1025,
+    g = 9.81,
+    R = 1,
+    circle = lewisForm(2 * R, R, (Math.PI * R * R) / 2),
+    norm = (rho * Math.PI * R * R) / 2,
+    at = (xi) => {
+      const w = Math.sqrt((xi * g) / R),
+        s = heaveSection(circle, w, rho, g);
+      return {
+        a: s.addedMass / norm,
+        b: s.damping / (norm * w),
+        waves: s.dampingFromWaves / (norm * w),
+        ratio: s.waveRatio,
+      };
+    };
+  for (const xi of [0.01, 0.2, 1, 2, 4]) {
+    const c = at(xi);
+    assert.ok(
+      Math.abs(c.b - c.waves) <= 2e-3 * c.waves,
+      `xi ${xi}: damping ${c.b} from the pressure, ${c.waves} from the waves`,
+    );
+    assert.ok(c.b > 0 && c.a > 0, `xi ${xi}: positive coefficients`);
+  }
+  // The gap is the fit's: it shrinks as the multipoles and the points grow (here at xi = 8, where the damping is small).
+  const w8 = Math.sqrt((8 * g) / R),
+    gap = (terms, points) => {
+      const s = heaveSection(circle, w8, rho, g, terms, points);
+      return Math.abs(s.damping - s.dampingFromWaves) / s.dampingFromWaves;
+    };
+  assert.ok(gap(24, 96) < gap(16, 64) && gap(16, 64) < gap(10, 40), 'the gap shrinks as the fit grows');
+  assert.ok(gap(24, 96) < 3e-3, `at 24 terms: ${gap(24, 96)}`);
+  const high = at(40);
+  assert.ok(Math.abs(high.a - 1) < 0.02 && high.b < 1e-3, `at high frequency a ${high.a}, b ${high.b}`);
+  const low = at(1e-4);
+  assert.ok(Math.abs(low.b - 8 / Math.PI) < 0.01 * (8 / Math.PI), `at low frequency b ${low.b} against 8 / pi`);
+  assert.ok(low.a > at(0.01).a && at(0.01).a > at(0.2).a, 'and a grows as the frequency falls');
 });

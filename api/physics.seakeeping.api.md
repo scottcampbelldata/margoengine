@@ -5,9 +5,28 @@
 ```ts
 export const GRAVITY = 9.81;
 
+export interface HeaveSection {
+    readonly addedMass: number;
+    readonly damping: number;
+    readonly dampingFromWaves: number;
+    readonly waveRatio: number;
+}
+
 export interface Hull {
     readonly row: number;
     readonly mesh: HullMesh;
+}
+
+export interface HullMemory {
+    readonly waterline: number;
+    readonly frequencies: Float64Array;
+    readonly heave: Float64Array;
+    readonly coupling: Float64Array;
+    readonly pitch: Float64Array;
+    readonly kernelHeave: Float64Array;
+    readonly kernelCoupling: Float64Array;
+    readonly kernelPitch: Float64Array;
+    readonly dt: number;
 }
 
 export interface HullMesh {
@@ -23,6 +42,8 @@ export interface HullParams {
     readonly gravity?: Vec3;
     readonly addedMass?: boolean;
     readonly stations?: number;
+    readonly radiation?: boolean;
+    readonly memory?: number;
 }
 
 export interface HullPose {
@@ -79,12 +100,22 @@ export function addedMassInfinite(sections: readonly Section[], centre: readonly
 
 export function heaveAddedMassInfinite(breadth: number, form: LewisForm, density: number): number;
 
+export function heaveSection(form: LewisForm, omega: number, density: number, gravity?: number, terms?: number, points?: number): HeaveSection;
+
+export function hullMemory(mesh: HullMesh, mass: number, centre: readonly [number, number, number], density: number, dt: number, { stations, count, window }?: {
+    count?: number | undefined;
+    stations?: number | undefined;
+    window?: number | undefined;
+}): HullMemory;
+
 export function hullSections(mesh: {
     readonly vertices: ArrayLike<number>;
     readonly indices: ArrayLike<number>;
 }, waterline: number, count?: number): Section[];
 
 export function lewisForm(breadth: number, draft: number, area: number): LewisForm;
+
+export function stillWaterline(mesh: HullMesh, mass: number, density: number): number;
 
 export function swayAddedMassInfinite(draft: number, form: LewisForm, density: number): number;
 

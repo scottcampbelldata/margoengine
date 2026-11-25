@@ -10,7 +10,11 @@
 // free hull (the research summary for SEA-08 in docs/clean-room.md; given explicitly instead, -A a goes unstable once A is
 // about M, a light hull's case). Forces the solver does not see (contacts, joints, a tow) act on M alone.
 //
-// State: none. Each step's load and added mass come from where the bodies are and the sea at that time.
+// Radiation: the waves a moving hull makes damp it, with memory (memory.ts, Cummins 1962): the hull's heave velocity and pitch
+// rate over the last seconds, convolved with its kernels, add to the load before the added-mass solve.
+//
+// State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
+// the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
 import {
   type Port,
@@ -23,6 +27,7 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { type HullMemory, hullMemory } from './memory.js';
 import { addedMassInfinite, hullSections } from './strips.js';
 import {
   GRAVITY,
@@ -56,10 +61,19 @@ export interface HullParams {
   readonly addedMass?: boolean;
   /** Stations along the hull for its sections (default 24). */
   readonly stations?: number;
+  /**
+   * Take the waves a hull makes as it moves (default true): its heave and pitch damping with memory, Cummins' convolution of
+   * its strip-theory damping over the last `memory` seconds of its motion (memory.ts).
+   */
+  readonly radiation?: boolean;
+  /** Seconds of a hull's motion its radiation remembers (default 20). */
+  readonly memory?: number;
 }
 
-/** The layout version of the `forces` port region. */
+/** The layout version of the `forces` port region and the state regions. */
 const HULL_LAYOUT = 1;
+/** f64 words a hull keeps of its last step: a flag, the body's velocity (six) and the load held (six). */
+const CARRY_WORDS = 20;
 
 /** The water's load on rigid hulls, for the rigid solver through `bodyForces`. `id` is `'hull'` unless a world holds more. */
 export class HullSolver implements Solver<HullParams> {
@@ -73,6 +87,12 @@ export class HullSolver implements Solver<HullParams> {
   private gravity: Vec3 = [0, -GRAVITY, 0];
   private addedMass = true;
   private stations = 24;
+  private radiation = true;
+  private lags = 0;
+  private history: Region | null = null;
+  /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
+  private carry: Region | null = null;
+  private readonly memories = new Map<Hull, HullMemory>();
 
   constructor(readonly id = 'hull') {}
 
@@ -85,7 +105,8 @@ export class HullSolver implements Solver<HullParams> {
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
       ],
       rate: level,
-      stableRate: () => level,
+      // Asked after init, which sets the level (describe comes first, before the Physics is known).
+      stableRate: () => (this.host ? this.level : 0),
     };
   }
 
@@ -123,6 +144,14 @@ export class HullSolver implements Solver<HullParams> {
       throw new RangeError(`A hull has 2 or more stations (got ${this.stations}).`);
     this.host = host;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
+    this.radiation = params.radiation ?? true;
+    const window = params.memory ?? 20;
+    if (!(window > 0 && Number.isFinite(window)))
+      throw new RangeError(`A hull's radiation memory is a number of seconds above 0 (got ${window}).`);
+    // Each hull's heave velocity and pitch rate, in its body's frame, at each of the last `lags` steps (by tick).
+    this.lags = Math.ceil(window * rateOf(level));
+    if (this.radiation) this.history = host.allocate('history', hulls.length * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+    if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
   }
 
   step(context: StepContext, dt: number): void {
@@ -141,23 +170,102 @@ export class HullSolver implements Solver<HullParams> {
     for (const hull of this.hulls) {
       const at = hull.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
-      const pose = {
-          position: [bodies[at]!, bodies[at + 1]!, bodies[at + 2]!] as const,
-          rotation: [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!] as const,
+      // The pose half a step on (the body's velocity and spin carried over half the step): the load held over a step is the
+      // load at its middle. Taken where the step starts, a restoring force held while the body moves through the step feeds
+      // the motion energy, a negative damping of about w dt / 4 of critical (the update's determinant 1 + (w dt)^2 / 2); at
+      // the middle the determinant is 1.
+      const half = 0.5 / rateOf(context.level),
+        v = [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!],
+        spin = [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!],
+        start = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!] as const,
+        turned = turn(start, spin, half),
+        pose = {
+          position: [
+            bodies[at]! + v[0]! * half,
+            bodies[at + 1]! + v[1]! * half,
+            bodies[at + 2]! + v[2]! * half,
+          ] as const,
+          rotation: turned,
         },
-        centre = [bodies[at + 7]!, bodies[at + 8]!, bodies[at + 9]!] as const,
-        loads = wettedLoads(hull.mesh, pose, this.sea, t, centre, this.loads),
-        w = hull.row * FORCE_WORDS,
+        centre = [
+          bodies[at + 7]! + v[0]! * half,
+          bodies[at + 8]! + v[1]! * half,
+          bodies[at + 9]! + v[2]! * half,
+        ] as const,
+        loads = wettedLoads(hull.mesh, pose, this.sea, t, centre, this.loads);
+      if (this.radiation) this.radiate(hull, bodies, at, pose, centre, context.tick, 1 / rateOf(context.level), loads);
+      const w = hull.row * FORCE_WORDS,
         held = this.addedMass
-          ? this.carried(hull, bodies, at, pose, centre, t, loads)
+          ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
           : [...loads.force, ...loads.torque];
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
     }
   }
 
   /**
-   * The load to hold so the body moves as the hull and the water it carries: M (M + A)^-1 (F + W) - W in world axes about
-   * the centre of mass, A the added mass of the sections under the waterline the hull floats at now.
+   * Adds the radiation force to `loads`: the hull's heave velocity and pitch rate (body frame) go into its history at this
+   * tick, and the force is minus the kernels convolved with the history (trapezoid in time, the oldest lag dropped).
+   */
+  private radiate(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    tick: number,
+    dt: number,
+    loads: WettedLoads,
+  ): void {
+    const inverseMass = bodies[at + 16]!;
+    if (!(inverseMass > 0)) return;
+    const q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]);
+    let memory = this.memories.get(hull);
+    if (!memory) {
+      memory = hullMemory(hull.mesh, 1 / inverseMass, local, this.sea!.density ?? SEA_WATER, dt, {
+        stations: this.stations,
+        window: this.lags * dt,
+      });
+      this.memories.set(hull, memory);
+    }
+    const lags = this.lags,
+      index = this.hulls.indexOf(hull),
+      ring = new Float64Array(this.host!.memory.buffer, this.history!.byteOffset + index * lags * 2 * 8, lags * 2),
+      velocity = rotate(conjugate, [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!]),
+      spin = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!]),
+      slot = tick % lags;
+    ring[2 * slot] = velocity[1];
+    ring[2 * slot + 1] = spin[2];
+    const n = Math.min(lags, memory.kernelHeave.length);
+    let heave = 0,
+      pitch = 0;
+    for (let j = 0; j < n; j++) {
+      const s = (slot - j + lags) % lags,
+        weight = j === 0 ? 0.5 : 1,
+        v = ring[2 * s]!,
+        w = ring[2 * s + 1]!;
+      heave += weight * (memory.kernelHeave[j]! * v + memory.kernelCoupling[j]! * w);
+      pitch += weight * (memory.kernelCoupling[j]! * v + memory.kernelPitch[j]! * w);
+    }
+    // The force along the body's y and the moment about its z, into world axes.
+    const force = rotate(q, [0, -heave * dt, 0]),
+      moment = rotate(q, [0, 0, -pitch * dt]);
+    for (let k = 0; k < 3; k++) {
+      loads.force[k]! += force[k]!;
+      loads.torque[k]! += moment[k]!;
+    }
+  }
+
+  /**
+   * The load to hold so the body moves as the hull and the water it carries: M (M + A)^-1 (F + W + E) - W - E in world axes
+   * about the centre of mass, A the added mass of the sections under the waterline the hull floats at now and E every other
+   * load on the body (a tow, the wind, a sail, a contact), which the rigid world applies to M alone: (M + A) a = F + W + E.
+   * E is what the body's last step shows: its change of velocity times M, less the load held and its weight then.
    */
   private carried(
     hull: Hull,
@@ -166,6 +274,7 @@ export class HullSolver implements Solver<HullParams> {
     pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
     centre: Vec3,
     t: number,
+    dt: number,
     loads: WettedLoads,
   ): number[] {
     const inverseMass = bodies[at + 16]!,
@@ -214,13 +323,40 @@ export class HullSolver implements Solver<HullParams> {
       system = new Float64Array(36),
       rhs = new Float64Array(6);
     for (let k = 0; k < 36; k++) system[k] = m[k]! + a[k]!;
-    for (let k = 0; k < 6; k++) rhs[k] = f[k]! + weight[k]!;
+    // Every other load, from the last step: M (v - v_last) / dt - held_last - W.
+    const index = this.hulls.indexOf(hull),
+      last = new Float64Array(this.host!.memory.buffer, this.carry!.byteOffset + index * CARRY_WORDS * 8, CARRY_WORDS),
+      velocity = [
+        bodies[at + 10]!,
+        bodies[at + 11]!,
+        bodies[at + 12]!,
+        bodies[at + 13]!,
+        bodies[at + 14]!,
+        bodies[at + 15]!,
+      ],
+      other = [0, 0, 0, 0, 0, 0];
+    const seen = [0, 0, 0, 0, 0, 0];
+    if (last[0] >= 1)
+      for (let i = 0; i < 6; i++) {
+        let sum = 0;
+        for (let j = 0; j < 6; j++) sum += (m[i * 6 + j]! * (velocity[j]! - last[1 + j]!)) / dt;
+        seen[i] = sum - last[7 + i]! - weight[i]!;
+        // Carried on to this step's middle from the last two steps' (a straight line), or held where there is one.
+        other[i] = last[0] >= 2 ? 2 * seen[i]! - last[13 + i]! : seen[i]!;
+      }
+    for (let k = 0; k < 6; k++) rhs[k] = f[k]! + weight[k]! + other[k]!;
     const acceleration = solve6(system, rhs),
       held: number[] = [];
     for (let i = 0; i < 6; i++) {
       let sum = 0;
       for (let j = 0; j < 6; j++) sum += m[i * 6 + j]! * acceleration[j]!;
-      held.push(sum - weight[i]!);
+      held.push(sum - weight[i]! - other[i]!);
+    }
+    if (last[0] >= 1) for (let k = 0; k < 6; k++) last[13 + k] = seen[k]!;
+    last[0] = last[0] >= 1 ? 2 : 1;
+    for (let k = 0; k < 6; k++) {
+      last[1 + k] = velocity[k]!;
+      last[7 + k] = held[k]!;
     }
     return held;
   }
@@ -233,8 +369,9 @@ export class HullSolver implements Solver<HullParams> {
 
   importPorts(_tick: number): void {}
 
+  /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [];
+    return [this.history, this.carry].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {
@@ -303,4 +440,22 @@ function solve6(matrix: Float64Array, rhs: Float64Array): Float64Array {
     x[row] = a[row * n + row]! !== 0 ? sum / a[row * n + row]! : 0;
   }
   return x;
+}
+
+/** The rotation `q` turned by the angular velocity `w` (world axes) for `h` seconds: q + (h / 2) [w, 0] q, made a unit. */
+function turn(
+  q: readonly [number, number, number, number],
+  w: readonly number[],
+  h: number,
+): [number, number, number, number] {
+  const [x, y, z, s] = q,
+    a = (w[0]! * h) / 2,
+    b = (w[1]! * h) / 2,
+    c = (w[2]! * h) / 2,
+    nx = x + (s * a + b * z - c * y),
+    ny = y + (s * b + c * x - a * z),
+    nz = z + (s * c + a * y - b * x),
+    ns = s - (a * x + b * y + c * z),
+    length = Math.sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
+  return [nx / length, ny / length, nz / length, ns / length];
 }

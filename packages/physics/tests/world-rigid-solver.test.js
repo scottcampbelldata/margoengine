@@ -220,3 +220,20 @@ test('the kernel state snapshots and restores with the world, and a world of oth
   assert.equal(other.hash(), before);
   for (const s of [first, second, third]) s.physics.dispose();
 });
+
+test('a Physics stepped 240 times a second steps at level 2 in a world, and to the bits it gives alone', () => {
+  // A solver's level was read from describe(), which the world asks before init (which learns the Physics's step), so
+  // every RigidSolver stepped at level 0 and a Physics at 1/240 s was refused ("the world asked for 1/60 s").
+  const make = () => {
+    const physics = new Physics(null, { fixedTimestep: 1 / 240 });
+    physics.addBody(null, { position: [0, 2, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+    return physics;
+  };
+  const alone = make(),
+    inWorld = make(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics: inWorld });
+  world.advance(30);
+  for (let i = 0; i < 120; i++) alone.step();
+  assert.equal(inWorld.stepCount, 120, 'four rigid steps a frame');
+  assert.equal(inWorld.kernel.hash, alone.kernel.hash);
+});

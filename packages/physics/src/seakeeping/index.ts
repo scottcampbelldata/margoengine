@@ -21,3 +21,5 @@ export {
   type Section,
   swayAddedMassInfinite,
 } from './strips.js';
+export { type HeaveSection, heaveSection } from './radiation.js';
+export { type HullMemory, hullMemory, stillWaterline } from './memory.js';

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19117091,
+  "total": 19120680,
   "history": [
     {
       "date": "2026-10-24",
@@ -12375,6 +12375,12 @@
       "commit": "d253915f3",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: the hull's added mass from its sections (station cuts, Lewis forms, strip integrals) and the six-by-six fold M (M + A)^-1 in HullSolver; measured gzip (Mac build) 4036 B, was under 2693; the added mass is what keeps a light hull's motion right and stable, and the entry is loaded only by scenes with hulls. Budget (measured + 256 B): 2693 to 4292 B."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "dd83fb427",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: the hull's radiation (Ursell-Tasai sections with the exponential integral and the least-squares fit, the strip-integrated damping, Cummins' kernel and its convolution over the motion history), the load at the step's middle and the estimate of the body's other loads; measured gzip (Mac build) 7625 B, was under 4292; the damping is what lets a hull settle, and the entry is loaded only by scenes with hulls. Budget (measured + 3%): 4292 to 7881 B."
     }
   ],
   "items": {
@@ -13170,7 +13176,7 @@
     "@margoengine/physics/flight": 7401,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/seakeeping": 4292,
+    "@margoengine/physics/seakeeping": 7881,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,

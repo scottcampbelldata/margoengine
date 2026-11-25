@@ -4,8 +4,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { addedMassInfinite, GRAVITY, HullSolver, hullSections, SEA_WATER } from '../../dist/seakeeping.js';
-import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
+import { GRAVITY, HullSolver, heaveSection, lewisForm, SEA_WATER } from '../../dist/seakeeping.js';
+import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 await Physics.load();
@@ -90,35 +90,102 @@ test('HullSolver: the load reaches the hull it names', () => {
   );
 });
 
-test('HullSolver: a box let go above its draft heaves at the period its buoyancy and the water it carries give it', () => {
-  // A box of mass m on a waterplane of area A_wp: a restoring force rho g A_wp per metre of heave, and the water it carries,
-  // its heave added mass a (from its sections, at infinite frequency), so a period of 2 pi sqrt((m + a) / (rho g A_wp))
-  // (Journee and Massie, Offshore Hydromechanics, 2001, section 6.3). Without the added mass, 2 pi sqrt(m / (rho g A_wp)).
-  // Let go 5 cm high, it oscillates about its draft.
-  const still = { density: SEA_WATER, elevation: () => 0 },
-    mass = SEA_WATER * L * B * T,
-    added = addedMassInfinite(hullSections(boxMesh([L, D, B]), T - D / 2, 24), [0, 0, 0], SEA_WATER)[7];
-  for (const [carry, expected] of [
-    [true, 2 * Math.PI * Math.sqrt((mass + added) / (SEA_WATER * GRAVITY * L * B))],
-    [false, 2 * Math.PI * Math.sqrt(mass / (SEA_WATER * GRAVITY * L * B))],
-  ]) {
-    const world = make({ num: 60, den: 1 }, 0, still, { addedMass: carry }),
-      box = world.boxes[0];
-    box.setPosition([0, D / 2 - T + 0.05, 0]);
-    const rest = D / 2 - T,
-      crossings = [];
-    let last = box.position[1] - rest;
-    for (let f = 1; f <= 600; f++) {
+/** A solver that drives body `row` up and down with f0 sin(w t), t the middle of each step. */
+function driver(row, f0, w) {
+  let region, host;
+  return {
+    describe: () => ({
+      id: 'drive',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: BODY_FORCES_FIELD, access: 'accumulate' }],
+    }),
+    init(h) {
+      host = h;
+      region = h.allocate('drive', (row + 1) * FORCE_WORDS * 8, 'f64', 1);
+    },
+    step(context) {
+      const words = new Float64Array(host.memory.buffer, region.byteOffset, region.byteLength / 8);
+      words.fill(0);
+      words[row * FORCE_WORDS + 1] = f0 * Math.sin((w * (context.tick + 0.5)) / 60);
+    },
+    exportPorts: (tick) => [{ field: 'bodyForces', region, tick, cell: [0, 0, 0] }],
+    importPorts() {},
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+}
+
+/** A box hull alone in still water, its own world, driven by `drive` when given. */
+function single(options = {}, drive) {
+  const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+    box = physics.addBody(null, {
+      position: [0, D / 2 - T, 0],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+    }),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new HullSolver(), {
+      hulls: [{ row: box.row, mesh: boxMesh([L, D, B]) }],
+      sea: { density: SEA_WATER, elevation: () => 0 },
+      ...options,
+    });
+  if (drive) world.add(driver(box.row, ...drive), {}).couple(['drive', 'hull', 'rigid'], 'staggered');
+  else world.couple(['hull', 'rigid'], 'staggered');
+  return { world, box };
+}
+
+test('HullSolver: driven up and down, a box heaves as Cummins equation in the frequency domain says', () => {
+  // Heave of amplitude F / |C - (m + A(w)) w^2 + i w B(w)| at each driving frequency w (Journee and Massie, Offshore
+  // Hydromechanics, 2001, eqs. 6.20-6.31), A(w) and B(w) the box section's added mass and damping (Ursell-Tasai, the same
+  // section for every station) times its length: the time-domain solver (its added mass at infinite frequency and its
+  // radiation memory, Cummins 1962) must give the frequency-domain answer. Its own errors: the kernel taken from 40
+  // frequencies with B(w) linear between them, and the step (the load taken at its middle, O((w dt)^2)); measured 0.6, 1.5
+  // and 2.1 percent at 60 steps a second (1 percent at 240), so a bound of 3 percent.
+  const rho = SEA_WATER,
+    m = rho * L * B * T,
+    C = rho * GRAVITY * L * B,
+    form = lewisForm(B, T, B * T),
+    f0 = 2000;
+  for (const w of [2.5, 2.9, 3.5]) {
+    const { world, box } = single({}, [f0, w]),
+      rest = D / 2 - T;
+    let amplitude = 0;
+    for (let f = 1; f <= 40 * 60; f++) {
       world.advance(f);
-      const now = box.position[1] - rest;
-      if (last > 0 && now <= 0) crossings.push(f - now / (now - last));
-      last = now;
+      if (f > 30 * 60) amplitude = Math.max(amplitude, Math.abs(box.position[1] - rest));
     }
-    const period = (crossings.at(-1) - crossings[0]) / (crossings.length - 1) / 60;
-    assert.ok(crossings.length >= 3, `it oscillates: ${crossings.length} crossings`);
+    const s = heaveSection(form, w, rho, GRAVITY),
+      expected = f0 / Math.hypot(C - (m + s.addedMass * L) * w * w, w * s.damping * L);
     assert.ok(
-      Math.abs(period - expected) <= 0.02 * expected,
-      `${carry ? 'with' : 'without'} its added mass: period ${period} s against ${expected} s`,
+      Math.abs(amplitude - expected) <= 0.03 * expected,
+      `at ${w} rad/s: heave ${amplitude} m against ${expected} m`,
     );
   }
+});
+
+test('HullSolver: let go above its draft, a box settles as its damping says; without the water it carries, it heaves at its bare period', () => {
+  // Its natural frequency w_n solves w^2 (m + A(w)) = C, and its damping ratio is B(w_n) / (2 sqrt((m + A) C)), 0.17 for this
+  // box: after 10 s its heave is e^(-0.17 w_n 10) = 0.7 percent of the 5 cm it was let go from. With neither its added mass
+  // nor its radiation it heaves on at 2 pi sqrt(m / C) (Journee and Massie, section 6.3).
+  const { world, box } = single(),
+    rest = D / 2 - T;
+  box.setPosition([0, rest + 0.05, 0]);
+  let late = 0;
+  for (let f = 1; f <= 660; f++) {
+    world.advance(f);
+    if (f > 600) late = Math.max(late, Math.abs(box.position[1] - rest));
+  }
+  assert.ok(late <= 0.02 * 0.05, `it settles: ${late} m left after 10 s`);
+  const bare = single({ addedMass: false, radiation: false }),
+    crossings = [];
+  bare.box.setPosition([0, rest + 0.05, 0]);
+  let last = 0.05;
+  for (let f = 1; f <= 600; f++) {
+    bare.world.advance(f);
+    const now = bare.box.position[1] - rest;
+    if (last > 0 && now <= 0) crossings.push(f - now / (now - last));
+    last = now;
+  }
+  const period = (crossings.at(-1) - crossings[0]) / (crossings.length - 1) / 60,
+    expected = 2 * Math.PI * Math.sqrt((SEA_WATER * L * B * T) / (SEA_WATER * GRAVITY * L * B));
+  assert.ok(Math.abs(period - expected) <= 0.02 * expected, `bare: period ${period} s against ${expected} s`);
 });

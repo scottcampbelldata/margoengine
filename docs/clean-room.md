@@ -12037,3 +12037,37 @@ carry -A a explicitly (unstable once A is about M), as the research summary note
 the added mass for that reason. The sections are taken from the mesh under the mean waterline in the body's frame each
 step, also this package's own. Proof: `packages/physics/tests/seakeeping.test.js` and `tests/coupling/seakeeping.test.js`
 (a box heaves at 2 pi sqrt((m + a)/(rho g A_wp)) with its added mass, and at the bare period without).
+
+### A hull's radiation: Ursell-Tasai sections and Cummins' memory (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
+
+`packages/physics/src/seakeeping/radiation.ts` solves a heaving section's two-dimensional radiation problem, and
+`memory.ts` turns the hull's damping into the force it remembers. Written from J. M. J. Journee and W. W. Massie,
+*Offshore Hydromechanics*, TU Delft, 2001, Part 2, read for this job:
+- the potentials and stream functions of the progressive waves and the multipoles (eqs. 7.71-7.79), and Tasai's Lewis form
+  of them (eqs. 7.103-7.112);
+- the body condition, the pressure and the heave force;
+- Cummins' equation and the retardation function (section 6.4; W. E. Cummins, "The impulse response function and ship
+  motions", Schiffstechnik 9, 1962, known through the book).
+
+These are this package's own, each checked:
+- **Least squares over the contour.** The book states only that the body condition determines the unknowns.
+- **The closed form of the waves' integral**, -e^{ikz} E1(ikz). It was checked against direct quadrature of the book's
+  integrals before use. E1 is by its power series (Abramowitz and Stegun, *Handbook of Mathematical Functions*, 1964, eq.
+  5.1.11), and the complex angle by Newton steps on the pinned sine and cosine.
+- **The energy check.** The damping from the pressure must equal rho g^2 Abar^2 / w^3, the energy the waves carry away.
+  The high- and low-frequency limits of the half circle (a -> 1; b -> 8 / pi) follow from the free-surface condition and
+  the waves' amplitude ratio.
+- **The direct convolution**, in place of Perez and Fossen's state-space fit (MIC 29(1), 2008, doi 10.4173/mic.2008.1.1),
+  which a later change may add as a speed-up.
+- **The load at the step's middle**, the pose carried half a step on. Held from the step's start, a restoring force has
+  the update determinant 1 + (w dt)^2 / 2, a negative damping; at the middle it is 1.
+- **Every other load on the body**, estimated from its last two steps for the added-mass solve.
+
+Published Ursell curves (Ursell 1949, Vugts 1968) could not be read online. In their place the solver is held to:
+- its own energy check;
+- the exact limits;
+- the frequency-domain answer of a driven box (`packages/physics/tests/coupling/seakeeping.test.js`, within 3 percent at 60
+  steps a second; measured 0.6, 1.5 and 2.1).
+
+No constant here is calibrated: every coefficient comes from the equations above, and the tests' bounds are their stated
+numerical errors.

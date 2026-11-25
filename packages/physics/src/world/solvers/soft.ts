@@ -68,7 +68,8 @@ export class SoftSolver implements Solver<SoftSolverParams> {
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
       ],
       rate: level,
-      stableRate: () => level,
+      // Asked after init, which sets the level (describe comes first, before the Physics is known).
+      stableRate: () => (this.soft ? this.level : 0),
     };
   }
 
