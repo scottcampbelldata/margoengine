@@ -724,7 +724,7 @@ including initialization failures and scene/engine disposal.
 right or modified drag turns and tilts, the wheel zooms toward the cursor, and `flyTo` flies a geodesic with an arc.
 The eye is kept `clearance` metres (default 2) above the ground height your `heightAt(longitude, latitude)` returns; it
 is a height query only (a function over a terrain, a height grid or a raycast), never a physics body. Angles are
-radians and lengths metres everywhere; convert with `degToRad`. The geodesy (geodetic/ECEF, ENU, Vincenty geodesics,
+radians and lengths metres everywhere; convert with `degToRad`. The geodesy (geodetic/ECEF, ENU, Karney geodesics,
 `orbitPose`) is `@margoengine/math/geo`, also what `@margoengine/tiles` uses.
 
 ```ts
@@ -748,7 +748,7 @@ camera
 
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF). Sources: NIMA TR8350.2 (WGS84);
-Vincenty, Survey Review 23 (176), 1975; Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
+Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976. Limits: `docs/limits.md`, "Geospatial camera".
 
 ## Globe navigation: `@margoengine/controls/globe`

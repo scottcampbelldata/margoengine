@@ -8491,9 +8491,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
 `add`, `addAllToScene`, `instantiate` and `loadContainer` are all or nothing. Removal and disposal cannot be undone: when a plugin's `dispose` throws, the rest still goes and the first error is thrown. Adding and removing attach and remove plugins, which core refuses during a frame, so call them outside plugin and frame callbacks.
 ## Geospatial camera and geo maths (2026-11-25)
 
-- `@margoengine/math/geo` geodesics use Vincenty (1975): millimetre accurate except within about half a degree of
-  antipodal points, where `geodesicInverse` throws a `MargoError` coded `failed`. Karney (2013) would remove the
-  limit; not built.
+- `@margoengine/math/geo` geodesics follow Karney (2013) and converge for every pair, antipodal included; a round trip of 6000
+  random pairs (a third near-antipodal) misses by under 1e-6 m. The Fourier series of the paper are replaced by 16-point
+  Gauss-Legendre quadrature of the same integrands per quarter turn (exact to double precision), so a call costs about
+  50 to 1000 kernel evaluations: do not call it per vertex of a large mesh.
 - `GeospatialControls` terrain clearance is a height query at the eye only (`heightAt`), sampled once per move, with up to
   6 lift iterations; it does not sweep the path between frames, so a fast move can cross a thin ridge. `@margoengine/tiles`
   streams terrain without a height query, so pass your own function (grid, raycast). No physics is involved.

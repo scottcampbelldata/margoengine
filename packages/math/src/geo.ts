@@ -6,10 +6,7 @@
 // - T. Vincenty, "Direct and inverse solutions of geodesics on the ellipsoid with application of nested equations",
 //   Survey Review 23 (176), 1975, https://www.ngs.noaa.gov/PUBS_LIB/inverse.pdf
 // - C. F. F. Karney, "Algorithms for geodesics", J. Geodesy 87, 2013, https://doi.org/10.1007/s00190-012-0578-z
-//   (the reference the tests' accuracy claims are judged against; Vincenty is used because it is short and
-//   sub-millimetre except near antipodal points, where Karney's method is the remedy: see {@link geodesicInverse}).
-
-import { MargoError } from './errors.js';
+//   (geodesics: see the notes above geodesicInverse).
 
 /** WGS84 semi-major axis, metres. */
 export const WGS84_A = 6378137;
@@ -131,71 +128,148 @@ export interface GeodesicInverse {
 const TAU = 2 * Math.PI;
 const norm2pi = (a: number) => ((a % TAU) + TAU) % TAU;
 
+// Geodesics, after Karney 2013 ("Algorithms for geodesics"): a geodesic maps to a great circle on the auxiliary sphere
+// (reduced latitude beta, arc length sigma from the node, longitude omega, equatorial azimuth alpha0), and
+//   s / b  = I1(sigma) = int sqrt(1 + k2 sin^2 s) ds
+//   lambda = omega - f sin(alpha0) I3(sigma),  I3 = int (2 - f) / (1 + (1 - f) sqrt(1 + k2 sin^2 s)) ds
+// with k2 = e'^2 cos^2(alpha0). The paper evaluates these integrals as Fourier series; here they are Gauss-Legendre
+// quadrature of the same integrands (smooth and periodic, so a 16-point rule per quarter turn is exact to double
+// precision). The direct problem is Newton on sigma; the inverse problem is the paper's one-dimensional root find of
+// lambda12(alpha1) = lon12 over [0, PI], after reducing the pair to lat1 <= 0, |lat1| >= |lat2|, lon12 >= 0
+// (section 4) with the equatorial case as a special geodesic (lon12 <= PI (1 - f)). The root find keeps a bracket on
+// alpha1 (parametrised as PI/2 - delta, so that near-equatorial geodesics keep full precision), so it converges for
+// every pair, including near-antipodal ones, where Vincenty's iteration diverges.
+const GL_N = 16;
+const GL: { x: number[]; w: number[] } = /* @__PURE__ */ (() => {
+  const x: number[] = [],
+    w: number[] = [];
+  for (let i = 0; i < GL_N; i++) {
+    let z = Math.cos((Math.PI * (i + 0.75)) / (GL_N + 0.5)),
+      dp = 1;
+    for (let it = 0; it < 100; it++) {
+      let p0 = 1,
+        p1 = z;
+      for (let k = 2; k <= GL_N; k++) [p0, p1] = [p1, ((2 * k - 1) * z * p1 - (k - 1) * p0) / k];
+      dp = (GL_N * (z * p1 - p0)) / (z * z - 1);
+      const dz = p1 / dp;
+      z -= dz;
+      if (Math.abs(dz) < 1e-16) break;
+    }
+    x.push(z);
+    w.push(2 / ((1 - z * z) * dp * dp));
+  }
+  return { x, w };
+})();
+/** The integrals I1 and I3 over [a, b] in sigma (b may be below a). */
+function integrate(k2: number, a: number, b: number): [number, number] {
+  const panels = Math.max(1, Math.ceil(Math.abs(b - a) / (Math.PI / 2))),
+    h = (b - a) / panels;
+  let i1 = 0,
+    i3 = 0;
+  for (let p = 0; p < panels; p++) {
+    const mid = a + (p + 0.5) * h;
+    for (let i = 0; i < GL_N; i++) {
+      const s = Math.sin(mid + 0.5 * h * GL.x[i]!),
+        r = Math.sqrt(1 + k2 * s * s),
+        w = 0.5 * h * GL.w[i]!;
+      i1 += w * r;
+      i3 += (w * (2 - WGS84_F)) / (1 + (1 - WGS84_F) * r);
+    }
+  }
+  return [i1, i3];
+}
+/** Longitude omega on the auxiliary sphere, continuous in sigma (tan omega = sin(alpha0) tan sigma). */
+function omega(sa0: number, sigma: number): number {
+  const k = Math.round(sigma / TAU),
+    s = sigma - TAU * k;
+  return Math.atan2(sa0 * Math.sin(s), Math.cos(s)) + TAU * k;
+}
+
 /**
- * Shortest distance and bearings between two surface points (Vincenty 1975), millimetre accurate for any pair that
- * is not nearly antipodal. Latitudes and longitudes in radians. Heights are ignored (the path lies on the ellipsoid).
- * Throws a `MargoError` with code `failed` when the iteration does not converge, which happens only within about
- * half a degree of antipodal; Karney (2013) is the algorithm to use there.
+ * Shortest distance and bearings between two surface points, Karney (2013): converges for every pair, including nearly
+ * antipodal points. Latitudes and longitudes in radians. Heights are ignored (the path lies on the ellipsoid).
  */
 export function geodesicInverse(lon1: number, lat1: number, lon2: number, lat2: number): GeodesicInverse {
   finite('geodesicInverse', lon1, lat1, lon2, lat2);
+  let lam = wrapPi(lon2 - lon1),
+    p1 = lat1,
+    p2 = lat2;
+  const swap = Math.abs(p1) < Math.abs(p2);
+  if (swap) ([p1, p2] = [p2, p1]), (lam = -lam); // the reversed geodesic runs the other way round the pole axis
+  const latFlip = p1 > 0;
+  if (latFlip) (p1 = -p1), (p2 = -p2);
+  const lonFlip = lam < 0;
+  if (lonFlip) lam = -lam;
   const f = WGS84_F,
-    a = WGS84_A,
-    b = WGS84_B;
-  const L = wrapPi(lon2 - lon1),
-    U1 = Math.atan((1 - f) * Math.tan(lat1)),
-    U2 = Math.atan((1 - f) * Math.tan(lat2)),
-    sU1 = Math.sin(U1),
-    cU1 = Math.cos(U1),
-    sU2 = Math.sin(U2),
-    cU2 = Math.cos(U2);
-  let lambda = L,
-    sinSigma = 0,
-    cosSigma = 1,
-    sigma = 0,
-    cosSqAlpha = 1,
-    cos2SigmaM = 0,
-    sinLambda = 0,
-    cosLambda = 1,
-    i = 0;
-  for (; i < 200; i++) {
-    sinLambda = Math.sin(lambda);
-    cosLambda = Math.cos(lambda);
-    sinSigma = Math.hypot(cU2 * sinLambda, cU1 * sU2 - sU1 * cU2 * cosLambda);
-    if (sinSigma === 0) return { distance: 0, initialBearing: 0, finalBearing: 0 };
-    cosSigma = sU1 * sU2 + cU1 * cU2 * cosLambda;
-    sigma = Math.atan2(sinSigma, cosSigma);
-    const sinAlpha = (cU1 * cU2 * sinLambda) / sinSigma;
-    cosSqAlpha = 1 - sinAlpha * sinAlpha;
-    cos2SigmaM = cosSqAlpha !== 0 ? cosSigma - (2 * sU1 * sU2) / cosSqAlpha : 0; // equatorial line: cos2SigmaM = 0
-    const C = (f / 16) * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha)),
-      next =
-        L +
-        (1 - C) * f * sinAlpha * (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)));
-    const done = Math.abs(next - lambda) < 1e-13;
-    lambda = next;
-    if (done) break;
-    if (Math.abs(lambda) > Math.PI)
-      throw new MargoError('failed', 'The points are nearly antipodal and Vincenty does not converge; move one point by about half a degree');
+    reduced = (p: number): [number, number] => {
+      const s = (1 - f) * Math.sin(p),
+        c = Math.cos(p),
+        h = Math.hypot(s, c);
+      return [s / h, Math.max(c / h, 1e-150)];
+    },
+    [sb1, cb1] = reduced(p1),
+    [sb2, cb2] = reduced(p2);
+  let s: number, a1: number, a2: number;
+  if (p1 === 0 && lam <= Math.PI * (1 - f)) {
+    (s = WGS84_A * lam), (a1 = a2 = Math.PI / 2);
+  } else {
+    // alpha1 = PI/2 - delta: sin a1 = cos delta, cos a1 = sin delta, so a tiny cos a1 keeps its relative precision.
+    const at = (delta: number) => {
+      const sa1 = Math.cos(delta),
+        ca1 = Math.sin(delta),
+        dd = cb1 < -sb1 ? (cb2 - cb1) * (cb1 + cb2) : (sb1 - sb2) * (sb1 + sb2),
+        ca2 = Math.sqrt(Math.max(0, ca1 * ca1 * cb1 * cb1 + dd)) / cb2,
+        sa0 = sa1 * cb1,
+        ca0 = Math.hypot(ca1, sa1 * sb1),
+        sigma1 = Math.atan2(sb1, ca1 * cb1),
+        k2 = EP2 * ca0 * ca0;
+      // sigma12 in [0, PI] from its sine and cosine, so rounding noise around zero cannot wrap it to 2 PI.
+      const c1 = ca1 * cb1,
+        c2 = ca2 * cb2,
+        sigma2 = sigma1 + Math.atan2(Math.max(0, c1 * sb2 - sb1 * c2), c1 * c2 + sb1 * sb2),
+        [i1, i3] = integrate(k2, sigma1, sigma2);
+      return {
+        s: WGS84_B * i1,
+        lambda: omega(sa0, sigma2) - omega(sa0, sigma1) - f * sa0 * i3,
+        sa1,
+        ca1,
+        sa2: sa0 / cb2,
+        ca2,
+      };
+    };
+    // delta = PI/2 is alpha1 = 0 (lambda12 = 0); delta = -PI/2 is alpha1 = PI (lambda12 = PI).
+    let x0 = Math.PI / 2,
+      x1 = -Math.PI / 2,
+      f0 = -lam,
+      f1 = Math.PI - lam,
+      side = 0,
+      x = f0 === 0 ? x0 : x1;
+    if (f0 !== 0 && f1 !== 0) {
+      for (let i = 0; i < 1500; i++) {
+        x = (x0 * f1 - x1 * f0) / (f1 - f0);
+        // Every third step bisects, so the bracket at least halves every three steps even where lambda12 has a kink.
+        if (i % 3 === 2 || !(x > Math.min(x0, x1) && x < Math.max(x0, x1))) x = 0.5 * (x0 + x1);
+        const fx = at(x).lambda - lam;
+        if (Math.abs(fx) <= 2e-16 || Math.abs(x1 - x0) <= 1e-16 * (Math.abs(x0) + Math.abs(x1))) break;
+        // Illinois regula falsi: keep the sign change bracketed, halving the retained end's value after a repeat.
+        if (fx * f1 > 0) {
+          (x1 = x), (f1 = fx);
+          if (side === -1) f0 /= 2;
+          side = -1;
+        } else {
+          (x0 = x), (f0 = fx);
+          if (side === 1) f1 /= 2;
+          side = 1;
+        }
+      }
+    }
+    const r = at(x);
+    (s = r.s), (a1 = Math.atan2(r.sa1, r.ca1)), (a2 = Math.atan2(r.sa2, r.ca2));
   }
-  if (i === 200) throw new MargoError('failed', 'The points are nearly antipodal and Vincenty does not converge; move one point by about half a degree');
-  const uSq = (cosSqAlpha * (a * a - b * b)) / (b * b),
-    A = 1 + (uSq / 16384) * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq))),
-    B = (uSq / 1024) * (256 + uSq * (-128 + uSq * (74 - 47 * uSq))),
-    dSigma =
-      B *
-      sinSigma *
-      (cos2SigmaM +
-        (B / 4) *
-          (cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) -
-            (B / 6) * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)));
-  sinLambda = Math.sin(lambda);
-  cosLambda = Math.cos(lambda);
-  return {
-    distance: b * A * (sigma - dSigma),
-    initialBearing: norm2pi(Math.atan2(cU2 * sinLambda, cU1 * sU2 - sU1 * cU2 * cosLambda)),
-    finalBearing: norm2pi(Math.atan2(cU1 * sinLambda, -sU1 * cU2 + cU1 * sU2 * cosLambda)),
-  };
+  if (lonFlip) (a1 = -a1), (a2 = -a2);
+  if (latFlip) (a1 = Math.PI - a1), (a2 = Math.PI - a2);
+  if (swap) [a1, a2] = [a2 + Math.PI, a1 + Math.PI];
+  return { distance: s, initialBearing: norm2pi(a1), finalBearing: norm2pi(a2) };
 }
 
 /** The result of {@link geodesicDirect}: radians, longitude in (-PI, PI], bearing in [0, 2 PI). */
@@ -206,63 +280,40 @@ export interface GeodesicDirect {
   finalBearing: number;
 }
 
-/** Follow a geodesic from a surface point for `distance` metres on `bearing` (clockwise from north), Vincenty 1975. */
+/** Follow a geodesic from a surface point for `distance` metres on `bearing` (clockwise from north), Karney 2013. */
 export function geodesicDirect(lon1: number, lat1: number, bearing: number, distance: number): GeodesicDirect {
   finite('geodesicDirect', lon1, lat1, bearing, distance);
   const f = WGS84_F,
-    a = WGS84_A,
-    b = WGS84_B,
-    s = distance,
-    sinA1 = Math.sin(bearing),
-    cosA1 = Math.cos(bearing),
-    tanU1 = (1 - f) * Math.tan(lat1),
-    cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1),
-    sinU1 = tanU1 * cosU1,
-    sigma1 = Math.atan2(tanU1, cosA1),
-    sinAlpha = cosU1 * sinA1,
-    cosSqAlpha = 1 - sinAlpha * sinAlpha,
-    uSq = (cosSqAlpha * (a * a - b * b)) / (b * b),
-    A = 1 + (uSq / 16384) * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq))),
-    B = (uSq / 1024) * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
-  let sigma = s / (b * A),
-    cos2SigmaM = 0,
-    sinSigma = 0,
-    cosSigma = 1;
-  for (let i = 0; i < 200; i++) {
-    cos2SigmaM = Math.cos(2 * sigma1 + sigma);
-    sinSigma = Math.sin(sigma);
-    cosSigma = Math.cos(sigma);
-    const dSigma =
-      B *
-      sinSigma *
-      (cos2SigmaM +
-        (B / 4) *
-          (cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) -
-            (B / 6) * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)));
-    const next = s / (b * A) + dSigma;
-    const done = Math.abs(next - sigma) < 1e-13;
-    sigma = next;
-    if (done) break;
+    sb = (1 - f) * Math.sin(lat1),
+    cb = Math.cos(lat1),
+    h = Math.hypot(sb, cb),
+    sb1 = sb / h,
+    cb1 = Math.max(cb / h, 1e-150),
+    sa1 = Math.sin(bearing),
+    ca1 = Math.cos(bearing),
+    target = distance / WGS84_B,
+    sa0 = sa1 * cb1,
+    ca0 = Math.hypot(ca1, sa1 * sb1),
+    sigma1 = Math.atan2(sb1, ca1 * cb1),
+    k2 = EP2 * ca0 * ca0;
+  // Newton on sigma2: I1(sigma2) - I1(sigma1) = s / b, with I1' = sqrt(1 + k2 sin^2 sigma).
+  let sigma2 = sigma1 + target / (1 + k2 / 4);
+  for (let i = 0; i < 50; i++) {
+    const step = (integrate(k2, sigma1, sigma2)[0] - target) / Math.sqrt(1 + k2 * Math.sin(sigma2) ** 2);
+    sigma2 -= step;
+    if (Math.abs(step) <= 1e-16 * Math.max(1, Math.abs(sigma2))) break;
   }
-  cos2SigmaM = Math.cos(2 * sigma1 + sigma);
-  sinSigma = Math.sin(sigma);
-  cosSigma = Math.cos(sigma);
-  const x = sinU1 * sinSigma - cosU1 * cosSigma * cosA1,
-    latitude = Math.atan2(
-      sinU1 * cosSigma + cosU1 * sinSigma * cosA1,
-      (1 - f) * Math.hypot(sinAlpha, x),
-    ),
-    lambda = Math.atan2(sinSigma * sinA1, cosU1 * cosSigma - sinU1 * sinSigma * cosA1),
-    C = (f / 16) * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha)),
-    L =
-      lambda -
-      (1 - C) * f * sinAlpha * (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)));
+  const i3 = integrate(k2, sigma1, sigma2)[1],
+    sbeta2 = ca0 * Math.sin(sigma2),
+    cbeta2 = Math.hypot(sa0, ca0 * Math.cos(sigma2)),
+    lambda = omega(sa0, sigma2) - omega(sa0, sigma1) - f * sa0 * i3;
   return {
-    longitude: wrapPi(lon1 + L),
-    latitude,
-    finalBearing: norm2pi(Math.atan2(sinAlpha, -x)),
+    longitude: wrapPi(lon1 + lambda),
+    latitude: Math.atan2(sbeta2, (1 - f) * cbeta2),
+    finalBearing: norm2pi(Math.atan2(sa0, ca0 * Math.cos(sigma2))),
   };
 }
+
 
 /** An ECEF camera pose looking at a geodetic target. */
 export interface OrbitPose {

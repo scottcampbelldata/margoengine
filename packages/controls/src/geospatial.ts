@@ -1,5 +1,5 @@
 // Geospatial camera: heading / pitch / range orbit about a geodetic point on the WGS84 globe, with cursor zoom, flights
-// and a terrain-clearance floor. The geodesy is @margoengine/math/geo (NIMA TR8350.2, Vincenty 1975, Karney 2013).
+// and a terrain-clearance floor. The geodesy is @margoengine/math/geo (NIMA TR8350.2, Karney 2013).
 import type { Camera, EngineKernel } from '@margoengine/core';
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
 import { MargoError } from '@margoengine/math/errors';
