@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19168307,
+  "total": 19170099,
   "history": [
     {
       "date": "2026-10-24",
@@ -12483,6 +12483,12 @@
       "commit": "93bf3f2435",
       "reason": "ATMO-09 adds @margoengine/weather/surface-energy at 3360 B gzip, budget 3616 B. The implicit temperature, water storage and dead-fuel update share one coupled step. Keeping the solver as a separate weather entry leaves the weather root, core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "a1c723996a",
+      "reason": "PA-83: physical steering mass, medium-relative drag and turning constraints; steering 3871 to 4736 B gzip, root 8891 to 9791 B gzip; a split duplicates the integration path or adds another required import",
+      "grew": 2
     }
   ],
   "items": {
@@ -12536,7 +12542,7 @@
     "@margoengine/audio/voices": 2373,
     "@margoengine/audio/wav": 2206,
     "@margoengine/audio/zones": 1395,
-    "@margoengine/behavior": 9158,
+    "@margoengine/behavior": 10085,
     "@margoengine/behavior/context": 1658,
     "@margoengine/behavior/eqs": 2221,
     "@margoengine/behavior/flowfield": 2656,
@@ -12546,7 +12552,7 @@
     "@margoengine/behavior/inspect": 1858,
     "@margoengine/behavior/perception": 3773,
     "@margoengine/behavior/smart-objects": 2029,
-    "@margoengine/behavior/steering": 4127,
+    "@margoengine/behavior/steering": 4992,
     "@margoengine/behavior/subtrees": 5463,
     "@margoengine/behavior/text": 4007,
     "@margoengine/behavior/triggers": 1862,

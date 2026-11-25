@@ -4,8 +4,9 @@
 // into `out`; `Steering` blends them by weight inside priority groups, and `integrate` applies the result. Agents are
 // structural, so a navmesh `CrowdAgent`, an ECS row view or a plain object all fit.
 import type { MutableVec3, Vec3 } from '@margoengine/math';
+import { pointMotion, pointVelocity, type SteeringMotion } from '../../shared/point-motion.js';
 
-export type { MutableVec3, Vec3 };
+export type { MutableVec3, SteeringMotion, Vec3 };
 
 /** Anything that steers: a position, a velocity and a top speed. A navmesh `CrowdAgent` fits as it is. */
 export interface SteeringAgent {
@@ -15,8 +16,10 @@ export interface SteeringAgent {
   readonly velocity: ArrayLike<number> & { [index: number]: number };
   /** Top speed, units per second. */
   maxSpeed: number;
-  /** Largest steering force (default unlimited). */
+  /** Largest steering force, N (default unlimited). */
   maxForce?: number;
+  /** Optional mass, medium drag and turning limits for {@link integrate}. */
+  locomotion?: SteeringMotion;
 }
 
 /** A moving body another agent reacts to (pursue, evade, flocking neighbours). */
@@ -600,7 +603,9 @@ function truncate(v: MutableVec3, limit: number): MutableVec3 {
 
 /**
  * Apply a steering force for `delta` seconds (semi-implicit Euler): velocity += force * delta, clamped to `maxSpeed`
- * (and the force to `maxForce`), then position += velocity * delta. Writes the agent's own arrays.
+ * (and the force to `maxForce`), then position += velocity * delta. When `locomotion` is supplied, acceleration is force
+ * divided by mass and velocity is damped by quadratic drag in the fluid frame. The speed cap and turning limits also
+ * apply in that frame. Writes the agent's own arrays.
  */
 export function integrate(agent: SteeringAgent, force: Vec3, delta: number): void {
   const max = speed(agent);
@@ -609,6 +614,16 @@ export function integrate(agent: SteeringAgent, force: Vec3, delta: number): voi
   const f = truncate([force[0], force[1], force[2]], agent.maxForce ?? Number.POSITIVE_INFINITY),
     v = agent.velocity,
     p = agent.position;
+  if (agent.locomotion !== undefined) {
+    const next = pointVelocity(v, f, delta, pointMotion(agent.locomotion), max, [0, 0, 0]);
+    v[0] = next[0];
+    v[1] = next[1];
+    v[2] = next[2];
+    p[0] += next[0] * delta;
+    p[1] += next[1] * delta;
+    p[2] += next[2] * delta;
+    return;
+  }
   v[0] += f[0] * delta;
   v[1] += f[1] * delta;
   v[2] += f[2] * delta;
@@ -648,8 +663,10 @@ export interface FlockOptions {
   cohesion?: number;
   /** Top speed (default 3). */
   maxSpeed?: number;
-  /** Largest steering force (default 6). */
+  /** Largest steering force, N (default 6). */
   maxForce?: number;
+  /** Optional common mass, medium drag and turning limits for the flock. */
+  locomotion?: SteeringMotion;
 }
 
 /**
@@ -665,7 +682,8 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
     wa = positive(options.alignment ?? 1, 'Flock alignment weight', true),
     wc = positive(options.cohesion ?? 1, 'Flock cohesion weight', true),
     max = positive(options.maxSpeed ?? 3, 'Flock maxSpeed', true),
-    maxForce = positive(options.maxForce ?? 6, 'Flock maxForce', true);
+    maxForce = positive(options.maxForce ?? 6, 'Flock maxForce', true),
+    motion = options.locomotion === undefined ? undefined : pointMotion(options.locomotion);
   positive(delta, 'Flock delta', true);
   if (!Number.isInteger(count) || count < 0) throw new RangeError('Flock count must be a whole number of 0 or more');
   const { x, y, z, vx, vy, vz } = arrays ?? ({} as FlockArrays);
@@ -693,6 +711,10 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
   const steer = (dx: number, dy: number, dz: number, i: number): [number, number, number] => {
     const l = Math.hypot(dx, dy, dz);
     if (l < 1e-12) return [0, 0, 0];
+    if (motion) {
+      const [fx, fy, fz] = motion.fluidVelocity;
+      return [(dx / l) * max + fx - vx[i], (dy / l) * max + fy - vy[i], (dz / l) * max + fz - vz[i]];
+    }
     return [(dx / l) * max - vx[i], (dy / l) * max - vy[i], (dz / l) * max - vz[i]];
   };
   for (let i = 0; i < count; i++) {
@@ -761,6 +783,27 @@ export function flock(arrays: FlockArrays, count: number, options: FlockOptions 
     forces[i * 3] = f[0];
     forces[i * 3 + 1] = f[1];
     forces[i * 3 + 2] = f[2];
+  }
+  if (motion) {
+    // Compute the whole flock's next velocities before writing any rows, including when a setting is out of range.
+    const previous: MutableVec3 = [0, 0, 0],
+      force: MutableVec3 = [0, 0, 0],
+      next: MutableVec3 = [0, 0, 0];
+    for (let i = 0; i < count; i++) {
+      set(previous, vx[i], vy[i], vz[i]);
+      set(force, forces[i * 3], forces[i * 3 + 1], forces[i * 3 + 2]);
+      pointVelocity(previous, force, delta, motion, max, next);
+      forces.set(next, i * 3);
+    }
+    for (let i = 0; i < count; i++) {
+      vx[i] = forces[i * 3];
+      vy[i] = forces[i * 3 + 1];
+      vz[i] = forces[i * 3 + 2];
+      x[i] += vx[i] * delta;
+      y[i] += vy[i] * delta;
+      z[i] += vz[i] * delta;
+    }
+    return;
   }
   for (let i = 0; i < count; i++) {
     let ux = vx[i] + forces[i * 3] * delta,

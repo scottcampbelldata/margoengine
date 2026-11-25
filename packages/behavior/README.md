@@ -191,6 +191,26 @@ for (let i = 0; i < 200; i++) boid.add(world.create(), { x: (i % 20) * 0.8, z: M
 flock(boid.fields, boid.size, { radius: 2, maxSpeed: 4 }, 1 / 60);
 ```
 
+
+Set `locomotion` on an agent or in the flock options to use inertial mass and medium-relative drag. `mass` is in kg
+and defaults to 1. `dragFactor` defaults to 0 and is half the density times the drag coefficient and reference area
+in kg/m. `fluidVelocity` is the current or wind in m/s and defaults to `[0, 0, 0]`. The speed cap then applies
+relative to the medium. `maxLateralAcceleration` is optional in m/s² and defaults to unlimited. `minimumTurnRadius`
+is optional in metres and defaults to 0. The tighter turning limit applies to acceleration perpendicular to movement.
+
+```ts
+import { integrate } from 'margoengine/behavior/steering';
+
+const swimmer = {
+  position: [0, 0, 0], velocity: [0.6, 0, 0], maxSpeed: 1.2, maxForce: 0.5,
+  locomotion: {
+    mass: 0.25, dragFactor: 0.1, fluidVelocity: [0.15, 0, 0] as const,
+    maxLateralAcceleration: 1.4, minimumTurnRadius: 0.25,
+  },
+};
+integrate(swimmer, [0.1, 0, 0.2], 1 / 60);
+```
+
 With `@margoengine/navmesh`: a `CrowdAgent` is a steering agent as it is (`position`, `velocity`, `maxSpeed`), the
 crowd's `agents` are valid neighbours, and a route from `navMesh.path(start, end)` is a valid `followPath` path. The
 crowd itself steers its agents to their targets with ORCA avoidance; use these behaviours for agents the crowd does

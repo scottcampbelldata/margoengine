@@ -322,3 +322,38 @@ test('obstacle avoidance push follows Buckland 2005: zero at a grazing path, lar
   const s = a.maxSpeed ?? 2;
   assert.ok(Math.abs(push(0, 0) - 2 * Math.max(s, 1e-6)) < 1e-9, `${push(0, 0)}`);
 });
+
+test('physical steering uses inertial mass and obeys the tighter lateral or turn-radius limit', () => {
+  const fish = {
+    ...agent([0, 0, 0], [1, 0, 0], 10),
+    locomotion: { mass: 2, maxLateralAcceleration: 0.25, minimumTurnRadius: 8 },
+  };
+  integrate(fish, [4, 2, 0], 0.5);
+  assert.deepEqual(fish.velocity, [2, 0.0625, 0], 'forward F/m and a turn limited by speed² / radius');
+  assert.deepEqual(fish.position, [1, 0.03125, 0]);
+  fish.velocity = [4, 0, 0];
+  integrate(fish, [0, 4, 0], 0.5);
+  assert.deepEqual(fish.velocity, [4, 0.125, 0], 'at higher speed the acceleration cap is tighter');
+});
+
+test('quadratic drag decelerates relative to flowing water with the analytic speed law', () => {
+  const fish = {
+    ...agent([0, 0, 0], [5, 0, 0], 10),
+    locomotion: { mass: 2, dragFactor: 0.5, fluidVelocity: [1, 0, 0] },
+  };
+  const ticks = 60;
+  for (let i = 0; i < ticks; i++) integrate(fish, [0, 0, 0], 1 / ticks);
+  // The initial relative speed is 4 m/s. After one second, u = 4 / (1 + (0.5/2) * 4 * 1).
+  near(fish.velocity[0], 3, ticks * 8 * Number.EPSILON);
+  assert.deepEqual(fish.velocity.slice(1), [0, 0]);
+});
+
+test('packed flock rows use physical drag and reject an invalid common mass before movement', () => {
+  const rows = { x: [0, 10], y: [0, 0], z: [0, 0], vx: [3, 1], vy: [0, 0], vz: [0, 0] };
+  const start = structuredClone(rows);
+  assert.throws(() => flock(rows, 2, { locomotion: { mass: 0 } }, 1), /mass/);
+  assert.deepEqual(rows, start);
+  flock(rows, 2, { maxSpeed: 10, locomotion: { mass: 2, dragFactor: 1, fluidVelocity: [1, 0, 0] } }, 1);
+  assert.deepEqual(rows.vx, [2, 1]);
+  assert.deepEqual(rows.x, [2, 11]);
+});

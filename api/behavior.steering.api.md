@@ -44,6 +44,7 @@ export interface FlockOptions {
     cohesion?: number;
     maxSpeed?: number;
     maxForce?: number;
+    locomotion?: SteeringMotion;
 }
 
 export interface Mover {
@@ -77,6 +78,7 @@ export interface SteeringAgent {
     };
     maxSpeed: number;
     maxForce?: number;
+    locomotion?: SteeringMotion;
 }
 
 export type SteeringBehavior<A extends SteeringAgent = SteeringAgent> = (agent: A, out: MutableVec3) => void;
@@ -84,6 +86,14 @@ export type SteeringBehavior<A extends SteeringAgent = SteeringAgent> = (agent: 
 export interface SteeringEntry {
     weight?: number;
     priority?: number;
+}
+
+export interface SteeringMotion {
+  readonly mass?: number;
+  readonly dragFactor?: number;
+  readonly fluidVelocity?: Vec3;
+  readonly maxLateralAcceleration?: number;
+  readonly minimumTurnRadius?: number;
 }
 
 export interface SteeringObstacle {
