@@ -12333,6 +12333,12 @@
       "commit": "lane-A",
       "reason": "post/ssr takes only the cone level WGSL from shared/reflection-cone.js (margoConeTangent, margoConeLevel), not the planar capture functions it never calls (margoCaptureRay, margoNearestDepth): budget 15,453 -> 15,069 B",
       "grew": 0
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-A",
+      "reason": "Correction to the 04c936b47f row (ed38289bec): post/image, post/blur and post/material-decals measure about 13,992, 8,283 and 10,026 B against about 13,578, 8,009 and 9,697 B when their old budgets were set (budget = measured + 3%), so they grew about +414, +274 and +329 B, not +7, +27 and +38. Most of it is 0b961a9441 (KB-POST-ALPHARIM1): shared/display.js straightDisplay and displayFor, which Bloom (bundled into post/image), Blur and MaterialDecals call to keep a premultiplied canvas free of a light rim, so the bytes are needed; it fitted inside the 3% headroom until a7ab55ea49 added its message bytes. Budgets unchanged.",
+      "grew": 0
     }
   ],
   "items": {
