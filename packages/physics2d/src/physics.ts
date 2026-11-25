@@ -203,7 +203,9 @@ const NONE = 0xffffffff;
 // The kernel `Physics2D.load` loaded, shared by every world of the app. Calls during a load share it; the download is
 // cancelled when every call waiting on it has been aborted.
 const solver = new SharedLoad<Kernel, { wasm?: KernelWasmSource; simd?: boolean }>(({ wasm, simd }, signal) =>
-  import('./kernel.js').then((chunk) => chunk.startKernel(wasm ?? chunk.defaultWasm(!(simd ?? chunk.hasSimd())), signal)),
+  import('./kernel.js').then((chunk) =>
+    chunk.startKernel(wasm ?? chunk.defaultWasm(!(simd ?? chunk.hasSimd())), signal),
+  ),
 );
 
 const BODY_KIND: Record<BodyType2D, number> = { dynamic: 0, fixed: 1, kinematicPosition: 2, kinematicVelocity: 2 };
