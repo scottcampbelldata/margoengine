@@ -126,10 +126,35 @@ pub struct Moving {
     pub angular: V3,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+std::thread_local! {
+    /// The work bodies that take no push but move, kinematic ones, have done on what they are solved against, in joules, over
+    /// this thread's steps: the energy a scene may gain that no force inside it made. Native only, for the tests; the Wasm
+    /// build has none of it.
+    pub static DRIVEN: core::cell::Cell<f64> = const { core::cell::Cell::new(0.0) };
+    /// Set while a joint's position bias is applied: a push that closes drift is no work a driver does, so DRIVEN leaves it
+    /// out, and energy it leaves behind shows as a gain.
+    pub(crate) static BIASED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+}
+
 impl Moving {
+    /// Counts the work of an impulse this body takes, `linear` and `angular` about its centre, when it takes no push: what it
+    /// takes, the bodies it is solved against take the other way, at its speed. Native only (DRIVEN).
+    #[cfg(not(target_arch = "wasm32"))]
+    #[inline(always)]
+    pub(crate) fn driven(&self, linear: V3, angular: V3) {
+        let i = &self.inertia;
+        if !BIASED.with(|b| b.get()) && self.mass.dot(self.mass) == 0.0 && i.xx == 0.0 && i.yy == 0.0 && i.zz == 0.0 && i.xy == 0.0 && i.xz == 0.0 && i.yz == 0.0 {
+            let work = -(linear.dot(self.linear) as f64 + angular.dot(self.angular) as f64);
+            DRIVEN.with(|d| d.set(d.get() + work));
+        }
+    }
+
     /// The change of an impulse `p` at the arm `r`.
     #[inline(always)]
     pub(crate) fn push(&mut self, p: V3, r: V3) {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.driven(p, r.cross(p));
         self.linear = self.linear.add(self.mass.mul(p));
         self.angular = self.angular.add(self.inertia.mul(r.cross(p)));
     }
@@ -479,6 +504,8 @@ impl World {
                 let twist = if share != 1.0 { twist * share } else { twist };
                 self.set_s(PAIR_TWIST, row, twist);
                 let turn = normal.scale(twist);
+                #[cfg(not(target_arch = "wasm32"))]
+                (body_a.driven(v3(0.0, 0.0, 0.0), turn.scale(-1.0)), body_b.driven(v3(0.0, 0.0, 0.0), turn));
                 body_a.angular = body_a.angular.sub(body_a.inertia.mul(turn));
                 body_b.angular = body_b.angular.add(body_b.inertia.mul(turn));
             }
@@ -720,6 +747,8 @@ impl World {
             let limit = friction * reach;
             let next_twist = if wanted > limit { limit } else if wanted < -limit { -limit } else { wanted };
             let delta = next_twist - held_twist;
+            #[cfg(not(target_arch = "wasm32"))]
+            (body_a.driven(v3(0.0, 0.0, 0.0), normal.scale(-delta)), body_b.driven(v3(0.0, 0.0, 0.0), normal.scale(delta)));
             body_a.angular = body_a.angular.sub(body_a.inertia.mul(normal.scale(delta)));
             body_b.angular = body_b.angular.add(body_b.inertia.mul(normal.scale(delta)));
             self.set_s(PAIR_TWIST, row, next_twist);

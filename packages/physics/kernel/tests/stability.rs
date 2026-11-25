@@ -31,6 +31,26 @@ fn speed(w: &World, body: u32) -> f32 {
     let v = w.v(LINEAR_X, body as usize);
     sqrt(v.dot(v))
 }
+/// A dynamic body's energy: its motion and its height in the world's gravity.
+fn energy(w: &World, body: usize) -> f64 {
+    if w.flags(body) & KIND != DYNAMIC {
+        return 0.0;
+    }
+    let mass = 1.0 / w.s(INVERSE_MASS, body) as f64;
+    let (v, spin) = (w.v(LINEAR_X, body), w.v(ANGULAR_X, body));
+    let local = w.q(ROTATION_X, body).mul(w.q(INERTIA_FRAME_X, body)).conjugate().rotate(spin);
+    let turning = w.s(INERTIA_X, body) as f64 * (local.x as f64).powi(2)
+        + w.s(INERTIA_Y, body) as f64 * (local.y as f64).powi(2)
+        + w.s(INERTIA_Z, body) as f64 * (local.z as f64).powi(2);
+    let g = w.header().gravity;
+    let p = w.v(POSITION_X, body);
+    let height = -(g[0] as f64 * p.x as f64 + g[1] as f64 * p.y as f64 + g[2] as f64 * p.z as f64) * w.s(GRAVITY_SCALE, body) as f64;
+    0.5 * mass * v.dot(v) as f64 + 0.5 * turning + mass * height
+}
+/// What kinematic bodies have done on the bodies they are solved against, in joules, over this thread's steps.
+fn driven() -> f64 {
+    margoengine_physics_kernel::solver::DRIVEN.with(|d| d.get())
+}
 fn no_gravity(w: &mut World) {
     w.header_mut().gravity = [0.0, 0.0, 0.0];
 }
@@ -167,6 +187,25 @@ fn a_stretched_joint_does_not_jump_a_body_past_a_wall() {
 /// spun and the widest any joint stood open after a step, across its slide for a slider, each not a number once a value
 /// stopped being one.
 fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
+    let run = web_run(seed, steps, 1, None);
+    (run.top, run.spin, run.open)
+}
+
+/// What one run of `web_run` saw.
+struct Web {
+    top: f32,
+    spin: f32,
+    open: f32,
+    /// The most the bodies' energy stood above what they started with, the test's own moves and the kinematic bodies' work
+    /// gave them, in joules: energy no force in the scene made.
+    gain: f64,
+    /// The kinematic bodies' work over the run, in joules.
+    work: f64,
+}
+
+/// `web` at `substeps`, keeping only some of its bodies and the joints between them when `keep` names them: the bodies by
+/// index, the joints by the order the scene makes them. The rest are left out of the run, far off and still.
+fn web_run(seed: u32, steps: u32, substeps: u32, keep: Option<(&[u32], &[usize])>) -> Web {
     let mut state = seed;
     let mut next = move || {
         state ^= state << 13;
@@ -194,6 +233,7 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
         w.touch_body(body);
         rows.push(body);
     }
+    let mut created = 0usize;
     for i in 0..24usize {
         let a = rows[(next() % 48) as usize];
         let b = rows[(next() % 48) as usize];
@@ -203,6 +243,10 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
         let flags = [LINEAR, HINGE, JOINT_LOCK * 6 | TURNS, LINEAR | TURNS][i % 4];
         let flags = if i % 4 == 1 { flags | JOINT_LIMIT << 3 } else { flags };
         let on_a = v3(((next() % 2049) as i32 - 1024) as f32 / 1024.0, ((next() % 2049) as i32 - 1024) as f32 / 1024.0, 0.0);
+        created += 1;
+        if keep.is_some_and(|(_, joints)| !joints.contains(&(created - 1))) {
+            continue;
+        }
         let row = joint(&mut w, a, b, flags, on_a, v3(0.0, 0.0, 0.0)) as usize;
         joints.push(row);
         if i % 4 == 1 {
@@ -210,17 +254,35 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
             w.set_s(JOINT_MAX_3, row, 1.0);
         }
     }
-    w.header_mut().substeps = 1;
+    w.header_mut().substeps = substeps;
+    if let Some((bodies, _)) = keep {
+        for &row in &rows {
+            if !bodies.contains(&row) {
+                w.set_v(POSITION_X, row as usize, v3(1000.0 + 10.0 * row as f32, 1000.0, 0.0));
+                w.set_v(TARGET_X, row as usize, v3(1000.0 + 10.0 * row as f32, 1000.0, 0.0));
+                w.set_v(LINEAR_X, row as usize, v3(0.0, 0.0, 0.0));
+                w.set_v(ANGULAR_X, row as usize, v3(0.0, 0.0, 0.0));
+                w.touch_body(row);
+            }
+        }
+        rows.retain(|r| bodies.contains(r));
+    }
     let (mut top, mut spin, mut open) = (0.0f32, 0.0f32, 0.0f32);
+    // The energy ledger: what the bodies hold, less what the test's own moves and the kinematic bodies gave them.
+    let total = |w: &World| rows.iter().map(|&r| energy(w, r as usize)).sum::<f64>();
+    let (start, work) = (total(&w), driven());
+    let (mut moved, mut gain) = (0.0f64, 0.0f64);
     for i in 0..steps {
         for &row in &rows {
             let at = row as usize;
             let p = w.v(POSITION_X, at);
             let out = |x: f32| x > 16.0 || x < -16.0;
             if out(p.x) || out(p.y) || out(p.z) {
+                let before = energy(&w, at);
                 w.set_v(POSITION_X, at, v3(p.x / 4.0, p.y / 4.0, p.z / 4.0));
                 w.set_v(LINEAR_X, at, v3(0.0, 0.0, 0.0));
                 w.touch_body(row);
+                moved += energy(&w, at) - before;
             }
             if w.flags(at) & KIND == KINEMATIC_POSITION {
                 let p = w.v(POSITION_X, at);
@@ -230,7 +292,9 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
                 w.set_s(TARGET_ROTATION_W, at, if turning { 0.8 } else { 1.0 });
             }
         }
+        let started: Vec<V3> = (0..64).map(|b| w.v(POSITION_X, b)).collect();
         w.step(DT);
+        gain = gain.max(total(&w) - start - moved - (driven() - work));
         for &row in &joints {
             let (a, b) = (w.uu(JOINT_A, row) as usize, w.uu(JOINT_B, row) as usize);
             let on = |body: usize, anchor: V3| w.v(POSITION_X, body).add(w.q(ROTATION_X, body).rotate(anchor));
@@ -239,7 +303,13 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
                 let slide = w.q(ROTATION_X, a).rotate(v3(1.0, 0.0, 0.0));
                 gap = gap.sub(slide.scale(slide.dot(gap)));
             }
-            let gap = sqrt(gap.dot(gap));
+            // Less what the two bodies travelled this step: a gap measured after the step stands on where the step took them,
+            // which is outside the cube for a body the scene's turns flung.
+            let travel = |body: usize| {
+                let d = w.v(POSITION_X, body).sub(started[body]);
+                sqrt(d.dot(d))
+            };
+            let gap = sqrt(gap.dot(gap)) - travel(a) - travel(b);
             if !(gap <= open) {
                 open = gap;
             }
@@ -256,22 +326,90 @@ fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
             }
         }
     }
-    (top, spin, open)
+    Web { top, spin, open, gain, work: driven() - work }
+}
+
+/// A kinematic body that turns 1.287 rad in one step, then holds, with a dynamic box held by `flags` from `r` m out along its
+/// x axis. Returns the box's speed at the end of the turning step.
+fn snapped(flags: u32, r: f32, substeps: u32) -> f32 {
+    let mut w = World::new(4, 4).unwrap();
+    no_gravity(&mut w);
+    w.header_mut().substeps = substeps;
+    let turner = w.add_body(KINEMATIC_POSITION).unwrap();
+    w.add_collider(turner, SHAPE_BOX, [0.5, 0.5, 0.5], [0.0; 3], [0.0, 0.0, 0.0, 1.0], 0.0).unwrap();
+    let held = w.add_body(DYNAMIC).unwrap();
+    w.add_collider(held, SHAPE_BOX, [0.5, 0.5, 0.5], [0.0; 3], [0.0, 0.0, 0.0, 1.0], 1.0).unwrap();
+    w.set_pose(held, v3(r, 0.0, 0.0), Q::IDENTITY, false);
+    joint(&mut w, turner, held, flags, v3(r, 0.0, 0.0), v3(0.0, 0.0, 0.0));
+    w.step(DT);
+    // A quarter turn's 0.6 and 0.8: 2 asin(0.6) = 1.287 rad about y in one step.
+    w.set_s(TARGET_ROTATION_Y, turner as usize, 0.6);
+    w.set_s(TARGET_ROTATION_W, turner as usize, 0.8);
+    w.step(DT);
+    speed(&w, held)
+}
+
+#[test]
+fn a_joint_does_not_turn_its_drift_into_speed() {
+    // A body held at its anchor moves with the anchor and no faster: w r, with w = 1.287 rad over a step. A locked row that
+    // measured its turn to the anchor on B and not to its own fed the gap the turn opens back as speed, w x gap, and the
+    // body left at 1.63 times its anchor's speed with one substep, 2.3 times a step later.
+    let w = 1.287_002_2 / DT;
+    for (name, flags) in [("spherical", LINEAR), ("revolute", HINGE), ("fixed", LINEAR | TURNS)] {
+        for r in [1.0f32, 4.0, 16.0] {
+            for n in [1u32, 8, 32, 128] {
+                let s = snapped(flags, r, n);
+                assert!((s - w * r).abs() < 1e-3 * w * r, "{name} at {r} m, {n} substeps: {s} m/s, its anchor {} m/s", w * r);
+            }
+        }
+    }
+    // A slider is a bead on a turning rod: r = r0 cosh(w t), so it ends the turn at r0 w sqrt(cosh 2 w t). That is work the
+    // turning body does, and the solve may only come short of it as its substeps grow coarse.
+    let theta = w * DT;
+    let bead = |r: f32| r * w * sqrt((2.0 * theta).cosh());
+    for r in [1.0f32, 4.0, 16.0] {
+        for (n, least) in [(1u32, 0.6f32), (8, 0.97), (32, 0.995), (128, 0.998)] {
+            let s = snapped(SLIDER, r, n);
+            assert!(s <= bead(r) * 1.001 && s >= bead(r) * least, "slider at {r} m, {n} substeps: {s} m/s, a bead {} m/s", bead(r));
+        }
+    }
 }
 
 #[test]
 fn a_web_of_joints_stays_in_the_numbers() {
     // Joints between bodies metres apart, with fixed ends, spinning ends and closed loops, none of it satisfiable. A body fixed
-    // to a kinematic turn of 1.29 rad a step at 30 m has a true speed of 2,300 m/s. What the joints remembered used to run
-    // this to not a number on most seeds.
+    // to a kinematic turn of 1.29 rad a step at 30 m has a true speed of 2,300 m/s, and one on a slider more: a bead on a rail
+    // runs out exponentially (a_bead_on_a_spinning_rail_is_refused_before_it_leaves_the_numbers), and one held where two rails
+    // cross runs out faster still as they close on parallel (a_web_of_joints_gains_no_more_than_its_kinematic_bodies_give_it).
+    // What the joints remembered used to run this to not a number on most seeds, and none may gain energy its kinematic
+    // bodies did not give it.
     let (mut worst, mut widest) = (0.0f32, 0.0f32);
     for seed in 1..=60 {
-        let (top, _, open) = web(seed, 2000);
-        assert!(top < 1e5, "seed {seed} reached {top} m/s");
-        worst = worst.max(top);
-        widest = widest.max(open);
+        let run = web_run(seed, 2000, 1, None);
+        assert!(run.top < 1e5, "seed {seed} reached {} m/s", run.top);
+        assert!(run.gain <= 1e-6 * run.work, "seed {seed} gained {} J over the {} J its kinematic bodies did", run.gain, run.work);
+        worst = worst.max(run.top);
+        widest = widest.max(run.open);
     }
     println!("fastest in the webs: {worst:.0} m/s, widest joint: {widest:.2} m");
+}
+
+#[test]
+fn a_web_of_joints_gains_no_more_than_its_kinematic_bodies_give_it() {
+    // Seed 1's knot: bodies 11 and 30 on sliders from a kinematicVelocity body and from a kinematicPosition body that turns
+    // 1.287 rad in a step, with a spherical joint between them. Held where the two rails cross, with one turning, the pair
+    // runs out along them faster each substep as they close on parallel, 1.5 times a substep at 8 substeps and 1.2 million
+    // m/s at 128. That is the geometry and not the solve: each relaxing pass that sped the pair up took more work from the
+    // turning body than the energy it added (2.3e8 J of kinetic energy for 3.6e8 J of work at the fastest step). The energy
+    // counts the motion, the height and the test's own moves back into its cube, and the work is every joint and contact
+    // impulse a kinematic body hands on, at the point it hands it on; a joint's position bias is no work, so energy it leaves
+    // shows. The bound is loose: a kinematic body's catch is inelastic and its work counts in full, three times the energy a
+    // box keeps in a_joint_does_not_turn_its_drift_into_speed, which is where the tight figures are.
+    for substeps in [1, 8, 32, 128] {
+        let run = web_run(1, 2000, substeps, Some((&[11, 30, 47, 21], &[0, 18, 21])));
+        println!("{substeps} substeps: fastest {:.0} m/s, {:.3e} J over the kinematic bodies' {:.3e} J", run.top, run.gain, run.work);
+        assert!(run.work > 0.0 && run.gain <= 1e-6 * run.work, "{substeps} substeps: {} J over the kinematic bodies' {} J", run.gain, run.work);
+    }
 }
 
 #[test]
@@ -282,7 +420,9 @@ fn a_path_with_more_locks_than_freedoms_drops_the_row_that_depends() {
     // gave 14,424 m/s at step 335 and 4,782,492 rad/s at step 336, and a joint stood 232 m open. Seed 35: 15 rows on 12
     // freedoms, 370,728 rad/s at step 577. The scene's kinematic turns carry an arm of 0.125 m at about 18,400 rad/s, and it
     // puts every body back inside a 32 m cube each step with anchors at most 1.42 m off a centre, so a joint opened wider than
-    // 56.85 m was opened by the solve.
+    // 56.85 m and what its two bodies travelled in the step was opened by the solve. A body the scene flings travels that far
+    // itself: seed 1's slider from a kinematicPosition body turning 77 rad/s carried body 30 at 2,670 m/s, 35 m out, and it
+    // stood 97 m from the slider's line after the step, 44 m of it the step's own travel.
     for (seed, steps) in [(1, 400), (35, 600)] {
         let (top, spin, open) = web(seed, steps);
         println!("web {seed}: fastest {top:.0} m/s, top spin {spin:.0} rad/s, widest joint {open:.2} m");

@@ -135,6 +135,8 @@ impl Row {
     }
     #[inline(always)]
     fn push(&self, a: &mut Moving, b: &mut Moving, p: f32) {
+        #[cfg(not(target_arch = "wasm32"))]
+        (a.driven(self.d.scale(-p), self.ta.scale(-p)), b.driven(self.d.scale(p), self.tb.scale(p)));
         a.linear = a.linear.sub(a.mass.mul(self.d).scale(p));
         a.angular = a.angular.sub(a.inertia.mul(self.ta).scale(p));
         b.linear = b.linear.add(b.mass.mul(self.d).scale(p));
@@ -835,8 +837,19 @@ impl World {
         let (frame_a, frame_b) = (rotation_a.mul(self.q(JOINT_FRAME_A_X, row)), rotation_b.mul(self.q(JOINT_FRAME_B_X, row)));
         let axes = [frame_a.rotate(AXES[0]), frame_a.rotate(AXES[1]), frame_a.rotate(AXES[2])];
 
-        // Along an axis the arm on A runs to the anchor on B, so an axis that turns with A is measured right (a prismatic).
-        let reach = arm_a.add(gap);
+        // Along an axis the arm on A runs to where B may stand: out along the axes that leave the anchor free (a prismatic's
+        // slide), so an axis that turns with A is measured right, and not across the locked ones, where the gap is drift. Run
+        // to the anchor on B, a locked row's speed held B at its drift as A turned: a spin w on a gap g asked w x g of B
+        // each substep, and a gap of 0.8 m behind a kinematic body turning 77 rad/s gave a ball joint's body 1.6 times the
+        // speed of its anchor (`a_joint_does_not_turn_its_drift_into_speed`).
+        let rigid = flags / JOINT_LOCK & 7;
+        let mut slide = gap;
+        for k in 0..3 {
+            if rigid >> k & 1 != 0 {
+                slide = slide.sub(axes[k].scale(axes[k].dot(gap)));
+            }
+        }
+        let reach = arm_a.add(slide);
         let mut rows = [Row { d: AXES[0], ta: AXES[0], tb: AXES[0] }; 6];
         let mut at = [0.0; 6];
         for k in 0..3 {
@@ -1283,7 +1296,11 @@ impl World {
         if pass == Pass::Push {
             let asked = self.path_right(first, last, rate, most, true);
             let share = self.push_share(first, last, asked, h);
+            #[cfg(not(target_arch = "wasm32"))]
+            crate::solver::BIASED.with(|b| b.set(true));
             self.apply_path(first, last, share, false);
+            #[cfg(not(target_arch = "wasm32"))]
+            crate::solver::BIASED.with(|b| b.set(false));
         }
     }
 
