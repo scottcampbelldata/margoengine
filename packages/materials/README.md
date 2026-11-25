@@ -453,15 +453,16 @@ photo.dispose();
 
 ### Sort modes
 
-`setMaterialSortModes(engine, { opaque, transparent })` picks how an engine's material meshes are ordered, as
-PlayCanvas layers do. Each phase takes `'manual'` (`mesh.renderOrder` alone), `'front-to-back'` or `'back-to-front'` (by
+`setMaterialSortModes(engine, { opaque, transparent })` picks how an engine's material meshes are ordered.
+Each phase takes `'manual'` (`mesh.renderOrder` alone), `'front-to-back'` or `'back-to-front'` (by
 `renderOrder`, then squared distance from the camera to the mesh origin). Defaults: opaque `'manual'`, transparent
 `'back-to-front'`. It is live, per engine and not per layer mask.
 
 ```ts
+import { Engine } from '@margoengine/core';
 import { setMaterialSortModes } from '@margoengine/materials';
 
-declare const engine: import('@margoengine/core').Engine;
+const engine = await Engine.create(document.querySelector('canvas')!);
 setMaterialSortModes(engine, { opaque: 'front-to-back' }); // less overdraw on pixel-heavy scenes
 ```
 
