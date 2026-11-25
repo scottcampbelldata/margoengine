@@ -893,39 +893,52 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /**
-   * Puts the world at frame `frame` of a shot rendered at `fps` frames a second: it has then taken exactly
-   * `floor(frame / fps / fixedTimestep)` steps in all (a frame on a step boundary counts, to a part in 10^9), whatever calls
-   * brought it there, so a shot rendered at 24, 30 or 60 frames a second, or resumed from a restored snapshot, is the same
-   * simulation. The fraction of a step left over is the interpolation `alpha` the meshes are written at. Returns the steps
+   * Puts the world at frame `frame` of a shot rendered at `rate` frames a second: it has then taken exactly
+   * `floor(frame * stepsPerSecond / rate)` steps in all, worked out in integers, whatever calls brought it there, so a shot
+   * rendered at 24, 30 or 60 frames a second, at the 24000/1001 of broadcast film, or resumed from a restored snapshot, is the
+   * same simulation. The fraction of a step left over is the interpolation `alpha` the meshes are written at. Returns the steps
    * taken. A world already past that frame cannot go back and throws; restore a snapshot instead.
+   * @param rate Frames a second as a whole number (24) or the ratio `{num, den}` of two (`{num: 24000, den: 1001}`).
    * @throws MargoError code `state` when the world has taken more steps than that frame allows.
-   * @throws RangeError for a frame that is not a finite, non-negative whole number or an `fps` that is not above 0.
+   * @throws RangeError for a frame that is not a non-negative whole number, a rate that is not whole numbers above 0, or a
+   * `fixedTimestep` that is not one over a whole number of steps a second (film needs a step that divides the second).
    */
-  advance(frame: number, fps: number): number {
+  advance(frame: number, rate: number | { num: number; den: number }): number {
     if (this.disposed) return 0;
-    if (!(Number.isFinite(frame) && frame >= 0 && Number.isInteger(frame)))
+    const whole = (x: unknown, what: string): bigint => {
+      if (typeof x !== 'number' || !Number.isSafeInteger(x) || x < 0)
+        throw new RangeError(`${what} must be a non-negative whole number; got ${String(x)}.`);
+      return BigInt(x);
+    };
+    const num = whole(typeof rate === 'number' ? rate : rate?.num, 'The rate'),
+      den = whole(typeof rate === 'number' ? 1 : rate?.den, 'The rate');
+    if (num === 0n || den === 0n)
+      throw new RangeError('The rate must be above 0 frames a second. Pass 24, or {num: 24000, den: 1001}.');
+    const perSecond = 1 / this.fixedTimestep;
+    if (Math.abs(perSecond - Math.round(perSecond)) > 1e-9 * perSecond)
       throw new RangeError(
-        `frame must be a finite, non-negative whole number; got ${frame}. Pass the frame's number in the shot.`,
+        `fixedTimestep ${this.fixedTimestep} s is not one over a whole number of steps a second, so frames do not land on steps. Use 1/60, 1/120 or the like.`,
       );
-    if (!(Number.isFinite(fps) && fps > 0)) throw new RangeError(`fps must be a finite number above 0; got ${fps}.`);
-    const owed = (frame / fps / this.fixedTimestep) * (1 + 1e-9),
-      target = Math.floor(owed);
+    const steps = BigInt(Math.round(perSecond)),
+      owed = whole(frame, 'The frame') * den * steps,
+      target = Number(owed / num);
     if (this.stepCount > target)
       throw new MargoError(
         'state',
-        `Physics has taken ${this.stepCount} steps and frame ${frame} at ${fps} fps is step ${target}; a world cannot go back. Restore a snapshot from before the frame.`,
+        `Physics has taken ${this.stepCount} steps and frame ${frame} is step ${target}; a world cannot go back. Restore a snapshot from before the frame.`,
       );
-    let steps = 0;
+    let taken = 0;
     if (!this.paused) {
       while (this.stepCount < target) {
         this.step();
-        steps++;
+        taken++;
       }
-      this.accumulator = Math.max(0, owed - target) * this.fixedTimestep;
-      this.lastAlpha = this.interpolate ? Math.min(1, this.accumulator / this.fixedTimestep) : 1;
+      const left = Number(owed % num) / Number(num);
+      this.accumulator = left * this.fixedTimestep;
+      this.lastAlpha = this.interpolate ? left : 1;
     }
     this.sync();
-    return steps;
+    return taken;
   }
 
   /** Runs exactly one fixed step. Does not touch meshes; call `sync()` to write them. */

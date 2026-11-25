@@ -355,7 +355,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
   physics.dispose();
   ```
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
-- **Film mode and exact frames.** With `film: true`, `update` never drops time (a one-second hitch runs sixty steps), and `physics.advance(frame, fps)` puts the world at frame `frame` of a shot rendered at `fps`: exactly `floor(frame / fps / fixedTimestep)` steps in all, whatever frame rate or calls got it there, so a shot rendered at 24, 30 or 60 frames a second, or resumed after a restore, is the same simulation. A world already past the frame throws a `state` error: restore a snapshot instead.
+- **Film mode and exact frames.** With `film: true`, `update` never drops time (a one-second hitch runs sixty steps), and `physics.advance(frame, rate)` puts the world at frame `frame` of a shot rendered at `rate` frames a second, a whole number or the ratio `{num: 24000, den: 1001}`: exactly `floor(frame * stepsPerSecond / rate)` steps in all, worked out in integers, whatever frame rate or calls got it there, so a shot rendered at 24, 30, 60 or 24000/1001 frames a second, or resumed after a restore, is the same simulation (the `fixedTimestep` must be one over a whole number of steps a second). A world already past the frame throws a `state` error: restore a snapshot instead.
 
   ```ts
   import {Physics} from 'margoengine/physics';

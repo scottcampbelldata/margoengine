@@ -68,10 +68,32 @@ test('advance puts the world on the frame whatever calls got it there, and a wor
   );
   assert.throws(() => direct.advance(1.5, 30), RangeError);
   assert.throws(() => direct.advance(1, 0), RangeError);
+  assert.throws(() => direct.advance(1, 29.97), RangeError, 'a float rate is refused: pass {num: 30000, den: 1001}');
+  assert.throws(() => direct.advance(1, { num: 24000, den: 0 }), RangeError);
   // A frame between steps leaves its fraction for the interpolation.
   const fine = scene({ film: true });
   fine.advance(1, 24);
   assert.equal(fine.stepCount, 2, '1/24 s is 2.5 steps of 1/60 s');
   assert.ok(Math.abs(fine.alpha - 0.5) < 1e-6, `alpha ${fine.alpha}`);
   for (const physics of [direct, mixed, fine]) physics.dispose();
+});
+
+test('a rate of 24000/1001 lands exactly: a frame on a step boundary counts, one before it does not', async () => {
+  await Physics.load();
+  const rate = { num: 24000, den: 1001 };
+  // 400 frames of 1001/24000 s are 1001/60 s each... 400 * 1001 * 60 / 24000 = 1001 steps, exactly.
+  const physics = scene({ film: true });
+  assert.equal(physics.advance(399, rate), 998, 'frame 399 is 998.9 steps: 998');
+  assert.equal(physics.advance(400, rate), 3, 'frame 400 is exactly 1001 steps');
+  assert.equal(physics.stepCount, 1001);
+  assert.equal(physics.alpha, 0, 'nothing is left over on the boundary');
+  // The same by single frames from the start, and by one call: the same bits.
+  const frames = scene({ film: true });
+  for (let frame = 1; frame <= 400; frame++) frames.advance(frame, rate);
+  assert.equal(frames.stepCount, 1001);
+  assert.equal(frames.kernel.hash, physics.kernel.hash);
+  // A step that does not divide the second cannot be advanced to a frame.
+  const odd = scene({ film: true, fixedTimestep: 0.0123 });
+  assert.throws(() => odd.advance(1, 24), RangeError);
+  for (const world of [physics, frames, odd]) world.dispose();
 });

@@ -1138,7 +1138,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     setup(engine: EngineKernel): void;
     onPreUpdate(delta: number): void;
     update(delta: number): number;
-    advance(frame: number, fps: number): number;
+    advance(frame: number, rate: number | {
+        num: number;
+        den: number;
+    }): number;
     step(): void;
     detectCollisions(): void;
     get quarantined(): readonly PhysicsBody[];
