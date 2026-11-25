@@ -441,6 +441,10 @@
       "status": "exempt",
       "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
     },
+    "headless:AccumulateTarget.texture": {
+      "status": "exempt",
+      "reason": "an output the Accumulate stage makes and headless reads back (the running mean), never a caller input"
+    },
     "html:HTMLSurface.texture": {
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
@@ -726,6 +730,22 @@
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
     "scatter:OrderedCull.flags": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "scatter:ScatterVelocityParts.commands": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "scatter:ScatterVelocityParts.indices": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "scatter:ScatterVelocityParts.instances": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "scatter:ScatterVelocityParts.vertices": {
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
