@@ -1,6 +1,7 @@
 // Ramp, Grid, DepthView and TextureOverlay: one composite pass each. Every effect computes a colour layer; the shared
 // shader blends it over the frame (W3C Compositing and Blending Level 1) with an opacity and an optional mask.
 import type { EngineKernel } from '@margoengine/core';
+import { hexColor } from '@margoengine/math/color';
 import type { StageOutput } from '../../shared/stack.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { copyExternal } from '../../shared/copy-external.js';
@@ -43,10 +44,10 @@ export interface OverlayOptions {
   enabled?: boolean;
 }
 
-const hex = /^#([0-9a-f]{3}){1,2}$/i;
+/** '#rgb' or '#rrggbb' (math/color's one hex parser, without the alpha form). */
+const isHex = (color: string) => color.length <= 7 && hexColor(color) !== undefined;
 function rgb(color: string): [number, number, number] {
-  const n = parseInt((color.length === 4 ? color.replace(/[^#]/g, '$&$&') : color).slice(1), 16);
-  return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  return hexColor(color)!.slice(0, 3) as [number, number, number];
 }
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const within = (v: unknown, min: number, max: number) => finite(v) && v >= min && v <= max;
@@ -267,7 +268,7 @@ export class Ramp extends OverlayEffect<RampOptions> {
     for (let i = 0; i < stops.length; i++) {
       const s = stops[i];
       need(within(s?.at, i ? stops[i - 1].at : 0, 1), 'Use Ramp stop positions from 0 to 1 in rising order');
-      need(typeof s.color === 'string' && hex.test(s.color), "Use a Ramp stop color as '#rgb' or '#rrggbb'");
+      need(typeof s.color === 'string' && isHex(s.color), "Use a Ramp stop color as '#rgb' or '#rrggbb'");
       need(s.alpha === undefined || within(s.alpha, 0, 1), 'Use a Ramp stop alpha from 0 to 1');
     }
     need(o.start === undefined || pair(o.start), 'Use Ramp start as [x, y] finite numbers');
@@ -360,7 +361,7 @@ export class Grid extends OverlayEffect<GridOptions> {
       'Use Grid lineWidth above 0 up to 4096',
     );
     need(
-      o.color === undefined || (typeof o.color === 'string' && hex.test(o.color)),
+      o.color === undefined || (typeof o.color === 'string' && isHex(o.color)),
       "Use Grid color as '#rgb' or '#rrggbb'",
     );
     need(o.offset === undefined || pair(o.offset), 'Use Grid offset as [x, y] finite numbers');

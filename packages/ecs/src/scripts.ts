@@ -1,4 +1,5 @@
 import { MargoError } from "@margoengine/math/errors";
+import { hexColor } from "@margoengine/math/color";
 import type { Entity, World } from "./index.js";
 import type { Schedule } from "./schedule.js";
 
@@ -134,12 +135,8 @@ const HOOKS = [
   "destroy",
   "swap",
 ] as const;
-const hex = (s: string): number[] | undefined => {
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s);
-  if (!m) return undefined;
-  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
-  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).concat(1);
-};
+/** [r, g, b, 1] of '#rgb' or '#rrggbb' (math/color's one hex parser, without the alpha form). */
+const hex = (s: string): number[] | undefined => (s.length <= 7 ? hexColor(s) : undefined);
 const bad = (name: string, spec: { type: string }, why: string): RangeError =>
   new RangeError(`Invalid ${spec.type} attribute ${name}: ${why}`);
 
@@ -261,7 +258,7 @@ export function defineScript(def: ScriptDefinition): ScriptType {
   for (const hook of HOOKS) {
     if (def[hook] === undefined) continue;
     if (typeof def[hook] !== "function")
-      throw new TypeError(`Script ${def.name} hook ${hook} is not a function`);
+      throw new TypeError(`Script ${def.name} hook ${hook} is not a function; pass a function or leave the hook out`);
     type[hook] = def[hook];
   }
   return Object.freeze(type) as unknown as ScriptType;

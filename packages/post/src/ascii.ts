@@ -1,4 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
+import { hexColor } from '@margoengine/math/color';
 import type { StageOutput } from '../../shared/stack.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
@@ -36,13 +37,10 @@ export interface ASCIIOptions {
 const RAMP = ' .:-+=*%#@',
   EDGES = '|/-\\',
   CELL = [12, 16] as const,
-  hex = /^#([0-9a-f]{3}){1,2}$/i;
+  /** '#rgb' or '#rrggbb' (math/color's one hex parser, without the alpha form). */
+  isHex = (value: string) => value.length <= 7 && hexColor(value) !== undefined;
 /** [r, g, b, 0] of a hex colour, or [0, 0, 0, 1] for 'scene'. */
-const paint = (value: string): number[] => {
-  if (value === 'scene') return [0, 0, 0, 1];
-  const long = value.length === 4 ? value.replace(/[^#]/g, '$&$&') : value;
-  return [1, 3, 5].map((i) => parseInt(long.slice(i, i + 2), 16) / 255).concat(0);
-};
+const paint = (value: string): number[] => (value === 'scene' ? [0, 0, 0, 1] : [...hexColor(value)!.slice(0, 3), 0]);
 const head = `${fullscreen}
 @group(0) @binding(0) var scene:texture_2d<f32>;
 @group(0) @binding(1) var<uniform> u:array<vec4f,4>;`;
@@ -125,7 +123,7 @@ export class ASCII extends ScreenEffect {
     if (o.fontSize !== undefined && !(Number.isFinite(o.fontSize) && o.fontSize > 0 && o.fontSize <= 256))
       throw new RangeError('Use ASCII fontSize above 0 up to 256');
     for (const key of ['color', 'background'] as const)
-      if (o[key] !== undefined && o[key] !== 'scene' && !hex.test(o[key]!))
+      if (o[key] !== undefined && o[key] !== 'scene' && !isHex(o[key]!))
         throw new RangeError(`Use ASCII ${key} as 'scene', '#rgb' or '#rrggbb'`);
     for (const key of ['intensity', 'edgeThreshold'] as const)
       if (o[key] !== undefined && !(Number.isFinite(o[key]) && o[key]! >= 0 && o[key]! <= 1))
