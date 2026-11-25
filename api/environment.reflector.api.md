@@ -111,7 +111,12 @@ export class Reflector extends PlanarSurface {
 
 export type ReflectorOptions = PlanarOptions;
 
-export function reflectionConeLevel(roughness: number, distance: number, pixelsPerUnit: number, maxLevel: number): number;
+export function reflectionConeLevel(
+  roughness: number,
+  distance: number,
+  pixelsPerUnit: number,
+  maxLevel: number,
+): number;
 
 export function reflectionConeTangent(roughness: number): number;
 
