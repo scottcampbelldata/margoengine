@@ -243,6 +243,20 @@ Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/math
 
+## Film clock
+
+`@margoengine/math/clock` has `FilmClock`, the time every physics solver steps on: a frame number (and a fraction of a frame for a motion-blur sub-frame) over a rational frame rate, with `ticks(rate)`, the whole ticks of `rate` a second up to that time, computed in integers. A float sum of frame times drifts (1001/24000 added 24,000 times is not 1,001), so two solvers, or one shot rendered at 24 and at 60 fps, would disagree about how many steps have run; with the clock a tick count is a function of the frame and the rate alone. A seek is an assignment (`clock.frame = n`, or `clock.at(n, {num, den})` for a sub-frame), `alpha(rate)` is how far the frame lies between its two ticks (for drawing between them), and `time` is the seconds as a double for display and uniforms. Solver rates are the dyadic `solverRate(k)` = 60 * 2^k Hz (k from 0 to 7), so coupled solvers always meet on a shared tick. Rates and offsets are whole numbers below 2^31; a tick count past the safe integers throws a `RangeError` rather than round.
+
+```ts
+import {FilmClock, solverRate} from 'margoengine/math/clock';
+
+const clock = new FilmClock({fps: {num: 24000, den: 1001}}); // 23.976 fps
+clock.frame = 24000;                       // 1,001 seconds in
+console.log(clock.ticks(solverRate(1)));   // 120120 ticks of 1/120 s, none lost
+clock.at(10, {num: 1, den: 2});            // a sub-frame half-way through frame 10
+console.log(clock.alpha(120));             // how far it is between two ticks of 1/120 s
+```
+
 ## Speed
 
 Every class here assigns its fields in the constructor and declares none before it (`useDefineForClassFields: false`). A number field declared first would start as `undefined`, and V8 would then allocate on each write of a fraction: 10,000 `quaternion.setFromEuler(euler)` calls took 0.29 ms this way and 0.48 ms before on the machine that measured it (a one-off measurement; no benchmark script in the repository repeats it), so reuse one `Euler` and one `Quaternion` in a loop:

@@ -171,6 +171,10 @@
     "./gravity": {
       "types": "./dist/gravity.d.ts",
       "import": "./dist/gravity.js"
+    },
+    "./clock": {
+      "types": "./dist/clock.d.ts",
+      "import": "./dist/clock.js"
     }
   },
   "files": [

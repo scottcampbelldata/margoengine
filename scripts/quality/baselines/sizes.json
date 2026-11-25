@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18671401,
+  "total": 18672430,
   "history": [
     {
       "date": "2026-10-24",
@@ -11883,6 +11883,12 @@
       "commit": "49fa63c26",
       "reason": "@margoengine/math/fields: new entry, 20 B gzip: the shared-field contracts of the physics framework (wind and any flow, follow targets) as types only, an empty module at run time.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "9eb122550",
+      "reason": "New optional math/clock entry: 0 to 773 B gzip, the film clock (exact frame time over a rational frame rate, integer solver ticks, dyadic solver rates). Pure, no imports; nothing to split.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12538,6 +12544,7 @@
     "@margoengine/math/billboard": 2974,
     "@margoengine/math/box3": 2581,
     "@margoengine/math/capsule": 4386,
+    "@margoengine/math/clock": 1029,
     "@margoengine/math/color": 3957,
     "@margoengine/math/color-space": 1099,
     "@margoengine/math/compat": 11593,
@@ -12545,9 +12552,9 @@
     "@margoengine/math/cylindrical": 554,
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
+    "@margoengine/math/fields": 276,
     "@margoengine/math/frustum": 2512,
     "@margoengine/math/geo": 2372,
-    "@margoengine/math/fields": 276,
     "@margoengine/math/gravity": 727,
     "@margoengine/math/line3": 2267,
     "@margoengine/math/mat4": 1934,
