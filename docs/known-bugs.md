@@ -831,11 +831,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** two faults of the cone's rotation drive. (1) The motor impulses a joint carries from one substep to the next were pushed along the joint's own rows (a cone's twist and swing rows), not the drive's rows, which agree only when the rest pose lies on the frames. (2) The target was read in the joint's frame coordinates, so a cone whose frames are not identity (which hold its axis, as a ragdoll's do) turned a target given as a rotation of body B in body A's frame, as a spherical joint takes it, into the wrong pose; the spherical and cone motors now mean the same thing by `rotation`.
 - **Fix:** `carry` and `drive_rows` in `kernel/src/joints.rs`. Regression: `packages/physics/tests/next-cone-motor.test.js` ("a cone whose rest pose lies off its frames holds that pose", "a driven cone holds a swing against gravity with its anchor where it was"), which fail without them; the ragdoll's powered tests on the cone joint (head turned 0.71 rad, hips drift) pass with them.
 
-### Open 2026-11-24: core + stage still measures 24,811 B gzip on macOS after the sorted compaction (KB-SIZE-PLATFORM2, core, build)
+### Fixed 2026-11-25: core + stage measured 24,811 B gzip on macOS against 24,797 B on Windows after the sorted compaction (KB-SIZE-PLATFORM2, core, build)
 
 - **Repro:** on this Mac (arm64, APFS, Node 26.13.0, zlib 1.3.2.1-motley-456ae73), at a83c7a8f2 with 84304f128 included, `npm ci` then `npm run build:packages` prints "Core and stage together: 24,811 B gzip", and `node scripts/measure-size.js` gives 24,811 B gzip / 60,994 B raw. The workstation and local CI measure 24,797 / 60,984 at the same commits, so `tests/public-size-claims.test.js` fails on macOS and passes on Windows.
 - **What is ruled out:** the committed kernel blueprint is kept (KB-SIZE-PLATFORM1), and compaction sorts its file names (84304f128); `packages/core/dist/index.js` and `packages/stage/dist/index.js` are byte-identical across two Mac worktrees.
-- **Next step:** diff the built `packages/core/dist` and `packages/stage/dist` files between a Mac build and a workstation build of one commit, and find the first differing byte. The published figures stay at the workstation's 24,797 B until the cause is found.
+- **Cause:** `compactPackage` bundles a package's files as one multi-entry library build and left imports between those
+  entries external by their relative path. On Windows the bundler kept them external; on Linux and macOS it recognised
+  the sibling entry, bundled it and moved `camera`, `renderer` (and in the stage `gltf-route`, `viewer-element`,
+  `viewer-extras`) into hashed chunks behind facade files. Found by printing Linux CI's core and stage output into its
+  log and comparing it file by file with a Windows build; bundling the sibling imports on Windows reproduced the Linux
+  files byte for byte.
+- **Fix:** b1584af9e: a sibling import resolves to an id that names no file, so every platform leaves it as written.
+  Windows output is unchanged (24,820 B gzip / 61,038 B raw), and Linux CI (run 45708085423) now prints 24,820 B with
+  all 38 core and stage files byte-identical to a Windows build. macOS was not measured here: it showed the Linux
+  figure before the fix.
+- **Regression:** `tests/compact-package-order.test.js` (core and the stage keep each entry's code in its own file and
+  its imports of other entries as written; the facade it forbids is what Linux and macOS built).
 
 ### Fixed 2026-11-24: core + stage measured differently on two machines because a from-source build re-deflated the kernel with the host's zlib (KB-SIZE-PLATFORM1, core, build)
 
@@ -2866,7 +2877,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/compact-package.test.js` ("compaction output is the same whatever order readdir lists the
   entries in"; failing on the old code with a different import order in the compacted entries).
 
-### Open 2026-11-16: `npm run measure:size` prints different core + stage bytes on macOS and on Windows for one commit (scripts)
+### Fixed 2026-11-25: `npm run measure:size` printed different core + stage bytes on macOS and on Windows for one commit (KB-SIZE-PLATFORM2, scripts)
 
 - **Repro:** at fea5924d5, `npm run build:packages` then `npm run measure:size` on an Apple M6 (macOS, Node 26.13.0)
   prints core + stage 24,859 B gzip / 61,056 B raw and core alone 22,208 B, while the Windows workstation measured
@@ -2874,11 +2885,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `examples/package-benchmarks/results/entry-sizes.json` as committed by 073f98cb9 and afc7f204d). The record measured
   on macOS in c6dbebe9f says 24,859, so `tests/public-size-claims.test.js` fails on whichever machine did not write the
   public figures (README, docs/limits.md, site/index.html and the rest still say 24,841).
-- **Cause, not yet found:** the raw bytes differ too (10 B), so it is the bundle, not gzip. Ruled out on macOS: the
-  embedded kernel (its raw deflate in `packages/core/src/wasm.ts` is byte-identical when recompressed here) and line
-  endings (core, stage, shared and math sources converted to CRLF build to the same 61,056 / 24,859 bytes). Left to
-  check on the workstation: the two bundles side by side (`measureCoreStage()` output), to find the differing bytes.
-  Until then the public figures are not changed from one machine.
+- **Cause, fix and regression:** as in the 2026-11-25 KB-SIZE-PLATFORM2 entry above (b1584af9e).
 
 ### Fixed 2026-11-24: displaced terrain relief read as shadowed by its own ground in the sun's shadow maps (terrain displace, shadows)
 

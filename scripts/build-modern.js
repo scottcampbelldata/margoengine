@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
-import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { build } from 'vite';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
@@ -381,14 +381,6 @@ async function sizeRecords() {
   await mkdir('test-results', { recursive: true });
   await writeFile(SIZES_FILE, JSON.stringify(sizes, null, 2));
   console.error(sizeReport(sizes, { full: wantsFullSizes(process.argv, process.env) }));
-  // Temporary, KB-SIZE-PLATFORM2: Linux CI measures core + stage 12 B above Windows. Its core and stage dist go into the
-  // log, to be compared file by file with a Windows build. Removed with the fix.
-  if (process.env.GITHUB_ACTIONS && process.platform === 'linux')
-    for (const name of ['core', 'stage'])
-      for (const file of (await readdir(`packages/${name}/dist`)).filter((file) => file.endsWith('.js')).sort()) {
-        const code = await readFile(`packages/${name}/dist/${file}`);
-        console.log(`PLATFORM2 ${name}/${file} ${code.length} ${gzipSync(code).toString('base64')}`);
-      }
   // The catalog reads every built dist, so it is regenerated here and can never trail the packages.
   execFileSync(process.execPath, ['scripts/build-catalog.js'], { stdio: 'inherit' });
 }
