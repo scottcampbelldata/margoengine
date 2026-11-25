@@ -1,6 +1,6 @@
 // Mip chains you supply: artists paint far levels by hand (fading detail, keeping thin lines) and tools bake them, and a
 // generated box filter would throw that away. Levels go to the GPU as given, largest first.
-import { Texture, loadTexture, type TextureOptions } from './built-material.js';
+import { Texture, loadTexture, type TextureOptions } from './texture-core.js';
 import { toHalfArray } from './texture-kinds.js';
 
 /** Raw texels of one level, row 0 first (at UV v = 0): bytes for rgba8unorm; half-float bits or floats for rgba16float. */

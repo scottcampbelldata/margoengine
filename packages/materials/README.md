@@ -1791,6 +1791,22 @@ filter only on a device with `float32-filterable` (request it in `Engine.create(
 elsewhere with a `MargoError('unsupported')` and a WgslMaterial reads them with `textureLoad`. A borrowed GPUTexture
 source (`new Texture(gpuTexture, {dimension})`) binds as it is and stays its owner's.
 
+### Textures without materials (`@margoengine/materials/texture`)
+
+Code that fills or samples textures but builds no `Material` (a video frame source, a custom pass, a tool) imports
+`Texture`, `CubeTexture`, `loadTexture`, `loadKTX2Texture` and `loadCubeTexture` from `@margoengine/materials/texture`.
+It is about 12 KB gzip and loads none of the Material pipeline or the glTF material entries; the classes are the same
+ones the package root exports, so a texture made there goes straight into any material.
+
+```ts
+import { Texture } from '@margoengine/materials/texture';
+
+const pixels = new Uint8Array(4 * 4 * 4).fill(255);
+const frame = new Texture({ data: pixels, width: 4, height: 4 }, { mipmaps: true, anisotropy: 8 });
+pixels.fill(128);
+frame.update(); // uploads on the next frame
+```
+
 ## After a device restore
 
 A plain GPU object belongs to the device that made it. `envMap` (a six-layer GPUTexture, a `{texture, view}` target or an

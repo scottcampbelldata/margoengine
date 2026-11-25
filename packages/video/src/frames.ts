@@ -2,7 +2,7 @@
 // headless film in Node, frames decoded by ffmpeg). The picture is a function of the film time alone: frame k shows for
 // k / fps <= t - start < (k + 1) / fps, so a seek gives the same picture as playing there. The pixels reach the GPU
 // through a materials Texture, which owns the per-device copies, the sRGB decoding, the mip chain and device restores.
-import { Texture } from '@margoengine/materials';
+import { Texture } from '@margoengine/materials/texture';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** One picture: `width * height * 4` bytes of straight-alpha sRGB RGBA, rows from the top. */

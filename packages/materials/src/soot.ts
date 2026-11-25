@@ -1,7 +1,7 @@
 // Soot from a fire: a darkening layer for `layered()` or a multiply decal, both from one plume model. Clean room from
 // Morton, Taylor and Turner 1956 (a buoyant plume's width grows linearly with height, b' = 6 alpha / 5 with entrainment
 // alpha about 0.1, and its centreline concentration falls as (b0 / b)^(5/3) for a plume of starting half-width b0).
-import { Texture } from './built-material.js';
+import { Texture } from './texture-core.js';
 import type { MaterialLayer } from './layered.js';
 
 type Vec3 = readonly [number, number, number];

@@ -125,3 +125,14 @@ test('options are checked', () => {
   assert.throws(() => clip({ loop: 1 }), TypeError);
   assert.throws(() => clip({ flipY: 'no' }), TypeError);
 });
+
+test('video/frames loads only the materials texture entry, not the Material pipeline (size leak)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const text = readFileSync(new URL('../dist/frames.js', import.meta.url), 'utf8');
+  const bare = [...text.matchAll(/from\s*["'](@margoengine\/[^"']+)["']/g)].map((m) => m[1]);
+  assert.deepEqual(
+    bare.filter((s) => s.startsWith('@margoengine/materials')),
+    ['@margoengine/materials/texture'],
+  );
+  assert.ok(new FrameVideo({ width: 2, height: 2, fps: 30, frames: 1, read: rows }).texture instanceof Texture);
+});

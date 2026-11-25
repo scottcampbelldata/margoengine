@@ -57,6 +57,10 @@
       "types": "./dist/atlas.d.ts",
       "import": "./dist/atlas.js"
     },
+    "./texture": {
+      "types": "./dist/texture.d.ts",
+      "import": "./dist/texture.js"
+    },
     "./transmission": {
       "types": "./dist/transmission.d.ts",
       "import": "./dist/transmission.js"

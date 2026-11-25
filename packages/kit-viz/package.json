@@ -1271,6 +1271,10 @@
       "types": "./dist/materials/atlas.d.ts",
       "import": "./dist/materials/atlas.js"
     },
+    "./materials/texture": {
+      "types": "./dist/materials/texture.d.ts",
+      "import": "./dist/materials/texture.js"
+    },
     "./materials/transmission": {
       "types": "./dist/materials/transmission.d.ts",
       "import": "./dist/materials/transmission.js"

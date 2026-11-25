@@ -4,7 +4,7 @@
 // deformation and textures; dispose() puts the original records back.
 import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
-import { Texture } from './built-material.js';
+import { Texture } from './texture-core.js';
 import { toonLit, toonShader } from './toon-shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
