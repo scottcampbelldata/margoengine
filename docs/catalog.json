@@ -2829,6 +2829,7 @@
       "collisionGroups",
       "convertMesh",
       "convexHull",
+      "coupleDofs",
       "eulerToQuat",
       "explosion",
       "geometryPositions",
