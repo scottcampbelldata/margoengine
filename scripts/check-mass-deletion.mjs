@@ -22,6 +22,13 @@ export const MAX_SYNC_FILES = 10;
 export const MAX_STALE_FILES = 2;
 /** How far back an undone commit may be; older bytes coming back are a deliberate restore. */
 export const STALE_WINDOW = 500;
+/** Landed commits Scott approved after the fact (full sha -> reason). Add one only with his yes. */
+export const APPROVED_COMMITS = new Map([
+  [
+    'caf466b4ccb8f186713544d5c6b4b59b91386354',
+    'Scott Campbell, 2026-11-25: the restore of the work sync ff88a70e7 undid; its 28,157 removed lines are the stale copies from the sync replaced by the restored ones',
+  ],
+]);
 const ABSENT = /^0+$/;
 const GENERATED = [
   /^api\/[^/]+\.api\.md$/,
@@ -172,14 +179,14 @@ export function undoneFiles(cwd, sha) {
 }
 
 /** The offences in a range, one { sha, subject, code, message } each. */
-export function scan(cwd, { range, last } = {}) {
+export function scan(cwd, { range, last, approvedCommits = APPROVED_COMMITS } = {}) {
   const args = ['log', '--no-merges', '--format=%H'];
   args.push(...(last ? ['-n', String(last), 'HEAD'] : [range ?? 'origin/main..HEAD']));
   const shas = git(cwd, args).split('\n').filter(Boolean);
   const bad = [];
   for (const sha of shas) {
     const [subject, body] = git(cwd, ['show', '-s', '--format=%s%x00%b', sha]).split('\0');
-    if (approved(body)) continue;
+    if (approved(body) || approvedCommits.has(sha)) continue;
     const { deleted, lines, lossy } = measure(cwd, sha);
     const found = (code, message) => bad.push({ sha, subject, code, message });
     if (deleted.length > MAX_FILES || lines > MAX_LINES)

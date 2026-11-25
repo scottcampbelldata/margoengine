@@ -47,6 +47,19 @@ test('a 60-file deletion fails, and passes with the approval line and a reason',
   assert.deepEqual(codes(commit('remove c', 'Mass-deletion-approved-by: Scott Campbell')), ['MASS-DELETION']);
 });
 
+test('a landed commit on the approved list passes; the same commit off the list fails', () => {
+  many('d', 60);
+  commit('add d');
+  git('rm', '-rq', 'd');
+  const sha = commit('remove d');
+  const range = `${sha}~1..${sha}`;
+  assert.deepEqual(
+    scan(dir, { range, approvedCommits: new Map() }).bad.map((b) => b.code),
+    ['MASS-DELETION'],
+  );
+  assert.deepEqual(scan(dir, { range, approvedCommits: new Map([[sha, 'test']]) }).bad, []);
+});
+
 test('a 30,000-line removal fails; generated files do not count', () => {
   put('big.js', 'x\n'.repeat(30_000));
   put('api/core.api.md', 'x\n'.repeat(30_000));
