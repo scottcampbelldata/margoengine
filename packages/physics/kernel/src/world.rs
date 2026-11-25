@@ -886,7 +886,10 @@ impl World {
         // size, the row capacities and the column offsets) and before the padding that rounds the header up to a
         // multiple of 16 bytes: the hash covers state, not where state lives.
         let layout = 2 + ROW_CLASSES + COLUMNS;
-        take(layout, core::mem::size_of::<Header>() / 4 - layout);
+        // The count of multibody walks (`mb_calls`) is a stamp the walks leave on the roots they have reached, in a column left out too.
+        let stamp = core::mem::offset_of!(Header, mb_calls) / 4;
+        take(layout, stamp - layout);
+        take(stamp + 1, core::mem::size_of::<Header>() / 4 - stamp - 1);
         for column in 0..COLUMNS {
             if !SCRATCH.contains(&column) {
                 let header = self.header();
