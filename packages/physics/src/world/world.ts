@@ -230,7 +230,8 @@ export class PhysicsWorld {
    * Adds `solver`, made from `params`, stepping in origin cell `cell`: declares its fields, calls `init` with a host over the
    * world's memory, chooses its rate level and publishes its ports as of now. A solver is added where a step of its level
    * would begin, so its first step covers a whole step.
-   * @throws RangeError for an id that is empty or taken or has another solver's {@link solverNumber}, a field that clashes with another solver's, a bad cell or rate;
+   * @throws MargoError `state` for an id with another solver's {@link solverNumber}; RangeError for an id that is empty or
+   * taken, a field that clashes with another solver's, a bad cell or rate;
    * MargoError `state` when the world's time is not on a step of the solver's level.
    */
   add<Params>(solver: Solver<Params>, params: Params, cell: Cell = [0, 0, 0]): this {
@@ -243,7 +244,8 @@ export class PhysicsWorld {
     const number = solverNumber(id),
       twin = this.entries.find((e) => solverNumber(e.id) === number);
     if (twin)
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         `Solvers "${twin.id}" and "${id}" have the same random-stream number (${number}), so they would draw the same numbers; rename one.`,
       );
     if (!isRateLevel(description.rate))
