@@ -132,6 +132,7 @@ fields (MOOSE, Gaston et al. 2009; ESMF, Hill et al. 2004).
 | terrain bed | terrain | One bed elevation that erosion, slides and craters write and colliders read (PA-37). |
 | rain | atmosphere | Rain rate in mm/h with a drop-size distribution, per position (PA-23). |
 | bodies | rigid | Pose, velocity, mass and inertia of every rigid body, the boundary signed-distance field of each, and an accumulator for impulses at points. |
+| follow targets | each moving solver | Pose, velocity and acceleration of anything a camera can follow (rigid bodies, vehicles, trains, ships, animals, birds, fish, flock and herd members), interpolated to the frame time on the world clock and expressed in large-world cells, so a following camera never jitters against the simulation. |
 
 **Transfers between representations** are registered operators owned by the framework, not code inside each solver:
 
