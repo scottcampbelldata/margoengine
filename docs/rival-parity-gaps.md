@@ -60,7 +60,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Configurable `loadTexture` caps (fixed at 16.7 MP and 64 MiB) | three.js | LIMIT | S |  |
 | 3MF textures, texture `center` on the texture, live metaball object | three.js | LIMIT | S each |  |
 | Webcam / MediaStream texture outside React | three.js | VERIFY | S |  |
-| Stale docs: cloth, caustics and the mesh path tracer still marked NOT PLANNED in [threejs-parity.md](threejs-parity.md); its MISSING 0 count; the "Not yet" section of [from-threejs.md](from-threejs.md) | — | DOCS | S |  |
+| Stale docs: cloth, caustics and the mesh path tracer still marked NOT PLANNED in [threejs-parity.md](threejs-parity.md); its MISSING 0 count; the "Not yet" section of [from-threejs.md](from-threejs.md) | — | DONE | S | 1525aff1e |
 
 ## Lane D: tools, runtime and interaction
 
