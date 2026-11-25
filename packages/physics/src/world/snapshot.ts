@@ -145,13 +145,15 @@ function entries(solvers: readonly SnapshotSolver[]): Entry[] {
   return out;
 }
 
+/** A region's bytes: in its own memory when it names one (a solver not yet on the world's memory), else the world's. */
 function view(memory: WebAssembly.Memory, region: Region): Uint8Array {
-  if (region.byteOffset < 0 || region.byteOffset + region.byteLength > memory.buffer.byteLength)
+  const buffer = (region.memory ?? memory).buffer;
+  if (region.byteOffset < 0 || region.byteOffset + region.byteLength > buffer.byteLength)
     throw new MargoError(
       'state',
-      `Region '${region.name}' lies outside the world's memory; it was allocated in another memory.`,
+      `Region '${region.name}' lies outside its memory; it was allocated in another memory.`,
     );
-  return new Uint8Array(memory.buffer, region.byteOffset, region.byteLength);
+  return new Uint8Array(buffer, region.byteOffset, region.byteLength);
 }
 
 function describeEntry(fingerprint: Fingerprint, entry: Entry): void {

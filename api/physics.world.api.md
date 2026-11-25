@@ -194,6 +194,7 @@ export interface Region {
     readonly byteLength: number;
     readonly type: ElementType;
     readonly layout: number;
+    readonly memory?: WebAssembly.Memory;
 }
 
 export type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint8Array;

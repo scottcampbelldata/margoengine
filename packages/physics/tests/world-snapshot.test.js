@@ -171,3 +171,31 @@ test('solvers with one id, or a solver with two regions of one name, are refused
   };
   assert.throws(() => takeSnapshot(a.memory, [doubled]), /two regions/);
 });
+
+test("a region's own memory is not recorded: the same state hashes and snapshots the same in the world's memory or its own", () => {
+  // Transitional: a solver whose module still owns its memory names it on its regions until the framework's solvers share one.
+  const shared = make();
+  run(shared, 25);
+  const own = make();
+  run(own, 25);
+  const elsewhere = new WebAssembly.Memory({ initial: 1 });
+  const moved = own.solvers.map((solver) => {
+    const relocate = (region) => {
+      new Uint8Array(elsewhere.buffer, region.byteOffset, region.byteLength).set(
+        new Uint8Array(own.memory.buffer, region.byteOffset, region.byteLength),
+      );
+      return { ...region, memory: elsewhere };
+    };
+    const state = solver.stateRegions().map(relocate),
+      extra = solver.extraState().map(relocate);
+    return { describe: solver.describe, stateRegions: () => state, extraState: () => extra };
+  });
+  const worldMemory = new WebAssembly.Memory({ initial: 1 }); // holds nothing of theirs
+  assert.equal(stateHash(worldMemory, moved), stateHash(shared.memory, shared.solvers));
+  const fromOwn = takeSnapshot(worldMemory, moved),
+    fromShared = takeSnapshot(shared.memory, shared.solvers);
+  assert.deepEqual(fromOwn.bytes, fromShared.bytes, 'the stream says nothing of where a region lies');
+  run(shared, 10);
+  restoreSnapshot(shared.memory, shared.solvers, fromOwn.bytes);
+  assert.equal(stateHash(shared.memory, shared.solvers), fromOwn.hash);
+});

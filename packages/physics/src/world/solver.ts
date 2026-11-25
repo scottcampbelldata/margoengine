@@ -97,6 +97,12 @@ export interface Region {
   readonly type: ElementType;
   /** The layout's version: a reader refuses a port whose layout it does not know, and a snapshot records it. */
   readonly layout: number;
+  /**
+   * The memory the region lies in when it is not the world's: transitional, for a solver whose module still owns its memory (the
+   * rigid and soft kernels, until the framework's solvers share one memory, docs/physics-framework.md, section 3), and removed
+   * then. A snapshot and the state hash read it and record nothing of it, so they do not change when the memory does.
+   */
+  readonly memory?: WebAssembly.Memory;
 }
 
 /**
