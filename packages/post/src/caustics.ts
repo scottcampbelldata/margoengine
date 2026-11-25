@@ -9,6 +9,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { accumulateNormals } from '../../shared/normals.js';
+import { rangeError } from '../../shared/errors.js';
 import { beamPipeline, group, layerPass, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -90,7 +91,7 @@ const meshSurface = (triangles: number): CausticSurfaceShader => ({
 });
 
 const fail = (message: string): never => {
-  throw new RangeError(`SurfaceCaustics ${message}`);
+  throw rangeError(`SurfaceCaustics ${message}`, 'geometry');
 };
 /** Corners of the triangles, six floats each, and the bounds `[minX, minY, minZ, maxX, maxY, maxZ]`. */
 function corners(geometry: CausticSurfaceGeometry): { data: Float32Array; bounds: number[] } {
@@ -101,7 +102,7 @@ function corners(geometry: CausticSurfaceGeometry): { data: Float32Array; bounds
   if (indices.length % 3 || !indices.length) fail('geometry needs whole triangles');
   for (let i = 0; i < indices.length; i++)
     if (!Number.isInteger(indices[i]) || indices[i] < 0 || indices[i] >= vertices)
-      fail(`index ${indices[i]} is outside 0..${vertices - 1}`);
+      fail(`index ${indices[i]} is outside 0..${vertices - 1}; pass indices of existing vertices`);
   for (let i = 0; i < p.length; i++) if (!Number.isFinite(p[i])) fail('positions must be finite');
   let n = geometry.normals;
   if (n && n.length !== p.length) fail('normals need one xyz per position');

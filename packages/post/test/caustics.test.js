@@ -10,7 +10,10 @@ const square = { positions: [0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1], indices: [0, 2
 test('SurfaceCaustics checks its options and copies its surface', () => {
   assert.throws(() => new SurfaceCaustics(), TypeError);
   assert.throws(() => new SurfaceCaustics({ geometry: { positions: [0, 0] } }), /xyz positions/);
-  assert.throws(() => new SurfaceCaustics({ geometry: { ...square, indices: [0, 1, 9] } }), /index 9 is outside 0..3/);
+  assert.throws(
+    () => new SurfaceCaustics({ geometry: { ...square, indices: [0, 1, 9] } }),
+    /index 9 is outside 0\.\.3; pass indices of existing vertices; see https:\/\/margoengine\.com\/errors#geometry$/,
+  );
   assert.throws(() => new SurfaceCaustics({ geometry: { ...square, normals: [0, 1, 0] } }), /one xyz per position/);
   for (const [key, value] of [
     ['resolution', 100],
