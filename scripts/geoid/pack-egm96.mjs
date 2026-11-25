@@ -7,10 +7,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const [source, out = resolve(import.meta.dirname, '../../packages/controls/data/egm96-15.bin')] = process.argv.slice(2);
-if (!source) {
-  console.error('usage: node scripts/geoid/pack-egm96.mjs path/to/WW15MGH.GRD [out.bin]');
-  process.exit(2);
-}
+if (!source) throw new Error('usage: node scripts/geoid/pack-egm96.mjs path/to/WW15MGH.GRD [out.bin]');
 const ROWS = 721,
   COLUMNS = 1441;
 const numbers = (await readFile(source, 'utf8')).trim().split(/\s+/).map(Number);
