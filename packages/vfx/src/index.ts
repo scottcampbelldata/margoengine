@@ -26,6 +26,7 @@ import { schedule } from './schedule.js';
 export type { VFXSchedule, VFXScheduledBurst } from './schedule.js';
 export type { VFXOverLife } from './over-life.js';
 export type { VFXSpace } from './space.js';
+export type { BurstSpawn } from './base.js';
 export type {
   VFXOptions,
   VFXWind,

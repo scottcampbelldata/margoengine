@@ -7,6 +7,13 @@ import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export interface BurstSpawn {
+    position?: ArrayLike<number>;
+    velocity?: ArrayLike<number>;
+    spread?: number;
+    emissionExtent?: ArrayLike<number>;
+}
+
 export interface FogLike {
   readonly color?: ColorInput;
   readonly near?: number;
@@ -403,7 +410,7 @@ class VFX implements EnginePlugin {
     static attach(instance: EngineKernel, options?: VFXOptions, features?: VFXFeatures): VFX;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
-    burst(count: number): this;
+    burst(count: number, spawn?: BurstSpawn): this;
     reset(): this;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;

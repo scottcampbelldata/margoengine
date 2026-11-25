@@ -48,6 +48,8 @@ export function optionalGPU() {
     copyBufferToBuffer: (source, from, target, to, size) =>
       new Uint8Array(target.data, to, size).set(new Uint8Array(source.data, from, size)),
     beginRenderPass: () => pass,
+    beginComputePass: () => pass,
+    clearBuffer() {},
     finish: () => ({}),
   });
   engine.gpu.queue.submit ??= () => {};

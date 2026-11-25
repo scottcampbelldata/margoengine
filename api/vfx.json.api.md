@@ -43,6 +43,13 @@ export function serializeEffect(source: VFXOptions | Pick<Base, 'options' | 'fog
 
 // Not exported from this entry, but used by the exports above:
 
+interface BurstSpawn {
+    position?: ArrayLike<number>;
+    velocity?: ArrayLike<number>;
+    spread?: number;
+    emissionExtent?: ArrayLike<number>;
+}
+
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
@@ -85,7 +92,7 @@ class VFX implements EnginePlugin {
     static attach(instance: EngineKernel, options?: VFXOptions, features?: VFXFeatures): VFX;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
-    burst(count: number): this;
+    burst(count: number, spawn?: BurstSpawn): this;
     reset(): this;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;

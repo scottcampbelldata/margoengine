@@ -357,7 +357,12 @@ export interface VFXLit {
    * P / (4 pi (d^2 + r^2)) lights a particle as the sun at intensity pi lights it with 1,000 W/m^2, so smoke over a fire
    * is lit orange from below, by night with no other light. Default none.
    */
-  glow?: { position: readonly [number, number, number]; power: number; radius?: number; color?: readonly [number, number, number] };
+  glow?: {
+    position: readonly [number, number, number];
+    power: number;
+    radius?: number;
+    color?: readonly [number, number, number];
+  };
 }
 /**
  * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
@@ -591,7 +596,23 @@ interface Tick {
   time: number;
   budget: number;
   frame: number;
+  /** Where and how a burst's births start, in place of the effect's own options (a burst given its own). */
+  spawn?: BurstSpawn;
 }
+/** Where and how one burst's births start: each given field replaces the effect's option of the same name for that burst alone. */
+export interface BurstSpawn {
+  position?: ArrayLike<number>;
+  velocity?: ArrayLike<number>;
+  spread?: number;
+  emissionExtent?: ArrayLike<number>;
+}
+/** A copy of a burst's spawn, so the caller's arrays can change after the call. */
+const copySpawn = (s: BurstSpawn): BurstSpawn => ({
+  ...(s.position && { position: Array.from(s.position) }),
+  ...(s.velocity && { velocity: Array.from(s.velocity) }),
+  ...(s.spread !== undefined && { spread: s.spread }),
+  ...(s.emissionExtent && { emissionExtent: Array.from(s.emissionExtent) }),
+});
 /**
  * The optional parts of a particle effect. Pass the exports of the feature entries, for example `{sort}` from
  * `@margoengine/vfx/sort`; the shapes are internal. Effects without a feature compile the same WGSL as before.
@@ -720,6 +741,8 @@ export class VFX implements EnginePlugin {
   private remainder = 0;
   private frames = 0;
   private burstCount = 0;
+  /** Bursts given a place of their own, in the order asked, born before the frame's step. */
+  private spawnQueue: { count: number; spawn: BurstSpawn }[] = [];
   /** This frame's step, set by `advanceTime` and taken by the simulate pass (once, however many views draw). */
   private readonly tick: Tick = { delta: 0, time: 0, budget: 0, frame: 0 };
   /** The 0 s step of a simulate pass that has no counted step: a second view of a frame, or a pass with no update. */
@@ -793,7 +816,9 @@ export class VFX implements EnginePlugin {
     }
     if (o.wind !== undefined) {
       if (typeof o.wind !== 'object' || o.wind === null || (!('sample' in o.wind) && !Array.isArray(o.wind)))
-        throw new TypeError('VFX wind must be [x, z] in m/s or an object with sample(x, y, z, t); check the wind option.');
+        throw new TypeError(
+          'VFX wind must be [x, z] in m/s or an object with sample(x, y, z, t); check the wind option.',
+        );
       if (!('sample' in o.wind)) windPair(o.wind, defaultPosition, 0);
     }
     finiteVector(o.position ?? defaultPosition, 3, 'Emitter position');
@@ -870,14 +895,19 @@ export class VFX implements EnginePlugin {
     return this;
   }
   /**
-   * Queues `count` births for the next frame, on top of `rate`.
+   * Queues `count` births for the next frame, on top of `rate`. With `spawn` they are born at its position, velocity, spread and
+   * extent (the options of the effect for what it leaves out), and bursts with their own spawn never share a place: two in one
+   * frame are born where each asked.
    * @throws RangeError when `count` is not a whole number from 0 to capacity; MargoError `'disposed'` after `dispose()`.
    */
-  burst(count: number): this {
+  burst(count: number, spawn?: BurstSpawn): this {
     if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to burst it');
     if (!Number.isInteger(count) || count < 0 || count > this.capacity)
       throw new RangeError('Particle burst must be a whole number up to capacity; pass a smaller count.');
-    this.burstCount = Math.min(this.capacity, this.burstCount + count);
+    if (spawn) {
+      // A burst with a place of its own is born on its own, where it was asked for, not where the next burst was.
+      if (count > 0) this.spawnQueue.push({ count, spawn: copySpawn(spawn) });
+    } else this.burstCount = Math.min(this.capacity, this.burstCount + count);
     return this;
   }
   /**
@@ -888,6 +918,7 @@ export class VFX implements EnginePlugin {
   reset(): this {
     if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to reset it');
     this.seconds = this.remainder = this.frames = this.burstCount = 0;
+    this.spawnQueue.length = 0;
     this.ticked = false;
     this.warm = [];
     this.held.length = 0;
@@ -1054,36 +1085,38 @@ export class VFX implements EnginePlugin {
     // Until the route resolves, the layer runs the WebGPU kernels of every step on its CPU tier (a prewarm of 600 steps
     // took 95 s over the ember effects of one FireFront), so the steps of an effect with a prewarm wait for the route.
     if (loading) this.routeLoading = true;
-    loading?.then((compat) => {
-      if (this.particles !== particles) return;
-      this.route = {
-        kernels: new compat.SimulationRoute(
-          this.device!,
-          simulation,
-          this.capacity,
-          {
-            uniform: u,
-            particles,
-            alive: this.alive!,
-            indirect: this.indirect!,
-            visible: this.visible!,
-            events: this.runtimes.find((r) => r.eventList)?.eventList,
-          },
-          [
-            ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
-            ...(this.emitterRuntime?.entries ?? []),
-            ...computeEntries,
-          ],
-          this.owned,
-        ),
-        billboard: compat.countedBillboard,
-        binding: compat.COUNT_BINDING,
-      };
-      this.renders.clear();
-      this.renderGroups.clear();
-    }).finally(() => {
-      if (this.particles === particles) this.routeLoading = false;
-    });
+    loading
+      ?.then((compat) => {
+        if (this.particles !== particles) return;
+        this.route = {
+          kernels: new compat.SimulationRoute(
+            this.device!,
+            simulation,
+            this.capacity,
+            {
+              uniform: u,
+              particles,
+              alive: this.alive!,
+              indirect: this.indirect!,
+              visible: this.visible!,
+              events: this.runtimes.find((r) => r.eventList)?.eventList,
+            },
+            [
+              ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
+              ...(this.emitterRuntime?.entries ?? []),
+              ...computeEntries,
+            ],
+            this.owned,
+          ),
+          billboard: compat.countedBillboard,
+          binding: compat.COUNT_BINDING,
+        };
+        this.renders.clear();
+        this.renderGroups.clear();
+      })
+      .finally(() => {
+        if (this.particles === particles) this.routeLoading = false;
+      });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -1124,8 +1157,15 @@ export class VFX implements EnginePlugin {
     // A step the pass did not take (nothing drew it) is dropped, as its particles are.
     this.warm.length = 0;
     for (const runtime of this.runtimes) runtime.warmup?.((step) => this.warm.push(this.countStep(step, {} as Tick)));
+    this.takeSpawns();
     this.countStep(delta, this.tick);
     this.ticked = this.clocked = true;
+  }
+  /** The bursts with a place of their own become steps of no time, one each, born before the frame's step. */
+  private takeSpawns(): void {
+    for (const { count, spawn } of this.spawnQueue)
+      this.warm.push({ delta: 0, time: this.seconds, budget: count, frame: this.frames++, spawn });
+    this.spawnQueue.length = 0;
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
@@ -1152,12 +1192,15 @@ export class VFX implements EnginePlugin {
       // frame delta, prewarm included, as before the counters moved to advanceTime.
       this.warm.length = 0;
       for (const runtime of this.runtimes) runtime.warmup?.((step) => this.warm.push(this.countStep(step, {} as Tick)));
+      this.takeSpawns();
       this.countStep(c.delta, this.tick);
       this.ticked = true;
-    } else if (!this.ticked)
+    } else if (!this.ticked) {
       // The frame's step was taken by an earlier view: a 0 s step moves no particle but lists, culls and sorts them for
       // this view's camera, and births a burst queued since the update.
+      this.takeSpawns();
       this.countStep(0, this.still, true);
+    }
     if (this.routeLoading && (this.warm.length || this.held.length)) {
       // The route is on its way and a prewarm asks for hundreds of steps, which the layer would run on its CPU tier: keep
       // this frame's steps (the prewarm and the live step, each as it was counted) and every later one until it loads,
@@ -1197,10 +1240,12 @@ export class VFX implements EnginePlugin {
       budget = tick.budget;
     this.values.set(c.camera.matrix);
     viewMatrix(this.view, c.camera);
+    const spawn = tick.spawn,
+      here = spawn?.position ?? o.position ?? defaultPosition;
     for (let i = 0; i < 3; i++) {
       this.values[16 + i] = this.view[i * 4];
       this.values[20 + i] = this.view[i * 4 + 1];
-      this.values[48 + i] = o.emissionExtent?.[i] ?? 0;
+      this.values[48 + i] = spawn?.emissionExtent?.[i] ?? o.emissionExtent?.[i] ?? 0;
     }
     this.values[19] = this.transparency.hook ? this.view[14] : 0;
     // up.w: pixels per world unit at clip w = 1, the clip-space length of the camera's up axis times half the viewport
@@ -1211,10 +1256,10 @@ export class VFX implements EnginePlugin {
     m[23] = Math.sqrt(x * x + y * y) * c.height * 0.5;
     this.values.set(o.gravity ?? defaultGravity, 24);
     this.values[27] = tick.delta;
-    this.values.set(o.position ?? defaultPosition, 28);
+    this.values.set(here, 28);
     this.values[31] = tick.time;
-    this.values.set(o.velocity ?? defaultVelocity, 32);
-    this.values[35] = o.spread ?? 1;
+    this.values.set(spawn?.velocity ?? o.velocity ?? defaultVelocity, 32);
+    this.values[35] = spawn?.spread ?? o.spread ?? 1;
     this.values.set(o.color ?? defaultColor, 36);
     const life = o.lifetime ?? defaultLife;
     this.values[40] = o.size ?? 0.1;
@@ -1230,7 +1275,7 @@ export class VFX implements EnginePlugin {
     this.ints[53] = budget;
     this.ints[54] = tick.frame;
     if (o.wind) {
-      const [wx, wz] = windPair(o.wind, o.position ?? defaultPosition, tick.time);
+      const [wx, wz] = windPair(o.wind, [here[0]!, here[1]!, here[2]!], tick.time);
       this.ints[55] = packWind(wx, wz);
     } else this.ints[55] = 0;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
