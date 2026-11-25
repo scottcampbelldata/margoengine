@@ -5685,7 +5685,50 @@ positions (Margo uses their stored integers), and orientation order across
 several triangles (Margo pops from the end like predictor 5). The fixture
 `legacy-uv.bin` (258 cases, 237 accepted) and the 21 rejections are checked by
 `packages/decoders/native/draco/tests/legacy_uv.rs`, with every strict prefix
-of an accepted stream rejected.
+of an accepted stream rejected. Both unobserved points were observed on
+2026-11-25 (E26 and E31 below).
+
+### Batch 133 E26 to E40: position predictors, historical layouts and wide values (2026-11-25)
+
+Method: Margo-crafted inputs fed to the vendored full decoder
+(`packages/decoders/vendor/draco-full`, Wasm SHA-256
+`c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2`) through
+its public decode and attribute calls only, compared byte for byte with the
+clean-room Wasm (acceptance, points, indices, descriptors, attribute bytes).
+No codec or wrapper source, disassembly or remembered internals were used. No
+new publication was read for this continuation: the framing starts from the
+sources cited in the E17 to E25 records, and the arithmetic below was selected
+by experiment. Rules were found by randomized differential sweeps over crafted
+streams, then isolated with targeted inputs. The emitters were session scripts
+and are not retained; the kept inputs and expected outputs are
+`packages/decoders/native/draco/tests/fixtures/layouts.bin` (284 cases: 233
+accepted, 49 rejected, 2 refused by Margo only; SHA-256
+`a2c81488e52c568447042579c2e4740282775bdb97aabfd46430ba1cd8691d7b`), checked by
+`tests/layouts.rs`. The module before these rules fails 278 of the 284.
+
+| Experiment | Distinguishing observation and rule | Confirmation |
+| --- | --- | --- |
+| E26 predictor 3 positions | int32 positions agreed, narrower integer and quantized positions differed. Predictor 3 reads the position attribute's output scalars (truncated to the declared width, or dequantized) as float32, not the portable integers. | 54,000 cases of 1 to 60 triangles (raw, integer, quantized; degenerate, large and tiny UV values) with no difference. |
+| E27 which positions | Attribute order, group and width sweeps: the first position attribute in file order supplies them and must have three components. When it does not precede the predicted attribute, every position is zero. | Attribute layouts over one to three decoders, 600 cases each. |
+| E28 decoder ids | Two decoders naming the same connectivity (255 or an attribute index) are rejected in 1.0, 1.2, 2.1 and 2.2. | Twelve id and seam layouts per version. |
+| E29 equal neighbours | Neighbours whose UV values are equal as float32 predict that value and consume no orientation, also when their positions coincide before 1.2. From 1.2 the degenerate test also covers a NaN squared distance (NaN neighbour). | Multi-triangle sweeps; one-triangle NaN, infinity, overflow, underflow and denormal positions per vertex and version. |
+| E30 position scalar types | i64, u64 and f64 positions are accepted and read as float32. A bool reads as one when nonzero. | Random bit patterns for every scalar type 1 to 11 and values on float32 rounding boundaries. |
+| E31 orientation counts | The count may exceed the entries; predictions use the last values. Predictor 3 requires 1 to the mesh's corner count; predictor 5 accepts any non-negative int32 count (zero included when none is consumed; Margo bounds it by its work budget). | Counts 0 to above the corner count on single and multi-triangle meshes; 3,000 cases with count 300. |
+| E32 predictor 5 bounds | Binary searches on one triangle: rejected when the largest neighbour UV magnitude times the squared length, or a positive projection product times the larger of the largest position difference and UV difference, passes int64. A negative product is not bounded. All other int64 steps wrap, the squared length is unsigned and the result is the low 32 bits. | 250,000 random 2.2 triangles with coordinates up to the whole int32 range, 16,175 of them accepted with a squared length of 2^63 or more, no difference. |
+| E33 predictor 5 before 2.0 | Positions are the E27 output scalars as int64: floats truncate toward zero, a bool keeps its byte, and a value outside int64 (NaN included) leaves that component and the rest of the point zero. | 14,400 cases over versions 1.0 to 2.2, three position encodings and both orders; targeted boundary values. |
+| E34 parent from 2.0 | Predictors 5 and 6 require the first position attribute to precede, with three components and integer or quantized encoding; otherwise rejected. | Order, width, encoding and group sweeps at 2.0 and 2.2. |
+| E35 prediction mode | Pre-2.2 predictor 6 streams were rejected until a byte (0 or 1) was placed between the two transform words and the flip stream. Mode 1 equals the 2.2 rule. Mode 0 reads one triangle on small coordinates, but no tested int32 or wrapping model reproduces multi-triangle meshes with coordinates near 16,000 and above, so Margo refuses mode 0. | Mode 1: 1,500 pairs against 2.2 with transform 3, and position scales to 2^30. |
+| E36 older normal transform | Predictor 6 also accepts transform 2, whose two words are read before 2.2 and one at 2.2. | Position scales to 2^30 in 1.0 to 2.2. |
+| E37 normal maximum | Odd maxima from 3 to 2^30 - 1 are accepted and even ones rejected; only the highest bit matters (maximum 2^k - 1). | Every odd maximum below 70 against stored widths 2 to 6. |
+| E38 KD values of width 32 | Quantized floats read the 32-bit tree value as int32. An int32 attribute with a tree value above int32 is rejected; other integer types truncate. | One-point boundary values per type, 300 random files per scalar type 1 to 11 and 10,080 uint32 files of 4, 5 and 8 dimensions. |
+| E39 wrap transform | Every version rejects `max - min` not below i32::MAX (E24 had seen it before 2.0 only). The sum of prediction and correction and the single wrap step are int32 and overflow. | 24,000 sequential point clouds at 1.0 and 2.2 (raw, integer, quantized). |
+| E40 wrapped normals | A normal attribute naming transform 1 reads no prediction data; its values are the signed symbols. | Sequential point clouds at 1.0 and 2.2. |
+
+KD observations without a new rule: the 33rd binary stream never changed an
+output byte in 1,056 accepted variants of four contents at levels 4 to 6 (its
+state is still validated, and an empty stream is rejected). All 369 retained
+2.3 KD bodies relabelled 1.0 to 2.2 are rejected by both decoders, so no
+historical KD layout is established.
 
 ### Batch 133 resources and E22 historical inventory
 

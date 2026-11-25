@@ -4403,6 +4403,17 @@ glTF flavor accepts these version 1 streams although the glTF prebuilt refuses
 every major version 1 file; this is a supported-feature superset. The Wasm grew
 from 122,842 to 127,592 bytes.
 
+Layout coverage (2026-11-25, E26 to E40): the optional decoder now matches the
+full prebuilt on the probed predictor-position, historical predictor 6, wrap
+transform and 32-bit KD layouts. It refuses KD point clouds before version 2.3
+(no layout is established), and these inputs that the full prebuilt decodes: a
+KD level 6 split on a dimension with no bits left, the one-triangle normal
+prediction mode of streams before 2.2, normals outside the stored octahedron,
+and normal prediction that would overflow int64 ([repros](known-bugs.md#open-batch-133-optional-decoder-replacement-gaps)).
+The glTF flavor shares these rules and was not compared with the glTF prebuilt
+on them. The Wasm went from 142,749 to 145,234 bytes (54,149 to 54,979 B
+gzip -9).
+
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
 hot Wasm functions (V8 TurboFan) compiles only the loop a stream uses. On the

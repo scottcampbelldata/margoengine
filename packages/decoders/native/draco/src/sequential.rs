@@ -1,4 +1,4 @@
-use crate::{Budget, Error, Limits, Result, cursor::Cursor, entropy};
+use crate::{Budget, Error, Limits, Result, cursor::Cursor, entropy, prediction::Positions};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Attribute {
@@ -64,55 +64,155 @@ fn read_format(c: &mut Cursor, attr: &Attribute, budget: &mut Budget) -> Result<
         _ => return Err(Error::Invalid),
     })
 }
-/// Float positions per point for historical predictor 3: the first
-/// three-component position attribute, raw scalars converted to float32 or
-/// reconstructed integer values.
-fn float_positions(
-    attributes: &[Attribute],
-    groups: &[PortableGroup],
-    parent: Option<&[i32]>,
-    points: usize,
+/// Final scalar bytes of a reconstructed integer-coded attribute, in entry
+/// order: truncated to the declared width, dequantized or unfolded.
+fn converted(
+    format: &Format,
+    attr: &Attribute,
+    values: &[i32],
+    entries: usize,
     budget: &mut Budget,
-) -> Result<Option<Vec<f32>>> {
-    let n = points.checked_mul(3).ok_or(Error::Overflow)?;
-    for group in groups {
-        for attr in &attributes[group.first..group.last] {
-            if attr.semantic != 0 || attr.components != 3 {
-                continue;
-            }
-            let mut values = budget.vector(n, 0_f32)?;
-            if attr.encoding != 0 {
-                let parent = parent.ok_or(Error::Invalid)?;
-                for (dst, src) in values.iter_mut().zip(parent) {
-                    *dst = *src as f32;
-                }
-                return Ok(Some(values));
-            }
+) -> Result<Vec<u8>> {
+    let mut data;
+    match format {
+        Format::Raw => return Err(Error::Invalid),
+        Format::Integer => {
             let width = scalar_bytes(attr.data_type)?;
-            for point in 0..points {
-                let entry = group
-                    .sequence
-                    .as_ref()
-                    .map_or(point, |s| s.point_entry[point]);
-                for c in 0..3 {
-                    let at = (entry * 3 + c) * width;
-                    let b = attr.data.get(at..at + width).ok_or(Error::Invalid)?;
-                    values[point * 3 + c] = match attr.data_type {
-                        1 => f32::from(b[0] as i8),
-                        2 | 11 => f32::from(b[0]),
-                        3 => f32::from(i16::from_le_bytes([b[0], b[1]])),
-                        4 => f32::from(u16::from_le_bytes([b[0], b[1]])),
-                        5 => i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f32,
-                        6 => u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f32,
-                        9 => f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
-                        _ => return Err(Error::Unsupported),
-                    };
-                }
-            }
-            return Ok(Some(values));
+            data = budget.vector(
+                values.len().checked_mul(width).ok_or(Error::Overflow)?,
+                0_u8,
+            )?;
+            integer_bytes(&mut data, values, width);
+        }
+        Format::Quantized { minima, factor } => {
+            data = budget.vector(values.len().checked_mul(4).ok_or(Error::Overflow)?, 0_u8)?;
+            quantized_bytes(
+                &mut data,
+                values,
+                minima,
+                *factor,
+                usize::from(attr.components),
+            );
+        }
+        Format::Normal(bits) => {
+            data = budget.vector(entries.checked_mul(12).ok_or(Error::Overflow)?, 0_u8)?;
+            normal_bytes(&mut data, values, *bits)?;
         }
     }
-    Ok(None)
+    Ok(data)
+}
+/// Positions per point that a predictor of a stream before 2.0 reads at
+/// attribute `user`. E26/E27: the first position attribute in file order
+/// supplies them and must have three components. Its final output scalars are
+/// converted, so integer and quantized positions give their output values.
+/// When it does not precede `user` it is not available yet and every position
+/// is zero. E33: a scalar `convert` refuses leaves it and the rest of its
+/// point zero.
+#[allow(clippy::too_many_arguments)]
+fn legacy_positions<T: Clone + Default>(
+    attributes: &[Attribute],
+    groups: &[PortableGroup],
+    integers: &[Option<crate::integer::Integer>],
+    formats: &[Format],
+    user: usize,
+    points: usize,
+    budget: &mut Budget,
+    convert: fn(u8, u64) -> Option<T>,
+) -> Result<Vec<T>> {
+    let index = position_attribute(attributes)?;
+    let attr = &attributes[index];
+    let count = points.checked_mul(3).ok_or(Error::Overflow)?;
+    let mut values = budget.vector(count, T::default())?;
+    if index >= user {
+        return Ok(values);
+    }
+    let group = groups
+        .iter()
+        .find(|g| (g.first..g.last).contains(&index))
+        .ok_or(Error::Invalid)?;
+    let width = scalar_bytes(attr.data_type)?;
+    let output = match &integers[index] {
+        Some(integer) => {
+            let entries = group
+                .sequence
+                .as_ref()
+                .map_or(points, |s| s.entry_corner.len());
+            Some(converted(
+                &formats[index],
+                attr,
+                &integer.values,
+                entries,
+                budget,
+            )?)
+        }
+        None => None,
+    };
+    let data = output.as_ref().unwrap_or(&attr.data);
+    for (point, row) in values.as_chunks_mut::<3>().0.iter_mut().enumerate() {
+        let entry = group
+            .sequence
+            .as_ref()
+            .map_or(point, |s| s.point_entry[point]);
+        for (c, value) in row.iter_mut().enumerate() {
+            let at = (entry * 3 + c) * width;
+            let mut scalar = [0_u8; 8];
+            scalar[..width].copy_from_slice(data.get(at..at + width).ok_or(Error::Invalid)?);
+            let Some(next) = convert(attr.data_type, u64::from_le_bytes(scalar)) else {
+                break;
+            };
+            *value = next;
+        }
+    }
+    Ok(values)
+}
+/// E27/E34: the attribute whose values predictors read as positions is the
+/// first position attribute in file order, three components wide.
+fn position_attribute(attributes: &[Attribute]) -> Result<usize> {
+    let index = attributes
+        .iter()
+        .position(|a| a.semantic == 0)
+        .ok_or(Error::Invalid)?;
+    if attributes[index].components != 3 {
+        return Err(Error::Invalid);
+    }
+    Ok(index)
+}
+/// E26/E30: predictor 3 reads each scalar as float32; any nonzero bool is one.
+fn scalar_float(data_type: u8, bits: u64) -> Option<f32> {
+    Some(match data_type {
+        8 => bits as f32,
+        9 => f32::from_bits(bits as u32),
+        10 => f64::from_bits(bits) as f32,
+        11 => f32::from(u8::from(bits != 0)),
+        _ => scalar_integer(data_type, bits)? as f32,
+    })
+}
+/// E33: predictor 5 before 2.0 reads each scalar as int64, truncating floats.
+/// A bool keeps its byte. Values outside int64, NaN included, are refused.
+fn scalar_integer(data_type: u8, bits: u64) -> Option<i64> {
+    Some(match data_type {
+        1 => i64::from(bits as u8 as i8),
+        2 | 11 => i64::from(bits as u8),
+        3 => i64::from(bits as u16 as i16),
+        4 => i64::from(bits as u16),
+        5 => i64::from(bits as u32 as i32),
+        6 => i64::from(bits as u32),
+        7 => bits as i64,
+        8 => i64::try_from(bits).ok()?,
+        9 | 10 => {
+            let value = if data_type == 9 {
+                f64::from(f32::from_bits(bits as u32))
+            } else {
+                f64::from_bits(bits)
+            };
+            let limit = 9_223_372_036_854_775_808.0;
+            if !(-limit..limit).contains(&value) {
+                return None;
+            }
+            value as i64
+        }
+        _ => return None,
+    })
 }
 struct PortableGroup {
     first: usize,
@@ -294,6 +394,16 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
             };
         }
     }
+    // E28: a mesh decoder may name each connectivity (255 or an attribute
+    // index) only once.
+    if topology.is_some() {
+        let mut named = [false; 256];
+        for group in &group_info {
+            if std::mem::replace(&mut named[usize::from(group.data_id)], true) {
+                return Err(Error::Invalid);
+            }
+        }
+    }
     let mut attributes = Vec::new();
     let mut unique_ids = Vec::new();
     let mut ranges = budget.vector(groups, (0_usize, 0_usize))?;
@@ -385,6 +495,8 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                     components,
                     &mut budget,
                     gltf_compat,
+                    nindices,
+                    attr.encoding == 3,
                     |c, budget| {
                         formats[index] = read_format(c, attr, budget)?;
                         Ok(())
@@ -403,69 +515,103 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
             sequence,
         });
     }
-    // All framing is parsed before reconstruction. Parent position attributes
-    // can therefore precede or follow their dependents, in any decoder group.
-    let mut parent = None;
-    let mut legacy_parent: Option<Vec<f32>> = None;
-    let legacy = integers.iter().flatten().any(|i| i.legacy_tex_coords());
-    for positions_first in [true, false] {
-        // E23: historical predictor 3 reads float positions. A raw position
-        // attribute gives its stored scalars; an integer one gives its values.
-        if !positions_first && legacy && legacy_parent.is_none() {
-            legacy_parent = float_positions(
-                &attributes,
-                &portable_groups,
-                parent.as_deref(),
-                points,
-                &mut budget,
-            )?;
-        }
-        for (group_id, group) in portable_groups.iter().enumerate() {
-            let predictor = if let (Some(topology), Some(mapping), Some(sequence)) =
-                (&topology, &mapping, &group.sequence)
-            {
-                Some(crate::prediction::Mesh {
-                    topology,
-                    mapping,
-                    sequence,
-                    group: group_info[group_id],
-                })
-            } else {
-                None
+    // All framing is parsed before reconstruction, which runs in file order.
+    // `parent` holds the portable positions of streams from 2.0.
+    let mut parent: Option<(usize, Vec<i32>)> = None;
+    // Positions of older streams, rebuilt once if the position attribute
+    // lies between two of its users (E27).
+    let mut legacy_float: Option<(bool, Vec<f32>)> = None;
+    let mut legacy_integer: Option<(bool, Vec<i64>)> = None;
+    for (group_id, group) in portable_groups.iter().enumerate() {
+        let predictor = if let (Some(topology), Some(mapping), Some(sequence)) =
+            (&topology, &mapping, &group.sequence)
+        {
+            Some(crate::prediction::Mesh {
+                topology,
+                mapping,
+                sequence,
+                group: group_info[group_id],
+            })
+        } else {
+            None
+        };
+        for index in group.first..group.last {
+            let Some(integer) = &integers[index] else {
+                continue;
             };
-            for index in group.first..group.last {
-                let attr = &attributes[index];
-                if (attr.semantic == 0) != positions_first {
-                    continue;
+            let positions = match integer.positions() {
+                None => None,
+                Some(float) if c.version < 0x200 => {
+                    let before = position_attribute(&attributes)? < index;
+                    if float {
+                        if legacy_float.as_ref().is_none_or(|p| p.0 != before) {
+                            let values = legacy_positions(
+                                &attributes,
+                                &portable_groups,
+                                &integers,
+                                &formats,
+                                index,
+                                points,
+                                &mut budget,
+                                scalar_float,
+                            )?;
+                            legacy_float = Some((before, values));
+                        }
+                        legacy_float.as_ref().map(|p| Positions::Float(&p.1))
+                    } else {
+                        if legacy_integer.as_ref().is_none_or(|p| p.0 != before) {
+                            let values = legacy_positions(
+                                &attributes,
+                                &portable_groups,
+                                &integers,
+                                &formats,
+                                index,
+                                points,
+                                &mut budget,
+                                scalar_integer,
+                            )?;
+                            legacy_integer = Some((before, values));
+                        }
+                        legacy_integer.as_ref().map(|p| Positions::Wide(&p.1))
+                    }
                 }
-                let Some(integer) = &mut integers[index] else {
-                    continue;
-                };
-                let components = if attr.encoding == 3 {
-                    2
-                } else {
-                    usize::from(attr.components)
-                };
-                integer.reconstruct(
-                    components,
-                    predictor.as_ref(),
-                    parent.as_deref(),
-                    legacy_parent.as_deref(),
-                    &mut budget,
-                )?;
-                if positions_first && components == 3 && parent.is_none() {
-                    let mut values =
-                        budget.vector(points.checked_mul(3).ok_or(Error::Overflow)?, 0_i32)?;
-                    parent_positions(&mut values, &integer.values, group.sequence.as_ref());
-                    parent = Some(values);
+                Some(_) => {
+                    // E34: from 2.0 the position attribute must already be
+                    // decoded, as three portable integers per entry.
+                    let at = position_attribute(&attributes)?;
+                    if at >= index || attributes[at].encoding == 3 {
+                        return Err(Error::Invalid);
+                    }
+                    if parent.is_none() {
+                        let source = integers[at].as_ref().ok_or(Error::Invalid)?;
+                        let sequence = portable_groups
+                            .iter()
+                            .find(|g| (g.first..g.last).contains(&at))
+                            .and_then(|g| g.sequence.as_ref());
+                        let count = points.checked_mul(3).ok_or(Error::Overflow)?;
+                        let mut values = budget.vector(count, 0_i32)?;
+                        parent_positions(&mut values, &source.values, sequence);
+                        parent = Some((at, values));
+                    }
+                    parent.as_ref().map(|p| Positions::Portable(&p.1))
                 }
-            }
+            };
+            let components = if attributes[index].encoding == 3 {
+                2
+            } else {
+                usize::from(attributes[index].components)
+            };
+            integers[index]
+                .as_mut()
+                .ok_or(Error::Invalid)?
+                .reconstruct(components, predictor.as_ref(), positions, &mut budget)?;
         }
     }
     // Prediction is finished. Release connectivity and the portable parent
     // before allocating the final attribute arrays and their point ordering.
     drop(parent);
-    drop(legacy_parent);
+    drop(legacy_float);
+    drop(legacy_integer);
     drop(topology);
     drop(mapping);
     drop(group_info);
@@ -477,34 +623,8 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
                 .as_ref()
                 .map_or(points, |s| s.entry_corner.len());
             if let Some(integer) = integers[index].take() {
-                let values = integer.values;
-                match &formats[index] {
-                    Format::Raw => return Err(Error::Invalid),
-                    Format::Integer => {
-                        let width = scalar_bytes(attr.data_type)?;
-                        attr.data = budget.vector(
-                            values.len().checked_mul(width).ok_or(Error::Overflow)?,
-                            0_u8,
-                        )?;
-                        integer_bytes(&mut attr.data, &values, width);
-                    }
-                    Format::Quantized { minima, factor } => {
-                        attr.data = budget
-                            .vector(values.len().checked_mul(4).ok_or(Error::Overflow)?, 0_u8)?;
-                        quantized_bytes(
-                            &mut attr.data,
-                            &values,
-                            minima,
-                            *factor,
-                            usize::from(attr.components),
-                        );
-                    }
-                    Format::Normal(bits) => {
-                        attr.data =
-                            budget.vector(entries.checked_mul(12).ok_or(Error::Overflow)?, 0_u8)?;
-                        normal_bytes(&mut attr.data, &values, *bits)?;
-                    }
-                }
+                attr.data =
+                    converted(&formats[index], attr, &integer.values, entries, &mut budget)?;
             }
             if let Some(sequence) = &group.sequence {
                 let stride = scalar_bytes(attr.data_type)?

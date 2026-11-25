@@ -49,6 +49,15 @@ the float32 rule, bit-stream bounds and wrap-span limit inferred in E23/E24;
 `tests/legacy_uv.rs` checks 258 crafted cases (237 accepted, 21 rejected)
 against the full opaque output.
 
+`tests/layouts.rs` checks 284 crafted cases (E26 to E40): which positions and
+orientations predictors 3 and 5 read, predictor 5's int64 bounds, predictor 6
+before version 2.2 and with the older transform, the normal maximum, duplicate
+decoder ids, the wrap transform and 32-bit KD values. KD point clouds before
+version 2.3 are refused (no layout is established), as are these inputs that the
+full prebuilt decodes: a KD level 6 split on an exhausted dimension, the
+one-triangle normal mode, normals outside the stored octahedron and
+int64-overflowing normal prediction (docs/known-bugs.md).
+
 `node --test packages/decoders/tests/draco-native.test.js` runs native tests,
 builds this Wasm artifact and runs the KD, memory, prediction, metadata, flavor and predictive Wasm
 regressions with hard process-tree limits. This package test is part of `verify`

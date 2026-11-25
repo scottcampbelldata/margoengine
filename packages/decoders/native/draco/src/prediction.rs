@@ -4,6 +4,16 @@ use crate::{
     traversal::{Group, Sequence},
 };
 
+/// Per-point position triples a predictor reads.
+#[derive(Clone, Copy)]
+pub(crate) enum Positions<'a> {
+    /// Portable integers (streams from 2.0).
+    Portable(&'a [i32]),
+    /// Output values as int64 (predictors 5 and 6 before 2.0).
+    Wide(&'a [i64]),
+    /// Output values as float32 (predictor 3).
+    Float(&'a [f32]),
+}
 pub(crate) struct Mesh<'a, 'b> {
     pub topology: &'a Topology<'b>,
     pub mapping: &'a Mapping,
@@ -18,20 +28,28 @@ impl Mesh<'_, '_> {
             &self.topology.corners
         }
     }
-    fn position(&self, corner: usize, parent: &[i32]) -> Result<[i64; 3]> {
-        let point = *self
-            .mapping
+    fn point(&self, corner: usize) -> Result<usize> {
+        self.mapping
             .corner_to_point
             .get(corner)
-            .ok_or(Error::Invalid)?;
-        let values = parent.get(point * 3..point * 3 + 3).ok_or(Error::Invalid)?;
-        Ok([
-            i64::from(values[0]),
-            i64::from(values[1]),
-            i64::from(values[2]),
-        ])
+            .copied()
+            .ok_or(Error::Invalid)
     }
-    fn entry_position(&self, entry: usize, parent: &[i32]) -> Result<[i64; 3]> {
+    fn position(&self, corner: usize, parent: Positions) -> Result<[i64; 3]> {
+        let at = self.point(corner)? * 3;
+        Ok(match parent {
+            Positions::Portable(values) => {
+                let v = values.get(at..at + 3).ok_or(Error::Invalid)?;
+                [i64::from(v[0]), i64::from(v[1]), i64::from(v[2])]
+            }
+            Positions::Wide(values) => {
+                let v = values.get(at..at + 3).ok_or(Error::Invalid)?;
+                [v[0], v[1], v[2]]
+            }
+            Positions::Float(_) => return Err(Error::Invalid),
+        })
+    }
+    fn entry_position(&self, entry: usize, parent: Positions) -> Result<[i64; 3]> {
         self.position(
             *self
                 .sequence
@@ -207,7 +225,7 @@ impl Mesh<'_, '_> {
         &self,
         id: usize,
         data: &[i32],
-        parent: &[i32],
+        parent: Positions,
         orientations: &mut Vec<bool>,
     ) -> Result<[i32; 2]> {
         let corner = self.sequence.entry_corner[id];
@@ -223,38 +241,52 @@ impl Mesh<'_, '_> {
             let np = self.entry_position(n, parent)?;
             let pp = self.entry_position(p, parent)?;
             let pn = sub(pp, np);
-            let norm2 = dot(pn, pn)?;
-            if norm2 != 0 {
+            // E32: every step wraps in int64, as the opaque decoder's results
+            // do. The squared length is read as uint64.
+            let norm2 = wrapping_dot(pn, pn) as u64;
+            if let Some(bound) = (i64::MAX as u64).checked_div(norm2) {
                 let cn = sub(tip, np);
-                let product = dot(cn, pn)?;
+                let product = wrapping_dot(cn, pn);
                 let duv = [puv[0] - nuv[0], puv[1] - nuv[1]];
+                // E32: the opaque decoder rejects the stream when one of these
+                // int64 products would pass i64::MAX. Only a positive
+                // projection product is bounded.
+                let largest = |v: &[i64]| v.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
+                let limit = i64::MAX as u64;
+                if largest(&nuv) > bound
+                    || u64::try_from(product)
+                        .is_ok_and(|p| p > limit / largest(&duv).max(largest(&pn)).max(1))
+                {
+                    return Err(Error::Overflow);
+                }
+                let divisor = norm2 as i64;
                 let mut xuv = [0_i64; 2];
                 for c in 0..2 {
-                    xuv[c] = narrow(
-                        i128::from(duv[c]) * i128::from(product)
-                            + i128::from(nuv[c]) * i128::from(norm2),
-                    )?;
+                    xuv[c] = duv[c]
+                        .wrapping_mul(product)
+                        .wrapping_add(nuv[c].wrapping_mul(divisor));
                 }
                 let mut displacement = [0_i64; 3];
                 for c in 0..3 {
-                    let projected =
-                        narrow(i128::from(pn[c]) * i128::from(product) / i128::from(norm2))?;
-                    displacement[c] = tip[c] - (np[c] + projected);
+                    let projected = pn[c].wrapping_mul(product).wrapping_div(divisor);
+                    displacement[c] = tip[c].wrapping_sub(np[c].wrapping_add(projected));
                 }
-                let distance2 = dot(displacement, displacement)?;
                 // E12 UV arithmetic: the spec's uint64 IntSqrt argument is
                 // formed modulo 2^64. q20 right triangles distinguish this
                 // from a widened product; two held-out scales confirm it.
-                let radicand = (distance2 as u64).wrapping_mul(norm2 as u64);
-                let length = i64::try_from(int_sqrt(radicand)).map_err(|_| Error::Overflow)?;
+                let distance2 = wrapping_dot(displacement, displacement) as u64;
+                let length = int_sqrt(distance2.wrapping_mul(norm2)) as i64;
                 let orientation = orientations.pop().ok_or(Error::Invalid)?;
                 let mut result = [0_i32; 2];
                 for c in 0..2 {
                     let perpendicular = if c == 0 { duv[1] } else { -duv[0] };
-                    let cross = i128::from(perpendicular) * i128::from(length);
-                    let value = (i128::from(xuv[c]) + if orientation { cross } else { -cross })
-                        / i128::from(norm2);
-                    result[c] = i32::try_from(value).map_err(|_| Error::Overflow)?;
+                    let cross = perpendicular.wrapping_mul(length);
+                    let value = if orientation {
+                        xuv[c].wrapping_add(cross)
+                    } else {
+                        xuv[c].wrapping_sub(cross)
+                    };
+                    result[c] = value.wrapping_div(divisor) as i32;
                 }
                 return Ok(result);
             }
@@ -282,7 +314,7 @@ impl Mesh<'_, '_> {
         &self,
         id: usize,
         data: &[i32],
-        parent: &[f32],
+        parent: Positions,
         skip_degenerate: bool,
         orientations: &mut Vec<bool>,
     ) -> Result<[i32; 2]> {
@@ -290,20 +322,17 @@ impl Mesh<'_, '_> {
         let n = self.sequence.vertex_entry[self.corners()[next(corner)]];
         let p = self.sequence.vertex_entry[self.corners()[prev(corner)]];
         if p < id && n < id {
-            // E24: equal neighbour values take the computed path too (no
-            // early return), so values beyond 2^24 round through float32.
+            let Positions::Float(parent) = parent else {
+                return Err(Error::Invalid);
+            };
             let point = |entry: usize| -> Result<[f32; 3]> {
                 let corner = *self
                     .sequence
                     .entry_corner
                     .get(entry)
                     .ok_or(Error::Invalid)?;
-                let point = *self
-                    .mapping
-                    .corner_to_point
-                    .get(corner)
-                    .ok_or(Error::Invalid)?;
-                let v = parent.get(point * 3..point * 3 + 3).ok_or(Error::Invalid)?;
+                let at = self.point(corner)? * 3;
+                let v = parent.get(at..at + 3).ok_or(Error::Invalid)?;
                 Ok([v[0], v[1], v[2]])
             };
             let (tip, np, pp) = (point(id)?, point(n)?, point(p)?);
@@ -311,40 +340,44 @@ impl Mesh<'_, '_> {
             let cn = [tip[0] - np[0], tip[1] - np[1], tip[2] - np[2]];
             let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
             let norm2 = dot(pn, pn);
-            // E24: before version 1.2 coincident neighbours are not special
-            // and 0/0 gives NaN. From 1.2 their projection and offset are
-            // zero, so the float32 next value is predicted (orientation still
-            // consumed, as on the computed path).
-            {
-                let degenerate = skip_degenerate && norm2 == 0.0;
-                let (s, norm2) = if degenerate {
-                    (0.0, 1.0)
-                } else {
-                    (dot(cn, pn) / norm2, norm2)
-                };
-                let disp = [cn[0] - pn[0] * s, cn[1] - pn[1] * s, cn[2] - pn[2] * s];
-                let t = if degenerate {
-                    0.0
-                } else {
-                    (dot(disp, disp) / norm2).sqrt()
-                };
-                let nuv = [data[n * 2] as f32, data[n * 2 + 1] as f32];
-                let duv = [data[p * 2] as f32 - nuv[0], data[p * 2 + 1] as f32 - nuv[1]];
-                let orientation = orientations.pop().ok_or(Error::Invalid)?;
-                let mut result = [0_i32; 2];
-                for c in 0..2 {
-                    let projected = nuv[c] + s * duv[c];
-                    let offset = t * if c == 0 { duv[1] } else { -duv[0] };
-                    // E23: the opposite sense from the portable predictor.
-                    let value = if orientation {
-                        projected - offset
-                    } else {
-                        projected + offset
-                    };
-                    result[c] = round_half_up(value);
-                }
-                return Ok(result);
+            // E24/E29: before version 1.2 coincident neighbours are not
+            // special and 0/0 gives NaN. From 1.2 neighbours whose squared
+            // distance is zero or NaN have zero projection and offset, so the
+            // float32 next value is predicted (orientation still consumed, as
+            // on the computed path).
+            let degenerate = skip_degenerate && (norm2 == 0.0 || norm2.is_nan());
+            let (s, norm2) = if degenerate {
+                (0.0, 1.0)
+            } else {
+                (dot(cn, pn) / norm2, norm2)
+            };
+            let disp = [cn[0] - pn[0] * s, cn[1] - pn[1] * s, cn[2] - pn[2] * s];
+            let t = if degenerate {
+                0.0
+            } else {
+                (dot(disp, disp) / norm2).sqrt()
+            };
+            let nuv = [data[n * 2] as f32, data[n * 2 + 1] as f32];
+            let duv = [data[p * 2] as f32 - nuv[0], data[p * 2 + 1] as f32 - nuv[1]];
+            // E29: neighbours equal as float32 predict that value, whatever
+            // the positions, and consume no orientation.
+            if duv == [0.0, 0.0] {
+                return Ok([round_half_up(nuv[0]), round_half_up(nuv[1])]);
             }
+            let orientation = orientations.pop().ok_or(Error::Invalid)?;
+            let mut result = [0_i32; 2];
+            for c in 0..2 {
+                let projected = nuv[c] + s * duv[c];
+                let offset = t * if c == 0 { duv[1] } else { -duv[0] };
+                // E23: the opposite sense from the portable predictor.
+                let value = if orientation {
+                    projected - offset
+                } else {
+                    projected + offset
+                };
+                result[c] = round_half_up(value);
+            }
+            return Ok(result);
         }
         let source = if n < id {
             n
@@ -359,7 +392,7 @@ impl Mesh<'_, '_> {
     pub fn normal(
         &self,
         id: usize,
-        parent: &[i32],
+        parent: Positions,
         flip: bool,
         max: i32,
         budget: &mut Budget,
@@ -459,10 +492,10 @@ fn narrow(value: i128) -> Result<i64> {
     i64::try_from(value).map_err(|_| Error::Overflow)
 }
 fn sub(a: [i64; 3], b: [i64; 3]) -> [i64; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+    std::array::from_fn(|i| a[i].wrapping_sub(b[i]))
 }
-fn dot(a: [i64; 3], b: [i64; 3]) -> Result<i64> {
-    narrow((0..3).map(|i| i128::from(a[i]) * i128::from(b[i])).sum())
+fn wrapping_dot(a: [i64; 3], b: [i64; 3]) -> i64 {
+    (0..3).fold(0, |sum, i| sum.wrapping_add(a[i].wrapping_mul(b[i])))
 }
 fn int_sqrt(number: u64) -> u64 {
     if number == 0 {

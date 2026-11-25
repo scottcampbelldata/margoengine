@@ -102,3 +102,8 @@ and wrap bounds, and six difference-predictor wrap-span probes. Each holds the
 opaque full build's public-API output bytes (237) or its rejection (21). These
 fixtures are Margo-authored syntax and oracle output, not outside source files;
 no implementation source, wrapper text or disassembly was read.
+
+`layouts.bin` contains 284 Margo-crafted inputs (E26 to E40 in
+`docs/clean-room.md`) with the full prebuilt decoder's public output or
+rejection; two cases record where Margo refuses an input that decoder accepts.
+Apache-2.0, like the other Margo specimens.

@@ -637,7 +637,9 @@ Cargo and the `wasm32-unknown-unknown` target; installed tarballs contain the as
 Warm performance parity remains open: the prior 1,937-input campaign has 365
 full-flavor and 288 glTF-flavor total-output losses. Historical (version 1.0 to 1.2)
 texture-coordinate predictor 3 decodes and matches the full prebuilt. Cold/RSS and
-the rest of the historical feature inventory remain incomplete; neither prebuilt is replaced. See
+the rest of the historical feature inventory remain incomplete (it refuses, among
+others, KD point clouds before version 2.3 and the one-triangle normal prediction
+mode); neither prebuilt is replaced. See
 [the evidence and limits](../../docs/limits.md#batch-133-optional-decoder-landing)
 and [native regression instructions](native/draco/README.md). `npm test` retains
 all native/Wasm cases, including 2,160 predictive cases and hostile input tests.

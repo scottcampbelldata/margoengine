@@ -315,6 +315,11 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
             .ok_or(Error::Overflow)?;
         attr.data = budget.vector(size, 0_u8)?;
         budget.steps(points.checked_mul(components).ok_or(Error::Overflow)?)?;
+        // E38: the opaque decoder rejects an int32 attribute whose unsigned
+        // tree value does not fit int32.
+        if attr.data_type == 5 && above_int32(&values, dimensions, offset, components) {
+            return Err(Error::Invalid);
+        }
         kd_rows(
             &mut attr.data,
             &values,
@@ -352,7 +357,8 @@ fn kd_rows(
             let value = values[point * dimensions + offset + k];
             match transform {
                 Transform::Quantized(minima, factor) => {
-                    let scaled = value as f32 * factor;
+                    // E38: quantized values read their 32 bits as signed.
+                    let scaled = value as i32 as f32 * factor;
                     chunk.copy_from_slice(&(scaled + minima[k]).to_le_bytes());
                 }
                 Transform::Signed(minima) => chunk
@@ -361,4 +367,13 @@ fn kd_rows(
             }
         }
     }
+}
+
+#[inline(never)]
+fn above_int32(values: &[u32], dimensions: usize, offset: usize, components: usize) -> bool {
+    values.chunks_exact(dimensions).any(|row| {
+        row[offset..offset + components]
+            .iter()
+            .any(|&value| i32::try_from(value).is_err())
+    })
 }

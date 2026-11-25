@@ -1,6 +1,10 @@
 //! Portable integer values and predictor side data, read before parent resolution.
 use crate::{
-    Budget, Error, Result, cursor::Cursor, edgebreaker::Binary, entropy, prediction::Mesh,
+    Budget, Error, Result,
+    cursor::Cursor,
+    edgebreaker::Binary,
+    entropy,
+    prediction::{Mesh, Positions},
 };
 
 pub(crate) enum Transform {
@@ -19,12 +23,15 @@ pub(crate) struct Integer {
     version: u16,
 }
 impl Integer {
+    #[allow(clippy::too_many_arguments)]
     pub fn read(
         c: &mut Cursor,
         n: usize,
         components: usize,
         budget: &mut Budget,
         gltf_compat: bool,
+        corners: usize,
+        normal: bool,
         legacy: impl FnOnce(&mut Cursor, &mut Budget) -> Result<()>,
     ) -> Result<Self> {
         let method = c.byte()? as i8;
@@ -37,6 +44,9 @@ impl Integer {
             method
         };
         let transform = if method != -2 { c.byte()? } else { 0 };
+        // E40: a normal attribute with the wrap transform has no prediction
+        // and no prediction data; its values are the signed symbols.
+        let method = if normal && transform == 1 { -2 } else { method };
         // E23: predictor 3 is the historical texture-coordinate predictor;
         // the opaque decoder accepts it only in streams before version 2.0.
         if ![-2, 0, 1, 2, 4, 5, 6].contains(&method) && !(method == 3 && c.version < 0x200) {
@@ -55,7 +65,8 @@ impl Integer {
         {
             return Err(Error::Unsupported);
         }
-        if method == 6 && transform != 3 {
+        // E36: predictor 6 also accepts the older normal transform.
+        if method == 6 && transform != 3 && transform != 2 {
             return Err(Error::Unsupported);
         }
         if c.version < 0x200 {
@@ -115,19 +126,26 @@ impl Integer {
                 }
             }
         } else if method == 3 || method == 5 {
+            // E31: the count may exceed the entries. It is a signed int32,
+            // and predictor 3 also bounds it to 1..=the mesh's corner count.
+            // Predictions pop from the end, so only the last `kept` bits are
+            // stored.
             let count = c.le(4)? as usize;
-            if count > n / components {
+            if count > i32::MAX as usize || (method == 3 && !(1..=corners).contains(&count)) {
                 return Err(Error::Invalid);
             }
-            out.orientations = budget.vector(count, false)?;
+            let kept = count.min(n / components);
+            out.orientations = budget.vector(kept, false)?;
             let mut binary = Binary::read(c)?;
             let mut previous = true;
             budget.steps(count)?;
-            for orientation in &mut out.orientations {
+            for i in 0..count {
                 if !binary.bit()? {
                     previous = !previous;
                 }
-                *orientation = previous;
+                if let Some(at) = i.checked_sub(count - kept) {
+                    out.orientations[at] = previous;
+                }
             }
         }
         out.transform = match transform {
@@ -137,16 +155,21 @@ impl Integer {
                 if min > max {
                     return Err(Error::Invalid);
                 }
-                // E24: before 2.0 the opaque decoder rejects a wrap whose
-                // max - min is not below i32::MAX (its span would not fit
-                // int32). Later versions are unobserved and keep the old rule.
-                if c.version < 0x200 && i64::from(max) - i64::from(min) >= i64::from(i32::MAX) {
+                // E24/E39: every version rejects a wrap whose max - min is not
+                // below i32::MAX (its span would not fit int32).
+                if i64::from(max) - i64::from(min) >= i64::from(i32::MAX) {
                     return Err(Error::Invalid);
                 }
                 Transform::Wrap(min, max)
             }
             2 | 3 => {
-                let max = c.le(4)? as i32;
+                // E37: the maximum must be odd; only its highest bit sets
+                // the quantization width.
+                let stored = c.le(4)?;
+                if stored & 1 == 0 || !(3..1 << 30).contains(&stored) {
+                    return Err(Error::Invalid);
+                }
+                let max = ((2_u32 << stored.ilog2()) - 1) as i32;
                 if transform == 3 || c.version < 0x202 {
                     c.le(4)?;
                 }
@@ -159,6 +182,16 @@ impl Integer {
             _ => return Err(Error::Unsupported),
         };
         if method == 6 {
+            // E35: before 2.2 a prediction mode byte follows the transform
+            // data. Mode 1 sums every triangle around the vertex, the only
+            // rule from 2.2. Mode 0 is not established.
+            if c.version < 0x202 {
+                match c.byte()? {
+                    0 => return Err(Error::Unsupported),
+                    1 => {}
+                    _ => return Err(Error::Invalid),
+                }
+            }
             let mut binary = Binary::read(c)?;
             out.flips = budget.vector(n / components, false)?;
             budget.steps(out.flips.len())?;
@@ -168,16 +201,16 @@ impl Integer {
         }
         Ok(out)
     }
-    /// Whether reconstruction needs float positions (historical predictor 3).
-    pub fn legacy_tex_coords(&self) -> bool {
-        self.method == 3
+    /// Whether reconstruction reads positions, and if so whether it reads
+    /// them as floats (historical predictor 3).
+    pub fn positions(&self) -> Option<bool> {
+        matches!(self.method, 3 | 5 | 6).then_some(self.method == 3)
     }
     pub fn reconstruct(
         &mut self,
         components: usize,
         mesh: Option<&Mesh>,
-        parent: Option<&[i32]>,
-        legacy_parent: Option<&[f32]>,
+        positions_read: Option<Positions>,
         budget: &mut Budget,
     ) -> Result<()> {
         if self.method == -2 {
@@ -211,8 +244,7 @@ impl Integer {
             self,
             components,
             mesh,
-            parent,
-            legacy_parent,
+            positions_read,
             budget,
             &mut prediction,
             &mut scratch,
@@ -226,8 +258,7 @@ impl Integer {
         &mut self,
         components: usize,
         mesh: Option<&Mesh>,
-        parent: Option<&[i32]>,
-        legacy_parent: Option<&[f32]>,
+        parent: Option<Positions>,
         budget: &mut Budget,
         prediction: &mut [i32],
         scratch: &mut [i32],
@@ -240,7 +271,7 @@ impl Integer {
                 let value = mesh.ok_or(Error::Invalid)?.legacy_tex_coords(
                     row,
                     &self.values,
-                    legacy_parent.ok_or(Error::Invalid)?,
+                    parent.ok_or(Error::Invalid)?,
                     self.version >= 0x102,
                     &mut self.orientations,
                 )?;
@@ -255,7 +286,7 @@ impl Integer {
                 prediction[..2].copy_from_slice(&value);
             } else if M == 6 {
                 let max = match self.transform {
-                    Transform::Normal(max) => max,
+                    Transform::Normal(max) | Transform::LegacyNormal(max) => max,
                     _ => return Err(Error::Invalid),
                 };
                 let value = mesh.ok_or(Error::Invalid)?.normal(
@@ -300,17 +331,18 @@ impl Integer {
             match self.transform {
                 Transform::None => return Err(Error::Invalid),
                 Transform::Wrap(min, max) => {
-                    let span = 1_i64 + i64::from(max) - i64::from(min);
+                    // E39: the sum and the single wrap step are int32 and
+                    // may overflow, as the opaque decoder's do.
+                    let span = (max - min).wrapping_add(1);
                     for (component, predicted) in prediction[..components].iter().enumerate() {
                         let i = offset + component;
-                        let mut value =
-                            i64::from((*predicted).clamp(min, max)) + i64::from(self.values[i]);
-                        if value > i64::from(max) {
-                            value -= span;
-                        } else if value < i64::from(min) {
-                            value += span;
+                        let mut value = (*predicted).clamp(min, max).wrapping_add(self.values[i]);
+                        if value > max {
+                            value = value.wrapping_sub(span);
+                        } else if value < min {
+                            value = value.wrapping_add(span);
                         }
-                        self.values[i] = i32::try_from(value).map_err(|_| Error::Invalid)?;
+                        self.values[i] = value;
                     }
                 }
                 Transform::Normal(max) => {

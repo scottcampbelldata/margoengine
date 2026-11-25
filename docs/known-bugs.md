@@ -13408,10 +13408,53 @@ by scripts/speed-phase.json; the item is listed in the speed-phase inventory.
 Fresh-process RSS losses are closed (KB4824a, below); the native process
 starts below the prebuilt in every campaign.
 Historical predictor 3 and invalid UTF8 metadata conversion were closed on
-2026-11-11 (bug sweep L5b, see the two entries below and above). Full
-historical KD/type/transform coverage beyond the crafted one-triangle layouts
-is not established. Both prebuilts stay default while the warm speed losses
-remain (deferred speed proof, KB1492 held); no replacement pass is claimed.
+2026-11-11 (bug sweep L5b, see the two entries below and above). Both
+prebuilts stay default while the warm speed losses remain (deferred speed
+proof, KB1492 held); no replacement pass is claimed.
+
+Layout coverage was narrowed on 2026-11-25
+([E26 to E40](clean-room.md#batch-133-e26-to-e40-position-predictors-historical-layouts-and-wide-values-2026-11-25)).
+Still open, against the full prebuilt (the glTF prebuilt was not compared for
+E26 to E40):
+
+- Historical KD point clouds (method 1 before version 2.3): Margo answers
+  `Unsupported`. The prebuilt rejects every 2.3 body relabelled 1.0 to 2.2, so
+  the older layout is unknown and no such file is tracked.
+- KD level 6, explicit split axis naming a dimension with no bits left: the
+  prebuilt decodes, Margo answers `Truncated` because it reads another axis.
+  Cycling to the next axis does not match. No encoder is known to write it.
+  Repro (255 bytes, hex):
+
+  ```text
+  445241434f020300010000be000000010100020300000601000000be000000c603fc163fc603
+  dd5c2fc603c5bd06c603e27022c60340e137c603524314c6034ecb39c603079628c6020040c6
+  020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c60200
+  40c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6
+  020040c6020040c6020040c6020040c602004038000000000000000000000000000000000000
+  0000000000000000000000000000000000000000000000000000000000000000000000000000
+  000000080000000000000000000000080000000000000000000000
+  ```
+
+- Predictor 6 prediction mode 0 (one triangle, before version 2.2): the
+  prebuilt decodes, Margo answers `Unsupported`. It equals the first incident
+  triangle's normal on small coordinates; at coordinates near 16,000 and above
+  no tested integer model reproduced meshes with several triangles. Repro: the
+  `E35 one-triangle normal mode` cases in
+  `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
+  int32 arithmetic of that mode is not established.
+- Normals outside the stored octahedron (unpredicted or wrapped symbols beyond
+  the quantization width, or a transform maximum wider than it): the prebuilt
+  returns a vector, Margo answers `Invalid`. Repro:
+  `445241434f020200000000010000000101010903000003fe0001090902`.
+- Predictor 6 with coordinates near the int32 limits, or unsigned 32-bit
+  positions before 2.0 near theirs: the prebuilt decodes, Margo answers
+  `Overflow` where a 64-bit step would overflow.
+- Not probed: position-reading predictors on attribute decoders with seams that
+  split vertices, metadata before 2.2, and constrained multi-parallelogram
+  before 2.2 beyond the retained cases.
+
+Every difference measured and left open is a refusal by Margo; no probe in
+these classes found it returning different bytes.
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 
@@ -13439,6 +13482,22 @@ opaque decoder's own result for the same value carrying explicit zero bytes in
 all 22 cases. Regression: `packages/decoders/tests/draco-native-entry.test.js`
 ("never read past the value"). The remaining difference is recorded in
 [limits.md](limits.md); no code change was needed.
+
+### Fixed 2026-11-25: optional Draco decoder differed from the full prebuilt on crafted layouts (batch 133, E26 to E40)
+
+The unshipped-by-default `@margoengine/decoders/draco-native` decoder returned
+different bytes, or accepted and rejected differently, where the full prebuilt
+reads: predictor 3 with non-int32 positions, equal neighbours or other
+attribute orders; predictors 5 and 6 before version 2.0 and their parent rule
+from 2.0; int64 bounds of predictor 5; predictor 6 before version 2.2 (a mode
+byte was not read, so those streams failed) and with transform 2; normal maxima
+that are not `2^k - 1`; duplicate decoder ids; the wrap transform's range and
+overflow; wrapped normals; and KD tree values of width 32. Cause: rules that
+one-triangle layouts could not show. Fixed in `native/draco` (E26 to E40 in
+[clean-room.md](clean-room.md#batch-133-e26-to-e40-position-predictors-historical-layouts-and-wide-values-2026-11-25));
+the refusals that remain are listed under the optional decoder replacement
+gaps. Regression: `packages/decoders/native/draco/tests/layouts.rs` (278 of its
+284 cases fail on the previous source).
 
 ### Fixed: glTF textured pass raw light alias
 
