@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // The own solver behind the names `Physics` has today. On the step path: no `Math`, tests/step-path.test.js holds that.
 import { MargoError } from '@margoengine/math/errors';
+import { filmSteps } from './film.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from './body.js';
 import {
@@ -905,23 +906,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    */
   advance(frame: number, rate: number | { num: number; den: number }): number {
     if (this.disposed) return 0;
-    const whole = (x: unknown, what: string): bigint => {
-      if (typeof x !== 'number' || !Number.isSafeInteger(x) || x < 0)
-        throw new RangeError(`${what} must be a non-negative whole number; got ${String(x)}.`);
-      return BigInt(x);
-    };
-    const num = whole(typeof rate === 'number' ? rate : rate?.num, 'The rate'),
-      den = whole(typeof rate === 'number' ? 1 : rate?.den, 'The rate');
-    if (num === 0n || den === 0n)
-      throw new RangeError('The rate must be above 0 frames a second. Pass 24, or {num: 24000, den: 1001}.');
-    const perSecond = 1 / this.fixedTimestep;
-    if (Math.abs(perSecond - Math.round(perSecond)) > 1e-9 * perSecond)
-      throw new RangeError(
-        `fixedTimestep ${this.fixedTimestep} s is not one over a whole number of steps a second, so frames do not land on steps. Use 1/60, 1/120 or the like.`,
-      );
-    const steps = BigInt(Math.round(perSecond)),
-      owed = whole(frame, 'The frame') * den * steps,
-      target = Number(owed / num);
+    const { steps: target, left } = filmSteps(frame, rate, this.fixedTimestep);
     if (this.stepCount > target)
       throw new MargoError(
         'state',
@@ -933,7 +918,6 @@ export class Physics implements EnginePlugin, BodyOwner {
         this.step();
         taken++;
       }
-      const left = Number(owed % num) / Number(num);
       this.accumulator = left * this.fixedTimestep;
       this.lastAlpha = this.interpolate ? left : 1;
     }
