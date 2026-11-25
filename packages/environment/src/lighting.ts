@@ -195,10 +195,12 @@ export class EnvironmentLighting extends ShaderEffect {
     check();
     // The scene load was called for, kept across the awaits below.
     const scope = captureScene(engine);
-    // The decoders load with the first URL (loaders.ts): a page that lights from pixels never fetches them.
+    // The loader comes with the first URL and imports only the decoder the file's signature names (load.ts); a page that
+    // lights from pixels fetches none. Not loaders.ts: it re-exports every decoder statically, so a bundle holding both
+    // would import each decoder both ways and could split none of them (KB-ENV-LOADCHUNK1).
     const image =
       typeof source === 'string' || source instanceof URL
-        ? await (await import('./loaders.js')).loadEnvironmentImage(source, { signal, decode, weight })
+        ? await (await import('./load.js')).loadEnvironmentImage(source, { signal, decode, weight })
         : source;
     check();
     const environment = await Environment.create(engine, image, options);
