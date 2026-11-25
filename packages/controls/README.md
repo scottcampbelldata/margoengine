@@ -772,6 +772,37 @@ console.log(camera.collisionRange < 600); // true: the tower stands between the 
 camera.underground = true; // look from below the ground: no floor, no sweeps
 ```
 
+### Feel: glide, presets, keys and reduced motion
+
+A fling glides on and slows down, each axis by its own time constant: `inertia` `{pan: 0.3, rotate: 0.25, zoom: 0.2}`
+seconds (0 stops that axis at once; `setInertia` changes some). A pause of more than 80 ms before release is a stop, not
+a fling. `preset` picks the buttons and feel: `'globe'` (default; left drag pans, right or modified drag turns and tilts,
+double click zooms in two times, Shift + double click out), `'map'` (the same with a longer pan glide, 0.45 s) or
+`'dcc'` (middle drag orbits, Shift + middle pans, Ctrl + middle zooms, the left button stays free for picking, no glide
+and no double click, as in DCC tools such as Blender and Maya); `applyPreset` switches later. In the orbit modes the
+keys pan along the heading at `keyPanSpeed` (1) heights above the ground per second (W/A/S/D or the arrows), so a pan
+feels the same at street level and from orbit; Q/E turn, R/F tilt, + and - zoom two times a second, Shift is 4 x.
+`reducedMotion` (default: the user's `prefers-reduced-motion` setting) turns the glide off and lands flights, paths and
+mode switches at once unless you pass a `duration`.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-87.6), latitude: degToRad(41.9), range: 5000, pitch: degToRad(60)},
+  preset: 'map',
+  inertia: {rotate: 0}, // turns stop when you let go; pans still glide
+});
+camera.keyPanSpeed = 0.5; // slower key pans
+console.log(camera.preset, camera.inertia, camera.reducedMotion);
+camera.applyPreset('dcc'); // middle-button orbit for a modelling session
+```
+
+Blender and Maya are trademarks of their respective owners; they are named only to describe the button layout.
+
 ### Navigation modes
 
 `mode` (option, default `'globe'`) picks how input moves the camera, and `setMode(mode, {duration})` switches with a
@@ -899,7 +930,8 @@ console.log(hit?.source, hit?.height); // 'terrain' and the ground height there,
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
 `clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
 everything visible), `raycast` (none), `raycaster` (a new one), `underground` (false), `mode` ('globe'), `eyeHeight`
-(1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document). Sources: NIMA TR8350.2 (WGS84);
+(1.7), `walkSpeed` (1.4), `flySpeed` (1), `keyTarget` (the element's document), `preset` ('globe'), `inertia`
+({pan: 0.3, rotate: 0.25, zoom: 0.2}), `reducedMotion` (the `prefers-reduced-motion` setting). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et

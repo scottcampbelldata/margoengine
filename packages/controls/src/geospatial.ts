@@ -60,6 +60,24 @@ export interface GeospatialPick {
  */
 export type GeospatialMode = 'globe' | 'local' | 'map' | 'fly' | 'walk';
 
+/**
+ * A feel preset for {@link GeospatialControls}: `globe` (the default: left drag pans the surface, right or modified drag
+ * turns and tilts, a short glide after a fling, double click zooms in), `map` (the same buttons with a longer glide, as
+ * web maps do) or `dcc` (as in digital content creation tools: middle drag orbits, Shift + middle pans, Ctrl + middle
+ * zooms, the left button is left free for picking, no glide or double click).
+ */
+export type GeospatialPreset = 'globe' | 'map' | 'dcc';
+
+/** Glide after a fling, per axis: the time constant of the decay in seconds; 0 stops at once. */
+export interface GeospatialInertia {
+  /** Pan glide, seconds. Default 0.3 (`map` 0.45, `dcc` 0). */
+  pan: number;
+  /** Heading and tilt glide, seconds. Default 0.25 (`dcc` 0). */
+  rotate: number;
+  /** Zoom glide (pinch and zoom drags), seconds. Default 0.2 (`dcc` 0). */
+  zoom: number;
+}
+
 /** Options for {@link GeospatialControls.setMode}. */
 export interface ModeSwitchOptions {
   /** Seconds of the move into the new mode when the pose must change (walk lands, map tilts). Default 0.75. */
@@ -132,6 +150,15 @@ export interface GeospatialOptions {
   flySpeed?: number;
   /** Where movement keys are read. Default the element's document. */
   keyTarget?: EventTargetLike | null;
+  /** Button mapping, glide and double click: see {@link GeospatialPreset}. Default `'globe'`. */
+  preset?: GeospatialPreset;
+  /** Glide per axis, overriding the preset's. */
+  inertia?: Partial<GeospatialInertia>;
+  /**
+   * No glide, and flights, paths and mode switches without an explicit `duration` jump straight to the end. Default
+   * the user's `prefers-reduced-motion: reduce` setting (false where it cannot be read).
+   */
+  reducedMotion?: boolean;
 }
 
 /** Options for {@link GeospatialControls.flyTo}. */
@@ -243,6 +270,20 @@ const MARCH_STEPS = 512;
 /** Steepest look up or down in the first-person modes, radians (just short of straight, where heading is undefined). */
 const LOOK = Math.PI / 2 - 0.01;
 const MODES: readonly GeospatialMode[] = ['globe', 'local', 'map', 'fly', 'walk'];
+const INERTIA: Record<GeospatialPreset, GeospatialInertia> = {
+  globe: { pan: 0.3, rotate: 0.25, zoom: 0.2 },
+  map: { pan: 0.45, rotate: 0.25, zoom: 0.2 },
+  dcc: { pan: 0, rotate: 0, zoom: 0 },
+};
+/** A drag older than this before release is a stop, not a fling (seconds). */
+const FLING_GAP = 0.08;
+const prefersReducedMotion = (): boolean => {
+  try {
+    return !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+};
 const held = (keys: ReadonlySet<string>, ...codes: string[]) => +codes.some((c) => keys.has(c));
 const smoother = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -317,6 +358,17 @@ export class GeospatialControls extends Controls {
   walkSpeed: number;
   /** `fly` speed in heights above the ground per second. */
   flySpeed: number;
+  /** Key pan speed in the orbit modes, heights above the ground per second. Default 1. */
+  keyPanSpeed = 1;
+  /** Glide per axis, seconds; see {@link GeospatialInertia}. */
+  inertia: GeospatialInertia;
+  /** No glide and instant automatic flights; see the option. */
+  reducedMotion: boolean;
+  private p: GeospatialPreset = 'globe';
+  /** Glide velocities: pan east and north (m/s), heading and pitch (rad/s), log range (1/s). */
+  private glide = { east: 0, north: 0, heading: 0, pitch: 0, zoom: 0 };
+  /** Last drag sample for fling velocities: time (s) and the view then. */
+  private sample: { t: number; v: Required<GeospatialView> } | null = null;
   private m: GeospatialMode;
   /** True while a mode switch moves the camera: pitch may cross both modes' limits. */
   private loose = false;
@@ -326,8 +378,14 @@ export class GeospatialControls extends Controls {
   private lifted = 0;
   private reachRange = 0;
   private flight: Flight | null = null;
-  private dragging: { id: number; x: number; y: number; rotate: boolean; grab: V | null; grabHeight: number } | null =
-    null;
+  private dragging: {
+    id: number;
+    x: number;
+    y: number;
+    act: 'pan' | 'rotate' | 'zoom';
+    grab: V | null;
+    grabHeight: number;
+  } | null = null;
   private dead = false;
   private changed = false;
   protected override get kind(): string {
@@ -377,6 +435,10 @@ export class GeospatialControls extends Controls {
     this.flySpeed = flySpeed;
     this.m = mode;
     this.keyTarget = options.keyTarget ?? null;
+    this.inertia = { ...INERTIA.globe };
+    this.reducedMotion = options.reducedMotion ?? prefersReducedMotion();
+    this.applyPreset(options.preset ?? 'globe');
+    if (options.inertia) this.setInertia(options.inertia);
     this.v = this.sanitize({
       ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 },
       longitude: 0,
@@ -769,6 +831,92 @@ export class GeospatialControls extends Controls {
     return g;
   }
 
+  /** The feel preset in use; change it with {@link GeospatialControls.applyPreset}. */
+  get preset(): GeospatialPreset {
+    return this.p;
+  }
+  /** Use a preset's button mapping, glide and double click (see {@link GeospatialPreset}). */
+  applyPreset(preset: GeospatialPreset): void {
+    if (!(preset in INERTIA))
+      throw rangeError(
+        `Geospatial preset is one of ${Object.keys(INERTIA).join(', ')}; got ${String(preset)}`,
+        'controls-arguments',
+      );
+    this.p = preset;
+    this.inertia = { ...INERTIA[preset] };
+    this.stopGlide();
+  }
+  /** Change the glide of some axes (seconds, 0 for none). */
+  setInertia(inertia: Partial<GeospatialInertia>): void {
+    const next = { ...this.inertia, ...inertia };
+    if (![next.pan, next.rotate, next.zoom].every((x) => x >= 0 && Number.isFinite(x)))
+      throw rangeError('Geospatial inertia is finite seconds >= 0 per axis', 'controls-arguments');
+    this.inertia = next;
+  }
+  /** Stop any glide at once. */
+  stopGlide(): void {
+    this.glide = { east: 0, north: 0, heading: 0, pitch: 0, zoom: 0 };
+  }
+  /** Seconds of an automatic duration, or 0 under reduced motion. */
+  private auto(seconds: number): number {
+    return this.reducedMotion ? 0 : seconds;
+  }
+  /** Record the view after a drag step, for the fling velocity at release. */
+  private track(at: number, before: Required<GeospatialView>): void {
+    const s = this.sample,
+      v = this.v;
+    this.sample = { t: at, v: { ...v } };
+    if (!s) return void (this.sample = { t: at, v: { ...before } });
+    const dt = at - s.t;
+    if (!(dt > 1e-4)) return;
+    const g = geodesicInverse(s.v.longitude, s.v.latitude, v.longitude, v.latitude),
+      k = 1 / dt;
+    // Blend with the previous estimate so one jittery event does not decide the fling.
+    const mix = (a: number, b: number) => a * 0.3 + b * 0.7;
+    this.glide = {
+      east: mix(this.glide.east, g.distance * Math.sin(g.initialBearing) * k),
+      north: mix(this.glide.north, g.distance * Math.cos(g.initialBearing) * k),
+      heading: mix(this.glide.heading, wrap(v.heading - s.v.heading) * k),
+      pitch: mix(this.glide.pitch, (v.pitch - s.v.pitch) * k),
+      zoom: mix(this.glide.zoom, Math.log(v.range / s.v.range) * k),
+    };
+  }
+  /** Carry the fling on, each axis decaying by its own time constant. */
+  private coast(delta: number): void {
+    const g = this.glide,
+      i = this.inertia;
+    if (!(delta > 0) || this.reducedMotion) return this.stopGlide();
+    const decay = (tau: number) => (tau > 0 ? Math.exp(-delta / tau) : 0),
+      // The distance a decaying velocity covers in delta: v tau (1 - e^(-delta / tau)).
+      reach = (v: number, tau: number) => (tau > 0 ? v * tau * (1 - Math.exp(-delta / tau)) : 0),
+      e = reach(g.east, i.pan),
+      n = reach(g.north, i.pan),
+      h = reach(g.heading, i.rotate),
+      p = reach(g.pitch, i.rotate),
+      z = reach(g.zoom, i.zoom);
+    g.east *= decay(i.pan);
+    g.north *= decay(i.pan);
+    g.heading *= decay(i.rotate);
+    g.pitch *= decay(i.rotate);
+    g.zoom *= decay(i.zoom);
+    const slow =
+      Math.hypot(g.east, g.north) < 1e-3 * Math.max(1, this.v.range) &&
+      Math.abs(g.heading) + Math.abs(g.pitch) + Math.abs(g.zoom) < 1e-3;
+    if (slow) this.stopGlide();
+    if (!e && !n && !h && !p && !z) return;
+    const v = this.v,
+      at = Math.hypot(e, n) > 0 ? geodesicDirect(v.longitude, v.latitude, Math.atan2(e, n), Math.hypot(e, n)) : v;
+    this.v = this.sanitize({
+      ...v,
+      longitude: at.longitude,
+      latitude: at.latitude,
+      heading: v.heading + h,
+      pitch: v.pitch + p,
+      range: v.range * Math.exp(z),
+    });
+    this.commit();
+  }
+
   /** The navigation mode; change it with {@link GeospatialControls.setMode}. */
   get mode(): GeospatialMode {
     return this.m;
@@ -784,7 +932,7 @@ export class GeospatialControls extends Controls {
     this.alive();
     if (!MODES.includes(mode))
       throw rangeError(`Geospatial mode is one of ${MODES.join(', ')}; got ${String(mode)}`, 'controls-arguments');
-    const duration = options.duration ?? 0.75;
+    const duration = options.duration ?? this.auto(0.75);
     if (!(duration >= 0) || !Number.isFinite(duration))
       throw rangeError('A mode switch duration is finite seconds >= 0', 'controls-arguments');
     this.cancel();
@@ -903,13 +1051,50 @@ export class GeospatialControls extends Controls {
   /** Held movement keys move the eye in fly and walk. */
   private steer(delta: number): void {
     const k = this.keys;
-    if (!k.size || !(delta > 0) || (this.m !== 'fly' && this.m !== 'walk')) return;
+    if (!k.size || !(delta > 0)) return;
+    if (this.m !== 'fly' && this.m !== 'walk') return this.keyOrbit(delta);
     const f = held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown'),
       r = held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft'),
       u = held(k, 'KeyE', 'PageUp') - held(k, 'KeyQ', 'PageDown');
     if (!f && !r && !(u && this.m === 'fly')) return;
     const step = this.moveSpeed * delta * (held(k, 'ShiftLeft', 'ShiftRight') ? 4 : 1);
     this.moveEye(f * step, r * step, u * step);
+  }
+  /**
+   * Keys in the orbit modes: W/A/S/D or the arrows pan along the heading at `keyPanSpeed` heights above the ground per
+   * second, Q/E turn, R/F tilt (not in map), + and - (or PageUp/PageDown) zoom, Shift 4 x.
+   */
+  private keyOrbit(delta: number): void {
+    const k = this.keys,
+      f = held(k, 'KeyW', 'ArrowUp') - held(k, 'KeyS', 'ArrowDown'),
+      r = held(k, 'KeyD', 'ArrowRight') - held(k, 'KeyA', 'ArrowLeft'),
+      turn = held(k, 'KeyE') - held(k, 'KeyQ'),
+      tilt = this.m === 'map' ? 0 : held(k, 'KeyR') - held(k, 'KeyF'),
+      zoom = held(k, 'Minus', 'NumpadSubtract', 'PageDown') - held(k, 'Equal', 'NumpadAdd', 'PageUp');
+    if (!f && !r && !turn && !tilt && !zoom) return;
+    const boost = held(k, 'ShiftLeft', 'ShiftRight') ? 4 : 1,
+      e = this.eye,
+      // Height above what is below the eye, so a pan crosses a valley as fast at street level as at orbit, per height.
+      above = Math.max(2, e.height - this.groundAt(e.longitude, e.latitude, e.height)),
+      step = this.keyPanSpeed * above * delta * boost,
+      h = this.v.heading,
+      v = this.v,
+      g =
+        f || r
+          ? geodesicDirect(
+              v.longitude,
+              v.latitude,
+              Math.atan2(r * Math.cos(h) + f * Math.sin(h), f * Math.cos(h) - r * Math.sin(h)),
+              step * Math.hypot(f, r),
+            )
+          : v;
+    this.setView({
+      longitude: g.longitude,
+      latitude: g.latitude,
+      heading: v.heading + (turn * Math.PI * delta * boost) / 2,
+      pitch: v.pitch + (tilt * Math.PI * delta * boost) / 4,
+      range: v.range * 2 ** (zoom * delta * boost),
+    });
   }
   /** Zoom by `factor` keeping the surface point under CSS pixel (x, y) under the cursor (sky: about the centre). */
   zoomAt(x: number, y: number, factor: number): void {
@@ -1010,7 +1195,8 @@ export class GeospatialControls extends Controls {
         : Math.abs(Math.log(to.range / this.v.range)) + (g.distance * scale) / Math.max(this.v.range, to.range),
       turn = Math.abs(wrap(to.heading - this.v.heading)) + Math.abs(to.pitch - this.v.pitch),
       duration =
-        options.duration ?? (length > 1e-9 || turn > 1e-9 ? Math.min(maxDuration, Math.max(1, length / speed)) : 0);
+        options.duration ??
+        this.auto(length > 1e-9 || turn > 1e-9 ? Math.min(maxDuration, Math.max(1, length / speed)) : 0);
     if (duration === 0) {
       this.v = to;
       this.commit();
@@ -1140,7 +1326,7 @@ export class GeospatialControls extends Controls {
       length += d;
       knots.push(knots[i - 1]! + Math.sqrt(d) + 1e-9);
     }
-    const duration = options.duration ?? (length > 1e-9 ? Math.max(1, length / speed) : 0),
+    const duration = options.duration ?? this.auto(length > 1e-9 ? Math.max(1, length / speed) : 0),
       n = rows.length,
       end = (i: number) => (i < 0 ? 2 * knots[0]! - knots[1]! : i >= n ? 2 * knots[n - 1]! - knots[n - 2]! : knots[i]!),
       row = (i: number) =>
@@ -1202,7 +1388,10 @@ export class GeospatialControls extends Controls {
     f.finish(false);
   }
   override update(delta = 0): boolean {
-    if (!this.flight && !this.dead && this.enabled) this.steer(delta);
+    if (!this.flight && !this.dead && this.enabled) {
+      this.steer(delta);
+      if (!this.dragging) this.coast(delta);
+    }
     const f = this.flight;
     if (f && !this.dead) {
       f.elapsed += Math.max(0, delta);
@@ -1256,6 +1445,7 @@ export class GeospatialControls extends Controls {
       [element, 'pointercancel', this.end],
       [element, 'wheel', this.wheel, { passive: false }],
       [element, 'contextmenu', this.menu],
+      [element, 'dblclick', this.double as InputEventListener],
       [this.keyTarget ?? documentOf(element), 'keydown', this.keyDown as InputEventListener],
       [this.keyTarget ?? documentOf(element), 'keyup', this.keyUp as InputEventListener],
     ];
@@ -1279,33 +1469,57 @@ export class GeospatialControls extends Controls {
     this.interrupt();
     if (this.dragging || event.button > 2) return;
     const first = this.m === 'fly' || this.m === 'walk',
-      alt = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey,
-      // Local orbit swaps the buttons (left turns about the site); first person looks with any button.
-      rotate = first || (this.m === 'local' ? !alt : alt);
-    if ((rotate && !this.enableRotate) || (!rotate && !this.enablePan)) return;
+      act = this.action(event, first);
+    if (!act) return;
+    if (
+      (act === 'rotate' && !this.enableRotate) ||
+      (act === 'pan' && !this.enablePan) ||
+      (act === 'zoom' && !this.enableZoom)
+    )
+      return;
     const p = this.local(event),
-      r = rotate ? null : this.screenRay(p.x, p.y),
+      r = act === 'pan' ? this.screenRay(p.x, p.y) : null,
       hit = r && this.hitAlong(r.o, r.d);
-    if (rotate && !first) this.pivotOnAxis();
-    this.dragging = { id: event.pointerId, ...p, rotate, grab: hit?.point ?? null, grabHeight: hit?.height ?? 0 };
+    if (act === 'rotate' && !first) this.pivotOnAxis();
+    this.stopGlide();
+    this.sample = null;
+    this.dragging = { id: event.pointerId, ...p, act, grab: hit?.point ?? null, grabHeight: hit?.height ?? 0 };
     this.element?.setPointerCapture?.(event.pointerId);
     event.preventDefault();
     this.dispatchEvent({ type: 'start' });
   };
+  /** What a press does under the preset and mode; null leaves it to the page (dcc's left button). */
+  private action(event: PointerEvent, first: boolean): 'pan' | 'rotate' | 'zoom' | null {
+    if (first) return 'rotate';
+    if (this.p === 'dcc') {
+      if (event.button !== 1) return null;
+      return event.shiftKey ? 'pan' : event.ctrlKey || event.metaKey ? 'zoom' : 'rotate';
+    }
+    const alt = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey;
+    // Local orbit swaps the buttons (left turns about the site).
+    return (this.m === 'local' ? !alt : alt) ? 'rotate' : 'pan';
+  }
+  /** Event time in seconds. */
+  private static time(event: Event): number {
+    const t = (event as { timeStamp?: number }).timeStamp;
+    return (typeof t === 'number' && t > 0 ? t : (globalThis.performance?.now() ?? Date.now())) / 1000;
+  }
   private move = (event: PointerEvent): void => {
     const d = this.dragging;
     if (!d || d.id !== event.pointerId || !this.enabled || !this.element) return;
+    const before = { ...this.v };
     const p = this.local(event),
       dx = p.x - d.x,
       dy = p.y - d.y,
       height = this.element.clientHeight;
     d.x = p.x;
     d.y = p.y;
-    if (d.rotate && (this.m === 'fly' || this.m === 'walk')) {
+    if (d.act === 'zoom') this.zoom(2 ** clamp((dy * this.zoomSpeed) / 200, -32, 32));
+    else if (d.act === 'rotate' && (this.m === 'fly' || this.m === 'walk')) {
       // Grab the world: a field of view per viewport height, so the point under the cursor stays near it.
       const k = ((this.camera.fov ?? 60) * Math.PI) / 180 / height;
       this.look(-dx * k, -dy * k);
-    } else if (d.rotate)
+    } else if (d.act === 'rotate')
       this.rotate((dx * this.rotateSpeed) / height, this.m === 'map' ? 0 : (dy * this.rotateSpeed) / height);
     else if (!d.grab || !this.dragTo(d.grab, d.grabHeight, p.x, p.y)) {
       // Sky under the cursor: ground metres per pixel at the centre; a tilted view stretches vertical drags by 1 / sin(pitch).
@@ -1316,10 +1530,17 @@ export class GeospatialControls extends Controls {
         right = -dx * m;
       this.pan(right * Math.cos(h) + up * Math.sin(h), -right * Math.sin(h) + up * Math.cos(h));
     }
+    this.track(GeospatialControls.time(event), before);
     event.preventDefault();
   };
   private end = (event: PointerEvent): void => {
     if (this.dragging?.id !== event.pointerId) return;
+    // A pause before release is a stop; a cancel never flings.
+    const s = this.sample;
+    if (!s || event.type === 'pointercancel' || GeospatialControls.time(event) - s.t > FLING_GAP || this.reducedMotion)
+      this.stopGlide();
+    if (this.m === 'fly' || this.m === 'walk') this.stopGlide();
+    this.sample = null;
     this.dragging = null;
     this.element?.releasePointerCapture?.(event.pointerId);
     this.dispatchEvent({ type: 'end' });
@@ -1334,6 +1555,13 @@ export class GeospatialControls extends Controls {
     if (this.m === 'walk') this.moveEye((-px * this.zoomSpeed * this.walkSpeed) / 100, 0);
     else if (this.m === 'fly') this.moveEye((-px * this.zoomSpeed * this.moveSpeed) / 500, 0);
     else this.zoomAt(p.x, p.y, 2 ** clamp((px * this.zoomSpeed) / 500, -32, 32));
+    event.preventDefault();
+  };
+  /** Double click zooms in two times toward the point (Shift: out), except in the dcc preset and first person. */
+  private double = (event: MouseEvent): void => {
+    if (!this.enabled || !this.enableZoom || this.p === 'dcc' || this.m === 'fly' || this.m === 'walk') return;
+    const p = this.local(event as PointerEvent);
+    this.zoomAt(p.x, p.y, event.shiftKey ? 2 : 0.5);
     event.preventDefault();
   };
   private menu = (event: Event): void => {

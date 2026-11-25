@@ -8678,6 +8678,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   below the surface along the chord (the range and the collision floor still hold the eye up); add views for long
   legs. Progress along the path follows the knots (square roots of each leg's length in screen widths), not true arc
   length, so speed varies a little between legs. One path at a time; it is a flight and cancels like one.
+- Glide: the fling velocity is a blend of the last drag steps (event `timeStamp`), so a single jittery event can still
+  tilt it; a pause over 80 ms before release, a `pointercancel`, first person and reduced motion give no glide. Pan
+  glide follows the geodesic from the centre at the release bearing. Wheel zoom has no glide (each notch is exact).
+  Keys pan by the height above the surface below the eye, at least 2 m. The dcc preset drags zoom 2 x per 200 px.
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)
