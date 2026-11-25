@@ -11628,9 +11628,13 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   random pairs (a third near-antipodal) misses by under 1e-6 m. The Fourier series of the paper are replaced by 16-point
   Gauss-Legendre quadrature of the same integrands per quarter turn (exact to double precision), so a call costs about
   50 to 1000 kernel evaluations: do not call it per vertex of a large mesh.
-- `GeospatialControls` terrain clearance is a height query at the eye only (`heightAt`), sampled once per move, with up to
-  6 lift iterations; it does not sweep the path between frames, so a fast move can cross a thin ridge. `@margoengine/tiles`
-  streams terrain without a height query, so pass your own function (grid, raycast). No physics is involved.
+- `GeospatialControls` collision keeps the eye and the four near-plane corners `clearance` above `heightAt` (up to 6 lift
+  iterations) and sweeps the arm from the orbit centre to each of them against the scene and `raycast` (front faces
+  only), with a down ray of twice `clearance` per point for roofs and tiles. It tests the pose of each update, not the
+  path between updates, so a fast move can cross a thin ridge the arm does not span; and when the orbit centre itself
+  is inside a mesh (a centre under a roof), nothing pulls an eye inside that same mesh out. About 10 scene rays per
+  update. `underground: true` turns collision off. `@margoengine/tiles` streams terrain without a height query, so pass
+  your own function (grid, raycast). No physics is involved.
 - Picking (zoom-to-cursor, anchored pan, the turn pivot) takes the nearest of the engine scene (bvh Raycaster), your
   `raycast` and a march over `heightAt`; only a miss of all of them falls back to the ellipsoid at the centre height.
   The `heightAt` march takes at most 512 steps of half the height above the ground, so a slope steeper than about 63

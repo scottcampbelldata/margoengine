@@ -31,10 +31,12 @@ export class GeospatialControls extends Controls {
     colliders: readonly (Mesh | ModelLike)[] | null;
     raycast: SurfaceRaycast | undefined;
     readonly raycaster: Raycaster;
+    underground: boolean;
     protected get kind(): string;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: GeospatialOptions);
     get view(): Readonly<Required<GeospatialView>>;
     get terrainLift(): number;
+    get collisionRange(): number;
     get eye(): {
         longitude: number;
         latitude: number;
@@ -68,6 +70,7 @@ export interface GeospatialOptions {
     colliders?: readonly (Mesh | ModelLike)[] | null;
     raycast?: SurfaceRaycast;
     raycaster?: Raycaster;
+    underground?: boolean;
 }
 
 export interface GeospatialPick {
