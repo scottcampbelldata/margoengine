@@ -11608,6 +11608,15 @@ edge read its nearest pixel; `rays` has no occlusion pass, so any pixel above `t
 Gems 3, 2007, chapter 13). `radius` applies to `gaussian` and `box` only. Checked on a real GPU
 (`packages/post/test/radial-blur-browser.mjs`); GPU cost not measured.
 
+
+## Asset containers (scene/container)
+
+A core mesh belongs to its scene for life and core has no detach (removing a mesh disposes it), so `removeAllFromScene` hides each member root: hidden trees are not drawn or picked and cast no shadows, but the meshes stay in `scene.meshes`, `traverse` still visits them, their geometry and model GPU data stay allocated, and other code that reads them (physics bodies, an `Animation`, a plugin walking the scene) keeps running. The container remembers each root's `visible` and puts it back; a write to it while the container is out is overwritten. Core can only dispose a removed plugin, so a container holds plugin factories: each add runs them again and a plugin starts fresh, with no state carried over. A plugin already attached, or one the container did not make, stays where it is, `moveAllFromScene` moves root meshes and models only, and the camera and scene lighting are not members. `moveAllFromScene` cannot tell a mesh that some plugin made for itself from yours; leave it with `keep`.
+
+A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `dispose`) or a factory, and is in one container at a time. The container owns each member tree: `dispose` takes meshes hung under a member too, except another container's members and other models. `instantiate` copies meshes and models, not plugin factories. A mesh tree is copied with `cloneSubtree` (same limits: core meshes only, so a model hung inside a tree copies as empty nodes); a model with `cloneModel`, by default that of `@margoengine/animation`, which takes gltf/pbr models, starts each copy from the source pose and rebuilds materials from the file, so meshes you hung on its nodes and runtime material edits are not copied. `cloneMaterials` copies the core material values of mesh trees only; textures a package keyed to a material object stay with the source. Copies of one geometry draw as instances. The default loader is `loadGLTF` of `@margoengine/gltf/pbr`; both packages are optional peers, loaded on first use. New entry 0 to 3,719 B gzip, ceiling 3,975 B; core and stage source unchanged. Capability list read from public documentation, no source read: Babylon.js documentation, "Asset Containers", 2026, https://doc.babylonjs.com/features/featuresDeepDive/importers/assetContainers.
+
+`add`, `addAllToScene`, `instantiate` and `loadContainer` are all or nothing. Removal and disposal cannot be undone: when a plugin's `dispose` throws, the rest still goes and the first error is thrown. Adding and removing attach and remove plugins, which core refuses during a frame, so call them outside plugin and frame callbacks.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -33351,7 +33360,7 @@ engine.start();
 
 The result is what the setters give, bit for bit, `mesh.rotation` and the world matrix included. A write is all or nothing: a value the setters refuse throws `RangeError`, and a mesh disposed since the writer was made throws MargoError `disposed` naming its row, before anything changes. Make a new writer then.
 
-## Good to know
+## Asset containers
 
 [README continues: https://margoengine.com/llms/packages/scene.md]
 
