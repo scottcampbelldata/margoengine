@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18962534,
+  "total": 18963244,
   "history": [
     {
       "date": "2026-10-24",
@@ -12231,6 +12231,12 @@
       "commit": "lane-c3",
       "reason": "post/caustics, new optional entry: SurfaceCaustics (caustics from any surface mesh onto every receiver) and the beam, flux-bound and projection shaders it shares with water/caustics, which now imports them from here instead of holding its own (water/caustics stays within its budget). Splitting the shaders into an entry of their own would leave water importing two post entries for one feature.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "bca3d0f6ca",
+      "reason": "water/flood +284 B: Flood.resetTime (GAP-FILM-RESET) restores the tick-0 inputs and frame-read settings and hands the Water a new solver factory; a split would put a 300 B reset in its own entry that every film using resetClocks loads anyway",
+      "grew": 1
     }
   ],
   "items": {
@@ -13058,9 +13064,9 @@
     "@margoengine/post/ascii": 9246,
     "@margoengine/post/bloom": 8379,
     "@margoengine/post/blur": 8249,
+    "@margoengine/post/caustics": 11810,
     "@margoengine/post/contact-shadows": 8001,
     "@margoengine/post/curvature": 10677,
-    "@margoengine/post/caustics": 11810,
     "@margoengine/post/decals": 5995,
     "@margoengine/post/depth": 4763,
     "@margoengine/post/fxaa": 4890,
@@ -13744,7 +13750,7 @@
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 13890,
+    "@margoengine/water/flood": 14600,
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
@@ -14050,10 +14056,10 @@
     "leak @margoengine/water/breaking -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/water/breaking -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/water/breaking -> @margoengine/materials": 1,
+    "leak @margoengine/water/caustics -> @margoengine/post/caustics": 1,
     "leak @margoengine/water/ice -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/water/ice -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/water/ice -> @margoengine/materials": 1,
-    "leak @margoengine/water/caustics -> @margoengine/post/caustics": 1,
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
