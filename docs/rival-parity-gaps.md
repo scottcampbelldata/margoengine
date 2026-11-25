@@ -50,7 +50,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | MISSING | M |  |
+| Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | DONE (scene save and load already existed: `save/src/engine.ts`) | M | f19d13852 |
 | Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | MISSING | S |  |
 | Blob shadow and planar `ShadowMesh` | three.js, drei | MISSING | S |  |
 | drei helpers: Float, Center, Resize, ScreenSizer, interaction prompt | drei, model-viewer | MISSING | S each |  |
