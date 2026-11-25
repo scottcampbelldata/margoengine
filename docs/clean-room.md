@@ -11122,6 +11122,15 @@ One scalar constraint on the volume a closed triangle surface encloses, V = sum 
 - D. Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996 (the direct solve of a tree of constraints, which the conjugate gradient solve matches in the answer; Margo's own tree solve of the 2D kernel, `packages/physics2d/kernel/src/joint/tree.rs`, follows it).
 - M. Macklin, M. Mueller and N. Chentanez, "XPBD: Position-Based Simulation of Compliant Constrained Dynamics", 2016 (the sweep that sheets keep, and the rigid-edge limit this replaces for ropes).
 
+### The pose a soft contact gives a rigid body (`@margoengine/physics/soft`, 2026-11-24, KB-SOFT-LIGHT1)
+
+The soft step moves a touched body's pose at each contact and solves the contact speeds after the positions; the pose it reaches, less the pose its start velocity and its velocity change spread evenly over the pieces reach, is given to the body as a change of pose with no velocity before the rigid step, and the contact's lever on the body is taken at the body's surface. Written from:
+
+- M. Mueller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007, https://doi.org/10.1016/j.jvcir.2007.01.005 (positions are corrected and the velocities follow from them).
+- M. Mueller, M. Macklin, N. Chentanez, S. Jeschke and T.-Y. Kim, "Detailed Rigid Body Simulation with Extended Position Based Dynamics", SCA 2020, https://doi.org/10.1111/cgf.14105, sections 3.4 and 3.5 (a rigid body's pose is corrected at the contact point, its velocity is the pose change over the substep, the contact speeds are solved after).
+- E. Catto, "Fast and Simple Physics using Sequential Impulses", GDC 2006, https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf (a velocity solver that corrects position apart from velocity, the part the host rigid step does not do for a soft contact).
+- R. Bridson, R. Fedkiw and J. Anderson, "Robust Treatment of Collisions, Contact and Friction for Cloth Animation", SIGGRAPH 2002, https://doi.org/10.1145/566654.566623 (read for the cloth contact against a moving body; its point-triangle tests were not needed, the particles of a default body already cover its triangles).
+
 ### Anisotropic cloth (`@margoengine/physics/soft`, 2026-11-24)
 
 A woven sheet's threads have springs of their own, each an XPBD distance constraint (Macklin et al. 2016) with its own natural frequency and damping ratio: the warp along the builder's `du`, the weft along `dv`, the diagonals of each cell as shear, and bend edges two along; the stretch and the shear are separate terms of an orthotropic sheet as in D. Baraff and A. Witkin, "Large Steps in Cloth Simulation", SIGGRAPH 1998, and B. Thomaszewski, S. Wacker and W. Strasser, "A consistent bending model for cloth simulation with corotational subdivision finite elements", SCA 2006 (for the bend); H. Wang, J. F. O'Brien and R. Ramamoorthi, "Data-driven elastic models for cloth: modeling and measurement", ACM TOG 30(4), 2011, for the anisotropic stretch measured on real cloth.

@@ -834,7 +834,6 @@ test('the builders take Rapier signatures: anisotropic cloth springs, a tube by 
 test('a deformable collider bound to a soft body follows it: direct, direct by position and skinned', async () => {
   const { physics, soft } = await create();
   const top = (collider) => collider.aabb().max[1];
-  const bottom = (collider) => collider.aabb().min[1];
   // A free 4 x 4 cloth falling; a thin mesh made of its four corner particles, bound directly.
   const cloth = soft.create(SoftBodyDesc.cloth([0, 5, 0], [0.1, 0, 0], [0, 0, 0.1], 4, 4).setParticleMass(0.05));
   const corners = [0, 3, 12, 15];
@@ -1095,9 +1094,10 @@ test('small and thin rigid bodies dropped on a default cloth rest on it and do n
     );
     const body = physics.addBody(null, options);
     // The cloth keeps ringing (a default body has no damping), so a light body may be tossed off it after a while; what it must
-    // never do is go through it: while it is over the cloth it stays above the cloth's lowest particle.
+    // never do is go through it: while it is over the cloth it stays above the cloth's lowest particle. Two and a half seconds:
+    // the bead went through at step 96 when the pose the soft step pushed it to did not reach the rigid body (KB-SOFT-LIGHT1).
     let landed = false;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 150; i++) {
       physics.step();
       const p = cloth.particlePositions();
       let lowest = Infinity;

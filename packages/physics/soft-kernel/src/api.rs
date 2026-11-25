@@ -21,6 +21,7 @@ static mut WORLD: World = World {
     vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(), dom: Col::new(), bsleep: Col::new(),
     m0x: Col::new(), m0y: Col::new(), m0z: Col::new(), l0x: Col::new(), l0y: Col::new(), l0z: Col::new(),
     dmx: Col::new(), dmy: Col::new(), dmz: Col::new(), a0x: Col::new(), a0y: Col::new(), a0z: Col::new(), kj: Col::new(), tau_end: 0.0, thx: Col::new(), thy: Col::new(), thz: Col::new(),
+    tux: Col::new(), tuy: Col::new(), tuz: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -49,7 +50,7 @@ columns! {
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
     kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
     at_p, at_row, at_rx, at_ry, at_rz,
-    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj,
+    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj, tux, tuy, tuz,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

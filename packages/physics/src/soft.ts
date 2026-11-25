@@ -3173,13 +3173,17 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.exports.soft_finish();
     this.giveToProxies(dt);
-    const c = this.columns();
+    const c = this.columns(),
+      proxies = new Set<PhysicsBody>();
+    // A cluster's proxy is put where its cluster is by giveToProxies; it takes no shift of its own.
+    for (const b of this.bodies) for (const info of b.clusterInfo) if (info.proxy) proxies.add(info.proxy);
     bodies.forEach((body, row) => {
       // A body of a higher dominance group than the soft body's is not pushed by it.
       if (body.type !== 'dynamic' || body.dominance > (this.rowGroups[row] ?? 0)) return;
       const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
         k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
       if (j[0] === 0 && j[1] === 0 && j[2] === 0 && k[0] === 0 && k[1] === 0 && k[2] === 0) return;
+      if (!proxies.has(body)) this.shiftBody(body, c, row, dt);
       const force: Vec3 = [j[0] / dt, j[1] / dt, j[2] / dt],
         torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
       body.addForce(force);
@@ -3366,6 +3370,56 @@ export class SoftBodies implements PhysicsAttachment {
       c.kvz[k] = f.velocity[2];
       c.kf[k] = f.friction ?? this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
     }
+  }
+
+  /**
+   * Gives a body the part of the pose the soft step moved it to that the force it takes does not carry. The step corrects
+   * the body's pose at each contact and then takes out the speed that correction would leave (an inelastic contact), so a
+   * push out of a particle is a change of pose with no impulse behind it; given only the impulses as a force, the body
+   * stayed where it was pushed from and a light one sank further into the particles every step (KB-SOFT-LIGHT1). The pose
+   * the step reached, less the pose its start velocity and its velocity change spread evenly over the pieces would reach
+   * (what the force does), is given as a pose change with no velocity: the position corrections of position-based dynamics
+   * (Mueller, Heidelberger, Hennix and Ratcliff 2007; Mueller, Macklin, Chentanez, Jeschke and Kim 2020, section 3.4), handed to
+   * a velocity solver the way a split impulse hands it a pseudo-velocity (Catto 2006). A body falling free or resting on
+   * the soft body gets none.
+   */
+  private shiftBody(body: PhysicsBody, c: Columns, row: number, dt: number): void {
+    const s = this.substeps,
+      even = (dt * (s + 1)) / (2 * s),
+      move: Vec3 = [
+        c.mx[row]! - c.m0x[row]! - c.l0x[row]! * dt - (c.lvx[row]! - c.l0x[row]!) * even,
+        c.my[row]! - c.m0y[row]! - c.l0y[row]! * dt - (c.lvy[row]! - c.l0y[row]!) * even,
+        c.mz[row]! - c.m0z[row]! - c.l0z[row]! * dt - (c.lvz[row]! - c.l0z[row]!) * even,
+      ],
+      turn: Vec3 = [
+        c.tux[row]! - c.a0x[row]! * dt - (c.avx[row]! - c.a0x[row]!) * even,
+        c.tuy[row]! - c.a0y[row]! * dt - (c.avy[row]! - c.a0y[row]!) * even,
+        c.tuz[row]! - c.a0z[row]! * dt - (c.avz[row]! - c.a0z[row]!) * even,
+      ];
+    if (move.every((v) => v === 0) && turn.every((v) => v === 0)) return;
+    // The centre of mass moves by `move` and the body turns by `turn` about it.
+    const q = body.rotation,
+      [x, y, z] = [turn[0] / 2, turn[1] / 2, turn[2] / 2],
+      t: Quat = [
+        q[0] + x * q[3] + y * q[2] - z * q[1],
+        q[1] + y * q[3] + z * q[0] - x * q[2],
+        q[2] + z * q[3] + x * q[1] - y * q[0],
+        q[3] - x * q[0] - y * q[1] - z * q[2],
+      ],
+      length = Math.hypot(...t),
+      turned: Quat = [t[0] / length, t[1] / length, t[2] / length, t[3] / length],
+      before = rotate(q, body.centerOfMass),
+      after = rotate(turned, body.centerOfMass),
+      p = body.position;
+    body.setRotation(turned, false);
+    body.setPosition(
+      [
+        p[0] + before[0] + move[0] - after[0],
+        p[1] + before[1] + move[1] - after[1],
+        p[2] + before[2] + move[2] - after[2],
+      ],
+      false,
+    );
   }
 
   /** Writes what the kernel needs to share a contact with a body: where it turns, how it moves, how heavy it is. */
@@ -3820,7 +3874,7 @@ function rowsOf(
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
-    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|dm[xyz]|th[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
+    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|dm[xyz]|th[xyz]|tu[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
       name,
     )
   )

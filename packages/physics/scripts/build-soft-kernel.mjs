@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { committedBlueprint } from '../../../scripts/committed-blueprint.mjs';
-import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
+import { blueprintRustEnv, sourceFolders } from '../../../scripts/rust-wasm-env.mjs';
 import { BLUEPRINTS, writeRecord } from '../../../scripts/wasm-blueprints.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -25,11 +25,15 @@ export function softColumns() {
 }
 
 /** The shared kernel parts (cloth contacts) are a path dependency outside the crate: cargo names their files by absolute path, so
- * that folder is remapped too, and the bytes do not depend on where the repository is checked out. */
+ * that folder is remapped too, and the bytes do not depend on where the repository is checked out. Each of its source folders
+ * is mapped onto a forward-slash path of its own, as the crate's are (scripts/rust-wasm-env.mjs): a prefix of the folder alone
+ * left the rest of the path with the host's separator (kernel-common\src\cloth.rs on Windows). */
 function kernelEnv() {
   const common = resolve(root, 'kernel-common');
   const env = blueprintRustEnv(kernel, RUSTFLAGS);
   env.RUSTFLAGS += ` --remap-path-prefix=${common}=physics/kernel-common`;
+  for (const folder of sourceFolders(common))
+    env.RUSTFLAGS += ` --remap-path-prefix=${resolve(common, folder)}=physics/kernel-common/${folder}/`;
   return env;
 }
 

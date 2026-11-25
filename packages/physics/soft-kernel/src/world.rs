@@ -188,6 +188,11 @@ pub struct World {
     pub thx: Col<f32>,
     pub thy: Col<f32>,
     pub thz: Col<f32>,
+    /// Per body row: how far it has turned over the step so far (a small-angle vector): its angular velocity over each piece
+    /// plus the turns the contacts gave it, so the host can give the body the turn its velocities do not account for.
+    pub tux: Col<f32>,
+    pub tuy: Col<f32>,
+    pub tuz: Col<f32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -250,7 +255,7 @@ impl World {
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
             &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
-            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.thx, &mut self.thy, &mut self.thz,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.thx, &mut self.thy, &mut self.thz, &mut self.tux, &mut self.tuy, &mut self.tuz,
         ] {
             grow(v, colliders);
         }
@@ -278,6 +283,9 @@ impl World {
             self.kx[c] = 0.0;
             self.ky[c] = 0.0;
             self.kz[c] = 0.0;
+            self.tux[c] = 0.0;
+            self.tuy[c] = 0.0;
+            self.tuz[c] = 0.0;
         }
         self.torn = 0;
         // A pinned particle with a target travels to it at a steady speed over the step.
@@ -385,6 +393,9 @@ impl World {
             self.lvx[c] += self.dmx[c] * inv_h;
             self.lvy[c] += self.dmy[c] * inv_h;
             self.lvz[c] += self.dmz[c] * inv_h;
+            self.tux[c] += self.avx[c] * h + self.thx[c];
+            self.tuy[c] += self.avy[c] * h + self.thy[c];
+            self.tuz[c] += self.avz[c] * h + self.thz[c];
             self.avx[c] += self.thx[c] * inv_h;
             self.avy[c] += self.thy[c] * inv_h;
             self.avz[c] += self.thz[c] * inv_h;
@@ -568,9 +579,9 @@ impl World {
                     continue;
                 }
                 let q = [
-                    self.x[i] - n[0] * self.radius[i] - carried[0],
-                    self.y[i] - n[1] * self.radius[i] - carried[1],
-                    self.z[i] - n[2] * self.radius[i] - carried[2],
+                    self.x[i] - n[0] * (self.radius[i] + d) - carried[0],
+                    self.y[i] - n[1] * (self.radius[i] + d) - carried[1],
+                    self.z[i] - n[2] * (self.radius[i] + d) - carried[2],
                 ];
                 // The body's velocity at the contact: its own, the turn it has taken since the step began, and what the surface does
                 // besides (a spin from before, a deforming mesh).
@@ -640,9 +651,9 @@ impl World {
         // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
         // the particle takes the share of the correction its inverse mass leaves it (Macklin et al. 2014, section 4).
         let (qx, qy, qz) = (
-            self.x[i] - mp[0] - nx * self.radius[i],
-            self.y[i] - mp[1] - ny * self.radius[i],
-            self.z[i] - mp[2] - nz * self.radius[i],
+            self.x[i] - mp[0] - nx * (self.radius[i] - push),
+            self.y[i] - mp[1] - ny * (self.radius[i] - push),
+            self.z[i] - mp[2] - nz * (self.radius[i] - push),
         );
         let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
         let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
