@@ -75,9 +75,12 @@ export class BoundaryLayerWind implements Wind {
       seaLevelTemperature = SEA_LEVEL_TEMPERATURE,
       turbulence = {},
     } = options;
-    if (!(speed >= 0 && Number.isFinite(speed))) throw new RangeError(`A wind speed is 0 or more m/s (got ${speed}).`);
+    if (!(speed >= 0 && Number.isFinite(speed)))
+      throw new RangeError(`A wind speed is 0 or more m/s (got ${speed}); pass a finite speed.`);
     if (!(roughness > 0 && Number.isFinite(roughness)))
-      throw new RangeError(`A roughness length is a finite number of metres above 0 (got ${roughness}).`);
+      throw new RangeError(
+        `A roughness length is a finite number of metres above 0 (got ${roughness}); pass a roughness such as 0.03 for open grass.`,
+      );
     if (!(referenceHeight > roughness && Number.isFinite(referenceHeight)))
       throw new RangeError(
         `The reference height (${referenceHeight} m) must be above the roughness length (${roughness} m).`,
@@ -87,7 +90,8 @@ export class BoundaryLayerWind implements Wind {
       ['ground', ground],
       ['altitude', altitude],
     ] as const)
-      if (!Number.isFinite(v)) throw new RangeError(`A wind's ${name} is a finite number (got ${v}).`);
+      if (!Number.isFinite(v))
+        throw new RangeError(`A wind's ${name} is a finite number (got ${v}); pass a finite value.`);
     this.speed = speed;
     this.referenceHeight = referenceHeight;
     this.direction = direction;

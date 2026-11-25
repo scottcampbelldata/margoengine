@@ -30,7 +30,7 @@ export class Fft {
   /** @throws RangeError for a length that is not a whole number from 1 to 2^24 whose prime factors are 2, 3 and 5. */
   constructor(n: number) {
     if (!Number.isSafeInteger(n) || n < 1 || n > 16777216)
-      throw new RangeError(`An FFT length is a whole number from 1 to 2^24 (got ${n}).`);
+      throw new RangeError(`An FFT length is a whole number from 1 to 2^24 (got ${n}); pass a length in that range.`);
     this.n = n;
     this.factors = factor(n);
     this.twiddles = new Float64Array(2 * n);
@@ -122,7 +122,7 @@ export class Fft3 {
     const { nx, ny, nz } = this;
     if (data.length !== 2 * nx * ny * nz)
       throw new RangeError(
-        `A ${nx} by ${ny} by ${nz} complex grid holds ${2 * nx * ny * nz} words (got ${data.length}).`,
+        `A ${nx} by ${ny} by ${nz} complex grid holds ${2 * nx * ny * nz} words (got ${data.length}); pass a grid of that length.`,
       );
     const [px, py, pz] = this.plans;
     for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) px.transform(data, inverse, 2 * nx * (j + ny * k), 1);
@@ -145,7 +145,8 @@ export class RealFft2 {
 
   /** @throws RangeError for an odd nx, or a length whose prime factors are not 2, 3 and 5. */
   constructor(nx: number, ny: number) {
-    if (nx % 2 !== 0) throw new RangeError(`A real 2D transform takes an even nx (got ${nx}).`);
+    if (nx % 2 !== 0)
+      throw new RangeError(`A real 2D transform takes an even nx (got ${nx}); pad the field to an even width.`);
     this.nx = nx;
     this.ny = ny;
     this.grid = new Fft3(nx, ny);
@@ -157,7 +158,9 @@ export class RealFft2 {
     const { nx, ny, full } = this,
       half = nx / 2 + 1;
     if (field.length !== nx * ny)
-      throw new RangeError(`A ${nx} by ${ny} real field holds ${nx * ny} values (got ${field.length}).`);
+      throw new RangeError(
+        `A ${nx} by ${ny} real field holds ${nx * ny} values (got ${field.length}); pass a field of that length.`,
+      );
     for (let i = 0; i < nx * ny; i++) {
       full[2 * i] = field[i]!;
       full[2 * i + 1] = 0;
@@ -176,7 +179,9 @@ export class RealFft2 {
     const { nx, ny, full } = this,
       half = nx / 2 + 1;
     if (spectrum.length !== 2 * half * ny)
-      throw new RangeError(`A ${nx} by ${ny} half spectrum holds ${2 * half * ny} words (got ${spectrum.length}).`);
+      throw new RangeError(
+        `A ${nx} by ${ny} half spectrum holds ${2 * half * ny} words (got ${spectrum.length}); pass the half spectrum forward() gave.`,
+      );
     for (let j = 0; j < ny; j++)
       for (let i = 0; i < nx; i++) {
         // The missing half by symmetry: X(i, j) = conj X(nx - i, ny - j).

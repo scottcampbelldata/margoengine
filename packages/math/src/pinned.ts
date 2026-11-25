@@ -217,7 +217,9 @@ function tree(values: readonly number[], from: number, to: number): number {
 /** The dot product of two arrays of equal length, summed as {@link sum} sums the products. */
 export function dot(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length)
-    throw new RangeError(`dot takes two arrays of one length (got ${a.length} and ${b.length}).`);
+    throw new RangeError(
+      `dot takes two arrays of one length (got ${a.length} and ${b.length}); pass arrays of equal length.`,
+    );
   const products = new Float64Array(a.length);
   for (let i = 0; i < a.length; i++) products[i] = a[i]! * b[i]!;
   return sum(products);

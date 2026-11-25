@@ -106,7 +106,7 @@ export class RandomStream {
   block(tick: number, element: number, stream = 0, out: Uint32Array = new Uint32Array(4)): Uint32Array {
     if (!(Number.isSafeInteger(tick) && tick >= 0) || !isWord(element) || !isWord(stream))
       throw new RangeError(
-        `A random draw takes a tick from 0 to 2^53, an element and a stream from 0 to 4294967295 (got ${tick}, ${element}, ${stream}).`,
+        `A random draw takes a tick from 0 to 2^53, an element and a stream from 0 to 4294967295 (got ${tick}, ${element}, ${stream}); pass whole numbers in those ranges.`,
       );
     return philox(element, stream, tick % TWO_32, Math.floor(tick / TWO_32), this.k0, this.k1, out);
   }
@@ -132,7 +132,8 @@ export class RandomStream {
    * @throws RangeError for an n outside 1..2^32 - 1.
    */
   below(tick: number, element: number, stream: number, n: number, out: Uint32Array = new Uint32Array(4)): Uint32Array {
-    if (!isWord(n) || n === 0) throw new RangeError(`below(n) takes n from 1 to 4294967295 (got ${n}).`);
+    if (!isWord(n) || n === 0)
+      throw new RangeError(`below(n) takes n from 1 to 4294967295 (got ${n}); pass a whole number in that range.`);
     const b = this.block(tick, element, stream, this.words);
     for (let i = 0; i < 4; i++) out[i] = mulhi(b[i]!, n);
     return out;

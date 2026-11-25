@@ -54,7 +54,10 @@ export function behaviorLines(behaviors: readonly USDZBehavior[], names: readonl
             ? [target]
             : []
           : names.flatMap((name, i) => (name === target ? [i] : []));
-      if (!hit.length) throw new RangeError(`${what} target ${JSON.stringify(target)} names no mesh in the file`);
+      if (!hit.length)
+        throw new RangeError(
+          `${what} target ${JSON.stringify(target)} names no mesh in the file; pass a mesh, its index or its name from the exported scene`,
+        );
       for (const i of hit) out.add(`</Margo/Mesh_${i}>`);
     }
     return `[${[...out].join(', ')}]`;
@@ -96,7 +99,10 @@ export function behaviorLines(behaviors: readonly USDZBehavior[], names: readonl
         `${p}uniform uint performCount = ${count}`,
         ...inner,
       );
-    } else throw new RangeError(`unknown action type ${JSON.stringify((a as { type: unknown }).type)}`);
+    } else
+      throw new RangeError(
+        `unknown action type ${JSON.stringify((a as { type: unknown }).type)}; use one of the action types in the exporters README`,
+      );
     into.push(
       `${indent}def Preliminary_Action "${id}" ( inherits = </${schema}> )`,
       `${indent}{`,
@@ -111,7 +117,9 @@ export function behaviorLines(behaviors: readonly USDZBehavior[], names: readonl
     const inner: string[] = [],
       triggers = b.triggers.map((t, k) => {
         if ((t as { type: unknown }).type !== 'tap')
-          throw new RangeError(`unknown trigger type ${JSON.stringify((t as { type: unknown }).type)}`);
+          throw new RangeError(
+            `unknown trigger type ${JSON.stringify((t as { type: unknown }).type)}; use one of the trigger types in the exporters README`,
+          );
         const id = `Trigger_${n}_${k}`;
         inner.push(
           `        def Preliminary_Trigger "${id}" ( inherits = </TapGestureTrigger> )`,

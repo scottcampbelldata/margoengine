@@ -79,9 +79,13 @@ export class MannBox {
       ...size.map((s, i) => [`size[${i}]`, s] as const),
     ] as const)
       if (!(v > 0 && Number.isFinite(v)))
-        throw new RangeError(`A Mann box's ${name} is a finite number above 0 (got ${v}).`);
+        throw new RangeError(
+          `A Mann box's ${name} is a finite number above 0 (got ${v}); pass a positive finite value.`,
+        );
     if (!(shear >= 0 && Number.isFinite(shear)))
-      throw new RangeError(`A Mann box's shear is 0 or more (got ${shear}).`);
+      throw new RangeError(
+        `A Mann box's shear is 0 or more (got ${shear}); pass a finite shear, 0 for isotropic turbulence.`,
+      );
     this.cells = [cells[0], cells[1], cells[2]];
     this.size = [size[0], size[1], size[2]];
     this.lengthScale = lengthScale;
