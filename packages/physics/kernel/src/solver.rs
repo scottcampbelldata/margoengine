@@ -385,6 +385,57 @@ impl World {
         }
     }
 
+    /// Whether body `at` has turned since the step began, by any amount a float can tell: its inertia in the world's axes is then not the
+    /// one the step's contact rows were made with.
+    #[inline]
+    fn has_turned(&self, at: usize) -> bool {
+        self.flags(at) & KIND == DYNAMIC && self.q(ROTATION_X, at) != self.q(PREVIOUS_ROTATION_X, at)
+    }
+
+    /// After a substep's poses: the world inverse inertia of every body that has turned, and the effective masses of the contacts it is in,
+    /// made again from where it is. The step's contact rows are made once, from the pose the step began with. An impulse `P` at a lever `r`
+    /// changes the spin by `W (r x P)` with `W` the inverse inertia in the world's axes, and the kinetic energy it changes by is `P` times the
+    /// mean speed of the point only when that `W` is the body's own now: with a stale `W`, an impulse that stops a point (a projection, which
+    /// can only lose energy) changes the energy by `w . I (W_stale - W) (r x P)` as well, which grows with the spin. A thin bar spinning at
+    /// 400 rad/s against a wall went from 85 to 273 kJ that way, with the step turning it 6.7 rad. The levers stay the step's (a point
+    /// moved on by the turn is the sticky friction's to follow, which a lever refreshed with it would not let rest: Catto, "Solver2D", 2024,
+    /// keeps anchors fixed over a step), and a lever is exact for every impulse as long as the speed it measures is the speed it applies at.
+    pub fn refresh_turned_contacts(&mut self) {
+        let mut any = false;
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            if self.has_turned(at) {
+                self.solver_mass(at);
+                any = true;
+            }
+        }
+        if !any {
+            return;
+        }
+        for i in 0..self.header().solving as usize {
+            let row = self.uu(SOLVE_PAIRS, i) as usize;
+            let (a, b) = self.pair_bodies(row as u32);
+            if !(self.has_turned(a) || self.has_turned(b)) {
+                continue;
+            }
+            let normal = self.v(PAIR_NORMAL_X, row);
+            let tangent = self.v(PAIR_TANGENT_X, row);
+            let other = normal.cross(tangent);
+            let (body_a, body_b) = self.pair_moving(row, a, b);
+            for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+                let at = row * MANIFOLD + k;
+                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+                let mass = |d: V3| {
+                    let give = body_a.give(d, arm_a) + body_b.give(d, arm_b);
+                    if give > 0.0 { 1.0 / give } else { 0.0 }
+                };
+                self.set_s(CONTACT_NORMAL_MASS, at, mass(normal));
+                self.set_s(CONTACT_TANGENT_MASS, at, mass(tangent));
+                self.set_s(CONTACT_OTHER_MASS, at, mass(other));
+            }
+        }
+    }
+
     /// Each substep: the impulses the points carry, before anything is solved.
     pub fn warm_start(&mut self) {
         let share = self.header().warm_start;

@@ -224,6 +224,7 @@ impl World {
             self.clamp_speeds();
             tick(self, 9, &mut inner);
             self.integrate_poses(h, substep + 1 == substeps);
+            self.refresh_turned_contacts();
             self.track_couplings(h);
             self.fk_multibodies(h);
             self.tally_drift(h);
