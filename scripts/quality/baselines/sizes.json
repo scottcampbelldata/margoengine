@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18775881,
+  "total": 18780484,
   "history": [
     {
       "date": "2026-10-24",
@@ -11937,6 +11937,12 @@
       "commit": "17243d4fb6",
       "reason": "environment lighting loads only the decoder it needs",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "e896fdce5c",
+      "reason": "new headless/frames entry and shared readback module reused by readPixels",
+      "grew": 6
     }
   ],
   "items": {
@@ -12403,17 +12409,18 @@
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9808,
     "@margoengine/gltf/worker": 92644,
-    "@margoengine/headless": 2864,
+    "@margoengine/headless": 3309,
     "@margoengine/headless/compare": 3721,
     "@margoengine/headless/ffmpeg": 5023,
     "@margoengine/headless/ffmpeg-files": 4632,
     "@margoengine/headless/formats": 5809,
+    "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
     "@margoengine/headless/look": 15956,
-    "@margoengine/headless/null": 2977,
-    "@margoengine/headless/stage": 3396,
-    "@margoengine/headless/tiles": 2466,
-    "@margoengine/headless/video": 12819,
+    "@margoengine/headless/null": 3411,
+    "@margoengine/headless/stage": 3972,
+    "@margoengine/headless/tiles": 2829,
+    "@margoengine/headless/video": 13452,
     "@margoengine/horses": 16111,
     "@margoengine/horses/anatomy": 1097,
     "@margoengine/horses/crowd": 12397,
