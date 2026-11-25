@@ -11984,6 +11984,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: `npm run build:packages` failed on Node 22.12.0 (KB-NODE22-BUILD1, scripts)
+
+- **Repro:** CI's Node 22.12.0 jobs (run 45703324344) stopped in `build:packages`: `SyntaxError: The requested module
+  'node:module' does not provide an export named 'registerHooks'`.
+- **Cause:** `scripts/support/record-reads.mjs`, which the build imports for its job names, imported `registerHooks` by
+  name; Node has it from 22.15, and a missing named export fails the load.
+- **Fix:** it is read off the default export; only an actual recording (`MARGO_RECORD_DIR`) needs it, and says so on an
+  older Node.
+- **Regression:** `tests/node-apis.test.js` (the build script and everything it imports pass the Node 22.12 API scan).
+  Not run on Node 22.12 here; CI's 22.12.0 jobs are that proof.
+
 ### Open 2026-11-25: a strong wind grows the sea too fast (KB-SEA-GROWTH1, physics waves)
 
 - **Repro:** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind toward +x and
