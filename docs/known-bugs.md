@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-25: a 30-row pyramid at one pass a substep creeps instead of resting (KB-PHYS-PILECREEP1, physics kernel, contact solver)
+
+- **Repro:** `packages/physics/kernel/tests/solver.rs`, `a_pyramid_of_thirty_rows_settles_at_one_pass_a_substep` (465 metre cubes, 4 substeps of one pass, sleeping off, 30 s). With gravity 9.80665 m/s^2 its fastest cube moves at 5.6 mm/s at 30 s (bound 1 mm/s) and the pile has moved 8.9 cm; at 9.81 it passed at 0.59 mm/s, but the 26- and 28-row piles of the same test helper already crept at 1.1 mm/s. Gravity is the only change: the old code with gravity set explicitly to 9.80665 gives the same bits (fastest 3bb76fa9, moved 3db5bae7 as f32 words).
+- **Cause:** not yet found. The pile sits at the edge of what one pass a substep settles (the eighth-rate chain spring of `CHAIN_LOAD`), so a 0.03 percent change of the load tips it into a slow creep. A pile that rests at one g and creeps at another is a solver defect, not a tolerance.
+- **Owner:** the contact solver's rebuild (with KB-PHYS-BLOCK1 and KB-PHYS-WALL1). Blocks moving the engine to standard gravity.
+
+### Open 2026-11-25: a contact's resting depth jumps between two branches, so a small change of g flips it (KB-PHYS-RESTDEPTH1, physics kernel, contact solver)
+
+- **Repro:** `packages/physics/tests/next-parameters.test.js`, "the solver settings do what they say", the case "a tenth the size, the default damping ratio": a 5 cm ball on a box with `contactHertz` 60 and `allowedPenetration` 0.003, 900 steps. At 9.81 m/s^2 it rests at the allowed depth plus g / omega^2 (6.9e-5 m past it), the soft spring's equilibrium; at 9.80665 it rests at the allowed depth exactly (2e-9 m past it).
+- **Cause:** a point inside the slop is closed by a rigid speculative row to the slop's depth, and one past it by the soft spring; the resting depth depends on which branch the point settles in, not continuously on the load. A correct contact gives a resting depth continuous in g.
+- **Owner:** the contact solver's rebuild. Blocks moving the engine to standard gravity.
+
+### Open 2026-11-25: a small or thin body falls through a default cloth (KB-SOFT-TUNNEL1, physics soft, soft-rigid contact)
+
+- **Repro:** `packages/physics/tests/soft.test.js`: "small and thin rigid bodies dropped on a default cloth rest on it for five seconds and never pass through it" (with gravity 9.80665 m/s^2 the rod leaves the cloth at step 163), and "a contact is stable at a mass ratio of a thousand either way, and a cloth holds a body or tears, never lets it through" (a body falls through to y = -25). Both pass at 9.81 by a margin a 0.03 percent change of g crosses.
+- **Cause:** under study in the soft-rigid contact, which is moving onto the framework as SoftSolver: a thin cloth meets a small body through contacts that can miss it within a step.
+- **Owner:** the dynamics lane, with SoftSolver. Blocks moving the engine to standard gravity.
+
 ### Fixed 2026-11-25: the glTF report could not decode a Draco file (KB-GLTFREPORT-DECODERS, gltf)
 
 - **Repro:** `reportGLTF` on the Khronos Draco Box gave a `decode` problem ("This file needs the Draco decoder") and
