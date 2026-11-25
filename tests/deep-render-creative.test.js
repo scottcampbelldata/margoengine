@@ -97,7 +97,7 @@ test('Creative validation and Toon source patches avoid repeated stable-frame sc
   }
   assert.equal(enumerations, 0);
   assert.equal(patches, 0);
-  const v = new Float32Array(h.resources.find((r) => r.size === 272).data);
+  const v = new Float32Array(h.resources.find((r) => r.size === 288).data);
   assert.deepEqual(Array.from(v.slice(44, 47)), [1, 1, 1]);
   assert.deepEqual(Array.from(v.slice(48, 51)), [0, 0, 0]);
   for (const change of [
