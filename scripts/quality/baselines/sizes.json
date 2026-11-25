@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18631921,
+  "total": 18634706,
   "history": [
     {
       "date": "2026-10-24",
@@ -11841,6 +11841,12 @@
       "commit": "0ba7a18dc",
       "reason": "xr/session: new optional entry, session state (952 B gzip); xr/layers 4353 to 4612 B budget: quality, blendTextureSourceAlpha, chromaticAberrationCorrection and mipLevels options",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "93f059b19",
+      "reason": "@margoengine/physics/world: 2,264 to 5,049 B gzip for the world's memory and the field registry of the physics framework (section 4): the region allocator, one writer per field with SI unit checks, mirrored ports with the previous value, contributions summed by solver id then element, and every refusal; every solver lane imports this entry for the registry, so a split would only move the bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12614,7 +12620,7 @@
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
-    "@margoengine/physics/world": 2520,
+    "@margoengine/physics/world": 5305,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

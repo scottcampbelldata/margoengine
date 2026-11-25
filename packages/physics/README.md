@@ -1511,7 +1511,7 @@ console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post
 
 ### The solver contract (`@margoengine/physics/world`)
 
-`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The world, the field registry and the scheduler that drive these come next.
+`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The field registry below keeps the fields between them; the world and the scheduler that drive them come next.
 
 ```ts
 import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
@@ -1590,6 +1590,28 @@ const saved = takeSnapshot(memory, [ball]);
 value[0] = 3; // the run goes on
 restoreSnapshot(memory, [ball], saved.bytes);
 console.log(value[0], stateHash(memory, [ball]) === saved.hash); // 10 true
+```
+
+The field registry (`FieldRegistry`, [docs/physics-framework.md](../../docs/physics-framework.md), section 4) holds every field that crosses a solver boundary: its kind, quantity, SI unit and centring, its one owner, its readers and the solvers that add to it. `declare(solver, uses)` takes what a solver's `describe()` lists and refuses a second writer, a field described two ways, or a known quantity in a unit other than its SI one (`QUANTITY_UNITS`: velocity in `m/s`, impulse in `N s`, temperature in `K`, and so on). `publish(solver, port, level)` copies an owner's port (its positions in `port.cell`, which the world sets) into one of two mirror regions that swap, so readers see the value at the coupling tick however often the owner steps after it, and the previous value stays for interpolation (`field(name).current` and `.previous`, each a port with its tick and origin cell, and its rate level). A contributor's port is added as f64 into a region of its own, and `sum(field, tick)` adds those by contributor id, then by element, into the field's sum region: the same bits whatever order the solvers ran in. All of it lies in regions of the world's memory (`Arena` allocates them, 8-byte aligned and zeroed), and `stateRegions()` lists them, so the state hash and a snapshot carry the registry with the solvers. `TransferRegistry` holds the framework's transfers between representations by name.
+
+```ts
+import {Arena, FieldRegistry, regionWords, type FieldDescriptor} from 'margoengine/physics/world';
+
+const impulse: FieldDescriptor = {name: 'hullImpulse', kind: 'bodySet', quantity: 'impulse', unit: 'N s', centring: 'particle'};
+const arena = new Arena();
+const fields = new FieldRegistry(arena);
+fields.declare('ship', [{field: impulse, access: 'write'}]);
+fields.declare('sail', [{field: impulse, access: 'accumulate'}]);
+fields.declare('waves', [{field: impulse, access: 'accumulate'}]);
+
+// Each contributor publishes its push on the hull; the order they come in does not matter.
+for (const [id, push] of [['waves', 120.5], ['sail', 40.25]] as const) {
+  const region = arena.allocate(`${id}Push`, 8, 'f64', 1);
+  regionWords(arena.memory, region)[0] = push;
+  fields.publish(id, {field: 'hullImpulse', region, tick: 0, cell: [0, 0, 0]}, 0, [0, 0, 0]);
+}
+const total = fields.sum('hullImpulse', 0)!;
+console.log(regionWords(arena.memory, total.region)[0]); // 160.75
 ```
 
 ## Limits

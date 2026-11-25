@@ -11271,6 +11271,22 @@ algorithm's published description: A. Appleby, "MurmurHash3", 2011, public domai
 (the description page; no source file of it was read). It is checked against the function's published vectors ("" seed 0:
 0, "hello" seed 0: 0x248bfa47, "The quick brown fox jumps over the lazy dog" seed 0: 0x2e4ff723), fed whole and in
 three-byte pieces. Proof: `packages/physics/tests/world-snapshot.test.js`.
+### The field registry of the physics framework (`@margoengine/physics/world`, 2026-11-25)
+
+`packages/physics/src/world/fields.ts` and `memory.ts` keep every field that crosses a solver boundary (docs/physics-framework.md,
+section 4): one writer, readers and contributors, values at the coupling tick with the previous one mirrored in the world's
+memory, and contributions summed by contributor id then element. The access model is the "privileges" of task-based runtimes and
+render graphs: M. Bauer, S. Treichler, E. Slaughter and A. Aiken, "Legion: Expressing Locality and Independence with Logical
+Regions", SC 2012, https://doi.org/10.1109/SC.2012.71, and Y. O'Donnell, "FrameGraph: Extensible Rendering Architecture in
+Frostbite", GDC 2017; fields shared by coupled models as in D. Gaston, C. Newman, G. Hansen and D. Lebrun-Grandie, "MOOSE: A
+parallel computational framework for coupled systems of nonlinear equations", Nuclear Engineering and Design 239(10), 2009,
+https://doi.org/10.1016/j.nucengdes.2009.05.021, and C. Hill, C. DeLuca, V. Balaji, M. Suarez and A. da Silva, "The
+Architecture of the Earth System Modeling Framework", Computing in Science and Engineering 6(1), 2004,
+https://doi.org/10.1109/MCISE.2004.1255817 (all known through the framework's survey, not read in full here). The order-fixed sum
+is the canonical order of the framework's section 7; the mirrors, the meta region and the f64 contribution regions are this
+package's own arrangement. Transfers are named after the methods that will fill them (Jiang et al. 2015, APIC; Jones 1999 and
+Ullrich and Taylor 2015, conservative remapping; Farhat, Lesoinne and Le Tallec 1998), none implemented yet. Proof:
+`packages/physics/tests/world-fields.test.js`.
 ### Pinned elementary functions and fixed-order sums (`kernel-common`, 2026-11-25, K01)
 
 `kernel-common/src/pinned.rs` has `exp`, `ln`, `sin`, `cos`, `pow` and a fixed-partition sum over f64, built only from + - * / and integer operations, so every build gives the same bits. The methods are the textbook ones: argument reduction by the leading and trailing parts of ln 2 and of pi / 2 (W. J. Cody and W. Waite, "Software Manual for the Elementary Functions", Prentice-Hall, 1980; the parts are split here with exact arithmetic from the decimal digits of pi and ln 2, not copied) and Taylor series on the reduced interval (J.-M. Muller, "Elementary Functions: Algorithms and Implementation", 3rd ed., Birkhauser, 2016, chapters 4 and 11); `pow` carries ln x and the product y ln x as pairs of doubles (TwoSum, T. J. Dekker's split product, "A floating-point technique for extending the available precision", Numerische Mathematik 18, 1971; Muller 2016, section 4.3). The sum adds blocks of 256 in order and the blocks' sums by a balanced tree over their indices, the fixed-partition idea of J. Demmel and H. D. Nguyen, "Parallel reproducible summation", IEEE Transactions on Computers 64(7), 2015. Accuracy is held against the host's functions by `kernel-common/tests/pinned.rs`: within 2 ulp for exp, ln, sin and cos, within 4 ulp for pow.
