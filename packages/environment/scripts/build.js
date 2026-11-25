@@ -71,6 +71,9 @@ for (const [entry, emptyOutDir] of [
       rollupOptions: {
         external: (id) =>
           id === '@margoengine/core' ||
+          // Math is a declared dependency, imported rather than copied into each decoder, so an app holds one copy of
+          // it however many files it splits into. A module worker has no import map, so its file stays whole.
+          (entry !== 'exr-codecs-worker' && id.startsWith('@margoengine/math/')) ||
           id.startsWith('node:') ||
           id === '@margoengine/core/extension' ||
           id === '@margoengine/environment' ||

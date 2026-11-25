@@ -7478,6 +7478,14 @@ The `create-margo` web starter's production build (every JS chunk, lazy ones inc
 The current Environment module graph accounts for 11,659 B of lazy loader code in the measured bundle. The starter
 does not load Water, and this correction changes no runtime code or core and stage size. It measured 82,837 B on
 09a33b8dd9.
+
+It measured 85,490 B on 2026-11-25, over the bound: +1,238 B from the image decoders splitting into separate lazy
+files (3ef159ec16 and 1aa72fb945, which let an app download one decoder; files compressed apart share nothing) and
++227 B of shadow, core and controls fixes. The bound did not move. The decoder files now import `@margoengine/math`
+instead of each carrying its colour matrices and error class (-370 B; the EXR codecs worker keeps its copy, since a
+module worker reads no import map), and the web starter's `vite.config.ts` turns off Vite's `modulepreload` polyfill,
+which no browser with WebGPU needs (-268 B). It measures 84,852 B.
+
 The earlier bound moved from 82,000 to 83,000 B (2026-11-16) for 1,246 B of shadow and controls fixes and features, measured
 per commit by rebuilding the template's packages at each commit that touched its dependency closure (81,591 B on
 9de40842c5): `add(group or model root)` casts every mesh below it +570 B (c0667a30ae; the group walk sits in the

@@ -80,6 +80,19 @@ test('an app that parses bytes and loads files keeps the parsers once, with no i
     );
 });
 
+test('the decoders import math instead of each carrying a copy; the module worker stays whole', async () => {
+  // Each decoder file once held its own colour matrices and error class, so an app downloaded them once per format.
+  const dist = (name) => readFile(new URL(`../dist/${name}`, import.meta.url), 'utf8');
+  for (const name of ['hdr.js', 'exr.js', 'ultrahdr.js']) {
+    const code = await dist(name);
+    for (const module of ['color', 'errors'])
+      assert.match(code, new RegExp(`from ["']@margoengine/math/${module}["']`), `${name} imports math/${module}`);
+    assert.doesNotMatch(code, /class extends Error/, `${name} defines its own error class`);
+  }
+  // A page without a bundler resolves bare names through its import map, which a worker does not read.
+  assert.doesNotMatch(await dist('workers/exr-codecs.js'), /(from|import)\s*\(?\s*["']@margoengine\//);
+});
+
 test('loadEnvironmentImage decodes by signature and keeps its errors', async () => {
   const bytes = await readFile(hdr);
   const serve =

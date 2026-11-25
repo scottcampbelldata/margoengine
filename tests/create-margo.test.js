@@ -40,6 +40,7 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
     'public',
     'src',
     'tsconfig.json',
+    'vite.config.ts',
   ]);
   const headers = readFileSync(join(app, 'public/_headers'), 'utf8');
   for (const directive of ["script-src 'self' 'wasm-unsafe-eval'", "worker-src 'self'", 'immutable'])
@@ -124,9 +125,15 @@ for (const [template, { main, imports }] of Object.entries(templates))
     // alphaHash() (tests/alpha-hash-free-imports.test.js), 81,613 B, and the bound is back at 82,000. 83,000 since
     // 09a33b8dd9 (82,837 B): shadow group casters, PCSS options, device-restore and frame-time fixes and controls help
     // links, +1,246 B, each commit measured in docs/limits.md.
-    // Scott, 2026-11-21: 85,000 B for the 84,025 B public-main starter with the current Environment graph.
+    // Scott, 2026-11-21: 85,000 B for the 84,025 B public-main starter with the current Environment graph. It reached
+    // 85,490 B on 2026-11-25 (the decoders' lazy chunks, 1aa72fb945); sharing one copy of math between them and
+    // dropping Vite's modulepreload polyfill brought it to 84,852 B (docs/limits.md).
     if (template === 'web') assert.ok(gzip > 10_000 && gzip < 85_000, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
+    // Every browser the web starter runs in has modulepreload, so its start-up code carries no polyfill for it.
+    if (template === 'web')
+      for (const file of scripts)
+        assert.doesNotMatch(readFileSync(join(assets, file), 'utf8'), /link\[rel="modulepreload"\]/, file);
     // WGSL comments are documentation for the source, not bytes for the user: they once cost the web template 698 B.
     if (template === 'web')
       for (const file of scripts) {
