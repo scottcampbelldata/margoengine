@@ -1,16 +1,16 @@
 {
-  "commit": "b52e9c50f",
-  "dirty": true,
+  "commit": "9fb89d1057",
+  "dirty": false,
   "browser": "msedge 158.0.4370.33 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-by-8gDUO.js",
+      "file": "assets/dist-BpM7Ungb.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_model-DGBgydA8-BUAJypM_.js",
+        "_model-DGBgydA8-f8tCvf_x.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -77,13 +77,13 @@
       ]
     },
     "../../../packages/gltf/dist/compression-dgiF4rBQ.js": {
-      "file": "assets/compression-dgiF4rBQ-DXJL9key.js",
+      "file": "assets/compression-dgiF4rBQ-DKnURAxG.js",
       "name": "compression-dgiF4rBQ",
       "src": "../../../packages/gltf/dist/compression-dgiF4rBQ.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-BH-IRRKh-D5TzHjGh.js"
+        "_asset-BH-IRRKh-Do-AP93g.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -125,14 +125,14 @@
       "isDynamicEntry": true
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-B-aWkERX.js",
+      "file": "assets/pbr-D1ezyiE-.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-DGBgydA8-BUAJypM_.js",
-        "_asset-BH-IRRKh-D5TzHjGh.js",
+        "_model-DGBgydA8-f8tCvf_x.js",
+        "_asset-BH-IRRKh-Do-AP93g.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -152,7 +152,7 @@
       ]
     },
     "../../../packages/gltf/dist/splats.js": {
-      "file": "assets/splats-6j0GEbT3.js",
+      "file": "assets/splats-CCaUqsxj.js",
       "name": "splats",
       "src": "../../../packages/gltf/dist/splats.js",
       "isDynamicEntry": true,
@@ -173,22 +173,22 @@
       "isDynamicEntry": true
     },
     "../../../packages/splats/dist/data.js": {
-      "file": "assets/data-DahV1vVU.js",
+      "file": "assets/data-O3c6CuhT.js",
       "name": "data",
       "src": "../../../packages/splats/dist/data.js",
       "isDynamicEntry": true,
       "imports": [
-        "_data-DYZnmghD-CnqB9AsR.js"
+        "_data-C20VhrZl-Bfz2Sq2a.js"
       ]
     },
-    "../../../packages/splats/dist/encode-CDa9aQY6.js": {
-      "file": "assets/encode-CDa9aQY6-DIM3pRIn.js",
-      "name": "encode-CDa9aQY6",
-      "src": "../../../packages/splats/dist/encode-CDa9aQY6.js",
+    "../../../packages/splats/dist/encode-C7wm9xjp.js": {
+      "file": "assets/encode-C7wm9xjp-CLCIyCG3.js",
+      "name": "encode-C7wm9xjp",
+      "src": "../../../packages/splats/dist/encode-C7wm9xjp.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_data-DYZnmghD-CnqB9AsR.js"
+        "_data-C20VhrZl-Bfz2Sq2a.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/errors-BPm2c1ar.js"
@@ -204,7 +204,7 @@
       ]
     },
     "../../../packages/splats/dist/index.js": {
-      "file": "assets/dist-DAYZ641o.js",
+      "file": "assets/dist-BACDxnOY.js",
       "name": "dist",
       "src": "../../../packages/splats/dist/index.js",
       "isDynamicEntry": true,
@@ -213,32 +213,32 @@
         "_extension-Bn1Wm_pY.js",
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-DYZnmghD-CnqB9AsR.js"
+        "_data-C20VhrZl-Bfz2Sq2a.js"
       ],
       "dynamicImports": [
         "../../../packages/splats/dist/compat-CDoDsXE8.js"
       ]
     },
-    "../../../packages/splats/dist/sog-BfTUNP6n.js": {
-      "file": "assets/sog-BfTUNP6n-NnPA-C8I.js",
-      "name": "sog-BfTUNP6n",
-      "src": "../../../packages/splats/dist/sog-BfTUNP6n.js",
+    "../../../packages/splats/dist/sog-0tR2JImv.js": {
+      "file": "assets/sog-0tR2JImv-f7riG6JD.js",
+      "name": "sog-0tR2JImv",
+      "src": "../../../packages/splats/dist/sog-0tR2JImv.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-DYZnmghD-CnqB9AsR.js",
+        "_data-C20VhrZl-Bfz2Sq2a.js",
         "_zip-C9cl7Ziq-BoJ0E_iH.js"
       ]
     },
-    "../../../packages/splats/dist/spz-C8rY30XT.js": {
-      "file": "assets/spz-C8rY30XT-DrptKN6U.js",
-      "name": "spz-C8rY30XT",
-      "src": "../../../packages/splats/dist/spz-C8rY30XT.js",
+    "../../../packages/splats/dist/spz-BN8dcQHU.js": {
+      "file": "assets/spz-BN8dcQHU-DXhCr0Et.js",
+      "name": "spz-BN8dcQHU",
+      "src": "../../../packages/splats/dist/spz-BN8dcQHU.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js",
-        "_data-DYZnmghD-CnqB9AsR.js",
+        "_data-C20VhrZl-Bfz2Sq2a.js",
         "_zip-C9cl7Ziq-BoJ0E_iH.js"
       ],
       "dynamicImports": [
@@ -258,8 +258,8 @@
         "_errors-THVaUwlL-C81vxm_p.js"
       ]
     },
-    "_asset-BH-IRRKh-D5TzHjGh.js": {
-      "file": "assets/asset-BH-IRRKh-D5TzHjGh.js",
+    "_asset-BH-IRRKh-Do-AP93g.js": {
+      "file": "assets/asset-BH-IRRKh-Do-AP93g.js",
       "name": "asset-BH-IRRKh",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
@@ -276,17 +276,17 @@
         "../../../packages/gltf/dist/optimize-7SEzNA23.js"
       ]
     },
-    "_data-DYZnmghD-CnqB9AsR.js": {
-      "file": "assets/data-DYZnmghD-CnqB9AsR.js",
-      "name": "data-DYZnmghD",
+    "_data-C20VhrZl-Bfz2Sq2a.js": {
+      "file": "assets/data-C20VhrZl-Bfz2Sq2a.js",
+      "name": "data-C20VhrZl",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
         "_errors-BPm2c1ar-mpjgtJAk.js"
       ],
       "dynamicImports": [
-        "../../../packages/splats/dist/spz-C8rY30XT.js",
-        "../../../packages/splats/dist/sog-BfTUNP6n.js",
-        "../../../packages/splats/dist/encode-CDa9aQY6.js"
+        "../../../packages/splats/dist/spz-BN8dcQHU.js",
+        "../../../packages/splats/dist/sog-0tR2JImv.js",
+        "../../../packages/splats/dist/encode-C7wm9xjp.js"
       ]
     },
     "_errors-BPm2c1ar-mpjgtJAk.js": {
@@ -329,8 +329,8 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-DGBgydA8-BUAJypM_.js": {
-      "file": "assets/model-DGBgydA8-BUAJypM_.js",
+    "_model-DGBgydA8-f8tCvf_x.js": {
+      "file": "assets/model-DGBgydA8-f8tCvf_x.js",
       "name": "model-DGBgydA8",
       "imports": [
         "_version-YYhCZP03.js",
@@ -340,7 +340,7 @@
         "_errors-THVaUwlL-C81vxm_p.js",
         "_accessor-DuqjpuxI-DJ8jujwr.js",
         "_scene-scope-CZDEkd24-B97nmpn7.js",
-        "_asset-BH-IRRKh-D5TzHjGh.js",
+        "_asset-BH-IRRKh-Do-AP93g.js",
         "_shader-BMd5jFDK-Xw8zkatD.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
@@ -395,7 +395,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-CRSmigUm.js",
+      "file": "assets/index--VvK8-mA.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -411,7 +411,7 @@
       ]
     }
   },
-  "adapter": "intel xe-2lpg",
+  "adapter": "nvidia ampere",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
@@ -460,13 +460,13 @@
       "brotli": 1858
     },
     {
-      "path": "assets/index-CRSmigUm.js",
+      "path": "assets/index--VvK8-mA.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27153,
-      "raw": 64929,
-      "gzip": 26771,
-      "brotli": 23631
+      "transferred": 27181,
+      "raw": 64983,
+      "gzip": 26799,
+      "brotli": 23652
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -510,8 +510,8 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 411,
-      "brotli": 261
+      "gzip": 410,
+      "brotli": 266
     },
     {
       "path": "model.glb",
@@ -525,14 +525,14 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46060,
-    "raw": 96065,
-    "gzip": 40512,
-    "brotli": 35784
+    "transferred": 46088,
+    "raw": 96119,
+    "gzip": 40539,
+    "brotli": 35810
   },
   "notFetched": [
     {
-      "path": "assets/asset-BH-IRRKh-D5TzHjGh.js",
+      "path": "assets/asset-BH-IRRKh-Do-AP93g.js",
       "raw": 30522
     },
     {
@@ -548,16 +548,16 @@
       "raw": 1134
     },
     {
-      "path": "assets/compression-dgiF4rBQ-DXJL9key.js",
+      "path": "assets/compression-dgiF4rBQ-DKnURAxG.js",
       "raw": 4289
     },
     {
-      "path": "assets/data-DahV1vVU.js",
-      "raw": 335
+      "path": "assets/data-C20VhrZl-Bfz2Sq2a.js",
+      "raw": 21285
     },
     {
-      "path": "assets/data-DYZnmghD-CnqB9AsR.js",
-      "raw": 21285
+      "path": "assets/data-O3c6CuhT.js",
+      "raw": 335
     },
     {
       "path": "assets/dds-Dg-e4ZGI.js",
@@ -568,16 +568,16 @@
       "raw": 17774
     },
     {
+      "path": "assets/dist-BACDxnOY.js",
+      "raw": 27485
+    },
+    {
       "path": "assets/dist-BiOVjC1X.js",
       "raw": 8699
     },
     {
-      "path": "assets/dist-by-8gDUO.js",
+      "path": "assets/dist-BpM7Ungb.js",
       "raw": 79044
-    },
-    {
-      "path": "assets/dist-DAYZ641o.js",
-      "raw": 27485
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -592,7 +592,7 @@
       "raw": 58456
     },
     {
-      "path": "assets/encode-CDa9aQY6-DIM3pRIn.js",
+      "path": "assets/encode-C7wm9xjp-CLCIyCG3.js",
       "raw": 10578
     },
     {
@@ -624,7 +624,7 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-DGBgydA8-BUAJypM_.js",
+      "path": "assets/model-DGBgydA8-f8tCvf_x.js",
       "raw": 159780
     },
     {
@@ -632,7 +632,7 @@
       "raw": 3727
     },
     {
-      "path": "assets/pbr-B-aWkERX.js",
+      "path": "assets/pbr-D1ezyiE-.js",
       "raw": 1058
     },
     {
@@ -644,7 +644,7 @@
       "raw": 40922
     },
     {
-      "path": "assets/sog-BfTUNP6n-NnPA-C8I.js",
+      "path": "assets/sog-0tR2JImv-f7riG6JD.js",
       "raw": 11597
     },
     {
@@ -652,11 +652,11 @@
       "raw": 2872
     },
     {
-      "path": "assets/splats-6j0GEbT3.js",
+      "path": "assets/splats-CCaUqsxj.js",
       "raw": 4178
     },
     {
-      "path": "assets/spz-C8rY30XT-DrptKN6U.js",
+      "path": "assets/spz-BN8dcQHU-DXhCr0Et.js",
       "raw": 4292
     },
     {
