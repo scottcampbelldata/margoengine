@@ -341,9 +341,9 @@ export const TARGETS = {
       final: equiv('steps starts at 0 again in stabilize, its only reader, before any read', [26, '0', '1']).concat(
         equiv(
           'start or after undefined makes distance NaN, and NaN > 0 is false, so the transition is skipped either way',
-          [110, '||', '&&'],
+          [140, '||', '&&'],
         ),
-        equiv('the return runs the finally, which sets the queue length to 0 straight after', [145, '0', '1']),
+        equiv('the return runs the finally, which sets the queue length to 0 straight after', [185, '0', '1']),
       ),
       index: equiv(
         'an undefined duration gives 0 or 1 here, both finite and not negative, so validation passes either way',
@@ -352,30 +352,30 @@ export const TARGETS = {
       ).concat(
         equiv(
           'the extra step compares a name past the end of one path with the other path: equal only when both paths end, which means the same state, and change returned before',
-          [185, '<', '<='],
+          [189, '<', '<='],
         ),
-        equiv('at end equal to due, due is set to the value it already holds', [263, '<', '<=']),
-        equiv('when the re-arm time equals the entry time both branches return the same number', [286, '>', '>=']),
+        equiv('at end equal to due, due is set to the value it already holds', [267, '<', '<=']),
+        equiv('when the re-arm time equals the entry time both branches return the same number', [290, '>', '>=']),
         equiv(
           'path[length + 1] and path[length] are undefined, which matches no transition from a state name, so the scan finds the same transition',
-          [290, '-', '+'],
+          [294, '-', '+'],
         ),
-        equiv('the only caller tests index < 0, so -1 and -2 mean the same', [300, '1', '2']),
+        equiv('the only caller tests index < 0, so -1 and -2 mean the same', [304, '1', '2']),
       ),
       inspect: equiv('an AbortSignal fires abort once, and dispose removes the listener, so once changes nothing', [
-        74,
+        91,
         'true',
         'false',
       ]),
       invoke: equiv(
         'an AbortSignal fires abort once, and dispose or settling removes the listener, so once changes nothing',
-        [75, 'true', 'false'],
-        [120, 'true', 'false'],
+        [97, 'true', 'false'],
+        [156, 'true', 'false'],
       ).concat(
         equiv(
           'a run leaves live only through cancel, which also aborts it, and is aborted only there, so both tests are true together or false together',
-          [124, '||', '&&'],
-          [129, '||', '&&'],
+          [160, '||', '&&'],
+          [166, '||', '&&'],
         ),
       ),
       parallel: equiv('the loop ends only with an empty queue, so clearing it again changes nothing', [
@@ -385,8 +385,8 @@ export const TARGETS = {
       ]),
       scxml: equiv(
         'regionXML is called with depth 0 from the root and with depth + level + 2 from write, which has already refused depth + level + 3 above 128, so depth is at most 127 here and this check never fires (scxml-export-pins.test.js pins the 126 and 62 level limits)',
-        [249, '>', '>='],
-        [249, '128', '129'],
+        [348, '>', '>='],
+        [348, '128', '129'],
       ),
     },
   ),
