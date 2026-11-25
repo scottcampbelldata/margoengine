@@ -214,7 +214,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Open | OPEN |
 | LIFE-03 | Aquatic locomotion | none | Open | OPEN |
-| LIFE-04 | Collective animal motion | stand-in | Open | OPEN |
+| LIFE-04 | Collective animal motion | stand-in | Codex | BUILDING (codex/physics-lane-4) |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | partial | Open | OPEN |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
