@@ -75,6 +75,31 @@ pub extern "C" fn world_ccd() -> u32 {
 pub extern "C" fn world_hash() -> u32 {
     world().hash()
 }
+/// How many ranges of words make up the world's state (`World::state_ranges`).
+#[unsafe(no_mangle)]
+pub extern "C" fn world_state_range_count() -> u32 {
+    let mut count = 0;
+    world().state_ranges(|_, _| count += 1);
+    count
+}
+/// Range `index` of the world's state: its byte address in the kernel's memory for `part` 0, its length in bytes for 1; 0 past
+/// the last range or for another part.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_state_range(index: u32, part: u32) -> u32 {
+    let (mut at, mut found) = (0u32, 0u32);
+    let base = world().arena.base as usize;
+    world().state_ranges(|from, words| {
+        if at == index {
+            found = match part {
+                0 => (base + 4 * from) as u32,
+                1 => (4 * words) as u32,
+                _ => 0,
+            };
+        }
+        at += 1;
+    });
+    found
+}
 /// The fingerprint of every word of the world, scratch included (`World::arena_hash`).
 #[unsafe(no_mangle)]
 pub extern "C" fn world_arena_hash() -> u32 {

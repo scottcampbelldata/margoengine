@@ -899,28 +899,34 @@ impl World {
     /// hold the order a step happens to solve in (the lists of pairs and joints it solves, the impacts it found, the islands it
     /// numbered). Two worlds with the same bodies, colliders, joints, couplings, manifolds and carried impulses hash alike
     /// whatever order their steps took the independent parts in.
-    pub fn hash(&self) -> u32 {
-        let data: *const u32 = self.arena.base.cast();
-        let mut hash = 0x811C_9DC5u32;
-        let mut take = |from: usize, words: usize| {
-            for word in from..from + words {
-                hash = (hash ^ unsafe { *data.add(word) }).wrapping_mul(0x0100_0193);
-            }
-        };
-        // The header's scalars, after the words that say what the layout is (the magic number, which counts the columns, the block
-        // size, the row capacities and the column offsets) and before the padding that rounds the header up to a
-        // multiple of 16 bytes: the hash covers state, not where state lives.
+    /// The words of the world that are its state, as ranges of 32-bit words from the arena's base, in a fixed order: the header's
+    /// scalars, after the words that say what the layout is (the magic number, which counts the columns, the block size, the row
+    /// capacities and the column offsets) and before the padding that rounds the header up to a multiple of 16 bytes, without the
+    /// count of multibody walks (`mb_calls`, a stamp the walks leave on the roots they have reached, in a column left out too);
+    /// then every column that is not scratch, over its capacity. `hash` covers exactly these, and the physics framework's state
+    /// regions are these (`world_state_range`), so the two can never cover different words.
+    pub fn state_ranges(&self, mut visit: impl FnMut(usize, usize)) {
         let layout = 2 + ROW_CLASSES + COLUMNS;
-        // The count of multibody walks (`mb_calls`) is a stamp the walks leave on the roots they have reached, in a column left out too.
         let stamp = core::mem::offset_of!(Header, mb_calls) / 4;
-        take(layout, stamp - layout);
-        take(stamp + 1, core::mem::size_of::<Header>() / 4 - stamp - 1);
+        visit(layout, stamp - layout);
+        visit(stamp + 1, core::mem::size_of::<Header>() / 4 - stamp - 1);
         for column in 0..COLUMNS {
             if !SCRATCH.contains(&column) {
                 let header = self.header();
-                take(header.offsets[column] as usize / 4, header.capacity[COLUMN_ROWS[column] as usize] as usize);
+                visit(header.offsets[column] as usize / 4, header.capacity[COLUMN_ROWS[column] as usize] as usize);
             }
         }
+    }
+
+    /// FNV-1a over the world's state (`state_ranges`): the state, not where it lies.
+    pub fn hash(&self) -> u32 {
+        let data: *const u32 = self.arena.base.cast();
+        let mut hash = 0x811C_9DC5u32;
+        self.state_ranges(|from, words| {
+            for word in from..from + words {
+                hash = (hash ^ unsafe { *data.add(word) }).wrapping_mul(0x0100_0193);
+            }
+        });
         hash
     }
 

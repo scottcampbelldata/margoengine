@@ -1313,6 +1313,11 @@ class KernelWorld {
     get bytes(): number;
     get arenaHash(): number;
     get hash(): number;
+    get memory(): WebAssembly.Memory;
+    stateRanges(): {
+        byteOffset: number;
+        byteLength: number;
+    }[];
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;

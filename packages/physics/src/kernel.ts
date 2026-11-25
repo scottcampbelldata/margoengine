@@ -16,6 +16,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_reserve(bodies: number, colliders: number): number;
   world_hash(): number;
   world_arena_hash(): number;
+  world_state_range_count(): number;
+  world_state_range(index: number, part: number): number;
   world_set_gravity(x: number, y: number, z: number): void;
   world_gravity(axis: number): number;
   world_set_substeps(substeps: number): void;
@@ -3231,6 +3233,25 @@ export class KernelWorld {
    */
   get hash(): number {
     return this.api.world_hash() >>> 0;
+  }
+  /**
+   * The memory the world lives in: its own, as each world is its own Wasm instance until the physics framework's solvers share
+   * one memory (docs/physics-framework.md, section 3). Transitional: it goes when they do.
+   */
+  get memory(): WebAssembly.Memory {
+    return this.api.memory;
+  }
+  /**
+   * The byte ranges of {@link KernelWorld.memory} that are the world's state, in a fixed order: exactly the words {@link hash}
+   * covers (the header's scalars and every column but scratch), with the layout words, the header's padding, the multibody walk
+   * stamp and the scratch columns left out. Read them afresh after the world grows, as growth moves them.
+   */
+  stateRanges(): { byteOffset: number; byteLength: number }[] {
+    const { api } = this,
+      ranges: { byteOffset: number; byteLength: number }[] = [];
+    for (let i = 0, count = api.world_state_range_count(); i < count; i++)
+      ranges.push({ byteOffset: api.world_state_range(i, 0) >>> 0, byteLength: api.world_state_range(i, 1) >>> 0 });
+    return ranges;
   }
   /** The whole world as one copy of its bytes, for {@link KernelWorld.restore}. Only this kernel build can read them. */
   snapshot(): Uint8Array {
