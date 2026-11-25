@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19128711,
+  "total": 19131036,
   "history": [
     {
       "date": "2026-10-24",
@@ -12393,6 +12393,12 @@
       "commit": "lane-a",
       "reason": "physics kernel: substep levels per island (tilt.rs: the tipping criterion along support paths, the turn bound, curved supports, warm rescaling). The lazy Wasm blueprint measures 519,848 B on the merged kernel against 513,179 recorded; this change's own share was 2,303 B, measured before the merge, and the rest is kernel work already on main whose ceiling was not raised. It is the step's own solve, so it lives in the one kernel; a separate Wasm would duplicate the solver. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "e98facdd3",
+      "reason": "physics/waves 6,250 to 8,319 B: the ST4 source terms of Ardhuin et al. 2010 (Janssen input with the wave-supported stress, sheltering, swell dissipation, saturation and cumulative breaking) as the default physics, and third-order ULTIMATE QUICKEST propagation, for fetch growth as measured (KB-SEA-GROWTH1). ST4 is the default, so a split entry would load with every sea and only move the bytes. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13193,7 +13199,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/tracers": 4952,
-    "@margoengine/physics/waves": 6250,
+    "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 15475,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,

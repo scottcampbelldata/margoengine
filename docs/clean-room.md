@@ -11848,6 +11848,54 @@ source step (decay implicit, growth and transfer explicit), the breaking fractio
 JONSWAP builder's cos^2 spread, and the arctangent from arithmetic are this package's own arrangement. Proof:
 `packages/physics/tests/waves.test.js` and `tests/coupling/waves.test.js`.
 
+#### ST4 physics, third-order propagation and the calibration of the sheltering (KB-SEA-GROWTH1, 2026-11-25)
+
+`packages/physics/src/waves/st4.ts` (the default `physics: 'st4'`) and the propagation of `spectral.ts`. Written from:
+
+- The WAVEWATCH III user manual, version 5.16 (The WAVEWATCH III Development Group, NOAA/NWS/NCEP/MMAB Technical Note 329,
+  2016), read 2026-11-25 as public documentation (the model's code was not read): section 2.3.9, eqs. 2.99 to 2.105 (Janssen's
+  input with the wave-supported stress and its f^-5 tail), section 2.3.10, eqs. 2.110 to 2.124 (sheltering, swell
+  dissipation, saturation and cumulative breaking), tables 2.6 and 2.7 (the TEST405, TEST451 and TEST471 constants), and
+  section 3.4, eqs. 3.12 to 3.23 (the ULTIMATE QUICKEST scheme of Leonard 1979 and 1991, known through it).
+- F. Ardhuin, W. E. Rogers, A. V. Babanin, J.-F. Filipot, R. Magne, A. Roland, A. van der Westhuysen, P. Queffeulou, J.-M.
+  Lefevre, L. Aouf and F. Collard, "Semi-empirical dissipation source functions for ocean waves. Part I: definition,
+  calibration and validation", J. Phys. Oceanogr. 40, 1917-1941, 2010 (arXiv:0907.4240), read in part (eqs. 8 to 25 and the
+  parameter discussion): the cross-check of every term above, and the sign of C_cu.
+- P. A. E. M. Janssen, "Quasi-linear theory of wind-wave generation applied to wave forecasting", J. Phys. Oceanogr. 21,
+  1991, and O. S. Madsen, Y.-K. Poon and H. C. Graber, "Spectral wave attenuation by bottom friction: theory", Proc. 21st
+  ICCE, 1988: known through the manual and the SWAN documentation (eq. 2.63) respectively.
+- The growth data: H. K. Kahma and C. J. Calkoen, "Reconciling discrepancies in the observed growth of wind-generated
+  waves", J. Phys. Oceanogr. 22, 1992, through the composite fetch law g^2 E / U^4 = 5.2e-7 chi^0.9 and omega_p U / g =
+  13.7 chi^-0.27 as P. A. Hwang, "Duration- and fetch-limited growth functions of wind-generated waves parameterized with
+  three different scaling wind velocities", J. Geophys. Res. 111, C02005, 2006, tabulates it; JONSWAP and Pierson-Moskowitz
+  as in the SEA-01 record above.
+
+Published constants, taken as they stand (TEST471 unless named): alpha_0 0.0095, beta_max 1.43, z_alpha 0.006, kappa 0.4,
+the wind height 10 m, z0_max 0.002 (TEST405; the paper's eq. 23 example is 0.0015), s1 0.66, s2 -0.018, s3 0.022, Re_c 1.5e5
+(times 4 / H_s), s5 1.2, s7 3.6e5, r_z 0.04, C_ds -2.2e-5, B_r 0.0009, the +-80 degree saturation sector, delta_d 0.3, C_cu
+-0.40344, r_cu 0.5, the cutoff 2.5 f_m and the quadruplets' C_nl4 2.5e7. One constant was calibrated:
+
+- **The sheltering s_u.** The sources disagree: 0.3 (TEST471), 0.4 (another of the manual's sets) and 1 (the paper's
+  TEST441). Data fitted: Kahma and Calkoen's fetch law at U10 = 10 and 20 m/s, at chi = 1,125, 3,125 and 10,125 (48 cells
+  over chi 0 to 12,000, a steady wind, warmed up for 24 hours times U10 / 10 m/s). Method: a grid search over s_u in {0,
+  0.3, 0.6, 1} crossed with z0_max in {0.0015, 0.002, none}, minimising the root mean square of ln(E / E_KC) over the six
+  points. Result: rms 0.56 at s_u = 0, 0.35 at 0.3 and at 0.6, 0.30 at 1; z0_max moved it by under 0.01. Fitted value s_u =
+  1, the top of the published range: the error still falls there, so 1 is a bound of the search rather than an interior
+  optimum, and the uncertainty is one-sided (from about 0.3 up the error is within 0.05 of its least). Values above 1 were
+  not tried, being outside what the literature reports.
+- **Validation, on data not fitted:** at 30 m/s the height is +38, +21 and +7 percent of Kahma and Calkoen at the same three
+  fetches (+75, +46 and +22 percent of JONSWAP's relation); with unlimited fetch at 10 m/s (a single periodic cell, 72
+  hours) 106 percent of the Pierson-Moskowitz height and 105 percent of its period; at 20 m/s 122 percent of its height.
+  The 10 m/s JONSWAP test at 31 and 59 km stays within 8 and 4 percent in height. The fetch law that remains, about
+  chi^0.66 against chi^0.9, is open as KB-SEA-GROWTH1 (docs/known-bugs.md).
+
+The mean frequency from the action's p = 0.5 moment for the cutoff, the Madsen friction factor solved by bisection with
+its 0.3 cap below a_b / K_N = 1.57, the precomputed per-cell tables of the saturation's cos^2 sector and of the cumulative
+term's weights, the friction velocity iterated to 1e-7 on U10 = (u* / kappa) ln(z_u / z_1), the face value taken at the
+upstream two cells and the downstream one with first order beside land, an open edge or a short stencil, and the axis order
+alternating per substep are this package's own arrangement. Proof: `packages/physics/tests/waves.test.js`, "a gale of 20
+m/s grows the sea as Kahma and Calkoen measured, not faster (KB-SEA-GROWTH1)" and the 10 m/s JONSWAP test with both physics.
+
 ### Flight: wings, rotors and lifting gas (AERO-03, `WingForce`, `RotorForce` and `LiftingGas` in `@margoengine/physics/flight`, 2026-11-25)
 
 `packages/physics/src/flight.ts`, on the vortex-lattice core `packages/physics/src/lattice.ts` that `SailForce` (AERO-02)

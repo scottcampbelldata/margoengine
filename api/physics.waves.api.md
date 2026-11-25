@@ -41,6 +41,7 @@ export interface WaveParams {
     interval?: number;
     warmUp?: number;
     periodic?: readonly ('x' | 'z')[];
+    physics?: 'st4' | 'wam3';
 }
 
 export class WaveSolver implements Solver<WaveParams> {

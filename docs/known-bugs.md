@@ -66,16 +66,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/node-apis.test.js` (the build script and everything it imports pass the Node 22.12 API scan).
   Not run on Node 22.12 here; CI's 22.12.0 jobs are that proof.
 
-### Open 2026-11-25: a strong wind grows the sea too fast (KB-SEA-GROWTH1, physics waves)
+### Open 2026-11-25, narrowed the same day: a strong wind still grows the sea somewhat fast (KB-SEA-GROWTH1, physics waves)
 
-- **Repro:** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind toward +x and
-  `warmUp: 12 * 3600`: the significant height at 6, 14, 30, 62 and 118 km fetch is 1.84, 2.42, 3.16, 4.07 and 5.04 m against
-  JONSWAP's 0.79, 1.21, 1.77, 2.54 and 3.51 m (g^2 E / U^4 = 1.6e-7 chi). At 10 m/s the same model is within 2 to 19 percent
-  beyond 30 km, and the point model reaches 90 percent of Pierson-Moskowitz.
-- **Cause:** not yet traced. The growth is not self-similar in U10, so a source term that scales with U* rather than U10 is
-  the suspect: the drag fit C_D(U10) of SWAN's eq. 2.36 rising with the wind, the linear growth A (U*^4) at short fetches,
-  or the action limiter, which allows more at low wavenumbers. A first look found the equilibrium height sensitive to the
-  quadruplets' strength C_nl4, so the DIA's normalisation is to be checked against Hasselmann et al. (1985) itself.
+- **Repro (as first filed):** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind
+  toward +x and `warmUp: 12 * 3600`: the significant height at 6, 14, 30, 62 and 118 km fetch was 1.84, 2.42, 3.16, 4.07 and
+  5.04 m against JONSWAP's 0.79, 1.21, 1.77, 2.54 and 3.51 m (g^2 E / U^4 = 1.6e-7 chi).
+- **Cause, found:** three parts. (1) WAM Cycle 3's input and whitecapping scale with U*, and SWAN's drag fit raises U* / U10
+  with the wind, so a 20 m/s sea grew relatively faster than a 10 m/s one. (2) First-order upwind propagation smeared the
+  energy downwind, flattening the fetch law to about chi^0.55 against the measured chi^0.9. (3) The comparison itself was
+  biased: a first-order cell's value belongs at its downwind face, not its centre. JONSWAP's own relation is also the
+  highest of the published fits; Kahma and Calkoen's composite (5.2e-7 chi^0.9) is the reference now.
+- **Fixed:** the ST4 source terms of Ardhuin et al. (2010) are the default (the waves' own stress feeds back on the sea's
+  roughness, and the short waves shelter each other with s_u calibrated to 1; docs/clean-room.md), and propagation is the
+  third-order ULTIMATE QUICKEST scheme. Against Kahma and Calkoen at a dimensionless fetch chi = g x / U^2 of 1,125, 3,125
+  and 10,125 (48 cells), the height is now +23, +7 and -8 percent at 20 m/s (was +72, +41 and +4 percent against JONSWAP
+  with first-order propagation at 6 to 118 km) and +2, -9 and -23 percent at 10 m/s. Regression:
+  `packages/physics/tests/waves.test.js`, "a gale of 20 m/s grows the sea as Kahma and Calkoen measured, not faster
+  (KB-SEA-GROWTH1)": 24 cells, +16 and -5 percent at chi 2,750 and 9,750, held within 20 percent.
+- **Still open:** the fetch law is still flatter than measured: energy grows about as chi^0.66 over chi 1,000 to 10,000
+  against Kahma and Calkoen's chi^0.9, so the sea is high at short fetches and low at long ones. At 30 m/s the height is 38,
+  21 and 7 percent above Kahma and Calkoen at those three fetches; with unlimited fetch a 20 m/s sea passes the
+  Pierson-Moskowitz height, reaching 122 percent of it after 72 hours (10 m/s: 106 percent). Not yet traced between the ST4
+  drag at strong winds, the DIA's strength C_nl4 = 2.5e7 and the residual diffusion of a 48-cell grid; the next step is a
+  point-model run with the terms switched off one at a time, and a finer grid, against the same data.
 
 ### Fixed 2026-11-25: a cloth attached to a rigid body blew up when its free particles took impulses (KB-SOFT-ATTACHKICK1, physics soft)
 

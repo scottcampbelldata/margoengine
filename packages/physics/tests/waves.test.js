@@ -1,4 +1,4 @@
-// The sea's waves (SEA-01): linear dispersion and group velocity at any depth; a wind sea that grows with fetch as JONSWAP
+// The sea's waves (SEA-01, ST4 by default): linear dispersion and group velocity at any depth; a wind sea that grows with fetch as JONSWAP
 // found and with duration toward the fully developed sea; swell that runs in from the open sea at its group velocity; waves
 // limited by shallow water; a lake's fresh water; the spectrum published for the sea surface; the same bits every time.
 import assert from 'node:assert/strict';
@@ -69,29 +69,58 @@ test('a JONSWAP sea built on the grid has the height and peak asked for', () => 
   assert.ok(Math.abs(1 / peakFrequency(out) - 9) / 9 < 0.05);
 });
 
-test('a wind sea grows with fetch as JONSWAP found (gale off a coast, 10 m/s)', () => {
+test('a wind sea grows with fetch as JONSWAP found (gale off a coast, 10 m/s), with ST4 and with WAM Cycle 3', () => {
   // Land up the wind of the grid's west edge; the sea goes on north and south (periodic in z).
-  const U = 10,
-    { waves } = sea({
+  const U = 10;
+  for (const physics of ['st4', 'wam3']) {
+    const { waves } = sea({
       cells: [30, 1],
       cellSize: 2000,
       centre: [30000, 0],
       wind: steady(U),
       periodic: ['z'],
       warmUp: 12 * 3600,
+      physics,
     });
-  for (const fetch of [31000, 59000]) {
-    const chi = (g * fetch) / (U * U),
-      // JONSWAP (Hasselmann et al. 1973): g^2 E / U^4 = 1.6e-7 chi, omega_p = 22 (g / U) chi^(-1/3).
-      height = 4 * Math.sqrt(1.6e-7 * chi) * ((U * U) / g),
-      period = (2 * Math.PI) / (22 * (g / U) * chi ** (-1 / 3)),
-      hs = waves.significantHeight(fetch, 0),
-      tp = waves.peakPeriod(fetch, 0);
-    // Measured: +19 and +2 percent in height, -2 and -9 percent in period (docs/limits.md, "Sea waves").
-    assert.ok(Math.abs(hs / height - 1) < 0.25, `fetch ${fetch / 1000} km: Hs ${hs} against ${height}`);
-    assert.ok(Math.abs(tp / period - 1) < 0.15, `fetch ${fetch / 1000} km: Tp ${tp} against ${period}`);
+    for (const fetch of [31000, 59000]) {
+      const chi = (g * fetch) / (U * U),
+        // JONSWAP (Hasselmann et al. 1973): g^2 E / U^4 = 1.6e-7 chi, omega_p = 22 (g / U) chi^(-1/3).
+        height = 4 * Math.sqrt(1.6e-7 * chi) * ((U * U) / g),
+        period = (2 * Math.PI) / (22 * (g / U) * chi ** (-1 / 3)),
+        hs = waves.significantHeight(fetch, 0),
+        tp = waves.peakPeriod(fetch, 0);
+      // Measured: ST4 +8 and -4 percent in height, WAM Cycle 3 +16 and 0; both -7 and -9 percent in period (docs/limits.md).
+      assert.ok(Math.abs(hs / height - 1) < 0.25, `${physics}, fetch ${fetch / 1000} km: Hs ${hs} against ${height}`);
+      assert.ok(Math.abs(tp / period - 1) < 0.15, `${physics}, fetch ${fetch / 1000} km: Tp ${tp} against ${period}`);
+    }
+    assert.ok(waves.significantHeight(59000, 0) > waves.significantHeight(5000, 0), `${physics}: higher with fetch`);
   }
-  assert.ok(waves.significantHeight(59000, 0) > waves.significantHeight(5000, 0), 'higher with fetch');
+});
+
+test('a gale of 20 m/s grows the sea as Kahma and Calkoen measured, not faster (KB-SEA-GROWTH1)', () => {
+  // Kahma and Calkoen's composite (as Hwang 2006 tabulates it): g^2 E / U^4 = 5.2e-7 chi^0.9. First-order propagation and
+  // WAM Cycle 3's u*-scaled input grew this sea 40 to 130 percent too high; the third-order scheme and ST4 keep it within 20
+  // percent in height (measured +16 and -5 percent).
+  const U = 20,
+    n = 24,
+    dx = (1.2e4 * U * U) / g / n,
+    { waves } = sea({
+      cells: [n, 1],
+      cellSize: dx,
+      centre: [(n * dx) / 2, 0],
+      wind: steady(U),
+      periodic: ['z'],
+      interval: 180,
+      warmUp: 36 * 3600,
+      frequencies: { min: 0.03, max: 1, count: 30 },
+    });
+  for (const cell of [5, 19]) {
+    const fetch = (cell + 0.5) * dx,
+      chi = (g * fetch) / (U * U),
+      kahma = 4 * Math.sqrt(5.2e-7 * chi ** 0.9) * ((U * U) / g),
+      hs = waves.significantHeight(fetch, 0);
+    assert.ok(Math.abs(hs / kahma - 1) < 0.2, `chi ${chi.toFixed(0)}: Hs ${hs} m against ${kahma} m`);
+  }
 });
 
 test('with unlimited fetch the sea grows with duration toward the fully developed sea', () => {
@@ -191,4 +220,5 @@ test('settings out of range are refused with what to pass', () => {
   assert.throws(() => world().add(new WaveSolver(), { cells: [0, 4] }), /1 to 1024/);
   assert.throws(() => world().add(new WaveSolver(), { frequencies: { min: 1, max: 0.5, count: 10 } }), /min < max/);
   assert.throws(() => world().add(new WaveSolver(), { periodic: ['y'] }), /'x' or 'z'/);
+  assert.throws(() => world().add(new WaveSolver(), { physics: 'st6' }), /'st4' or 'wam3'/);
 });

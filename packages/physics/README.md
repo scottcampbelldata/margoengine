@@ -1854,14 +1854,17 @@ console.log(clouds.sample(0, 800, 0).velocity[1] > 10); // true: its updraft, ov
 
 ### Sea waves: a spectral wave model (`@margoengine/physics/waves`)
 
-`WaveSolver` is the physics framework's sea waves (SEA-01): a third-generation spectral wave model, the energy balance of WAM as SWAN states it, on a grid of the water. Wind seas grow with fetch and duration, swell runs in from the open sea at its group velocity and decays slowly, and waves feel the bottom and break where the water is shallow. The physics: Komen wind input with Cavaleri and Malanotte-Rizzoli's linear growth, Komen whitecapping, the discrete interaction approximation of the quadruplets, JONSWAP bottom friction, Battjes and Janssen depth breaking, and the Hersbach and Janssen action limiter. Its settings:
+`WaveSolver` is the physics framework's sea waves (SEA-01): a third-generation spectral wave model, the energy balance of WAM as SWAN states it, on a grid of the water. Wind seas grow with fetch and duration, swell runs in from the open sea at its group velocity and decays slowly, and waves feel the bottom and break where the water is shallow. The physics: by default the ST4 wind input and dissipation of Ardhuin et al. (2010), as WAVEWATCH III states them (Janssen's input with the waves' own stress feeding back on the sea's roughness, swell damped by the air, breaking from the spectrum's saturation), with Cavaleri and Malanotte-Rizzoli's linear growth, the discrete interaction approximation of the quadruplets, JONSWAP bottom friction, Battjes and Janssen depth breaking, and the Hersbach and Janssen action limiter. `physics: 'wam3'` swaps in WAM Cycle 3's Komen input and whitecapping. Waves travel by the third-order ULTIMATE QUICKEST scheme, so a wind sea grows along its fetch as measured, without the smearing of a first-order scheme. Its settings:
 
 - the grid: `cells`, default 32 by 32, of `cellSize` metres, default 1000, about `centre`;
 - the water: `depth` (a number or a function of (x, z), 0 or less for land) or a terrain `bed` under `waterLevel`, and `density` (1025 for the sea, `FRESH_WATER_DENSITY` 1000 for a lake);
 - the `wind` over it, any framework `Wind`, sampled 10 m above the water;
 - the spectrum: `frequencies` (default 0.04 to 1 Hz in 34 steps) and `directions` (default 24);
 - the sea: a JONSWAP `swell` coming in over the open edges, a `start` sea, and `periodic` edges for a sea that goes on the same way;
-- time: `interval` (the sea's own step, default 60 s), `timeScale`, and `warmUp`, seconds of sea run before the shot so the sea is already up.
+- time: `interval` (the sea's own step, default 60 s), `timeScale`, and `warmUp`, seconds of sea run before the shot so the sea is already up;
+- `physics`: `'st4'` (default) or `'wam3'`.
+
+**How well it grows.** Every ST4 constant is the WAVEWATCH III manual's TEST471 set except one, the sheltering of the short waves `s_u`, which the sources give as 0.3, 0.4 or 1. It was calibrated on Kahma and Calkoen's fetch-limited growth (g^2 E / U^4 = 5.2e-7 chi^0.9) at 10 and 20 m/s over 0, 0.3, 0.6 and 1, fitting the energy's log error over fetches of 1,000 to 10,000 (in g x / U^2): 1 fits best (rms 0.30 in ln E; 0.3 and 0.6 give 0.35, 0 gives 0.56). The error falls all the way to 1, the top of the published range and the paper's own TEST441 value, so the fit is a bound rather than a sharp optimum: anything from 0.3 up is within 0.05 of it, and values above 1 were not tried. The roughness cap z0_max (0.0015, 0.002 or none) changed the error by under 0.01 and stays at the manual's 0.002. Checked on data it was not fitted on: at 10 and 20 m/s the height is within 23 percent of Kahma and Calkoen over those fetches, but the fetch law is still flatter than measured (about chi^0.66 against chi^0.9); at 30 m/s it is 38, 21 and 7 percent above them; at 10 m/s with unlimited fetch the sea reaches 106 percent of the Pierson-Moskowitz height and 105 percent of its period in 72 hours; at 20 m/s it overshoots Pierson-Moskowitz to 122 percent (docs/known-bugs.md, KB-SEA-GROWTH1). It costs about 4.6 ms a cell-step in TypeScript, five times WAM Cycle 3.
 
 It publishes the spectrum E(f, theta) of every cell as the registry field `waveSpectrum`. `waves.field` is the framework's `WaveSpectrumField`, which the sea surface synthesises its waves from. `significantHeight(x, z)` and `peakPeriod(x, z)` summarise a place. `wavenumber`, `groupVelocity`, `jonswap`, `significantHeight` and `peakFrequency` work on any spectrum.
 
@@ -1874,8 +1877,8 @@ import {BoundaryLayerWind} from 'margoengine/weather/boundary-layer';
 const wind = new BoundaryLayerWind({speed: 18, turbulence: false});
 const waves = new WaveSolver();
 new PhysicsWorld({rate: {num: 24, den: 1}}).add(waves, {
-  cells: [40, 4],
-  cellSize: 2000,
+  cells: [20, 1],
+  cellSize: 4000,
   centre: [40000, 0],
   periodic: ['z'],
   depth: 60,
@@ -1883,7 +1886,7 @@ new PhysicsWorld({rate: {num: 24, den: 1}}).add(waves, {
   wind,
   warmUp: 10 * 3600,
 });
-console.log(waves.significantHeight(5000, 0).toFixed(1), waves.significantHeight(75000, 0).toFixed(1)); // 1.4 3.7: higher with fetch
+console.log(waves.significantHeight(5000, 0).toFixed(1), waves.significantHeight(75000, 0).toFixed(1)); // 1.6 3.2: higher with fetch
 console.log(waves.peakPeriod(75000, 0).toFixed(1)); // 7.0 s at 75 km
 const spectrum = waves.field.sample(75000, 0); // 34 frequencies by 24 directions, fresh water: what the sea surface reads
 console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.density); // 34 24 1000

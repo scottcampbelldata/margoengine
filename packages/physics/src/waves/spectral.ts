@@ -25,8 +25,13 @@
 // - the action limiter of Hersbach and Janssen (1999) as SWAN takes it: a change of at most 0.1 alpha_PM / (2 sigma k^3
 //   c_g) in action a step, alpha_PM = 8.1e-3 (eq. 3.42).
 //
-// Accepted differences: first-order upwind propagation in space (diffusive; no garden-sprinkler correction needed at this
-// order), no currents (no Doppler shift, no frequency shift), no diffraction or reflection, no triads, the source terms
+// By default the wind input and dissipation are ST4 (Ardhuin et al. 2010, st4.ts) with its quadruplet constant C_nl4 =
+// 2.5e7 and an f^-5 tail above 2.5 times the mean frequency; `physics: 'wam3'` keeps the WAM Cycle 3 terms above.
+// Propagation in space is the third-order ULTIMATE QUICKEST scheme (Leonard 1979 and 1991, as the WAVEWATCH III 5.16 manual
+// states it, eqs. 3.12 to 3.23), split by axis; first-order upwind spread fetch-limited growth too far downwind
+// (KB-SEA-GROWTH1).
+//
+// Accepted differences: no garden-sprinkler correction, no currents (no Doppler shift, no frequency shift), no diffraction or reflection, no triads, the source terms
 // integrated semi-implicitly in each cell (the decay implicitly, the growth and transfer explicitly) rather than WAM's
 // implicit scheme, and a spectral range of its frequencies only (no parametric tail).
 
@@ -34,6 +39,7 @@ import type { Bed, FlowSample, Wind, WaveSpectrumField, WaveSpectrumSample } fro
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { angleOf } from '../flight.js';
+import { ST4, st4Rates, type SpectralCell } from './st4.js';
 import { regionWords } from '../world/memory.js';
 import type {
   Cell,
@@ -66,6 +72,8 @@ const TWO_PI = 6.283185307179586;
 const PI = 3.141592653589793;
 const DEGREE = 0.017453292519943295;
 const AIR_DENSITY = 1.225;
+/** Kinematic viscosity of air at 15 C, m^2/s: Sutherland's law with the U.S. Standard Atmosphere (1976) constants over 1.225 kg/m^3. */
+const AIR_VISCOSITY = 1.4607e-5;
 /** Komen whitecapping. */
 const C_DS = 2.36e-5;
 const S_PM = 0.05495452665613635; // sqrt(3.02e-3)
@@ -253,6 +261,11 @@ export interface WaveParams {
   warmUp?: number;
   /** Edges that wrap around to the opposite side: 'x', 'z' or both, for a sea that goes on the same way (default none). */
   periodic?: readonly ('x' | 'z')[];
+  /**
+   * The wind input and dissipation: 'st4', Ardhuin et al. (2010) with the WAVEWATCH III TEST471 constants (default), or
+   * 'wam3', WAM Cycle 3 (Komen et al. 1984) as SWAN states it.
+   */
+  physics?: 'st4' | 'wam3';
 }
 
 const ORIGIN: Cell = [0, 0, 0];
@@ -284,6 +297,7 @@ export class WaveSolver implements Solver<WaveParams> {
   private swell: Float64Array | undefined;
   private wrapX = false;
   private wrapZ = false;
+  private physics: 'st4' | 'wam3' = 'st4';
   private energy!: Region;
   private clock!: Region;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
@@ -320,7 +334,11 @@ export class WaveSolver implements Solver<WaveParams> {
       interval = 60,
       warmUp = 0,
       periodic = [],
+      physics = 'st4',
     } = params;
+    if (physics !== 'st4' && physics !== 'wam3')
+      throw new RangeError(`A wave model's physics is 'st4' or 'wam3' (got ${physics}); pass one of them.`);
+    this.physics = physics;
     if (!(cells.length === 2 && cells.every((n) => Number.isInteger(n) && n >= 1 && n <= 1024)))
       throw new RangeError(`A wave grid has 1 to 1024 whole cells along x and z (got ${cells}); pass two.`);
     for (const [name, value] of [
@@ -488,7 +506,7 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   /**
-   * Propagation in space by first-order upwind fluxes of c_g E across cell faces (in substeps that keep the Courant number
+   * Propagation in space by ULTIMATE QUICKEST fluxes of c_g E across cell faces (in substeps that keep the Courant number
    * of every bin at most 1/2), with refraction in direction where the depth changes, waves turning toward shallower water.
    */
   private propagate(dt: number): void {
@@ -501,29 +519,15 @@ export class WaveSolver implements Solver<WaveParams> {
       sub = dt / steps,
       next = new Float64Array(words.length);
     for (let s = 0; s < steps; s++) {
+      // Space: ULTIMATE QUICKEST along x and along z in turn, alternating which goes first.
+      if (s % 2 === 0) {
+        this.advect(words, 'x', sub);
+        this.advect(words, 'z', sub);
+      } else {
+        this.advect(words, 'z', sub);
+        this.advect(words, 'x', sub);
+      }
       next.set(words);
-      for (let c = 0; c < nz; c++)
-        for (let r = 0; r < nx; r++) {
-          const at = r + nx * c;
-          if (!(this.depth[at]! > 0)) continue;
-          for (let i = 0; i < nf; i++) {
-            const cgHere = this.cg[at * nf + i]!;
-            for (let j = 0; j < nd; j++) {
-              const theta = this.dirs[j]!,
-                ux = cgHere * cos(theta),
-                uz = cgHere * sin(theta),
-                bin = i * nd + j,
-                here = words[at * per + bin]!;
-              // Out through each face this bin's waves cross; in from the upwind neighbour (or the open sea's swell).
-              let change = -((ux < 0 ? -ux : ux) + (uz < 0 ? -uz : uz)) * here;
-              const fromX = ux > 0 ? r - 1 : r + 1,
-                fromZ = uz > 0 ? c - 1 : c + 1;
-              change += (ux < 0 ? -ux : ux) * this.upwind(words, fromX, c, bin);
-              change += (uz < 0 ? -uz : uz) * this.upwind(words, r, fromZ, bin);
-              next[at * per + bin]! += (sub / h) * change;
-            }
-          }
-        }
       // Refraction: c_theta = -(1/k) (d sigma / d d) (d d / d m), m across the wave's direction.
       for (let c = 0; c < nz; c++)
         for (let r = 0; r < nx; r++) {
@@ -556,22 +560,93 @@ export class WaveSolver implements Solver<WaveParams> {
     }
   }
 
+  /**
+   * One step of `dt` of propagation along `axis` by the ULTIMATE QUICKEST scheme (Leonard 1979 and 1991, as the WAVEWATCH III
+   * manual states it, eqs. 3.12 to 3.23): each face's value from the upstream cells and the upstream curvature, third order
+   * in space and time, limited so it makes no new extremum; first-order upwind at a face beside land, an open edge or a
+   * stencil cell beyond either. Waves entering over an open edge carry the open sea's swell.
+   */
+  private advect(words: Float64Array, axis: 'x' | 'z', dt: number): void {
+    const { nx, nz, nf, nd, h } = this,
+      per = nf * nd,
+      along = axis === 'x' ? nx : nz,
+      across = axis === 'x' ? nz : nx,
+      wrap = axis === 'x' ? this.wrapX : this.wrapZ,
+      before = words.slice(),
+      // Cell index of position p along the axis at position q across it, or -1 beyond an edge that does not wrap.
+      cellAt = (p: number, q: number): number => {
+        if (wrap) p = ((p % along) + along) % along;
+        else if (p < 0 || p >= along) return -1;
+        return axis === 'x' ? p + nx * q : q + nx * p;
+      },
+      wet = (cell: number): boolean => cell >= 0 && this.depth[cell]! > 0,
+      // A cell's value of a bin: 0 on land, the open sea's swell beyond an open edge.
+      value = (cell: number, bin: number): number =>
+        cell >= 0 ? (this.depth[cell]! > 0 ? before[cell * per + bin]! : 0) : this.swell ? this.swell[bin]! : 0,
+      flux = new Float64Array(along + 1);
+    for (let q = 0; q < across; q++)
+      for (let i = 0; i < nf; i++)
+        for (let j = 0; j < nd; j++) {
+          const bin = i * nd + j,
+            direction = axis === 'x' ? cos(this.dirs[j]!) : sin(this.dirs[j]!);
+          // The flux through face p, between cells p - 1 and p.
+          for (let p = 0; p <= along; p++) {
+            const left = cellAt(p - 1, q),
+              right = cellAt(p, q),
+              lw = wet(left),
+              rw = wet(right);
+            if (!lw && !rw) {
+              flux[p] = 0;
+              continue;
+            }
+            const speed =
+                (lw && rw
+                  ? 0.5 * (this.cg[left * nf + i]! + this.cg[right * nf + i]!)
+                  : this.cg[(lw ? left : right) * nf + i]!) * direction,
+              courant = (speed * dt) / h,
+              upstream = speed >= 0 ? left : right,
+              downstream = speed >= 0 ? right : left,
+              far = speed >= 0 ? cellAt(p - 2, q) : cellAt(p + 1, q),
+              nc = value(upstream, bin);
+            // First order beside land or an open edge, or where the stencil reaches past one.
+            if (!lw || !rw || !wet(far)) {
+              flux[p] = speed * nc;
+              continue;
+            }
+            const nu = value(far, bin),
+              nd2 = value(downstream, bin),
+              curvature = nu - 2 * nc + nd2,
+              c = courant < 0 ? -courant : courant;
+            let face = 0.5 * ((1 + c) * nc + (1 - c) * nd2) - ((1 - c * c) / 6) * curvature;
+            // The ULTIMATE limiter in normalised variables: monotone data keep the face between N_c and min(1, N_c / C).
+            const span = nd2 - nu;
+            if (span !== 0) {
+              const tc = (nc - nu) / span;
+              if (tc >= 0 && tc <= 1) {
+                let tb = (face - nu) / span;
+                const top = c > 0 && tc / c < 1 ? tc / c : 1;
+                if (tb < tc) tb = tc;
+                if (tb > top) tb = top;
+                face = nu + tb * span;
+              } else face = nc;
+            } else face = nc;
+            flux[p] = speed * face;
+          }
+          for (let p = 0; p < along; p++) {
+            const cell = cellAt(p, q);
+            if (!wet(cell)) continue;
+            const updated = before[cell * per + bin]! + (dt / h) * (flux[p]! - flux[p + 1]!);
+            words[cell * per + bin] = updated > 0 ? updated : 0;
+          }
+        }
+  }
+
   private depthAt(r: number, c: number, fallback: number): number {
     if (this.wrapX) r = (r + this.nx) % this.nx;
     if (this.wrapZ) c = (c + this.nz) % this.nz;
     if (r < 0 || c < 0 || r >= this.nx || c >= this.nz) return fallback;
     const d = this.depth[r + this.nx * c]!;
     return d > 0 ? d : 0;
-  }
-
-  /** The energy of bin `bin` coming from cell (r, c): 0 from land, the open sea's swell from beyond the grid. */
-  private upwind(words: Float64Array, r: number, c: number, bin: number): number {
-    if (this.wrapX) r = (r + this.nx) % this.nx;
-    if (this.wrapZ) c = (c + this.nz) % this.nz;
-    if (r < 0 || c < 0 || r >= this.nx || c >= this.nz) return this.swell ? this.swell[bin]! : 0;
-    const at = r + this.nx * c;
-    if (!(this.depth[at]! > 0)) return 0;
-    return words[at * this.nf * this.nd + bin]!;
   }
 
   /** The source terms in every wet cell, integrated over `dt`. */
@@ -583,6 +658,9 @@ export class WaveSolver implements Solver<WaveParams> {
       grow = new Float64Array(per),
       decay = new Float64Array(per),
       transfer = new Float64Array(per),
+      energyF = new Float64Array(per),
+      inputRate = new Float64Array(per),
+      sinkRate = new Float64Array(per),
       dtheta = TWO_PI / nd,
       rhoRatio = AIR_DENSITY / this.settings.density;
     for (let c = 0; c < nz; c++)
@@ -619,10 +697,25 @@ export class WaveSolver implements Solver<WaveParams> {
           u10 = hypot(v[0], v[2]);
           windDirection = u10 > 0 ? angleTo(v[2], v[0]) : 0;
         }
-        const ut = u10 / 31.5,
-          drag = (0.55 + 2.97 * ut - 1.49 * ut * ut) * 1e-3,
-          ustar = u10 * pow(drag > 0 ? drag : 0, 0.5),
-          sigmaPM = (TWO_PI * 0.13 * g) / (28 * (ustar > 0 ? ustar : 1e-9));
+        const st4 = this.physics === 'st4';
+        let ustar = 0,
+          cutoff = nf - 1;
+        if (st4) {
+          for (let b = 0; b < per; b++) energyF[b] = words[at * per + b]!;
+          ({ ustar, cutoff } = st4Rates(
+            energyF,
+            this.cellOf(at, d, rhoRatio),
+            u10,
+            windDirection,
+            inputRate,
+            sinkRate,
+          ));
+        } else {
+          const ut = u10 / 31.5,
+            drag = (0.55 + 2.97 * ut - 1.49 * ut * ut) * 1e-3;
+          ustar = u10 * pow(drag > 0 ? drag : 0, 0.5);
+        }
+        const sigmaPM = (TWO_PI * 0.13 * g) / (28 * (ustar > 0 ? ustar : 1e-9));
         let gamma = 0,
           meanS = 0,
           meanK = 0,
@@ -661,6 +754,11 @@ export class WaveSolver implements Solver<WaveParams> {
               lin = ustar > 0 && along > 0 ? (1.5e-3 / (TWO_PI * g * g)) * pow(ustar * along, 4) * filter : 0,
               exponential = ustar > 0 ? 0.25 * rhoRatio * ((28 * ustar) / cph) * along - 0.25 * rhoRatio : 0;
             grow[b] = lin;
+            if (st4) {
+              grow[b]! += inputRate[b]! * eSigma[b]!;
+              decay[b] = sinkRate[b]! - friction - breaking;
+              continue;
+            }
             // Gamma = C_ds ((1 - delta) + delta k / k~) (s~ / s~_PM)^p with delta = 1, SWAN's default since 40.91A.
             const relative = kk / (meanK > 0 ? meanK : kk);
             decay[b] = -(gamma * relative * meanS * relative) - friction - breaking;
@@ -686,7 +784,31 @@ export class WaveSolver implements Solver<WaveParams> {
             words[at * per + b] = (value > 0 ? value : 0) * TWO_PI;
           }
         }
+        // ST4 integrates up to 2.5 times the mean frequency; above it the spectrum is the f^-5 tail (WAVEWATCH III eq. 2.17).
+        if (st4)
+          for (let i = cutoff + 1; i < nf; i++) {
+            const decline = pow(this.freqs[i]! / this.freqs[cutoff]!, -5);
+            for (let j = 0; j < nd; j++) words[at * per + i * nd + j] = words[at * per + cutoff * nd + j]! * decline;
+          }
       }
+  }
+
+  /** The spectral grid and water of cell `at` for the ST4 source terms. */
+  private cellOf(at: number, depth: number, densityRatio: number): SpectralCell {
+    const nf = this.nf;
+    return {
+      nf,
+      nd: this.nd,
+      freqs: this.freqs,
+      widths: this.widths,
+      dirs: this.dirs,
+      k: this.k.subarray(at * nf, (at + 1) * nf),
+      cg: this.cg.subarray(at * nf, (at + 1) * nf),
+      depth,
+      g: this.g,
+      densityRatio,
+      airViscosity: AIR_VISCOSITY,
+    };
   }
 
   /**
@@ -700,7 +822,7 @@ export class WaveSolver implements Solver<WaveParams> {
       dtheta = TWO_PI / nd,
       ratio = this.freqs[1]! / this.freqs[0]!,
       logRatio = ln(ratio),
-      scale = (C_NL4 * TWO_PI * TWO_PI) / (g * g * g * g),
+      scale = ((this.physics === 'st4' ? ST4.nonlinear : C_NL4) * TWO_PI * TWO_PI) / (g * g * g * g),
       up = pow(1 + LAMBDA, 4),
       down = pow(1 - LAMBDA, 4),
       both = pow(1 - LAMBDA * LAMBDA, 4),
