@@ -4,10 +4,12 @@
 // the hull under its still waterline is mapped to a Lewis form, the two-parameter conformal map of a half circle
 // (Journee and Massie eqs. 7.88-7.95, after Lewis, "The inertia of the water surrounding a vibrating ship", SNAME 1929): its
 // breadth B, its draft T and its area coefficient sigma = A / (B T) fix the map's a1 and a3. At high frequency the free
-// surface holds the potential at zero, so a section moves the water as half of its mirrored double body in an unbounded
-// fluid does: in heave rho pi B^2 / 8 times Lewis's coefficient ((1 + a1)^2 + 3 a3^2) / (1 + a1 + a3)^2, and in sway
-// rho pi T^2 / 2 times ((1 - a1)^2 + 3 a3^2) / (1 - a1 + a3)^2. Both meet the exact limits of a half circle (rho pi R^2 / 2),
-// a flat plate on the surface (rho pi B^2 / 8, half the unbounded plate's rho pi (B/2)^2) and a vertical plate (rho pi T^2 / 2).
+// surface holds the potential at zero, so a heaving section moves the water as half of its mirrored double body in an
+// unbounded fluid does: rho pi B^2 / 8 times Lewis's coefficient ((1 + a1)^2 + 3 a3^2) / (1 + a1 + a3)^2, which meets the exact
+// limits of a half circle (rho pi R^2 / 2) and of a flat plate on the surface (rho pi B^2 / 8, half the unbounded plate's
+// rho pi (B/2)^2). In sway the mirror image moves the other way at high frequency, so the double body is not rigid and the
+// limit is smaller (radiation.ts finds it): rho pi T^2 / 2 times ((1 - a1)^2 + 3 a3^2) / (1 - a1 + a3)^2 is the sway added
+// mass under a rigid lid, the zero-frequency limit, where the image moves with the section (a vertical plate: rho pi T^2 / 2).
 // The sections then add along the hull to the added mass the rigid body carries with it (Journee and Massie eq. 8.25 at
 // zero speed). Each section's breadth, draft and area come from the mesh cut by the plane of the station (Green's theorem
 // over the cut's segments under the waterline).
@@ -126,8 +128,8 @@ export function heaveAddedMassInfinite(breadth: number, form: LewisForm, density
   );
 }
 
-/** The sway added mass per metre of a Lewis section of draft T at infinite frequency, kg/m. */
-export function swayAddedMassInfinite(draft: number, form: LewisForm, density: number): number {
+/** The sway added mass per metre of a Lewis section of draft T under a rigid lid (the zero-frequency limit), kg/m. */
+export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: number): number {
   const { a1, a3 } = form;
   return (
     ((density * Math.PI * draft * draft) / 2) * (((1 - a1) * (1 - a1) + 3 * a3 * a3) / ((1 - a1 + a3) * (1 - a1 + a3)))
@@ -135,10 +137,10 @@ export function swayAddedMassInfinite(draft: number, form: LewisForm, density: n
 }
 
 /**
- * The hull's added mass at infinite frequency, 6 by 6 (row-major), in the body's frame about `centre` (x, y, z): rows and
- * columns surge, heave (y), sway (z), roll (about x), yaw (about y), pitch (about z). Heave, pitch and their coupling come
- * from the sections' heave added mass, sway, yaw and theirs from the sway added mass; surge (slender) and roll (its lever
- * needs the sections' roll added mass, not built yet) take none.
+ * The hull's heave and pitch added mass at infinite frequency, 6 by 6 (row-major), in the body's frame about `centre`
+ * (x, y, z): rows and columns surge, heave (y), sway (z), roll (about x), yaw (about y), pitch (about z). Only the heave,
+ * the pitch and their coupling are filled, from the sections' heave added mass; the lateral block (sway, roll, yaw) comes
+ * from the sections' radiation (memory.ts), as its high-frequency limit needs the full solution.
  */
 export function addedMassInfinite(
   sections: readonly Section[],
@@ -151,18 +153,12 @@ export function addedMassInfinite(
     if (!(s.breadth > 0 && s.draft > 0)) continue;
     const form = lewisForm(s.breadth, s.draft, s.area),
       heave = heaveAddedMassInfinite(s.breadth, form, density) * s.width,
-      sway = swayAddedMassInfinite(s.draft, form, density) * s.width,
       x = s.x - centre[0];
     // Heave y and pitch about z: a pitch rate w_z moves the section along y at w_z x.
     a[at(1, 1)]! += heave;
     a[at(1, 5)]! += heave * x;
     a[at(5, 1)]! += heave * x;
     a[at(5, 5)]! += heave * x * x;
-    // Sway z and yaw about y: a yaw rate w_y moves the section along z at -w_y x.
-    a[at(2, 2)]! += sway;
-    a[at(2, 4)]! -= sway * x;
-    a[at(4, 2)]! -= sway * x;
-    a[at(4, 4)]! += sway * x * x;
   }
   return a;
 }

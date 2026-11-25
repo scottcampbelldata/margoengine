@@ -4,14 +4,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { GRAVITY, HullSolver, heaveSection, lewisForm, SEA_WATER } from '../../dist/seakeeping.js';
+import {
+  GRAVITY,
+  HullSolver,
+  heaveSection,
+  lateralSection,
+  lewisForm,
+  SEA_WATER,
+  wettedLoads,
+} from '../../dist/seakeeping.js';
 import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 await Physics.load();
 
 /** A box hull of `size` (x, y, z), each face a 4 by 4 grid, wound outward. */
-function boxMesh([sx, sy, sz]) {
+function boxMesh([sx, sy, sz], [ox, oy, oz] = [0, 0, 0]) {
   const h = [sx / 2, sy / 2, sz / 2],
     vertices = [],
     indices = [],
@@ -32,7 +40,7 @@ function boxMesh([sx, sy, sz]) {
         p[axis] = sign * h[axis];
         p[u] = -h[u] + (2 * h[u] * i) / n;
         p[v] = -h[v] + (2 * h[v] * j) / n;
-        vertices.push(...p);
+        vertices.push(p[0] + ox, p[1] + oy, p[2] + oz);
       }
     const at = (i, j) => first + i * (n + 1) + j;
     for (let i = 0; i < n; i++)
@@ -41,7 +49,7 @@ function boxMesh([sx, sy, sz]) {
           [at(i, j), at(i + 1, j), at(i + 1, j + 1)],
           [at(i, j), at(i + 1, j + 1), at(i, j + 1)],
         ]) {
-          const p = t.map((k) => vertices.slice(3 * k, 3 * k + 3)),
+          const p = t.map((k) => [vertices[3 * k] - ox, vertices[3 * k + 1] - oy, vertices[3 * k + 2] - oz]),
             e1 = [0, 1, 2].map((c) => p[1][c] - p[0][c]),
             e2 = [0, 1, 2].map((c) => p[2][c] - p[0][c]),
             nrm = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
@@ -90,8 +98,11 @@ test('HullSolver: the load reaches the hull it names', () => {
   );
 });
 
-/** A solver that drives body `row` up and down with f0 sin(w t), t the middle of each step. */
-function driver(row, f0, w) {
+/**
+ * A solver that drives body `row` along `axis` (1 heave, 2 sway) with f0 sin(w t), t the middle of each step; over the first
+ * `ramp` seconds the force grows as (1 - cos(pi t / ramp)) / 2, so the start excites little but the frequency w.
+ */
+function driver(row, f0, w, axis = 1, ramp = 0) {
   let region, host;
   return {
     describe: () => ({
@@ -107,7 +118,9 @@ function driver(row, f0, w) {
     step(context) {
       const words = new Float64Array(host.memory.buffer, region.byteOffset, region.byteLength / 8);
       words.fill(0);
-      words[row * FORCE_WORDS + 1] = f0 * Math.sin((w * (context.tick + 0.5)) / 60);
+      const t = (context.tick + 0.5) / 60,
+        grow = t < ramp ? (1 - Math.cos((Math.PI * t) / ramp)) / 2 : 1;
+      words[row * FORCE_WORDS + axis] = grow * f0 * Math.sin(w * t);
     },
     exportPorts: (tick) => [{ field: 'bodyForces', region, tick, cell: [0, 0, 0] }],
     importPorts() {},
@@ -116,15 +129,15 @@ function driver(row, f0, w) {
   };
 }
 
-/** A box hull alone in still water, its own world, driven by `drive` when given. */
-function single(options = {}, drive) {
+/** A box hull alone in still water, its own world, driven by `drive` when given; `mesh` and `mass` for another hull. */
+function single(options = {}, drive, mesh = boxMesh([L, D, B]), mass = SEA_WATER * L * B * T) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
     box = physics.addBody(null, {
       position: [0, D / 2 - T, 0],
-      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass },
     }),
     world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new HullSolver(), {
-      hulls: [{ row: box.row, mesh: boxMesh([L, D, B]) }],
+      hulls: [{ row: box.row, mesh }],
       sea: { density: SEA_WATER, elevation: () => 0 },
       ...options,
     });
@@ -188,4 +201,189 @@ test('HullSolver: let go above its draft, a box settles as its damping says; wit
   const period = (crossings.at(-1) - crossings[0]) / (crossings.length - 1) / 60,
     expected = 2 * Math.PI * Math.sqrt((SEA_WATER * L * B * T) / (SEA_WATER * GRAVITY * L * B));
   assert.ok(Math.abs(period - expected) <= 0.02 * expected, `bare: period ${period} s against ${expected} s`);
+});
+
+/** The complex amplitudes of `signals` (sampled at 60 Hz from frame `from`) at frequency w: x(t) = Re(X e^(i w t)). */
+function amplitudes(signals, w, from) {
+  return signals.map((x) => {
+    // Least squares on [cos, sin, 1, t]: the motion at w, a constant and a drift.
+    const n = x.length - from,
+      rows = [];
+    for (let f = from; f < x.length; f++) {
+      const t = (f + 1) / 60;
+      rows.push([Math.cos(w * t), Math.sin(w * t), 1, t, x[f]]);
+    }
+    const N = Array.from({ length: 4 }, () => new Array(5).fill(0));
+    for (const r of rows) for (let a = 0; a < 4; a++) for (let b = 0; b < 5; b++) N[a][b] += r[a] * r[b];
+    for (let c = 0; c < 4; c++)
+      for (let r = c + 1; r < 4; r++) {
+        const f = N[r][c] / N[c][c];
+        for (let k = c; k < 5; k++) N[r][k] -= f * N[c][k];
+      }
+    const sol = new Array(4).fill(0);
+    for (let r = 3; r >= 0; r--) {
+      let v = N[r][4];
+      for (let k = r + 1; k < 4; k++) v -= N[r][k] * sol[k];
+      sol[r] = v / N[r][r];
+    }
+    void n;
+    // x = c cos + s sin = Re((c - i s) e^(i w t)).
+    return [sol[0], -sol[1]];
+  });
+}
+
+/** Solves the 2 by 2 complex system [[a, b], [c, d]] X = [f, g] (complex numbers as [re, im]). */
+function solve2(a, b, c, d, f, g) {
+  const mul = (x, y) => [x[0] * y[0] - x[1] * y[1], x[0] * y[1] + x[1] * y[0]],
+    sub = (x, y) => [x[0] - y[0], x[1] - y[1]],
+    div = (x, y) => {
+      const m = y[0] * y[0] + y[1] * y[1];
+      return [(x[0] * y[0] + x[1] * y[1]) / m, (x[1] * y[0] - x[0] * y[1]) / m];
+    },
+    det = sub(mul(a, d), mul(b, c));
+  return [div(sub(mul(f, d), mul(b, g)), det), div(sub(mul(a, g), mul(c, f)), det)];
+}
+
+test('HullSolver: driven sideways, a box sways and rolls as the coupled frequency-domain equations say', () => {
+  // Sway z and roll about x, coupled through the water (a24, b24 of each section about the centre of gravity, 0.25 m above
+  // the waterline): [C - w^2 (M + A(w)) + i w B(w)] X = F with C the roll restoring rho g V GM (GM = KB + BM - KG, a box's:
+  // T/2 + B^2/(12 T) - D/2) and nothing in sway. The radiation memory and the lateral added mass at infinite frequency must
+  // give that. Driven above the roll's resonance (about 1.6 rad/s), the drift sway has no spring to hold is taken out with
+  // the fit. The roll's own oscillation near 1.6 rad/s is barely damped (its potential damping is small there), so a drive
+  // switched on at once leaves it ringing through the fit, which then moved by 3 to 7 percent with the window; the drive
+  // grows over 10 s instead, and the fit holds within 0.1 percent from 20, 40 or 60 s. Measured 1.1 to 2.3 percent off at
+  // 60 steps a second and 0.2 to 0.5 at 240 (the step's own error, the load at its middle): a bound of 3 percent.
+  const rho = SEA_WATER,
+    m = rho * L * B * T,
+    ixx = (m * (D * D + B * B)) / 12,
+    gm = T / 2 + (B * B) / (12 * T) - D / 2,
+    c44 = rho * GRAVITY * L * B * T * gm,
+    form = lewisForm(B, T, B * T),
+    // The centre of gravity's depth under the waterline (body y: waterline T - D/2, centre 0): 0.25 m above it.
+    pivot = T - D / 2 - 0,
+    f0 = 2000;
+  for (const w of [3, 4]) {
+    const { world, box } = single({}, [f0, w, 2, 10]),
+      sway = [],
+      roll = [];
+    for (let f = 1; f <= 40 * 60; f++) {
+      world.advance(f);
+      sway.push(box.position[2]);
+      roll.push(2 * box.rotation[0]);
+    }
+    const [X2, X4] = amplitudes([sway, roll], w, 20 * 60),
+      s = lateralSection(form, w, rho, pivot, GRAVITY),
+      a = (x) => x * L,
+      [P2, P4] = solve2(
+        [-w * w * (m + a(s.sway.addedMass)), w * a(s.sway.damping)],
+        [-w * w * a(s.swayOfRoll.addedMass), w * a(s.swayOfRoll.damping)],
+        [-w * w * a(s.rollOfSway.addedMass), w * a(s.rollOfSway.damping)],
+        [c44 - w * w * (ixx + a(s.roll.addedMass)), w * a(s.roll.damping)],
+        [0, -f0],
+        [0, 0],
+      );
+    const close = (got, want, what) =>
+      assert.ok(
+        Math.hypot(got[0] - want[0], got[1] - want[1]) <= 0.03 * Math.hypot(...want),
+        `at ${w} rad/s, ${what}: ${got} against ${want}`,
+      );
+    close(X2, P2, 'sway');
+    close(X4, P4, 'roll');
+  }
+});
+
+test('HullSolver: on a hull uneven fore and aft, heave drives pitch with the sign the strips give it', () => {
+  // A wide short body aft (3 m by 2 m) and a narrow long one forward (1.5 m by 2.83 m), so its centre of buoyancy is at
+  // its centre of mass (no trim) but its sections' added mass and damping are not even about it: heave and pitch couple
+  // through A15 = sum a33 x and B15 = sum b33 x. Driven in heave, its pitch must follow with the phase that coupling gives
+  // (a coupling of the wrong sign leaves the amplitudes and turns the pitch half a cycle): the coupled 2 by 2 equations, C
+  // taken from the hull's own load (finite differences of wettedLoads).
+  const rho = SEA_WATER,
+    lf = Math.sqrt(8),
+    [ba, bf] = [3, 1.5],
+    aft = boxMesh([2, D, ba], [-1, 0, 0]),
+    fore = boxMesh([lf, D, bf], [lf / 2, 0, 0]),
+    count = aft.vertices.length / 3,
+    mesh = {
+      vertices: Float64Array.from([...aft.vertices, ...fore.vertices]),
+      indices: Uint32Array.from([...aft.indices, ...fore.indices.map((i) => i + count)]),
+    },
+    volume = (2 * ba + lf * bf) * T,
+    m = rho * volume,
+    izz = (m * (L * L + D * D)) / 12,
+    rest = D / 2 - T,
+    // Restoring, from the load itself: heave and pitch moved a little each way from rest.
+    load = (dy, angle) =>
+      wettedLoads(
+        mesh,
+        { position: [0, rest + dy, 0], rotation: [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)] },
+        { density: rho, elevation: () => 0 },
+        0,
+        [0, rest + dy, 0],
+      ),
+    h = 1e-4,
+    c11 = -(load(h, 0).force[1] - load(-h, 0).force[1]) / (2 * h),
+    c15 = -(load(0, h).force[1] - load(0, -h).force[1]) / (2 * h),
+    c51 = -(load(h, 0).torque[2] - load(-h, 0).torque[2]) / (2 * h),
+    c55 = -(load(0, h).torque[2] - load(0, -h).torque[2]) / (2 * h),
+    // The strips' coefficients at w, in the body's axes: heave-pitch sum a x, pitch sum a x^2.
+    strips = (w) => {
+      let [a11, a15, a55, b11, b15, b55] = [0, 0, 0, 0, 0, 0];
+      for (const [b, x0, x1] of [
+        [ba, -2, 0],
+        [bf, 0, lf],
+      ]) {
+        const s = heaveSection(lewisForm(b, T, b * T), w, rho, GRAVITY),
+          [i0, i1, i2] = [x1 - x0, (x1 * x1 - x0 * x0) / 2, (x1 ** 3 - x0 ** 3) / 3];
+        a11 += s.addedMass * i0;
+        a15 += s.addedMass * i1;
+        a55 += s.addedMass * i2;
+        b11 += s.damping * i0;
+        b15 += s.damping * i1;
+        b55 += s.damping * i2;
+      }
+      return { a11, a15, a55, b11, b15, b55 };
+    },
+    w = 3,
+    f0 = 3000,
+    { world, box } = single({}, [f0, w, 1], mesh, m),
+    heave = [],
+    pitch = [];
+  for (let f = 1; f <= 40 * 60; f++) {
+    world.advance(f);
+    heave.push(box.position[1] - rest);
+    pitch.push(2 * box.rotation[2]);
+  }
+  const [X1, X5] = amplitudes([heave, pitch], w, 25 * 60),
+    k = strips(w),
+    [P1, P5] = solve2(
+      [c11 - w * w * (m + k.a11), w * k.b11],
+      [c15 - w * w * k.a15, w * k.b15],
+      [c51 - w * w * k.a15, w * k.b15],
+      [c55 - w * w * (izz + k.a55), w * k.b55],
+      [0, -f0],
+      [0, 0],
+    );
+  // The test tells the coupling's sign: with it turned round, the pitch would be far off.
+  const [, F5] = solve2(
+    [c11 - w * w * (m + k.a11), w * k.b11],
+    [c15 + w * w * k.a15, -w * k.b15],
+    [c51 + w * w * k.a15, -w * k.b15],
+    [c55 - w * w * (izz + k.a55), w * k.b55],
+    [0, -f0],
+    [0, 0],
+  );
+  assert.ok(
+    Math.hypot(F5[0] - P5[0], F5[1] - P5[1]) > 0.5 * Math.hypot(...P5),
+    'a turned coupling would pitch otherwise',
+  );
+  assert.ok(Math.hypot(P5[0], P5[1]) > (0.1 * Math.hypot(P1[0], P1[1])) / L, 'the hull pitches noticeably');
+  for (const [got, want, what] of [
+    [X1, P1, 'heave'],
+    [X5, P5, 'pitch'],
+  ])
+    assert.ok(
+      Math.hypot(got[0] - want[0], got[1] - want[1]) <= 0.05 * Math.hypot(...want),
+      `${what}: ${got} against ${want}`,
+    );
 });

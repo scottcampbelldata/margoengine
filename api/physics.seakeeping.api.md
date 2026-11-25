@@ -20,12 +20,8 @@ export interface Hull {
 export interface HullMemory {
     readonly waterline: number;
     readonly frequencies: Float64Array;
-    readonly heave: Float64Array;
-    readonly coupling: Float64Array;
-    readonly pitch: Float64Array;
-    readonly kernelHeave: Float64Array;
-    readonly kernelCoupling: Float64Array;
-    readonly kernelPitch: Float64Array;
+    readonly pairs: readonly RadiationPair[];
+    readonly lateralInfinite: Float64Array;
     readonly dt: number;
 }
 
@@ -63,6 +59,27 @@ export class HullSolver implements Solver<HullParams> {
     extraState(): readonly Region[];
 }
 
+export interface LateralSection {
+    readonly sway: {
+        readonly addedMass: number;
+        readonly damping: number;
+        readonly dampingFromWaves: number;
+    };
+    readonly roll: {
+        readonly addedMass: number;
+        readonly damping: number;
+        readonly dampingFromWaves: number;
+    };
+    readonly swayOfRoll: {
+        readonly addedMass: number;
+        readonly damping: number;
+    };
+    readonly rollOfSway: {
+        readonly addedMass: number;
+        readonly damping: number;
+    };
+}
+
 export interface LewisForm {
     readonly scale: number;
     readonly a1: number;
@@ -71,6 +88,13 @@ export interface LewisForm {
 }
 
 export type Quat = readonly [number, number, number, number];
+
+export interface RadiationPair {
+    readonly i: number;
+    readonly j: number;
+    readonly damping: Float64Array;
+    readonly kernel: Float64Array;
+}
 
 export const SEA_WATER = 1025;
 
@@ -113,11 +137,13 @@ export function hullSections(mesh: {
     readonly indices: ArrayLike<number>;
 }, waterline: number, count?: number): Section[];
 
+export function lateralSection(form: LewisForm, omega: number, density: number, pivot: number, gravity?: number, terms?: number, points?: number): LateralSection;
+
 export function lewisForm(breadth: number, draft: number, area: number): LewisForm;
 
 export function stillWaterline(mesh: HullMesh, mass: number, density: number): number;
 
-export function swayAddedMassInfinite(draft: number, form: LewisForm, density: number): number;
+export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: number): number;
 
 export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads): WettedLoads;
 

@@ -213,6 +213,158 @@ export function heaveSection(
   };
 }
 
+/** A section's sway and roll coefficients: added mass and damping, each from the pressure and the diagonal ones again from the waves. */
+export interface LateralSection {
+  /** Sway: added mass kg/m, damping N s/m^2, the damping from the waves. */
+  readonly sway: { readonly addedMass: number; readonly damping: number; readonly dampingFromWaves: number };
+  /** Roll about the section's own point at depth `pivot`: added inertia kg m, damping N m s, the damping from the waves. */
+  readonly roll: { readonly addedMass: number; readonly damping: number; readonly dampingFromWaves: number };
+  /** The sway force of a roll (kg, N s/m) and the roll moment of a sway: the two must be equal (reciprocity). */
+  readonly swayOfRoll: { readonly addedMass: number; readonly damping: number };
+  readonly rollOfSway: { readonly addedMass: number; readonly damping: number };
+}
+
+/**
+ * The sway and roll added mass and damping per metre of a section of Lewis form `form` at `omega` rad/s, rolling about the
+ * point `pivot` metres below the waterline on its centre line (negative above it), in deep water (Journee and Massie eqs.
+ * 7.70, 7.73, 7.105-7.112, the antisymmetric potentials, and the same least squares as `heaveSection`).
+ *
+ * One formulation for every mode: the hull's motion V(t) in mode i puts the stream function V S_i(theta) + C on the contour
+ * (S = y0 for sway, -((x0^2 + (y0 - pivot)^2) / 2 for roll about the pivot, -x0 for heave), the constant taken off at the keel;
+ * the pressure of the solution of mode i on mode j's motion, 2 integral of p dS_j, is mode j's force, so with p and q the
+ * motion's two parts over the waves' amplitude, M_ji w^2 (p^2 + q^2) = -K (q I_s + p I_c) and N_ji w (p^2 + q^2) =
+ * K (q I_c - p I_s), K = 2 rho g / pi, I the potentials' integrals against dS_j. Two of the book's printed forms carry a
+ * wrong sign (the sway multipoles' stream function on the contour, eqs. 7.76 and 7.108, and the circle's sway body condition,
+ * eq. 7.66): the forms used are those that satisfy Cauchy-Riemann with their potentials (eqs. 7.73 and 7.106).
+ */
+export function lateralSection(
+  form: LewisForm,
+  omega: number,
+  density: number,
+  pivot: number,
+  gravity = 9.81,
+  terms = 16,
+  points = 64,
+): LateralSection {
+  const { scale: ms, a1, a3 } = form,
+    k = (omega * omega) / gravity,
+    xi = (omega * omega * ms) / gravity,
+    draft = ms * (1 - a1 + a3),
+    contour = (t: number): [number, number] => [
+      ms * ((1 + a1) * sin(t) - a3 * sin(3 * t)),
+      ms * ((1 - a1) * cos(t) + a3 * cos(3 * t)),
+    ],
+    dx0 = (t: number) => ms * ((1 + a1) * cos(t) - 3 * a3 * cos(3 * t)),
+    dy0 = (t: number) => ms * (-(1 - a1) * sin(t) - 3 * a3 * sin(3 * t)),
+    coefficients = [1, a1, a3],
+    // The antisymmetric multipoles on the contour (eq. 7.106): m from 1.
+    multipole = (m: number, t: number, stream: boolean): number => {
+      let sum = 0;
+      for (let n = 0; n < 3; n++) {
+        const order = 2 * m + 2 * n,
+          c = ((n % 2 === 0 ? 1 : -1) * (2 * n - 1) * coefficients[n]!) / order;
+        sum += c * (stream ? cos(order * t) : sin(order * t));
+      }
+      return stream ? -cos((2 * m + 1) * t) + xi * sum : sin((2 * m + 1) * t) - xi * sum;
+    },
+    psiBc = (x: number, y: number) => Math.PI * exp(-k * y) * cos(k * x),
+    phiBc = (x: number, y: number) => -Math.PI * exp(-k * y) * sin(k * x),
+    psiBs = (x: number, y: number) =>
+      Math.PI * exp(-k * y) * sin(k * x) + waveIntegral(k, x, y)[1] - y / (k * (x * x + y * y)),
+    phiBs = (x: number, y: number) =>
+      Math.PI * exp(-k * y) * cos(k * x) - waveIntegral(k, x, y)[0] + x / (k * (x * x + y * y)),
+    keelC = psiBc(0, draft),
+    keelS = psiBs(0, draft),
+    keelA = Array.from({ length: terms }, (_, m) => multipole(m + 1, 0, true)),
+    shapes = {
+      sway: (t: number) => contour(t)[1],
+      roll: (t: number) => {
+        const [x0, y0] = contour(t);
+        return -(x0 * x0 + (y0 - pivot) * (y0 - pivot)) / 2;
+      },
+    },
+    slopes = {
+      sway: (t: number) => dy0(t),
+      roll: (t: number) => {
+        const [x0, y0] = contour(t);
+        return -(x0 * dx0(t) + (y0 - pivot) * dy0(t));
+      },
+    },
+    K = (2 * density * gravity) / Math.PI,
+    [nodes, weights] = QUADRATURE;
+  // One radiation problem: mode `mode`'s motion, solved for the multipoles and the motion over the waves.
+  const solveMode = (mode: 'sway' | 'roll') => {
+    const shape = shapes[mode],
+      size = terms + 1,
+      normal = new Float64Array(size * size),
+      rc = new Float64Array(size),
+      rs = new Float64Array(size),
+      row = new Float64Array(size),
+      keel = shape(0);
+    let spread = 0;
+    for (let j = 1; j <= points; j++) {
+      const t = (j * Math.PI) / (2 * points),
+        [x0, y0] = contour(t);
+      for (let m = 1; m <= terms; m++) row[m - 1] = multipole(m, t, true) - keelA[m - 1]!;
+      const ds = shape(t) - keel;
+      spread = Math.max(spread, ds < 0 ? -ds : ds);
+      row[terms] = Math.PI * k * ds;
+      const bc = -(psiBc(x0, y0) - keelC),
+        bs = -(psiBs(x0, y0) - keelS);
+      for (let a = 0; a < size; a++) {
+        for (let b = 0; b < size; b++) normal[a * size + b]! += row[a]! * row[b]!;
+        rc[a]! += row[a]! * bc;
+        rs[a]! += row[a]! * bs;
+      }
+    }
+    // A motion that moves no water normal to the contour (a half circle rolling about its centre) makes no waves.
+    if (!(spread > 1e-9 * ms * ms)) return null;
+    const P = solve(normal, rc, size),
+      Q = solve(normal, rs, size);
+    return { P, Q, p: P[terms]!, q: Q[terms]! };
+  };
+  // Mode j's force from mode i's solution.
+  const load = (solution: ReturnType<typeof solveMode>, j: 'sway' | 'roll') => {
+    if (!solution) return { addedMass: 0, damping: 0 };
+    const { P, Q, p, q } = solution,
+      slope = slopes[j];
+    let ic = 0,
+      is = 0;
+    for (let n = 0; n < nodes.length; n++) {
+      const t = (nodes[n]! * Math.PI) / 2,
+        w = (weights[n]! * Math.PI) / 2,
+        [x0, y0] = contour(t),
+        d = slope(t);
+      let c = phiBc(x0, y0),
+        s = phiBs(x0, y0);
+      for (let m = 1; m <= terms; m++) {
+        const f = multipole(m, t, false);
+        c += P[m - 1]! * f;
+        s += Q[m - 1]! * f;
+      }
+      ic += w * c * d;
+      is += w * s * d;
+    }
+    const pq = p * p + q * q;
+    return {
+      addedMass: (-K * (q * is + p * ic)) / (omega * omega * pq),
+      damping: (K * (q * ic - p * is)) / (omega * pq),
+    };
+  };
+  const waves = (solution: ReturnType<typeof solveMode>) =>
+      solution
+        ? (density * gravity * gravity) / (omega * omega * omega * (solution.p * solution.p + solution.q * solution.q))
+        : 0,
+    sway = solveMode('sway'),
+    roll = solveMode('roll');
+  return {
+    sway: { ...load(sway, 'sway'), dampingFromWaves: waves(sway) },
+    roll: { ...load(roll, 'roll'), dampingFromWaves: waves(roll) },
+    swayOfRoll: load(roll, 'sway'),
+    rollOfSway: load(sway, 'roll'),
+  };
+}
+
 /** Solves the symmetric system (row-major) by Gaussian elimination with partial pivoting, in a fixed order. */
 function solve(matrix: Float64Array, rhs: Float64Array, n: number): Float64Array {
   const a = matrix.slice(),

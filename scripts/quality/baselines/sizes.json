@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19121125,
+  "total": 19121740,
   "history": [
     {
       "date": "2026-10-24",
@@ -12405,6 +12405,12 @@
       "commit": "0e82ac547",
       "reason": "Optional lines/infinite-grid: an endless ground grid drawn by one shader draw (cell and section lines, analytic antialiasing, distance fade, follow-camera disc); a new entry, absent before. A page that does not import it pays 0 B.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "SEA-08 sway and roll",
+      "grew": 2,
+      "reason": "@margoengine/physics/seakeeping: the sway and roll radiation of each section (Ursell-Tasai antisymmetric multipoles on its Lewis form, lateralSection) and the sway, roll and yaw pairs of the radiation memory with their added mass at infinite frequency; measured gzip (Mac build) 8701 B, was under 7881; a hull without them sways and rolls undamped, and a split would put one hull solve into two entries every hull loads. Budget (measured + 3%): 7881 to 8962 B. @margoengine/physics/world: 15475 to 15518 B, the measured size after ba84133b2 made the framework errors name their fix (longer messages; its budget was not raised then)."
     }
   ],
   "items": {
@@ -13201,13 +13207,13 @@
     "@margoengine/physics/flight": 7401,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/seakeeping": 7881,
+    "@margoengine/physics/seakeeping": 8962,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 8575,
-    "@margoengine/physics/world": 15984,
+    "@margoengine/physics/world": 15518,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

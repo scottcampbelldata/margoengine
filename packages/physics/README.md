@@ -1906,14 +1906,17 @@ console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.de
   - in a small wave, a box takes the linear Froude-Krylov heave load;
   - a section's Lewis form matches the book's container section, and its added mass meets the exact limits of a half circle and of flat plates;
   - a heaving half circle's damping from the pressure equals that from its waves, and meets its limits at high and low frequency;
-  - driven, a box heaves within 2.1 percent of the frequency-domain answer at 60 steps a second (1 percent at 240), and let go it settles at its damping.
-- **The water a hull carries:** its added mass at infinite frequency, from its sections under the waterline it floats at each step (strip theory). Each section is mapped to its Lewis form, and its heave and sway added mass are integrated to the hull's heave, pitch, sway and yaw. The solver holds M (M + A)^-1 (F + W + E) - W - E, so the body moves as hull and water together, stable even when the water outweighs a light hull. E is every other load on the body (a tow, the wind, a sail, a contact), seen from its last two steps. `addedMass: false` leaves it out; `stations` sets the sections (default 24); `gravity` must be the rigid world's. `hullSections`, `lewisForm` and `addedMassInfinite` are exported to inspect it.
-- **The waves a hull makes:** its heave and pitch damping, with memory (Cummins 1962).
-  - Each section's damping at each frequency comes from Ursell-Tasai's multipole solution on its Lewis form (`heaveSection`). The damping is computed twice, once from the pressure on the hull and once from the energy of the waves it sends out, and the two agree.
+  - a swaying and rolling section's damping from the pressure equals that from its waves, its couplings are reciprocal, and a half circle rolling about its centre makes no waves;
+  - driven, a box heaves within 2.1 percent of the frequency-domain answer at 60 steps a second (1 percent at 240), and let go it settles at its damping;
+  - driven sideways, a box sways and rolls within 2.3 percent of the coupled frequency-domain answer at 60 steps a second (0.5 at 240);
+  - on a hull uneven fore and aft, heave drives pitch with the phase the strips' coupling gives it.
+- **The water a hull carries:** its added mass at infinite frequency, from its sections under the waterline it floats at each step (strip theory). Each section is mapped to its Lewis form, and its heave added mass is integrated to the hull's heave and pitch; its sway and roll added mass at infinite frequency come from the radiation solution below (the free surface makes it smaller than the rigid-lid value `swayAddedMassRigidLid`, which is the zero-frequency limit). The solver holds M (M + A)^-1 (F + W + E) - W - E, so the body moves as hull and water together, stable even when the water outweighs a light hull. E is every other load on the body (a tow, the wind, a sail, a contact), seen from its last two steps. `addedMass: false` leaves it out; `stations` sets the sections (default 24); `gravity` must be the rigid world's. `hullSections`, `lewisForm` and `addedMassInfinite` are exported to inspect it.
+- **The waves a hull makes:** its heave, pitch, sway, roll and yaw damping and their couplings, with memory (Cummins 1962).
+  - Each section's damping at each frequency comes from Ursell-Tasai's multipole solution on its Lewis form: `heaveSection` in heave, `lateralSection` in sway and roll about the centre of mass (and their coupling). The damping is computed twice, once from the pressure on the hull and once from the energy of the waves it sends out, and the two agree.
   - The damping is integrated along the hull at its still-water draft (`hullMemory`), turned into the radiation kernel K(t), and convolved with the hull's motion over the last `memory` seconds (default 20).
   - A hull let go settles, and a hull driven at a frequency heaves as the frequency-domain equation of motion says. `radiation: false` leaves it out.
 - **The load each step** is taken at the step's middle (the pose carried half a step on). Taken where the step starts, it feeds the motion a little energy each step, a numerical negative damping of about w dt / 4 of critical.
-- **Not yet:** sway, roll and yaw damping, surge and roll added mass, diffraction, wave drift and green water.
+- **Not yet:** roll's viscous damping (a real hull's roll is damped mostly by eddies at its bilges, which potential flow leaves out), surge added mass, diffraction, wave drift and green water.
 
 ```ts
 import {Physics} from 'margoengine/physics';

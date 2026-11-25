@@ -8,10 +8,11 @@ import {
   GRAVITY,
   heaveAddedMassInfinite,
   heaveSection,
+  lateralSection,
   hullSections,
   lewisForm,
   SEA_WATER,
-  swayAddedMassInfinite,
+  swayAddedMassRigidLid,
   wettedLoads,
 } from '../dist/seakeeping.js';
 
@@ -148,23 +149,30 @@ test("a section's Lewis form: the book's container section, and a half circle, w
   );
 });
 
-test('a section moves at high frequency the water of half its mirrored double body: a half circle and the flat plates', () => {
-  // With the potential 0 on the free surface, a half circle of radius R moves rho pi R^2 / 2 in heave and in sway (half the
-  // unbounded circle's rho pi R^2); a flat plate of breadth B on the surface heaves rho pi B^2 / 8 (half the unbounded
-  // plate's rho pi (B/2)^2); a vertical plate of draft T sways rho pi T^2 / 2.
+test('a section moves the water of half its mirrored double body: in heave at high frequency, in sway under a rigid lid', () => {
+  // With the potential 0 on the free surface (high frequency) a heaving section's image moves with it: a half circle of
+  // radius R heaves rho pi R^2 / 2 (half the unbounded circle's rho pi R^2) and a flat plate of breadth B on the surface
+  // rho pi B^2 / 8 (half the unbounded plate's rho pi (B/2)^2). In sway the same holds with the surface a rigid lid (zero
+  // frequency), where the image sways with it: rho pi R^2 / 2 for the half circle, rho pi T^2 / 2 for a vertical plate of draft
+  // T. (At high frequency a swaying section's image moves the other way, so its sway limit is smaller: radiation.ts.)
   const rho = 1025,
     R = 1.5,
     circle = lewisForm(2 * R, R, (Math.PI * R * R) / 2);
   const close = (got, want, tol, what) =>
     assert.ok(Math.abs(got - want) <= tol * want, `${what}: ${got} against ${want}`);
   close(heaveAddedMassInfinite(2 * R, circle, rho), (rho * Math.PI * R * R) / 2, 1e-12, 'half circle in heave');
-  close(swayAddedMassInfinite(R, circle, rho), (rho * Math.PI * R * R) / 2, 1e-12, 'half circle in sway');
+  close(swayAddedMassRigidLid(R, circle, rho), (rho * Math.PI * R * R) / 2, 1e-12, 'half circle in sway, rigid lid');
   // A plate is a section of breadth to draft 100 (or 1/100), the end of Lewis's range, of area coefficient pi/4: its
   // coefficient is within a few parts in a hundred of the plate's.
   const flat = lewisForm(200, 1, (Math.PI / 4) * 200);
   close(heaveAddedMassInfinite(200, flat, rho), (rho * Math.PI * 200 * 200) / 8, 0.03, 'flat plate in heave');
   const upright = lewisForm(1, 50, (Math.PI / 4) * 50);
-  close(swayAddedMassInfinite(50, upright, rho), (rho * Math.PI * 50 * 50) / 2, 0.03, 'vertical plate in sway');
+  close(
+    swayAddedMassRigidLid(50, upright, rho),
+    (rho * Math.PI * 50 * 50) / 2,
+    0.03,
+    'vertical plate in sway, rigid lid',
+  );
 });
 
 test("a hull's sections are its cuts under the waterline, and a half cylinder carries rho pi R^2 L / 2 in heave", () => {
@@ -245,4 +253,51 @@ test('a heaving half circle: the pressure and the waves give the same damping, a
   const low = at(1e-4);
   assert.ok(Math.abs(low.b - 8 / Math.PI) < 0.01 * (8 / Math.PI), `at low frequency b ${low.b} against 8 / pi`);
   assert.ok(low.a > at(0.01).a && at(0.01).a > at(0.2).a, 'and a grows as the frequency falls');
+});
+
+test('a swaying and rolling section: its waves give its damping again, its couplings are reciprocal, a half circle rolls freely', () => {
+  // Journee and Massie eqs. 7.70-7.112, the antisymmetric problem (radiation.ts, lateralSection). For each motion the damping
+  // from the pressure equals the energy its waves carry away, rho g^2 / (w^3 |motion / wave|^2); the roll moment of a sway
+  // equals the sway force of a roll (Green's reciprocity: two independent solutions); a half circle rolling about its centre
+  // moves no water normal to itself and makes no waves (section 7.6.2). A box section rolls about a point 0.2 m above its
+  // waterline (its centre of gravity); the checks use 24 multipoles on 96 points.
+  const rho = 1025,
+    g = 9.81,
+    box = lewisForm(2, 0.5, 1);
+  for (const xi of [0.5, 1, 2]) {
+    const w = Math.sqrt((xi * g) / box.scale),
+      s = lateralSection(box, w, rho, -0.2, g, 24, 96);
+    for (const [name, mode] of [
+      ['sway', s.sway],
+      ['roll', s.roll],
+    ])
+      assert.ok(
+        Math.abs(mode.damping - mode.dampingFromWaves) <= 1e-2 * mode.dampingFromWaves,
+        `xi ${xi}: ${name} damping ${mode.damping} from the pressure, ${mode.dampingFromWaves} from the waves`,
+      );
+    const scale = Math.abs(s.swayOfRoll.addedMass) + Math.abs(s.swayOfRoll.damping) / w;
+    assert.ok(
+      Math.abs(s.swayOfRoll.addedMass - s.rollOfSway.addedMass) <= 1e-2 * scale,
+      `xi ${xi}: reciprocal added mass`,
+    );
+    assert.ok(
+      Math.abs(s.swayOfRoll.damping - s.rollOfSway.damping) <= 1e-2 * scale * w,
+      `xi ${xi}: reciprocal damping`,
+    );
+  }
+  // The gap is the fit's: largest where a motion makes few waves (this roll, near a node at xi = 0.5), it shrinks as the fit
+  // grows (1.1, 0.52 and 0.30 percent at 16, 24 and 32 terms).
+  const w = Math.sqrt((0.5 * g) / box.scale),
+    gap = (terms) => {
+      const r = lateralSection(box, w, rho, -0.2, g, terms, 4 * terms).roll;
+      return Math.abs(r.damping - r.dampingFromWaves) / r.dampingFromWaves;
+    };
+  assert.ok(gap(32) < gap(24) && gap(24) < gap(16), 'the roll gap shrinks as the fit grows');
+  const circle = lateralSection(lewisForm(2, 1, Math.PI / 2), 3, rho, 0, g);
+  assert.deepEqual(
+    [circle.roll.addedMass, circle.roll.damping, circle.swayOfRoll.addedMass],
+    [0, 0, 0],
+    'a half circle rolls freely',
+  );
+  assert.ok(circle.sway.damping > 0 && circle.sway.addedMass > 0, 'and sways against the water');
 });

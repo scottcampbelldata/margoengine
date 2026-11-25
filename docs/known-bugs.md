@@ -155,6 +155,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   costs more to step: see docs/limits.md. Regression: the test above, `soft-kernel/tests/threads.rs`, and in soft.test.js
   "an inextensible sheet holds its threads within 0.1 percent at any pass count and load".
 
+### Fixed 2026-11-25: a hull's heave drove its pitch the wrong way (KB-SEA-COUPLESIGN1, physics seakeeping)
+
+- **Repro:** `packages/physics/tests/coupling/seakeeping.test.js`, "on a hull uneven fore and aft, heave drives pitch with
+  the sign the strips give it". A hull wide aft and narrow forward, driven in heave, pitched half a cycle out of phase with
+  the coupled frequency-domain answer.
+- **Cause:** the radiation memory summed the heave-pitch coupling as -int b33 x. In the body's axes a pitch rate about z
+  moves a section at x along +y at w_z x, so the coupling is +int b33 x (as the added mass already had it). A box, even fore
+  and aft, has no coupling, so the earlier tests could not see it.
+- **Fixed:** the sign, in `memory.ts`. Regression: the test above (it also checks that the wrong sign fails).
+
+### Fixed 2026-11-25: a hull's sway added mass at infinite frequency was the rigid-lid value (KB-SEA-SWAYLID1, physics seakeeping)
+
+- **Repro:** `packages/physics/tests/coupling/seakeeping.test.js`, "driven sideways, a box sways and rolls as the coupled
+  frequency-domain equations say", and `tests/seakeeping.test.js`, "a swaying and rolling section". A box driven in sway
+  moved too little; a half circle's sway added mass at high frequency is 0.405 of rho pi R^2 / 2, not rho pi R^2 / 2.
+- **Cause:** the sway added mass at infinite frequency was taken as Lewis's formula for half the mirrored double body,
+  which holds under a rigid lid. At high frequency the free surface holds the potential at 0, so in sway the image moves
+  against the section, and the limit is smaller. The rigid-lid value is the zero-frequency limit.
+- **Fixed:** the lateral added mass at infinite frequency comes from the sections' radiation solution, carried to xi = inf
+  (`memory.ts`); the rigid-lid formula is renamed `swayAddedMassRigidLid`. Regression: the tests above.
+
 ### Fixed 2026-11-25: a world stepped every rigid and soft solver at 60 Hz (KB-PHYS-WORLDLEVEL1, physics world)
 
 - **Repro:** `packages/physics/tests/world-rigid-solver.test.js`, "a Physics stepped 240 times a second steps at level 2 in

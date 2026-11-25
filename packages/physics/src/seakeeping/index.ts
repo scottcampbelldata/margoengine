@@ -19,7 +19,7 @@ export {
   type LewisForm,
   lewisForm,
   type Section,
-  swayAddedMassInfinite,
+  swayAddedMassRigidLid,
 } from './strips.js';
-export { type HeaveSection, heaveSection } from './radiation.js';
-export { type HullMemory, hullMemory, stillWaterline } from './memory.js';
+export { type HeaveSection, heaveSection, type LateralSection, lateralSection } from './radiation.js';
+export { type HullMemory, hullMemory, type RadiationPair, stillWaterline } from './memory.js';

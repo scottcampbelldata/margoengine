@@ -71,7 +71,7 @@ export interface HullParams {
 }
 
 /** The layout version of the `forces` port region and the state regions. */
-const HULL_LAYOUT = 1;
+const HULL_LAYOUT = 2;
 /** f64 words a hull keeps of its last step: a flag, the body's velocity (six) and the load held (six). */
 const CARRY_WORDS = 20;
 
@@ -114,25 +114,31 @@ export class HullSolver implements Solver<HullParams> {
     const { hulls, sea, level = 0 } = params ?? ({} as HullParams);
     if (!Array.isArray(hulls) || hulls.length === 0)
       throw new TypeError(
-        'A HullSolver floats one or more hulls: world.add(new HullSolver(), {hulls: [{row, mesh}], sea}).',
+        'A HullSolver floats one or more hulls; pass them: world.add(new HullSolver(), {hulls: [{row, mesh}], sea}).',
       );
     if (!sea || typeof sea.elevation !== 'function')
       throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
     for (const hull of hulls) {
       if (!(Number.isInteger(hull.row) && hull.row >= 0))
-        throw new RangeError(`A hull's row is a kernel body row, a whole number of 0 or more (got ${hull.row}).`);
+        throw new RangeError(
+          `A hull's row is a kernel body row (got ${hull.row}); pass the body's row, a whole number of 0 or more.`,
+        );
       const { vertices, indices } = hull.mesh ?? {};
       if (!vertices || !indices || vertices.length % 3 !== 0 || indices.length % 3 !== 0 || indices.length === 0)
         throw new RangeError(
-          'A hull mesh has vertices (three numbers each) and triangles (three indices each, wound outward).',
+          'A hull mesh is not whole; pass vertices (three numbers each) and triangles (three indices each, wound outward).',
         );
       for (let k = 0; k < indices.length; k++)
         if (!(Number.isInteger(indices[k]) && indices[k]! >= 0 && indices[k]! < vertices.length / 3))
-          throw new RangeError(`Hull triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}.`);
+          throw new RangeError(
+            `Hull triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}; keep each index under the vertex count.`,
+          );
     }
     const capacity = params.capacity ?? Math.max(...hulls.map((h) => h.row)) + 1;
     if (!(Number.isInteger(capacity) && hulls.every((h) => h.row < capacity)))
-      throw new RangeError(`A HullSolver's capacity covers every hull's row (got ${capacity}).`);
+      throw new RangeError(
+        `A HullSolver's capacity of ${capacity} misses a hull's row; set it above every hull's row.`,
+      );
     this.capacity = capacity;
     this.hulls = hulls;
     this.sea = sea;
@@ -141,16 +147,16 @@ export class HullSolver implements Solver<HullParams> {
     this.addedMass = params.addedMass ?? true;
     this.stations = params.stations ?? 24;
     if (!(Number.isInteger(this.stations) && this.stations >= 2))
-      throw new RangeError(`A hull has 2 or more stations (got ${this.stations}).`);
+      throw new RangeError(`A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
     this.host = host;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.radiation = params.radiation ?? true;
     const window = params.memory ?? 20;
     if (!(window > 0 && Number.isFinite(window)))
-      throw new RangeError(`A hull's radiation memory is a number of seconds above 0 (got ${window}).`);
-    // Each hull's heave velocity and pitch rate, in its body's frame, at each of the last `lags` steps (by tick).
+      throw new RangeError(`A hull's radiation memory is ${window} s; pass a finite number of seconds above 0.`);
+    // Each hull's velocity (linear then angular), in its body's frame, at each of the last `lags` steps (by tick).
     this.lags = Math.ceil(window * rateOf(level));
-    if (this.radiation) this.history = host.allocate('history', hulls.length * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+    if (this.radiation) this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
     if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
   }
 
@@ -202,9 +208,24 @@ export class HullSolver implements Solver<HullParams> {
     }
   }
 
+  /** The hull's radiation memory at its still-water draft, made at its first step (from its mesh and mass alone). */
+  private memoryOf(hull: Hull, bodies: Float32Array, at: number, local: Vec3, dt: number): HullMemory | null {
+    const inverseMass = bodies[at + 16]!;
+    if (!(inverseMass > 0)) return null;
+    let memory = this.memories.get(hull);
+    if (!memory) {
+      memory = hullMemory(hull.mesh, 1 / inverseMass, local, this.sea!.density ?? SEA_WATER, dt, {
+        stations: this.stations,
+        window: Math.max(1, this.lags) * dt,
+      });
+      this.memories.set(hull, memory);
+    }
+    return memory;
+  }
+
   /**
-   * Adds the radiation force to `loads`: the hull's heave velocity and pitch rate (body frame) go into its history at this
-   * tick, and the force is minus the kernels convolved with the history (trapezoid in time, the oldest lag dropped).
+   * Adds the radiation force to `loads`: the hull's velocity (body frame: linear then angular) goes into its history at this
+   * tick, and the force is minus each pair's kernel convolved with the history (trapezoid in time, the oldest lag dropped).
    */
   private radiate(
     hull: Hull,
@@ -216,48 +237,42 @@ export class HullSolver implements Solver<HullParams> {
     dt: number,
     loads: WettedLoads,
   ): void {
-    const inverseMass = bodies[at + 16]!;
-    if (!(inverseMass > 0)) return;
     const q = pose.rotation,
       conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
       local = rotate(conjugate, [
         centre[0] - pose.position[0],
         centre[1] - pose.position[1],
         centre[2] - pose.position[2],
-      ]);
-    let memory = this.memories.get(hull);
-    if (!memory) {
-      memory = hullMemory(hull.mesh, 1 / inverseMass, local, this.sea!.density ?? SEA_WATER, dt, {
-        stations: this.stations,
-        window: this.lags * dt,
-      });
-      this.memories.set(hull, memory);
-    }
+      ]),
+      memory = this.memoryOf(hull, bodies, at, local, dt);
+    if (!memory) return;
     const lags = this.lags,
       index = this.hulls.indexOf(hull),
-      ring = new Float64Array(this.host!.memory.buffer, this.history!.byteOffset + index * lags * 2 * 8, lags * 2),
+      ring = new Float64Array(this.host!.memory.buffer, this.history!.byteOffset + index * lags * 6 * 8, lags * 6),
       velocity = rotate(conjugate, [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!]),
       spin = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!]),
       slot = tick % lags;
-    ring[2 * slot] = velocity[1];
-    ring[2 * slot + 1] = spin[2];
-    const n = Math.min(lags, memory.kernelHeave.length);
-    let heave = 0,
-      pitch = 0;
-    for (let j = 0; j < n; j++) {
-      const s = (slot - j + lags) % lags,
-        weight = j === 0 ? 0.5 : 1,
-        v = ring[2 * s]!,
-        w = ring[2 * s + 1]!;
-      heave += weight * (memory.kernelHeave[j]! * v + memory.kernelCoupling[j]! * w);
-      pitch += weight * (memory.kernelCoupling[j]! * v + memory.kernelPitch[j]! * w);
+    ring.set([...velocity, ...spin], 6 * slot);
+    const force = [0, 0, 0, 0, 0, 0];
+    for (const { i, j, kernel } of memory.pairs) {
+      const n = Math.min(lags, kernel.length);
+      let ij = 0,
+        ji = 0;
+      for (let lag = 0; lag < n; lag++) {
+        const s = 6 * ((slot - lag + lags) % lags),
+          weight = (lag === 0 ? 0.5 : 1) * kernel[lag]!;
+        ij += weight * ring[s + j]!;
+        ji += weight * ring[s + i]!;
+      }
+      force[i]! -= ij * dt;
+      if (i !== j) force[j]! -= ji * dt;
     }
-    // The force along the body's y and the moment about its z, into world axes.
-    const force = rotate(q, [0, -heave * dt, 0]),
-      moment = rotate(q, [0, 0, -pitch * dt]);
+    // Into world axes.
+    const f = rotate(q, [force[0]!, force[1]!, force[2]!]),
+      m = rotate(q, [force[3]!, force[4]!, force[5]!]);
     for (let k = 0; k < 3; k++) {
-      loads.force[k]! += force[k]!;
-      loads.torque[k]! += moment[k]!;
+      loads.force[k]! += f[k]!;
+      loads.torque[k]! += m[k]!;
     }
   }
 
@@ -290,7 +305,10 @@ export class HullSolver implements Solver<HullParams> {
       level = this.sea!.elevation(centre[0], centre[2], t),
       waterline = toBody([0, level - pose.position[1], 0])[1],
       density = this.sea!.density ?? SEA_WATER,
-      body = addedMassInfinite(hullSections(hull.mesh, waterline, this.stations), local, density);
+      body = addedMassInfinite(hullSections(hull.mesh, waterline, this.stations), local, density),
+      memory = this.memoryOf(hull, bodies, at, local, dt);
+    // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
+    if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
     let any = false;
     for (let k = 0; k < 36; k++) any ||= body[k] !== 0;
     if (!any) return f;

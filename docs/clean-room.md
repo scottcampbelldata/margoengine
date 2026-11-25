@@ -12124,3 +12124,28 @@ Published Ursell curves (Ursell 1949, Vugts 1968) could not be read online. In t
 
 No constant here is calibrated: every coefficient comes from the equations above, and the tests' bounds are their stated
 numerical errors.
+
+### A hull's sway and roll radiation (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
+
+`lateralSection` in `packages/physics/src/seakeeping/radiation.ts` solves a section swaying and rolling, and `memory.ts`
+adds the sway, roll and yaw pairs. Written from the same book (Journee and Massie 2001, Part 2): the antisymmetric
+multipoles and wave of Tasai's Lewis form, the stream function's body condition in sway and roll, and the sway, roll and
+sway-roll coefficients. Two of the book's printed signs disagree with its own definitions; the solver follows the
+definitions, and the tests show which is right (the damping from the pressure equals the energy the waves carry away only
+with these signs, and the coupling then comes out reciprocal, a24 = a42 and b24 = b42).
+
+These are this package's own, each checked:
+- **The roll about the centre of mass**, by the stream function's body condition -(x^2 + (y - pivot)^2) / 2, so the
+  couplings need no shift afterward. Checked: a half circle rolling about its centre moves no water (its coefficients are
+  0), and the coupling is reciprocal.
+- **The added mass at infinite frequency** in sway and roll, by a straight line in 1 / xi through xi = 64 and 128. A
+  section's coefficients approach their limits as 1 / xi; a half circle's sway limit is 0.405 of rho pi R^2 / 2, as the
+  free surface reverses the mirrored double body's motion. The rigid-lid value, which an earlier version of the solver used
+  at infinite frequency, is the zero-frequency limit; it is kept as `swayAddedMassRigidLid`.
+- **The frequency table to xi = 48**, where the heave table stopped at 12: sway and roll damping fall off slowly, and the
+  tail matters (measured on the driven box: 3.7 percent off with the table to 12, 2.3 with it to 48).
+- **The yaw pairs** from the sections' sway, -int b22 x and int b22 x^2, in the body's axes.
+
+Proof: `packages/physics/tests/seakeeping.test.js` (energy, reciprocity, the half circle) and
+`tests/coupling/seakeeping.test.js` (a box driven sideways sways and rolls within 3 percent of the coupled frequency-domain
+equations at 60 steps a second, measured 1.1 to 2.3; 0.2 to 0.5 at 240). No constant is calibrated.
