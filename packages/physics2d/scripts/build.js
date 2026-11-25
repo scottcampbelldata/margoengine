@@ -28,9 +28,13 @@ const kernelModule = new WebAssembly.Module(kernelBytes);
 // The same hash src/wasm-load.ts takes of a Wasm it is given: FNV-1a over the module's exports and imports.
 const kernelInterface = (() => {
   const text =
-    WebAssembly.Module.exports(kernelModule).map((entry) => `${entry.kind}:${entry.name}`).join(',') +
+    WebAssembly.Module.exports(kernelModule)
+      .map((entry) => `${entry.kind}:${entry.name}`)
+      .join(',') +
     '|' +
-    WebAssembly.Module.imports(kernelModule).map((entry) => `${entry.kind}:${entry.module}:${entry.name}`).join(',');
+    WebAssembly.Module.imports(kernelModule)
+      .map((entry) => `${entry.kind}:${entry.module}:${entry.name}`)
+      .join(',');
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
   return hash >>> 0;
@@ -38,22 +42,35 @@ const kernelInterface = (() => {
 const scalarModule = new WebAssembly.Module(readFileSync(scalarFile));
 const interfaceOf = (module) => {
   const text =
-    WebAssembly.Module.exports(module).map((entry) => `${entry.kind}:${entry.name}`).join(',') +
+    WebAssembly.Module.exports(module)
+      .map((entry) => `${entry.kind}:${entry.name}`)
+      .join(',') +
     '|' +
-    WebAssembly.Module.imports(module).map((entry) => `${entry.kind}:${entry.module}:${entry.name}`).join(',');
+    WebAssembly.Module.imports(module)
+      .map((entry) => `${entry.kind}:${entry.module}:${entry.name}`)
+      .join(',');
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
   return hash >>> 0;
 };
 if (interfaceOf(scalarModule) !== kernelInterface)
-  throw new Error('The scalar kernel has other exports or imports than the SIMD one; rebuild both with node packages/physics2d/scripts/build-kernel.mjs.');
-const kernelVersion = String(new WebAssembly.Instance(kernelModule, { env: { hook_filter: () => 1, hook_contact: () => 0 } }).exports.api_version());
+  throw new Error(
+    'The scalar kernel has other exports or imports than the SIMD one; rebuild both with node packages/physics2d/scripts/build-kernel.mjs.',
+  );
+const kernelVersion = String(
+  new WebAssembly.Instance(kernelModule, {
+    env: { hook_filter: () => 1, hook_contact: () => 0, clock: () => 0 },
+  }).exports.api_version(),
+);
 // The source marks the Wasm URL @vite-ignore so this build leaves it alone; the app's bundler must see it.
 const exposeWasmUrl = {
   name: 'expose-wasm-url',
   renderChunk(code) {
     if (!code.includes('physics2d.wasm?') && !code.includes('physics2d-scalar.wasm?')) return null;
-    return { code: code.replace(/\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/physics2d(?:-scalar)?\.wasm\?no-inline["'])/g, ''), map: null };
+    return {
+      code: code.replace(/\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/physics2d(?:-scalar)?\.wasm\?no-inline["'])/g, ''),
+      map: null,
+    };
   },
 };
 await build({

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18330625,
+  "total": 18371407,
   "history": [
     {
       "date": "2026-10-24",
@@ -11691,6 +11691,12 @@
       "commit": "8c7e2d7f6",
       "reason": "physics gains a scalar kernel blueprint (210,456 B deflated, its own lazy chunk) beside the SIMD one (217,596 B): the lazy figure sums both, a page loads one; base unchanged at 75,857 B; physics2d gains physics2d-scalar.wasm (489,682 B) as a file of its own",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "85d4eb492",
+      "reason": "physics kernel and its entry: the tree broad phase with its builds and rotations, contact recycling and clustering, the simplified friction model, quarantine, the collision-only step and the finer timers: physics 526,507 to 531,255 B gzip and the lazy kernel blueprint 447,804 to 454,271 B (both builds, SIMD and scalar)",
+      "grew": 2
     }
   ],
   "items": {
@@ -12449,9 +12455,9 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 526507,
+    "@margoengine/physics": 547193,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 77941,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 447804,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 467900,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,

@@ -141,7 +141,7 @@ test('contact recycling and clustering read back, refuse bad values and keep a s
   assert.equal(physics.solver.contactClustering, false);
   physics.setSolver({ contactRecycling: true, contactClustering: true });
   assert.equal(physics.solver.contactRecycling, true);
-  assert.ok(Math.abs(physics.solver.contactRecycleDistance - 0.05) < 1e-6, 'the distance is Rapier\'s default');
+  assert.ok(Math.abs(physics.solver.contactRecycleDistance - 0.05) < 1e-6, "the distance is Rapier's default");
   assert.ok(Math.abs(physics.solver.contactClusteringAngle - 0.1) < 1e-6);
   physics.setSolver({ contactRecycleDistance: 0.02, contactClusteringAngle: 0.2 });
   assert.ok(Math.abs(physics.solver.contactRecycleDistance - 0.02) < 1e-6);
@@ -156,9 +156,16 @@ test('contact recycling and clustering read back, refuse bad values and keep a s
   const stack = (options) => {
     const world = new Physics(null);
     world.setSolver(options);
-    world.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
+    world.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+    });
     const boxes = [0, 1, 2, 3].map((k) =>
-      world.addBody(null, { position: [0, 0.3 + 0.52 * k, 0], colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] } }),
+      world.addBody(null, {
+        position: [0, 0.3 + 0.52 * k, 0],
+        colliders: { shape: 'box', halfExtents: [0.25, 0.25, 0.25] },
+      }),
     );
     for (let i = 0; i < 240; i++) world.step();
     const ys = boxes.map((box) => box.position[1]);
@@ -177,15 +184,23 @@ test('contact recycling and clustering read back, refuse bad values and keep a s
       cell = 0.4,
       vertices = [],
       indices = [];
-    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) vertices.push(i * cell - (n * cell) / 2, 0, j * cell - (n * cell) / 2);
+    for (let i = 0; i <= n; i++)
+      for (let j = 0; j <= n; j++) vertices.push(i * cell - (n * cell) / 2, 0, j * cell - (n * cell) / 2);
     for (let i = 0; i < n; i++)
       for (let j = 0; j < n; j++) {
         const a = i * (n + 1) + j,
           b = (i + 1) * (n + 1) + j;
         indices.push(a, b + 1, b, a, a + 1, b + 1);
       }
-    world.addBody(null, { type: 'fixed', colliders: { shape: 'trimesh', vertices: new Float32Array(vertices), indices: new Uint32Array(indices) } });
-    const box = world.addBody(null, { position: [0.05, 0.26, 0.05], canSleep: false, colliders: { shape: 'box', halfExtents: [0.5, 0.25, 0.5] } });
+    world.addBody(null, {
+      type: 'fixed',
+      colliders: { shape: 'trimesh', vertices: new Float32Array(vertices), indices: new Uint32Array(indices) },
+    });
+    const box = world.addBody(null, {
+      position: [0.05, 0.26, 0.05],
+      canSleep: false,
+      colliders: { shape: 'box', halfExtents: [0.5, 0.25, 0.5] },
+    });
     for (let i = 0; i < 240; i++) world.step();
     const c = world.kernel.columns;
     let held = 0;
@@ -198,14 +213,21 @@ test('contact recycling and clustering read back, refuse bad values and keep a s
     four = meshed({ contactClustering: true });
   assert.ok(many.held > 4, `without clustering: ${many.held} points`);
   assert.ok(four.held <= 4 && four.held >= 3, `with clustering: ${four.held} points`);
-  assert.ok(Math.abs(many.y - 0.25) < 0.01 && Math.abs(four.y - 0.25) < 0.01, `the box rests on both: ${many.y}, ${four.y}`);
+  assert.ok(
+    Math.abs(many.y - 0.25) < 0.01 && Math.abs(four.y - 0.25) < 0.01,
+    `the box rests on both: ${many.y}, ${four.y}`,
+  );
 });
 
 test('the tree broad phase, its build and rotations and the adaptive margin give the same world', () => {
   const run = (options) => {
     const world = new Physics(null);
     world.setSolver(options);
-    world.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [30, 0.5, 30] } });
+    world.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [30, 0.5, 30] },
+    });
     const bodies = [];
     for (let i = 0; i < 80; i++)
       bodies.push(
@@ -221,7 +243,10 @@ test('the tree broad phase, its build and rotations and the adaptive margin give
     return { ys, asleep };
   };
   const sweep = run({});
-  assert.ok(sweep.ys.every((y) => y > 0.4 && y < 12), 'the pile stands on the floor');
+  assert.ok(
+    sweep.ys.every((y) => y > 0.4 && y < 12),
+    'the pile stands on the floor',
+  );
   for (const options of [
     { broadPhase: 'bvh' },
     { broadPhase: 'bvh', bvhBuildStrategy: 'binned' },
@@ -229,7 +254,10 @@ test('the tree broad phase, its build and rotations and the adaptive margin give
     { adaptiveChangeDetectionMargin: true },
   ]) {
     const other = run(options);
-    assert.ok(other.ys.every((y) => y > 0.4 && y < 12), `the pile stands with ${JSON.stringify(options)}`);
+    assert.ok(
+      other.ys.every((y) => y > 0.4 && y < 12),
+      `the pile stands with ${JSON.stringify(options)}`,
+    );
     const worst = Math.max(...other.ys.map((y, i) => Math.abs(y - sweep.ys[i])));
     assert.ok(worst < 1.5, `and rests where the sweep's pile does (${worst} m apart): ${JSON.stringify(options)}`);
   }
@@ -238,9 +266,19 @@ test('the tree broad phase, its build and rotations and the adaptive margin give
   assert.equal(physics.solver.bvhBuildStrategy, 'incremental');
   assert.equal(physics.solver.bvhOptimizationStrategy, 'none');
   assert.equal(physics.solver.adaptiveChangeDetectionMargin, false);
-  physics.setSolver({ broadPhase: 'bvh', bvhBuildStrategy: 'ploc', bvhOptimizationStrategy: 'rotations', adaptiveChangeDetectionMargin: true });
+  physics.setSolver({
+    broadPhase: 'bvh',
+    bvhBuildStrategy: 'ploc',
+    bvhOptimizationStrategy: 'rotations',
+    adaptiveChangeDetectionMargin: true,
+  });
   assert.deepEqual(
-    [physics.solver.broadPhase, physics.solver.bvhBuildStrategy, physics.solver.bvhOptimizationStrategy, physics.solver.adaptiveChangeDetectionMargin],
+    [
+      physics.solver.broadPhase,
+      physics.solver.bvhBuildStrategy,
+      physics.solver.bvhOptimizationStrategy,
+      physics.solver.adaptiveChangeDetectionMargin,
+    ],
     ['bvh', 'ploc', 'rotations', true],
   );
   assert.throws(() => physics.setSolver({ broadPhase: 'octree' }), /broadPhase/);
@@ -251,15 +289,25 @@ test('the tree broad phase, its build and rotations and the adaptive margin give
 
 test('switching the broad phase of a running world keeps it going', () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [30, 0.5, 30] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [30, 0.5, 30] },
+  });
   const boxes = Array.from({ length: 20 }, (_, i) =>
-    physics.addBody(null, { position: [(i % 5) * 1.2, 1 + Math.floor(i / 5) * 1.2, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } }),
+    physics.addBody(null, {
+      position: [(i % 5) * 1.2, 1 + Math.floor(i / 5) * 1.2, 0],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] },
+    }),
   );
   for (let i = 0; i < 60; i++) physics.step();
   physics.setSolver({ broadPhase: 'bvh' });
   for (let i = 0; i < 60; i++) physics.step();
   physics.setSolver({ broadPhase: 'sweep' });
   for (let i = 0; i < 120; i++) physics.step();
-  assert.ok(boxes.every((box) => box.position[1] > 0.4 && box.position[1] < 6), 'every box is still on the floor');
+  assert.ok(
+    boxes.every((box) => box.position[1] > 0.4 && box.position[1] < 6),
+    'every box is still on the floor',
+  );
   physics.dispose();
 });

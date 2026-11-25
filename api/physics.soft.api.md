@@ -1097,6 +1097,14 @@ interface KernelSolverOptions {
     ccdTolerance?: number;
     ccdMaxAdvances?: number;
     quarantine?: boolean;
+    contactRecycling?: boolean;
+    contactRecycleDistance?: number;
+    contactClustering?: boolean;
+    contactClusteringAngle?: number;
+    broadPhase?: 'sweep' | 'bvh';
+    bvhBuildStrategy?: 'incremental' | 'binned' | 'ploc';
+    bvhOptimizationStrategy?: 'none' | 'rotations';
+    adaptiveChangeDetectionMargin?: boolean;
 }
 
 interface KernelTrimeshOptions {

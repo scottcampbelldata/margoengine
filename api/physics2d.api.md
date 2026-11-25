@@ -390,6 +390,16 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     set gravity(value: Vec2D);
     get alpha(): number;
     get bodyCount(): number;
+    get timing(): {
+        step: number;
+        begin: number;
+        broad: number;
+        narrow: number;
+        islands: number;
+        solver: number;
+        ccd: number;
+        events: number;
+    };
     getBodies(): Body2D[];
     getColliders(): Collider2D[];
     get colliderCount(): number;
@@ -666,6 +676,7 @@ interface Exports {
     world_destroy(world: number): number;
     world_set_gravity(world: number, gx: number, gy: number): number;
     world_step(world: number, dt: number): number;
+    world_timing(world: number, phase: number): number;
     body_create(world: number, kind: number, flags: number): number;
     body_remove(world: number, body: number): number;
     body_read(world: number, body: number): number;
