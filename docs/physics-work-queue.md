@@ -14,7 +14,7 @@ against the problems in [physics-demo-review.md](physics-demo-review.md). Read a
 3. Build it on your branch. Land it on `main` in working pieces (rebase, fast-forward, never force-push).
 4. When it works with its tests, set Status **LANDED** with the commit, in the same push as the code.
 
-Never take or edit a row owned by someone else. One claim at a time per agent, at most three open claims per tool.
+Never take or edit a row owned by someone else. Claim one solver at a time per working session.
 
 ## What every solver must do
 
@@ -60,7 +60,6 @@ there, add a line below with the solver ID and what is needed, and build against
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | none | Open | OPEN |
 | SEA-03 | Nonlinear waves, rogue waves | none | Open | OPEN |
-| SEA-05 | Nearshore waves and surf zone | partial | Open | OPEN |
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
 | SEA-07 | Tides, storm surge and currents | none | Open | OPEN |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
@@ -102,32 +101,45 @@ there, add a line below with the solver ID and what is needed, and build against
 | SPACE-01 | N-body and orbital dynamics | partial | Open | OPEN |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Open | OPEN |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
+| DYN-04 | Wheeled vehicles on roads | partial | Open | OPEN |
+| DYN-05 | Rail vehicle dynamics | none | Open | OPEN |
+| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
+| SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
+| BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
+| BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
+| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Open | OPEN |
+| LIFE-03 | Aquatic locomotion | none | Open | OPEN |
+| LIFE-04 | Collective animal motion | stand-in | Open | OPEN |
+| LIFE-05 | Pedestrian and dense-crowd dynamics | partial | Open | OPEN |
+| LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
+| FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
+| FLUID-02 | Position based fluids (fast mode) | none | Open | OPEN |
+| FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
+| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Open | OPEN |
+| ATMO-10 | Synoptic weather and moisture transport | stand-in | Open | OPEN |
+| EARTH-01 | MPM continuum | stand-in | Open | OPEN |
+| EARTH-02 | Depth-averaged granular flow | partial | Open | OPEN |
+| EARTH-04 | Discrete-element rubble and boulders | partial | Open | OPEN |
+| FIRE-01 | Wildfire spread | partial | Open | OPEN |
+| FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
+| FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
+| BIO-01 | Plant mechanics under wind and water | stand-in | Open | OPEN |
 
 ## Taken
 
-Claimed by Claude: being built now or queued next, film-first. Do not start these.
+Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wakes, spray, wind, rain) and the rigid core. Do not start these.
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
+| SEA-05 | Nearshore waves and surf zone | partial | Claude | CLAIMED |
 | DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
-| DYN-04 | Wheeled vehicles on roads | partial | Claude | CLAIMED |
-| DYN-05 | Rail vehicle dynamics | none | Claude | CLAIMED |
 | DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
 | DYN-07 | Dynamic character, balance, push response | partial | Claude | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
-| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Claude | CLAIMED |
-| SOFT-05 | Muscle, fat and skin soft tissue | none | Claude | CLAIMED |
-| BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Claude | CLAIMED |
-| BREAK-02 | Structural collapse and load path | stand-in | Claude | CLAIMED |
-| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Claude | CLAIMED |
-| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Claude | CLAIMED |
-| LIFE-03 | Aquatic locomotion | none | Claude | CLAIMED |
-| LIFE-04 | Collective animal motion | stand-in | Claude | CLAIMED |
-| LIFE-05 | Pedestrian and dense-crowd dynamics | partial | Claude | CLAIMED |
-| LIFE-06 | Mass formations and cavalry charge | stand-in | Claude | CLAIMED |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | CLAIMED |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Claude | CLAIMED |
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | CLAIMED |
@@ -142,21 +154,9 @@ Claimed by Claude: being built now or queued next, film-first. Do not start thes
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | CLAIMED |
 | SEA-14 | Water entry and exit | stand-in | Claude | CLAIMED |
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | CLAIMED |
-| FLUID-01 | SPH, divergence-free (accurate mode) | none | Claude | CLAIMED |
-| FLUID-02 | Position based fluids (fast mode) | none | Claude | CLAIMED |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
-| FLUID-04 | Eulerian smoke and gas | stand-in | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Claude | CLAIMED |
-| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Claude | CLAIMED |
 | ATMO-01 | Boundary-layer wind field | stand-in | Claude | CLAIMED |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | CLAIMED |
 | ATMO-03 | Moist convection and cloud dynamics | none | Claude | CLAIMED |
 | ATMO-04 | Precipitation microphysics | stand-in | Claude | CLAIMED |
-| ATMO-10 | Synoptic weather and moisture transport | stand-in | Claude | CLAIMED |
-| EARTH-01 | MPM continuum | stand-in | Claude | CLAIMED |
-| EARTH-02 | Depth-averaged granular flow | partial | Claude | CLAIMED |
-| EARTH-04 | Discrete-element rubble and boulders | partial | Claude | CLAIMED |
-| FIRE-01 | Wildfire spread | partial | Claude | CLAIMED |
-| FIRE-02 | Flame and fireball | stand-in | Claude | CLAIMED |
-| FIRE-03 | Integral plume and thermal model | partial | Claude | CLAIMED |
-| BIO-01 | Plant mechanics under wind and water | stand-in | Claude | CLAIMED |
