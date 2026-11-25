@@ -52,6 +52,36 @@ export function staleTotal(baseline) {
   return baseline.total === sum ? undefined : sum;
 }
 
+/**
+ * History entries of a gate's baseline at `ref` that the working tree no longer has. The history is append-only: a
+ * merge or rebase that took one side's whole file once dropped two lanes' accepted growth with their budgets
+ * (3bcef614ed, 2026-11-25), and every entry they covered failed main. Empty when `ref` or its file is missing.
+ */
+export function droppedHistory(root, gate, baseline, ref = 'origin/main') {
+  let base;
+  try {
+    const at = execFileSync('git', ['merge-base', 'HEAD', ref], { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
+    base = JSON.parse(
+      execFileSync('git', ['show', `${at}:${BASELINES}/${gate}.json`], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        maxBuffer: 1 << 28,
+      }),
+    );
+  } catch {
+    return [];
+  }
+  return historyMissing(base.history ?? [], baseline.history ?? []);
+}
+
+/** Entries of `before` (by date, commit and reason) that `after` lacks. */
+export function historyMissing(before, after) {
+  const key = (h) => `${h.date}|${h.commit}|${h.reason}`,
+    kept = new Set(after.map(key));
+  return before.filter((h) => !kept.has(key(h)));
+}
+
 function headCommit(root) {
   try {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();

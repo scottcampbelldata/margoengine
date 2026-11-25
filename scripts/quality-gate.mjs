@@ -23,7 +23,7 @@ import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
-import { compare, frozenItems, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
+import { compare, droppedHistory, frozenItems, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
 import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
@@ -125,6 +125,13 @@ async function runGates() {
       failed++;
       console.error(
         `quality ${gate}: FAIL, the baseline total ${baseline.total} is not the sum of its items, ${sum} (a hand-settled merge). Fix: npm run quality -- --gate=${gate} --update.`,
+      );
+    }
+    const dropped = droppedHistory(root, gate, baseline);
+    if (dropped.length) {
+      failed++;
+      console.error(
+        `quality ${gate}: FAIL, the baseline lost ${dropped.length} history entr${dropped.length === 1 ? 'y' : 'ies'} that origin/main has (a merge took one side's whole file): ${dropped.map((h) => h.commit).join(', ')}. Fix: put those entries and the budgets they raised back.`,
       );
     }
     if (worse.length) {

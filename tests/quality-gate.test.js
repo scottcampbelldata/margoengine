@@ -285,3 +285,13 @@ test('reexports distinguish package boundaries from shared name prefixes', () =>
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("a baseline that lost history entries origin/main has is caught (3bcef614ed dropped two lanes' accepted growth)", async () => {
+  const { historyMissing } = await import('../scripts/quality/ratchet.js');
+  const msdf = { date: '2026-11-25', commit: '6aa08e59b4', reason: 'GAP-FILM-MSDF', grew: 4 },
+    cone = { date: '2026-11-25', commit: '519453f01', reason: 'reflection cone', grew: 4 },
+    weather = { date: '2026-11-25', commit: 'lane-B', reason: 'Weather resetTime', grew: 2 };
+  // The parent had both entries; the commit kept only its own.
+  assert.deepEqual(historyMissing([cone, msdf], [weather]), [cone, msdf]);
+  assert.deepEqual(historyMissing([cone, msdf], [cone, msdf, weather]), []);
+});
