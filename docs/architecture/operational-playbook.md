@@ -9366,7 +9366,7 @@ and depth render targets. game is excluded: it is generated re-exports and holds
 and enforces. The fixtures found KB-HORSES-CROWDOWN1 (async crowd and horse calls ignored the scene they were made for; the herd's coat
 atlas outlived its scene), KB-CREATIVE-DISPOSE1 (ToonShading and Stars disposal left them registered; the starfield ignored the view
 rectangle, as did the planet's) and KB-CREATIVE-TARGETFMT1 (GrassField and Planet refused the other 8-bit canvas format), all fixed with regression tests, and one
-open defect, KB-CREATIVE-POSTVIEW1 (PostProcessing, alone or in a stack, is not per view, so it is not an entry).
+defect, KB-CREATIVE-POSTVIEW1 (PostProcessing, alone or in a stack, was not per view, so it was not an entry; fixed 2026-11-25, and PostProcessing is now an entry built with `new`, `attach` and in a PostStack).
 
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 

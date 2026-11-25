@@ -6,10 +6,10 @@
 // (Node, the CPU model, has no such call). The three render targets (HDR scene target, cube/array/3d texture target
 // and its depth variant) are not plugins: each holds textures of the engine's device, so each is tied to a plugin
 // registration that releases it, as `ownedByEngine` does for any such object.
-// Not entries: PostProcessing, alone or in a PostStack, grades and presents the whole canvas for every view, which the
-// harness's two views cannot hold for (docs/known-bugs.md, KB-CREATIVE-POSTVIEW1), so it is an entry once that is fixed;
-// grass-settings (numbers and a target interface), the shaders and the hashing/maths helpers hold nothing with a lifetime.
-// check:owners runs one browser leaf per entry: the 18 entries are 247 cases, past the 208 a leaf may hold, and the orbit
+// PostProcessing is an entry built three ways: `new`, `attach` and inside a PostStack (each view keeps its own state since
+// KB-CREATIVE-POSTVIEW1). Not entries: grass-settings (numbers and a target interface), the shaders and the hashing/maths
+// helpers hold nothing with a lifetime.
+// check:owners runs one browser leaf per entry: the 21 entries are 273 cases, past the 208 a leaf may hold, and the orbit
 // atmosphere alone takes about 130 s on the WebGL2 layer (the Hillaire tables compile on both devices of every case),
 // so no two of them fit the leaf's 180 s limit together, which never rises.
 export const leafPerEntry = true;
@@ -31,6 +31,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Planet } = await load('../dist/planet.js');
   const { Stars } = await load('../dist/stars.js');
   const { OrbitAtmosphere } = await load('../dist/planet-atmosphere.js');
+  const { PostProcessing } = await load('../dist/post.js');
   const { Painterly } = await load('../dist/paint.js');
   const { AnisotropicPainterly } = await load('../dist/paint-aniso.js');
   const { HDRRenderTarget, TextureRenderTarget } = await load('../dist/targets.js');
@@ -56,6 +57,9 @@ export async function fixtures(load = (entry) => import(entry)) {
     );
     own(`${name}.attach`, (engine) => Plugin.attach(engine, options));
   }
+  own('PostProcessing', () => new PostProcessing());
+  own('PostProcessing.attach', (engine) => PostProcessing.attach(engine));
+  own('PostProcessing in a PostStack', () => new PostStack([new PostProcessing()]));
   // The painterly effects only run inside a PostStack: `attach` joins the scene's stack (or makes one) and takes it out
   // again, and a `new` effect is handed to a stack the app makes.
   for (const [name, Effect] of [
