@@ -975,6 +975,37 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     return out;
   }
 
+  /**
+   * The contact between two colliders as of the last step, or null when the world holds none (Rapier's `contact_pair`): the normal
+   * from `a` to `b`, up to two points with their separation (negative: overlapping) and the normal impulse. A sensor's overlap is not a
+   * contact, so a sensor and what it senses have an {@link Physics2D.intersectionPair} and no contact pair with `solverActive`.
+   * @throws MargoError (`state`) for a collider that was removed.
+   */
+  contactPair(a: Collider2D, b: Collider2D): ContactPair2D | null {
+    return this.contactPairs(a).find((pair) => pair.other === b) ?? null;
+  }
+
+  /**
+   * Whether two colliders overlap with at least one a sensor, as of the last step (Rapier's `intersection_pair`): the overlap that raises
+   * `intersectionstart` and `intersectionend`. Two solid colliders never have one, and a sensor and what it senses overlapping is not a contact.
+   * @throws MargoError (`state`) for a collider that was removed.
+   */
+  intersectionPair(a: Collider2D, b: Collider2D): boolean {
+    if (!a.isSensor() && !b.isSensor()) return false;
+    return this.contactPair(a, b)?.touching ?? false;
+  }
+
+  /**
+   * The colliders that overlap `collider` with one of the two a sensor, as of the last step: what a sensor currently senses, or the sensors
+   * a solid collider is inside (Rapier's `intersection_pairs_with`).
+   * @throws MargoError (`state`) for a collider that was removed.
+   */
+  intersectionPairsWith(collider: Collider2D): Collider2D[] {
+    return this.contactPairs(collider)
+      .filter((pair) => pair.touching && (collider.isSensor() || pair.other.isSensor()))
+      .map((pair) => pair.other);
+  }
+
   /** @internal Holds `body` at its position on the axes picked, with a generic joint to a fixed body no one sees. */
   lockTranslation(body: Body2D, x: boolean, y: boolean): void {
     this.live();

@@ -448,6 +448,9 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     projectPoint(point: Vec2D, filter?: QueryFilter2D): ProjectedPoint2D | null;
     intersectionsWithBox(min: Vec2D, max: Vec2D, filter?: QueryFilter2D): Body2D[];
     contactPairs(collider: Collider2D): ContactPair2D[];
+    contactPair(a: Collider2D, b: Collider2D): ContactPair2D | null;
+    intersectionPair(a: Collider2D, b: Collider2D): boolean;
+    intersectionPairsWith(collider: Collider2D): Collider2D[];
     lockTranslation(body: Body2D, x: boolean, y: boolean): void;
     addJoint(bodyA: Body2D, bodyB: Body2D, options: JointOptions2D): Joint2D;
     removeJoint(joint: Joint2D): void;

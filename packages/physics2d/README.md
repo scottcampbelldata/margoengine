@@ -75,7 +75,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
 | Collision | physics hooks (filter and modify contact pairs, one-way platforms) | `physics.hooks = {filterPair, modifyContact}` for colliders with `hooks` set; `oneWay`, `friction`, `restitution`, `tangentVelocity` (conveyors), `solverActive` per contact | full |
 | Queries | ray cast with normal (solid or not), every hit along a ray (`raycastAll`, nearest first), point, shape intersection, shape cast, project point, box intersection, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `projectPoint`, `intersectionsWithBox`, `QueryFilter2D` | full |
-| Queries | contact pairs of a collider | `contactPairs(collider)` | full |
+| Queries | contact pairs of a collider, the contact between two colliders, intersection pairs of sensors | `contactPairs(collider)`, `contactPair(a, b)`, `intersectionPair(a, b)`, `intersectionPairsWith(collider)` | full |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance, body type changes | `BodyOptions2D`, the same names as setters on `Body2D`, `setType` | full |
 | Bodies | forces, torques, impulses (at the centre or a point), forces at a point, resetting the torque or both, velocities, wake and sleep | `applyForce`, `applyForceAtPoint`, `applyTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, and the velocity setters | full |
