@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18395817,
+  "total": 18399027,
   "history": [
     {
       "date": "2026-10-24",
@@ -11727,6 +11727,12 @@
       "commit": "af1d54538",
       "reason": "physics2d entry 19,911 to 20,128 B gzip budget: the debug render's style palette and filter, contactPair, intersectionPair, enabled, maxAngularSpeed and additional mass properties of the earlier landings; each is facade code of the world and body classes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "4dd7818ec",
+      "reason": "New optional entry @margoengine/ecs/scripts (script components), 0 -> 3210 B baseline (2954 B measured gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12041,6 +12047,7 @@
     "@margoengine/ecs/relation-query": 1279,
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
+    "@margoengine/ecs/scripts": 3210,
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/environment": 34105,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,

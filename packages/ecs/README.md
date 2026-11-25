@@ -109,6 +109,72 @@ schedule.update(1 / 30); // two fixed steps of move, then report once
 
 Systems receive `{delta, elapsed, tick, alpha, fixed}`: `delta` is the step in a fixed system and the frame time otherwise, `alpha` is the share of a step left in the accumulator, for blending the last two fixed states when drawing. The object is reused, so read it during the call. Order is `before` and `after`, then the order of `add`. `schedule.order()` lists the result. A missing name, a cycle, or a frame system ordered before a fixed one throws MargoError `'state'` from `order` or the next `update`. Systems are synchronous and run on the calling thread; a `Schedule` holds one step size, so use a second `Schedule` for a second rate.
 
+## Script components
+
+`Scripts` (from `margoengine/ecs/scripts`) puts behaviour on entities the way the script components of PlayCanvas and Needle do: a script type declares typed attributes and lifecycle hooks, and any number of instances attach to an entity. One registry belongs to one `World`; there are no globals. Hooks run with the instance as `this`, which carries `entity`, `world`, `attributes`, `state` (yours, kept across hot reload) and `enabled`.
+
+```ts
+import {Schedule, World} from 'margoengine/ecs';
+import {Scripts, defineScript} from 'margoengine/ecs/scripts';
+const world = new World(64);
+const errors: unknown[] = [];
+const scripts = new Scripts(world, {onError: (error) => errors.push(error)});
+const spin = defineScript({
+  name: 'spin',
+  attributes: {
+    speed: {type: 'number', default: 1, min: 0, max: 10},
+    axis: {type: 'vec3', default: [0, 1, 0]},
+    tint: {type: 'color', default: '#ff8800'},
+  },
+  initialize() { this.state.angle = 0; },
+  update(dt) { this.state.angle += this.attributes.speed * dt; },
+  onAttributeChange(name, value, previous) { console.log(name, previous, '->', value); },
+});
+scripts.register(spin);
+const entity = world.create();
+const instance = scripts.add(entity, spin, {values: {speed: 2}});
+const schedule = new Schedule();
+scripts.install(schedule); // frame system "scripts" and fixed system "scripts.fixed"
+schedule.update(0.5);
+instance.attributes.speed = 4; // validated; logs: speed 2 -> 4
+console.log(instance.state.angle); // 1
+// Hot reload: same instances, attribute values and state, no new initialize.
+scripts.reload(defineScript({
+  name: 'spin',
+  attributes: {speed: {type: 'number', default: 1}, axis: {type: 'vec3'}},
+  update(dt) { this.state.angle += this.attributes.speed * dt * 2; },
+  swap(previous) { console.log('swapped from', previous.name); },
+}));
+schedule.update(0.5);
+console.log(instance.state.angle, scripts.schema()[0].attributes.map((a) => a.name)); // 5 [ 'speed', 'axis' ]
+scripts.dispose();
+```
+
+| Attribute `type` | Value | Options |
+| --- | --- | --- |
+| `number` | finite number, default 0 | `min`, `max` |
+| `boolean`, `string` | default `false`, `''` | none |
+| `enum` | one of `options`, default the first | `options` (required) |
+| `vec2`, `vec3`, `vec4` | array of that many finite numbers, default zeros | `min`, `max` per element |
+| `color` | `[r, g, b, a]` in 0..1, or `'#rgb'` / `'#rrggbb'`, default white | `min`, `max` (inside 0..1) |
+| `entity`, `asset` | entity id or asset id string, default `null` | `assetKind` hint |
+
+Every attribute also takes `default` and `title` (an inspector label). A bad default throws when the script is defined; a bad value throws `RangeError` naming the attribute when it is added or assigned. `scripts.schema()` returns every registered type's attributes as JSON-safe data for an inspector.
+
+| Hook | When |
+| --- | --- |
+| `onEnable`, `initialize`, `postInitialize` | First `update`, `fixedUpdate` or `flush` after `add` while enabled: every `initialize` of the batch, then every `postInitialize` |
+| `update(dt)`, `postUpdate(dt)` | Each `scripts.update(dt)`, every `update` before any `postUpdate`, ordered by `priority` then by `add` |
+| `fixedUpdate(step)` | Each `scripts.fixedUpdate(step)` |
+| `onEnable`, `onDisable` | `instance.enabled` changes; a disabled instance gets no update hooks |
+| `onAttributeChange(name, value, previous)` | An attribute is assigned a different value after `initialize` |
+| `destroy` | `scripts.remove`, `world.destroy(entity)` or dispose, after `onDisable` |
+| `swap(previous)` | Hot reload, on the new type |
+
+`scripts.reload(newType, {reinitialize})` swaps the implementation registered under that name. Instances stay with their attribute values (kept when the attribute still exists and is valid, else reset to the new default), `state`, enabled flag and order. `initialize` runs again only with `reinitialize: true`, after the old `onDisable` and `destroy`, with `state` cleared. An error thrown by a hook goes to `onError(error, {script, hook})` and the other scripts still run; without `onError` the pass finishes and throws one MargoError `'failed'` whose `cause` is the first error. `scripts.dispose()` (or `using`) destroys every instance.
+
+Sources: the feature set follows the public documentation of PlayCanvas script components (attributes, initialize/postInitialize/update/postUpdate, enable/disable, swap for hot reload) and Needle Engine components; the code is written clean room from those feature names.
+
 ## Change detection
 
 `ChangeTracker` (from `margoengine/ecs`, or `margoengine/ecs/changes` alone) answers which entities gained, changed or lost one component since its last `clear()`.

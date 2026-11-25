@@ -1131,6 +1131,10 @@
       "types": "./dist/ecs/objects.d.ts",
       "import": "./dist/ecs/objects.js"
     },
+    "./ecs/scripts": {
+      "types": "./dist/ecs/scripts.d.ts",
+      "import": "./dist/ecs/scripts.js"
+    },
     "./ecs/relation-query": {
       "types": "./dist/ecs/relation-query.d.ts",
       "import": "./dist/ecs/relation-query.js"
