@@ -71,7 +71,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | --- | --- | --- | --- | --- |
 | Script component system (attributes, lifecycle hooks, hot reload) | PlayCanvas, Needle | DONE | L | b95470338 |
 | Occlusion query API for apps (only internal in voxel-pathtracer; Hi-Z culling exists) | three.js, Babylon | DONE | M | 3a95eb3b7 |
-| Mesh path tracer: instancing, skinning, emissive triangles, alpha blend, `/mesh-pbr` README | three-gpu-pathtracer | PARTIAL | L |  |
+| Mesh path tracer: instancing, skinning, emissive triangles, alpha blend, `/mesh-pbr` README | three-gpu-pathtracer | DONE | L | README 4f7780bf7, BLEND eb57207ea, skinned poses 8ce7e3e8d; instancing EXISTS (d34b3de1c, src/mesh-instances.ts), emissive triangles EXISTS (adc7807e5, src/mesh-light-build.ts) |
 | Raycaster current-pose hits on skinned meshes (sync), Line and Points thresholds | three.js | DONE | M | 99d42804c (thresholds EXISTS: packages/bvh/src/scene.ts, packages/bvh/src/points.ts) |
 | Greased Line: per-point width and colour | Babylon | DONE | S | 61f3dcf3f (colorMode; per-point colour and width EXISTS: packages/lines/src/line.ts, packages/lines/src/stroke.ts) |
 | Geospatial camera with terrain collision and geo maths | Babylon | DONE | M | 56d8616c4 (WGS84/ECEF/ENU EXISTS: packages/tiles/src/wgs84.ts, now backed by math/geo) |
