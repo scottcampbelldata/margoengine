@@ -1457,6 +1457,7 @@ class LinkedProgram {
     };
     constructor(device: CompatDevice, glsl: GLSLProgram, attributes: readonly Attribute[]);
     done(): boolean;
+    waiting(): boolean;
     warmed(targets: readonly (TargetState | null)[]): boolean;
     free(): void;
     finish(): void;
