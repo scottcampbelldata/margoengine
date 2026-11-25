@@ -164,3 +164,31 @@ test('an agent whose target beside a wall is taken stops beside it instead of pr
   settle(crowd);
   assert.ok(gap([first, second]) >= -1e-3, 'they end apart');
 });
+
+test('a crowd gathering at taken targets beside walls runs the same on every run', () => {
+  // Walls, corners passed by straight view and arrival by joining are all deterministic: two runs agree to the bit.
+  const run = () => {
+    const nav = new NavMesh(
+        [
+          [0, 0, 0],
+          [4, 0, 0],
+          [4, 0, 1.2],
+          [0, 0, 1.2],
+          [8, 0, 4],
+          [8, 0, 5.2],
+          [12, 0, 4],
+          [12, 0, 5.2],
+        ],
+        [
+          [0, 1, 2, 3],
+          [1, 4, 5, 2],
+          [4, 6, 7, 5],
+        ],
+      ),
+      crowd = new Crowd(nav);
+    for (let i = 0; i < 5; i++) crowd.addAgent({ position: [0.4 + i * 0.7, 0, 0.6], radius: 0.25 }).setTarget([11.5, 0, 4.6]);
+    for (let k = 0; k < 600; k++) crowd.update(1 / 60);
+    return crowd.agents.flatMap((a) => [...a.position, ...a.velocity, a.state]);
+  };
+  assert.deepEqual(run(), run());
+});
