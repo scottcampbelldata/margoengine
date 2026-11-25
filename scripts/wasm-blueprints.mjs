@@ -290,14 +290,20 @@ export function sourceHash(entry, root = repository) {
   return hash.digest('hex');
 }
 
+/** The packed bytes a deflated TypeScript blueprint holds: the string its constant is assigned, wherever the formatter
+ * wraps that statement. The one reader of those modules, for the checks and the tests. */
+export function packedBlueprint(entry, root = repository) {
+  const name = entry.exportName ?? 'wasmBase64';
+  const assigned = new RegExp(`\\b${name}\\s*(?::\\s*string\\s*)?=\\s*'([^']+)'`);
+  const base64 = assigned.exec(readFileSync(join(root, entry.blueprint), 'utf8'))?.[1];
+  if (!base64) throw margoError('WASM_BLUEPRINT_UNREADABLE', `${entry.blueprint} holds no ${name} blueprint`);
+  return Buffer.from(base64, 'base64');
+}
+
 /** The blueprint's Wasm bytes (a deflated TypeScript blueprint is read back to its module). */
 export function blueprintBytes(entry, root = repository) {
-  const bytes = readFileSync(join(root, entry.blueprint));
-  if (!entry.deflated) return bytes;
-  const name = entry.exportName ?? 'wasmBase64';
-  const base64 = new RegExp(`${name}(?::\\s*string)?\\s*=\\s*'([^']+)'`).exec(bytes.toString('utf8'))?.[1];
-  if (!base64) throw margoError('WASM_BLUEPRINT_UNREADABLE', `${entry.blueprint} holds no ${name} blueprint`);
-  const packed = Buffer.from(base64, 'base64');
+  if (!entry.deflated) return readFileSync(join(root, entry.blueprint));
+  const packed = packedBlueprint(entry, root);
   return entry.deflated === 'gzip' ? gunzipSync(packed) : inflateRawSync(packed);
 }
 

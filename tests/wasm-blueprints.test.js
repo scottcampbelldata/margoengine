@@ -6,11 +6,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { gzipSync } from 'node:zlib';
 import { blueprintRustEnv, hostSourcePath, portableRemaps } from '../scripts/rust-wasm-env.mjs';
 import {
   BLUEPRINTS,
   blueprintBytes,
   NOT_SHIPPED,
+  packedBlueprint,
   staleBlueprints,
   unlistedCrates,
   writeRecord,
@@ -185,7 +187,28 @@ test('every blueprint build script builds through the shared environment', () =>
 
 test('a gzip blueprint names no build system in its header', () => {
   const machinery = BLUEPRINTS.find((entry) => entry.deflated === 'gzip');
-  const base64 = /machineryWasm: string = '([^']+)'/.exec(readFileSync(machinery.blueprint, 'utf8'))[1];
   // RFC 1952 2.3.1: byte 9 is the OS of the compressing system; 255 is unknown.
-  assert.equal(Buffer.from(base64, 'base64')[9], 255);
+  assert.equal(packedBlueprint(machinery)[9], 255);
+});
+
+// Regression: the formatter wraps a long assignment after `=`, and a pattern that expected one line found nothing.
+test('a TypeScript blueprint is read however its assignment wraps', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'margo-wasm-wrapped-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const module = Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]),
+    entry = { blueprint: 'wasm.ts', deflated: 'gzip', exportName: 'machineryWasm' },
+    base64 = gzipSync(module).toString('base64');
+  for (const head of [
+    'machineryWasm: string = ',
+    'machineryWasm: string =\n  ',
+    'machineryWasm: string =\r\n  ',
+    'machineryWasm:\n  string\n  =\n  ',
+    'machineryWasm =\n  ',
+  ]) {
+    writeFileSync(join(root, entry.blueprint), `export const ${head}'${base64}';\n`);
+    assert.deepEqual(blueprintBytes(entry, root), module, JSON.stringify(head));
+    assert.deepEqual(packedBlueprint(entry, root), Buffer.from(base64, 'base64'), JSON.stringify(head));
+  }
+  writeFileSync(join(root, entry.blueprint), `export const oldmachineryWasm = '${base64}';\n`);
+  assert.throws(() => packedBlueprint(entry, root), { code: 'WASM_BLUEPRINT_UNREADABLE' });
 });
