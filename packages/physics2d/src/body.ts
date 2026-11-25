@@ -398,7 +398,7 @@ export class Body2D {
   private read(): Words {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_read(h, this.handle));
-    return kernel.io(12);
+    return kernel.io(13);
   }
   /** Velocity in world units per second. */
   get linearVelocity(): [number, number] {
@@ -520,6 +520,21 @@ export class Body2D {
   set enabled(value: boolean) {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_set_enabled(h, this.handle, value ? 1 : 0));
+  }
+  /**
+   * The most the body may turn at, in radians a second (default 0: no limit). Rapier caps every body's spin by default to keep its
+   * continuous collision reliable, and its `allowFastRotation` lifts the cap; here a fast spinner with `ccd` set is swept along its turn
+   * (it is stopped by a thin wall at 2000 rad/s, `kernel/tests/ccd.rs`), so there is no default cap and `allowFastRotation` has nothing to
+   * lift. Set this to cap a body as Rapier does. Applied each substep before the solve.
+   * @throws RangeError for a speed below 0 or not finite.
+   */
+  set maxAngularSpeed(value: number) {
+    const { x, h, kernel } = this.k;
+    encode(value, 'max angular speed');
+    kernel.ok(x.body_set_max_angular_speed(h, this.handle, value));
+  }
+  get maxAngularSpeed(): number {
+    return this.read().f[12];
   }
   /** The centre of mass in world units, as of the last step. */
   get centerOfMass(): [number, number] {

@@ -522,6 +522,9 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
             body.v = v.scale(1.0 / (1.0 + h * source.linear_damping));
             body.w += h * source.inv_inertia * source.torque;
             body.w *= 1.0 / (1.0 + h * source.angular_damping);
+            if source.max_angular_speed > 0.0 {
+                body.w = body.w.clamp(-source.max_angular_speed, source.max_angular_speed);
+            }
         }
         crate::world::tick(&mut world.timing, 10, &mut inner);
         wide::warm_start(&mut bodies, &blocks.blocks);

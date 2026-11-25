@@ -277,8 +277,8 @@ pub extern "C" fn body_remove(handle: i32, body: u32) -> i32 {
 pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| {
         let b = w.bodies.get(body as usize).filter(|b| !b.dead).ok_or(PhysicsError::InvalidHandle)?;
-        let (xf, v, av, mass, awake, center, enabled) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled);
-        ensure(12);
+        let (xf, v, av, mass, awake, center, enabled, cap) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed);
+        ensure(13);
         for (i, value) in [xf.p.x, xf.p.y, xf.q.c, xf.q.s, v.x, v.y, av, mass].into_iter().enumerate() {
             put(i, value);
         }
@@ -286,6 +286,7 @@ pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
         put(9, center.x);
         put(10, center.y);
         io()[11] = enabled as u32;
+        put(12, cap);
         Ok(0)
     })
 }
@@ -644,6 +645,10 @@ pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
 }
 
 /// Takes a body out of the simulation (0) or puts it back (1).
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_max_angular_speed(handle: i32, body: u32, speed: f32) -> i32 {
+    with_world!(handle, |w| w.set_max_angular_speed(body, speed).map(|()| 0))
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn body_set_enabled(handle: i32, body: u32, enabled: u32) -> i32 {
     with_world!(handle, |w| w.set_body_enabled(body, enabled != 0).map(|()| 0))

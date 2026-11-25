@@ -101,6 +101,9 @@ pub struct Body {
     pub linear_damping: f32,
     pub angular_damping: f32,
     pub gravity_scale: f32,
+    /// The most the body may turn at, in radians a second; 0 for no limit (the default: a fast spinner is swept by continuous
+    /// collision, so Rapier's default cap is not needed).
+    pub max_angular_speed: f32,
     pub can_sleep: bool,
     pub fixed_rotation: bool,
     pub ccd: bool,
@@ -695,6 +698,7 @@ impl World {
             linear_damping: def.linear_damping,
             angular_damping: def.angular_damping,
             gravity_scale: def.gravity_scale,
+            max_angular_speed: 0.0,
             can_sleep: def.can_sleep,
             fixed_rotation: def.fixed_rotation,
             ccd: def.ccd,
@@ -1140,6 +1144,14 @@ impl World {
         if linear_damping < 0.0 || angular_damping < 0.0 { return Err(PhysicsError::InvalidParameter); }
         let b = self.live_body(body)?;
         (b.linear_damping, b.angular_damping, b.gravity_scale, b.can_sleep, b.ccd, b.dominance) = (linear_damping, angular_damping, gravity_scale, can_sleep, ccd, dominance);
+        self.wake(body)
+    }
+
+    /// Limits how fast the body may turn, in radians a second (0 takes the limit away). Applied each substep before the solve.
+    pub fn set_max_angular_speed(&mut self, body: u32, speed: f32) -> Result<(), PhysicsError> {
+        if !speed.is_finite() { return Err(PhysicsError::NotFinite); }
+        if speed < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        self.live_body(body)?.max_angular_speed = speed;
         self.wake(body)
     }
 

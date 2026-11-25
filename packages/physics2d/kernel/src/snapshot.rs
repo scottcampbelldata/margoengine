@@ -13,8 +13,8 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-/// The version written. Versions 5 to 7 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag.
-const VERSION: u32 = 8;
+/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit.
+const VERSION: u32 = 9;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -184,6 +184,7 @@ impl World {
             w.bool(b.awake);
             w.bool(b.dead);
             w.bool(b.enabled);
+            w.f32(b.max_angular_speed);
             let (extra_mass, extra_center, extra_inertia) = b.extra_solid.unwrap_or((0.0, V2::ZERO, 0.0));
             w.bool(b.extra_solid.is_some());
             w.f32(extra_mass);
@@ -368,6 +369,7 @@ impl World {
             let (np, nq) = (r.v2()?, r.rot()?);
             let (awake, dead) = (r.bool()?, r.bool()?);
             let enabled = if r.version >= 8 { r.bool()? } else { true };
+            let max_angular_speed = if r.version >= 9 { r.f32()? } else { 0.0 };
             let extra_solid = if r.version >= 7 {
                 let some = r.bool()?;
                 let (m, c, i) = (r.f32()?, r.v2()?, r.f32()?);
@@ -380,7 +382,7 @@ impl World {
             for _ in 0..k {
                 shapes.push(r.u32()?);
             }
-            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, can_sleep, fixed_rotation, ccd, dominance, soft_ccd, additional_mass, extra_solid, force, torque, next_target: has_next.then_some((np, nq)), awake, enabled, sleep_time, shapes, dead });
+            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, max_angular_speed, can_sleep, fixed_rotation, ccd, dominance, soft_ccd, additional_mass, extra_solid, force, torque, next_target: has_next.then_some((np, nq)), awake, enabled, sleep_time, shapes, dead });
         }
         let n = r.count(100)?;
         for id in 0..n {

@@ -161,3 +161,26 @@ fn an_added_solid_joins_the_shapes_by_the_parallel_axis_theorem() {
     assert!(w.set_additional_mass_properties(b, -1.0, v2(0.0, 0.0), 0.0).is_err());
     assert!(w.set_additional_mass_properties(b, 1.0, v2(f32::NAN, 0.0), 0.0).is_err());
 }
+
+#[test]
+fn a_body_with_a_maximum_angular_speed_turns_no_faster_and_one_without_is_free() {
+    let mut w = space();
+    let (capped, free) = (crate_(&mut w, 0.0, 0.0), crate_(&mut w, 10.0, 0.0));
+    w.bodies[capped as usize].angular_velocity = 50.0;
+    w.bodies[free as usize].angular_velocity = 50.0;
+    w.set_max_angular_speed(capped, 8.0).unwrap();
+    for _ in 0..10 {
+        w.step(DT).unwrap();
+    }
+    assert!((w.bodies[capped as usize].angular_velocity - 8.0).abs() < 1e-5, "capped at 8: {}", w.bodies[capped as usize].angular_velocity);
+    assert!((w.bodies[free as usize].angular_velocity - 50.0).abs() < 1e-5, "the other keeps its 50");
+    w.bodies[capped as usize].angular_velocity = -50.0;
+    w.step(DT).unwrap();
+    assert!((w.bodies[capped as usize].angular_velocity + 8.0).abs() < 1e-5, "and the cap holds the other way");
+    w.set_max_angular_speed(capped, 0.0).unwrap();
+    w.bodies[capped as usize].angular_velocity = 50.0;
+    w.step(DT).unwrap();
+    assert!((w.bodies[capped as usize].angular_velocity - 50.0).abs() < 1e-5, "0 takes the cap off");
+    assert!(w.set_max_angular_speed(capped, -1.0).is_err());
+    assert!(w.set_max_angular_speed(capped, f32::NAN).is_err());
+}

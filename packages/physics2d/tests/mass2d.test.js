@@ -81,3 +81,22 @@ test('a snapshot made by the version 6 kernel (no extra solid) restores and step
   near(b.position[1], later.b[1], 1e-5, 'box y');
   assert.ok(a.mass > 0 && b.mass > 0);
 });
+
+test("a maximum angular speed caps a body's spin, and the default leaves it free", () => {
+  const physics = world();
+  const capped = physics.addBody(null, { colliders: disc, canSleep: false });
+  const free = physics.addBody(null, { position: [50, 0], colliders: disc, canSleep: false });
+  capped.angularVelocity = 40;
+  free.angularVelocity = 40;
+  capped.maxAngularSpeed = 6;
+  physics.step();
+  near(capped.angularVelocity, 6, 1e-5, 'capped');
+  near(free.angularVelocity, 40, 1e-5, 'free');
+  assert.equal(capped.maxAngularSpeed, 6);
+  assert.equal(free.maxAngularSpeed, 0);
+  assert.throws(() => (capped.maxAngularSpeed = -1), RangeError);
+  const bytes = physics.snapshot();
+  capped.maxAngularSpeed = 0;
+  physics.restore(bytes);
+  assert.equal(capped.maxAngularSpeed, 6, 'a snapshot carries it');
+});
