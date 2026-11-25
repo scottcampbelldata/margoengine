@@ -90,6 +90,8 @@ function completeDevice(device) {
   device.queue.writeTexture ??= () => {};
   device.limits.maxTextureArrayLayers ??= 256;
   device.limits.maxTextureDimension2D ??= 8192;
+  // WebGPU's default limit; a real device reports at least this many (shadows/rt and shadows/ibl read it).
+  device.limits.maxStorageBuffersPerShaderStage ??= 8;
   // A real GPUTexture reports its layer and mip level counts (mipLevelCount defaults to 1); the inert one does not.
   const createTexture = device.createTexture;
   device.createTexture = function (descriptor) {

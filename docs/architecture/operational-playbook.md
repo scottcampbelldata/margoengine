@@ -1,3 +1,15 @@
+### Section 5 evidence: shadows from the environment map (shadows/ibl, 2026-11-25)
+
+`@margoengine/shadows/ibl` is a PostStack HDR stage: directions importance sampled from the equirect's luminance
+times sin(theta) are traced per pixel against a BVH in the fragment shader, kept as the ratio estimator (cos-weighted
+visible over cos-weighted total) with reverse-reprojected, decayed sums, and filtered with a distance edge stop. Ray
+starts add half a pixel's step to `bias`: the 1x depth holds one MSAA sample, the nearest on WebGPU and sample 0 on
+the WebGL2 layer, and without it the layer's floor sat 1 to 2 cm under its own surface and shadowed itself. Evidence:
+`packages/shadows/test/ibl.test.js` (texel shares within 2% of luminance x solid angle at three rotations; the
+estimator within 0.01 of a brute-force integral) and `ibl-browser.mjs` on both backends (mean visibility error 0.003
+to 0.006 against a Node reference, still, rotated and after a refit). Missing: timing, and a comparison against a
+path-traced frame of a real model.
+
 ### Section 5 evidence: short wind waves and sky reflection (2026-11-24)
 
 Water now filters each ripple against its rotated pixel footprint. The old common six-metre

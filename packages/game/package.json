@@ -2831,6 +2831,10 @@
       "types": "./dist/shadows/rt-alpha.d.ts",
       "import": "./dist/shadows/rt-alpha.js"
     },
+    "./shadows/ibl": {
+      "types": "./dist/shadows/ibl.d.ts",
+      "import": "./dist/shadows/ibl.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18980834,
+  "total": 18991955,
   "history": [
     {
       "date": "2026-10-24",
@@ -12255,6 +12255,12 @@
       "commit": "473d11b22",
       "reason": "physics/flight is a new optional entry (AERO-03): WingForce, RotorForce and LiftingGas on the shared vortex lattice; its own entry so scenes that do not fly pay nothing, and the physics base stays as it was. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "shadows-ibl",
+      "reason": "shadows/ibl: new entry, shadows from the environment map (IBLShadows, environment importance sampling and BVH visibility), its own file so apps that do not use it pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13399,6 +13405,7 @@
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 22060,
     "@margoengine/shadows/distance": 2421,
+    "@margoengine/shadows/ibl": 11121,
     "@margoengine/shadows/light-function": 2533,
     "@margoengine/shadows/rt": 6227,
     "@margoengine/shadows/rt-alpha": 8540,

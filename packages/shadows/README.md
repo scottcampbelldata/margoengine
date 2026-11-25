@@ -374,6 +374,63 @@ WebGPU has no ray queries yet, so no hardware path is used: the rays walk the tr
 
 Only the tree casts, in the pose it was built. After moving what it holds, call `bvh.refit()` and then `filter.refit()`, for the same triangles. The ordinary tree treats triangles as opaque; use `shadows/rt-alpha` below for MASK coverage. Shadows end where the map's reach ends. `Shadows` only: `VirtualShadows` keeps its named filters.
 
+## Shadows from the environment map
+
+`@margoengine/shadows/ibl` adds the soft shadows and occlusion an environment map casts, as a PostStack HDR effect.
+Each frame it draws directions from the equirect's bright regions (luminance times solid angle), traces them from
+every pixel of the frame depth against a BVH of the scene, and keeps the result over frames. Casters off screen and
+behind other surfaces still cast, because the rays walk the tree, not the screen.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {MeshBVH, worldTriangles} from 'margoengine/bvh';
+import {PostStack} from 'margoengine/post/stack';
+import {IBLShadows} from 'margoengine/shadows/ibl';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const ground = engine.createMesh().setGeometry(box(20, 0.1, 20)).setPosition([0, -0.05, 0]);
+const caster = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 0.6, 0]);
+const {vertices, indices} = worldTriangles(engine, [ground, caster]);
+const bvh = MeshBVH.build({positions: vertices, indices});
+// The equirect your Environment was made from (parseHDR or parseEXR of margoengine/environment); here a grey sky
+// with a bright patch 50 degrees up.
+const sky = {width: 64, height: 32, data: new Float32Array(64 * 32 * 3).fill(0.5)};
+sky.data.fill(40, (8 * 64 + 30) * 3, (8 * 64 + 34) * 3);
+const shadows = new IBLShadows(bvh, sky, {rays: 4});
+PostStack.attach(engine, [shadows]);
+engine.start();
+shadows.options.rotation = 0.5; // live: follow the Environment's rotation
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `rays` | 4 | Rays per pixel per frame, 1 to 32. Neighbouring pixels in a 4 x 4 tile take different directions. Live. |
+| `history` | 32 | Frames kept, 1 (none) to 256. More is smoother; a moving shadow lags by about this many frames. Live. |
+| `blur` | 2 | Radius in pixels of the edge-stopped spatial filter, 0 to 4. Live. |
+| `strength` | 1 | Share of the colour a fully occluded pixel loses, 0 to 1. Live. |
+| `rotation` | 0 | Environment rotation about +Y in radians, as `Environment` `rotation`. Live. |
+| `bias` | 0.01 | World units a ray starts off its surface; half a pixel's step is added to it. Live. |
+| `far` | 1e6 | World units a ray reaches; lower it for local occlusion only. Live. |
+| `enabled` | true | False passes frames through and drops the history. Live. |
+
+How it works: the visibility a pixel keeps is the ratio estimator of Heitz, Hill and McGuire (2018, "Combining
+Analytic Direct Illumination and Stochastic Shadows"): the sum of cos x visible over the sum of cos for the same
+samples, so no radiance scale is needed. Directions come from the image's marginal and conditional CDFs (Pharr,
+Jakob and Humphreys, "Physically Based Rendering", 2016) along a Halton sequence, interleaved over 4 x 4 pixels
+(Keller and Heidrich 2001). The sums are reprojected into the previous frame and kept where the same surface point is
+found there (Nehab et al. 2007), then summed over an edge-stopped neighbourhood (Dammertz et al. 2010; Schied et al.
+2017). Voxel tracing, screen-space tracing, extracted lights with shadow maps and precomputed SH visibility were
+compared; see the header of `src/ibl.ts`.
+
+The image is read once, as given; build a new effect for another image. After moving what the tree holds, write the
+new positions into `bvh.positions` and call `bvh.refit()`: the next frame sends the tree again. Call
+`shadows.reset()` after a camera cut. `environmentDistribution(image)` and `environmentDirections(...)` are exported
+for CPU use of the same sampler.
+
+It multiplies the whole frame colour by the visibility, so a pixel's other lights dim with it: use it where the
+environment is the main light, or lower `strength`. It needs four storage buffers in a fragment shader (WebGPU and the
+WebGL2 layer both have them) and throws MargoError `'unsupported'` where a device has fewer; ContactShadows or SSAO
+are the fallback there. [docs/limits.md](../../docs/limits.md#rendering) states what is approximated.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

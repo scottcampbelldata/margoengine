@@ -40,7 +40,8 @@
     "test:gpu:virtual-filters": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs --page=virtual && node packages/shadows/test/virtual-edges-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:rt-alpha": "cd ../.. && node packages/shadows/test/rt-alpha-browser.mjs",
-    "test:gpu:rt-alpha-attach": "cd ../.. && node packages/shadows/test/rt-alpha-attach-browser.mjs"
+    "test:gpu:rt-alpha-attach": "cd ../.. && node packages/shadows/test/rt-alpha-attach-browser.mjs",
+    "test:gpu:ibl": "cd ../.. && node packages/shadows/test/ibl-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -79,6 +80,10 @@
     "./rt-alpha": {
       "types": "./dist/rt-alpha.d.ts",
       "import": "./dist/rt-alpha.js"
+    },
+    "./ibl": {
+      "types": "./dist/ibl.d.ts",
+      "import": "./dist/ibl.js"
     }
   },
   "files": [
