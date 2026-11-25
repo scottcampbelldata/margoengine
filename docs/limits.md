@@ -8499,7 +8499,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
 - `GeospatialControls` terrain clearance is a height query at the eye only (`heightAt`), sampled once per move, with up to
   6 lift iterations; it does not sweep the path between frames, so a fast move can cross a thin ridge. `@margoengine/tiles`
   streams terrain without a height query, so pass your own function (grid, raycast). No physics is involved.
-- Zoom-to-cursor and picking intersect the ellipsoid raised to the centre height, not the terrain surface.
+- Picking (zoom-to-cursor, anchored pan, the turn pivot) takes the nearest of the engine scene (bvh Raycaster), your
+  `raycast` and a march over `heightAt`; only a miss of all of them falls back to the ellipsoid at the centre height.
+  The `heightAt` march takes at most 512 steps of half the height above the ground, so a slope steeper than about 63
+  degrees across one step can be crossed unseen, and a grazing ray past 512 steps misses; pass an exact `raycast`
+  (terrain/query) for cliffs. Scene picks are float32 in core: about 0.5 m at Earth-centred coordinates until the
+  floating origin row lands. Zoom keeps the cursor point to a tenth of a pixel (the view re-levels at its new centre).
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)

@@ -1,6 +1,8 @@
-// Geospatial camera: heading / pitch / range orbit about a geodetic point on the WGS84 globe, with cursor zoom, flights
-// and a terrain-clearance floor. The geodesy is @margoengine/math/geo (NIMA TR8350.2, Karney 2013).
-import type { Camera, EngineKernel } from '@margoengine/core';
+// Geospatial camera: heading / pitch / range orbit about a geodetic point on the WGS84 globe, with surface-true cursor
+// zoom, anchored pan and pivot, flights and a terrain-clearance floor. The geodesy is @margoengine/math/geo (NIMA
+// TR8350.2, Karney 2013); surface picks use the bvh Raycaster, your own ray query or a march over `heightAt`.
+import type { Camera, EngineKernel, Mesh } from '@margoengine/core';
+import { Raycaster, type ModelLike } from '@margoengine/bvh';
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
 import { MargoError } from '@margoengine/math/errors';
 import {
@@ -8,6 +10,7 @@ import {
   WGS84_B,
   cartographicToEcef,
   ecefToCartographic,
+  enuBasis,
   geodesicDirect,
   geodesicInverse,
   orbitPose,
@@ -17,6 +20,29 @@ import { rangeError } from '../../shared/errors.js';
 
 /** Terrain height above the WGS84 ellipsoid, metres, at longitude and latitude in RADIANS; undefined or NaN when unknown. */
 export type HeightQuery = (longitude: number, latitude: number) => number | undefined;
+
+/**
+ * Your own surface ray query in WORLD coordinates (the camera's frame): the distance along the unit `direction` to the
+ * first hit within `far`, or undefined / NaN on a miss. A `TerrainQuery.raycast`, a tiles query or a height grid fit.
+ */
+export type SurfaceRaycast = (
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  far: number,
+) => number | undefined;
+
+/** What a {@link GeospatialControls.pick} hit: the engine scene (bvh), your `raycast`, the `heightAt` terrain, or the ellipsoid fallback. */
+export type GeospatialPickSource = 'scene' | 'raycast' | 'terrain' | 'ellipsoid';
+
+/** A picked surface point: geodetic position (radians, metres above the ellipsoid), distance along the ray and what was hit. */
+export interface GeospatialPick {
+  longitude: number;
+  latitude: number;
+  height: number;
+  /** Metres from the ray origin (the eye) to the hit. */
+  distance: number;
+  source: GeospatialPickSource;
+}
 
 /** A geodetic view of the globe. Angles are radians, lengths metres. */
 export interface GeospatialView {
@@ -53,6 +79,17 @@ export interface GeospatialOptions {
   clipPlanes?: boolean;
   /** World is ECEF (Z up) when true; the engine's Y-up world (x, z, -y of ECEF) when false. Default false. */
   zUp?: boolean;
+  /**
+   * Pick against the engine's visible meshes and models (terrain meshes, 3D Tiles, glTF) with the bvh `Raycaster`, so
+   * zoom, rotate and pan grab the real surface. Needs the controls attached to an engine. Default true.
+   */
+  scene?: boolean;
+  /** Limit scene queries to these meshes and models. Default null: every visible mesh and model. */
+  colliders?: readonly (Mesh | ModelLike)[] | null;
+  /** Your own surface ray query, in world coordinates, tried alongside the scene; the nearest hit wins. Default none. */
+  raycast?: SurfaceRaycast;
+  /** Raycaster for scene queries (layers, side, filter). Default a new one. */
+  raycaster?: Raycaster;
 }
 
 /** Options for {@link GeospatialControls.flyTo}. */
@@ -80,17 +117,42 @@ interface Flight {
   off: () => void;
 }
 
+type V = [number, number, number];
+type Pose = { position: V; target: V; up: V };
+
+/** Steps of the `heightAt` ray march before a pick gives up (the ellipsoid then stands in). */
+const MARCH_STEPS = 512;
 const smoother = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 const num = (what: string, ...v: number[]) => {
   if (!v.every(Number.isFinite)) throw rangeError(`${what} needs finite numbers (radians and metres)`, 'controls-arguments');
 };
+const dot3 = (a: readonly number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+const along = (o: readonly number[], d: readonly number[], t: number): V => [o[0]! + d[0]! * t, o[1]! + d[1]! * t, o[2]! + d[2]! * t];
+
+/** Distance along a unit ECEF ray to the ellipsoid raised by `h` metres (first hit in front), or null on a miss. */
+function rayEllipsoid(o: readonly number[], d: readonly number[], h: number): number | null {
+  const ax = WGS84_A + h,
+    bz = WGS84_B + h;
+  if (!(ax > 0 && bz > 0)) return null;
+  const po = [o[0]! / ax, o[1]! / ax, o[2]! / bz],
+    pd = [d[0]! / ax, d[1]! / ax, d[2]! / bz],
+    a = dot3(pd, pd),
+    b = dot3(po, pd),
+    c = dot3(po, po) - 1,
+    disc = b * b - a * c;
+  if (disc < 0) return null;
+  const t = (-b - Math.sqrt(disc)) / a;
+  return t >= 0 ? t : null;
+}
 
 /**
- * Orbit, pan, zoom and fly about the WGS84 globe. Drag pans over the surface, right/modified drag changes heading and
- * pitch, the wheel zooms toward the cursor. The eye never goes below `clearance` metres above the terrain `heightAt`
- * reports (a hill under the eye lifts the view; it settles back when the hill is gone).
+ * Orbit, pan, zoom and fly about the WGS84 globe. Drag grabs the surface under the cursor and keeps it there, right or
+ * modified drag turns and tilts about the surface in the middle of the screen, the wheel zooms toward the surface under
+ * the cursor. Surfaces are the engine's meshes and models (bvh), your `raycast` and the `heightAt` terrain, else the
+ * ellipsoid. The eye never goes below `clearance` metres above the terrain `heightAt` reports (a hill under the eye
+ * lifts the view; it settles back when the hill is gone).
  */
 export class GeospatialControls extends Controls {
   /** Enable left-drag panning. Default true. */
@@ -113,10 +175,17 @@ export class GeospatialControls extends Controls {
   readonly maxRange: number;
   clipPlanes: boolean;
   readonly zUp: boolean;
+  /** Pick against the engine scene with the bvh Raycaster. Default true. */
+  scene: boolean;
+  /** Scene meshes and models picks consider; null is everything visible. */
+  colliders: readonly (Mesh | ModelLike)[] | null;
+  /** Your own world-space surface ray query. Default none. */
+  raycast: SurfaceRaycast | undefined;
+  readonly raycaster: Raycaster;
   private v: Required<GeospatialView>;
   private lifted = 0;
   private flight: Flight | null = null;
-  private dragging: { id: number; x: number; y: number; rotate: boolean } | null = null;
+  private dragging: { id: number; x: number; y: number; rotate: boolean; grab: V | null; grabHeight: number } | null = null;
   private dead = false;
   private changed = false;
   protected override get kind(): string {
@@ -143,6 +212,10 @@ export class GeospatialControls extends Controls {
     this.heightAt = options.heightAt;
     this.clipPlanes = options.clipPlanes ?? true;
     this.zUp = options.zUp ?? false;
+    this.scene = options.scene ?? true;
+    this.colliders = options.colliders ?? null;
+    this.raycast = options.raycast;
+    this.raycaster = options.raycaster ?? new Raycaster();
     this.v = this.sanitize({ ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 }, longitude: 0, latitude: 0, ...options.view } as Required<GeospatialView>);
     this.commit();
     this.init();
@@ -178,21 +251,24 @@ export class GeospatialControls extends Controls {
   private alive(): void {
     if (this.dead) throw new MargoError('disposed', 'Geospatial controls are disposed; create new GeospatialControls');
   }
-  private toWorld(p: readonly number[]): [number, number, number] {
+  /** ECEF position (or direction when `dir`) to world. */
+  private toWorld(p: readonly number[], dir = false): V {
+    void dir;
     return this.zUp ? [p[0]!, p[1]!, p[2]!] : [p[0]!, p[2]!, -p[1]!];
   }
-  private toEcef(p: readonly number[]): [number, number, number] {
+  /** World position (or direction when `dir`) to ECEF. */
+  private toEcef(p: readonly number[], dir = false): V {
+    void dir;
     return this.zUp ? [p[0]!, p[1]!, p[2]!] : [p[0]!, -p[2]!, p[1]!];
   }
   private floor(longitude: number, latitude: number): number {
     const h = this.heightAt?.(longitude, latitude);
     return (typeof h === 'number' && Number.isFinite(h) ? h : 0) + this.clearance;
   }
-  /** Write the camera from the view, lifting the centre until the eye clears the terrain below it. */
-  private commit(): void {
-    const v = this.v;
+  /** The ECEF pose of a view, its centre lifted until the eye clears the terrain below it, and that lift. */
+  private poseOf(v: Required<GeospatialView>): { pose: Pose; lift: number } {
     let lift = 0;
-    let pose = orbitPose(v, v.heading, v.pitch, v.range);
+    let pose: Pose = orbitPose(v, v.heading, v.pitch, v.range);
     for (let i = 0; i < 6; i++) {
       const e = ecefToCartographic(pose.position[0], pose.position[1], pose.position[2]),
         deficit = this.floor(e.longitude, e.latitude) - e.height;
@@ -201,10 +277,15 @@ export class GeospatialControls extends Controls {
       pose = orbitPose({ ...v, height: v.height + lift }, v.heading, v.pitch, v.range);
     }
     // The ground can fall away as the lift grows; a lift is only the terrain's demand at the final eye.
+    return { pose, lift };
+  }
+  /** Write the camera from the view. */
+  private commit(): void {
+    const { pose, lift } = this.poseOf(this.v);
     this.lifted = lift;
     this.camera.position = this.toWorld(pose.position);
     this.camera.target = this.toWorld(pose.target);
-    this.camera.up = this.toWorld(pose.up);
+    this.camera.up = this.toWorld(pose.up, true);
     if (this.clipPlanes) {
       const eye = ecefToCartographic(pose.position[0], pose.position[1], pose.position[2]),
         h = Math.max(1, eye.height);
@@ -243,42 +324,193 @@ export class GeospatialControls extends Controls {
     if (!(factor > 0) || !Number.isFinite(factor)) throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
     this.setView({ range: this.v.range * factor });
   }
-  /** Nearest hit of the screen ray with the ellipsoid raised to the centre height, as geodetic; null on sky. */
-  pick(x: number, y: number): { longitude: number; latitude: number; height: number } | null {
-    num('Geospatial pick', x, y);
+
+  /** The ECEF ray through CSS pixel (x, y) of a pose (default the camera now), or null without a sized element. */
+  private screenRay(x: number, y: number, pose?: Pose): { o: V; d: V } | null {
     const e = this.element;
     if (!e || !(e.clientWidth > 0 && e.clientHeight > 0)) return null;
-    const r = ray(rollFrame(this.camera), x, y, e.clientWidth, e.clientHeight),
-      o = this.toEcef(r.origin),
-      d = this.toEcef(r.direction),
-      h = this.v.height,
-      ax = WGS84_A + h,
-      by = WGS84_B + h,
-      s = [1 / ax, 1 / ax, 1 / by],
-      po = o.map((c, i) => c * s[i]!),
-      pd = d.map((c, i) => c * s[i]!),
-      a = pd[0]! ** 2 + pd[1]! ** 2 + pd[2]! ** 2,
-      b = po[0]! * pd[0]! + po[1]! * pd[1]! + po[2]! * pd[2]!,
-      c = po[0]! ** 2 + po[1]! ** 2 + po[2]! ** 2 - 1,
-      disc = b * b - a * c;
-    if (disc < 0) return null;
-    const t = (-b - Math.sqrt(disc)) / a;
-    if (!(t >= 0)) return null;
-    const hit = ecefToCartographic(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t);
-    return { ...hit, height: h };
+    const c = this.camera,
+      p = pose ?? { position: this.toEcef(c.position), target: this.toEcef(c.target), up: this.toEcef(c.up, true) },
+      r = ray(rollFrame({ ...p, fov: c.fov ?? 60 }), x, y, e.clientWidth, e.clientHeight);
+    return { o: r.origin, d: r.direction };
   }
-  /** Zoom by `factor` keeping the surface point under CSS pixel (x, y) in place (sky: about the centre). */
+  /** How far along a ray from ECEF `o` a surface can be seen: the eye's horizon plus 400 km for the highest mountains. */
+  private reach(o: readonly number[]): number {
+    const h = Math.max(1, ecefToCartographic(o[0]!, o[1]!, o[2]!).height);
+    return Math.sqrt(h * (h + 2 * WGS84_A)) + 4e5;
+  }
+  /** The nearest surface along a unit ECEF ray within `far`: scene meshes, your raycast and the heightAt terrain. */
+  private castSurface(o: V, d: V, far: number): { t: number; source: GeospatialPickSource } | null {
+    let best = far,
+      source: GeospatialPickSource | null = null;
+    const wo = this.toWorld(o),
+      wd = this.toWorld(d, true);
+    if (this.scene && this.engine) {
+      const r = this.raycaster;
+      r.set(wo, wd);
+      r.near = 0;
+      r.far = best;
+      r.firstHitOnly = true;
+      const [hit] = this.colliders ? r.intersectObjects(this.engine, this.colliders) : r.intersectEngine(this.engine);
+      if (hit && hit.distance < best) (best = hit.distance), (source = 'scene');
+    }
+    if (this.raycast) {
+      const t = this.raycast(wo, wd, best);
+      if (typeof t === 'number' && t >= 0 && t < best) (best = t), (source = 'raycast');
+    }
+    if (this.heightAt) {
+      const t = this.march(o, d, best);
+      if (t !== null && t < best) (best = t), (source = 'terrain');
+    }
+    return source ? { t: best, source } : null;
+  }
+  /** First crossing of a unit ECEF ray below the `heightAt` terrain within `far`, refined by bisection; null when clear. */
+  private march(o: V, d: V, far: number): number | null {
+    const gap = (t: number) => {
+      const p = along(o, d, t),
+        c = ecefToCartographic(p[0], p[1], p[2]),
+        g = this.heightAt!(c.longitude, c.latitude);
+      return c.height - (typeof g === 'number' && Number.isFinite(g) ? g : 0);
+    };
+    let t = 0,
+      a = gap(0);
+    if (a <= 0) return 0;
+    // ponytail: steps by half the height above the ground, so a slope steeper than about 63 degrees across one step can
+    // be crossed unseen; terrain/query's min-max tree passed as `raycast` is the exact path.
+    for (let i = 0; i < MARCH_STEPS && t < far; i++) {
+      const next = Math.min(far, t + Math.max(a * 0.5, 0.05, t * 1e-4)),
+        b = gap(next);
+      if (b <= 0) {
+        let lo = t,
+          hi = next;
+        for (let k = 0; k < 40; k++) {
+          const mid = (lo + hi) / 2;
+          if (gap(mid) > 0) lo = mid;
+          else hi = mid;
+        }
+        return hi;
+      }
+      t = next;
+      a = b;
+    }
+    return null;
+  }
+  /** The surface hit along a unit ECEF ray, else the ellipsoid raised to the centre height; null on sky. */
+  private hitAlong(o: V, d: V): (GeospatialPick & { point: V }) | null {
+    const s = this.castSurface(o, d, this.reach(o));
+    if (s) {
+      const point = along(o, d, s.t);
+      return { ...ecefToCartographic(point[0], point[1], point[2]), distance: s.t, source: s.source, point };
+    }
+    const t = rayEllipsoid(o, d, this.v.height);
+    if (t === null) return null;
+    const point = along(o, d, t);
+    return { ...ecefToCartographic(point[0], point[1], point[2]), height: this.v.height, distance: t, source: 'ellipsoid', point };
+  }
+  /**
+   * The surface under CSS pixel (x, y): the nearest hit of the engine scene (bvh), your `raycast` and the `heightAt`
+   * terrain, else the ellipsoid raised to the centre height; null on sky.
+   */
+  pick(x: number, y: number): GeospatialPick | null {
+    num('Geospatial pick', x, y);
+    const r = this.screenRay(x, y),
+      hit = r && this.hitAlong(r.o, r.d);
+    if (!hit) return null;
+    return { longitude: hit.longitude, latitude: hit.latitude, height: hit.height, distance: hit.distance, source: hit.source };
+  }
+  /** The camera now in ECEF: eye, unit forward and screen-up. */
+  private eyeFrame(): { eye: V; forward: V; up: V } {
+    const c = this.camera,
+      eye = this.toEcef(c.position),
+      t = this.toEcef(c.target),
+      d = [t[0] - eye[0], t[1] - eye[1], t[2] - eye[2]],
+      l = Math.hypot(...d);
+    return { eye, forward: d.map((x) => x / l) as V, up: this.toEcef(c.up, true) };
+  }
+  /** Re-centre the orbit on ECEF `centre` seen from ECEF `eye`, taking the heading from screen-up `up` at any pitch. */
+  private aimAt(eye: V, centre: V, up: V): void {
+    const c = ecefToCartographic(centre[0], centre[1], centre[2]),
+      b = enuBasis(c.longitude, c.latitude),
+      d: V = [centre[0] - eye[0], centre[1] - eye[1], centre[2] - eye[2]],
+      range = Math.hypot(...d),
+      f = d.map((x) => x / range),
+      cp = Math.hypot(dot3(f, b.east), dot3(f, b.north)),
+      sp = -dot3(f, b.up),
+      // orbitPose: view_en * cos(pitch) + up_en * sin(pitch) is (sin, cos) of the heading at every pitch.
+      he = dot3(f, b.east) * cp + dot3(up, b.east) * sp,
+      hn = dot3(f, b.north) * cp + dot3(up, b.north) * sp;
+    this.cancel();
+    this.v = this.sanitize({
+      ...c,
+      heading: Math.hypot(he, hn) > 1e-12 ? Math.atan2(he, hn) : this.v.heading,
+      pitch: Math.asin(clamp(sp, -1, 1)),
+      range,
+    });
+    this.commit();
+  }
+  /** Zoom by `factor` keeping the surface point under CSS pixel (x, y) under the cursor (sky: about the centre). */
   zoomAt(x: number, y: number, factor: number): void {
     this.alive();
     if (!(factor > 0) || !Number.isFinite(factor)) throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
-    const hit = this.pick(x, y);
-    const range = clamp(this.v.range * factor, this.minRange, this.maxRange);
+    const r = this.screenRay(x, y),
+      hit = r && this.hitAlong(r.o, r.d),
+      range = clamp(this.v.range * factor, this.minRange, this.maxRange);
     if (!hit) return this.setView({ range });
-    const k = 1 - range / this.v.range,
-      c = cartographicToEcef(this.v.longitude, this.v.latitude, this.v.height),
-      t = cartographicToEcef(hit.longitude, hit.latitude, hit.height),
-      m = ecefToCartographic(c[0] + (t[0] - c[0]) * k, c[1] + (t[1] - c[1]) * k, c[2] + (t[2] - c[2]) * k);
-    this.setView({ longitude: m.longitude, latitude: m.latitude, height: this.v.height, range });
+    // The eye slides along the cursor ray toward the hit with the view direction kept, so the hit stays put on screen.
+    const k = range / this.v.range,
+      { eye, forward, up } = this.eyeFrame(),
+      p = hit.point,
+      next: V = [p[0] + (eye[0] - p[0]) * k, p[1] + (eye[1] - p[1]) * k, p[2] + (eye[2] - p[2]) * k];
+    this.aimAt(next, along(next, forward, range), up);
+  }
+  /** Re-centre the orbit on the surface on the view axis, so a turn pivots about what is in the middle of the screen. */
+  private pivotOnAxis(): void {
+    const { eye, forward, up } = this.eyeFrame(),
+      hit = this.hitAlong(eye, forward);
+    if (hit && hit.source !== 'ellipsoid') this.aimAt(eye, hit.point, up);
+  }
+  /**
+   * Move the centre so the ray through CSS pixel (x, y) meets ECEF `grab` on the ellipsoid raised to its height: Newton
+   * steps on the centre's longitude and latitude with heading, pitch and range kept. False when the cursor is on sky.
+   */
+  private dragTo(grab: V, grabHeight: number, x: number, y: number): boolean {
+    const g = ecefToCartographic(grab[0], grab[1], grab[2]),
+      b = enuBasis(g.longitude, g.latitude),
+      miss = (lon: number, lat: number): [number, number] | null => {
+        const { pose } = this.poseOf({ ...this.v, longitude: lon, latitude: lat }),
+          r = this.screenRay(x, y, pose),
+          t = r && rayEllipsoid(r.o, r.d, grabHeight);
+        if (t === null || !r) return null;
+        const q = along(r.o, r.d, t),
+          off = [q[0] - grab[0], q[1] - grab[1], q[2] - grab[2]];
+        return [dot3(off, b.east), dot3(off, b.north)];
+      };
+    let lon = this.v.longitude,
+      lat = this.v.latitude,
+      r0 = miss(lon, lat);
+    if (!r0) return false;
+    const eps = Math.max(1e-11, (this.v.range / WGS84_A) * 1e-4);
+    for (let i = 0; i < 10 && Math.hypot(...r0) > 1e-4; i++) {
+      const ep = lat + eps <= Math.PI / 2 ? eps : -eps,
+        rl = miss(lon + eps, lat),
+        rp = miss(lon, lat + ep);
+      if (!rl || !rp) break;
+      const a = (rl[0] - r0[0]) / eps,
+        c = (rl[1] - r0[1]) / eps,
+        bb = (rp[0] - r0[0]) / ep,
+        dd = (rp[1] - r0[1]) / ep,
+        det = a * dd - bb * c;
+      if (!(Math.abs(det) > 0)) break;
+      const nl = lon - (dd * r0[0] - bb * r0[1]) / det,
+        np = clamp(lat - (a * r0[1] - c * r0[0]) / det, -Math.PI / 2, Math.PI / 2),
+        rn = miss(nl, np);
+      if (!rn || Math.hypot(...rn) >= Math.hypot(...r0)) break;
+      lon = nl;
+      lat = np;
+      r0 = rn;
+    }
+    this.setView({ longitude: lon, latitude: lat });
+    return true;
   }
 
   /**
@@ -383,8 +615,11 @@ export class GeospatialControls extends Controls {
     if (!this.enabled || this.dragging || event.button > 2) return;
     const rotate = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey;
     if ((rotate && !this.enableRotate) || (!rotate && !this.enablePan)) return;
-    const p = this.local(event);
-    this.dragging = { id: event.pointerId, ...p, rotate };
+    const p = this.local(event),
+      r = rotate ? null : this.screenRay(p.x, p.y),
+      hit = r && this.hitAlong(r.o, r.d);
+    if (rotate) this.pivotOnAxis();
+    this.dragging = { id: event.pointerId, ...p, rotate, grab: hit?.point ?? null, grabHeight: hit?.height ?? 0 };
     this.element?.setPointerCapture?.(event.pointerId);
     event.preventDefault();
     this.dispatchEvent({ type: 'start' });
@@ -399,8 +634,8 @@ export class GeospatialControls extends Controls {
     d.x = p.x;
     d.y = p.y;
     if (d.rotate) this.rotate((dx * this.rotateSpeed) / height, (dy * this.rotateSpeed) / height);
-    else {
-      // Ground metres per pixel at the centre; a tilted view stretches the vertical drag by 1 / sin(pitch).
+    else if (!d.grab || !this.dragTo(d.grab, d.grabHeight, p.x, p.y)) {
+      // Sky under the cursor: ground metres per pixel at the centre; a tilted view stretches vertical drags by 1 / sin(pitch).
       const fov = ((this.camera.fov ?? 60) * Math.PI) / 180,
         m = (2 * this.v.range * Math.tan(fov / 2)) / height,
         h = this.v.heading,

@@ -746,10 +746,38 @@ camera
   .then((arrived) => console.log(arrived, camera.terrainLift));
 ```
 
+### Surface-true picking
+
+Zoom, pan and turn grab the real surface, not the ellipsoid. `pick(x, y)` returns the nearest hit of the engine's
+visible meshes and models (terrain meshes, 3D Tiles, glTF; the bvh `Raycaster`, option `scene`, default true), your own
+world-space `raycast(origin, direction, far)` and a march over `heightAt`; only on a miss does it fall back to the
+ellipsoid raised to the centre height. The wheel slides the eye along the cursor ray toward the hit, so the point under
+the cursor stays there; a left drag keeps the grabbed point under the cursor (Newton steps on the centre, heading kept);
+a right drag first re-centres the orbit on the surface in the middle of the screen, so a mountain top turns in place.
+
+```ts
+import {GeospatialControls} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-105.6), latitude: degToRad(40.3), range: 20000, pitch: degToRad(40)},
+  heightAt: (lon, lat) => 2500 + 1500 * Math.sin(lon * 900) * Math.cos(lat * 700),
+  // Your own query in world coordinates, e.g. a TerrainQuery or a tiles height grid: metres to the hit, or undefined.
+  raycast: () => undefined,
+});
+const hit = camera.pick(200, 150);
+console.log(hit?.source, hit?.height); // 'terrain' and the ground height there, when the canvas has a size
+```
+
 Options: `view`, `heightAt`, `clearance` (2), `minPitch` (0), `maxPitch` (PI/2), `minRange` (1), `maxRange` (4 x 6378137),
-`clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF). Sources: NIMA TR8350.2 (WGS84);
+`clipPlanes` (true), `zUp` (false: world is the engine's Y-up `(x, z, -y)` of ECEF), `scene` (true), `colliders` (null:
+everything visible), `raycast` (none), `raycaster` (a new one). Sources: NIMA TR8350.2 (WGS84);
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
-23 (181), 1976. Limits: `docs/limits.md`, "Geospatial camera".
+23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
+STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
+al., "HoverCam", I3D 2005, https://doi.org/10.1145/1053427.1053439 (orbiting about the surface under the view). Limits: `docs/limits.md`, "Geospatial camera".
 
 ## Globe navigation: `@margoengine/controls/globe`
 
