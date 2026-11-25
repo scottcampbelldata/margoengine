@@ -2143,6 +2143,10 @@
       "types": "./dist/physics/seakeeping.d.ts",
       "import": "./dist/physics/seakeeping.js"
     },
+    "./physics/tracers": {
+      "types": "./dist/physics/tracers.d.ts",
+      "import": "./dist/physics/tracers.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

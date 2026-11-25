@@ -276,7 +276,11 @@ export interface ShipOptions {
   lamps?: readonly ShipLamp[];
   /** Height multiplier of this ship's wake and bow wave, 0..5. Default 1. */
   wake?: number;
-  /** Linear RGB of discoloured water in this ship's turbulent stern trail, 0..1 per channel. Default null. */
+  /**
+   * Linear RGB of discoloured water in this ship's turbulent stern trail, 0..1 per channel. Default null. An art override:
+   * for water discoloured by what the ship leaks, release it as a tracer (`TracerSolver` of `@margoengine/physics/tracers`).
+   * @deprecated as the source of discoloured water; kept as an override of the trail's look.
+   */
   wakeTint?: Vec3 | null;
 }
 /** Settings of {@link ShipWakes}. */

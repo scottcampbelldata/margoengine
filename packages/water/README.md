@@ -1341,6 +1341,9 @@ console.log(fronts.length, fronts[0].count, geometry.positions.length / 3, mater
     and foam along this ship's turbulent stern trail. The tint spreads and fades with the turbulence. Change
     `WakeShip.wakeTint` to recolour the current trail, including on a paused frame. Where tinted trails overlap,
     the strongest local contribution supplies the colour. The tint leaves the height and foam-density queries intact.
+    It is an art override of the trail's look and is deprecated as the source of discoloured water: water coloured by
+    what a ship leaks (iron ore from a breached hold, coal, fuel) is a tracer of `TracerSolver`
+    (`@margoengine/physics/tracers`), which carries, settles and spreads it.
   - Ships' and shore lamps leave glints on a night sea.
   - A ship with a `path` (time to [x, z]) draws the same wake after a seek as after playing to that time. A ship placed
     with `setPose` leaves the trail it has passed through. Either way a turning ship's wake bends with its track.

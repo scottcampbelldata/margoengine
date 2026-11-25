@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19103825,
+  "total": 19108777,
   "history": [
     {
       "date": "2026-10-24",
@@ -12351,6 +12351,12 @@
       "commit": "0c86a10242",
       "reason": "KB5029b: AudioMusic schedules an OfflineAudioContext render a window of loops at a time and refills it at suspend(time) points (an hour of loops scheduled at once made Chromium render about 40 times slower: 34.9 s against 0.86 s, identical samples). audio/music measures 1,901 B gzip (budget 1828 B before). Only this entry is recorded here.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "e6f74c4bb",
+      "reason": "physics/tracers is a new optional entry (SEA-15): TracerSolver, dye, sediment and cargo plumes and oil slicks as particles carried by the water; its own entry so scenes without tracers pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13150,6 +13156,7 @@
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
+    "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 6250,
     "@margoengine/physics/world": 15475,
     "@margoengine/physics2d": 21360,

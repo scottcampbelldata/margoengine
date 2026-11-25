@@ -3135,6 +3135,10 @@
       "types": "./dist/physics/seakeeping.d.ts",
       "import": "./dist/physics/seakeeping.js"
     },
+    "./physics/tracers": {
+      "types": "./dist/physics/tracers.d.ts",
+      "import": "./dist/physics/tracers.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

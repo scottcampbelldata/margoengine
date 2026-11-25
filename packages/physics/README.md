@@ -1917,6 +1917,32 @@ const world = new PhysicsWorld({rate: {num: 60, den: 1}})
 world.advance(60);
 console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
 ```
+### Tracers and slicks in water (`@margoengine/physics/tracers`)
+
+`TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
+
+The solver keeps the mass exactly: `budget` gives what was released, what is in the water, on the surface and on the bed, always adding up. `concentration(min, max, cells)` gives the concentration (kg/m^3) on a grid and the colour it gives the water, `particlesOf()` every particle, and the particles are the registry field `tracers` for the sea surface to tint its water. A ship's `wakeTint` (`@margoengine/water`) remains as an art override for a stern trail and is deprecated as the source of discoloured water: release the cargo here instead.
+
+```ts
+import {TracerSolver} from 'margoengine/physics/tracers';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A hull steaming at 3 m/s through a 0.4 m/s current leaks iron ore from a breach, less as its hold empties.
+const water = {medium: 'water' as const, cell: [0, 0, 0] as const, sample: (_x: number, _y: number, _z: number, _t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 1025, temperature: 285}) => ((out.velocity = [0.4, 0, 0]), out)};
+const tracers = new TracerSolver();
+const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(tracers, {
+  water,
+  bed: 12,
+  sources: [{material: 'ironOre', position: (t) => [3 * t, -5, 0], rate: (t) => 40 * Math.exp(-t / 60)}],
+});
+world.advance(240); // ten seconds
+const {released, water: suspended, bed} = tracers.budget;
+console.log(released.toFixed(0), (suspended + bed).toFixed(0)); // 368 368: every kilogram in the water or on the bed
+const plume = tracers.concentration([-10, -12, -10], [50, 0, 10], [12, 6, 4]);
+const cell = plume.mass.findIndex((m) => m > 0);
+console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

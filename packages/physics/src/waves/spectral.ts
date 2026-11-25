@@ -32,6 +32,7 @@
 
 import type { Bed, FlowSample, Wind, WaveSpectrumField, WaveSpectrumSample } from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
+import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { angleOf } from '../flight.js';
 import { regionWords } from '../world/memory.js';
 import type {
@@ -82,7 +83,7 @@ const LIMITER = 0.1;
 const ALPHA_PM = 8.1e-3;
 
 /** The wavenumber of waves of frequency `f` Hz in water `depth` m deep under gravity `g`: sigma^2 = g k tanh(k d). */
-export function wavenumber(f: number, depth: number, g = 9.81): number {
+export function wavenumber(f: number, depth: number, g = gravityMagnitude(DEFAULT_GRAVITY)): number {
   const sigma = TWO_PI * f,
     deep = (sigma * sigma) / g;
   if (!(depth < 1e6)) return deep;
@@ -109,7 +110,7 @@ export function wavenumber(f: number, depth: number, g = 9.81): number {
 }
 
 /** The group velocity of waves of frequency `f` Hz in water `depth` m deep: 1/2 (1 + 2 k d / sinh 2 k d) sigma / k. */
-export function groupVelocity(f: number, depth: number, g = 9.81): number {
+export function groupVelocity(f: number, depth: number, g = gravityMagnitude(DEFAULT_GRAVITY)): number {
   const k = wavenumber(f, depth, g),
     sigma = TWO_PI * f;
   if (!(k > 0)) return 0;
@@ -145,7 +146,11 @@ export interface SeaState {
  * (2 s^2 f_p^2)), s = 0.07 below the peak and 0.09 above (Hasselmann et al. 1973), times a cos^2 spread about the direction,
  * scaled to the height asked for, on the grid of `out`.
  */
-export function jonswap(state: SeaState, out: WaveSpectrumSample, g = 9.81): WaveSpectrumSample {
+export function jonswap(
+  state: SeaState,
+  out: WaveSpectrumSample,
+  g = gravityMagnitude(DEFAULT_GRAVITY),
+): WaveSpectrumSample {
   const { height, period, direction, peakedness = 3.3 } = state,
     { frequencies: fs, directions: ds, energy } = out,
     nf = fs.length,
@@ -265,7 +270,7 @@ export class WaveSolver implements Solver<WaveParams> {
   private h = 0;
   private x0 = 0;
   private z0 = 0;
-  private g = 9.81;
+  private g = gravityMagnitude(DEFAULT_GRAVITY);
   private nf = 0;
   private nd = 0;
   private freqs!: Float64Array;

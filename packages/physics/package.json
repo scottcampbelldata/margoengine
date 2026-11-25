@@ -75,6 +75,10 @@
     "./seakeeping": {
       "types": "./dist/seakeeping/index.d.ts",
       "import": "./dist/seakeeping.js"
+    },
+    "./tracers": {
+      "types": "./dist/tracers.d.ts",
+      "import": "./dist/tracers.js"
     }
   },
   "files": [

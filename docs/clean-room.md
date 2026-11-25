@@ -11763,6 +11763,22 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### Tracers and slicks in water (SEA-15, `@margoengine/physics/tracers`, 2026-11-25)
+
+`packages/physics/src/tracers.ts` (`TracerSolver`, a framework solver). Written from:
+
+- R. I. Ferguson and M. Church, "A simple universal equation for grain settling velocity", J. Sediment. Res. 74, 2004: not
+  readable here; its equation w = R g D^2 / (C1 nu + sqrt(0.75 C2 R g D^3)), C1 = 18 and the turbulent-drag range of C2
+  (0.4 to 1.2) as restated by A. Metelkin and B. Vowinckel, arXiv:2410.12477 (read, section 2.1, eqs. 2 and 3).
+- The wind drift factor of floating oil, a constant share of the wind (3 percent the traditional value): Liu, Li and Mu,
+  Frontiers in Marine Science 2023 (abstract read), and the 0 to 5 percent range tested in arXiv:2409.20096 (abstract read).
+- The random walk of diffusion, a step of sqrt(2 K dt) times a standard normal number giving a variance 2 K t (the
+  diffusion equation's solution), and the Box-Muller transform: textbook results.
+
+The particle columns in world memory, the source's carried remainder, the exact mass ledger, the reflecting surface and
+the absorbing bed, the floating state, and the concentration grid with mass-weighted colour are this package's own
+arrangement. Proof: `packages/physics/tests/tracers.test.js` and `tests/coupling/tracers.test.js`.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`
