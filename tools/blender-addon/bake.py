@@ -22,12 +22,35 @@ def second_uv(mesh):
     return next((layer for layer in mesh.uv_layers if layer.name != first.name), None) if first else None
 
 
+def feed(socket):
+    """The (node, output socket) Blender evaluates into the input `socket`, or None where the socket keeps its own
+    value. A muted link feeds nothing, a reroute passes its input on, and a muted node passes to each output the input
+    its internal link names; an output with no internal link feeds nothing (tests/blender_mute.py bakes the cases)."""
+    seen = set()
+    while socket.links and socket.as_pointer() not in seen:
+        seen.add(socket.as_pointer())
+        link = socket.links[0]
+        if link.is_muted:
+            break
+        node, out = link.from_node, link.from_socket
+        if node.type == "REROUTE":
+            socket = node.inputs[0]
+        elif node.mute:
+            socket = next((i.from_socket for i in node.internal_links if i.to_socket == out), None)
+            if socket is None:
+                break
+        else:
+            return node, out
+    return None
+
+
 def principled(material):
     """The active output node and the Principled BSDF on its Surface (None for any other surface shader)."""
     outputs = [n for n in material.node_tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]
-    if len(outputs) != 1 or not outputs[0].inputs["Surface"].is_linked:
+    surface = feed(outputs[0].inputs["Surface"]) if len(outputs) == 1 else None
+    if surface is None:
         raise ValueError(f"Material '{material.name}': missing active surface output, so there is nothing to bake")
-    shader = outputs[0].inputs["Surface"].links[0].from_node
+    shader = surface[0]
     return outputs[0], shader if shader.type == "BSDF_PRINCIPLED" else None
 
 
@@ -94,7 +117,7 @@ def bake_material(context, obj, material, size):
     def socket(name):
         """Bakes what feeds a Principled input, through an Emission shader on the output."""
         links = material.node_tree.links
-        links.new(node("shader").inputs[name].links[0].from_socket, node("emission").inputs["Color"])
+        links.new(feed(node("shader").inputs[name])[1], node("emission").inputs["Color"])
         links.new(node("emission").outputs["Emission"], node("output").inputs["Surface"])
         try:
             return run("EMIT")
@@ -126,7 +149,7 @@ def bake_material(context, obj, material, size):
         result = {"base": None, "metal_rough": None, "normal": None, "emission": None}
         factors = {"base": [1, 1, 1, 1], "metallic": 0, "roughness": 0.5, "emissive": [0, 0, 0]}
         if shader:
-            linked = {name: shader.inputs[name].is_linked for name in CHANNELS + ("Normal", "Emission Strength")}
+            linked = {name: feed(shader.inputs[name]) is not None for name in CHANNELS + ("Normal", "Emission Strength")}
             values = {name: shader.inputs[name].default_value for name in CHANNELS + ("Emission Strength",)}
             values = {name: list(v) if hasattr(v, "__len__") else v for name, v in values.items()}
             constant = values.__getitem__
