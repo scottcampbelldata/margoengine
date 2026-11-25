@@ -3115,6 +3115,10 @@
       "types": "./dist/physics/earth.d.ts",
       "import": "./dist/physics/earth.js"
     },
+    "./physics/clouds": {
+      "types": "./dist/physics/clouds.d.ts",
+      "import": "./dist/physics/clouds.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

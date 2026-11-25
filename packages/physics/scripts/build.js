@@ -33,6 +33,7 @@ await build({
         robots: resolve(root, 'src/robots.ts'),
         world: resolve(root, 'src/world/index.ts'),
         earth: resolve(root, 'src/earth/index.ts'),
+        clouds: resolve(root, 'src/clouds/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

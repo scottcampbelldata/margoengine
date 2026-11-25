@@ -11690,6 +11690,31 @@ intercept set so the drops carry exactly the rate, the drift of a shaft by the m
 middle of its fall, and the 64-point Gauss-Legendre integrals in units of the slope are this package's own arrangement.
 Proof: `packages/weather/tests/precipitation.test.js`.
 
+### The framework's clouds: moist convection with warm rain (ATMO-03, `@margoengine/physics/clouds`, 2026-11-25)
+
+`packages/physics/src/clouds/convection.ts` (`CloudSolver`, a framework solver). Written from:
+
+- M. J. Harris, W. V. Baxter, T. Scheuermann and A. Lastra, "Simulation of cloud dynamics on graphics hardware", Graphics
+  Hardware 2003, read in full: the incompressible equations of motion (eqs. 1 and 2), potential temperature and the Exner
+  function (eq. 3), the buoyancy of the virtual potential temperature less the hydrometeors (eq. 4), the saturation mixing
+  ratio (eq. 6, after Rogers and Yau 1989), water continuity and latent heating (eqs. 7 and 8, L = 2.501e6 J/kg), the
+  stable-fluids solution (semi-Lagrangian advection and a pressure projection, after Stam 1999), and vorticity
+  confinement (after Fedkiw, Stam and Jensen 2001).
+- S. Hittmeir et al., "A discontinuous Galerkin approach for atmospheric flows with implicit condensation",
+  arXiv:2305.13847, read (section 2): the COSMO closure of Kessler's warm rain, autoconversion (eq. 5b),
+  accretion (eq. 5c), rain evaporation (eq. 5a) and the Marshall-Palmer rain fall speed (section 2.1). Kessler (1969) and
+  Kessler (1995, Atmospheric Research 38) were not readable here (a scan).
+- T. Hadrich et al., "Thunderscapes: simulating the dynamics of mesoscale convective systems", arXiv:2412.00703, read
+  (section 4): Kessler's autoconversion threshold of 1e-3 (eq. 9), and the cold-phase blend not yet used.
+- S. Arabas et al., "libcloudph++ 0.2", arXiv:1310.1905, read (sections 3.1 to 3.1.4): the single-moment scheme's
+  structure, the autoconversion threshold range 1e-4 to 1e-3 kg/kg, and the heat capacities.
+
+The staggered (MAC) grid, the midpoint back-trace, Jacobi-preconditioned conjugate gradients from the last pressure with
+the wall's constant null space taken out, the two-pass linearised saturation adjustment, column sedimentation in
+substeps of at most a cell, the surface fluxes made patchy by the framework's counter-based random numbers, environment
+air at the upwind side, and the cloud's own clock (`timeScale`, `interval`) are this package's own arrangement. Proof:
+`packages/physics/tests/clouds.test.js` and `tests/coupling/clouds.test.js`.
+
 ### Aerodynamic loads from shape (AERO-01, `WindForce` in `@margoengine/physics`, 2026-11-25)
 
 `packages/physics/src/aero.ts` cuts each collider's surface into panels and `fields.ts` loads them: on each windward panel the

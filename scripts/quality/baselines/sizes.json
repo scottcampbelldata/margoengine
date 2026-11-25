@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18941239,
+  "total": 18949001,
   "history": [
     {
       "date": "2026-10-24",
@@ -12213,6 +12213,12 @@
       "commit": "4074591412",
       "reason": "KB5330c: eight skin influences (joints1/weights1) through exporters validation, the glTF and GLB readers and writer, the pose bake, USDZ elementSize 8 and the Roblox and Unity refusals (gzip: collect 13657 to 14143, gltf 20685 to 21509, materials 21552 to 22374, roblox 23608 to 24533, sparse 24609 to 25614, usdz-anim 25615 to 26542 B; each of these entries carries the shared scene validator and bake); fbx/surfaces 4932 to 6826 B for exact control-net skin blends through tetrahedron helper joints: it now shares the fbx math chunk (geometric transform, matrix product) that the fbx root already loads, and copying those helpers would duplicate code the duplicates gate refuses. A split would put the eight-influence path behind a second import in every exporter for no gain, since every glTF skin can carry JOINTS_1.",
       "grew": 7
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "041638cd2",
+      "reason": "physics/clouds is a new optional entry (ATMO-03): CloudSolver, moist convection with Kessler's warm rain in a box of air, a framework solver; its own entry so scenes without clouds pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13001,6 +13007,7 @@
     "@margoengine/physics": 599864,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87407,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
+    "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/meshfiles": 2857,

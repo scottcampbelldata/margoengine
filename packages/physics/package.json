@@ -59,6 +59,10 @@
     "./earth": {
       "types": "./dist/earth/index.d.ts",
       "import": "./dist/earth.js"
+    },
+    "./clouds": {
+      "types": "./dist/clouds/index.d.ts",
+      "import": "./dist/clouds.js"
     }
   },
   "files": [

@@ -325,6 +325,14 @@ export interface RainCell {
   velocity?: readonly [number, number];
 }
 
+/** Rain made elsewhere, such as under a cloud solver's clouds: its rate at the field's cloud base. */
+export interface RainSource {
+  /** The rate at (x, z) at time `t`, mm/h of liquid water, 0 or more. */
+  rate(x: number, z: number, t: number): number;
+  /** Its strongest rate now, mm/h: the field carries the falling water sideways at that rain's median drop speed. */
+  readonly peak: number;
+}
+
 /** Rimed ice carried with the rain: its share of the rate and its sizes. */
 export interface RimedIce {
   /** The share of the precipitation rate it carries, 0 to 1. */
@@ -335,10 +343,15 @@ export interface RimedIce {
 
 /** Settings of a {@link PrecipitationField}; each has a default. */
 export interface PrecipitationFieldOptions {
-  /** A rate everywhere, mm/h of liquid water at cloud base (default 4, moderate rain, when there are no cells; otherwise 0). */
+  /** A rate everywhere, mm/h of liquid water at cloud base (default 4, moderate rain, with no cells and no source; otherwise 0). */
   rate?: number;
   /** Rain cells on top of `rate`. */
   cells?: readonly RainCell[];
+  /**
+   * Rain from elsewhere on top of `rate` and `cells`, such as `CloudSolver.rainSource()` of `@margoengine/physics/clouds`
+   * (give `base` half a cloud cell then, as its rain is already at the ground). A sample then depends on the source's state.
+   */
+  source?: RainSource;
   /** Cloud base, m above the ground (default 1500). */
   base?: number;
   /** The ground's height, y m, that heights are measured from (default 0). */
@@ -369,6 +382,7 @@ export class PrecipitationField implements Precipitation {
   readonly base: number;
   private readonly rate: number;
   private readonly cells: readonly Required<RainCell>[];
+  private readonly source: RainSource | undefined;
   private readonly ground: number;
   private readonly altitude: number;
   private readonly seaLevel: number;
@@ -389,7 +403,8 @@ export class PrecipitationField implements Precipitation {
   constructor(options: PrecipitationFieldOptions = {}) {
     const {
       cells = [],
-      rate = cells.length ? 0 : 4,
+      source,
+      rate = cells.length || source ? 0 : 4,
       base = 1500,
       ground = 0,
       altitude = 0,
@@ -446,6 +461,9 @@ export class PrecipitationField implements Precipitation {
       throw new RangeError(
         `A hailstone's density lies in (0, 917] kg/m^3, solid ice at most (got ${h.density}); pass one in that range.`,
       );
+    if (source !== undefined && !(typeof source.rate === 'function' && 'peak' in source))
+      throw new TypeError('A rain source has rate(x, z, t) and peak; pass one such as CloudSolver.rainSource().');
+    this.source = source;
     this.rate = rate;
     this.base = base;
     this.ground = ground;
@@ -467,6 +485,14 @@ export class PrecipitationField implements Precipitation {
       const dx = x - (c.centre[0] + c.velocity[0] * t),
         dz = z - (c.centre[1] + c.velocity[1] * t);
       rate += c.rate * exp(-Math.sqrt(dx * dx + dz * dz) / c.radius);
+    }
+    if (this.source) {
+      const extra = this.source.rate(x, z, t);
+      if (!(extra >= 0 && Number.isFinite(extra)))
+        throw new RangeError(
+          `A rain source gave ${extra} mm/h at (${x}, ${z}); its rate must be a finite number, 0 or more.`,
+        );
+      rate += extra;
     }
     return rate;
   }
@@ -497,11 +523,12 @@ export class PrecipitationField implements Precipitation {
     let sx = x,
       sz = z,
       st = t;
-    if (fall > 0 && this.driftRate > 0) {
+    const driftRate = this.source ? Math.max(this.driftRate, this.source.peak) : this.driftRate;
+    if (fall > 0 && driftRate > 0) {
       const mid = this.airAt(x, y + fall / 2, z, t),
         air = this.air(mid),
         snowShare = snowFraction(mid.temperature, this.snowTemperature, this.snowSharpness),
-        median = 3.67 / (4100 * pow(this.driftRate, -0.21)),
+        median = 3.67 / (4100 * pow(driftRate, -0.21)),
         speed =
           (1 - snowShare) * rainSpeed(median, air, capillaryLength(air)) +
           snowShare * snowSpeed(this.snowSize(median), air),

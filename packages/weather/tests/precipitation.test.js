@@ -195,6 +195,22 @@ test('rain varies from place to place and gusts bend its streaks (EF-7)', () => 
   assert.ok(a.rain.slope > 0 && a.rain.impactRate > 0, 'with a size distribution and impacts to make rings');
 });
 
+test('rain from a source, such as a cloud solver, adds to the field', () => {
+  let peak = 12;
+  const source = {
+      rate: (x) => (x > 0 ? 12 : 0),
+      get peak() {
+        return peak;
+      },
+    },
+    field = new PrecipitationField({ source, base: 50, seaLevelTemperature: 293.15 });
+  assert.equal(field.sample(100, 0, 0, 0).rate, 12);
+  assert.equal(field.sample(-100, 0, 0, 0).rate, 0, 'no rate of its own beside a source');
+  peak = 30;
+  assert.ok(field.sample(100, 0, 0, 0).rain.rate > 0);
+  assert.throws(() => new PrecipitationField({ source: { rate: () => -1, peak: 1 } }).sample(0, 0, 0, 0), /0 or more/);
+});
+
 test('hail and graupel take their share, at their own sizes and speeds', () => {
   const field = new PrecipitationField({
       rate: 40,

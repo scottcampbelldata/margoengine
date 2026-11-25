@@ -1750,6 +1750,30 @@ console.log(ball.position[1] < 0); // true: it fell in
 console.log(bedSurface(grid, heights).sample(0, 0).elevation); // -2
 ```
 
+### Clouds: moist convection (`@margoengine/physics/clouds`)
+
+`CloudSolver` is the physics framework's clouds (ATMO-03): a box of air over flat ground in which warm, moist air rises, cools, condenses into cloud, releases its latent heat, rains and drifts with the wind. Add it to a `PhysicsWorld` with its settings: the box (`cells`, default 48 by 24 by 48, of `cellSize` metres, default 200, about `centre` over `ground`), the environment (the standard atmosphere at `altitude` with `seaLevelTemperature`, default 298.15 K, and relative `humidity` from 0.75 at the ground to `humidityTop` 0.3 at the top), the ground's `surfaceHeat` and `surfaceLatent` heat (W/m^2, defaults 250 and 150, varying by `patchiness` from place to place each `thermalPeriod` so thermals rise in some places and not others), warm `bubbles` to start from, the `wind` that carries air through the box, and `timeScale`, the seconds of cloud time per second of world time (60 runs a minute of weather a second, for a timelapse); the cloud steps every `interval` seconds of its own time (default 2). It publishes `cloudWater` (kg/kg per cell) as a registry field, `cloudWater()` copies it as a density volume for the sky to draw (x fastest, then up, then z), `sample(x, y, z)` gives the cloud and rain water, vapour, temperature and velocity anywhere in the box, `rainRate(x, z)` the rain reaching the ground in mm/h, `rainSource()` that rain as a `source` for `PrecipitationField` (`@margoengine/weather/precipitation`), and `windWith(base)` a wind with the clouds' own updrafts and outflow added. Physics after Harris et al. (2003), with Kessler's warm rain; whether rain reaches the ground as snow is the precipitation field's to decide from the air there.
+
+```ts
+import {CloudSolver} from 'margoengine/physics/clouds';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const clouds = new CloudSolver();
+const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(clouds, {
+  cells: [16, 16, 16],
+  cellSize: 100,
+  humidity: 0.9,
+  humidityTop: 0.8,
+  surfaceHeat: 0,
+  surfaceLatent: 0,
+  bubbles: [{centre: [0, 400, 0], radius: 500, warming: 3, humidity: 1.05}],
+  timeScale: 120, // two minutes of weather a second
+});
+world.advance(24); // one second of film
+console.log(clouds.time, clouds.cloudWater().some((q) => q > 1e-5)); // 120 true: a cumulus after two minutes
+console.log(clouds.sample(0, 800, 0).velocity[1] > 10); // true: its updraft, over 10 m/s
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

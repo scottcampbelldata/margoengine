@@ -2123,6 +2123,10 @@
       "types": "./dist/physics/earth.d.ts",
       "import": "./dist/physics/earth.js"
     },
+    "./physics/clouds": {
+      "types": "./dist/physics/clouds.d.ts",
+      "import": "./dist/physics/clouds.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

@@ -26,6 +26,7 @@ export class PrecipitationField implements Precipitation {
 export interface PrecipitationFieldOptions {
     rate?: number;
     cells?: readonly RainCell[];
+    source?: RainSource;
     base?: number;
     ground?: number;
     altitude?: number;
@@ -45,6 +46,11 @@ export interface RainCell {
     radius: number;
     rate: number;
     velocity?: readonly [number, number];
+}
+
+export interface RainSource {
+    rate(x: number, z: number, t: number): number;
+    readonly peak: number;
 }
 
 export interface RimedIce {
