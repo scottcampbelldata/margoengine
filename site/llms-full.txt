@@ -12161,8 +12161,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** `endOwned` (scripts/support/browser-host.mjs) ends an unlisted tree by pid while the browser still runs and
   kills it through its handle and closes its pipes (Chromium ends itself when its pipe closes) only after, and never ends a tree by the pid of a browser that had already exited.
   Regression: tests/browser-host.test.js (both KB-HOST-COMPATEXIT1 cases fail on the old order). The exit was not caught
-  live with this fix in place; the listed-children kill (`process.kill` by pid, pids read moments before) keeps a far
-  smaller window of the same kind.
+  live with this fix in place. The listed-children kill (`process.kill` by pid, pids read moments before) kept a far
+  smaller window of the same kind; closed the same day: on Windows `endOwned`'s default `endListed` ends each listed pid
+  through a handle to a process whose StartTime is no later than the listing (`listedAt`, sent by the suite), then waits
+  for it (`waitSignaled` with `kill`, scripts/support/shutdown.mjs). Regression: tests/browser-host.test.js ("spares a
+  pid whose process started after it", fails on the bare-pid kill).
+  The handle kill first reported every listed child as a survivor in 1 real close of 5: .NET's Process.Kill throws
+  Win32Exception (access denied) for a child Chromium is already ending, and the waiter's script, stopping on errors,
+  fell to its error path, which keeps every pid. Kill now takes that exception as done and WaitForExit still reports a
+  child that stays; 24 real closes left no survivor. Regression: tests/browser-teardown.test.js ("a child already
+  terminating", fails without the catch).
 
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
