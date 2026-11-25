@@ -11472,3 +11472,16 @@ problem as Catto states it in "Ghost Collisions" (box2d.org, 2020) and the specu
 collision detection", Journal of Graphics Tools 9(3), 2004, was dropped because its termination is relative to the size of the
 triangle. Proof: `kernel/tests/mesh.rs`, `tests/next-mesh-seam.test.js`.
 
+
+### Pinned maths in TypeScript, the twin of K01 (`@margoengine/math/pinned`, 2026-11-25)
+
+`packages/math/src/pinned.ts` is kernel-common's `pinned.rs` (K01) written again in TypeScript step for step: the same
+reduction constants, the same series to the same terms, the same order of every operation, truncation where the Rust casts,
+and the exponent and mantissa read from the bits, so the results are the same doubles (JavaScript never fuses a multiply and
+an add, and Rust does not contract them unasked). The methods are those the Rust cites: W. J. Cody and W. Waite, "Software
+Manual for the Elementary Functions", Prentice-Hall, 1980; J.-M. Muller, "Elementary Functions: Algorithms and
+Implementation", 3rd ed., Birkhauser, 2016; T. J. Dekker, "A floating-point technique for extending the available
+precision", Numerische Mathematik 18, 1971; J. Demmel and H. D. Nguyen, "Parallel reproducible summation", IEEE Transactions
+on Computers 64(7), 2015. `hypot` is the square root of the sum of squares, which IEEE 754 rounds correctly everywhere.
+`kernel-common/tests/pinned_twin.rs` writes `pinned-vectors.txt` from the Rust (2,844 vectors over each function's range) and
+checks it; `packages/math/test/pinned.test.js` reproduces every one bit for bit.

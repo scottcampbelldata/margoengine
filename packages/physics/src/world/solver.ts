@@ -30,7 +30,7 @@ export function isRateLevel(value: unknown): value is RateLevel {
 export function rateOf(level: RateLevel): number {
   if (!isRateLevel(level))
     throw new RangeError(`A rate level is an integer from 0 to ${RATE_LEVELS - 1}; got ${level}.`);
-  return BASE_RATE * 2 ** level;
+  return BASE_RATE * (1 << level);
 }
 
 /**
@@ -41,7 +41,7 @@ export function rateOf(level: RateLevel): number {
 export function substepsBetween(fast: RateLevel, slow: RateLevel): number {
   if (!isRateLevel(fast) || !isRateLevel(slow)) throw new RangeError('Both rates must be rate levels from 0 to 7.');
   if (fast < slow) throw new RangeError(`Rate level ${fast} is slower than ${slow}; pass the faster level first.`);
-  return 2 ** (fast - slow);
+  return 1 << (fast - slow);
 }
 
 /** How a field is laid out (docs/physics-framework.md, section 4). */

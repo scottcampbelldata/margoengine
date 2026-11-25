@@ -225,14 +225,18 @@ export class FieldRegistry {
       sameShape(port, entry.mirrors[0]);
       const meta = this.words(entry.meta) as Float64Array;
       // Tick t at level L ends at (t + 1) * 2^(7 - L) ticks of the 7,680 Hz grid: whole numbers, compared exactly.
-      if (meta[0] === 1 && (port.tick + 1) * 2 ** (TOP_LEVEL - level) < (meta[1]! + 1) * 2 ** (TOP_LEVEL - meta[2]!))
+      if (
+        meta[0] === 1 &&
+        (port.tick + 1) * (1 << (TOP_LEVEL - level)) < (meta[1]! + 1) * (1 << (TOP_LEVEL - meta[2]!))
+      )
         throw new RangeError(
           `Field "${port.field}" was published at tick ${port.tick} (level ${level}), before its current tick ${meta[1]} (level ${meta[2]}); publish in time order.`,
         );
       // A port for the tick the current value ends at replaces it (a coupling group re-running its tick); a later one
       // moves the current value to previous.
       const again =
-          meta[0] === 1 && (port.tick + 1) * 2 ** (TOP_LEVEL - level) === (meta[1]! + 1) * 2 ** (TOP_LEVEL - meta[2]!),
+          meta[0] === 1 &&
+          (port.tick + 1) * (1 << (TOP_LEVEL - level)) === (meta[1]! + 1) * (1 << (TOP_LEVEL - meta[2]!)),
         next = again ? meta[12]! : meta[0] === 1 ? 1 - meta[12]! : meta[12]!;
       this.words(entry.mirrors[next]!).set(data);
       if (!again) meta.copyWithin(6, 0, 6);

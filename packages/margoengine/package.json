@@ -2643,6 +2643,10 @@
       "types": "./dist/math/atmosphere.d.ts",
       "import": "./dist/math/atmosphere.js"
     },
+    "./math/pinned": {
+      "types": "./dist/math/pinned.d.ts",
+      "import": "./dist/math/pinned.js"
+    },
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",
       "import": "./dist/math/spherical.js"

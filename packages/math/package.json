@@ -116,6 +116,10 @@
       "types": "./dist/atmosphere.d.ts",
       "import": "./dist/atmosphere.js"
     },
+    "./pinned": {
+      "types": "./dist/pinned.d.ts",
+      "import": "./dist/pinned.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"

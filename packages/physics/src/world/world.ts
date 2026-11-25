@@ -47,7 +47,7 @@ export const BASE_HZ = 7680;
 /** The finest rate level. */
 const TOP = 7;
 /** Base ticks in a step of level 0 (1/60 s): every level's steps meet on a multiple of it. */
-export const HYPER_PERIOD = 2 ** TOP;
+export const HYPER_PERIOD = 1 << TOP;
 
 /** A film's frame rate as a ratio of whole numbers: `num / den` frames a second (`{num: 24000, den: 1001}` for 23.976). */
 export interface FrameRate {
@@ -118,7 +118,7 @@ function checkRate(rate: FrameRate): void {
 }
 
 function checkCell(cell: Cell): void {
-  if (!cell || cell.length !== 3 || !cell.every((k) => Number.isInteger(k) && Math.abs(k) < 2 ** 31))
+  if (!cell || cell.length !== 3 || !cell.every((k) => Number.isInteger(k) && Math.abs(k) < 2147483648))
     throw new RangeError('A cell is three whole numbers within +-2^31; pass [i, j, k].');
 }
 
@@ -182,7 +182,7 @@ export class PhysicsWorld {
       throw new RangeError(`A world seed is a whole number from 0 to 4294967295 (got ${seed}); pass one in range.`);
     if (!gravity || gravity.length !== 3 || !gravity.every(Number.isFinite))
       throw new RangeError('Gravity is three finite numbers in m/s^2; pass [0, -9.80665, 0] for Earth.');
-    if (!(cellSize >= 1 && cellSize <= 2 ** 20 && Number.isInteger(Math.log2(cellSize))))
+    if (!(cellSize >= 1 && cellSize <= 1048576 && Number.isInteger(cellSize) && (cellSize & (cellSize - 1)) === 0))
       throw new RangeError(`A cell size is a power of two of metres from 1 to 2^20 (got ${cellSize}); pass 4096.`);
     this.rate = { num: rate.num, den: rate.den };
     this.seed = seed;
@@ -267,15 +267,15 @@ export class PhysicsWorld {
       solver.init(this.host(entry), params);
       const level = this.chooseLevel(entry),
         ran = this.tick;
-      if (ran % 2 ** (TOP - level) !== 0)
+      if (ran % (1 << (TOP - level)) !== 0)
         throw new MargoError(
           'state',
-          `Solver "${id}" steps at level ${level}, and the world is ${ran % 2 ** (TOP - level)} base ticks into one of its steps; add it on a multiple of 1/${60 * 2 ** level} s, as at a 1/60 s boundary.`,
+          `Solver "${id}" steps at level ${level}, and the world is ${ran % (1 << (TOP - level))} base ticks into one of its steps; add it on a multiple of 1/${60 * (1 << level)} s, as at a 1/60 s boundary.`,
         );
       this.words(entry.record).set([level, cell[0], cell[1], cell[2]]);
       this.entries = [...this.entries, entry].sort((a, b) => (a.id < b.id ? -1 : 1));
       this.reorder();
-      this.publish(entry, ran / 2 ** (TOP - level) - 1);
+      this.publish(entry, ran / (1 << (TOP - level)) - 1);
     } catch (error) {
       this.entries = this.entries.filter((e) => e !== entry);
       this.fields.remove(id);
@@ -414,7 +414,7 @@ export class PhysicsWorld {
   alpha(frame: number, level: RateLevel, part: readonly [number, number] = [0, 1]): number {
     if (!isRateLevel(level)) throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}).`);
     const [numerator, denominator] = framePoint(frame, this.rate, part),
-      stride = 2 ** (TOP - level),
+      stride = 1 << (TOP - level),
       before = divide(numerator, denominator * stride) * stride;
     return (numerator - before * denominator) / (stride * denominator);
   }
@@ -494,7 +494,7 @@ export class PhysicsWorld {
   }
 
   private stride(e: Entry): number {
-    return 2 ** (TOP - this.levelOf(e.id));
+    return 1 << (TOP - this.levelOf(e.id));
   }
 
   /** Runs `unit`'s steps that end at base tick `t`. */
@@ -548,7 +548,7 @@ export class PhysicsWorld {
     const f = this.fields.field(name)!,
       out = regionWords(this.memory, into),
       current = regionWords(this.memory, f.current!.port.region),
-      end = (p: { port: Port; level: RateLevel }) => (p.port.tick + 1) * 2 ** (TOP - p.level),
+      end = (p: { port: Port; level: RateLevel }) => (p.port.tick + 1) * (1 << (TOP - p.level)),
       tc = end(f.current!),
       tp = f.previous ? end(f.previous) : tc;
     if (tp === tc) {
@@ -656,7 +656,7 @@ export class PhysicsWorld {
   private fineStride(): number {
     let level = 0;
     for (const e of this.entries) level = Math.max(level, this.levelOf(e.id));
-    return 2 ** (TOP - level);
+    return 1 << (TOP - level);
   }
 
   private host(e: Entry): SolverHost {

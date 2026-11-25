@@ -66,9 +66,9 @@ export function philox(
   return out;
 }
 
-const TWO_24 = 2 ** -24;
-const TWO_32 = 2 ** 32;
-const TWO_53 = 2 ** -53;
+const TWO_24 = 5.9604644775390625e-8; // 2^-24
+const TWO_32 = 4294967296; // 2^32
+const TWO_53 = 1.1102230246251565e-16; // 2^-53
 
 /**
  * The random numbers of one (seed, solver, tick, element) and its streams, the same as the kernels' Rust `Random`
@@ -121,8 +121,8 @@ export class RandomStream {
   /** Two numbers of [0, 1) of (tick, element, stream), 53 random bits each, into `out`: Rust's `unit_f64`. */
   unitF64(tick: number, element: number, stream = 0, out: [number, number] = [0, 0]): [number, number] {
     const b = this.block(tick, element, stream, this.words);
-    out[0] = (b[0]! * 2 ** 21 + (b[1]! >>> 11)) * TWO_53;
-    out[1] = (b[2]! * 2 ** 21 + (b[3]! >>> 11)) * TWO_53;
+    out[0] = (b[0]! * 2097152 + (b[1]! >>> 11)) * TWO_53;
+    out[1] = (b[2]! * 2097152 + (b[3]! >>> 11)) * TWO_53;
     return out;
   }
 
@@ -148,7 +148,7 @@ export class RandomStream {
   /** One number of [0, 1) with 53 random bits: the first of {@link RandomStream.unitF64}. */
   uniform(tick: number, element: number, stream = 0): number {
     const b = this.block(tick, element, stream, this.words);
-    return (b[0]! * 2 ** 21 + (b[1]! >>> 11)) * TWO_53;
+    return (b[0]! * 2097152 + (b[1]! >>> 11)) * TWO_53;
   }
 }
 
