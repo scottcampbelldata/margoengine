@@ -127,3 +127,56 @@ fn a_soft_ccd_distance_stops_a_fast_ball_at_a_thick_wall() {
     let x = run(6.0);
     assert!(x < 9.7, "held in front of the wall: {x}");
 }
+
+/// A thin bar spinning fast, carried at a thin wall: it turns several times over in one step, so the pose between the steps' ends does
+/// not say how far it swept. With CCD it is stopped by the wall, and the wall, which cannot give it energy, leaves it no more than it had.
+fn spinning_bar(ccd: bool, spin: f32) -> (World, u32, f32) {
+    let mut w = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+    let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(3.0, 0.0), ..Default::default() }).unwrap();
+    w.create_shape(wall, Core::rect(0.05, 5.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+    let b = w
+        .create_body(&BodyDef { position: v2(0.0, 0.0), linear_velocity: v2(5.0, 0.0), angular_velocity: spin, ccd, can_sleep: false, ..Default::default() })
+        .unwrap();
+    w.create_shape(b, Core::rect(1.0, 0.02, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, restitution: 0.0, friction: 0.0, ..Default::default() }).unwrap();
+    let body = &w.bodies[b as usize];
+    let energy = 0.5 * body.mass * body.linear_velocity.length_squared() + 0.5 * body.inertia * spin * spin;
+    (w, b, energy)
+}
+
+#[test]
+fn a_bar_spinning_many_turns_a_step_is_stopped_by_a_thin_wall_and_gains_no_energy() {
+    for spin in [100.0, 400.0, 2000.0] {
+        let (mut w, b, start) = spinning_bar(true, spin);
+        for step in 0..90 {
+            w.step(DT).unwrap();
+            let body = &w.bodies[b as usize];
+            assert!(body.xf.p.x < 3.0 - 0.05, "spin {spin} step {step}: the bar's centre went through the wall, x {}", body.xf.p.x);
+            let energy = 0.5 * body.mass * body.linear_velocity.length_squared() + 0.5 * body.inertia * body.angular_velocity * body.angular_velocity;
+            assert!(energy <= start * 1.001, "spin {spin} step {step}: energy {energy} grew past {start}");
+        }
+    }
+}
+
+/// The same bar turning in place with its tips through a thin wall from the first step: a wall that cannot move gives it nothing, so
+/// what it holds, in turning and in moving, never grows past what it began with (Rapier 2D loses most of it to its spin cap; here none is
+/// thrown away but the impacts' own loss).
+#[test]
+fn a_bar_spinning_through_a_wall_never_holds_more_energy_than_it_began_with() {
+    for (spin, ccd) in [(100.0, true), (100.0, false), (400.0, true), (400.0, false), (2000.0, true)] {
+        let mut w = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+        let wall = w.create_body(&BodyDef { kind: Kind::Static, position: v2(0.9, 0.0), ..Default::default() }).unwrap();
+        w.create_shape(wall, Core::rect(0.01, 3.0, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        let b = w.create_body(&BodyDef { angular_velocity: spin, ccd, can_sleep: false, ..Default::default() }).unwrap();
+        w.create_shape(b, Core::rect(1.0, 0.02, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, ..Default::default() }).unwrap();
+        let start = {
+            let body = &w.bodies[b as usize];
+            0.5 * body.inertia * spin * spin
+        };
+        for step in 0..120 {
+            w.step(DT).unwrap();
+            let body = &w.bodies[b as usize];
+            let energy = 0.5 * body.mass * body.linear_velocity.length_squared() + 0.5 * body.inertia * body.angular_velocity * body.angular_velocity;
+            assert!(energy <= start * 1.001, "spin {spin} ccd {ccd} step {step}: energy {energy} against {start}");
+        }
+    }
+}
