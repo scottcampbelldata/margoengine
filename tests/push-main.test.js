@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blockReason } from '../scripts/push-main.mjs';
 
-const clean = { inProgress: null, unmerged: [], markers: [], containsUpstream: true };
+const clean = { inProgress: null, unmerged: [], markers: [], containsUpstream: true, dirty: false };
 
 test('push:main pushes only a clean HEAD that contains origin/main', () => {
   assert.equal(blockReason(clean), null);
@@ -17,4 +17,8 @@ test('push:main refuses unmerged files, conflict markers and a HEAD behind origi
   assert.match(blockReason({ ...clean, unmerged: ['docs/api-surface.md'] }), /unmerged files: docs\/api-surface\.md/);
   assert.match(blockReason({ ...clean, markers: ['scripts/quality/baselines/sizes.json'] }), /conflict markers in/);
   assert.match(blockReason({ ...clean, containsUpstream: false }), /does not contain origin\/main/);
+});
+
+test('push:main refuses a dirty working tree, so the checks see exactly what is pushed', () => {
+  assert.match(blockReason({ ...clean, dirty: true }), /uncommitted changes/);
 });

@@ -15,6 +15,8 @@ export function blockReason(state) {
   if (state.unmerged.length) return `unmerged files: ${state.unmerged.join(', ')}; resolve and add them first`;
   if (state.markers.length) return `conflict markers in: ${state.markers.join(', ')}; remove them first`;
   if (!state.containsUpstream) return 'HEAD does not contain origin/main; rebase onto origin/main first';
+  if (state.dirty)
+    return 'the working tree has uncommitted changes to tracked files; commit or discard them so the checks see what is pushed';
   return null;
 }
 
@@ -31,9 +33,13 @@ function readState() {
   const unmerged = git(['diff', '--name-only', '--diff-filter=U']).split('\n').filter(Boolean);
   let markers = [];
   try {
-    markers = git(['grep', '-lE', '^(<<<<<<<|>>>>>>>) ', '--', '.']).split('\n').filter(Boolean);
-  } catch {
-    markers = []; // git grep exits 1 when nothing matches
+    // Scoped to HEAD, the content that is pushed. A bare ======= is left out: Markdown uses it to underline headings.
+    markers = git(['grep', '-lE', '^(<<<<<<<|>>>>>>>|[|]{7})( |$)', 'HEAD', '--', '.'])
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.replace(/^HEAD:/, ''));
+  } catch (error) {
+    if (error.status !== 1) throw error; // 1 means no match; anything else refuses the push
   }
   let containsUpstream = true;
   try {
@@ -41,7 +47,8 @@ function readState() {
   } catch {
     containsUpstream = false;
   }
-  return { inProgress, unmerged, markers, containsUpstream };
+  const dirty = git(['status', '--porcelain', '--untracked-files=no']).length > 0;
+  return { inProgress, unmerged, markers, containsUpstream, dirty };
 }
 
 function main() {
@@ -52,9 +59,14 @@ function main() {
     return 1;
   }
   const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit' });
-  run('git', ['diff', 'origin/main', '--check']);
+  if (!existsSync('scripts/check-mass-deletion.mjs') || !existsSync('scripts/check-banned-terms.mjs')) {
+    console.error('push:main refused: scripts/check-mass-deletion.mjs or scripts/check-banned-terms.mjs is missing');
+    return 1;
+  }
+  // The tree is clean (blockReason refuses a dirty one), so the working tree is HEAD: the checks see what is pushed.
+  run('git', ['diff', '--check', 'origin/main...HEAD']);
   run('node', ['scripts/check-banned-terms.mjs', '--changed']);
-  if (existsSync('scripts/check-mass-deletion.mjs')) run('node', ['scripts/check-mass-deletion.mjs']);
+  run('node', ['scripts/check-mass-deletion.mjs']);
   run('git', ['push', 'origin', 'HEAD:main']);
   console.log(`push:main: pushed ${git(['rev-parse', '--short', 'HEAD'])}`);
   return 0;
