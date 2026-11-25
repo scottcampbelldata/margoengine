@@ -286,6 +286,24 @@ test('a multibody replays bit for bit', async () => {
   assert.equal(hash(), hash());
 });
 
+test("inverse and forward dynamics hold a pendulum against the world's gravity, not the Earth's", async () => {
+  await Physics.load();
+  const moon = 1.62;
+  const physics = new Physics(null, { gravity: [0, -moon, 0] });
+  const { bodies, multibody } = chain(physics, 1);
+  const m = bodies[0].mass;
+  multibody.setCoordinates([Math.PI / 2]);
+  // Regression: both defaulted to 9.81 down y whatever the world's gravity, so a Moon pendulum was held with six times the torque.
+  near(multibody.inverseDynamics()[0], m * Math.fround(moon) * 1, 1e-3, 'm g L with the Moon g');
+  near(
+    multibody.forwardDynamics([0])[0],
+    (-m * Math.fround(moon)) / (bodies[0].principalInertia[2] + m),
+    1e-3,
+    'and it falls at the Moon rate',
+  );
+  physics.dispose();
+});
+
 test('the mass matrix, the Jacobian and inverse dynamics of a pendulum match the closed forms', async () => {
   await Physics.load();
   const physics = new Physics(null);

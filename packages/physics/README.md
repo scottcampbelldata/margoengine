@@ -414,7 +414,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 
 | Option | Default | Notes |
 | --- | --- | --- |
-| `gravity` | `[0, -9.81, 0]` | Also `physics.gravity = [...]` |
+| `gravity` | `[0, -9.81, 0]` (`DEFAULT_GRAVITY` of `@margoengine/math/gravity`, the engine's one gravity) | Also `physics.gravity = [...]`; multibody `inverseDynamics` and `forwardDynamics` and a `Motorcycle`'s lean read it |
 | `fixedTimestep` | `1 / 60` | Seconds per step |
 | `maxSubsteps` | `4` | Steps per frame before the backlog is dropped |
 | `film` | `false` | Film mode: `update` runs every step it owes and keeps the fraction of a step, so no time is dropped; `maxSubsteps` is not used |

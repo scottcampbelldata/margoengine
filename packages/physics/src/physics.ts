@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // The own solver behind the names `Physics` has today. On the step path: no `Math`, tests/step-path.test.js holds that.
+import { DEFAULT_GRAVITY } from '@margoengine/math/gravity';
 import { MargoError } from '@margoengine/math/errors';
 import { filmSteps } from './film.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
@@ -73,7 +74,7 @@ import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
 export interface PhysicsOptions {
-  /** Default [0, -9.81, 0]. */
+  /** Default `DEFAULT_GRAVITY` of `@margoengine/math/gravity`, [0, -9.81, 0]. */
   gravity?: Vec3;
   /** Seconds per physics step (default 1/60). */
   fixedTimestep?: number;
@@ -679,7 +680,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new RangeError('fixedTimestep must be in (0, 1] seconds');
     if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1)
       throw new RangeError('maxSubsteps must be a positive integer');
-    const gravity = options.gravity ?? [0, -9.81, 0];
+    const gravity = options.gravity ?? DEFAULT_GRAVITY;
     checkVec(gravity, 'Gravity');
     this.world = new KernelWorld();
     this.world.setGravity(...gravity);

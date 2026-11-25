@@ -11,6 +11,7 @@ import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { Vehicle, type VehicleOptions, type WheelOptions } from './vehicle.js';
 import { pacejkaTyre } from './tyres.js';
+import { gravityMagnitude } from '@margoengine/math/gravity';
 
 /** Options of `new Motorcycle(physics, chassis, options)`. */
 export interface MotorcycleOptions {
@@ -167,7 +168,7 @@ export class Motorcycle implements PhysicsAttachment {
     const rollRate = -(w[0] * fh[0] + w[2] * fh[2]);
     // The turn asked for: a yaw rate over the speed, as a sideways acceleration the lean balances.
     const lateral = this.steerInput * this.maxLateral;
-    this.target_ = Math.atan2(lateral, 9.81);
+    this.target_ = Math.atan2(lateral, gravityMagnitude(this.physics.gravity));
     if (!this.balance) return;
     // Steering into the fall: more lean toward the side than asked steers toward it; less steers away (the counter-steer that starts a turn).
     // The steering's pull on the roll grows with speed, as the square of it for the steering angle and the speed itself for its rate (the

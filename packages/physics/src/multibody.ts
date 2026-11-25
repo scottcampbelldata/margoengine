@@ -206,17 +206,23 @@ export class Multibody {
       this,
       this.velocities(),
       accelerations ?? new Array<number>(dof).fill(0),
-      options.gravity ?? [0, -9.81, 0],
+      options.gravity ?? this.owner.kernel.gravity,
     );
   }
   /**
    * Forward dynamics: the joint accelerations that `torques` give at the tree's present coordinates and speeds, under `gravity`
-   * (default 0, 0 and -9.81 down the y axis): H qdd = tau - bias.
+   * (default the world's): H qdd = tau - bias.
    */
   forwardDynamics(torques: readonly number[], options: { gravity?: Vec3 } = {}): number[] {
     this.check();
     if (torques.length !== this.dof) throw new RangeError(`Give ${this.dof} joint torques, one for each coordinate.`);
-    return forwardDynamics(this.owner.kernel, this, this.velocities(), torques, options.gravity ?? [0, -9.81, 0]);
+    return forwardDynamics(
+      this.owner.kernel,
+      this,
+      this.velocities(),
+      torques,
+      options.gravity ?? this.owner.kernel.gravity,
+    );
   }
   /** Releases the tree: the bodies stay, with their joints as ordinary joints that are no longer held to reduced coordinates. */
   remove(): void {

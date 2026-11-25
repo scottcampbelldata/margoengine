@@ -6,8 +6,8 @@ import { Motorcycle, Physics } from '../dist/index.js';
 await Physics.load();
 
 /** A 250 kg bike at 10 m/s on a floor, wheels 1.4 m apart, upright (or leaning by `lean` radians toward +X to start with). */
-function bike(options = {}, lean = 0, speed = 10) {
-  const physics = new Physics(null);
+function bike(options = {}, lean = 0, speed = 10, gravity) {
+  const physics = new Physics(null, gravity ? { gravity } : {});
   physics.addBody(null, {
     type: 'fixed',
     position: [0, -0.5, 0],
@@ -122,4 +122,14 @@ test('the rider keeps a bike that leans up from 4 to 30 m/s, the gains scaled wi
       physics.dispose();
     }
   }
+});
+
+test("the lean a turn asks for balances the world's gravity, not the Earth's", () => {
+  const moon = 1.62;
+  const { physics, rider } = bike({}, 0, 10, [0, -moon, 0]);
+  rider.setInput({ steer: 0.5 });
+  physics.step();
+  // Regression: the target was atan(a / 9.81) in any world, so a bike on the Moon leaned a sixth of what holds a turn there.
+  assert.ok(Math.abs(rider.leanTarget - Math.atan2(0.5 * 7, Math.fround(moon))) < 1e-6, `${rider.leanTarget}`);
+  physics.dispose();
 });
