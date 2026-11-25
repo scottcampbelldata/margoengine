@@ -77,7 +77,6 @@ const alignX = (axis: readonly number[]): Quat => {
     n = Math.hypot(0, -z, y, w);
   return [0, -z / n, y / n, w / n];
 };
-const conj = (q: Quat): Quat => [-q[0], -q[1], -q[2], q[3]];
 const vec = (text: string | undefined, fallback: Vec3 = [0, 0, 0]): Vec3 => {
   const v = numbers(text ?? '');
   return v.length >= 3 && v.every(Number.isFinite) ? [v[0]!, v[1]!, v[2]!] : fallback;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17858244,
+  "total": 17863371,
   "history": [
     {
       "date": "2026-10-24",
@@ -11667,6 +11667,12 @@
       "commit": "cbf0a3782",
       "reason": "physics with its kernel 293,955 to 296,242 B gzip: the integration parameters, simplified friction, quarantine, collision-only step and finer timers, with growth from other landings not recorded; water/flood 12,642 to 13,890 and water/flood-bake 4,334 to 4,359 recorded as found on main",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "72b47ff89",
+      "reason": "physics gains the robots entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -12429,6 +12435,7 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 224757,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
+    "@margoengine/physics/robots": 5127,
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
