@@ -147,6 +147,11 @@ export interface XRBinding {
    * usagePreference ['gpu-optimized']; null while the device has none this frame.
    */
   getDepthInformation?(view: XRView): XRGPUDepthLike | null;
+  /**
+   * The probe's reflection cube map (WebXR Lighting Estimation, `getReflectionCubeMap`), where the binding gives it as a
+   * WebGPU texture: 6 array layers, `rgba16float`; null while the device has none.
+   */
+  getReflectionCubeMap?(probe: object): GPUTexture | null;
 }
 /** The browser's XRGPUDepthInformation, as far as Margo reads it: an r32float or r16uint texture valid this frame. */
 export interface XRGPUDepthLike {

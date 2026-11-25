@@ -35,7 +35,8 @@
     "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs",
     "test:gpu:performance": "cd ../.. && node packages/xr/tests/performance.browser.mjs",
     "test:gpu:view-layers": "cd ../.. && node packages/xr/tests/view-layers.browser.mjs",
-    "test:gpu:occlusion": "cd ../.. && node packages/xr/tests/occlusion.browser.mjs"
+    "test:gpu:occlusion": "cd ../.. && node packages/xr/tests/occlusion.browser.mjs",
+    "test:gpu:reflection": "cd ../.. && node packages/xr/tests/reflection.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -58,6 +59,10 @@
     "./occlusion": {
       "types": "./dist/occlusion.d.ts",
       "import": "./dist/occlusion.js"
+    },
+    "./reflection": {
+      "types": "./dist/reflection.d.ts",
+      "import": "./dist/reflection.js"
     },
     "./layers": {
       "types": "./dist/layers.d.ts",

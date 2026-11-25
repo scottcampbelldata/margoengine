@@ -209,6 +209,37 @@ enter.onclick=async()=>{
 
 `AROcclusion.create` throws `state` without a session and `unsupported` when the session has no depth sensing, or has GPU depth in `luminance-alpha`, which WebGPU cannot read. Tested with stand-in sessions on real GPUs (`npm run test:gpu:occlusion`); not yet run on an AR device.
 
+## AR reflections from the room's light
+
+`@margoengine/xr/reflection` turns the room's light estimate into a cube texture, which an `Environment` from `@margoengine/environment` filters into the scene's specular reflections and diffuse harmonics, so a shiny virtual object reflects the room it sits in. Start the session with `light-estimation`.
+
+- `ARReflection.create(xr, { device })` follows the browser's light probe. Where the WebGPU binding gives the probe's reflection cube map (`getReflectionCubeMap`, the `reflectionchange` event of the WebXR Lighting Estimation API), that texture is copied into the cube; everywhere else the cube is painted from the probe's nine spherical harmonics, a soft room of bands 0 to 2 (Ramamoorthi and Hanrahan, 2001).
+- Options and defaults: `size` 32 (power of two, 8 to 256; the harmonics path), `reflectionFormat` `'rgba16f'`, `interval` 500 ms between harmonics repaints, `forceSH` false, `light` (an `ARLight` to share; one is made otherwise).
+- `await reflection.ready` gives the cube texture after the first estimate; make the `Environment` from it and `reflection.attach(environment)` so it is refreshed after each repaint.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Environment} from 'margoengine/environment';
+import {XR} from 'margoengine/xr';
+import {ARReflection} from 'margoengine/xr/reflection';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const enter=document.createElement('button');enter.textContent='Enter AR';document.body.append(enter);
+enter.onclick=async()=>{
+  await xr.requestSession('immersive-ar',{requiredFeatures:['light-estimation']});
+  const reflection=await ARReflection.create(xr,{device:engine.gpu,size:32});
+  const cube=await reflection.ready;
+  const environment=await Environment.create(engine,{texture:cube},{size:cube.width});
+  engine.use(environment);
+  reflection.attach(environment);
+  // reflection.dispose() stops it.
+};
+```
+
+Tested with stand-in sessions on real GPUs (`npm run test:gpu:reflection`); not yet run on an AR device.
+
 ## Layers, haptics, video and locomotion
 
 `@margoengine/xr/layers` adds WebXR composition layers, controller vibration and teleport movement. Layers are drawn by the headset's compositor at their own resolution, so text and video stay sharp. Ask for `optionalFeatures: ['layers']`.

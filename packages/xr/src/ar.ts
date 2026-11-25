@@ -346,12 +346,23 @@ export class ARLight {
   };
   private constructor(
     private readonly host: ARHost,
-    private readonly probe: { probeSpace: XRSpace },
+    /** The browser's XRLightProbe; its `reflectionchange` event and `getReflectionCubeMap` serve ARReflection. */
+    readonly probe: { probeSpace: XRSpace },
     private readonly lighting?: LightingLike,
   ) {
     this.unsubscribe = host.onFrame((state) => this.update(state.frame));
   }
-  static async create(xr: ARHost, { lighting }: { lighting?: LightingLike } = {}): Promise<ARLight> {
+  static create(xr: ARHost, { lighting }: { lighting?: LightingLike } = {}): Promise<ARLight> {
+    return ARLight.withReflection(xr, { lighting });
+  }
+  /**
+   * As {@link ARLight.create}, with the light probe asked for a reflection cube map in `reflectionFormat` (the WebXR
+   * Lighting Estimation API's XRLightProbeInit); `probe` then serves {@link ARReflection}.
+   */
+  static async withReflection(
+    xr: ARHost,
+    { lighting, reflectionFormat }: { lighting?: LightingLike; reflectionFormat?: 'srgb8' | 'rgba16f' } = {},
+  ): Promise<ARLight> {
     const session = xr?.session as
       | (XRNativeSession & { requestLightProbe?(init?: object): Promise<{ probeSpace: XRSpace }> })
       | null;
@@ -361,7 +372,11 @@ export class ARLight {
         'unsupported',
         "The XR session has no 'light-estimation' feature; ask for it when starting the session",
       );
-    return new ARLight(xr, await session.requestLightProbe(), lighting);
+    return new ARLight(
+      xr,
+      await session.requestLightProbe(reflectionFormat ? { reflectionFormat } : undefined),
+      lighting,
+    );
   }
   /** Reads this frame's estimate and applies it; runs from the XR frame hook. */
   update(frame: XRNativeFrame): void {
