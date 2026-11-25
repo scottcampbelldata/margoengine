@@ -9,6 +9,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { margoError } from '../../shared/errors.js';
+import { mapRead } from '../../shared/map-read.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
@@ -200,20 +201,7 @@ export class TerrainQuery {
       const encoder = device.createCommandEncoder();
       encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: stride, rowsPerImage: rows }, [columns, rows]);
       device.queue.submit([encoder.finish()]);
-      await new Promise<void>((resolve, reject) => {
-        const abort = () => reject(signal!.reason);
-        signal?.addEventListener('abort', abort, { once: true });
-        buffer.mapAsync(GPUMapMode.READ).then(
-          () => {
-            signal?.removeEventListener('abort', abort);
-            resolve();
-          },
-          (error: unknown) => {
-            signal?.removeEventListener('abort', abort);
-            reject(error);
-          },
-        );
-      });
+      await mapRead(buffer, signal);
       const view = new DataView(buffer.getMappedRange()),
         heights = new Float32Array(columns * rows);
       for (let y = 0; y < rows; y++)

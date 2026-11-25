@@ -6,6 +6,7 @@
 import type { EngineKernel, Geometry } from '@margoengine/core';
 import type { Scatter } from './index.js';
 import { margoError } from '../../shared/errors.js';
+import { mapRead } from '../../shared/map-read.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
@@ -71,20 +72,7 @@ export async function readScatter(
       at += sizes[i];
     });
     device.queue.submit([encoder.finish()]);
-    await new Promise<void>((resolve, reject) => {
-      const abort = () => reject(signal!.reason);
-      signal?.addEventListener('abort', abort, { once: true });
-      buffer.mapAsync(GPUMapMode.READ).then(
-        () => {
-          signal?.removeEventListener('abort', abort);
-          resolve();
-        },
-        (error: unknown) => {
-          signal?.removeEventListener('abort', abort);
-          reject(error);
-        },
-      );
-    });
+    await mapRead(buffer, signal);
     const words = new Uint32Array(buffer.getMappedRange().slice(0)),
       floats = new Float32Array(words.buffer);
     buffer.unmap();
