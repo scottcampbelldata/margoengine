@@ -2126,6 +2126,12 @@ export class SoftBodies implements PhysicsAttachment {
   private rowGroups: number[] = [];
   private contactHook: ((contact: SoftContact) => void) | null = null;
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
+  /** Every body a step pushed, by kernel row: a world's restore finds the bodies of the held forces it brings back by row. */
+  private readonly pushedByRow = new Map<number, PhysicsBody>();
+  /** Stepped by a framework `SoftSolver`: the Physics attachment's own step does nothing then, so nothing steps twice. */
+  private driven = false;
+  /** @internal Soft steps taken: one a fixed step, whether the Physics or a world's `SoftSolver` ran it. */
+  steps = 0;
   private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
   private particleCount = 0;
@@ -3247,6 +3253,75 @@ export class SoftBodies implements PhysicsAttachment {
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */
   beforeStep(dt: number): void {
+    // A world's SoftSolver steps these bodies in its own step (stepOnce), in the order the world gives it.
+    if (this.driven) return;
+    this.stepOnce(dt);
+  }
+
+  /** @internal Hands the step to a framework `SoftSolver`: from now on only `stepOnce` steps the bodies. */
+  drive(): Physics {
+    this.driven = true;
+    return this.physics;
+  }
+
+  /** @internal The kernel's memory, which the columns lie in (a `SoftSolver`'s state regions, transitional). */
+  get kernelMemory(): WebAssembly.Memory {
+    return this.exports.memory;
+  }
+
+  /**
+   * @internal Every column of the kernel, particle, edge, body, contact and cell alike, as [name, view]: the state a world
+   * snapshots and hashes for a `SoftSolver`. Empty columns hold nothing, and the face contacts (`fc_*`) and the table of the
+   * rigid bodies the contacts meet are built afresh at the start of every step, as many rows as the step finds, so none of
+   * them is state.
+   */
+  stateColumns(): [string, Float32Array | Uint32Array][] {
+    const out: [string, Float32Array | Uint32Array][] = [];
+    for (const [name, view] of Object.entries(this.columns()))
+      if (view.byteLength > 0 && !name.startsWith('fc_') && !COLLIDER_COLUMN.test(name))
+        out.push([name, view as Float32Array | Uint32Array]);
+    for (const [name, view] of Object.entries(this.cellColumns()))
+      if (view.byteLength > 0) out.push([`cell.${name}`, view as Float32Array | Uint32Array]);
+    return out;
+  }
+
+  /**
+   * @internal Writes the forces and torques the last step left on the rigid bodies (taken off at the start of the next) into
+   * `out`, six words a kernel body row: force then torque. A row past `out` throws.
+   */
+  storeHeld(out: Float64Array): void {
+    out.fill(0);
+    for (const [body, [force, torque]] of this.pushes) {
+      if (!body.valid) continue;
+      const at = body.row * 6;
+      if (at + 6 > out.length)
+        throw new MargoError(
+          'state',
+          `A soft body pushed body row ${body.row}, past the ${out.length / 6} rows its SoftSolver holds; make the solver with a larger capacity.`,
+        );
+      out.set([...force, ...torque], at);
+    }
+  }
+
+  /** @internal Takes the held forces from `words` (as `storeHeld` wrote them), so a restored world takes off what it left. */
+  loadHeld(words: Float64Array): void {
+    this.pushes.clear();
+    for (let at = 0; at + 6 <= words.length; at += 6) {
+      let any = false;
+      for (let k = 0; k < 6; k++) any ||= words[at + k] !== 0;
+      if (!any) continue;
+      const body = this.pushedByRow.get(at / 6);
+      if (!body?.valid) continue;
+      this.pushes.set(body, [
+        [words[at]!, words[at + 1]!, words[at + 2]!],
+        [words[at + 3]!, words[at + 4]!, words[at + 5]!],
+      ]);
+    }
+  }
+
+  /** @internal One soft step of `dt` seconds, before the rigid world's step of the same length. */
+  stepOnce(dt: number): void {
+    this.steps++;
     // The force and torque the bodies were pushed with last step come off (the rigid world keeps a force until it is taken back;
     // the impulse part of a push lands once).
     for (const [body, [force, torque]] of this.pushes) {
@@ -3310,6 +3385,7 @@ export class SoftBodies implements PhysicsAttachment {
         body.addForce(force);
         body.addTorque(torque);
         const had = this.pushes.get(body);
+        this.pushedByRow.set(body.row, body);
         this.pushes.set(
           body,
           had
@@ -3332,6 +3408,7 @@ export class SoftBodies implements PhysicsAttachment {
       ]);
       body.addForce(force);
       const had = this.pushes.get(body);
+      this.pushedByRow.set(body.row, body);
       this.pushes.set(
         body,
         had ? [[had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]], had[1]] : [force, [0, 0, 0]],
@@ -4050,6 +4127,7 @@ export class SoftBodies implements PhysicsAttachment {
   /** @internal */
   bodyRemoved(_body: PhysicsBody): void {
     this.attachments = this.attachments.filter((a) => a.body !== _body);
+    if (this.pushedByRow.get(_body.row) === _body) this.pushedByRow.delete(_body.row);
   }
 
   /** Removes every soft body and leaves the world. */
@@ -4136,6 +4214,10 @@ function inverseMass(body: PhysicsBody): number[] {
   return out;
 }
 
+/** The columns of the table of rigid bodies a step's contacts meet, one row each, built afresh at the start of every step. */
+const COLLIDER_COLUMN =
+  /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/;
+
 function rowsOf(
   name: string,
   particles: number,
@@ -4153,12 +4235,7 @@ function rowsOf(
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj|kr)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
-  if (
-    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
-      name,
-    )
-  )
-    return colliders;
+  if (COLLIDER_COLUMN.test(name)) return colliders;
   return particles;
 }
 

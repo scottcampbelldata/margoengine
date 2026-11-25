@@ -234,6 +234,23 @@ export interface Snapshot {
 
 export type SnapshotSolver = Pick<Solver, 'describe' | 'stateRegions' | 'extraState'>;
 
+export class SoftSolver implements Solver<SoftSolverParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: SoftSolverParams): void;
+    step(_context: StepContext, dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(_tick: number): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface SoftSolverParams {
+    readonly soft: SoftBodies;
+    readonly capacity?: number;
+}
+
 export interface Solver<Params = unknown> {
     describe(): SolverDescription;
     init(host: SolverHost, params: Params): void;
@@ -350,6 +367,38 @@ interface BodyOwner {
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
 
+class CellMaterial {
+    youngsModulus: number;
+    poissonRatio: number;
+    model: CellModel;
+    elasticDampingRatio: number;
+    deformationDamping: number | null;
+    density: number;
+    yieldStrain: number;
+    creep: number;
+    plasticMax: number;
+    get plasticYield(): number;
+    set plasticYield(value: number);
+    get plasticCreep(): number;
+    set plasticCreep(value: number);
+    tearSmoothing: number;
+    interiorStrength: number;
+    tearStrain: number;
+    clone(): CellMaterial;
+    lame(): [number, number];
+}
+
+type CellModel = 'neo-hookean' | 'corotated' | 'volume';
+
+interface CellRange {
+    first: number;
+    count: number;
+    clusterFirst: number;
+    clusterCount: number;
+    memberFirst: number;
+    memberCount: number;
+}
+
 interface CharacterCollision {
     collider: PhysicsCollider;
     point: [number, number, number];
@@ -423,6 +472,18 @@ interface CharacterMoveResult {
     slidingDownSlope: boolean;
 }
 
+interface ClusterInfo {
+    members: number[];
+    hertz: number;
+    matching: boolean;
+    stiffness: number;
+    edgeSoftness: SoftSoftness | null;
+    tearResistance: number;
+    proxy: PhysicsBody | null;
+    lin: Vec3;
+    ang: Vec3;
+}
+
 interface ColliderDistance {
     distance: number;
     pointA: [number, number, number];
@@ -488,6 +549,8 @@ interface CollisionEvent {
 type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
 
 type CollisionPairKind = 'dynamicDynamic' | 'dynamicKinematic' | 'dynamicFixed' | 'kinematicKinematic' | 'kinematicFixed' | 'fixedFixed';
+
+type Columns = Record<string, Float32Array>;
 
 type CombineRule = 'average' | 'min' | 'multiply' | 'max' | 'clampedSum' | 'geometricMean';
 
@@ -2008,6 +2071,375 @@ type ShapeOptions = {
     shape: 'halfSpace';
     normal?: Vec3;
 };
+
+interface Skin {
+    vertices: Float32Array;
+    indices: Uint32Array;
+    cell: Uint32Array;
+    weight: Float32Array;
+}
+
+class SoftBodies implements PhysicsAttachment {
+    steps: number;
+    cellTornByHand: boolean;
+    cellDamping: number;
+    femLinearTolerance: number;
+    femMaxLinearIterations: number;
+    femMaxDenseDofs: number;
+    splitOnTear: 'cells' | 'all' | 'never';
+    substeps: number;
+    iterations: number;
+    private constructor();
+    static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
+    debugRender(options?: {
+        edges?: boolean;
+        stress?: boolean;
+        stressRange?: number;
+        particles?: boolean;
+        contacts?: boolean;
+    }): {
+        vertices: Float32Array;
+        colors: Float32Array;
+    };
+    get alpha(): number;
+    list(): readonly SoftBody[];
+    onTear(listener: (event: SoftTearEvent) => void): () => void;
+    hash(): number;
+    columns(): Columns;
+    cellColumns(): Columns;
+    create(desc: SoftBodyDesc): SoftBody;
+    setContactHook(hook: ((contact: SoftContact) => void) | null): void;
+    setSleep(body: SoftBody, asleep: boolean): void;
+    setVolumeFactorOf(body: SoftBody, factor: number): void;
+    surfaceVolume(body: SoftBody): number;
+    setVolume(body: SoftBody, factor: number | null): void;
+    attach(soft: SoftBody, index: number, body: PhysicsBody): void;
+    release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
+    writeClusterSprings(body: SoftBody): void;
+    rewriteClusters(body: SoftBody, infos: ClusterInfo[], keep: number[], extra?: {
+        members: number[];
+        hertz: number;
+    }): void;
+    addCluster(body: SoftBody, indices: ArrayLike<number>, hertz: number): number;
+    removeCluster(body: SoftBody, cluster: number): void;
+    clusterProxy(body: SoftBody, cluster: number): PhysicsBody;
+    relinkCells(body: SoftBody): void;
+    writeCellMaterial(body: SoftBody): void;
+    writeMaterial(body: SoftBody): void;
+    remove(body: SoftBody): void;
+    beforeStep(dt: number): void;
+    drive(): Physics;
+    get kernelMemory(): WebAssembly.Memory;
+    stateColumns(): [string, Float32Array | Uint32Array][];
+    storeHeld(out: Float64Array): void;
+    loadHeld(words: Float64Array): void;
+    stepOnce(dt: number): void;
+    createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
+    createDeformableCollider(soft: SoftBody, mesh: {
+        vertices: ArrayLike<number>;
+        indices: ArrayLike<number>;
+    }, binding: SoftMeshBinding, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
+    tear(body: SoftBody, { cells, edges }?: {
+        cells?: readonly number[];
+        edges?: readonly number[];
+    }): SoftTearEvent;
+    cut(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent;
+    afterSync(): void;
+    bodyRemoved(_body: PhysicsBody): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface SoftBodiesOptions {
+    signal?: AbortSignal;
+    substeps?: number;
+    iterations?: number;
+}
+
+class SoftBody {
+    handle: number;
+    firstParticle: number;
+    particles: number;
+    firstEdge: number;
+    edgeTotal: number;
+    structural: number;
+    masses: Float32Array;
+    material: SoftBodyMaterial;
+    cellRange: CellRange;
+    cellMaterial: CellMaterial;
+    constructor(owner: SoftBodies,
+    handle: number,
+    firstParticle: number,
+    particles: number,
+    firstEdge: number,
+    edgeTotal: number,
+    structural: number,
+    masses: Float32Array,
+    material: SoftBodyMaterial,
+    cellRange?: CellRange,
+    cellMaterial?: CellMaterial);
+    removed: boolean;
+    cellsTornSeen: Set<number>;
+    skin: Skin | null;
+    skinCells: Uint32Array<ArrayBuffer>;
+    previous: Float32Array<ArrayBuffer>;
+    clusterInfo: ClusterInfo[];
+    solverKind: SoftSolver;
+    rootCluster: number;
+    force: Vec3;
+    pointForces: Map<number, Vec3>;
+    tornSeen: Set<number>;
+    triangleList: Uint32Array<ArrayBuffer>;
+    surface: PhysicsBody | null;
+    matched: boolean;
+    edgeKinds: Uint8Array<ArrayBuffer>;
+    volumeOn: boolean;
+    surfaceRest: number;
+    canSleepFlag: boolean;
+    asleep: boolean;
+    quiet: number;
+    collisionGroups: number | undefined;
+    dominance: number;
+    grid: {
+        readonly nu: number;
+        readonly nv: number;
+        readonly wrap: boolean;
+    } | null;
+    additionalIterations: number;
+    oriented: boolean | undefined;
+    selfContacts: boolean;
+    selfFriction: number;
+    selfThickness: number;
+    get valid(): boolean;
+    private get c();
+    numParticles(): number;
+    particlePosition(index: number): Vec3;
+    particlePositions(target?: Float32Array): Float32Array;
+    interpolatedPositions(alpha?: number, out?: Float32Array): Float32Array;
+    interpolatedMeshVertices(alpha?: number): Float32Array;
+    remember(): void;
+    particleVelocity(index: number): Vec3;
+    particleVelocities(): Float32Array;
+    setParticlePosition(index: number, position: Vec3): this;
+    setParticleVelocity(index: number, velocity: Vec3): this;
+    setParticlePinned(index: number, pinned: boolean): this;
+    attachParticle(index: number, body: PhysicsBody): this;
+    detachParticle(index: number, body?: PhysicsBody): boolean;
+    isParticlePinned(index: number): boolean;
+    setParticleKinematicTarget(index: number, position: Vec3): this;
+    surfaceVolume(): number;
+    setVolumeFactor(factor: number | null): this;
+    threadSoftness(edge: number): SoftSoftness | null;
+    get canSleep(): boolean;
+    set canSleep(value: boolean);
+    get sleeping(): boolean;
+    sleep(): this;
+    wakeUp(): this;
+    wake(): this;
+    triangles(): Uint32Array;
+    structuralEdges(): number;
+    edges(): Uint32Array;
+    bendEdges(): Uint32Array;
+    setTensionOnly(on?: boolean): this;
+    isEdgeTorn(edge: number): boolean;
+    tearEdge(edge: number): this;
+    get solver(): SoftSolver;
+    setSolver(solver: SoftSolver): this;
+    numClusters(): number;
+    addCluster(indices: ArrayLike<number>, hertz?: number): number;
+    removeCluster(cluster: number): this;
+    clusterProxy(cluster: number): PhysicsBody;
+    rootBody(): PhysicsBody;
+    setClusterStiffnessScale(cluster: number, scale: number): this;
+    setClusterEdgeSoftness(cluster: number, softness: SoftSoftness | null): this;
+    setClusterTearResistance(cluster: number, scale: number): this;
+    enableClusterShapeMatching(cluster: number, on?: boolean, hertz?: number): this;
+    setClusterPinned(cluster: number, pinned: boolean): this;
+    setClusterKinematicTarget(cluster: number, position: Vec3, rotation?: Quat): this;
+    meshVertices(): Float32Array;
+    meshIndices(): Uint32Array;
+    numCells(): number;
+    cells(): Uint32Array;
+    isCellTorn(cell: number): boolean;
+    tornCells(): number[];
+    tearCell(cell: number): this;
+    volume(): number;
+    restVolume(): number;
+    resetPlasticity(): this;
+    setCellMaterial(material: CellMaterial): this;
+    getCellMaterial(): CellMaterial;
+    setMaterial(material: SoftBodyMaterial): this;
+    getMaterial(): SoftBodyMaterial;
+    setGravityScale(scale: number): this;
+    setLinearDamping(damping: number): this;
+    mass(): number;
+    centerOfMass(): Vec3;
+    addForce(force: Vec3): this;
+    addParticleForce(index: number, force: Vec3): this;
+    resetForces(): this;
+    applyImpulse(impulse: Vec3): this;
+    applyParticleImpulse(index: number, impulse: Vec3): this;
+    applyImpulseAtPoint(impulse: Vec3, point: Vec3, radius: number): this;
+    applyRadialImpulse(center: Vec3, magnitude: number, radius: number): this;
+}
+
+class SoftBodyDesc {
+    positions: number[];
+    edgePairs: number[];
+    edgeKinds: number[];
+    bendPairs: number[];
+    grid: {
+        nu: number;
+        nv: number;
+        wrap: boolean;
+    } | null;
+    masses: number[];
+    pinned: Set<number>;
+    radius: number | null;
+    material: SoftBodyMaterial;
+    gravity: number;
+    damping: number;
+    shift: Vec3;
+    shapeMatching: boolean;
+    volumeFactor: number | null;
+    groups: number | undefined;
+    selfContacts: boolean;
+    selfFriction: number;
+    dominance: number;
+    canSleep: boolean;
+    additionalIterations: number;
+    surfaceSettings: Omit<ColliderSettings, 'offset' | 'rotation'> | null;
+    oriented: boolean | undefined;
+    tension: boolean | number[];
+    triangles: number[];
+    cells: number[];
+    cellMaterial: CellMaterial;
+    clusterGroups: number[][];
+    clusterHertz: number;
+    massGiven: boolean;
+    skin: Skin | null;
+    solver: SoftSolver;
+    constructor(positions: ArrayLike<number> | readonly Vec3[]);
+    get particleCount(): number;
+    static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
+        bending?: boolean;
+    }): SoftBodyDesc;
+    static cloth(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+    static clothTube(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number): SoftBodyDesc;
+    static clothTube(origin: Vec3, axis: Vec3, radiusStart: number, radiusEnd: number, numAround: number, numAlong: number): SoftBodyDesc;
+    static clothAnisotropic(origin: Vec3, du: Vec3, dv: Vec3, nu: number, nv: number, warp?: SoftSoftness, weft?: SoftSoftness, shear?: SoftSoftness): SoftBodyDesc;
+    static trimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, { bending }?: {
+        bending?: boolean;
+    }): SoftBodyDesc;
+    setSelfContacts(on: boolean, { friction }?: {
+        friction?: number;
+    }): this;
+    setCollisionGroups(groups: number): this;
+    static sphere(center: Vec3, radius: number, options?: number | {
+        detail?: number;
+    }): SoftBodyDesc;
+    setVolumeFactor(factor: number | null): this;
+    setTensionOnly(edges?: boolean | readonly number[]): this;
+    setDominanceGroup(group: number): this;
+    setCanSleep(on: boolean): this;
+    setAdditionalSolverIterations(passes: number): this;
+    setSurfaceCollider(settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): this;
+    setNoSurfaceCollider(): this;
+    setOriented(oriented: boolean): this;
+    setShapeMatching(on: boolean): this;
+    static solid(origin: Vec3, cell: number, counts: readonly [number, number, number], inside?: (x: number, y: number, z: number) => boolean, material?: CellMaterial): SoftBodyDesc;
+    static box(origin: Vec3, size: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
+    static cuboid(centre: Vec3, halfExtents: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
+    static volumetric(vertices: ArrayLike<number>, indices: ArrayLike<number>, size: number, skinned?: boolean, material?: CellMaterial): SoftBodyDesc;
+    setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
+    setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
+    addCellEdges(): this;
+    setSurface(): this;
+    setSolver(solver: SoftSolver): this;
+    setCellMaterial(material: CellMaterial): this;
+    setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
+    resolvedMasses(): number[];
+    setEdges(pairs: ArrayLike<number>): this;
+    setBendEdges(pairs: ArrayLike<number>): this;
+    addEdges(pairs: ArrayLike<number>): this;
+    append(other: SoftBodyDesc): this;
+    setPinnedParticles(indices: ArrayLike<number>): this;
+    setParticleMass(mass: number): this;
+    setMass(mass: number): this;
+    setMasses(masses: ArrayLike<number>): this;
+    setParticleRadius(radius: number): this;
+    setSoftness(naturalFrequency: number, dampingRatio: number): this;
+    setMaterial(material: SoftBodyMaterial): this;
+    setEdgeTearResistance(strain: number): this;
+    setGravityScale(scale: number): this;
+    setLinearDamping(damping: number): this;
+    setTranslation(translation: Vec3): this;
+}
+
+class SoftBodyMaterial {
+    edgeSoftness: SoftSoftness;
+    warpSoftness: SoftSoftness | null;
+    weftSoftness: SoftSoftness | null;
+    shearSoftness: SoftSoftness | null;
+    bendSoftness: SoftSoftness;
+    tearStrain: number;
+    shapeMatchingSoftness: SoftSoftness;
+    volumeSoftness: SoftSoftness;
+    edgePlasticYield: number;
+    edgePlasticCreep: number;
+    edgePlasticMax: number;
+    edgePlasticFlow: 'compression' | 'stretch' | 'both';
+    tearForce: number;
+    tearSmoothing: number;
+    maxTearsPerStep: number;
+    minPiece: number;
+    static uniform(naturalFrequency: number, dampingRatio: number): SoftBodyMaterial;
+    clone(): SoftBodyMaterial;
+}
+
+interface SoftContact {
+    readonly soft: SoftBody;
+    readonly particle: number;
+    readonly face: readonly [number, number, number] | null;
+    readonly weights: readonly [number, number, number] | null;
+    readonly collider: PhysicsCollider;
+    readonly particleVelocity: Vec3;
+    normal: Vec3;
+    point: Vec3;
+    velocity: Vec3;
+    friction: number;
+    enabled: boolean;
+}
+
+interface SoftDestination {
+    body: SoftBody;
+    particle: number;
+}
+
+class SoftMeshBinding {
+    readonly mode: 'direct' | 'directByPosition' | 'skinned';
+    readonly particles: readonly number[];
+    readonly eps: number;
+    private constructor();
+    static direct(particles: ArrayLike<number>): SoftMeshBinding;
+    static directByPosition(eps: number): SoftMeshBinding;
+    static skinned(): SoftMeshBinding;
+}
+
+interface SoftSoftness {
+    naturalFrequency: number;
+    dampingRatio: number;
+}
+
+type SoftSolver = 'constraints' | 'fem';
+
+interface SoftTearEvent {
+    body: SoftBody;
+    edges: number[];
+    cells: number[];
+    pieces: SoftBody[];
+    destination(particle: number): SoftDestination[];
+}
 
 type Vec3 = readonly [number, number, number];
 ```

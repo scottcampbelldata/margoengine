@@ -30,6 +30,7 @@ export class CellMaterial {
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
 export class SoftBodies implements PhysicsAttachment {
+    steps: number;
     cellTornByHand: boolean;
     cellDamping: number;
     femLinearTolerance: number;
@@ -77,6 +78,12 @@ export class SoftBodies implements PhysicsAttachment {
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
+    drive(): Physics;
+    get kernelMemory(): WebAssembly.Memory;
+    stateColumns(): [string, Float32Array | Uint32Array][];
+    storeHeld(out: Float64Array): void;
+    loadHeld(words: Float64Array): void;
+    stepOnce(dt: number): void;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     createDeformableCollider(soft: SoftBody, mesh: {
         vertices: ArrayLike<number>;

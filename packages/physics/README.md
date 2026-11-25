@@ -1688,6 +1688,27 @@ console.log(x[0].toFixed(6)); // 1.200000
 
 Migration: a world steps at the framework's rates, so the Physics's `fixedTimestep` must be one of them (1/60, 1/120, 1/240 ... 1/7680 s); any other is refused with a `RangeError` that names the nearest two (`rateLevelOf(step)`). The kernel's state is the words its own hash covers, named by column and row capacity (`positionX[1024]`), with the scratch columns it carries from one step into the next as extra state, in the kernel's own memory until the framework's solvers share one. A snapshot restored into a world built with other capacities or another column table is refused before anything is written, with every region that does not fit named in the message.
 
+`SoftSolver` puts the `SoftBodies` of that `Physics` in the world: `world.add(new SoftSolver(), {soft})`, coupled soft before rigid with `world.couple(['soft', 'rigid'], 'staggered')`, so the soft step meets the bodies where the tick began and its push lands in that tick's rigid step, as inside `Physics.step()`. Added to a world, the Physics attachment's own soft step does nothing, so nothing steps twice, and a world steps a scene to the same bits as `step()` alone. It reads `bodies` and accumulates into `bodyImpulses`; transitionally its push still goes through the body API (an impulse, a force held over the rigid step and the spin change), and the port holds zeros ([docs/limits.md](../../docs/limits.md)). Its state is every soft kernel column but those a step builds afresh (its contacts and the table of the bodies they meet), in the kernel's own memory, and the forces the last step left on the bodies, so a restored world goes on bit for bit; a snapshot restores into the same soft bodies.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SoftBodies, SoftBodyDesc} from 'margoengine/physics/soft';
+import {PhysicsWorld, RigidSolver, SoftSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+const soft = await SoftBodies.attach(physics);
+soft.create(SoftBodyDesc.cloth([-0.35, 1, -0.35], [0.1, 0, 0], [0, 0, 0.1], 8, 8).setPinnedParticles([0, 7, 56, 63]));
+const box = physics.addBody(null, {position: [0, 1.3, 0], colliders: {shape: 'box', halfExtents: [0.08, 0.08, 0.08], mass: 2}});
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(new SoftSolver(), {soft})
+  .couple(['soft', 'rigid'], 'staggered');
+world.advance(60); // one second
+console.log(physics.stepCount); // 60: each solver stepped once a tick
+console.log(box.position[1] < 1.3); // true: the box came down onto the cloth
+```
+
 ### The terrain bed (`@margoengine/physics/earth`)
 
 One grid of ground elevations that erosion, slides and craters change and that colliders, water and hooves read (PA-37). `TerrainBed` is the framework solver that owns the field `bed`: it keeps the elevations in f64, adds each tick what writers accumulated into the field `bedChange` (metres of change a vertex, summed by contributor id then vertex, so the result is the same bits whatever order the writers were added in), keeps the bed above an optional bedrock, and publishes the elevations as f32. Its ledger holds the volume writers asked for and the volume the bedrock refused, so `volume() - startVolume = requestedVolume() + refusedVolume()`. `bedVertexAreas` gives each vertex's area exactly for the triangulation, so a writer that removes a volume here and puts it there conserves it. The grid is laid out as the kernel's height field (rows along z, columns along x, column major) and cut into the same triangles, so `Bed.sample`, a kernel ray and a contact see one surface. `BedCollider` puts the bed in a `Physics` world as a height field and `sync(bed)` writes the changed heights into the field's own memory (`PhysicsCollider.setHeights`): editing the ground every step allocates nothing, and what rests on it wakes, so a ball on ground that a crater opens under falls in.

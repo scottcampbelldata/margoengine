@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18880434,
+  "total": 18881356,
   "history": [
     {
       "date": "2026-10-24",
@@ -12069,6 +12069,12 @@
       "commit": "lane-d",
       "reason": "geospatial flyTo on the van Wijk and Nuij path, flyToBoundingSphere and fitBounds",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "4b38c0431",
+      "reason": "SoftSolver: SoftBodies can be stepped by a framework world (driven mode, the held forces mirrored into a state region by body row, and its state columns named for snapshots), +107 B gzip on the soft entry's base (27,046 to 27,153 measured); the solver itself lives in the world entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -12859,7 +12865,7 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/soft": 88860,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27968,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
     "@margoengine/physics/world": 14716,
     "@margoengine/physics2d": 21360,

@@ -65,3 +65,4 @@ export {
   rateLevelOf,
   type RigidSolverParams,
 } from './solvers/rigid.js';
+export { SoftSolver, type SoftSolverParams } from './solvers/soft.js';
