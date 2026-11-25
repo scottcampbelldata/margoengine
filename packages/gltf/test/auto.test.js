@@ -9,7 +9,6 @@ import { loadAuto } from '../dist/auto.js';
 import { sceneData } from '../dist/scene-data.js';
 import { encodeAttributes } from '../../decoders/tests/support/meshopt-encode.js';
 import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.js';
-import { MargoError } from '@margoengine/math/errors';
 
 // Stands in for gltf/pbr, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs.
 registerHooks({
