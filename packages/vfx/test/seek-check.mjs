@@ -1,5 +1,6 @@
 // Real-GPU bound of GAP-FILM-TIME for particles (run from the repository root after building packages):
 //   node scripts/run-with-timeout.mjs -- node packages/vfx/test/seek-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/vfx/test/seek-check.mjs --compat   (the WebGL2 layer)
 // Particles are world history on the GPU (class B in docs/limits.md): a seek replays the effect's counters, and the
 // scene's prewarm (P = 150 frames, longer than the longest lifetime) rebuilds the particles. A runs n + 1 live frames;
 // B seeks (n - P) / fps and draws P + 1; C draws P + 1 with no seek. A and B must upload the same simulate uniform in
@@ -71,7 +72,7 @@ try {
       `${r.resetShared} of ${r.resetKept[0]} live particles equal a fresh effect's after the reset`,
     );
     console.log(
-      `ok vfx seek n = ${n} (${((Date.now() - started) / 1000).toFixed(1)} s): births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit`,
+      `ok vfx seek n = ${n} (${((Date.now() - started) / 1000).toFixed(1)} s): births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit; after resetTime ${r.resetShared} of ${r.resetKept[0]} equal a fresh effect's`,
     );
   }
   assert.deepEqual(pageErrors, []);

@@ -875,7 +875,7 @@ queues the `ignitions` of its options again (ones added with `ignite` are droppe
 `broadside` are dropped), idles its banks, flashes and lights and clears the holes it drew into its targets' masks;
 `HullFire` repaints its mask for time 0. Evidence: `test/reset-time.test.js` (state of a reset clock equals a fresh
 one's, before and after a seek) and `test/seek-check.mjs` (on the GPU, a reset effect drawn beside a fresh one holds the
-same live particles, bit for bit).
+same live particles, bit for bit, on WebGPU and on the WebGL2 layer).
 
 ```ts
 import {Engine} from 'margoengine/core';
