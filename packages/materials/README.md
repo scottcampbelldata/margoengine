@@ -1426,7 +1426,7 @@ engine.onFrame((_, delta) => {
 | Option | Meaning |
 | --- | --- |
 | `name` | Required. Letters and digits, starting with a letter, not a WGSL keyword or a name the PBR shader uses. Uniforms read as `<name>.<uniform>`, textures as `<name>_<texture>` with `<name>_<texture>Sampler`. A material holds one plugin of each name |
-| `uniforms` | Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f` (default none). Assign `plugin.uniforms.k = v` (same size) or write an array uniform's elements in place |
+| `uniforms` | Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f` (default none). Assign `plugin.uniforms.k = v` (same size) or write an array uniform's elements in place. TypeScript keeps the declared kind: a number uniform reads as `number`, an array as `Float32Array`, and an undeclared name is an error |
 | `textures` | Up to 4 filterable Textures by name (default none); a Texture's own colour space wins, sRGB otherwise. Live: assign another Texture of the same dimension |
 | `declarations` | Module-scope WGSL helpers; prefix their names with the plugin's name (default none). They may not declare bindings |
 | `vertex`, `surface`, `light`, `output` | The WGSL of each point, the body of a function (at least one) |

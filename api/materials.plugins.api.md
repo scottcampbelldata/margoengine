@@ -7,18 +7,20 @@ import { Engine } from "@margoengine/core/extension";
 import { MaterialSide, TextureTransform } from "@margoengine/gltf/pbr";
 import { ColorInput } from "@margoengine/math";
 
-export interface MaterialPlugin extends MaterialFeature {
+export interface MaterialPlugin<U extends MaterialPluginValues = MaterialPluginValues> extends MaterialFeature {
     readonly pluginName: string;
     readonly code: Readonly<MaterialPluginPoints & {
         declarations?: string;
     }>;
-    readonly uniforms: Record<string, number | Float32Array>;
+    readonly uniforms: {
+        -readonly [K in keyof U]: MaterialPluginUniform<U[K]>;
+    };
     readonly textures: Record<string, Texture>;
 }
 
-export interface MaterialPluginOptions extends MaterialPluginPoints {
+export interface MaterialPluginOptions<U extends MaterialPluginValues = MaterialPluginValues> extends MaterialPluginPoints {
     name: string;
-    uniforms?: Readonly<Record<string, number | readonly number[]>>;
+    uniforms?: Readonly<U>;
     textures?: Readonly<Record<string, Texture>>;
     declarations?: string;
 }
@@ -30,7 +32,11 @@ export interface MaterialPluginPoints {
     output?: string;
 }
 
-export function materialPlugin(options: MaterialPluginOptions): MaterialPlugin;
+export type MaterialPluginUniform<V> = V extends number ? number : Float32Array;
+
+export type MaterialPluginValues = Record<string, number | readonly number[]>;
+
+export function materialPlugin<U extends MaterialPluginValues = MaterialPluginValues>(options: MaterialPluginOptions<U>): MaterialPlugin<U>;
 
 export const materialPluginCodec: MaterialValueCodec;
 

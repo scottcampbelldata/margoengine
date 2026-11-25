@@ -29,25 +29,30 @@ export interface MaterialPluginPoints {
   /** Last, before the pass writes: edit `var color: vec3f` (display-encoded when the engine tone-maps in the shader); read `i`, `s`, `v`. */
   output?: string;
 }
+/** The values a plugin's `uniforms` are declared with, by name. */
+export type MaterialPluginValues = Record<string, number | readonly number[]>;
+/** What a declared uniform reads as: a number stays a number, an array is a fixed-size Float32Array. */
+export type MaterialPluginUniform<V> = V extends number ? number : Float32Array;
 /** `materialPlugin()` options. */
-export interface MaterialPluginOptions extends MaterialPluginPoints {
+export interface MaterialPluginOptions<U extends MaterialPluginValues = MaterialPluginValues>
+  extends MaterialPluginPoints {
   /** WGSL identifier naming the plugin (letters and digits): its uniforms read as `<name>.<uniform>`, its textures as `<name>_<texture>`. One plugin of each name per material. */
   name: string;
   /** Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f`. Default none. */
-  uniforms?: Readonly<Record<string, number | readonly number[]>>;
+  uniforms?: Readonly<U>;
   /** Up to 4 filterable textures by name, read as `<name>_<texture>` with `<name>_<texture>Sampler` (use `textureSampleLevel` in `vertex`). Live: assign another Texture of the same dimension. Default none. */
   textures?: Readonly<Record<string, Texture>>;
   /** Module-scope WGSL helpers (functions, constants); prefix their names with the plugin's name. Default none. */
   declarations?: string;
 }
 /** What `materialPlugin()` returns: a material feature with live uniforms and textures. */
-export interface MaterialPlugin extends MaterialFeature {
+export interface MaterialPlugin<U extends MaterialPluginValues = MaterialPluginValues> extends MaterialFeature {
   /** The plugin's own name (the feature's `name` is `plugin:<name>`). */
   readonly pluginName: string;
   /** The WGSL, fixed at creation; make a new plugin to change it. */
   readonly code: Readonly<MaterialPluginPoints & { declarations?: string }>;
   /** Live uniforms: `plugin.uniforms.time = 2`, or write an array uniform's elements in place. Sizes are fixed. */
-  readonly uniforms: Record<string, number | Float32Array>;
+  readonly uniforms: { -readonly [K in keyof U]: MaterialPluginUniform<U[K]> };
   /** Live textures: assign another Texture of the same dimension under the same name. */
   readonly textures: Record<string, Texture>;
 }
@@ -355,7 +360,9 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
  * in list order. The WGSL and names are fixed and checked here (TypeError, RangeError); uniforms and textures stay live.
  * WGSL compile errors come from WebGPU's validation when the shader first draws.
  */
-export function materialPlugin(options: MaterialPluginOptions): MaterialPlugin {
+export function materialPlugin<U extends MaterialPluginValues = MaterialPluginValues>(
+  options: MaterialPluginOptions<U>,
+): MaterialPlugin<U> {
   if (!options || typeof options !== 'object')
     throw new TypeError(`materialPlugin needs an options object with a name and WGSL for a point${help}`);
   for (const key of Object.keys(options))
@@ -363,7 +370,8 @@ export function materialPlugin(options: MaterialPluginOptions): MaterialPlugin {
       throw new TypeError(
         `Material plugin option '${key}' is unknown; use name, uniforms, textures, declarations, vertex, surface, light or output${help}`,
       );
-  const { name, uniforms = {}, textures = {}, declarations } = options;
+  const { name, textures = {}, declarations } = options,
+    uniforms: MaterialPluginValues = options.uniforms ?? {};
   checkName('name', name);
   const code: MaterialPluginPoints & { declarations?: string } = {};
   for (const point of [...points, 'declarations'] as const) {
@@ -434,11 +442,11 @@ export function materialPlugin(options: MaterialPluginOptions): MaterialPlugin {
   };
   let users = 0;
   const cached = new Map<string, string>();
-  const feature: MaterialPlugin = {
+  const feature: MaterialPlugin<U> = {
     name: 'plugin:' + name,
     pluginName: name,
     code: state.code,
-    uniforms: Object.seal(liveUniforms) as Record<string, number | Float32Array>,
+    uniforms: Object.seal(liveUniforms) as MaterialPlugin<U>['uniforms'],
     textures: Object.seal(liveTextures) as Record<string, Texture>,
     shader(source, group, material) {
       const list = pluginsOf(material);
