@@ -2,7 +2,7 @@
 import math
 import struct
 
-from .bake import render_uv
+from .bake import feed, render_uv
 
 # F-curve keys of one live parameter, in seconds from the scene start, when Blender's own evaluation can be reproduced
 # exactly between frames: CONSTANT, LINEAR, BEZIER and every easing (ELASTIC with its amplitude, and its period in seconds),
@@ -145,18 +145,19 @@ def noise_trees(material):
         found = found or node.type == "TEX_NOISE"
         if node.type == "GROUP" and node.node_tree:
             stack += [(node.node_tree, n) for n in node.node_tree.nodes if n.type == "GROUP_OUTPUT" and n.is_active_output]
-        stack += [(tree, link.from_node) for s in node.inputs for link in s.links]
+        stack += [(tree, source[0]) for source in map(feed, node.inputs) if source]
     return trees if found else None
 
 
 def graph(context, material, owner):
     tree = material.node_tree
     outputs = [n for n in tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]
-    if len(outputs) != 1 or not outputs[0].inputs["Surface"].is_linked:
+    surface_source = feed(outputs[0].inputs["Surface"]) if len(outputs) == 1 else None
+    if surface_source is None:
         raise ValueError(f"Material '{material.name}': connect one active surface output")
     output = outputs[0]
-    shader = output.inputs["Surface"].links[0].from_node
-    if shader.type != "BSDF_PRINCIPLED" or output.inputs["Volume"].is_linked or output.inputs["Displacement"].is_linked:
+    shader = surface_source[0]
+    if shader.type != "BSDF_PRINCIPLED" or feed(output.inputs["Volume"]) or feed(output.inputs["Displacement"]):
         raise ValueError(f"Material '{material.name}': live nodes require a direct Principled surface")
     nodes, parameters, readers, memo, active, paths = [], {}, {}, {}, set(), {}
 
@@ -177,9 +178,9 @@ def graph(context, material, owner):
 
     def socket(node, index):
         s = node.inputs[index]
-        if s.is_linked:
-            link = s.links[0]
-            return visit(link.from_node, link.from_socket)
+        source = feed(s)
+        if source:
+            return visit(*source)
         return parameter(f"{node.name}/inputs/{index}", lambda: s.default_value, s.path_from_id("default_value"))
 
     def visit(node, out):
@@ -193,10 +194,6 @@ def graph(context, material, owner):
         active.add(key)
         t = node.type
         data = {"name": node.name, "type": "float" if out.type == "VALUE" else "color" if out.type == "RGBA" else "vector"}
-        if t == "REROUTE":
-            result = socket(node, 0)
-            active.remove(key)
-            return result
         if t in {"VALUE", "RGB"}:
             data.update(op="value", inputs=[parameter(f"{node.name}/outputs/0", lambda: out.default_value, out.path_from_id("default_value"))])
         elif t == "MATH":
@@ -222,7 +219,7 @@ def graph(context, material, owner):
             data.update(op="noise", dimensions=int(node.noise_dimensions[0]), normalize=getattr(node, "normalize", True), noiseType=getattr(node, "noise_type", "FBM"), color=out.name == "Color")
             data["inputs"] = [socket(node, i) for i in range(len(node.inputs))]
             data["sockets"] = [s.name for s in node.inputs]
-            if not node.inputs["Vector"].is_linked:
+            if not feed(node.inputs["Vector"]):
                 data["inputs"][0] = {"link": coordinate("generated")}
         elif t in {"UVMAP", "TEX_COORD"}:
             mode = "uv" if t == "UVMAP" or out.name == "UV" else out.name.lower()
@@ -253,7 +250,7 @@ def graph(context, material, owner):
     for i, s in enumerate(shader.inputs):
         if s.name in names:
             surface[names[s.name]] = socket(shader, i)
-        elif s.is_linked:
+        elif feed(s):
             fail(shader, f"unsupported linked surface input {s.name}")
     # Reject static lobes that the compact live surface cannot represent instead of silently losing them.
     for name in ("Transmission Weight", "Coat Weight", "Sheen Weight", "Subsurface Weight", "Anisotropic IOR Level"):

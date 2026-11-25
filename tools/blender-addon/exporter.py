@@ -8,7 +8,7 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from .animation import animated, export_animated
-from .bake import bake_material, principled, render_uv, second_uv
+from .bake import feed, bake_material, principled, render_uv, second_uv
 from .curves import KINDS, GeometryData, read_object
 from .writer import png, write
 
@@ -106,17 +106,13 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         return len(textures) - 1
 
     def image_node(material, socket):
-        if len(socket.links) != 1:
-            failure(material, f"unsupported links on {socket.name}")
-        link = socket.links[0]
-        node = link.from_node
-        if node.type != "TEX_IMAGE" or not node.image or node.projection != "FLAT" or link.from_socket.name != "Color":
+        source = feed(socket)
+        node = source[0] if source else None
+        if not source or node.type != "TEX_IMAGE" or not node.image or node.projection != "FLAT" or source[1].name != "Color":
             failure(material, f"{socket.name} must use a direct Image Texture Color output", bake=True)
-        vector = node.inputs["Vector"]
-        if vector.is_linked:
-            source = vector.links[0]
-            if source.from_node.type != "TEX_COORD" or source.from_socket.name != "UV":
-                failure(material, "texture mapping must use the active UV map", bake=True)
+        vector = feed(node.inputs["Vector"])
+        if vector and (vector[0].type != "TEX_COORD" or vector[1].name != "UV"):
+            failure(material, "texture mapping must use the active UV map", bake=True)
         return node
 
     def material_key(material):
@@ -130,11 +126,12 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         if bpy.app.version < (5, 0, 0) and not material.use_nodes:
             failure(material, "enable nodes and use Principled BSDF")
         outputs = [n for n in material.node_tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]
-        if len(outputs) != 1 or not outputs[0].inputs["Surface"].is_linked:
+        surface = feed(outputs[0].inputs["Surface"]) if len(outputs) == 1 else None
+        if surface is None:
             failure(material, "missing active surface output")
         output = outputs[0]
-        shader = output.inputs["Surface"].links[0].from_node
-        if output.inputs["Volume"].is_linked or output.inputs["Displacement"].is_linked:
+        shader = surface[0]
+        if feed(output.inputs["Volume"]) or feed(output.inputs["Displacement"]):
             failure(material, "only a surface without volume/displacement is supported")
         if shader.type != "BSDF_PRINCIPLED":
             failure(material, f"the surface is a {shader.bl_label} node, not a direct Principled BSDF", bake=True)
@@ -142,7 +139,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         # Transmission, IOR, coat, sheen and subsurface map to glTF material extensions (extended() below).
         defaults = {"Anisotropic IOR Level": 0, "Specular IOR Level": 0.5, "Specular Tint": (1, 1, 1, 1)}
         for socket in shader.inputs:
-            if socket.is_linked and socket.name not in supported:
+            if feed(socket) and socket.name not in supported:
                 failure(material, f"unsupported linked input {socket.name}")
             if socket.name in defaults:
                 expected = defaults[socket.name]
@@ -157,34 +154,36 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         pbr["baseColorFactor"][3] = shader.inputs["Alpha"].default_value
         for name, factor_key in (("Metallic", "metallicFactor"), ("Roughness", "roughnessFactor")):
             socket = shader.inputs[name]
-            if socket.is_linked:
+            if feed(socket):
                 failure(material, f"textured {name} needs a packed metallic-roughness map", bake=True)
             pbr[factor_key] = socket.default_value
-        if base.is_linked:
+        if feed(base):
             node = image_node(material, base)
             pbr["baseColorTexture"] = {"index": texture(node.image, node, color=True, dry=dry)}
             pbr["baseColorFactor"][:3] = [1, 1, 1]
         alpha = shader.inputs["Alpha"]
-        if alpha.is_linked:
-            link = alpha.links[0]
-            if not base.is_linked or link.from_node != base.links[0].from_node or link.from_socket.name != "Alpha":
+        opacity = feed(alpha)
+        if opacity:
+            color = feed(base)
+            if not color or opacity[0] != color[0] or opacity[1].name != "Alpha":
                 failure(material, "Alpha must come from the base color image", bake=True)
             pbr["baseColorFactor"][3] = 1
-        if alpha.is_linked or pbr["baseColorFactor"][3] < 1:
+        if opacity or pbr["baseColorFactor"][3] < 1:
             result["alphaMode"] = "BLEND"
         normal = shader.inputs["Normal"]
-        if normal.is_linked:
-            normal_node = normal.links[0].from_node
-            if normal_node.type != "NORMAL_MAP" or normal_node.space != "TANGENT" or normal_node.uv_map or normal_node.inputs["Strength"].is_linked:
+        bumped = feed(normal)
+        if bumped:
+            normal_node = bumped[0]
+            if normal_node.type != "NORMAL_MAP" or normal_node.space != "TANGENT" or normal_node.uv_map or feed(normal_node.inputs["Strength"]):
                 failure(material, "Normal requires tangent-space Normal Map using the active UV map", bake=True)
             image = image_node(material, normal_node.inputs["Color"])
             result["normalTexture"] = {"index": texture(image.image, image, dry=dry), "scale": normal_node.inputs["Strength"].default_value}
         emission = shader.inputs["Emission Color"]
         strength = shader.inputs["Emission Strength"]
-        if strength.is_linked:
+        if feed(strength):
             failure(material, "Emission Strength must be constant", bake=True)
         factor = [v * strength.default_value for v in emission.default_value[:3]]
-        if emission.is_linked:
+        if feed(emission):
             node = image_node(material, emission)
             result["emissiveTexture"] = {"index": texture(node.image, node, color=True, dry=dry)}
             factor = [strength.default_value] * 3
@@ -215,7 +214,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         if value("Coat Weight") > 0:
             if abs(value("Coat IOR") - 1.5) > 1e-5 or any(abs(c - 1) > 1e-5 for c in value("Coat Tint")[:3]):
                 failure(material, "a coat needs Coat IOR 1.5 and a white Coat Tint, as glTF's clearcoat has")
-            if shader.inputs["Coat Normal"].is_linked:
+            if feed(shader.inputs["Coat Normal"]):
                 failure(material, "a coat normal map is unsupported; the coat uses the surface normal")
             result["KHR_materials_clearcoat"] = {"clearcoatFactor": value("Coat Weight"), "clearcoatRoughnessFactor": value("Coat Roughness")}
         if value("Sheen Weight") > 0:
