@@ -1802,6 +1802,10 @@ export function convertMesh(vertices: ArrayLike<number>, indices: ArrayLike<numb
 export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
+export function coupleDofs(physics: Physics, multibody: Multibody, linkA: PhysicsBody, linkB: PhysicsBody, options?: {
+    ratio?: number;
+}): GearJoint;
+
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 
 export function explosion(physics: Physics, center: Vec3, options: ExplosionOptions): PhysicsBody[];

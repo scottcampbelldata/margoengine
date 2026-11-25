@@ -1,7 +1,7 @@
 // A multibody's own API: its links by index and body, the joint between two bodies, and the switch for contacts inside the tree.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Physics } from '../dist/index.js';
+import { Physics, coupleDofs } from '../dist/index.js';
 
 function tree(physics) {
   const root = physics.addBody(null, { type: 'fixed', colliders: { shape: 'sphere', radius: 0.5 } });
@@ -111,5 +111,38 @@ test('a loop closed by an ordinary joint between a tree link and a fixed body ho
   }
   assert.ok(worst < 2e-3, `the loop stays closed to 2 mm: ${worst}`);
   assert.ok(Number.isFinite(a.position[0]) && Math.abs(a.position[0]) < 3, 'and nothing blows up');
+  physics.dispose();
+});
+
+test('two hinge coordinates of a tree are coupled: q_a + ratio q_b holds, and the tree keeps its joints', async () => {
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const root = physics.addBody(null, { type: 'fixed' });
+  const link = (x) =>
+    physics.addBody(null, { position: [x, 0, 0], colliders: { shape: 'box', halfExtents: [0.4, 0.1, 0.1], mass: 1 } });
+  const [a, b] = [link(0), link(3)];
+  const multibody = physics.addMultibody(root, [
+    { body: a, joint: { type: 'revolute', axis: [0, 0, 1] } },
+    { body: b, parent: root, joint: { type: 'revolute', axis: [0, 0, 1], anchorA: [3, 0, 0] } },
+  ]);
+  coupleDofs(physics, multibody, a, b, { ratio: 2 });
+  a.setAngularVelocity([0, 0, 1]);
+  for (let i = 0; i < 90; i++) physics.step();
+  const [qa, qb] = multibody.coordinates();
+  assert.ok(Math.abs(qa + 2 * qb) < 1e-3, `q_a + 2 q_b stays 0: ${qa} ${qb}`);
+  assert.ok(Math.abs(qa) > 0.5, `and the pair really turned: ${qa}`);
+  assert.ok(Math.abs(a.position[0]) < 1e-3 && Math.abs(b.position[0] - 3) < 1e-3, 'each link stays on its hinge');
+  // A link that does not hang from the root has no DOF of its own to couple.
+  const chain = new Physics(null, { gravity: [0, 0, 0] });
+  const base = chain.addBody(null, { type: 'fixed' });
+  const first = chain.addBody(null, { position: [1, 0, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
+  const second = chain.addBody(null, { position: [2, 0, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 1 } });
+  const tall = chain.addMultibody(base, [
+    { body: first, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-1, 0, 0] } },
+    { body: second, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-1, 0, 0] } },
+  ]);
+  assert.throws(() => coupleDofs(chain, tall, first, second), TypeError);
+  chain.dispose();
+  assert.throws(() => coupleDofs(physics, multibody, a, root), TypeError);
   physics.dispose();
 });

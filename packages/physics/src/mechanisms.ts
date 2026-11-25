@@ -4,8 +4,9 @@
 // by default or soft, as the constraint of Catto, "Soft Constraints", GDC 2011 (a frequency and a damping ratio). Baraff,
 // "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, is the form of a constraint between two bodies' coordinates as
 // one row of the system. They act next to the joints that guide the bodies (a hinge for each gear, a slider for a rack).
-import { checkVec, type Vec3 } from './math.js';
+import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
+import type { Multibody } from './multibody.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 
 type V = [number, number, number];
@@ -284,4 +285,28 @@ export class PathJoint extends Mechanism {
     this.physics.kernel.setCoupling(this.slot, 10, [speed, maxForce, 0]);
     return this;
   }
+}
+
+/**
+ * Couples two joint coordinates of a multibody: the angle of hinge link `linkA` plus `ratio` times the angle of hinge link `linkB` stays
+ * what it was (Rapier's multibody DOF couplings, and MuJoCo's tendon-like coupled joints), through a {@link GearJoint} on the two link bodies. A
+ * link's coordinate is its body's own angle only where its parent does not turn, so both links must hang from the tree's root.
+ * @throws TypeError for a link that is not a hinge link of the tree, or whose parent is not the root.
+ */
+export function coupleDofs(
+  physics: Physics,
+  multibody: Multibody,
+  linkA: PhysicsBody,
+  linkB: PhysicsBody,
+  options: { ratio?: number } = {},
+): GearJoint {
+  const hinge = (body: PhysicsBody): Vec3 => {
+    const link = multibody.links.find((candidate) => candidate.body === body);
+    if (!link || link.joint.type !== 'revolute' || link.parent !== multibody.root)
+      throw new TypeError(
+        "A DOF coupling takes two hinge links that hang from the multibody's root; pass revolute links whose parent is the root.",
+      );
+    return rotateVec(link.joint.frameB, [1, 0, 0]);
+  };
+  return new GearJoint(physics, linkA, linkB, { axisA: hinge(linkA), axisB: hinge(linkB), ratio: options.ratio });
 }

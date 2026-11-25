@@ -65,7 +65,7 @@ export { DragJoint } from './drag.js';
 export type { DragOptions } from './drag.js';
 export { addUniversalJoint, addWheelJoint } from './joint-presets.js';
 export type { UniversalJointOptions, WheelJoint, WheelJointOptions } from './joint-presets.js';
-export { DistanceJoint, GearJoint, PathJoint, PulleyJoint, RackAndPinionJoint } from './mechanisms.js';
+export { coupleDofs, DistanceJoint, GearJoint, PathJoint, PulleyJoint, RackAndPinionJoint } from './mechanisms.js';
 export type {
   DistanceOptions,
   GearOptions,
