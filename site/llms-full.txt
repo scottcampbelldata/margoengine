@@ -11348,15 +11348,28 @@ equality has been shown on Windows only; no Linux or macOS rebuild is on record 
 
 `glslFn(code, {name, defines, flipY, strict})` turns one GLSL ES 3.00 or 1.00 function, with the helpers, structs and constants it uses, into a node function; `glslToWGSL` returns its WGSL, entry name, parameters and result type; `toGLSL(target, translator, options)` returns the GLSL ES 3.00 program and binding tables the WebGL2 layer makes from a NodePass, a NodeMaterial that has drawn, or `{vertex, fragment}` WGSL, through the translator the caller passes (`await import('@margoengine/webgl2-compat/glsl')`). Defaults: the last function defined is called, no defines, `flipY` false, `strict` false (translated functions carry `@diagnostic(off, derivative_uniformity)`, so an implicit lookup in a per-pixel branch compiles as GLSL allows; `strict: true` keeps WGSL's rule). A source without `#version` reads as GLSL ES 3.00. Lookups read level 0 in vertex and compute nodes and use implicit derivatives in fragment and post nodes, as `texture()` does; each stage is translated once per source and options (cache of 256 translations). Refused, with MargoError `failed`, `line`, `column` and a help link: syntax errors, a uniform or a `gl_` built-in inside the source ("pass it as an argument"), an `out` or `inout` parameter on the called function, a parameter that is not a scalar, vector, square matrix or `sampler2D`/`samplerCube`/`sampler3D`/`sampler2DArray`, and a non-value return. Lines count from the source as written; a backslash line continuation joins two lines, so lines after it count one less, and columns after a macro expansion are those of the expanded line. Errors found while typing the translation (an unknown function, mismatched operands) carry no position. Limits are the shared front end's: 65,536 code units, 32,768 tokens, 128 nested statements and expressions, 64 macro rounds. Not in this entry: whole GLSL programs with `main`, uniforms and varyings (a raw GLSL material), and a Shadertoy `mainImage` wrapper; both are separate rows for Scott to decide. Sizes: shader/glsl 17,206 B min+gzip (new, ceiling 17,723 B); it bundles the GLSL front end that transitions/glsl also bundles, because two packages cannot share a chunk. Shader root unchanged at 18,664 B, transitions/glsl 19,656 B within 20,083 B, core + stage unchanged. Evidence: `packages/shader/test/glsl.test.js` (pinned WGSL for five fixtures, each checked by the layer's WGSL checker, toGLSL for a NodePass and a NodeMaterial, positions, options, hostile input) and `packages/shader/test/glsl-check.mjs` natively and with `--compat` on an RTX A6000 (Chrome, ANGLE Direct3D 11 for WebGL2): every pixel of five fixtures at two parameter values equals the browser's own WebGL2 compiler (maximum difference 0 levels on both legs, bound 1), NodeMaterials from GLSL equal their WGSL and `texture()` twins, and six toGLSL programs compile and link in raw WebGL2.
 
+## Process tree kills
+
+Scripts and tests end a process tree on Windows only through scripts/support/shutdown.mjs (KB-TEST-FILEEXIT1;
+tests/process-kill.test.js fails on a raw `taskkill` or a `ParentProcessId` walk anywhere else). A child process is
+ended by `killChildTreeSync` (`taskkill /T /F` while Node still holds its handle; 1.2 s measured on the loaded
+workstation); a bare pid by `killOwnTree`, which reads the whole process table first (4 to 20 s there, up to the 30,000
+ms shutdown budget) and ends the pid only if it is below the caller. Accepted difference: below a live child,
+taskkill finds the tree by `ParentProcessId`, which Microsoft documents may name a newer process that took a dead
+parent's pid, and does not say whether taskkill compares creation times; a process orphaned by an earlier holder of
+the child's pid could be taken in. Pass a pid instead of the child to get the checked walk, at its cost. A child whose
+exit was seen is never ended by pid; anything it left running is not ended either.
+
 ## Browser close limit
 
 A hosted browser close (`launchBrowser` in `scripts/lib/browser.mjs`, KB-P3h, 2026-11-15) has a hard limit,
 `CLOSE_LIMIT_MS` (20,000 ms). A close still open then (a host that never acknowledges the end, a client close that
-never returns) kills the host and the browser with their process trees (`taskkill /T /F` on Windows, the process
-groups elsewhere), waits up to `CLOSE_KILL_MS` (8,000 ms) for them to be gone, releases the host and fails with
-`SHUTDOWN_TIMEOUT`, listing the open steps (`open`), the killed pids (`killed`) and any still running (`survivors`).
-The limit and the kill end inside the 30,000 ms shutdown budget, so the suite reports this error, not the outer
-budget. Measured closes: 0.25 s alone, 0.28 to 2.03 s beside two GPU suites and ten CPU hogs; the close's own
+never returns) kills the host and the browser with their process trees (on Windows `killOwnTree` in
+`scripts/support/shutdown.mjs`, which ends a pid only while it is below the suite's own process, KB-TEST-FILEEXIT1; the
+process groups elsewhere), waits up to `CLOSE_KILL_MS` (8,000 ms) after the kill for them to be gone, releases the host
+and fails with `SHUTDOWN_TIMEOUT`, listing the open steps (`open`), the killed pids (`killed`) and any still running
+(`survivors`). On Windows the kill itself reads the whole process table: 4 to 20 s measured on the loaded
+workstation (it may take up to the 30,000 ms shutdown budget), against 1.2 s for the `taskkill /T` it replaced, which could end another run's process through a reused pid. Measured closes: 0.25 s alone, 0.28 to 2.03 s beside two GPU suites and ten CPU hogs; the close's own
 bounded waits add up to about 7 s. Before the limit a close past the budget threw but left the host and its
 browser running and the host referenced, so a suite that went on after the error never exited. Firefox and WebKit
 run without a host and close the ordinary way, inside the 30,000 ms budget, with no kill. `check:readme-run` closes each example's browser after the example's 20 s deadline,
@@ -12141,14 +12154,48 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
   `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
 
-### Open 2026-11-25: a long test file ends with no result in its package run (KB-TEST-FILEEXIT1, humans, water, test runner)
+### Fixed 2026-11-25: a long test file ends with no result in its package run (KB-TEST-FILEEXIT1, humans, water, scripts, process kills)
 
 - **Repro:** `npm run test:changed` on the workstation (2026-11-25, lane A, a change to packages/shared, so every package
   runs): `packages/humans/test/fit.test.js` failed after 122 s and `packages/water/test/flood-bounds.test.js` after 257 s, each
   as 'test failed' at the file with no failing or cancelled subtest and nothing on stderr. Run alone
   (`node --test-reporter=tap --test test/<file>` in the package folder) both pass, 30 of 30 in 315 s and 18 of 18 in 345 s.
-- **Cause:** not found yet. The file process ends long before its tests could finish, which points at the process being
-  ended (memory or a kill) while the package runs its other test files beside it, not at a wrong value.
+- **Cause:** the file's process was ended from outside by a tree kill aimed at another process's old pid. On Node
+  26.13, `taskkill /F` on a running `node --test` file process gives exactly that report: 'test failed' at the file, the
+  test in flight neither failed nor cancelled, nothing on stderr. Running out of memory does not: V8 prints `FATAL ERROR
+  ... heap out of memory` and its stack to stderr, which the runner passes on. A pid names a process only while it runs;
+  once it has exited and its last handle is closed Windows gives the number to a new process (measured on the
+  workstation: after 295 process starts, 51 s), and a test file is the process the lanes start most often. Margo's
+  scripts ended trees by bare pid in about 30 places (`taskkill /T /F <pid>`, `endTree(pid)`, run-with-timeout's
+  `killTree(pid)`), several of them after the target could have exited: a limit timer cleared only on `close`, which
+  waits for every pipe and so fires after the exit when a grandchild holds one; a cleanup that kills a pid it kept
+  (template-browser-check's `finally`, jupyter-steps' second `killTree`); an asynchronous
+  taskkill during which Node sees the exit and closes its handle. `taskkill /T` also follows `ParentProcessId`, which
+  may name a parent that has exited or a newer process that took its pid (Microsoft, "Win32_Process class",
+  https://learn.microsoft.com/windows/win32/cimwin32prov/win32-process; "Process Handles and Identifiers",
+  https://learn.microsoft.com/windows/win32/procthread/process-handles-and-identifiers: the identifier is valid only
+  until the process ends, a handle until it is closed). Which lane's kill hit these two files was not caught live; the
+  minutes between the file's start and its end match a pid kept past its process's exit and reused.
+- **Fixed:** every tree kill on Windows goes through scripts/support/shutdown.mjs, by one of two routes. A child
+  process this one started is ended by `killChildTreeSync`: `taskkill /T /F` run synchronously and only before Node has
+  seen its exit, so Node still holds its handle and Windows cannot give its pid to anyone else during the kill (fast,
+  about 1 s); a child whose exit was seen is not ended by pid at all. A bare pid is ended by `killOwnTree` /
+  `killOwnTreeSync`: one PowerShell reads the process table, walks this process's own tree with each child created no
+  earlier than its parent, ends the pid and its tree only if it is in it, and ends each process through a handle
+  checked against its creation time, so a pid that has become another run's process is left alone (4 to 20 s on the
+  loaded workstation). `endTree` and both `killTree`s take either and pick the route; run-with-timeout, runWithTimeout's
+  CLI, the dev-server probe, the browser host's unlisted-tree end, verify, mutation, node22-tests, the reference
+  renderers, the shot queue, draco-resources, test-unity and the netcode and voxel-net checks pass the child.
+  test-watch's hung-run stop now uses the creation-checked walk (its own walk followed `ParentProcessId` unchecked);
+  test-unity's orphan kill checks each start time. Not covered: taskkill's own walk below a live child follows
+  `ParentProcessId`, and Microsoft does not say whether it checks creation times (docs/limits.md, "Process tree
+  kills"). Regression: tests/process-kill.test.js (a process not below this one survives `endTree`, `killTree` and
+  `killOwnTreeSync`, which the old taskkill route ended; a child whose exit was seen is not killed by pid; a child's
+  whole tree, a detached grandchild included, still ends by every route; and a scan that fails on a raw `taskkill` or
+  a `ParentProcessId` walk outside the helper, which verify and so check:merge run). A second report fits the same
+  class but was not traced: `npm run check:owners -- --packages=post` on the laptop (ea4937f59, 67 to 99% CPU, other
+  lanes' GPU suites running) failed `post/SSAO.attach` with `page.goto: net::ERR_ABORTED` for tests/modern-game.html,
+  as a page server or browser ended from outside would.
 
 ### Fixed 2026-11-25: the browser host sometimes exited mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
 
