@@ -221,11 +221,11 @@ impl World {
         let mut axes = [NO_AXIS; 6];
         let mut n = 0;
         let flags = self.uu(JOINT_FLAGS, joint);
-        let rotation = self.q(ROTATION_X, parent);
+        let rotation = self.pose_rotation(parent);
         let frame = rotation.mul(self.q(JOINT_FRAME_A_X, joint));
-        let point = self.v(POSITION_X, parent).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
-        let (center_b, center_p) = (self.v(CENTER_X, body), self.v(CENTER_X, parent));
-        let anchor_b = self.v(POSITION_X, body).add(self.q(ROTATION_X, body).rotate(self.v(JOINT_ANCHOR_B_X, joint)));
+        let point = self.pose_position(parent).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
+        let (center_b, center_p) = (self.pose_center(body), self.pose_center(parent));
+        let anchor_b = self.pose_position(body).add(self.pose_rotation(body).rotate(self.v(JOINT_ANCHOR_B_X, joint)));
         let along = self
             .v(LINEAR_X, body)
             .add(self.v(ANGULAR_X, body).cross(anchor_b.sub(center_b)))
@@ -263,7 +263,7 @@ impl World {
             return m;
         }
         let mass = 1.0 / inverse as f64;
-        let frame = self.q(ROTATION_X, body).mul(self.q(INERTIA_FRAME_X, body));
+        let frame = self.pose_rotation(body).mul(self.q(INERTIA_FRAME_X, body));
         let principal = d3(self.v(INERTIA_X, body));
         for k in 0..3 {
             m[k][k] = mass;
@@ -319,7 +319,7 @@ impl World {
                 }
             }
             let (axes, k) = self.joint_axes(joint, b, parent);
-            let center = d3(self.v(CENTER_X, b));
+            let center = d3(self.pose_center(b));
             let mut s = [[0.0; 6]; 6];
             for c in 0..k {
                 let ax = axes[c];
@@ -368,7 +368,7 @@ impl World {
                 }
                 *d.add(K_AT) = k as f64;
             }
-            let p = transport(sub(center, d3(self.v(CENTER_X, parent))));
+            let p = transport(sub(center, d3(self.pose_center(parent))));
             let (pt, back) = (transposed(&p), mul6(&mul6(&transposed(&p), &hat_a), &p));
             let up = apply6(&pt, &hat_r);
             if parent == root {
@@ -418,7 +418,7 @@ impl World {
                 }
                 u
             };
-            let p = transport(sub(d3(self.v(CENTER_X, b)), d3(self.v(CENTER_X, parent))));
+            let p = transport(sub(d3(self.pose_center(b)), d3(self.pose_center(parent))));
             let moved = apply6(&p, &up);
             let k = unsafe { *d.add(K_AT) } as usize;
             let mut u = moved;
@@ -478,9 +478,9 @@ impl World {
             let p_row = self.uu(MB_PARENT, body) as usize;
             let joint = self.uu(MB_JOINT, body) as usize;
             let flags = self.uu(JOINT_FLAGS, joint);
-            let (rp, pp) = (self.q(ROTATION_X, p_row), self.v(POSITION_X, p_row));
+            let (rp, pp) = (self.pose_rotation(p_row), self.pose_position(p_row));
             let frame_a = rp.mul(self.q(JOINT_FRAME_A_X, joint));
-            let (rc, frame_b) = (self.q(ROTATION_X, body), self.q(JOINT_FRAME_B_X, joint));
+            let (rc, frame_b) = (self.pose_rotation(body), self.q(JOINT_FRAME_B_X, joint));
             // The turn of frame B in frame A, cut to what the joint's angular axes allow.
             let mut rel = frame_a.conjugate().mul(rc.mul(frame_b));
             if rel.w < 0.0 {
@@ -524,7 +524,7 @@ impl World {
             let turned = frame_a.mul(rel).mul(frame_b.conjugate()).normalized();
             let anchor_a = pp.add(rp.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
             let arm = turned.rotate(self.v(JOINT_ANCHOR_B_X, joint));
-            let gap = self.v(POSITION_X, body).add(arm).sub(anchor_a);
+            let gap = self.pose_position(body).add(arm).sub(anchor_a);
             let mut target = anchor_a;
             for k in 0..3 {
                 if flags & (JOINT_LOCK << k) == 0 {
@@ -542,7 +542,7 @@ impl World {
             // The position correction is also a speed (SHAKE with RATTLE, Andersen 1983): what the joint has to take back to close
             // the step's second-order error leaves as a speed along the constraint, which the projection that follows removes, so
             // the pose is exact and the energy stays where the plain solver keeps it.
-            let moved = center.sub(self.v(CENTER_X, body)).scale(1.0 / h);
+            let moved = center.sub(self.pose_center(body)).scale(1.0 / h);
             let turn = turned.mul(rc.conjugate()).to_rotation_vector().scale(1.0 / h);
             // Within the slack of the joint rows nothing is touched: a position correction that small is the second-order step
             // of the integrator itself, and making it every substep takes energy the rows' own RATTLE stages keep.

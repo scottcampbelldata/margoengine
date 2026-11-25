@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18423932,
+  "total": 18445900,
   "history": [
     {
       "date": "2026-10-24",
@@ -11751,10 +11751,16 @@
       "commit": "cc1fc9c6b",
       "reason": "physics lazy kernel grows from 467,900 B to 468,876 B (+976 B over both blueprints): the counting sort of the solved pairs by island, three columns of the table",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "b76b611ef",
+      "reason": "physics grows from 564,869 B to 565,422 B (+553 B) and its base by 2 B: the solve by island (windows, group windows, the staged kinematic pose, the kinematic pass) in both Wasm blueprints, the SIMD and the scalar one, whose sizes the figure sums; a page loads one",
+      "grew": 5
     }
   ],
   "items": {
-    "@margoengine/animation": 25172,
+    "@margoengine/animation": 26165,
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
@@ -11878,7 +11884,7 @@
     "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/parallel": 11405,
-    "@margoengine/bvh/points": 17799,
+    "@margoengine/bvh/points": 18489,
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 11036,
@@ -12311,7 +12317,7 @@
     "@margoengine/lines": 23270,
     "@margoengine/lines/batch": 6616,
     "@margoengine/lines/debug": 10845,
-    "@margoengine/lines/edges": 5972,
+    "@margoengine/lines/edges": 6268,
     "@margoengine/lines/hidden": 5219,
     "@margoengine/lines/pick": 6268,
     "@margoengine/lines/stroke": 5680,
@@ -12510,8 +12516,8 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 564869,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 82354,
+    "@margoengine/physics": 582385,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 84827,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 482943,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,

@@ -79,3 +79,44 @@ test('hinged bodies under a sweeping kinematic platform step the same either way
     });
   });
 });
+
+test('a multibody arm on a moving kinematic base, and one whose tip rests on a moving platform, step the same either way', async () => {
+  await Physics.load();
+  const arm = (physics, root, x) => {
+    const bodies = [0, 1].map((i) =>
+      physics.addBody(null, {
+        position: [x + i + 1, 6, 0],
+        colliders: { shape: 'sphere', radius: 0.3, mass: 1 },
+        canSleep: false,
+      }),
+    );
+    physics.addMultibody(
+      root,
+      bodies.map((body) => ({
+        body,
+        joint: { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0], anchorB: [-1, 0, 0] },
+      })),
+    );
+    return bodies;
+  };
+  same(240, (physics) => {
+    floor(physics);
+    const base = physics.addBody(null, {
+      type: 'kinematicVelocity',
+      position: [0, 6, 0],
+      linearVelocity: [0.3, 0.1, 0],
+      angularVelocity: [0, 0.5, 0.2],
+      colliders: [],
+    });
+    arm(physics, base, 0);
+    const wall = physics.addBody(null, { type: 'fixed', position: [20, 6, 0], colliders: [] });
+    const [, tip] = arm(physics, wall, 20);
+    physics.addBody(null, {
+      type: 'kinematicVelocity',
+      position: [tip.position[0], 4.6, 0],
+      linearVelocity: [0, 0.6, 0],
+      angularVelocity: [0, 0.3, 0],
+      colliders: { shape: 'box', halfExtents: [1, 0.2, 1] },
+    });
+  });
+});

@@ -121,3 +121,27 @@ fn each_islands_couplings_are_listed_together_in_slot_order() {
     }
     assert_eq!(seen, rows);
 }
+
+#[test]
+fn two_doors_hinged_to_one_wall_are_two_paths_in_two_islands() {
+    // A path stops at a body that is not dynamic, so the wall joins nothing: each door is an island of its own with a path of
+    // one joint, and the two paths are in different runs.
+    let mut w = World::new(8, 8).unwrap();
+    let wall = w.add_body(FIXED).unwrap();
+    w.add_collider(wall, SHAPE_BOX, [0.2, 3.0, 5.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    for z in [-2.0f32, 2.0] {
+        let door = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(door, SHAPE_BOX, [0.1, 1.0, 0.5], [0.0; 3], IDENTITY, 1.0).unwrap();
+        w.set_v(POSITION_X, door as usize, v3(0.5, 0.0, z));
+        w.add_joint(wall, door, 7).unwrap();
+    }
+    for _ in 0..3 {
+        w.step(1.0 / 60.0);
+    }
+    assert_eq!(w.header().islands, 2);
+    assert_eq!(w.header().joint_solving, 2);
+    for island in 0..2 {
+        assert_eq!((w.uu(ISLAND_JOINT_START, island), w.uu(ISLAND_JOINT_COUNT, island)), (island as u32, 1));
+    }
+    assert!((0..2).all(|i| w.uu(SOLVE_VIA, i) == NONE), "no joint goes on through the wall");
+}

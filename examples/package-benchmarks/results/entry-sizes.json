@@ -1,5 +1,5 @@
 {
-  "commit": "19bae9b75",
+  "commit": "b76b611ef",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 78865,
-        "gzip": 25040
+        "raw": 80100,
+        "gzip": 25402
       },
       "./vat": {
         "raw": 22507,
@@ -486,8 +486,8 @@
     },
     "@margoengine/bvh": {
       ".": {
-        "raw": 67194,
-        "gzip": 23719
+        "raw": 68593,
+        "gzip": 23902
       },
       "./tree": {
         "raw": 27293,
@@ -506,12 +506,12 @@
         "gzip": 5146
       },
       "./scene": {
-        "raw": 8655,
-        "gzip": 3611
+        "raw": 8709,
+        "gzip": 3633
       },
       "./points": {
-        "raw": 46277,
-        "gzip": 17777
+        "raw": 47676,
+        "gzip": 17950
       },
       "./sdf": {
         "raw": 5990,
@@ -526,8 +526,8 @@
         "gzip": 18936
       },
       "./alpha": {
-        "raw": 44211,
-        "gzip": 16875
+        "raw": 45610,
+        "gzip": 17073
       },
       "./alpha-triangles": {
         "raw": 2180,
@@ -12574,40 +12574,40 @@
     },
     "@margoengine/lines": {
       ".": {
-        "raw": 62241,
-        "gzip": 22592
+        "raw": 62662,
+        "gzip": 22745
       },
       "./edges": {
-        "raw": 15520,
-        "gzip": 5960
+        "raw": 15674,
+        "gzip": 6012
       },
       "./pick": {
-        "raw": 16057,
-        "gzip": 6097
+        "raw": 16262,
+        "gzip": 6167
       },
       "./trail": {
-        "raw": 16230,
-        "gzip": 6296
+        "raw": 16384,
+        "gzip": 6347
       },
       "./batch": {
         "raw": 15349,
         "gzip": 6384
       },
       "./hidden": {
-        "raw": 12889,
-        "gzip": 4963
+        "raw": 13043,
+        "gzip": 5014
       },
       "./stroke": {
-        "raw": 14131,
-        "gzip": 5424
+        "raw": 14285,
+        "gzip": 5473
       },
       "./texture": {
-        "raw": 20064,
-        "gzip": 7604
+        "raw": 20218,
+        "gzip": 7656
       },
       "./debug": {
-        "raw": 28510,
-        "gzip": 10554
+        "raw": 28664,
+        "gzip": 10602
       },
       "./tiles": {
         "raw": 2454,
@@ -13412,8 +13412,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 910586,
-        "gzip": 561489
+        "raw": 916515,
+        "gzip": 565422
       },
       "./decomposition": {
         "raw": 26661,
@@ -16684,9 +16684,9 @@
       "brotli": 13103
     },
     "packages/physics/dist/index.js": {
-      "raw": 910586,
-      "gzip": 561489,
-      "brotli": 541839
+      "raw": 916515,
+      "gzip": 565422,
+      "brotli": 546809
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -16914,14 +16914,14 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 427469,
-      "gzip": 155090,
-      "brotli": 123913
+      "raw": 431809,
+      "gzip": 156947,
+      "brotli": 125362
     },
     "packages/physics2d/dist/physics2d-scalar.wasm": {
-      "raw": 508248,
-      "gzip": 173188,
-      "brotli": 135473
+      "raw": 512938,
+      "gzip": 175289,
+      "brotli": 137364
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -17071,13 +17071,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 259904,
-        "gzip": 81960
+        "raw": 261107,
+        "gzip": 82356
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 650681,
-        "gzip": 478805,
+        "raw": 655407,
+        "gzip": 482372,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

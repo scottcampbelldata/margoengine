@@ -191,7 +191,7 @@ impl World {
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
         let stiffness = soft(hertz, damping, h);
-        if self.island_major && !self.multibody_beside_kinematic() {
+        if self.island_major {
             // Each island by itself, through all its substeps: islands share no body a solve changes. The kinematic bodies' columns
             // keep the pose the step began at while the islands solve, and each substep reads them through the stage it is at.
             let islands = self.header().islands as usize;
@@ -316,19 +316,6 @@ impl World {
                 kin: None,
             }
         }
-    }
-
-    /// True when a multibody and a moving kinematic body are both awake. The multibody's rows read the poses of its links and their
-    /// parents straight from the columns, so with a kinematic body about a step is solved phase by phase, as the kinematic bodies
-    /// are then moved at each substep, until those rows read the stage too.
-    fn multibody_beside_kinematic(&self) -> bool {
-        let (mut multibody, mut kinematic) = (false, false);
-        for slot in 0..self.header().awake as usize {
-            let at = self.uu(AWAKE, slot) as usize;
-            multibody |= self.uu(MB_ROLE, at) != 0;
-            kinematic |= self.flags(at) & KIND != DYNAMIC;
-        }
-        multibody && kinematic
     }
 
     /// The pose of a kinematic body at the stage of the substep being solved (`Window::kin`): what `integrate_poses` has made of
