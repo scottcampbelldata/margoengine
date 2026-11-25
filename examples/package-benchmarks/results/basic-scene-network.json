@@ -1,10 +1,10 @@
 {
-  "commit": "3fd9c8653",
-  "dirty": true,
+  "commit": "e25c78fcc",
+  "dirty": false,
   "browser": "chromium 156.0.8078.4 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-Bp660i7j.js",
+      "file": "assets/dist-lgEBSGC2.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
@@ -395,7 +395,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-Bw2RY_83.js",
+      "file": "assets/index-BbbBHg3E.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -460,13 +460,13 @@
       "brotli": 1846
     },
     {
-      "path": "assets/index-Bw2RY_83.js",
+      "path": "assets/index-BbbBHg3E.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
       "transferred": 27117,
       "raw": 64941,
       "gzip": 26735,
-      "brotli": 23604
+      "brotli": 23626
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -510,8 +510,8 @@
       "encoding": "identity",
       "transferred": 955,
       "raw": 705,
-      "gzip": 401,
-      "brotli": 248
+      "gzip": 402,
+      "brotli": 249
     },
     {
       "path": "model.glb",
@@ -527,8 +527,8 @@
     "requests": 12,
     "transferred": 45999,
     "raw": 96029,
-    "gzip": 40455,
-    "brotli": 35734
+    "gzip": 40456,
+    "brotli": 35757
   },
   "notFetched": [
     {
@@ -572,12 +572,12 @@
       "raw": 8699
     },
     {
-      "path": "assets/dist-Bp660i7j.js",
-      "raw": 77809
-    },
-    {
       "path": "assets/dist-BtMFhvz4.js",
       "raw": 27245
+    },
+    {
+      "path": "assets/dist-lgEBSGC2.js",
+      "raw": 79044
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
