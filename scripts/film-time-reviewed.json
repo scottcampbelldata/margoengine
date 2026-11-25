@@ -127,6 +127,9 @@
   "packages/netcode/src/lobby.ts": {
     "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
   },
+  "packages/netcode/src/media.ts": {
+    "wall": "network timestamps (netcode runs on real time, injectable `now`); nothing drawn"
+  },
   "packages/netcode/src/presence.ts": {
     "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
   },
@@ -268,6 +271,9 @@
   "packages/ui/src/meters.ts": {
     "delta": "widget clocks move in Ui.update, which UiRenderer.advanceTime runs in the frame update, so seek replays them (seek test: packages/ui/tests/seek.test.js)"
   },
+  "packages/vfx/src/debris.ts": {
+    "delta": "the film clock: seek(t) sets the film time and the debris is a function of it alone, update(delta) only moves it on (seek test: packages/vfx/test/debris.test.js)"
+  },
   "packages/voxel-edit/src/voxelize.ts": {
     "wall": "voxelize yields to the page every 16 ms; the voxels do not depend on it"
   },
@@ -311,6 +317,9 @@
   },
   "packages/water/src/ripples.ts": {
     "delta": "class B, history on the GPU: the ripple field's time to simulate (damped waves) settles over the scene's warm-up frames after a cut (GAP-FILM-TIME plan)"
+  },
+  "packages/weather/src/thermal.ts": {
+    "delta": "the film clock: seek(t) sets the film time and the cloud is a function of it alone, update(delta) only moves it on (seek test: packages/weather/tests/thermal.test.js)"
   },
   "packages/webgl2-compat/src/device/render.ts": {
     "wall": "shader translate and link timing stats of the compatibility layer"

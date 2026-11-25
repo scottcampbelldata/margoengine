@@ -9976,7 +9976,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   `high: an arm entered the torso or head`: the green route finishes (938 steps, "Top of the green route", end joint
   0.00008 off target) but `worst.body` is -0.0408 against the floor `GAP_FLOOR`.
 - **Cause:** not found. The climber rig's arm reach on the green route passes through the torso gap; the route solver
-  keeps the end joint on target and the body clearance check is the one that fails. Scott's stop (private/control.json)
+  keeps the end joint on target and the body clearance check is the one that fails. Scott's stop (in the project stop file)
   forbids people and suit work, so nobody is on it. The script's final `process.exit(0)` stays on the KB-OWN-EXIT2 owed
   list until this passes.
 

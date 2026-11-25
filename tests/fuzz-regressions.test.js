@@ -80,15 +80,20 @@ test('PCD: POINTS and LZF sizes are checked against the body before allocating',
   await loaderError(() => parsePCD(pcd('ascii', 8_000_000)), 'truncated');
 });
 
-test('USDA: bad string escapes are LoaderError syntax errors, not JSON SyntaxErrors', async () => {
-  // Found: SyntaxError from JSON.parse for `( """doc""" )` metadata and quoted prim names with bad escapes.
+test('USDA: odd string escapes are never a JSON SyntaxError', async () => {
+  // Found: SyntaxError from JSON.parse for `( """doc""" )` metadata and quoted prim names with bad escapes. Since
+  // KB-USDA-S1 (packages/loaders/tests/usda-strings.test.js) strings read as OpenUSD reads them and an unknown escape
+  // stands for the escaped character, so these stages parse and end in the LoaderError for a stage with no mesh.
   for (const usda of [
     '#usda 1.0\n(\n    """doc"""\n)\n',
     '#usda 1.0\n(\n    "\\q"\n)\n',
     '#usda 1.0\ndef "\\u12" {\n}\n',
   ])
-    await loaderError(() => parseUSDA(text(usda)), /"""doc"""/.test(usda) ? 'unsupported' : 'syntax');
-  assert.throws(() => usdzUSDA(text('#usda 1.0\ndef "\\q" {\n}\n')), /USD: invalid string escape|LoaderError|syntax/);
+    await loaderError(() => parseUSDA(text(usda)), 'unsupported');
+  assert.throws(
+    () => usdzUSDA(text('#usda 1.0\ndef "\\q" {\n}\n')),
+    (error) => error instanceof LoaderError,
+  );
 });
 
 test('3MF: component fan-out is bounded in instances, not only in depth', async () => {

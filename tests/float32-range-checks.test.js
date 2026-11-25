@@ -44,14 +44,14 @@ test('the Math.fround edges are where the limits say', () => {
   assert.equal(Math.fround(next(ZERO, 1)), 2 ** -149);
 });
 
-test('transform setters accept exactly the values Math.fround keeps finite (and nonzero for scale)', async () => {
+test('transform setters accept exactly the values Math.fround keeps finite (a zero scale included, KB-GLTFA B1)', async () => {
   const { canvas, renderer } = stillRenderer(),
     engine = new Engine(canvas, await TransformStore.create(4), renderer, undefined, null);
   try {
     const mesh = engine.createMesh().setGeometry(box());
     for (const v of [...edges, '2', null]) {
       const position = finite32(v),
-        scale = position && Math.fround(v) !== 0;
+        scale = position;
       assert.equal(!throwsOn(() => (mesh.position.x = v)), position, `position.x = ${String(v)}`);
       assert.equal(!throwsOn(() => (mesh.scale.y = v)), scale, `scale.y = ${String(v)}`);
       assert.equal(!throwsOn(() => mesh.setPosition([0, v, 0])), position, `setPosition([0, ${String(v)}, 0])`);

@@ -100,7 +100,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | 8. Works out of the box with terrain, tiles (a tiles height query) and biomes open worlds, zero config | CesiumJS, 3D Tiles renderer | MISSING | M |  |
 | 9. Follow camera for moving targets (chase, orbit-follow, side, flyby, lock-on with lead room, flock framing), critically damped springs, banking, surface clearance, built on third-person | CesiumJS `trackedEntity`, Babylon `FollowCamera` | MISSING | L |  |
 
-## Needs Scott or hardware first
+## Needs a maintainer decision or hardware first
 
 | Gap | Why it waits | Size |
 | --- | --- | --- |

@@ -17,7 +17,7 @@ test('build:packages checks the export targets of every package it built before 
   const build = readFileSync('scripts/build-modern.js', 'utf8');
   const check = build.indexOf('missingPackageTargets(');
   assert.ok(check > 0, 'build-modern calls missingPackageTargets');
-  assert.ok(check < build.indexOf('if (only) process.exit(0);'), 'before an --only build returns');
+  assert.ok(check < build.indexOf('if (!only) await sizeRecords();'), 'before an --only build ends (KB-OWN-EXIT2)');
 });
 
 test('the export gate detects missing runtime, declaration and nested condition outputs', () => {

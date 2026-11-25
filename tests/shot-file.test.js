@@ -712,7 +712,7 @@ test('page.ground: heights above the ground, set on it under the camera and unde
   assert.equal(cameraFrames(parseShot(shot({ fps: 2, seconds: 1 }, { tracks }))).heights, 'world');
 });
 
-test('every Fauld countryside and crater shot file is a valid shot on the Fauld still page with its ground', () => {
+test('every Fauld countryside, crater and blast shot file is a valid shot on the Fauld still page with its ground', () => {
   const dir = join(root, 'tools/shot/shots'),
     // The tunnel rows (scene fauld-tunnels) share the fr numbering and draw on their own page.
     files = readdirSync(dir).filter(
@@ -720,7 +720,11 @@ test('every Fauld countryside and crater shot file is a valid shot on the Fauld 
         /^fauld-fr\d+\.json$/.test(name) &&
         JSON.parse(readFileSync(join(dir, name), 'utf8')).shot.scene !== 'fauld-tunnels',
     );
-  assert.equal(files.length, 81, `${files.length} Fauld countryside and crater shot files`);
+  assert.equal(
+    files.length,
+    102,
+    `${files.length} Fauld countryside, crater and blast shot files (81 and the 21 blast rows of 4d78e331de)`,
+  );
   for (const name of files) {
     const json = JSON.parse(readFileSync(join(dir, name), 'utf8'));
     // A catalogue scene, the query apart from the path, an engine: validateShot passes (tools/shot/fauld-shots.mjs).
@@ -734,7 +738,7 @@ test('every Fauld countryside and crater shot file is a valid shot on the Fauld 
   }
 });
 
-test('every Fauld countryside and crater shot has a lens in a named band, a real f-stop that covers its subject, and moves its subject across the frame', () => {
+test('every Fauld countryside, crater and blast shot has a lens in a named band, a real f-stop that covers its subject, and moves its subject across the frame', () => {
   // channel-films rules (section 12 focal bands, section 18 f-stops, section 30 still_hits), read the way the film's
   // gates read a Margo shot: the vertical field of view on the 24.89 x 14 mm filmback, the subject's centre projected
   // through the camera over the shot. Regression: the generator took the field of view of a 24 mm high frame (a 24 mm
@@ -794,5 +798,5 @@ test('every Fauld countryside and crater shot has a lens in a named band, a real
       );
     }
   }
-  assert.equal(n, 81);
+  assert.equal(n, 102);
 });
