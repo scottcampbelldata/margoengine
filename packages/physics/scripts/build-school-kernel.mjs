@@ -55,7 +55,8 @@ if (!all.subarray(0, 4096).every((value) => value === 0xa7) || !all.subarray(819
   throw new Error('School kernel wrote outside its 4096-byte static data lease during instantiation.');
 const body = new Float64Array(memory.buffer, 49152, 12);
 body.set([0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1]);
-const status = instance.exports.school_intent(49152, 2, 50000, 0, 50112, 0.25, 2, 3, -1, 1, 2, 1);
+new Float64Array(memory.buffer, 50304, 8).fill(0);
+const status = instance.exports.school_intent(49152, 2, 50304, 50000, 0, 50112, 0.25, 2, 3, -1, 1, 2, 1);
 const output = new Float64Array(memory.buffer, 50112, 6);
 if (status !== 0 || output[2] !== 1 || output[3] !== 1 || all[0] !== 0xa7)
   throw new Error('School kernel did not run in its arena lease; check its shared memory ABI and stack.');

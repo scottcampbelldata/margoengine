@@ -2211,7 +2211,7 @@ console.log(fish.position, fish.velocity, fish.intent);
 - Each point member defaults to a mass of 1 kg, a peak thrust of 1 N, drag area 0 m², maximum lateral acceleration
   2 m/s², and minimum turn radius 0.2 m. `dragArea` means coefficient of drag times reference area. Specify a
   `FlowField` to sample local velocity and density, or use motionless fluid of `density` (1.225 kg/m³ by default).
-  The normal acceleration is bounded by `maxLateralAcceleration` and speed squared divided by `minimumTurnRadius`.
+  Local flow is subtracted before members compare headings. The normal acceleration is bounded by `maxLateralAcceleration` and speed squared divided by `minimumTurnRadius`.
   A minimum radius of 0 disables the radius constraint. Point masses advance position after updating velocity.
 - A body solver can own locomotion with `mode: 'intent'`. Write `SCHOOL_KINEMATICS_FIELD` and read
   `SCHOOL_INTENT_FIELD`. The kinematics port holds six f64 words per stable member row (position, then world velocity).
