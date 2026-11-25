@@ -417,6 +417,11 @@ pub extern "C" fn collider_set_shape(collider: u32, shape: u32, a: f32, b: f32, 
 pub extern "C" fn collider_set_pose(collider: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> u32 {
     world().set_collider_pose(collider, [x, y, z], [qx, qy, qz, qw]) as u32
 }
+/// Moves a live collider to another body, at a pose in that body's frame; false when it cannot (see `World::move_collider`).
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_move(collider: u32, body: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> u32 {
+    world().move_collider(collider, body, [x, y, z], [qx, qy, qz, qw]) as u32
+}
 /// Adds a convex child to a compound collider, placed in the compound's frame: its row, or -1 when the rows are used up,
 /// the compound is gone or the shape is not a ball, box, capsule or hull.
 #[unsafe(no_mangle)]

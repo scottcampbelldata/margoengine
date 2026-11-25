@@ -315,6 +315,26 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   get bodyCount(): number {
     return this.bodies.size;
   }
+  /** Every body in the world, in the order they were added. */
+  getBodies(): Body2D[] {
+    return [...this.bodies];
+  }
+  /** Every collider in the world, in the order their kernel shapes were made. */
+  getColliders(): Collider2D[] {
+    return [...new Set(this.byShape.values())].sort((a, b) => a.shapes[0]! - b.shapes[0]!);
+  }
+  /** How many colliders the world holds. */
+  get colliderCount(): number {
+    return new Set(this.byShape.values()).size;
+  }
+  /** Every joint in the world, in the order they were added. */
+  getJoints(): Joint2D[] {
+    return [...this.joints];
+  }
+  /** How many joints the world holds. */
+  get jointCount(): number {
+    return this.joints.size;
+  }
 
   setup(engine: EngineKernel): void {
     this.live();

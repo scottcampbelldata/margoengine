@@ -93,6 +93,25 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | World | debug render data | `debugRender()` | full |
 | Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
 
+## Lists of what a world holds
+
+`physics.getBodies()`, `getColliders()` and `getJoints()` list what the world holds (bodies and joints in the order they were added, colliders in the order their shapes were made), and `bodyCount`, `colliderCount` and `jointCount` count them; a removed body leaves the lists with its colliders and joints. Any number of worlds run side by side in the one Wasm instance, each with its own `name` and nothing shared:
+
+```ts
+import {Physics2D} from 'margoengine/physics2d';
+
+await Physics2D.load();
+const earth = new Physics2D(null, {gravity: [0, 400]});
+const moon = new Physics2D(null, {gravity: [0, 40], name: 'moon'});
+const stone = earth.addBody(null, {colliders: {shape: 'circle', radius: 1}});
+moon.addBody(null, {colliders: {shape: 'circle', radius: 1}});
+earth.step();
+moon.step();
+console.log(earth.bodyCount, moon.bodyCount, earth.getColliders().length, stone.position[1] > 0); // 1 1 1 true
+earth.dispose();
+moon.dispose();
+```
+
 ## Forces at a point, locked rotation and collider settings
 
 `body.applyForceAtPoint(force, point)` holds a force that acts every step and turns the body by the arm from its centre of mass, as Rapier's `addForceAtPoint` does; `resetTorques()` clears the turning and keeps the push, `resetForces()` clears both. `body.lockRotation(locked = true)` holds the angle and takes the spin away until `lockRotation(false)`. A collider's `setActiveCollisionTypes(bits)` chooses the pairs it meets (1 dynamic with dynamic, 2 dynamic with kinematic, 4 dynamic with fixed, 8 kinematic with kinematic, 16 kinematic with fixed, 32 fixed with fixed; the default is 7), `setActiveEvents({collision, contactForce})` the events it asks for, and `setContactForceEventThreshold(newtons)` how hard a contact must press to raise `contactforce`.

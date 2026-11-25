@@ -6,6 +6,7 @@ import { BODY_CCD, BODY_DISABLED, BODY_NO_GYROSCOPIC, type KernelWorld } from '.
 import { checkVec, matrixOf, multiplyQuat, quatFromTurn, rotateVec, type Quat, type Vec3 } from './math.js';
 import type { ColliderOptions } from './shapes.js';
 import type { PhysicsCollider } from './collider.js';
+import type { PhysicsJoint } from './joints.js';
 
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
@@ -68,7 +69,9 @@ export interface BodyOwner {
   readonly kernel: KernelWorld;
   addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
   removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
-  removeBody(body: PhysicsBody): void;
+  removeBody(body: PhysicsBody, options?: { keepColliders?: boolean }): void;
+  /** The joints that hold this body, when the owner keeps a list. */
+  jointsOf?(body: PhysicsBody): PhysicsJoint[];
   /** The body was placed by hand or changed type: its mesh is written at the next sync, awake or not. */
   moved(body: PhysicsBody): void;
 }
@@ -122,6 +125,10 @@ export class PhysicsBody {
   }
   get valid(): boolean {
     return !this.removed;
+  }
+  /** The joints that hold this body, as either end (Rapier's per-body joint lists), in the order they were added. */
+  joints(): PhysicsJoint[] {
+    return this.owner.jointsOf?.(this) ?? [];
   }
   /** @internal */
   markRemoved(): void {

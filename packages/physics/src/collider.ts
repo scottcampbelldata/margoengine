@@ -99,6 +99,16 @@ export class PhysicsCollider {
     /** What it is, as named in its options. */
     public shape: ColliderShape,
   ) {}
+  /** @internal Whether this collider belongs to no body of the caller's: it sits on the world's anchor body (see `Physics.addFreeCollider`). */
+  free = false;
+  /** @internal Moves the collider to another body's list: its body is then that one. */
+  reparent(body: PhysicsBody): void {
+    (this as { body: PhysicsBody }).body = body;
+  }
+  /** The body this collider is attached to, or null for a free one (Rapier's `parent()`). */
+  get parent(): PhysicsBody | null {
+    return this.free ? null : this.body;
+  }
   /** @internal Set by the world: rebuilds this collider's shape from options. */
   reshape: ((options: ColliderOptions) => void) | null = null;
   /** False once the collider or its body was removed. */

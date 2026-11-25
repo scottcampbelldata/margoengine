@@ -168,6 +168,17 @@ interface KernelExports extends WebAssembly.Exports {
   probe_depth(): number;
   soft_probe(count: number, k: number, flags: number, body: number): number;
   collider_set_shape(collider: number, shape: number, a: number, b: number, c: number): number;
+  collider_move(
+    collider: number,
+    body: number,
+    x: number,
+    y: number,
+    z: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ): number;
   collider_set_pose(
     collider: number,
     x: number,
@@ -368,6 +379,17 @@ export const BODY_NO_GYROSCOPIC = 1 << 16;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
+const IN_BROAD_STATE = 1,
+  PENDING_STATE = 2,
+  REMOVED_STATE = 4;
+
+/** A row of the kernel with the number of times it had been freed when the handle was made: a generational handle. */
+export interface KernelHandle {
+  readonly kind: 'body' | 'collider' | 'joint';
+  readonly row: number;
+  readonly generation: number;
+}
+
 /** The top bit of an event's second word: the stop is because a collider or its body was removed (layout.rs EVENT_REMOVED). */
 export const EVENT_REMOVED = 0x80000000;
 /** Bit of the `pairFlags` column: a part of a mesh pair, one triangle's manifold. */
@@ -2183,6 +2205,31 @@ export class KernelWorld {
    * Moves a live collider in its body's frame and works the body's mass out again.
    * @throws RangeError for a collider that is gone, a position that is not finite or a rotation that is not a unit quaternion.
    */
+  /**
+   * Moves a collider to another body, at `position` and `rotation` in that body's frame (Rapier's `set_parent`): what it touched
+   * ends, both bodies' masses are worked out again and both wake. A compound takes its children with it.
+   * @throws RangeError for a collider or body that is gone, a compound's child, a position that is not finite or a rotation that
+   * is not a unit quaternion.
+   */
+  moveCollider(collider: number, body: number, position: readonly number[], rotation: readonly number[]): void {
+    this.checkPose(position, rotation);
+    if (
+      !this.api.collider_move(
+        collider,
+        body,
+        position[0]!,
+        position[1]!,
+        position[2]!,
+        rotation[0]!,
+        rotation[1]!,
+        rotation[2]!,
+        rotation[3]!,
+      )
+    )
+      throw new RangeError(
+        `Collider ${collider} cannot move to body ${body}: one is gone, or it is a compound's child.`,
+      );
+  }
   setColliderPose(collider: number, position: readonly number[], rotation: readonly number[]): void {
     this.checkPose(position, rotation);
     if (
@@ -2837,6 +2884,51 @@ export class KernelWorld {
     if (failed)
       throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     return this;
+  }
+  /**
+   * A generational handle to a live body, collider or joint row: the row and how many times it had been freed. Rows are reused
+   * last in, first out, so a row number kept across a removal can name another thing; a handle cannot, since {@link KernelWorld.isLive}
+   * is false for it once its row has been freed, whatever now lives there.
+   * @throws MargoError (`state`) when the row holds nothing now.
+   */
+  handle(kind: KernelHandle['kind'], row: number): KernelHandle {
+    const handle = { kind, row, generation: this.generationOf(kind, row) };
+    if (!this.rowLive(kind, row))
+      throw new MargoError('state', `The ${kind} row ${row} holds nothing: it was removed or never made.`);
+    return handle;
+  }
+  /** Whether the thing a handle named is still there: its row has not been freed since. */
+  isLive(handle: KernelHandle): boolean {
+    return this.rowLive(handle.kind, handle.row) && this.generationOf(handle.kind, handle.row) === handle.generation;
+  }
+  /**
+   * Refuses a stale handle.
+   * @throws MargoError (`state`) when the handle's row was freed since it was made, with another thing in it or none.
+   */
+  assertLive(handle: KernelHandle): void {
+    if (!this.isLive(handle))
+      throw new MargoError(
+        'state',
+        `The ${handle.kind} handle for row ${handle.row} (generation ${handle.generation}) is stale: its ${handle.kind} was removed.`,
+      );
+  }
+  private generationOf(kind: KernelHandle['kind'], row: number): number {
+    const c = this.columns;
+    const column = (
+      kind === 'body' ? c.generation : kind === 'collider' ? c.colliderGeneration : c.jointGeneration
+    ) as Uint32Array;
+    return row >= 0 && row < column.length ? column[row]! : -1;
+  }
+  private rowLive(kind: KernelHandle['kind'], row: number): boolean {
+    if (!Number.isInteger(row) || row < 0) return false;
+    const c = this.columns;
+    if (kind === 'body') return row < (c.flags?.length ?? 0) && ((c.flags as Uint32Array)[row]! & 1) !== 0;
+    if (kind === 'collider') {
+      // Live: in the broad phase or waiting to be, and not removed (layout.rs IN_BROAD, PENDING, REMOVED).
+      const state = row < (c.colliderState?.length ?? 0) ? (c.colliderState as Uint32Array)[row]! : 0;
+      return (state & REMOVED_STATE) === 0 && (state & (IN_BROAD_STATE | PENDING_STATE)) !== 0;
+    }
+    return row < (c.jointFlags?.length ?? 0) && ((c.jointFlags as Uint32Array)[row]! & (1 << 24)) !== 0;
   }
   /** How many bodies the world has taken out of it for leaving the numbers so far (see the `quarantine` solver option). */
   get quarantinedCount(): number {

@@ -415,7 +415,7 @@ impl World {
             rows
         };
         let at = row as usize;
-        self.clear_row(Rows::Joint, at, COLUMNS);
+        self.clear_row(Rows::Joint, at, JOINT_GENERATION);
         self.set_u(JOINT_A, at, a);
         self.set_u(JOINT_B, at, b);
         self.set_u(JOINT_FLAGS, at, flags | JOINT_ALIVE);
@@ -476,6 +476,7 @@ impl World {
         self.unchain(a as usize, joint);
         self.unchain(b as usize, joint);
         self.set_u(JOINT_FLAGS, at, 0);
+        self.set_u(JOINT_GENERATION, at, self.uu(JOINT_GENERATION, at).wrapping_add(1));
         self.set_u(JOINT_NEXT_A, at, self.header().free_joint);
         self.header_mut().free_joint = joint;
         true

@@ -573,6 +573,81 @@ impl World {
         true
     }
 
+    /// Moves a live collider to another live body, at `position` and `rotation` in that body's frame: what it touched ends, both
+    /// bodies' masses are worked out again and both wake. A compound takes its children with it. False for a collider or body that is
+    /// gone, a compound's child, a turn that is not a unit quaternion or numbers that are not finite.
+    pub fn move_collider(&mut self, collider: u32, body: u32, position: [f32; 3], rotation: [f32; 4]) -> bool {
+        let at = collider as usize;
+        let length = rotation.iter().map(|v| v * v).sum::<f32>();
+        if collider >= self.header().collider_rows
+            || self.uu(COLLIDER_STATE, at) & REMOVED != 0
+            || self.uu(COLLIDER_STATE, at) & (IN_BROAD | PENDING) == 0
+            || self.uu(COLLIDER_BODY, at) == NONE
+            || !self.body_alive(body)
+            || !position.iter().chain(rotation.iter()).all(|v| v.is_finite())
+            || !(0.99..=1.01).contains(&length)
+        {
+            return false;
+        }
+        let old = self.uu(COLLIDER_BODY, at);
+        if old == body {
+            return self.set_collider_pose(collider, position, rotation);
+        }
+        // A compound's child is a row on the compound's chain, not on a body's: only the compound itself moves.
+        let mut first = self.uu(FIRST_COLLIDER, old as usize);
+        let mut on_chain = false;
+        let mut previous = NONE;
+        while first != NONE {
+            if first == collider {
+                on_chain = true;
+                break;
+            }
+            previous = first;
+            first = self.uu(COLLIDER_NEXT, first as usize);
+        }
+        if !on_chain {
+            return false;
+        }
+        self.end_touches(collider);
+        let next = self.uu(COLLIDER_NEXT, at);
+        if previous == NONE {
+            self.set_u(FIRST_COLLIDER, old as usize, next);
+        } else {
+            self.set_u(COLLIDER_NEXT, previous as usize, next);
+        }
+        self.set_u(COLLIDER_NEXT, at, NONE);
+        let head = self.uu(FIRST_COLLIDER, body as usize);
+        if head == NONE {
+            self.set_u(FIRST_COLLIDER, body as usize, collider);
+        } else {
+            let mut last = head;
+            while self.uu(COLLIDER_NEXT, last as usize) != NONE {
+                last = self.uu(COLLIDER_NEXT, last as usize);
+            }
+            self.set_u(COLLIDER_NEXT, last as usize, collider);
+        }
+        self.set_u(COLLIDER_BODY, at, body);
+        if self.uu(COLLIDER_SHAPE, at) == SHAPE_COMPOUND {
+            let mut child = self.uu(COLLIDER_HULL, at);
+            while child != NONE {
+                self.set_u(COLLIDER_BODY, child as usize, body);
+                child = self.uu(COLLIDER_NEXT, child as usize);
+            }
+        }
+        for k in 0..3 {
+            self.set_s(COLLIDER_X + k, at, position[k]);
+        }
+        for k in 0..4 {
+            self.set_s(COLLIDER_ROTATION_X + k, at, rotation[k]);
+        }
+        self.mark_pending(collider);
+        self.update_mass(old);
+        self.update_mass(body);
+        self.wake(old);
+        self.wake(body);
+        true
+    }
+
     /// Gives a box or hull child of a compound a border (see `api::collider_set_part_border`). False when the child is not
     /// in the compound's chain or cannot have one.
     pub fn set_part_border(&mut self, compound: u32, child: u32, border: f32) -> bool {

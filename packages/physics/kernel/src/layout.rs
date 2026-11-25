@@ -404,6 +404,8 @@ columns! {
     JOINT_A u32 Joint,
     JOINT_B u32 Joint,
     JOINT_FLAGS u32 Joint,
+    // How many joints this row has held and let go, so an old row number can be told from the joint now in the row.
+    JOINT_GENERATION u32 Joint,
     JOINT_NEXT_A u32 Joint,
     JOINT_NEXT_B u32 Joint,
     // Where the joint holds each body, from the body's origin in its frame, and the joint's frame on each body.

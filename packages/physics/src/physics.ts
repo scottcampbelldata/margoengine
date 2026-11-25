@@ -41,7 +41,7 @@ import { writeGroups } from './groups.js';
 import { groupWords } from './shapes.js';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { multiplyMatrices } from '@margoengine/math/mat4';
-import { checkVec, type Quat, type Vec3 } from './math.js';
+import { checkVec, multiplyQuat, rotateVec, type Quat, type Vec3 } from './math.js';
 import { matrixRotation, worldMatrix } from './transform.js';
 import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 import { colliderGeometry } from './mesh-fit.js';
@@ -837,7 +837,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     return this.byRow.size;
   }
   get bodyCount(): number {
-    return this.bodies.size;
+    return this.bodies.size - (this.anchorBody ? 1 : 0);
   }
 
   // Engine plugin hooks.
@@ -1170,9 +1170,26 @@ export class Physics implements EnginePlugin, BodyOwner {
     return shapeServed(shape);
   }
   getBodies(): PhysicsBody[] {
-    return [...this.bodies];
+    return [...this.bodies].filter((body) => body !== this.anchorBody);
   }
 
+  /** The fixed body at the origin that free colliders sit on; made with the first one, and counted as no body of the caller's. */
+  private anchorBody: PhysicsBody | null = null;
+  private anchor(): PhysicsBody {
+    return (this.anchorBody ??= this.addBody(null, { type: 'fixed', colliders: [] }));
+  }
+  /**
+   * Adds a collider that belongs to no body of yours (Rapier's `createCollider` with no parent), in world coordinates: `position` and
+   * `rotation` in its options are the world's. It sits on a fixed body at the origin the world keeps for them, so it is fixed,
+   * pushes dynamic bodies and has no mass of its own to give; `collider.parent` is null and `collider.free` is true.
+   * @throws MargoError (`disposed`) on a disposed world.
+   */
+  addFreeCollider(options: ColliderOptions): PhysicsCollider {
+    this.live();
+    const collider = this.addCollider(this.anchor(), options);
+    collider.free = true;
+    return collider;
+  }
   /** @internal use `body.addCollider`. */
   addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
     const { mesh } = body,
@@ -1273,8 +1290,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /** Removes a body with its colliders and joints. */
-  removeBody(body: PhysicsBody): void {
+  removeBody(body: PhysicsBody, options: { keepColliders?: boolean } = {}): void {
     if (!this.bodies.has(body)) return;
+    if (options.keepColliders) this.freeColliders(body);
     for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
     for (const multibody of this.multibodies)
       if (multibody.root === body || multibody.links.some((link) => link.body === body))
@@ -1291,6 +1309,31 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (body.mesh) this.byMesh.delete(body.mesh);
     this.kernel.removeBody(body.row);
     body.markRemoved();
+  }
+  /** @internal use `body.joints()`. */
+  jointsOf(body: PhysicsBody): PhysicsJoint[] {
+    return [...this.joints].filter((joint) => joint.bodyA === body || joint.bodyB === body);
+  }
+  /** Hands a body's colliders to the world, where they stay at the poses they have now, as free colliders. */
+  private freeColliders(body: PhysicsBody): void {
+    const anchor = this.anchor(),
+      position = body.position,
+      rotation = body.rotation;
+    for (const collider of body.colliders) {
+      const local = collider.translationWrtParent(),
+        turn = collider.rotationWrtParent(),
+        offset = rotateVec(rotation, [local.x, local.y, local.z]);
+      this.kernel.moveCollider(
+        collider.handle,
+        anchor.row,
+        [position[0] + offset[0], position[1] + offset[1], position[2] + offset[2]],
+        multiplyQuat(rotation, [turn.x, turn.y, turn.z, turn.w]),
+      );
+      collider.reparent(anchor);
+      collider.free = true;
+      anchor.colliders.push(collider);
+    }
+    body.colliders.length = 0;
   }
   /** @internal use `body.setTranslation` and the like: the mesh follows at the next sync. */
   moved(body: PhysicsBody): void {
