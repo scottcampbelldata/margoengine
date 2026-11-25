@@ -1,5 +1,7 @@
 // The standard atmosphere (ISO 2533:1975 and ICAO Doc 7488, the same model): temperature, pressure and density of dry air
-// by height, the shared default of the physics framework wherever air is not simulated (docs/physics-framework.md, K03).
+// by height, the shared default of the physics framework wherever air is not simulated (docs/physics-solvers.md, K03). The
+// canonical implementation is kernel-common's Rust (`packages/physics/kernel-common/src/atmosphere.rs`); this is its
+// TypeScript twin, operation for operation, pinned to the same bits by `kernel-common/tests/atmosphere-vectors.txt`.
 // Heights are taken as given, in metres above sea level, without the geopotential correction (under 0.2 % in
 // temperature below 11 km). The sea-level temperature and the tropopause height may be shifted for a warmer or colder day,
 // the layers above keeping their lapse rates. It is computed with the pinned exp and pow (K01), so every engine gives the same

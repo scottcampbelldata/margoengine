@@ -11543,7 +11543,10 @@ re-exports it. Written from International Organization for Standardization, ISO 
 International Civil Aviation Organization, Doc 7488, "Manual of the ICAO Standard Atmosphere", 3rd edition, 1993 (the same
 model: layer lapse rates, sea-level 288.15 K and 101,325 Pa, the gas constant 287.05287 J/(kg K), g = 9.80665 m/s^2, and the
 tabulated values the test checks, -1 km to 47 km). Below sea level the first layer continues, as ISO 2533 tabulates to
--2 km (before the move it held sea-level values there). Proof: `packages/math/test/atmosphere.test.js`.
+-2 km (before the move it held sea-level values there). Proof: `packages/math/test/atmosphere.test.js`. Since 2026-11-25 the
+canonical implementation is `packages/physics/kernel-common/src/atmosphere.rs`, the same operations on the pinned `exp` and
+`pow` (K01); `kernel-common/tests/atmosphere_twin.rs` writes and checks `atmosphere-vectors.txt` (218 heights from -2 km to
+50 km, shifted sea levels and tropopauses, and the ISO 2533 table), and the TypeScript reproduces every row bit for bit.
 
 ## Seams between meshes (2026-11-25)
 

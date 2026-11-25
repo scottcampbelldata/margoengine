@@ -4,6 +4,7 @@
 #![no_std]
 extern crate alloc;
 
+pub mod atmosphere;
 pub mod broad;
 pub mod cloth;
 pub mod colour;

@@ -37,3 +37,23 @@ test('a shifted sea-level temperature and tropopause, and the ideal-gas density'
   // Below sea level pressure and density keep rising: the Dead Sea shore at -430 m.
   assert.ok(standardDensity(-430) > standardDensity(0));
 });
+
+test("the TypeScript standard atmosphere gives kernel-common's Rust bits (K03)", async () => {
+  const { readFileSync } = await import('node:fs');
+  const fromHex = (hex) => new Float64Array(new BigUint64Array([BigInt(`0x${hex}`)]).buffer)[0];
+  const toHex = (x) => new BigUint64Array(new Float64Array([x]).buffer)[0].toString(16).padStart(16, '0');
+  const text = readFileSync(
+    new URL('../../physics/kernel-common/tests/atmosphere-vectors.txt', import.meta.url),
+    'utf8',
+  );
+  let rows = 0;
+  for (const line of text.split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const words = line.split(' '),
+      [z, sea, tropo] = words.slice(0, 3).map(fromHex),
+      [t, p] = standardAtmosphere(z, sea, tropo);
+    assert.deepEqual([toHex(t), toHex(p), toHex(standardDensity(z, sea, tropo))], words.slice(3), `z ${z}`);
+    rows++;
+  }
+  assert.ok(rows > 200);
+});
