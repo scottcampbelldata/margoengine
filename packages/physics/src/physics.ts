@@ -12,6 +12,7 @@ import {
   EVENT_SENSOR,
   KernelWorld,
   kernelBuild,
+  kernelVariant,
   loadKernel,
   PAIR_IS_PART,
   PAIR_TOUCHING,
@@ -628,6 +629,13 @@ export class Physics implements EnginePlugin, BodyOwner {
     const build = kernelBuild();
     if (!build) throw new MargoError('state', 'The solver is not loaded yet; await Physics.load() first.');
     return build;
+  }
+  /**
+   * Which build of the solver is loaded: `'simd'` (with Wasm SIMD) or `'scalar'` (for engines without it); both step a world to the same bits. Left
+   * blank before `Physics.load()` has finished.
+   */
+  static get kernelVariant(): string {
+    return kernelVariant();
   }
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.

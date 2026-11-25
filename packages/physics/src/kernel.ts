@@ -775,28 +775,50 @@ let kernelColumns: readonly (readonly [string, 'f' | 'u', number])[] = [];
 let loadedBuild = '';
 /** The hash of the kernel source the loaded Wasm was made from, or '' before {@link loadKernel} has finished. */
 export const kernelBuild = (): string => loadedBuild;
-const compiled = new LoadOnce<WebAssembly.Module>(async () => {
-  const blueprint = await import('./wasm.js');
-  loadedBuild = blueprint.kernelSource;
-  kernelColumns = blueprint.kernelColumns;
-  const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
-  return WebAssembly.compile(
-    await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(),
+/** Whether this engine compiles Wasm SIMD: a module with one 128-bit instruction (the probe of the wasm-feature-detect project). */
+const hasSimd = (): boolean =>
+  WebAssembly.validate(
+    new Uint8Array([
+      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+    ]),
   );
-});
+/** The two builds of the kernel, each its own chunk loaded on first use: with Wasm SIMD, and without it for engines that lack it. */
+const compile = (variant: 'simd' | 'scalar') =>
+  new LoadOnce<WebAssembly.Module>(async () => {
+    const blueprint = await (variant === 'simd' ? import('./wasm.js') : import('./wasm-scalar.js'));
+    loadedBuild = blueprint.kernelSource;
+    kernelColumns = blueprint.kernelColumns;
+    const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
+    return WebAssembly.compile(
+      await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(),
+    );
+  });
+const builds = { simd: compile('simd'), scalar: compile('scalar') };
+/** Which build new worlds use: the one the latest {@link loadKernel} chose. */
+let chosen: 'simd' | 'scalar' | null = null;
+/** The build the loaded kernel is: `'simd'` or `'scalar'`, or '' before {@link loadKernel} has finished. */
+export const kernelVariant = (): string => chosen ?? '';
 
 /** Options of {@link loadKernel}. */
 export interface KernelLoadOptions {
   /** Stops waiting for the load; the load itself carries on and a later call reuses it. */
   signal?: AbortSignal;
+  /**
+   * Which build of the kernel to load: `true` the one with Wasm SIMD, `false` the scalar one, left out the SIMD one when this
+   * engine compiles it and the scalar one when it does not. Both step a world to the same bits; only the build for the engine
+   * is downloaded. New worlds use the build of the latest call.
+   */
+  simd?: boolean;
 }
 
 /**
  * Compiles the kernel, once per app: compiling is asynchronous, so `new KernelWorld()` can stay synchronous.
  * @throws AbortError (the signal's reason) when `signal` aborts first.
  */
-export async function loadKernel({ signal }: KernelLoadOptions = {}): Promise<void> {
-  await compiled.load(signal);
+export async function loadKernel({ signal, simd }: KernelLoadOptions = {}): Promise<void> {
+  const variant = (simd ?? hasSimd()) ? 'simd' : 'scalar';
+  await builds[variant].load(signal);
+  chosen = variant;
 }
 
 /** A column view: float columns are `Float32Array`, integer columns `Uint32Array`. One row per body or collider. */
@@ -876,7 +898,7 @@ export class KernelWorld {
    * @throws RangeError for a capacity the kernel refuses.
    */
   constructor(bodies = 1024, colliders = bodies) {
-    const module = compiled.value;
+    const module = chosen ? builds[chosen].value : undefined;
     if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
     this.api = new WebAssembly.Instance(module, {
       env: {

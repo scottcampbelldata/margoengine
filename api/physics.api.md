@@ -597,6 +597,7 @@ export interface KernelDistance {
 
 export interface KernelLoadOptions {
     signal?: AbortSignal;
+    simd?: boolean;
 }
 
 export interface KernelManifold {
@@ -965,6 +966,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     paused: boolean;
     stepCount: number;
     static get kernelBuild(): string;
+    static get kernelVariant(): string;
     static load(options?: KernelLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);
@@ -1859,7 +1861,7 @@ export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float
 
 export function interactionGroups(memberships?: number | readonly number[], filter?: number | readonly number[], testMode?: 'and' | 'or'): InteractionGroups;
 
-export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
+export function loadKernel({ signal, simd }?: KernelLoadOptions): Promise<void>;
 
 export function meshConnectedComponents(indices: ArrayLike<number>): {
     component: Uint32Array;

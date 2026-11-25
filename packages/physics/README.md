@@ -1045,6 +1045,8 @@ console.log(physics.contactPoints(ball).length);  // 1
 physics.dispose();
 ```
 
+Two builds of the kernel ship, each a chunk of its own that loads on first use: one with Wasm SIMD and a scalar one for engines that cannot compile it (older Safari and some embedded webviews). `Physics.load()` probes the engine and loads the one it can run, so a page downloads one of them and the root entry pays for neither; `Physics.load({simd: false})` forces the scalar build (to test it) and `Physics.kernelVariant` reads `'simd'` or `'scalar'`. They are one kernel: both carry the same build id and step a world to the same bits, which the replay test holds on the committed hashes in both builds. The scalar build takes its square roots from integer arithmetic that matches the hardware instruction bit for bit, as Wasm without SIMD has no float square root in Rust's core; it is slower, never different.
+
 A world is one block of memory, so a snapshot is one copy. `world.snapshot()` returns its bytes and `world.restore(bytes)` puts every row, pair and timer back, into a world of any size. A snapshot reads only in the kernel build that wrote it, and it covers the `KernelWorld`; `physics.takeSnapshot()` and `physics.restoreSnapshot()` (see Snapshots) take a whole `Physics` the same way, keeping your handles, `userData` and meshes.
 
 ```ts

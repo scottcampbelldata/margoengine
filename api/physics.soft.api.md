@@ -987,6 +987,7 @@ interface KernelHeightfieldOptions {
 
 interface KernelLoadOptions {
     signal?: AbortSignal;
+    simd?: boolean;
 }
 
 interface KernelManifold {
@@ -1367,6 +1368,7 @@ class Physics implements EnginePlugin, BodyOwner {
     paused: boolean;
     stepCount: number;
     static get kernelBuild(): string;
+    static get kernelVariant(): string;
     static load(options?: KernelLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: PhysicsOptions): Physics;
     constructor(engine: EngineKernel | null, options?: PhysicsOptions);

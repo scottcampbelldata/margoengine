@@ -14,6 +14,7 @@
       "!packages/clustered/src/ltc.ts",
       "!packages/core/src/wasm.ts",
       "!packages/physics/src/wasm.ts",
+      "!packages/physics/src/wasm-scalar.ts",
       "!packages/physics/src/soft-wasm.ts"
     ]
   },
