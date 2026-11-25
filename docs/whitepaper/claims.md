@@ -1787,7 +1787,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `de20fb3c`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `896367b181` (repeated points: each point's nearest distinct neighbours ride after the points, so the points buffer is 1.5 times as large and a strip or loop gets one more write when its points or mode change; before that `9f9845a0f5`, KB5588c selection masks: binding 7 in every style layout and bind group, a zeroed 16-byte stand-in for lines without a mask; before that `f1854aa04`, the root's 96-byte Frame and base shaders again, tile code only in `lines/tiles`; earlier: per-line clipping planes at `86063c47` grew the style uniform from 128 to 224 bytes and added a world-position varying and a zero-count plane loop, and `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose each time) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `8c3c049935` (main's id of `2484971`) |
-| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `00f9ebc193` -> `216781aff4`) | `0ddb41c899` |
+| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `00f9ebc193` -> `216781aff4`) | `196bb7feb3` |
 | selection-xray-off | `46f9484` -> `80d4cfb`: 10,586 calls | `f3d25c892` |
 | clustered-local-shadows | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `6a958e532` |
 | clustered-area-lights | `67e0172` -> `dab9633`: 482 calls | `57250a49` |
@@ -1797,12 +1797,12 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | deformed-shadows | `38d448e` -> `282e751` | `667d1a26` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `de20fb3c`: 2,392 calls |
-| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `0ddb41c899` |
-| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `0ddb41c899` |
+| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `196bb7feb3` |
+| post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `196bb7feb3` |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `96136151cd` |
-| quality-presets | `96daac7` -> `01e5e35` | `0ddb41c899` |
+| quality-presets | `96daac7` -> `01e5e35` | `196bb7feb3` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
 | procedural-deps | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, since removed from the lockfile, so the runner reports it instead of failing | - |
@@ -5325,7 +5325,7 @@ Proof capture (2026-11-19, KB-GLTFA B1): the clustered-area-lights, clustered-li
 
 Proof capture (2026-11-25, history ids): the public history (sync e2177dc6e5, 2026-11-20) holds none of the pre-rewrite ids the --current golden outputs named, so a clone could not capture them again (tests/proofs-golden.test.js). Every --current reference now names a commit on main: 8c71da0556, 206cda6acb, 41050c560 and 5038720b8 became e2177dc6e5; 8c3c049935 became bdfc53b35c, e80acecc2 (the AgX re-derivation `ignoreAgx` asks about) became f5b3575bc0, and post-stack's creative pair 00f9ebc193 and 216781aff4 became f044d8ef05 and ca366457a3. lines-perspective advances to 61f3dcf3f7 (colorMode: the lines shader now holds a `tinted` function and a bit test for how a point colour meets the material colour, so its shader text, module and pipeline calls differ from a63f7433a1, an intended change of feature commit 61f3dcf3f7). All 19 proofs but water-ssr (lane D) pass against the working tree and their golden outputs were stored again (`node examples/package-benchmarks/proofs/capture.mjs`).
 
-Proof capture (2026-11-25, KB-SSAO-SILHOUETTE1): the post-ssr, post-ssr-models, post-stack and quality-presets --current proofs advance to 0ddb41c899, whose SSAO extract pass treats a background neighbour (depth 0) as no surface when it builds a pixel's normal from depth, so a one-pixel tip of a silhouette no longer takes a sideways normal and occludes itself. Only the extract shader's module text changed: with that one shader put back to its text at e2177dc6e5, all four proofs pass against e2177dc6e5 with no other call, descriptor, write, dispatch or draw differing. The pinned claims and their references are unchanged. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=post-stack,post-ssr,post-ssr-models,quality-presets`.
+Proof capture (2026-11-25, KB-SSAO-SILHOUETTE1): the post-ssr, post-ssr-models, post-stack and quality-presets --current proofs advance to 196bb7feb3, whose SSAO extract pass treats a background neighbour (depth 0) as no surface when it builds a pixel's normal from depth, so a one-pixel tip of a silhouette no longer takes a sideways normal and occludes itself. Only the extract shader's module text changed: with that one shader put back to its text at e2177dc6e5, all four proofs pass against e2177dc6e5 with no other call, descriptor, write, dispatch or draw differing. The pinned claims and their references are unchanged. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=post-stack,post-ssr,post-ssr-models,quality-presets`.
 
 Proof capture (2026-11-21): the water-ssr current reference advances to c82e6722a. The guard retains the exact call log, including shader code. These shaders filter HDR sky, wave-normal and foam footprints and use live HDR sky irradiance. The frame retains its 560-byte layout. The pinned historical claim and its reference are unchanged. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
