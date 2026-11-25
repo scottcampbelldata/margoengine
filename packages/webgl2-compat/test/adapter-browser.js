@@ -88,7 +88,9 @@ const surfelScene = (engine, drawn = true) => {
   if (!drawn) return;
   const positions = sheet(),
     colors = positions.map((value, i) => (i % 3 === 0 ? +(value < 0) : i % 3 === 2 ? +(positions[i - 2] >= 0) : 0.3));
-  SurfelPlugin.attach(engine, { overlap: 2 }).add(new PointCloud({ positions, colors, material: { size: 0.06, sizeUnits: 'world' } }));
+  SurfelPlugin.attach(engine, { overlap: 2 }).add(
+    new PointCloud({ positions, colors, material: { size: 0.06, sizeUnits: 'world' } }),
+  );
 };
 /** Sky fog over PostStack's 4x capture: per sample by sample_index at the full level, by masked draws at the level. */
 const fogScene = (engine, density = 0.2) => {

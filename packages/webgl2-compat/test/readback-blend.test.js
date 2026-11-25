@@ -47,11 +47,16 @@ struct O { @location(0) a: vec4f, @location(1) b: vec4f };
       entryPoint: 'fs',
       targets: [
         { format: 'rgba8unorm' },
-        { format: 'rgba8unorm', blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: {} } },
+        {
+          format: 'rgba8unorm',
+          blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: {} },
+        },
       ],
     },
   });
-  const colors = [0, 1].map(() => device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: T.RENDER_ATTACHMENT }));
+  const colors = [0, 1].map(() =>
+    device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: T.RENDER_ATTACHMENT }),
+  );
   const stencil = device.createTexture({ size: [4, 4], format: 'stencil8', usage: T.COPY_SRC | T.RENDER_ATTACHMENT });
   const out = device.createBuffer({ size: 256 * 4, usage: B.COPY_DST | B.MAP_READ });
   const errors = [];
@@ -77,7 +82,12 @@ struct O { @location(0) a: vec4f, @location(1) b: vec4f };
   draw();
   const first = blendCalls(from);
   // The first draw sets both draw buffers: 0 off, 1 on with its equation and factors.
-  assert.deepEqual(first, ['disableiOES(0)', 'enableiOES(1)', 'blendEquationSeparateiOES(1)', 'blendFuncSeparateiOES(1)']);
+  assert.deepEqual(first, [
+    'disableiOES(0)',
+    'enableiOES(1)',
+    'blendEquationSeparateiOES(1)',
+    'blendFuncSeparateiOES(1)',
+  ]);
 
   // A second draw with nothing in between changes nothing: the cache holds.
   from = gl.calls.length;
@@ -93,7 +103,10 @@ struct O { @location(0) a: vec4f, @location(1) b: vec4f };
   await device.queue.onSubmittedWorkDone();
   const readback = gl.calls.slice(from);
   assert.equal(readback.filter((c) => c[0] === 'stencilFunc').length, 8, 'the readback drew its eight bit planes');
-  assert.ok(readback.some((c) => c[0] === 'enable' && c[1] === gl.BLEND), 'the readback enabled blending GL-wide');
+  assert.ok(
+    readback.some((c) => c[0] === 'enable' && c[1] === gl.BLEND),
+    'the readback enabled blending GL-wide',
+  );
 
   // The next draw sets both draw buffers again, as after any change it cannot see.
   from = gl.calls.length;

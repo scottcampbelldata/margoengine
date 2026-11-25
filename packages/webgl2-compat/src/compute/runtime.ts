@@ -523,7 +523,17 @@ class Runtime implements ComputeRuntime {
           from = c.base * 4;
         if (full) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, ws.width, full, gl.RED_INTEGER, gl.UNSIGNED_INT, from);
         if (rest)
-          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, full, rest, 1, gl.RED_INTEGER, gl.UNSIGNED_INT, from + full * ws.width * 4);
+          gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0,
+            full,
+            rest,
+            1,
+            gl.RED_INTEGER,
+            gl.UNSIGNED_INT,
+            from + full * ws.width * 4,
+          );
         c.texture.initialized = true;
       }
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);

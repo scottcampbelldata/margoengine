@@ -136,7 +136,8 @@ export class CompatBuffer {
     const most = device.limits.maxBufferSize;
     if (size > most) {
       // WebGPU: a validation error and an invalid buffer that holds nothing; mapped at creation, a RangeError.
-      if (descriptor.mappedAtCreation) throw new RangeError(`A buffer mapped at creation is limited to ${most} bytes; pass a smaller size`);
+      if (descriptor.mappedAtCreation)
+        throw new RangeError(`A buffer mapped at creation is limited to ${most} bytes; pass a smaller size`);
       device.validationError(
         `createBuffer${this.label ? ` '${this.label}'` : ''}: ${size} bytes is over this device's maxBufferSize of ${most}`,
       );
@@ -557,7 +558,10 @@ const applying = new WeakSet<object>();
  * ready and may not be forced (`force` false, or query results). Inside a write being applied (its `land` reads `gl`)
  * it applies nothing, so the writes keep their order.
  */
-function applyWaiting(buffer: { readonly readbacks: Readback[]; readonly device: { stalls: number } }, force: boolean): boolean {
+function applyWaiting(
+  buffer: { readonly readbacks: Readback[]; readonly device: { stalls: number } },
+  force: boolean,
+): boolean {
   if (applying.has(buffer)) return true;
   applying.add(buffer);
   try {
@@ -857,7 +861,17 @@ export class CompatTexture {
    * (whole blocks) of layers `z` to `z + depth` of `level`, `w` by `h` texels (rounded up to whole blocks). `keep` writes
    * the region from `tight`; otherwise it is read into `tight`.
    */
-  blockRegion(level: number, x: number, y: number, z: number, w: number, h: number, depth: number, tight: Uint8Array, keep: boolean): void {
+  blockRegion(
+    level: number,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    depth: number,
+    tight: Uint8Array,
+    keep: boolean,
+  ): void {
     const block = this.info.block as NonNullable<FormatInfo['block']>,
       mirror = (this.blocks as Uint8Array[])[level],
       [pitch, image] = this.blockPitch(level),
@@ -955,7 +969,13 @@ export class CompatTexture {
   private copy(format: GPUTextureFormat, target: number, layer: number, layers: number, alias = 0): TextureStorage {
     const p = this.primary as TextureStorage;
     if (!alias && format === this.format && target === p.target) return p;
-    if (this.info.block && !alias && format !== this.format && target === p.target && (this.blockTwin || this.blockWrites)) {
+    if (
+      this.info.block &&
+      !alias &&
+      format !== this.format &&
+      target === p.target &&
+      (this.blockTwin || this.blockWrites)
+    ) {
       if (!this.blockTwin) {
         this.blockTwin = this.storageOf(target, format, FORMATS.get(format) as FormatInfo, 0, this.layers);
         for (const write of this.blockWrites as BlockWrite[]) this.device.replayer.putBlocks(this.blockTwin, write);
@@ -1059,7 +1079,14 @@ export class CompatTexture {
   /** The resolved copy a binding of this multisampled texture reads: the stencil aspect's own, or `resolved`. */
   resolvedFor(stencil: boolean): WebGLTexture | null {
     if (!this.resolved || !stencil || !hasDepth(this.info)) return this.resolved;
-    return (this.stencilCopy ??= this.allocate(this.device.gl.TEXTURE_2D, this.storageInfo, 1, this.width, this.height, 1));
+    return (this.stencilCopy ??= this.allocate(
+      this.device.gl.TEXTURE_2D,
+      this.storageInfo,
+      1,
+      this.width,
+      this.height,
+      1,
+    ));
   }
 
   /** Width of a mip level. */
@@ -1501,18 +1528,18 @@ export class CompatBindGroup {
     // binding size. Without them a too-small buffer reached the CPU tier, which read past its end (a RangeError).
     if (!this.invalid)
       for (const l of this.layout.entries) {
-      const bound = this.entries.get(l.binding);
-      if (!l.buffer || bound?.kind !== 'buffer') continue;
-      const where = `createBindGroup${this.label ? ` '${this.label}'` : ''} @binding(${l.binding})`;
-      if (bound.offset < 0 || bound.offset + bound.size > bound.buffer.size)
-        this.invalid = `${where}: bytes ${bound.offset} to ${bound.offset + bound.size} are outside the ${bound.buffer.size}-byte buffer`;
-      else if (bound.size < l.buffer.minBindingSize)
-        this.invalid = `${where}: the binding is ${bound.size} bytes, below the layout's minimum binding size of ${l.buffer.minBindingSize}`;
-      else if ((l.buffer.type ?? 'uniform') !== 'uniform' && bound.size > device.limits.maxStorageBufferBindingSize)
-        // A storage binding is read through an RGBA32UI texture 2,048 texels wide: past the limit it would not fit.
-        this.invalid = `${where}: the storage binding is ${bound.size} bytes, over this device's maxStorageBufferBindingSize of ${device.limits.maxStorageBufferBindingSize}`;
-      if (this.invalid) break;
-    }
+        const bound = this.entries.get(l.binding);
+        if (!l.buffer || bound?.kind !== 'buffer') continue;
+        const where = `createBindGroup${this.label ? ` '${this.label}'` : ''} @binding(${l.binding})`;
+        if (bound.offset < 0 || bound.offset + bound.size > bound.buffer.size)
+          this.invalid = `${where}: bytes ${bound.offset} to ${bound.offset + bound.size} are outside the ${bound.buffer.size}-byte buffer`;
+        else if (bound.size < l.buffer.minBindingSize)
+          this.invalid = `${where}: the binding is ${bound.size} bytes, below the layout's minimum binding size of ${l.buffer.minBindingSize}`;
+        else if ((l.buffer.type ?? 'uniform') !== 'uniform' && bound.size > device.limits.maxStorageBufferBindingSize)
+          // A storage binding is read through an RGBA32UI texture 2,048 texels wide: past the limit it would not fit.
+          this.invalid = `${where}: the storage binding is ${bound.size} bytes, over this device's maxStorageBufferBindingSize of ${device.limits.maxStorageBufferBindingSize}`;
+        if (this.invalid) break;
+      }
     // The group's storage bindings share one texture at most maxTextureDimension2D wide and high (storageTexture).
     if (!this.invalid) {
       let rows = 0;
@@ -1590,7 +1617,14 @@ export class CompatBindGroup {
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
       this.device.allocated(`the storage texture of bind group '${this.label}'`);
       this.device.replayer.zero(texture, gl.TEXTURE_2D, WORDS, 1, 1 << shift, Math.ceil(total / (1 << shift)), 1);
-      this.shared = { texture, shift, rows, versions: new Map(), bindings: [...rows.keys()], rowOf: [...rows.values()] };
+      this.shared = {
+        texture,
+        shift,
+        rows,
+        versions: new Map(),
+        bindings: [...rows.keys()],
+        rowOf: [...rows.values()],
+      };
     }
     const d = this.shared;
     let read = false;

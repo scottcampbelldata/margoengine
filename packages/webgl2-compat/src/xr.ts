@@ -99,7 +99,9 @@ export class CompatXRBinding {
       throw new TypeError(`An XRWebGLLayer takes rgba8unorm, not '${init.colorFormat}'; use getPreferredColorFormat()`);
     const factor = init.scaleFactor ?? scale;
     if (factor !== undefined && (!Number.isFinite(Math.fround(factor)) || Math.fround(factor) <= 0))
-      throw new RangeError('XR projection scaleFactor must be finite and positive; pass 1 for the runtime recommendation');
+      throw new RangeError(
+        'XR projection scaleFactor must be finite and positive; pass 1 for the runtime recommendation',
+      );
     const Layer = (globalThis as unknown as { XRWebGLLayer?: WebGLLayerClass }).XRWebGLLayer;
     if (!Layer) throw fault('unsupported', 'This browser has no XRWebGLLayer', 'compatibility-layer');
     return new CompatXRProjectionLayer(
@@ -118,7 +120,11 @@ export class CompatXRBinding {
   getViewSubImage(layer: CompatXRProjectionLayer, view: View) {
     const target = layer.baseLayer.getViewport(view);
     if (!target)
-      throw fault('state', 'The XR view has no viewport in this layer; pass a view of this session', 'compatibility-layer');
+      throw fault(
+        'state',
+        'The XR view has no viewport in this layer; pass a view of this session',
+        'compatibility-layer',
+      );
     const key = `${target.x},${target.y}`;
     let eye = layer.eyes.get(key);
     if (!eye) layer.eyes.set(key, (eye = {}));
@@ -204,7 +210,10 @@ export function installXR({ framebufferScale }: CompatXROptions = {}): CompatXR 
       'compatibility-layer',
     );
   if (active) throw fault('state', 'installXR is already in place; dispose the first call', 'compatibility-layer');
-  if (framebufferScale !== undefined && (!Number.isFinite(Math.fround(framebufferScale)) || Math.fround(framebufferScale) <= 0))
+  if (
+    framebufferScale !== undefined &&
+    (!Number.isFinite(Math.fround(framebufferScale)) || Math.fround(framebufferScale) <= 0)
+  )
     throw new RangeError('framebufferScale must be finite and positive; pass 1 for the runtime recommendation');
   const own = Object.getOwnPropertyDescriptor(globalThis, 'XRGPUBinding');
   Object.defineProperty(globalThis, 'XRGPUBinding', { value: CompatXRBinding, configurable: true, writable: true });

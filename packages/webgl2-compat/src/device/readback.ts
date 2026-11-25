@@ -69,7 +69,15 @@ export function fetchInto(
   const target = gl.createTexture() as WebGLTexture;
   state.scratch(gl.TEXTURE_2D, target);
   gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
-  r.zero(target, gl.TEXTURE_2D, FORMATS.get(outputKind === 'u' ? 'rgba32uint' : outputKind === 'i' ? 'rgba32sint' : 'rgba32float') as FormatInfo, 1, w, h, 1);
+  r.zero(
+    target,
+    gl.TEXTURE_2D,
+    FORMATS.get(outputKind === 'u' ? 'rgba32uint' : outputKind === 'i' ? 'rgba32sint' : 'rgba32float') as FormatInfo,
+    1,
+    w,
+    h,
+    1,
+  );
   const fbo = gl.createFramebuffer() as WebGLFramebuffer;
   state.bindDrawFramebuffer(fbo);
   gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);

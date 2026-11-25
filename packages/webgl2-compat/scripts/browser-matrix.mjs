@@ -102,7 +102,8 @@ export function crop(image, rect, scale) {
     width = Math.max(0, x1 - x0),
     height = Math.max(0, y1 - y0),
     data = new Uint8Array(width * height * 4);
-  for (let y = 0; y < height; y++) data.set(image.data.subarray(((y0 + y) * image.width + x0) * 4, ((y0 + y) * image.width + x1) * 4), y * width * 4);
+  for (let y = 0; y < height; y++)
+    data.set(image.data.subarray(((y0 + y) * image.width + x0) * 4, ((y0 + y) * image.width + x1) * 4), y * width * 4);
   return { width, height, data };
 }
 
@@ -122,7 +123,8 @@ export function differences(a, b, path = '', out = { count: 0, first: [] }, limi
     if (a.length !== b.length) add(`${path}: length ${a.length} vs ${b.length}`);
     else a.forEach((x, i) => differences(x, b[i], `${path}[${i}]`, out, limit));
   } else if (a && b && typeof a === 'object' && typeof b === 'object') {
-    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) differences(a[k], b[k], `${path}.${k}`, out, limit);
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+      differences(a[k], b[k], `${path}.${k}`, out, limit);
   } else if (a !== b) add(`${path}: native ${JSON.stringify(a)}, layer ${JSON.stringify(b)}`);
   return out;
 }
@@ -136,7 +138,11 @@ export function thrownOf(thrown) {
   const text = String(thrown),
     named = /^(\w*Error): ([\s\S]*)$/.exec(text),
     anchor = /margoengine\.com\/errors#([\w-]+)/.exec(text)?.[1];
-  return { name: named?.[1] ?? 'Error', code: named?.[1] === 'MargoError' ? (anchor ?? null) : null, message: named?.[2] ?? text };
+  return {
+    name: named?.[1] ?? 'Error',
+    code: named?.[1] === 'MargoError' ? (anchor ?? null) : null,
+    message: named?.[2] ?? text,
+  };
 }
 
 /** Largest error of the inverseTrig probe's results against float64 (features-browser.mjs's measure) and where. */
@@ -225,7 +231,11 @@ const ENVIRONMENT_PROBE = `async () => {
  */
 export function copyRules(side) {
   const texel = (key) => side.result[key]?.slice((2 * 8 + 1) * 4, (2 * 8 + 1) * 4 + 4);
-  return differences(texel('none/1/whole/up/straight'), [11, 200, 7, 0]).count + differences(texel('none/1/whole/up/premultiplied'), [0, 0, 0, 0]).count === 0;
+  return (
+    differences(texel('none/1/whole/up/straight'), [11, 200, 7, 0]).count +
+      differences(texel('none/1/whole/up/premultiplied'), [0, 0, 0, 0]).count ===
+    0
+  );
 }
 
 /** In-page: a plain WebGL2 canvas (no engine) cleared to red, for `canvasShotsWork`. */
@@ -257,11 +267,15 @@ export async function canvasShotsWork(driver) {
 /** The row of a picture the browser cannot show (see `canvasShotsWork`). */
 export const UNSHOT = Object.freeze({
   status: 'unmeasured',
-  message: "the browser's screenshot shows no WebGL2 canvas (a plain one cleared to red comes back empty), so no picture can be judged",
+  message:
+    "the browser's screenshot shows no WebGL2 canvas (a plain one cleared to red comes back empty), so no picture can be judged",
 });
 
 /** The native row in a browser that offers no WebGPU adapter: nothing native to measure or compare. */
-export const NO_ADAPTER = Object.freeze({ status: 'unmeasured', message: 'the browser offers no WebGPU adapter (requestAdapter answers null)' });
+export const NO_ADAPTER = Object.freeze({
+  status: 'unmeasured',
+  message: 'the browser offers no WebGPU adapter (requestAdapter answers null)',
+});
 
 /**
  * A page's recorded error strings as one row: `refusal` when every one is a coded refusal with its help link (the
@@ -288,7 +302,11 @@ export const CASES = {
       const item = `${scene}${exact ? ' exact-pixel' : ' 4x MSAA'}`,
         images = {};
       for (const mode of MODES) {
-        const page = await t.load('/packages/webgl2-compat/test/compat-check.html', { mode: mode === 'native' ? 'native' : 'compat', scene, exact }, { layer: false });
+        const page = await t.load(
+          '/packages/webgl2-compat/test/compat-check.html',
+          { mode: mode === 'native' ? 'native' : 'compat', scene, exact },
+          { layer: false },
+        );
         if (page.failed) {
           t.row(item, mode, page.failed);
           continue;
@@ -314,8 +332,10 @@ export const CASES = {
           problems = [
             ...info.ok.errors,
             ...(gl.ok ? [`GL error ${gl.ok}`] : []),
-            ...(info.ok.vendor === 'margo-webgl2' === (mode === 'layer') ? [] : [`adapter vendor ${info.ok.vendor}`]),
-            ...(lit * 12 > image.width * image.height ? [] : [`only ${lit} lit pixels of ${image.width * image.height}`]),
+            ...((info.ok.vendor === 'margo-webgl2') === (mode === 'layer') ? [] : [`adapter vendor ${info.ok.vendor}`]),
+            ...(lit * 12 > image.width * image.height
+              ? []
+              : [`only ${lit} lit pixels of ${image.width * image.height}`]),
           ];
         if (problems.length) t.row(item, mode, { status: 'bug', message: problems.join('; ') });
         else {
@@ -347,7 +367,13 @@ export const CASES = {
         v.afterLoss?.replaced !== true && 'device not replaced after loss',
         v.coreErrors?.length && `core errors: ${v.coreErrors.join('; ')}`,
       ].filter(Boolean);
-    t.row('compatibility feature level', 'native', wrong.length ? { status: 'bug', message: wrong.join('; ') } : { status: 'pass', numbers: { levelGiven: v.limits?.core } });
+    t.row(
+      'compatibility feature level',
+      'native',
+      wrong.length
+        ? { status: 'bug', message: wrong.join('; ') }
+        : { status: 'pass', numbers: { levelGiven: v.limits?.core } },
+    );
   },
   // features-browser.mjs: each feature probe of the layer, run natively and on the layer by the page itself.
   async features(t) {
@@ -372,10 +398,20 @@ export const CASES = {
           continue;
         }
         const side = r.ok[mode === 'native' ? 'native' : 'compat'],
-          wrong = [side.thrown && `threw ${side.thrown}`, side.errors?.length && side.errors.join('; '), side.gl && `GL error ${side.gl}`].filter(Boolean);
+          wrong = [
+            side.thrown && `threw ${side.thrown}`,
+            side.errors?.length && side.errors.join('; '),
+            side.gl && `GL error ${side.gl}`,
+          ].filter(Boolean);
         if (wrong.length) {
           failed = true;
-          t.row(name, mode, side.thrown && !side.errors?.length && !side.gl ? classifyError(thrownOf(side.thrown)) : { status: 'bug', message: wrong.join('; ') });
+          t.row(
+            name,
+            mode,
+            side.thrown && !side.errors?.length && !side.gl
+              ? classifyError(thrownOf(side.thrown))
+              : { status: 'bug', message: wrong.join('; ') },
+          );
         } else if (mode === 'native') t.row(name, mode, { status: 'pass' });
       }
       if (failed) continue;
@@ -394,7 +430,10 @@ export const CASES = {
       if (!r.ok.native) {
         // No native result to hold the layer to: bitmapCopies keeps its two copy rules; the rest ran without an error.
         if (name === 'bitmapCopies' && !copyRules(r.ok.compat))
-          t.row(name, 'layer', { status: 'bug', message: 'the layer breaks a copy rule (no native result to compare)' });
+          t.row(name, 'layer', {
+            status: 'bug',
+            message: 'the layer breaks a copy rule (no native result to compare)',
+          });
         else t.row(name, 'layer', { status: 'pass', note: 'no native result to compare' });
         continue;
       }
@@ -418,7 +457,11 @@ export const CASES = {
         );
         continue;
       }
-      t.row(name, 'layer', d.count ? { status: 'difference', numbers: { values: d.count }, note: d.first.join('; ') } : { status: 'pass' });
+      t.row(
+        name,
+        'layer',
+        d.count ? { status: 'difference', numbers: { values: d.count }, note: d.first.join('; ') } : { status: 'pass' },
+      );
     }
   },
   // materials/test/browser-check.mjs: the unlit scenarios whose centre colour needs no lighting model.
@@ -446,7 +489,13 @@ export const CASES = {
         }
         const centre = pixelAt(await t.shot('canvas')),
           off = Math.max(...centre.map((c, i) => Math.abs(c - expected[i])));
-        t.row(name, mode, off <= 3 ? { status: 'pass' } : { status: 'bug', message: `centre ${centre.join(',')}, expected ${expected.join(',')}` });
+        t.row(
+          name,
+          mode,
+          off <= 3
+            ? { status: 'pass' }
+            : { status: 'bug', message: `centre ${centre.join(',')}, expected ${expected.join(',')}` },
+        );
         // As the materials check does after each scenario: its mesh goes, so the next one draws alone.
         await t.call('() => window.check.clear()');
       }
@@ -468,7 +517,11 @@ export const CASES = {
       else {
         const image = await t.shot('canvas'),
           [red, green] = pixelAt(image);
-        if (red <= green + 40) t.row('PBR quad', mode, { status: 'bug', message: `centre ${pixelAt(image).join(',')} is not the red material` });
+        if (red <= green + 40)
+          t.row('PBR quad', mode, {
+            status: 'bug',
+            message: `centre ${pixelAt(image).join(',')} is not the red material`,
+          });
         else {
           images[mode] = image;
           if (mode === 'native') t.row('PBR quad', mode, { status: 'pass', numbers: { centre: pixelAt(image) } });
@@ -479,7 +532,10 @@ export const CASES = {
       if (!images.native) t.row('PBR quad', 'layer', { status: 'pass', note: 'no native picture to compare' });
       else {
         const m = compareImages(images.native, images.layer);
-        t.row('PBR quad', 'layer', { status: m.share <= MAX_SHARE && m.mean <= MAX_MEAN ? 'pass' : 'difference', numbers: m });
+        t.row('PBR quad', 'layer', {
+          status: m.share <= MAX_SHARE && m.mean <= MAX_MEAN ? 'pass' : 'difference',
+          numbers: m,
+        });
       }
     }
   },
@@ -495,7 +551,12 @@ export const CASES = {
       const r = await t.call(POST_PROBE);
       if (r.thrown) t.row('GTAO creases', mode, classifyError(r.thrown));
       else if (r.ok.errors.length || !r.ok.finite || !(r.ok.mean > 0))
-        t.row('GTAO creases', mode, { status: 'bug', message: [...r.ok.errors, !r.ok.finite && 'non-finite output', `mean ${r.ok.mean}`].filter(Boolean).join('; ') });
+        t.row('GTAO creases', mode, {
+          status: 'bug',
+          message: [...r.ok.errors, !r.ok.finite && 'non-finite output', `mean ${r.ok.mean}`]
+            .filter(Boolean)
+            .join('; '),
+        });
       else {
         grids[mode] = r.ok;
         if (mode === 'native') t.row('GTAO creases', mode, { status: 'pass', numbers: { mean: r.ok.mean } });
@@ -508,7 +569,11 @@ export const CASES = {
           largest = Math.max(...gaps);
         t.row('GTAO creases', 'layer', {
           status: largest <= 1 / 255 ? 'pass' : 'difference',
-          numbers: { mean: grids.layer.mean, largestGap: largest, meanGap: gaps.reduce((a, b) => a + b, 0) / gaps.length },
+          numbers: {
+            mean: grids.layer.mean,
+            largestGap: largest,
+            meanGap: gaps.reduce((a, b) => a + b, 0) / gaps.length,
+          },
         });
       }
     }
@@ -534,7 +599,19 @@ export const CASES = {
         if (!(v.maxRelativeDepth < 1e-4)) wrong.push(`${view}: depth ${v.maxRelativeDepth}`);
       }
       if (r.ok.errors?.length) wrong.push(...r.ok.errors);
-      t.row('traversal', mode, wrong.length ? { status: 'bug', message: wrong.join('; ') } : { status: 'pass', numbers: { perspective: `${r.ok.perspective.same}/${r.ok.perspective.pixels}`, orthographic: `${r.ok.orthographic.same}/${r.ok.orthographic.pixels}` } });
+      t.row(
+        'traversal',
+        mode,
+        wrong.length
+          ? { status: 'bug', message: wrong.join('; ') }
+          : {
+              status: 'pass',
+              numbers: {
+                perspective: `${r.ok.perspective.same}/${r.ok.perspective.pixels}`,
+                orthographic: `${r.ok.orthographic.same}/${r.ok.orthographic.pixels}`,
+              },
+            },
+      );
     }
   },
 };
@@ -560,7 +637,12 @@ async function settle(driver, limitMs) {
  */
 export const SAFARI_CAPABILITIES = {
   safari: { browserName: 'safari' },
-  'ios-simulator': { browserName: 'safari', platformName: 'iOS', 'safari:useSimulator': true, 'safari:deviceType': 'iPhone' },
+  'ios-simulator': {
+    browserName: 'safari',
+    platformName: 'iOS',
+    'safari:useSimulator': true,
+    'safari:deviceType': 'iPhone',
+  },
 };
 
 /** A Safari driver: safaridriver on a free port, one session with `capabilities`. */
@@ -570,7 +652,10 @@ async function safariDriver(name) {
   try {
     // MARGO_IOS_UDID picks the simulator (one `xcrun simctl list devices` names); safaridriver chooses one otherwise.
     const udid = name === 'ios-simulator' && process.env.MARGO_IOS_UDID;
-    session = await openSession(driver.base, { ...SAFARI_CAPABILITIES[name], ...(udid ? { 'safari:deviceUDID': udid } : {}) });
+    session = await openSession(driver.base, {
+      ...SAFARI_CAPABILITIES[name],
+      ...(udid ? { 'safari:deviceUDID': udid } : {}),
+    });
     await session.timeouts(15 * 60_000, 180_000);
   } catch (error) {
     await driver.stop();
@@ -579,7 +664,13 @@ async function safariDriver(name) {
   return {
     name,
     version: session.capabilities.browserVersion,
-    platform: [session.capabilities.platformName, session.capabilities['safari:platformVersion'], session.capabilities['safari:deviceName']].filter(Boolean).join(' '),
+    platform: [
+      session.capabilities.platformName,
+      session.capabilities['safari:platformVersion'],
+      session.capabilities['safari:deviceName'],
+    ]
+      .filter(Boolean)
+      .join(' '),
     goto: (url) => session.goto(url),
     run: (source, arg) => session.run(source, arg),
     // The page shot cropped to the element: Safari's element shot of a WebGPU canvas is black (webdriver.mjs).
@@ -690,7 +781,11 @@ export async function androidDriver(
   try {
     let context, version, closeBrowser;
     if (shell('getprop', 'ro.debuggable').trim() === '1') {
-      context = await within(device.launchBrowser(), launchMs, () => new Error(`Chrome on ${device.model()} opened no DevTools socket in ${launchMs / 1000} s`));
+      context = await within(
+        device.launchBrowser(),
+        launchMs,
+        () => new Error(`Chrome on ${device.model()} opened no DevTools socket in ${launchMs / 1000} s`),
+      );
       closeBrowser = () => context.close();
     } else {
       shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'about:blank', 'com.android.chrome');
@@ -702,7 +797,9 @@ export async function androidDriver(
       undo.push(async () => run(['-s', device.serial(), 'forward', '--remove', `tcp:${local}`]));
       const endpoint = `http://127.0.0.1:${local}`,
         info = await devtoolsVersion(`${endpoint}/json/version`, get, launchMs, `Chrome on ${device.model()}`);
-      const browser = await (chromium ?? (await import('playwright-core')).chromium).connectOverCDP(endpoint, { timeout: 60_000 });
+      const browser = await (chromium ?? (await import('playwright-core')).chromium).connectOverCDP(endpoint, {
+        timeout: 60_000,
+      });
       context = browser.contexts()[0] ?? (await browser.newContext());
       version = info.Browser?.match(/Chrome\/([\d.]+)/)?.[1];
       closeBrowser = () => browser.close();
@@ -740,13 +837,17 @@ export async function devtoolsVersion(url, get, ms, who) {
     } catch (error) {
       last = error.message;
     }
-    if (Date.now() >= end) throw new Error(`${who} opened no DevTools socket (${CHROME_ANDROID_SOCKET}) in ${ms / 1000} s (${last}): is USB debugging on?`);
+    if (Date.now() >= end)
+      throw new Error(
+        `${who} opened no DevTools socket (${CHROME_ANDROID_SOCKET}) in ${ms / 1000} s (${last}): is USB debugging on?`,
+      );
     await new Promise((resolve) => setTimeout(resolve, Math.min(500, ms)));
   }
 }
 
 /** A page script: whether the page gets an animation frame within 5 s. */
-export const FRAME_PROBE = '() => new Promise((resolve) => { requestAnimationFrame(() => resolve(true)); setTimeout(() => resolve(false), 5000); })';
+export const FRAME_PROBE =
+  '() => new Promise((resolve) => { requestAnimationFrame(() => resolve(true)); setTimeout(() => resolve(false), 5000); })';
 
 /**
  * Refuses to run in a browser that fires no animation frames: the cases wait for frames, and a script waiting for one
@@ -761,15 +862,27 @@ export async function requireFrames(driver) {
 }
 
 /** Runs `cases` in the browser `name` and returns the report; rows are `{case, item, mode, status, ...}`. */
-export async function runMatrix(name, cases = Object.keys(CASES), { pageLimitMs = 120_000, caseLimitMs = 15 * 60_000 } = {}) {
-  const server = await startDevServer({ startPath: '/packages/webgl2-compat/test/compat-check.html', port: 'free', plugins: [preludePlugin()] }),
+export async function runMatrix(
+  name,
+  cases = Object.keys(CASES),
+  { pageLimitMs = 120_000, caseLimitMs = 15 * 60_000 } = {},
+) {
+  const server = await startDevServer({
+      startPath: '/packages/webgl2-compat/test/compat-check.html',
+      port: 'free',
+      plugins: [preludePlugin()],
+    }),
     origin = `http://127.0.0.1:${server.server.config.server.port}`;
   let driver;
   const rows = [];
   try {
     const port = server.server.config.server.port;
     driver =
-      name in SAFARI_CAPABILITIES ? await safariDriver(name) : name === 'android-chrome' ? await androidDriver(port) : await playwrightDriver(name);
+      name in SAFARI_CAPABILITIES
+        ? await safariDriver(name)
+        : name === 'android-chrome'
+          ? await androidDriver(port)
+          : await playwrightDriver(name);
     await driver.goto(`${origin}/tests/modern-extension.html`);
     const environment = await driver.run(ENVIRONMENT_PROBE);
     await requireFrames(driver);
@@ -846,7 +959,8 @@ export function table(report) {
     '| --- | --- | --- | --- |',
     ...keys.map((k) => {
       const [c, item] = k.split('\u0000'),
-        find = (mode) => report.rows.find((r) => r.case === c && r.item === item && (r.mode === mode || r.mode === '-'));
+        find = (mode) =>
+          report.rows.find((r) => r.case === c && r.item === item && (r.mode === mode || r.mode === '-'));
       return `| ${c} | ${item} | ${cell(find('native'))} | ${cell(find('layer'))} |`;
     }),
   ].join('\n');

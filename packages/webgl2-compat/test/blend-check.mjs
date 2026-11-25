@@ -33,7 +33,8 @@ export function classifyBlend(whiteBlackBits, nativeBits) {
     if (error > worst.error) worst = { k, weight, error };
   }
   if (!nativeBits) throw new TypeError('classifyBlend needs native WebGPU probe bits beside the WebGL2 ones');
-  const blend = worst.error <= 1 / 256 ? 'linear' : same([...whiteBlackBits], [...nativeBits]) ? 'native' : 'compressed';
+  const blend =
+    worst.error <= 1 / 256 ? 'linear' : same([...whiteBlackBits], [...nativeBits]) ? 'native' : 'compressed';
   return { blend, worst };
 }
 
@@ -54,10 +55,14 @@ export function compressedFailures(native, compat, { rows, sweeps, probes, float
   for (const key of sweeps) {
     if (!native[key] || !compat[key]) push(`${key}: sweep missing`);
     else if (!same(bitsOf(native[key]), bitsOf(compat[key]))) {
-      const n = bitsOf(native[key]), c = bitsOf(compat[key]);
+      const n = bitsOf(native[key]),
+        c = bitsOf(compat[key]);
       const i = n.findIndex((v, j) => v !== c[j]) >> 2;
-      push(`${key}[${i}]: nearest-mip LOD sweep differs (native ${f32(texel(n, i))[0]}, compat ${f32(texel(c, i))[0]}): another LOD`);
-    } else if (new Set(bitsOf(native[key])).size < 2) push(`${key}: the sweep never changes level, so it proves nothing`);
+      push(
+        `${key}[${i}]: nearest-mip LOD sweep differs (native ${f32(texel(n, i))[0]}, compat ${f32(texel(c, i))[0]}): another LOD`,
+      );
+    } else if (new Set(bitsOf(native[key])).size < 2)
+      push(`${key}: the sweep never changes level, so it proves nothing`);
   }
   for (const [key, probeName] of Object.entries(rows)) {
     const probe = probes[probeName];
@@ -65,7 +70,8 @@ export function compressedFailures(native, compat, { rows, sweeps, probes, float
       push(`${key}: missing`);
       continue;
     }
-    const n = bitsOf(native[key]), c = bitsOf(compat[key]);
+    const n = bitsOf(native[key]),
+      c = bitsOf(compat[key]);
     if (n.length !== c.length) push(`${key}: length ${n.length} vs ${c.length}`);
     for (let i = 0; i < n.length / 4; i++) {
       const lods = [];
@@ -76,7 +82,10 @@ export function compressedFailures(native, compat, { rows, sweeps, probes, float
       }
       if (!lods.some((k) => same(texel(probe.gl, k), texel(c, i)))) {
         const k = lods[0];
-        push(`${key}[${i}]: compat ${f32(texel(c, i))} is not the driver's blend ${f32(texel(probe.gl, k))} at native's LOD ${k}/256` + (lods.length > 1 ? ` (or ${lods.length - 1} more)` : ''));
+        push(
+          `${key}[${i}]: compat ${f32(texel(c, i))} is not the driver's blend ${f32(texel(probe.gl, k))} at native's LOD ${k}/256` +
+            (lods.length > 1 ? ` (or ${lods.length - 1} more)` : ''),
+        );
       }
     }
   }

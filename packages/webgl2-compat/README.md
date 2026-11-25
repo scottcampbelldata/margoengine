@@ -149,8 +149,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `antialias: false`, so exact-pixel rendering stays exact; it multisamples itself when a pipeline asks for 4
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`, and on ANGLE Direct3D 11 for one
-  draw with rasterizer discard into a pipeline's own colour targets when it has more than one: that back end compiles
-  the pixel shader again for them at the first draw, so a first frame would otherwise wait for it), render passes with clears,
+  draw into 1 x 1 throwaway copies of a pipeline's own colour targets, or a 1 x 1 depth-stencil buffer when it has
+  none: that back end compiles the pixel shader at the first draw that rasterizes, so a first frame would otherwise
+  wait for it), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
   is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or
@@ -175,7 +176,10 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `info.vendor === 'margo-webgl2'`. Clip space keeps WebGPU's z range through `EXT_clip_control`, and rendering is
   flipped in y so every texture keeps WebGPU's top-left origin; the canvas present flips it back with a texel-fetch
   draw of its own (exact, one texel a pixel), not `blitFramebuffer` (see `docs/known-bugs.md`, "ANGLE D3D11 flipped
-  blit").
+  blit"). A multisampled `resolveTarget` resolves with one `blitFramebuffer` at the end of the pass. On NVIDIA under
+  ANGLE D3D11 the same resolve can read back as two images one float16 step apart; it is exact on Intel and AMD under
+  the same backend and on ANGLE Vulkan, so it is recorded as a driver defect (`docs/known-bugs.md`, "two versions of
+  the same MSAA-resolved HDR texture").
 - **GLSL back end** (`margoengine/webgl2-compat/glsl`): `translateWGSL({ vertex, fragment })` turns a render
   pipeline's WGSL stages into GLSL ES 3.00 and the table the device binds resources by; `translateStage` translates one
   entry point alone. Uniform buffers are read in WGSL's own memory layout (exact for every struct, `@size`, `@align`

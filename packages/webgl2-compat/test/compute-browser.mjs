@@ -108,7 +108,9 @@ async function suite() {
       // and must store the nearest one exactly, as the CPU tier does. Equal to native is not defined here.
       const { steps } = compat.result;
       const nearest = steps.map((s) => Math.floor(s + 0.5));
-      const wrong = compat.result.values.flatMap((v, i) => (v === nearest[i] ? [] : [`[${i}]: compat ${v}, nearest ${nearest[i]}`]));
+      const wrong = compat.result.values.flatMap((v, i) =>
+        v === nearest[i] ? [] : [`[${i}]: compat ${v}, nearest ${nearest[i]}`],
+      );
       assert.deepEqual(wrong.slice(0, 8), [], `${name}: compat stores the nearest step`);
       assert.equal(compat.result.values.length, steps.length, `${name}: compat texel count`);
       const outside = native.result.values.flatMap((v, i) =>
@@ -121,7 +123,8 @@ async function suite() {
     }
     // AMD GPU hunt row 34: compute writes read by later dispatches stay on the GPU as textures; nothing is read back
     // into a GL buffer until a copy reads one (each dispatch read its stores back with readPixels before).
-    if (name === 'mirrorReads') assert.equal(compat.result.readPixels, 0, `${name}: readPixels while the dispatches ran`);
+    if (name === 'mirrorReads')
+      assert.equal(compat.result.readPixels, 0, `${name}: readPixels while the dispatches ran`);
     const diff = differences(native.result.values, compat.result.values, compat.result.tolerance ?? 1e-6);
     assert.deepEqual(diff, [], `${name}: compat differs from native`);
     // Each case must test something: all-zero results on both sides fail.
@@ -150,7 +153,11 @@ async function suite() {
     assert.equal(link.first, true, 'an async pipeline polls for the link');
     lines.push('an async compute pipeline leaves the link to the driver');
   } else {
-    assert.equal(link.first, true, 'without KHR_parallel_shader_compile an async pipeline reads the link status at once');
+    assert.equal(
+      link.first,
+      true,
+      'without KHR_parallel_shader_compile an async pipeline reads the link status at once',
+    );
     lines.push('no KHR_parallel_shader_compile here: an async compute pipeline reads the link status at once');
   }
   // Since KB-COMPAT-FIRSTTASK1 requestDevice loads the compute part and with it the read-back chunk, so a device has it

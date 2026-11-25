@@ -44,7 +44,17 @@ export function loggingContext() {
     getError: () => 0,
     getInternalformatParameter: () => Int32Array.of(4),
   };
-  for (const kind of ['Buffer', 'Texture', 'Framebuffer', 'Renderbuffer', 'Sampler', 'Program', 'Shader', 'VertexArray', 'Query'])
+  for (const kind of [
+    'Buffer',
+    'Texture',
+    'Framebuffer',
+    'Renderbuffer',
+    'Sampler',
+    'Program',
+    'Shader',
+    'VertexArray',
+    'Query',
+  ])
     context[`create${kind}`] = () => ({ kind });
   context.fenceSync = () => ({ kind: 'Sync' });
   const proxy = new Proxy(context, {
@@ -72,4 +82,3 @@ export async function loggingDevice(features = []) {
   const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
   return { gl, device: await adapter.requestDevice({ requiredFeatures: features }) };
 }
-

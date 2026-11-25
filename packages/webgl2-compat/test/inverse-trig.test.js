@@ -29,11 +29,12 @@ const fragment = (accurateInverseTrig) =>
 
 // The one-argument atan stayed GLSL's until 2026-11-12: on the Radeon 680M under ANGLE D3D11 it was 1.16e-5 off over
 // [-8, 8] (features-browser.mjs inverseTrig, sweep 4), past the 1e-5 the rest meet.
-test('the option calls the layer\'s acos, asin, atan and atan2 for scalars and vectors', () => {
+test("the option calls the layer's acos, asin, atan and atan2 for scalars and vectors", () => {
   const on = fragment(true);
   for (const call of ['_acos(', '_asin(', '_atan2(', '_atan(']) assert.ok(on.includes(call), call);
   assert.ok(!/(?<![_\w])(acos|asin|atan)\(/.test(on), 'no built-in acos, asin or atan is left');
-  for (const name of ['_atanu', '_atan2', '_atan', '_asin', '_acos']) assert.equal(on.split(`${name}(float`).length, 2, `${name} once`);
+  for (const name of ['_atanu', '_atan2', '_atan', '_asin', '_acos'])
+    assert.equal(on.split(`${name}(float`).length, 2, `${name} once`);
 });
 
 test('without the option the shader is unchanged: GLSL built-ins, no helpers', () => {
@@ -43,9 +44,10 @@ test('without the option the shader is unchanged: GLSL built-ins, no helpers', (
   assert.ok(!off.includes('_atanu') && !off.includes('_acos') && !off.includes('_atan2'));
 });
 
-test('_atanu evaluates ATAN_UNIT by Horner\'s rule', () => {
+test("_atanu evaluates ATAN_UNIT by Horner's rule", () => {
   const body = ATAN_UNIT.reduceRight(
-    (inner, c, k) => (k === ATAN_UNIT.length - 1 ? String(c) : `${Number.isInteger(c) ? `${c}.0` : c} + t * (${inner})`),
+    (inner, c, k) =>
+      k === ATAN_UNIT.length - 1 ? String(c) : `${Number.isInteger(c) ? `${c}.0` : c} + t * (${inner})`,
     '',
   );
   assert.equal(GLSL_HELPERS._atanu.source, `float _atanu(float a) { float t = a * a; return a * (${body}); }`);
@@ -109,7 +111,16 @@ test('atan2 stays within 1e-6 in every octant, at every magnitude, and keeps the
   // Every ratio the octant reduction can give (a stride of the float32 values in [0, 1]), in all eight octants.
   for (let b = 0; b <= ONE; b += 1021) {
     const a = fromBits(b);
-    for (const [y, x] of [[a, 1], [1, a], [a, -1], [1, -a], [-a, 1], [-1, a], [-a, -1], [-1, -a]])
+    for (const [y, x] of [
+      [a, 1],
+      [1, a],
+      [a, -1],
+      [1, -a],
+      [-a, 1],
+      [-1, a],
+      [-a, -1],
+      [-1, -a],
+    ])
       worst = Math.max(worst, Math.abs(atan2(y, x) - Math.atan2(y, x)));
   }
   // Directions around the circle at tiny, unit and huge magnitudes.
@@ -122,7 +133,16 @@ test('atan2 stays within 1e-6 in every octant, at every magnitude, and keeps the
     }
   }
   assert.ok(worst < 1e-6, `largest error ${worst}`);
-  for (const [y, x] of [[0, 1], [-0, 1], [0, -1], [-0, -1], [0, 0], [-0, -0], [1, 0], [-1, -0]])
+  for (const [y, x] of [
+    [0, 1],
+    [-0, 1],
+    [0, -1],
+    [-0, -1],
+    [0, 0],
+    [-0, -0],
+    [1, 0],
+    [-1, -0],
+  ])
     assert.ok(Object.is(atan2(y, x), f(Math.atan2(y, x))), `atan2(${y}, ${x})`);
 });
 
@@ -139,7 +159,9 @@ test('atan stays within 1e-6 at every magnitude and keeps the sign of zero', () 
 });
 
 test('the probe flags the ANGLE Direct3D 11 results and passes accurate ones', () => {
-  const exact = new Float32Array(INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [Math.acos(x), Math.asin(x), Math.atan2(y, z), 0]));
+  const exact = new Float32Array(
+    INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [Math.acos(x), Math.asin(x), Math.atan2(y, z), 0]),
+  );
   assert.ok(inverseTrigError(exact) < 1e-6);
   assert.ok(inverseTrigError(exact) <= INVERSE_TRIG_TOLERANCE);
   // The Radeon 680M's D3D11 compiler: acos(0) = 1.5707288 (raw WebGL2, docs/known-bugs.md).
@@ -161,7 +183,11 @@ test('the probe flags the ANGLE Direct3D 11 results and passes accurate ones', (
   assert.equal(inverseTrigError(off), Infinity);
   assert.equal(inverseTrigVerdict(exact), false);
   assert.equal(inverseTrigVerdict(d3d11), true);
-  assert.equal(inverseTrigVerdict(new Float32Array(INVERSE_TRIG_PROBE.length * 4)), false, 'a stand-in never changes the shaders');
+  assert.equal(
+    inverseTrigVerdict(new Float32Array(INVERSE_TRIG_PROBE.length * 4)),
+    false,
+    'a stand-in never changes the shaders',
+  );
   assert.equal(inverseTrigVerdict(own), false);
 });
 
@@ -169,9 +195,15 @@ test('the probe flags the ANGLE Direct3D 11 results and passes accurate ones', (
 // smooth input, but atan2(1, -0) = -pi / 2, atan2(-1, -0) = pi / 2 and atan2(-0, -1) = pi. The layer then shipped
 // those built-ins, and features-browser.mjs inverseTrig read atan2(-0, -1) 6.28 off.
 test('the probe flags a driver whose atan2 is a half turn off at x = -0 (Apple silicon Metal)', () => {
-  const metalAtan2 = (y, x) => (Object.is(x, -0) && y !== 0 ? -Math.atan2(y, 0) : Object.is(y, -0) && x < 0 ? Math.PI : Math.atan2(y, x));
-  const metal = new Float32Array(INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [Math.acos(x), Math.asin(x), metalAtan2(y, z), 0]));
-  assert.ok(INVERSE_TRIG_PROBE.slice(INVERSE_TRIG_SMOOTH).every(([, y, x]) => Object.is(x, -0) || Object.is(y, -0)), 'the edges hold signed zeros');
+  const metalAtan2 = (y, x) =>
+    Object.is(x, -0) && y !== 0 ? -Math.atan2(y, 0) : Object.is(y, -0) && x < 0 ? Math.PI : Math.atan2(y, x);
+  const metal = new Float32Array(
+    INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [Math.acos(x), Math.asin(x), metalAtan2(y, z), 0]),
+  );
+  assert.ok(
+    INVERSE_TRIG_PROBE.slice(INVERSE_TRIG_SMOOTH).every(([, y, x]) => Object.is(x, -0) || Object.is(y, -0)),
+    'the edges hold signed zeros',
+  );
   assert.ok(inverseTrigError(metal, INVERSE_TRIG_SMOOTH) < 1e-6, 'every smooth input is exact');
   assert.ok(inverseTrigError(metal) > 1, 'an edge is a half turn off');
   assert.equal(inverseTrigVerdict(metal), true);

@@ -32,7 +32,8 @@ test('no corpus entry point inlines past the Direct3D compile limits (KB-COMPAT-
     for (const entry of Object.values(m.entryPoints).flat()) {
       entries++;
       const { copies, size } = inlinedCopies(m.code, entry);
-      if (size > SIZE_LIMIT) over.push(`${m.package} ${m.key} ${entry}: ${size} characters inlined, over ${SIZE_LIMIT}`);
+      if (size > SIZE_LIMIT)
+        over.push(`${m.package} ${m.key} ${entry}: ${size} characters inlined, over ${SIZE_LIMIT}`);
       for (const [name, n] of copies) {
         const body = bodies.get(name).body;
         if (n > WALK_COPIES && /\b(loop|while)\b/.test(body) && /\bvar\s+\w+\s*:\s*array</.test(body))

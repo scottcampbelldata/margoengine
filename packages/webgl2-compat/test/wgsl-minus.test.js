@@ -3,7 +3,13 @@ import test from 'node:test';
 import { checkWGSL, parseWGSL } from '../dist/wgsl.js';
 
 test('WGSL chooses subtraction and unary negation when decrement is not valid lookahead', () => {
-  for (const [expression, expected] of [['1--2', 3], ['--2', 2], ['1---2', -1], ['1----2', 3], ['2*--3', 6]]) {
+  for (const [expression, expected] of [
+    ['1--2', 3],
+    ['--2', 2],
+    ['1---2', -1],
+    ['1----2', 3],
+    ['2*--3', 6],
+  ]) {
     const module = checkWGSL(`const result = ${expression};`);
     assert.equal(module.globals.find((item) => item.name === 'result').value, expected, expression);
   }

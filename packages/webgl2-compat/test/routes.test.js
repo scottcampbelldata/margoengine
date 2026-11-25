@@ -247,7 +247,9 @@ test('VFX: the route kernels are point draws, and frames of them equal the WebGP
   // A simulation with events writes the flags from its update kernel, and stores each event once `update` has returned,
   // so the kernel is a point draw too (KB-VFX-EVENTS-CPU: storing the event before the births read planned it on the CPU tier).
   for (const on of ['death', 'collision']) {
-    const raised = vfx.routeShaders((await import('../../vfx/src/events.ts')).events.simulation(simulationShader, { on }));
+    const raised = vfx.routeShaders(
+      (await import('../../vfx/src/events.ts')).events.simulation(simulationShader, { on }),
+    );
     assert.equal(raised.events, true);
     assert.match(raised.update, /storeEvents\(id\.x\);eventFlags\[id\.x\]=eventHere/);
     assert.doesNotMatch(raised.update, /atomic|var<workgroup>|workgroupBarrier/, 'events');

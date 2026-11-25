@@ -50,7 +50,17 @@ function recordingContext() {
     fenceSync: () => ({ kind: 'Sync' }),
     deleteSync: (o) => deleted.push(o),
   };
-  for (const kind of ['Buffer', 'Texture', 'Framebuffer', 'Renderbuffer', 'Sampler', 'Program', 'Shader', 'VertexArray', 'Query']) {
+  for (const kind of [
+    'Buffer',
+    'Texture',
+    'Framebuffer',
+    'Renderbuffer',
+    'Sampler',
+    'Program',
+    'Shader',
+    'VertexArray',
+    'Query',
+  ]) {
     context[`create${kind}`] = () => ({ kind });
     context[`delete${kind}`] = (o) => deleted.push(o);
   }
@@ -82,7 +92,11 @@ const pipeline = (device, n = 0, format = 'float32x2') =>
       entryPoint: 'vs',
       buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format }] }],
     },
-    fragment: { module: device.createShaderModule({ code: WGSL(n) }), entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+    fragment: {
+      module: device.createShaderModule({ code: WGSL(n) }),
+      entryPoint: 'fs',
+      targets: [{ format: 'rgba8unorm' }],
+    },
   });
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -112,7 +126,11 @@ test('every WebGL object the device makes is deleted by the device; destroy() le
   assert.equal(created.Program, 2);
   assert.equal(created.VertexArray, 2);
   device.destroy();
-  assert.deepEqual({ ...device.glObjects.deleted }, { ...device.glObjects.created }, 'created == deleted after destroy');
+  assert.deepEqual(
+    { ...device.glObjects.deleted },
+    { ...device.glObjects.created },
+    'created == deleted after destroy',
+  );
   assert.equal(gl.deleted.length - probes, sum(deleted), 'each delete reached the context once');
   assert.ok(kept.length);
 });

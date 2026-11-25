@@ -65,7 +65,8 @@ export async function openBrowser({
     } finally {
       socket?.close();
       for (const entry of pending.values()) entry.reject(new Error('Firefox closed'));
-      if (child?.pid && child.exitCode === null) await bounded(Promise.all([endTree(child.pid)]), 10000, 'Firefox cleanup');
+      if (child?.pid && child.exitCode === null)
+        await bounded(Promise.all([endTree(child.pid)]), 10000, 'Firefox cleanup');
       try {
         await stopServer?.();
       } finally {
@@ -155,7 +156,10 @@ export async function openBrowser({
     const makePage = async (context, owner) => {
       const events = new EventEmitter();
       eventTargets.set(context, events);
-      await command('session.subscribe', { events: ['log.entryAdded', 'network.beforeRequestSent'], contexts: [context] });
+      await command('session.subscribe', {
+        events: ['log.entryAdded', 'network.beforeRequestSent'],
+        contexts: [context],
+      });
       await command('browsingContext.setViewport', {
         context,
         viewport: { width: 1440, height: 1100 },
