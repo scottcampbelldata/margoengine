@@ -4,6 +4,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { boxGeometry, planeGeometry } from '../../geometry/dist/index.js';
 import {
   Texture,
+  setMaterialSortModes,
   Material,
   createMesh,
   createInstancedMesh,
@@ -391,6 +392,49 @@ test('materials draw opaque first, then transparent back to front, each by rende
   }
 });
 
+test('setMaterialSortModes orders opaque and transparent meshes front to back, back to front or by renderOrder alone', async () => {
+  const s = await scene();
+  try {
+    const order = [],
+      mesh = (name, material, z, options) => {
+        const m = createMesh(s.engine, planeGeometry(1, 1), material, options);
+        m.root.setPosition([0, 0, z]);
+        const draw = m.draw.bind(m);
+        m.draw = (...args) => {
+          order.push(name);
+          return draw(...args);
+        };
+        return m;
+      };
+    const solid = new Material(),
+      glass = new Material({ transparent: true, opacity: 0.5 });
+    const meshes = [
+      mesh('s-far', solid, -6),
+      mesh('s-near', solid, 2),
+      mesh('s-mid', solid, -1),
+      mesh('g-near', glass, 2),
+      mesh('g-far', glass, -6),
+    ];
+    const draws = () => {
+      order.length = 0;
+      s.frame();
+      return [...order];
+    };
+    assert.deepEqual(draws(), ['s-far', 's-near', 's-mid', 'g-far', 'g-near'], 'defaults: creation order, then back to front');
+    setMaterialSortModes(s.engine, { opaque: 'front-to-back', transparent: 'front-to-back' });
+    assert.deepEqual(draws(), ['s-near', 's-mid', 's-far', 'g-near', 'g-far']);
+    setMaterialSortModes(s.engine, { opaque: 'back-to-front', transparent: 'manual' });
+    assert.deepEqual(draws(), ['s-far', 's-mid', 's-near', 'g-near', 'g-far']);
+    meshes[0].renderOrder = 5;
+    assert.deepEqual(draws(), ['s-mid', 's-near', 's-far', 'g-near', 'g-far'], 'renderOrder still comes first');
+    setMaterialSortModes(s.engine, { opaque: 'manual', transparent: 'back-to-front' });
+    assert.throws(() => setMaterialSortModes(s.engine, { opaque: 'random' }), /front-to-back/);
+    for (const m of meshes) m.destroy();
+  } finally {
+    s.close();
+  }
+});
+
 test('loadTexture fetches into an owned ImageBitmap and enforces protocol and size limits', async () => {
   const fetchBefore = globalThis.fetch,
     bitmapBefore = globalThis.createImageBitmap,
@@ -419,8 +463,16 @@ test('loadTexture fetches into an owned ImageBitmap and enforces protocol and si
     size = [8192, 4096];
     await assert.rejects(loadTexture('https://assets.test/huge.png'), /size limit/);
     assert.equal(closed.length, 2);
+    const big = await loadTexture('https://assets.test/huge.png', { maxPixels: 8192 * 4096 });
+    assert.equal(big.width, 8192, 'maxPixels raises the decoded-size cap');
+    big.dispose();
+    await assert.rejects(loadTexture('https://assets.test/crate.png', { maxPixels: 8 }), /size limit/);
+    await assert.rejects(loadTexture('https://assets.test/crate.png', { maxBytes: 2 }), /Texture download/);
+    await assert.rejects(loadTexture('https://assets.test/crate.png', { maxBytes: 0 }), /positive integer/);
+    await assert.rejects(loadTexture('https://assets.test/crate.png', { maxPixels: 1.5 }), /positive integer/);
+    const closedBefore = closed.length;
     new Texture({ width: 1, height: 1 }).dispose();
-    assert.equal(closed.length, 2, 'caller-owned sources stay open');
+    assert.equal(closed.length, closedBefore, 'caller-owned sources stay open');
   } finally {
     globalThis.fetch = fetchBefore;
     globalThis.createImageBitmap = bitmapBefore;

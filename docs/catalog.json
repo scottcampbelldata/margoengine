@@ -964,6 +964,7 @@
       "packGeometry",
       "padTileGrid",
       "remapTileUVs",
+      "setMaterialSortModes",
       "sheen",
       "specular",
       "tileAnimationFrame",

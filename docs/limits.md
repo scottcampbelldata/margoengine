@@ -8532,3 +8532,6 @@ dither). TextureOverlay reads mip level 0 with bilinear filtering, so an image d
 its texture must be 2D and filterable, with straight alpha. An ImageBitmap is uploaded when `source` changes and must stay
 open (a device restore uploads it again). One of each effect per stack. Entry
 10,454 B gzip; core plus stage unchanged.
+
+Material sort modes (`setMaterialSortModes`, `@margoengine/materials`, 2026-11-25): one setting per engine for opaque and for transparent material meshes, not one per layer mask; distance is measured to the mesh's first primitive origin, not its bounds; raw-shader, gltf/pbr model and sprite draws keep their own order. Accepted difference from PlayCanvas layers, which sort per layer. No core change; the materials root entry grows by the function's few bytes.
+Texture download caps (`loadTexture`, `@margoengine/materials`, 2026-11-25): defaults stay 64 MiB and 16,777,216 decoded pixels; `maxBytes` and `maxPixels` raise or lower them per call (`maxBytes` on `loadKTX2Texture` too). `loadCubeTexture` face downloads keep the defaults. A device with a smaller `maxTextureDimension2D` still rejects the upload.

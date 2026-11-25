@@ -590,6 +590,13 @@ export interface MaterialOptions extends PhysicalOptions {
 
 export { MaterialSide } from "@margoengine/gltf";
 
+export type MaterialSortMode = 'manual' | 'front-to-back' | 'back-to-front';
+
+export interface MaterialSortModes {
+    opaque?: MaterialSortMode;
+    transparent?: MaterialSortMode;
+}
+
 export interface MeshGeometry {
     positions: ArrayLike<number>;
     normals: ArrayLike<number>;
@@ -1016,6 +1023,8 @@ export function remapTileUVs(uvs: ArrayLike<number>, tiles: ArrayLike<number>, g
     margin?: number;
     spacing?: number;
 }): Float32Array;
+
+export function setMaterialSortModes(engine: Engine, next: MaterialSortModes): void;
 
 export function sheen(options?: SheenOptions, base?: MaterialExtension): MaterialExtension;
 

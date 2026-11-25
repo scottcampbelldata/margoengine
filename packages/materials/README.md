@@ -437,6 +437,33 @@ object for picking, shadows and export. A mesh with a material extension, transm
 own draws on its own. Opaque meshes may draw in another order than they were created (as other engines sort opaque
 draws by material); transparent ones keep their back-to-front order.
 
+### Texture download caps
+
+`loadTexture(url, { maxBytes, maxPixels })` raises or lowers the two caps: 64 MiB downloaded (default
+67,108,864) and 16,777,216 decoded pixels (4096 x 4096). Each takes a positive integer, else a RangeError. `maxBytes`
+also works on `loadKTX2Texture`. The device's own texture size limit still applies at upload.
+
+```ts
+import { loadTexture } from '@margoengine/materials';
+
+const photo = await loadTexture('/scan-8k.jpg', { maxPixels: 8192 * 4096, maxBytes: 128 * 1024 * 1024 });
+photo.dispose();
+```
+
+### Sort modes
+
+`setMaterialSortModes(engine, { opaque, transparent })` picks how an engine's material meshes are ordered, as
+PlayCanvas layers do. Each phase takes `'manual'` (`mesh.renderOrder` alone), `'front-to-back'` or `'back-to-front'` (by
+`renderOrder`, then squared distance from the camera to the mesh origin). Defaults: opaque `'manual'`, transparent
+`'back-to-front'`. It is live, per engine and not per layer mask.
+
+```ts
+import { setMaterialSortModes } from '@margoengine/materials';
+
+declare const engine: import('@margoengine/core').Engine;
+setMaterialSortModes(engine, { opaque: 'front-to-back' }); // less overdraw on pixel-heavy scenes
+```
+
 For many copies under one node, `createInstancedMesh` keeps them in one `instances` object; `setMatrices` writes many
 rows at once:
 

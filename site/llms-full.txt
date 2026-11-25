@@ -11664,6 +11664,8 @@ its texture must be 2D and filterable, with straight alpha. An ImageBitmap is up
 open (a device restore uploads it again). One of each effect per stack. Entry
 10,454 B gzip; core plus stage unchanged.
 
+Material sort modes (`setMaterialSortModes`, `@margoengine/materials`, 2026-11-25): one setting per engine for opaque and for transparent material meshes, not one per layer mask; distance is measured to the mesh's first primitive origin, not its bounds; raw-shader, gltf/pbr model and sprite draws keep their own order. Accepted difference from PlayCanvas layers, which sort per layer. No core change; the materials root entry grows by the function's few bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

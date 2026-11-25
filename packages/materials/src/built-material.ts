@@ -1158,30 +1158,52 @@ function mipmaps(device: GPUDevice, texture: GPUTexture): void {
     texture.dimension === '2d' ? (texture.depthOrArrayLayers ?? 1) : 1,
   );
 }
-/** The bytes at an http(s), blob: or data: `url` (64 MiB at most) and the response's content type. */
+/** Download and decode caps of `loadTexture` (and `maxBytes` of `loadKTX2Texture`); each takes a positive integer. */
+export interface TextureLimits {
+  /** Most bytes downloaded (default 64 MiB, 67,108,864). */
+  maxBytes?: number;
+  /** Most decoded pixels, width times height (default 16,777,216, 4096 x 4096). A device's own texture size limit still applies. */
+  maxPixels?: number;
+}
+const limit = (value: number | undefined, fallback: number, name: string): number => {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value < 1)
+    throw new RangeError(`Texture ${name} must be a positive integer; pass a number of ${name === 'maxBytes' ? 'bytes' : 'pixels'}`);
+  return value;
+};
+/** The bytes at an http(s), blob: or data: `url` (`maxBytes`, default 64 MiB, at most) and the response's content type. */
 async function download(
   url: string | URL,
   signal?: AbortSignal,
   get: typeof fetch = globalThis.fetch,
+  maxBytes?: number,
 ): Promise<[Uint8Array, string]> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:', 'blob:', 'data:'].includes(target.protocol))
     throw new TypeError('Texture URL must use HTTP(S), blob: or data:');
   const response = await get(target, { signal }),
-    bytes = await readResponse(response, { maxBytes: 64 * 1024 * 1024, signal, label: 'Texture download' });
+    bytes = await readResponse(response, { maxBytes: limit(maxBytes, 64 * 1024 * 1024, 'maxBytes'), signal, label: 'Texture download' });
   return [bytes, response.headers.get('content-type') ?? ''];
 }
 /** The image at `url` as an ImageBitmap (4096x4096 pixels at most), pixels as stored (no colour or alpha conversion). */
-async function fetchBitmap(url: string | URL, signal?: AbortSignal, get?: typeof fetch): Promise<ImageBitmap> {
-  const [bytes, type] = await download(url, signal, get);
+async function fetchBitmap(
+  url: string | URL,
+  signal?: AbortSignal,
+  get?: typeof fetch,
+  limits: TextureLimits = {},
+): Promise<ImageBitmap> {
+  const pixels = limit(limits.maxPixels, maxPixels, 'maxPixels'),
+    [bytes, type] = await download(url, signal, get, limits.maxBytes);
   const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>], { type }), {
     colorSpaceConversion: 'none',
     premultiplyAlpha: 'none',
   });
   try {
     signal?.throwIfAborted();
-    if (bitmap.width * bitmap.height > maxPixels)
-      throw new RangeError('Texture exceeds decoded size limit; use an image of 4096x4096 pixels or fewer.');
+    if (bitmap.width * bitmap.height > pixels)
+      throw new RangeError(
+        `Texture exceeds decoded size limit; use an image of ${pixels} pixels or fewer, or raise maxPixels.`,
+      );
     return bitmap;
   } catch (error) {
     bitmap.close();
@@ -1189,14 +1211,21 @@ async function fetchBitmap(url: string | URL, signal?: AbortSignal, get?: typeof
   }
 }
 /**
- * Fetches http(s), blob: or data: image bytes (64 MiB, 4096x4096 pixels at most) into an ImageBitmap the texture owns.
+ * Fetches http(s), blob: or data: image bytes into an ImageBitmap the texture owns. `maxBytes` (default 64 MiB) and
+ * `maxPixels` (default 4096x4096) raise or lower the caps.
  * `fetch`: default `globalThis.fetch`, e.g. a LoadingManager's or AssetCache's `fetch`.
  */
 export async function loadTexture(
   url: string | URL,
-  { signal, fetch: get, ...options }: TextureOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
+  {
+    signal,
+    fetch: get,
+    maxBytes,
+    maxPixels: pixels,
+    ...options
+  }: TextureOptions & TextureLimits & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<Texture> {
-  const bitmap = await fetchBitmap(url, signal, get);
+  const bitmap = await fetchBitmap(url, signal, get, { maxBytes, maxPixels: pixels });
   try {
     return new Texture(bitmap, options, true);
   } catch (error) {
@@ -1227,14 +1256,20 @@ export async function loadKTX2Texture(
     decoder,
     signal,
     fetch: get,
+    maxBytes,
     ...options
-  }: TextureOptions & { decoder: KTX2Transcoder | KTX2LayerReader; signal?: AbortSignal; fetch?: typeof fetch },
+  }: TextureOptions & {
+    decoder: KTX2Transcoder | KTX2LayerReader;
+    signal?: AbortSignal;
+    fetch?: typeof fetch;
+    maxBytes?: number;
+  },
 ): Promise<Texture> {
   const layers = decoder as KTX2LayerReader,
     plain = decoder as KTX2Transcoder;
   if (typeof layers?.decode !== 'function' && typeof plain?.transcode !== 'function')
     throw new TypeError('loadKTX2Texture needs a decoder; pass {decoder: new KTX2Decoder({device: engine.gpu})}');
-  const [bytes] = await download(url, signal, get);
+  const [bytes] = await download(url, signal, get, maxBytes);
   if (typeof layers.decode !== 'function') {
     const result = await plain.transcode(bytes, { signal });
     signal?.throwIfAborted();
@@ -3955,11 +3990,43 @@ const blends: Record<Blending, GPUBlendState | null | undefined> = {
   additive: { color: { srcFactor: 'src-alpha', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } },
   multiply: { color: { srcFactor: 'zero', dstFactor: 'src' }, alpha: { srcFactor: 'zero', dstFactor: 'src-alpha' } },
 };
+/** How a phase of the material draw queue orders meshes (PlayCanvas layer sort modes): `manual` is `renderOrder` alone. */
+export type MaterialSortMode = 'manual' | 'front-to-back' | 'back-to-front';
+/** Sort modes of the material draw queue; each falls back to its default when left out. */
+export interface MaterialSortModes {
+  /** Opaque meshes. Default `'manual'`; `'front-to-back'` cuts overdraw on pixel-heavy scenes. */
+  opaque?: MaterialSortMode;
+  /** Transparent meshes. Default `'back-to-front'`. */
+  transparent?: MaterialSortMode;
+}
 interface MaterialDraws {
+  sortModes: { opaque: MaterialSortMode; transparent: MaterialSortMode };
   add(entry: Entry): void;
   delete(entry: Entry): void;
   /** Re-sorts on the next frame (a render order changed). */
   reorder(): void;
+}
+const modes = new WeakMap<Engine['frameGraph'], MaterialDraws['sortModes']>();
+function sortSettings(graph: Engine['frameGraph']): MaterialDraws['sortModes'] {
+  let m = modes.get(graph);
+  if (!m) modes.set(graph, (m = { opaque: 'manual', transparent: 'back-to-front' }));
+  return m;
+}
+/**
+ * Sets how this engine's material meshes (plain, instanced and batched) are ordered for drawing, live and for every
+ * mesh: `opaque` (default `'manual'`) and `transparent` (default `'back-to-front'`) each take `'manual'` (by
+ * `mesh.renderOrder` alone), `'front-to-back'` or `'back-to-front'` (by `renderOrder`, then by squared distance from the
+ * camera to the mesh origin). Leave a field out to keep it; pass `{}` to change nothing.
+ * @example
+ * setMaterialSortModes(engine, { opaque: 'front-to-back' }); // less overdraw on pixel-heavy scenes
+ */
+export function setMaterialSortModes(engine: Engine, next: MaterialSortModes): void {
+  const ok = (v: unknown) => v === undefined || v === 'manual' || v === 'front-to-back' || v === 'back-to-front';
+  if (!next || !ok(next.opaque) || !ok(next.transparent))
+    throw new TypeError("Material sort modes take 'manual', 'front-to-back' or 'back-to-front'; pass one of those");
+  const m = sortSettings(engine.frameGraph);
+  if (next.opaque) m.opaque = next.opaque;
+  if (next.transparent) m.transparent = next.transparent;
 }
 const queues = new WeakMap<Engine['frameGraph'], MaterialDraws>(),
   late = (m: Material) => m.transparent || m.transmissive;
@@ -3980,6 +4047,7 @@ function queue(runtime: Engine): MaterialDraws {
   if (draws) return draws;
   const members: Entry[] = [],
     tail: Phase[] = [],
+    sortModes = sortSettings(graph),
     name = 'materials:' + serial++,
     // One run, reused every frame: it keeps its batch records (gltf/pbr draw-batch.ts) instead of making new ones.
     run = new PBRDrawRun();
@@ -4014,12 +4082,19 @@ function queue(runtime: Engine): MaterialDraws {
     arranged = true;
     epoch++;
   };
-  /** Sorts the late phase back to front from `eye`. With `check`, returns false (unsorted) when one of its entries changed phase. */
-  const sortLate = (eye: ArrayLike<number>, check: boolean): boolean => {
-    if (opaqueEnd === phases.length) return true;
-    for (let i = opaqueEnd; i < phases.length; i++) {
+  /** Sorts phases[from, to) by renderOrder, then by distance from `eye` as `mode` says (`manual` keeps the arranged order). With `check`, returns false (unsorted) when one of its entries changed phase. */
+  const sortRange = (
+    eye: ArrayLike<number>,
+    from: number,
+    to: number,
+    mode: MaterialSortMode,
+    check: boolean,
+  ): boolean => {
+    if (from === to) return true;
+    for (let i = from; i < to; i++) {
       const entry = phases[i].entry;
       if (check && !current(entry)) return false;
+      if (mode === 'manual') continue;
       const matrix = entry.model.primitives[0].node.matrix;
       // The squared distance sorts alike and needs no square root (2,000 blended meshes a frame).
       const x = eye[0] - matrix[12],
@@ -4027,13 +4102,17 @@ function queue(runtime: Engine): MaterialDraws {
         z = eye[2] - matrix[14];
       entry.distance = x * x + y * y + z * z;
     }
-    const count = phases.length - opaqueEnd;
-    for (let i = 0; i < count; i++) tail[i] = phases[opaqueEnd + i];
+    if (mode === 'manual') return true;
+    const count = to - from,
+      sign = mode === 'back-to-front' ? -1 : 1;
+    for (let i = 0; i < count; i++) tail[i] = phases[from + i];
     tail.length = count;
-    tail.sort((a, b) => a.entry.order - b.entry.order || b.entry.distance - a.entry.distance);
-    for (let i = 0; i < count; i++) phases[opaqueEnd + i] = tail[i];
+    tail.sort((a, b) => a.entry.order - b.entry.order || sign * (a.entry.distance - b.entry.distance));
+    for (let i = 0; i < count; i++) phases[from + i] = tail[i];
     return true;
   };
+  const sortLate = (eye: ArrayLike<number>, check: boolean): boolean =>
+    sortRange(eye, opaqueEnd, phases.length, sortModes.transparent, check);
   const plugin: EnginePlugin = {
     name,
     setup(engine) {
@@ -4054,6 +4133,7 @@ function queue(runtime: Engine): MaterialDraws {
           // opaque phase this frame.
           const eye = c.camera.position;
           while (!sortLate(eye, true)) arrange();
+          sortRange(eye, 0, opaqueEnd, sortModes.opaque, false);
           // One render pass for every mesh: a pass per mesh stores and reloads the multisampled colour and depth each
           // time and costs a begin, an end and a command-buffer flush (10,000 meshes: 168 ms of CPU a frame).
           // A frame drawn inside this one (a draw callback rendering a probe) takes a run of its own.
@@ -4105,6 +4185,7 @@ function queue(runtime: Engine): MaterialDraws {
   };
   runtime.use(plugin);
   draws = {
+    sortModes,
     add(entry) {
       members.push(entry);
       arranged = false;
