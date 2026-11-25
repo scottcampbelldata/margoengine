@@ -737,6 +737,10 @@
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
+    "scatter:ScatterVelocityParts.cull": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
     "scatter:ScatterVelocityParts.indices": {
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
