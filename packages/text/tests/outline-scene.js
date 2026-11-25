@@ -67,7 +67,15 @@ export const CORNER_SIZE = [640, 640];
 export function buildCorner(engine, { TextRenderer, Text, Camera }, font) {
   engine.scene.background = '#000000';
   TextRenderer.attach(engine).add(
-    new Text({ text: 'L', font, fontSize: 2.6, anchorX: 'center', anchorY: 'middle', position: [0, 0, 0], color: '#ffffff' }),
+    new Text({
+      text: 'L',
+      font,
+      fontSize: 2.6,
+      anchorX: 'center',
+      anchorY: 'middle',
+      position: [0, 0, 0],
+      color: '#ffffff',
+    }),
   );
   return new Camera({ position: [0, 0, 3.2], target: [0, 0, 0] });
 }
@@ -97,7 +105,12 @@ export async function fieldHash(font) {
   for (const text of SCENE_TEXTS)
     for (const char of new Set(text)) {
       const g = font.glyph(char);
-      if (g) parts.push(new TextEncoder().encode(`${char}|${g.width}|${g.height}|${g.left}|${g.top}|`), g.data, g.msdf ?? new Uint8Array(0));
+      if (g)
+        parts.push(
+          new TextEncoder().encode(`${char}|${g.width}|${g.height}|${g.left}|${g.top}|`),
+          g.data,
+          g.msdf ?? new Uint8Array(0),
+        );
     }
   let length = 0;
   for (const p of parts) length += p.length;

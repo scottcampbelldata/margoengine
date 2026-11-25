@@ -116,7 +116,8 @@ export function colourPieces(setup: FieldSetup, cornerAngle: number): Uint8Array
     for (let r = 0; r < runs; r++) {
       const from = corners[r],
         to = r + 1 < runs ? corners[r + 1] : corners[0] + n;
-      for (let e = from; e < to; e++) for (const p of edgePieces[first + ((e - first) % n)]) colours[p] = TWO_CHANNEL[runColour[r]];
+      for (let e = from; e < to; e++)
+        for (const p of edgePieces[first + ((e - first) % n)]) colours[p] = TWO_CHANNEL[runColour[r]];
     }
   }
   return colours;

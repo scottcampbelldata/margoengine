@@ -136,11 +136,7 @@ export function flattenEdges(
           ax = bx;
           ay = by;
         }
-        close(
-          before,
-          direction(x1 - x0, y1 - y0, x2 - x0, y2 - y0),
-          direction(x2 - x1, y2 - y1, x2 - x0, y2 - y0),
-        );
+        close(before, direction(x1 - x0, y1 - y0, x2 - x0, y2 - y0), direction(x2 - x1, y2 - y1, x2 - x0, y2 - y0));
         px = x2;
         py = y2;
       } else if (s.length === 8) {
@@ -422,7 +418,10 @@ export function fieldSetup(
 }
 
 /** The distance pass of {@link outlineSdf}: squared distance to the nearest kept part per texel. @internal */
-export function nearestSquared(setup: FieldSetup, options: OutlineSdfOptions): { best: Float64Array; evaluations: number } {
+export function nearestSquared(
+  setup: FieldSetup,
+  options: OutlineSdfOptions,
+): { best: Float64Array; evaluations: number } {
   const { radius, cutoff } = options,
     { width, height, kept } = setup;
   // Exact distance to the nearest piece, each piece only over its box grown by the reach of the byte range.
@@ -490,5 +489,13 @@ export function outlineSdf(
   if (!setup) return null;
   const { best, evaluations } = nearestSquared(setup, options);
   const { width, height, left, top, overlapped } = setup;
-  return { width, height, left, top, data: sdfBytes(setup, best, options.radius, options.cutoff), evaluations, overlapped };
+  return {
+    width,
+    height,
+    left,
+    top,
+    data: sdfBytes(setup, best, options.radius, options.cutoff),
+    evaluations,
+    overlapped,
+  };
 }

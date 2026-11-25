@@ -203,7 +203,11 @@ test('edge colouring: corners split channels so neighbours share exactly one; a 
   // outside (that channel is what keeps the corner sharp); in the outer opposite quadrant every channel is outside.
   const outerBorders = [at(0.05, 0.12), at(0.12, 0.05)];
   for (const values of outerBorders) {
-    assert.equal(values.filter((v) => v > level).length, 1, `one channel inside in an outer border quadrant: ${values}`);
+    assert.equal(
+      values.filter((v) => v > level).length,
+      1,
+      `one channel inside in an outer border quadrant: ${values}`,
+    );
     assert.ok(median(...values) < level, `the median is outside in an outer border quadrant: ${values}`);
   }
   assert.equal(corner.filter((v) => v > level).length >= 2, true, `two channels inside the corner: ${corner}`);
@@ -219,7 +223,10 @@ test('edge colouring: corners split channels so neighbours share exactly one; a 
   assert.equal(i + square.left + 0.5, square.top - 0.5 - j, 'the sample is on the diagonal');
   assert.equal(new Set(opposite).size, 1, `every channel equal on the diagonal: ${opposite}`);
   assert.ok(opposite[0] < level, 'outside past the corner');
-  assert.ok(opposite[0] > square.msdf[k + 3], `pseudo-distance ${opposite[0]} nearer than the true distance ${square.msdf[k + 3]}`);
+  assert.ok(
+    opposite[0] > square.msdf[k + 3],
+    `pseudo-distance ${opposite[0]} nearer than the true distance ${square.msdf[k + 3]}`,
+  );
   // Off the diagonal, still in the outer opposite quadrant, the two edges' channels differ but all stay outside.
   const off = at(0.05, 0.07);
   assert.ok(new Set(off).size > 1, `channels differ off the diagonal: ${off}`);
