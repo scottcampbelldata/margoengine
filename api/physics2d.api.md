@@ -414,6 +414,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     createCharacterController(body: Body2D, options?: CharacterOptions2D): CharacterController2D;
     writeFilter(f?: QueryFilter2D): void;
     raycast(origin: Vec2D, direction: Vec2D, options?: RaycastOptions2D): CastHit2D | null;
+    raycastAll(origin: Vec2D, direction: Vec2D, options?: RaycastOptions2D): CastHit2D[];
     overlapPoint(point: Vec2D, filter?: QueryFilter2D): Body2D[];
     overlapShape(shape: ShapeOptions2D, position: Vec2D, rotation?: number, filter?: QueryFilter2D): Body2D[];
     castShape(shape: ShapeOptions2D, position: Vec2D, direction: Vec2D, maxDistance: number, filter?: QueryFilter2D, rotation?: number): CastHit2D | null;
@@ -488,6 +489,7 @@ export interface ProjectedPoint2D extends Hit2D {
 export interface QueryFilter2D {
     groups?: number;
     exclude?: Body2D;
+    excludeCollider?: Collider2D;
     excludeSensors?: boolean;
     excludeFixed?: boolean;
     excludeKinematic?: boolean;

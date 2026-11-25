@@ -49,7 +49,7 @@ const physics = new Physics2D(null, {gravity: [0, 320]});
 physics.dispose();
 ```
 
-Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step, and a `teleport` or `moveTo` at once. `castShape` and `overlapShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points.
+`raycastAll(origin, direction)` lists every collider a ray meets, nearest first, and a filter's `excludeCollider` leaves one collider out where `exclude` leaves a body. Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step, and a `teleport` or `moveTo` at once. `castShape` and `overlapShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0. The kernel is Margo's own, written from papers (`docs/clean-room.md`); it holds no third-party code.
 
@@ -74,7 +74,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Collision | collision groups, solver groups, active collision types | `collisionGroups`, `solverGroups`, `activeCollisionTypes` | full |
 | Collision | collision events, contact force events | `contactstart`, `contactend`, `intersectionstart`, `intersectionend`, `contactforce` (`contactForceThreshold`) | full |
 | Collision | physics hooks (filter and modify contact pairs, one-way platforms) | `physics.hooks = {filterPair, modifyContact}` for colliders with `hooks` set; `oneWay`, `friction`, `restitution`, `tangentVelocity` (conveyors), `solverActive` per contact | full |
-| Queries | ray cast with normal (solid or not), point, shape intersection, shape cast, project point, box intersection, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `projectPoint`, `intersectionsWithBox`, `QueryFilter2D` | full |
+| Queries | ray cast with normal (solid or not), every hit along a ray (`raycastAll`, nearest first), point, shape intersection, shape cast, project point, box intersection, filters | `raycast`, `overlapPoint`, `overlapShape`, `castShape`, `projectPoint`, `intersectionsWithBox`, `QueryFilter2D` | full |
 | Queries | contact pairs of a collider | `contactPairs(collider)` | full |
 | Bodies | dynamic, fixed, kinematic position, kinematic velocity | `type` | full |
 | Bodies | damping, gravity scale, locked rotation, can sleep, dominance, body type changes | `BodyOptions2D`, the same names as setters on `Body2D`, `setType` | full |

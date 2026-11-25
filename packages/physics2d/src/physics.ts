@@ -158,6 +158,8 @@ export interface QueryFilter2D {
   groups?: number;
   /** Ignore this body. */
   exclude?: Body2D;
+  /** Ignore this one collider, not the body's others (Rapier's `exclude_collider`). */
+  excludeCollider?: Collider2D;
   excludeSensors?: boolean;
   excludeFixed?: boolean;
   excludeKinematic?: boolean;
@@ -869,7 +871,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   }
   private hitOf(shape: number, filter: QueryFilter2D | undefined): Hit2D | null {
     const collider = this.byShape.get(shape);
-    if (!collider) return null;
+    if (!collider || collider === filter?.excludeCollider) return null;
     const body = collider.body;
     if (filter?.predicate && filter.predicate(body, collider) === false) return null;
     return { body, sprite: body.sprite, collider };
@@ -877,6 +879,19 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
 
   /** First collider along a ray from `origin` in `direction` (any length), or null. */
   raycast(origin: Vec2D, direction: Vec2D, options: RaycastOptions2D = {}): CastHit2D | null {
+    return this.rayHits(origin, direction, options, true)[0] ?? null;
+  }
+
+  /**
+   * Every collider a ray meets, nearest first (ties by collider order), each with its point, normal and distance: Rapier's
+   * `intersections_with_ray`. A collider of several shapes appears once per shape the ray meets.
+   * @throws RangeError for an origin or direction that is not two finite numbers, or a zero direction.
+   */
+  raycastAll(origin: Vec2D, direction: Vec2D, options: RaycastOptions2D = {}): CastHit2D[] {
+    return this.rayHits(origin, direction, options, false);
+  }
+
+  private rayHits(origin: Vec2D, direction: Vec2D, options: RaycastOptions2D, first: boolean): CastHit2D[] {
     this.live();
     this.checkVec(origin, 'Ray2D origin');
     this.checkVec(direction, 'Ray2D direction');
@@ -890,19 +905,21 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     io.f.set([origin[0] * k, origin[1] * k, dx, dy, Math.min((options.maxDistance ?? 1e9) * k, 3e38)], 4);
     io.u[9] = (options.solid ?? true) ? 1 : 0;
     const count = this.kernel.ok(this.kernel.exports.ray_cast(this.handle));
-    const out = this.kernel.io(4 * count);
+    const out = this.kernel.io(4 * count),
+      hits: CastHit2D[] = [];
     for (let i = 0; i < count; i++) {
       const base = this.hitOf(out.u[4 * i], options);
       if (!base) continue;
       const d = out.f[4 * i + 1] / k;
-      return {
+      hits.push({
         ...base,
         distance: d,
         point: [origin[0] + dx * d, origin[1] + dy * d],
         normal: [out.f[4 * i + 2] + 0, out.f[4 * i + 3] + 0],
-      };
+      });
+      if (first) break;
     }
-    return null;
+    return hits;
   }
 
   /** The bodies with a collider containing `point`. */
