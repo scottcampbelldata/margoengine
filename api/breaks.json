@@ -14955,7 +14955,7 @@
     "was": "7cdaaf85",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics",
@@ -14964,7 +14964,7 @@
     "was": "ebe5f369",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics/soft",
@@ -14973,7 +14973,7 @@
     "was": "7cdaaf85",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics/soft",
@@ -14982,7 +14982,7 @@
     "was": "ebe5f369",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics/robots",
@@ -14991,7 +14991,7 @@
     "was": "7cdaaf85",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics/robots",
@@ -15000,7 +15000,7 @@
     "was": "ebe5f369",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics2d",
@@ -15009,7 +15009,7 @@
     "was": "fa7f0845",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   },
   {
     "entry": "@margoengine/physics2d",
@@ -15018,6 +15018,6 @@
     "was": "7cdaaf85",
     "reason": "Renamed to Rapier's own name, additionalPgsIterations: the count is extra internal passes a substep, Rapier's `additional_pgs_iterations`; Rapier's `additional_solver_iterations` is extra substeps and will take the old name. Unpublished packages, so no alias.",
     "date": "2026-11-24",
-    "approved": "Scott 2026-11-24, relayed by the lane manager session (its decision: match Rapier's names and meanings exactly, record it here, no alias); Scott's own yes is still to be had"
+    "approved": "Scott 2026-11-25: \"I approve\" (the rename of additionalSolverIterations to additionalPgsIterations, Rapier's name for extra passes, no alias)"
   }
 ]
