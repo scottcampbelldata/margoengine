@@ -52,8 +52,8 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | DONE (`@margoengine/xr/session`: blend mode, visibility, frame rate, play-area bounds; layer `quality`, `blendTextureSourceAlpha`, `chromaticAberrationCorrection`, `mipLevels`. Multiview not built, see limits.md; not yet run on a headset) | M | 5f1f6ca25 |
 | AR Quick Look and Scene Viewer launch where WebXR is absent | model-viewer | DONE (`@margoengine/xr/launch`: Quick Look `rel="ar"` link, Scene Viewer intent, fallback; URL scheme checks; not yet run on a phone) | S | 73d8e2269 |
 | USDZ interactive behaviours (Quick Look tap and trigger actions in the USDZ exporter) | Apple AR Quick Look | DONE (`behaviors` option of `exportUSDZ`: tap trigger; emphasize, hide, wait and group actions, only values Apple's pages state; others listed in limits.md; not yet run in Quick Look) | M | 38e3af6bf |
-| SVG from an engine scene (sciviz writes SVG from supplied geometry only) | three.js SVGRenderer | PARTIAL | M |  |
-| WebXR multiview (both eyes in one pass where the device and binding offer it, a view per eye otherwise) | three.js, Babylon | MISSING | M |  |
+| SVG from an engine scene (sciviz writes SVG from supplied geometry only) | three.js SVGRenderer | DONE (`@margoengine/sciviz/scene-svg`: meshes, lines and points through a camera, BSP painter's order, back-face culling, shading) | M | 640a0e630 |
+| WebXR multiview (both eyes in one pass where the device and binding offer it, a view per eye otherwise) | three.js, Babylon | BLOCKED: needs core. Core's render passes and every package pipeline draw one view per pass into a 2D target; a single pass over both eyes needs a layered target and a view index in the shaders (no stable WGSL `view_index`; Chromium has it only as an experimental feature), all in core's pipelines. A package can only draw a view per eye, which `EyeViews` already does. Needs Scott's decision on a core change | M |  |
 
 ## Lane C: scene, assets, text and formats
 
