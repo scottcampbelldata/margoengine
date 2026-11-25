@@ -303,7 +303,7 @@ impl World {
 
     fn accepts(&self, shape: u32, filter: &QueryFilter) -> bool {
         let s = &self.shapes[shape as usize];
-        if shape == filter.exclude_shape || s.body == filter.exclude_body || !groups_meet(filter.groups, s.groups) {
+        if !self.bodies[s.body as usize].enabled || shape == filter.exclude_shape || s.body == filter.exclude_body || !groups_meet(filter.groups, s.groups) {
             return false;
         }
         if s.sensor && filter.flags & EXCLUDE_SENSORS != 0 {

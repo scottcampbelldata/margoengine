@@ -398,7 +398,7 @@ export class Body2D {
   private read(): Words {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_read(h, this.handle));
-    return kernel.io(11);
+    return kernel.io(12);
   }
   /** Velocity in world units per second. */
   get linearVelocity(): [number, number] {
@@ -506,6 +506,18 @@ export class Body2D {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_set_additional_mass(h, this.handle, encode(value, 'additional mass')));
     this.extraMass = value;
+  }
+  /**
+   * Whether the body is in the simulation (default true). Disabled, it keeps its pose and velocity, moves and wakes nothing, touches
+   * nothing (its contacts end), is found by no query, and its joints rest; enabled again, it goes on with the velocity it had. Rapier's
+   * `setEnabled`; its published guide does not describe the effect, so this matches what the 3D kernel's disabled body does.
+   */
+  get enabled(): boolean {
+    return this.read().u[11] !== 0;
+  }
+  set enabled(value: boolean) {
+    const { x, h, kernel } = this.k;
+    kernel.ok(x.body_set_enabled(h, this.handle, value ? 1 : 0));
   }
   /** The centre of mass in world units, as of the last step. */
   get centerOfMass(): [number, number] {

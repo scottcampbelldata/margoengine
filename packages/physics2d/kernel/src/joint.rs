@@ -540,7 +540,7 @@ pub struct Paths {
 #[inline]
 fn active(world: &World, def: &JointDef) -> bool {
     let (ba, bb) = (&world.bodies[def.a as usize], &world.bodies[def.b as usize]);
-    def.a != def.b && ((ba.is_dynamic() && ba.awake) || (bb.is_dynamic() && bb.awake))
+    def.a != def.b && ba.enabled && bb.enabled && ((ba.is_dynamic() && ba.awake) || (bb.is_dynamic() && bb.awake))
 }
 
 fn find(parent: &mut [u32], mut x: u32) -> u32 {

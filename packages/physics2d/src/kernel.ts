@@ -60,6 +60,7 @@ interface Exports {
   body_wake(world: number, body: number): number;
   body_sleep(world: number, body: number): number;
   body_set_additional_mass(world: number, body: number, mass: number): number;
+  body_set_enabled(world: number, body: number, enabled: number): number;
   body_set_additional_mass_properties(
     world: number,
     body: number,

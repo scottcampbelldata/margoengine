@@ -102,6 +102,8 @@ export class Body2D {
     restoreAdditionalMass(value: number): void;
     get additionalMass(): number;
     set additionalMass(value: number);
+    get enabled(): boolean;
+    set enabled(value: boolean);
     get centerOfMass(): [number, number];
     setAdditionalMassProperties(mass: number, centre?: Vec2D, inertia?: number): this;
     get sleeping(): boolean;
@@ -682,6 +684,7 @@ interface Exports {
     body_wake(world: number, body: number): number;
     body_sleep(world: number, body: number): number;
     body_set_additional_mass(world: number, body: number, mass: number): number;
+    body_set_enabled(world: number, body: number, enabled: number): number;
     body_set_additional_mass_properties(world: number, body: number, mass: number, x: number, y: number, inertia: number): number;
     body_set_kind(world: number, body: number, kind: number): number;
     body_set_soft_ccd(world: number, body: number, distance: number): number;

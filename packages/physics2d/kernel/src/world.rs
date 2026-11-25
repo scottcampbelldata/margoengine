@@ -116,6 +116,9 @@ pub struct Body {
     /// Where a position-driven kinematic body is to be at the end of the next step.
     pub next_target: Option<(V2, Rot)>,
     pub awake: bool,
+    /// False takes the body out of the simulation: it keeps its pose and velocity, moves and wakes nothing, touches nothing, is
+    /// found by no query and its joints rest, until it is enabled again.
+    pub enabled: bool,
     pub sleep_time: f32,
     pub shapes: Vec<u32>,
     /// A removed body keeps its slot, as a static body with no shapes, until a new body takes it.
@@ -662,6 +665,7 @@ impl World {
             torque: 0.0,
             next_target: None,
             awake: moving,
+            enabled: true,
             sleep_time: 0.0,
             shapes: Vec::new(),
             dead: false,
@@ -977,7 +981,7 @@ impl World {
         }
         for body in woken {
             let b = &mut self.bodies[body as usize];
-            if b.kind != Kind::Static && !b.dead {
+            if b.kind != Kind::Static && !b.dead && b.enabled {
                 b.awake = true;
                 b.sleep_time = 0.0;
             }
@@ -1186,11 +1190,23 @@ impl World {
     pub fn wake(&mut self, body: u32) -> Result<(), PhysicsError> {
         let b = self.bodies.get_mut(body as usize).ok_or(PhysicsError::InvalidHandle)?;
         validate_body_state(b)?;
-        if b.kind != Kind::Static {
+        if b.kind != Kind::Static && b.enabled {
             b.awake = true;
             b.sleep_time = 0.0;
         }
         Ok(())
+    }
+
+    /// Takes a body out of the simulation (false) or puts it back (true). Out, it keeps its pose and velocity, moves and wakes nothing,
+    /// touches nothing, is found by no query and its joints rest. Back, it wakes with the velocity it had.
+    pub fn set_body_enabled(&mut self, body: u32, enabled: bool) -> Result<(), PhysicsError> {
+        let b = self.live_body(body)?;
+        b.enabled = enabled;
+        if !enabled {
+            b.awake = false;
+            return Ok(());
+        }
+        self.wake(body)
     }
 
     /// Whether a contact between the two shapes' bodies can do anything: two shapes of one body, or two bodies that
@@ -1259,7 +1275,7 @@ impl World {
         self.force_events.clear();
         self.steps = self.steps.checked_add(1).ok_or(PhysicsError::ArithmeticOverflow)?;
         for body in self.bodies.iter_mut() {
-            if let Some((target, q)) = body.next_target {
+            if let (Some((target, q)), true) = (body.next_target, body.enabled) {
                 let origin = body.exact_origin();
                 let turn = q.mul(Rot { c: body.xf.q.c, s: -body.xf.q.s });
                 body.linear_velocity = v2(((target.x as f64 - origin[0]) / dt as f64) as f32, ((target.y as f64 - origin[1]) / dt as f64) as f32);
@@ -1317,7 +1333,7 @@ impl World {
         self.broad.pairs(&mut pairs, |a, b| {
             let (Some(sa), Some(sb)) = (shapes.get(a as usize), shapes.get(b as usize)) else { invalid_handle = true; return false; };
             let (ba, bb) = (sa.body, sb.body);
-            let allowed = ba != bb && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err());
+            let allowed = ba != bb && bodies[ba as usize].enabled && bodies[bb as usize].enabled && pair_allowed(sa, bodies[ba as usize].kind, sb, bodies[bb as usize].kind) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err());
             // A hook is asked only about a pair that would meet, and only when one of its shapes asks for it.
             if allowed && (sa.hooks | sb.hooks) & HOOK_FILTER != 0 {
                 if let Some(hook) = hook.as_mut() {
@@ -1527,6 +1543,9 @@ impl World {
         for joint in &self.joints {
             let (a, b) = (joint.def.a, joint.def.b);
             let (ba, bb) = (&self.bodies[a as usize], &self.bodies[b as usize]);
+            if !ba.enabled || !bb.enabled {
+                continue;
+            }
             if ba.is_dynamic() && bb.is_dynamic() {
                 self.union.union(a, b);
             } else {
@@ -1550,7 +1569,7 @@ impl World {
             self.bodies[b as usize].sleep_time = 0.0;
         }
         for (i, body) in self.bodies.iter_mut().enumerate() {
-            if body.is_dynamic() && !body.awake && awake[self.island_of[i] as usize] {
+            if body.is_dynamic() && body.enabled && !body.awake && awake[self.island_of[i] as usize] {
                 body.awake = true;
                 body.sleep_time = 0.0;
             }
