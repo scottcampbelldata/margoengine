@@ -1511,7 +1511,7 @@ console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post
 
 ### The solver contract (`@margoengine/physics/world`)
 
-`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The field registry below keeps the fields between them; the world and the scheduler that drive them come next.
+`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The field registry below keeps the fields between them, and `PhysicsWorld` drives them.
 
 ```ts
 import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
@@ -1623,6 +1623,45 @@ const random = new RandomStream(7, solverNumber('spray'));
 const a = random.uniform(120, 3); // tick 120, element 3
 const b = random.uniform(120, 3);
 console.log(a === b, a >= 0 && a < 1); // true true
+```
+
+`PhysicsWorld` runs solvers on one clock and one memory ([docs/physics-framework.md](../../docs/physics-framework.md), sections 2 and 5). `world.add(solver, params, cell)` declares the solver's fields in the world's registry, calls its `init` with a host over the world's memory, picks its rate level (the faster of its preferred `rate` and its `stableRate()`) and publishes its ports. `world.advance(frame)` runs every step owed to reach frame `frame` of the film (`rate`, default `{num: 24, den: 1}`; NTSC as `{num: 24000, den: 1001}`): time is counted in base ticks of 7,680 Hz, and `ticksAt(frame, rate)` maps a frame to them in exact integers, so the same shot at 24, 30 or 60 frames a second is the same physics. On each tick the solvers due run in coupling order (groups of the coupling graph in data order, ids within a group): each takes the sums of what others added to its fields (`host.port`), imports, steps with its readers' ports in `context.inputs`, and exports. A solver's ports include those of the fields it accumulates into. `{maxTicks}` caps one call and `world.settle()` runs the rest, so nothing is dropped; a frame before the world's time is refused (restore a snapshot to go back). Levels are chosen again from each solver's state at every 1/60 s boundary, where every level meets. `world.alpha(frame, level)` is where a frame lies between steps of a level, for drawing. The clock, the levels, the origin cells and the registry lie in the world's memory with the solvers' state, so `world.hash()`, `world.takeSnapshot()` and `world.restoreSnapshot(bytes)` cover all of it and a restored run goes on bit for bit. For large worlds each solver steps in the frame of an origin cell of `cellSize` metres (default 4,096), its `context.cell`, which the world also sets on every port it publishes: `shiftOrigin(delta)` moves every cell by whole numbers and changes no simulated state, and `relocate(offset, fromCell, toCell)` moves a position through the exact cell difference. `RandomStream` is Philox4x32-10 (Salmon et al. 2011) keyed by the world's seed and `solverNumber(id)` and counted by tick, element and stream, so a draw is a pure function of those.
+
+```ts
+import {PhysicsWorld, regionWords, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
+
+// A mass on a spring stepped 240 times a second (rate level 2), publishing its height.
+let host: SolverHost, state: Region, port: Region;
+const spring: Solver = {
+  describe: () => ({
+    id: 'spring',
+    rate: 2,
+    fields: [{field: {name: 'height', kind: 'scalarSeries', quantity: 'height', unit: 'm', centring: 'particle'}, access: 'write'}],
+    stableRate: () => 2,
+  }),
+  init(h) {
+    host = h;
+    state = h.allocate('state', 16, 'f64', 1);
+    port = h.allocate('height', 8, 'f64', 1);
+    regionWords(h.memory, state)[0] = 1;
+  },
+  step(_context, dt) {
+    const s = regionWords(host.memory, state);
+    s[1] -= 40 * s[0] * dt;
+    s[0] += s[1] * dt;
+  },
+  exportPorts(tick) {
+    regionWords(host.memory, port)[0] = regionWords(host.memory, state)[0];
+    return [{field: 'height', region: port, tick, cell: [0, 0, 0]}]; // the world sets the cell to the solver's
+  },
+  importPorts() {},
+  stateRegions: () => [state],
+  extraState: () => [],
+};
+const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(spring, {});
+world.advance(24); // one second: 240 steps of 1/240 s
+const height = world.fields.port('height')!;
+console.log(world.time, height.tick, regionWords(world.memory, height.region)[0].toFixed(3)); // 1 239 0.999
 ```
 
 ## Limits

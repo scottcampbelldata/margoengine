@@ -39,3 +39,18 @@ export {
   type Transfer,
 } from './fields.js';
 export { RandomStream, philox, solverNumber } from './random.js';
+export {
+  type CouplingEdge,
+  type CouplingGraph,
+  type CouplingNode,
+  couplingGraph,
+  stronglyConnected,
+} from './graph.js';
+export {
+  BASE_HZ,
+  HYPER_PERIOD,
+  PhysicsWorld,
+  ticksAt,
+  type FrameRate,
+  type PhysicsWorldOptions,
+} from './world.js';

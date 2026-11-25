@@ -11300,6 +11300,32 @@ A solver's number is the 32-bit FNV-1a hash of its id's UTF-8 bytes (G. Fowler, 
 Hansen, G. Fowler, K.-P. Vo and L. Noll, "The FNV Non-Cryptographic Hash Algorithm", IETF Internet-Draft,
 https://datatracker.ietf.org/doc/draft-eastlake-fnv/), checked against its published values for "", "a" and "foobar", and
 xor-folded to 16 bits as that draft describes for shorter hashes. Proof: `packages/physics/tests/world-random.test.js`.
+### The physics world: clock, coupling order, rate levels and origin cells (`@margoengine/physics/world`, 2026-11-25)
+
+`packages/physics/src/world/world.ts` and `graph.ts` run the framework's solvers on one clock and one memory
+(docs/physics-framework.md, sections 2 and 5): a base tick grid at the finest dyadic rate, frames mapped to ticks in exact
+integers, solvers ordered by their coupling graph, rate levels chosen from state at 1/60 s boundaries, and integer origin
+cells, with the world's own state in regions of the shared memory so the snapshot and hash of the framework take it along.
+Written from:
+
+- R. Tarjan, "Depth-First Search and Linear Graph Algorithms", SIAM Journal on Computing 1(2), 1972,
+  https://doi.org/10.1137/0201010 (strongly connected components; written here without recursion).
+- A. B. Kahn, "Topological Sorting of Large Networks", Communications of the ACM 5(11), 1962,
+  https://doi.org/10.1145/368996.369025 (the order of the coupling groups; ties broken by solver id).
+- C. W. Gear and D. R. Wells, "Multirate Linear Multistep Methods", BIT 24, 1984, https://doi.org/10.1007/BF01934907, and W.
+  H. Neal and T. Belytschko, "Explicit-Explicit Subcycling with Non-Integer Time Step Ratios for Structural Dynamic Systems",
+  Computers and Structures 31(6), 1989 (solvers at different rates meeting on shared ticks; known through the framework's
+  survey, not read in full here).
+- C. A. Felippa, K. C. Park and C. Farhat, "Partitioned analysis of coupled mechanical systems", Computer Methods in Applied
+  Mechanics and Engineering 190, 2001, https://doi.org/10.1016/S0045-7825(00)00391-1 (the staggered exchange; known through
+  the framework's survey, not read in full here).
+- C. Thorne, "Using a Floating Origin to Improve Fidelity and Performance of Large, Distributed Virtual Worlds",
+  International Conference on Cyberworlds, 2005, https://doi.org/10.1109/CW.2005.15 (positions kept relative to a moving
+  origin; known through the framework's survey, not read in full here). The integer cell and the exact cell shift are this
+  framework's own arrangement of it.
+- Standard gravity 9.80665 m/s^2: the value fixed by the 3rd CGPM (1901) and ISO 80000-3.
+
+Proof: `packages/physics/tests/world.test.js`.
 ### Pinned elementary functions and fixed-order sums (`kernel-common`, 2026-11-25, K01)
 
 `kernel-common/src/pinned.rs` has `exp`, `ln`, `sin`, `cos`, `pow` and a fixed-partition sum over f64, built only from + - * / and integer operations, so every build gives the same bits. The methods are the textbook ones: argument reduction by the leading and trailing parts of ln 2 and of pi / 2 (W. J. Cody and W. Waite, "Software Manual for the Elementary Functions", Prentice-Hall, 1980; the parts are split here with exact arithmetic from the decimal digits of pi and ln 2, not copied) and Taylor series on the reduced interval (J.-M. Muller, "Elementary Functions: Algorithms and Implementation", 3rd ed., Birkhauser, 2016, chapters 4 and 11); `pow` carries ln x and the product y ln x as pairs of doubles (TwoSum, T. J. Dekker's split product, "A floating-point technique for extending the available precision", Numerische Mathematik 18, 1971; Muller 2016, section 4.3). The sum adds blocks of 256 in order and the blocks' sums by a balanced tree over their indices, the fixed-partition idea of J. Demmel and H. D. Nguyen, "Parallel reproducible summation", IEEE Transactions on Computers 64(7), 2015. Accuracy is held against the host's functions by `kernel-common/tests/pinned.rs`: within 2 ulp for exp, ln, sin and cos, within 4 ulp for pow.

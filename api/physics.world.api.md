@@ -11,6 +11,8 @@ export class Arena {
     words(region: Region): RegionWords;
 }
 
+export const BASE_HZ = 7680;
+
 export const BASE_RATE = 60;
 
 export const BYTES: Readonly<Record<ElementType, number>>;
@@ -18,6 +20,26 @@ export const BYTES: Readonly<Record<ElementType, number>>;
 export type Cell = readonly [number, number, number];
 
 export type Centring = 'cell' | 'face' | 'vertex' | 'particle';
+
+export interface CouplingEdge {
+    readonly from: string;
+    readonly to: string;
+    readonly field: string;
+    readonly kind: 'read' | 'accumulate';
+}
+
+export interface CouplingGraph {
+    readonly edges: readonly CouplingEdge[];
+    readonly groups: readonly (readonly string[])[];
+    readonly groupOf: ReadonlyMap<string, number>;
+}
+
+export interface CouplingNode {
+    readonly id: string;
+    readonly writes: readonly string[];
+    readonly reads: readonly string[];
+    readonly accumulates: readonly string[];
+}
 
 export type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
@@ -48,6 +70,54 @@ export class FieldRegistry {
 export interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
+}
+
+export interface FrameRate {
+    readonly num: number;
+    readonly den: number;
+}
+
+export const HYPER_PERIOD: number;
+
+export class PhysicsWorld {
+    readonly rate: FrameRate;
+    readonly seed: number;
+    readonly gravity: readonly [number, number, number];
+    readonly cellSize: number;
+    readonly arena: Arena;
+    readonly fields: FieldRegistry;
+    readonly transfers: TransferRegistry;
+    constructor(options?: PhysicsWorldOptions);
+    get memory(): WebAssembly.Memory;
+    get tick(): number;
+    get time(): number;
+    get settled(): boolean;
+    get ids(): string[];
+    get coupling(): CouplingGraph;
+    add<Params>(solver: Solver<Params>, params: Params, cell?: Cell): this;
+    remove(id: string): boolean;
+    levelOf(id: string): RateLevel;
+    cellOf(id: string): Cell;
+    setCell(id: string, cell: Cell): this;
+    shiftOrigin(delta: Cell): this;
+    relocate(offset: readonly [number, number, number], from: Cell, to: Cell, out?: [number, number, number]): [number, number, number];
+    advance(frame: number, options?: {
+        part?: readonly [number, number];
+        maxTicks?: number;
+    }): number;
+    settle(): number;
+    alpha(frame: number, level: RateLevel, part?: readonly [number, number]): number;
+    hash(): string;
+    takeSnapshot(): Snapshot;
+    restoreSnapshot(bytes: Uint8Array): this;
+}
+
+export interface PhysicsWorldOptions {
+    rate?: FrameRate;
+    seed?: number;
+    gravity?: readonly [number, number, number];
+    cellSize?: number;
+    memory?: WebAssembly.Memory;
 }
 
 export interface Port {
@@ -154,6 +224,8 @@ export class TransferRegistry {
     names(): string[];
 }
 
+export function couplingGraph(nodes: readonly CouplingNode[], partial?: boolean): CouplingGraph;
+
 export function isRateLevel(value: unknown): value is RateLevel;
 
 export function philox(c0: number, c1: number, c2: number, c3: number, k0: number, k1: number, out?: Uint32Array): Uint32Array;
@@ -168,7 +240,11 @@ export function solverNumber(id: string): number;
 
 export function stateHash(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): string;
 
+export function stronglyConnected(ids: readonly string[], edges: readonly CouplingEdge[]): string[][];
+
 export function substepsBetween(fast: RateLevel, slow: RateLevel): number;
 
 export function takeSnapshot(memory: WebAssembly.Memory, solvers: readonly SnapshotSolver[]): Snapshot;
+
+export function ticksAt(frame: number, rate: FrameRate, part?: readonly [number, number]): number;
 ```
