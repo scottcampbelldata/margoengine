@@ -6106,6 +6106,39 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   garbage-collector sweep task (`cppgc` IncrementalSweepTask, `CommandBufferHelper::Finish`) for that thread. So
   nothing the layer compiles or links blocks the page: the wait is Blink's collector behind ANGLE's draw-time
   compiles, and the 10 s stall limit then sees no finished pipeline for 13 s. Cheaper programs shorten it.
+- **Reproduced and traced 2026-11-25** (Intel Arc 140V laptop, Chrome 157, `MARGO_COMPAT=1`, ANGLE Direct3D 11, other
+  agents' jobs on the machine). Two Margo-side causes, both fixed:
+  - The private-main sync ff88a70e7 (2026-11-24) had reverted the rasterizing warm draw (0e11055b5, a65c16551) and its
+    tests, so on this GPU every program paid its draw-time compile inside its first render. Restored with its tests in
+    508b6c1cc (`packages/webgl2-compat/test/d3d11-warm.test.js`, 3 of 4 cases fail without it;
+    `packages/webgl2-compat/test/first-draw-browser.mjs` passes here: 1 warm draw, first draw 5.2 ms).
+  - A Chrome trace of the denoise tracer's first compile (categories `gpu`, `blink.gc`, `toplevel`) showed the page's
+    thread held 18.0 s in one `getUniformBlockIndex` (`ImplementationBase::GetBucketContents`,
+    `CommandBufferHelper::Finish`): the layer read the next program's binding table, a synchronous call, while the GPU
+    thread was compiling another program's warm draw. A linked program now reads its link status and binding table
+    only once no other program's warm draw is on the GPU (`LinkedProgram.waiting`, packages/webgl2-compat/src/device/render.ts;
+    the fences are polled without blocking). The same trace after: longest page-thread task 0.84 s (a 0.73 s collector
+    sweep still waits in `CommandBufferHelper::Finish`). Regression: d3d11-warm.test.js "a linked program makes no
+    synchronous query while another program warms" (fails on the code before). `test:gpu:d3d11` passes (traversal
+    105 s, analytic 87 s, determinism 2.9 s), as do traversal and determinism on ANGLE Vulkan.
+- **Cause left, in ANGLE (no Margo-side fix found):** the same trace holds every D3DCompile with its HLSL. ANGLE compiles
+  each program's pixel shader at link on its worker threads with only `SV_TARGET0` in the output struct (fxc then drops
+  the other outputs' code) and again, with all seven outputs, at the first draw on CrGpuMain, the browser's one GPU
+  thread: 3.1, 5.8, 6.7, 5.1, 12.7 and 21.8 s for the denoise tracer's programs, one after another, 55 s in all. The
+  two texts differ only in the output struct and its copies. A probe of 7-output programs (new text each run, three
+  rounds) found no WebGL state that makes the link-time compile the one the draw uses: with nothing bound at link, with
+  the 7-target framebuffer bound during `linkProgram`, and with one output array, the first draw took 28 to 31 ms and
+  the second 1 to 2 ms every time. Splitting the programs into 1-output programs would let the link-time compile serve
+  the draw but multiply the passes a sample (seven writes a page) and the compile work, so it was not done. With this
+  serial compile, `test:gpu:stall`'s 10 s limit still fires in "compiling the tracer" (no pipeline finished for 10 s, 10
+  pipelines compiling; the page now answers), and the three `denoise` steps' 16384-sample references cost the route's
+  passes, not compiles. Sources: Khronos, "KHR_parallel_shader_compile" (WebGL extension, 2018),
+  https://registry.khronos.org/webgl/extensions/KHR_parallel_shader_compile/ (link status is polled, the compile may
+  finish later); Microsoft, "D3DCompile function", https://learn.microsoft.com/en-us/windows/win32/api/d3dcompiler/nf-d3dcompiler-d3dcompile ;
+  Microsoft, "Semantics" (`SV_Target[n]` outputs of a pixel shader),
+  https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics ; The Chromium Projects,
+  "GPU Command Buffer" (synchronous calls wait for the GPU process),
+  https://www.chromium.org/developers/design-documents/gpu-command-buffer/ .
 - **Next:** make the staged route cheaper per sample on Direct3D 11 (fewer passes an iteration, or more samples a
   pass) and its programs cheaper to compile (`hit` and `sample`, the largest), or share one reference between the WebGPU and compat legs, then rerun the repro. The tests, their samples and their limits stay as they are. A driver reset (nvlddmkm 153) at 06:03 local
   on 2026-11-15 came during the first of these runs.

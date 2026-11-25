@@ -32,6 +32,7 @@ const GL = {
   DEPTH24_STENCIL8: 0x88f0,
   DEPTH_STENCIL_ATTACHMENT: 0x821a,
   SCISSOR_TEST: 0x0c11,
+  LINK_STATUS: 0x8b82,
 };
 
 /** A device on a stand-in context that reports `renderer` and logs the calls a warm draw makes. */
@@ -39,6 +40,9 @@ async function device(renderer) {
   const enums = Object.fromEntries(COMPAT_LIMITS.map((name, i) => [name, 0x1000 + i]));
   const values = new Map(COMPAT_LIMITS.map((name, i) => [0x1000 + i, 4096]));
   const log = [],
+    // Programs whose link status the layer asked for: a synchronous query, answered only once the GPU thread has
+    // finished the work queued before it.
+    queries = [],
     on = new Set(),
     state = { signalled: false };
   const context = {
@@ -65,6 +69,10 @@ async function device(renderer) {
     framebufferTexture2D: (_target, point) => log.push(['attach', point]),
     renderbufferStorage: (_target, format) => log.push(['renderbufferStorage', format]),
     framebufferRenderbuffer: (_target, point) => log.push(['attach', point]),
+    getProgramParameter: (program, name) => {
+      if (name === GL.LINK_STATUS) queries.push(program);
+      return true;
+    },
     fenceSync: () => ({ fence: true }),
     clientWaitSync: () => (state.signalled ? GL.ALREADY_SIGNALED : GL.TIMEOUT_EXPIRED),
   };
@@ -72,7 +80,8 @@ async function device(renderer) {
   const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
   const d = await adapter.requestDevice();
   log.length = 0;
-  return { device: d, log, state };
+  queries.length = 0;
+  return { device: d, log, state, queries };
 }
 
 const code = `
@@ -92,6 +101,7 @@ const pipeline = (d, entryPoint, targets, depthStencil) => {
     depthStencil,
   });
 };
+
 const turns = (n) => new Promise((resolve) => setTimeout(resolve, n));
 
 test('on ANGLE Direct3D 11 an async pipeline with two colour targets compiles its draw before it resolves', async () => {
@@ -195,5 +205,28 @@ test('another backend resolves at link with no warm draw', async () => {
     } finally {
       d.destroy();
     }
+  }
+});
+
+// KB-L5a-10 (2026-11-25): on ANGLE Direct3D 11 a warm draw compiles the program's pixel shader on the browser's one GPU
+// thread (D3DCompile under CommandBufferService:PutChanged on CrGpuMain in a Chrome trace: 3 to 22 s a staged tracer
+// program on an Intel Arc 140V, Chrome 157), and a synchronous query made meanwhile held the page's thread for 18 s
+// (getUniformBlockIndex, reading the next program's binding table). A linked program now reads its link status and
+// binding table only once no other program's warm draw is still on the GPU.
+test('on ANGLE Direct3D 11 a linked program makes no synchronous query while another program warms', async () => {
+  const { device: d, queries, state } = await device(D3D11);
+  try {
+    const made = [
+      pipeline(d, 'one', [{ format: 'rgba8unorm' }]),
+      pipeline(d, 'f', [{ format: 'rgba32uint' }, null, { format: 'rgba16float' }]),
+    ];
+    await turns(30);
+    assert.equal(queries.length, 1, 'the second program waits for the first one to warm before it reads its link');
+    state.signalled = true;
+    assert.equal((await Promise.all(made)).length, 2);
+    assert.equal(queries.length, 2, 'the second program reads its link once the warm draw has passed');
+    assert.notEqual(queries[0], queries[1]);
+  } finally {
+    d.destroy();
   }
 });

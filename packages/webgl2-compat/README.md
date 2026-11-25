@@ -151,7 +151,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`, and on ANGLE Direct3D 11 for one
   draw into 1 x 1 throwaway copies of a pipeline's own colour targets, or a 1 x 1 depth-stencil buffer when it has
   none: that back end compiles the pixel shader at the first draw that rasterizes, so a first frame would otherwise
-  wait for it), render passes with clears,
+  wait for it; while one pipeline's warm draw is on the GPU, the next linked program waits to read its link status and
+  bindings, synchronous calls that would hold the page's thread until the GPU thread finished that compile), render
+  passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
   is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or

@@ -149,6 +149,8 @@ export const IDLE_PROGRAMS = 64;
 
 /** Buffer ids of the warm draws' uniform buffers (LinkedProgram.warmed): below 0, so no real buffer's id matches. */
 let warmIds = 0;
+/** Per device, the programs whose warm draw is still on the GPU (LinkedProgram.waiting). */
+const warming = new WeakMap<CompatDevice, Set<LinkedProgram>>();
 
 /**
  * A GL program and VAO shared by every pipeline of the device with the same GLSL and vertex attributes (the device's
@@ -228,6 +230,20 @@ export class LinkedProgram {
   }
 
   /**
+   * True while this program has yet to read its link status and binding table and another program's warm draw (see
+   * warmed()) is still on the GPU. Those reads are synchronous: the page's thread waits until the browser's GPU thread
+   * has run every command before them, and a warm draw there is a pixel shader compile on that one thread (a Chrome
+   * trace on an Intel Arc 140V, Chrome 157, ANGLE Direct3D 11: D3DCompile on CrGpuMain for 3 to 22 s a staged voxel
+   * path tracer program, one after another, and the page's thread held 18 s in a getUniformBlockIndex behind them,
+   * KB-L5a-10). Waiting for the other warm draws' fences, which are polled without blocking, keeps the page's thread
+   * free; the GPU thread compiles the same programs in the same time.
+   */
+  waiting(): boolean {
+    const others = warming.get(this.device);
+    return this.refusal === null && !!others?.size && !others.has(this);
+  }
+
+  /**
    * True once the program can draw into `targets` without compiling again. ANGLE's Direct3D back end compiles a
    * program's pixel shader for the colour targets bound at its first draw, synchronously on the browser's one GPU
    * thread (Edge 157, RTX A6000: a 4-output program linked in 64 ms and its first draw took 67 ms more; the 26 programs
@@ -252,11 +268,22 @@ export class LinkedProgram {
         return true;
       }
       this.warmFence = this.warmDraw(colours, targets.length);
+      if (this.warmFence) {
+        let set = warming.get(device);
+        if (!set) warming.set(device, (set = new Set()));
+        set.add(this);
+      }
     }
     if (this.warmFence && !fenceDone(gl, this.warmFence)) return false;
-    if (this.warmFence) gl.deleteSync(this.warmFence);
-    this.warmFence = null;
+    this.unwarm();
     return true;
+  }
+
+  /** Drops the warm draw's fence, and this program from the device's warming set. */
+  private unwarm(): void {
+    if (this.warmFence) this.device.gl.deleteSync(this.warmFence);
+    this.warmFence = null;
+    warming.get(this.device)?.delete(this);
   }
 
   /** The draw warmed() makes, and the fence after it (null when the context is lost). */
@@ -330,8 +357,7 @@ export class LinkedProgram {
   /** Deletes the program and VAO (the device drops an idle program, or is destroyed). */
   free(): void {
     const { gl, state } = this.device;
-    if (this.warmFence) gl.deleteSync(this.warmFence);
-    this.warmFence = null;
+    this.unwarm();
     state.forgetProgram(this.program);
     state.forgetVertexArray(this.vao);
     gl.deleteProgram(this.program);
@@ -668,7 +694,7 @@ export class CompatRenderPipeline {
         if (this.device.destroyed || !this.linked) {
           this.finish();
           resolve();
-        } else if (!this.linked.done()) setTimeout(poll, 2);
+        } else if (!this.linked.done() || this.linked.waiting()) setTimeout(poll, 2);
         else {
           this.finish();
           if (this.failure || this.linked.warmed(this.targets)) resolve();

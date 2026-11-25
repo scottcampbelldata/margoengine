@@ -2685,7 +2685,24 @@ Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in contex
 resolves, and the same pixels as an unwarmed pipeline). Missing: depth-only pipelines (no colour target) are not
 warmed; whether that back end compiles them at first draw too is not measured. `:mesh-pbr-lobes` now passes there in
 3 min 53 s (420 s limit); `:mesh-pbr` (376 s) and `:mesh-lights` (383 s) pass their checks but still run past their
-300 s step limits on the cold compiles themselves. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
+300 s step limits on the cold compiles themselves. Since 2026-11-21 (0e11055b5) the warm draw rasterizes and
+depth-only pipelines are warmed too; the private-main sync ff88a70e7 (2026-11-24) reverted that, and 508b6c1cc
+restored it with its tests on 2026-11-25. Same day (KB-L5a-10, Intel Arc 140V, Chrome 157, ANGLE Direct3D 11), a Chrome
+trace of the staged tracer's first compile shows where the time goes: ANGLE compiles each program's pixel shader at
+link on its worker threads (D3DCompile on ThreadPoolForegroundWorker) with only `SV_TARGET0` in its output struct, and
+the warm draw compiles it again with all seven `SV_TARGET` outputs on the browser's one GPU thread (D3DCompile on
+CrGpuMain, 3 to 22 s a program, one after another: 55 s for the denoise tracer). The two HLSL texts differ only in the
+output struct (dumped from the trace), so the link-time compile drops the other outputs' code and is no use to the
+draw. A probe of 7-output programs showed no WebGL state that changes this: binding the 7-target framebuffer before
+`linkProgram`, or one output array, still paid the compile at the first draw (28 ms against 1 ms for the second
+draw). While those compiles ran, the layer's synchronous reads of the next program's link status and binding table
+held the page's thread (one `getUniformBlockIndex` 18.0 s), so the page stopped answering. Since 2026-11-25 a linked
+program reads them only once no other program's warm draw is on the GPU (`LinkedProgram.waiting`, polled through the
+warm draws' fences): the same trace's longest page-thread task went from 18.0 s to 0.84 s, and `test:gpu:d3d11`
+passes (traversal 105 s, analytic 87 s, determinism 2.9 s). Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js`
+("a linked program makes no synchronous query while another program warms", fails on the code before). Still missing:
+the serial GPU-thread compile itself, which is ANGLE's design (docs/known-bugs.md, KB-L5a-10), and the 16384-sample
+denoise references, which cost the staged route's passes, not compiles. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
 `coverage` kernel's 64-ray loop around `closest()` never finished its first compile in 22 minutes (89.4 s for the whole
 `transparent` case with the bound read from the frame uniform, the same image hashes); `tests/compat-staged.test.js`
 checks every layer-compiled kernel for it, and since KB-L5a-3 every staged program too, and that no staged program
