@@ -145,6 +145,34 @@ physics.dispose();
 
 `pacejkaTyre({longitudinal, lateral, nominalLoad, loadSensitivity, combined})` is the Magic Formula of Pacejka and Bakker (1992), `F = D sin(C atan(B x - E (B x - atan(B x))))` against the slip ratio and the slip angle with each curve's `B`, `C`, `D` (the peak friction coefficient) and `E`, the peak falling with load, the two forces held in the friction ellipse where they meet; `brushTyre({friction, stiffness, halfLength})` is the brush model (a patch of bristles that stick and then slide, force `mu Fz (1 - (1 - theta s)^3)` along the combined slip, cornering stiffness `2 c a^2`). With a tyre each wheel has a spin of its own (`inertia`, kg m squared): `engineForce` and `brake` are then forces at the contact patch, the slip ratio and slip angle come from the spin and the ground speed (`wheel(i).slipRatio`, `slipAngle`, `spin`, `load`), and the force a step gives is the one that agrees with the slip the step leaves. A `Drivetrain` takes the throttle in `setInput({throttle, clutch})` (negative at a standstill selects reverse): its torque curve (`torqueCurve`, `[rpm, N m]` points), `idleRpm`, `redlineRpm`, `engineInertia`, `gears`, `finalDrive`, `efficiency`, an automatic gearbox (`automatic`, `upshiftRpm`, `downshiftRpm`, `shiftTime`) or `gear`, `shiftUp()` and `shiftDown()` by hand, a clutch of `clutchTorque` that holds or slips, and per axle a differential (`'open'`, `'locked'`, `'limitedSlip'` with `preload` and `bias`) and between two axles a centre one. `antiRollBars` join two wheels and push the more compressed side up by `stiffness` newtons for each metre of difference. A wheel with `cast: 'shape'` (or the vehicle's `wheelCast`) sweeps a cylinder of its `width` and radius along the suspension, so it meets the lip of a slot or a kerb where one ray passes between them.
 
+Tracked vehicles and motorcycles:
+
+```ts
+import {Motorcycle, Physics, TrackedVehicle} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [200, 0.5, 200], friction: 1}});
+
+const hull = physics.addBody(null, {position: [0, 1.2, -20], colliders: {shape: 'box', halfExtents: [1.2, 0.4, 2.5], mass: 10000}});
+const tank = new TrackedVehicle(physics, hull, {
+  tracks: [-1, 1].map(x => ({position: [x, -0.3, 0], length: 3.6, roadWheels: 6})),
+  maxSpeed: 8, // belt speed at full throttle, m/s
+});
+const frame = physics.addBody(null, {position: [10, 0.95, 0], colliders: {shape: 'box', halfExtents: [0.15, 0.3, 0.9], mass: 250}});
+const wheel = (z: number) => ({position: [0, -0.25, z], radius: 0.3, suspensionRestLength: 0.25, suspensionStiffness: 30, suspensionCompression: 4, suspensionRelaxation: 5});
+const bike = new Motorcycle(physics, frame, {front: wheel(0.7), rear: wheel(-0.7)});
+frame.setLinearVelocity([0, 0, 10]); // a bike stays up by being ridden: start it rolling
+for (let i = 0; i < 120; i++) physics.step();
+tank.setInput({throttle: 0.5, steer: 0.2}); // belts at different speeds turn it
+bike.setInput({throttle: 0.3, steer: 0.5}); // a turn asked for: the rider counter-steers, then leans into it
+for (let i = 0; i < 120; i++) physics.step();
+console.log(tank.speed > 1, bike.lean > 0.2, bike.leanTarget > 0.3); // true true true
+physics.dispose();
+```
+
+A `TrackedVehicle` has tracks (a `position` where each is mounted, a `length`, `roadWheels` that each cast a ray and carry the hull on a spring): the belts are driven at `maxSpeed` times the throttle (`trackAcceleration` limits how fast a belt speeds up), the side a `steer` turns toward slower, so a steer with no throttle spins the hull on the spot, and the ground is pushed by how far each belt slips against it, with Wong's shear, `1 - exp(-slip / shearSlip)` of the friction the load allows, the friction along the belt (`longitudinalFriction`) larger than across it (`lateralFriction`, the skid-steering resistance). A `Motorcycle` is a two-wheeled `Vehicle` (`motorcycle.vehicle`, on Magic Formula tyres) with a rider: it steers into the fall (`balanceGain`, `balanceDamping`), and a `steer` input is a turn it asks for (`maxLateralAcceleration`), which becomes the lean `atan(a / g)` that balances it and so is started by steering the other way, the counter-steer; `lean` and `leanTarget` read the angle, and `balance: false` lets the rider go.
+
 ## Drag joint
 
 `new DragJoint(physics, body, point, {frequency = 5, damping = 0.7, maxForce})` grabs a dynamic body at a world point and pulls that point toward a target, as a mouse joint does (the soft constraint of Catto, GDC 2011, as a frequency and a damping ratio, so a light body and a heavy one follow the pointer alike). Move the target with `setTarget(point)`, read the grabbed point with `gripPoint()`, and let go with `remove()` (removing the body lets go too). `maxForce` caps the pull in newtons so a far target cannot hurl a body.

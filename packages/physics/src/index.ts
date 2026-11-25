@@ -60,6 +60,10 @@ export type {
 export { Vehicle } from './vehicle.js';
 export { pacejkaTyre, brushTyre } from './tyres.js';
 export { Drivetrain } from './drivetrain.js';
+export { TrackedVehicle } from './tracked.js';
+export { Motorcycle } from './motorcycle.js';
+export type { MotorcycleOptions, MotorcycleInput } from './motorcycle.js';
+export type { TrackOptions, TrackedVehicleOptions } from './tracked.js';
 export type { DrivetrainOptions, AxleOptions, DifferentialOptions, DrivenWheel } from './drivetrain.js';
 export type { TyreModel, TyreSample, TyreForces, MagicCurve, PacejkaOptions, BrushOptions } from './tyres.js';
 export type { VehicleOptions, VehicleInput, WheelOptions, WheelState } from './vehicle.js';
