@@ -973,6 +973,40 @@ export interface MotorOptions {
     maxForce?: number;
 }
 
+export class Motorcycle implements PhysicsAttachment {
+    readonly chassis: PhysicsBody;
+    readonly vehicle: Vehicle;
+    balance: boolean;
+    constructor(physics: Physics, chassis: PhysicsBody, options: MotorcycleOptions);
+    get lean(): number;
+    get leanTarget(): number;
+    get speed(): number;
+    get steering(): number;
+    get valid(): boolean;
+    setInput(input: MotorcycleInput): this;
+    beforeStep(): void;
+    bodyRemoved(body: PhysicsBody): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface MotorcycleInput {
+    throttle?: number;
+    brake?: number;
+    steer?: number;
+}
+
+export interface MotorcycleOptions {
+    front: WheelOptions;
+    rear: WheelOptions;
+    vehicle?: Omit<VehicleOptions, 'wheels' | 'forward'>;
+    maxSteeringAngle?: number;
+    maxLateralAcceleration?: number;
+    balanceGain?: number;
+    balanceDamping?: number;
+    balance?: boolean;
+}
+
 export class Multibody {
     readonly root: PhysicsBody;
     readonly links: readonly MultibodyLink[];
@@ -1772,6 +1806,53 @@ export type ShapeOptions = {
     shape: 'halfSpace';
     normal?: Vec3;
 };
+
+export interface TrackOptions {
+    position: Vec3;
+    length: number;
+    roadWheels?: number;
+    width?: number;
+    suspensionRestLength?: number;
+    suspensionStiffness?: number;
+    suspensionCompression?: number;
+    suspensionRelaxation?: number;
+    maxSuspensionForce?: number;
+}
+
+export class TrackedVehicle implements PhysicsAttachment {
+    readonly chassis: PhysicsBody;
+    maxSpeed: number;
+    constructor(physics: Physics, chassis: PhysicsBody, options: TrackedVehicleOptions);
+    get trackCount(): number;
+    get valid(): boolean;
+    get speed(): number;
+    setInput(input: {
+        throttle?: number;
+        steer?: number;
+    }): this;
+    track(index: number): {
+        speed: number;
+        target: number;
+        inContact: number;
+        load: number;
+    };
+    beforeStep(dt: number): void;
+    bodyRemoved(body: PhysicsBody): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface TrackedVehicleOptions {
+    tracks: readonly TrackOptions[];
+    maxSpeed?: number;
+    trackAcceleration?: number;
+    longitudinalFriction?: number;
+    lateralFriction?: number;
+    shearSlip?: number;
+    forward?: Vec3;
+    groups?: number;
+    predicate?: (collider: PhysicsCollider) => boolean;
+}
 
 export interface TyreForces {
     longitudinal: number;
