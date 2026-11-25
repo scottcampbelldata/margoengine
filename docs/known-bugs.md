@@ -8693,6 +8693,8 @@ create an adapter because the native binding could not load vulkan-1.dll
 (Windows Error87). No ETC upload occurred. Public API/worker/final all-target
 corpus, fuzz, memory, upload and entry acceptance remain open; prebuilt retained.
 
+Waiting on Scott's ruling (2026-11-25), not started: the BC1/BC3 bar was set against a private draft that is gone and is never to be used, and the Basis replacement is weeks of work against a corpus the public repository does not have (it tracks 17 of the 51 active-corpus files by SHA-256, 13 of the 51 historical-baseline files). Stays open.
+
 ### Resolved scalar bar: batch 134 source-reference mismatch (2026-11-09)
 
 Scott's written "Do recommend" replaces scalar acceptance with per-file SSE
@@ -9442,6 +9444,8 @@ pairs. The four replacements account for 45 pairs and 250 images. Three .basis
 files use real FlightHelmet image content; the HDR cube uses an analytic light
 field. The historical baseline is retained, and its timings are not transplanted
 onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
+
+Waiting on Scott's ruling (2026-11-25), not started: the BC1/BC3 bar was set against a private draft that is gone and is never to be used, and the Basis replacement is weeks of work against a corpus the public repository does not have (it tracks 17 of the 51 active-corpus files by SHA-256, 13 of the 51 historical-baseline files). Stays open.
 
 ### Fixed 2026-11-09: batch 133 crafted capped-fan point mapping
 
