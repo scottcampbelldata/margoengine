@@ -596,5 +596,8 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // scene started by a seek draws the same picture. NodeMaterial holds it because a material is the first to read
   // `time` on an engine with no shader plugin; the plugin carries the core version guard. A split would leave
   // NodeMaterial time on the wall clock, which is the bug.
-  assert.ok(minimal.gzip < 9300 && all.gzip < 19250, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Then 9,310 B (2026-11-25, minimal 9,292 B to 9,302 B, whole 19,206 B to 19,220 B): ShaderClock gains resetTime,
+  // so cutscene resetClocks can put the frame clock back to 0 between films (GAP-FILM-RESET). It lives on the clock
+  // NodeMaterial already holds; a split would need a second clock object for one method.
+  assert.ok(minimal.gzip < 9310 && all.gzip < 19250, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });
