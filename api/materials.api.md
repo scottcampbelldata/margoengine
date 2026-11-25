@@ -803,6 +803,11 @@ export class Texture {
 
 export type TextureDimension = '2d' | '2d-array' | '3d' | 'cube';
 
+export interface TextureLimits {
+    maxBytes?: number;
+    maxPixels?: number;
+}
+
 export interface TextureNode {
     type: 'texture';
     texture: MaterialExtensionTexture;
@@ -988,13 +993,14 @@ export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], 
     fetch?: typeof fetch;
 }): Promise<CubeTexture>;
 
-export function loadKTX2Texture(url: string | URL, { decoder, signal, fetch: get, ...options }: TextureOptions & {
+export function loadKTX2Texture(url: string | URL, { decoder, signal, fetch: get, maxBytes, ...options }: TextureOptions & {
     decoder: KTX2Transcoder | KTX2LayerReader;
     signal?: AbortSignal;
     fetch?: typeof fetch;
+    maxBytes?: number;
 }): Promise<Texture>;
 
-export function loadTexture(url: string | URL, { signal, fetch: get, ...options }?: TextureOptions & {
+export function loadTexture(url: string | URL, { signal, fetch: get, maxBytes, maxPixels: pixels, ...options }?: TextureOptions & TextureLimits & {
     signal?: AbortSignal;
     fetch?: typeof fetch;
 }): Promise<Texture>;
