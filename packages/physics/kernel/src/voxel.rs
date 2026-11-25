@@ -63,6 +63,24 @@ pub fn voxel_verdict_of(n: V3, byte: u32, out: &Manifold) -> Option<(bool, usize
     if apart && along[verdict.1] <= 0.0 { None } else { Some(verdict) }
 }
 
+/// The deepest point of a manifold: its least separation (0 for none).
+fn deepest(out: &Manifold) -> f32 {
+    out.points[..out.count].iter().fold(0.0f32, |least, point| if point.separation < least { point.separation } else { least })
+}
+
+/// After a snap to exposed face `face` that normal `n` (in the grid's frame) leans away from: whether the shape is nearer the
+/// hidden side it came in by than the exposed face it would be pushed out through. `before` is the depth of the manifold
+/// before the snap, read along `n` through the hidden face; `out` is the snapped manifold. A shape a slop or a few millimetres
+/// into a buried cell from its hidden side (a cube's foot pressed against a wall, grazing the floor cell under the wall)
+/// would otherwise be pushed out through the open face on the cell's far side, a metre and more away: 1.8 m down through the
+/// open bottom of a floor, a push the solver caps at its speed limit and the cube sank 2.2 cm under. Such a shape is in the
+/// filled neighbour across the hidden face, whose own exposed faces push it out the short way, so the cell gives nothing;
+/// a shape that is deeper in the cell from that side than out of it through the exposed face is still pushed out there.
+fn nearer_hidden_side(n: V3, face: usize, before: f32, out: &Manifold) -> bool {
+    let along = [n.x, -n.x, n.y, -n.y, n.z, -n.z];
+    out.count > 0 && along[face] <= 0.0 && deepest(out) < before
+}
+
 impl World {
     /// The cells along x, y and z of grid `mesh`.
     #[inline(always)]
@@ -417,12 +435,17 @@ impl World {
             let cell_solid = crate::cast::Solid::Poly { poly, pose: cell };
             crate::smooth::collide_solids(&cell_solid, &solid, limit, out);
             if out.count > 0 {
-                match voxel_verdict_of(pose.q.unrotate(out.normal), self.cell_byte(mesh, index), out) {
+                let n = pose.q.unrotate(out.normal);
+                match voxel_verdict_of(n, self.cell_byte(mesh, index), out) {
                     None => out.count = 0,
                     Some((false, _)) => {}
                     Some((true, face)) => {
+                        let before = deepest(out);
                         let (core_o, border) = crate::cast::core(&solid);
                         crate::smooth::clip_along(&cell_solid, 0.0, &core_o, border, cell.q.rotate(poly.normal(face)), limit, out);
+                        if nearer_hidden_side(n, face, before, out) {
+                            out.count = 0;
+                        }
                     }
                 }
             }
@@ -447,11 +470,21 @@ impl World {
             collide_polys(&poly, cell, &other_poly, other_pose, limit, out);
         }
         if out.count > 0 {
-            match voxel_verdict_of(pose.q.unrotate(out.normal), self.cell_byte(mesh, index), out) {
+            let n = pose.q.unrotate(out.normal);
+            match voxel_verdict_of(n, self.cell_byte(mesh, index), out) {
                 None => out.count = 0,
                 Some((false, _)) => {}
-                Some((true, face)) if round => crate::mesh::snap_round(other_round, &poly, face, cell, limit, out),
-                Some((true, face)) => snap_poly(&poly, cell, &other_poly, other_pose, face, limit, out),
+                Some((true, face)) => {
+                    let before = deepest(out);
+                    if round {
+                        crate::mesh::snap_round(other_round, &poly, face, cell, limit, out);
+                    } else {
+                        snap_poly(&poly, cell, &other_poly, other_pose, face, limit, out);
+                    }
+                    if nearer_hidden_side(n, face, before, out) {
+                        out.count = 0;
+                    }
+                }
             }
         }
         if other_is_a {
@@ -473,21 +506,33 @@ impl World {
         if out.count == 0 {
             return;
         }
-        match voxel_verdict_of(pa.q.unrotate(out.normal), self.cell_byte(ma, ia), out) {
+        let n = pa.q.unrotate(out.normal);
+        match voxel_verdict_of(n, self.cell_byte(ma, ia), out) {
             None => {
                 out.count = 0;
                 return;
             }
-            Some((true, face)) => snap_poly(&poly_a, cell_a, &poly_b, cell_b, face, limit, out),
+            Some((true, face)) => {
+                let before = deepest(out);
+                snap_poly(&poly_a, cell_a, &poly_b, cell_b, face, limit, out);
+                if nearer_hidden_side(n, face, before, out) {
+                    out.count = 0;
+                }
+            }
             Some((false, _)) => {}
         }
         if out.count == 0 {
             return;
         }
-        match voxel_verdict_of(pb.q.unrotate(out.normal.scale(-1.0)), self.cell_byte(mb, ib), out) {
+        let n = pb.q.unrotate(out.normal.scale(-1.0));
+        match voxel_verdict_of(n, self.cell_byte(mb, ib), out) {
             None => out.count = 0,
             Some((true, face)) => {
+                let before = deepest(out);
                 snap_poly(&poly_b, cell_b, &poly_a, cell_a, face, limit, out);
+                if nearer_hidden_side(n, face, before, out) {
+                    out.count = 0;
+                }
                 crate::mesh::flip(out);
             }
             Some((false, _)) => {}

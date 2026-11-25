@@ -11580,3 +11580,11 @@ checks the resulting texel. The wide-step crossing search supplies fallback
 seeds where a depth discontinuity defeats the first estimate. It uses the
 existing Water snapshots, depth convention and Snell normal. The shader and
 regression were written from these descriptions and analytic geometry.
+
+## A buried voxel cell and the nearer side (2026-11-25)
+
+`packages/physics/kernel/src/voxel.rs` (`nearer_hidden_side`): when the ghost rule would snap a contact to an exposed face the
+normal leans away from, the snap is dropped if it makes the contact deeper than it was, as a point inside a box leaves through the
+nearer side. Plain geometry on top of the ghost rule of Catto, "Ghost Collisions" (box2d.org, 2020); no other source. Proof:
+`kernel/tests/voxel.rs`.
+

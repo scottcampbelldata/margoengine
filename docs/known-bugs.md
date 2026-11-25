@@ -15371,14 +15371,15 @@ its existing bound (Catto, "Solver2D", 2024, the soft step; Tonge, Benevolenski 
 and Trinkle, "Interactive simulation of rigid body dynamics in computer graphics", Computer Graphics Forum 33(1), 2014, for friction
 against exact normal blocks).
 
-## KB-PHYS-WALL1: a cube stopped by a wall at 6 m/s sinks 2.2 cm into the floor with the sweeps solver
+## KB-PHYS-SPEC1: the sweeps throw a cube that a wall stops at 6 m/s 0.115 m up, at 8 substeps and 2 passes
 
-`packages/voxel/tests/physics.test.js`, "a chunk that comes back after edits made out of range leaves no stale seam": a frictionless
-0.4 m cube slides at 6 m/s over a voxel floor into a one-block wall. It stops at the wall face as it should, but its centre goes
-0.0219 m below its rest height for five steps (the test allows 0.02), with floor impulses of 3.8 and 7.3 against 0.005 at rest.
-With `setSolver({blockSolver: true})` the test passes. Cause as understood: the wall's four points take their impulses one after
-the other, the top ones more than the bottom ones in the first passes, which pitches the cube onto its lower front edge and drives
-that edge into the floor until the passes even the load out; the exact block solve gives them together. It is not a seam (the floor
-and wall are voxel grids that meet no other collider at that spot). To fix with the block solver's default (KB-PHYS-BLOCK1): the
-test stays red until then.
+`packages/physics/kernel/tests/voxel.rs`, `a_cube_stopped_by_a_wall_over_the_seam_of_two_grids_is_not_thrown_by_the_cell_under_the_wall`:
+a frictionless 0.4 m cube slid at 6 m/s into a one-block wall, with the kernel's defaults (8 substeps, 2 passes) and the sweeps,
+rises 0.115 m and spins at 6.8 rad/s after the stop (2 passes: 0.115 m; 4 passes: 0.22; 1 pass: 0.0005; the block solve:
+0.0005). Cause: the wall's points are speculative rows when the stop begins (the face is still 0.1 m off), and a speculative
+row only bounds a point's approach by its gap over the substep. Points solved one after another can meet that bound with one
+point stopped and the cube turning about it, an equally valid answer of the same inequalities, and more passes settle on it
+more firmly. The exact block solve of each manifold (`blockSolver`) gives the stop to all the points at once. Fixed by the
+block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
+was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
 
