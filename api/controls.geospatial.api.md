@@ -6,11 +6,21 @@
 import { ModelLike, Raycaster } from "@margoengine/bvh";
 import { Camera, EngineKernel, Mesh } from "@margoengine/core";
 
+export interface BoundingSphereFlight extends FlightOptions {
+    heading?: number;
+    pitch?: number;
+    padding?: number;
+}
+
 export interface FlightOptions {
     duration?: number;
+    speed?: number;
+    maxDuration?: number;
+    curve?: number;
     easing?: (t: number) => number;
     signal?: AbortSignal;
     arc?: boolean;
+    cancelOnInput?: boolean;
 }
 
 export class GeospatialControls extends Controls {
@@ -49,6 +59,22 @@ export class GeospatialControls extends Controls {
     pick(x: number, y: number): GeospatialPick | null;
     zoomAt(x: number, y: number, factor: number): void;
     flyTo(destination: GeospatialView, options?: FlightOptions): Promise<boolean>;
+    get flightTime(): {
+        elapsed: number;
+        duration: number;
+    } | null;
+    flyToBoundingSphere(centre: {
+        longitude: number;
+        latitude: number;
+        height?: number;
+    }, radius: number, options?: BoundingSphereFlight): Promise<boolean>;
+    fitBounds(bounds: {
+        west: number;
+        south: number;
+        east: number;
+        north: number;
+        height?: number;
+    }, options?: BoundingSphereFlight): Promise<boolean>;
     cancel(): void;
     update(delta?: number): boolean;
     dispose(): void;
@@ -95,6 +121,16 @@ export interface GeospatialView {
 export type HeightQuery = (longitude: number, latitude: number) => number | undefined;
 
 export type SurfaceRaycast = (origin: readonly [number, number, number], direction: readonly [number, number, number], far: number) => number | undefined;
+
+export interface ZoomPanPath {
+    S: number;
+    at(s: number): {
+        u: number;
+        w: number;
+    };
+}
+
+export function zoomPanPath(w0: number, w1: number, u1: number, rho?: number): ZoomPanPath;
 
 // Not exported from this entry, but used by the exports above:
 

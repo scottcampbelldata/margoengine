@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18879542,
+  "total": 18880434,
   "history": [
     {
       "date": "2026-10-24",
@@ -12063,6 +12063,12 @@
       "commit": "377e3ee95",
       "reason": "new scene/helpers entry (drei-style helpers)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial flyTo on the van Wijk and Nuij path, flyToBoundingSphere and fitBounds",
+      "grew": 1
     }
   ],
   "items": {
@@ -12279,7 +12285,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 7734,
+    "@margoengine/controls/geospatial": 8626,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
