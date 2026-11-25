@@ -1,0 +1,447 @@
+{
+ "stage48": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n    def \"a\" (\n        append inherits = </C>\n    )\n    {\n    }\n    over \"c\" (\n        append inherits = </C>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        over \"c\"\n        {\n        }\n    }\n    def \"c\"\n    {\n    }\n}\ndef \"M\" (\n    payload = @./l0.usda@ (offset = 10)\n)\n{\n    def \"a\" (\n        append references = @./l0.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\" (\n    references = @./l1.usda@</M/a> (offset = 10)\n)\n{\n    def \"a\" (\n        references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    7,
+    0,
+    4
+   ],
+   "/M/a": [
+    8,
+    1,
+    3,
+    0,
+    4
+   ],
+   "/M/a/c": [
+    3,
+    6,
+    2,
+    5
+   ],
+   "/M/a/c/a": [
+    4
+   ],
+   "/M/a/c/c": [
+    6
+   ],
+   "/M/a/a": [
+    3,
+    4,
+    1
+   ],
+   "/M/a/a/c": [
+    6,
+    5
+   ],
+   "/M/a/a/a": [
+    4
+   ],
+   "/R": [
+    11,
+    3,
+    8,
+    0,
+    1,
+    4
+   ],
+   "/R/c": [
+    3,
+    6,
+    2,
+    5
+   ],
+   "/R/c/a": [
+    4
+   ],
+   "/R/c/c": [
+    6
+   ],
+   "/R/a": [
+    12,
+    3,
+    4,
+    10,
+    7,
+    0,
+    1
+   ],
+   "/R/a/c": [
+    3,
+    6,
+    2,
+    5
+   ],
+   "/R/a/c/a": [
+    4
+   ],
+   "/R/a/c/c": [
+    6
+   ],
+   "/R/a/a": [
+    3,
+    4,
+    8,
+    0,
+    1
+   ],
+   "/R/a/a/c": [
+    3,
+    6,
+    2,
+    5
+   ],
+   "/R/a/a/c/a": [
+    4
+   ],
+   "/R/a/a/c/c": [
+    6
+   ],
+   "/R/a/a/a": [
+    3,
+    4,
+    1
+   ],
+   "/R/a/a/a/c": [
+    6,
+    5
+   ],
+   "/R/a/a/a/a": [
+    4
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/c/c": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   },
+   "/R/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/c/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/c/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/c/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/a/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage48-parent": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n    def \"a\" (\n        append inherits = </C>\n    )\n    {\n        over \"c\"\n        {\n        }\n    }\n    over \"c\" (\n        append inherits = </C>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        over \"c\"\n        {\n        }\n    }\n}\ndef \"M\" (\n    payload = @./l0.usda@ (offset = 10)\n)\n{\n    def \"a\" (\n        append references = @./l0.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"c\"\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\" (\n    references = @./l1.usda@</M/a> (offset = 10)\n)\n{\n    def \"a\" (\n        references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    7,
+    0,
+    5
+   ],
+   "/M/a": [
+    8,
+    1,
+    4,
+    0,
+    5
+   ],
+   "/M/a/a": [
+    4,
+    5,
+    1
+   ],
+   "/M/a/a/a": [
+    5
+   ],
+   "/R": [
+    12,
+    4,
+    8,
+    0,
+    1,
+    5
+   ],
+   "/R/a": [
+    13,
+    4,
+    5,
+    10,
+    7,
+    0,
+    1
+   ],
+   "/R/a/c": [
+    4,
+    11,
+    3,
+    6,
+    2
+   ],
+   "/R/a/c/a": [
+    5
+   ],
+   "/R/a/a": [
+    4,
+    5,
+    8,
+    0,
+    1
+   ],
+   "/R/a/a/a": [
+    4,
+    5,
+    1
+   ],
+   "/R/a/a/a/a": [
+    5
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R/a/a/a/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "held-inherit-first-hop": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l0.usda@ (offset = 5)]\n)\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n)\n{\n    def \"b\" (\n        inherits = </C>\n    )\n    {\n    }\n    over \"c\" (\n    )\n    {\n        def \"a\" (\n            append inherits = </C>\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\" (\n)\n{\n    over \"c\"\n    {\n        over \"a\"\n        {\n        }\n    }\n}\ndef \"R\" (\n    append references = @./l2.usda@</M> (offset = 3; scale = 2)\n)\n{\n    def \"b\" (\n        append references = @./l2.usda@\n    )\n    {\n        def \"c\"\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/R": [
+    7,
+    0,
+    4
+   ],
+   "/R/b": [
+    8,
+    4,
+    0,
+    1
+   ],
+   "/R/b/b": [
+    4,
+    1
+   ],
+   "/R/b/c": [
+    9,
+    5,
+    2
+   ],
+   "/R/b/c/a": [
+    4,
+    6,
+    3
+   ]
+  },
+  "reading": {
+   "/R": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/c/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "root-inherit-against-inherit": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n    over \"a\" (\n        append inherits = </C>\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C/a>\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    over \"a\"\n    {\n        def \"a\"\n        {\n        }\n    }\n}\ndef \"Q\" (\n)\n{\n    over \"b\" (\n        references = @./l1.usda@</M/a> (offset = 3; scale = 2)\n    )\n    {\n        def \"a\" (\n            append inherits = </C>\n            references = @./l2.usda@</M>\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    8
+   ],
+   "/Q/b": [
+    9,
+    5,
+    6,
+    3,
+    0,
+    1
+   ],
+   "/Q/b/a": [
+    10,
+    5,
+    6,
+    7,
+    4,
+    1
+   ],
+   "/Q/b/a/a": [
+    6,
+    7
+   ],
+   "/Q/b/a/a/a": [
+    7
+   ]
+  },
+  "reading": {
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/b/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/b/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/b/a/a/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ }
+}

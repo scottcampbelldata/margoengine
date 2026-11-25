@@ -686,7 +686,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         for (let i = 1; i < b.lift.length; i++) if (rank.get(b.lift[i])! < rank.get(b.lift[best])!) best = i;
         const start = b.lift.splice(best, 1)[0];
         const from = carriedFrom.get(start);
-        const bare = !!b.pending && !!from && !!start.inert && start.kind === 'specialize' && !from.family;
+        const bare = !!from && !!start.inert && start.kind === 'specialize' && !from.family;
         weak = bare;
         weakBorn = start.born;
         weakBare =
@@ -741,7 +741,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         if (!gone.has(p) && p.of && gone.has(p.of) && carriedFrom.has(p)) drop(p), (more = true);
     }
     for (const x of gone) {
-      b.pending!.delete(x);
+      b.pending?.delete(x);
       if (x.parent && !gone.has(x.parent)) x.parent.children = x.parent.children.filter((c) => c !== x);
       if (b.held.get(siteKey(x)) === x) b.held.delete(siteKey(x));
     }
@@ -933,9 +933,29 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     let held = node.children.find((c) => c.stack === node.stack && stripVariants(c.path) === path);
     const pb = build!;
     const fresh = !stands || !carriedFrom.has(ownerOf(stands));
+    // Seen on OpenUSD (black-box prim indexes, KB1942c part 31), the specification does not say: an implied inherit
+    // carried down onto the index root keeps its site against the inherits implied at this prim, but an implied
+    // specializes arc of a stronger arc that reaches the site first takes it, and the inherit goes with the arcs implied
+    // from it.
+    if (
+      held &&
+      node === pb.top &&
+      kind === 'specialize' &&
+      implied &&
+      !weak &&
+      !fresh &&
+      held.kind === 'inherit' &&
+      held.implied &&
+      carriedFrom.has(held) &&
+      pb.lift.includes(ownerOf(held))
+    ) {
+      dropPending(pb, held);
+      held = undefined;
+    }
     if (held && pb.pending?.has(held) && !stays(held) && !fresh) {
       const other = pb.held.get(siteKey(held));
-      if (implied && stands && held.of === stands && held.kind === kind && !other) {
+      // A node of another parent that holds the site does not stop the arc taking its carried node again (part 31).
+      if (implied && stands && held.of === stands && held.kind === kind && (!other || other.parent !== node)) {
         pb.pending.delete(held);
         pb.held.set(siteKey(held), held);
         return held;
@@ -975,8 +995,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // Seen on OpenUSD (black-box prim indexes, KB1942c), the specification does not say: the first live node made for a
     // site holds it in the index. A later inherit to it makes no node; a later specializes leaves an inert placeholder,
     // which still implies its arc upward unless it was itself implied.
+    const claimed = b.held.has(node.stack.id + '\0' + path);
     if (
-      b.held.has(node.stack.id + '\0' + path) ||
+      claimed ||
       [...(b.pending ?? [])].some(
         (p) => (fresh || stays(p)) && p.stack === node.stack && stripVariants(p.path) === path,
       )
@@ -984,6 +1005,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       if (kind === 'inherit') return undefined;
       const placeholder = stub();
       if (!implied) queue(placeholder, false);
+      // Seen on OpenUSD (black-box prim indexes, KB1942c part 31), the specification does not say: an implied placeholder
+      // left only because a carried implied inherit still waits on the site goes on implying its arc upward.
+      if (implied && !claimed && !fresh) return placeholder;
       return undefined;
     }
     // Seen on OpenUSD (black-box prim indexes, KB1942c): a specializes arc below the index root leaves an inert
@@ -1011,7 +1035,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     attach(node, placed);
     if (build!.pending && !fresh)
       for (const p of [...build!.pending])
-        if (!stays(p) && build!.pending.has(p) && p !== placed && siteKey(p) === siteKey(placed))
+        if (
+          !stays(p) &&
+          build!.pending.has(p) &&
+          p !== placed &&
+          siteKey(p) === siteKey(placed) &&
+          // Seen on OpenUSD (KB1942c part 31): a carried inherit under another parent node keeps its place.
+          p.parent === placed.parent
+        )
           dropPending(build!, p);
     queuePlaced(placed, !implied);
     return placed;
@@ -1392,7 +1423,12 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       // A placeholder's class arcs are those of the node it left under the root.
       for (const c of (realOf.get(arc) ?? arc).children) if (isClass(c)) lift(placed, c, stripVariants(c.path));
       const up = upstream(near, path);
+      // Seen on OpenUSD (black-box prim indexes, KB1942c part 31), the specification does not say: past the first live
+      // node it places, the lift of a placeholder that made no family at the parent prim takes sites as any lift does.
+      const was = weak;
+      if (!placed.inert) weak = false;
       if (up) lift(up[0], placed, up[1]);
+      weak = was;
     };
     const node = start.parent!,
       c = start;
