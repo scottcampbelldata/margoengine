@@ -551,6 +551,10 @@ pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn body_set_additional_mass_properties(handle: i32, body: u32, mass: f32, x: f32, y: f32, inertia: f32) -> i32 {
+    with_world!(handle, |w| w.set_additional_mass_properties(body, mass, v2(x, y), inertia).map(|()| 0))
+}
+#[unsafe(no_mangle)]
 pub extern "C" fn body_set_additional_mass(handle: i32, body: u32, mass: f32) -> i32 {
     with_world!(handle, |w| w.set_additional_mass(body, mass).map(|()| 0))
 }

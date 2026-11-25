@@ -58,6 +58,14 @@ interface Exports {
   body_wake(world: number, body: number): number;
   body_sleep(world: number, body: number): number;
   body_set_additional_mass(world: number, body: number, mass: number): number;
+  body_set_additional_mass_properties(
+    world: number,
+    body: number,
+    mass: number,
+    x: number,
+    y: number,
+    inertia: number,
+  ): number;
   body_set_kind(world: number, body: number, kind: number): number;
   body_set_soft_ccd(world: number, body: number, distance: number): number;
   project_point(world: number): number;

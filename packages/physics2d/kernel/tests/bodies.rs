@@ -141,3 +141,23 @@ fn set_velocity_wakes_a_sleeping_body() {
     w.step(DT).unwrap();
     assert!(w.bodies[b as usize].xf.p.x > 0.0);
 }
+
+#[test]
+fn an_added_solid_joins_the_shapes_by_the_parallel_axis_theorem() {
+    let mut w = space();
+    let b = crate_(&mut w, 0.0, 0.0);
+    let (m, i) = (w.bodies[b as usize].mass, w.bodies[b as usize].inertia);
+    // 3 kg at (2, 0) with inertia 0.5 about its own centre: the centre moves to 3 * 2 / (m + 3), and the inertia is the sum of each
+    // part's own and its mass times the squared distance of its centre from the combined one.
+    w.set_additional_mass_properties(b, 3.0, v2(2.0, 0.0), 0.5).unwrap();
+    let body = &w.bodies[b as usize];
+    let cx = 6.0 / (m + 3.0);
+    assert!((body.mass - (m + 3.0)).abs() < 1e-5);
+    assert!((body.local_center.x - cx).abs() < 1e-5 && body.local_center.y.abs() < 1e-6);
+    let expected = i + m * cx * cx + 0.5 + 3.0 * (2.0 - cx) * (2.0 - cx);
+    assert!((body.inertia - expected).abs() < 1e-4, "{} against {}", body.inertia, expected);
+    w.set_additional_mass_properties(b, 0.0, v2(0.0, 0.0), 0.0).unwrap();
+    assert!((w.bodies[b as usize].mass - m).abs() < 1e-6 && w.bodies[b as usize].local_center.x.abs() < 1e-6);
+    assert!(w.set_additional_mass_properties(b, -1.0, v2(0.0, 0.0), 0.0).is_err());
+    assert!(w.set_additional_mass_properties(b, 1.0, v2(f32::NAN, 0.0), 0.0).is_err());
+}

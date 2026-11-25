@@ -507,6 +507,37 @@ export class Body2D {
     kernel.ok(x.body_set_additional_mass(h, this.handle, encode(value, 'additional mass')));
     this.extraMass = value;
   }
+  /** The centre of mass in world units, as of the last step. */
+  get centerOfMass(): [number, number] {
+    const { f } = this.read(),
+      { scale } = this.k;
+    return [f[9] / scale, f[10] / scale];
+  }
+  /**
+   * Adds a solid to what the colliders weigh, as it is and not in proportion (Rapier's `setAdditionalMassProperties`): `mass` in
+   * kilograms with its centre at `centre` in the body's frame (world units) and `inertia` in kg m^2 (in the body's world units, as
+   * the colliders' are) about that centre. It joins the colliders' mass by the parallel axis theorem about the combined centre of
+   * mass. A mass and an inertia of 0 take it away; {@link Body2D.additionalMass} stays as the share-in-proportion kind.
+   * @throws RangeError for a number that is not finite, or a mass or inertia below 0.
+   */
+  setAdditionalMassProperties(mass: number, centre: Vec2D = [0, 0], inertia = 0): this {
+    const { x, h, kernel, scale } = this.k;
+    encode(mass, 'additional mass');
+    encode(inertia, 'additional inertia');
+    encode(centre[0], 'additional mass centre x');
+    encode(centre[1], 'additional mass centre y');
+    kernel.ok(
+      x.body_set_additional_mass_properties(
+        h,
+        this.handle,
+        mass,
+        centre[0] * scale,
+        centre[1] * scale,
+        inertia * scale * scale,
+      ),
+    );
+    return this;
+  }
   get sleeping(): boolean {
     return this.read().u[8] === 0;
   }

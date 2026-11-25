@@ -13,7 +13,8 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-const VERSION: u32 = 6;
+/// The version written. Versions 5 and 6 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid.
+const VERSION: u32 = 7;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -52,6 +53,7 @@ impl Writer {
 struct Reader<'a> {
     bytes: &'a [u8],
     at: usize,
+    version: u32,
 }
 impl<'a> Reader<'a> {
     fn take(&mut self, n: usize) -> Result<&'a [u8], PhysicsError> {
@@ -120,7 +122,7 @@ fn write_motor(w: &mut Writer, m: Option<Motor>) {
 }
 fn read_motor(r: &mut Reader) -> Result<Option<Motor>, PhysicsError> {
     let some = r.bool()?;
-    let m = Motor { target_position: r.f32()?, target_velocity: r.f32()?, stiffness: r.f32()?, damping: r.f32()?, max_force: r.f32()?, per_mass: r.f32()? };
+    let m = Motor { target_position: r.f32()?, target_velocity: r.f32()?, stiffness: r.f32()?, damping: r.f32()?, max_force: r.f32()?, per_mass: if r.version >= 6 { r.f32()? } else { 0.0 } };
     Ok(some.then_some(m))
 }
 fn write_limits(w: &mut Writer, l: Option<(f32, f32)>) {
@@ -181,6 +183,11 @@ impl World {
             w.rot(q);
             w.bool(b.awake);
             w.bool(b.dead);
+            let (extra_mass, extra_center, extra_inertia) = b.extra_solid.unwrap_or((0.0, V2::ZERO, 0.0));
+            w.bool(b.extra_solid.is_some());
+            w.f32(extra_mass);
+            w.v2(extra_center);
+            w.f32(extra_inertia);
             w.u32(b.shapes.len() as u32);
             for &id in &b.shapes {
                 w.u32(id);
@@ -321,8 +328,10 @@ impl World {
     /// A world made from `bytes`; the same bytes always make the same world. A truncated, altered or foreign snapshot is
     /// refused with `InvalidParameter`.
     pub fn from_snapshot(bytes: &[u8]) -> Result<World, PhysicsError> {
-        let mut r = Reader { bytes, at: 0 };
-        if r.u32()? != MAGIC || r.u32()? != VERSION {
+        let mut r = Reader { bytes, at: 0, version: 0 };
+        let magic = r.u32()?;
+        r.version = r.u32()?;
+        if magic != MAGIC || !(5..=VERSION).contains(&r.version) {
             return Err(PhysicsError::InvalidParameter);
         }
         let gravity = r.v2()?;
@@ -357,12 +366,19 @@ impl World {
             let has_next = r.bool()?;
             let (np, nq) = (r.v2()?, r.rot()?);
             let (awake, dead) = (r.bool()?, r.bool()?);
+            let extra_solid = if r.version >= 7 {
+                let some = r.bool()?;
+                let (m, c, i) = (r.f32()?, r.v2()?, r.f32()?);
+                some.then_some((m, c, i))
+            } else {
+                None
+            };
             let k = r.count(4)?;
             let mut shapes = Vec::with_capacity(k);
             for _ in 0..k {
                 shapes.push(r.u32()?);
             }
-            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, can_sleep, fixed_rotation, ccd, dominance, soft_ccd, additional_mass, force, torque, next_target: has_next.then_some((np, nq)), awake, sleep_time, shapes, dead });
+            world.bodies.push(Body { kind, xf, center, local_center, exact_center, linear_velocity, angular_velocity, mass, inv_mass, inertia, inv_inertia, extent, linear_damping, angular_damping, gravity_scale, can_sleep, fixed_rotation, ccd, dominance, soft_ccd, additional_mass, extra_solid, force, torque, next_target: has_next.then_some((np, nq)), awake, sleep_time, shapes, dead });
         }
         let n = r.count(100)?;
         for id in 0..n {

@@ -108,6 +108,8 @@ pub struct Body {
     pub soft_ccd: f32,
     /// Mass added to what the shapes weigh; the inertia grows in proportion (a heavier body of the same build).
     pub additional_mass: f32,
+    /// A solid added to the shapes' as it is, not in proportion: its mass, its centre in the body's frame and its inertia about that centre.
+    pub extra_solid: Option<(f32, V2, f32)>,
     /// A force and a torque that act every step until reset.
     pub force: V2,
     pub torque: f32,
@@ -655,6 +657,7 @@ impl World {
             dominance: def.dominance,
             soft_ccd: def.soft_ccd,
             additional_mass: 0.0,
+            extra_solid: None,
             force: V2::ZERO,
             torque: 0.0,
             next_target: None,
@@ -810,10 +813,19 @@ impl World {
             first = first.add(data.center.scale(data.mass));
             list.push(data);
         }
+        // An added solid joins the shapes by the parallel axis theorem about the combined centre (Goldstein, Classical Mechanics, ch. 5).
+        let extra_solid = body.extra_solid;
+        if let Some((m, c, _)) = extra_solid {
+            mass += m;
+            first = first.add(c.scale(m));
+        }
         let local_center = if mass > 0.0 { first.scale(1.0 / mass) } else { V2::ZERO };
         let mut inertia = 0.0f32;
         for data in &list {
             inertia += data.inertia + data.mass * data.center.sub(local_center).length_squared();
+        }
+        if let Some((m, c, i)) = extra_solid {
+            inertia += i + m * c.sub(local_center).length_squared();
         }
         let mut extent = 0.0f32;
         for &s in &body.shapes {
@@ -1124,6 +1136,20 @@ impl World {
         if mass < 0.0 { return Err(PhysicsError::InvalidParameter); }
         let before = self.live_body(body)?.clone();
         self.bodies[body as usize].additional_mass = mass;
+        if let Err(error) = self.update_mass(body) {
+            self.bodies[body as usize] = before;
+            return Err(error);
+        }
+        self.wake(body)
+    }
+
+    /// Adds a solid of `mass` kilograms with its centre at `center` (the body's frame) and `inertia` about that centre to what the
+    /// shapes weigh, as it is. A mass and an inertia of 0 take it away.
+    pub fn set_additional_mass_properties(&mut self, body: u32, mass: f32, center: V2, inertia: f32) -> Result<(), PhysicsError> {
+        if ![mass, center.x, center.y, inertia].into_iter().all(f32::is_finite) { return Err(PhysicsError::NotFinite); }
+        if mass < 0.0 || inertia < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let before = self.live_body(body)?.clone();
+        self.bodies[body as usize].extra_solid = (mass > 0.0 || inertia > 0.0).then_some((mass, center, inertia));
         if let Err(error) = self.update_mass(body) {
             self.bodies[body as usize] = before;
             return Err(error);
