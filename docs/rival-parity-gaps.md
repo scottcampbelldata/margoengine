@@ -42,9 +42,11 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | --- | --- | --- | --- | --- |
 | Solid Particle System (many meshes as one mesh, per-particle transform and colour, pickable) | Babylon | DONE | M | 86b898ed7 |
 | Particle sub-emitters (spawn on birth, death, collision) | Babylon, PlayCanvas | DONE (death and collision EXISTS in `packages/vfx/src/events.ts`; birth added) | S to M | 0480e7a40 |
-| Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | MAC (physics: built by Scott's Mac) | L |  |
+| Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | PLANNED: FLUID-01 and FLUID-02 in [physics-solvers.md](physics-solvers.md) | L |  |
 | Soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1, plus a cloth render bridge | three.js, Babylon | DONE (KB-SOFT-LIGHT1, KB-SOFT-ITER1, cloth render bridge `@margoengine/gltf/soft-mesh`) | M | 0a4570d8e, d640a7242, 606261f00 |
-| Breakable / fracturing bodies | three.js `physics_ammo_break` | MAC (physics: built by Scott's Mac) | M |  |
+| Breakable / fracturing bodies | three.js `physics_ammo_break` | PLANNED: BREAK-01 in [physics-solvers.md](physics-solvers.md) | M |  |
+| Swappable physics plugin (one API over different engines) | Babylon physics v2 plugins | PLANNED: "Other engines as solvers", [physics-framework.md](physics-framework.md) section 5 | M |  |
+| Floating-origin physics regions (large worlds without precision loss) | Babylon | PLANNED: "Large worlds", [physics-framework.md](physics-framework.md) section 2 | M |  |
 | WebXR AR GPU depth occlusion (real objects hide virtual ones; only CPU depth today) | three.js, Babylon | MISSING | M |  |
 | WebXR AR reflection cube map from light estimation, as the environment's specular | three.js, Babylon | MISSING | M |  |
 | WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | PARTIAL | M |  |
@@ -84,7 +86,6 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | --- | --- | --- |
 | WebXR VR and AR, XR passes, controller poses, XR layers | Being built by lane B without a device (Scott, 2026-11-25: "Anything that's waiting on hardware, just build it, push it to main, and assume that it works") | M |
 | WebGL2 layer: path tracers cannot finish on ANGLE D3D11, no integrated-GPU frame budget, Safari, Firefox and phones unmeasured | The ANGLE fix is lane D's (reproducible on this laptop); the other machines are recorded as not yet measured | L |
-| Swappable physics plugin, floating-origin physics regions | Physics: built by Scott's Mac | M |
 | Deferred shading, voxel cone-traced GI | NOT PLANNED by decision; clustered forward and probes plus SSGI instead | XL |
 | USDZ interactive behaviours | Not yet given to a lane | M |
 

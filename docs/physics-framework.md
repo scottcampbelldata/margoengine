@@ -69,6 +69,12 @@ physics:
 slices. GPU division is not correctly rounded, so a tick time computed on the GPU differs between devices and the
 WebGL2 compatibility layer.
 
+**Large worlds (floating origin).** A ship crossing an ocean or an army on a continent must not lose precision far
+from the origin. The world keeps positions as an integer cell plus an f32 offset inside the cell. Each solver steps
+in a region-local frame centred on its own cell, and the renderer draws relative to the camera (Thorne 2005). Moving
+an origin is an exact integer cell shift, never a float subtraction, so the shift changes no bit of the simulated
+state. A coupling between solvers in different cells converts through the cell difference, which is exact.
+
 ## 3. Memory: one shared memory, many solver modules
 
 Today each kernel is its own WebAssembly instance with its own memory, so soft-rigid coupling copies particles,
@@ -169,6 +175,12 @@ iterate(), rollback() for strong coupling: re-run a tick from a saved start, and
   implicit or iterated scheme below a threshold.
 - **Iteration counts are fixed.** Residual tests use fixed-order sums, so a loop never stops at a different count on
   another machine.
+
+**Other engines as solvers.** The rigid-body contract (the bodies field of section 4 plus the public body, collider,
+joint and query API) does not depend on Margo's kernel. Another engine can stand in for the rigid solver by
+implementing that contract, as Babylon.js physics plugins do. Margo's own kernel is the default and the reference for
+the coupling tests. A plugged-in engine is held to the same tests, and the determinism rules of section 7 apply only
+when that engine is deterministic itself.
 
 ## 6. Shared numerical kernels
 
@@ -303,6 +315,8 @@ For every coupling edge and every solver that claims a physical effect, `check:m
 - Peng, Deng, Wang and Kim (2018). Anderson acceleration for geometry optimization and physics simulation. ACM TOG 37(4).
 - Robinson-Mosher, Schroeder and Fedkiw (2011). A symmetric positive definite formulation for monolithic fluid structure interaction. Journal of Computational Physics 230.
 - Salmon, Moraes, Dror and Shaw (2011). Parallel random numbers: as easy as 1, 2, 3. SC 2011.
+- Thorne (2005). Using a floating origin to improve fidelity and performance of large, distributed virtual worlds.
+  International Conference on Cyberworlds 2005, IEEE.
 - Strang (1968). On the construction and comparison of difference schemes. SIAM Journal on Numerical Analysis 5(3).
 - Tarjan (1972). Depth-first search and linear graph algorithms. SIAM Journal on Computing 1(2).
 - Tonge, Benevolenski and Voroshilov (2012). Mass splitting for jitter-free parallel rigid body simulation. ACM TOG 31(4).
