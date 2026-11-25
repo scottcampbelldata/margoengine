@@ -28,8 +28,8 @@ export class Aitken {
    */
   constructor(length: number, start = 0.5) {
     if (!Number.isSafeInteger(length) || length < 1)
-      throw new RangeError(`An interface has a whole number of values above 0 (got ${length}).`);
-    if (!(start > 0 && start <= 1)) throw new RangeError(`Aitken's first relaxation lies in (0, 1] (got ${start}).`);
+      throw new RangeError(`An interface has a whole number of values above 0 (got ${length}); pass the interface's value count as a positive integer.`);
+    if (!(start > 0 && start <= 1)) throw new RangeError(`Aitken's first relaxation lies in (0, 1] (got ${start}); pass a relaxation such as 0.5, or leave it out for the default.`);
     this.start = start;
     this.omega = start;
     this.last = new Float64Array(length);
@@ -53,7 +53,7 @@ export class Aitken {
   next(x: ArrayLike<number>, gx: ArrayLike<number>, out: Float64Array | number[]): void {
     const n = this.last.length;
     if (x.length !== n || gx.length !== n)
-      throw new RangeError(`Aitken was made for ${n} values and was given ${x.length} and ${gx.length}.`);
+      throw new RangeError(`Aitken was made for ${n} values and was given ${x.length} and ${gx.length}; pass the iterate and its update with the interface's ${n} values each.`);
     if (this.has) {
       let dot = 0,
         norm = 0;
@@ -96,9 +96,9 @@ export class Anderson {
    */
   constructor(length: number, depth = 5) {
     if (!Number.isSafeInteger(length) || length < 1)
-      throw new RangeError(`An interface has a whole number of values above 0 (got ${length}).`);
+      throw new RangeError(`An interface has a whole number of values above 0 (got ${length}); pass the interface's value count as a positive integer.`);
     if (!Number.isSafeInteger(depth) || depth < 1 || depth > 32)
-      throw new RangeError(`Anderson's depth is a whole number from 1 to 32 (got ${depth}).`);
+      throw new RangeError(`Anderson's depth is a whole number from 1 to 32 (got ${depth}); pass a depth such as 5, or leave it out for the default.`);
     this.depth = depth;
     this.n = length;
     const columns = () => Array.from({ length: depth }, () => new Float64Array(length));
@@ -122,7 +122,7 @@ export class Anderson {
     const n = this.n,
       m = this.depth;
     if (x.length !== n || gx.length !== n)
-      throw new RangeError(`Anderson was made for ${n} values and was given ${x.length} and ${gx.length}.`);
+      throw new RangeError(`Anderson was made for ${n} values and was given ${x.length} and ${gx.length}; pass the iterate and its update with the interface's ${n} values each.`);
     if (this.has) {
       // Shift the oldest difference out when the history is full, so columns stay oldest to newest.
       if (this.count === m) {
@@ -211,8 +211,8 @@ export class Anderson {
  */
 export function staggeringStable(bodyMass: number, addedMass: number, margin = 2): boolean {
   if (!(bodyMass > 0 && Number.isFinite(bodyMass)) || !(addedMass >= 0 && Number.isFinite(addedMass)))
-    throw new RangeError(`Masses are finite, the body's above 0 (got ${bodyMass} and ${addedMass}).`);
-  if (!(margin >= 1 && Number.isFinite(margin))) throw new RangeError(`The margin is 1 or more (got ${margin}).`);
+    throw new RangeError(`Masses are finite, the body's above 0 (got ${bodyMass} and ${addedMass}); pass the body's mass in kg and the fluid's added mass in kg.`);
+  if (!(margin >= 1 && Number.isFinite(margin))) throw new RangeError(`The margin is 1 or more (got ${margin}); pass a finite margin of at least 1, or leave it out for the default.`);
   return bodyMass > margin * addedMass;
 }
 
@@ -298,13 +298,13 @@ export function coupling(ids: readonly string[], scheme: CouplingScheme, options
     margin = 2,
   } = options;
   if (!Number.isSafeInteger(iterations) || iterations < 2 || iterations > 64)
-    throw new RangeError(`An iterated coupling runs a tick 2 to 64 times (got ${iterations}).`);
+    throw new RangeError(`An iterated coupling runs a tick 2 to 64 times (got ${iterations}); pass iterations between 2 and 64.`);
   if (accelerator !== 'aitken' && accelerator !== 'anderson')
-    throw new RangeError(`The accelerator is 'aitken' or 'anderson' (got ${accelerator}).`);
+    throw new RangeError(`The accelerator is 'aitken' or 'anderson' (got ${accelerator}); pass one of those two, or leave it out for the default.`);
   if (!Number.isSafeInteger(depth) || depth < 1 || depth > 32)
-    throw new RangeError(`Anderson's depth is a whole number from 1 to 32 (got ${depth}).`);
+    throw new RangeError(`Anderson's depth is a whole number from 1 to 32 (got ${depth}); pass a depth such as 5, or leave it out for the default.`);
   if (!(relaxation > 0 && relaxation <= 1))
-    throw new RangeError(`Aitken's first relaxation lies in (0, 1] (got ${relaxation}).`);
+    throw new RangeError(`Aitken's first relaxation lies in (0, 1] (got ${relaxation}); pass a relaxation such as 0.5, or leave it out for the default.`);
   if ((bodyMass === undefined) !== (addedMass === undefined))
     throw new RangeError('Give the body mass and the added mass together, or neither.');
   if (

@@ -390,7 +390,7 @@ export class PhysicsWorld {
    * rate, exact).
    */
   alpha(level: RateLevel): number {
-    if (!isRateLevel(level)) throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}).`);
+    if (!isRateLevel(level)) throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}); pass a level between 0 (60 Hz) and 7 (7,680 Hz).`);
     return this.clock.alpha(rateOf(level));
   }
 
@@ -723,7 +723,7 @@ export class PhysicsWorld {
     if (c.scheme === 'implicitPressure' && !members.some((e) => this.addsToGroup(e, members)))
       throw new MargoError(
         'state',
-        `The 'implicitPressure' coupling of ${c.ids.join(', ')} has no member that adds to another's fields (the solve that takes the bodies in).`,
+        `The 'implicitPressure' coupling of ${c.ids.join(', ')} has no member that adds to another's fields (the solve that takes the bodies in); give the fluid solver an accumulated field the bodies write, or couple the pair with 'iterated' instead.`,
       );
     const scratch = new Map<string, Region>();
     if (c.scheme === 'predicted' || c.scheme === 'iterated')

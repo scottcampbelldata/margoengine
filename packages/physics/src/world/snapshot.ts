@@ -328,7 +328,7 @@ export function restoreSnapshot(
   if (saved !== hash)
     throw new MargoError(
       'failed',
-      `The snapshot's regions hash to ${saved}, not the ${hash} it was taken with: its bytes were changed.`,
+      `The snapshot's regions hash to ${saved}, not the ${hash} it was taken with: its bytes were changed; take a new snapshot with takeSnapshot, or restore one stored unmodified.`,
     );
   for (const [entry, source] of copies) view(memory, entry.region).set(source);
 }
