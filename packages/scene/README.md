@@ -199,11 +199,12 @@ measures `size`. `float(mesh, options)` bobs and tilts a mesh from a time you pa
 screen. `InteractionPrompt` is the timing of a "drag me" hint: `visible` after `threshold` ms without interaction.
 
 ```ts
-import type { Mesh } from '@margoengine/core';
+import { box, Engine } from '@margoengine/core';
 import { InteractionPrompt, center, float, resize, screenSizeScale } from '@margoengine/scene/helpers';
 
-declare const model: Mesh;
-declare const marker: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = engine.createMesh().setGeometry(box());
+const marker = engine.createMesh().setGeometry(box());
 
 resize(model, 2); // longest side is now 2 world units
 center(model, { align: { y: 'min' } }); // centred on x and z, standing on y = 0
@@ -216,4 +217,5 @@ function frame(seconds: number, distance: number): void {
   prompt.update(seconds * 1000); // show your hint while prompt.visible; call prompt.interact(ms) on pointerdown
 }
 frame(0, 10);
+engine.start();
 ```
