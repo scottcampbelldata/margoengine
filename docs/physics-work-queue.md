@@ -262,5 +262,5 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | HYDRO-01 | Conservative shallow water | partial | Claude | CLAIMED |
 | ATMO-01 | Boundary-layer wind field | stand-in | Claude | LANDED c38c25d3d |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | LANDED c38c25d3d |
-| ATMO-03 | Moist convection and cloud dynamics | none | Claude | CLAIMED |
+| ATMO-03 | Moist convection and cloud dynamics | none | Claude | LANDED 8833dbf0c |
 | ATMO-04 | Precipitation microphysics | stand-in | Claude | LANDED acbc53c7e |
