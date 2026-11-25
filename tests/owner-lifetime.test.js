@@ -482,8 +482,9 @@ test('water runs check:owners in leaves of eight entries, not one leaf per entry
 // culling's 30 entries passed the same limit in one WebGL2 leaf on 2026-11-12; environment's 19 (247 cases) took 137 s
 // idle and passed it under load on 2026-11-13.
 // post gained HeatHaze with KB-FLAME-HEATHAZE1 (32 entries); environment gained SHLight in 882c56a49 (20 entries).
+// post gained ASCII in 12d7c41c57 and Ramp, Grid, DepthView and TextureOverlay in 7efaf14455 (37 entries).
 for (const [name, count, sample] of [
-  ['post', 32, 'PostStack.attach'],
+  ['post', 37, 'PostStack.attach'],
   ['culling', 30, 'WebGL2Culling.attach'],
   ['environment', 20, 'LightProbes'],
 ])

@@ -11857,6 +11857,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-24: a bundle holding EnvironmentLighting imported each image decoder both lazily and eagerly (KB-ENV-LOADCHUNK1, environment)
+
+- **Repro:** bundle `@margoengine/react/lights` alone (packages/react/tests/subpaths.test.js, "lights and fog load the environment entry without image decoders"): the bundler warned `INEFFECTIVE_DYNAMIC_IMPORT` for exr.js, hdr.js and ultrahdr.js, which load.js imports with `import()` while loaders.js and parse-image.js import them statically. Found while restoring the sync loss of ff88a70e71.
+- **Cause:** `EnvironmentLighting.load` reached `loadEnvironmentImage` through `import('./loaders.js')`, the entry that re-exports every decoder, so the decoder `import()` calls in load.ts could split nothing.
+- **Fix:** `EnvironmentLighting.load` imports `./load.js`, which imports only the decoder the file's signature names (packages/environment/src/lighting.ts).
+- **Regression:** packages/react/tests/subpaths.test.js "lights and fog load the environment entry without image decoders (KB-REACT-ENVDECODERS1)", which fails without it.
+
 ### Fixed 2026-11-23: a shoulder could exceed its range between two accepted poses (rigging/contact)
 
 - **Repro:** keep a sleeve above a torso capsule. Aim the upper arm diagonally backward to opposite sides in two poses. Both poses pass the shoulder direction limit, but the interpolated arm points directly backward in between.

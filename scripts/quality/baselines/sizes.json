@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18770188,
+  "total": 18775881,
   "history": [
     {
       "date": "2026-10-24",
@@ -11931,6 +11931,12 @@
       "commit": "efc136466",
       "reason": "post/overlays: TextureOverlay holds its source by the borrowed-object rule (TextureOption, setSource), +115 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "17243d4fb6",
+      "reason": "environment lighting loads only the decoder it needs",
+      "grew": 1
     }
   ],
   "items": {
@@ -12251,7 +12257,7 @@
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/scripts": 3150,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 34105,
+    "@margoengine/environment": 39799,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
@@ -12708,7 +12714,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 599864,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87410,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87409,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
