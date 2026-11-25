@@ -1377,6 +1377,55 @@ console.log(await ascii.text()); // the same picture as lines of text
   option changes. Every frame reads each pixel twice (five times that for the character pass with `edges`); GPU cost not
   measured yet. A cell's alpha is its average coverage on a transparent canvas. WebGPU and the WebGL2 layer.
 
+## Overlays: `Ramp`, `Grid`, `DepthView`, `TextureOverlay`
+
+`@margoengine/post/overlays` (10,454 B min+gzip, its own entry; it carries the stack) draws a layer over the frame:
+a colour gradient, a screen-space grid, the scene depth, or an image. All four are LDR `PostStack` effects, so put them
+last.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {Ramp, Grid, DepthView, TextureOverlay} from 'margoengine/post/overlays';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const art = new OffscreenCanvas(256, 64);
+const ink = art.getContext('2d')!;
+ink.fillStyle = '#ffffff';
+ink.font = '48px sans-serif';
+ink.fillText('DRAFT', 48, 48);
+const ramp = new Ramp({type: 'radial', stops: [{at: 0, color: '#ffffff'}, {at: 1, color: '#203060'}], blend: 'multiply'});
+const grid = new Grid({cellSize: 40, opacity: 0.2});
+const depth = new DepthView({near: 1, far: 20, opacity: 0}); // raise opacity to inspect the depth
+const label = new TextureOverlay({source: art.transferToImageBitmap(), fit: 'none', offset: [0.3, 0.38], opacity: 0.8});
+PostStack.attach(stage.engine, [ramp, grid, depth, label]);
+depth.options.opacity = 0.5; // options are read every frame
+stage.engine.render();
+```
+
+Every effect takes these:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `blend` | `'normal'` (Ramp `'soft-light'`) | `normal`, `add`, `subtract`, `multiply`, `screen`, `overlay`, `soft-light`, `hard-light`, `darken`, `lighten`, `color-dodge`, `color-burn`, `difference`, `exclusion` |
+| `opacity` | `1` (Grid `0.5`) | Layer strength, 0 to 1 |
+| `mask` | `'none'` | `'luminance'` (of the frame) or `'depth'` (view distance) weights the layer |
+| `maskRange` | `[0, 1]`; depth: `[near, far]` | Mask values given weight 0 and 1; swap them to invert |
+| `enabled` | `true` | False passes frames through |
+
+| Effect | Option (default) |
+| --- | --- |
+| `Ramp` | `type` (`'linear'`; `'radial'`, `'mirrored'`), `stops` (black to white, 2 to 8 of `{at, color, alpha}`), `start` (`[0, 0.5]`, radial `[0.5, 0.5]`), `end` (`[1, 0.5]`), `angle` (`0` degrees), `bias` (`0.5`), `gain` (`0.5`), `invert` (`false`) |
+| `Grid` | `style` (`'lines'`; `'dots'`), `cellSize` (`32` pixels, or `[x, y]`), `lineWidth` (`1`, dots `3`), `color` (`'#ffffff'`), `offset` (`[0, 0]` pixels), `angle` (`0`) |
+| `DepthView` | `depth` (the stack's capture, or a `DepthTexture`), `mode` (`'linear'`; `'raw'` reversed Z), `near` and `far` (camera planes), `invert` (`false`) |
+| `TextureOverlay` | `source` (required: `ImageBitmap`, `GPUTexture` or `() => texture`), `fit` (`'cover'`; `'fill'`, `'contain'`, `'none'`), `offset` (`[0, 0]` frame fractions), `scale` (`1`, negative mirrors), `rotation` (`0` degrees), `repeat` (`false`) |
+
+- **Method.** One pass per effect. Blends are the formulas of W3C "Compositing and Blending Level 1" on display
+  values; `bias` and `gain` are Schlick's ("Fast Alternatives to Perlin's Bias and Gain Functions", Graphics Gems IV,
+  1994). Gradient colours interpolate as display values, as CSS gradients do.
+- **Depth.** To show a `DepthTexture` (with models you added to it), attach it and pass it:
+  `new DepthView({depth: DepthTexture.attach(engine)})`. It is also what `mask: 'depth'` then reads on that effect.
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

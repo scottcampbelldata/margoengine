@@ -93,6 +93,7 @@ abstract class ScreenEffect implements EnginePlugin {
     protected engine?: Engine;
     protected stack?: PostStack;
     protected uniform?: GPUBuffer;
+    protected uniformBytes: number;
     protected readonly textures: GPUTexture[];
     protected abstract readonly kind: StackStage['kind'];
     abstract readonly name: string;

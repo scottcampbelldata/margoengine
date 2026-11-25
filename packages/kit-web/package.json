@@ -1467,6 +1467,10 @@
       "types": "./dist/post/ascii.d.ts",
       "import": "./dist/post/ascii.js"
     },
+    "./post/overlays": {
+      "types": "./dist/post/overlays.d.ts",
+      "import": "./dist/post/overlays.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

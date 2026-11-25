@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18586497,
+  "total": 18597106,
   "history": [
     {
       "date": "2026-10-24",
@@ -11811,6 +11811,12 @@
       "commit": "606261f00",
       "reason": "new optional entry @margoengine/gltf/soft-mesh (drawSoftBody, SoftSurface): about 2.5 KB of its own code over the PBRModel chunk it shares with @margoengine/gltf/pbr-model, which an app drawing a soft body as a PBR mesh pays once either way; physics is a type import",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "de3d54b48",
+      "reason": "New optional post/overlays: 0 to 10454 B gzip. Ramp, Grid, DepthView and TextureOverlay share one composite pass (14 blend modes, masks) and the stack; one entry, a split per effect would repeat the stack and the composite in four chunks.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12554,7 +12560,7 @@
     "@margoengine/netcode/interpolation-fields": 2936,
     "@margoengine/netcode/interpolation-timeline": 1495,
     "@margoengine/netcode/lobby": 4439,
-    "@margoengine/netcode/media": 3100,
+    "@margoengine/netcode/media": 2941,
     "@margoengine/netcode/migrate": 8607,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/presence": 6475,
@@ -12629,6 +12635,7 @@
     "@margoengine/post/motion-blur": 9027,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,
+    "@margoengine/post/overlays": 10768,
     "@margoengine/post/pixelate": 10491,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11160,

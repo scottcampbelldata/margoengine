@@ -22,6 +22,7 @@ export abstract class ScreenEffect implements EnginePlugin {
   protected engine?: Engine;
   protected stack?: PostStack;
   protected uniform?: GPUBuffer;
+  protected uniformBytes = 64;
   protected readonly textures: GPUTexture[] = [];
   private readonly views: GPUTextureView[] = [];
   private disposed = false;
@@ -47,7 +48,7 @@ export abstract class ScreenEffect implements EnginePlugin {
     if (!this.host) throw margoError('state', 'Use an effect inside PostStack or call its attach method');
     if (!engine.gpu) throw margoError('unsupported', 'Screen effects require a GPU backend; use WebGPU or full WebGL2');
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({ size: 64, usage: 0x40 | 0x8 });
+    this.uniform = engine.gpu.createBuffer({ size: this.uniformBytes, usage: 0x40 | 0x8 });
   }
   protected target(c: ScreenContext, index: number, format: GPUTextureFormat = 'rgba16float'): GPUTextureView {
     let t = this.textures[index];

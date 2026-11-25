@@ -21,6 +21,7 @@ const entries = {
   lens: ['Lens'],
   'material-decals': ['MaterialDecals'],
   outline: ['Outline'],
+  overlays: ['Ramp', 'Grid', 'DepthView', 'TextureOverlay'],
   pixelate: ['Pixelate'],
   smaa: ['SMAA'],
   ssao: ['SSAO'],
@@ -38,6 +39,7 @@ const required = {
   MotionBlur: { velocity: () => undefined },
   SceneTargets: { outputs: { albedo: 'albedo', normal: 'normal' } },
   SelectiveBloom: { mask: () => undefined },
+  TextureOverlay: { source: () => undefined },
 };
 export async function fixtures(load = (entry) => import(entry)) {
   const out = [];
