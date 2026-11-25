@@ -28,6 +28,12 @@ function reversed(animation, clip, name) {
   animation.clips.push({ ...source, name, tracks });
 }
 
+/*
+ * How a limp rig lands is chaotic: which way it lies is not monotonic in the push (a forward push of 20 lands it face down, 60 and 80 face
+ * up, and 40 was the edge, where the smallest change to the solver turned it over). The pushes here, 20 forward and 40 backward, land
+ * the same way for every push within 4 of them.
+ */
+
 /**
  * The rig standing on a floor, turned `yaw` radians about up, with its ragdoll and get-up, thrown over forward (`push` > 0)
  * or backward along where it faces, sliding away from the character's root as it falls.
@@ -59,7 +65,7 @@ const across = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
 rtest('a body on its back gets the face-up clip, a body on its front the face-down clip', async () => {
   const back = await fallen(-40),
-    front = await fallen(40);
+    front = await fallen(20);
   assert.equal(back.getUp.pick(), 'faceUp');
   assert.equal(front.getUp.pick(), 'faceDown');
   back.rig.dispose();
@@ -68,7 +74,7 @@ rtest('a body on its back gets the face-up clip, a body on its front the face-do
 
 for (const [label, push, side] of [
   ['back', -40, 'faceUp'],
-  ['front', 40, 'faceDown'],
+  ['front', 20, 'faceDown'],
 ])
   rtest(`from its ${label}: the character comes to the body, and the bones blend into the clip without a pop`, async () => {
     const { rig, ragdoll, getUp } = await fallen(push),
@@ -91,16 +97,20 @@ for (const [label, push, side] of [
     assert.ok(distance(worldPosition(hips), before[0]) < 0.06, 'the hips stay put');
     assert.ok(distance(worldPosition(head), before[1]) < 0.12, 'the head stays put');
     // The blend ends on the clip: the root bone drawn where the clip has it, near the body it left.
-    let jump = 0,
+    // The head's step each frame of the blend: the clip's own rise makes it grow smoothly (to 10 cm a frame, 6 m/s, at the end of a
+    // get-up from the back), so a pop is a step that differs from the one before it, not a step that is large.
+    let pop = 0,
+      before2 = 0,
       last = worldPosition(head);
     rig.frames(24, 1 / 60, () => {
       rig.engine.store.tick(false);
-      jump = Math.max(jump, distance(worldPosition(head), last));
+      const step = distance(worldPosition(head), last);
+      if (before2 > 0) pop = Math.max(pop, Math.abs(step - before2));
+      before2 = step;
       last = worldPosition(head);
     });
     assert.equal(ragdoll.weight, 0, 'the 0.4 s blend is over');
-    // A head moves at most a few m/s in a get-up, plus the blend across the pose gap over 24 frames: 10 cm a frame is a pop.
-    assert.ok(jump < 0.1, `no frame jumps (${jump} m)`);
+    assert.ok(pop < 0.03, `no frame jumps: one step differs from the one before by ${pop} m`);
     assert.ok(across(worldPosition(hips), body) < 0.3, 'the clip goes on from where the body lay');
     let result = null;
     finished.then((value) => (result = value));
