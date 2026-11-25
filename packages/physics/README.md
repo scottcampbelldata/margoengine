@@ -1875,6 +1875,48 @@ const spectrum = waves.field.sample(75000, 0); // 34 frequencies by 24 direction
 console.log(spectrum.frequencies.length, spectrum.directions.length, spectrum.density); // 34 24 1000
 ```
 
+
+### A hull on the sea (`@margoengine/physics/seakeeping`)
+
+`HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.
+- **Each step:** it reads where each hull's body is from the `bodies` port, and integrates the water's pressure over the wetted part of the hull's surface at the middle of the step. It then holds the body with that force, and its moment about the centre of mass, over the rigid step through `bodyForces`.
+- **The hull** is a closed triangle mesh in the body's frame, wound outward. Each triangle is cut where the sea's surface crosses it (the linear cut, then two secant steps on the surface). The wet pieces are integrated by Dunavant's six-point rule, which is exact for the hydrostatic force and moment.
+- **The sea** is anything with `elevation(x, z, t)`, and optionally `pressure(x, y, z, t)`: the hydrostatic pressure plus the waves' dynamic pressure, stretched to 0 at the surface (Wheeler). Without it, the water is still to its local surface, rho g (eta - y). The pressure over the instantaneous wetted surface is the nonlinear Froude-Krylov load. `density` is the sea's, default sea water.
+- **`wettedLoads(mesh, pose, sea, t, about)`** gives the same force, moment and wetted area for one hull at one instant.
+- **Measured:**
+  - a box at its draft is held up by the weight of the water it displaces, to f64 rounding;
+  - heeled, a box rights itself by the wall-sided righting arm;
+  - in a small wave, a box takes the linear Froude-Krylov heave load;
+  - let go above its draft, a box heaves at the period its buoyancy gives it.
+- **Not yet:** the added mass and the radiation damping of the water the hull moves, diffraction, wave drift and green water. A hull rides the waves' pressure but does not yet stir the water: let go, it heaves without settling.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+// A 4 m by 2 m box, 1.5 m deep, as heavy as 0.5 m of sea water under it: it floats at a 0.5 m draft.
+const [L, D, B, T] = [4, 1.5, 2, 0.5];
+const box = physics.addBody(null, {
+  position: [0, D / 2 - T, 0],
+  colliders: {shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: 1025 * L * B * T},
+});
+// The box's surface, twelve triangles wound outward.
+const v = [];
+for (const x of [-L / 2, L / 2]) for (const y of [-D / 2, D / 2]) for (const z of [-B / 2, B / 2]) v.push(x, y, z);
+const mesh = {
+  vertices: v,
+  indices: [0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3],
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(new HullSolver(), {hulls: [{row: box.row, mesh}], sea: {elevation: () => 0}})
+  .couple(['hull', 'rigid'], 'staggered');
+world.advance(60);
+console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
+```
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

@@ -11910,3 +11910,25 @@ Multi-Segment Motion Blur", HPG 2017, https://doi.org/10.1145/3105762.3105779, s
 by the union of its key-frame boxes; the per-node two-box form of their paper is for piece 4b). The rotation blend is the
 existing voxel 'trs' path (shortest-arc slerp, Ken Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985,
 https://doi.org/10.1145/325165.325242). Written from these papers; no renderer's code was read.
+### A hull on the sea: wetted-surface loads (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
+
+`packages/physics/src/seakeeping/wetted.ts` integrates the water's pressure over the part of a hull mesh under the sea's
+surface. It was written from these, read for this job (a research summary, papers only, no code):
+
+- J. Kerner, "Water interaction model for boats in video games", Game Developer, 2015 (parts 1 and 2, text only): cut each
+  triangle by its vertices' heights over the surface, one wet corner leaving a triangle and two a quadrilateral in two.
+- G. Giorgi, S. Sirigu, M. Bonfanti, G. Bracco and G. Mattiazzo, "Fast nonlinear Froude-Krylov force calculation for
+  prismatic floating platforms", J. Ocean Eng. Mar. Energy, 2021, doi 10.1007/s40722-021-00212-z (introduction and
+  formulation): the nonlinear Froude-Krylov load as the incident pressure over the instantaneous wetted surface, with
+  Wheeler stretching as the cheap choice that leaves the pressure 0 at the surface.
+- D. A. Dunavant, "High degree efficient symmetrical Gaussian quadrature rules for the triangle", IJNME 21(6), 1985, doi
+  10.1002/nme.1620210612 (the published degree-four six-point rule).
+- J. M. J. Journee and W. W. Massie, *Offshore Hydromechanics*, TU Delft, 2001, chapters 6 to 8: the heave natural period
+  2 pi sqrt((m + a) / (rho g A_wp)) the coupling test checks (without the added mass a, which is not built yet).
+
+The secant refinement of each cut (two fixed steps), the moment about the centre of mass, and the framework solver
+(`HullSolver`, through `bodyForces`) are this package's own. The wall-sided righting arm,
+GZ = sin(phi) (GM + BM tan^2(phi) / 2), is the textbook stability result. Proof: `packages/physics/tests/seakeeping.test.js`
+(a box's buoyancy to f64 rounding, the righting arm to 1e-9, the linear Froude-Krylov heave load of a box in a small wave)
+and `tests/coupling/seakeeping.test.js`. The research summary is kept with the solver's notes, and covers what comes next
+(Cummins radiation in state-space form from strip-theory coefficients, diffraction, drift, green water).

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19100803,
+  "total": 19103496,
   "history": [
     {
       "date": "2026-10-24",
@@ -12339,6 +12339,12 @@
       "commit": "lane-A",
       "reason": "Correction to the 04c936b47f row (ed38289bec): post/image, post/blur and post/material-decals measure about 13,992, 8,283 and 10,026 B against about 13,578, 8,009 and 9,697 B when their old budgets were set (budget = measured + 3%), so they grew about +414, +274 and +329 B, not +7, +27 and +38. Most of it is 0b961a9441 (KB-POST-ALPHARIM1): shared/display.js straightDisplay and displayFor, which Bloom (bundled into post/image), Blur and MaterialDecals call to keep a premultiplied canvas free of a light rim, so the bytes are needed; it fitted inside the 3% headroom until a7ab55ea49 added its message bytes. Budgets unchanged.",
       "grew": 0
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "38bb58dfa",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: new entry (SEA-08), the water's load on a hull over its wetted surface and the HullSolver that holds it through bodyForces; measured gzip (Mac build) 2437 B, budget 2693 B (measured + 256 B)."
     }
   ],
   "items": {
@@ -13134,6 +13140,7 @@
     "@margoengine/physics/flight": 7401,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/seakeeping": 2693,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,

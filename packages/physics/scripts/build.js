@@ -36,6 +36,7 @@ await build({
         clouds: resolve(root, 'src/clouds/index.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
+        seakeeping: resolve(root, 'src/seakeeping/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

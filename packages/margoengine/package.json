@@ -3131,6 +3131,10 @@
       "types": "./dist/physics/waves.d.ts",
       "import": "./dist/physics/waves.js"
     },
+    "./physics/seakeeping": {
+      "types": "./dist/physics/seakeeping.d.ts",
+      "import": "./dist/physics/seakeeping.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"
