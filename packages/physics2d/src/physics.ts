@@ -152,11 +152,63 @@ export interface Physics2DHooks {
   modifyContact?(change: ContactChange2D): void;
 }
 
-/** Lines that draw a world: four numbers a line, and a colour code a line. */
+/** Lines that draw a world: four numbers a line, a colour code a line, and the colour of each line as red, green, blue and alpha from 0 to 1. */
 export interface DebugLines2D {
   vertices: Float32Array;
   colors: Uint8Array;
+  /** Four numbers a line: the colour its code has in the style, or the default one (see {@link DebugStyle2D}). */
+  rgba: Float32Array;
 }
+
+/** What a debug line draws, the names of the colour codes of {@link DebugLines2D.colors} in order. */
+export type DebugColour2D =
+  | 'fixed'
+  | 'awake'
+  | 'sleeping'
+  | 'kinematic'
+  | 'sensor'
+  | 'joint'
+  | 'contactPoint'
+  | 'contactNormal'
+  | 'box'
+  | 'axisX'
+  | 'axisY'
+  | 'solverPoint'
+  | 'solverNormal';
+
+/** Colours for the lines of `debugRender`: red, green, blue and alpha from 0 to 1 for any of the kinds; the others keep the defaults. */
+export type DebugStyle2D = Partial<Record<DebugColour2D, readonly [number, number, number, number]>>;
+
+const DEBUG_COLOURS: readonly DebugColour2D[] = [
+  'fixed',
+  'awake',
+  'sleeping',
+  'kinematic',
+  'sensor',
+  'joint',
+  'contactPoint',
+  'contactNormal',
+  'box',
+  'axisX',
+  'axisY',
+  'solverPoint',
+  'solverNormal',
+];
+const DEBUG_STYLE: Readonly<Record<DebugColour2D, readonly [number, number, number, number]>> = {
+  fixed: [0.5, 0.5, 0.5, 1],
+  awake: [0.2, 0.9, 0.3, 1],
+  sleeping: [0.15, 0.5, 0.2, 1],
+  kinematic: [0.3, 0.5, 1, 1],
+  sensor: [1, 0.9, 0.2, 1],
+  joint: [1, 0.2, 0.2, 1],
+  contactPoint: [1, 0.2, 1, 1],
+  contactNormal: [1, 0.6, 1, 1],
+  box: [0.2, 0.9, 0.9, 0.4],
+  axisX: [0.9, 0.1, 0.1, 1],
+  axisY: [0.1, 0.8, 0.1, 1],
+  solverPoint: [1, 0.5, 0, 1],
+  solverNormal: [1, 0.75, 0.3, 1],
+};
 
 /** Limits which colliders a scene query can hit. */
 export interface QueryFilter2D {
@@ -1319,29 +1371,51 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   }
 
   /**
-   * Lines that draw the world, in world units: `vertices` holds x1, y1, x2, y2 for each line and `colors` its colour
-   * code (0 fixed, 1 awake, 2 sleeping, 3 kinematic, 4 sensor, 5 joint, 6 contact point, 7 contact normal, 8 broad
-   * phase box). Everything is drawn unless `options` picks parts.
+   * Lines that draw the world, in world units: `vertices` holds x1, y1, x2, y2 for each line, `colors` its colour code (0 fixed, 1 awake,
+   * 2 sleeping, 3 kinematic, 4 sensor, 5 joint, 6 contact point, 7 contact normal, 8 broad phase box, 9 and 10 a body's x and y axes,
+   * 11 and 12 a solver contact's point and normal) and `rgba` its colour. Shapes, joints, contacts and boxes are drawn unless `options` picks
+   * parts; `axes` draws each body's two axes at its centre of mass, `solverContacts` the contacts the solver acts on apart from the touching
+   * ones. `style` sets colours (red, green, blue, alpha from 0 to 1) by kind, and `filter` leaves out every line of a body it returns false for
+   * (its shapes, boxes, axes, joints and contacts).
    */
-  debugRender(options: { shapes?: boolean; joints?: boolean; contacts?: boolean; boxes?: boolean } = {}): DebugLines2D {
+  debugRender(
+    options: {
+      shapes?: boolean;
+      joints?: boolean;
+      contacts?: boolean;
+      boxes?: boolean;
+      axes?: boolean;
+      solverContacts?: boolean;
+      style?: DebugStyle2D;
+      filter?: (body: Body2D) => boolean;
+    } = {},
+  ): DebugLines2D {
     this.live();
-    const all = Object.keys(options).length === 0;
-    const what =
-      (all || options.shapes ? 1 : 0) |
-      (all || options.joints ? 2 : 0) |
-      (all || options.contacts ? 4 : 0) |
-      (all || options.boxes ? 8 : 0);
+    const { style, filter, ...parts } = options,
+      all = Object.keys(parts).length === 0,
+      what =
+        (all || parts.shapes ? 1 : 0) |
+        (all || parts.joints ? 2 : 0) |
+        (all || parts.contacts ? 4 : 0) |
+        (all || parts.boxes ? 8 : 0) |
+        (parts.axes ? 16 : 0) |
+        (parts.solverContacts ? 32 : 0);
     const { kernel } = this;
-    const count = kernel.ok(kernel.exports.debug_lines(this.handle, what));
+    const skipped: number[] = [];
+    if (filter) for (const body of this.bodies) if (!filter(body)) skipped.push(body.handle);
+    kernel.io(Math.max(skipped.length, 1)).u.set(skipped, 0);
+    const count = kernel.ok(kernel.exports.debug_lines(this.handle, what, skipped.length));
     const f = kernel.io(5 * count).f;
     const k = 1 / this.scale;
     const vertices = new Float32Array(4 * count),
-      colors = new Uint8Array(count);
+      colors = new Uint8Array(count),
+      rgba = new Float32Array(4 * count);
     for (let i = 0; i < count; i++) {
       for (let j = 0; j < 4; j++) vertices[4 * i + j] = f[5 * i + j] * k;
       colors[i] = f[5 * i + 4];
+      rgba.set(style?.[DEBUG_COLOURS[colors[i]!]!] ?? DEBUG_STYLE[DEBUG_COLOURS[colors[i]!]!], 4 * i);
     }
-    return { vertices, colors };
+    return { vertices, colors, rgba };
   }
 
   /** Adds a listener; returns a function that removes it. */

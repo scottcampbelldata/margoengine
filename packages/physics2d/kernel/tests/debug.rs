@@ -82,3 +82,22 @@ fn colours_follow_what_a_shape_is_doing_and_joints_contacts_and_boxes_are_asked_
     }
     assert!(lines(&w, DEBUG_SHAPES).iter().any(|l| l[4] == margoengine_physics2d_kernel::debug::COLOUR_SLEEPING));
 }
+
+#[test]
+fn axes_are_two_lines_a_body_along_its_own_x_and_y_and_a_skip_list_leaves_a_body_out() {
+    use margoengine_physics2d_kernel::debug::{COLOUR_AXIS_X, COLOUR_AXIS_Y, DEBUG_AXES};
+    use margoengine_physics2d_kernel::math::Rot;
+    let mut w = World::default();
+    let turned = w.create_body(&BodyDef { position: v2(1.0, 2.0), rotation: Rot::from_pair(0.0, 1.0), ..Default::default() }).unwrap();
+    let other = w.create_body(&BodyDef { position: v2(5.0, 0.0), ..Default::default() }).unwrap();
+    let _ = other;
+    let axes = lines(&w, DEBUG_AXES);
+    assert_eq!(axes.len(), 4, "two a body");
+    let x = axes.iter().find(|l| l[4] == COLOUR_AXIS_X && (l[0] - 1.0).abs() < 1e-5).expect("the turned body's x axis");
+    // Turned a quarter, its x axis points up the world's y: from (1, 2) to (1, 2.5).
+    assert!((x[2] - 1.0).abs() < 1e-4 && (x[3] - 2.5).abs() < 1e-4, "{:?}", x);
+    let y = axes.iter().find(|l| l[4] == COLOUR_AXIS_Y && (l[0] - 1.0).abs() < 1e-5).unwrap();
+    assert!((y[2] - 0.5).abs() < 1e-4 && (y[3] - 2.0).abs() < 1e-4, "{:?}", y);
+    let left: Vec<f32> = w.debug_lines_without(DEBUG_AXES, &[turned]);
+    assert_eq!(left.len() / 5, 2, "the skipped body's axes are gone");
+}

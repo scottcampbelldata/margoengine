@@ -82,7 +82,7 @@ interface Exports {
   world_set_hooks(world: number, on: number): number;
   world_snapshot(world: number): number;
   world_restore(world: number, bytes: number): number;
-  debug_lines(world: number, what: number): number;
+  debug_lines(world: number, what: number, skipping: number): number;
   shape_create(world: number, body: number, kind: number): number;
   shape_remove(world: number, shape: number): number;
   shape_set(world: number, shape: number): number;

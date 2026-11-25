@@ -90,7 +90,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Character | kinematic character controller: slide, autostep, snap to ground, slope climb and slide, push dynamic bodies, up vector | `createCharacterController` | full |
 | World | fixed timestep, interpolation, determinism (bit-identical native and Wasm) | `Physics2D`, kernel tests | full |
 | World | snapshots (serialise and restore the world) | `snapshot()`, `restore()`: a restored world steps bit for bit as the original | full |
-| World | debug render data | `debugRender()` | full |
+| World | debug render data: shapes, joints, contacts, boxes, body axes, solver contacts, a colour style (`rgba` a line) and a body filter | `debugRender({axes, solverContacts, style, filter})` | full |
 | Tools | tile map and sprite outline colliders | `addTileMap`, `outlineColliders` | full |
 
 ## Lists of what a world holds

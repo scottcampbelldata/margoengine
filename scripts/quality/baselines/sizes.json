@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18394996,
+  "total": 18395817,
   "history": [
     {
       "date": "2026-10-24",
@@ -11721,6 +11721,12 @@
       "commit": "ca2386622",
       "reason": "physics grows from 547,193 B to 548,416 B (+1,223 B): the block solve of a manifold's normal rows (block_normal) in both Wasm blueprints, the SIMD and the scalar one, whose sizes the figure sums; a page loads one",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "af1d54538",
+      "reason": "physics2d entry 19,911 to 20,128 B gzip budget: the debug render's style palette and filter, contactPair, intersectionPair, enabled, maxAngularSpeed and additional mass properties of the earlier landings; each is facade code of the world and body classes",
+      "grew": 1
     }
   ],
   "items": {
@@ -12488,7 +12494,7 @@
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
-    "@margoengine/physics2d": 19911,
+    "@margoengine/physics2d": 20732,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 18567,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,

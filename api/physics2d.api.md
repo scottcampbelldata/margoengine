@@ -286,10 +286,15 @@ export interface ContactPair2D {
     touching: boolean;
 }
 
+export type DebugColour2D = 'fixed' | 'awake' | 'sleeping' | 'kinematic' | 'sensor' | 'joint' | 'contactPoint' | 'contactNormal' | 'box' | 'axisX' | 'axisY' | 'solverPoint' | 'solverNormal';
+
 export interface DebugLines2D {
     vertices: Float32Array;
     colors: Uint8Array;
+    rgba: Float32Array;
 }
+
+export type DebugStyle2D = Partial<Record<DebugColour2D, readonly [number, number, number, number]>>;
 
 export interface Hit2D {
     body: Body2D;
@@ -470,6 +475,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
         joints?: boolean;
         contacts?: boolean;
         boxes?: boolean;
+        axes?: boolean;
+        solverContacts?: boolean;
+        style?: DebugStyle2D;
+        filter?: (body: Body2D) => boolean;
     }): DebugLines2D;
     on<K extends keyof Physics2DEventMap>(type: K, listener: (event: Physics2DEventMap[K]) => void): () => void;
     dispose(): void;
@@ -756,7 +765,7 @@ interface Exports {
     world_set_hooks(world: number, on: number): number;
     world_snapshot(world: number): number;
     world_restore(world: number, bytes: number): number;
-    debug_lines(world: number, what: number): number;
+    debug_lines(world: number, what: number, skipping: number): number;
     shape_create(world: number, body: number, kind: number): number;
     shape_remove(world: number, shape: number): number;
     shape_set(world: number, shape: number): number;

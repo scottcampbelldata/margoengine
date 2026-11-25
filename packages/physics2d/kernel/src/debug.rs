@@ -12,6 +12,10 @@ pub const DEBUG_SHAPES: u32 = 1;
 pub const DEBUG_JOINTS: u32 = 2;
 pub const DEBUG_CONTACTS: u32 = 4;
 pub const DEBUG_BOXES: u32 = 8;
+/// Each body's two axes at its centre of mass.
+pub const DEBUG_AXES: u32 = 16;
+/// The contacts the solver acts on (a sensor's overlap is not one), drawn apart from the touching contacts of `DEBUG_CONTACTS`.
+pub const DEBUG_SOLVER_CONTACTS: u32 = 32;
 pub const DEBUG_ALL: u32 = 15;
 
 /// Colours of a line, by what it draws.
@@ -24,6 +28,12 @@ pub const COLOUR_JOINT: f32 = 5.0;
 pub const COLOUR_CONTACT_POINT: f32 = 6.0;
 pub const COLOUR_CONTACT_NORMAL: f32 = 7.0;
 pub const COLOUR_BOX: f32 = 8.0;
+pub const COLOUR_AXIS_X: f32 = 9.0;
+pub const COLOUR_AXIS_Y: f32 = 10.0;
+pub const COLOUR_SOLVER_POINT: f32 = 11.0;
+pub const COLOUR_SOLVER_NORMAL: f32 = 12.0;
+/// How long a body's axis lines are, metres.
+const AXIS: f32 = 0.5;
 
 const CIRCLE: usize = 24;
 const ARC: usize = 6;
@@ -77,9 +87,15 @@ fn outline(out: &mut Vec<f32>, core: &Core, xf: Xf, colour: f32) {
 impl World {
     /// Segments of five numbers (x1, y1, x2, y2, colour) for what `what` (`DEBUG_*` bits) names.
     pub fn debug_lines(&self, what: u32) -> Vec<f32> {
+        self.debug_lines_without(what, &[])
+    }
+
+    /// The same, leaving out everything of the bodies in `skip`: their shapes, boxes, axes, joints and contacts.
+    pub fn debug_lines_without(&self, what: u32, skip: &[u32]) -> Vec<f32> {
         let mut out = Vec::new();
+        let hidden = |body: u32| skip.contains(&body);
         if what & DEBUG_SHAPES != 0 {
-            for s in self.shapes.iter().filter(|s| !s.dead) {
+            for s in self.shapes.iter().filter(|s| !s.dead && !hidden(s.body)) {
                 let b = &self.bodies[s.body as usize];
                 let colour = if s.sensor {
                     COLOUR_SENSOR
@@ -95,7 +111,7 @@ impl World {
             }
         }
         if what & DEBUG_JOINTS != 0 {
-            for j in &self.joints {
+            for j in self.joints.iter().filter(|j| !hidden(j.def.a) && !hidden(j.def.b)) {
                 let (a, b) = (&self.bodies[j.def.a as usize], &self.bodies[j.def.b as usize]);
                 push(&mut out, a.xf.apply(j.def.anchor_a), b.xf.apply(j.def.anchor_b), COLOUR_JOINT);
             }
@@ -103,7 +119,7 @@ impl World {
         if what & DEBUG_CONTACTS != 0 {
             for c in &self.contacts {
                 let m = &c.manifold;
-                if m.count == 0 {
+                if m.count == 0 || hidden(self.shapes[c.a as usize].body) || hidden(self.shapes[c.b as usize].body) {
                     continue;
                 }
                 let from = self.bodies[self.shapes[c.a as usize].body as usize].exact_center;
@@ -116,8 +132,36 @@ impl World {
                 }
             }
         }
+        if what & DEBUG_SOLVER_CONTACTS != 0 {
+            for c in self.contacts.iter().filter(|c| c.solved) {
+                let m = &c.manifold;
+                if m.count == 0 || hidden(self.shapes[c.a as usize].body) || hidden(self.shapes[c.b as usize].body) {
+                    continue;
+                }
+                let from = self.bodies[self.shapes[c.a as usize].body as usize].exact_center;
+                for p in &m.points[..m.count] {
+                    let at = v2((from[0] + p.point.x as f64) as f32, (from[1] + p.point.y as f64) as f32);
+                    push(&mut out, at.sub(v2(0.05, 0.0)), at.add(v2(0.05, 0.0)), COLOUR_SOLVER_POINT);
+                    push(&mut out, at.sub(v2(0.0, 0.05)), at.add(v2(0.0, 0.05)), COLOUR_SOLVER_POINT);
+                    push(&mut out, at, at.add(m.normal.scale(0.25)), COLOUR_SOLVER_NORMAL);
+                }
+            }
+        }
+        if what & DEBUG_AXES != 0 {
+            for (id, b) in self.bodies.iter().enumerate().filter(|(_, b)| !b.dead) {
+                if hidden(id as u32) {
+                    continue;
+                }
+                let origin = v2(b.exact_center[0] as f32, b.exact_center[1] as f32);
+                push(&mut out, origin, origin.add(b.xf.q.apply(v2(AXIS, 0.0))), COLOUR_AXIS_X);
+                push(&mut out, origin, origin.add(b.xf.q.apply(v2(0.0, AXIS))), COLOUR_AXIS_Y);
+            }
+        }
         if what & DEBUG_BOXES != 0 {
             for id in 0..self.shapes.len() as u32 {
+                if self.shapes[id as usize].dead || hidden(self.shapes[id as usize].body) {
+                    continue;
+                }
                 let Some(f) = self.broad_fat(id) else { continue };
                 let (a, b, c, d) = (v2(f.min[0], f.min[1]), v2(f.max[0], f.min[1]), v2(f.max[0], f.max[1]), v2(f.min[0], f.max[1]));
                 for (p, q) in [(a, b), (b, c), (c, d), (d, a)] {

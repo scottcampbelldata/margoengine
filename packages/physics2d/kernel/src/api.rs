@@ -706,11 +706,14 @@ pub extern "C" fn world_restore(handle: i32, len: u32) -> i32 {
     }
 }
 
-/// Writes the lines to draw (five numbers each: x1, y1, x2, y2, colour; `what` is the `DEBUG_*` bits) and returns how many.
+/// Writes the lines to draw (five numbers each: x1, y1, x2, y2, colour; `what` is the `DEBUG_*` bits, `skipping` how many body
+/// handles the buffer holds to leave out) and returns how many.
 #[unsafe(no_mangle)]
-pub extern "C" fn debug_lines(handle: i32, what: u32) -> i32 {
+pub extern "C" fn debug_lines(handle: i32, what: u32, skipping: u32) -> i32 {
     with_world!(handle, |w| {
-        let lines = w.debug_lines(what);
+        // The first `skipping` words of the buffer are the bodies to leave out.
+        let skip: Vec<u32> = io()[..skipping as usize].to_vec();
+        let lines = w.debug_lines_without(what, &skip);
         ensure(lines.len());
         for (i, v) in lines.iter().enumerate() {
             put(i, *v);
