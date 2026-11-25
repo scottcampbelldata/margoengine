@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18877118,
+  "total": 18879542,
   "history": [
     {
       "date": "2026-10-24",
@@ -12057,6 +12057,12 @@
       "commit": "edad7b6e0",
       "reason": "tonemap Grade tonal ranges (colour curves: hue, density, saturation, exposure per global, shadows, midtones, highlights)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "377e3ee95",
+      "reason": "new scene/helpers entry (drei-style helpers)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12840,7 +12846,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 599864,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87409,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87407,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
@@ -13066,6 +13072,7 @@
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
     "@margoengine/scene/graph": 2254,
+    "@margoengine/scene/helpers": 2426,
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4642,

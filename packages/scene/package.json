@@ -47,6 +47,10 @@
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"
     },
+    "./helpers": {
+      "types": "./dist/helpers.d.ts",
+      "import": "./dist/helpers.js"
+    },
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"

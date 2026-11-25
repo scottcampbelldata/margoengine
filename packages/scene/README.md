@@ -187,3 +187,33 @@ engine.start();
 - `lookAt` turns +Z, the way a glTF model faces. A camera looks down its -Z and aims with `camera.target`.
 - `lookAt` holds under any parent, scaled, mirrored or sheared: the direction goes back through the parent's matrix. At the target itself the mesh keeps its rotation, and looking straight along `up` uses the world axis furthest from it.
 - Under a rotated, unevenly scaled parent the world matrix has shear, which no rotation and scale can hold: `getWorldQuaternion` and `getWorldScale` give the nearest ones, and `worldMatrix` stays exact.
+
+## Helpers: Float, Center, Resize, ScreenSizer, interaction prompt (`@margoengine/scene/helpers`)
+
+The small helpers people know from react-three-drei and model-viewer, as plain functions over meshes.
+`worldBounds(mesh | scene)` is the exact world box of a mesh and its descendants (it reads every vertex once).
+`center(root, { align, target })` moves `root` so that box lands on a point (the middle by default; `{ align: { y: 'min' } }`
+stands it on the target). `resize(root, size, { axis })` scales `root` uniformly so the longest side (or one axis)
+measures `size`. `float(mesh, options)` bobs and tilts a mesh from a time you pass to `update`, a pure function of time.
+`screenSizeScale({ distance, fov, viewportHeight, pixels })` is the scale that makes a unit object span `pixels` on
+screen. `InteractionPrompt` is the timing of a "drag me" hint: `visible` after `threshold` ms without interaction.
+
+```ts
+import type { Mesh } from '@margoengine/core';
+import { InteractionPrompt, center, float, resize, screenSizeScale } from '@margoengine/scene/helpers';
+
+declare const model: Mesh;
+declare const marker: Mesh;
+
+resize(model, 2); // longest side is now 2 world units
+center(model, { align: { y: 'min' } }); // centred on x and z, standing on y = 0
+const bob = float(model, { floatIntensity: 2 });
+const prompt = new InteractionPrompt({ threshold: 2500 });
+
+function frame(seconds: number, distance: number): void {
+  bob.update(seconds);
+  marker.scale.setAll(screenSizeScale({ distance, fov: Math.PI / 3, viewportHeight: 720, pixels: 48 }));
+  prompt.update(seconds * 1000); // show your hint while prompt.visible; call prompt.interact(ms) on pointerdown
+}
+frame(0, 10);
+```

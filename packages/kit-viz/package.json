@@ -1571,6 +1571,10 @@
       "types": "./dist/scene/mesh.d.ts",
       "import": "./dist/scene/mesh.js"
     },
+    "./scene/helpers": {
+      "types": "./dist/scene/helpers.d.ts",
+      "import": "./dist/scene/helpers.js"
+    },
     "./scene/graph": {
       "types": "./dist/scene/graph.d.ts",
       "import": "./dist/scene/graph.js"
