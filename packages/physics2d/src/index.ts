@@ -1,6 +1,7 @@
 export { Physics2D } from './physics.js';
 export type {
   Physics2DOptions,
+  Physics2DSolverOptions,
   Physics2DLoadOptions,
   KernelWasmSource,
   ContactForceEvent2D,

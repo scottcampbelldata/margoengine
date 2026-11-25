@@ -1,5 +1,5 @@
 {
-  "commit": "0deff1fc7",
+  "commit": "2b8e628cc",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -13410,8 +13410,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 57239,
-        "gzip": 19331
+        "raw": 58296,
+        "gzip": 19697
       },
       "./outline": {
         "raw": 4782,
@@ -16886,14 +16886,14 @@
       "brotli": 5202
     },
     "packages/physics2d/dist/physics2d.wasm": {
-      "raw": 411838,
-      "gzip": 148872,
-      "brotli": 118808
+      "raw": 413163,
+      "gzip": 149260,
+      "brotli": 118850
     },
     "packages/physics2d/dist/physics2d-scalar.wasm": {
-      "raw": 491572,
-      "gzip": 166324,
-      "brotli": 130051
+      "raw": 492915,
+      "gzip": 166767,
+      "brotli": 130324
     },
     "packages/ifc/dist/workers/ifc.js": {
       "raw": 9078,
@@ -17069,13 +17069,13 @@
     "@margoengine/physics2d": {
       "entry": ".",
       "base": {
-        "raw": 52975,
-        "gzip": 17665
+        "raw": 54031,
+        "gzip": 18026
       },
       "lazy": {
         "name": "2D physics kernel loader JavaScript",
-        "raw": 4263,
-        "gzip": 1976,
+        "raw": 4264,
+        "gzip": 1977,
         "loadedBy": "`await Physics2D.load()`, once per app (import() in physics.ts); its Wasm, physics2d.wasm, is a file of its own"
       }
     }

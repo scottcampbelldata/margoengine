@@ -112,6 +112,24 @@ earth.dispose();
 moon.dispose();
 ```
 
+## Solver settings
+
+`physics.setSolver(options)` changes the solver and `physics.solver` reads it, with the names the 3D world uses: `substeps` a step (default 4), `iterations` (pushing passes a substep, each followed by as many relaxing ones, default 1), the contact spring `contactHertz` and `contactDamping`, `contactMaxPush` (the fastest a depth is pushed out), `restitutionThreshold` (under this approach speed a contact does not bounce), `sleepThreshold` and `sleepTime` with `canSleep`, `blockSolver` (Rapier's block solver: the two points of a contact solved together as one 2 by 2 problem, on by default; off, one point at a time), and the joint spring `jointHertz`, `jointDamping`, `jointMaxPush` with `jointGeometricStiffness`. Speeds are in world units a second. A name left out keeps its value, and a refused one (a count that is not a whole number from 1 to 65535, a negative or non-finite number) throws a `RangeError` and changes nothing. The settings are part of a snapshot.
+
+```ts
+import {Physics2D} from 'margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null);
+physics.addBody(null, {type: 'fixed', position: [0, 100], colliders: {shape: 'box', width: 1000, height: 20}});
+physics.addBody(null, {position: [0, 80], colliders: {shape: 'box', width: 20, height: 20}});
+physics.setSolver({substeps: 8, blockSolver: false});
+for (let i = 0; i < 30; i++) physics.step();
+const {substeps, blockSolver} = physics.solver;
+console.log(substeps, blockSolver, physics.counts.blockSolves); // 8 false 0
+physics.dispose();
+```
+
 ## What a step did and how long it took
 
 `physics.counts` reads the work the last step did as whole numbers that do not depend on the machine: `awake` bodies, `islands` (groups of dynamic bodies with an awake body in them; a fixed body is no island and a sleeping group is no work), `boxesCompared`, `pairs`, `manifolds`, `coldPoints` (manifold points that found no point in the last manifold and start with no impulse), `contactsSolved`, `blockSolves` and `sequentialSolves` (two-point contacts solved together or one point at a time), `colours` and `uncoloured`, `treeJoints`, `events` and `steps`. `physics.timing` reads how long the phases took in milliseconds, Rapier's `timingStep` and its siblings: `step` is the whole of it, then `begin`, `broad`, `narrow`, `islands`, `solver`, `ccd` and `events`, which add up to it; `assembly`, `resolution`, `update` and `writeback` split `solver` and `ccdBroad`, `ccdToi` and `ccdSolver` split `ccd`, as sums over the substeps and the bodies. Everything reads zero before the first step. The clock is not part of the world: a snapshot and the replay hash leave timings out, and two worlds built the same way give the same counts.

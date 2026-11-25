@@ -423,6 +423,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
         events: number;
         steps: number;
     };
+    get solver(): Required<Physics2DSolverOptions>;
+    setSolver(options: Physics2DSolverOptions): this;
     getBodies(): Body2D[];
     getColliders(): Collider2D[];
     get colliderCount(): number;
@@ -499,6 +501,23 @@ export interface Physics2DOptions {
     timeScale?: number;
     paused?: boolean;
     name?: string;
+}
+
+export interface Physics2DSolverOptions {
+    substeps?: number;
+    iterations?: number;
+    contactHertz?: number;
+    contactDamping?: number;
+    contactMaxPush?: number;
+    restitutionThreshold?: number;
+    sleepThreshold?: number;
+    sleepTime?: number;
+    canSleep?: boolean;
+    blockSolver?: boolean;
+    jointHertz?: number;
+    jointDamping?: number;
+    jointMaxPush?: number;
+    jointGeometricStiffness?: boolean;
 }
 
 export class PidController2D {
@@ -701,6 +720,8 @@ interface Exports {
     world_step(world: number, dt: number): number;
     world_timing(world: number, phase: number): number;
     world_counts(world: number): number;
+    world_set_setting(world: number, which: number, value: number): number;
+    world_settings(world: number): number;
     body_create(world: number, kind: number, flags: number): number;
     body_remove(world: number, body: number): number;
     body_read(world: number, body: number): number;

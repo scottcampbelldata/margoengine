@@ -210,6 +210,52 @@ const solver = new SharedLoad<Kernel, { wasm?: KernelWasmSource; simd?: boolean 
 
 const BODY_KIND: Record<BodyType2D, number> = { dynamic: 0, fixed: 1, kinematicPosition: 2, kinematicVelocity: 2 };
 
+/** The solver settings in the order the kernel numbers them, and how each is checked and carried: a count, a flag, a speed in world units a second or any other amount. */
+const SOLVER_SETTINGS = [
+  ['substeps', 'count'],
+  ['iterations', 'count'],
+  ['contactHertz', 'amount'],
+  ['contactDamping', 'amount'],
+  ['contactMaxPush', 'speed'],
+  ['restitutionThreshold', 'speed'],
+  ['sleepThreshold', 'speed'],
+  ['sleepTime', 'amount'],
+  ['canSleep', 'flag'],
+  ['blockSolver', 'flag'],
+  ['jointHertz', 'amount'],
+  ['jointDamping', 'amount'],
+  ['jointMaxPush', 'speed'],
+  ['jointGeometricStiffness', 'flag'],
+] as const;
+
+/** The settings of the solver that {@link Physics2D.setSolver} changes. */
+export interface Physics2DSolverOptions {
+  /** Substeps a step (default 4). */
+  substeps?: number;
+  /** Pushing passes in a substep, each followed by as many relaxing ones (default 1). */
+  iterations?: number;
+  /** The contact spring's frequency in hertz, held to a quarter of the substep rate, and its damping ratio. */
+  contactHertz?: number;
+  contactDamping?: number;
+  /** How fast a depth is pushed out at most, in world units a second. */
+  contactMaxPush?: number;
+  /** Under this approach speed, in world units a second, a contact does not bounce. */
+  restitutionThreshold?: number;
+  /** A body slower than this, in world units a second, for `sleepTime` seconds may sleep with its island. */
+  sleepThreshold?: number;
+  sleepTime?: number;
+  /** Whether bodies may sleep at all (default true). */
+  canSleep?: boolean;
+  /** Two-point manifolds solved as one 2 by 2 problem, Rapier's block solver (default true); off, one point at a time. */
+  blockSolver?: boolean;
+  /** The joint spring's frequency, damping ratio and the fastest a joint's error is pulled out, in world units a second. */
+  jointHertz?: number;
+  jointDamping?: number;
+  jointMaxPush?: number;
+  /** Joints solve with each body's turning stiffened by the pull of its taut point joints (default true); off, the plain inertia. */
+  jointGeometricStiffness?: boolean;
+}
+
 /**
  * 2D rigid-body physics on Margo's own 2D kernel as a Margo Engine plugin. Steps a fixed timestep with an accumulator
  * and writes interpolated poses to sprites. Y is down, like sprites; angles are radians, clockwise on screen.
@@ -414,6 +460,52 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       events: read[12],
       steps: read[13],
     };
+  }
+  /**
+   * The solver's settings, with the names `Physics.setSolver` has in 3D: `substeps` a step, `iterations` (pushing passes,
+   * each followed by as many relaxing ones) a substep, the contact spring `contactHertz` and `contactDamping`, how fast a depth is
+   * pushed out at most (`contactMaxPush`), the approach speed under which a contact does not bounce (`restitutionThreshold`), the
+   * speed and time under which a body may sleep (`sleepThreshold`, `sleepTime`) and whether it may (`canSleep`), `blockSolver`,
+   * the joint spring (`jointHertz`, `jointDamping`, `jointMaxPush`) and `jointGeometricStiffness`. Speeds are in world units a
+   * second. Defaults are what a new world reads.
+   */
+  get solver(): Required<Physics2DSolverOptions> {
+    this.live();
+    const { kernel } = this;
+    const read = kernel.io(kernel.ok(kernel.exports.world_settings(this.handle))).f;
+    const out: Record<string, number | boolean> = {};
+    SOLVER_SETTINGS.forEach(([name, kind], at) => {
+      out[name] = kind === 'flag' ? read[at] !== 0 : kind === 'speed' ? read[at]! / this.scale : read[at]!;
+    });
+    return out as Required<Physics2DSolverOptions>;
+  }
+  /**
+   * Changes the solver's settings; a name left out keeps its value, and nothing changes when one is refused.
+   * @throws RangeError for a count that is not a whole number from 1 to 65535, or a number that is negative or not finite.
+   */
+  setSolver(options: Physics2DSolverOptions): this {
+    this.live();
+    const { kernel } = this;
+    for (const [name, kind] of SOLVER_SETTINGS) {
+      const value = options[name] as number | undefined;
+      if (kind === 'flag' || value === undefined) continue;
+      if (
+        kind === 'count'
+          ? !(Number.isInteger(value) && value >= 1 && value <= 65535)
+          : !(value >= 0 && value < Infinity)
+      )
+        throw new RangeError(
+          `Solver ${name} must be ${kind === 'count' ? 'a whole number from 1 to 65535' : 'a finite number of 0 or more'}; got ${value}. Give ${kind === 'count' ? 'a count such as 4' : '0 for none'}.`,
+        );
+    }
+    SOLVER_SETTINGS.forEach(([name, kind], at) => {
+      const value = options[name];
+      if (value !== undefined)
+        kernel.ok(
+          kernel.exports.world_set_setting(this.handle, at, Number(value) * (kind === 'speed' ? this.scale : 1)),
+        );
+    });
+    return this;
   }
   /** Every body in the world, in the order they were added. */
   getBodies(): Body2D[] {
