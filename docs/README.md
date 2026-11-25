@@ -10,6 +10,8 @@ Draco/Meshopt support in glTF PBR and synchronous parsing behavior. The core and
 [entry measurements](../examples/package-benchmarks/results/entry-sizes.json) list every package entry, and the measured size of a React page is in
 [limits](limits.md).
 
+What Margo still lacks against the rival engines is listed in [Rival parity gaps](rival-parity-gaps.md).
+
 Margo is written clean room: the rule, the process and the source of every lighting and post-processing formula
 are in [clean-room.md](clean-room.md).
 
