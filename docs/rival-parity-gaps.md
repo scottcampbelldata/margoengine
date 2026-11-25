@@ -60,13 +60,13 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
 | Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | DONE (scene save and load already existed: `save/src/engine.ts`) | M | f19d13852 |
-| Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | DONE (`setMaterialSortModes`: per engine, opaque and transparent material meshes) | S | HASH |
+| Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | DONE (`setMaterialSortModes`: per engine, opaque and transparent material meshes) | S | 8aaf6a290 |
 | Blob shadow and planar `ShadowMesh` | three.js, drei | MISSING | S |  |
 | drei helpers: Float, Center, Resize, ScreenSizer, interaction prompt | drei, model-viewer | MISSING | S each |  |
 | Font formats: WOFF and WOFF2, CFF `.otf`, GPOS kerning | three.js TextGeometry, troika | DONE | M | d2f0084e2 |
-| Configurable `loadTexture` caps (fixed at 16.7 MP and 64 MiB) | three.js | DONE (`maxBytes`, `maxPixels`) | S | HASH |
+| Configurable `loadTexture` caps (fixed at 16.7 MP and 64 MiB) | three.js | DONE (`maxBytes`, `maxPixels`; cube maps and restore take them too, cd259602f, e1c8eff03) | S | 8aaf6a290 |
 | 3MF textures, texture `center` on the texture, live metaball object | three.js | LIMIT | S each |  |
-| Webcam / MediaStream texture outside React | three.js | VERIFY | S |  |
+| Webcam / MediaStream texture outside React | three.js | EXISTS: `new Texture(video)` takes any HTMLVideoElement (`packages/materials/src/built-material.ts`, live upload per frame), and `prepareVideo` accepts a video whose `srcObject` is a getUserMedia stream (`packages/video/src/playback.ts`); no React needed | S |  |
 | Stale docs: cloth, caustics and the mesh path tracer still marked NOT PLANNED in [threejs-parity.md](threejs-parity.md); its MISSING 0 count; the "Not yet" section of [from-threejs.md](from-threejs.md) | — | DONE | S | 1525aff1e |
 
 ## Lane D: tools, runtime and interaction
