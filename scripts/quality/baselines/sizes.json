@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18885422,
+  "total": 18885832,
   "history": [
     {
       "date": "2026-10-24",
@@ -12093,6 +12093,12 @@
       "commit": "938a9433ef",
       "reason": "new entry @margoengine/video/frames (GAP-FILM-VIDEOTEX): recorded RGBA frames in a materials Texture by film time",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "106a28c6d",
+      "reason": "UV transform centre (materials root) and Metaballs (procedural marching-cubes entry)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12962,7 +12968,7 @@
     "@margoengine/procedural/gears": 2188,
     "@margoengine/procedural/harbour": 8604,
     "@margoengine/procedural/lsystem": 2454,
-    "@margoengine/procedural/marching-cubes": 3256,
+    "@margoengine/procedural/marching-cubes": 3666,
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/poisson": 1525,
     "@margoengine/procedural/sdf": 2112,

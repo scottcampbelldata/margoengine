@@ -486,3 +486,89 @@ function extract(
     weights: weights.subarray(0, count),
   };
 }
+
+/** One ball of a {@link Metaballs} surface. */
+export interface Metaball {
+  /** World position of the centre. */
+  position: [number, number, number];
+  /** Pull of the ball; negative carves the surface away (default 1). */
+  strength: number;
+  /** Distance past which the ball has no effect (default 0.5). */
+  radius: number;
+}
+/** Options of {@link Metaballs}. */
+export interface MetaballsOptions extends Omit<MarchingCubesOptions, 'level'> {
+  /** The summed pull at which the surface sits (default 0.5). */
+  threshold?: number;
+}
+/** A ball's pull at squared distance `d2`: the finite-support cubic (1 - d^2/r^2)^3 of Wyvill, McPheeters and Wyvill (1986), 1 at the centre and exactly 0 at the radius. */
+const influence = (d2: number, r2: number): number => (d2 >= r2 ? 0 : (1 - d2 / r2) ** 3);
+/**
+ * A live metaball surface, the object three.js's marching-cubes example builds by hand: add, move and remove balls, then
+ * call `geometry()` to polygonize the current sum. Each ball's pull is a smooth cubic that is exactly zero past its
+ * `radius`, so distant balls never merge and the sum costs only the balls near each grid point; a negative `strength`
+ * subtracts. The surface is where the summed pull equals `threshold`.
+ * @example
+ * const blobs = new Metaballs({ resolution: [40, 40, 40], bounds: [[-2, -2, -2], [2, 2, 2]] });
+ * const a = blobs.add([-0.4, 0, 0], { radius: 0.9 });
+ * blobs.add([0.4, 0, 0], { radius: 0.9 });
+ * a.position[0] += 0.1; // balls are plain objects you edit between calls
+ * const geometry = blobs.geometry(); // Geometry | null (null when no surface)
+ */
+export class Metaballs {
+  /** The balls, edited in place or through `add` and `remove`. */
+  readonly balls: Metaball[] = [];
+  readonly options: MetaballsOptions;
+  constructor(options: MetaballsOptions = {}) {
+    const threshold = options.threshold ?? 0.5;
+    if (!Number.isFinite(threshold) || threshold <= 0)
+      throw new RangeError(
+        'Metaballs threshold must be a positive finite number; pass the summed pull of the surface.',
+      );
+    this.options = { ...options, threshold };
+  }
+  /** Adds a ball and returns it, so its fields can be edited later. */
+  add(
+    position: readonly [number, number, number],
+    { strength = 1, radius = 0.5 }: { strength?: number; radius?: number } = {},
+  ): Metaball {
+    if (
+      position.length !== 3 ||
+      !position.every(Number.isFinite) ||
+      !Number.isFinite(strength) ||
+      !(radius > 0) ||
+      !Number.isFinite(radius)
+    )
+      throw new RangeError('Metaball needs a finite [x, y, z], a finite strength and a positive finite radius.');
+    const ball: Metaball = { position: [position[0], position[1], position[2]], strength, radius };
+    this.balls.push(ball);
+    return ball;
+  }
+  /** Removes a ball; true when it was there. */
+  remove(ball: Metaball): boolean {
+    const at = this.balls.indexOf(ball);
+    if (at >= 0) this.balls.splice(at, 1);
+    return at >= 0;
+  }
+  /** The summed pull at a point. */
+  sample(x: number, y: number, z: number): number {
+    let sum = 0;
+    for (const { position, strength, radius } of this.balls) {
+      const dx = x - position[0],
+        dy = y - position[1],
+        dz = z - position[2];
+      sum += strength * influence(dx * dx + dy * dy + dz * dz, radius * radius);
+    }
+    return sum;
+  }
+  /** Polygonizes the surface of the balls as they are now: a new Geometry, or null when nothing crosses the threshold. */
+  geometry(): Geometry | null {
+    const { threshold, ...rest } = this.options;
+    for (const { position, strength, radius } of this.balls)
+      if (!position.every(Number.isFinite) || !Number.isFinite(strength) || !(radius > 0) || !Number.isFinite(radius))
+        throw new RangeError(
+          'Metaball needs a finite [x, y, z], a finite strength and a positive finite radius; fix the ball you edited.',
+        );
+    return marchingCubes((x, y, z) => (threshold as number) - this.sample(x, y, z), rest);
+  }
+}

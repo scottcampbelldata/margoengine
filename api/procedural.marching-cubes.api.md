@@ -13,5 +13,28 @@ export interface MarchingCubesOptions {
     level?: number;
 }
 
+export interface Metaball {
+    position: [number, number, number];
+    strength: number;
+    radius: number;
+}
+
+export class Metaballs {
+    readonly balls: Metaball[];
+    readonly options: MetaballsOptions;
+    constructor(options?: MetaballsOptions);
+    add(position: readonly [number, number, number], { strength, radius }?: {
+        strength?: number;
+        radius?: number;
+    }): Metaball;
+    remove(ball: Metaball): boolean;
+    sample(x: number, y: number, z: number): number;
+    geometry(): Geometry | null;
+}
+
+export interface MetaballsOptions extends Omit<MarchingCubesOptions, 'level'> {
+    threshold?: number;
+}
+
 export function marchingCubes(field: DensityField | ArrayLike<number>, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 ```

@@ -340,7 +340,7 @@ class Material {
     set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
-    setUVTransform(t: TextureTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
+    setUVTransform(transformWithCenter: MaterialUVTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
     get customState(): boolean;
     clone(): this;
     copy(source: Material): this;
@@ -453,8 +453,12 @@ interface MaterialOptions extends PhysicalOptions {
     stencilFail?: GPUStencilOperation;
     stencilZFail?: GPUStencilOperation;
     stencilZPass?: GPUStencilOperation;
-    uvTransform?: TextureTransform;
+    uvTransform?: MaterialUVTransform;
 }
+
+type MaterialUVTransform = TextureTransform & {
+    center?: readonly [number, number];
+};
 
 type ParallaxMode = 'offset' | 'occlusion' | 'relief';
 

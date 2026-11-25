@@ -34,7 +34,14 @@ export {
 } from './cabin.js';
 export { generateWindowPane, type Glazing, type WindowPane, type WindowPaneOptions } from './glazing.js';
 export { createHumanoid, poseHumanoid } from './humanoid.js';
-export { marchingCubes, type DensityField, type MarchingCubesOptions } from './marching-cubes.js';
+export {
+  marchingCubes,
+  Metaballs,
+  type DensityField,
+  type MarchingCubesOptions,
+  type Metaball,
+  type MetaballsOptions,
+} from './marching-cubes.js';
 /** Seeded coastal island preset; returns an allocation-free world-height sampler. */
 export function createIslandHeight(seed = 731): (x: number, z: number) => number {
   const noise = new Noise(seed);

@@ -463,6 +463,20 @@ const shadow = createPlanarShadow(engine, boxGeometry(1, 1, 1), {
 shadow.update(new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.5, 0, 1]));
 ```
 
+### UV transform centre
+
+`uvTransform` (and `setUVTransform`) take an optional `center`, the UV point that rotation and scale turn around, as
+three.js's `Texture.center` (default [0, 0]). It folds into the offset, so the mapping is still a plain
+`KHR_texture_transform` and `exportModel` writes it unchanged.
+
+```ts
+import { Material } from '@margoengine/materials';
+
+// Spin a map a quarter turn about the middle of the image.
+const spun = new Material({ uvTransform: { rotation: Math.PI / 2, center: [0.5, 0.5] } });
+spun.setUVTransform({ rotation: 0.3, scale: [2, 2], center: [0.5, 0.5] }, 'map');
+```
+
 ### Texture download caps
 
 `loadTexture(url, { maxBytes, maxPixels })` raises or lowers the two caps: 64 MiB downloaded (default

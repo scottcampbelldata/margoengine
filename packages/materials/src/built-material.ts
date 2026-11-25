@@ -59,6 +59,23 @@ import {
   sectionShader,
 } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf/pbr';
+/** A `KHR_texture_transform` (offset, rotation, scale, texCoord) with an optional `center`: the UV point the rotation and scale turn around, as three.js's `Texture.center` (default [0, 0]). */
+export type MaterialUVTransform = TextureTransform & { center?: readonly [number, number] };
+/** The same mapping without `center`: the pivot folds into the offset, since uv' = offset + R S (uv - c) + c = (offset + c - R S c) + R S uv. */
+function foldCenter(t: MaterialUVTransform | null): TextureTransform | null {
+  if (!t || t.center === undefined) return t;
+  const { center, ...rest } = t;
+  if (!Array.isArray(center) || center.length !== 2 || !center.every(Number.isFinite))
+    throw new TypeError('UV transform center must be two finite numbers; pass [u, v]');
+  const [cx, cy] = center,
+    [ox, oy] = rest.offset ?? [0, 0],
+    [sx, sy] = rest.scale ?? [1, 1],
+    r = rest.rotation ?? 0,
+    cos = Math.cos(r),
+    sin = Math.sin(r);
+  if (!Number.isFinite(r) || ![ox, oy, sx, sy].every(Number.isFinite)) return rest; // the usual validation reports it
+  return { ...rest, offset: [ox + cx - (cos * sx * cx + sin * sy * cy), oy + cy - (-sin * sx * cx + cos * sy * cy)] };
+}
 export {
   packAtlas,
   padTileGrid,
@@ -1655,7 +1672,7 @@ export interface MaterialOptions extends PhysicalOptions {
   stencilZFail?: GPUStencilOperation;
   stencilZPass?: GPUStencilOperation;
   /** UV offset/scale/rotation for every map but `matcap` (KHR_texture_transform semantics), e.g. an atlas region. */
-  uvTransform?: TextureTransform;
+  uvTransform?: MaterialUVTransform;
 }
 /** Every map slot of a material, in the order its physical maps are numbered. */
 export const mapSlots = [
@@ -3659,10 +3676,11 @@ export class Material {
    * UV set); null restores the identity (UV1 for `lightMap`, unless the transform names a `texCoord`).
    */
   setUVTransform(
-    t: TextureTransform | null,
+    transformWithCenter: MaterialUVTransform | null,
     slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number],
   ): this {
-    const f = featureMaps.indexOf(slot as (typeof featureMaps)[number]),
+    const t = foldCenter(transformWithCenter),
+      f = featureMaps.indexOf(slot as (typeof featureMaps)[number]),
       g = surfaceMaps.indexOf(slot as (typeof surfaceMaps)[number]),
       i = slot === undefined || f >= 0 || g >= 0 ? -1 : mapSlots.indexOf(slot as MapSlot);
     if (slot !== undefined && f < 0 && g < 0 && i < 0)

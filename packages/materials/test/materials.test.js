@@ -565,6 +565,27 @@ test('loadCubeTexture applies maxPixels to every face and one maxBytes budget to
   }
 });
 
+test('uvTransform center turns and scales around a UV point, as three.js Texture.center', async () => {
+  const { textureTransform } = await import('../../gltf/dist/pbr.js');
+  const near = (a, b) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-6, `${a} vs ${b}`));
+  // A quarter turn about (0.5, 0.5): the same mapping as a quarter turn with offset (0, 1).
+  const m = new Material({ uvTransform: { rotation: Math.PI / 2, center: [0.5, 0.5] } });
+  near(m.uvt.slice(32), textureTransform({ rotation: Math.PI / 2, offset: [0, 1] }));
+  // The centre maps to itself under rotation and scale: (offset' + R S c) = c for offset 0.
+  const s = new Material();
+  s.setUVTransform({ rotation: 0.7, scale: [2, 3], center: [0.25, 0.75] });
+  const rows = s.uvt.slice(32, 40);
+  const probe = (u, v) => [rows[0] * u + rows[1] * v + rows[2], rows[4] * u + rows[5] * v + rows[6]];
+  near(probe(0.25, 0.75), [0.25, 0.75]);
+  // No centre, or the origin, changes nothing.
+  assert.deepStrictEqual(
+    new Material({ uvTransform: { center: [0, 0], scale: [2, 2] } }).uvt.slice(32),
+    textureTransform({ scale: [2, 2] }),
+  );
+  assert.throws(() => new Material({ uvTransform: { center: [0.5] } }), /center/);
+  assert.throws(() => new Material({ uvTransform: { center: [0, Number.NaN] } }), /center/);
+});
+
 test('uvTransform follows KHR_texture_transform, defaults to gltf/pbr identity rows bit for bit and stays live per slot', async () => {
   const { textureTransform } = await import('../../gltf/dist/pbr.js');
   const plain = new Material(),

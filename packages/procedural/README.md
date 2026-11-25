@@ -218,6 +218,23 @@ const noise = new Noise(123);
 const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,32]});
 ```
 
+### Metaballs
+
+`Metaballs` is the live metaball object: add, move and remove balls, then call `geometry()` for the current surface.
+Each ball pulls with the finite-support cubic of Wyvill, McPheeters and Wyvill (1986), exactly zero past its `radius`; a
+negative `strength` carves. The surface sits where the summed pull equals `threshold` (default 0.5); the polygonizer is
+`marchingCubes` below.
+
+```ts
+import {Metaballs} from 'margoengine/procedural';
+
+const blobs = new Metaballs({resolution: [40, 40, 40], bounds: [[-2, -2, -2], [2, 2, 2]]});
+const a = blobs.add([-0.4, 0, 0], {radius: 0.9});
+blobs.add([0.4, 0, 0], {radius: 0.9});
+a.position[0] += 0.1; // balls are plain objects you edit between calls
+const geometry = blobs.geometry(); // Geometry | null
+```
+
 Surface extraction is the package's own Marching Cubes (Lorensen and Cline 1987; it replaced the `isosurface` dependency, and since 2026-11-16 the earlier marching tetrahedra): vertices lie on the grid's own axis edges, and each cube's polygons are traced on its faces, where a face whose corners alternate inside and outside is split by the asymptotic decider (Nielson and Hamann 1991), so both cubes on a face agree (the paper's own test: the corners below the level join when the saddle value lies below it, and a saddle value exactly at the level joins the upper pair) and the indexed mesh is closed wherever the surface stays inside the grid. With a density function each vertex is the function's own root on its edge (an Illinois regula falsi, Dowell and Jarratt 1971), so it lies on the exact surface to float32 precision; with a grid it is linear between the two samples. Tetrahedra put vertices on face and body diagonals too, up to 1.73 cells long, where linear interpolation of a curved field strays furthest: a 1 / d^2 metaball came out 1.229 times its radius at resolution 28, against 1.073 on cube edges and exact with the function. Negative density is inside; gradient normals and triangle winding face outward. A surface through a grid point (a sample at the level, or within float32 precision of it) gets one vertex on that point, shared by every edge from it, with no zero-area triangles (the corner snapping of Treece, Prager and Gee's regularised marching tetrahedra, 1998). Body ambiguities (Chernyaev 1995, Marching Cubes 33) are not resolved: a cube whose inside corners meet only through its interior gets the separated polygons. Empty surfaces return null. Resolution is 3..128 on each axis, with a bounded output geometry. Worley searches a sufficient five-cell neighborhood per axis for F1. Sampling/extraction are CPU work, not frame-time GPU voxel meshing.
 
 For a surface that changes every frame (metaballs, sculpting), pass the samples instead of a function: a grid of

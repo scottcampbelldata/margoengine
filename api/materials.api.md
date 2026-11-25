@@ -430,7 +430,7 @@ export class Material {
     set side(v: MaterialSide);
     get doubleSided(): boolean;
     set doubleSided(v: boolean);
-    setUVTransform(t: TextureTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
+    setUVTransform(transformWithCenter: MaterialUVTransform | null, slot?: MapSlot | (typeof featureMaps)[number] | (typeof surfaceMaps)[number]): this;
     get customState(): boolean;
     clone(): this;
     copy(source: Material): this;
@@ -585,7 +585,7 @@ export interface MaterialOptions extends PhysicalOptions {
     stencilFail?: GPUStencilOperation;
     stencilZFail?: GPUStencilOperation;
     stencilZPass?: GPUStencilOperation;
-    uvTransform?: TextureTransform;
+    uvTransform?: MaterialUVTransform;
 }
 
 export { MaterialSide } from "@margoengine/gltf";
@@ -596,6 +596,10 @@ export interface MaterialSortModes {
     opaque?: MaterialSortMode;
     transparent?: MaterialSortMode;
 }
+
+export type MaterialUVTransform = TextureTransform & {
+    center?: readonly [number, number];
+};
 
 export interface MeshGeometry {
     positions: ArrayLike<number>;
