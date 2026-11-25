@@ -81,6 +81,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Geospatial camera with terrain collision and geo maths | Babylon | DONE | M | 56d8616c4 (WGS84/ECEF/ENU EXISTS: packages/tiles/src/wgs84.ts, now backed by math/geo) |
 | Gaussian splat part visibility and compound mode, interactive splat editing | Babylon, PlayCanvas | PARTIAL | M to L |  |
 | Voice chat and screen share over the netcode WebRTC transport | Needle | DONE | M | 8092aaee6 |
+| WebGL2 layer: voxel and mesh path tracers on ANGLE D3D11 (Safari, Firefox, phones and the integrated-GPU frame budget recorded as not yet measured in [limits.md](limits.md)) | three.js WebGLRenderer, Babylon WebGL2 | DONE | L | 508b6c1cc (warm draw restored), 7144a4fc0 (no synchronous query behind a warm compile); `test:gpu:d3d11` and `test:gpu:mesh-pbr` pass on an Intel Arc 140V, Chrome 157. The serial draw-time fxc compile left is ANGLE's (KB-L5a-10) |
 
 ### Geospatial camera: best in open source
 
@@ -104,7 +105,6 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Gap | Why it waits | Size |
 | --- | --- | --- |
 | WebXR VR and AR, XR passes, controller poses, XR layers | Being built by lane B without a device (Scott, 2026-11-25: "Anything that's waiting on hardware, just build it, push it to main, and assume that it works") | M |
-| WebGL2 layer: path tracers cannot finish on ANGLE D3D11, no integrated-GPU frame budget, Safari, Firefox and phones unmeasured | The ANGLE fix is lane D's (reproducible on this laptop); the other machines are recorded as not yet measured | L |
 | Deferred shading, voxel cone-traced GI | NOT PLANNED by decision; clustered forward and probes plus SSGI instead | XL |
 
 The visual scene editor, several canvases on one device and the visual flow-graph editor are in
