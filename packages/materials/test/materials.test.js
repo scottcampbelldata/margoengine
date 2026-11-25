@@ -565,7 +565,7 @@ test('loadCubeTexture applies maxPixels to every face and one maxBytes budget to
   }
 });
 
-test('uvTransform center turns and scales around a UV point, as three.js Texture.center', async () => {
+test('uvTransform center turns and scales around a UV point (the texture centre pivot)', async () => {
   const { textureTransform } = await import('../../gltf/dist/pbr.js');
   const near = (a, b) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-6, `${a} vs ${b}`));
   // A quarter turn about (0.5, 0.5): the same mapping as a quarter turn with offset (0, 1).

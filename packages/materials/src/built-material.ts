@@ -59,7 +59,7 @@ import {
   sectionShader,
 } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf/pbr';
-/** A `KHR_texture_transform` (offset, rotation, scale, texCoord) with an optional `center`: the UV point the rotation and scale turn around, as three.js's `Texture.center` (default [0, 0]). */
+/** A `KHR_texture_transform` (offset, rotation, scale, texCoord) with an optional `center`: the UV point the rotation and scale turn around, the usual texture centre pivot (default [0, 0]). */
 export type MaterialUVTransform = TextureTransform & { center?: readonly [number, number] };
 /** The same mapping without `center`: the pivot folds into the offset, since uv' = offset + R S (uv - c) + c = (offset + c - R S c) + R S uv. */
 function foldCenter(t: MaterialUVTransform | null): TextureTransform | null {

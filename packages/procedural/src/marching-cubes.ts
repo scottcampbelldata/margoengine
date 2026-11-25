@@ -504,7 +504,7 @@ export interface MetaballsOptions extends Omit<MarchingCubesOptions, 'level'> {
 /** A ball's pull at squared distance `d2`: the finite-support cubic (1 - d^2/r^2)^3 of Wyvill, McPheeters and Wyvill (1986), 1 at the centre and exactly 0 at the radius. */
 const influence = (d2: number, r2: number): number => (d2 >= r2 ? 0 : (1 - d2 / r2) ** 3);
 /**
- * A live metaball surface, the object three.js's marching-cubes example builds by hand: add, move and remove balls, then
+ * A live metaball surface (Wyvill, McPheeters and Wyvill 1986, "soft objects"): add, move and remove balls, then
  * call `geometry()` to polygonize the current sum. Each ball's pull is a smooth cubic that is exactly zero past its
  * `radius`, so distant balls never merge and the sum costs only the balls near each grid point; a negative `strength`
  * subtracts. The surface is where the summed pull equals `threshold`.

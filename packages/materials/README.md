@@ -480,8 +480,8 @@ shadow.update(new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.5, 0, 1
 
 ### UV transform centre
 
-`uvTransform` (and `setUVTransform`) take an optional `center`, the UV point that rotation and scale turn around, as
-three.js's `Texture.center` (default [0, 0]). It folds into the offset, so the mapping is still a plain
+`uvTransform` (and `setUVTransform`) take an optional `center`, the UV point that rotation and scale turn around, the
+texture centre pivot of DCC tools and web engines (default [0, 0]). It folds into the offset, so the mapping is still a plain
 `KHR_texture_transform` and `exportModel` writes it unchanged.
 
 ```ts
