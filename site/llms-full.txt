@@ -11989,6 +11989,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
   `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
 
+### Open 2026-11-25: a long test file ends with no result in its package run (KB-TEST-FILEEXIT1, humans, water, test runner)
+
+- **Repro:** `npm run test:changed` on the workstation (2026-11-25, lane A, a change to packages/shared, so every package
+  runs): `packages/humans/test/fit.test.js` failed after 122 s and `packages/water/test/flood-bounds.test.js` after 257 s, each
+  as 'test failed' at the file with no failing or cancelled subtest and nothing on stderr. Run alone
+  (`node --test-reporter=tap --test test/<file>` in the package folder) both pass, 30 of 30 in 315 s and 18 of 18 in 345 s.
+- **Cause:** not found yet. The file process ends long before its tests could finish, which points at the process being
+  ended (memory or a kill) while the package runs its other test files beside it, not at a wrong value.
+
 ### Open 2026-11-25: the browser host sometimes exits mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
 
 - **Repro:** `npm run check:owners -- --packages=environment,lines,creative,lod,selection,shader` on the workstation (2026-11-25, lane A): after 82 fixtures passed, `creative/TextureRenderTarget (WebGL2 compatibility)` failed with `browser host <pid> ended (stdout closed) before it answered` (`HOST_GONE`). `--packages=creative` alone then passed 234 of 234. Handoff 11 of lane A recorded the same exit at `post/SSGI.attach (WebGL2 compatibility)` on 2026-11-24; post alone passed today. Not tied to one fixture: both runs had other GPU work on the machine, and both were long multi-package runs.
