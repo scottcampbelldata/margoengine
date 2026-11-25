@@ -243,6 +243,15 @@ Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/math
 
+## Geodesy
+
+`@margoengine/math/geo` holds the WGS84 ellipsoid (`WGS84_A`, `WGS84_F`, `WGS84_B`) and the conversions a globe needs, in
+radians and metres: `cartographicToEcef(longitude, latitude, height?)` and `ecefToCartographic(x, y, z)` (Bowring's
+closed form with two refinements), `geodeticNormal`, the east-north-up frame (`enuBasis`, `enuToEcef`, `ecefToEnu`), and
+geodesics on the ellipsoid after Karney (2013): `geodesicInverse(lon1, lat1, lon2, lat2)` gives the distance and both
+bearings for every pair, nearly antipodal ones included, and `geodesicDirect(lon1, lat1, bearing, distance)` follows a
+bearing. `degToRad` and `radToDeg` convert angles. `@margoengine/controls/geospatial` steers its camera with them.
+
 ## Film clock
 
 `@margoengine/math/clock` has `FilmClock`, the time every physics solver steps on: a frame number (and a fraction of a frame for a motion-blur sub-frame) over a rational frame rate, with `ticks(rate)`, the whole ticks of `rate` a second up to that time, computed in integers. A float sum of frame times drifts (1001/24000 added 24,000 times is not 1,001), so two solvers, or one shot rendered at 24 and at 60 fps, would disagree about how many steps have run; with the clock a tick count is a function of the frame and the rate alone. A seek is an assignment (`clock.frame = n`, or `clock.at(n, {num, den})` for a sub-frame), `alpha(rate)` is how far the frame lies between its two ticks (for drawing between them), and `time` is the seconds as a double for display and uniforms. Solver rates are the dyadic `solverRate(k)` = 60 * 2^k Hz (k from 0 to 7), so coupled solvers always meet on a shared tick. Rates and offsets are whole numbers below 2^31; a tick count past the safe integers throws a `RangeError` rather than round.
