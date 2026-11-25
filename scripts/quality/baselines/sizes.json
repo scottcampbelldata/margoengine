@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18868348,
+  "total": 18869966,
   "history": [
     {
       "date": "2026-10-24",
@@ -12009,6 +12009,12 @@
       "commit": "e54a6d61a",
       "reason": "RigidSolver joins the world entry: the rigid kernel as a framework solver, its bodies and bodyImpulses fields and its state regions (12,919 to 14,287 B gzip); every world with rigid bodies uses it, so a separate entry would only add an import",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "xr-launch",
+      "reason": "new optional entry xr/launch",
+      "grew": 1
     }
   ],
   "items": {
@@ -13578,6 +13584,7 @@
     "@margoengine/xr/device-check": 2344,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
+    "@margoengine/xr/launch": 1618,
     "@margoengine/xr/layers": 4612,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3600,
