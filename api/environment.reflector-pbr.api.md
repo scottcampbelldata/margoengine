@@ -34,6 +34,8 @@ export class MeshReflector extends Reflector {
     set f0(value: ColorInput);
     get roughness(): number;
     set roughness(value: number);
+    get contactHardening(): boolean;
+    set contactHardening(value: boolean);
     protected aim(main: Camera): boolean;
     protected get surfaceBlend(): GPUBlendState;
     protected get surfaceUniformLength(): number;
@@ -44,7 +46,7 @@ export class MeshReflector extends Reflector {
     protected get surfaceShader(): string;
 }
 
-export interface MeshReflectorOptions extends Omit<ReflectorOptions, 'roughness'> {
+export interface MeshReflectorOptions extends Omit<ReflectorOptions, 'roughness' | 'contactHardening'> {
     mixStrength?: number;
     mixBlur?: number;
     mixContrast?: number;
@@ -74,6 +76,7 @@ export class PBRReflector extends Reflector {
     protected surfaceUniforms(c: Extract<PassContext, {
         backend: 'webgpu';
     }>, values: Float32Array): void;
+    protected coneShader(code: string): string;
     protected get surfaceShader(): string;
 }
 
@@ -128,6 +131,7 @@ interface PlanarOptions {
     resolution?: number;
     clipBias?: number;
     roughness?: number;
+    contactHardening?: boolean;
     normalMap?: Borrowable<GPUTexture> | NormalMapImage;
     distortion?: number;
     normalRepeat?: readonly [number, number];
@@ -169,6 +173,8 @@ abstract class PlanarSurface {
     set clipBias(value: number);
     get roughness(): number;
     set roughness(value: number);
+    get contactHardening(): boolean;
+    set contactHardening(value: boolean);
     get distortion(): number;
     set distortion(value: number);
     get layers(): number;
@@ -177,6 +183,8 @@ abstract class PlanarSurface {
     set normalMap(value: Borrowable<GPUTexture> | NormalMapImage | undefined);
     get texture(): GPUTexture | undefined;
     get textureMatrix(): Float32Array | undefined;
+    get blurTexture(): GPUTexture | undefined;
+    get depthTexture(): GPUTexture | undefined;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
@@ -190,9 +198,11 @@ abstract class PlanarSurface {
     protected get surfaceUniformLength(): number;
     protected get surfaceBlend(): GPUBlendState | undefined;
     protected get surfaceDepth(): GPUTextureView | undefined;
+    protected coneShader(code: string): string;
     protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void;
     protected clip(main: Camera, n: Vec3, w: number): boolean;
     update(): boolean;
+    protected captureDepthView(): GPUTextureView | undefined;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }

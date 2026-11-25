@@ -10,6 +10,8 @@ import { ColorInput } from "@margoengine/math";
 export interface WaterPlanarCapture {
     readonly texture: GPUTexture | undefined;
     readonly textureMatrix: ArrayLike<number> | undefined;
+    readonly blurTexture?: GPUTexture | undefined;
+    readonly depthTexture?: GPUTexture | undefined;
     passes?: (pass: FramePass) => boolean;
 }
 
@@ -29,6 +31,7 @@ export interface WaterReflectionOptions {
     strength?: number;
     distortion?: number;
     roughness?: number;
+    contactHardening?: boolean;
     color?: readonly [number, number, number];
 }
 

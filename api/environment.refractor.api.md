@@ -26,6 +26,7 @@ export interface PlanarOptions {
     resolution?: number;
     clipBias?: number;
     roughness?: number;
+    contactHardening?: boolean;
     normalMap?: Borrowable<GPUTexture> | NormalMapImage;
     distortion?: number;
     normalRepeat?: readonly [number, number];
@@ -67,6 +68,8 @@ export abstract class PlanarSurface {
     set clipBias(value: number);
     get roughness(): number;
     set roughness(value: number);
+    get contactHardening(): boolean;
+    set contactHardening(value: boolean);
     get distortion(): number;
     set distortion(value: number);
     get layers(): number;
@@ -75,6 +78,8 @@ export abstract class PlanarSurface {
     set normalMap(value: Borrowable<GPUTexture> | NormalMapImage | undefined);
     get texture(): GPUTexture | undefined;
     get textureMatrix(): Float32Array | undefined;
+    get blurTexture(): GPUTexture | undefined;
+    get depthTexture(): GPUTexture | undefined;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
@@ -88,9 +93,11 @@ export abstract class PlanarSurface {
     protected get surfaceUniformLength(): number;
     protected get surfaceBlend(): GPUBlendState | undefined;
     protected get surfaceDepth(): GPUTextureView | undefined;
+    protected coneShader(code: string): string;
     protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void;
     protected clip(main: Camera, n: Vec3, w: number): boolean;
     update(): boolean;
+    protected captureDepthView(): GPUTextureView | undefined;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
