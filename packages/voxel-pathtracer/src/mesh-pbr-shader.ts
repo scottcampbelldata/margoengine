@@ -7,6 +7,12 @@ import { meshSource } from './mesh-shader.js';
 // call, keeps one filter body instead of twelve (KB5451). The same calls with the same arguments give the same values;
 // the sRGB slots (mask 0x489) are base, emissive, sheen and specular colour. pbrMapNormal turns the texel the loop read
 // into the shading normal; pbrMappedNormal reads its own texel first.
+// pbrVisible is the any-hit coverage. MASK (mode 1) compares the cutoff. BLEND (mode 2) is stochastic transparency:
+// the candidate is kept with probability equal to its coverage. The uniform hashes the current rng state (one per
+// traced ray; it is read, never advanced, so scenes without BLEND keep their random sequence) with the hit distance t
+// rounded to 13 mantissa bits: two triangles sharing an edge the ray passes through meet it at one t and so take one
+// decision (an independent draw each would keep the surface 1-(1-c)^2 of the time there), while stacked layers decide
+// apart. A sampled light point emits its expected coverage: binary for MASK, the coverage itself for BLEND.
 const PBR = /* wgsl */ `
 fn pbrRecord(h:Hit)->u32 {
  if(h.inst!=TRIANGLE||h.value==0u){return 0u;}
@@ -67,11 +73,6 @@ fn pbrTexture(h:Hit,record:u32,slot:u32,srgb:bool)->vec4f {
  return value;
 }
 fn pbrCoverage(h:Hit,r:u32)->f32 {return fl(r+7u)*pbrAttribute(h,12u).a*pbrTexture(h,r,0u,false).a;}
-// Any-hit coverage. MASK (mode 1) compares the cutoff. BLEND (mode 2) is stochastic transparency: the candidate
-// is kept with probability equal to its coverage. The uniform hashes the current rng state (one per traced ray; it
-// is read, never advanced, so scenes without BLEND keep their random sequence) with the hit distance t rounded to
-// 13 mantissa bits: two triangles sharing an edge the ray passes through meet it at one t and so take one decision
-// (an independent draw each would keep the surface 1-(1-c)^2 of the time there), while stacked layers decide apart.
 fn pbrVisible(h:Hit,back:bool,t:f32)->bool {
  let r=pbrRecord(h);if(r==0u){return true;}
  if(back&&scene[r+2u]==0u){return false;}
@@ -151,7 +152,6 @@ fn pbrNormal(h:Hit)->vec3f {let r=pbrRecord(h);return pbrMappedNormal(h,2u,fl(r+
 fn pbrEmitterRadiance(h:Hit,wo:vec3f)->vec3f {
  let r=pbrRecord(h);if(r==0u){return material(h.value).emission;}
  if(dot(triangleNormal(h),wo)<0.0&&scene[r+2u]==0u){return vec3f(0.0);}
- // A sampled light point emits its expected coverage: binary for MASK, the coverage itself for BLEND.
  var cover=1.0;let mode=scene[r+1u];
  if(mode!=0u){let c=pbrCoverage(h,r);cover=select(select(0.0,1.0,c>=fl(r+15u)),c,mode==2u);}
  if(cover==0.0){return vec3f(0.0);}
