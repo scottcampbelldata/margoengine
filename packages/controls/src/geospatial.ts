@@ -1375,6 +1375,17 @@ export class GeospatialControls extends Controls {
       next: V = [p[0] + (eye[0] - p[0]) * k, p[1] + (eye[1] - p[1]) * k, p[2] + (eye[2] - p[2]) * k];
     this.aimAt(next, along(next, forward, range), up);
   }
+  /**
+   * Take the view over from wherever the camera is now (after a follow camera, a cut or another controls), keeping
+   * the pose: the orbit centre becomes the surface in the middle of the screen, or a point `range` ahead on sky.
+   * Pitch is then kept within the mode's limits.
+   */
+  fromCamera(): void {
+    this.alive();
+    const { eye, forward, up } = this.eyeFrame(),
+      hit = this.hitAlong(eye, forward);
+    this.aimAt(eye, hit?.point ?? along(eye, forward, this.v.range), up);
+  }
   /** Re-centre the orbit on the surface on the view axis, so a turn pivots about what is in the middle of the screen. */
   private pivotOnAxis(): void {
     const { eye, forward, up } = this.eyeFrame(),

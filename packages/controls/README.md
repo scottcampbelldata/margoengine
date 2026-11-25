@@ -183,6 +183,56 @@ the pivot to the subject after a teleport, and `rotate(yaw, pitch)` takes gamepa
 `@margoengine/input` actions. `rotate` and `update(delta)` throw a `RangeError` for a value that is not finite, and
 `update` also for a negative step. Events: `start`, `change`, `end`.
 
+### Following ships, birds and convoys
+
+The same controls follow anything that moves, across an open world. A subject can be a mesh, a model, a position
+function, or a `FollowTarget` from `@margoengine/math/fields`. That is the physics framework's follow-targets contract
+([docs/physics-framework.md](../../docs/physics-framework.md), section 4): pose, velocity and acceleration at the
+frame's time, in a large-world origin cell of `cellSize` metres (4096). Pass the target itself or a function returning
+it each frame. Meshes and models are turned into the same pose, velocity and acceleration from their motion, smoothed
+over 0.1 s. A list of subjects (a flock, a convoy) is framed together: the arm lengthens until the whole spread fits
+the view.
+
+`style` picks the follow. `'orbit'` is the default: you turn the arm. `'chase'` swings behind the travel. `'side'`
+tracks alongside, on the right. `'lock'` aims `lead` (0.35) of the arm ahead, so the subject has room in front.
+`'flyby'` holds a point ahead of and beside the path while the subject passes, then moves on `flybyAhead` (3) seconds
+ahead. The pivot and the arm's heading each ride a critically damped spring integrated exactly (`lag` 0.12 s,
+`turnLag` 0.6 s), so nothing overshoots or jitters at any frame rate. The aim leads by `lookAhead` (0.4 s outside
+orbit) seconds of velocity and acceleration. `bank` (0: ships and cars stay level) is the share of a flying subject's
+roll the camera banks with, within `maxBank` (0.5 rad). `ground` (a terrain query, a biomes world's `heightAt`, a
+tiles height) keeps the camera `clearance` (1) above the ground. With `origin` (a `FloatingOrigin`) everything is
+worked in float64 world metres and written in its local coordinates, so a ship crossing a lake hundreds of km wide
+never jitters. `follow(subject, seconds)` switches what is followed and `takeOver(seconds)` eases in from the
+camera's current view, for a hand-off from any other camera, or after a geospatial flight:
+`geo.flyTo(view).then(() => follow.takeOver(0.8))`. `GeospatialControls.fromCamera()` hands back, keeping the pose.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ThirdPersonControls} from 'margoengine/controls/third-person';
+import type {FollowTarget} from 'margoengine/math/fields';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A freighter on Lake Michigan, as the physics world publishes it: 6 m/s east, in cell (100, 0, 0) of 4,096 m.
+let time = 0;
+const ship = (): FollowTarget => ({
+  id: 'freighter', solver: 'boats', cell: [100, 0, 0], position: [6 * time, 0, 0],
+  rotation: [0, 0, 0, 1], velocity: [6, 0, 0], acceleration: [0, 0, 0], angularVelocity: [0, 0, 0],
+});
+const follow = ThirdPersonControls.attach(engine, ship, {style: 'chase', distance: 120, pivotOffset: [0, 20, 0], collide: false});
+engine.onFrame((_, delta) => (time += delta));
+follow.style = 'flyby'; // hold a point by the shipping lane while it passes
+follow.bank = 0;        // a ship stays level; a bird would take bank: 1
+engine.start();
+```
+
+Sources: Halper, Helbing and Strothotte, "A camera engine for computer games: managing the trade-off between
+constraint satisfaction and frame coherence", Computer Graphics Forum 20 (3), 2001, https://doi.org/10.1111/1467-8659.00514
+(look-ahead and frame-coherent follow); Lino and Christie, "Intuitive and efficient camera control with the toric
+space", ACM TOG 34 (4), 2015, https://doi.org/10.1145/2766965 (framing one or two subjects, lead room); Gleicher and
+Witkin, "Through-the-lens camera control", SIGGRAPH 1992, https://doi.org/10.1145/133994.134088 (aim from screen
+goals); the critically damped spring is the damped harmonic oscillator at damping ratio 1, x(t) = (x0 + (v0 +
+w x0) t) e^(-w t), stepped with that closed form so the result does not depend on the frame rate. Limits: `docs/limits.md`, "Follow camera".
+
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.
 
 `OrbitControls.update()` reuses its camera vectors during continuous updates. Copy `camera.position` and `camera.target` when taking a snapshot.
