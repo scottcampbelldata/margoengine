@@ -93,7 +93,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | AERO-04 | Turbomachines in flow | Windmills, wind turbines, waterwheels, paddles, propellers, with wakes | procedural/src/gears.ts (geometry only) | none | Glauert, blade-element-momentum theory (1935), in Hansen, *Aerodynamics of Wind Turbines* (2015). | K18 K22 |
 | AERO-05 | Falling and tumbling light bodies | Leaves, paper, ash flakes, snowflakes, seeds, feathers: flutter, tumble | none (hail has a single speed, PA-32) | none | Andersen, Pesavento and Wang, "Analysis of transitions between fluttering, tumbling and steady descent of falling cards" (2005). | K09 K18 K22 |
 
-### Family SEA: ocean, ships and marine (14)
+### Family SEA: ocean, ships and marine (15)
 
 | ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
 |---|---|---|---|---|---|---|
@@ -111,6 +111,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | Exact submerged-volume buoyancy, added mass, Morison drag, current and flood loads; debris, anchors, animals, bodies in floods | physics (none); water/src/ice.ts (static hydrostatics only) | none: X-35, 36, 39, PA-19 | Morison et al., "The force exerted by surface waves on piles" (1950). Sarpkaya and Isaacson, *Mechanics of Wave Forces on Offshore Structures* (1981). Haehnel and Daly, "Maximum impact force of woody debris on floodplain structures" (2004). | K07 K11 K22 |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | Entrainment, decay, wake foam, whitecap coverage, sea-spray source function | water/src/index.ts:507, liquid-whitewater.ts, spray.ts | stand-in: PA-03, 21 | Ihmsen et al., "Unified spray, foam and bubbles for particle-based fluids" (2012). Monahan et al., whitecap aerosol (1986). Andreas, "A new sea spray generation function" (1998). | K06 K16 |
 | SEA-14 | Water entry and exit | Cavity, crown splash, jets, cannonball, diver, launch, breach | water/src/splash.ts (`ShotSplash`) | stand-in: PA-17 | Duclaux et al., "Air entrainment during impact of droplets on liquid surfaces" (2007), as the audit cites. Wagner (1932). | K16 K22 K25 |
+| SEA-15 | Tracers and slicks in water | Dye, discoloured water, silt and sediment plumes, oil and fuel slicks: advection and diffusion on the surface and below, carried by currents, waves and a hull's wake, settling by grain size, slick spreading and drift | water ships entry (a stern-wake tint: a look, nothing is transported) | stand-in | Stam, "Stable fluids" (SIGGRAPH 1999) for advection. Fay, "The spread of oil slicks on a calm sea" (1969). van Rijn, *Principles of Sediment Transport in Rivers, Estuaries and Coastal Seas* (1993) for settling. | K13 K14 |
 
 ### Family FLUID: general fluid solvers (7)
 
@@ -148,7 +149,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | ATMO-07 | Lightning and atmospheric electricity | Leader branching, return stroke, thunder source | sky/src/lightning-bolt.ts (rendering) | none | Niemeyer, Pietronero and Wiesmann, "Fractal dimension of dielectric breakdown" (1984). Rakov and Uman, *Lightning* (2003). Kim and Lin (2004). | K06 K12 |
 | ATMO-08 | Fog and cold-air drainage | Radiation fog, valley fog, katabatic flow | environment/src/fog-volumes.ts | stand-in: PA-34 | Manins and Sawford (1979). Duynkerke (1991). | K13 K27 |
 | ATMO-09 | Surface energy balance | Insolation, ground temperature, evapotranspiration, fuel and ground wetness | weather/src/fuel-moisture.ts; weather/src/surface.ts; biomes/src/seasons.ts, climate.ts | partial. Fuel moisture is sound (Fosberg and Cohen-Deeming). Degree days are only a proxy. | Monteith (1965). Allen et al., FAO-56 (1998). Liston and Elder, SnowModel (2006). | K27 |
-| ATMO-10 | Synoptic weather | Pressure systems, fronts, geostrophic and gradient wind driving the weather state | weather/src/machine.ts, state.ts (scripted presets and a seeded walk) | stand-in | Charney, Fjørtoft and von Neumann (1950), barotropic vorticity. Holton, *An Introduction to Dynamic Meteorology* (2004). | K12 K13 K17 |
+| ATMO-10 | Synoptic weather and moisture transport | Pressure systems, fronts, geostrophic and gradient wind driving the weather state; water vapour carried across oceans (integrated vapour transport, atmospheric rivers), lifted over mountains and rained or snowed out (orographic precipitation) | weather/src/machine.ts, state.ts (scripted presets and a seeded walk) | stand-in | Charney, Fjørtoft and von Neumann (1950), barotropic vorticity. Holton, *An Introduction to Dynamic Meteorology* (2004). Dacre et al., "How do atmospheric rivers form?" (BAMS 2015). Smith and Barstad, "A linear theory of orographic precipitation" (J. Atmos. Sci. 2004). | K12 K13 K17 |
 
 ### Family EARTH: granular, terrain and solid earth (10)
 
@@ -224,7 +225,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | BREAK | Fracture, structures and impact | 5 |
 | LIFE | Characters, animals, crowds and machines | 7 |
 | AERO | Aerodynamics and flight | 5 |
-| SEA | Ocean, ships and marine | 14 |
+| SEA | Ocean, ships and marine | 15 |
 | FLUID | General fluid solvers | 7 |
 | HYDRO | Rivers, floods and hydrology | 6 |
 | ATMO | Atmosphere and weather | 10 |
@@ -234,7 +235,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | SOUND | Acoustics | 5 |
 | BIO | Vegetation and ecosystems | 4 |
 | SPACE | Orbital and celestial | 2 |
-| **Total** | | **101** |
+| **Total** | | **102** |
 
 ### 2b. Kernel list
 
@@ -417,7 +418,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 
 ## 4. State, order and owners
 
-**State across the 101.**
+**State across the 102.**
 - Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core), BIO-03 and the SGP4 part of SPACE-01.
 - Partial: about 25. The deterministic analytic models in weather, vfx and sky count here: avalanche, eruption,
   lava, thermal, fire front, hurricane and tornado, snow drift and fuel moisture.

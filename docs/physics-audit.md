@@ -167,7 +167,7 @@ in the merge gate.
 
 The framework every solver is built on (clock, shared memory, field registry, solver interface, coupling scheduler,
 shared kernels, determinism, snapshot and bake, threads) is specified in [physics-framework.md](physics-framework.md). The full
-catalog of 101 solvers, with methods, kernels and the coupling matrix, is in [physics-solvers.md](physics-solvers.md).
+catalog of 102 solvers, with methods, kernels and the coupling matrix, is in [physics-solvers.md](physics-solvers.md).
 
 Fixing the findings one by one would leave the engine as it is now: systems that look right alone and never affect
 each other. So the physics is rebuilt as a set of solvers that share one clock, one set of physical fields and explicit
