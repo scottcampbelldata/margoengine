@@ -23,6 +23,7 @@ export interface HeadlessStageOptions extends Omit<EngineOptions, 'backend'> {
     gpu?: GPUBinding;
     globals?: Readonly<Record<string, unknown>>;
     onError?: (error: unknown) => void;
+    transparent?: boolean;
 }
 
 export function createHeadlessStage(_arg0: HeadlessStageOptions): Promise<HeadlessStage>;
