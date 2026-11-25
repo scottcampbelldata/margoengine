@@ -60,7 +60,8 @@ function collect(engine: Engine, options: AdvanceTimeOptions, unseekable?: strin
       else if (typeof plugin.onPreUpdate === 'function') unseekable?.push(name);
   let i = 0;
   for (const clock of options.extra ?? []) {
-    if (!isClock(clock)) throw new TypeError(`extra[${i}] needs advanceTime(delta); pass a clock such as a WeatherMachine`);
+    if (!isClock(clock))
+      throw new TypeError(`extra[${i}] needs advanceTime(delta); pass a clock such as a WeatherMachine`);
     const own = (clock as { name?: unknown }).name;
     clocks.push([typeof own === 'string' && own ? own : `extra[${i}]`, clock]);
     i++;

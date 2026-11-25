@@ -28,7 +28,9 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
 type Light = Record<string, unknown>;
 type Config = {
-  local?: { resolution?: number; bias?: number; normalBias?: number; receiverPlane?: boolean; slopeBias?: number } | false;
+  local?:
+    | { resolution?: number; bias?: number; normalBias?: number; receiverPlane?: boolean; slopeBias?: number }
+    | false;
   points?: Light[];
   suns?: Light[];
   areas?: Light[];
@@ -133,7 +135,13 @@ function scene(config: Config) {
   lights.setLights((config.points ?? []) as never);
   if (config.local !== false) {
     local = config.atlas
-      ? ShadowAtlas.attach(engine, { lights, resolution: 512, minResolution: 32, maxResolution: 128, ...(config.local ?? {}) })
+      ? ShadowAtlas.attach(engine, {
+          lights,
+          resolution: 512,
+          minResolution: 32,
+          maxResolution: 128,
+          ...(config.local ?? {}),
+        })
       : LocalShadows.attach(engine, { lights, resolution: 512, ...(config.local ?? {}) });
     for (const name of config.meshes) local.add(meshes[name]);
   }

@@ -299,7 +299,8 @@ export class SceneEditor {
     parent: MeshHandle | null = null,
   ): MeshHandle {
     this.alive();
-    if (!['point', 'spot', 'directional', 'ambient'].includes(kind)) throw new TypeError('Unknown light kind; use point, spot, directional or ambient');
+    if (!['point', 'spot', 'directional', 'ambient'].includes(kind))
+      throw new TypeError('Unknown light kind; use point, spot, directional or ambient');
     const data = this.validateLight({
       kind,
       color: [1, 1, 1],

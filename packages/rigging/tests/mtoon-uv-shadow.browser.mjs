@@ -78,12 +78,25 @@ try {
         },
       ],
     };
-    const model = parsePreparedPBR(engine, doc, [[{ vertices, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) }]], [base, mask]);
-    const receiver = engine.createMesh().setGeometry(box(8, 6, 0.1)).setPosition([0, 0, 3.05]);
+    const model = parsePreparedPBR(
+      engine,
+      doc,
+      [[{ vertices, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) }]],
+      [base, mask],
+    );
+    const receiver = engine
+      .createMesh()
+      .setGeometry(box(8, 6, 0.1))
+      .setPosition([0, 0, 3.05]);
     engine.lighting.direction.set([0, 0, -1]);
     engine.lighting.radiance.set([3, 3, 3, 0]);
     const effect = MToon.attach(model);
-    const shadows = Shadows.attach(engine, { resolution: 1024, bias: 0, normalBias: 0, bounds: { min: [-4, -3, -1], max: [4, 3, 4] } });
+    const shadows = Shadows.attach(engine, {
+      resolution: 1024,
+      bias: 0,
+      normalBias: 0,
+      bounds: { min: [-4, -3, -1], max: [4, 3, 4] },
+    });
     shadows.add(model);
     shadows.add(receiver, { castShadow: false });
     const picking = Picking.attach(engine, { capture: false });
@@ -122,7 +135,9 @@ try {
   });
   const shot = async (name) =>
     decodePNG(
-      await context.page.locator('canvas').screenshot({ path: `test-results/mtoon/uv-shadow-${name}${compat ? '-compat' : ''}.png` }),
+      await context.page
+        .locator('canvas')
+        .screenshot({ path: `test-results/mtoon/uv-shadow-${name}${compat ? '-compat' : ''}.png` }),
     );
   mkdirSync('test-results/mtoon', { recursive: true });
   // Mean red of a 16 x 16 block centred at a quarter and three quarters of the width.
@@ -154,7 +169,11 @@ try {
   assert.notEqual(darker(after), darker(before), `the shadow follows the moving cut-out: ${before} then ${after}`);
   // One half hits the quad and the other passes through to the receiver, and the halves swap once the map has moved.
   for (const sidesPicked of picked) assert.deepEqual([...sidesPicked].sort(), ['quad', 'receiver'], `picked ${picked}`);
-  assert.deepEqual(picked[1], [...picked[0]].reverse(), `picking follows the moving cut-out: ${JSON.stringify(picked)}`);
+  assert.deepEqual(
+    picked[1],
+    [...picked[0]].reverse(),
+    `picking follows the moving cut-out: ${JSON.stringify(picked)}`,
+  );
   console.log('MToon UV-animated cut-out shadow and picking check passed');
 } finally {
   await context.close();

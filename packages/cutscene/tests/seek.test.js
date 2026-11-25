@@ -65,7 +65,11 @@ const live = (w, delta) => {
   for (const plugin of w.engine.scene.plugins.values()) plugin.onPreUpdate(delta);
   w.machine.advanceTime(delta);
 };
-const state = (w) => ({ wind: { ...w.wind }, clouds: { ...w.clouds, wind: undefined }, machine: { ...w.machine, wind: undefined } });
+const state = (w) => ({
+  wind: { ...w.wind },
+  clouds: { ...w.clouds, wind: undefined },
+  machine: { ...w.machine, wind: undefined },
+});
 
 for (const n of [1, 600, 54_000])
   test(`seek to step ${n} then one live frame equals ${n + 1} live frames, bit for bit`, async () => {
@@ -93,7 +97,14 @@ test('a closed form n x dt is not what stepping gives, which is why seek replays
 test('advanceTime steps plugins in attach order, then extra, and checks the delta', () => {
   const order = [],
     clock = (name) => ({ name, time: 0, setup() {}, advanceTime: () => order.push(name) }),
-    engine = { scene: { plugins: new Map([['b', clock('b')], ['a', clock('a')]]) } },
+    engine = {
+      scene: {
+        plugins: new Map([
+          ['b', clock('b')],
+          ['a', clock('a')],
+        ]),
+      },
+    },
     other = { plugins: new Map([['c', clock('c')]]) };
   advanceTime(engine, 0.5, { extra: [clock('x')] });
   assert.deepEqual(order, ['b', 'a', 'x']);
@@ -107,13 +118,23 @@ test('advanceTime steps plugins in attach order, then extra, and checks the delt
 test('seek needs a fresh start, a valid time and rate, and stops on abort', async () => {
   const w = world();
   live(w, 1 / 60);
-  await assert.rejects(seek(w.engine, 1), (e) => e.name === 'MargoError' && e.code === 'state' && /wind, clouds/.test(e.message) && /errors#film-seek/.test(e.message));
+  await assert.rejects(
+    seek(w.engine, 1),
+    (e) =>
+      e.name === 'MargoError' &&
+      e.code === 'state' &&
+      /wind, clouds/.test(e.message) &&
+      /errors#film-seek/.test(e.message),
+  );
   const fresh = world();
   await assert.rejects(seek(fresh.engine, -1), RangeError);
   await assert.rejects(seek(fresh.engine, Number.NaN), RangeError);
   await assert.rejects(seek(fresh.engine, 1, { fps: 0.5 }), RangeError);
   const controller = new AbortController();
-  const late = seek(fresh.engine, 100, { signal: controller.signal, onStep: (step) => step === 10 && controller.abort(new Error('stop')) });
+  const late = seek(fresh.engine, 100, {
+    signal: controller.signal,
+    onStep: (step) => step === 10 && controller.abort(new Error('stop')),
+  });
   await assert.rejects(late, /stop/);
   assert.equal(fresh.wind.calls, 11);
   assert.deepEqual((await seek(world().engine, 0)).steps, 0);

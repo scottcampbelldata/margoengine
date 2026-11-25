@@ -118,7 +118,11 @@ test('a source brighter than half floats is divided into range and lighting mult
   assert.equal(device.params.at(-1)[3], 6);
   environment.dispose();
   // A source within range keeps the factor 1 and its texels as they are.
-  const plain = await Environment.create(recordingDevice(), { width, height, data: new Float32Array(128).fill(60000) }, { size: 16 });
+  const plain = await Environment.create(
+    recordingDevice(),
+    { width, height, data: new Float32Array(128).fill(60000) },
+    { size: 16 },
+  );
   assert.equal(plain.radianceScale, 1);
   plain.dispose();
 });

@@ -23,7 +23,8 @@ const W = 256,
   bits = new Uint32Array(1),
   float = new Float32Array(bits.buffer);
 const f32 = (u) => ((bits[0] = u), float[0]);
-const half = (h) => (h & 0x7c00 ? 1 + (h & 0x3ff) / 1024 : (h & 0x3ff) / 1024) * 2 ** (Math.max(1, (h >> 10) & 31) - 15);
+const half = (h) =>
+  (h & 0x7c00 ? 1 + (h & 0x3ff) / 1024 : (h & 0x3ff) / 1024) * 2 ** (Math.max(1, (h >> 10) & 31) - 15);
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 // float64 of what the shaders compute. The pixel's solid angle is the area element of the unit ray's map from NDC,

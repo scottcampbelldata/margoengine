@@ -99,7 +99,11 @@ test('margoengine/react puts no Wasm in a build, and a model page gets it from i
   assert.notDeepEqual(await emitted("import { Model } from 'margoengine/react/gltf'; export { Model };"), []);
   // The kits, and the packages that only draw models: gltf/pbr's root alone names the decoders.
   for (const kit of ['game', 'web', 'viz'])
-    assert.deepEqual(await emitted(`import { createStage } from 'margoengine/${kit}'; export { createStage };`), [], kit);
+    assert.deepEqual(
+      await emitted(`import { createStage } from 'margoengine/${kit}'; export { createStage };`),
+      [],
+      kit,
+    );
   assert.deepEqual(await emitted("import { createMesh } from 'margoengine/materials'; export { createMesh };"), []);
   assert.deepEqual(await emitted("import { Animation } from 'margoengine/animation'; export { Animation };"), []);
   assert.deepEqual(await emitted("import { PBRModel } from 'margoengine/gltf/pbr-model'; export { PBRModel };"), []);

@@ -25,7 +25,8 @@ const ridge = (x: number, z: number) => {
   return x < 0 ? crest * Math.max(0, 1 + x / 90) : crest * Math.max(0, 1 - x / 22);
 };
 const ground = new Float32Array(N * N);
-for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) ground[j * N + i] = ridge(origin[0] + i * cell, origin[1] + j * cell);
+for (let j = 0; j < N; j++)
+  for (let i = 0; i < N; i++) ground[j * N + i] = ridge(origin[0] + i * cell, origin[1] + j * cell);
 
 async function start() {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -73,7 +74,8 @@ async function start() {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const b = drift.budget,
       off = drift.mass + b.cornices - (initial + b.fallen + b.blownIn - b.blownOut - b.sublimated);
-    if (Math.abs(off) > 1e-6 * (initial + b.fallen + b.blownIn)) console.warn(`BUG: the snow budget is off by ${off} kg`);
+    if (Math.abs(off) > 1e-6 * (initial + b.fallen + b.blownIn))
+      console.warn(`BUG: the snow budget is off by ${off} kg`);
     for (const [x, z] of [
       [-60, 0],
       [3, 10],
@@ -104,7 +106,8 @@ async function start() {
     drift.seek(0);
     drift.seek(2);
     const sought = drift.snowDepth();
-    if (!stepped.every((v, k) => v === sought[k])) console.warn('BUG: stepping to 2 hours drew other snow than a seek to it');
+    if (!stepped.every((v, k) => v === sought[k]))
+      console.warn('BUG: stepping to 2 hours drew other snow than a seek to it');
     await check(2);
   };
   button('btnTurn').onclick = async () => {
@@ -112,19 +115,27 @@ async function start() {
     await check(drift.time + 0.5);
   };
   button('btnLook').onclick = async () => {
-    applySnowDriftSettings(drift, { ...SNOW_DRIFT_LOOKS.blizzard, windDirection: 90, timeScale: 3600, step: 30, initialDepth: 0.3 });
+    applySnowDriftSettings(drift, {
+      ...SNOW_DRIFT_LOOKS.blizzard,
+      windDirection: 90,
+      timeScale: 3600,
+      step: 30,
+      initialDepth: 0.3,
+    });
     await check(drift.time + 0.5);
   };
   button('btnWeather').onclick = async () => {
     applySnowDriftSettings(drift, { timeScale: 3600, step: 30, initialDepth: 0.3, windDirection: null, wind: null });
-    if (drift.options.wind !== undefined) console.warn('BUG: a null wind row did not hand the wind back to the weather');
+    if (drift.options.wind !== undefined)
+      console.warn('BUG: a null wind row did not hand the wind back to the weather');
     await check(drift.time + 0.5);
   };
   button('btnTrigger').onclick = async () => {
     const before = drift.stabilityAt(10, 0);
     drift.options.trigger = 300;
     const after = drift.stabilityAt(10, 0);
-    if (before < 10 && !(after < before)) console.warn(`BUG: a trigger did not lower the stability (${before} to ${after})`);
+    if (before < 10 && !(after < before))
+      console.warn(`BUG: a trigger did not lower the stability (${before} to ${after})`);
     await check(drift.time);
   };
   await check(1);

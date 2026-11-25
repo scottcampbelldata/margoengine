@@ -103,8 +103,14 @@ export function skinningFromModel(model: SkinnedModel, primitive: SkinnedPrimiti
     bones = storage(palette, 'vec4f'),
     // A part of a split primitive reads the definition's JOINTS_0 and WEIGHTS_0 through its vertexMap.
     map = primitive.part?.vertexMap,
-    joints = storage(Uint32Array.from(vertexValues(model.asset.accessor(attributes.JOINTS_0, 'VEC4'), 4, map)), 'vec4u'),
-    weights = storage(Float32Array.from(vertexValues(model.asset.accessor(attributes.WEIGHTS_0, 'VEC4'), 4, map)), 'vec4f');
+    joints = storage(
+      Uint32Array.from(vertexValues(model.asset.accessor(attributes.JOINTS_0, 'VEC4'), 4, map)),
+      'vec4u',
+    ),
+    weights = storage(
+      Float32Array.from(vertexValues(model.asset.accessor(attributes.WEIGHTS_0, 'VEC4'), 4, map)),
+      'vec4f',
+    );
   const update = () => {
     nodes.forEach((node, bone) => {
       const a = model.nodes[node].matrix,
@@ -121,7 +127,14 @@ export function skinningFromModel(model: SkinnedModel, primitive: SkinnedPrimiti
     bones.update();
   };
   update();
-  return { ...skinning({ bones, joints, weights }), geometry: { positions, normals, uvs, indices }, bones, joints, weights, update };
+  return {
+    ...skinning({ bones, joints, weights }),
+    geometry: { positions, normals, uvs, indices },
+    bones,
+    joints,
+    weights,
+    update,
+  };
 }
 /**
  * Linear blend skinning in the vertex stage. `positionNode: skin.position()` draws the posed mesh in every pass, and the
@@ -181,7 +194,9 @@ export function morphing({ count, vertices, positions, normals, weights }: Morph
   if (!Number.isInteger(count) || count < 1 || !Number.isInteger(vertices) || vertices < 1)
     throw new RangeError('morphing() needs a whole count and vertices of at least 1');
   const blend = (base: Node<'vec3f'>, offsets: StorageBuffer<'vec4f'>) =>
-    loop(count, base, (i, sum) => sum.add(offsets.element(i.toUint().mul(vertices).add(vertexIndex)).xyz.mul(weights.element(i))));
+    loop(count, base, (i, sum) =>
+      sum.add(offsets.element(i.toUint().mul(vertices).add(vertexIndex)).xyz.mul(weights.element(i))),
+    );
   return {
     position: (position = positionLocal) => blend(cast(position, 'vec3f', 'morph position'), positions),
     normal(normal = normalLocal) {

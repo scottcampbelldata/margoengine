@@ -52,10 +52,7 @@ test('parse3dl reads the Lustre header with and without a vertex line, and takes
 });
 
 test('parse3dl infers the output depth from the values and the vertex line, or takes it as an option', () => {
-  const identity10 = flame(
-    17,
-    (r, g, b) => [r, g, b].map((i) => Math.min(64 * i, 1023)).join(' '),
-  );
+  const identity10 = flame(17, (r, g, b) => [r, g, b].map((i) => Math.min(64 * i, 1023)).join(' '));
   const lut = parse3dl(identity10);
   assert.equal(lut.data[4 * (16 * 289 + 16 * 17 + 16)], 1, '10-bit white is 1');
   assert.equal(lut.data[4 * 8], Math.fround(512 / 1023));
@@ -81,11 +78,16 @@ test('parse3dl rejects malformed files', () => {
     [flame(2, () => '70000 0 0', '0 1023'), RangeError],
     ['0\n1 1 1\n', RangeError],
   ];
-  for (const [text, type, options] of bad) assert.throws(() => parse3dl(text, options), type, String(text).slice(0, 40));
+  for (const [text, type, options] of bad)
+    assert.throws(() => parse3dl(text, options), type, String(text).slice(0, 40));
 });
 
 test('export3dl writes the Flame layout and round-trips a Grade and a CubeLUT', () => {
-  const grade = new Grade({ shadows: [0.02, 0, -0.01], highlights: [0.1, 0, -0.1], hueSaturation: [1.2, 1, 1, 1, 0.8, 1] }),
+  const grade = new Grade({
+      shadows: [0.02, 0, -0.01],
+      highlights: [0.1, 0, -0.1],
+      hueSaturation: [1.2, 1, 1, 1, 0.8, 1],
+    }),
     text = export3dl(grade, { size: 17 }),
     lines = text.trimEnd().split('\n');
   assert.equal(lines[0], VERTICES);
@@ -115,7 +117,10 @@ test('export3dl validates its source and options', () => {
   assert.throws(() => export3dl(lut, { size: 5 }), RangeError);
   assert.throws(() => export3dl({ ...lut, domainMax: new Float32Array([2, 1, 1]) }), RangeError);
   assert.throws(() => export3dl({ key: 'other', values: () => new Float32Array(4) }), TypeError);
-  assert.throws(() => export3dl({ size: 3, data: new Float32Array(4), domainMin: lut.domainMin, domainMax: lut.domainMax }), TypeError);
+  assert.throws(
+    () => export3dl({ size: 3, data: new Float32Array(4), domainMin: lut.domainMin, domainMax: lut.domainMax }),
+    TypeError,
+  );
 });
 
 test('Tonemap takes a parsed .3dl LUT', () => {

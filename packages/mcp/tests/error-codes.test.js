@@ -3,13 +3,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { createMargoServer } from '../dist/index.js';
-import {
-  createErrorTool,
-  errorPageUrl,
-  formatError,
-  loadErrorEntries,
-  lookupError,
-} from '../dist/error-codes.js';
+import { createErrorTool, errorPageUrl, formatError, loadErrorEntries, lookupError } from '../dist/error-codes.js';
 import { corpus, repository } from './support.js';
 
 const entries = [
@@ -38,7 +32,10 @@ test('lookupError finds an entry by its link, its id or code, and a listed messa
   );
   assert.equal(lookupError(entries, 'DISPOSED')[0].by, 'id', 'an error code in any case');
   const thrown = lookupError(entries, 'Uncaught TypeError: Slider step must be 0 or more');
-  assert.deepEqual([thrown[0].entry.id, thrown[0].by, thrown[0].message], ['widgets', 'message', 'Slider step must be 0 or more']);
+  assert.deepEqual(
+    [thrown[0].entry.id, thrown[0].by, thrown[0].message],
+    ['widgets', 'message', 'Slider step must be 0 or more'],
+  );
   assert.equal(lookupError(entries, 'MargoError [disposed]: Mesh disposed')[0].entry.id, 'disposed');
 });
 
@@ -47,7 +44,11 @@ test('lookupError falls back to shared words, and a stray word or an unknown lin
   assert.equal(near[0].entry.id, 'widgets');
   assert.equal(near[0].by, 'words');
   assert.equal(near[0].message, 'Slider needs finite min < max');
-  assert.deepEqual(lookupError(entries, 'the slider exploded completely today'), [], 'one shared word of five is no match');
+  assert.deepEqual(
+    lookupError(entries, 'the slider exploded completely today'),
+    [],
+    'one shared word of five is no match',
+  );
   assert.deepEqual(lookupError(entries, 'errors#nope'), []);
   assert.deepEqual(lookupError(entries, 'the of and'), [], 'stop words alone match nothing');
   assert.throws(() => lookupError(entries, '  '), { name: 'TypeError', message: /errors#mcp/ });
@@ -90,7 +91,10 @@ test('explain_error answers with the cause and fix, structured matches, and reje
     score: 100,
   });
   const near = await tool.run({ error: 'slider min max must be finite' }, context);
-  assert.match(near.content[0].text, /^Widgets {2}\(https:\/\/margoengine\.com\/errors#widgets\)\nClosest listed message: Slider needs finite min < max\n/);
+  assert.match(
+    near.content[0].text,
+    /^Widgets {2}\(https:\/\/margoengine\.com\/errors#widgets\)\nClosest listed message: Slider needs finite min < max\n/,
+  );
   const none = await tool.run({ error: 'qwertyuiop' }, context);
   assert.deepEqual(none.structuredContent.matches, []);
   assert.equal(none.content[0].text, formatError('qwertyuiop', []));
@@ -108,7 +112,10 @@ test('the Margo server lists explain_error and answers it over JSON-RPC', async 
     jsonrpc: '2.0',
     id: 2,
     method: 'tools/call',
-    params: { name: 'explain_error', arguments: { error: 'Mesh disposed; see https://margoengine.com/errors#disposed' } },
+    params: {
+      name: 'explain_error',
+      arguments: { error: 'Mesh disposed; see https://margoengine.com/errors#disposed' },
+    },
   });
   assert.equal(answer.result.isError, undefined);
   assert.match(answer.result.content[0].text, /^disposed: /);

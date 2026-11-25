@@ -4,7 +4,10 @@ import { ops, quatMul, quatSlerp, type GraphRef, type GraphValue } from './inter
 import { ACTIVE_LIMIT, type ObjectModel } from './interactivity-model.js';
 
 type Json = Record<string, any>;
-type Sampler = (channel: { times: Float32Array; values: Float32Array; width: number; interpolation: any }, time: number) => number[];
+type Sampler = (
+  channel: { times: Float32Array; values: Float32Array; width: number; interpolation: any },
+  time: number,
+) => number[];
 
 /** Why a file's interactivity does not run: `extension` for the whole object, otherwise the selected graph. */
 export class GraphRejected extends Error {
@@ -82,7 +85,8 @@ export function parseTemplate(text: unknown): PointerTemplate | undefined {
   }
   return { segments, params };
 }
-const literal = (s: string) => s.replaceAll('[[', '[').replaceAll(']]', ']').replaceAll('{{', '{').replaceAll('}}', '}');
+const literal = (s: string) =>
+  s.replaceAll('[[', '[').replaceAll(']]', ']').replaceAll('{{', '{').replaceAll('}}', '}');
 
 /** Parses a `debug/log` message: its parameter ids, or undefined for bad syntax. */
 function messageParams(message: string): { from: number; to: number; id: string }[] | undefined {
@@ -108,7 +112,8 @@ function messageParams(message: string): { from: number; to: number; id: string 
 
 /** Bezier easing of `variable/interpolate` and `pointer/interpolate`: the y of the curve where its x is `t`. */
 export function ease(p1: number[], p2: number[], t: number): number {
-  const curve = (a: number, b: number, u: number) => (3 * a - 3 * b + 1) * u ** 3 + (-6 * a + 3 * b) * u * u + 3 * a * u;
+  const curve = (a: number, b: number, u: number) =>
+    (3 * a - 3 * b + 1) * u ** 3 + (-6 * a + 3 * b) * u * u + 3 * a * u;
   let low = 0,
     high = 1,
     u = t;
@@ -156,10 +161,22 @@ interface Compiled {
 }
 
 /** The operations an extension brings, with the sockets it declares, the types by id. */
-const extensionOps: Record<string, Record<string, { inputs?: Record<string, string>; outputs?: Record<string, string>; flows?: string[]; implied?: boolean }>> = {
+const extensionOps: Record<
+  string,
+  Record<
+    string,
+    { inputs?: Record<string, string>; outputs?: Record<string, string>; flows?: string[]; implied?: boolean }
+  >
+> = {
   KHR_node_selectability: {
     'event/onSelect': {
-      outputs: { selectedNode: 'ref', controllerIndex: 'int', selectionPoint: 'float3', selectionRayOrigin: 'float3', event: 'ref' },
+      outputs: {
+        selectedNode: 'ref',
+        controllerIndex: 'int',
+        selectionPoint: 'float3',
+        selectionRayOrigin: 'float3',
+        event: 'ref',
+      },
     },
   },
   KHR_node_hoverability: {
@@ -167,8 +184,16 @@ const extensionOps: Record<string, Record<string, { inputs?: Record<string, stri
     'event/onHoverOut': { outputs: { hoveredNode: 'ref', controllerIndex: 'int', event: 'ref' } },
   },
   KHR_physics_rigid_bodies: {
-    'rigid_body/applyImpulse': { inputs: { nodeIndex: 'int', linearImpulse: 'float3', angularImpulse: 'float3' }, flows: ['in'], implied: true },
-    'rigid_body/applyPointImpulse': { inputs: { nodeIndex: 'int', impulse: 'float3', position: 'float3' }, flows: ['in'], implied: true },
+    'rigid_body/applyImpulse': {
+      inputs: { nodeIndex: 'int', linearImpulse: 'float3', angularImpulse: 'float3' },
+      flows: ['in'],
+      implied: true,
+    },
+    'rigid_body/applyPointImpulse': {
+      inputs: { nodeIndex: 'int', impulse: 'float3', position: 'float3' },
+      flows: ['in'],
+      implied: true,
+    },
     'rigid_body/rayCast': {
       inputs: { rayStart: 'float3', rayEnd: 'float3', collisionFilterIndex: 'int' },
       outputs: { hitNodeIndex: 'int', hitFraction: 'float', hitNormal: 'float3' },
@@ -180,7 +205,10 @@ const extensionOps: Record<string, Record<string, { inputs?: Record<string, stri
   },
 };
 // Sockets of the operations with flows, config-free part: inputs, outputs and the extra input flows.
-const flowOps: Record<string, { inputs?: Record<string, string>; outputs?: Record<string, string>; entries?: string[] }> = {
+const flowOps: Record<
+  string,
+  { inputs?: Record<string, string>; outputs?: Record<string, string>; entries?: string[] }
+> = {
   'flow/sequence': {},
   'flow/branch': { inputs: { condition: 'bool' } },
   'flow/switch': { inputs: { selection: 'int' } },
@@ -221,7 +249,8 @@ function inline(value: unknown, type: string, model: ObjectModel): GraphValue {
   const [first] = items;
   if (type === 'bool') return typeof first === 'boolean' ? first : reject('A bool value is not a boolean');
   if (type === 'int') return isInt(first) ? first | 0 : reject('An int value is not a 32-bit integer');
-  if (type === 'ref') return validPointer(first) ? model.resolveRef(first) : reject('A ref value is not a JSON pointer');
+  if (type === 'ref')
+    return validPointer(first) ? model.resolveRef(first) : reject('A ref value is not a JSON pointer');
   if (!items.every((v) => typeof v === 'number')) reject(`A ${type} value holds something other than numbers`);
   return type === 'float' ? (first as number) : (items as number[]).slice();
 }
@@ -309,12 +338,19 @@ function compile(graph: unknown, model: ObjectModel, extensions: string[]): Comp
       } else assert(typeof d.extension === 'string', 'A declaration extension is not a string');
       const inputs = sockets('inputValueSockets'),
         outputs = sockets('outputValueSockets');
-      const key = JSON.stringify([d.op, d.extension, Object.entries(d.inputValueSockets ?? {}).map(([id, s]: [string, any]) => [id, s.type]).sort()]);
+      const key = JSON.stringify([
+        d.op,
+        d.extension,
+        Object.entries(d.inputValueSockets ?? {})
+          .map(([id, s]: [string, any]) => [id, s.type])
+          .sort(),
+      ]);
       if (seen.has(key)) reject(`Declarations of ${d.op} are equal`);
       seen.add(key);
       const known = extensions.includes(d.extension) ? extensionOps[d.extension]?.[d.op] : undefined,
         match = (a: Record<string, string> | undefined, b: Record<string, string> | undefined) =>
-          (!a && known?.implied) || JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b ?? {}).sort());
+          (!a && known?.implied) ||
+          JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b ?? {}).sort());
       declarations.push({
         op: d.op,
         extension: d.extension,
@@ -336,7 +372,8 @@ function compile(graph: unknown, model: ObjectModel, extensions: string[]): Comp
       const declaration = declarations[n.declaration];
       if ('configuration' in n) {
         assert(hasKeys(n.configuration), 'A node has an empty configuration');
-        for (const c of Object.values<any>(n.configuration)) assert(isObject(c) && filled(c.value), 'A configuration has no value');
+        for (const c of Object.values<any>(n.configuration))
+          assert(isObject(c) && filled(c.value), 'A configuration has no value');
       }
       const inputs: Live['inputs'] = {};
       if ('values' in n) {
@@ -405,8 +442,31 @@ const configCases = (n: Json): number[] => {
 };
 
 /** Settles a node's sockets from its operation, configuration and input types. */
-function settle(index: number, d: { op: string; inputs?: Record<string, string>; outputs?: Record<string, string>; supported: boolean; extension?: string }, n: Json, inputs: Live['inputs'], flows: Live['flows'], scope: Scope): Live {
-  const live: Live = { index, op: d.op, noop: false, inputs, outputs: {}, flows, config: noConfig, state: {}, memoEpoch: -1 };
+function settle(
+  index: number,
+  d: {
+    op: string;
+    inputs?: Record<string, string>;
+    outputs?: Record<string, string>;
+    supported: boolean;
+    extension?: string;
+  },
+  n: Json,
+  inputs: Live['inputs'],
+  flows: Live['flows'],
+  scope: Scope,
+): Live {
+  const live: Live = {
+    index,
+    op: d.op,
+    noop: false,
+    inputs,
+    outputs: {},
+    flows,
+    config: noConfig,
+    state: {},
+    memoEpoch: -1,
+  };
   if (d.extension !== undefined) {
     for (const [id, type] of Object.entries(d.inputs ?? {})) need(inputs, id, type, d.op);
     live.outputs = d.outputs ?? {};
@@ -414,7 +474,8 @@ function settle(index: number, d: { op: string; inputs?: Record<string, string>;
     else {
       const nodeIndex = configInt(n, 'nodeIndex');
       live.config = { nodeIndex: nodeIndex !== undefined && nodeIndex >= 0 ? nodeIndex : undefined };
-      for (const [id, type] of Object.entries(live.outputs)) live.state[id] = id === 'controllerIndex' ? -1 : typeDefault(type);
+      for (const [id, type] of Object.entries(live.outputs))
+        live.state[id] = id === 'controllerIndex' ? -1 : typeDefault(type);
     }
     return live;
   }
@@ -523,8 +584,10 @@ function settle(index: number, d: { op: string; inputs?: Record<string, string>;
       const v = variable(configInt(n, 'variable')),
         type = scope.variables[v].type,
         useSlerp = configBool(n, 'useSlerp');
-      if (type === 'bool' || type === 'int' || type === 'ref' || type === 'custom') reject(`variable/interpolate cannot move a ${type}`);
-      if (useSlerp === undefined || (useSlerp && type !== 'float4')) reject('variable/interpolate has no valid useSlerp');
+      if (type === 'bool' || type === 'int' || type === 'ref' || type === 'custom')
+        reject(`variable/interpolate cannot move a ${type}`);
+      if (useSlerp === undefined || (useSlerp && type !== 'float4'))
+        reject('variable/interpolate has no valid useSlerp');
       need(inputs, 'value', type, d.op);
       live.config = { variable: v, useSlerp };
       break;
@@ -537,7 +600,8 @@ function settle(index: number, d: { op: string; inputs?: Record<string, string>;
       break;
     case 'pointer/interpolate': {
       const type = pointer(['value', 'duration', 'p1', 'p2']);
-      if (type === 'bool' || type === 'int' || type === 'ref' || type === 'custom') reject(`pointer/interpolate cannot move a ${type}`);
+      if (type === 'bool' || type === 'int' || type === 'ref' || type === 'custom')
+        reject(`pointer/interpolate cannot move a ${type}`);
       need(inputs, 'value', type, d.op);
       break;
     }
@@ -597,7 +661,11 @@ export interface BehaviorGraphOptions {
 export interface GraphPhysics {
   applyImpulse(nodeIndex: number, linear: number[], angular: number[]): void;
   applyPointImpulse(nodeIndex: number, impulse: number[], position: number[]): void;
-  rayCast(start: number[], end: number[], filter: number): { nodeIndex: number; fraction: number; normal: number[] } | undefined;
+  rayCast(
+    start: number[],
+    end: number[],
+    filter: number,
+  ): { nodeIndex: number; fraction: number; normal: number[] } | undefined;
 }
 /** One selection, as `select` takes it. */
 export interface SelectInfo {
@@ -615,11 +683,11 @@ export function compileInteractivity(doc: Json, model: ObjectModel, extensions: 
   const extension = doc.extensions?.KHR_interactivity;
   if (extension === undefined) return undefined;
   assert(isObject(extension) && filled(extension.graphs), 'graphs is empty or missing');
-  let chosen: Compiled | undefined,
-    failure: GraphRejected | undefined;
+  let chosen: Compiled | undefined, failure: GraphRejected | undefined;
   const selected = 'graph' in extension ? extension.graph : 0;
   assert(isIndex(selected), 'graph is not an index');
-  if (selected >= extension.graphs.length) throw new GraphRejected('graph names no graph; fix the KHR_interactivity object', true);
+  if (selected >= extension.graphs.length)
+    throw new GraphRejected('graph names no graph; fix the KHR_interactivity object', true);
   (extension.graphs as unknown[]).forEach((graph, i) => {
     try {
       const compiled = compile(graph, model, extensions);
@@ -650,9 +718,38 @@ export class BehaviorGraph {
   private readonly listeners = new Map<string, Set<Listener>>();
   private readonly queue: { event: number; values: Record<string, GraphValue> }[] = [];
   private delays: { ref: GraphRef; node: Live; at: number; serial: number }[] = [];
-  private variableMoves: { variable: number; start: number; duration: number; from: number | number[]; to: number | number[]; p1: number[]; p2: number[]; slerp: boolean; node: Live }[] = [];
-  private pointerMoves: { pointer: string; start: number; duration: number; from: number | number[]; to: number | number[]; p1: number[]; p2: number[]; slerp: boolean; node: Live }[] = [];
-  private playing: { index: number; start: number; end: number; stop: number; speed: number; created: number; endDone: Live; stopDone?: Live }[] = [];
+  private variableMoves: {
+    variable: number;
+    start: number;
+    duration: number;
+    from: number | number[];
+    to: number | number[];
+    p1: number[];
+    p2: number[];
+    slerp: boolean;
+    node: Live;
+  }[] = [];
+  private pointerMoves: {
+    pointer: string;
+    start: number;
+    duration: number;
+    from: number | number[];
+    to: number | number[];
+    p1: number[];
+    p2: number[];
+    slerp: boolean;
+    node: Live;
+  }[] = [];
+  private playing: {
+    index: number;
+    start: number;
+    end: number;
+    stop: number;
+    speed: number;
+    created: number;
+    endDone: Live;
+    stopDone?: Live;
+  }[] = [];
   private readonly refsMade = new Set<GraphRef>();
   private readonly hovered = new Map<number, number>();
   private epoch = 0;
@@ -678,7 +775,8 @@ export class BehaviorGraph {
   }
   /** The value of a variable by index or name. */
   variable(which: number | string): GraphValue {
-    const found = typeof which === 'number' ? this.variableList[which] : this.variableList.find((v) => v.name === which);
+    const found =
+      typeof which === 'number' ? this.variableList[which] : this.variableList.find((v) => v.name === which);
     return found ? found.value : null;
   }
   /** Calls `listener` when the graph sends the custom event `id`; returns a remover. */
@@ -786,7 +884,8 @@ export class BehaviorGraph {
         def = this.events[event],
         targets = this.of('event/receive').filter((n) => n.config.event === event);
       this.dispatch(targets, this.occurrence(), (node) => {
-        for (const [id, socket] of Object.entries(def.values)) node.state[id] = id in values ? values[id] : socket.value;
+        for (const [id, socket] of Object.entries(def.values))
+          node.state[id] = id in values ? values[id] : socket.value;
       });
     }
   }
@@ -805,7 +904,10 @@ export class BehaviorGraph {
     this.delays = this.delays.filter((d) => d !== found);
     found.node.state.pending = found.node.state.pending.filter((r: GraphRef) => r !== ref);
   }
-  private mixed(move: { from: number | number[]; to: number | number[]; p1: number[]; p2: number[]; slerp: boolean }, t: number): number | number[] {
+  private mixed(
+    move: { from: number | number[]; to: number | number[]; p1: number[]; p2: number[]; slerp: boolean },
+    t: number,
+  ): number | number[] {
     const q = ease(move.p1, move.p2, t),
       { from, to } = move;
     if (typeof from === 'number') return (1 - q) * from + q * (to as number);
@@ -878,7 +980,14 @@ export class BehaviorGraph {
   private output(node: Live, socket: string): GraphValue {
     if (node.noop) return typeDefault(node.outputs[socket]);
     const pure = ops.get(node.op);
-    if (pure || node.op === 'math/switch' || node.op === 'pointer/get' || node.op === 'variable/get' || node.op === 'math/random' || node.op === 'math/quatFromAngles') {
+    if (
+      pure ||
+      node.op === 'math/switch' ||
+      node.op === 'pointer/get' ||
+      node.op === 'variable/get' ||
+      node.op === 'math/random' ||
+      node.op === 'math/quatFromAngles'
+    ) {
       if (node.memoEpoch !== this.epoch || !node.memo) {
         node.memoEpoch = this.epoch;
         node.memo = this.compute(node, pure);
@@ -890,7 +999,10 @@ export class BehaviorGraph {
   private compute(node: Live, pure: ReturnType<typeof ops.get>): Record<string, GraphValue> {
     if (pure) {
       const values = pure.inputs.map((id) => this.input(node, id)),
-        result = pure.run(values, pure.inputs.map((id) => node.inputs[id].type));
+        result = pure.run(
+          values,
+          pure.inputs.map((id) => node.inputs[id].type),
+        );
       return pure.multi ? result : { value: result };
     }
     switch (node.op) {
@@ -1035,7 +1147,8 @@ export class BehaviorGraph {
           return;
         }
         const duration = input('duration');
-        if (!Number.isFinite(duration) || duration < 0 || this.delays.length >= ACTIVE_LIMIT) return this.fire(node, 'err');
+        if (!Number.isFinite(duration) || duration < 0 || this.delays.length >= ACTIVE_LIMIT)
+          return this.fire(node, 'err');
         const serial = this.serial++,
           ref = this.model.ref(`/extensions/KHR_interactivity/delays/${serial}`);
         s.lastDelay = ref;
@@ -1061,7 +1174,13 @@ export class BehaviorGraph {
           move = this.motion(node);
         if (!move || this.variableMoves.length >= ACTIVE_LIMIT) return this.fire(node, 'err');
         this.variableMoves = this.variableMoves.filter((m) => m.variable !== variable);
-        this.variableMoves.push({ ...move, variable, from: this.variableList[variable].value as number, slerp: useSlerp, node });
+        this.variableMoves.push({
+          ...move,
+          variable,
+          from: this.variableList[variable].value as number,
+          slerp: useSlerp,
+          node,
+        });
         return this.fire(node, 'out');
       }
       case 'pointer/set': {
@@ -1115,7 +1234,10 @@ export class BehaviorGraph {
       case 'debug/log': {
         let message: string = node.config.message;
         for (const { from, to, id } of [...node.config.params].reverse())
-          message = message.slice(0, from) + show(input(id)).replaceAll('{', '{{').replaceAll('}', '}}') + message.slice(to + 1);
+          message =
+            message.slice(0, from) +
+            show(input(id)).replaceAll('{', '{{').replaceAll('}', '}}') +
+            message.slice(to + 1);
         this.options.log?.(message.replaceAll('{{', '{').replaceAll('}}', '}'), node.config.severity);
         return this.fire(node, 'out');
       }
@@ -1187,7 +1309,8 @@ export class BehaviorGraph {
       speed = this.input(node, 'speed');
     if (Number.isNaN(start) || Number.isNaN(end) || !Number.isFinite(start)) return this.fire(node, 'err');
     if (!Number.isFinite(speed) || speed <= 0) return this.fire(node, 'err');
-    if (!this.options.sample || !state.channels.length || (!entry && this.playing.length >= ACTIVE_LIMIT)) return this.fire(node, 'err');
+    if (!this.options.sample || !state.channels.length || (!entry && this.playing.length >= ACTIVE_LIMIT))
+      return this.fire(node, 'err');
     this.playing = this.playing.filter((e) => e !== entry);
     this.playing.push({ index: i, start, end, stop: end, speed, created: this.time, endDone: node });
     state.isPlaying = true;
@@ -1218,7 +1341,8 @@ export class BehaviorGraph {
   }
   /** Moves the hover of a controller to `nodeIndex`, or off everything with undefined. */
   hover(nodeIndex: number | undefined, controllerIndex = 0): void {
-    const target = nodeIndex !== undefined && this.model.inherited(nodeIndex, 'hoverability/hoverable') ? nodeIndex : -1,
+    const target =
+        nodeIndex !== undefined && this.model.inherited(nodeIndex, 'hoverability/hoverable') ? nodeIndex : -1,
       before = this.hovered.get(controllerIndex) ?? -1;
     if (target === before) return;
     this.hovered.set(controllerIndex, target);
@@ -1242,13 +1366,26 @@ export class BehaviorGraph {
       }
     };
     this.slice(() => {
-      run('event/onHoverOut', old.filter((n) => !fresh.includes(n)), before);
-      run('event/onHoverIn', fresh.filter((n) => !old.includes(n)), target);
+      run(
+        'event/onHoverOut',
+        old.filter((n) => !fresh.includes(n)),
+        before,
+      );
+      run(
+        'event/onHoverIn',
+        fresh.filter((n) => !old.includes(n)),
+        target,
+      );
       this.drain();
     });
   }
   /** Runs a physics trigger event of `op` for the trigger at `nodeIndex`. */
-  trigger(op: 'event/rigid_body_triggerEntered' | 'event/rigid_body_triggerExited', nodeIndex: number, colliderNodeIndex: number, motionNodeIndex: number): void {
+  trigger(
+    op: 'event/rigid_body_triggerEntered' | 'event/rigid_body_triggerExited',
+    nodeIndex: number,
+    colliderNodeIndex: number,
+    motionNodeIndex: number,
+  ): void {
     this.slice(() => {
       this.dispatch(
         this.of(op).filter((n) => n.config.nodeIndex === nodeIndex),

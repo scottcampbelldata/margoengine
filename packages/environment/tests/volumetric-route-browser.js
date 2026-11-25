@@ -89,11 +89,18 @@ window.runTests = async () => {
     report.tiers = { route: own.tiers, column: other.tiers };
     assert(own.tiers.cpu === 0 && own.tiers.fragment > 0, `the layer route ran ${JSON.stringify(own.tiers)}`);
     assert(other.tiers.cpu === 1, `the column kernel ran ${JSON.stringify(other.tiers)} on the layer`);
-    report.checks.push(`layer: the fog's compute ran ${JSON.stringify(own.tiers)} dispatches (column kernel: ${JSON.stringify(other.tiers)})`);
+    report.checks.push(
+      `layer: the fog's compute ran ${JSON.stringify(own.tiers)} dispatches (column kernel: ${JSON.stringify(other.tiers)})`,
+    );
     // The column kernel runs on the layer's CPU tier, whose filtering and exp round apart from the GPU's: values agree
     // to one rgba16float step. That the two kernels compute the same arithmetic is the native leg's value-for-value check.
-    assert(steps <= 1, `the layer routes differ in ${differ} of ${own.data.length} values, by up to ${steps} half-float steps`);
-    report.checks.push(`layer: GPU route and CPU-tier column kernel agree within one half-float step (${differ} of ${own.data.length} values differ, by up to ${worst})`);
+    assert(
+      steps <= 1,
+      `the layer routes differ in ${differ} of ${own.data.length} values, by up to ${steps} half-float steps`,
+    );
+    report.checks.push(
+      `layer: GPU route and CPU-tier column kernel agree within one half-float step (${differ} of ${own.data.length} values differ, by up to ${worst})`,
+    );
   } else {
     assert(differ === 0, `the routes differ in ${differ} of ${own.data.length} values, by up to ${worst}`);
     report.checks.push(`both integration routes store the same ${grid.join(' x ')} volume, value for value`);

@@ -35,7 +35,10 @@ export function checkTuning(table: ComputeTuning, limit: number): void {
     if (![64, 128, 256, 512, 1024].includes(threads))
       throw rangeError(`Tuned ${name} must be 64, 128, 256, 512 or 1024 threads, got ${String(threads)}`, 'compute');
     if (threads > limit)
-      throw rangeError(`Tuned ${name} of ${threads} threads is over this device's limit of ${limit}; measure again on it`, 'compute');
+      throw rangeError(
+        `Tuned ${name} of ${threads} threads is over this device's limit of ${limit}; measure again on it`,
+        'compute',
+      );
   }
 }
 

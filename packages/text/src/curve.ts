@@ -81,7 +81,10 @@ export interface PathTextOptions extends TextOptions {
 const unit = (v: Vec3): [number, number, number] => {
   const length = Math.hypot(...v);
   if (v.length !== 3 || !v.every(Number.isFinite) || !length)
-    throw new MargoError('failed', 'Text path has a degenerate frame; supply finite nonzero tangent and normal vectors');
+    throw new MargoError(
+      'failed',
+      'Text path has a degenerate frame; supply finite nonzero tangent and normal vectors',
+    );
   return [v[0] / length, v[1] / length, v[2] / length];
 };
 
@@ -98,32 +101,65 @@ export class PathText {
   private disposed = false;
   /** Mutable owned settings; update applies changes atomically. */
   readonly options: PathTextOptions;
-  constructor(options: PathTextOptions) { this.options = { ...options }; this.update(); }
+  constructor(options: PathTextOptions) {
+    this.options = { ...options };
+    this.update();
+  }
   /** Atomically rebuild the path placement from options. */
   update(options: Partial<PathTextOptions> = {}): this {
     if (this.disposed) throw new MargoError('disposed', 'PathText is disposed; create a new PathText');
-    const settings = { ...this.options, ...options }, path = settings.path;
+    const settings = { ...this.options, ...options },
+      path = settings.path;
     if (!path || !(path.length > 0) || !Number.isFinite(path.length) || !Number.isFinite(settings.startOffset ?? 0))
       throw new RangeError('Text path length must be positive and offset finite; supply an arc-length path');
-    if (settings.billboard) throw new MargoError('unsupported', 'Path frames set glyph orientation; set billboard to false');
-    const base = new Text(settings), layout = layoutText(base.text, settings, base.font), next: Text[] = [];
+    if (settings.billboard)
+      throw new MargoError('unsupported', 'Path frames set glyph orientation; set billboard to false');
+    const base = new Text(settings),
+      layout = layoutText(base.text, settings, base.font),
+      next: Text[] = [];
     for (const g of layout.glyphs) {
       if (g.whitespace) continue;
       let distance = g.x + g.advance / 2 + (settings.startOffset ?? 0);
       if (settings.closed) distance = ((distance % path.length) + path.length) % path.length;
       else if (distance < 0 || distance > path.length) continue;
-      const frame = path.sample(distance), t = unit(frame.tangent);
+      const frame = path.sample(distance),
+        t = unit(frame.tangent);
       if (frame.position.length !== 3 || !frame.position.every(Number.isFinite))
         throw new MargoError('failed', 'Text path position is invalid; supply three finite coordinates');
       const projection = frame.normal[0] * t[0] + frame.normal[1] * t[1] + frame.normal[2] * t[2];
-      const n = unit([frame.normal[0] - projection * t[0], frame.normal[1] - projection * t[1], frame.normal[2] - projection * t[2]]);
+      const n = unit([
+        frame.normal[0] - projection * t[0],
+        frame.normal[1] - projection * t[1],
+        frame.normal[2] - projection * t[2],
+      ]);
       const z = [t[1] * n[2] - t[2] * n[1], t[2] * n[0] - t[0] * n[2], t[0] * n[1] - t[1] * n[0]];
-      const matrix = new Float32Array([t[0],t[1],t[2],0,n[0],n[1],n[2],0,z[0],z[1],z[2],0,
-        frame.position[0] - t[0] * g.advance / 2 + n[0] * g.y,
-        frame.position[1] - t[1] * g.advance / 2 + n[1] * g.y,
-        frame.position[2] - t[2] * g.advance / 2 + n[2] * g.y,1]);
-      const text = new Text({ ...settings, text: g.cluster, font: base.font, maxWidth: Infinity,
-        anchorX: 'left', anchorY: 'baseline', direction: g.rtl ? 'rtl' : 'ltr' });
+      const matrix = new Float32Array([
+        t[0],
+        t[1],
+        t[2],
+        0,
+        n[0],
+        n[1],
+        n[2],
+        0,
+        z[0],
+        z[1],
+        z[2],
+        0,
+        frame.position[0] - (t[0] * g.advance) / 2 + n[0] * g.y,
+        frame.position[1] - (t[1] * g.advance) / 2 + n[1] * g.y,
+        frame.position[2] - (t[2] * g.advance) / 2 + n[2] * g.y,
+        1,
+      ]);
+      const text = new Text({
+        ...settings,
+        text: g.cluster,
+        font: base.font,
+        maxWidth: Infinity,
+        anchorX: 'left',
+        anchorY: 'baseline',
+        direction: g.rtl ? 'rtl' : 'ltr',
+      });
       text.setMatrix(multiplyMatrices(base.matrix, matrix, new Float32Array(16)));
       next.push(text);
     }
@@ -149,7 +185,14 @@ export class PathText {
     return this;
   }
   /** Release glyph renderer memberships. */
-  dispose(): void { for (const text of this.texts) text.dispose(); this.texts.length = 0; this.renderer = undefined; this.disposed = true; }
+  dispose(): void {
+    for (const text of this.texts) text.dispose();
+    this.texts.length = 0;
+    this.renderer = undefined;
+    this.disposed = true;
+  }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

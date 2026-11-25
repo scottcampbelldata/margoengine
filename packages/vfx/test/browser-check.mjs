@@ -131,7 +131,10 @@ try {
     assert.ok(r.capacity >= 2_097_152, `scale: a default device holds 2,097,152 slots (${r.capacity})`);
     assert.match(String(r.refused), /exceeds the device limits .*at most \d+ here/, 'scale: one more slot is refused');
     assert.equal(r.live, r.capacity, 'scale: every slot is born and alive');
-    assert.ok(r.visible > r.capacity * 0.9 && r.visible <= r.capacity, `scale: on-screen particles listed (${r.visible})`);
+    assert.ok(
+      r.visible > r.capacity * 0.9 && r.visible <= r.capacity,
+      `scale: on-screen particles listed (${r.visible})`,
+    );
     console.log(
       `ok scale${r.compat ? ' (compat)' : ''}: ${r.capacity} particles live, ${r.visible} drawn, GPU ${r.gpuMs ?? 'n/a'} ms, wall ${r.wallMs} ms a frame`,
     );

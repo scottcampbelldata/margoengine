@@ -35,21 +35,30 @@ export class PrecipitationCover implements EnginePlugin {
   private disposed = false;
   private readonly cache = new Map<string, string>();
 
-  constructor(readonly capture: PrecipitationCapture, options: PrecipitationCoverOptions = {}) {
+  constructor(
+    readonly capture: PrecipitationCapture,
+    options: PrecipitationCoverOptions = {},
+  ) {
     this.bias = options.bias ?? 0.02;
     if (!Number.isFinite(this.bias) || this.bias < 0)
       throw new RangeError('PrecipitationCover bias must be finite and nonnegative; pass metres');
   }
 
   /** Attaches the cover and takes ownership of its previously unattached capture. */
-  static attach(engine: EngineKernel, capture: PrecipitationCapture, options?: PrecipitationCoverOptions): PrecipitationCover {
+  static attach(
+    engine: EngineKernel,
+    capture: PrecipitationCapture,
+    options?: PrecipitationCoverOptions,
+  ): PrecipitationCover {
     const cover = new PrecipitationCover(capture, options);
     engineRuntime(engine).use(cover);
     return cover;
   }
 
   /** The underlying top-down depth32float map, updated every frame. */
-  get texture(): GPUTexture | undefined { return this.capture.coverTexture; }
+  get texture(): GPUTexture | undefined {
+    return this.capture.coverTexture;
+  }
 
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'PrecipitationCover is disposed; create a new cover');
@@ -68,18 +77,25 @@ export class PrecipitationCover implements EnginePlugin {
   registerPasses(graph: FrameGraph): void {
     const captureGraph = new FrameGraph();
     let found = false;
-    captureGraph.add = pass => {
+    captureGraph.add = (pass) => {
       if (!pass.name.endsWith(':cover')) return () => {};
       found = true;
       return graph.add({ ...pass, name: 'weather:cover-map', order: -3 });
     };
     this.capture.registerPasses?.(captureGraph);
     if (!found) throw new MargoError('unsupported', 'PrecipitationCover needs a WeatherFX capture with a cover pass');
-    graph.add({ name: 'weather:cover-surfaces', order: -0.5, execute: c => {
-      if (c.backend !== 'webgpu' || !this.bindings().length) return;
-      const code = this.shader(c.shader, 0);
-      if (code !== c.shader) { c.shader = code; c.bindings.push(...this.bindings()); }
-    } });
+    graph.add({
+      name: 'weather:cover-surfaces',
+      order: -0.5,
+      execute: (c) => {
+        if (c.backend !== 'webgpu' || !this.bindings().length) return;
+        const code = this.shader(c.shader, 0);
+        if (code !== c.shader) {
+          c.shader = code;
+          c.bindings.push(...this.bindings());
+        }
+      },
+    });
   }
 
   /** Cover declarations and weather calls in either a core or gltf\/pbr shader. */
@@ -90,7 +106,8 @@ export class PrecipitationCover implements EnginePlugin {
     const key = group + source;
     const cached = this.cache.get(key);
     if (cached) return cached;
-    let code = source.replaceAll('weather_puddle_surface(i.position,', 'weather_cover_water(i.position,')
+    let code = source
+      .replaceAll('weather_puddle_surface(i.position,', 'weather_cover_water(i.position,')
       .replaceAll('weather_snow_at(i.position.xz,', 'weather_cover_snow(i.position,')
       .replaceAll('weather_snow_depth(p.xz,', 'weather_cover_depth(p.xyz,');
     if (code === source) return source;
@@ -112,16 +129,19 @@ export class PrecipitationCover implements EnginePlugin {
         let n=i32(f.depth.y)-1;let b=vec2i(floor(uv*f.depth.y-0.5));var d=1.0;
         for(var k=0;k<4;k++){d=min(d,textureLoad(weatherCoverMap,clamp(b+vec2i(k&1,k/2),vec2i(0),vec2i(n)),0));}
         let rise=select(0.0,1.41421356*sqrt(max(1.0-ny*ny,0.0))/max(ny,0.5)/(f.area.z*f.depth.y),ny>=0.5);
-        return d>=1.0||p.y+${this.bias.toExponential() }+rise>=f.area.w-d*f.depth.x;
+        return d>=1.0||p.y+${this.bias.toExponential()}+rise>=f.area.w-d*f.depth.x;
       }`;
-    if (code.includes('weather_cover_water(')) helpers += `
+    if (code.includes('weather_cover_water('))
+      helpers += `
       fn weather_cover_water(p:vec3f,n:vec3f,c:vec3f,r:f32,m:f32,wet:bool,u:WeatherPuddles)->mat3x4f {
         var v=u;if(!weather_exposed(p,n.y)){v.a.x=0.0;v.a.y=0.0;}
         return weather_puddle_surface(p,n,c,r,m,wet,v);
       }`;
-    if (code.includes('weather_cover_snow(')) helpers += `
+    if (code.includes('weather_cover_snow('))
+      helpers += `
       fn weather_cover_snow(p:vec3f,ny:f32,c:f32)->f32 {return weather_snow_at(p.xz,ny,select(0.0,c,weather_exposed(p,ny)));}`;
-    if (code.includes('weather_cover_depth(')) helpers += `
+    if (code.includes('weather_cover_depth('))
+      helpers += `
       fn weather_cover_depth(p:vec3f,ny:f32,u:WeatherSnow)->f32 {var v=u;if(!weather_exposed(p,ny)){v.a.x=0.0;}return weather_snow_depth(p.xz,ny,v);}`;
     code = helpers + code;
     if (this.cache.size >= 32) this.cache.clear();
@@ -132,9 +152,12 @@ export class PrecipitationCover implements EnginePlugin {
   /** Map bindings in the same group as the weather effect. */
   bindings(): GPUBindGroupEntry[] {
     const map = this.capture.options.weather.occlusion;
-    return !this.disposed && map?.buffer && map.view ? [
-      { binding: 162, resource: { buffer: map.buffer } }, { binding: 163, resource: map.view },
-    ] : [];
+    return !this.disposed && map?.buffer && map.view
+      ? [
+          { binding: 162, resource: { buffer: map.buffer } },
+          { binding: 163, resource: map.view },
+        ]
+      : [];
   }
 
   onDeviceRestored(engine: Engine): void {
@@ -150,5 +173,7 @@ export class PrecipitationCover implements EnginePlugin {
     this.cache.clear();
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

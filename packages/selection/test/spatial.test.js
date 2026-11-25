@@ -129,7 +129,9 @@ test('model instances retain instance identity and world-space contact distance'
   assert.deepEqual(hit.position, [3, 0, 0]);
 });
 test('model primitives inherit the root render mask and can override it', async (t) => {
-  const { engine } = await fixture(t), root = engine.createMesh(), node = engine.createMesh();
+  const { engine } = await fixture(t),
+    root = engine.createMesh(),
+    node = engine.createMesh();
   const primitive = { node, vertices: triangle(0), indices: new Uint32Array([0, 1, 2]) };
   engine.use({ name: 'layered-model', root, primitives: [primitive], setup() {} });
   const picker = new SpatialPicking(engine, {}, { layers: 2 });
@@ -161,11 +163,20 @@ test('deformed model proximity uses the current readback rather than bind-pose v
   assert.equal(await picker.sphere([0, 0, 0.1], 0.11), null);
 });
 test('static batched primitives remain selectable in a model with deformed siblings', async (t) => {
-  const { engine, picker } = await fixture(t), root = engine.createMesh(), other = engine.createMesh().setPosition([3, 0, 0]);
+  const { engine, picker } = await fixture(t),
+    root = engine.createMesh(),
+    other = engine.createMesh().setPosition([3, 0, 0]);
   const moving = { node: root, vertices: triangle(0), indices: new Uint32Array([0, 1, 2]), deformed: {} };
   const fixed = { node: other, vertices: triangle(0), indices: moving.indices };
-  engine.use({ name: 'mixed-contact', root, primitives: [moving, fixed], setup() {},
-    async readPickingGeometry() { return [{ primitiveIndex: 0, vertices: triangle(2), indices: moving.indices, matrix: root.matrix.slice() }]; } });
+  engine.use({
+    name: 'mixed-contact',
+    root,
+    primitives: [moving, fixed],
+    setup() {},
+    async readPickingGeometry() {
+      return [{ primitiveIndex: 0, vertices: triangle(2), indices: moving.indices, matrix: root.matrix.slice() }];
+    },
+  });
   const hit = await picker.sphere([3, 0, 0.1], 0.11);
   assert.equal(hit.mesh, other);
   assert.equal(hit.primitiveIndex, 1);
@@ -189,12 +200,19 @@ test('an abort settles a pending ray without waiting for GPU readback', async (t
 });
 test('ray helper refuses a picker registered in a different scene', async (t) => {
   const { engine } = await fixture(t);
-  const picking = { name: 'ray-picker', setup() {}, pick() { assert.fail('a foreign picker must not be called'); } };
+  const picking = {
+    name: 'ray-picker',
+    setup() {},
+    pick() {
+      assert.fail('a foreign picker must not be called');
+    },
+  };
   engine.use(picking);
   const scene = engine.createScene('ray-owner');
   const spatial = SpatialPicking.attach(engine, picking, { scene });
   await assert.rejects(spatial.ray([0, 0, 1], [0, 0, -1]), { code: 'attached', message: /errors#arguments$/ });
-  spatial.dispose(); engine.removePlugin(picking.name);
+  spatial.dispose();
+  engine.removePlugin(picking.name);
 });
 test('rays ask the picker for the centre pixel only', async (t) => {
   const { picker, calls } = await fixture(t);

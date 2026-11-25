@@ -305,7 +305,10 @@ export function metarState(report: Metar, options: MetarStateOptions = {}): Weat
 function air(temperature: number | undefined, dewPoint: number | undefined): { humidity: number; temperature: number } {
   const t = temperature === undefined || !Number.isFinite(temperature) ? 15 : Math.min(60, Math.max(-80, temperature)),
     e = (c: number) => Math.exp((17.625 * c) / (c + 243.04)),
-    humidity = temperature === undefined || dewPoint === undefined || !Number.isFinite(dewPoint) ? 0.5 : Math.min(1, e(Math.min(dewPoint, t)) / e(t));
+    humidity =
+      temperature === undefined || dewPoint === undefined || !Number.isFinite(dewPoint)
+        ? 0.5
+        : Math.min(1, e(Math.min(dewPoint, t)) / e(t));
   return { humidity, temperature: t };
 }
 

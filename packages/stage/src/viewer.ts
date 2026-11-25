@@ -136,7 +136,10 @@ export async function addViewer(
   if (shadows !== 'contact' && shadows !== 'cascaded' && shadows !== false)
     throw typeError('shadows: contact, cascaded or false', 'arguments');
   if (typeof fit !== 'boolean')
-    throw typeError('Invalid fit: expected a boolean; use true to fit the camera or false to keep its view', 'arguments');
+    throw typeError(
+      'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
+      'arguments',
+    );
   const { seconds = 30, resumeAfter = 3 } = typeof turntable === 'object' ? turntable : {};
   if (!Number.isFinite(seconds) || !seconds || !Number.isFinite(resumeAfter) || !(resumeAfter >= 0))
     throw rangeError('Turntable: finite seconds not 0, finite resumeAfter 0 or more', 'arguments');
@@ -178,7 +181,9 @@ export async function addViewer(
       ? null
       : optionalPackage('@margoengine/environment', () => import('@margoengine/environment'), abort),
     shadows === 'contact' ? optionalPackage('@margoengine/studio', () => import('@margoengine/studio'), abort) : null,
-    shadows === 'cascaded' ? optionalPackage('@margoengine/shadows', () => import('@margoengine/shadows'), abort) : null,
+    shadows === 'cascaded'
+      ? optionalPackage('@margoengine/shadows', () => import('@margoengine/shadows'), abort)
+      : null,
     tonemap ? optionalPackage('@margoengine/tonemap', () => import('@margoengine/tonemap'), abort) : null,
   ]);
   const [modelLoad, lightLoad, backdropLoad, contactLoad, castLoad, gradeLoad] = loading,

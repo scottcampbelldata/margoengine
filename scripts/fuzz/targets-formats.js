@@ -337,38 +337,34 @@ export default [
           throw new Error('GARBAGE: a metadata name is not text');
     },
   }),
-  gltfPbr(
-    'gltf/worker',
-    'gltf/pbr parse-worker job: prepareGLTF, structured clone with transfers, modelFromPrepared',
-    {
-      async setup() {
-        const [{ prepareGLTF }, { modelFromPrepared }, { instancing }, { extendedMaterials }, { transferables }] =
-          await Promise.all([
-            import(dist('gltf/dist/prepare.js')),
-            import(dist('gltf/dist/worker.js')),
-            import(dist('gltf/dist/pbr-instancing.js')),
-            import(dist('gltf/dist/extended.js')),
-            import(dist('shared/worker.js')),
-          ]);
-        Object.assign(this, { prepareGLTF, modelFromPrepared, transferables, engine: await headless() });
-        this.decoders = { instancing, materials: extendedMaterials };
-      },
-      seeds: async () => gltfSeeds(),
-      async run(bytes) {
-        // The job runs in the worker; postMessage structured-clones its reply; the model is built on the main thread.
-        const prepared = await this.prepareGLTF(undefined, bytes, undefined, maxDownloadBytes),
-          moved = structuredClone(prepared, {
-            transfer: [...this.transferables(prepared)].filter((b) => b instanceof ArrayBuffer),
-          }),
-          model = this.modelFromPrepared(this.engine, moved, undefined, this.decoders);
-        try {
-          await checkModel(model);
-        } finally {
-          model.dispose();
-        }
-      },
+  gltfPbr('gltf/worker', 'gltf/pbr parse-worker job: prepareGLTF, structured clone with transfers, modelFromPrepared', {
+    async setup() {
+      const [{ prepareGLTF }, { modelFromPrepared }, { instancing }, { extendedMaterials }, { transferables }] =
+        await Promise.all([
+          import(dist('gltf/dist/prepare.js')),
+          import(dist('gltf/dist/worker.js')),
+          import(dist('gltf/dist/pbr-instancing.js')),
+          import(dist('gltf/dist/extended.js')),
+          import(dist('shared/worker.js')),
+        ]);
+      Object.assign(this, { prepareGLTF, modelFromPrepared, transferables, engine: await headless() });
+      this.decoders = { instancing, materials: extendedMaterials };
     },
-  ),
+    seeds: async () => gltfSeeds(),
+    async run(bytes) {
+      // The job runs in the worker; postMessage structured-clones its reply; the model is built on the main thread.
+      const prepared = await this.prepareGLTF(undefined, bytes, undefined, maxDownloadBytes),
+        moved = structuredClone(prepared, {
+          transfer: [...this.transferables(prepared)].filter((b) => b instanceof ArrayBuffer),
+        }),
+        model = this.modelFromPrepared(this.engine, moved, undefined, this.decoders);
+      try {
+        await checkModel(model);
+      } finally {
+        model.dispose();
+      }
+    },
+  }),
   gltfPbr('gltf/ktx2', 'gltf/pbr KHR_texture_basisu: KTX2 header and budget checks, the real Basis transcoder', {
     timeMs: 8000,
     memory: 1100 * MiB,
@@ -420,46 +416,42 @@ export default [
       }
     },
   }),
-  gltfPbr(
-    'gltf/progressive',
-    'gltf/progressive: GLB/JSON head and range requests against misbehaving servers',
-    {
-      timeMs: 8000,
-      async setup() {
-        this.load = (await import(dist('gltf/dist/progressive.js'))).loadGLTFProgressive;
-        this.engine = await gpuEngine();
-      },
-      seeds: async () => gltfSeeds(256 * 1024).map((s, i) => withParams([i % SERVER.length], s)),
-      generators: [
-        function structure(r, context) {
-          return withParams(
-            [r.int(SERVER.length)],
-            mutateGLTF(
-              r,
-              context.seeds.map((s) => splitParams(s).body),
-            ),
-          );
-        },
-      ],
-      async run(bytes) {
-        const { params, body } = splitParams(bytes),
-          fetch = globalThis.fetch;
-        globalThis.fetch = server(body, SERVER[params[0] % SERVER.length]);
-        const load = this.load(this.engine, 'https://fuzz.test/model.glb', { maxDownloadBytes });
-        try {
-          const model = await load.complete;
-          try {
-            await checkModel(model);
-          } finally {
-            model.dispose();
-          }
-        } finally {
-          load.abort();
-          globalThis.fetch = fetch;
-        }
-      },
+  gltfPbr('gltf/progressive', 'gltf/progressive: GLB/JSON head and range requests against misbehaving servers', {
+    timeMs: 8000,
+    async setup() {
+      this.load = (await import(dist('gltf/dist/progressive.js'))).loadGLTFProgressive;
+      this.engine = await gpuEngine();
     },
-  ),
+    seeds: async () => gltfSeeds(256 * 1024).map((s, i) => withParams([i % SERVER.length], s)),
+    generators: [
+      function structure(r, context) {
+        return withParams(
+          [r.int(SERVER.length)],
+          mutateGLTF(
+            r,
+            context.seeds.map((s) => splitParams(s).body),
+          ),
+        );
+      },
+    ],
+    async run(bytes) {
+      const { params, body } = splitParams(bytes),
+        fetch = globalThis.fetch;
+      globalThis.fetch = server(body, SERVER[params[0] % SERVER.length]);
+      const load = this.load(this.engine, 'https://fuzz.test/model.glb', { maxDownloadBytes });
+      try {
+        const model = await load.complete;
+        try {
+          await checkModel(model);
+        } finally {
+          model.dispose();
+        }
+      } finally {
+        load.abort();
+        globalThis.fetch = fetch;
+      }
+    },
+  }),
   {
     name: 'margo',
     description: '@margoengine/blender parseMargo: header, section table, scene JSON, packed geometry, PNG headers',

@@ -112,7 +112,10 @@ test('the deck lights the scene once: a light-only map, and the sun and moon onl
   assert.equal(v[23], Math.fround(0.55), 'the default sun on the clouds');
   assert.equal(v[61], 0, 'dimLight: the engine sun carries the sun under the deck');
   assert.equal(v[62], 0, 'dimLight: the moon under the deck is the engine moon');
-  assert.ok(Math.abs(v[63] - 0.2 * cloudDeckTransmittance(layerOf(clouds.options), sky.sun[1])) < 1e-6, 'albedo x share');
+  assert.ok(
+    Math.abs(v[63] - 0.2 * cloudDeckTransmittance(layerOf(clouds.options), sky.sun[1])) < 1e-6,
+    'albedo x share',
+  );
   clouds.options.dimLight = false;
   clouds.options.groundAlbedo = 0.8;
   frame(h, sky, clouds);
@@ -122,7 +125,10 @@ test('the deck lights the scene once: a light-only map, and the sun and moon onl
   // 1 / (4 pi 0.15), engine units laid into a map that was itself left in sky units.
   assert.ok(Math.abs(sky.lightScale - 2 / (4 * Math.PI * 0.55)) < 1e-9, 'the sky scale');
   assert.ok(Math.abs(v[61] - 1) < 1e-6, 'the sun matched to the engine light, in sky units');
-  assert.ok(Math.abs(v[62] - Math.fround(0.55 / (0.15 * 2))) < 1e-6, 'the moon matched to the engine moon, in sky units');
+  assert.ok(
+    Math.abs(v[62] - Math.fround(0.55 / (0.15 * 2))) < 1e-6,
+    'the moon matched to the engine moon, in sky units',
+  );
   assert.ok(Math.abs(v[63] - 0.8 * cloudDeckTransmittance(layerOf(clouds.options), sky.sun[1])) < 1e-6);
   for (const groundAlbedo of [-0.1, 1.5, Number.NaN])
     assert.throws(() => new VolumetricClouds({ groundAlbedo }), /groundAlbedo 0 to 1/);
@@ -161,7 +167,10 @@ test('the coverage map drifts on without a jump where the shapes wrap', () => {
     h.context.bindings = [];
     h.engine.frameGraph.execute(h.context);
     const v = uniforms.at(-1);
-    for (const [axis, wind] of [[0, 10], [1, 3]]) {
+    for (const [axis, wind] of [
+      [0, 10],
+      [1, 3],
+    ]) {
       // Shapes: (p + drift) / scale; coverage map: (p + flags.zw) / scale * 0.17. Each may differ from the unwrapped
       // drift only by whole repeats.
       const shapes = (v[36 + axis] - wind * seconds) / 14000,

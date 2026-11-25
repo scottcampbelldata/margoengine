@@ -180,7 +180,10 @@ function resolveLook(mesh: Mesh, given: TerrainColorOptions): ResolvedLook {
     throw new RangeError(
       'Invalid terrain wetness or variation; stoneNormal must stay within 0..1, wetDarkening and variation must be between 0 and 1.',
     );
-  if (!(options.wetDryTime >= 1 && options.wetDryTime <= 604800) || !(options.wetGlossTime >= 0.1 && options.wetGlossTime <= 3600))
+  if (
+    !(options.wetDryTime >= 1 && options.wetDryTime <= 604800) ||
+    !(options.wetGlossTime >= 0.1 && options.wetGlossTime <= 3600)
+  )
     throw new RangeError('Invalid terrain drying; wetDryTime must be 1 to 604,800 s and wetGlossTime 0.1 to 3,600 s.');
   const detail = options.detail ?? 1;
   if (typeof detail !== 'number' || !(detail >= 0 && detail <= 1))
@@ -338,7 +341,11 @@ export function wetSandAfter(
   glossTime = 20,
 ): { moisture: number; film: number; darkening: number } {
   const moisture = Math.exp(-seconds / dryTime);
-  return { moisture, film: Math.exp(-seconds / glossTime), darkening: (1 - Math.exp(-3 * moisture)) / (1 - Math.exp(-3)) };
+  return {
+    moisture,
+    film: Math.exp(-seconds / glossTime),
+    darkening: (1 - Math.exp(-3 * moisture)) / (1 - Math.exp(-3)),
+  };
 }
 const rnd = (value: number) => Math.round(value * 1e6) / 1e6;
 const num = (value: number) => String(rnd(value));

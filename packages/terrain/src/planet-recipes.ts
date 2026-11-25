@@ -134,7 +134,8 @@ export function combine(heights: readonly PlanetHeight[], options: CombineOption
   const { mode = 'add', smooth = 100 } = options;
   if (!Array.isArray(heights) || heights.length === 0 || heights.some((h) => typeof h !== 'function'))
     throw new TypeError('Invalid combine heights; pass a non-empty array of height functions');
-  if (mode !== 'add' && mode !== 'max' && mode !== 'smoothMax') throw new RangeError("Invalid combine mode; pass 'add', 'max' or 'smoothMax'");
+  if (mode !== 'add' && mode !== 'max' && mode !== 'smoothMax')
+    throw new RangeError("Invalid combine mode; pass 'add', 'max' or 'smoothMax'");
   if (!finite(smooth, 0)) throw new RangeError('Invalid combine smooth; pass a width in metres, 0 or more');
   const list = heights.slice();
   return (x, y, z, detail) => {
@@ -169,7 +170,8 @@ const BODIES: Record<PlanetPresetName, { radius: number; relief: number }> = {
  */
 export function planetPresetRadius(name: PlanetPresetName): number {
   const body = BODIES[name];
-  if (!Object.hasOwn(BODIES, name) || !body) throw new RangeError("Invalid planet preset; pass 'moon', 'mars', 'asteroid' or 'ice'");
+  if (!Object.hasOwn(BODIES, name) || !body)
+    throw new RangeError("Invalid planet preset; pass 'moon', 'mars', 'asteroid' or 'ice'");
   return body.radius;
 }
 
@@ -207,7 +209,15 @@ export function planetPreset(name: PlanetPresetName, options: { radius?: number;
     case 'ice':
       return combine([
         domainWarp(ridges(250, 4), { radius, amplitude: radius / 15, frequency: 6, levels: 2, seed }),
-        craterField({ radius, density: 60, dMin: radius / 10000, dMax: radius / 10, depthRatio: 0.08, rimRatio: 0.02, seed }),
+        craterField({
+          radius,
+          density: 60,
+          dMin: radius / 10000,
+          dMax: radius / 10,
+          depthRatio: 0.08,
+          rimRatio: 0.02,
+          seed,
+        }),
       ]);
     default:
       throw new RangeError("Invalid planet preset; pass 'moon', 'mars', 'asteroid' or 'ice'");

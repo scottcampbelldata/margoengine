@@ -133,10 +133,13 @@ fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {re
   const withHook = await readTexture(device, fog.texture);
   let hookDiff = 0;
   for (let j = 0; j < grid[1]; j++)
-    for (let i = 0; i < grid[0]; i++) hookDiff = Math.max(hookDiff, Math.abs(withHook.at(grid[2] - 1, i, j)[0] - without.at(grid[2] - 1, i, j)[0]));
+    for (let i = 0; i < grid[0]; i++)
+      hookDiff = Math.max(hookDiff, Math.abs(withHook.at(grid[2] - 1, i, j)[0] - without.at(grid[2] - 1, i, j)[0]));
   assert(errors.length === 0, `a Clustered hook the fog does not read: GPU errors ${errors.join('; ')}`);
   assert(hookDiff < 1e-6, `the beam's fog is the same with a hook the fog does not read (max difference ${hookDiff})`);
-  report.checks.push(`a Clustered hook the fog does not read: no GPU error, the fog unchanged (max difference ${hookDiff})`);
+  report.checks.push(
+    `a Clustered hook the fog does not read: no GPU error, the fog unchanged (max difference ${hookDiff})`,
+  );
   lights.bounce = undefined;
   hookBuffer.destroy();
   await device.queue.onSubmittedWorkDone();

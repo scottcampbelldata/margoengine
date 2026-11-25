@@ -100,7 +100,8 @@ function readSymbol(bits: Bits, code: Code): number {
 
 /** One block's transformed bytes into `tt`; returns how many. */
 function readBlock(bits: Bits, tt: Uint32Array, size: number): { count: number; origin: number } {
-  if (bits.read(1)) throw deviceUnsupported('bzip2 randomised blocks are not read; nothing has written them since 1999');
+  if (bits.read(1))
+    throw deviceUnsupported('bzip2 randomised blocks are not read; nothing has written them since 1999');
   const origin = bits.read(24),
     ranges = bits.read(16),
     seen: number[] = [];
@@ -210,7 +211,8 @@ export function decodeBzip2(input: Uint8Array, options: Bzip2Options = {}): Uint
     length = 0,
     start = 0;
   const room = (bytes: number) => {
-    if (length + bytes > maxBytes) throw decodeFailed(`bzip2 output is over maxBytes (${maxBytes}); raise it to read this file`);
+    if (length + bytes > maxBytes)
+      throw decodeFailed(`bzip2 output is over maxBytes (${maxBytes}); raise it to read this file`);
     if (length + bytes <= out.length) return;
     const next = new Uint8Array(Math.min(maxBytes, Math.max(out.length * 2, length + bytes)));
     next.set(out.subarray(0, length));

@@ -156,15 +156,36 @@ function compose(inner: Pair[], outer: Pair[]): Pair[] {
   return out;
 }
 const composed = new WeakMap<Step[], Pair[]>();
-/** A path through the steps of a node, or nothing when it has no place in the root namespace. */
-function mapPath(steps: Step[], path: string): string | undefined {
-  if (!steps.length) return stripVariants(path);
+/** The steps of a node, nearest arc first, as one map function. */
+function pairsFor(steps: Step[]): Pair[] {
   let pairs = composed.get(steps);
   if (!pairs) {
     pairs = steps.slice(1).reduce((f, step) => compose(f, pairsOf(step)), pairsOf(steps[0]));
     composed.set(steps, pairs);
   }
-  return mapBy(pairs, stripVariants(path));
+  return pairs;
+}
+/** A path through the steps of a node, or nothing when it has no place in the root namespace. */
+const mapPath = (steps: Step[], path: string): string | undefined =>
+  steps.length ? mapBy(pairsFor(steps), stripVariants(path)) : stripVariants(path);
+/** A path of the root namespace back through the steps of a node, or nothing when the node has no place for it. */
+const unmapPath = (steps: Step[], path: string): string | undefined =>
+  steps.length ? mapBy(pairsFor(steps), path, 1) : path;
+/** The ancestor of `path` with `k` prim names, variant selections on the way kept: `/M{vs=x}c` and 1 give `/M{vs=x}`. */
+function ancestorAt(path: string, k: number): string {
+  if (k === 0) return '/';
+  let names = 0;
+  for (let i = 1; i < path.length; i++) {
+    if (path[i] === '{') {
+      i = path.indexOf('}', i);
+      if (i < 0) break;
+      continue;
+    }
+    if (path[i] === '/' || (path[i - 1] !== '/' && path[i - 1] !== '}')) continue;
+    if (names === k) return path.slice(0, path[i - 1] === '/' ? i - 1 : i);
+    names++;
+  }
+  return path;
 }
 
 /** Index one layer's spec map: children and properties by prim, variant paths included. */
@@ -356,6 +377,18 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // An implied arc from deeper in the same stack ranks here as the placeholder it passes on the way up would.
     if (Y.implied && Y.of && isClass(Y) && !isClass(X) && X.stack === at.stack) return before(a, Y.of);
     if (X.implied && X.of && isClass(X) && !isClass(Y) && Y.stack === at.stack) return before(X.of, b);
+    // Seen on OpenUSD (black-box prim indexes, KB1942c part 28), the specification does not say: a class arc under a
+    // variant of this node's own stack implies an inert placeholder on this node on its way up, and the arcs implied
+    // from it rank as that placeholder does among this node's class arcs.
+    const viaVariant = (n: Node, V: Node) =>
+      V.kind === 'variant' && V.stack === at.stack && isClass(n) && n.stack === at.stack && holderOf(n.parent) === at;
+    const asPlaceholder = (p: Node, q: Node) =>
+      ORDER[p.kind] - ORDER[q.kind] ||
+      ns(q) - ns(p) ||
+      1 - +!!q.implied ||
+      at.children.indexOf(X) - at.children.indexOf(Y);
+    if (isClass(Y) && viaVariant(a, X)) return asPlaceholder(a, Y);
+    if (isClass(X) && viaVariant(b, Y)) return -asPlaceholder(b, X);
     return at.children.indexOf(X) - at.children.indexOf(Y);
   };
   /**
@@ -364,16 +397,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
    */
   const byOrigin = (a: Node, b: Node) => (a.implied && b.implied && a.of && b.of ? before(a.of, b.of) : 0);
   /**
-   * Namespace depth as sibling nodes rank by it. Seen on OpenUSD (black-box prim indexes, KB1942c), the specification
-   * does not say: below the index root, a class arc authored at its node counts from that node's prim in its own stack,
-   * and one implied from an arc under a reference or payload of this prim counts from that reference's depth.
+   * Namespace depth as sibling nodes rank by it. Seen on OpenUSD (black-box prim indexes, KB1942c parts 23 and 29), the
+   * specification does not say which namespace: below the index root, a class arc, authored or implied, counts the
+   * depth of its parent node's path (variant selections left out) when it was placed there, which a node carried down
+   * to a child prim keeps. That is the depth in the parent node's own stack, not the stage prim's: an inherit implied
+   * into a stack a payload brought in at `/R/a/c/b` (4) hangs from that payload's `/M/a` and counts 2.
    */
-  const ns = (n: Node) => {
-    const o = n.of?.parent;
-    if (!isClass(n) || !n.parent?.parent) return n.depth;
-    if (!n.implied) return n.anc ? n.depth : Math.max(n.depth, depthOf(n.parent.path));
-    return !n.anc && o && (o.kind === 'reference' || o.kind === 'payload') ? Math.max(n.depth, o.depth) : n.depth;
-  };
+  const ns = (n: Node) => (isClass(n) && n.parent?.parent ? (n.intro ?? n.depth) : n.depth);
   function attach(parent: Node, node: Node) {
     node.parent = parent;
     parent.children.push(node);
@@ -465,7 +495,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     list(tree);
     for (let more = true; more; ) {
       more = false;
-      for (const n of implied) if (!dropped.has(n) && dropped.has(n.of!)) (drop(n), (more = true));
+      for (const n of implied) if (!dropped.has(n) && dropped.has(n.of!)) drop(n), (more = true);
     }
     const copy = (node: Node, top: boolean): Node => {
       const out: Node = {
@@ -534,6 +564,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     walk(top);
   }
   const building = new Set<string>();
+  /** Whether no index of `path` in `stack` is being built, so one may be composed now. */
+  const unbuilt = (stack: Stack, path: string) =>
+    !building.has(stack.id + '\0' + path) && !building.has(stack.id + '\0' + path + '\0v');
   const trees = new Map<string, Node>();
   /**
    * The prim index of `path` in `stack`, its arcs followed, with steps up to that stack's namespace. With `ctx`, its
@@ -656,7 +689,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         const bare = !!b.pending && !!from && !!start.inert && start.kind === 'specialize' && !from.family;
         weak = bare;
         weakBorn = start.born;
-        weakBare = !specsBelow(start) || !!start.parent?.children.some((c) => c.kind === 'specialize' && !c.anc && !c.implied);
+        weakBare =
+          !specsBelow(start) || !!start.parent?.children.some((c) => c.kind === 'specialize' && !c.anc && !c.implied);
         implied(start, b.depth);
         weak = false;
         if (b.pending) keepPending(b, start);
@@ -683,7 +717,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   function unhold(b: Build) {
     const pending = new Set<Node>();
     const walk = (n: Node) => {
-      if (n.kind === 'inherit' && n.implied && !n.inert && n.parent && n.parent !== b.top && carriedFrom.has(n)) pending.add(n);
+      if (n.kind === 'inherit' && n.implied && !n.inert && n.parent && n.parent !== b.top && carriedFrom.has(n))
+        pending.add(n);
       n.children.forEach(walk);
     };
     walk(b.top);
@@ -702,7 +737,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     drop(n);
     for (let more = true; more; ) {
       more = false;
-      for (const p of allNodes(b.top)) if (!gone.has(p) && p.of && gone.has(p.of) && carriedFrom.has(p)) (drop(p), (more = true));
+      for (const p of allNodes(b.top))
+        if (!gone.has(p) && p.of && gone.has(p.of) && carriedFrom.has(p)) drop(p), (more = true);
     }
     for (const x of gone) {
       b.pending!.delete(x);
@@ -780,7 +816,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // The implied arcs that stand for a dropped one go with it.
     for (let more = true; more; ) {
       more = false;
-      for (const n of all) if (n.of && !gone.has(n) && gone.has(n.of)) (drop(n), (more = true));
+      for (const n of all) if (n.of && !gone.has(n) && gone.has(n.of)) drop(n), (more = true);
     }
     for (const n of all) {
       n.children = n.children.filter((c) => !gone.has(c));
@@ -790,8 +826,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   }
   /** Whether an arc to `path` in `stack` from `node` would lead back to a site on the way up. */
   const loops = (node: Node, stack: Stack, path: string) => {
-    for (let up: Node | undefined = node; up; up = up.parent)
-      if (up.stack === stack && stripVariants(up.path) === path) return true;
+    for (let up: Node | undefined = node; up; up = up.parent) {
+      if (up.stack !== stack) continue;
+      // An arc to an ancestor or a descendant of a site on the way up is a cycle too: `/M/a` referencing `/M` would
+      // bring `/M/a` back under itself, one prim deeper each time. OpenUSD (black box) reports such an arc as a cycle
+      // and composes the prim without it.
+      const at = stripVariants(up.path);
+      if (under(at, path) || under(path, at)) return true;
+    }
     return false;
   };
   /**
@@ -933,7 +975,12 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // Seen on OpenUSD (black-box prim indexes, KB1942c), the specification does not say: the first live node made for a
     // site holds it in the index. A later inherit to it makes no node; a later specializes leaves an inert placeholder,
     // which still implies its arc upward unless it was itself implied.
-    if (b.held.has(node.stack.id + '\0' + path) || [...(b.pending ?? [])].some((p) => (fresh || stays(p)) && p.stack === node.stack && stripVariants(p.path) === path)) {
+    if (
+      b.held.has(node.stack.id + '\0' + path) ||
+      [...(b.pending ?? [])].some(
+        (p) => (fresh || stays(p)) && p.stack === node.stack && stripVariants(p.path) === path,
+      )
+    ) {
       if (kind === 'inherit') return undefined;
       const placeholder = stub();
       if (!implied) queue(placeholder, false);
@@ -962,7 +1009,10 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     if (implied && stands) placed.of = stands;
     if (stands) ancestral(placed, node, stands);
     attach(node, placed);
-    if (build!.pending && !fresh) for (const p of [...build!.pending]) if (!stays(p) && build!.pending.has(p) && p !== placed && siteKey(p) === siteKey(placed)) dropPending(build!, p);
+    if (build!.pending && !fresh)
+      for (const p of [...build!.pending])
+        if (!stays(p) && build!.pending.has(p) && p !== placed && siteKey(p) === siteKey(placed))
+          dropPending(build!, p);
     queuePlaced(placed, !implied);
     return placed;
   }
@@ -974,28 +1024,16 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
    * and the nodes of other stacks in the index of the stage prim A maps to. At the index root it is A's own index there,
    * when that stack holds the layer that authored the arc; the node that stands for this same arc there does not count.
    */
-  function ancestral(placed: Node, near: Node, arc: Node) {
+  function carriedContext(near: Node, arc: Node): Node[] {
     const step = arc.steps[0],
       site = stripVariants(arc.path),
-      b = build!;
-    // Seen on OpenUSD (black-box prim indexes, KB1942c): an implied inherit that stands for an implied arc, the chain
-    // ending in an arc carried down from prim A, reads the selections at its class's parent in each other stack of
-    // that chain, nearest first.
-    let origin = arc;
-    while (origin.implied && origin.of) origin = origin.of;
-    if (!step || !arc.parent) return;
-    const chain = arc.kind === 'inherit' && !!arc.implied && !arc.anc && !!origin.anc && !origin.implied;
-    if (!chain && (!arc.anc || arc.implied || !under(site, step.from) || site === step.from)) return;
-    const hop = arc.parent.steps.slice(0, Math.max(0, arc.parent.steps.length - near.steps.length)),
+      b = build!,
+      ctx: Node[] = [];
+    if (!arc.anc || !under(site, step.from) || site === step.from) return ctx;
+    const hop = arc.parent!.steps.slice(0, Math.max(0, arc.parent!.steps.length - near.steps.length)),
       authored = mapPath(hop, step.to) ?? step.to,
-      counterpart = (n: Node) => n.kind === arc.kind && n.stack === near.stack && stripVariants(n.path) === site,
-      open = (stack: Stack, path: string) =>
-        !building.has(stack.id + '\0' + path) && !building.has(stack.id + '\0' + path + '\0v');
-    const ctx: Node[] = [];
-    if (chain) {
-      for (let n: Node | undefined = arc; n; n = n.implied ? n.of : undefined)
-        if (n.stack !== near.stack) ctx.push({ ...n, path: parentOf(n.path) });
-    } else if (near.parent) {
+      counterpart = (n: Node) => n.kind === arc.kind && n.stack === near.stack && stripVariants(n.path) === site;
+    if (near.parent) {
       let into = near;
       while (into.parent && into.parent.stack === into.stack) into = into.parent;
       const by = into.parent,
@@ -1010,13 +1048,52 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
             .join('/'),
         });
       const up = mapPath(near.steps, authored);
-      if (up !== undefined && open(b.top.stack, up))
+      if (up !== undefined && unbuilt(b.top.stack, up))
         for (const n of strength(tree(b.top.stack, up, true)))
           if (n.stack !== by?.stack && !counterpart(n)) ctx.push(n);
-    } else if (near.stack.layers.some((e) => e.layer === arc.stack.root) && open(near.stack, authored))
+    } else if (near.stack.layers.some((e) => e.layer === arc.stack.root) && unbuilt(near.stack, authored))
       for (const n of strength(tree(near.stack, authored, true))) if (!counterpart(n)) ctx.push(n);
-    const parent = parentOf(site);
-    if (!ctx.length || !open(near.stack, parent)) return;
+    return ctx;
+  }
+  /**
+   * Seen on OpenUSD (black-box prim indexes, KB1942c parts 14 and 30), the specification does not say: an implied class
+   * arc that stands for another implied arc reads the selections for its class's parent across the prim index built so
+   * far, itself in its place among them, strongest first. The parent maps to the root namespace through the new arc's
+   * own map function (`/C/a` to `/Q/a/b` when the pair `/C/a` to `/M` came up the chain with it), and each node reads at
+   * the path that maps back into it; the arcs of that chain read at their class's parent. Class arcs off the chain are
+   * not read: an inherit carried down from `/R` to `/C`, whose `/C/b` selects `vs = "x"`, gives no `/C{vs=x}a`, where a
+   * payload's `l2.usda /M/b` selecting `vs = "y"` does. A parent that only the root namespace's identity maps reads none.
+   */
+  function chainContext(placed: Node, near: Node, arc: Node): Node[] {
+    const parent = parentOf(stripVariants(placed.path)),
+      up = mapPath(placed.steps, parent),
+      ctx: Node[] = [];
+    if (up === undefined || up === parent) return ctx;
+    const chain = new Set<Node>();
+    for (let n: Node | undefined = arc; n; n = n.implied ? n.of : undefined) chain.add(n);
+    // The index so far with the new arc in the place it takes: put there for the reading, then taken out again.
+    const kids = near.children.slice();
+    attach(near, placed);
+    const nodes = strength(build!.top);
+    near.children = kids;
+    placed.parent = undefined;
+    for (const n of nodes) {
+      if (n === placed || chain.has(n)) ctx.push({ ...n, path: parentOf(n.path) });
+      else if (!isClass(n)) {
+        const at = unmapPath(n.steps, up);
+        if (at !== undefined)
+          ctx.push({ ...n, path: under(stripVariants(n.path), at) ? ancestorAt(n.path, depthOf(at)) : at });
+      }
+    }
+    return ctx;
+  }
+  /** The ancestral variants of an implied class arc `placed` on `near` that stands for `arc`, read in its context. */
+  function ancestral(placed: Node, near: Node, arc: Node) {
+    if (!arc.steps[0] || !arc.parent) return;
+    const site = stripVariants(arc.path),
+      ctx = arc.implied ? (arc.anc ? [] : chainContext(placed, near, arc)) : carriedContext(near, arc),
+      parent = parentOf(site);
+    if (!ctx.length || !unbuilt(near.stack, parent)) return;
     // The class site's parent composed with those selections first: its variants, carried down to the site.
     const from = tree(near.stack, parent, true, ctx),
       name = site.slice(site.lastIndexOf('/') + 1),
@@ -1285,7 +1362,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
      * The pairs an implied arc keeps from the arc it stands for. Seen on OpenUSD (KB1942b): when the authored arc
      * reaches its prim through an ancestor's class arc, the ancestor's pair goes up with it, its prim mapped by the arcs
      * on the way where they can and left as authored where they cannot. A target under the class root then maps to the
-     * ancestor's path, and one under the ancestor, which mapping back would not give again, drops.
+     * ancestor's path, and one under the ancestor, which mapping back would not give again, drops. The arc it stands for
+     * may itself be implied, carried down from an ancestor prim: its own pair goes up the same way (KB1942c part 25).
      */
     const carried = (near: Node, arc: Node): [string, string][] => {
       const step = arc.steps[0];
@@ -1294,7 +1372,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         up = ([from, to]: [string, string]): [string, string] => [from, mapPath(hop, to) ?? to];
       const own = (step.also ?? []).map(up);
       // The first step of a site reached through an ancestor's class arc is that ancestor's pair.
-      if (arc.implied || stripVariants(arc.parent.path) === step.to) return own;
+      if (stripVariants(arc.parent.path) === step.to) return own;
       return [...own, up([step.from, step.to])];
     };
     /** Places arc on near and on every stack above it, and the same for the class arcs that class has in turn. */
@@ -1302,6 +1380,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       const kind = arc.kind as 'inherit' | 'specialize',
         placed = placeClass(near, depth, kind, path, near.children.length, true, carried(near, arc), arc);
       if (!placed) return;
+      // Seen on OpenUSD (black-box prim indexes, KB1942c part 26), the specification does not say: an implied arc that
+      // reaches a placeholder which itself implies nothing (its site held by an inherit of its stack) stops there.
+      if (placed.inert && !blocked.has(placed) && inert(placed) && !near.children.some(active)) return;
       arc.family ??= {};
       if (placed.implied) {
         placed.of ??= arc;

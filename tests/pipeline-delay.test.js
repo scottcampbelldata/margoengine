@@ -45,12 +45,17 @@ test('delayPipelines is a no-op without WebGPU', () => {
   delete globalThis.__margoDelayPipelines;
 });
 
-test('lazy compatibility installation delays the actual device and counts its pending promise', { timeout: 10_000 }, async (t) => {
+test('lazy compatibility installation delays the actual device and counts its pending promise', {
+  timeout: 10_000,
+}, async (t) => {
   const ownLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
   const ownGpu = Object.getOwnPropertyDescriptor(navigator, 'gpu');
   const ownDelay = Object.getOwnPropertyDescriptor(globalThis, '__margoDelayPipelines');
   const timers = [];
-  t.mock.method(globalThis, 'setTimeout', (callback, ms) => { timers.push({ callback, ms }); return 1; });
+  t.mock.method(globalThis, 'setTimeout', (callback, ms) => {
+    timers.push({ callback, ms });
+    return 1;
+  });
   const fixture = `
 export class CompatDevice {
   createRenderPipelineAsync(descriptor) { return Promise.resolve(descriptor); }
@@ -72,7 +77,10 @@ export async function installCompat() {
     for (const method of ['createRenderPipelineAsync', 'createComputePipelineAsync']) {
       const pipeline = { label: method };
       let settled = false;
-      const promise = device[method](pipeline).then((result) => { settled = true; return result; });
+      const promise = device[method](pipeline).then((result) => {
+        settled = true;
+        return result;
+      });
       await Promise.resolve();
       await Promise.resolve();
       assert.equal(timers.length, 1, `${method}: the installed device schedules exactly one delay`);
@@ -88,9 +96,12 @@ export async function installCompat() {
     assert.equal(timers.length, 0, 'validation rejection is not delayed or replaced');
     assert.equal(globalThis.__margoPipelines.pending, 0, 'failed compilation releases readiness');
   } finally {
-    if (ownGpu) Object.defineProperty(navigator, 'gpu', ownGpu); else delete navigator.gpu;
-    if (ownLocation) Object.defineProperty(globalThis, 'location', ownLocation); else delete globalThis.location;
-    if (ownDelay) Object.defineProperty(globalThis, '__margoDelayPipelines', ownDelay); else delete globalThis.__margoDelayPipelines;
+    if (ownGpu) Object.defineProperty(navigator, 'gpu', ownGpu);
+    else delete navigator.gpu;
+    if (ownLocation) Object.defineProperty(globalThis, 'location', ownLocation);
+    else delete globalThis.location;
+    if (ownDelay) Object.defineProperty(globalThis, '__margoDelayPipelines', ownDelay);
+    else delete globalThis.__margoDelayPipelines;
     delete globalThis.__margoCompat;
     delete globalThis.__margoPipelines;
   }

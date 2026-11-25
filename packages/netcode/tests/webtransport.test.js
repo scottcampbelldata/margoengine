@@ -91,9 +91,18 @@ test('webtransport: reliable goes on the stream in order, unreliable as datagram
   far.send(new Uint8Array([7]), 'unreliable');
   far.send(new Uint8Array([]), 'reliable');
   await settle();
-  assert.deepEqual(got.filter(([c]) => c === 'reliable').map(([, d]) => d), [[1, 2], [3]]);
-  assert.deepEqual(got.filter(([c]) => c === 'unreliable').map(([, d]) => d), [[9]]);
-  assert.deepEqual(back.sort(), [['reliable', []], ['unreliable', [7]]]);
+  assert.deepEqual(
+    got.filter(([c]) => c === 'reliable').map(([, d]) => d),
+    [[1, 2], [3]],
+  );
+  assert.deepEqual(
+    got.filter(([c]) => c === 'unreliable').map(([, d]) => d),
+    [[9]],
+  );
+  assert.deepEqual(back.sort(), [
+    ['reliable', []],
+    ['unreliable', [7]],
+  ]);
   assert.equal(client.sent.length, 1, 'only the unreliable message went as a datagram');
 });
 
@@ -106,11 +115,19 @@ test('webtransport: frames split across reads and joined in one read come out wh
     writer = up.writable.getWriter();
   const frame = (bytes) => [bytes.length, 0, 0, 0, ...bytes];
   const stream = new Uint8Array([...frame([1, 2, 3]), ...frame([4]), ...frame([5, 6])]);
-  for (const cut of [[0, 1], [1, 5], [5, 9], [9, stream.length]]) {
+  for (const cut of [
+    [0, 1],
+    [1, 5],
+    [5, 9],
+    [9, stream.length],
+  ]) {
     await writer.write(stream.subarray(...cut));
     await settle();
   }
-  assert.deepEqual(got.map(([, d]) => d), [[1, 2, 3], [4], [5, 6]]);
+  assert.deepEqual(
+    got.map(([, d]) => d),
+    [[1, 2, 3], [4], [5, 6]],
+  );
 });
 
 test('webtransport: a message too big for a datagram goes on the stream, not into silence', async () => {
@@ -129,20 +146,32 @@ test('webtransport: unreliable messages are dropped while the link is behind, re
   const hold = new Promise((resolve) => (release = resolve)),
     session = pair().client,
     writes = [],
-    sink = () => new WritableStream({ write: (chunk) => (writes.push(chunk), hold) }, new CountQueuingStrategy({ highWaterMark: 2 }));
+    sink = () =>
+      new WritableStream(
+        { write: (chunk) => (writes.push(chunk), hold) },
+        new CountQueuingStrategy({ highWaterMark: 2 }),
+      );
   session.datagrams.createWritable = sink;
   const connection = webTransportConnection(session, { readable: pipe().readable, writable: pipe().writable });
   for (let i = 0; i < 10; i++) connection.send(new Uint8Array([i]), 'unreliable');
   release();
   await settle();
-  assert.deepEqual(writes.map((w) => w[0]), [0, 1], 'the queue holds 2; the rest are stale by the time they could go');
+  assert.deepEqual(
+    writes.map((w) => w[0]),
+    [0, 1],
+    'the queue holds 2; the rest are stale by the time they could go',
+  );
 
   // A message too big for a datagram waits on the stream only while the stream is not behind.
   let open;
   const stuck = new Promise((resolve) => (open = resolve)),
     lines = [],
     slow = new WritableStream({ write: (chunk) => (lines.push(chunk.length), stuck) }),
-    big = webTransportConnection(pair({ maxDatagramSize: 4 }).client, { readable: pipe().readable, writable: slow }, { dropUnreliableAbove: 50 });
+    big = webTransportConnection(
+      pair({ maxDatagramSize: 4 }).client,
+      { readable: pipe().readable, writable: slow },
+      { dropUnreliableAbove: 50 },
+    );
   big.send(new Uint8Array(100), 'reliable');
   big.send(new Uint8Array(100), 'unreliable');
   big.send(new Uint8Array(30), 'reliable');
@@ -189,7 +218,11 @@ test('webtransport: a session that fails closes the connection with what it says
 test('webtransport: a length past the limit closes the connection instead of waiting for it', async () => {
   const up = pipe(),
     session = pair().client,
-    connection = webTransportConnection(session, { readable: up.readable, writable: pipe().writable }, { maxMessageBytes: 16 }),
+    connection = webTransportConnection(
+      session,
+      { readable: up.readable, writable: pipe().writable },
+      { maxMessageBytes: 16 },
+    ),
     closes = [];
   connection.onclose = (code) => closes.push(code);
   await up.writable.getWriter().write(new Uint8Array([255, 255, 255, 255]));
@@ -226,7 +259,10 @@ test('webtransport: opening says what went wrong; a signal aborts', async () => 
   const { server } = pair();
   server.incomingBidirectionalStreams = new ReadableStream({ start: (c) => c.close() });
   await assert.rejects(acceptWebTransport(server), { code: 'failed' });
-  assert.throws(() => webTransportConnection({ ...pair().client, datagrams: { readable: pipe().readable } }, pipe()), TypeError);
+  assert.throws(
+    () => webTransportConnection({ ...pair().client, datagrams: { readable: pipe().readable } }, pipe()),
+    TypeError,
+  );
 });
 
 test('webtransport: the older writable property works, and a whole game runs over it', async () => {

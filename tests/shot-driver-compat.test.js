@@ -96,7 +96,11 @@ test('on the WebGL2 layer the driver tracks the layer device, its buffer maps an
   // A readback the page starts in a frame: settle() must wait for it before the next frame.
   device.createBuffer().mapAsync(1);
   assert.equal(layer.maps.length, 1);
-  assert.equal(realm.__margoShot.pending, 1, "the layer's buffer map is not tracked, so a frame can run before it lands");
+  assert.equal(
+    realm.__margoShot.pending,
+    1,
+    "the layer's buffer map is not tracked, so a frame can run before it lands",
+  );
   // The canvas is read from its texture (capture 'gpu'): configure asks for COPY_SRC beside the page's usage.
   const context = new layer.GPUCanvasContext();
   context.canvas = {};

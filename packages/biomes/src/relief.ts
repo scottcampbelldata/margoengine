@@ -204,7 +204,7 @@ const RIA_LOW = 12_000,
 function riaOf(o: RiaOptions, coast: string, along: number): Ria {
   const bad = () =>
     rangeError(
-      "Invalid relief ria; use it with coast west, east, north or south, center 0.1..0.9, width 20..2,000 m, headWidth 5 m up to width, length 200..8,000 m, depth 0..200 m, headDepth 0..depth, slope 0.1..1.5, flat 0..1,500 m, flatHeight 0..30 m and run 100..8,000 m",
+      'Invalid relief ria; use it with coast west, east, north or south, center 0.1..0.9, width 20..2,000 m, headWidth 5 m up to width, length 200..8,000 m, depth 0..200 m, headDepth 0..depth, slope 0.1..1.5, flat 0..1,500 m, flatHeight 0..30 m and run 100..8,000 m',
       'biomes',
     );
   if (typeof o !== 'object' || o === null) throw bad();
@@ -364,7 +364,11 @@ export function createRelief(options: ReliefOptions = {}): Relief {
         'biomes',
       );
     const alone =
-        coast === 'none' && options.ria === undefined && io === undefined && count === 0 && options.erosion === undefined,
+        coast === 'none' &&
+        options.ria === undefined &&
+        io === undefined &&
+        count === 0 &&
+        options.erosion === undefined,
       ms = check(options.mountainValley, [sx, sz], alone),
       { valley, height } = build(ms, seed, [ox, oz], [sx, sz], baseMm, reliefMm),
       rivers = [valley.creek];
@@ -568,7 +572,12 @@ export function createRelief(options: ReliefOptions = {}): Relief {
   // and the waterline's rise, levelled near the bay head.
   const riaHeight = (r: Ria, uu: number, v: number, x: number, z: number): number => {
     const dv = Math.abs(v - riaAxis(uu)),
-      w = uu <= 0 ? r.mouth : uu >= r.length ? r.head : r.mouth + Math.floor(((r.head - r.mouth) * smooth(divFloor(uu * ONE, r.length))) / ONE),
+      w =
+        uu <= 0
+          ? r.mouth
+          : uu >= r.length
+            ? r.head
+            : r.mouth + Math.floor(((r.head - r.mouth) * smooth(divFloor(uu * ONE, r.length))) / ONE),
       bayFloor = (): number => {
         const lengthwise = uu <= 0 ? ONE : ONE - smooth(divFloor(uu * ONE, r.length));
         // From `headDepth` at the head to `depth` at the mouth (0 at the head without it, the bytes of before).

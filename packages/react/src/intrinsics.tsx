@@ -57,7 +57,10 @@ const isComponent = (value: unknown) =>
 export function extend(table: Record<string, ElementType>): void {
   for (const [name, component] of Object.entries(table)) {
     if (!name || !isComponent(component))
-      throw typeError(`extend({ ${name || '""'} }) needs a React component as the value; pass the component itself, for example extend({ SphereGeometry }) with SphereGeometry imported from '@margoengine/react/geometry'`, 'react-arguments');
+      throw typeError(
+        `extend({ ${name || '""'} }) needs a React component as the value; pass the component itself, for example extend({ SphereGeometry }) with SphereGeometry imported from '@margoengine/react/geometry'`,
+        'react-arguments',
+      );
     components.set(name[0].toLowerCase() + name.slice(1), component);
   }
 }

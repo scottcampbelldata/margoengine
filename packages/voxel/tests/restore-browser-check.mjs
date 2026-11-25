@@ -28,7 +28,10 @@ try {
   assert.ok(r.restored, 'the engine restored a new device');
   assert.deepEqual(errors, [], 'no validation error or throw from a frame after the restore');
   assert.deepEqual(reported, [], 'nothing reported through engine.onError');
-  assert.ok(r.meshedAfter > r.meshedBefore, `the caller's GpuVoxelMesher meshed again: ${r.meshedBefore} -> ${r.meshedAfter}`);
+  assert.ok(
+    r.meshedAfter > r.meshedBefore,
+    `the caller's GpuVoxelMesher meshed again: ${r.meshedBefore} -> ${r.meshedAfter}`,
+  );
   for (const key of ['nearWall', 'open', 'wall'])
     r.before[key].forEach((v, c) =>
       assert.ok(

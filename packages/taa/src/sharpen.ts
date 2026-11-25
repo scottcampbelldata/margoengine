@@ -31,7 +31,8 @@ export class Sharpen implements TAAPresent {
     return present
       .replace(
         '@group(0) @binding(0) var image:texture_2d<f32>;',
-        '@group(0) @binding(0) var image:texture_2d<f32>;\n@group(0) @binding(1) var<uniform> sharpen:vec4f;\n' + sharpenCode,
+        '@group(0) @binding(0) var image:texture_2d<f32>;\n@group(0) @binding(1) var<uniform> sharpen:vec4f;\n' +
+          sharpenCode,
       )
       .replace(read, 'let c=max(margoSharpen(image,vec2i(i.clip.xy),sharpen.x),vec3f(0));');
   }

@@ -2,14 +2,15 @@ import { Children, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import type { EngineKernel } from '@margoengine/core';
 import type { EnginePlugin } from '@margoengine/core/extension';
 import type { PBRModel, LightingEffect } from '@margoengine/gltf/pbr';
-import type * as EnvironmentModule from '@margoengine/environment';
-import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment';
+import type * as EnvironmentModule from '@margoengine/environment/main';
+import type { Environment as IBLEnvironment, EnvironmentBackground } from '@margoengine/environment/main';
 import { preloadAsset, retainAsset } from './assets.js';
 import { environmentAsset } from './environment-asset.js';
 import { Mesh } from './components.js';
 import type { Captured, EnvironmentCapture as CaptureComponent } from './environment-capture.js';
 import { LightformerPending } from './lightformer.js';
 import { report, useCommit, useResourceEffect, useScene } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { rangeError } from '../../shared/errors.js';
 
 export * from './lights.js';
@@ -27,7 +28,10 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw rangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}`, 'react-arguments');
+    throw rangeError(
+      `Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}`,
+      'react-arguments',
+    );
 }
 
 /** Props of the Environment component; every prop is optional unless noted. */
@@ -70,12 +74,16 @@ function EnvironmentComponent({
 }: EnvironmentProps) {
   const scene = useScene(),
     { engine, resources, assetCache } = scene,
+    owner = sceneOwner(scene),
     [source, setSource] = useState<IBLEnvironment | null>(null),
     [captured, setCaptured] = useState<Captured | null>(null),
     [pending] = useState(() => ({ count: 0 })),
     capturing = Children.toArray(children).length > 0;
   if (!(frames === Infinity || (Number.isInteger(frames) && frames > 0)))
-    throw rangeError('Environment frames must be a positive integer or Infinity; pass how many captures to make', 'react-arguments');
+    throw rangeError(
+      'Environment frames must be a positive integer or Infinity; pass how many captures to make',
+      'react-arguments',
+    );
   const [loading, setLoading] = useState<Loading | null>(null),
     errorHandler = useRef(onError);
   errorHandler.current = onError;
@@ -103,25 +111,25 @@ function EnvironmentComponent({
   const previous = useRef<{ direction: Float32Array; radiance: Float32Array } | null>(null);
   const backdrop = useRef<EnvironmentBackground | null>(null);
   useCommit(() => {
-    const saved = { direction: engine.lighting.direction.slice(), radiance: engine.lighting.radiance.slice() };
+    const saved = { direction: owner.lighting.direction.slice(), radiance: owner.lighting.radiance.slice() };
     previous.current = saved;
     return () => {
-      engine.lighting.direction.set(saved.direction);
-      engine.lighting.radiance.set(saved.radiance);
+      owner.lighting.direction.set(saved.direction);
+      owner.lighting.radiance.set(saved.radiance);
     };
-  }, [engine]);
+  }, [owner]);
   useCommit(() => {
     values([exposure], 1, 'exposure', 0, Infinity);
     if (!src && !capturing) {
-      engine.lighting.direction.set([3, 5, 4, 3]);
-      engine.lighting.radiance.set([exposure, exposure, exposure, 0.15 * exposure]);
+      owner.lighting.direction.set([3, 5, 4, 3]);
+      owner.lighting.radiance.set([exposure, exposure, exposure, 0.15 * exposure]);
     } else if (previous.current) {
-      engine.lighting.direction.set(previous.current.direction);
-      engine.lighting.radiance.set(previous.current.radiance);
-      for (let i = 0; i < 4; i++) engine.lighting.radiance[i] *= exposure;
+      owner.lighting.direction.set(previous.current.direction);
+      owner.lighting.radiance.set(previous.current.radiance);
+      for (let i = 0; i < 4; i++) owner.lighting.radiance[i] *= exposure;
     }
     if (environment && !environment.disposed) environment.intensity = exposure;
-  }, [engine, src, capturing, exposure, environment]);
+  }, [owner, src, capturing, exposure, environment]);
   useResourceEffect(
     (lease) => {
       setSource(null);
@@ -132,7 +140,7 @@ function EnvironmentComponent({
         releaseAsset = retainAsset(assetCache, src, asset, assetCache.environments);
       const release = () => {
         if (current) {
-          engine.removePlugin(current.name);
+          owner.removePlugin(current.name);
           current.dispose();
           current = undefined;
         }
@@ -149,7 +157,7 @@ function EnvironmentComponent({
           return;
         }
         current = loaded;
-        engine.use(loaded as unknown as EnginePlugin);
+        owner.use(loaded as unknown as EnginePlugin);
         setModule(api);
         setSource(loaded);
       })()
@@ -172,7 +180,7 @@ function EnvironmentComponent({
         release();
       };
     },
-    [engine, src, assetCache],
+    [engine, owner, src, assetCache],
   );
   useCommit(() => {
     if (!environment || environment.disposed || !module) return;
@@ -181,35 +189,36 @@ function EnvironmentComponent({
     // storage buffer and `<Environment>` stopped compiling on gltf/pbr models).
     const lighting = new module.EnvironmentLighting(environment),
       effect = lighting as unknown as LightingEffect;
-    engine.use(lighting);
+    owner.use(lighting);
     const models = new Map<PBRModel, () => void>();
-    resources.lighting.set(effect, models);
+    // The Canvas's glTF models stay in the default scene: a named Scene's environment leaves them alone.
+    if (!scene.world) resources.lighting.set(effect, models);
     const release = () => {
       resources.lighting.delete(effect);
       for (const remove of models.values()) remove();
       models.clear();
-      if (!engine.disposed && engine.hasPlugin(lighting.name)) engine.removePlugin(lighting.name);
+      if (!engine.disposed && owner.plugins.has(lighting.name)) owner.removePlugin(lighting.name);
       lighting.dispose();
     };
     try {
-      for (const model of resources.models) models.set(model, model.addLighting(effect));
+      if (!scene.world) for (const model of resources.models) models.set(model, model.addLighting(effect));
     } catch (error) {
       release();
       throw error;
     }
     return release;
-  }, [engine, resources, environment, module]);
+  }, [engine, owner, scene.world, resources, environment, module]);
   useCommit(() => {
     if (!environment || environment.disposed || !module || !background) return;
     const effect = new module.EnvironmentBackground(environment);
-    engine.use(effect as unknown as EnginePlugin);
+    owner.use(effect as unknown as EnginePlugin);
     backdrop.current = effect;
     return () => {
       backdrop.current = null;
-      engine.removePlugin(effect.name);
+      owner.removePlugin(effect.name);
       effect.dispose();
     };
-  }, [engine, environment, module, background]);
+  }, [owner, environment, module, background]);
   useCommit(() => {
     if (backdrop.current) {
       backdrop.current.exposure = exposure;

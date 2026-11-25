@@ -44,6 +44,20 @@ export async function checkExampleTypes({
   return Promise.all(picked.map(({ id, config }) => runProject({ id, config, cwd, compiler, limitMs })));
 }
 
+/**
+ * A checkout whose packages were never built (or built before the last pull) has no dist/*.d.ts, and tsc then prints one
+ * TS2307 per import. When every error is such an import of a Margo package, say so once with the fix.
+ */
+export function staleBuildHint(output) {
+  const errors = output.split(/\r?\n/).filter((line) => /: error TS\d+:/.test(line));
+  const missing = errors.filter((line) =>
+    /error TS2307: Cannot find module '(?:@margoengine\/|margoengine['/])/.test(line),
+  );
+  if (!missing.length || missing.length !== errors.length) return undefined;
+  const first = /Cannot find module '([^']+)'/.exec(missing[0])[1];
+  return `EXAMPLE_TYPES_PACKAGES_NOT_BUILT: ${missing.length} Margo imports have no built types (first: ${first}); run npm ci and npm run build:packages in this checkout, then retry.`;
+}
+
 /** One tsc run with its output kept (the projects run side by side) and a hard limit that ends its process tree. */
 function runProject({ id, config, cwd, compiler, limitMs }) {
   return new Promise((done) => {
@@ -61,12 +75,13 @@ function runProject({ id, config, cwd, compiler, limitMs }) {
     for (const stream of [child.stdout, child.stderr]) stream.on('data', (chunk) => chunks.push(chunk));
     const finish = (code) => {
       clearTimeout(timer);
+      const output = Buffer.concat(chunks).toString();
       done({
         id,
         config,
         ok: !timedOut && code === 0,
         seconds: Math.round((performance.now() - started) / 100) / 10,
-        output: Buffer.concat(chunks).toString(),
+        output: (code !== 0 && staleBuildHint(output)) || output,
         message: timedOut
           ? `type-check of the ${id} examples hung: no result after ${Math.round(limitMs / 1000)} s, killed`
           : undefined,

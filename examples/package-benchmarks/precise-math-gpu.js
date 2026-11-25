@@ -110,7 +110,8 @@ window.computeCost = async ({ count, trials }) => {
       p = await run(precise, name, a, b),
       f = await run(fast, name, a, b);
     let differ = 0;
-    for (let i = 0; i < count; i++) if (p.last[i] !== f.last[i] && (p.last[i] === p.last[i] || f.last[i] === f.last[i])) differ++;
+    for (let i = 0; i < count; i++)
+      if (p.last[i] !== f.last[i] && (p.last[i] === p.last[i] || f.last[i] === f.last[i])) differ++;
     rows[name] = { precise: p.times, fast: f.times, differ: differ / count };
   }
   return { adapter: adapter.info?.description ?? adapter.info?.vendor ?? '', rows };
@@ -146,7 +147,7 @@ window.tracerCost = async ({ builtin, width, height, samples, trials, bounces })
       for (let x = 0; x < size; x++) {
         const tall = 8 + (((x >> 4) * 7 + (z >> 4) * 13) % 5) * 12,
           street = (x & 15) < 3 || (z & 15) < 3;
-        if (y < 4 || (!street && y < tall)) voxels[x + size * (z + size * y)] = 1 + ((x >> 3) + (z >> 3)) % 3;
+        if (y < 4 || (!street && y < tall)) voxels[x + size * (z + size * y)] = 1 + (((x >> 3) + (z >> 3)) % 3);
       }
   const scene = {
     revision: 1,

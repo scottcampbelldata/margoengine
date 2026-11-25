@@ -108,7 +108,9 @@ try {
   assert.equal(missed, 0, `the depth-equal replay missed ${missed} covered pixels (first: ${first})`);
   await page.evaluate(() => window.finish());
   assert.deepEqual(errors, []);
-  console.log(`depth-equal replay of core meshes (${covered.compat ? 'WebGL2 layer' : 'WebGPU'}): ${magenta} pixels, 0 missed`);
+  console.log(
+    `depth-equal replay of core meshes (${covered.compat ? 'WebGL2 layer' : 'WebGPU'}): ${magenta} pixels, 0 missed`,
+  );
 } finally {
   await browser.close();
 }

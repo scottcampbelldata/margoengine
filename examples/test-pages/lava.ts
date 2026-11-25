@@ -38,7 +38,9 @@ async function start() {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   canvas.width = canvas.clientWidth * devicePixelRatio;
   canvas.height = canvas.clientHeight * devicePixelRatio;
-  const engine = await Engine.create(canvas, { camera: { position: [-700, 520, -150], target: [0, 150, 600], near: 1, far: 8000 } });
+  const engine = await Engine.create(canvas, {
+    camera: { position: [-700, 520, -150], target: [0, 150, 600], near: 1, far: 8000 },
+  });
   // Night: a faint cool moonlight, so the lava lights the ground.
   engine.lighting.direction.set([0.3, 0.8, 0.2, 3]);
   engine.lighting.radiance.set([0.55, 0.62, 0.8, 0.02]);
@@ -75,17 +77,22 @@ async function start() {
     const arms = lava.branches(),
       q = lava.options.effusionRate ?? 20,
       // Lava at each arm's end: its flux, less its branches, plus what reaches it from arms that ran into it.
-      end = (k: number): number => arms.reduce((f, b, i) => f - (b.parent === k ? b.flux : 0) + (b.joins?.arm === k ? end(i) : 0), arms[k]!.flux),
+      end = (k: number): number =>
+        arms.reduce((f, b, i) => f - (b.parent === k ? b.flux : 0) + (b.joins?.arm === k ? end(i) : 0), arms[k]!.flux),
       ends = arms.map((b, k) => (b.stop === 'joined' ? 0 : end(k))),
       total = ends.reduce((a, b) => a + b, 0);
-    if (ends.some((f, k) => Math.abs(f - lava.endFlux(k)) > 1e-9 * q && arms[k]!.stop !== 'joined')) console.warn('BUG: endFlux() disagrees with the arms');
+    if (ends.some((f, k) => Math.abs(f - lava.endFlux(k)) > 1e-9 * q && arms[k]!.stop !== 'joined'))
+      console.warn('BUG: endFlux() disagrees with the arms');
     if (Math.abs(total - q) > 1e-6 * q) console.warn(`BUG: the arms carry ${total} m^3/s of ${q}`);
     const stepped = new LavaFlow({ ...lava.options, lights: undefined });
     stepped.seek(0);
     for (let k = 0; k < 50; k++) stepped.update(time / 50);
     stepped.seek(time);
     // Read the seeked flow at `time`: while Play runs, the frames since the seek have moved its clock on.
-    if (JSON.stringify([stepped.front(), stepped.lavaEvents()]) !== JSON.stringify([lava.front(time), lava.lavaEvents(256, time)]))
+    if (
+      JSON.stringify([stepped.front(), stepped.lavaEvents()]) !==
+      JSON.stringify([lava.front(time), lava.lavaEvents(256, time)])
+    )
       console.warn('BUG: stepping reached other lava than a seek');
     const max = lava.options.leveeMax ?? 0.35;
     let highest = 0;
@@ -93,7 +100,8 @@ async function start() {
       const now = lava.leveeShare(i, time),
         later = lava.leveeShare(i, time + 3600);
       highest = Math.max(highest, now);
-      if (now > max + 1e-12 || later < now - 1e-12) console.warn(`BUG: the levee at ${i} is ${now}, later ${later}, cap ${max}`);
+      if (now > max + 1e-12 || later < now - 1e-12)
+        console.warn(`BUG: the levee at ${i} is ${now}, later ${later}, cap ${max}`);
     }
     // The tube's cooling over its roofed stretches only (open stretches between them cool as an open channel), against
     // the open channel's over the same stretches: the roof must keep heat in. On this apron the sheet spreads 70 m to
@@ -110,7 +118,8 @@ async function start() {
         span += (p[i]!.distance - p[i - 1]!.distance) / 1000;
       }
     const perKm = span > 0.2 ? drop / span : NaN;
-    if (perKm >= open / span || perKm < 0) console.warn(`BUG: the tube cools ${perKm} K/km, the open channel ${open / span} K/km`);
+    if (perKm >= open / span || perKm < 0)
+      console.warn(`BUG: the tube cools ${perKm} K/km, the open channel ${open / span} K/km`);
     // The channel-scale tube: 1 K/km or so inside the roof, not the tens of K/km of the roofed sheet above.
     const kupaianaha = new LavaFlow({
         vent: [0, 1000, 0],
@@ -128,7 +137,8 @@ async function start() {
       k0 = kp.findIndex((_, i) => kupaianaha.roofTime(i) < Infinity),
       k1 = kp.length - 1,
       tubeKm = k0 >= 0 ? (kt[k0]! - kt[k1]!) / ((kp[k1]!.distance - kp[k0]!.distance) / 1000) : NaN;
-    if (!(tubeKm > 0.3 && tubeKm < 2)) console.warn(`BUG: a 4 m tube cools ${tubeKm} K/km, against 0.6 (Helz et al. 2003) to 1 (Keszthelyi 1995)`);
+    if (!(tubeKm > 0.3 && tubeKm < 2))
+      console.warn(`BUG: a 4 m tube cools ${tubeKm} K/km, against 0.6 (Helz et al. 2003) to 1 (Keszthelyi 1995)`);
     const front = lava.front(time),
       tubes = p.filter((_, i) => lava.tubed(i, time)).length;
     say(

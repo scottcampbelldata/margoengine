@@ -661,10 +661,12 @@ export function disturbanceStates(
     if (age < charYears) {
       const kw = intensityAt(x, z),
         char = 0.0775 * kw ** 0.46;
-      out =
-        age < burnYears
-          ? { scorch: Math.min(100, (4.665 * kw ** (7 / 6)) / ((60 - ambient) * Math.sqrt(kw + 38.7 * wind ** 3))), char: Math.min(100, char), intensity: kw / 1000, ash: 1 } // float division: kW to MW
-          : { char: Math.min(100, char) };
+      if (age < burnYears) {
+        const numerator = 4.665 * kw ** (7 / 6);
+        const denominator = (60 - ambient) * Math.sqrt(kw + 38.7 * wind ** 3);
+        const scorch = Math.min(100, numerator / denominator); // float division: visual scorch height
+        out = { scorch, char: Math.min(100, char), intensity: kw / 1000, ash: 1 };
+      } else out = { char: Math.min(100, char) };
     }
     if (flood >= 2 && flood <= period) out = { ...out, water: mark };
     return out;

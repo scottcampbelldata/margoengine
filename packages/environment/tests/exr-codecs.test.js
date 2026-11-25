@@ -12,8 +12,16 @@ const bytes = (name) => readFileSync(new URL(name, root));
 test('standard decoder bytes match the pinned upstream provenance without checkout newline conversion', () => {
   const vendor = new URL('../vendor/exr-codecs/', import.meta.url);
   const provenance = JSON.parse(readFileSync(new URL('provenance.json', vendor), 'utf8'));
-  for (const [file, expected] of [['exrview.js', provenance.glueSha256], ['exrview.wasm', provenance.wasmSha256]])
-    assert.equal(createHash('sha256').update(readFileSync(new URL(file, vendor))).digest('hex'), expected);
+  for (const [file, expected] of [
+    ['exrview.js', provenance.glueSha256],
+    ['exrview.wasm', provenance.wasmSha256],
+  ])
+    assert.equal(
+      createHash('sha256')
+        .update(readFileSync(new URL(file, vendor)))
+        .digest('hex'),
+      expected,
+    );
 });
 
 test('every remaining codec, HALF/FLOAT, scanline/tiled odd edge blocks matches native OpenEXR bits on a real photograph', async () => {

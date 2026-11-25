@@ -33,12 +33,19 @@ const root = resolve(import.meta.dirname, '..'),
   rounds = Number(arg('rounds') ?? 8);
 if (!(rounds >= 0)) throw new RangeError(`--rounds must be 0 or more, got ${arg('rounds')}`);
 
-execFileSync('cargo', wasmBuildArgs(check), { cwd: root, stdio: 'inherit', timeout: 20 * 60_000, env: { ...process.env, RUSTFLAGS: WASM_RUSTFLAGS } });
+execFileSync('cargo', wasmBuildArgs(check), {
+  cwd: root,
+  stdio: 'inherit',
+  timeout: 20 * 60_000,
+  env: { ...process.env, RUSTFLAGS: WASM_RUSTFLAGS },
+});
 const module = `/${wasmModule(check, await readFile(join(root, check), 'utf8'))}`;
 const rapierPath = process.env.RAPIER2D_MODULE ? resolve(process.env.RAPIER2D_MODULE) : undefined;
 const rapier = rapierPath ? `/@fs/${rapierPath.replaceAll('\\', '/')}` : undefined;
 const rapierVersion = rapierPath
-  ? JSON.parse(await readFile(join(dirname(rapierPath), '../package.json'), 'utf8').catch(() => '{"version":"unknown"}')).version
+  ? JSON.parse(
+      await readFile(join(dirname(rapierPath), '../package.json'), 'utf8').catch(() => '{"version":"unknown"}'),
+    ).version
   : 'not run';
 const box2dPath = process.env.BOX2D_WASM ? resolve(process.env.BOX2D_WASM) : undefined;
 const box2d = box2dPath ? `/@fs/${box2dPath.replaceAll('\\', '/')}` : undefined;
@@ -57,14 +64,25 @@ const server = await createServer({
     headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' },
   },
 });
-const report = { module: module.slice(1), rustflags: WASM_RUSTFLAGS, rapier2d: rapierVersion, box2d: box2dPath ? 'v3.2.0 Wasm (BOX2D_WASM)' : 'not run', runs: [] };
+const report = {
+  module: module.slice(1),
+  rustflags: WASM_RUSTFLAGS,
+  rapier2d: rapierVersion,
+  box2d: box2dPath ? 'v3.2.0 Wasm (BOX2D_WASM)' : 'not run',
+  runs: [],
+};
 let failed = 0;
 try {
   await server.listen();
   const page = `${server.resolvedUrls.local[0]}packages/physics2d/tests/kernel-wasm.html`;
   for (const name of browsers) {
     const executablePath = name === 'firefox' ? process.env.REPLAY_FIREFOX : undefined;
-    const browser = await launchBrowser({ ...(name === 'default' ? {} : { name }), needs: name === 'firefox' ? 'none' : 'webgpu', headless: true, ...(executablePath ? { executablePath } : {}) });
+    const browser = await launchBrowser({
+      ...(name === 'default' ? {} : { name }),
+      needs: name === 'firefox' ? 'none' : 'webgpu',
+      headless: true,
+      ...(executablePath ? { executablePath } : {}),
+    });
     try {
       const probe = await browser.newPage();
       await probe.goto(page);
@@ -86,12 +104,19 @@ try {
         await tab.goto(page);
         await tab.waitForFunction(() => typeof window.runKernel === 'function', null, { timeout: 60_000 });
         const timed = backend === (hasWebGPU ? 'webgpu' : 'webgl2') ? rounds : 0;
-        const result = await tab.evaluate((o) => window.runKernel(o), { backend, module, rapier, box2d, rounds: timed });
+        const result = await tab.evaluate((o) => window.runKernel(o), {
+          backend,
+          module,
+          rapier,
+          box2d,
+          rounds: timed,
+        });
         await tab.close();
         try {
           assert.deepEqual(errors, []);
           assert.equal(result.backend, backend, `${label}: the page drew with ${result.backend}`);
-          for (const c of result.checks) assert.ok(c.pass, `${label}: scene ${c.check} stepped to ${c.bits}, not the native hash`);
+          for (const c of result.checks)
+            assert.ok(c.pass, `${label}: scene ${c.check} stepped to ${c.bits}, not the native hash`);
           console.log(`${label}: ${result.checks.length} pinned-bits scenes equal to native`);
         } catch (error) {
           failed++;
@@ -99,17 +124,24 @@ try {
         }
         if (result.times.length) {
           const margo = Math.min(...result.times.map((t) => t.margo));
-          console.log(`${label}: 100-row pyramid step, best of ${result.times.length} rounds: Margo ${margo.toFixed(2)} ms`);
+          console.log(
+            `${label}: 100-row pyramid step, best of ${result.times.length} rounds: Margo ${margo.toFixed(2)} ms`,
+          );
           if (rapier) {
             const rapier2d = Math.min(...result.times.map((t) => t.rapier2d)),
               faster = result.times.filter((t) => t.margo < t.rapier2d).length;
-            console.log(`${label}: Rapier 2D ${rapierVersion} ${rapier2d.toFixed(2)} ms (Margo faster in ${faster} rounds)`);
+            console.log(
+              `${label}: Rapier 2D ${rapierVersion} ${rapier2d.toFixed(2)} ms (Margo faster in ${faster} rounds)`,
+            );
           }
           if (box2d) {
             const box2d3 = Math.min(...result.times.map((t) => t.box2d)),
               ahead = result.times.filter((t) => t.margo < t.box2d).length,
               tops = result.times.map((t) => t.box2dTop);
-            assert.ok(tops.every((y) => y > 98 && y < 100), `${label}: Box2D's top box ended at ${tops}, not near 99.5 m`);
+            assert.ok(
+              tops.every((y) => y > 98 && y < 100),
+              `${label}: Box2D's top box ended at ${tops}, not near 99.5 m`,
+            );
             console.log(`${label}: Box2D v3 Wasm ${box2d3.toFixed(2)} ms (Margo faster in ${ahead} rounds)`);
           }
         }

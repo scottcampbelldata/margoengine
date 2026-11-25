@@ -1,9 +1,24 @@
 // Tessellation against what it promises: no edge over the limit, the same surface, and no cracks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { boxGeometry, computeTangents, mergeGeometries, planeGeometry, sphereGeometry, torusGeometry } from '../dist/index.js';
+import {
+  boxGeometry,
+  computeTangents,
+  mergeGeometries,
+  planeGeometry,
+  sphereGeometry,
+  torusGeometry,
+} from '../dist/index.js';
 import { tessellateGeometry, tessellateWithParents } from '../dist/tessellate.js';
-import { assertValid, close, point, signedVolume, surfaceArea, vertexCount, watertight } from './support/mesh-checks.js';
+import {
+  assertValid,
+  close,
+  point,
+  signedVolume,
+  surfaceArea,
+  vertexCount,
+  watertight,
+} from './support/mesh-checks.js';
 
 function longestEdge(data) {
   let longest = 0;

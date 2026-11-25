@@ -20,4 +20,6 @@ test('the cabin window opening passes the recess and sill of its frame', () => {
   assert.match(opening, /\n\s*recess: depth \/ 2 \+ 0\.17 - \(paneAt\[2\] \+ 0\.002\),/);
   // The sill block runs to depth / 2 + 0.05 + 0.21 = 2.76, 0.09 m past the frame's face at 2.67.
   assert.match(opening, /\n\s*sill: 0\.09,/);
+  // The room's opening light is built from that object, so the clip reaches the light and its bounce.
+  assert.match(source, /const roomLight = openingLight\(opening\);/);
 });

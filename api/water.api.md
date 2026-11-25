@@ -107,6 +107,7 @@ export interface WaterOptions {
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;
     reflection?: () => GPUTexture | undefined;
+    reflectionEnvironment?: WaterSkyEnvironment;
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];
     spray?: boolean;
@@ -122,6 +123,12 @@ export interface WaterShadowSource {
         readonly declarations: string;
     };
     bindings(): GPUBindGroupEntry[];
+}
+
+export interface WaterSkyEnvironment {
+    readonly equirectTexture: GPUTexture | undefined;
+    readonly rotation?: number;
+    readonly radianceScale?: number;
 }
 
 export interface WaterTerrain {

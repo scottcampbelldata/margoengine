@@ -208,7 +208,8 @@ function prune(json: JSONObject, stats: OptimizeExtraStats): void {
   while (changed) {
     const before = live.size;
     for (const i of live) {
-      const index = nodes[i].skin, skin = json.skins?.[index];
+      const index = nodes[i].skin,
+        skin = json.skins?.[index];
       if (!skin || usedSkins.has(index)) continue;
       usedSkins.add(index);
       for (const joint of [...skin.joints, ...(skin.skeleton === undefined ? [] : [skin.skeleton])]) mark(joint);

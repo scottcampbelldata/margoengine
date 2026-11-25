@@ -25,8 +25,11 @@ test('horizonHeights: the ring meets the world at its edge, skirts under it, and
   }
   assert.equal(at(512, 512), heights[64 * width + 64] - HORIZON_SKIRT, 'inside, a skirt under the world');
   // The valley leaving the west edge carries on: 64 m out the floor is still near 100 m, the walls near their height.
-  assert.ok(Math.abs(at(-64, 496) - at(0, 496)) < 10, `the valley floor carries on: ${at(-64, 496)} past ${at(0, 496)}`);
-  assert.ok(at(-64, 200) - at(-64, 496) > 150, "and so do its walls");
+  assert.ok(
+    Math.abs(at(-64, 496) - at(0, 496)) < 10,
+    `the valley floor carries on: ${at(-64, 496)} past ${at(0, 496)}`,
+  );
+  assert.ok(at(-64, 200) - at(-64, 496) > 150, 'and so do its walls');
   // Far out, mountains: a range of heights spanning a good share of the world's relief, none flat.
   const out = [];
   for (let z = -3000; z <= 4000; z += 160) out.push(at(-2500, z));
@@ -35,7 +38,7 @@ test('horizonHeights: the ring meets the world at its edge, skirts under it, and
   assert.ok(hi - lo > 50, `relief out to the horizon: ${lo} to ${hi}`);
   // Holes cover the world's own ground but not the first row of cells inside its edge.
   const cells = far.width - 1,
-    first = 3 * 1024 / 16; // float division: ring cells
+    first = (3 * 1024) / 16; // float division: ring cells
   assert.equal(far.inside[(first + 10) * cells + first + 10], 1);
   assert.equal(far.inside[(first + 10) * cells + first], 0, 'the skirt row is drawn');
   assert.equal(far.inside[(first + 10) * cells + first - 1], 0, 'outside is drawn');
@@ -46,7 +49,11 @@ test('regression KB-BIOMES-WORLDEDGE1: a land-locked view draws far ground to th
   globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2, RENDER_ATTACHMENT: 16, STORAGE_BINDING: 8 };
   const engine = {
     backend: 'webgpu',
-    gpu: { limits: { maxTextureDimension2D: 8192 }, createTexture: () => ({ destroy() {} }), queue: { writeTexture() {} } },
+    gpu: {
+      limits: { maxTextureDimension2D: 8192 },
+      createTexture: () => ({ destroy() {} }),
+      queue: { writeTexture() {} },
+    },
     camera: { position: [0, 0, 0] },
     use() {},
     removePlugin() {},
@@ -68,7 +75,13 @@ test('regression KB-BIOMES-WORLDEDGE1: a land-locked view draws far ground to th
     assert.deepEqual(new Set(view.horizon.options.layers.map((l) => l.scale)), new Set([1 / 16]));
     assert.deepEqual(new Set(view.terrain.options.layers.map((l) => l.scale)), new Set([0.25]));
     view.dispose();
-    const off = await BiomeView.attach(engine, land, { objects: false, water: false, radius: 50, textureResolution: 16, horizon: false });
+    const off = await BiomeView.attach(engine, land, {
+      objects: false,
+      water: false,
+      radius: 50,
+      textureResolution: 16,
+      horizon: false,
+    });
     assert.equal(off.horizon, undefined);
     off.dispose();
     const coast = await BiomeWorld.create({
@@ -89,7 +102,13 @@ test('regression KB-BIOMES-WORLDEDGE1: a land-locked view draws far ground to th
 test('regression KB-BIOMES-RIVERSTEP1: the riverbed paints the ground under the rivers, and the canopy stays the last material', async () => {
   // Main's first riverbed went after the canopy, which the cover writes at the last index: the forest drew as riverbed.
   const usage = globalThis.GPUTextureUsage;
-  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2, RENDER_ATTACHMENT: 16, STORAGE_BINDING: 8, COPY_SRC: 1 };
+  globalThis.GPUTextureUsage = {
+    TEXTURE_BINDING: 4,
+    COPY_DST: 2,
+    RENDER_ATTACHMENT: 16,
+    STORAGE_BINDING: 8,
+    COPY_SRC: 1,
+  };
   const counts = new Map(),
     device = {
       limits: { maxTextureDimension2D: 8192, maxBufferSize: 1 << 30, maxStorageBufferBindingSize: 1 << 30 },
@@ -128,7 +147,9 @@ test('regression KB-BIOMES-RIVERSTEP1: the riverbed paints the ground under the 
       canvas: { width: 64, height: 64 },
     };
   try {
-    const world = await BiomeWorld.create({ height: { relief: { seed: 3, relief: 900, base: 300, rivers: 1, coast: 'south' } } }),
+    const world = await BiomeWorld.create({
+        height: { relief: { seed: 3, relief: 900, base: 300, rivers: 1, coast: 'south' } },
+      }),
       view = await BiomeView.attach(engine, world, {
         objects: false,
         water: { rivers: 'auto' },

@@ -40,7 +40,8 @@ function setup() {
   // Node has no canvas to rasterize glyphs: every glyph is an 8 by 10 bitmap.
   const bitmaps = new Map();
   ui.font.glyph = (cluster) => {
-    if (!bitmaps.has(cluster)) bitmaps.set(cluster, { cluster, width: 8, height: 10, left: 0, top: 8, color: false, data: new Uint8Array(80) });
+    if (!bitmaps.has(cluster))
+      bitmaps.set(cluster, { cluster, width: 8, height: 10, left: 0, top: 8, color: false, data: new Uint8Array(80) });
     return bitmaps.get(cluster);
   };
   let execute;
@@ -53,7 +54,12 @@ function setup() {
   } finally {
     console.warn = warn;
   }
-  return { ui, renderer, warnings, run: (gl, extra = {}) => execute({ backend: 'webgl2', gl, width: 640, height: 360, ...extra }) };
+  return {
+    ui,
+    renderer,
+    warnings,
+    run: (gl, extra = {}) => execute({ backend: 'webgl2', gl, width: 640, height: 360, ...extra }),
+  };
 }
 
 // The drawing code loads on first use: run frames until it has drawn, yielding to the event loop between them.
@@ -92,7 +98,10 @@ test('on the WebGL2 backend UiRenderer draws the draw list: instanced rectangles
   // The default framebuffer, premultiplied alpha blending, and the state put back after.
   assert.ok(gl.calls.some((c) => c[0] === 'bindFramebuffer' && c[2] === null));
   const blend = gl.calls.find((c) => c[0] === 'blendFuncSeparate');
-  assert.deepEqual(blend.slice(1), ['ONE', 'ONE_MINUS_SRC_ALPHA', 'ONE', 'ONE_MINUS_SRC_ALPHA'].map((k) => k.length));
+  assert.deepEqual(
+    blend.slice(1),
+    ['ONE', 'ONE_MINUS_SRC_ALPHA', 'ONE', 'ONE_MINUS_SRC_ALPHA'].map((k) => k.length),
+  );
   assert.ok(gl.calls.at(-1)[0] === 'disable' || gl.calls.at(-1)[0] === 'enable');
 
   // An unchanged frame draws again (the default framebuffer is cleared every frame) but uploads nothing.
@@ -113,7 +122,13 @@ test('a glyph upload resets the unpack row length, skips and image height before
   const at = gl.calls.findIndex((c) => c[0] === 'texSubImage3D');
   assert.ok(at > 0, 'a glyph was uploaded');
   const before = gl.calls.slice(0, at).filter((c) => c[0] === 'pixelStorei');
-  for (const name of ['UNPACK_ROW_LENGTH', 'UNPACK_SKIP_ROWS', 'UNPACK_SKIP_PIXELS', 'UNPACK_SKIP_IMAGES', 'UNPACK_IMAGE_HEIGHT']) {
+  for (const name of [
+    'UNPACK_ROW_LENGTH',
+    'UNPACK_SKIP_ROWS',
+    'UNPACK_SKIP_PIXELS',
+    'UNPACK_SKIP_IMAGES',
+    'UNPACK_IMAGE_HEIGHT',
+  ]) {
     const set = before.filter((c) => c[1] === name.length && c[2] === 0);
     assert.ok(set.length > 0, name + ' is reset to 0 before the upload');
   }
@@ -133,7 +148,12 @@ test('WebGL2 runs move the attribute offsets to their first instance (no base in
   // The list clips its rows: one scissor is the list's box, in GL's bottom-up rows.
   const s = ui.scale * 1,
     r = list.rect,
-    box = [Math.round(r.x * s), Math.round(360 - (r.y + r.height) * s), Math.round(r.width * s), Math.round(r.height * s)];
+    box = [
+      Math.round(r.x * s),
+      Math.round(360 - (r.y + r.height) * s),
+      Math.round(r.width * s),
+      Math.round(r.height * s),
+    ];
   const scissors = gl.calls.filter((c) => c[0] === 'scissor').map((c) => c.slice(1).map(Math.round));
   assert.ok(
     scissors.some((c) => c.every((v, i) => Math.abs(v - box[i]) <= 1)),
@@ -150,7 +170,11 @@ test('a lost WebGL2 context draws nothing; after a restore the painter is made a
   gl.lose();
   const before = gl.calls.length;
   run(gl);
-  assert.equal(gl.calls.slice(before).filter((c) => c[0] === 'drawArraysInstanced').length, 0, 'nothing drawn on a lost context');
+  assert.equal(
+    gl.calls.slice(before).filter((c) => c[0] === 'drawArraysInstanced').length,
+    0,
+    'nothing drawn on a lost context',
+  );
   const fresh = fakeGl();
   renderer.onDeviceRestored({ sceneOf: () => undefined, backend: 'webgl2', canvas: { clientWidth: 640 } });
   run(fresh);

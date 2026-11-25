@@ -928,7 +928,9 @@ function inherit(parent: Props, declared: Props): Props {
  */
 export function parseSVG(input: string | BinaryInput, options: XMLExternalOptions = {}): LoadedSVG {
   const text = typeof input === 'string' ? input : decodeXML(toBytes(input, F));
-  const root = readXMLTree(text, F, { external: options.external }).children.find((element) => localName(element.name) === 'svg');
+  const root = readXMLTree(text, F, { external: options.external }).children.find(
+    (element) => localName(element.name) === 'svg',
+  );
   if (!root) throw new LoaderError(F, 'header', 'the document has no <svg> root element; pass an SVG file');
   const paths: DrawnPath[] = [],
     warnings: string[] = [],

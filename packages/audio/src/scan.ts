@@ -93,7 +93,8 @@ function channelsOf(input: Channels, name: string): ArrayLike<number>[] {
 }
 
 const checkRate = (sampleRate: number, name: string) => {
-  if (!(Number.isFinite(sampleRate) && sampleRate > 0)) throw rangeError(`${name} needs a sampleRate above 0`, 'audio-scan');
+  if (!(Number.isFinite(sampleRate) && sampleRate > 0))
+    throw rangeError(`${name} needs a sampleRate above 0`, 'audio-scan');
 };
 
 /**
@@ -105,7 +106,8 @@ export function scanClipping(channels: Channels, sampleRate: number, options: Cl
   checkRate(sampleRate, 'scanClipping');
   const { level = 0.999, run = 3 } = options;
   if (!(level > 0 && level <= 1)) throw rangeError('scanClipping needs a level above 0 and at most 1', 'audio-scan');
-  if (!(Number.isInteger(run) && run >= 1)) throw rangeError('scanClipping needs a run of 1 or more samples', 'audio-scan');
+  if (!(Number.isInteger(run) && run >= 1))
+    throw rangeError('scanClipping needs a run of 1 or more samples', 'audio-scan');
   const runs: ClipRun[] = [];
   let clippedSamples = 0,
     peak = 0;
@@ -140,7 +142,8 @@ export function findSilences(samples: Channels, sampleRate: number, options: Sil
   checkRate(sampleRate, 'findSilences');
   const { floorDb = -50, minSeconds = 2, window = 0.01 } = options;
   if (!Number.isFinite(floorDb)) throw rangeError('findSilences needs a finite floorDb', 'audio-scan');
-  if (!(minSeconds >= 0 && minSeconds < Infinity)) throw rangeError('findSilences needs minSeconds of 0 or more', 'audio-scan');
+  if (!(minSeconds >= 0 && minSeconds < Infinity))
+    throw rangeError('findSilences needs minSeconds of 0 or more', 'audio-scan');
   const size = Math.round(window * sampleRate);
   if (!(size >= 1)) throw rangeError('findSilences needs a window of at least one sample', 'audio-scan');
   const total = list[0].length,

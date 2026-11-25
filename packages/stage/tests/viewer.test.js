@@ -131,7 +131,13 @@ function fixture() {
       return (world.floor = part('floor', { options }));
     },
   };
-  return { stage, canvas, tick: (delta) => ticks.forEach((tick) => tick(delta)), ticks, dispose: () => disposal.abort() };
+  return {
+    stage,
+    canvas,
+    tick: (delta) => ticks.forEach((tick) => tick(delta)),
+    ticks,
+    dispose: () => disposal.abort(),
+  };
 }
 
 test('defaults: model, studio light on it, contact shadow fitted to it, tonemap, framed camera, turntable', async () => {
@@ -325,7 +331,8 @@ function realCamera(options) {
       const changed = fields.filter((key, i) => camera[key] !== before[i]).map((key) => `camera.${key}`);
       camera.advance(0.75);
       twin.advance(0.75);
-      if (String([camera.position, camera.target]) !== String([twin.position, twin.target])) changed.push('fit in flight');
+      if (String([camera.position, camera.target]) !== String([twin.position, twin.target]))
+        changed.push('fit in flight');
       if (f.ticks.size) changed.push('tick');
       if (!signals.every((signal) => signal.aborted)) changed.push('listener');
       for (const made of parts) if (made.disposed !== 1) changed.push(`${made.name} disposed ${made.disposed} times`);
@@ -420,7 +427,11 @@ test('a model with nothing to frame rejects and leaves nothing behind', async ()
 });
 
 test('zero and nonfinite model bounds reject without leaving viewer resources', async () => {
-  for (const modelBounds of [[0, 0, 0, 0, 0, 0], [NaN, 0, 0, 1, 1, 1], [0, 0, 0, Infinity, 1, 1]]) {
+  for (const modelBounds of [
+    [0, 0, 0, 0, 0, 0],
+    [NaN, 0, 0, 1, 1, 1],
+    [0, 0, 0, Infinity, 1, 1],
+  ]) {
     const { stage, ticks } = fixture();
     world.modelBounds = modelBounds;
     await assert.rejects(addViewer(stage, '/invalid-bounds.glb'), { code: 'state', message: /no geometry to frame/ });
@@ -459,7 +470,8 @@ test('bad options throw before anything loads', async () => {
   await assert.rejects(addViewer(stage, '/shoe.glb', { shadows: 'soft' }), TypeError);
   await assert.rejects(addViewer(stage, '/shoe.glb', { fit: 1 }), {
     name: 'TypeError',
-    message: /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
+    message:
+      /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
   });
   await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { seconds: 0 } }), RangeError);
   await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { resumeAfter: -1 } }), RangeError);
@@ -476,8 +488,11 @@ test('finite extreme turn periods retain the reduced phase without overflowing t
       tick(delta);
       const actual = stage.engine.camera.position;
       assert.ok(actual.every(Number.isFinite), `finite position for seconds=${seconds}, delta=${delta}`);
-      const expected = [before[0] * Math.cos(angle) + before[2] * Math.sin(angle), before[1],
-        -before[0] * Math.sin(angle) + before[2] * Math.cos(angle)];
+      const expected = [
+        before[0] * Math.cos(angle) + before[2] * Math.sin(angle),
+        before[1],
+        -before[0] * Math.sin(angle) + before[2] * Math.cos(angle),
+      ];
       for (let k = 0; k < 3; k++) assert.ok(Math.abs(actual[k] - expected[k]) < 1e-12);
       assert.ok(Math.abs(Math.hypot(...actual) - Math.hypot(...before)) < 1e-12);
     }
@@ -489,8 +504,10 @@ test('nonfinite turntable settings reject before loading', async () => {
   const { stage } = fixture();
   for (const key of ['seconds', 'resumeAfter']) {
     for (const value of [NaN, Infinity, -Infinity]) {
-      await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { [key]: value } }),
-        { name: 'RangeError', message: /Turntable.*https:\/\/margoengine.com\/errors#arguments/ });
+      await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { [key]: value } }), {
+        name: 'RangeError',
+        message: /Turntable.*https:\/\/margoengine.com\/errors#arguments/,
+      });
     }
   }
   assert.deepEqual(log, []);

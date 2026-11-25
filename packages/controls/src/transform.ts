@@ -111,7 +111,10 @@ const rgba = (color: GizmoColor, name: string): RGBA => {
   else if ((color?.length === 3 || color?.length === 4) && color.every((v) => Number.isFinite(v) && v >= 0 && v <= 1))
     out = [color[0], color[1], color[2], color[3] ?? 1];
   if (!out)
-    throw typeError(`TransformControls ${name} must be '#rgb', '#rrggbb', '#rrggbbaa' or [r, g, b(, a)] in 0..1; pass a colour like that`, 'controls-transform');
+    throw typeError(
+      `TransformControls ${name} must be '#rgb', '#rrggbb', '#rrggbbaa' or [r, g, b(, a)] in 0..1; pass a colour like that`,
+      'controls-transform',
+    );
   return out as unknown as RGBA;
 };
 
@@ -316,7 +319,10 @@ export class TransformControls extends EventDispatcher {
   private owned(object: Mesh): void {
     meshRuntime(object).check();
     if ((meshRuntime(object) as unknown as { engine: unknown }).engine !== engineRuntime(this.engine))
-      throw typeError('TransformControls: the mesh belongs to another engine; attach a mesh created by this engine', 'controls-transform');
+      throw typeError(
+        'TransformControls: the mesh belongs to another engine; attach a mesh created by this engine',
+        'controls-transform',
+      );
   }
   attach(object: Mesh): this {
     this.owned(object);
@@ -337,7 +343,11 @@ export class TransformControls extends EventDispatcher {
     for (const object of list) this.owned(object);
     const chosen = active ?? list[list.length - 1];
     if (!chosen) return this.detach();
-    if (!list.includes(chosen)) throw typeError('TransformControls: the active mesh is not one of the attached meshes; pass one of them or none', 'controls-transform');
+    if (!list.includes(chosen))
+      throw typeError(
+        'TransformControls: the active mesh is not one of the attached meshes; pass one of them or none',
+        'controls-transform',
+      );
     if (list.length === 1) return this.attach(chosen);
     if (this.dragging) this.endDrag();
     this.object = chosen;
@@ -387,7 +397,10 @@ export class TransformControls extends EventDispatcher {
   }
   setSize(size: number): void {
     if (!(Number.isFinite(size) && size > 0))
-      throw rangeError('TransformControls size must be a finite number above 0; pass a positive size', 'controls-transform');
+      throw rangeError(
+        'TransformControls size must be a finite number above 0; pass a positive size',
+        'controls-transform',
+      );
     this.size = size;
     this.dispatchEvent({ type: 'change' });
   }
@@ -519,8 +532,15 @@ export class TransformControls extends EventDispatcher {
   }
   set axisColors(value: readonly [GizmoColor, GizmoColor, GizmoColor] | null) {
     if (value !== null && value?.length !== 3)
-      throw typeError('TransformControls axisColors must be three colours or null; pass [x, y, z] colours', 'controls-transform');
-    this.colorsValue = value && [rgba(value[0], 'axisColors'), rgba(value[1], 'axisColors'), rgba(value[2], 'axisColors')];
+      throw typeError(
+        'TransformControls axisColors must be three colours or null; pass [x, y, z] colours',
+        'controls-transform',
+      );
+    this.colorsValue = value && [
+      rgba(value[0], 'axisColors'),
+      rgba(value[1], 'axisColors'),
+      rgba(value[2], 'axisColors'),
+    ];
   }
   /** Colour of the hovered or dragged handle, or null for yellow. */
   get hoveredColor(): RGBA | null {
@@ -535,7 +555,10 @@ export class TransformControls extends EventDispatcher {
   }
   set lineWidth(value: number) {
     if (!(Number.isFinite(value) && value > 0))
-      throw rangeError('TransformControls lineWidth must be a finite number above 0; pass a width in CSS pixels', 'controls-transform');
+      throw rangeError(
+        'TransformControls lineWidth must be a finite number above 0; pass a width in CSS pixels',
+        'controls-transform',
+      );
     this.widthValue = value;
   }
   /** True when one object is attached with a non-zero `offset`: drags then go about the offset point. */

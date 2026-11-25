@@ -42,8 +42,22 @@ for (const [name, points, closed] of cases) {
     if (!closed && (segment === 0 || segment === segments - 1)) ends = Math.max(ends, d);
     else interior = Math.max(interior, d);
   }
-  console.log(JSON.stringify({ case: name, three: manifest.version, samples: 401, interiorMaxError: interior, endSegmentMaxError: ends }));
+  console.log(
+    JSON.stringify({
+      case: name,
+      three: manifest.version,
+      samples: 401,
+      interiorMaxError: interior,
+      endSegmentMaxError: ends,
+    }),
+  );
 }
 const [a, b] = [new Spline(wave(9, 0)), new Spline(wave(9, 1.3))],
   hits = intersectSplines(a, b);
-console.log(JSON.stringify({ case: 'intersections', points: hits.points.length, rival: 'none (three.js has no curve-curve intersection)' }));
+console.log(
+  JSON.stringify({
+    case: 'intersections',
+    points: hits.points.length,
+    rival: 'none (three.js has no curve-curve intersection)',
+  }),
+);

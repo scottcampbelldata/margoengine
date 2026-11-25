@@ -118,9 +118,7 @@ async function main() {
     const ok = unexpected.length === 0 && gone.length === 0;
     if (!ok) failed++;
     else
-      console.log(
-        `PASS ${name} ${backend}, ${clicked} buttons${expected.length ? `, ${expected.length} known` : ''}`,
-      );
+      console.log(`PASS ${name} ${backend}, ${clicked} buttons${expected.length ? `, ${expected.length} known` : ''}`);
     results.push({ page: name, backend, ok, clicked, expected, unexpected, gone });
   }
   mkdirSync(join(root, 'test-results'), { recursive: true });

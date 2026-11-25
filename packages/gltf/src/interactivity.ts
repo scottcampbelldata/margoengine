@@ -1,7 +1,14 @@
 // @margoengine/gltf/interactivity: KHR_interactivity (ratified by the Khronos Group; specification read at commit
 // a7963af6dc of 2026-10-19), with KHR_node_selectability and KHR_node_hoverability. Runs the behaviour graph a file carries,
 // so clicks, animations and material changes authored in the file work with no code of the app's.
-import { BehaviorGraph, GraphRejected, compileInteractivity, type BehaviorGraphOptions, type GraphPhysics, type SelectInfo } from './interactivity-graph.js';
+import {
+  BehaviorGraph,
+  GraphRejected,
+  compileInteractivity,
+  type BehaviorGraphOptions,
+  type GraphPhysics,
+  type SelectInfo,
+} from './interactivity-graph.js';
 import { ObjectModel, type ActiveCamera } from './interactivity-model.js';
 import type { GraphRef, GraphValue } from './interactivity-ops.js';
 import type { GLTFAsset } from './pbr.js';
@@ -10,7 +17,13 @@ export { BehaviorGraph };
 export type { ActiveCamera, BehaviorGraphOptions, GraphPhysics, GraphRef, GraphValue, SelectInfo };
 
 /** The extensions a graph sees as enabled, beyond those of the materials and lights gltf/pbr reads. */
-const extensions = ['KHR_interactivity', 'KHR_node_selectability', 'KHR_node_hoverability', 'KHR_node_visibility', 'KHR_physics_rigid_bodies'];
+const extensions = [
+  'KHR_interactivity',
+  'KHR_node_selectability',
+  'KHR_node_hoverability',
+  'KHR_node_visibility',
+  'KHR_physics_rigid_bodies',
+];
 
 // What the loaders read, each by name, so an unknown extension in a file never reads as enabled.
 const read =

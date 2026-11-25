@@ -78,7 +78,8 @@ export function tessellateWithParents(
   if (!Number.isInteger(vertices) || data.indices.length % 3)
     throw new RangeError('Invalid geometry; pass xyz positions and whole triangles');
   for (const index of data.indices)
-    if (index >= vertices) throw new RangeError(`Index ${index} is past the last vertex; pass indices below ${vertices}`);
+    if (index >= vertices)
+      throw new RangeError(`Index ${index} is past the last vertex; pass indices below ${vertices}`);
   for (const value of data.positions)
     if (!Number.isFinite(value)) throw new RangeError('Invalid position; pass finite coordinates');
   const P = new Column(data.positions),

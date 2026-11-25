@@ -11,7 +11,10 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { wgsl } from '../../core/src/shaders.ts';
 
 const vertexCodes = (h) =>
-  h.pipelines.filter((p) => p.vertex).map((p) => p.vertex.module.code).filter((c) => c.includes('fn scatterPose('));
+  h.pipelines
+    .filter((p) => p.vertex)
+    .map((p) => p.vertex.module.code)
+    .filter((c) => c.includes('fn scatterPose('));
 
 test('each posing stage reads the field after its own bindings and turns after the instance turn', () => {
   for (const [options, group] of [
@@ -88,11 +91,20 @@ test('options and interactors are checked; the field is made with the first fram
 
 test('interaction uploads height and samples the same validated terrain and world rectangle as placement', () => {
   const h = optionalGPU();
-  let texture = h.engine.gpu.createTexture({ size: [2, 2], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING });
+  let texture = h.engine.gpu.createTexture({
+    size: [2, 2],
+    format: 'r32float',
+    usage: GPUTextureUsage.TEXTURE_BINDING,
+  });
   let reads = 0;
   const effect = new TrampledScatter(box(), {
-    count: 64, center: [3, 2, -5], bounds: [-8, -8, 8, 8],
-    heightmap: () => { reads++; return texture; },
+    count: 64,
+    center: [3, 2, -5],
+    bounds: [-8, -8, 8, 8],
+    heightmap: () => {
+      reads++;
+      return texture;
+    },
   });
   try {
     effect.setInteractors([{ position: [1, 7, -2], radius: 3, strength: 0.6 }]);
@@ -112,7 +124,10 @@ test('interaction uploads height and samples the same validated terrain and worl
     texture = h.engine.gpu.createTexture({ size: [2, 2], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING });
     h.frame();
     assert.equal(reads, 2);
-    assert.ok(h.groups.some((g) => g.entries[4]?.resource.texture === texture), 'a replacement map rebinds');
+    assert.ok(
+      h.groups.some((g) => g.entries[4]?.resource.texture === texture),
+      'a replacement map rebinds',
+    );
   } finally {
     effect.dispose();
     h.cleanup();

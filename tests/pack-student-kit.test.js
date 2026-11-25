@@ -53,7 +53,10 @@ test('the NOTICE names each model, its licence and its source, and refuses a mod
 
 test('a guide that names a new model is found, in any of the asset folders formats', () => {
   assert.deepEqual(
-    referencedModels(['Copy `examples/assets/a.glb` and examples/assets/khronos/Box/b.gltf.', 'again examples/assets/a.glb']),
+    referencedModels([
+      'Copy `examples/assets/a.glb` and examples/assets/khronos/Box/b.gltf.',
+      'again examples/assets/a.glb',
+    ]),
     ['a.glb', 'khronos/Box/b.gltf'],
   );
 });
@@ -70,7 +73,10 @@ test('the zip round-trips: deflated text, stored binary, UTF-8 names, CRCs check
   assert.equal(zip.readUInt32LE(0), 0x04034b50);
   assert.ok(zip.length < 1600 + random.length, 'text was deflated');
   const back = unzipEntries(zip);
-  assert.deepEqual(back.map((e) => e.name), entries.map((e) => e.name));
+  assert.deepEqual(
+    back.map((e) => e.name),
+    entries.map((e) => e.name),
+  );
   for (let i = 0; i < entries.length; i++) assert.ok(back[i].data.equals(entries[i].data), entries[i].name);
   const damaged = Buffer.from(zip);
   damaged[30 + 'kit/README.md'.length + 2] ^= 0xff; // inside the first entry's deflated body
@@ -93,7 +99,10 @@ test('packStudentKit writes one folder with the packages, the guide models, the 
     });
     assert.equal(summary.tarballs, 2);
     const names = unzipEntries(readFileSync(out)).map((entry) => entry.name);
-    assert.ok(names.every((name) => name.startsWith(`${KIT_FOLDER}/`)), 'one top-level folder');
+    assert.ok(
+      names.every((name) => name.startsWith(`${KIT_FOLDER}/`)),
+      'one top-level folder',
+    );
     for (const path of [
       ...KIT_DOCUMENTS,
       'NOTICE.md',
@@ -103,7 +112,11 @@ test('packStudentKit writes one folder with the packages, the guide models, the 
       'margo-packages/margoengine-core-1.0.0.tgz',
     ])
       assert.ok(names.includes(`${KIT_FOLDER}/${path}`), path);
-    assert.equal(names.filter((name) => name.includes('/examples/assets/')).length, summary.models.length, 'no model the guides do not name');
+    assert.equal(
+      names.filter((name) => name.includes('/examples/assets/')).length,
+      summary.models.length,
+      'no model the guides do not name',
+    );
     const helmet = unzipEntries(readFileSync(out)).find((entry) => entry.name.endsWith('flight-helmet.glb'));
     assert.equal(helmet.data.toString('latin1', 0, 4), 'glTF', 'the real model, not a Git LFS pointer');
   } finally {

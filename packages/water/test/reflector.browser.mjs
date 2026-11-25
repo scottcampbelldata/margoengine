@@ -105,13 +105,55 @@ try {
   };
   const redGain = red(images[1]) - red(images[0]);
   assert.ok(redGain > 3, 'offscreen red object appears at its independent mirrored projection: ' + redGain);
-  // A deliberately narrow borrowed projection places a capture boundary on an interior stretch of visible water.
-  // A constant red capture isolates the boundary weighting from texture filtering and scene geometry.
+  // Shift a constant capture so its right edge lands at the middle of the water. The reflection has full
+  // strength in the interior and approaches the sky across the filter's footprint.
+  const edgeFrame = async (capture) => {
+    await page.evaluate((capture) => {
+      const t = window.reflectTest;
+      t.adapter.dispose();
+      let source = t.mirror;
+      if (capture) {
+        const gpu = t.engine.gpu;
+        const texture = gpu.createTexture({ size: [32, 32], format: 'rgba16float', usage: 6 });
+        const data = new Uint16Array(32 * 32 * 4);
+        for (let n = 0; n < data.length; n += 4) data.set([0x3c00, 0, 0, 0x3c00], n);
+        gpu.queue.writeTexture({ texture }, data, { bytesPerRow: 256 }, [32, 32]);
+        const textureMatrix = t.engine.camera.matrix.slice();
+        for (let i = 0; i < 16; i += 4) textureMatrix[i] += textureMatrix[i + 3];
+        source = { texture, textureMatrix };
+        t.edgeTexture = texture;
+      } else {
+        source = { texture: undefined, textureMatrix: undefined };
+      }
+      t.adapter = t.WaterReflection.attach(t.engine, { surface: t.water, reflector: source });
+      t.engine.render({ delta: 0 });
+    }, capture);
+    return decodePNG(await page.locator('canvas').screenshot());
+  };
+  const skyOnly = await edgeFrame(false);
+  const edge = await edgeFrame(true);
+  const lift = (x) => {
+    let sum = 0;
+    for (let y = 160; y < 178; y++) {
+      const i = (y * edge.width + x) * 4;
+      sum += edge.data[i] - skyOnly.data[i];
+    }
+    return sum / 18;
+  };
+  const interior = lift(98);
+  const boundary = lift(120);
+  const outside = lift(132);
+  assert.ok(interior > 10, `interior reflection is missing: ${interior}`);
+  assert.ok(boundary > 0 && boundary < interior * 0.45, `capture edge does not fade: ${boundary} vs ${interior}`);
+  assert.equal(outside, 0, 'the sky is unchanged outside the borrowed capture');
   await page.evaluate(() => {
     const t = window.reflectTest;
     t.adapter.dispose();
+    t.edgeTexture.destroy();
     t.engine.render({ delta: 0 });
   });
+  // A deliberately narrow borrowed projection places a capture boundary on an interior stretch of visible water.
+  // A constant red capture isolates the boundary weighting from texture filtering and scene geometry.
   const edgeBefore = await page.locator('canvas').screenshot();
   const edgeSamples = await page.evaluate(() => {
     const t = window.reflectTest,
@@ -129,6 +171,7 @@ try {
     const projection = new Float32Array(16);
     projection[0] = 0.125;
     projection[12] = -1;
+    projection[5] = 2; // a vertical row, so the horizon feather of the bent capture has an angular texel
     projection[15] = 1;
     t.edgeTexture = texture;
     t.edgeAdapter = t.WaterReflection.attach(t.engine, {
@@ -154,8 +197,8 @@ try {
     const i = (y * withEdge.width + x) * 4;
     return withEdge.data[i] - withoutEdge.data[i];
   });
-  const [outside, near, inside, inner, solid] = edgeGains;
-  assert.equal(outside, 0, 'outside the capture the sky fallback is exact');
+  const [outsideGain, near, inside, inner, solid] = edgeGains;
+  assert.equal(outsideGain, 0, 'outside the capture the sky fallback is exact');
   assert.ok(solid > 15, 'an interior reflection still contributes strongly');
   assert.ok(near < inside && inside < inner && inner < solid, 'the border transitions progressively: ' + edgeGains);
   assert.ok(near < solid * 0.3, 'the first sample inside the border does not jump to the full capture: ' + edgeGains);
@@ -257,6 +300,9 @@ try {
     lifecycle,
     redGain,
     edgeGains,
+    interior,
+    boundary,
+    outside,
     visibleChange: true,
     unreadyExact: true,
     windBearing: wind,

@@ -39,7 +39,7 @@ function gapShare(canopy, ring) {
   return open / rays;
 }
 
-test('a near spruce shows its branches: sky between the lowest whorl\'s branches, little through a skirt', () => {
+test("a near spruce shows its branches: sky between the lowest whorl's branches, little through a skirt", () => {
   const skirt = gapShare(generateTreeMesh('conifer').canopy, 0.75),
     whorls = gapShare(generateTreeMesh('conifer', { branches: true }).canopy, 0.75);
   assert.ok(skirt < 0.1, `the skirt closes the crown but for its rim's notches: ${skirt.toFixed(3)}`);
@@ -48,7 +48,10 @@ test('a near spruce shows its branches: sky between the lowest whorl\'s branches
   const mid = generateTreeMesh('conifer', { branches: true, detail: 1 });
   assert.ok(gapShare(mid.canopy, 0.75) > 0.2, 'detail 1 keeps the gaps');
   // Detail 0 is the far silhouette: branches do not apply.
-  assert.deepEqual(generateTreeMesh('conifer', { branches: true, detail: 0 }), generateTreeMesh('conifer', { detail: 0 }));
+  assert.deepEqual(
+    generateTreeMesh('conifer', { branches: true, detail: 0 }),
+    generateTreeMesh('conifer', { detail: 0 }),
+  );
   // The broadleaf ignores the option.
   assert.deepEqual(generateTreeMesh('broadleaf', { branches: true }), generateTreeMesh('broadleaf'));
 });
@@ -63,7 +66,8 @@ test('the sprays face up, lean out from the trunk and their normals vary from ve
     assert.ok(Math.abs(Math.hypot(n[i], n[i + 1], n[i + 2]) - 1) < 1e-5, 'unit normals');
     if (n[i + 1] > 0) up++;
     count++;
-    if (i >= 3) turn += Math.acos(Math.max(-1, Math.min(1, n[i] * n[i - 3] + n[i + 1] * n[i - 2] + n[i + 2] * n[i - 1])));
+    if (i >= 3)
+      turn += Math.acos(Math.max(-1, Math.min(1, n[i] * n[i - 3] + n[i + 1] * n[i - 2] + n[i + 2] * n[i - 1])));
   }
   assert.ok(up / count > 0.85, `most normals face the sky (${(up / count).toFixed(3)})`);
   // Neighbouring vertices of a spray differ by more than its surface's own bend: the needle tilt.
@@ -80,7 +84,9 @@ test('the needle colour follows the measured needle reflectance less the light a
     ],
     p = 0.47,
     expected = needle.map(([r, t]) => (r * (1 - p)) / (1 - p * (r + t)));
-  CONIFER_NEEDLES.forEach((c, i) => assert.ok(Math.abs(c - expected[i]) < 0.0006, `channel ${i}: ${c} against ${expected[i].toFixed(4)}`));
+  CONIFER_NEEDLES.forEach((c, i) =>
+    assert.ok(Math.abs(c - expected[i]) < 0.0006, `channel ${i}: ${c} against ${expected[i].toFixed(4)}`),
+  );
   const y = 0.2126 * CONIFER_NEEDLES[0] + 0.7152 * CONIFER_NEEDLES[1] + 0.0722 * CONIFER_NEEDLES[2];
   assert.ok(y > 0.04 && y < 0.05, `albedo ${y.toFixed(4)}`);
 });
@@ -95,11 +101,15 @@ test('createTree places a conifer with branches, the needle colour and the heigh
   });
   const tree = createTree(engine, 'conifer', { position: [1, 0, 2], height: 11.4 });
   // 3.6 m from the engine camera: the branches show their shoots (KB-CABIN-FGTREE2, conifer-shoots.test.js).
-  assert.equal(tree.canopy.geometry.indices.length, generateTreeMesh('conifer', { branches: true, shoots: true }).canopy.indices.length);
+  assert.equal(
+    tree.canopy.geometry.indices.length,
+    generateTreeMesh('conifer', { branches: true, shoots: true }).canopy.indices.length,
+  );
   assert.deepEqual([...tree.canopy.material.data.slice(0, 3)], [...CONIFER_NEEDLES].map(Math.fround));
   const data = generateTreeMesh('conifer', { branches: true });
   let top = 0;
-  for (const part of [data.trunk, data.canopy]) for (let i = 1; i < part.positions.length; i += 3) top = Math.max(top, part.positions[i]);
+  for (const part of [data.trunk, data.canopy])
+    for (let i = 1; i < part.positions.length; i += 3) top = Math.max(top, part.positions[i]);
   engine.store.tick();
   const m = engine.store.matrices.subarray(tree.root.id * 16, tree.root.id * 16 + 16);
   assert.ok(Math.abs(m[5] * top - 11.4) < 1e-4, `the top stands 11.4 m up (${(m[5] * top).toFixed(4)})`);
@@ -107,7 +117,8 @@ test('createTree places a conifer with branches, the needle colour and the heigh
   const skirts = createTree(engine, 'conifer', { branches: false });
   assert.equal(skirts.canopy.geometry.indices.length, generateTreeMesh('conifer').canopy.indices.length);
   skirts.dispose();
-  for (const height of [0, -1, NaN, 500, '8']) assert.throws(() => createTree(engine, 'conifer', { height }), { code: 'failed' });
+  for (const height of [0, -1, NaN, 500, '8'])
+    assert.throws(() => createTree(engine, 'conifer', { height }), { code: 'failed' });
   const own = new PbrMaterial({ color: '#204020' });
   using _ = createTree(engine, 'conifer', { canopyMaterial: own });
   assert.equal(engine.meshes.size, 3);

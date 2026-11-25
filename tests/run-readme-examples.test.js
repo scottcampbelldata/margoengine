@@ -72,7 +72,9 @@ test('each page example owns and closes a browser before the next example starts
   let serial = 0,
     release,
     enteredClose;
-  const atClose = new Promise((resolve) => { enteredClose = resolve; });
+  const atClose = new Promise((resolve) => {
+    enteredClose = resolve;
+  });
   const launch = async (options) => {
     const id = ++serial;
     assert.ok(options.args.includes('--enable-unsafe-webgpu'));
@@ -86,10 +88,11 @@ test('each page example owns and closes a browser before the next example starts
         close: async () => calls.push(`page ${id}`),
       }),
       close: async () => {
-        if (id === 1) await new Promise((resolve) => {
-          release = resolve;
-          enteredClose();
-        });
+        if (id === 1)
+          await new Promise((resolve) => {
+            release = resolve;
+            enteredClose();
+          });
         calls.push(`browser ${id}`);
       },
     };
@@ -113,17 +116,70 @@ test('a browser that arrives after its page deadline is closed without creating 
   const result = await runInPage(
     { id: 'runner-test/late-browser', code: 'export {}' },
     { origin: 'http://example.test' },
-    { timeout: 50, launch: () => new Promise((resolve) => { release = resolve; }) },
+    {
+      timeout: 50,
+      launch: () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    },
   );
   assert.equal(result.result, 'fail');
   assert.match(result.reason, /while creating browser/);
   release({
-    newPage: async () => { created = true; },
-    close: async () => { closed = true; },
+    newPage: async () => {
+      created = true;
+    },
+    close: async () => {
+      closed = true;
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(created, false);
   assert.equal(closed, true);
+});
+
+/** A launch whose browser passes every check and whose close settles `ms` later, the way `settle` says. */
+const slowTeardown = (ms, settle) => async () => ({
+  newPage: async () => ({
+    goto: async () => {},
+    waitForFunction: async () => {},
+    waitForTimeout: async () => {},
+    evaluate: async () => [],
+    close: async () => {},
+  }),
+  close: () => new Promise((resolve, reject) => setTimeout(() => settle(resolve, reject), ms)),
+});
+
+test('a browser the OS tears down after the example deadline does not fail an example whose checks passed', async () => {
+  // Under load Windows finishes with an ended Chromium seconds late (KB1703); the old runner counted that against the
+  // example's own deadline and failed it "while closing browser". The close has its own bounded limit instead.
+  const pages = { origin: 'http://example.test' };
+  const result = await runInPage({ id: 'runner-test/slow-teardown', code: 'export {}' }, pages, {
+    timeout: 50,
+    launch: slowTeardown(200, (resolve) => resolve()),
+  });
+  assert.equal(result.result, 'pass', result.reason);
+  assert.equal(pages.failed, undefined, 'a slow teardown does not stop the run');
+});
+
+test('a browser close that hangs past its own limit fails the example and names what was killed', async () => {
+  const pages = { origin: 'http://example.test' };
+  const killed = Object.assign(
+    new Error('browser close passed its 20000 ms limit; killed browser host 11 and browser 12'),
+    {
+      code: 'SHUTDOWN_TIMEOUT',
+    },
+  );
+  const result = await runInPage({ id: 'runner-test/hung-teardown', code: 'export {}' }, pages, {
+    timeout: 50,
+    launch: slowTeardown(100, (_, reject) => reject(killed)),
+  });
+  assert.equal(result.result, 'fail');
+  assert.match(
+    result.reason,
+    /Every check passed; closing its browser failed: .*killed browser host 11 and browser 12/,
+  );
 });
 
 test('loader rendering and resolver examples choose one host, and OBJ examples fetch mesh bytes', () => {
@@ -387,7 +443,10 @@ test('named page and worker sources are written together, including the emitted 
     // the 20 s example limit and failed the worker run. It runs only inside the page example that loads it.
     const ofWorker = collectExamples(workspacePackages()).filter(({ name }) => name === 'worker');
     assert.ok(ofWorker.some(({ id }) => id === 'worker/readme-margoengine-worker-b56e85'));
-    assert.equal(ofWorker.some(({ code }) => /^\s*\/\/\s*scene-worker\.ts/.test(code)), false);
+    assert.equal(
+      ofWorker.some(({ code }) => /^\s*\/\/\s*scene-worker\.ts/.test(code)),
+      false,
+    );
     assert.equal(loadedByAnother(worker, [{ code }, { code: worker }]), true);
     assert.equal(loadedByAnother(code, [{ code }, { code: worker }]), false);
   } finally {
@@ -540,21 +599,29 @@ const engine = { width: 3, height: 2, data: new Uint8Array(24).fill(80) };
 const readPixels = async (engine) => engine;
 const result = await compareImages(await readPixels(engine), await readFile('reference.png'));
 assert.ok(result.pass);`;
-  const result = await runInNode({ id: 'runner-test/headless-reference', code }, {
-    byName: new Map([['reference.png', { path: wrong }]]), byExtension: new Map(),
-  });
+  const result = await runInNode(
+    { id: 'runner-test/headless-reference', code },
+    {
+      byName: new Map([['reference.png', { path: wrong }]]),
+      byExtension: new Map(),
+    },
+  );
   assert.equal(result.result, 'pass', result.reason);
   assert.deepEqual(readFileSync(wrong), Buffer.from(bytes), 'the external reference fixture is never changed');
 });
 
-
 test('browser preprocessing covers CommonJS React imports reached by every public React entry', () => {
   const folder = new URL('../packages/react/dist/', import.meta.url);
   const dependencies = new Set();
-  for (const name of readdirSync(folder).filter(name => name.endsWith('.js'))) {
+  for (const name of readdirSync(folder).filter((name) => name.endsWith('.js'))) {
     const source = readFileSync(new URL(name, folder), 'utf8');
-    for (const [, dependency] of source.matchAll(/from\s*['"](react(?:-dom)?(?:\/[^'"]+)?)['"]/g)) dependencies.add(dependency);
+    for (const [, dependency] of source.matchAll(/from\s*['"](react(?:-dom)?(?:\/[^'"]+)?)['"]/g))
+      dependencies.add(dependency);
   }
   assert.ok(dependencies.has('react-dom/test-utils'), 'the public test entry needs the React 18 act fallback');
-  for (const dependency of dependencies) assert.ok(readmeReactDependencies.includes(dependency), `${dependency} must be converted before native browser import`);
+  for (const dependency of dependencies)
+    assert.ok(
+      readmeReactDependencies.includes(dependency),
+      `${dependency} must be converted before native browser import`,
+    );
 });

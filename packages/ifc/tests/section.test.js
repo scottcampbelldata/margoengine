@@ -44,15 +44,27 @@ function cube(lo = [0, 0, 0], hi = [1, 1, 1]) {
         positions.push(...p);
         normals.push(...n);
       }
-      indices.push(...(side ? [base, base + 1, base + 2, base, base + 2, base + 3] : [base, base + 2, base + 1, base, base + 3, base + 2]));
+      indices.push(
+        ...(side
+          ? [base, base + 1, base + 2, base, base + 2, base + 3]
+          : [base, base + 2, base + 1, base, base + 3, base + 2]),
+      );
     }
-  return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: new Uint32Array(indices) };
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    indices: new Uint32Array(indices),
+  };
 }
 const area = (cut) => {
   let s = 0;
   const p = cut.positions;
   for (let t = 0; t < cut.indices.length; t += 3) {
-    const [a, b, c] = [cut.indices[t], cut.indices[t + 1], cut.indices[t + 2]].map((i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]]);
+    const [a, b, c] = [cut.indices[t], cut.indices[t + 1], cut.indices[t + 2]].map((i) => [
+      p[i * 3],
+      p[i * 3 + 1],
+      p[i * 3 + 2],
+    ]);
     const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
       v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     s += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
@@ -94,7 +106,11 @@ test('placement matrices move the cut; a cavity is a hole, whatever the winding'
   assert.equal(cut.closed, 2);
   close(area(cut), 8, 'outer square minus the hole');
   close(length(cut), 16, 'both loops are cut edges');
-  assert.ok(Array.from(cut.positions).filter((_, i) => i % 3 === 0).every((x) => x >= 10 - 1e-6 && x <= 13 + 1e-6));
+  assert.ok(
+    Array.from(cut.positions)
+      .filter((_, i) => i % 3 === 0)
+      .every((x) => x >= 10 - 1e-6 && x <= 13 + 1e-6),
+  );
 });
 
 test('caps and edges are trimmed by the other planes, and each plane caps its own face of the cut', () => {
@@ -166,7 +182,11 @@ test('IFCSectionView caps shown elements in their colour, draws edges, and follo
     }
   }
   const lines = { add: (l) => (added.push(l), l), remove: (l) => removed.push(l) };
-  const view = new IFCSectionView(scene['engine'], scene, { edges: { lines, Line }, edgeColor: [1, 1, 1], edgeWidth: 3 });
+  const view = new IFCSectionView(scene['engine'], scene, {
+    edges: { lines, Line },
+    edgeColor: [1, 1, 1],
+    edgeWidth: 3,
+  });
   assert.equal(view.cuts.length, 0, 'no planes, no cuts');
   scene.clippingPlanes = [[0, -1, 0, 0.5]];
   view.update();

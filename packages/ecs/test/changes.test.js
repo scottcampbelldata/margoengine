@@ -107,7 +107,10 @@ test('two trackers keep separate windows and a stopped tracker sees nothing new'
 test('a small output throws and says what to pass', () => {
   const { world, position, tracker } = setup();
   position.add(world.create());
-  assert.throws(() => tracker.added(new Uint32Array(0)), (error) => error instanceof RangeError && /;/.test(error.message));
+  assert.throws(
+    () => tracker.added(new Uint32Array(0)),
+    (error) => error instanceof RangeError && /;/.test(error.message),
+  );
 });
 
 test('seeded random work matches a snapshot diff of the window', () => {

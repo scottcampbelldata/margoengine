@@ -16,9 +16,11 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error') pageErrors.push(m.text());
   });
-  await page.waitForFunction(() => window.ready, null, { timeout: 30000 }).catch((error) => {
-    throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
-  });
+  await page
+    .waitForFunction(() => window.ready, null, { timeout: 30000 })
+    .catch((error) => {
+      throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
+    });
   const build = async (o) => {
     await page.evaluate((options) => window.check.build(options), o);
     const url = await page.evaluate(() => window.check.shot());
@@ -44,7 +46,13 @@ try {
       wall = at(moment, 4, 4),
       wanted = over(wall, four);
     const [m, w] = [biggest(centre(moment), wanted), biggest(centre(weighted), wanted)];
-    report['four' + samples] = { moment: centre(moment), weighted: centre(weighted), wanted: wanted.map(Math.round), m, w };
+    report['four' + samples] = {
+      moment: centre(moment),
+      weighted: centre(weighted),
+      wanted: wanted.map(Math.round),
+      m,
+      w,
+    };
     assert.ok(m < w / 2, `${samples}x: four layers land nearer the sorted result than weighted, ${m} against ${w}`);
     const other = await build({ samples, mode: 'moment', order: [3, 1, 0, 2] });
     let moved = 0;

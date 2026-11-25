@@ -284,7 +284,8 @@ test('check:merge always runs the core and stage stress class check, with more s
   const script = readFileSync(join(root, 'scripts/core-stress.mjs'), 'utf8');
   assert.ok(manifest.scripts['check:merge:steps'].split(' && ').includes('npm run check:core-stress'));
   assert.equal(manifest.scripts['check:core-stress'], 'node scripts/core-stress.mjs');
-  for (const file of ['tests/deep-core-stress.test.js', 'packages/stage/tests/stress.test.js']) assert.ok(script.includes(file));
+  for (const file of ['tests/deep-core-stress.test.js', 'packages/stage/tests/stress.test.js'])
+    assert.ok(script.includes(file));
   // The fast gate reaches the same files through the package tests of core and stage.
   assert.ok(core.scripts.test.includes('../../tests/deep-core*.test.js'));
   assert.ok(stage.scripts.test.includes('tests/*.test.js'));

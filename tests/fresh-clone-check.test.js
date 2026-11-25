@@ -3,7 +3,16 @@
 // commits only one PC's pre-rewrite history held. Every way that showed up, or could show up, must count as a problem.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { linkModules, MISSING_HISTORY, problems, scratchFolder } from '../scripts/fresh-clone-check.mjs';
@@ -75,7 +84,11 @@ test("the clone's verify reads this checkout's outside test inputs, wherever the
   assert.equal(externalAssetRoot(env), externalAssetRoot({}), 'the clone resolves the same folder as this checkout');
   assert.ok(env.MARGO_JUPYTER_VENV);
   const bench = { MARGO_ENGINE_BENCH: 'D:/bench' };
-  assert.equal(externalAssetRoot(verifyEnv(bench)), externalAssetRoot(bench), 'an override in this checkout carries over');
+  assert.equal(
+    externalAssetRoot(verifyEnv(bench)),
+    externalAssetRoot(bench),
+    'an override in this checkout carries over',
+  );
 });
 
 // The 2026-11-15 nightly: every dev server in the clone answered 403 (Vite's allow list held the short 8.3 temporary
@@ -119,7 +132,11 @@ test('node_modules in the clone are its own files: real paths inside the clone, 
       assert.equal(readFileSync(path, 'utf8'), readFileSync(join(source, file), 'utf8'));
     }
     assert.equal(lstatSync(join(modules, 'next')).isSymbolicLink(), false);
-    assert.equal(realpathSync.native(join(modules, 'next', 'linked')), join(source, 'shared'), 'a link in the tree stays one');
+    assert.equal(
+      realpathSync.native(join(modules, 'next', 'linked')),
+      join(source, 'shared'),
+      'a link in the tree stays one',
+    );
     assert.equal(realpathSync.native(join(modules, '@margoengine', 'core')), join(clone, 'packages', 'core'));
   } finally {
     rmSync(scratch, { recursive: true, force: true });

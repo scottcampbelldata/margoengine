@@ -110,6 +110,11 @@ await runSuite(
     // Biome look plan 3, B3: trees past the radius. Off, the far hillside is bare; on, it reads as forest.
     console.log('far', JSON.stringify(r.far));
     assert.deepEqual(r.far.errors, []);
+    assert.ok(r.far.farCount > 0, 'default distant forest keeps its geometry');
+    assert.ok(
+      ['r32float', 'rgba16float'].includes(r.far.surfaceFormat),
+      'default distant forest captures the drawn terrain',
+    );
     assert.ok(r.far.off.n > 2000, `pixels on the far hillside: ${r.far.off.n}`);
     assert.ok(r.far.on.share > 0.25, `far forest: ${r.far.on.share} of far pixels are green`);
     assert.ok(

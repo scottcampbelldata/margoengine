@@ -21,7 +21,14 @@ import {
   type ReliefErosionOptions,
 } from './erosion.js';
 // The ground-material look families, so a scene can pick one by name without loading BiomeView.
-export { BIOME_LOOKS, MATERIALS, biomeMaterials, type BiomeLookName, type BiomeLookValues, type MaterialLook } from './looks.js';
+export {
+  BIOME_LOOKS,
+  MATERIALS,
+  biomeMaterials,
+  type BiomeLookName,
+  type BiomeLookValues,
+  type MaterialLook,
+} from './looks.js';
 import type { HeightGrid } from './hydrology.js';
 import type { Relief } from './relief.js';
 
@@ -264,14 +271,59 @@ const d = (
  * (a live fire or flood goes through `view.plantStates.setSources` instead).
  */
 export const DISTURBANCE_SETTINGS: readonly DisturbanceSetting[] = [
-  d('disturbance.intensity', 'fire', 2000, 1, 100000, 1, 'kW/m', 'Fireline intensity of the burns. Sets the scorch height (Van Wagner 1973) and flame length that chars the bark (Byram 1959); a function of position goes through `disturbanceStates` itself.'),
+  d(
+    'disturbance.intensity',
+    'fire',
+    2000,
+    1,
+    100000,
+    1,
+    'kW/m',
+    'Fireline intensity of the burns. Sets the scorch height (Van Wagner 1973) and flame length that chars the bark (Byram 1959); a function of position goes through `disturbanceStates` itself.',
+  ),
   d('disturbance.ambient', 'fire', 25, -60, 59, 1, 'deg C', 'Air temperature at the fires, for the scorch height.'),
   d('disturbance.wind', 'fire', 2, 0, 40, 0.5, 'm/s', 'Midflame wind at the fires, for the scorch height.'),
-  d('disturbance.burnYears', 'fire', 1, 1, 10000, 1, 'years', 'Whole years a burn shows scorched foliage, stripped crowns and ash. 1 means burnt in the history\'s last year.'),
-  d('disturbance.charYears', 'fire', 30, 1, 10000, 1, 'years', 'Whole years charred bark stays on the stems after a burn (at least burnYears).'),
-  d('disturbance.floodPeriod', 'flood', 10, 2, 65535, 1, 'years', 'Return period of the flood whose mud line shows: cells it reaches carry the mark.'),
+  d(
+    'disturbance.burnYears',
+    'fire',
+    1,
+    1,
+    10000,
+    1,
+    'years',
+    "Whole years a burn shows scorched foliage, stripped crowns and ash. 1 means burnt in the history's last year.",
+  ),
+  d(
+    'disturbance.charYears',
+    'fire',
+    30,
+    1,
+    10000,
+    1,
+    'years',
+    'Whole years charred bark stays on the stems after a burn (at least burnYears).',
+  ),
+  d(
+    'disturbance.floodPeriod',
+    'flood',
+    10,
+    2,
+    65535,
+    1,
+    'years',
+    'Return period of the flood whose mud line shows: cells it reaches carry the mark.',
+  ),
   d('disturbance.floodMark', 'flood', 0.5, 0, 100, 0.1, 'm', 'Height of the high-water mark on the plants.'),
-  d('disturbance.cell', 'map', 8, 0.5, 1000, 0.5, 'm', 'Size of a plant state map cell. A map is at most 1,024 cells a side.'),
+  d(
+    'disturbance.cell',
+    'map',
+    8,
+    0.5,
+    1000,
+    0.5,
+    'm',
+    'Size of a plant state map cell. A map is at most 1,024 cells a side.',
+  ),
 ];
 /** The rows that can change every frame: none, the marks are made when the view attaches. */
 export const DISTURBANCE_LIVE_SETTINGS: readonly DisturbanceSetting[] = [];

@@ -168,7 +168,12 @@ test('smoothing takes the journey and leaves the surge in the pose, and a lap st
       buffers.push(data);
       doc.buffers.push({ byteLength: data.byteLength });
       doc.bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength });
-      doc.accessors.push({ bufferView: doc.bufferViews.length - 1, componentType: 5126, count: data.length / (type === 'VEC3' ? 3 : 1), type });
+      doc.accessors.push({
+        bufferView: doc.bufferViews.length - 1,
+        componentType: 5126,
+        count: data.length / (type === 'VEC3' ? 3 : 1),
+        type,
+      });
       return doc.accessors.length - 1;
     },
     times = Array.from({ length: count }, (_, i) => i / (count - 1));

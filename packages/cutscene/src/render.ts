@@ -151,7 +151,8 @@ export function mixCutsceneAudio(
     first.forEach((clip, i) => {
       const other = second[i] ?? clip,
         sound = sounds[clip.sound];
-      if (!sound || !Object.hasOwn(sounds, clip.sound)) throw new RangeError(`No sound '${clip.sound}' to mix; add it to sounds`);
+      if (!sound || !Object.hasOwn(sounds, clip.sound))
+        throw new RangeError(`No sound '${clip.sound}' to mix; add it to sounds`);
       const rate = far > near ? (other.time - clip.time) / (far - near) : 1,
         fade = far > near ? (other.volume - clip.volume) / (far - near) : 0;
       for (let n = sample; n < stop; n++) {
@@ -159,7 +160,8 @@ export function mixCutsceneAudio(
           time = clip.time + rate * lead,
           volume = Math.max(0, clip.volume + fade * lead),
           stereo = sound.numberOfChannels > 1;
-        if (channels === 1) out[0][n] += volume * (stereo ? (read(sound, 0, time) + read(sound, 1, time)) / 2 : read(sound, 0, time));
+        if (channels === 1)
+          out[0][n] += volume * (stereo ? (read(sound, 0, time) + read(sound, 1, time)) / 2 : read(sound, 0, time));
         else {
           out[0][n] += volume * read(sound, 0, time);
           out[1][n] += volume * read(sound, stereo ? 1 : 0, time);
@@ -221,7 +223,8 @@ export async function renderCutscene(
     tracks,
     ...video
   } = options;
-  if (typeof apply !== 'function') throw new TypeError('renderCutscene needs apply(state, frame) to put state on your scene');
+  if (typeof apply !== 'function')
+    throw new TypeError('renderCutscene needs apply(state, frame) to put state on your scene');
   positive(fps, 'fps');
   const player =
     cutscene instanceof CutscenePlayer

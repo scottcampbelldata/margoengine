@@ -206,10 +206,12 @@ export function createTree(engine: EngineKernel, kind: 'conifer' | 'broadleaf', 
     const scale = height === undefined ? 1 : height / plain.top;
     if (height !== undefined) root.setScale([scale, scale, scale]);
     // The flare is measured at 1.3 m of the placed tree; trunks are shared by trees within a centimetre of that.
-    const breastHeight = common.flare === undefined ? undefined : Math.min(6, Math.max(0.3, Math.round(130 / scale) / 100)),
+    const breastHeight =
+        common.flare === undefined ? undefined : Math.min(6, Math.max(0.3, Math.round(130 / scale) / 100)),
       // The stem for the tree's height, in mesh metres to a millimetre, so trees of about one size share a trunk.
       stem = diameter ?? (kind === 'conifer' ? spruceDiameter(plain.top * scale) : undefined),
-      breastDiameter = stem === undefined ? undefined : Math.min(3, Math.max(0.005, Math.round((stem / scale) * 1000) / 1000));
+      breastDiameter =
+        stem === undefined ? undefined : Math.min(3, Math.max(0.005, Math.round((stem / scale) * 1000) / 1000));
     const trunk = engine.createMesh(root);
     created.push(trunk);
     trunk

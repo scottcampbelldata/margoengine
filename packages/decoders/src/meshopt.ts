@@ -538,7 +538,8 @@ export function meshoptDecodeGltfBuffer(
   )
     failRange('invalid count or byteStride');
   const length = src.length;
-  if (count > meshoptMostElements(mode, length, stride)) failRange(`truncated stream (${count} elements cannot fit in ${length} bytes)`);
+  if (count > meshoptMostElements(mode, length, stride))
+    failRange(`truncated stream (${count} elements cannot fit in ${length} bytes)`);
 
   let out: Uint8Array;
   if (mode === 'ATTRIBUTES') {

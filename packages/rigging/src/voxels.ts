@@ -141,14 +141,7 @@ export function fill(grid: Grid, closing: number): void {
         for (let x = 1; x < nx - 1; x++) {
           const i = x + nx * (y + ny * z);
           if (copy[i] || state[i] === SHELL) continue;
-          if (
-            copy[i - 1] ||
-            copy[i + 1] ||
-            copy[i - nx] ||
-            copy[i + nx] ||
-            copy[i - nx * ny] ||
-            copy[i + nx * ny]
-          )
+          if (copy[i - 1] || copy[i + 1] || copy[i - nx] || copy[i + nx] || copy[i - nx * ny] || copy[i + nx * ny])
             outside[i] = 1;
         }
   }
@@ -231,4 +224,3 @@ export const NEIGHBOURS: readonly (readonly [number, number, number, number])[] 
     dz = ((i / 9) | 0) - 1;
   return [dx, dy, dz, Math.hypot(dx, dy, dz)] as const;
 }).filter((n) => n[3] > 0);
-

@@ -36,13 +36,16 @@ const texture = (size, color) => {
   return t;
 };
 const center = async (t) => {
-  const buffer = engine.gpu.createBuffer({ size: 256 * t.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+  const buffer = engine.gpu.createBuffer({
+      size: 256 * t.height,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    }),
     encoder = engine.gpu.createCommandEncoder();
   encoder.copyTextureToBuffer({ texture: t }, { buffer, bytesPerRow: 256 }, [t.width, t.height]);
   engine.gpu.queue.submit([encoder.finish()]);
   await buffer.mapAsync(GPUMapMode.READ);
   const raw = new Uint8Array(buffer.getMappedRange()),
-    at = (Math.floor(t.height / 2) * 256 + Math.floor(t.width / 2) * 4);
+    at = Math.floor(t.height / 2) * 256 + Math.floor(t.width / 2) * 4;
   const out = [...raw.subarray(at, at + 4)];
   buffer.destroy();
   return out;

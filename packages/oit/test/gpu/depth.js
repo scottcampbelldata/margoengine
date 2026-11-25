@@ -89,9 +89,11 @@ window.check = {
     });
     engine.stop();
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
-    createMesh(engine, planeGeometry(8, 8), new Material({ shading: 'basic', color: [0.1, 0.1, 0.1] })).root.setPosition([
-      0, 0, -1.5,
-    ]);
+    createMesh(
+      engine,
+      planeGeometry(8, 8),
+      new Material({ shading: 'basic', color: [0.1, 0.1, 0.1] }),
+    ).root.setPosition([0, 0, -1.5]);
     plane = createMesh(
       engine,
       planeGeometry(1.2, 1.2),

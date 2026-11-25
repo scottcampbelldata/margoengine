@@ -24,33 +24,46 @@ export async function fixtures(load = (entry) => import(entry)) {
   const entries = [];
   for (const factory of [false, true]) {
     const suffix = factory ? '.attach' : '';
-    entries.push({ name: 'Splats' + suffix, visible: false, create({ engine }) {
-      const plugin = factory ? Splats.attach(engine, data()) : new Splats(data());
-      if (!factory) engine.use(plugin);
-      return { plugin, dispose: () => plugin.dispose() };
-    } });
+    entries.push({
+      name: 'Splats' + suffix,
+      visible: false,
+      create({ engine }) {
+        const plugin = factory ? Splats.attach(engine, data()) : new Splats(data());
+        if (!factory) engine.use(plugin);
+        return { plugin, dispose: () => plugin.dispose() };
+      },
+    });
     for (const [name, [Plugin, extra]] of Object.entries(followers))
-      entries.push({ name: name + suffix, create({ engine, scene, dependency }) {
+      entries.push({
+        name: name + suffix,
+        create({ engine, scene, dependency }) {
           const cloud = new Splats(data());
+          dependency(() => scene.use(cloud));
+          const plugin = factory ? Plugin.attach(engine, cloud, ...extra()) : new Plugin(cloud, ...extra());
+          return { plugin, dependencies: [cloud], dispose: () => plugin.dispose(), cleanup: () => cloud.dispose() };
+        },
+      });
+    entries.push({
+      name: 'SplatModifier' + suffix,
+      async create({ engine, scene, dependency }) {
+        const cloud = new Splats(data());
         dependency(() => scene.use(cloud));
-        const plugin = factory ? Plugin.attach(engine, cloud, ...extra()) : new Plugin(cloud, ...extra());
+        const plugin = await SplatModifier.create(cloud);
         return { plugin, dependencies: [cloud], dispose: () => plugin.dispose(), cleanup: () => cloud.dispose() };
-      } });
-    entries.push({ name: 'SplatModifier' + suffix, async create({ engine, scene, dependency }) {
-      const cloud = new Splats(data());
-      dependency(() => scene.use(cloud));
-      const plugin = await SplatModifier.create(cloud);
-      return { plugin, dependencies: [cloud], dispose: () => plugin.dispose(), cleanup: () => cloud.dispose() };
-    } });
-    entries.push({ name: 'SplatLod' + suffix, create({ engine }) {
-      const source = buildSplatLod(data(), { leafSize: 1024 });
-      const plugin = factory ? SplatLod.attach(engine, source) : new SplatLod(source);
-      if (!factory) {
-        engine.use(plugin.cloud);
-        engine.use(plugin);
-      }
-      return { plugin, dispose: () => plugin.dispose() };
-    } });
+      },
+    });
+    entries.push({
+      name: 'SplatLod' + suffix,
+      create({ engine }) {
+        const source = buildSplatLod(data(), { leafSize: 1024 });
+        const plugin = factory ? SplatLod.attach(engine, source) : new SplatLod(source);
+        if (!factory) {
+          engine.use(plugin.cloud);
+          engine.use(plugin);
+        }
+        return { plugin, dispose: () => plugin.dispose() };
+      },
+    });
   }
   return entries;
 }

@@ -5,12 +5,22 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
-import { killTree, notebookHasKernel, StepTimeout, serverPort, waitForServerPort, step } from '../python/tests/jupyter-steps.mjs';
+import {
+  killTree,
+  notebookHasKernel,
+  StepTimeout,
+  serverPort,
+  waitForServerPort,
+  step,
+} from '../python/tests/jupyter-steps.mjs';
 
 test('server readiness follows split output events and cleans up every listener', { timeout: 5000 }, async () => {
   for (const stream of ['stdout', 'stderr']) {
     const server = Object.assign(new EventEmitter(), {
-      stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      exitCode: null,
+      signalCode: null,
     });
     let log = '';
     const waiting = waitForServerPort(server, () => log, AbortSignal.timeout(3000));
@@ -30,15 +40,24 @@ test('server readiness follows split output events and cleans up every listener'
 test('server readiness rejects exit, signal exit, spawn errors and cancellation', { timeout: 5000 }, async () => {
   for (const mode of ['exit', 'signal', 'error', 'abort', 'already-exited', 'already-aborted']) {
     const server = Object.assign(new EventEmitter(), {
-      stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      exitCode: null,
+      signalCode: null,
     });
     const controller = new AbortController();
     const error = new Error('startup failed');
     if (mode === 'already-exited') server.exitCode = 1;
     if (mode === 'already-aborted') controller.abort(error);
     const waiting = waitForServerPort(server, () => 'startup log', controller.signal);
-    if (mode === 'exit') { server.exitCode = 1; server.emit('exit', 1, null); }
-    if (mode === 'signal') { server.signalCode = 'SIGTERM'; server.emit('exit', null, 'SIGTERM'); }
+    if (mode === 'exit') {
+      server.exitCode = 1;
+      server.emit('exit', 1, null);
+    }
+    if (mode === 'signal') {
+      server.signalCode = 'SIGTERM';
+      server.emit('exit', null, 'SIGTERM');
+    }
     if (mode === 'error') server.emit('error', error);
     if (mode === 'abort') controller.abort(error);
     await assert.rejects(waiting, /startup (failed|log)/);

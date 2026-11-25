@@ -29,7 +29,12 @@ test('single-call tree places both parts under one movable root and removes them
       // createTree's defaults: a conifer has branches, the spruce butt flare and, 12.6 m from the engine camera, its
       // shoots (KB-CABIN-FGTREE2).
       const conifer = kind === 'conifer',
-        generated = generateTreeMesh(kind, { detail, branches: conifer, shoots: conifer, flare: conifer ? 1.3 : undefined });
+        generated = generateTreeMesh(kind, {
+          detail,
+          branches: conifer,
+          shoots: conifer,
+          flare: conifer ? 1.3 : undefined,
+        });
       const tree = createTree(engine, kind, { position: [4, 2, -7], detail, trunkMaterial: material });
       assert.equal(engine.meshes.size, 3);
       assert.equal(tree.root.geometry, null);

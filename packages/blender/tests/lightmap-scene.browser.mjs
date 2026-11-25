@@ -74,7 +74,9 @@ try {
   assert.deepEqual(result.outside.after, { meshes: 0, plugins: [] });
   assert.equal(result.validation, null);
   assert.deepEqual(errors, []);
-  console.log(`PASS lightmap-scene${process.env.MARGO_COMPAT === '1' || process.argv.includes('--compat') ? ' (WebGL2 layer)' : ''}`);
+  console.log(
+    `PASS lightmap-scene${process.env.MARGO_COMPAT === '1' || process.argv.includes('--compat') ? ' (WebGL2 layer)' : ''}`,
+  );
 } finally {
   await browser.close();
 }

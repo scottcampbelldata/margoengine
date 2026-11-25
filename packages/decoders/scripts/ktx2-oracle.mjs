@@ -20,7 +20,9 @@ for (const name of readdirSync(folder).filter((file) => file.endsWith('.ktx2')))
       .sort()
       .map((image) => [
         image.replace(/^output_?|\.raw$/g, '') || 'image',
-        createHash('sha256').update(readFileSync(join(out, 'x', image))).digest('hex'),
+        createHash('sha256')
+          .update(readFileSync(join(out, 'x', image)))
+          .digest('hex'),
       ]),
   );
   rmSync(out, { recursive: true, force: true });

@@ -5,7 +5,10 @@ import { PostStack } from '../../post/dist/stack.js';
 import { WideAngle } from '../dist/panini.js';
 import { WideAngleCube } from '../dist/wide-cube.js';
 
-for (const [name, Type] of [['WideAngle', WideAngle], ['WideAngleCube', WideAngleCube]])
+for (const [name, Type] of [
+  ['WideAngle', WideAngle],
+  ['WideAngleCube', WideAngleCube],
+])
   for (const remove of [false, true])
     test(`${name} ${remove ? 'owner removal' : 'disposal'} preserves other scenes`, async (t) => {
       const e = await engine(t),

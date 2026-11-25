@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OPEN, bounceIrradiance, bounceLightSource, bounceViews, packBounce, pointFalloff, reduceBounce, texelRay } from '../dist/bounce.js';
+import {
+  OPEN,
+  bounceIrradiance,
+  bounceLightSource,
+  bounceViews,
+  packBounce,
+  pointFalloff,
+  reduceBounce,
+  texelRay,
+} from '../dist/bounce.js';
 import { IESLights, iesCandela, parseIES } from '../dist/ies.js';
 import { ProjectorLights } from '../dist/projector.js';
 import { CubeProjectorLights } from '../dist/cube-projector.js';
@@ -24,7 +33,10 @@ const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
   };
 // The floor: x -2 to 2, z -1 to 3 at y 0, albedo 0.8, seen from both sides.
 const floor = { c: [0, 0, 1], u: [2, 0, 0], v: [0, 0, 2], albedo: [0.8, 0.8, 0.8], n: [0, 1, 0] },
-  receiver = [[0, 1, -1.2], [0, 0, 1]],
+  receiver = [
+    [0, 1, -1.2],
+    [0, 0, 1],
+  ],
   lampAt = [0, 2, 1];
 /** The floor's capture from `source`, as the GPU writes it: albedo and distance per texel. */
 function capture(source, resolution = 48) {
@@ -73,7 +85,11 @@ function quadrature(plain, factor) {
 }
 const near = (got, want, label, tolerance = 0.05) => {
   for (let k = 0; k < 3; k++)
-    if (want[k] > 1e-9) assert.ok(Math.abs(got[k] / want[k] - 1) < tolerance, `${label} channel ${k}: ${got[k]} vs the quadrature's ${want[k]}`);
+    if (want[k] > 1e-9)
+      assert.ok(
+        Math.abs(got[k] / want[k] - 1) < tolerance,
+        `${label} channel ${k}: ${got[k]} vs the quadrature's ${want[k]}`,
+      );
     else assert.ok(Math.abs(got[k]) < 1e-9, `${label} channel ${k}: ${got[k]} where the quadrature gives 0`);
 };
 const fakeLights = (list) => ({ list, setLights() {} });
@@ -81,7 +97,11 @@ const fakeLights = (list) => ({ list, setLights() {} });
 test("an IES lamp bounces the light its profile casts, not a plain point light's", () => {
   // Dark straight down, bright from 30 to 60 degrees, and twice as bright toward phi 90 (the receiver's side, -z).
   const profile = parseIES(
-      iesFile(range(0, 180, 5), range(0, 360, 15), (t, p) => (t < 20 ? 50 : t <= 60 ? 1000 : 200) * (1 + Math.max(0, Math.sin((p * Math.PI) / 180)))),
+      iesFile(
+        range(0, 180, 5),
+        range(0, 360, 15),
+        (t, p) => (t < 20 ? 50 : t <= 60 ? 1000 : 200) * (1 + Math.max(0, Math.sin((p * Math.PI) / 180))),
+      ),
     ),
     light = { position: lampAt, range: 0, intensity: 1 },
     host = fakeLights([light]),
@@ -102,16 +122,23 @@ test("an IES lamp bounces the light its profile casts, not a plain point light's
     got = bounce(lights),
     old = bounce({ list: [light] });
   near(got, want, 'IES');
-  assert.ok(Math.abs(old[0] / want[0] - 1) > 0.3, `the plain point light's bounce ${old[0]} is not the profile's ${want[0]}`);
+  assert.ok(
+    Math.abs(old[0] / want[0] - 1) > 0.3,
+    `the plain point light's bounce ${old[0]} is not the profile's ${want[0]}`,
+  );
 });
 
 test("a projector spot bounces the colours of its image; a cube cookie a point light's", () => {
   // A red | blue image on a 50-degree spot straight down: the floor toward the receiver (-z) is one colour.
   const picture = image(2, 2, (x) => (x === 0 ? [255, 40, 0, 255] : [0, 60, 255, 255])),
     light = { position: lampAt, direction: [0, -1, 0], angle: 0.9, penumbra: 0.2, range: 0, intensity: 1 },
-    projector = new ProjectorLights({ lights: fakeLights([light]) }).setProjectors([{ image: picture, colorSpace: 'linear' }]),
+    projector = new ProjectorLights({ lights: fakeLights([light]) }).setProjectors([
+      { image: picture, colorSpace: 'linear' },
+    ]),
     plain = bounceLightSource({ list: [light] }, 0),
-    want = quadrature(plain, (y) => projectorColor({ ...light, outerAngle: light.angle }, y, { image: picture, colorSpace: 'linear' })),
+    want = quadrature(plain, (y) =>
+      projectorColor({ ...light, outerAngle: light.angle }, y, { image: picture, colorSpace: 'linear' }),
+    ),
     got = bounce({ list: [light], projector });
   near(got, want, 'projector');
   const old = bounce({ list: [light] });
@@ -136,7 +163,7 @@ test("a projector spot bounces the colours of its image; a cube cookie a point l
   near(cookie, quadrature(bounceLightSource({ list: [point] }, 0), below), 'cube cookie');
 });
 
-test("a lamp off layer 0 bounces nothing off core meshes; on it, all of its light", () => {
+test('a lamp off layer 0 bounces nothing off core meshes; on it, all of its light', () => {
   const light = { position: lampAt, range: 0, intensity: 1 },
     plain = bounce({ list: [light] }),
     layers = (mask) => new LightLayers({ lights: fakeLights([light]) }).setLayers([mask]);
@@ -154,4 +181,3 @@ test('a spot of half angle pi / 2 bounces off what is in front of it only, as th
   const down = { ...light, direction: [0, -2, 0] };
   assert.ok(bounce({ list: [down] })[0] > 0);
 });
-

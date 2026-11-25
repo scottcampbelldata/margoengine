@@ -22,7 +22,9 @@ export function lockProblems(lock, readManifest) {
     for (const field of FIELDS)
       for (const name of new Set([...Object.keys(own[field] ?? {}), ...Object.keys(entry[field] ?? {})]))
         if (own[field]?.[name] !== entry[field]?.[name])
-          wrong.push(`${path || '(root)'} ${field} ${name}: package.json ${own[field]?.[name]}, lock ${entry[field]?.[name]}`);
+          wrong.push(
+            `${path || '(root)'} ${field} ${name}: package.json ${own[field]?.[name]}, lock ${entry[field]?.[name]}`,
+          );
     const ownOptional = optionalPeers(own.peerDependenciesMeta).join(', ');
     const lockOptional = optionalPeers(entry.peerDependenciesMeta).join(', ');
     if (ownOptional !== lockOptional)
@@ -31,7 +33,8 @@ export function lockProblems(lock, readManifest) {
   if (rootManifest) {
     compare('', rootManifest, entries[''] ?? {});
     for (const path of rootManifest.workspaces ?? [])
-      if (!path.includes('*') && readManifest(path) && !entries[path]) wrong.push(`${path}: workspace missing from the lock`);
+      if (!path.includes('*') && readManifest(path) && !entries[path])
+        wrong.push(`${path}: workspace missing from the lock`);
   }
   for (const [path, entry] of Object.entries(entries)) {
     if (!path || path.includes('node_modules') || entry.link) continue;

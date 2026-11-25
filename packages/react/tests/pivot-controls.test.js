@@ -18,7 +18,12 @@ mock.module('@margoengine/html', {
         return new this();
       }
       add(element, options) {
-        const label = { element, ...options, setMesh: () => label, setOffset: (value) => ((label.offset = value), label) };
+        const label = {
+          element,
+          ...options,
+          setMesh: () => label,
+          setOffset: (value) => ((label.offset = value), label),
+        };
         labels.add(label);
         return label;
       }

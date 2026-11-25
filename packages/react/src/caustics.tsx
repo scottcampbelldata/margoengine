@@ -5,6 +5,7 @@ import type { Vec3 } from '@margoengine/math';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useMesh, useScene, type Scene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 
 /** Props of `<Caustics>`: the caustic catcher of `@margoengine/studio/caustics` and mesh props, every one optional. */
@@ -141,12 +142,14 @@ function Catcher({
           const { floor, ...rest } = latest.current.options,
             asked = JSON.stringify(latest.current.options),
             m = root.matrix,
-            made = await api.ProductCaustics.attach(scene.engine, {
-              ...rest,
-              geometry,
-              position: floor ?? [m[12], m[13], m[14]],
-              signal: controller.signal,
-            });
+            made = await inScene(scene, () =>
+              api.ProductCaustics.attach(scene.engine, {
+                ...rest,
+                geometry,
+                position: floor ?? [m[12], m[13], m[14]],
+                signal: controller.signal,
+              }),
+            );
           if (!active) {
             made.dispose();
             return;

@@ -8,10 +8,9 @@ import { wgsl } from '../../core/src/shaders.ts';
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const mirror = [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const parts = () =>
-  new CulledInstances(
-    [{ geometry: box(), material: new PbrMaterial(), transforms: new Float32Array(identity) }],
-    { culling: 'occlusion' },
-  );
+  new CulledInstances([{ geometry: box(), material: new PbrMaterial(), transforms: new Float32Array(identity) }], {
+    culling: 'occlusion',
+  });
 function harness() {
   const h = optionalGPU();
   globalThis.GPUTextureUsage = { RENDER_ATTACHMENT: 16, TEXTURE_BINDING: 4 };
@@ -57,7 +56,11 @@ test('a core mesh and a model occlude: front faces only, depth greater-equal, at
   p.addOccluder({ shadowPrimitives: [primitive()] });
   h.run();
   assert.equal(h.draws.length, 2);
-  assert.deepEqual(h.draws.map((d) => d.offset), [0, 256], 'each draw has its own matrix');
+  assert.deepEqual(
+    h.draws.map((d) => d.offset),
+    [0, 256],
+    'each draw has its own matrix',
+  );
   const { pipeline } = h.draws[1];
   assert.equal(pipeline.primitive.cullMode, 'back');
   assert.equal(pipeline.multisample.count, 4);

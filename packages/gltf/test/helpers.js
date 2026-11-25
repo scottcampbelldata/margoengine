@@ -109,7 +109,10 @@ function recordingDevice() {
 
 /** An engine on {@link recordingDevice}, with the WebGPU usage flags Node lacks. */
 export async function gpuEngine(t, capacity = 64) {
-  const flags = { GPUBufferUsage: { VERTEX: 1, UNIFORM: 2, COPY_DST: 4 }, GPUTextureUsage: { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 } };
+  const flags = {
+    GPUBufferUsage: { VERTEX: 1, UNIFORM: 2, COPY_DST: 4 },
+    GPUTextureUsage: { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 },
+  };
   for (const [name, value] of Object.entries(flags)) {
     globalThis[name] = value;
     t.after(() => delete globalThis[name]);
@@ -117,7 +120,13 @@ export async function gpuEngine(t, capacity = 64) {
   const store = await TransformStore.create(capacity),
     device = recordingDevice(),
     renderer = { backend: 'webgpu', gpu: device, add() {}, remove() {}, render() {}, dispose() {} },
-    engine = new Engine({ width: 200, height: 200, clientWidth: 200, clientHeight: 200 }, store, renderer, undefined, null);
+    engine = new Engine(
+      { width: 200, height: 200, clientWidth: 200, clientHeight: 200 },
+      store,
+      renderer,
+      undefined,
+      null,
+    );
   return { engine, device };
 }
 

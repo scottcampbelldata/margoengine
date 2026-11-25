@@ -31,10 +31,7 @@ function entry(path, text) {
 
 const tarball = (files) =>
   gzipSync(
-    Buffer.concat([
-      ...Object.entries(files).map(([path, text]) => entry(`package/${path}`, text)),
-      Buffer.alloc(1024),
-    ]),
+    Buffer.concat([...Object.entries(files).map(([path, text]) => entry(`package/${path}`, text)), Buffer.alloc(1024)]),
   );
 
 const good = (extra = {}, files = {}) =>
@@ -92,7 +89,10 @@ test('the audit reports each thing that must not be published', () => {
   const noNotice = good();
   noNotice.delete('NOTICE');
   assert.match(auditTarball(noNotice, names).join(), /NOTICE is not in the tarball/);
-  assert.match(auditTarball(good({}, { 'dist/c.js': 'const p = "/secret/home";' }), names, ['/secret/home']).join(), /maintainer path/);
+  assert.match(
+    auditTarball(good({}, { 'dist/c.js': 'const p = "/secret/home";' }), names, ['/secret/home']).join(),
+    /maintainer path/,
+  );
 });
 
 test('a template folder imports for the new app, not for the package that ships it', () => {

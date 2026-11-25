@@ -27,7 +27,9 @@ try {
     // With nothing alive a seek's slots are clear where playing's hold the dead, which nothing reads: the picture says.
     if (played[frame].live === 0) sought[frame].particles = played[frame].particles;
     assert.deepEqual(sought[frame], played[frame], `frame ${frame}: a seek lands on what playing shows`);
-    console.log(`ok vfx frame ${frame}: ${played[frame].live} live, particles ${played[frame].particles}, picture ${played[frame].picture}`);
+    console.log(
+      `ok vfx frame ${frame}: ${played[frame].live} live, particles ${played[frame].particles}, picture ${played[frame].picture}`,
+    );
   }
 } finally {
   await context.close();

@@ -101,7 +101,9 @@ function checkRepeats(maps: (LayerMap | undefined)[], tiling: readonly [number, 
     if (!m) continue;
     const texture = textureOf(m);
     if ((tiling[0] !== 1 && texture.wrapS === 'clamp') || (tiling[1] !== 1 && texture.wrapT === 'clamp'))
-      throw new TypeError(`layered ${label} tiling needs Textures that repeat; make them with {wrapS: 'repeat', wrapT: 'repeat'}`);
+      throw new TypeError(
+        `layered ${label} tiling needs Textures that repeat; make them with {wrapS: 'repeat', wrapT: 'repeat'}`,
+      );
   }
 }
 const unitRange = (v: number | undefined, label: string) => {
@@ -137,7 +139,8 @@ function checkLayer(layer: MaterialLayer, k: number): void {
 export function layered(options: LayeredOptions = {}): LayeredFeature {
   const layers = [...(options.layers ?? [])],
     detail = options.detail ? { ...options.detail } : undefined;
-  if (layers.length > 8) throw new RangeError('layered takes at most 8 layers; merge some into one mask or texture array');
+  if (layers.length > 8)
+    throw new RangeError('layered takes at most 8 layers; merge some into one mask or texture array');
   if (!layers.length && !detail) throw new TypeError('layered needs layers or detail; pass at least one');
   layers.forEach(checkLayer);
   if (detail) {
@@ -259,7 +262,10 @@ ${slots
         buffers.set(
           device,
           (held = {
-            buffer: device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+            buffer: device.createBuffer({
+              size: data.byteLength,
+              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            }),
             last: new Float32Array(data.length).fill(Number.NaN),
           }),
         );

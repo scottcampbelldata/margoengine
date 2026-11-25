@@ -196,7 +196,10 @@ test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD erro
     { path: '/', type: 7, fields: {} },
     { path: '/M', type: 6, fields: { typeName: V.token('Mesh'), xformOpOrder: V.specifier(5) } },
   ];
-  assert.throws(() => parseUSDC(writeCrate(mesh)), /^LoaderError: USD: invalid xformOpOrder; see https:\/\/margoengine\.com\/errors#loader-syntax$/);
+  assert.throws(
+    () => parseUSDC(writeCrate(mesh)),
+    /^LoaderError: USD: invalid xformOpOrder; see https:\/\/margoengine\.com\/errors#loader-syntax$/,
+  );
   const shader = [
     { path: '/', type: 7, fields: {} },
     { path: '/M', type: 6, fields: { typeName: V.token('Material') } },
@@ -208,7 +211,10 @@ test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD erro
     { path: '/P.faceVertexIndices', type: 1, fields: { default: V.intArray([0, 1, 2]) } },
     { path: '/P.subdivisionScheme', type: 1, fields: { default: V.token('none') } },
   ];
-  assert.throws(() => parseUSDC(writeCrate(shader)), /^LoaderError: USD: invalid relationship target; see https:\/\/margoengine\.com\/errors#loader-syntax$/);
+  assert.throws(
+    () => parseUSDC(writeCrate(shader)),
+    /^LoaderError: USD: invalid relationship target; see https:\/\/margoengine\.com\/errors#loader-syntax$/,
+  );
 });
 
 test('USDC: counts read from the file are never preallocated (fuzzer reproducers, 1,706 B each)', async () => {

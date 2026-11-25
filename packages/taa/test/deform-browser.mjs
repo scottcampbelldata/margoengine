@@ -29,7 +29,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-deform/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5378, strictPort: true, watch: null },
+  server: { host: '127.0.0.1', port: 5378, strictPort: true, watch: null, hmr: false },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5378 });
@@ -83,7 +83,10 @@ try {
           shift = uniform(0),
           x = positionLocal.x,
           y = positionLocal.y,
-          dots = step(0.75, fract(x.mul(+k))).mul(step(0.75, fract(y.mul(+k)))).mul(0.88).add(0.02),
+          dots = step(0.75, fract(x.mul(+k)))
+            .mul(step(0.75, fract(y.mul(+k))))
+            .mul(0.88)
+            .add(0.02),
           bar = step(abs(x.sub(START)), 0.5),
           material = new NodeMaterial({
             color: [0, 0, 0],
@@ -209,10 +212,16 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
   console.log('against the matrix-moved plane, in sRGB levels', result);
   // Apple silicon Mac, Metal: the raw shape without its own motion trails about 21 levels; with it, and the graph, the frames
   // match the reference but for rounding (a level at most).
-  assert.ok(result.rawPlain.trail > 15, `a raw shape without its own motion trails (${result.rawPlain.trail.toFixed(1)})`);
+  assert.ok(
+    result.rawPlain.trail > 15,
+    `a raw shape without its own motion trails (${result.rawPlain.trail.toFixed(1)})`,
+  );
   for (const id of ['graph', 'raw']) {
     assert.ok(Math.abs(result[id].trail) < 2, `${id}: no trail (${result[id].trail.toFixed(1)})`);
-    assert.ok(result[id].mean < 0.5, `${id}: the frame matches the matrix-moved one (mean ${result[id].mean.toFixed(3)})`);
+    assert.ok(
+      result[id].mean < 0.5,
+      `${id}: the frame matches the matrix-moved one (mean ${result[id].mean.toFixed(3)})`,
+    );
   }
   assert.deepEqual(await page.evaluate(() => window.t.gpuErrors()), []);
   assert.deepEqual(errors, []);

@@ -110,20 +110,25 @@ for (const name of cases)
  * emission, opacity, thin film, dispersion or occlusion slot (docs/limits.md, MaterialX row). */
 const SKIPS = {
   gltf_pbr_carpaint: [],
-  gltf_pbr_default: 'occlusion specular specular_color alpha alpha_mode alpha_cutoff iridescence iridescence_ior iridescence_thickness sheen_color sheen_roughness clearcoat_normal emissive emissive_strength thickness attenuation_distance attenuation_color',
+  gltf_pbr_default:
+    'occlusion specular specular_color alpha alpha_mode alpha_cutoff iridescence iridescence_ior iridescence_thickness sheen_color sheen_roughness clearcoat_normal emissive emissive_strength thickness attenuation_distance attenuation_color',
   gltf_pbr_glass: [],
   gltf_pbr_gold: [],
   gltf_pbr_plastic: [],
   open_pbr_aluminum_brushed: 'specular_color specular_roughness_anisotropy',
   open_pbr_carpaint: 'coat_ior',
-  open_pbr_default: 'base_diffuse_roughness specular_weight specular_color specular_roughness_anisotropy transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion_scale transmission_dispersion_abbe_number subsurface_weight subsurface_color subsurface_radius subsurface_radius_scale subsurface_scatter_anisotropy fuzz_weight fuzz_color fuzz_roughness coat_color coat_roughness_anisotropy coat_ior coat_darkening thin_film_weight thin_film_thickness thin_film_ior emission_luminance emission_color geometry_opacity geometry_thin_walled',
+  open_pbr_default:
+    'base_diffuse_roughness specular_weight specular_color specular_roughness_anisotropy transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion_scale transmission_dispersion_abbe_number subsurface_weight subsurface_color subsurface_radius subsurface_radius_scale subsurface_scatter_anisotropy fuzz_weight fuzz_color fuzz_roughness coat_color coat_roughness_anisotropy coat_ior coat_darkening thin_film_weight thin_film_thickness thin_film_ior emission_luminance emission_color geometry_opacity geometry_thin_walled',
   open_pbr_glass: 'transmission_dispersion_abbe_number transmission_dispersion_scale',
-  open_pbr_pearl: 'subsurface_weight subsurface_color subsurface_radius_scale coat_ior thin_film_weight thin_film_thickness thin_film_ior',
+  open_pbr_pearl:
+    'subsurface_weight subsurface_color subsurface_radius_scale coat_ior thin_film_weight thin_film_thickness thin_film_ior',
   standard_surface_carpaint: 'specular specular_color specular_anisotropy',
   standard_surface_chrome: 'specular specular_color',
   standard_surface_copper: 'specular coat_color',
-  standard_surface_default: 'diffuse_roughness specular specular_color specular_anisotropy specular_rotation transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion transmission_extra_roughness subsurface subsurface_color subsurface_radius subsurface_scale subsurface_anisotropy sheen sheen_color sheen_roughness thin_walled coat_color coat_anisotropy coat_rotation coat_IOR coat_affect_color coat_affect_roughness thin_film_thickness thin_film_IOR emission emission_color opacity',
-  standard_surface_glass: 'specular specular_color transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion transmission_extra_roughness opacity',
+  standard_surface_default:
+    'diffuse_roughness specular specular_color specular_anisotropy specular_rotation transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion transmission_extra_roughness subsurface subsurface_color subsurface_radius subsurface_scale subsurface_anisotropy sheen sheen_color sheen_roughness thin_walled coat_color coat_anisotropy coat_rotation coat_IOR coat_affect_color coat_affect_roughness thin_film_thickness thin_film_IOR emission emission_color opacity',
+  standard_surface_glass:
+    'specular specular_color transmission_color transmission_depth transmission_scatter transmission_scatter_anisotropy transmission_dispersion transmission_extra_roughness opacity',
   standard_surface_glass_tinted: 'specular specular_color transmission_color',
   standard_surface_gold: 'specular specular_color',
   standard_surface_greysphere: [],
@@ -131,7 +136,8 @@ const SKIPS = {
   standard_surface_plastic: [],
   standard_surface_velvet: 'specular specular_color sheen sheen_color sheen_roughness',
   usd_preview_surface_carpaint: [],
-  usd_preview_surface_default: 'emissiveColor useSpecularWorkflow specularColor opacity opacityMode opacityThreshold displacement occlusion',
+  usd_preview_surface_default:
+    'emissiveColor useSpecularWorkflow specularColor opacity opacityMode opacityThreshold displacement occlusion',
   usd_preview_surface_glass: 'useSpecularWorkflow opacity opacityThreshold',
   usd_preview_surface_gold: [],
   usd_preview_surface_plastic: [],

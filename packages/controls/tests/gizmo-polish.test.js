@@ -69,7 +69,13 @@ test('flip: plane squares and scale handles flip too, rings do not', async () =>
   gizmo.setMode('scale');
   assert.ok(tip(gizmo, 'X')[0] < 0, 'scale handle');
   gizmo.setMode('rotate');
-  assert.deepEqual(gizmo.handles().map((h) => h.name).slice(0, 3), ['X', 'Y', 'Z']);
+  assert.deepEqual(
+    gizmo
+      .handles()
+      .map((h) => h.name)
+      .slice(0, 3),
+    ['X', 'Y', 'Z'],
+  );
   gizmo.dispose();
   engine.dispose();
 });
@@ -138,7 +144,10 @@ test('delta: a move draws a line from the start to where the object is, and only
   assert.equal(line.kind, 'lines');
   closeVec(line.points[1], frame.origin, 0);
   assert.equal(marker.kind, 'triangles');
-  assert.ok(marker.points.every((p) => Math.hypot(...p) < s), 'the marker stays at the start');
+  assert.ok(
+    marker.points.every((p) => Math.hypot(...p) < s),
+    'the marker stays at the start',
+  );
   gizmo.showDelta = false;
   assert.equal(gizmo.frame().delta, null);
   gizmo.showDelta = true;

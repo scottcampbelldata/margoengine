@@ -81,7 +81,7 @@ test('past the newest snapshot, animation time runs on at its last rate, capped'
   assert.equal(buffer.sample(2.1).clipTime, 0, 'one snapshot of a clip gives no rate');
 });
 
-test('steps change on the next snapshot\'s time and not before', () => {
+test("steps change on the next snapshot's time and not before", () => {
   const buffer = new FieldBuffer({ flags: { type: 'step', size: 2 } });
   buffer.push(0, { flags: [1, 2] });
   buffer.push(1, { flags: [3, 4] });

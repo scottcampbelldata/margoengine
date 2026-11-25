@@ -11,6 +11,8 @@ export interface Registry {
   current: EngineMesh | null;
   children: Set<EngineMesh>;
   attachments: Set<(mesh: EngineMesh) => void>;
+  /** The model whose children this `<Mesh>` sits in, so `<Outlines>` can tell which is nearer. */
+  model?: PBRModel | null;
   register(mesh: EngineMesh): void;
   unregister(mesh: EngineMesh): void;
   geometry?: Geometry | null;
@@ -278,7 +280,7 @@ export function useCreated<A, T>(scene: Scene, options: Created<A, T>, keys: rea
       setValue((state) => (state === made ? null : state));
       latest.current.dispose(made);
     };
-  }, [scene.engine, ...keys]);
+  }, [scene.engine, scene.world, ...keys]);
   const { ref } = options;
   useCommit(() => {
     if (!ref || value === null) return;

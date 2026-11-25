@@ -5,13 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sheen } from '../dist/index.js';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import {
-  closedFormAlbedoCommit,
-  closedFormAlbedoWGSL,
-  sheenAlbedo as tanhSinhAlbedo,
-} from '../../../scripts/sheen-albedo-fit.mjs';
+import { closedFormAlbedoWGSL, sheenAlbedo as tanhSinhAlbedo } from '../../../scripts/sheen-albedo-fit.mjs';
 import { wgslConst, wgslFunction, wgslModule } from '../../../tests/support/wgsl-eval.js';
 
 // The fit script measured the table on its validation grid against min(E, 1): at most 0.01426 for roughness 0.03 and
@@ -50,7 +45,9 @@ function brdf(roughness, nl, mu, phi) {
     tangential = sv * sv + sl * sl + 2 * sv * sl * Math.cos(phi),
     sin2 = tangential / (tangential + (mu + nl) ** 2);
   return (
-    ((2 + 1 / alpha) * sin2 ** (0.5 / alpha)) / (2 * Math.PI) / ((1 + lambda(mu, alpha) + lambda(nl, alpha)) * 4 * nl * mu)
+    ((2 + 1 / alpha) * sin2 ** (0.5 / alpha)) /
+    (2 * Math.PI) /
+    ((1 + lambda(mu, alpha) + lambda(nl, alpha)) * 4 * nl * mu)
   );
 }
 
@@ -143,16 +140,18 @@ test('the table is a finite energy fraction, 1 at grazing for smooth sheen and n
 // The GPU check compares the shipped table with the closed form it replaced. That reference was once taken as the
 // parent of the last commit touching packages/shared/sheen.js, so a later, unrelated sheen fix to that file made the
 // reference the shipped table itself and the check failed on a correct tree. It is now pinned.
+// coefficients are polynomials in roughness and a knee, a fit of the sheen albedo E of Estevez and Kulla 2017). It is
+// held here because the commit that held it is not in every checkout's history, and a test must not need history.
+// Never edit it to follow the script: it is the reference the script's copy is checked against.
+const original = `fn materialLobesSheenAlbedo(mu:f32,roughness:f32)->f32 {
+  let sheenR2=roughness*roughness;let sheenKnee=sheenR2/(sheenR2+0.046698);
+  let sheenBasis=vec4f(1.0,sheenKnee,roughness,sheenKnee*roughness);let sheenX=mu/max(roughness,0.0001);
+  return clamp(exp(dot(sheenBasis,vec4f(0.67486,-1.0569,1.2955,-1.6596))-sheenX*(dot(sheenBasis,vec4f(0.78851,0.09914,-0.27042,0.61309))+sheenX*dot(sheenBasis,vec4f(0.072685,0.29184,-0.084342,-0.10518)))),0.0,1.0);
+}
+`;
+
 test('the GPU check reference is the pinned closed form the table replaced, not a revision found from history', () => {
-  const root = new URL('../../../', import.meta.url),
-    before = execFileSync('git', ['show', `${closedFormAlbedoCommit}^:packages/shared/sheen.js`], {
-      cwd: root,
-      encoding: 'utf8',
-    }).replaceAll('\r\n', '\n'),
-    marker = 'export const sheenAlbedoWGSL = (name) => /* wgsl */ `',
-    start = before.indexOf(marker) + marker.length,
-    original = before.slice(start, before.indexOf('`;', start)).replaceAll('${name}', 'materialLobesSheenAlbedo');
-  assert.ok(start > marker.length, 'the parent of the table commit has the closed-form sheenAlbedoWGSL');
+  const root = new URL('../../../', import.meta.url);
   assert.equal(closedFormAlbedoWGSL('materialLobesSheenAlbedo'), original);
   assert.ok(
     !sheen({ colorFactor: [1, 1, 1] }).declarations.includes(original.trim()),

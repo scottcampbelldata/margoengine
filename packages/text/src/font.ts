@@ -95,7 +95,9 @@ export class Font implements TextMeasurer {
       !/^(normal|bold|bolder|lighter)$/.test(this.weight) &&
       !(/^\d{1,4}(\.\d+)?$/.test(this.weight) && Number(this.weight) >= 1 && Number(this.weight) <= 1000)
     )
-      throw new TypeError('Invalid font weight; use normal, bold, bolder, lighter or a number from 1 to 1000 such as 400.');
+      throw new TypeError(
+        'Invalid font weight; use normal, bold, bolder, lighter or a number from 1 to 1000 such as 400.',
+      );
     if (!['normal', 'italic', 'oblique'].includes(this.style))
       throw new TypeError('Invalid font style; use normal, italic or oblique.');
   }

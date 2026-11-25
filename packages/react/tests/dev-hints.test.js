@@ -8,7 +8,8 @@ import React from 'react';
 const created = [];
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement,
+    assertCore,
+    coreRequirement,
     Engine: {
       async create(canvas, options) {
         const engine = {

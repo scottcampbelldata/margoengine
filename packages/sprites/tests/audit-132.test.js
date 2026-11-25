@@ -255,7 +255,10 @@ test('a Spine IK key without bendPositive, compress or stretch means true, false
   const scale = (setup, key) => {
     const r = parseSpineJSON({
       skeleton: { spine: '4.2.22' },
-      bones: [{ name: 'root', length: 5 }, { name: 'far', x: 20, y: 0 }],
+      bones: [
+        { name: 'root', length: 5 },
+        { name: 'far', x: 20, y: 0 },
+      ],
       slots: [],
       ik: [{ name: 'one', bones: ['root'], target: 'far', ...setup }],
       animations: { reach: { ik: { one: [key] } } },

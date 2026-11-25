@@ -101,7 +101,10 @@ test('intersectEngine adds the clouds and batches of the points plugin', async (
   const ray = worldRay();
   ray.set([0, 0, 5], [0, 0, -1]);
   assert.deepEqual(
-    ray.intersectEngine(engine).slice(0, 3).map((hit) => hit.target ?? hit.mesh),
+    ray
+      .intersectEngine(engine)
+      .slice(0, 3)
+      .map((hit) => hit.target ?? hit.mesh),
     [batch, cloud, mesh],
   );
 });
@@ -146,7 +149,12 @@ test('a block whose largest point reaches the ray is not skipped', async () => {
     sizes = new Float32Array(100).fill(1);
   sizes[37] = 40;
   const positions = Float32Array.from({ length: 300 }, (_, i) => (i % 3 === 0 ? 50 + i : 0)),
-    cloud = new PointCloud({ positions, sizes, blockSize: 10, material: { size: 1, sizeUnits: 'world', maxPixelSize: 1e6 } }),
+    cloud = new PointCloud({
+      positions,
+      sizes,
+      blockSize: 10,
+      material: { size: 1, sizeUnits: 'world', maxPixelSize: 1e6 },
+    }),
     ray = worldRay(0),
     x = positions[37 * 3];
   ray.set([x + 19, 0, 9], [0, 0, -1]);

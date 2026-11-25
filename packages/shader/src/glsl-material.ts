@@ -110,7 +110,9 @@ export function shaderScene(raw: RawShaders): ShaderScene {
       },
       setLights(value) {
         if (value !== null && (typeof value !== 'object' || !Array.isArray(value.list)))
-          throw new TypeError('ShaderScene.setLights needs a Clustered, an object with a list of point and spot lights, or null');
+          throw new TypeError(
+            'ShaderScene.setLights needs a Clustered, an object with a list of point and spot lights, or null',
+          );
         lights = value;
         return this;
       },
@@ -151,7 +153,14 @@ function sceneValues(linked: GLSLLinked, holder: SceneHolder): Record<string, Sh
   // Fog as Fog's fields, its colour encoded as the program writes colour (display-ready or linear).
   const f = new Float32Array(12);
   writeFog(scene?.fog ?? off, [0, 0, 0], f, linked.display);
-  Object.assign(out, { fogColor: [f[0]!, f[1]!, f[2]!], fogHeight: f[3]!, fogNear: f[4]!, fogFar: f[5]!, fogDensity: f[6]!, fogHeightFalloff: f[7]! });
+  Object.assign(out, {
+    fogColor: [f[0]!, f[1]!, f[2]!],
+    fogHeight: f[3]!,
+    fogNear: f[4]!,
+    fogFar: f[5]!,
+    fogDensity: f[6]!,
+    fogHeightFalloff: f[7]!,
+  });
   // Point and spot lights in list order, as many as each declared array holds.
   const source = scene?.lights,
     scale = typeof source?.intensityScale === 'function' ? source.intensityScale() : (source?.intensityScale ?? 1),
@@ -167,7 +176,12 @@ function sceneValues(linked: GLSLLinked, holder: SceneHolder): Record<string, Sh
   for (const light of source?.list ?? []) {
     const c = light.color ?? [1, 1, 1],
       k = (light.intensity ?? 1) * scale,
-      base = { position: Array.from(light.position), color: [c[0]! * k, c[1]! * k, c[2]! * k], range: light.range, decay: light.decay ?? 2 };
+      base = {
+        position: Array.from(light.position),
+        color: [c[0]! * k, c[1]! * k, c[2]! * k],
+        range: light.range,
+        decay: light.decay ?? 2,
+      };
     if (!('direction' in light)) {
       if (points.length < pointRoom) points.push(base);
       continue;
@@ -177,9 +191,19 @@ function sceneValues(linked: GLSLLinked, holder: SceneHolder): Record<string, Sh
       n = Math.hypot(s.direction[0]!, s.direction[1]!, s.direction[2]!) || 1,
       outer = s.angle ?? s.outerAngle ?? Math.PI / 2,
       inner = s.angle === undefined ? (s.innerAngle ?? 0) : s.angle * (1 - (s.penumbra ?? 0));
-    spots.push({ ...base, direction: [s.direction[0]! / n, s.direction[1]! / n, s.direction[2]! / n], outerCos: Math.cos(outer), innerCos: Math.cos(inner) });
+    spots.push({
+      ...base,
+      direction: [s.direction[0]! / n, s.direction[1]! / n, s.direction[2]! / n],
+      outerCos: Math.cos(outer),
+      innerCos: Math.cos(inner),
+    });
   }
-  Object.assign(out, { pointLights: points, spotLights: spots, pointLightCount: points.length, spotLightCount: spots.length });
+  Object.assign(out, {
+    pointLights: points,
+    spotLights: spots,
+    pointLightCount: points.length,
+    spotLightCount: spots.length,
+  });
   return (holder.cache = out);
 }
 // The scene options' code: the linker's part, and the {value} of each scene uniform the program reads, unless the
@@ -195,7 +219,9 @@ const scene: GLSLMaterialScene = {
           return sceneValues(linked, holder)[name] ?? null;
         },
         set value(_: ShaderUniformValue) {
-          throw new TypeError(`ShaderMaterial uniform ${name} comes from the scene; give it in uniforms to set it yourself`);
+          throw new TypeError(
+            `ShaderMaterial uniform ${name} comes from the scene; give it in uniforms to set it yourself`,
+          );
         },
       };
       sceneObjects.add(u);
@@ -221,7 +247,9 @@ export class ShaderMaterial extends GLSLMaterial {
    * same program core without the scene options (so those entries carry no scene code). A subclass checks as usual.
    */
   static override [Symbol.hasInstance](value: unknown): boolean {
-    return this === ShaderMaterial ? value instanceof GLSLMaterial : Function.prototype[Symbol.hasInstance].call(this, value);
+    return this === ShaderMaterial
+      ? value instanceof GLSLMaterial
+      : Function.prototype[Symbol.hasInstance].call(this, value);
   }
 }
 

@@ -48,7 +48,12 @@ assert.equal(
   `consumer build did not emit both Draco builds: ${emitted.join(', ')}`,
 );
 
-const server = await createServer({ plugins: [noFileWatcher()], configFile: config, logLevel: 'error', server: { port: 0 } });
+const server = await createServer({
+  plugins: [noFileWatcher()],
+  configFile: config,
+  logLevel: 'error',
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
+});
 await server.listen();
 const productionServer = await preview({
   configFile: config,

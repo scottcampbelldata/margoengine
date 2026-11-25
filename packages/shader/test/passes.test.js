@@ -51,7 +51,10 @@ test('a positionNode that reads uv() takes the normal of each triangle in the fr
   assert.ok(m.fragmentCode.includes('dpdx(i.position)'));
   const chosen = new NodeMaterial({ positionNode: wave, positionNormals: 'faces' });
   assert.ok(chosen.fragmentCode.includes('dpdx(i.position)') && !chosen.vertexCode.includes('margoNormal'));
-  const told = new NodeMaterial({ positionNode: positionLocal.add(normalLocal.mul(uv().x)), positionNormals: 'neighbours' });
+  const told = new NodeMaterial({
+    positionNode: positionLocal.add(normalLocal.mul(uv().x)),
+    positionNormals: 'neighbours',
+  });
   assert.ok(told.vertexCode.includes('margoNormal'));
 });
 
@@ -61,7 +64,10 @@ test('positionNormals keep, a normalNode and a graph with no positionNode leave 
   assert.ok(!kept.fragmentCode.includes('dpdx'));
   const told = new NodeMaterial({ positionNode: positionLocal.add(uv().x), normalNode: vec3(0, 1, 0) });
   assert.ok(!told.fragmentCode.includes('dpdx'));
-  assert.equal(new NodeMaterial({ colorNode: vec3(1, 0, 0) }).vertexCode.trim(), 'let p=f.model*vec4f(i.position.xyz,1);');
+  assert.equal(
+    new NodeMaterial({ colorNode: vec3(1, 0, 0) }).vertexCode.trim(),
+    'let p=f.model*vec4f(i.position.xyz,1);',
+  );
 });
 
 test('the G-buffer pass reads the same patched vertex and surface as the colour pass', () => {
@@ -137,7 +143,10 @@ test('a constant move binds nothing, so an automatic layout gets no displacement
   assert.equal(asked, 0);
   const own = moved.layout();
   assert.deepEqual(own.entries, []);
-  assert.deepEqual(displacementGroup(device, () => own, moved, true), { layout: own, entries: [] });
+  assert.deepEqual(
+    displacementGroup(device, () => own, moved, true),
+    { layout: own, entries: [] },
+  );
   // A move that reads a uniform still gets its group from the automatic layout.
   const read = new NodeMaterial({ positionNode: positionLocal.mul(uniform(1)) }).caster(made);
   assert.equal(displacementGroup(device, () => 'auto group 1', read).layout, 'auto group 1');
@@ -196,10 +205,18 @@ test('the colour group holds what any stage of the colour pass reads, and not a 
   const gpu = mockGPU().device,
     held = (material) => material.bindings(gpu).filter((entry) => entry.binding >= 48).length,
     value = uniform(0.5);
-  assert.equal(held(new PassMaterial({ outputs: { loop: vec4(0, value, 0, 1) } })), 1, 'a uniform only an output reads');
+  assert.equal(
+    held(new PassMaterial({ outputs: { loop: vec4(0, value, 0, 1) } })),
+    1,
+    'a uniform only an output reads',
+  );
   assert.equal(held(new LightingMaterial({ lightingNode: vec3(value) })), 1, 'a uniform only the lighting reads');
   assert.equal(held(new NodeMaterial({ colorNode: vec3(value) })), 1, 'a uniform the colour reads');
-  assert.equal(held(new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) })), 0, 'the depth camera');
+  assert.equal(
+    held(new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) })),
+    0,
+    'the depth camera',
+  );
 });
 
 test("a move that reads the graph's uniforms runs again on last frame's in TAA's velocity", () => {
@@ -209,15 +226,24 @@ test("a move that reads the graph's uniforms runs again on last frame's in TAA's
     shift = uniform(0),
     graph = new NodeMaterial({ positionNode: positionLocal.add(vec3(shift, 0, 0)) }),
     record = graph.caster(gpu.device);
-  assert.ok(record.move.some((line) => line.includes('ndu.')), 'the move alone, reading the block');
-  assert.ok(record.entries().every((e) => e.binding < record.program.next), 'last frame binds after the graph');
+  assert.ok(
+    record.move.some((line) => line.includes('ndu.')),
+    'the move alone, reading the block',
+  );
+  assert.ok(
+    record.entries().every((e) => e.binding < record.program.next),
+    'last frame binds after the graph',
+  );
   graph.bindings(gpu.device);
   assert.equal(record.program.buffers.get(gpu.device).bytes.length % 16, 0, 'the block TAA copies');
   const code = objectVelocity(true, false, false, false, true, false, record.velocity, {
     move: record.move,
     binding: record.program.next,
   });
-  assert.match(code, new RegExp(`@group\\(1\\) @binding\\(${record.program.next}\\) var<uniform> nduBefore:NdUniforms;`));
+  assert.match(
+    code,
+    new RegExp(`@group\\(1\\) @binding\\(${record.program.next}\\) var<uniform> nduBefore:NdUniforms;`),
+  );
   assert.match(code, /\{var o:Out;var margoBefore=i\.position\.xyz;\{let margoWorld=\(f\.previousModel\*/);
   assert.match(code, /nduBefore\./);
   assert.match(code, /margoBefore=margoPosition;\}let margoWorld=\(f\.model\*/, 'last frame first, then this frame');

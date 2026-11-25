@@ -3,9 +3,18 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { WalkControls } = await load('../dist/walk.js');
   const { ThirdPersonControls } = await load('../dist/third-person.js');
   return [
-    ...['OrbitControls', 'MapControls', 'TrackballControls', 'ArcballControls', 'FlyControls',
-      'FirstPersonControls', 'PointerLockControls', 'TransformControls'].map((name) => [name, controls[name]]),
-    ['WalkControls', WalkControls], ['ThirdPersonControls', ThirdPersonControls],
+    ...[
+      'OrbitControls',
+      'MapControls',
+      'TrackballControls',
+      'ArcballControls',
+      'FlyControls',
+      'FirstPersonControls',
+      'PointerLockControls',
+      'TransformControls',
+    ].map((name) => [name, controls[name]]),
+    ['WalkControls', WalkControls],
+    ['ThirdPersonControls', ThirdPersonControls],
   ].map(([name, Control]) => ({
     name,
     create({ engine, scene }) {

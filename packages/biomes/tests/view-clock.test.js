@@ -49,24 +49,43 @@ async function timeline(extra, cost) {
   return out;
 }
 
-test('maxSteps copies the same tiles on the same frames on a slow machine and a fast one', { timeout: 60000 }, async () => {
+test('maxSteps copies the same tiles on the same frames on a slow machine and a fast one', {
+  timeout: 60000,
+}, async () => {
   const fast = await timeline({ maxSteps: 2 }, 0.001),
     slow = await timeline({ maxSteps: 2 }, 5);
   assert.deepEqual(slow, fast);
   assert.deepEqual(fast, [16, 14, 12, 10, 8]);
 });
 
-test('the live millisecond budget still follows the clock (a slow clock copies fewer tiles a frame)', { timeout: 60000 }, async () => {
+test('the live millisecond budget still follows the clock (a slow clock copies fewer tiles a frame)', {
+  timeout: 60000,
+}, async () => {
   const fast = await timeline({}, 0.001),
     slow = await timeline({}, 5);
   assert.notDeepEqual(slow, fast);
-  const clocked = await timeline({ clock: (() => { let n = 0; return () => (n += 5); })() }, 0.001);
+  const clocked = await timeline(
+    {
+      clock: (() => {
+        let n = 0;
+        return () => (n += 5);
+      })(),
+    },
+    0.001,
+  );
   assert.deepEqual(clocked.slice(1), slow.slice(1));
 });
 
 test('maxSteps and clock are checked', { timeout: 60000 }, async () => {
   const world = await BiomeWorld.create({ size: [1024, 1024], workers: false }),
-    engine = { backend: 'webgpu', gpu: { limits: { maxTextureDimension2D: 8192 } }, camera: { position: [0, 0, 0] }, use() {}, removePlugin() {}, sceneOf: () => undefined };
+    engine = {
+      backend: 'webgpu',
+      gpu: { limits: { maxTextureDimension2D: 8192 } },
+      camera: { position: [0, 0, 0] },
+      use() {},
+      removePlugin() {},
+      sceneOf: () => undefined,
+    };
   await assert.rejects(BiomeView.attach(engine, world, { maxSteps: 0 }), RangeError);
   await assert.rejects(BiomeView.attach(engine, world, { clock: 3 }), TypeError);
   world.dispose();

@@ -79,7 +79,10 @@ export function parseRichText(markup: string): RichSpan[] {
     else if (name === 'link' && value) apply = { link: value };
     // Finite too (batch 132b): <size=Infinity> or <size=1e999> used to pass and lay every piece out at NaN.
     else if (name === 'size' && Number(value) > 0 && Number.isFinite(Number(value))) apply = { size: Number(value) };
-    else throw new TypeError(`Unknown rich text tag <${tag}>; use b, i, color, size (a finite number above 0), link or img`);
+    else
+      throw new TypeError(
+        `Unknown rich text tag <${tag}>; use b, i, color, size (a finite number above 0), link or img`,
+      );
     stack.push({ tag: name, apply });
     restyle();
   }

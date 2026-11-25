@@ -52,24 +52,51 @@ const checks = {
     assert.equal(r.validation, null);
     assert.deepEqual(r.errors, []);
     const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b, 1e-6);
-    assert.ok(r.light.intensity > 0 && r.light.shadow, `the held flash lists a shadowed light: ${JSON.stringify(r.light)}`);
+    assert.ok(
+      r.light.intensity > 0 && r.light.shadow,
+      `the held flash lists a shadowed light: ${JSON.stringify(r.light)}`,
+    );
     assert.ok(r.light.group.includes('lightning'), 'the weather made its own light group');
     assert.equal(r.deckFlash, true, 'the deck took the flash');
-    assert.ok(r.lit.ground > 1.5 * r.dark.ground + 1e-4, `the ground flashes: ${JSON.stringify({ dark: r.dark, lit: r.lit })}`);
-    assert.ok(r.lit.deck > 1.2 * r.dark.deck + 1e-4, `the deck lights from inside: ${JSON.stringify({ dark: r.dark, lit: r.lit })}`);
-    assert.ok(near(r.noLights.ground, r.dark.ground), `link.lights false leaves the ground: ${JSON.stringify(r.noLights)}`);
+    assert.ok(
+      r.lit.ground > 1.5 * r.dark.ground + 1e-4,
+      `the ground flashes: ${JSON.stringify({ dark: r.dark, lit: r.lit })}`,
+    );
+    assert.ok(
+      r.lit.deck > 1.2 * r.dark.deck + 1e-4,
+      `the deck lights from inside: ${JSON.stringify({ dark: r.dark, lit: r.lit })}`,
+    );
+    assert.ok(
+      near(r.noLights.ground, r.dark.ground),
+      `link.lights false leaves the ground: ${JSON.stringify(r.noLights)}`,
+    );
     assert.ok(r.noLights.deck > 1.2 * r.dark.deck + 1e-4, 'link.lights false still lights the deck');
-    assert.ok(near(r.off.ground, r.dark.ground) && near(r.off.deck, r.dark.deck), `link false changes nothing: ${JSON.stringify(r.off)}`);
+    assert.ok(
+      near(r.off.ground, r.dark.ground) && near(r.off.deck, r.dark.deck),
+      `link false changes nothing: ${JSON.stringify(r.off)}`,
+    );
     assert.equal(r.offFlash, true, 'link false takes the flash out of the deck');
     // The settings rows through applySkySettings (the sky re-applied at its defaults, so compared with rows.base, the same
     // frame with no flash): a light scale of 0 puts the ground's light out, a deck scale of 0 the deck's, null hands back.
     const w = r.rows;
-    assert.ok(w.full.ground > 1.5 * w.base.ground && w.full.deck > 1.2 * w.base.deck, `rows at their defaults flash: ${JSON.stringify(w)}`);
-    assert.ok(w.lightOff.ground < 0.5 * w.full.ground && w.lightOff.deck > 1.2 * w.base.deck, `lightning.light.scale 0: ${JSON.stringify(w)}`);
-    assert.ok(w.cloudOff.deck < 0.7 * w.full.deck && w.cloudOff.ground > 1.5 * w.base.ground, `lightning.cloud.scale 0: ${JSON.stringify(w)}`);
+    assert.ok(
+      w.full.ground > 1.5 * w.base.ground && w.full.deck > 1.2 * w.base.deck,
+      `rows at their defaults flash: ${JSON.stringify(w)}`,
+    );
+    assert.ok(
+      w.lightOff.ground < 0.5 * w.full.ground && w.lightOff.deck > 1.2 * w.base.deck,
+      `lightning.light.scale 0: ${JSON.stringify(w)}`,
+    );
+    assert.ok(
+      w.cloudOff.deck < 0.7 * w.full.deck && w.cloudOff.ground > 1.5 * w.base.ground,
+      `lightning.cloud.scale 0: ${JSON.stringify(w)}`,
+    );
     assert.equal(w.noShadowMap, null, 'lightning.light.shadow off asks for no map');
     assert.ok(w.noShadow.ground > 1.5 * w.base.ground, `lightning.light.shadow off still lights: ${JSON.stringify(w)}`);
-    assert.ok(near(w.handedBack.ground, w.full.ground) && near(w.handedBack.deck, w.full.deck), `the defaults give the lit frame back: ${JSON.stringify(w)}`);
+    assert.ok(
+      near(w.handedBack.ground, w.full.ground) && near(w.handedBack.deck, w.full.deck),
+      `the defaults give the lit frame back: ${JSON.stringify(w)}`,
+    );
     console.log(`ok lightning-link ${samples}x: ${JSON.stringify({ dark: r.dark, lit: r.lit, noLights: r.noLights })}`);
     return r;
   },
@@ -83,24 +110,65 @@ const checks = {
     assert.equal(r.none.bright, 0, `no bolt without a flash: ${JSON.stringify(r.none)}`);
     assert.ok(r.bolt.bright > 40 && r.bolt.max > 20, `the bolt is drawn bright: ${JSON.stringify(r.bolt)}`);
     assert.ok(r.bolt.rows > 0.2 * r.bolt.h, `it runs down a good part of the frame: ${JSON.stringify(r.bolt)}`);
-    assert.ok(r.bolt.bright < 0.1 * r.bolt.h * r.bolt.h * 1.78, `it is a thin line, not a wash: ${JSON.stringify(r.bolt)}`);
-    assert.ok(r.again.bright === r.bolt.bright && r.again.rows === r.bolt.rows && Math.abs(r.again.sum / r.bolt.sum - 1) < 1e-4, `the same held flash draws the same frame: ${JSON.stringify({ again: r.again, bolt: r.bolt })}`);
-    assert.ok(r.dim.sum < r.bolt.sum && r.dim.max < r.bolt.max, `a dimmer flash is dimmer: ${JSON.stringify({ dim: r.dim, bolt: r.bolt })}`);
+    assert.ok(
+      r.bolt.bright < 0.1 * r.bolt.h * r.bolt.h * 1.78,
+      `it is a thin line, not a wash: ${JSON.stringify(r.bolt)}`,
+    );
+    assert.ok(
+      r.again.bright === r.bolt.bright && r.again.rows === r.bolt.rows && Math.abs(r.again.sum / r.bolt.sum - 1) < 1e-4,
+      `the same held flash draws the same frame: ${JSON.stringify({ again: r.again, bolt: r.bolt })}`,
+    );
+    assert.ok(
+      r.dim.sum < r.bolt.sum && r.dim.max < r.bolt.max,
+      `a dimmer flash is dimmer: ${JSON.stringify({ dim: r.dim, bolt: r.bolt })}`,
+    );
     assert.equal(r.off.bright, 0, `bolt.scale 0 draws no bolt: ${JSON.stringify(r.off)}`);
-    assert.ok(r.coreOnly.sum < r.bolt.sum && r.bolt.sum > r.off.sum, `glow 0 leaves the core alone: ${JSON.stringify({ core: r.coreOnly, bolt: r.bolt })}`);
-    assert.ok(r.wideGlow.sum > r.bolt.sum, `a wider glow lights more of the frame: ${JSON.stringify({ wide: r.wideGlow, bolt: r.bolt })}`);
-    assert.ok(r.fat.bright > r.bolt.bright, `a wider core covers more pixels: ${JSON.stringify({ fat: r.fat, bolt: r.bolt })}`);
-    assert.ok(r.forked.bright > r.plain.bright, `branching adds forks: ${JSON.stringify({ forked: r.forked, plain: r.plain })}`);
-    assert.ok(r.hidden.bright < 0.05 * r.shown.bright + 1, `a hill in front hides the bolt: ${JSON.stringify({ hidden: r.hidden, shown: r.shown })}`);
+    assert.ok(
+      r.coreOnly.sum < r.bolt.sum && r.bolt.sum > r.off.sum,
+      `glow 0 leaves the core alone: ${JSON.stringify({ core: r.coreOnly, bolt: r.bolt })}`,
+    );
+    assert.ok(
+      r.wideGlow.sum > r.bolt.sum,
+      `a wider glow lights more of the frame: ${JSON.stringify({ wide: r.wideGlow, bolt: r.bolt })}`,
+    );
+    assert.ok(
+      r.fat.bright > r.bolt.bright,
+      `a wider core covers more pixels: ${JSON.stringify({ fat: r.fat, bolt: r.bolt })}`,
+    );
+    assert.ok(
+      r.forked.bright > r.plain.bright,
+      `branching adds forks: ${JSON.stringify({ forked: r.forked, plain: r.plain })}`,
+    );
+    assert.ok(
+      r.hidden.bright < 0.05 * r.shown.bright + 1,
+      `a hill in front hides the bolt: ${JSON.stringify({ hidden: r.hidden, shown: r.shown })}`,
+    );
     assert.equal(r.rowOff.bright, 0, 'the scale row 0 draws no bolt');
-    assert.ok(r.rowOn.bright > 40, `the rows at their defaults draw a bolt (the panel's seed and cloud base, so another one): ${JSON.stringify(r.rowOn)}`);
+    assert.ok(
+      r.rowOn.bright > 40,
+      `the rows at their defaults draw a bolt (the panel's seed and cloud base, so another one): ${JSON.stringify(r.rowOn)}`,
+    );
     // The ground is lit by the lights along the channel, differently from one point light 700 m up, and by the one
     // light of a single segment (the mean of the channel) differently again.
-    assert.ok(r.groundLine > 1.2 * r.groundDark, `the lights along the channel light the ground: ${JSON.stringify({ line: r.groundLine, dark: r.groundDark })}`);
-    assert.ok(r.groundPoint > 1.2 * r.groundDark, `the point light still lights it: ${JSON.stringify({ point: r.groundPoint, dark: r.groundDark })}`);
-    assert.ok(Math.abs(r.groundLine - r.groundPoint) > 0.01 * r.groundPoint, `the line is another light: ${JSON.stringify({ line: r.groundLine, point: r.groundPoint })}`);
-    assert.ok(Math.abs(r.groundOne - r.groundLine) > 0.003 * r.groundLine, `one segment is not three: ${JSON.stringify({ one: r.groundOne, three: r.groundLine })}`);
-    console.log(`ok lightning-bolt ${samples}x: ${JSON.stringify({ bolt: r.bolt, hidden: r.hidden.bright, ground: { dark: r.groundDark, line: r.groundLine, point: r.groundPoint } })}`);
+    assert.ok(
+      r.groundLine > 1.2 * r.groundDark,
+      `the lights along the channel light the ground: ${JSON.stringify({ line: r.groundLine, dark: r.groundDark })}`,
+    );
+    assert.ok(
+      r.groundPoint > 1.2 * r.groundDark,
+      `the point light still lights it: ${JSON.stringify({ point: r.groundPoint, dark: r.groundDark })}`,
+    );
+    assert.ok(
+      Math.abs(r.groundLine - r.groundPoint) > 0.01 * r.groundPoint,
+      `the line is another light: ${JSON.stringify({ line: r.groundLine, point: r.groundPoint })}`,
+    );
+    assert.ok(
+      Math.abs(r.groundOne - r.groundLine) > 0.003 * r.groundLine,
+      `one segment is not three: ${JSON.stringify({ one: r.groundOne, three: r.groundLine })}`,
+    );
+    console.log(
+      `ok lightning-bolt ${samples}x: ${JSON.stringify({ bolt: r.bolt, hidden: r.hidden.bright, ground: { dark: r.groundDark, line: r.groundLine, point: r.groundPoint } })}`,
+    );
     return r;
   },
   // The clouds' bounds (elements plan step 6; cloud-bounds-check.html).
@@ -132,13 +200,18 @@ const checks = {
     // irradiance (the cloud neither makes nor loses light) within 15%. RTX A6000: 0.68, 0.45, 0.22 down against 0.75,
     // 0.45, 0.19.
     for (const t of r.twoStream) {
-      assert.ok(Math.abs((t.down + t.direct) / t.want - 1) < 0.25, `two-stream down at tau ${t.tau}: ${JSON.stringify(t)}`);
+      assert.ok(
+        Math.abs((t.down + t.direct) / t.want - 1) < 0.25,
+        `two-stream down at tau ${t.tau}: ${JSON.stringify(t)}`,
+      );
       assert.ok(Math.abs(t.up / (1 - t.want) - 1) < 0.25, `two-stream up at tau ${t.tau}: ${JSON.stringify(t)}`);
       assert.ok(Math.abs(t.sum - 1) < 0.15, `two-stream energy at tau ${t.tau}: ${JSON.stringify(t)}`);
     }
     // The moon disc outshines the deck it lights.
     assert.ok(r.moon.up > 0 && r.moon.disc > r.moon.cloud && r.moon.cloud > 0, `moon: ${JSON.stringify(r.moon)}`);
-    console.log(`ok cloud-bounds ${samples}x: ${JSON.stringify({ grain: r.grain, deck: d, twoStream: r.twoStream, moon: r.moon })}`);
+    console.log(
+      `ok cloud-bounds ${samples}x: ${JSON.stringify({ grain: r.grain, deck: d, twoStream: r.twoStream, moon: r.moon })}`,
+    );
     return r;
   },
   // A tornado (tornado-check.html): rays deep in the CPU funnel show lit cloud, rays that come near nothing stay black;
@@ -154,16 +227,26 @@ const checks = {
     for (const name of ['strong', 'wedge', 'weak']) {
       const v = r[name];
       assert.ok(v.clear > 50 && v.clearMax < 1e-4, `${name}: rays that miss the storm stay black ${JSON.stringify(v)}`);
-      if (name !== 'weak') assert.ok(v.solid > 20 && v.solidP10 > 0.01, `${name}: the funnel is drawn and lit ${JSON.stringify(v)}`);
+      if (name !== 'weak')
+        assert.ok(v.solid > 20 && v.solidP10 > 0.01, `${name}: the funnel is drawn and lit ${JSON.stringify(v)}`);
     }
     const near = (row, cpu, name) =>
-      assert.ok(Math.abs(row.width - cpu) <= Math.max(2.5, 0.25 * cpu), `${name} funnel ${row.width} px wide, CPU ${cpu.toFixed(1)} px`);
+      assert.ok(
+        Math.abs(row.width - cpu) <= Math.max(2.5, 0.25 * cpu),
+        `${name} funnel ${row.width} px wide, CPU ${cpu.toFixed(1)} px`,
+      );
     near(r.strongRow, r.strongCpu, 'strong');
     near(r.wedgeRow, r.wedgeCpu, 'wedge');
-    assert.ok(r.wedgeRow.width > 3 * Math.max(1, r.ropeRow.width), `a wedge is wider than a rope: ${JSON.stringify([r.ropeRow, r.wedgeRow])}`);
+    assert.ok(
+      r.wedgeRow.width > 3 * Math.max(1, r.ropeRow.width),
+      `a wedge is wider than a rope: ${JSON.stringify([r.ropeRow, r.wedgeRow])}`,
+    );
     assert.ok(Math.abs(r.moved - 400) < 60, `the funnel followed its path 400 m: ${r.moved}`);
     assert.ok(r.weakBottom > 100, `a weak funnel hangs aloft: bottom ${r.weakBottom}`);
-    assert.ok(r.weakGround < 1e-4 && r.weakAloft > 0.01, `clear ground under a funnel aloft: ${r.weakGround}, ${r.weakAloft}`);
+    assert.ok(
+      r.weakGround < 1e-4 && r.weakAloft > 0.01,
+      `clear ground under a funnel aloft: ${r.weakGround}, ${r.weakAloft}`,
+    );
     console.log(`ok tornado ${samples}x`);
     return r;
   },
@@ -185,7 +268,10 @@ const checks = {
     assert.ok(r.air.clear > 50, `the eye and the gaps between the bands from the air: ${JSON.stringify(r.air)}`);
     // The haze follows the air the ray crosses: from 90 km up, through near-empty air, the cloud keeps at least 80
     // percent of its light from 40 km (with the old haze by distance alone, exp(-t / 40 km), it kept about a quarter).
-    assert.ok(r.high.solidMean > 0.8 * r.air.solidMean, `haze from 90 km: ${r.high.solidMean} against ${r.air.solidMean}`);
+    assert.ok(
+      r.high.solidMean > 0.8 * r.air.solidMean,
+      `haze from 90 km: ${r.high.solidMean} against ${r.air.solidMean}`,
+    );
     // From sea level in the eye the sky straight up is clear (no solid ray), and the stadium wall stands low around it.
     assert.equal(r.up.solid, 0);
     assert.ok(r.up.clear > 500 && r.up.clearMax < 1e-4, `the sky up from the eye: ${JSON.stringify(r.up)}`);
@@ -193,7 +279,10 @@ const checks = {
     const [x0, z0] = r.eyeBefore,
       [x1, z1] = r.eyeAfter;
     assert.ok(Math.hypot(x0, z0) < 1500, `eye at the centre: ${r.eyeBefore}`);
-    assert.ok(Math.abs(x1 - x0 - 6000) < 1500 && Math.abs(z1 - z0) < 1500, `the eye moved: ${r.eyeBefore} to ${r.eyeAfter}`);
+    assert.ok(
+      Math.abs(x1 - x0 - 6000) < 1500 && Math.abs(z1 - z0) < 1500,
+      `the eye moved: ${r.eyeBefore} to ${r.eyeAfter}`,
+    );
     return r;
   },
   async volumetric(page, samples) {
@@ -215,6 +304,8 @@ const checks = {
     assert.equal(r.pillar.changed, 0, `clouds drew over the near pillar: ${JSON.stringify(r.pillar)}`);
     // The block 160 m ahead of a camera inside dense cloud is veiled by the cloud in between.
     assert.ok(r.block.changed > r.block.total * 0.9, `cloud in front of the block: ${JSON.stringify(r.block)}`);
+    assert.equal(r.automaticDepth.same, 0, 'automatic cloud depth matches the explicit live capture');
+    assert.equal(r.automaticDepth.override, 0, 'an explicit unavailable depth leaves the foreground block clear');
     assert.equal(
       r.noDepth.pillar.changed,
       0,
@@ -587,17 +678,26 @@ checks.look = async (page, samples) => {
     assert.equal(at('BackDiff'), 0, `${model}: cleared, the frame is the plain one again`);
     // Zenith tint: green up high at the same luminance, the horizon nearly untouched.
     const z = at('Zenith');
-    assert.ok(z.high[1] > 2 * z.high[0] && z.high[1] > 2 * z.high[2], `${model} zenith green: ${show(model + 'Zenith')}`);
+    assert.ok(
+      z.high[1] > 2 * z.high[0] && z.high[1] > 2 * z.high[2],
+      `${model} zenith green: ${show(model + 'Zenith')}`,
+    );
     assert.ok(Math.abs(lum(z.high) / lum(plain.high) - 1) < 0.05, `${model} zenith keeps its luminance`);
     assert.ok(Math.abs(lum(z.horizon) / lum(plain.horizon) - 1) < 0.05, `${model} zenith tint spares the horizon`);
     // Horizon tint: red at the horizon at the same luminance, the high sky untouched.
     const h = at('Horizon');
     assert.ok(h.horizon[0] > 3 * h.horizon[1], `${model} horizon red: ${show(model + 'Horizon')}`);
     assert.ok(Math.abs(lum(h.horizon) / lum(plain.horizon) - 1) < 0.02, `${model} horizon keeps its luminance`);
-    assert.ok(Math.abs(h.high[2] - plain.high[2]) < 0.01 * plain.high[2] + 0.002, `${model} horizon tint spares the zenith`);
+    assert.ok(
+      Math.abs(h.high[2] - plain.high[2]) < 0.01 * plain.high[2] + 0.002,
+      `${model} horizon tint spares the zenith`,
+    );
     // Gradient at strength 1: the sky is the gradient, orange (2, 1, 0) at the horizon to purple (1, 0, 2) overhead.
     const g = at('Gradient');
-    assert.ok(g.horizon[0] > 1.8 && g.horizon[2] < 0.2, `${model} gradient horizon orange: ${show(model + 'Gradient')}`);
+    assert.ok(
+      g.horizon[0] > 1.8 && g.horizon[2] < 0.2,
+      `${model} gradient horizon orange: ${show(model + 'Gradient')}`,
+    );
     assert.ok(g.high[2] > g.high[1] && g.high[0] > g.high[1], `${model} gradient purple overhead`);
     // Glow adds light most at the horizon.
     const gl = at('Glow');
@@ -605,28 +705,58 @@ checks.look = async (page, samples) => {
     // The sun above the air: twice as strong is about twice the day sky; orange sun, orange sky.
     const si = at('SunIntensity'),
       sc = at('SunColor');
-    assert.ok(Math.abs(lum(si.mid) / lum(plain.mid) - 2) < 0.05, `${model} sunIntensity 2 doubles the sky: ${show(model + 'SunIntensity')}`);
-    assert.ok(sc.mid[2] < 0.3 * plain.mid[2] && Math.abs(sc.mid[0] - plain.mid[0]) < 0.01, `${model} sunColor tints the sky`);
+    assert.ok(
+      Math.abs(lum(si.mid) / lum(plain.mid) - 2) < 0.05,
+      `${model} sunIntensity 2 doubles the sky: ${show(model + 'SunIntensity')}`,
+    );
+    assert.ok(
+      sc.mid[2] < 0.3 * plain.mid[2] && Math.abs(sc.mid[0] - plain.mid[0]) < 0.01,
+      `${model} sunColor tints the sky`,
+    );
   }
   const b = r.bruneton;
   // The air under the Bruneton model: a green Rayleigh spectrum, thin and thick air, heavy and coloured haze, ozone.
   assert.ok(r.rayleighGreen.high[1] > 2.5 * r.rayleighGreen.high[2], `green Rayleigh: ${show('rayleighGreen')}`);
   assert.ok(lum(r.rayleighNone.high) < 0.2 * lum(b.high), `thin air is dark: ${show('rayleighNone')}`);
-  assert.ok(r.rayleighThick.horizon[2] < 0.5 * b.horizon[2] && r.rayleighThick.high[0] > 2 * b.high[0], 'thick air: a yellow horizon, a paler zenith');
+  assert.ok(
+    r.rayleighThick.horizon[2] < 0.5 * b.horizon[2] && r.rayleighThick.high[0] > 2 * b.high[0],
+    'thick air: a yellow horizon, a paler zenith',
+  );
   assert.ok(r.mieHaze.mid[0] / r.mieHaze.mid[2] > b.mid[0] / b.mid[2], `haze whitens the sky: ${show('mieHaze')}`);
-  assert.ok(r.mieRed.horizon[2] < 0.8 * r.mieHaze.horizon[2] && r.mieRed.horizon[0] >= r.mieHaze.horizon[0] * 0.99, `red dust eats blue: ${show('mieRed')}`);
-  assert.ok(r.ozone.high[1] < 0.7 * b.high[1] && r.ozone.high[2] > 0.9 * b.high[2], `ozone takes green and red: ${show('ozone')}`);
+  assert.ok(
+    r.mieRed.horizon[2] < 0.8 * r.mieHaze.horizon[2] && r.mieRed.horizon[0] >= r.mieHaze.horizon[0] * 0.99,
+    `red dust eats blue: ${show('mieRed')}`,
+  );
+  assert.ok(
+    r.ozone.high[1] < 0.7 * b.high[1] && r.ozone.high[2] > 0.9 * b.high[2],
+    `ozone takes green and red: ${show('ozone')}`,
+  );
   const wide = r.mieForwardShape,
     tight = r.mieForwardTightShape;
-  assert.ok(tight.near > 2 * wide.near && tight.far < wide.far, `a high asymmetry tightens the glow round the sun: ${show('mieForwardTightShape')} against ${show('mieForwardShape')}`);
+  assert.ok(
+    tight.near > 2 * wide.near && tight.far < wide.far,
+    `a high asymmetry tightens the glow round the sun: ${show('mieForwardTightShape')} against ${show('mieForwardShape')}`,
+  );
   // The disc: four times the radius covers many times the pixels; a red disc keeps its red and loses green and blue.
   assert.ok(r.disc.big > 4 * r.disc.plain && r.disc.plain > 0, `disc pixels ${show('disc')}`);
-  assert.ok(r.sunPeak.red[1] < 0.3 * r.sunPeak.plain[1] && r.sunPeak.red[0] >= 0.99 * r.sunPeak.plain[0], `red disc ${show('sunPeak')}`);
+  assert.ok(
+    r.sunPeak.red[1] < 0.3 * r.sunPeak.plain[1] && r.sunPeak.red[0] >= 0.99 * r.sunPeak.plain[0],
+    `red disc ${show('sunPeak')}`,
+  );
   // Clouds: a red tint, and density 0.2 thins them toward the clear sky.
-  assert.ok(r.cloudRed.high[1] < 0.6 * r.cloudPlain.high[1] && r.cloudRed.high[0] === r.cloudPlain.high[0], `cloud colour ${show('cloudRed')}`);
-  assert.ok(lum(r.cloudThin.high) < lum(r.cloudPlain.high) && lum(r.cloudThin.high) > lum(r.cloudClear.high), `cloud density ${show('cloudThin')}`);
+  assert.ok(
+    r.cloudRed.high[1] < 0.6 * r.cloudPlain.high[1] && r.cloudRed.high[0] === r.cloudPlain.high[0],
+    `cloud colour ${show('cloudRed')}`,
+  );
+  assert.ok(
+    lum(r.cloudThin.high) < lum(r.cloudPlain.high) && lum(r.cloudThin.high) > lum(r.cloudClear.high),
+    `cloud density ${show('cloudThin')}`,
+  );
   // Ground tint below the horizon only.
-  assert.ok(r.groundTint.horizon[2] > 3 * r.groundTint.horizon[0] && r.groundTint.high[2] === r.groundPlain.high[2], `ground tint ${show('groundTint')}`);
+  assert.ok(
+    r.groundTint.horizon[2] > 3 * r.groundTint.horizon[0] && r.groundTint.high[2] === r.groundPlain.high[2],
+    `ground tint ${show('groundTint')}`,
+  );
   console.log(
     `ok look ${samples}x: neutral and cleared frames exact under both models; zenith ${show('brunetonZenith')}; green Rayleigh ${show('rayleighGreen')}`,
   );
@@ -691,7 +821,9 @@ checks.coverage = async (page, samples) => {
   assert.equal(r.same, true, 'the record is kept from frame to frame at one size');
   assert.equal(r.cleared, true, 'clearing the option drops the record');
   assert.equal(r.disposed, true, 'dispose drops the record');
-  console.log(`ok coverage ${samples}x: sky share ${r.share.toFixed(4)}, wall 0 of ${r.wall}, open ${r.openSet} of ${r.open}`);
+  console.log(
+    `ok coverage ${samples}x: sky share ${r.share.toFixed(4)}, wall 0 of ${r.wall}, open ${r.openSet} of ${r.open}`,
+  );
   return r;
 };
 checks.presets = async (page, samples) => {
@@ -759,9 +891,25 @@ const hurricaneBase = {
 const tornadoBase = { 'tornado.centerX': 3000 };
 // The tornado rows that set only the weather it makes (wind, gusts, rain, updraft) or act over time (its motion, its
 // spin-up and its death) show in no still frame at time 0: tornado.test.js proves them through the options they write.
-const TORNADO_UNSEEN = new Set(['speed', 'heading', 'inflow', 'updraft', 'gustFactor', 'rainMax', 'liftoff', 'spinUp'].map((k) => `tornado.${k}`));
+const TORNADO_UNSEEN = new Set(
+  ['speed', 'heading', 'inflow', 'updraft', 'gustFactor', 'rainMax', 'liftoff', 'spinUp'].map((k) => `tornado.${k}`),
+);
 const HURRICANE_UNSEEN = new Set(
-  ['speed', 'heading', 'pressureDrop', 'holland', 'latitude', 'surfaceFactor', 'inflow', 'gustFactor', 'rainMax', 'rainExtent', 'flowPeriod', 'swirl', 'bandDrift'].map((k) => `hurricane.${k}`),
+  [
+    'speed',
+    'heading',
+    'pressureDrop',
+    'holland',
+    'latitude',
+    'surfaceFactor',
+    'inflow',
+    'gustFactor',
+    'rainMax',
+    'rainExtent',
+    'flowPeriod',
+    'swirl',
+    'bandDrift',
+  ].map((k) => `hurricane.${k}`),
 );
 // A value away from v within [lo, hi]: 30% of the way to the farther end.
 const away = (v, lo, hi) => (hi - v >= v - lo ? v + 0.3 * (hi - v) : v - 0.3 * (v - lo));
@@ -896,7 +1044,12 @@ checks.settings = async (page, samples) => {
   // The wind direction: at speed 20 two frames 2 s apart, drifting toward +Z or toward +X, differ; at speed 0 they do not.
   await cloudsOn(true);
   const windFrame = async (name, speed, direction) => {
-    const base = { ...settingsBase, 'volumetric.evolution': 0, 'volumetric.windSpeed': speed, 'volumetric.windDirection': direction };
+    const base = {
+      ...settingsBase,
+      'volumetric.evolution': 0,
+      'volumetric.windSpeed': speed,
+      'volumetric.windDirection': direction,
+    };
     await apply(`${name}A`, base, [0, 0]);
     await apply(`${name}B`, null, [1, 1]);
     return diff(`${name}B`, `${name}A`);
@@ -915,8 +1068,13 @@ checks.settings = async (page, samples) => {
     await apply(name, values);
     looks[name] = await diff(name, 'defaults');
     // natural is today's defaults: the very sky drawn with no settings.
-    if (name === 'natural') assert.equal(looks[name].changed, 0, `look natural draws the default sky: ${JSON.stringify(looks[name])}`);
-    else assert.ok(looks[name].changed > 1000, `look ${name} differs from the default sky: ${JSON.stringify(looks[name])}`);
+    if (name === 'natural')
+      assert.equal(looks[name].changed, 0, `look natural draws the default sky: ${JSON.stringify(looks[name])}`);
+    else
+      assert.ok(
+        looks[name].changed > 1000,
+        `look ${name} differs from the default sky: ${JSON.stringify(looks[name])}`,
+      );
   }
   // Live rows (R2): after one warm-up frame, writing every live row each frame for 60 frames, each swept between two
   // values away from its default (30% to 100% of the way to its moved value), makes no pipeline, buffer or texture, and
@@ -955,7 +1113,12 @@ checks.settings = async (page, samples) => {
     sweepAt = (frame) =>
       Object.fromEntries(
         SKY_LIVE_SETTINGS.filter(
-          (s) => s.group !== 'lightning' && s.name !== 'timeScale' && s.name !== 'clouds.speed' && s.name !== 'volumetric.evolution' && s.name !== 'volumetric.windSpeed',
+          (s) =>
+            s.group !== 'lightning' &&
+            s.name !== 'timeScale' &&
+            s.name !== 'clouds.speed' &&
+            s.name !== 'volumetric.evolution' &&
+            s.name !== 'volumetric.windSpeed',
         ).map((s) => [s.name, sweepValue(s, frame / 59)]),
       );
   await cloudsOn(true);
@@ -990,7 +1153,10 @@ checks.settings = async (page, samples) => {
     if (!(change <= edge.change)) edge = { change, at: k };
   }
   assert.ok(profile[8] > profile[58] + 20, `the glow is brighter near the sun: ${profile[8]} and ${profile[58]}`);
-  assert.ok(edge.change < 2.5, `the glow round the sun has an edge: ${JSON.stringify(edge)} in ${profile.map(Math.round)}`);
+  assert.ok(
+    edge.change < 2.5,
+    `the glow round the sun has an edge: ${JSON.stringify(edge)} in ${profile.map(Math.round)}`,
+  );
   assert.deepEqual(await page.evaluate(() => window.check.errors()), []);
   const quiet = Object.entries(rows)
     .map(([k, v]) => [k, v.changed ?? v.run.changed])
@@ -1031,7 +1197,9 @@ checks.overcast = async (page, samples) => {
     }
     r[tag] = run;
   }
-  console.log(`ok overcast ${samples}x: even deck, no holes, no disc, two-stream light at depth 20 and 60 and under Bruneton`);
+  console.log(
+    `ok overcast ${samples}x: even deck, no holes, no disc, two-stream light at depth 20 and 60 and under Bruneton`,
+  );
   return r;
 };
 // Named cases, each with its own hard limit: test:gpu runs the checks in groups of at most three (one browser each), so

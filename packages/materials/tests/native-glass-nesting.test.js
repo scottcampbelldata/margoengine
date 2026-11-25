@@ -23,12 +23,20 @@ for (const [name, make] of [
         release = acquireNativeGlass(h.engine, () => true);
       h.engine.use(make());
       let active;
-      const begin = h.engine.frameGraph.add({ name: 'test:inside', order: 0.5, execute: (c) => (active = nativeGlass(c)) });
+      const begin = h.engine.frameGraph.add({
+        name: 'test:inside',
+        order: 0.5,
+        execute: (c) => (active = nativeGlass(c)),
+      });
       try {
         for (let frame = 0; frame < 2; frame++) {
           const log = h.gpu.record(() => h.frame()),
             original = h.gpu.snap(h.view.c.color);
-          assert.equal(active, undefined, 'the glass reads the HDR capture with the linear blend, no capture of its own');
+          assert.equal(
+            active,
+            undefined,
+            'the glass reads the HDR capture with the linear blend, no capture of its own',
+          );
           assert.ok(
             !log.some((e) => e[0] === 'beginRenderPass' && e[1].label === 'native-glass:present'),
             'no glass presentation pass',

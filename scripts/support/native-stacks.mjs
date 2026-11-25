@@ -131,7 +131,9 @@ export function nativeStacks(pid, { log, token = pid, timeoutMs = 30_000 } = {})
         kept = readdirSync(dirname(log)).filter((name) => name.startsWith(prefix) && name.endsWith('.dmp')).length;
       } catch {}
       if (kept >= maxDumps) {
-        lines.push(`minidump skipped: ${kept} dumps already beside the log (at most ${maxDumps}; remove them once read)`);
+        lines.push(
+          `minidump skipped: ${kept} dumps already beside the log (at most ${maxDumps}; remove them once read)`,
+        );
         dump = undefined;
       }
     }

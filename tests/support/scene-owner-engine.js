@@ -13,9 +13,14 @@ export async function sceneOwnerEngine(name, canvas = { width: 64, height: 64 })
     render() {},
     dispose() {},
   });
-  const decoy = { name, disposed: 0, setup() {}, dispose() {
-    this.disposed++;
-  } };
+  const decoy = {
+    name,
+    disposed: 0,
+    setup() {},
+    dispose() {
+      this.disposed++;
+    },
+  };
   engine.use(decoy);
   return { engine, scene: engine.createScene('second'), decoy };
 }

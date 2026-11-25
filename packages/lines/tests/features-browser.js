@@ -6,6 +6,7 @@ import { TexturedLine, LineTexture, loadLineTexture } from '@margoengine/lines/t
 import { DebugLines, ArcLine } from '@margoengine/lines/debug';
 import { Stroke } from '@margoengine/lines/stroke';
 import { Trail } from '@margoengine/lines/trail';
+import { FlowPath } from '@margoengine/lines/flow';
 import { Picking } from '../../selection/dist/index.js';
 import { LineBatch, LineBatches } from '@margoengine/lines/batch';
 import { EdgesHelper } from '@margoengine/lines/edges';
@@ -703,6 +704,51 @@ async function renderWork() {
   return 'Six-vertex segments and resident frame uniforms match every pixel of full 78-vertex forced-upload control';
 }
 
+async function flowPath() {
+  const { engine, lines, frame, done } = await rig();
+  try {
+    const path = new FlowPath(lines, {
+      positions: [-3, 0, 0, 3, 0, 0],
+      color: GREEN,
+      width: 8,
+      speed: 0.6,
+      dashSize: 0.45,
+      gapSize: 0.75,
+      guideOpacity: 0,
+    });
+    const first = await frame();
+    path.seek(1);
+    const shifted = await frame();
+    assert(
+      isGreen(first.at(120, 128)) && !isGreen(shifted.at(120, 128)),
+      'Moving flow leaves the original pulse location',
+    );
+    assert(
+      !isGreen(first.at(133, 128)) && isGreen(shifted.at(133, 128)),
+      'Positive speed moves the pulse toward the last point',
+    );
+    path.seek(0);
+    const replay = await frame();
+    assert(
+      first.bytes.every((byte, i) => replay.bytes[i] === byte),
+      'Seeking back reproduces the full flow image',
+    );
+    path.seek(0, 0);
+    assert(!isGreen((await frame()).at(120, 128)), 'A zero-gain flow draws nothing');
+    path.seek(0);
+    engine
+      .createMesh()
+      .setGeometry(box(1.4, 1, 1))
+      .setPosition([0, 0, 1]);
+    assert(!isGreen((await frame()).at(120, 128)), 'Opaque geometry occludes the flow behind it');
+    path.dispose();
+    assert(lines.lines.size === 0, 'Disposal unregisters the flow');
+  } finally {
+    done();
+  }
+  return 'Flow dashes move forward, seek exactly, fade out, and respect depth on the real GPU';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
   for (const check of [
@@ -710,6 +756,7 @@ window.runLineFeatures = async () => {
     depthWrite,
     picking,
     trail,
+    flowPath,
     ribbon,
     batch,
     hidden,

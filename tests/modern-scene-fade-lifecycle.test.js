@@ -153,7 +153,12 @@ test('KB-FILM-CLOCK1: SceneFade with a clock option fades by that clock, not by 
     getContext: (kind) =>
       kind === 'webgpu'
         ? {
-            getConfiguration: () => ({ device, format: output.format, alphaMode: 'premultiplied', usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+            getConfiguration: () => ({
+              device,
+              format: output.format,
+              alphaMode: 'premultiplied',
+              usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            }),
             configure() {},
             getCurrentTexture: () => output,
           }

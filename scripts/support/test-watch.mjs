@@ -24,7 +24,8 @@ export class HangWatch {
     const isFile = resolve(data.name) === resolve(data.file),
       { files } = this;
     if (isFile) {
-      if (type === 'test:dequeue') files.set(data.file, { name: data.name, heard: now, queue: [], running: [], done: undefined });
+      if (type === 'test:dequeue')
+        files.set(data.file, { name: data.name, heard: now, queue: [], running: [], done: undefined });
       else if (type === 'test:complete') files.delete(data.file);
       return;
     }

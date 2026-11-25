@@ -20,6 +20,7 @@ import { queryStates } from './query-state.js';
 import { surfacePass } from './surface-pass.js';
 import { SurfaceCapture } from './surface-capture.js';
 import { underwaterOptics } from './underwater-optics.js';
+import { skyTexture, validWaterSky, writeSkySampling, type WaterSkyEnvironment } from './sky-radiance.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -57,6 +58,8 @@ export interface UnderwaterOptions {
   thickness?: number;
   /** Borrowed sampleable single-sample rgba16float equirectangular sky. Default the sky gradient. */
   environment?: () => GPUTexture | undefined;
+  /** Borrowed HDR Environment with live rotation and radiance scale. Takes precedence over environment. */
+  skyEnvironment?: WaterSkyEnvironment;
   /** Linear horizon radiance, three channels in 0..100. Default [0.38, 0.53, 0.67]. */
   skyHorizon?: readonly [number, number, number];
   /** Linear zenith radiance, three channels in 0..100. Default [0.045, 0.16, 0.34]. */
@@ -98,7 +101,9 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
  let px=max(fwidth(side),1e-9);
  if(u[20].y<0.5||!found){return vec4f(${encode ? 'toDisplay(now.rgb)' : 'now.rgb'},now.a);}
  var rgb=now.rgb;
- if(side<0.0){
+ // Antialias the wet and dry coverage across the camera's near plane before tinting the optical interface.
+ let submerged=1.0-smoothstep(-px*0.5,px*0.5,side);
+ if(submerged>0.0){
   let d=textureLoad(depth,p,0);let far=unproject(xy,max(d,0.000001));let ray=normalize(far-near);
   var span=select(u[19].y,distance(near,far),d>0.0);
   let hit=textureLoad(mask,p,0);let hitSpan=max(0.0,abs(hit.w)-distance(u[8].xyz,near));
@@ -133,7 +138,7 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
   // Past the march the in-scatter of a constant source at the last depth integrates in closed form.
   let z=max(0.0,probed.w-(near+ray*march).y);
   let tail=b*(u[20].x*fresnel*phase*sun*exp(-k*z/max(-down.y,0.05))+ambient*exp(-k*z))*(exp(-k*march)-view)/max(k,vec3f(1e-6));
-  rgb=rgb*view+light+tail;
+  rgb=mix(now.rgb,rgb*view+light+tail,submerged);
  }
  let band=select(0.0,1.0-smoothstep(0.0,u[19].x,abs(side)/px),u[19].x>0.0);
  rgb=mix(rgb,rgb*vec3f(0.35,0.5,0.55),band);
@@ -215,8 +220,11 @@ export class Underwater implements EnginePlugin {
     }
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw fault('state', 'Underwater enabled must be true or false');
-    if (o.environment !== undefined && typeof o.environment !== 'function')
-      throw fault('state', 'Underwater environment must be a function returning a sampleable sky texture');
+    if (
+      (o.environment !== undefined && typeof o.environment !== 'function') ||
+      (o.skyEnvironment !== undefined && !validWaterSky(o.skyEnvironment))
+    )
+      throw fault('state', 'Pass a Sky texture callback as environment or an HDR Environment as skyEnvironment');
   }
   private joinStack(host: StackHost): StackStage {
     if (this.disposed) throw fault('disposed', 'Underwater is disposed; create another Underwater');
@@ -308,7 +316,8 @@ export class Underwater implements EnginePlugin {
       pass.draw(3);
       pass.end();
     }
-    this.environment = o.environment?.();
+    const skySource = o.skyEnvironment ?? o.environment;
+    this.environment = skyTexture(skySource);
     const environment = this.environment;
     if (
       environment &&
@@ -337,7 +346,8 @@ export class Underwater implements EnginePlugin {
     v[72] = this.resolution;
     v.set([o.waterline ?? 2, o.maxDistance ?? 200, o.shaftDistance ?? 40, o.refractiveIndex ?? 1.333], 76);
     v.set([o.shafts ?? 1, 1, 0, 0], 80);
-    v.set([o.raySteps ?? 512, o.thickness ?? 0.05, 0, 0], 84);
+    v.set([o.raySteps ?? 512, o.thickness ?? 0.05], 84);
+    writeSkySampling(skySource, v, 86);
     v.set([...(o.skyHorizon ?? [0.38, 0.53, 0.67]), 0], 88);
     v.set([...(o.skyZenith ?? [0.045, 0.16, 0.34]), environment ? 1 : 0], 92);
     c.device.queue.writeBuffer(this.uniform!, 0, v);

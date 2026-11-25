@@ -123,6 +123,8 @@ function world(module, options = {}) {
   };
   const terrain = new module.Terrain({
     size: [4096, 4096],
+    // Keep the same roaming clipmap policy in both versions to isolate the SSR hooks.
+    clipmapAnchor: 'camera',
     layers: Array.from({ length: 4 }, (_, i) => ({ height: [i * 40 - 10, i * 40 + 60], slope: [0, 1], scale: 8 + i })),
     textures: () => ({
       heightmap: texture('r32float', 1),

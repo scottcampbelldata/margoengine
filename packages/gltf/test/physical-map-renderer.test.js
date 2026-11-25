@@ -276,19 +276,20 @@ test('absent normal maps decode to the exact geometric normal', async (t) => {
   assert.equal(normal.layout.bytesPerRow, 8);
 });
 
-
 test('a physical-shading replacement receives no native volume helper or uniforms', async (t) => {
   const f = await fixture();
   t.after(() => f.engine.dispose());
   Object.assign(f.model.primitives[0].material, {
-    tint: [0.5,0.5,0.5], attenuation: [0.5,0.5,0.5],
-    ext: [0,1.5,0,0], physical: [0,0,0,1,1,1,1,1,0,0,0,0],
+    tint: [0.5, 0.5, 0.5],
+    attenuation: [0.5, 0.5, 0.5],
+    ext: [0, 1.5, 0, 0],
+    physical: [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
     extension: { replacesPhysical: true },
   });
   f.frame();
   const code = f.draws[0].pipeline.fragment.module.code;
-  assert.doesNotMatch(code,/fn margoVolumeTint\(/);
-  assert.doesNotMatch(code,/f\.ext\./);
+  assert.doesNotMatch(code, /fn margoVolumeTint\(/);
+  assert.doesNotMatch(code, /f\.ext\./);
 });
 
 test('native volume upload retains explicit optical depth and legacy attenuation limits', async (t) => {
@@ -296,8 +297,11 @@ test('native volume upload retains explicit optical depth and legacy attenuation
   t.after(() => f.engine.dispose());
   const material = f.model.primitives[0].material;
   Object.assign(material, {
-    tint: [0, 0, 1], attenuation: [0, 0, 1], opticalDepth: [400, 200, 0],
-    ext: [0, 1.5, 0, 0], physical: [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+    tint: [0, 0, 1],
+    attenuation: [0, 0, 1],
+    opticalDepth: [400, 200, 0],
+    ext: [0, 1.5, 0, 0],
+    physical: [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
   });
   const lanes = () => {
     f.frame();

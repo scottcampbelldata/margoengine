@@ -1,0 +1,488 @@
+{
+ "carried-inherit-unread": {
+  "files": {
+   "l0.usda": "#usda 1.0\ndef \"M\" (\n    append inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"b\"\n    {\n        def \"c\" (\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"x\" {\n                    def \"b\" (\n                        payload = @./l0.usda@</M/a>\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\ndef \"M\" (\n)\n{\n    def \"b\" (\n        prepend references = @./l1.usda@\n        variants = { string vs = \"y\" }\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    def \"b\" (\n        variants = { string vs = \"x\" }\n    )\n    {\n        def \"c\" (\n            variants = { string vs = \"x\" }\n        )\n        {\n        }\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\"\n            {\n                custom double v3 = 1\n            }\n        }\n        \"y\" {\n            def \"a\" (\n            )\n            {\n                custom double v2.timeSamples = { 0: 66, 6: 73 }\n            }\n        }\n    }\n}\ndef \"R\" (\n    append inherits = </C>\n    payload = @./l2.usda@</M>\n)\n{\n    over \"b\" (\n        prepend inherits = </C>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/R": [
+    15,
+    8,
+    6
+   ],
+   "/R/b": [
+    16,
+    8,
+    11,
+    9,
+    7,
+    1
+   ],
+   "/R/b/b": [
+    9,
+    2
+   ],
+   "/R/b/b/c": [
+    10,
+    3,
+    4
+   ],
+   "/R/b/b/c/b": [
+    14,
+    5
+   ],
+   "/R/b/c": [
+    10
+   ],
+   "/R/b/a": [
+    12
+   ]
+  },
+  "reading": {
+   "/R": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/b/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/b/c/b": {
+    "type": "",
+    "props": {
+     "v2": {
+      "times": [
+       0,
+       6
+      ],
+      "v": null
+     }
+    }
+   },
+   "/R/b/c": {
+    "type": "",
+    "props": {}
+   },
+   "/R/b/a": {
+    "type": "",
+    "props": {
+     "v3": {
+      "v": 1
+     }
+    }
+   }
+  }
+ },
+ "carried-specializes-unread": {
+  "files": {
+   "l0.usda": "#usda 1.0\ndef \"M\" (\n    prepend inherits = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n",
+   "l2.usda": "#usda 1.0\ndef \"M\" (\n)\n{\n    over \"b\" (\n    )\n    {\n        def \"a\" (\n            append references = @./l0.usda@</M/a>\n        )\n        {\n            custom double v2 = 512\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\nclass \"C\" (\n    variants = { string vs = \"x\" }\n)\n{\n    def \"a\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"y\" }\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\" (\n                    variantSets = \"vs\"\n                    variants = { string vs = \"y\" }\n                )\n                {\n                    variantSet \"vs\" = {\n                        \"y\" {\n                            custom double v2 = 525\n                        }\n                    }\n                }\n            }\n        }\n    }\n    def \"b\" (\n    )\n    {\n    }\n}\ndef \"P\" (\n)\n{\n    def \"b\" (\n        specializes = </C>\n        payload = @./l2.usda@</M>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    10
+   ],
+   "/P/b": [
+    11,
+    1,
+    4
+   ],
+   "/P/b/a": [
+    5
+   ],
+   "/P/b/b": [
+    2,
+    9
+   ],
+   "/P/b/b/a": [
+    3
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/a": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {
+     "v2": {
+      "v": 512
+     }
+    }
+   }
+  }
+ },
+ "inherit": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    inherits = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                    custom rel r = [</Shared>]\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    variantSets = \"vs\"\n)\n{\n    custom double v1.timeSamples = { 1: 73, 4: 75 }\n    over \"b\" (\n        variants = { string vs = \"x\" }\n    )\n    {\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            custom double v3.timeSamples = { 0: 67, 5: 43 }\n            def \"c\" (\n                payload = @./l0.usda@</M/a> (offset = 10)\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M> (offset = 10)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    0,
+    2
+   ],
+   "/Q": [
+    12,
+    9
+   ],
+   "/Q/a": [
+    10,
+    5
+   ],
+   "/Q/a/b": [
+    11,
+    6,
+    5,
+    7
+   ],
+   "/Q/a/b/c": [
+    4,
+    8
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       8,
+       11
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       15,
+       21
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       11,
+       14
+      ],
+      "v": null
+     },
+     "v3": {
+      "times": [
+       10,
+       15
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b/c": {
+    "type": "",
+    "props": {
+     "r": {
+      "t": [
+       "/Shared"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "no-selection": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                    custom rel r = [</Shared>]\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    variantSets = \"vs\"\n)\n{\n    custom double v1.timeSamples = { 1: 73, 4: 75 }\n    over \"b\" (\n    )\n    {\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            custom double v3.timeSamples = { 0: 67, 5: 43 }\n            def \"c\" (\n                payload = @./l0.usda@</M/a> (offset = 10)\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M> (offset = 10)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    0,
+    2
+   ],
+   "/Q": [
+    12,
+    9
+   ],
+   "/Q/a": [
+    10,
+    5
+   ],
+   "/Q/a/b": [
+    11,
+    6,
+    5
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       8,
+       11
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       15,
+       21
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       11,
+       14
+      ],
+      "v": null
+     }
+    }
+   }
+  }
+ },
+ "root-selection": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                    custom rel r = [</Shared>]\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    variantSets = \"vs\"\n)\n{\n    custom double v1.timeSamples = { 1: 73, 4: 75 }\n    over \"b\" (\n    )\n    {\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            custom double v3.timeSamples = { 0: 67, 5: 43 }\n            def \"c\" (\n                payload = @./l0.usda@</M/a> (offset = 10)\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M> (offset = 10)\n)\n{\n    over \"a\"\n    {\n        over \"b\" (\n            variants = { string vs = \"x\" }\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    0,
+    2
+   ],
+   "/Q": [
+    12,
+    9
+   ],
+   "/Q/a": [
+    13,
+    10,
+    5
+   ],
+   "/Q/a/b": [
+    14,
+    11,
+    6,
+    5,
+    7
+   ],
+   "/Q/a/b/c": [
+    8,
+    4
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       8,
+       11
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       15,
+       21
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       11,
+       14
+      ],
+      "v": null
+     },
+     "v3": {
+      "times": [
+       10,
+       15
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b/c": {
+    "type": "",
+    "props": {
+     "r": {
+      "t": [
+       "/Shared"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "stage48": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                    custom rel r = [</Shared>]\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    variantSets = \"vs\"\n)\n{\n    custom double v1.timeSamples = { 1: 73, 4: 75 }\n    over \"b\" (\n        variants = { string vs = \"x\" }\n    )\n    {\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            custom double v3.timeSamples = { 0: 67, 5: 43 }\n            def \"c\" (\n                payload = @./l0.usda@</M/a> (offset = 10)\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M> (offset = 10)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    0,
+    2
+   ],
+   "/Q": [
+    12,
+    9
+   ],
+   "/Q/a": [
+    10,
+    5
+   ],
+   "/Q/a/b": [
+    11,
+    6,
+    5,
+    7
+   ],
+   "/Q/a/b/c": [
+    8,
+    4
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       8,
+       11
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       15,
+       21
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b": {
+    "type": "",
+    "props": {
+     "v1": {
+      "times": [
+       11,
+       14
+      ],
+      "v": null
+     },
+     "v3": {
+      "times": [
+       10,
+       15
+      ],
+      "v": null
+     }
+    }
+   },
+   "/Q/a/b/c": {
+    "type": "",
+    "props": {
+     "r": {
+      "t": [
+       "/Shared"
+      ]
+     }
+    }
+   }
+  }
+ }
+}

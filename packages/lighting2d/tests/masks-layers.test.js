@@ -1,12 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  Light2D,
-  lightAt,
-  inLightMask,
-  lightAffectsLayer,
-  Lighting2D,
-} from '../dist/index.js';
+import { Light2D, lightAt, inLightMask, lightAffectsLayer, Lighting2D } from '../dist/index.js';
 
 test('Light layers bitmask and layer filtering', () => {
   const lightAll = new Light2D({ x: 0, y: 0, radius: 50 });
@@ -59,7 +53,7 @@ test('Light masks: rect, circle, and polygon masks', () => {
     ],
   };
   assert.ok(inLightMask(polyMask, 20, 10)); // inside triangle
-  assert.ok(!inLightMask(polyMask, 0, 40));  // outside triangle
+  assert.ok(!inLightMask(polyMask, 0, 40)); // outside triangle
 
   // lightAt with mask
   const maskedLight = new Light2D({
@@ -78,14 +72,8 @@ test('Light masks: rect, circle, and polygon masks', () => {
 });
 
 test('Light layer and mask validation', () => {
-  assert.throws(
-    () => new Light2D({ layers: -1 }),
-    /Invalid layers: must be an integer in \[0, 4294967295\]/,
-  );
-  assert.throws(
-    () => new Light2D({ layers: 1.5 }),
-    /Invalid layers: must be an integer in \[0, 4294967295\]/,
-  );
+  assert.throws(() => new Light2D({ layers: -1 }), /Invalid layers: must be an integer in \[0, 4294967295\]/);
+  assert.throws(() => new Light2D({ layers: 1.5 }), /Invalid layers: must be an integer in \[0, 4294967295\]/);
   assert.throws(
     () => new Light2D({ mask: { kind: 'rect', minX: 30, maxX: 10, minY: 0, maxY: 10 } }),
     /Invalid rect mask bounds: use finite minX <= maxX and minY <= maxY/,
@@ -95,7 +83,16 @@ test('Light layer and mask validation', () => {
     /Invalid circle mask radius: must be finite and non-negative/,
   );
   assert.throws(
-    () => new Light2D({ mask: { kind: 'polygon', points: [[0, 0], [1, 1]] } }),
+    () =>
+      new Light2D({
+        mask: {
+          kind: 'polygon',
+          points: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+      }),
     /Invalid polygon mask points: use at least three points with two finite coordinates each/,
   );
 });

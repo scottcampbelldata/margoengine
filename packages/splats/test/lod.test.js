@@ -54,7 +54,10 @@ test('buildSplatLod: leaves keep every splat once, every node fits leafSize, inn
       seen.set(k, seen.get(k) + 1);
     }
   }
-  assert.ok([...seen.values()].every((v) => v === 1), 'each capture splat is in exactly one leaf');
+  assert.ok(
+    [...seen.values()].every((v) => v === 1),
+    'each capture splat is in exactly one leaf',
+  );
   await assert.rejects(source.load(0, AbortSignal.abort()));
   assert.throws(() => buildSplatLod(data, { leafSize: 10 }), RangeError);
 });
@@ -69,7 +72,10 @@ test('chooseSplatNodes refines by projected error, within the budget, only into 
   // maxError 0 refines to every leaf.
   const full = chooseSplatNodes(nodes, view([8, 1, 8]), { maxError: 0, budget: 1e9, loaded: all });
   assert.ok(full.selected.every((i) => !nodes[i].children.length));
-  assert.equal(full.selected.reduce((s, i) => s + nodes[i].count, 0), leafTotal);
+  assert.equal(
+    full.selected.reduce((s, i) => s + nodes[i].count, 0),
+    leafTotal,
+  );
   // Close to one corner (8 px allowed), nodes near it refine further than far ones.
   const near = chooseSplatNodes(nodes, view([0, 0.5, 0]), { maxError: 8, budget: 1e9, loaded: all }),
     distance = (i) => Math.hypot(nodes[i].center[0], nodes[i].center[2]),
@@ -102,14 +108,27 @@ test('chooseSplatNodes walks a hierarchy far past 3,000,000 splats without its d
     if (level < 3)
       for (let a = 0; a < 4; a++)
         for (let b = 0; b < 4; b++) children.push(make(x0 + (a * size) / 4, z0 + (b * size) / 4, size / 4, level + 1));
-    nodes[at] = { center: [x0 + size / 2, 0, z0 + size / 2], radius: size * 0.71, error: level < 3 ? size / 64 : 0, count: level < 3 ? 16384 : 65536, children };
+    nodes[at] = {
+      center: [x0 + size / 2, 0, z0 + size / 2],
+      radius: size * 0.71,
+      error: level < 3 ? size / 64 : 0,
+      count: level < 3 ? 16384 : 65536,
+      children,
+    };
     return at;
   };
   make(0, 0, 4096, 0);
-  const cut = chooseSplatNodes(nodes, { eye: [10, 2, 10], focal: 800, near: 0.05 }, { maxError: 1, budget: 3_000_000, loaded: () => true }),
+  const cut = chooseSplatNodes(
+      nodes,
+      { eye: [10, 2, 10], focal: 800, near: 0.05 },
+      { maxError: 1, budget: 3_000_000, loaded: () => true },
+    ),
     drawn = cut.selected.reduce((s, i) => s + nodes[i].count, 0);
   assert.ok(drawn <= 3_000_000 && drawn > 65536, `${drawn} splats drawn of ${4096 * 65536}`);
-  assert.ok(cut.selected.some((i) => !nodes[i].children.length), 'leaves by the camera');
+  assert.ok(
+    cut.selected.some((i) => !nodes[i].children.length),
+    'leaves by the camera',
+  );
 });
 
 test('SplatLod checks its source and options; Splats.reserve, write and clear check their ranges', () => {
@@ -135,7 +154,11 @@ test('SplatLod checks its source and options; Splats.reserve, write and clear ch
   assert.equal(pool.coefficients, 4);
   assert.throws(() => Splats.reserve(0), RangeError);
   assert.throws(() => Splats.reserve(5, 3), RangeError);
-  const one = { positions: new Float32Array(3), covariances: new Float32Array([1, 0, 0, 1, 0, 1]), colors: new Float32Array([1, 1, 1, 1]) };
+  const one = {
+    positions: new Float32Array(3),
+    covariances: new Float32Array([1, 0, 0, 1, 0, 1]),
+    colors: new Float32Array([1, 1, 1, 1]),
+  };
   assert.throws(() => pool.write(0, one), RangeError, 'SH count must match');
   const plain = Splats.reserve(3);
   plain.write(2, one).clear(0, 3);

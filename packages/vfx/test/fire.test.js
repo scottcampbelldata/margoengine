@@ -22,7 +22,7 @@ async function scene(t, { shadows = true } = {}) {
 }
 const sum = (lights) => lights.reduce((s, l) => s + l.intensity, 0);
 
-test('the kit hearth describes its flame line: its radius is lineLights\' default for that length', () => {
+test("the kit hearth describes its flame line: its radius is lineLights' default for that length", () => {
   const { light, emberHeight } = snowNight().hearth;
   assert.equal(light.length, 0.62);
   // The light stands at the flames' radiance centroid over the fuel top (0.3 m put it 0.16 m over the flames, 6 cm
@@ -37,7 +37,10 @@ test('the kit hearth describes its flame line: its radius is lineLights\' defaul
     },
     luma = (u) => {
       const c = fire.curves.color,
-        j = Math.max(1, c.findIndex((p) => p.at >= u)),
+        j = Math.max(
+          1,
+          c.findIndex((p) => p.at >= u),
+        ),
         a = c[j - 1],
         b = c[j],
         t = (u - a.at) / (b.at - a.at);
@@ -55,7 +58,10 @@ test('the kit hearth describes its flame line: its radius is lineLights\' defaul
       moment += w * (rise * t + (lift * t * t) / 2);
     }
   const centroid = moment / weight;
-  assert.ok(Math.abs(light.height - centroid) <= 0.02, `height ${light.height} m vs the flames' centroid ${centroid.toFixed(3)} m`);
+  assert.ok(
+    Math.abs(light.height - centroid) <= 0.02,
+    `height ${light.height} m vs the flames' centroid ${centroid.toFixed(3)} m`,
+  );
   assert.ok(Math.abs(light.radius - lineShadowRadius(light.length, 2)) < 1e-12, `radius ${light.radius}`);
   assert.equal(emberHeight, 0.1);
   assert.ok(Object.isFrozen(snowNight().hearth.light));
@@ -69,7 +75,10 @@ test('Fire.attach: a flame line of two soft-shadowed points over the fuel, in a 
   assert.equal(fire.lights.length, 2);
   const [a, b] = fire.lights;
   for (const p of [a, b]) {
-    assert.ok(Math.abs(p.position[1] - (0.3 + light.height)) < 1e-12, 'the light stands in the flames, over the fuel top');
+    assert.ok(
+      Math.abs(p.position[1] - (0.3 + light.height)) < 1e-12,
+      'the light stands in the flames, over the fuel top',
+    );
     assert.ok(p.radius >= light.radius, 'each point is a sphere at least its share of the flame line');
     assert.equal(p.position[2], -2);
     assert.equal(p.castShadow, true);
@@ -108,7 +117,10 @@ test('Fire.attach: a flame line of two soft-shadowed points over the fuel, in a 
   assert.equal(clustered.list.length, 3);
   for (const effect of [flames, embers]) assert.equal(e.sceneOf(effect), undefined);
   other.dispose();
-  assert.deepEqual(clustered.list.map((l) => l.intensity), [2]);
+  assert.deepEqual(
+    clustered.list.map((l) => l.intensity),
+    [2],
+  );
   fire.dispose();
 });
 
@@ -204,7 +216,8 @@ test('Fire: the sphere each light shows on a metal is no brighter than the flame
   const { e, groups } = await scene(t),
     hearth = snowNight().hearth,
     lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
-    flames = (fire) => fire.intensity * Math.max(...fire.curves.color.map((k) => lum(k.color.map((v, i) => v * fire.color[i]))));
+    flames = (fire) =>
+      fire.intensity * Math.max(...fire.curves.color.map((k) => lum(k.color.map((v, i) => v * fire.color[i]))));
   for (const power of [0.5, 1, 3])
     for (const samples of [1, 2, 5]) {
       const fire = Fire.attach(e, { position: [0, 0.4, -2], lights: groups, power, samples });
@@ -212,7 +225,10 @@ test('Fire: the sphere each light shows on a metal is no brighter than the flame
       assert.ok(Math.abs(flames(fire.particles.flames.options) - bright) < 1e-9, 'the flames carry the power');
       for (const p of fire.lights) {
         const radiance = (p.intensity * lum(p.color)) / (Math.PI * p.radius ** 2);
-        assert.ok(radiance <= bright * (1 + 1e-9), `power ${power}, ${samples} samples: sphere ${radiance.toFixed(2)} > flames ${bright.toFixed(2)}`);
+        assert.ok(
+          radiance <= bright * (1 + 1e-9),
+          `power ${power}, ${samples} samples: sphere ${radiance.toFixed(2)} > flames ${bright.toFixed(2)}`,
+        );
         assert.ok(p.radius >= hearth.light.radius, 'never smaller than its share of the flame line');
         assert.equal(p.shadow.radius, hearth.light.radius * 1, "the shadow keeps the flame line's own size");
       }
@@ -221,7 +237,10 @@ test('Fire: the sphere each light shows on a metal is no brighter than the flame
       if (samples === 2)
         for (const p of fire.lights) {
           assert.ok(Math.abs(p.radius - 0.155) < 1e-12, `power ${power}: sphere radius ${p.radius}`);
-          assert.ok(Math.abs((p.intensity * lum(p.color)) / (Math.PI * p.radius ** 2) / bright - 1) < 1e-9, 'sphere and flames tie');
+          assert.ok(
+            Math.abs((p.intensity * lum(p.color)) / (Math.PI * p.radius ** 2) / bright - 1) < 1e-9,
+            'sphere and flames tie',
+          );
         }
       fire.dispose();
     }
@@ -237,7 +256,9 @@ test('Fire: a light wall 0.4 m behind the fire stays outside the light spheres a
   const { e, groups } = await scene(t),
     hearth = snowNight().hearth,
     lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
-    flames = hearth.fire.intensity * Math.max(...hearth.fire.curves.color.map((k) => lum(k.color.map((v, i) => v * hearth.fire.color[i])))),
+    flames =
+      hearth.fire.intensity *
+      Math.max(...hearth.fire.curves.color.map((k) => lum(k.color.map((v, i) => v * hearth.fire.color[i])))),
     fire = Fire.attach(e, { position: [0, 0, 0], lights: groups }),
     wall = -0.4,
     albedo = 0.5;

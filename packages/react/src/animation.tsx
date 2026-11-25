@@ -5,6 +5,7 @@ import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Vec3 } from '@margoengine/core/extension';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
 import { ModelContext } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
@@ -90,10 +91,15 @@ function restore(model: PBRModel, value: Pose): void {
   model.primitives.forEach((primitive, index) => primitive.weights.set(value.weights[index]));
 }
 function validate({ clip, playing = true, loop = true, blend = 0, speed = 1, time, parameters }: AnimationProps): void {
-  if (typeof clip !== 'string' || !clip) throw typeError('Animation: clip must name a glTF animation', 'react-arguments');
+  if (typeof clip !== 'string' || !clip)
+    throw typeError('Animation: clip must name a glTF animation', 'react-arguments');
   if (typeof playing !== 'boolean' || typeof loop !== 'boolean' || !Number.isFinite(blend) || blend < 0)
-    throw rangeError('Animation: playing and loop must be booleans and blend a finite number >= 0; pass valid values', 'react-arguments');
-  if (!Number.isFinite(speed) || speed < 0) throw rangeError('Animation: speed must be a finite number >= 0', 'react-arguments');
+    throw rangeError(
+      'Animation: playing and loop must be booleans and blend a finite number >= 0; pass valid values',
+      'react-arguments',
+    );
+  if (!Number.isFinite(speed) || speed < 0)
+    throw rangeError('Animation: speed must be a finite number >= 0', 'react-arguments');
   if (time !== undefined && (!Number.isFinite(time) || time < 0))
     throw rangeError('Animation: time must be a finite number of seconds >= 0', 'react-arguments');
   for (const [name, value] of Object.entries(parameters ?? {}))
@@ -114,7 +120,10 @@ function checkTrees(current: Playback, props: AnimationProps): void {
       throw rangeError(`Animation: blend tree names must differ from clip names, rename "${name}"`, 'react-arguments');
     for (const clip of treeClips(tree))
       if (!names.has(clip))
-        throw rangeError(`Animation: blend tree clips must exist in the model, fix "${name}" which uses "${clip}"`, 'react-arguments');
+        throw rangeError(
+          `Animation: blend tree clips must exist in the model, fix "${name}" which uses "${clip}"`,
+          'react-arguments',
+        );
   }
 }
 /** Bring a running Animator in line with the props: states, parameters and additive layers. */
@@ -138,7 +147,10 @@ function select(current: Playback, props: AnimationProps): void {
   validate(props);
   const isClip = current.animation.clips.some((clip) => clip.name === props.clip);
   if (!isClip && !Object.hasOwn(props.blendTrees ?? {}, props.clip))
-    throw rangeError(`Animation: unknown clip "${props.clip}"; use a clip name from the model or a key of blendTrees`, 'react-arguments');
+    throw rangeError(
+      `Animation: unknown clip "${props.clip}"; use a clip name from the model or a key of blendTrees`,
+      'react-arguments',
+    );
   checkTrees(current, props);
   current.animation.options.loop = props.loop ?? true;
   current.animation.options.speed = props.speed ?? 1;
@@ -233,8 +245,12 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
         validate(latest.current);
         const api = await optionalPeer('@margoengine/animation', () => import('@margoengine/animation'));
         if (!lease.active || scene.engine.disposed || model.disposed) return;
-        if (scene.engine.hasPlugin('animation:' + model.name))
-          throw fault('attached', 'Animation: this model already has an animation plugin; mount one <Animation> per model', 'react-usage');
+        if (sceneOwner(scene).plugins.has('animation:' + model.name))
+          throw fault(
+            'attached',
+            'Animation: this model already has an animation plugin; mount one <Animation> per model',
+            'react-usage',
+          );
         const animation = new api.Animation(model, { loop: latest.current.loop ?? true });
         const rest = pose(model);
         owned = { animation, clip: '', prepareMixer: () => {}, resample: () => {}, layerKey: '[]', layerOff: [] };
@@ -243,7 +259,10 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
           !animation.clips.some((value) => value.name === latest.current.clip) &&
           !Object.hasOwn(latest.current.blendTrees ?? {}, latest.current.clip)
         )
-          throw rangeError(`Animation: unknown clip "${latest.current.clip}"; use a clip name from the model or a key of blendTrees`, 'react-arguments');
+          throw rangeError(
+            `Animation: unknown clip "${latest.current.clip}"; use a clip name from the model or a key of blendTrees`,
+            'react-arguments',
+          );
         // A non-looping clip that reached its end fires onFinished once per run.
         const watchFinish = () => {
           const props = latest.current;
@@ -268,7 +287,7 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
           watchFinish();
         };
         // Native setup owns deformation buffers and the picking preparation hook.
-        scene.engine.use(animation);
+        sceneOwner(scene).use(animation);
         let preparing: Promise<void> | undefined;
         playback.prepareMixer = () => {
           if (preparing || playback.animator) return;
@@ -301,9 +320,13 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
             } finally {
               restore(model, visual);
             }
-            if (scene.engine.hasPlugin(animator.name))
-              throw fault('attached', 'Animation: this model already has an animator plugin; mount one <Animation> per model', 'react-usage');
-            scene.engine.use(animator);
+            if (sceneOwner(scene).plugins.has(animator.name))
+              throw fault(
+                'attached',
+                'Animation: this model already has an animator plugin; mount one <Animation> per model',
+                'react-usage',
+              );
+            sceneOwner(scene).use(animator);
             playback.animator = animator;
             const advance = animator.onPreUpdate.bind(animator);
             playback.resample = () => advance(0);
@@ -355,7 +378,7 @@ export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationPr
       });
       return release;
     },
-    [scene.engine, model],
+    [scene.engine, scene.world, model],
   );
   useCommit(() => {
     if (current.current) {

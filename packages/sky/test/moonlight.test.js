@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Sky, moonlight, moonlightColor, cloudTransmittance, MOON_EXTINCTION, MOON_PHASES, moonLook, moonPhase, moonWaning } from '../dist/index.js';
+import {
+  Sky,
+  moonlight,
+  moonlightColor,
+  cloudTransmittance,
+  MOON_EXTINCTION,
+  MOON_PHASES,
+  moonLook,
+  moonPhase,
+  moonWaning,
+} from '../dist/index.js';
 import { Sky as SkyBase } from '../dist/base.js';
 import { bruneton } from '../dist/bruneton.js';
 import { night } from '../dist/night.js';
@@ -18,10 +28,16 @@ const ks = (phase, up, k = 0.172) => {
 
 test('moonlight follows Krisciunas and Schaefer: 0.313 lux full above the air, 0.367 of it at phase 0.75', () => {
   assert.ok(Math.abs(moonlight(1, [0, 1, 0], 0).illuminance - 0.3133) < 5e-4);
-  assert.ok(Math.abs(moonlight(0.75, [0, 1, 0], 0).illuminance / moonlight(1, [0, 1, 0], 0).illuminance - 0.367) < 0.002);
+  assert.ok(
+    Math.abs(moonlight(0.75, [0, 1, 0], 0).illuminance / moonlight(1, [0, 1, 0], 0).illuminance - 0.367) < 0.002,
+  );
   assert.equal(MOON_EXTINCTION, 0.172);
   for (const phase of [1, 0.75, 0, -0.5])
-    for (const dir of [[0, 1, 0], [-0.45, 0.42, -1], [1, 0.1, 0]]) {
+    for (const dir of [
+      [0, 1, 0],
+      [-0.45, 0.42, -1],
+      [1, 0.1, 0],
+    ]) {
       const up = dir[1] / Math.hypot(...dir),
         light = moonlight(phase, dir);
       assert.ok(Math.abs(light.illuminance / ks(phase, up) - 1) < 1e-9, `phase ${phase} at ${dir}`);
@@ -30,7 +46,12 @@ test('moonlight follows Krisciunas and Schaefer: 0.313 lux full above the air, 0
     }
   assert.equal(moonlight(1, [1, 0, 0]).illuminance, 0, 'no moonlight from a moon on the horizon');
   assert.equal(moonlight(1, [1, -0.2, 0]).illuminance, 0, 'none from below it');
-  for (const bad of [[2, [0, 1, 0]], [0, [0, 0, 0]], [0, [0, 1, 0], -1], [NaN, [0, 1, 0]]])
+  for (const bad of [
+    [2, [0, 1, 0]],
+    [0, [0, 0, 0]],
+    [0, [0, 1, 0], -1],
+    [NaN, [0, 1, 0]],
+  ])
     assert.throws(() => moonlight(...bad), RangeError);
 });
 
@@ -61,7 +82,10 @@ test('the sky lights with the moon it draws: a 0.75 moon 21 degrees up gives 0.0
   sky.options.night.moonPhase = 0.75;
   sky.options.lighting.moon.color = [1, 1, 1];
   h.frame();
-  assert.ok(Math.abs(sky.lights[1].direction[3] - ks(0.75, 0.42 / Math.hypot(...moonDirection))) < 1e-6, 'a set colour keeps the lux');
+  assert.ok(
+    Math.abs(sky.lights[1].direction[3] - ks(0.75, 0.42 / Math.hypot(...moonDirection))) < 1e-6,
+    'a set colour keeps the lux',
+  );
   sky.options.lighting.moon = { intensity: 0.5 };
   h.frame();
   assert.equal(sky.lights[1].direction[3], 0.5, 'a set intensity replaces it');
@@ -69,7 +93,10 @@ test('the sky lights with the moon it draws: a 0.75 moon 21 degrees up gives 0.0
   sky.options.lighting.moon = {};
   h.frame();
   const up = sky.moon[1];
-  assert.ok(Math.abs(sky.lights[1].direction[3] * luminance(sky.lights[1].radiance) / ks(1, up) - 1) < 1e-4, 'without a night the moon is full');
+  assert.ok(
+    Math.abs((sky.lights[1].direction[3] * luminance(sky.lights[1].radiance)) / ks(1, up) - 1) < 1e-4,
+    'without a night the moon is full',
+  );
   sky.options.lighting.moon = { extinction: 3 };
   assert.throws(() => h.frame(), RangeError);
 });
@@ -128,7 +155,12 @@ const uniforms = (h) => new Float32Array(h.resources.findLast((r) => !r.destroye
 const presetSky = (night) => {
   const h = optionalGPU();
   h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
-  const sky = new Sky({ hours: 23, timeScale: 0, night: { moonDirection: [-0.45, 0.42, -1], ...night }, lighting: { moon: {} } });
+  const sky = new Sky({
+    hours: 23,
+    timeScale: 0,
+    night: { moonDirection: [-0.45, 0.42, -1], ...night },
+    lighting: { moon: {} },
+  });
   h.engine.use(sky);
   return { h, sky, lux: () => sky.lights[1].direction[3] * luminance(sky.lights[1].radiance) };
 };
@@ -137,8 +169,16 @@ const UP = 0.42 / Math.hypot(-0.45, 0.42, -1);
 test('named phases: new to full by the octants (Meeus), the waning ones lit on the left, a number still accepted', () => {
   const c = Math.SQRT1_2,
     want = {
-      new: [-1, 1], waxingCrescent: [-c, 1], firstQuarter: [0, 1], half: [0, 1], quarter: [0, 1], waxingGibbous: [c, 1],
-      full: [1, 1], waningGibbous: [c, 3], lastQuarter: [0, 3], waningCrescent: [-c, 3],
+      new: [-1, 1],
+      waxingCrescent: [-c, 1],
+      firstQuarter: [0, 1],
+      half: [0, 1],
+      quarter: [0, 1],
+      waxingGibbous: [c, 1],
+      full: [1, 1],
+      waningGibbous: [c, 3],
+      lastQuarter: [0, 3],
+      waningCrescent: [-c, 3],
     };
   assert.deepEqual(Object.keys(MOON_PHASES).sort(), Object.keys(want).sort());
   const { h, sky, lux } = presetSky({});
@@ -194,7 +234,8 @@ test('bright and dim: a supermoon 1.164 times as bright with a disc 1.079 times 
   h.frame();
   v = uniforms(h);
   assert.ok(Math.abs(lux() / base - 0.5) < 1e-5, 'thin cloud halves the light (USNO Circular 171)');
-  for (let i = 0; i < 3; i++) assert.ok(Math.abs(v[52 + i] / v0[52 + i] - 0.5 ** (1 / 3)) < 1e-5, 'the disc as the eye judges it');
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs(v[52 + i] / v0[52 + i] - 0.5 ** (1 / 3)) < 1e-5, 'the disc as the eye judges it');
   assert.equal(v[55], v0[55]);
   sky.options.lighting.moon = { brightness: 2 };
   h.frame();
@@ -214,11 +255,20 @@ test('red moons: the eclipsed blood moon at 1.06e-4 of the light and the low red
   sky.options.lighting.moon = { color: 'blood' };
   h.frame();
   let v = uniforms(h);
-  assert.ok(Math.abs(lux() / base / eclipse - 1) < 1e-4, 'the eclipsed moon gives 1.06e-4 of the light (V -2.8 against -12.74)');
+  assert.ok(
+    Math.abs(lux() / base / eclipse - 1) < 1e-4,
+    'the eclipsed moon gives 1.06e-4 of the light (V -2.8 against -12.74)',
+  );
   const blood = [0, 1, 2].map((i) => v[52 + i] / v0[52 + i]);
   assert.ok(blood[0] > 4 * blood[1] && blood[1] > blood[2], 'the disc is red: ' + blood);
-  assert.ok(Math.abs(luminance(blood) / eclipse ** (1 / 3) - 1) < 1e-4, 'as bright as the eye judges 1.06e-4 (Stevens)');
-  assert.deepEqual([...sky.lights[1].radiance], moonlightColor(lux(), [0, 0, 0], moonLook(1, 'blood').source).map(Math.fround));
+  assert.ok(
+    Math.abs(luminance(blood) / eclipse ** (1 / 3) - 1) < 1e-4,
+    'as bright as the eye judges 1.06e-4 (Stevens)',
+  );
+  assert.deepEqual(
+    [...sky.lights[1].radiance],
+    moonlightColor(lux(), [0, 0, 0], moonLook(1, 'blood').source).map(Math.fround),
+  );
   sky.options.lighting.moon = { color: 'reddened' };
   h.frame();
   v = uniforms(h);

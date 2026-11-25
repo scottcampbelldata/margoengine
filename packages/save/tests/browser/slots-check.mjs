@@ -12,7 +12,12 @@ page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
-const save = (title) => ({ format: 'margo-save', version: 1, meta: { title }, entities: [{ id: 'player', components: { hp: 3 } }] });
+const save = (title) => ({
+  format: 'margo-save',
+  version: 1,
+  meta: { title },
+  entities: [{ id: 'player', components: { hp: 3 } }],
+});
 try {
   const written = await page.evaluate(async (first) => {
     const { Engine, box } = await import('/packages/core/dist/index.js'),
@@ -24,7 +29,10 @@ try {
     canvas.style.cssText = 'width:256px;height:128px';
     document.body.append(canvas);
     const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 64, exactSize: [256, 128] });
-    engine.createMesh().setGeometry(box(2, 2, 2)).material.set({ color: [0.9, 0.2, 0.1] });
+    engine
+      .createMesh()
+      .setGeometry(box(2, 2, 2))
+      .material.set({ color: [0.9, 0.2, 0.1] });
     Object.assign(engine.camera, { position: [0, 0, 5], target: [0, 0, 0] });
     engine.scene.background = '#103050';
     engine.render({ delta: 0 });

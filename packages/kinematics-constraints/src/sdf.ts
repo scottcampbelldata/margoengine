@@ -29,11 +29,23 @@ class Placement {
     const sx = Math.hypot(f[0], f[1], f[2]),
       sy = Math.hypot(f[3], f[4], f[5]),
       sz = Math.hypot(f[6], f[7], f[8]),
-      square = Math.abs(f[0] * f[3] + f[1] * f[4] + f[2] * f[5]) + Math.abs(f[0] * f[6] + f[1] * f[7] + f[2] * f[8]) + Math.abs(f[3] * f[6] + f[4] * f[7] + f[5] * f[8]),
+      square =
+        Math.abs(f[0] * f[3] + f[1] * f[4] + f[2] * f[5]) +
+        Math.abs(f[0] * f[6] + f[1] * f[7] + f[2] * f[8]) +
+        Math.abs(f[3] * f[6] + f[4] * f[7] + f[5] * f[8]),
       handed =
         f[0] * (f[4] * f[8] - f[5] * f[7]) + f[1] * (f[5] * f[6] - f[3] * f[8]) + f[2] * (f[3] * f[7] - f[4] * f[6]);
-    if (!(sx > 0) || Math.abs(sy - sx) > 1e-6 * sx || Math.abs(sz - sx) > 1e-6 * sx || square > 1e-6 * sx * sx || handed < 0)
-      throw rangeError('A volume matrix must be a rotation, one uniform scale and a move: distances must survive it', 'kinematics');
+    if (
+      !(sx > 0) ||
+      Math.abs(sy - sx) > 1e-6 * sx ||
+      Math.abs(sz - sx) > 1e-6 * sx ||
+      square > 1e-6 * sx * sx ||
+      handed < 0
+    )
+      throw rangeError(
+        'A volume matrix must be a rotation, one uniform scale and a move: distances must survive it',
+        'kinematics',
+      );
     this.scale = sx;
     const inv = this.inverse,
       k = 1 / (sx * sx);
@@ -147,9 +159,12 @@ export class SDFVolume implements ConstraintVolume {
     this.precision = options.precision ?? (this.grid ? smallest / 4 : 1e-3);
     this.lipschitz = options.lipschitz ?? (this.grid ? Math.sqrt(3) : 1);
     this.maxCells = options.maxCells ?? 4096;
-    if (!(this.margin >= 0) || !Number.isFinite(this.margin)) throw rangeError('SDFVolume margin must be 0 or more', 'kinematics');
-    if (!(this.precision > 0) || !Number.isFinite(this.precision)) throw rangeError('SDFVolume precision must be above 0', 'kinematics');
-    if (!(this.lipschitz > 0) || !Number.isFinite(this.lipschitz)) throw rangeError('SDFVolume lipschitz must be above 0', 'kinematics');
+    if (!(this.margin >= 0) || !Number.isFinite(this.margin))
+      throw rangeError('SDFVolume margin must be 0 or more', 'kinematics');
+    if (!(this.precision > 0) || !Number.isFinite(this.precision))
+      throw rangeError('SDFVolume precision must be above 0', 'kinematics');
+    if (!(this.lipschitz > 0) || !Number.isFinite(this.lipschitz))
+      throw rangeError('SDFVolume lipschitz must be above 0', 'kinematics');
     if (!Number.isSafeInteger(this.maxCells) || this.maxCells < 1)
       throw rangeError('SDFVolume maxCells must be a positive integer', 'kinematics');
   }

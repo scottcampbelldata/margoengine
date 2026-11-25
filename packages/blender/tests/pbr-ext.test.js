@@ -13,7 +13,10 @@ const extensions = (name) => asset.document.materials.find((m) => m.name === nam
 /** Blender holds its sockets as float32, so a value set as 0.05 reads back within float32 rounding. */
 const close = (actual, expected, label) => {
   if (Array.isArray(expected)) return expected.forEach((e, i) => close(actual[i], e, `${label}[${i}]`));
-  assert.ok(Math.abs(actual - expected) <= 1e-6 * Math.max(1, Math.abs(expected)), `${label}: ${actual} is not ${expected}`);
+  assert.ok(
+    Math.abs(actual - expected) <= 1e-6 * Math.max(1, Math.abs(expected)),
+    `${label}: ${actual} is not ${expected}`,
+  );
 };
 
 test('transmission and IOR become KHR_materials_transmission and KHR_materials_ior', () => {

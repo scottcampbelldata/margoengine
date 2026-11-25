@@ -134,7 +134,10 @@ export function shapeShader(code: string): string {
   const call = 'color=clamp(margoContrast(color,p.grade.y),';
   if (!code.includes(call) || !code.includes('fn margoContrast'))
     throw new RangeError('Tonemap shader has no contrast step to shape before; pass tonemapShader or outputShader.');
-  return code.replace('fn margoContrast', shape + 'fn margoContrast').split(call).join('color=margoShape(color);\n  ' + call);
+  return code
+    .replace('fn margoContrast', shape + 'fn margoContrast')
+    .split(call)
+    .join('color=margoShape(color);\n  ' + call);
 }
 const shape = `fn margoCurveAt(x:vec3f)->vec3f {
   if(p.grade.z==1.0){return aces(x);}

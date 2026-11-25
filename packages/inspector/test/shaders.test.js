@@ -131,7 +131,10 @@ test('a compile error keeps the last good shader and is placed at its line and c
     // gpu-lost error on Metal). Only the labelled check module may hold the broken text.
     const holding = w.compiled.filter((c) => c.code.includes(broken));
     assert.ok(holding.length >= 1);
-    assert.ok(holding.every((c) => c.label === 'check-wgsl:inspector-shaders'), 'the broken edit is never drawn');
+    assert.ok(
+      holding.every((c) => c.label === 'check-wgsl:inspector-shaders'),
+      'the broken edit is never drawn',
+    );
     assert.equal(history.undoCount, 0, 'a refused edit records nothing');
   } finally {
     w.destroy();

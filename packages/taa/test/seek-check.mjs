@@ -26,7 +26,10 @@ try {
     assert.ok(r.clocks.includes(r.name) && !r.unseekable.includes(r.name), `TAA is replayed: ${JSON.stringify(r)}`);
     assert.equal(r.sampleB, r.sampleA, 'the jitter phase after the seek is the continuous run');
     assert.ok(r.peak <= 1, `the fixture stays LDR: peak ${r.peak}`);
-    assert.ok(r.gap <= 1 / 255, `after 53 prewarm frames the resolved frames differ by ${(r.gap * 255).toFixed(3)} levels`);
+    assert.ok(
+      r.gap <= 1 / 255,
+      `after 53 prewarm frames the resolved frames differ by ${(r.gap * 255).toFixed(3)} levels`,
+    );
     console.log(
       `ok taa seek n = ${n}: phase ${r.sampleA} equal, gap ${(r.gap * 255).toFixed(3)} levels after 53 frames (no seek: phase ${r.sampleC}, gap ${(r.fresh * 255).toFixed(3)}), peak ${r.peak.toFixed(3)}`,
     );

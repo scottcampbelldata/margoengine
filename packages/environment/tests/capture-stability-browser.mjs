@@ -24,8 +24,11 @@ try {
         ],
       ]) {
         const shader = gl.createShader(type);
-        gl.shaderSource(shader, `#version 300 es
-${source}`);
+        gl.shaderSource(
+          shader,
+          `#version 300 es
+${source}`,
+        );
         gl.compileShader(shader);
         gl.attachShader(program, shader);
       }

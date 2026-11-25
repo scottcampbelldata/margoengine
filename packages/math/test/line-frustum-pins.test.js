@@ -14,7 +14,13 @@ const clamp01 = (t) => Math.max(0, Math.min(1, t));
 
 test('Line3: construction, centre, delta, length, at', () => {
   const d = new Line3();
-  assert.deepEqual([arr(d.start), arr(d.end)], [[0, 0, 0], [0, 0, 0]]);
+  assert.deepEqual(
+    [arr(d.start), arr(d.end)],
+    [
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
+  );
   const l = line([1, 2, 3], [5, 8, 15]);
   assert.deepEqual(arr(l.getCenter(new Vector3())), [3, 5, 9]);
   assert.deepEqual(arr(l.delta(new Vector3())), [4, 6, 12]);
@@ -56,7 +62,7 @@ test('Line3: closest point and distance to a point', () => {
   assert.equal(l.distanceToPoint(v3([4, 3, 4])), 5);
   assert.equal(l.distanceSqToPoint(v3([-3, 4, 0])), 25);
   assert.equal(l.distanceSqToPoint(v3([13, 4, 0])), 25);
-  near(line([0, 0, 0], [0, 3, 4]).distanceSqToPoint(v3([7, 3, 0])), 49 + (3 - 9 / 25 * 3) ** 2 + (9 / 25 * 4) ** 2);
+  near(line([0, 0, 0], [0, 3, 4]).distanceSqToPoint(v3([7, 3, 0])), 49 + (3 - (9 / 25) * 3) ** 2 + ((9 / 25) * 4) ** 2);
 });
 
 const segmentDistanceSq = (a, b) => {
@@ -66,7 +72,12 @@ const segmentDistanceSq = (a, b) => {
     const t = l2 === 0 ? 0 : clamp01(dx.reduce((s, x, i) => s + x * (p[i] - c[i]), 0) / l2);
     return dx.reduce((s, x, i) => s + (c[i] + x * t - p[i]) ** 2, 0);
   };
-  const f = (s) => pointSeg(a[0].map((x, i) => x + (a[1][i] - x) * s), b[0], b[1]);
+  const f = (s) =>
+    pointSeg(
+      a[0].map((x, i) => x + (a[1][i] - x) * s),
+      b[0],
+      b[1],
+    );
   let lo = 0,
     hi = 1;
   for (let i = 0; i < 200; i++) {
@@ -113,11 +124,19 @@ test('Line3: segment to segment distance matches a minimisation reference, with 
   assert.deepEqual(arr(other), [5, 0, 1]);
   const m = new Matrix4().makeTranslation(1, 2, 3);
   const moved = line([0, 0, 0], [1, 1, 1]).applyMatrix4(m);
-  assert.deepEqual([arr(moved.start), arr(moved.end)], [[1, 2, 3], [2, 3, 4]]);
+  assert.deepEqual(
+    [arr(moved.start), arr(moved.end)],
+    [
+      [1, 2, 3],
+      [2, 3, 4],
+    ],
+  );
 });
 
 const perspective = new Matrix4().makePerspective(-0.5, 0.5, 0.4, -0.4, 1, 50, true);
-const view = new Matrix4().compose({ x: 2, y: -1, z: 3 }, new Quaternion(0.1, 0.5, -0.2, 0.8).normalize(), { x: 1, y: 1, z: 1 }).invert();
+const view = new Matrix4()
+  .compose({ x: 2, y: -1, z: 3 }, new Quaternion(0.1, 0.5, -0.2, 0.8).normalize(), { x: 1, y: 1, z: 1 })
+  .invert();
 const viewProj = new Matrix4().multiplyMatrices(perspective, view);
 const clipInside = (m, p, zeroToOne) => {
   const e = m.elements;
@@ -161,9 +180,13 @@ test('Frustum: array layout, defaults, copy and box queries', () => {
   const f = new Frustum().setFromProjectionMatrix(viewProj);
   const flat = f.toArray();
   assert.equal(flat.length, 24);
-  f.planes.forEach((p, i) => assert.deepEqual(flat.slice(i * 4, i * 4 + 4), [p.normal.x, p.normal.y, p.normal.z, p.constant]));
+  f.planes.forEach((p, i) =>
+    assert.deepEqual(flat.slice(i * 4, i * 4 + 4), [p.normal.x, p.normal.y, p.normal.z, p.constant]),
+  );
   const g = new Frustum().fromArray([0, 0, 0, 0, ...flat], 4);
-  g.planes.forEach((p, i) => assert.deepEqual([p.normal.x, p.normal.y, p.normal.z, p.constant], flat.slice(i * 4, i * 4 + 4)));
+  g.planes.forEach((p, i) =>
+    assert.deepEqual([p.normal.x, p.normal.y, p.normal.z, p.constant], flat.slice(i * 4, i * 4 + 4)),
+  );
   const out = new Array(30).fill(-1);
   assert.equal(f.toArray(out, 3), out);
   assert.deepEqual(out.slice(3, 27), flat);
@@ -189,12 +212,19 @@ test('Frustum: array layout, defaults, copy and box queries', () => {
   }
   // the box is tested against the corner furthest along each normal, in every sign combination
   const planeOnly = new Frustum();
-  for (const n of [[1, 1, 1], [-1, 1, 1], [1, -1, 1], [1, 1, -1], [-1, -1, -1]]) {
+  for (const n of [
+    [1, 1, 1],
+    [-1, 1, 1],
+    [1, -1, 1],
+    [1, 1, -1],
+    [-1, -1, -1],
+  ]) {
     planeOnly.planes.forEach((p) => p.set(v3(n), 0));
     const lo = [-2, -2, -2],
       hi = [-1, -1, -1];
     const corners = [];
-    for (const x of [lo[0], hi[0]]) for (const y of [lo[1], hi[1]]) for (const z of [lo[2], hi[2]]) corners.push([x, y, z]);
+    for (const x of [lo[0], hi[0]])
+      for (const y of [lo[1], hi[1]]) for (const z of [lo[2], hi[2]]) corners.push([x, y, z]);
     const want = corners.some((c) => c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0);
     assert.equal(planeOnly.intersectsBox(new Box3(v3(lo), v3(hi))), want, n.join());
   }

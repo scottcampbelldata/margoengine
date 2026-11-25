@@ -72,7 +72,10 @@ test('a save from another device is a conflict, and the default changes nothing'
   await one.write('k', bytes('base'));
   await two.read('k');
   await one.write('k', bytes('from one'));
-  await assert.rejects(two.write('k', bytes('from two')), (error) => error.code === 'state' && /read it again/.test(error.message));
+  await assert.rejects(
+    two.write('k', bytes('from two')),
+    (error) => error.code === 'state' && /read it again/.test(error.message),
+  );
   assert.equal(text(await one.read('k')), 'from one');
   await two.read('k');
   await two.write('k', bytes('from two, after reading'));
@@ -173,7 +176,10 @@ test('429 and 5xx are tried again as Retry-After says, then fail with the way ou
   assert.equal(sent.length, 3);
   assert.equal(sent[0].url, 'http://x/saves/k');
   const failing = scripted(reply(500), reply(500));
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: failing.fetch, retries: 1 }).read('k'), (error) => error.code === 'failed' && /try again later/.test(error.message));
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: failing.fetch, retries: 1 }).read('k'),
+    (error) => error.code === 'failed' && /try again later/.test(error.message),
+  );
   assert.equal(failing.sent.length, 2);
   const none = scripted(reply(503));
   await assert.rejects(remoteStorage({ url: 'http://x', fetch: none.fetch, retries: 0 }).read('k'), /503/);
@@ -185,7 +191,10 @@ test('429 and 5xx are tried again as Retry-After says, then fail with the way ou
 test('a timeout counts as a failed attempt and names itself', async () => {
   const hanging = (url, init) =>
     new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: hanging, timeout: 5, retries: 1 }).read('k'), (error) => error.code === 'timeout' && /raise timeout/.test(error.message));
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: hanging, timeout: 5, retries: 1 }).read('k'),
+    (error) => error.code === 'timeout' && /raise timeout/.test(error.message),
+  );
 });
 
 test('the signal stops a call at once, in a request and in a wait', async () => {
@@ -198,7 +207,10 @@ test('the signal stops a call at once, in a request and in a wait', async () => 
   assert.equal(sent.length, 1);
   const hanging = (url, init) =>
     new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: hanging }).read('k', { signal: AbortSignal.abort(new Error('before')) }), /before/);
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: hanging }).read('k', { signal: AbortSignal.abort(new Error('before')) }),
+    /before/,
+  );
   const late = new AbortController(),
     pending = remoteStorage({ url: 'http://x', fetch: hanging }).read('k', { signal: late.signal });
   await new Promise((resolve) => setTimeout(resolve, 5));
@@ -210,11 +222,18 @@ test('a weak ETag is refused with the reason, since If-Match could never match i
   const { fetch } = scripted(reply(200, 'x', { etag: 'W/"1"' }), reply(200, 'x', { etag: 'W/"1"' })),
     storage = remoteStorage({ url: 'http://x', fetch });
   assert.equal(text(await storage.read('k')), 'x', 'reading is fine');
-  await assert.rejects(storage.write('k', bytes('y')), (error) => error.code === 'unsupported' && /strong ETags/.test(error.message));
+  await assert.rejects(
+    storage.write('k', bytes('y')),
+    (error) => error.code === 'unsupported' && /strong ETags/.test(error.message),
+  );
 });
 
 test('a weak ETag that has gone strong is used, as Apache gives one for a file just changed', async () => {
-  const { fetch, sent } = scripted(reply(200, 'x', { etag: 'W/"1"' }), reply(200, 'x', { etag: '"1"' }), reply(204, null, { etag: '"2"' })),
+  const { fetch, sent } = scripted(
+      reply(200, 'x', { etag: 'W/"1"' }),
+      reply(200, 'x', { etag: '"1"' }),
+      reply(204, null, { etag: '"2"' }),
+    ),
     storage = remoteStorage({ url: 'http://x', fetch });
   await storage.read('k');
   await storage.write('k', bytes('y'));
@@ -222,11 +241,18 @@ test('a weak ETag that has gone strong is used, as Apache gives one for a file j
 });
 
 test('a weak ETag over bytes that have since changed is a conflict, not a base', async () => {
-  const { fetch, sent } = scripted(reply(200, 'x', { etag: 'W/"1"' }), reply(200, 'other', { etag: '"2"' }), reply(200, 'other', { etag: '"2"' })),
+  const { fetch, sent } = scripted(
+      reply(200, 'x', { etag: 'W/"1"' }),
+      reply(200, 'other', { etag: '"2"' }),
+      reply(200, 'other', { etag: '"2"' }),
+    ),
     storage = remoteStorage({ url: 'http://x', fetch });
   await storage.read('k');
   await assert.rejects(storage.write('k', bytes('y')), (error) => error.code === 'state');
-  assert.ok(sent.every((s) => s.method === 'GET'), 'nothing was written');
+  assert.ok(
+    sent.every((s) => s.method === 'GET'),
+    'nothing was written',
+  );
 });
 
 test('a 2xx with no ETag is followed by a GET, and a server with none says so', async () => {
@@ -234,12 +260,20 @@ test('a 2xx with no ETag is followed by a GET, and a server with none says so', 
     storage = remoteStorage({ url: 'http://x', fetch });
   await storage.write('k', bytes('mine'));
   await storage.write('k', bytes('next'));
-  assert.deepEqual(sent.map((s) => [s.method, s.headers['if-match'], s.headers['if-none-match']]), [
-    ['PUT', undefined, '*'],
-    ['GET', undefined, undefined],
-    ['PUT', '"1"', undefined],
-  ]);
-  const moved = scripted(reply(201), reply(200, 'someone else', { etag: '"9"' }), reply(412), reply(200, 'someone else', { etag: '"9"' })),
+  assert.deepEqual(
+    sent.map((s) => [s.method, s.headers['if-match'], s.headers['if-none-match']]),
+    [
+      ['PUT', undefined, '*'],
+      ['GET', undefined, undefined],
+      ['PUT', '"1"', undefined],
+    ],
+  );
+  const moved = scripted(
+      reply(201),
+      reply(200, 'someone else', { etag: '"9"' }),
+      reply(412),
+      reply(200, 'someone else', { etag: '"9"' }),
+    ),
     second = remoteStorage({ url: 'http://x', fetch: moved.fetch });
   await second.write('k', bytes('mine'));
   await assert.rejects(second.write('k', bytes('next')), (error) => error.code === 'state');
@@ -247,7 +281,10 @@ test('a 2xx with no ETag is followed by a GET, and a server with none says so', 
   const bare = scripted(reply(200, 'x')),
     third = remoteStorage({ url: 'http://x', fetch: bare.fetch });
   await third.read('k');
-  await assert.rejects(third.write('k', bytes('y')), (error) => error.code === 'unsupported' && /turn on ETags/.test(error.message));
+  await assert.rejects(
+    third.write('k', bytes('y')),
+    (error) => error.code === 'unsupported' && /turn on ETags/.test(error.message),
+  );
 });
 
 test('headers are sent, a function runs for each attempt, and 401 names the option', async () => {
@@ -257,7 +294,10 @@ test('headers are sent, a function runs for each attempt, and 401 names the opti
     remoteStorage({ url: 'http://x', fetch, headers: () => ({ authorization: `Bearer ${++token}` }) }).read('k'),
     /check the headers/,
   );
-  assert.deepEqual(sent.map((s) => s.headers.authorization), ['Bearer 1', 'Bearer 2']);
+  assert.deepEqual(
+    sent.map((s) => s.headers.authorization),
+    ['Bearer 1', 'Bearer 2'],
+  );
   const plain = scripted(reply(404));
   await remoteStorage({ url: 'http://x', fetch: plain.fetch, headers: { 'x-game': 'a' } }).read('k');
   assert.equal(plain.sent[0].headers['x-game'], 'a');
@@ -265,15 +305,27 @@ test('headers are sent, a function runs for each attempt, and 401 names the opti
 });
 
 test('a bad list says what to serve', async () => {
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: scripted(reply(200, '<html>')).fetch }).keys(), /not JSON/);
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: scripted(reply(200, '[1]')).fetch }).keys(), /array of strings/);
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: scripted(reply(403)).fetch }).keys(), /check the headers/);
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: scripted(reply(200, '<html>')).fetch }).keys(),
+    /not JSON/,
+  );
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: scripted(reply(200, '[1]')).fetch }).keys(),
+    /array of strings/,
+  );
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: scripted(reply(403)).fetch }).keys(),
+    /check the headers/,
+  );
 });
 
 test('a write that keeps meeting newer saves gives up', async () => {
   let n = 0;
   const moving = (url, init) => (init.method === 'PUT' ? reply(412) : reply(200, `v${++n}`, { etag: `"${n}"` }));
-  await assert.rejects(remoteStorage({ url: 'http://x', fetch: moving, conflict: 'local' }).write('k', bytes('x')), /kept changing/);
+  await assert.rejects(
+    remoteStorage({ url: 'http://x', fetch: moving, conflict: 'local' }).write('k', bytes('x')),
+    /kept changing/,
+  );
 });
 
 test('arguments are checked', async () => {
@@ -301,10 +353,21 @@ test('the handler speaks plain HTTP: preconditions, status codes, tags, limits',
   assert.equal(await got.text(), 'abc');
   assert.equal((await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-none-match': '*' } })).status, 412);
   assert.equal((await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-match': '"no"' } })).status, 412);
-  assert.equal((await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-match': `W/${tag}` } })).status, 412, 'If-Match compares strongly');
-  assert.equal((await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-none-match': `W/${tag}` } })).status, 412, 'If-None-Match compares weakly');
+  assert.equal(
+    (await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-match': `W/${tag}` } })).status,
+    412,
+    'If-Match compares strongly',
+  );
+  assert.equal(
+    (await call('/saves/k', { method: 'PUT', body: 'x', headers: { 'if-none-match': `W/${tag}` } })).status,
+    412,
+    'If-None-Match compares weakly',
+  );
   assert.equal((await call('/saves/none', { method: 'PUT', body: 'x', headers: { 'if-match': '*' } })).status, 412);
-  assert.equal((await call('/saves/k', { method: 'PUT', body: 'abd', headers: { 'if-match': `"a", ${tag}` } })).status, 204);
+  assert.equal(
+    (await call('/saves/k', { method: 'PUT', body: 'abd', headers: { 'if-match': `"a", ${tag}` } })).status,
+    204,
+  );
   assert.equal((await call('/saves/k', { method: 'PUT', body: 'way too long' })).status, 413);
   assert.equal((await call('/saves/k', { method: 'POST', body: 'x' })).status, 405);
   assert.equal((await call('/saves', { method: 'PUT', body: 'x' })).status, 405);
@@ -324,11 +387,16 @@ test('CORS: only when asked, with ETag exposed and the conditional headers allow
   assert.match(preflight.headers.get('access-control-allow-headers'), /if-match, if-none-match, authorization/);
   const put = await open(new Request('http://x/k', { method: 'PUT', body: 'a' }));
   assert.match(put.headers.get('access-control-expose-headers'), /ETag/);
-  assert.equal((await closed(new Request('http://x/k', { method: 'OPTIONS' }))).headers.get('access-control-allow-origin'), null);
+  assert.equal(
+    (await closed(new Request('http://x/k', { method: 'OPTIONS' }))).headers.get('access-control-allow-origin'),
+    null,
+  );
 });
 
 test('authorize runs first, and a preflight needs none', async () => {
-  const handle = remoteHandler(memoryStorage(), { authorize: (request) => request.headers.get('authorization') === 'yes' });
+  const handle = remoteHandler(memoryStorage(), {
+    authorize: (request) => request.headers.get('authorization') === 'yes',
+  });
   assert.equal((await handle(new Request('http://x/k'))).status, 403);
   assert.equal((await handle(new Request('http://x/k', { headers: { authorization: 'yes' } }))).status, 404);
   assert.equal((await handle(new Request('http://x/k', { method: 'OPTIONS' }))).status, 204);
@@ -365,9 +433,7 @@ test('remoteHandler stops reading a body without a length once it passes maxByte
       else controller.enqueue(new Uint8Array(1024));
     },
   });
-  const response = await handle(
-    new Request('http://localhost/saves/k', { method: 'PUT', body, duplex: 'half' }),
-  );
+  const response = await handle(new Request('http://localhost/saves/k', { method: 'PUT', body, duplex: 'half' }));
   assert.equal(response.status, 413);
   assert.ok(pulled <= 4, `read ${pulled} chunks of 1 KiB for a 1 KiB limit`);
   // A body at the limit is still taken.

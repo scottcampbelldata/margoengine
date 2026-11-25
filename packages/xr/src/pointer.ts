@@ -321,7 +321,10 @@ export class XRPointerEvents {
       const released = hit ?? (found.type === 'touch' ? pointer.down : null);
       if (released) this.fire('pointerup', pointer, released);
       if (this.disposed) return;
-      if (released && (captured || (pointer.down?.mesh === released.mesh && pointer.down?.instanceId === released.instanceId)))
+      if (
+        released &&
+        (captured || (pointer.down?.mesh === released.mesh && pointer.down?.instanceId === released.instanceId))
+      )
         this.fire('click', pointer, released);
       pointer.down = pointer.capture = null;
     }

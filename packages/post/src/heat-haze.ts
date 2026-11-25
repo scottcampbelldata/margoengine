@@ -292,8 +292,12 @@ export class HeatHaze implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'HeatHaze is disposed; create a new HeatHaze');
     if (!this.stacked)
-      throw new MargoError('state', 'HeatHaze runs inside a PostStack; use HeatHaze.attach(engine) or add it to a PostStack');
-    if (!engine.gpu) throw new MargoError('unsupported', 'HeatHaze requires a GPU device (WebGPU or the WebGL2 compatibility layer)');
+      throw new MargoError(
+        'state',
+        'HeatHaze runs inside a PostStack; use HeatHaze.attach(engine) or add it to a PostStack',
+      );
+    if (!engine.gpu)
+      throw new MargoError('unsupported', 'HeatHaze requires a GPU device (WebGPU or the WebGL2 compatibility layer)');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({
       size: this.values.byteLength,
@@ -329,10 +333,19 @@ export class HeatHaze implements EnginePlugin {
     const sources = typeof o.sources === 'function' ? o.sources() : (o.sources ?? []);
     for (const source of sources) {
       const p = plumeOf(source);
-      if (!p || typeof p !== 'object' || !Array.isArray(p.position) || p.position.length !== 3 || !p.position.every(Number.isFinite))
+      if (
+        !p ||
+        typeof p !== 'object' ||
+        !Array.isArray(p.position) ||
+        p.position.length !== 3 ||
+        !p.position.every(Number.isFinite)
+      )
         throw new TypeError('A HeatHaze plume needs a position [x, y, z]; pass a Flame or a HeatPlume');
       const fp = p.footprint ?? [0.5 * p.length, 0.5 * p.length];
-      if (!(Number.isFinite(p.length) && p.length >= 0) || !(fp[0] >= 0 && fp[1] >= 0 && Number.isFinite(fp[0] + fp[1])))
+      if (
+        !(Number.isFinite(p.length) && p.length >= 0) ||
+        !(fp[0] >= 0 && fp[1] >= 0 && Number.isFinite(fp[0] + fp[1]))
+      )
         throw new RangeError('A HeatHaze plume needs a finite length and footprint of 0 or more metres');
       if (!Number.isFinite(p.yaw ?? 0) || !(p.lean ?? [0, 0]).every(Number.isFinite) || !Number.isFinite(p.time ?? 0))
         throw new RangeError('A HeatHaze plume needs a finite yaw, lean and time');
@@ -412,10 +425,22 @@ function writePlume(p: HeatPlume, ambient: number, clock: number, out: Float32Ar
     rise = 0.5 * Math.sqrt(G * L);
   out.set(
     [
-      p.position[0], p.position[1], p.position[2], L,
-      c, s, fp[0] / 2, fp[1] / 2,
-      c * lx - s * lz, s * lx + c * lz, z0, EDDY * L,
-      rise * (p.time ?? clock), 2.5 * widest, least, top,
+      p.position[0],
+      p.position[1],
+      p.position[2],
+      L,
+      c,
+      s,
+      fp[0] / 2,
+      fp[1] / 2,
+      c * lx - s * lz,
+      s * lx + c * lz,
+      z0,
+      EDDY * L,
+      rise * (p.time ?? clock),
+      2.5 * widest,
+      least,
+      top,
     ],
     at,
   );
@@ -440,8 +465,22 @@ export function plumeBend(
     tb = options.background ?? Infinity;
   writePlume(plume, T0, 0, v, 0);
   const [bx, by, bz, L, c, s, hx, hz, lx, lz, z0, ell, , margin, least, top] = Array.from(v, (x) => x) as [
-    number, number, number, number, number, number, number, number,
-    number, number, number, number, number, number, number, number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
   ];
   const local = (x: number, y: number, z: number): [number, number, number] => {
     const rx = c * x - s * z,
@@ -487,7 +526,8 @@ export function plumeBend(
     const t = t0 + (i + 0.5) * ds,
       q = [lo[0] + ld[0] * t, lo[1] + ld[1] * t, lo[2] + ld[2] * t],
       gl = [0, 1, 2].map(
-        (a) => (field(q.map((x, j) => (j === a ? x + e : x))) - field(q.map((x, j) => (j === a ? x - e : x)))) / (2 * e),
+        (a) =>
+          (field(q.map((x, j) => (j === a ? x + e : x))) - field(q.map((x, j) => (j === a ? x - e : x)))) / (2 * e),
       ),
       vy = gl[1]! - lx * gl[0]! - lz * gl[2]!,
       g = [c * gl[0]! + s * gl[2]!, vy, -s * gl[0]! + c * gl[2]!],
@@ -500,7 +540,10 @@ export function plumeBend(
 
 /** The eddy noise of the shader on the CPU (two octaves of value noise, scaled to unit root-mean-square); for tests. */
 export function heatHazeNoise(x: number, y: number, z: number): number {
-  return (0.7 * vnoise3(x, y, z) + 0.3 * vnoise3(x * 2.03 + 17.1, y * 2.03 + 3.7, z * 2.03 + 9.2) - 0.5) / HEAT_HAZE_NOISE_RMS;
+  return (
+    (0.7 * vnoise3(x, y, z) + 0.3 * vnoise3(x * 2.03 + 17.1, y * 2.03 + 3.7, z * 2.03 + 9.2) - 0.5) /
+    HEAT_HAZE_NOISE_RMS
+  );
 }
 const hash1 = (n: number): number => {
   let x = (Math.imul(n >>> 0, 747796405) + 2891336453) >>> 0;

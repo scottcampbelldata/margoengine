@@ -114,7 +114,11 @@ ${maps[1] ? bump : ''}${maps[2] ? displacementWgsl : ''}`
   if (has('p')) out = parallaxShader(out);
   if (has('x')) out = triplanarShader(out);
   const surface = has('p') || has('x') || has('s');
-  out = (has('q') ? dither : '') + declarations + (surface ? surfaceDeclarations(group, has('p'), has('s'), has('k')) : '') + out;
+  out =
+    (has('q') ? dither : '') +
+    declarations +
+    (surface ? surfaceDeclarations(group, has('p'), has('s'), has('k')) : '') +
+    out;
   if (!inner) {
     if (cache.size >= 64) cache.clear();
     cache.set(code, (inner = new Map()));

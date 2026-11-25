@@ -1,3 +1,140 @@
+### Section 5 evidence: short wind waves and sky reflection (2026-11-24)
+
+Water now filters each ripple against its rotated pixel footprint. The old common six-metre
+cutoff removed the longest wind ripple while that band still had visible energy. Nonzero chop
+also shades two short gravity-wave bands whose curved crests vary across a moving wind field.
+The normal and the roughness derived from it are shared by the beauty and SSR paths.
+
+The procedural sky callback now samples the same two angular axes as HDR reflection. Its
+real GPU witness changes roughness over a blue horizon with red above it and checks the
+red contribution. The previous shader leaves that contribution at zero. Coarse surface
+depth, authored swell, and water-query geometry follow their existing paths. No benchmark
+claim is made. See the [clean-room record](../clean-room.md#short-wind-waves-and-open-water-reflection-2026-11-24).
+
+### Section 5 evidence: discoloured water behind a ship (2026-11-23)
+
+`ShipWakes` has a per-ship linear RGB tint for the turbulent stern trail. It shades the part of the water body
+and foam that the stern has passed over, with the existing turbulence envelope. The uniform holds one extra vector
+per vessel. The same fragment and buffer layout run on WebGPU and WebGL2. Core stays unchanged.
+
+The browser witness changes and clears the tint with the wake time held still. It checks the RGB near the stern,
+the pixels ahead and outside of the trail, and the unchanged foam-density values. The CPU fixture checks input
+validation and the unchanged height and foam query. See the [clean-room record](../clean-room.md#colour-in-the-stern-wake-2026-11-23).
+
+### Section 5 evidence: Kelvin wake crest phase (2026-11-23)
+
+`ShipWakes` now uses the correct sign for the lateral part of the phase when distance along the trail is measured aft.
+The positive stationary roots were previously evaluated with the opposite projection, which pitched the crests into
+strong, linear breaks in a view down a long hull. The CPU test checks the closed-form cusp on both sides of a 128 m ship.
+The water GPU fixture compares sampled heights to the CPU law over a grid on open and flooded water, on WebGPU and WebGL2.
+The hull and foam terms are independent of the phase change. See the
+[clean-room record](../clean-room.md#kelvin-wake-crest-phase-2026-11-23).
+
+### Section 5 evidence: open-ocean horizon depth (2026-11-23)
+
+Water keeps its original homogeneous depth on the displaced grid. A separate flat quad fills the remaining ocean
+beyond the camera's far plane at reversed-Z zero. The previous vertex clamp changed the depth plane of triangles
+straddling the far clip and hid dry land in regional aerial shots. The existing Water pass draws both parts with
+the same bindings, depth test and surface shader. Core and the public API stay unchanged.
+
+The GPU regression in `packages/water/test/horizon.browser.mjs` puts a 1 km high plateau about 155 km ahead of a
+26 km high camera. Its central RGBA pixel matches the dry reference exactly. The same fixture compares the near
+field of bounded and camera-following grids and measures coverage at the horizon. It makes no speed claim.
+
+The implementation follows James F. Blinn and Martin E. Newell, [Clipping Using Homogeneous Coordinates](https://authors.library.caltech.edu/records/c543j-0mg40) (1978), the W3C GPU for the Web Working Group's [WebGPU primitive clipping](https://www.w3.org/TR/webgpu/#primitive-clipping), and the separation of resolved waves and distant surface appearance in Eric Bruneton, Fabrice Neyret and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless Transitions from Geometry to BRDF](https://diglib.eg.org/items/fb727c69-2be2-4edd-833e-f7a9baea9b63) (2010).
+
+### Section 5 evidence: ink hatching over shadowed meshes (2026-11-22)
+
+`@margoengine/toon/hatch` now wraps the light expression after the shadow and clustered-lighting passes. Applying
+ink earlier removed the shader anchor used by Shadows and caused the frame to fail. The CPU fixture exercises the
+pass order and verifies that ink wraps the shadow term. The browser fixture draws a board with both packages
+attached. The core shader and exported APIs stay unchanged.
+
+### Section 5 evidence: ship wakes at harbor speed (2026-11-21)
+
+At 1.5 m/s the 68 m test hull's analytic crest is about 0.23 m aft of the stem. The CPU and WGSL profiles broaden the
+support around that crest and widen the side section as the crest scale shrinks. The crest height and centre remain those
+of `bowWave`. The stern foam ramps in at harbor speeds and its density still decays using `foamLife`. The fragment shader
+modulates that density with slow spatial noise so thinning foam breaks into patches. See the
+[clean-room record](../clean-room.md#ship-wakes-at-harbor-speed-2026-11-21).
+
+The WebGPU and WebGL2 readbacks measured 0.103 m at the bow witness and 0.011 m at each side witness at 1.5 m/s, with
+zero outside the band. The new slow stern case reads 0.290 and 0.278 coverage in two lit patches 0.9 and 15 m behind a
+separate hull, with zero forward and off the trail. The CPU decay test checks the underlying density, independently of the
+patch locations. Existing 3 m/s height and foam bounds on both backends still pass. The profile continues to use the hull's
+parametric waterplane. Grid resolution and lighting still affect how much detail resolves in a wide shot.
+
+### Section 5 evidence: water displacement alongside a ship (2026-11-21)
+
+`ShipWakes` models the surface outside the current hull as a smooth lift and drawdown behind the bow crest. The added
+section has zero signed integral across the water on each side. It is evaluated in the existing CPU and WGSL height paths,
+so the drawn surface, normals and queries agree. The speed-dependent bow height scales both effects. The new term uses the
+existing hull dimensions, uniforms and draw. See the [clean-room record](../clean-room.md#ship-side-wash-in-water-2026-11-21).
+
+At 18 m aft of the stem on a 68 m hull moving at 3 m/s, both backends read 0.101 m of rise on each side, −0.051 m in the
+drawdown, and zero farther out. The CPU test also checks that the lift weakens at half speed and vanishes at rest. The new
+shape is a heightfield approximation. It needs Water grid cells small enough to resolve the near-hull band.
+
+### Section 5 evidence: bow wave planform (2026-11-21)
+
+The near-field bow crest and its breaking foam use current hull coordinates. The existing bow contact profile sweeps aft and fades as the distance from the hull increases. The compact support ends the near-field crest before it carries on across open water. Kelvin height still uses the recorded bow trajectory.
+
+WebGPU and WebGL2 height readbacks for a 68 m hull at 3 m/s measured 0.458 m at the bow shoulder and 0.344 m at the swept crest. Both measured zero on the old transverse line at that outboard station and zero farther out. See the [clean-room record](../clean-room.md#swept-bow-crest-in-water-2026-11-21).
+
+### Section 5 evidence: ship wake foam history (2026-11-21)
+
+Water's ships entry reads each turbulent foam sample from the stern's nearest historical segment. Kelvin waves still use the bow track. The two positions and arc lengths share the existing eight-float station layout. Vertex shading continues to evaluate only wave height and slope. The fragment shader uses the stern's time and speed, and rejects samples before the track begins or ahead of the stern. Zero-speed samples on a path retain the nearest newer moving heading so a stationary ship does not leave a false turn at the dock.
+
+The CPU regression compares two hull lengths at the same speed. The WebGPU and WebGL2 tests read four GPU foam samples with a 72 m ship at 3 m/s. Their values were 0.553 near the stern, 0.192 farther astern, and zero ahead and outside the trail on both backends. See the [clean-room research](../clean-room.md#stern-foam-history-in-water-2026-11-21).
+
+### Section 5 evidence: above-water refraction depth (2026-11-21)
+Water uses the existing opaque color and reversed depth snapshots. It solves
+the intersection of a Snell-bent ray with a sampled texel's depth plane in
+homogeneous clip space. A hit must reproject to the same texel. When the
+initial estimate cannot converge, bounded depth probes bracket a crossing
+and validate it with the same intersection. Optical attenuation uses the
+hit distance. Shore foam keeps its separate straight depth comparison. The
+active viewport occupies one four-float row in the Water uniform.
+The GPU regression puts a submerged slab in front of the straight ray,
+outside the bent ray, then removes it. The mean RGB in the 7 × 7 witness
+region is identical in both frames on the RTX A6000 in WebGPU and the
+WebGL2 layer. A dark seabed changes the bent-ray sample on both backends.
+See the [clean-room research](../clean-room.md#above-water-refraction-depth-2026-11-21).
+
+### Section 5 evidence: HDR ocean reflection and the camera waterline (2026-11-21)
+
+Water and Underwater borrow an HDR Environment through `reflectionEnvironment` and `skyEnvironment`. They use its azimuth convention, live rotation
+and radiance scale, so the reflected and refracted sky match the camera's background. The callback used by procedural
+Sky keeps its original orientation. Water smooths the rough HDR reflection over a tangent-plane footprint in both
+angular axes. The local change in the rippled normal contributes to the specular lobe width shared by the sky and SSR. Underwater blends partial wet and dry coverage within one pixel of the near-plane intersection.
+
+The HDR water body and seabed use eight stratified cosine-weighted sky samples relative to 18% grey. The estimate keeps cloud light in the troughs when their normals reflect away from the horizon. Foam reuses this estimate. The initial procedural sky and its low-light behaviour retain their ambient model.
+
+Planar water applies the wave's change from the flat reflected ray in capture space, fades to the sky over the filter footprint at the capture boundary and far horizon, and keeps sky lighting independent of the captured geometry. The reflector fixture measures a red-channel change of 11.17 codes in the capture interior, 1 at its feathered edge and 0 outside.
+
+The GPU sky witness compares the colour of the visible background with grazing water before and after a 90-degree
+environment rotation. The underwater witness checks subpixel coverage, an unchanged dry region, and the scale of the
+Snell-window radiance. The feature uses the existing water capture and does not change core.
+
+- Eric Bruneton, Fabrice Neyret, and Nicolas Holzschuch, [Real-time Realistic Ocean Lighting using Seamless Transitions from Geometry to BRDF](https://www-evasion.imag.fr/Publications/2010/BNH10/), 2010. The reflection footprint grows with the unresolved roughness.
+- Curtis D. Mobley, [Estimation of the remote-sensing reflectance from above-surface measurements](https://misclab.umeoce.maine.edu/ftp/classes/OO2015/Readings/Mobley1999.pdf), 1999. Above-water radiance includes light emerging from the water body and Fresnel-reflected sky.
+- Charles Cox and Walter Munk, [Measurement of the Roughness of the Sea Surface from Photographs of the Sun’s Glitter](https://opg.optica.org/josa/abstract.cfm?URI=josa-44-11-838), 1954. Wind-driven surface slopes broaden reflected light.
+- Yusuke Tokuyoshi and Anton S. Kaplanyan, [Improved Geometric Specular Antialiasing](https://doi.org/10.1145/3306131.3317026), 2019. The box-pixel variance supplements the intrinsic lobe width.
+- W3C GPU for the Web Working Group, [WebGPU Shading Language, derivative built-in functions](https://www.w3.org/TR/WGSL/#derivative-builtin-functions). The waterline uses the local screen derivative for pixel coverage.
+
+### Section 5 evidence: water contact foam at depth discontinuities (2026-11-21)
+
+Shoreline filtering uses derivatives of the depth gap clipped to the contact
+band. A local fragment quad that spans open water and a deeply submerged
+surface therefore cannot widen the foam band. The GPU regression reads the
+foam target directly. On the RTX A6000, a submerged block fell from 360 foam
+pixels to zero while 4,289 pixels remained over a near-surface block. This
+applies to the main Water WebGPU shader and its SSR variant.
+
+- Yusuke Tokuyoshi and Anton S. Kaplanyan, [Improved Geometric Specular Antialiasing](https://doi.org/10.1145/3306131.3317026), 2019. The box-pixel variance supplements the intrinsic lobe width.
+- W3C GPU for the Web Working Group, [WebGPU Shading Language, derivative built-in functions](https://www.w3.org/TR/WGSL/#derivative-builtin-functions).
+- Charles Loop and Jim Blinn, [Resolution Independent Curve Rendering Using Programmable Graphics Hardware](https://www.microsoft.com/en-us/research/publication/resolution-independent-curve-rendering-using-programmable-graphics-hardware/), 2005. Local derivative-based filtering informs the contact edge.
+
 ### Section 5 evidence: scatter texture maps, cut-out shadows and the cotangent frame (KB-SCATTER-TEX1, 2026-11-17)
 
 `ScatterOptions.textures` patches core's lit fragment stage (base colour, alpha MASK, occlusion-roughness-metal, a
@@ -74,6 +211,18 @@ a frame, one more texture read a pixel on the surface; the record pass reads 4 m
 does not change height (no morphodynamics), and the carry is not mass-conservative (bilinear semi-Lagrangian).
 
 ### Section 5 evidence: cliffs, overhangs and sea rocks over the heightfield (terrain/rocks, 2026-11-18)
+
+Fieldstone scatter uses seeded fracture profiles at 180 triangles per mesh. In `/rocks`, fallen boulders use a
+common bearing plane, a seeded pitched face and unequal side cuts within an anisotropic envelope. `/rock-surface`
+adds mineral grain to albedo, roughness and the surface gradient. The grain contribution tapers with the same
+world-space pixel footprint used for the existing relief. The CPU regressions cover distinct proportions, the
+fieldstone seam normals, and a boulder's planar underside. The existing rock GPU fixture also renders equal base
+colours with different mineral types, and confirms that disabling the tide band removes all sea-level-dependent
+darkening with moss disabled. Both checks pass on WebGPU and the WebGL2 compatibility layer on the development
+workstation. Grain shading cost and evidence on other hardware tiers are still unmeasured. Optional entry sizes
+(minified gzip) changed from 17,562 to 18,164 B for procedural, from 6,588 to 6,733 B for `/rocks`, and from 4,408
+to 4,800 B for `/rock-surface`. The procedural and rock-surface ceilings cover this growth. A separate geometry
+entry would delay the synchronous scatter path and a second shader variant would duplicate material setup.
 
 The clipmap terrain stays a heightfield; rock it cannot hold (overhangs, stacks, notches) comes as closed meshes from
 `@margoengine/terrain/rocks`: signed distance fields polygonized once on the CPU by procedural's `marchingCubes` in
@@ -2485,7 +2634,15 @@ frame within 2 of 255. Sky fog, the VolumetricFog composite and water spray also
 sample index and a one-sample mask (`perSample` in `packages/shared/msaa.js`, 2026-11-11), proved by the adapter check's
 4x cases and its fogged frame. Surfels at 4x (2026-11-11) pack their front depth into rgba8unorm and add their sums in
 two rg16float targets (r, g and b, weight: the full level's half floats), resolved by a masked draw per sample; the
-adapter check's surfel frame is within 4 of 255 of the full level's. On the WebGL2 layer below its full tier surfels pack
+adapter check's surfel frame is within 4 of 255 of the full level's. Since 2026-11-21 (KB2481) native WebGPU at 4x takes
+the same masked resolve at the full level, reading the one rgba16float sum target per sample: on the Intel Arc 140V the
+one `sample_index` draw over 4x additive sums did not repeat itself (up to 33 of 255 frame to frame over PostStack), a
+driver fault. Cost: the resolve is 4 draws in place of 1 (with their 4 pipelines), passes unchanged (3 per frame); the
+adapter check's surfel frame on that laptop went from 33 to 4 of 255 apart, and one engine's frame repeats bit for bit
+(`surfelRepeat` in packages/points/tests/features-browser.js, which fails on the old route there). Same pixels where the
+old route was exact is the arithmetic (each sample shaded from its own sums, blended over its own destination, either
+way); it is not measured on another GPU yet (no software WebGPU adapter on that laptop). The WebGL2 layer, which ignores
+sample masks, keeps the one draw. On the WebGL2 layer below its full tier surfels pack
 the front depth the same way (that tier stores r32float as r16float) and refuse LDR; the tier check's half-float surfel
 frame equals the full tier's. Eye-dome lighting packs its depth target the same way below the full tier (tier cases
 `points edl` and `points edl 4x`). A lone Bloom at 4x and the float-target test
@@ -2679,11 +2836,20 @@ a pipeline with one colour target is warmed the same way: on an Intel Arc 140V (
 program reported its link complete after 58 to 74 ms and its first draw then took 194 to 346 ms more, so the compile
 came after `ready`. The GPU check there, before the change: no warm draw before a 1-output async pipeline resolved
 (it fails); after: one, the same pixels, and its first draw 5.3 ms against 10.7 ms for an unwarmed pipeline of the
-same small shader (one loaded run, printed only, not asserted).
-Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in context) and
-`packages/webgl2-compat/test/first-draw-browser.mjs` (in `test:gpu`: a count of warm draws before the pipeline
-resolves, and the same pixels as an unwarmed pipeline). Missing: depth-only pipelines (no colour target) are not
-warmed; whether that back end compiles them at first draw too is not measured. `:mesh-pbr-lobes` now passes there in
+same small shader (one loaded run, printed only, not asserted). Later the same day a probe on that laptop (a 256-step
+loop, new shader text each run, three runs a kind) showed two more things. First, a program with a fragment stage and
+no colour output (a depth-only pass that discards) also compiles at its first draw: link 45 to 53 ms, first draw 128
+to 174 ms more (with no fragment stage, 1 to 4 ms). Second, the rasterizer-discard warm draw compiled nothing on that
+backend: a warmed 1-output pipeline still took 131 to 152 ms at its first real draw. (The KB-VPT-LOBES-COMPAT probe on
+the RTX A6000 had found that a discard draw compiles there.) The warm draw now rasterizes into its 1 x 1 throwaway
+targets (scissor test off, viewport 1 x 1, every colour channel written), and every program on ANGLE Direct3D is
+warmed, one with no colour target into a 1 x 1 depth-stencil buffer. After the change: link to `ready` 179 to 205 ms
+for both kinds, first draw 1.2 to 2.1 ms.
+Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js` (CPU, stand-in context: the warm draw rasterizes, and a
+depth-only pipeline is warmed) and `packages/webgl2-compat/test/first-draw-browser.mjs` (in `test:gpu`: a count of
+rasterizing warm draws before a 1-output and a depth-only pipeline resolve, and the same pixels as an unwarmed
+pipeline). Both fail on the code before the change. Missing: the rasterizing warm draw has not been rerun on the
+RTX A6000, and no other Direct3D GPU has been measured. `:mesh-pbr-lobes` now passes there in
 3 min 53 s (420 s limit); `:mesh-pbr` (376 s) and `:mesh-lights` (383 s) pass their checks but still run past their
 300 s step limits on the cold compiles themselves. Since 2026-11-21 (0e11055b5) the warm draw rasterizes and
 depth-only pipelines are warmed too; the private-main sync ff88a70e7 (2026-11-24) reverted that, and 508b6c1cc
@@ -3478,6 +3644,10 @@ Known rendering gaps:
 
 **Bounce light, step 3: Cabin Hearth (2026-11-16, KB-CABIN-SNOWBOUNCE1).** The cabin attaches `LightBounce` with its window as an opening (`bounce=0` turns it off; the direct-light physics checks run so). Three bugs fixed on the way, each with its test: the capture now draws under a post stack's linear tail and TAA's jittered clip (`packages/shared/frame-capture.js`, test at the end of packages/clustered/test/bounce.test.js), and LightProbes moved onto the same helper (it drew TAA's main camera into every probe face, KB-PROBES-TAA1, packages/environment/tests/probes.test.js); VolumetricFog's froxel pass keeps every light hook binding statically used (`packages/shared/keep-bindings.js`; any unread hook stopped the fog, KB-FOG-HOOK-BINDINGS1, packages/environment/tests/volumetric.test.js and the hook case of tests/volumetric-beam-browser.js); VPLs are lifted to their cluster's top along the normal (a drift's centroid lay under the snow and its own surfels hid it: 0.0020 R at the log crest instead of 0.11, KB-BOUNCE-VPL-BURIED1, the convex mound test in bounce.test.js). Evidence (RTX A6000, WebGPU and the WebGL2 layer, scripts/cabin-hearth-browser-test.mjs): at the log crest the lantern's bounce through clear glazing is 2.8% under a quadrature over the snow (bound 15%), the frame within 2% of the JS twin; behind the frosted pane the lantern bounces nothing outside and the window's bounce is 2.0% under the quadrature of the opening's own model (the snow its centre sees, lit by the bare rectangle; bound 15%), between the shaded (physics, which the model exceeds by 42%) and unshaded quadratures; the hearth view's mean luminance rises 4.3% (WebGPU) and 5.6% (WebGL2 layer), the rug 15%. Missing: IES, projector and layer terms, materials, gltf-pro and terrain in the capture; GPU-culled instances.
 
+**Bounce light visibility: the texel's surface decides the receiver plane (2026-11-21, KB-BOUNCE-SHADOWSNOW1 cause 4).** `buildVisibility` keeps each texel's surface normal beside its depth, one float holding an integer below 2^24 (hemi-octahedral, 4,095 levels a coordinate: Meyer et al., EGSR 2010; Cigolle et al., JCGT 3(2) 2014), so `packBounce` lays out a second layer of the same size after the depths (0 where only depths are given), as an object-ID shadow buffer records which surface a texel holds (Hourcade and Nicolas, Computers & Graphics 9(3), 1985). The lit shader `clusterBounceLighting` and its twin `bounceIrradiance` keep the adaptive depth bias (Dou et al. 2014) but, when the receiver itself lies past the texel's depth plus 2 cm and 2%, light it only if one flat or convex surface can join it to the texel's point H: normals within 60 degrees and H behind the receiver's tangent plane by at most |H - x| sin(angle) + 2 cm, the receiver's own normal used for the offset since a captured texel's normal can be 9 degrees off on a faceted log. The same WGSL serves WebGPU and the WebGL2 layer. Work: one more float per texel written with each depth and one more read and a few products per VPL a fragment, only where the plain depth test hides it; the storage buffer doubles (about 260 KB per bouncing source at the defaults). Evidence: packages/clustered/test/bounce.test.js (the table room outside the wall, flat and on a 20-degree drift, 0% to 0.09% of unblocked where depths alone leak 0.9% to 5.5%; the floor inside and a 0.15 m log's crest over lit snow within 10% of traced visibility); scripts/clustered-bounce-gpu-check.js on WebGPU and the WebGL2 layer (Intel Arc 140V laptop GPU); scripts/cabin-hearth-browser-test.mjs on both, every check passing: the window's bounce at the log crest 0.0624 R against the shaded quadrature's 0.0647 R (-3.6%, a normal-only test of this change had hidden 29% of it), the lantern's twin 0.1274 R against its quadrature 0.1155 R, the frame equal to its twin, the shadowed snow at (-2.0, 0.05, 3.2) 0.0000 R. Missing: a receiver within about 2 cm of level with a floor behind the wall (Cabin Hearth's snow 0.2 to 0.3 m from the front wall over its plank floor, 0.0007 to 0.0013 R where the cast gives 0.00003 R; docs/known-bugs.md), more map resolution near walls.
+
+**Bounce light visibility: the texel beside places a wall on the joined surface (2026-11-21, KB-BOUNCE-SHADOWSNOW1 cause 5, closed).** When a receiver past the texel's depth joins the texel's surface (cause 4), `bounceIrradiance` and the lit shader's `clusterBounceLighting` (one WGSL for WebGPU and the WebGL2 layer) also read the texel beside it on each axis, toward the ray to the receiver, depth and normal code: where the two texels' points form a valley (each in front of the other's plane by over 2 cm) and the receiver lies over 2 cm behind the second one's plane, the ray meets that wall between the texels, so the receiver is hidden. It places the floor-and-wall edge inside the texel pair, as shadow silhouette maps store an edge inside a texel (Sen, Cammarano and Hanrahan, ACM TOG 22(3) 2003); taps as in percentage-closer filtering (Reeves, Salesin and Cook 1987), deciding only for a valley; a convex edge is never one. Finer maps near walls (Fernando et al., adaptive shadow maps, 2001; Lloyd et al., logarithmic perspective shadow maps, 2008) were weighed and not taken: Cabin Hearth's snow sees past the wall about 2 degrees above its foot, under a third of a texel, so about 16 times the texels round every wall, and the edge still placed to a texel. Work: two more depth and normal reads and a few products per VPL a fragment, only where a receiver past its texel's depth passes the joined-surface test; no change to the maps or the build. Evidence: packages/clustered/test/bounce.test.js (Cabin Hearth's front wall, door, floor and snow with VPLs over its back and side walls: 0 at (-1.5, 0.163, 3.0) and (-2.5, 0.172, 2.9) where the traced visibility is 0, 5.5% of unblocked at the first before; the snow along the wall 0.06% of unblocked; the floor and wall inside within 10% of traced; the cause-4 room, log-crest and under-table tests unchanged). Cabin Hearth on an Intel GPU (adapter `intel`, `xe-2lpg`, as scripts/clustered-bounce-gpu-check.js reports it), WebGPU: both points added to the shadowed-snow check (bound 0.0005): frame 0.0001 R, twin 0.0000 R (0.0013 R and 0.0007 R before); the crest's lantern twin 0.1274 R against the quadrature's 0.1155 R (+10%, bound 15%), the window's 0.0624 R against the shaded quadrature's 0.0647 R; scripts/clustered-bounce-gpu-check.js passes. WebGL2 layer: the same figures, and scripts/clustered-bounce-gpu-check.js passes (adapter `margo-webgl2`). Still missing, recorded in docs/limits.md as accepted: a receiver behind a surface thinner than the 2 cm and 2% depth slack is lit, and a receiver within about one texel of a concave corner on the lit side loses some bounce (the same with depths alone).
+
 **Bounce light visibility: the scene's triangles are occluders (2026-11-17, KB-BOUNCE-SHADOWSNOW1 cause 3).** `LightBounce` passes every instance of the frame's unclaimed batches to `sampleSurfaces`, which keeps a triangle whose circumradius reaches the cell size 2^floor(log2(2 d / visibility)) (d to the nearest VPL in front of it) as itself, drawn into each map by a ray/triangle test per texel (Moller and Trumbore 1997), and merges smaller ones per cell and normal axis into one covering surfel; the detail follows each VPL's solid angle (view-adaptive imperfect shadow maps, Ritschel et al. 2011; ManyLoDs, Hollander et al. 2011; Christensen 2008). Triangle depths under 0.02 m are a VPL's own patch. The shader and its twin's receiver test are unchanged. Work per rebuild: every drawn triangle's vertices transformed and visited once, at most 16,384 pieces (Cabin Hearth: 15,026 from 1,169,052 triangles), each piece's texels tested per VPL; `stats.occluders` reports the count. Evidence: packages/clustered/test/bounce.test.js (a table-by-the-wall room under 2% of unblocked at five receivers, 5.9% to 8.2% with captures alone; merged surfels cover far small triangles); scripts/clustered-bounce-gpu-check.js on WebGPU and the WebGL2 layer; Cabin Hearth's crest checks unchanged and the snow at (-1.2, 0.05, 4.0) at 0.00245 R, the 0.00246 R an exact cast from every VPL gives (0.0032 R before), the shadowed-snow check moved to (-2.0, 0.05, 3.2), bound 0.0005. Missing: the concave-corner receiver plane (0.7 to 1.2 mR within 0.3 m of a wall's foot in Cabin Hearth; docs/known-bugs.md), surfaces a vertex hook moves, a laptop iGPU.
 
 **Bounce light visibility: elliptical surfels and plane-true normals (2026-11-17, KB-BOUNCE-SHADOWSNOW1).** `buildVisibility` splats each capture point as the ellipse of its texel's footprint (1 / cos longer along the capture ray's projection, Heckbert 1989; Zwicker et al. 2001; Botsch et al. 2005) instead of a disc of its area, and `reduceBounce` takes a texel's tangents from the side whose next two texels run straight on, so a wall's foot no longer takes the floor's tilt. Same point count and the same texel loop per point (the bounding square grows to the long semi-axis); work unchanged in kind. Evidence: packages/clustered/test/bounce.test.js (three VPL maps of a grazing wall with no hole, 4, 15 and 3 before; every wall texel within 2 degrees of the wall, 108 of 2270 tilted up to 38.7 degrees before); scripts/clustered-bounce-gpu-check.js passes on WebGPU and the WebGL2 layer (RTX A6000); Cabin Hearth's shadowed snow 0.0030 R to 0.0026 R on both backends. Missing: occluders on surfaces no source sees, the capture-point subset's gaps and the concave-corner receiver plane (docs/known-bugs.md, KB-BOUNCE-SHADOWSNOW1), so that check still fails.
@@ -3573,7 +3743,7 @@ This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they d
 | Owner/lifetime | `npm run check:owners` (`scripts/check-owner-lifetime-gate.mjs`): in the fast gate with `-- --packages=<changed>`, and a scoped step of `check:merge` after verify | Every package with `test(s)/owner-lifetime.fixture.js` runs each fixture through `tests/support/owner-lifetime.js` on two engines, the default and a second scene, two views and six lifetimes (dispose, detach, scene and engine disposal, device loss attached and detached): registration identity, frame-graph removal, listeners and GPU buffers, textures and query sets released, neighbours and the other engine untouched, viewport and scissor restored at every draw. CPU model first (no GPU), then one GPU run per package on native WebGPU and on the WebGL2 compatibility layer with real device loss; a fixture that exports `leafPerEntry` (post, whose 31 entries took 208 s on the WebGL2 layer of a Radeon 680M, and culling, 30 entries past 180 s there) runs one leaf per entry instead, each inside the leaf's 180 s limit, which never rises; a fixture that exports `leafCases` (water, 104: eight entries a leaf) packs its entries in order into leaves of at most that many cases, since one leaf per entry paid a dev server, a browser and the shared shader compiles per entry and water's 70 leaves ran past the gate's 10 minutes on 2026-11-18 (`tests/owner-lifetime.test.js` holds the packing). An async factory owns everything it does until it settles (before 2026-11-10 work after its first await escaped the owner). Fixtures never shim a device: the CPU model's missing browser members are filled in by `tests/support/owner-lifetime-node.js` only, so the GPU leaf builds real resources (2026-11-11). On the WebGL2 layer an imported external texture's copy is the layer's own storage, as the browser's is on native WebGPU: it expires when the importing task ends and returns to at most two spares per device that the next same-size import reuses (`packages/webgl2-compat/src/device/externals.ts`), so steady video allocates nothing and no copy lives as long as its source object. A selected package with no fixture is printed as pending, never passed; core and physics are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`. React (2026-11-16): `packages/react/tests/owner-lifetime.fixture.js` mounts a tree (mesh, geometry, material, glTF model, Environment, OrbitControls, Bloom, Html label) into the harness's engine with the test renderer and unmounts it; on the CPU a jsdom page stands in, whose `EventTarget` the fixture names (`eventTargets`) so its listeners are watched too, and the leaf starts on `packages/react/tests/owner-lifetime.html` so the dev server bundles React before the page loads. Two harness additions, each scoped to the fixture that uses it: `app(fn)` runs a synchronous call outside any owner, for what the application owns (the React root, whose delegated listeners React DOM never removes), and `detachedNodes` (a reason) stops counting listeners on DOM nodes the fixture's objects took out of the page (React DOM's listeners on the Html label's portal element). It found that an HTML overlay replaced the shared scene depth plugin on every device restore (fixed in `@margoengine/html`, regression in `packages/html/test/html.test.js`). Not covered: the `Canvas` component's own engine creation (the harness supplies the engine), which `packages/react/tests/react.test.js` covers. HTML (2026-11-16): `packages/html/test/owner-lifetime.fixture.js` attaches, draws and disposes `HTML` (scene-depth occlusion and fade, `new` and `attach`), `HTMLBlend`, `HTMLTexture`, `HTMLTextureGL` and an `HTMLTexture` prepared by `resourceInliner` (inline), 78 cases on the CPU, native WebGPU and the WebGL2 compatibility layer; each also checks that the overlay roots, surface holders and given elements leave the page, the canvas style `HTMLBlend` changed is restored and nothing reaches `engine.onError`. On the CPU a jsdom page stands in (no 2D canvas or image decoding there), so a texture's preparation holds until its surface is removed: the CPU proves that disposal aborts a raster in flight; the browser leaves draw for real. `HTMLTextureGL`'s WebGL2 route draws only on the WebGL2 preview backend, which the harness does not create; `packages/html/test/html-browser.js` covers it. |
 | Core and stage stress | `npm run check:core-stress` (`scripts/core-stress.mjs`, 1,000 seeds a family), a CPU step of `check:merge` after verify; the same files in the core and stage package tests (40 and 30 seeds), so the fast gate runs them whenever core or stage changes | Seeded runs of the real built `Engine`, `FrameGraph`, `GPURenderer` and `Stage` on a fake WebGPU device and frame queue check lifecycle, async and error-path invariants: one frame loop, no GPU call after dispose or on a destroyed device, every error reported once (engine errors with a code), every pick settled with the right mesh, a lost device restored, no unhandled rejection. A failure prints its seed; `MARGO_STRESS_SEED=<seed>` replays it. See "Core and stage stress check" below. |
 | GPU/package checks | `check:views`, `check:gpu-packages`, `check:depth`, `check:wgsl`, `check:no-webgpu` | Scoped rendering, shader, package, depth, fallback, and view behavior. `check:gpu-packages` refuses to plan while a `scripts/*-gpu-check.js` file is named by no command, unless `LOOSE_CHECKS` states why: on 2026-11-07 twenty-two such files ran by hand only and five had rotted. The list is empty since 2026-11-11, when `scripts/ssao-gpu-check.js` joined post as `test:gpu:ssao` (KB1900). A check that compares with an earlier build (`--baseline`) says so and goes on when no baseline is on disk, since that proof belongs to one change. Since 2026-11-16 (KB-GPURUN-HOLD60) `check:gpu-packages` has no whole-run limit, so a long `--select` run is not ended with nothing hung: each suite keeps its own limit, covering its run and one rerun after a driver reset, and its builds, heat pauses and the gaps between suites are not limited. Since 2026-11-18 (KB-POSTFX-DOFSTALE1) a root suite that checks one package's own shaders or kernels is listed in `ROOT_OWNERS` with its owners, and each owner runs it from its own GPU script (`"test:gpu:postfx": "cd ../.. && npm run modern:test:postfx:browser"` in dof and tonemap; sky, usdz, decoders and gltf, and physics2d likewise), so the fast gate's changed-package GPU tests run it on WebGPU and with `MARGO_COMPAT=1`; `plan()` folds those scripts into the one root test (`--only=<package>` and `--select=<package>/<script>` reach it), so a full or affected run still runs it once. `tests/gpu-root-owners.test.js` fails on an owner with no such script and on a root suite whose files import `/packages/<name>/src/` without that package among its owners. The postfx suite's hand-built DOF and tonemap bindings went stale on 2026-11-15 and no push ran it. |
-| README examples run | `npm run check:readme-run`, a step of `check:merge` after a build, GPU, 296 s on 2026-11-07 (about 25 minutes when first measured). Whole in the full check after a push; on a narrowed run, the examples of the affected packages, or all of them when a file the step runs changed. In no gate before the push and not in `verify`. An example's id is the heading above it and a hash of its code, never its place in the file, so the known list survives a new example above a listed one. A README edit renames the example it changes, so `tests/run-readme-examples.test.js`, in `verify`, fails while the known list names an example no README holds: 8 such entries went unseen until this step ran on 2026-11-07 | Runs every example of every package README and guide as a reader would paste it: in Node when it can, else in a real Chromium page with WebGPU, the elements it asks for and a real sample file of the format it fetches. Passes when nothing threw, no promise was left rejected and the GPU reported no validation error; a Node example still going at 30 s passes, as a server does. A failure off `scripts/support/readme-run-known.json` fails, and so does an entry left on it that passes or names an example that is gone. Examples that listen on one port take turns. Each page example launches and closes its own browser, GPU process included, inside its 20 s deadline: closing only the page left the previous example's shader-compile teardown in a shared GPU process, which stalled the next example's adapter request (2026-11-11). 641 of 767 ran on 2026-11-07; the 126 left are in docs/known-bugs.md. |
+| README examples run | `npm run check:readme-run`, a step of `check:merge` after a build, GPU, 296 s on 2026-11-07 (about 25 minutes when first measured). Whole in the full check after a push; on a narrowed run, the examples of the affected packages, or all of them when a file the step runs changed. In no gate before the push and not in `verify`. An example's id is the heading above it and a hash of its code, never its place in the file, so the known list survives a new example above a listed one. A README edit renames the example it changes, so `tests/run-readme-examples.test.js`, in `verify`, fails while the known list names an example no README holds: 8 such entries went unseen until this step ran on 2026-11-07 | Runs every example of every package README and guide as a reader would paste it: in Node when it can, else in a real Chromium page with WebGPU, the elements it asks for and a real sample file of the format it fetches. Passes when nothing threw, no promise was left rejected and the GPU reported no validation error; a Node example still going at 30 s passes, as a server does. A failure off `scripts/support/readme-run-known.json` fails, and so does an entry left on it that passes or names an example that is gone. Examples that listen on one port take turns. Each page example launches and closes its own browser, GPU process included: closing only the page left the previous example's shader-compile teardown in a shared GPU process, which stalled the next example's adapter request (2026-11-11). The 20 s deadline bounds the example's own work (launch, page, run, settle, errors, page close); the browser's teardown after it is bounded by the browser close limit (`CLOSE_LIMIT_MS`, docs/limits.md#browser-close-limit), whose kill fails the example with the killed pids named, so the late Windows teardown of an ended Chromium under load (KB1703) no longer fails an example that passed (2026-11-21). 641 of 767 ran on 2026-11-07; the 126 left are in docs/known-bugs.md. |
 | Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples (the same examples as `check:readmes`, against the tarballs, with no known list), browser packages, bundlers, licenses, and documented first use work. |
 | Release rehearsal | `publish:rehearsal` (in `publish:dry-run` and the publish workflow) | Every tarball audited, then the one-line install, every entry imported and type-checked, and every template built, from a stand-in registry that refuses writes. |
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
@@ -5846,6 +6016,14 @@ error budget or merge gate is changed. The exact assertions remain failing
 regressions on the affected platform; batch 160 jobs 4/5 cannot land as passing
 and the list row stays open. tests/reference-blend-repeat.test.js verifies the
 fixture's uint32 indices, all retained triangles and atomic concurrent downloads.
+
+Section 5 evidence, second vendor (2026-11-21): on an Intel Arc 140V under the same default ANGLE D3D11 backend the
+WebGL2 layer's 4x resolves are repeatable. The dispersion grid (`--backend=compat`, 278 of 278), geo-lod restore,
+atmosphere restoration, the SSAO resolve control (12 of 12 byte-identical) and the raw KB3508 page (0 of 299 frames
+changed at 640x480 and 1024x768) are all exact. The layer's resolve path has no vendor branch (only the capability tier changes formats; this run was the full
+tier), so this places the
+"two versions of one MSAA-resolved texture" row (docs/known-bugs.md) in the NVIDIA D3D driver path. Still missing: a
+self-contained replay that fails on the A6000, for the NVIDIA report.
 
 ### Batch 99 spectral transport and section 5 evidence
 
@@ -9047,6 +9225,64 @@ attached and detached. It found no leak in road. Batch owners-b8 also ran mixer 
 entries are 221 cases, past the 208 a leaf may hold, which `tests/owner-lifetime.test.js` fails) and moved the biomes
 scene fix (KB-OWN-BIOMES1/2) onto main.
 
+Batch owners-b9 (2026-11-21) gated bvh, geometry, navmesh and mesh-edit, which held lifetimes with no fixture. bvh: GPUMeshBVH
+(upload and raycast), `forShader`, GPUDynamicBVH in build and refit mode, and SceneBVH, each tied to a plugin registration
+(`ownedByEngine`); the worker builds keep their own browser test. geometry: GeometryGenerator.attach with one item of every
+kind, an item disposed early and a read-back. navmesh: NavDebug on a plain and a tiled mesh with a crowd and a route (the Wasm
+worker build refuses without a Worker host and releases its worker, timer and listener in its own `finally`, test/wasm.test.js).
+mesh-edit: SculptView with and without dynamic topology (its other entries are typed-array work). All pass on the CPU model,
+native WebGPU and the WebGL2 layer, with device loss attached and detached. The geometry fixture found KB-GEOMETRY-GENDISPOSE1:
+GeometryGenerator.dispose never removed its plugin from the scene (fixed in packages/geometry/src/gpu.ts, regression in
+packages/geometry/tests/gpu.test.js).
+
+Batch owners-b10 (2026-11-21) gated machinery and recorded the three install kits as exclusions. machinery: Kinematics, ExplodedView,
+SurfacePhysics and TelemetryChannel (Wasm memory, socket listener), Dimensions, FeatureEdges, SectionPlanes (WebGPU only),
+EngineeringAnnotations (an SVG overlay) and the AssemblyIndex and AssemblyBVH indexes tied to a plugin registration
+(`ownedByEngine`); the metrology, clearance and anchor entries and the Rust kernel's queries are numbers and typed arrays. The fixture
+found KB-MACHINERY-DISPOSE1: seven plugins' dispose never removed them from their scene (regression in
+packages/machinery/test/scene.test.js), and KB-MACHINERY-VIEWPORT1: FeatureEdges and the section caps ignored the view's viewport
+and scissor (fixed in packages/machinery/src; the browser leaf is the regression). kit-react, kit-viz and kit-web are generated files of re-exports
+(scripts/umbrella.mjs) with no code of their own, so each is in OWNER_EXCLUSIONS and `tests/owner-exclusions.test.js` fails if a
+kit source line is anything but a comment or a re-export; the lifetimes they hand out belong to the packages they re-export.
+
+Batch owners-b11 (2026-11-21) gated voxel-edit and voxel-pathtracer. voxel-edit: GpuGrid (every queued edit kind, a shader brush, a
+write and a read-back) and ShaderBrush; the editing, format and collab entries are typed-array work. voxel-pathtracer: the tracer and
+its Resampled, Guided, Media and Spectral subclasses (after `ready` and one off-screen image), MeshPathTracer and the composed tracer
+with every feature and with the glTF PBR feature (a mesh kernel takes 20 to 60 s to compile cold, past the 20 s the harness gives a
+frame, so the first of each is awaited in the fixture, and every case replaces its scene once), and DenoiseML. The trace kernel takes 100
+to 270 s to compile on the Direct3D 11 route of the WebGL2 layer (tests/compat-d3d11-case-seconds.json), past a leaf's 180 s, so the
+voxel-pathtracer fixture exports `compatAngle = 'vulkan'`, which scripts/check-owner-lifetime-browser.mjs reads to launch its
+compatibility leaf on the Vulkan route on Windows, as the package's compose-browser.mjs does; a case then takes seconds. Native WebGPU
+legs are unchanged. All pass on the CPU model, native WebGPU and the WebGL2 layer, with device loss attached and detached.
+
+Batch owners-b11 also gated voxel-net (2026-11-21): the server (listening, with a connection, and with a file and a SQLite store),
+connectVoxelNet, VoxelBot and VoxelShardClient against a bare WebSocket endpoint (a joined player makes a real server start generator
+worker threads, whose own message ports carry the runtime's listeners), and every server add-on (entities, chat, inventories, rewind,
+shard, recorder, lobby); the browser leaf runs the client entries that work in a page. The WebTransport and WebRTC entries wrap a
+connection the caller owns, and the Bun and Deno hosts need those runtimes, so they are not entries. The voxel-net fixture found
+KB-VOXELNET-WSLISTENERS1: connectVoxelNet never removed its listeners from a closed socket (fixed in packages/voxel-net/src/client.ts,
+regression in packages/voxel-net/tests/on-close.test.js).
+
+Batch owners-b11 also gated sciviz (2026-11-21): a Figure on 3D and 2D charts with every layer family that holds engine resources
+(scatter, line, quiver, streamlines, bar, histogram, heatmap, timeline, colour bar, surface, volume with its quality and cinematic variants, density,
+isosurface, multi-volume, mesh, graph, AMR, glyph).
+The readers and writers, the data maths and the network readers hold no engine resource of their own and are not entries; progressive
+rendering brackets a frame with a begin and a present pass that swap `context.view`, which the harness's per-pass view check cannot
+express (its own tests cover it). The fixture found KB-SCIVIZ-SCENE1, KB-SCIVIZ-PLUGINS1 and KB-SCIVIZ-AXESDISPOSE1 (a Figure's plugins
+went to the wrong scene and were never removed, and a disposal during axes loading ended in an unhandled rejection), fixed in
+packages/sciviz/src with packages/sciviz/tests/scene-owner.test.js. More sciviz layers (molecule, tetrahedral and curvilinear volumes,
+flow particles, LIC, tiles, point clouds, parallel coordinates) remain to be added to the fixture.
+
+Batch owners-b12 (2026-11-21) gated the last four packages `check:owners` listed as pending, so none is pending. armies: `PersonCrowd.attach`,
+`addArmy` and `addArmy` with cavalry (the horse herd), on a person baked from a body built in code. horses: `addHorse` (with and without
+strand hair) and `addHorseCrowd`. creative: every plugin built with `new` and `attach` (GPU particles, toon shading, grass, terrain grass,
+starfield, orbit atmosphere, the two painterly effects), `Planet` in the browser leaves, and the HDR, texture
+and depth render targets. game is excluded: it is generated re-exports and holds nothing, which `tests/owner-exclusions.test.js` now reads
+and enforces. The fixtures found KB-HORSES-CROWDOWN1 (async crowd and horse calls ignored the scene they were made for; the herd's coat
+atlas outlived its scene), KB-CREATIVE-DISPOSE1 (ToonShading and Stars disposal left them registered; the starfield ignored the view
+rectangle, as did the planet's) and KB-CREATIVE-TARGETFMT1 (GrassField and Planet refused the other 8-bit canvas format), all fixed with regression tests, and one
+open defect, KB-CREATIVE-POSTVIEW1 (PostProcessing, alone or in a stack, is not per view, so it is not an entry).
+
 ## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
 
 `@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
@@ -9136,6 +9372,52 @@ to 0.268, 0.783 to 0.783 against 0.5, 0.25, 0.75, and the orthographic open floo
 Wu, Pesce and Jarabo 2016 (slices and the arc integral); Bavoil, Sainz and Dimitrov 2008 (horizon search in image
 space); Max 1988 (a horizon over a height field, the height above the tangent plane as what occludes). Missing: other
 GPUs.
+
+**Covered scatter rings write coverage depth (KB-SCENES-DUNE-GTAO1, 2026-11-20, rendering).** Since
+KB-SCATTER-SUBPIXEL1 `GrassScatter` blends its blades by prefiltered coverage with no depth write, and GTAO and SSAO
+find occluders only in the depth buffer, so the grass stopped occluding the sand. Scatter now draws every covered ring
+once more after all its blended draws, depth only (colour write mask 0, the same pose), keeping a fragment whose
+coverage passes `scatterCover.w`; `GrassScatter` sets that to a hash of the blade, an object-space hashed alpha test of
+the coverage (Wyman and McGuire 2017), so depth is present with the chance of the coverage and overlapping blades leave
+a pixel bare with the chance over leaves its colour bare (Enderton, Sintorn, Shirley and Luebke 2010), stable as the
+camera moves. Drawn last, the depth rejects no blended blade, so the colour and anti-aliasing are those of
+KB-SCATTER-SUBPIXEL1. Post is unchanged. Evidence (Intel Arc 140V): scatter test/grass.test.js (the depth stage);
+test/grass-pixel.browser.mjs on WebGPU and the WebGL2 layer (0 ppm speckle on WebGPU, means within 0.4 codes of the
+supersampled view); scenes test/dune-coast-still.mjs camp view on the WebGL2 layer, mean 177.0 with occlusion against
+180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent); on native WebGPU
+(2026-11-21, adapter `intel` `xe-2lpg`, once KB-SCENES-DUNE-ARCHANG1 below let it run) 177.2 against 180.6 and 10.2
+percent darker. Missing: other GPUs, the cost of the extra draw (speed phase deferred), and the grass itself darkened
+(it is not in the ambient replay).
+
+**No submission of the coastal flow's set-up holds the GPU for seconds (KB-SCENES-DUNE-ARCHANG1, 2026-11-21, GPU
+behaviour).** The dune coast hung the device on a laptop GPU (DXGI_ERROR_DEVICE_HUNG within 3 s, three runs of three).
+Timestamp queries on every pass of the page's frames found one compute pass of 4,403 ms on the first frame: `Water`'s
+coastal flow recorded its whole first-step set-up (initial state, connectivity, the surf field's width + height
+relaxation sweeps, the 40 s spin-up of 3,600 flow dispatches; about 4,600 grid dispatches on a 512 x 512 map) into the
+frame's one command buffer. Windows resets a GPU that cannot complete or preempt one DMA packet within 2 s (Microsoft,
+"Timeout detection and recovery (TDR)" and "TdrDelay", Windows driver documentation), so it hung whenever the scheduler
+asked to preempt it. `CoastalFlow.setUp` now records the same commands in order into command buffers of at most
+`SETUP_WORKGROUPS` (2^18 workgroups, 64 dispatches of a 512 x 512 grid), one `queue.submit` each (Dawn merges the
+buffers of one submit into one D3D12 command list), ahead of the frame's commands; the frame keeps its own three
+substeps. The rule for any package: one-time GPU work of thousands of dispatches is submitted in bounded pieces, never in
+the frame's command buffer. Evidence (adapter `intel` `xe-2lpg`, native WebGPU): 74 set-up submissions of at most 84 ms,
+4.4 to 4.8 s of GPU time in all as before; water test/surf.browser.mjs (no first-frame submission over 2^18 workgroups,
+at least the set-up's workgroups in all, run-up 0.126 m as before; fails before with one submission of 18,986,279) and
+scenes test/dune-coast-still.mjs camp view passing. Missing: other GPUs, and a bound in time rather than workgroups (a
+GPU 25 times slower than this one could still pass 2 s on one piece).
+
+**No tanh in shader code takes an unbounded argument (KB-WATER-SURGEVOL1, 2026-11-21, GPU maths).** Native WebGPU on
+an Intel xe-2lpg laptop GPU returns NaN for WGSL `tanh(x)` once sinh and cosh overflow f32 (measured: 1 at x = 50, NaN
+at 100 and -100), while the WebGL2 layer ran the same surf without NaN. The surf's Ruessink et al. 2012 phase `tanh(0.815 / Ur^0.672)`
+passes that in calm deep water (Ursell number under about 1e-3), so `surfSea` returned NaN, the open sea's relaxation
+target `max(0, NaN)` read 0 and the sea next to the map's deep edge drained: water test/surge.browser.mjs held 1,431 of
+the beach's 2,880 m^3 at rest. Every tanh in the surf's WGSL now takes `min(x, 10.0)`, which is exact in f32 (for x
+over 9.01, 1 - tanh x is under 2^-25, so tanh rounds to 1; IEEE 754-2019 round to nearest). The rule for any package:
+clamp a tanh argument to +-10 (or use an overflow-free form, as compute's `preciseTanh`); the WGSL implementation may
+overflow inside. Evidence (adapter `intel` `xe-2lpg`): water test/surge.browser.mjs gives 2,880.15 m^3 at rest and
+5,133.87 at a 1 m surge on native WebGPU and the WebGL2 layer alike, against the still-water 2,880 and 5,120 it now
+asks for; water test/coast-runup.test.js fails on a bare tanh in water's sources. Open: blender's TANH math node
+(KB-BLENDER-TANH1). Missing: other GPUs.
 
 **SSAO's ambient replay binds every pass binding (KB-POST-GTAO-TERRAINLOOK1, 2026-11-18, GPU behaviour).** The replay
 that gives SSAO and GTAO the ambient light to darken cut the lit shader from `let direct=` and bound a hand-picked
@@ -9337,3 +9619,58 @@ The solver's own switches (`world_set_solver` 12 to 18, in the header so a snaps
 ## ASCII post effect (section 5 evidence, 2026-11-24)
 
 `packages/post/src/ascii.ts` is an LDR PostStack stage in two fragment passes: a (2 x columns) by rows rgba8unorm target holding each cell's mean colour and character index, then the full-size draw from an r8unorm glyph atlas made on the CPU at the cell size (rebuilt only when the ramp, cell or font changes, and after a device restore). `text()` copies that target and maps it. Evidence: `packages/post/test/ascii.test.js` (uniforms, atlas bytes, rebuild and release, readback and abort, bounds) and `ascii-browser.mjs` on WebGPU and the WebGL2 layer (Intel Arc 140V: 405 of 405 characters equal the CPU reading, edge directions, bit-exact passthrough, resize). The same change makes `ScreenEffect.draw` keep a bind group when a caller passes a new `{ buffer }` object for the same buffer range: before, every screen effect made one bind group per draw per frame. Missing: no GPU time measurement.
+
+## Sky and cloud depth in a live capture
+
+Sky fog and the volumetric cloud march use the active scene capture's depth by default. Terrain, masked canopies and
+other depth-writing surfaces stop the sky effects at their current silhouettes. A separately registered depth prepass
+can omit meshes, so an explicit depth callback still selects that pass. At 4x the sky reads the current multisampled
+depth attachment before it resolves. When the selected depth is unavailable, clouds use the empty-sky depth test and
+fog has no surface to shade.
+
+The proofs are the turning camera in `packages/sky/test/fog-motion-check.html` and the foreground pillar and block
+inside the layer in `packages/sky/test/volumetric-check.html`. These compare automatic depth with an explicit live
+capture and check the explicit unavailable-source behavior. The optical sources are Schneider and Vos (2015) and
+Hillaire (2016), linked from the sky README.
+
+### Fixed world-space terrain rings
+
+Camera-driven clipmap snaps can replace ridge triangles without appreciable camera motion. Bounded `Terrain` and
+`BiomeView` now keep a fixed world XZ anchor. `BiomeView` uses it for both terrain and horizon, while `TerrainStream`
+selects a moving window on the fixed world lattice as tiles arrive. Both colour and shadow passes use the same ring
+plan. A fixed anchor preserves static terrain shadows across camera moves. A rebase still updates local coordinates.
+The terrain GPU regression in `packages/terrain/test/clipmap-anchor.browser.mjs` crosses a ring boundary with a
+two-millimetre camera move. The legacy moving window changed 1,315 colour pixels beyond 16 code values and 786
+silhouette pixels. Anchored terrain changed zero by either measure on WebGPU and the WebGL2 compatibility layer.
+
+### Distant forest contact
+
+The Terrain prepare pass can rasterize its drawn triangles from above before Scatter reads their height. The image
+uses the original heightmap UVs and is rebuilt when the ring plan or elevation data changes. With a source peak of
+154 m between coarse vertices, `packages/terrain/test/surface-height.browser.mjs` reads 104 m at that point on
+WebGPU and the WebGL2 layer. Biomes' distant trees use that image, the placement graph and the chosen canopy kind.
+Regional and tile queries return curvature in the same signed integer units before conversion to inverse metres.
+The worker cover regression proves the distant mask matches the main-thread mask and loads the existing graph part
+only when a canopy request supplies a graph.
+
+### Scene sections with lighting providers
+
+The Machinery section pass reserves mesh-shader binding 232 before the shadow and lighting passes run. Those
+passes can read the same section planes for clipped shadows. Choosing a slot from the current entry count allowed
+the shadow sampler and the clustered-light frame to share binding 4. WGSL requires distinct group and binding
+pairs for distinct resources. The real-adapter `packages/machinery/test/section-open-check.mjs` proof attaches
+both providers and verifies that the closed solid is capped and the open sheet stays open. The binding rules are in the
+[W3C WGSL resource interface](https://www.w3.org/TR/WGSL/#resource-interface) and
+[W3C WebGPU pipeline layout](https://www.w3.org/TR/webgpu/#pipeline-layout).
+
+### Section 5 evidence for heightfield relief lighting (terrain/relief-lighting, 2026-11-23)
+
+An optional compute pass records the directional horizon and projected sky visibility separately so landforms
+retain both broad cast shadows and diffuse shading. The fields are indexed by world XZ, independent of the
+camera and of the surface color. The terrain clipmap evaluates both through one bilinear lookup in its lit pass.
+The package also exposes the same bake and lookup for a caller's terrain mesh. Core and stage are outside this path.
+
+The GPU regression uses an untextured ridge to verify east and west sunlight, open-sky versus valley irradiance,
+zenith visibility, map edges and rebaking. The clipmap render in the same test verifies that the baked terms
+change untextured pixels and that disposing the effect removes the render attachment.
+[GPU regression](../../packages/terrain/test/relief-lighting.browser.mjs)

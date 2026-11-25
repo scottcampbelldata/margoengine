@@ -264,7 +264,8 @@ const hall = new RawShaderMaterial({
     depthTest: false,
     depthWrite: false,
     cull: 'none',
-    name: 'cathedral-hall',  }),
+    name: 'cathedral-hall',
+  }),
   dust = new RawShaderMaterial({
     vertexShader: dustShader,
     uniforms: uniforms(),
@@ -274,7 +275,8 @@ const hall = new RawShaderMaterial({
     depthTest: false,
     depthWrite: false,
     cull: 'none',
-    name: 'cathedral-dust',  });
+    name: 'cathedral-dust',
+  });
 const raw = RawShaders.attach(stage.engine);
 raw.add(new RawMesh({ material: hall, vertexCount: 3 }));
 raw.add(new RawMesh({ material: dust, vertexCount: 6, instanceCount: 3500 }));

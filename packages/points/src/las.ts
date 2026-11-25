@@ -212,9 +212,16 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     formatByte = u8(104),
     pointRecordLength = u16(105);
   if (versionMajor !== 1 || versionMinor > 5)
-    throw fail('unsupported', `Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.5`, TypeError);
+    throw fail(
+      'unsupported',
+      `Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.5`,
+      TypeError,
+    );
   if (headerSize < 227 || headerSize > bytes.byteLength || pointDataOffset < headerSize)
-    throw fail('header', `LAS header size ${headerSize} or point offset ${pointDataOffset} is invalid; the file is corrupt`);
+    throw fail(
+      'header',
+      `LAS header size ${headerSize} or point offset ${pointDataOffset} is invalid; the file is corrupt`,
+    );
   if (pointDataOffset > bytes.byteLength)
     throw fail('header', `LAS points start at ${pointDataOffset}, past the end of the file; the file is corrupt`);
   const pointFormat = formatByte & 0x3f,
@@ -317,7 +324,11 @@ export function lasExtraBytes(records: readonly LASRecord[], header: LASHeader):
         options = view.getUint8(at + 3),
         name = text(record.data, at + 4, 32);
       if (dataType > 30)
-        throw fail('header', `Extra bytes data type ${dataType} of ${name} is reserved; the file is corrupt`, TypeError);
+        throw fail(
+          'header',
+          `Extra bytes data type ${dataType} of ${name} is reserved; the file is corrupt`,
+          TypeError,
+        );
       // Types 11 to 30 are the deprecated pairs and triples of types 1 to 10, one field per element here.
       const scalar = dataType > 10 ? ((dataType - 1) % 10) + 1 : dataType,
         elements = dataType > 20 ? 3 : dataType > 10 ? 2 : 1,
@@ -555,7 +566,11 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
     base = LAS_RECORD_SIZES[format];
   const put = (view: DataView, at: number, i: number) => {
     if (i === 0 && fromBox) {
-      const first = [view.getInt32(at, true) * sx + ox, view.getInt32(at + 4, true) * sy + oy, view.getInt32(at + 8, true) * sz + oz];
+      const first = [
+        view.getInt32(at, true) * sx + ox,
+        view.getInt32(at + 4, true) * sy + oy,
+        view.getInt32(at + 8, true) * sz + oz,
+      ];
       const inside = first.every(
         (v, a) => v >= header.min[a] - header.scale[a] && v <= header.max[a] + header.scale[a],
       );

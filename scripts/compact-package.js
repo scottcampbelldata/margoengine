@@ -29,6 +29,7 @@ export async function compactPackage(
     // an import. A fixed list once missed the stage's glTF route and lights helpers.
     sharedDir = real(resolve(directory, '../shared')),
     isShared = (path) => dirname(real(path)) === sharedDir,
+    // Sorted: readdir order is the file system's (APFS is not alphabetical), and the entry order decides chunk layout.
     files = (await list(root)).filter((file) => file.endsWith('.js')).sort();
   for (const file of files)
     await writeFile(

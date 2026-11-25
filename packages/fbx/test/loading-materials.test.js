@@ -112,7 +112,11 @@ test('native Phong properties become dielectric PBR with opacity taking preceden
 test('TransparencyFactor supplies alpha and shininess respects roughness limits', async () => {
   // Transparency is TransparentColor x TransparencyFactor; the colour's default is black (FbxSurfaceLambert's template).
   for (const [properties, alpha, roughness] of [
-    [[color('TransparentColor', [1, 1, 1]), scalar('TransparencyFactor', 0.6), scalar('Shininess', 0)].join('\n'), 0.4, 1],
+    [
+      [color('TransparentColor', [1, 1, 1]), scalar('TransparencyFactor', 0.6), scalar('Shininess', 0)].join('\n'),
+      0.4,
+      1,
+    ],
     [[scalar('Opacity', 1), scalar('TransparencyFactor', 1), scalar('Shininess', 1e12)].join('\n'), 1, 0.045],
   ]) {
     const { doc } = readGLB(await convertFBX(fixture({ properties }))),
@@ -140,7 +144,10 @@ test('Phong shininess maps to roughness like @margoengine/materials ((2/(n+2))^(
 
 test('Phong roughness reads ShininessExponent, which is all 3ds Max writes', async () => {
   // Both files hold ShininessExponent 675.587890625 and no Shininess.
-  for (const name of ['max_pbr_metal_rough_material_7700_ascii.fbx', 'max_physical_material_properties_7500_ascii.fbx']) {
+  for (const name of [
+    'max_pbr_metal_rough_material_7700_ascii.fbx',
+    'max_physical_material_properties_7500_ascii.fbx',
+  ]) {
     const { doc } = readGLB(await convertFBX(real(name), { fetch: missing, resourcePath: 'https://assets.example/' }));
     const actual = doc.materials[0].pbrMetallicRoughness.roughnessFactor;
     assert.ok(Math.abs(actual - (2 / 677.587890625) ** 0.25) < 1e-6, `${name}: ${actual}`);
@@ -250,7 +257,7 @@ test('an image the server does not have leaves the model, and the material names
   assert.deepEqual(doc.materials[0].extras.fbxMissingTextures, ['missing.png']);
 });
 
-test('a full path from the writer\'s PC looks beside the file, by its file name', async () => {
+test("a full path from the writer's PC looks beside the file, by its file name", async () => {
   const asked = [];
   const glb = await convertFBX(fixture({ textures: [{ path: 'C:\\Users\\artist\\scene\\wood.png' }] }), {
     resourcePath: 'https://assets.example/models/',
@@ -267,16 +274,22 @@ test("a relative path that climbs above the server root to the writer's PC looks
   // Character Creator 4 writes the images it made while exporting this way, from its own temporary folder.
   const asked = [],
     climb = '../../../../../../Users/artist/AppData/Local/Temp/CharacterCreator5Temp/FbxWorkingDirectory/tear.png';
-  const glb = await convertFBX(fixture({ textures: [{ path: climb }, { path: '../normals/normal.png', slot: 'NormalMap' }] }), {
-    resourcePath: 'https://assets.example/models/robot/',
-    allowedURLs: ['https://assets.example/models/normals/'],
-    fetch: async (url) => {
-      asked.push(String(url));
-      return new Response(PNG);
+  const glb = await convertFBX(
+    fixture({ textures: [{ path: climb }, { path: '../normals/normal.png', slot: 'NormalMap' }] }),
+    {
+      resourcePath: 'https://assets.example/models/robot/',
+      allowedURLs: ['https://assets.example/models/normals/'],
+      fetch: async (url) => {
+        asked.push(String(url));
+        return new Response(PNG);
+      },
     },
-  });
+  );
   // A climb the app allows still goes where it says.
-  assert.deepEqual(asked, ['https://assets.example/models/robot/tear.png', 'https://assets.example/models/normals/normal.png']);
+  assert.deepEqual(asked, [
+    'https://assets.example/models/robot/tear.png',
+    'https://assets.example/models/normals/normal.png',
+  ]);
   assert.equal(readGLB(glb).doc.images.length, 2);
 });
 
@@ -462,9 +475,15 @@ test('a TransparentColor map is opacity as Max, Blender and Character Creator wr
   // Character Creator: Opacity 1 and no TransparencyFactor (the template's 0). The white texels stay.
   assert.deepEqual(await alphas(scalar('Opacity', 1), [255, 0, 255, 0]), { mode: 'MASK', alpha: [255, 0, 255, 0] });
   // Its brow base card: Opacity 0.9 with TransparencyFactor 0.316; still an opacity map.
-  assert.deepEqual((await alphas([scalar('Opacity', 0.9), scalar('TransparencyFactor', 0.316)].join('\n'), [255, 0, 255, 0])).alpha, [255, 0, 255, 0]);
+  assert.deepEqual(
+    (await alphas([scalar('Opacity', 0.9), scalar('TransparencyFactor', 0.316)].join('\n'), [255, 0, 255, 0])).alpha,
+    [255, 0, 255, 0],
+  );
   // Maya: TransparencyFactor 1 makes the map the transparency itself, white clear.
-  assert.deepEqual(await alphas([scalar('Opacity', 1), scalar('TransparencyFactor', 1)].join('\n'), [255, 0, 255, 0]), { mode: 'MASK', alpha: [0, 255, 0, 255] });
+  assert.deepEqual(await alphas([scalar('Opacity', 1), scalar('TransparencyFactor', 1)].join('\n'), [255, 0, 255, 0]), {
+    mode: 'MASK',
+    alpha: [0, 255, 0, 255],
+  });
   // A map with no hole cuts nothing: the material stays opaque.
   assert.equal((await alphas(scalar('Opacity', 1), [255, 255, 255, 255])).mode, 'OPAQUE');
 });

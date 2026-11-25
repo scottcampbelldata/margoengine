@@ -11,28 +11,54 @@ class Canvas extends EventTarget {
   // A canvas in the page's document when the process has one (a fixture that brings a DOM, such as React's on jsdom).
   // A fixture may set its own document.
   #document;
-  get ownerDocument() { return this.#document ?? globalThis.document; }
-  set ownerDocument(value) { this.#document = value; }
+  get ownerDocument() {
+    return this.#document ?? globalThis.document;
+  }
+  set ownerDocument(value) {
+    this.#document = value;
+  }
   captures = new Set();
-  setPointerCapture(id) { this.captures.add(id); }
-  releasePointerCapture(id) { this.captures.delete(id); }
-  hasPointerCapture(id) { return this.captures.has(id); }
-  getBoundingClientRect() { return { left: 0, top: 0, width: 64, height: 32 }; }
+  setPointerCapture(id) {
+    this.captures.add(id);
+  }
+  releasePointerCapture(id) {
+    this.captures.delete(id);
+  }
+  hasPointerCapture(id) {
+    return this.captures.has(id);
+  }
+  getBoundingClientRect() {
+    return { left: 0, top: 0, width: 64, height: 32 };
+  }
   attributes = new Map();
-  hasAttribute(name) { return this.attributes.has(name); }
-  getAttribute(name) { return this.attributes.get(name) ?? null; }
-  setAttribute(name, value) { this.attributes.set(name, String(value)); }
-  removeAttribute(name) { this.attributes.delete(name); }
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
   getContext() {
     const canvas = this;
-    return { configure() {}, getConfiguration: () => ({ device: canvas.device, format: 'bgra8unorm' }),
-      getCurrentTexture: () => ({ width: 8, height: 8, format: 'bgra8unorm' }) };
+    return {
+      configure() {},
+      getConfiguration: () => ({ device: canvas.device, format: 'bgra8unorm' }),
+      getCurrentTexture: () => ({ width: 8, height: 8, format: 'bgra8unorm' }),
+    };
   }
 }
 class Frame {
   displayWidth = 8;
   closed = false;
-  close() { this.closed = true; this.displayWidth = 0; }
+  close() {
+    this.closed = true;
+    this.displayWidth = 0;
+  }
 }
 
 // The browser members the inert device lacks, filled in here and only here: fixtures never shim a device, so on a real
@@ -49,8 +75,15 @@ function completeDevice(device) {
   device.createRenderPipelineAsync ??= async (descriptor) => device.createRenderPipeline(descriptor);
   device.createComputePipelineAsync ??= async (descriptor) => device.createComputePipeline(descriptor);
   device.createRenderBundleEncoder ??= () => ({
-    setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, draw() {}, drawIndexed() {},
-    drawIndirect() {}, drawIndexedIndirect() {}, finish: () => ({}),
+    setPipeline() {},
+    setBindGroup() {},
+    setVertexBuffer() {},
+    setIndexBuffer() {},
+    draw() {},
+    drawIndexed() {},
+    drawIndirect() {},
+    drawIndexedIndirect() {},
+    finish: () => ({}),
   });
   device.pushErrorScope ??= () => {};
   device.popErrorScope ??= async () => null;
@@ -78,10 +111,13 @@ function completeDevice(device) {
 export const standardShader = [
   '@group(0) @binding(0) var<uniform> frame:Frame;',
   'struct Output { @builtin(position) @invariant clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) color:vec3f,@location(3) material:vec4f }',
-  '@vertex fn vertex(i:Input)->Output {', 'let model=mat4x4f(i.m0,i.m1,i.m2,i.m3);let p=model*vec4f(i.position,1);',
+  '@vertex fn vertex(i:Input)->Output {',
+  'let model=mat4x4f(i.m0,i.m1,i.m2,i.m3);let p=model*vec4f(i.position,1);',
   'var o:Output;o.clip=frame.camera*p;o.position=p.xyz;',
-  '@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {', 'let direct=vec3f(1);',
-  'let ambient=i.color*frame.radiance.w*frame.ambient.rgb;', 'let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;',
+  '@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {',
+  'let direct=vec3f(1);',
+  'let ambient=i.color*frame.radiance.w*frame.ambient.rgb;',
+  'let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;',
   'let mapped=pbrNeutral(max(linear,vec3f(0))); return vec4f(mapped,1);}',
 ].join('\n');
 
@@ -108,19 +144,36 @@ export async function nodeLifetimeAdapter() {
             return { ...begin(descriptor), setViewport() {}, setScissorRect() {}, setStencilReference() {} };
           },
           copyTextureToBuffer() {},
-          finish() { return {}; },
+          finish() {
+            return {};
+          },
         });
         return h;
       };
       let gpu = makeGPU();
       const renderer = {
-        backend: 'webgpu', gpu: gpu.engine.gpu, add() {}, remove() {}, dispose() {},
+        backend: 'webgpu',
+        gpu: gpu.engine.gpu,
+        add() {},
+        remove() {},
+        dispose() {},
         render(camera, _lighting, _batches, graph, delta, view) {
-          const context = { ...gpu.context, camera, delta, width: 64, height: 32, shader: standardShader,
-            descriptor: { multisample: { count: 1 }, vertex: { buffers: [] },
-              depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less' } },
-            device: renderer.gpu, encoder: renderer.gpu.createCommandEncoder(),
-            view: view && { ...view, viewport: view.rect } };
+          const context = {
+            ...gpu.context,
+            camera,
+            delta,
+            width: 64,
+            height: 32,
+            shader: standardShader,
+            descriptor: {
+              multisample: { count: 1 },
+              vertex: { buffers: [] },
+              depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less' },
+            },
+            device: renderer.gpu,
+            encoder: renderer.gpu.createCommandEncoder(),
+            view: view && { ...view, viewport: view.rect },
+          };
           graph.execute(context);
         },
       };
@@ -129,12 +182,18 @@ export async function nodeLifetimeAdapter() {
       const engine = new Engine(canvas, await TransformStore.create(32), renderer, undefined, null);
       const scenes = new Set([engine.scene]);
       const create = engine.createScene.bind(engine);
-      engine.createScene = (...args) => { const scene = create(...args); scenes.add(scene); return scene; };
+      engine.createScene = (...args) => {
+        const scene = create(...args);
+        scenes.add(scene);
+        return scene;
+      };
       return {
         engine,
         camera: () => new Camera(),
         frame: () => new Frame(),
-        async render(views) { engine.render({ views, delta: 0.125 }); },
+        async render(views) {
+          engine.render({ views, delta: 0.125 });
+        },
         async lose(observer) {
           // Deterministic notification simulation; browser adapter separately proves real device destruction/recovery.
           observer.lost(renderer.gpu);
@@ -145,9 +204,12 @@ export async function nodeLifetimeAdapter() {
           for (const scene of scenes) {
             const plugins = [...scene.plugins.values()];
             if (!plugins.length) continue;
-            const scope = { name: 'owner-lifetime:restore', setup() {
-              for (const plugin of plugins) plugin.onDeviceRestored?.(engine);
-            } };
+            const scope = {
+              name: 'owner-lifetime:restore',
+              setup() {
+                for (const plugin of plugins) plugin.onDeviceRestored?.(engine);
+              },
+            };
             scene.use(scope);
             scene.removePlugin(scope.name);
           }

@@ -364,6 +364,71 @@ function lanternOnSnow({ matrix, image }, points) {
   }
   return { radiance: sum.map((c) => c / n), lit: open[0] ? sum[0] / open[0] : 1 };
 }
+// The window's geometry outside its glass: the cross bar, the mullion and the sill (main.ts), as boxes [lo, hi].
+const windowBars = [
+    [
+      [0.6, 1.4775, 2.425],
+      [1.8, 1.5225, 2.475],
+    ],
+    [
+      [1.1775, 0.95, 2.425],
+      [1.2225, 2.05, 2.475],
+    ],
+    [
+      [0.52, 0.89, 2.34],
+      [1.88, 0.97, 2.76],
+    ],
+  ],
+  windowSill = windowBars[2],
+  // The opening light's rectangle at z 2.452 (1.2 x 1.1 m), 840 patches of equal area.
+  panePatches = [];
+for (let a = 0; a < 30; a++)
+  for (let b = 0; b < 28; b++) panePatches.push([0.6 + ((a + 0.5) * 1.2) / 30, 0.95 + ((b + 0.5) * 1.1) / 28, 2.452]);
+/** Whether the segment from p to q crosses the box [lo, hi] (the slab test). */
+function crossesBox(p, q, [lo, hi]) {
+  let t0 = 0,
+    t1 = 1;
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(q[k] - p[k]) < 1e-12) {
+      if (p[k] < lo[k] || p[k] > hi[k]) return false;
+      continue;
+    }
+    let a = (lo[k] - p[k]) / (q[k] - p[k]),
+      b = (hi[k] - p[k]) / (q[k] - p[k]);
+    if (a > b) [a, b] = [b, a];
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, b);
+  }
+  return t0 <= t1;
+}
+/** Whether the segment from snow point p to q (inside) passes the window's opening (x 0.6 to 1.8, y 0.97 to 2.05) at depth z. */
+function inOpening(p, q, z) {
+  const t = (z - p[2]) / (q[2] - p[2]),
+    x = p[0] + t * (q[0] - p[0]),
+    y = p[1] + t * (q[1] - p[1]);
+  return x >= 0.6 && x <= 1.8 && y >= 0.97 && y <= 2.05;
+}
+/**
+ * The window's form factor from a point outside (unit normal `n`), sum cos_p cos_q dA / (pi r^2) over the pane's 840
+ * patches by midpoint quadrature: `shaded` (default) lets a patch count only where the segment to it leaves through the
+ * opening's outer face (the frame, z 2.67) and passes over the sill, as physics does; without it every patch in front of
+ * the receiver counts, the bare rectangle (Lambert's polygon form). KB-BOUNCE-REVEAL1: the opening light clips its
+ * rectangle the same way (`recess`, `sill`), so what it lights outside is held to this.
+ */
+function paneFormFactor(p, n, { shaded = true } = {}) {
+  let sum = 0;
+  for (const q of panePatches) {
+    const d = q.map((c, k) => c - p[k]),
+      d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
+      l = Math.sqrt(d2),
+      cosP = (n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / l,
+      cosQ = -d[2] / l;
+    if (cosP <= 0 || cosQ <= 0) continue;
+    if (shaded && (!inOpening(p, q, 2.67) || crossesBox(p, q, windowSill))) continue;
+    sum += (cosP * cosQ * ((1.2 * 1.1) / panePatches.length)) / d2;
+  }
+  return sum / Math.PI;
+}
 /**
  * KB-CABIN-SNOWBOUNCE1: the one bounce off the snow onto the outward crest of the log at (0.3, 1.35, 2.65), normal +z,
  * per unit of the source, by midpoint quadrature over the snow surface of `lanternOnSnow` (the ground's 1 m grid lifted
@@ -372,12 +437,12 @@ function lanternOnSnow({ matrix, image }, points) {
  * 'lantern': a point at the lantern of unit intensity, by the inverse square law, the range window (1 - (d / 18)^4)^2
  * and the cosine, through the window's opening (x 0.6 to 1.8, y 0.97 to 2.05 from its inner face at z 2.33 to its outer
  * face at z 2.67) past the cross bar, mullion and sill of `lanternOnSnow`; 2 cm elements.
- * 'pane': the window's opening at z 2.452 (1.2 x 1.1 m) of unit radiance, 840 patches; `shaded` (default) lets a patch
- * light a snow element only through the opening's outer face and past the sill, as physics does; without it every patch
- * lights every element in front of the pane, as the opening light (no shadow) does; 4 cm elements. `centre` (a point,
- * with `shaded: false`) is LightBounce's own model of the frosted scene: the opening's capture looks out from in front
- * of its glazing bars, so the snow it reflects is what that point sees through the opening's outer face and past the sill,
- * and each such element takes the bare rectangle's irradiance (`rectIrradiance`, the opening light's unshadowed light).
+ * 'pane': the window's opening at z 2.452 (1.2 x 1.1 m) of unit radiance, E_in = pi `paneFormFactor`; `shaded`
+ * (default) lets the pane light a snow element only through the opening's outer face and past the sill, as physics
+ * does; without it, as the bare rectangle does; 4 cm elements. `centre` (a point, with `shaded: false`) is LightBounce's
+ * own model of the frosted scene: the opening's capture looks out from in front of its glazing bars, so the snow it
+ * reflects is what that point sees through the opening's outer face and past the sill, and each such element takes the
+ * bare rectangle's irradiance (`rectIrradiance`, the opening light's unshadowed light; KB-BOUNCE-CAPEYE1).
  * The plan's 0.096 R for the lantern is this quadrature on the unlifted ground (y = 0): 0.0986 R; the scene's snow
  * lies on drifts lifted by `snowDepthAt`, nearer the lantern and the crest.
  */
@@ -385,21 +450,6 @@ function bounceQuadrature(kind, { shaded = true, centre } = {}) {
   const lantern = [1.2, 1.875, 1.95],
     crest = [0.3, 1.35, 2.65],
     albedo = [0.9, 0.92, 0.95],
-    bars = [
-      [
-        [0.6, 1.4775, 2.425],
-        [1.8, 1.5225, 2.475],
-      ],
-      [
-        [1.1775, 0.95, 2.425],
-        [1.2225, 2.05, 2.475],
-      ],
-      [
-        [0.52, 0.89, 2.34],
-        [1.88, 0.97, 2.76],
-      ],
-    ],
-    sill = bars[2],
     vertex = (vx, vz) => snowDepthAt(vx, vz, 1, 1, { depth: 0.12, variation: 0.5, drift: 3 }),
     height = (px, pz) => {
       const ix = Math.floor(px),
@@ -408,33 +458,7 @@ function bounceQuadrature(kind, { shaded = true, centre } = {}) {
         w = pz - iz,
         [h00, h10, h01, h11] = [vertex(ix, iz), vertex(ix + 1, iz), vertex(ix, iz + 1), vertex(ix + 1, iz + 1)];
       return u + w <= 1 ? h00 + u * (h10 - h00) + w * (h01 - h00) : h11 + (1 - u) * (h01 - h11) + (1 - w) * (h10 - h11);
-    },
-    crosses = (p, q, [lo, hi]) => {
-      let t0 = 0,
-        t1 = 1;
-      for (let k = 0; k < 3; k++) {
-        if (Math.abs(q[k] - p[k]) < 1e-12) {
-          if (p[k] < lo[k] || p[k] > hi[k]) return false;
-          continue;
-        }
-        let a = (lo[k] - p[k]) / (q[k] - p[k]),
-          b = (hi[k] - p[k]) / (q[k] - p[k]);
-        if (a > b) [a, b] = [b, a];
-        t0 = Math.max(t0, a);
-        t1 = Math.min(t1, b);
-      }
-      return t0 <= t1;
-    },
-    // Whether the segment from snow point p to q (inside) passes the opening's face at depth z.
-    inOpening = (p, q, z) => {
-      const t = (z - p[2]) / (q[2] - p[2]),
-        x = p[0] + t * (q[0] - p[0]),
-        y = p[1] + t * (q[1] - p[1]);
-      return x >= 0.6 && x <= 1.8 && y >= 0.97 && y <= 2.05;
-    },
-    patches = [];
-  for (let a = 0; a < 30; a++)
-    for (let b = 0; b < 28; b++) patches.push([0.6 + ((a + 0.5) * 1.2) / 30, 0.95 + ((b + 0.5) * 1.1) / 28, 2.452]);
+    };
   const step = kind === 'lantern' ? 0.02 : 0.04,
     e = [0, 0, 0];
   for (let x = -4; x < 7; x += step)
@@ -448,24 +472,19 @@ function bounceQuadrature(kind, { shaded = true, centre } = {}) {
       if (cosS <= 0 || cosC <= 0) continue;
       let lit = 0;
       if (kind === 'lantern') {
-        if (!inOpening(p, lantern, 2.33) || !inOpening(p, lantern, 2.67) || bars.some((b) => crosses(p, lantern, b)))
+        if (
+          !inOpening(p, lantern, 2.33) ||
+          !inOpening(p, lantern, 2.67) ||
+          windowBars.some((b) => crossesBox(p, lantern, b))
+        )
           continue;
         const l = lantern.map((c, k) => c - p[k]),
           d = Math.hypot(...l);
         lit = (Math.max(0, 1 - (d / 18) ** 4) ** 2 * (l[1] / d)) / (d * d);
       } else {
         if (p[2] > 12) continue;
-        if (centre && (!inOpening(p, centre, 2.67) || crosses(p, centre, sill))) continue;
-        for (const q of patches) {
-          const d = q.map((c, k) => c - p[k]),
-            d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
-            l = Math.sqrt(d2),
-            up = d[1] / l,
-            out = -d[2] / l;
-          if (up <= 0 || out <= 0) continue;
-          if (shaded && (!inOpening(p, q, 2.67) || crosses(p, q, sill))) continue;
-          lit += (up * out * ((1.2 * 1.1) / patches.length)) / d2;
-        }
+        if (centre && (!inOpening(p, centre, 2.67) || crossesBox(p, centre, windowSill))) continue;
+        lit = Math.PI * paneFormFactor(p, [0, 1, 0], { shaded });
       }
       for (let k = 0; k < 3; k++) e[k] += (albedo[k] * lit * cosS * cosC * step * step) / (Math.PI * r * r);
     }
@@ -816,9 +835,10 @@ try {
   // KB-CABIN-WINDOWGLOW1: the room's light leaves through the window (clustered/area `openingLight`, its radiance the
   // room's integrating-sphere mean, and through the frosted pane also the lamps' light the frost lets through, checked
   // in packages/clustered/test/opening-light.test.js). Its light on the snow just under the window, where the wall and
-  // the sill keep the lantern's own light off: the frame with it less the frame without it, against Lambert's polygon
-  // form factor F from each snow point to the window (diffuse albedo x radiance x F; the snow's specular adds under 10%
-  // at this roughness). Before, nothing lit that snow but the moon.
+  // the sill keep the lantern's own light off: the frame with it less the frame without it, against the form factor F
+  // from each snow point to the part of the window it sees past the frame and the sill (`paneFormFactor`, traced;
+  // KB-BOUNCE-REVEAL1), diffuse albedo x radiance x F; the snow's specular adds under 10% at this roughness. Before,
+  // nothing lit that snow but the moon.
   const frostedLit = await frame(bare, 'outside-linear', { linear: true, lamp: 'steady' }),
     frostedUnlit = await frame(bare, 'outside-linear-no-lantern', { linear: true, lamp: false }),
     [opening] = await ctx.page.evaluate(() => window.cabinHearth.windowLight.list),
@@ -832,32 +852,7 @@ try {
       [1.5, 4.05],
     ].map(([x, z]) => [x, 0.05, z]),
     lift = [0, 1, 2].map((k) => colour(frostedUnlit, underAt).lin[k] - colour(noWindow, underAt).lin[k]),
-    corners = [
-      [-1, -1],
-      [1, -1],
-      [1, 1],
-      [-1, 1],
-    ].map(([a, b]) => [
-      opening.position[0] + (a * opening.width) / 2,
-      opening.position[1] + (b * opening.height) / 2,
-      opening.position[2],
-    ]),
-    formFactor = (p) => {
-      let sum = 0;
-      for (let i = 0; i < 4; i++) {
-        const a = corners[i].map((c, k) => c - p[k]),
-          b = corners[(i + 1) % 4].map((c, k) => c - p[k]),
-          cross = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
-          angle = Math.acos(
-            Math.min(
-              1,
-              Math.max(-1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b))),
-            ),
-          );
-        sum += (angle * cross[1]) / Math.hypot(...cross);
-      }
-      return Math.abs(sum) / (2 * Math.PI);
-    },
+    formFactor = (p) => paneFormFactor(p, [0, 1, 0]),
     hits = snowHits(noWindow, underAt),
     F = hits.reduce((a, p) => a + formFactor(p) / hits.length, 0),
     expected = [0, 1, 2].map((k) => 0.9 * opening.color[k] * opening.intensity * F);
@@ -888,8 +883,8 @@ try {
   // jamb cut the beam (the line above, 3.5 m out, where clear glass gave a 22 mm flame's 4 cm penumbra) is as soft as a
   // Lambertian rectangle the pane's size makes it. Edge width here is the light over its slope across the line, both
   // from a least-squares line through the profile's 7 x 7 px boxes 2 cm apart over 0.8 m: for a light that falls off
-  // smoothly, the distance over which it would fall to nothing. The window's light at each point is Lambert's polygon
-  // form factor F times its radiance, so the predicted width is F's over F's slope over the same points; the minimum is
+  // smoothly, the distance over which it would fall to nothing. The window's light at each point is the form factor F
+  // of the part of the pane it sees past the frame and sill (`paneFormFactor`) times its radiance, so the predicted width is F's over F's slope over the same points; the minimum is
   // half that. The clear window's crisp edge reads a quarter of a metre or less this way.
   const near = 3.5,
     nearAt = [lampAt[0] + along[0] * near, lampAt[1] + along[1] * near],
@@ -1262,11 +1257,10 @@ try {
   // the bounce); the snow beside the lantern's patch changes by under
   // 0.0005. Frosted (the scene as it is): the lantern's beam stops at the frost, so its bounce outside is under 2% of the
   // window's (the dark room's bound: counted once, by the window's light); the window's light (the pane's tau_d E / pi as the opening's mean radiance) bounces off
-  // the snow it lights, and its twin lies between the quadrature with the window's reveal and sill shading the snow
-  // (physics) and without them (what the opening light, which casts no shadow, puts on the snow; KB-BOUNCE-REVEAL1), and
-  // within 15% of the quadrature of LightBounce's own model of it (`centre`: the snow the opening's capture sees from
-  // in front of its glazing bars, KB-BOUNCE-CAPEYE1, lit by the bare rectangle), so its excess over physics is the
-  // opening model's, not the GPU's. Every
+  // the snow it lights, and its twin is within 15% of the quadrature with the window's frame and sill shading the snow
+  // (physics; KB-BOUNCE-REVEAL1: the opening light's `recess` and `sill` clip its rectangle to what each point sees past
+  // them, in AreaLights and in the bounce's capture, which looks out from the frame's mouth). The bare quadrature, what
+  // an opening light with no reveal puts on the snow, is reported beside it. Every
   // check above that holds a light to physics runs with `bounce=0`. Before KB-BOUNCE-VPL-BURIED1 the snow's VPLs sat
   // under their own drifts and the crest got 0.0020 R.
   const stops = 3,
@@ -1278,6 +1272,14 @@ try {
     // by the same cast, which is physics; the bounce now gives it that (0.0032 R before the scene's triangles were
     // occluders, the rest the room's walls lighting it through the front wall).
     shadowed = [-2.0, 0.05, 3.2],
+    // Snow 0.25 to 0.35 m in front of the front wall and 1.3 to 2.2 cm over the cabin's plank floor (y 0.15) behind it:
+    // the same cast gives each 0.00003 R. The texels of the back wall's VPLs there held the floor just inside the wall,
+    // to one depth sample the snow's own plane, and the bounce took 0.0013 R and 0.0007 R (the twin, albedo 0.9 / pi)
+    // through the wall until the texel beside, which holds the wall, was asked too (KB-BOUNCE-SHADOWSNOW1).
+    nearWall = [
+      [-1.5, 0.163, 3.0],
+      [-2.5, 0.172, 2.9],
+    ],
     wood = weatheredWood.color.slice(0, 3),
     crestRead = async (glazing) => {
       const query = `view=outside&fog=0&snow=0&fire=0${glazing === 'clear' ? '&glazing=clear' : ''}`,
@@ -1286,7 +1288,7 @@ try {
           exposure: stops,
           lamp: 'steady',
           bloom: false,
-          hdr: [crest, shadowed],
+          hdr: [crest, shadowed, ...nearWall],
         }),
         data = new Float32Array(await ctx.page.evaluate(() => [...window.cabinHearth.lightBounce.data])),
         stats = await ctx.page.evaluate(() => window.cabinHearth.lightBounce.stats),
@@ -1295,7 +1297,7 @@ try {
           exposure: stops,
           lamp: 'steady',
           bloom: false,
-          hdr: [crest, shadowed],
+          hdr: [crest, shadowed, ...nearWall],
         }),
         change = (at) => [0, 1, 2].map((k) => (colour(on, at, 1).lin[k] - colour(off, at, 1).lin[k]) / gain),
         float = (key, i = 0) => [0, 1, 2].map((k) => on.hdr[i][key][k] - off.hdr[i][key][k]),
@@ -1317,6 +1319,8 @@ try {
         scales: [[...data.slice(4, 7)], [...data.slice(8, 11)]],
         shadowChange: float('at', 1),
         shadowChange8: change([shadowed]),
+        nearWallChange: nearWall.map((_, i) => float('at', 2 + i)),
+        nearWallTwin: nearWall.map((p) => bounceIrradiance(data, p, [0, 1, 0]).map((e) => (0.9 / Math.PI) * e)),
         stats,
       };
     },
@@ -1343,6 +1347,8 @@ try {
           quadrature: fmt(lanternQuad),
           shadowChange: fmt(clear.shadowChange),
           shadowChange8: fmt(clear.shadowChange8),
+          nearWallChange: clear.nearWallChange.map(fmt),
+          nearWallTwin: clear.nearWallTwin.map(fmt),
           stats: clear.stats,
         },
         frosted: {
@@ -1375,6 +1381,13 @@ try {
   assert.ok(
     clear.shadowChange.every((c) => Math.abs(c) < 0.0005),
     `the shadowed snow keeps its light (${fmt(clear.shadowChange)})`,
+  );
+  nearWall.forEach((p, i) =>
+    assert.ok(
+      clear.nearWallChange[i].every((c) => Math.abs(c) < 0.0005) &&
+        clear.nearWallTwin[i].every((c) => Math.abs(c) < 0.0005),
+      `the snow at ${p} by the wall keeps its light (frame ${fmt(clear.nearWallChange[i])}, twin ${fmt(clear.nearWallTwin[i])})`,
+    ),
   );
   assert.ok(
     frosted.lantern.every((c) => c <= 0.02 * frosted.window[0]),

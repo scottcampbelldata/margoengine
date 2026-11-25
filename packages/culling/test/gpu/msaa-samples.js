@@ -5,7 +5,8 @@
 // samples mean an equal frame on every GPU, and a culling error (a box dropped, moved or drawn twice) changes them.
 // Load it before the page module (module scripts run in order): it must see the engines' textures being created.
 // On the WebGL2 compatibility layer (globalThis.__margoCompat) there is no GPUDevice to hook; msaaDiff returns null.
-const multisampled = (d) => d.sampleCount === 4 && !String(d.format).startsWith('depth') && !String(d.format).startsWith('stencil');
+const multisampled = (d) =>
+  d.sampleCount === 4 && !String(d.format).startsWith('depth') && !String(d.format).startsWith('stencil');
 const deviceOf = new WeakMap(),
   textureOfView = new WeakMap(),
   canvasOf = new WeakMap(),
@@ -14,7 +15,10 @@ if (globalThis.GPUDevice && !globalThis.__margoCompat) {
   const createTexture = GPUDevice.prototype.createTexture;
   GPUDevice.prototype.createTexture = function (d) {
     // Readable samples: the colour attachment is also bound as a multisampled texture for the read below.
-    const texture = createTexture.call(this, multisampled(d) ? { ...d, usage: d.usage | GPUTextureUsage.TEXTURE_BINDING } : d);
+    const texture = createTexture.call(
+      this,
+      multisampled(d) ? { ...d, usage: d.usage | GPUTextureUsage.TEXTURE_BINDING } : d,
+    );
     if (multisampled(d)) deviceOf.set(texture, this);
     return texture;
   };
@@ -98,7 +102,8 @@ window.msaaDiff = async (a = 'a', b = 'b') => {
     tb = latest.get(b);
   if (!ta || !tb) return null;
   const [x, y] = [await read(ta), await read(tb)];
-  if (x.width !== y.width || x.height !== y.height) throw new Error(`canvas sizes differ: ${x.width}x${x.height}, ${y.width}x${y.height}`);
+  if (x.width !== y.width || x.height !== y.height)
+    throw new Error(`canvas sizes differ: ${x.width}x${x.height}, ${y.width}x${y.height}`);
   const rgb = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255];
   let differing = 0;
   const at = [];
@@ -108,7 +113,12 @@ window.msaaDiff = async (a = 'a', b = 'b') => {
     if (same) continue;
     differing++;
     if (at.length < 6)
-      at.push([p % x.width, Math.floor(p / x.width), [...x.data.subarray(p * 4, p * 4 + 4)].map(rgb), [...y.data.subarray(p * 4, p * 4 + 4)].map(rgb)]);
+      at.push([
+        p % x.width,
+        Math.floor(p / x.width),
+        [...x.data.subarray(p * 4, p * 4 + 4)].map(rgb),
+        [...y.data.subarray(p * 4, p * 4 + 4)].map(rgb),
+      ]);
   }
   return { differing, at, pixels: x.width * x.height };
 };

@@ -282,27 +282,54 @@ window.runTextTests = async () => {
   const { getSelectionRects } = await import('@margoengine/text/selection');
   const selectionBlock = new Text({ text: 'Hello world\n\u05d0\u05d1\u05d2 abc', font, maxWidth: 4 });
   const highlights = getSelectionRects(selectionBlock.layout, 2, selectionBlock.text.length - 1);
-  assert(highlights.length >= 2 && highlights.every(r => r.right > r.left && r.top > r.bottom),
-    'Real font multiline bidi selection must produce valid rectangles');
+  assert(
+    highlights.length >= 2 && highlights.every((r) => r.right > r.left && r.top > r.bottom),
+    'Real font multiline bidi selection must produce valid rectangles',
+  );
   report.checks.push('Selection rectangles span wrapped real-font text and bidi runs');
 
   const { CurvedText, PathText } = await import('@margoengine/text/curve');
   label.visible = false;
-  const curved = renderer.add(new CurvedText({ text: 'Margo curve', font, fontSize: 1.2,
-    curveRadius: Infinity, curveSegments: 12, anchorX: 'center', anchorY: 'middle' }));
+  const curved = renderer.add(
+    new CurvedText({
+      text: 'Margo curve',
+      font,
+      fontSize: 1.2,
+      curveRadius: Infinity,
+      curveSegments: 12,
+      anchorX: 'center',
+      anchorY: 'middle',
+    }),
+  );
   const flatImage = await frame();
   curved.curveRadius = 2.5;
   image = await frame();
   let curvedDifference = 0;
-  for (let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) if(Math.abs(flatImage.at(x,y)[0]-image.at(x,y)[0])>80) curvedDifference++;
-  assert(ink(image).count > 100 && curvedDifference > 100 && renderer.stats.drawCalls === 1,
-    `Subdivided cylinder must change actual pixels in one draw: ${curvedDifference}`);
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++) if (Math.abs(flatImage.at(x, y)[0] - image.at(x, y)[0]) > 80) curvedDifference++;
+  assert(
+    ink(image).count > 100 && curvedDifference > 100 && renderer.stats.drawCalls === 1,
+    `Subdivided cylinder must change actual pixels in one draw: ${curvedDifference}`,
+  );
   curved.dispose();
-  const alongPath = new PathText({ text: 'Path text', font, fontSize: 0.8,
-    path: { length: 10, sample: d => ({ position: [d-2,0.3*Math.sin(d),0],
-      tangent: [1,0.3*Math.cos(d),0], normal: [-0.3*Math.cos(d),1,0] }) } }).addTo(renderer);
+  const alongPath = new PathText({
+    text: 'Path text',
+    font,
+    fontSize: 0.8,
+    path: {
+      length: 10,
+      sample: (d) => ({
+        position: [d - 2, 0.3 * Math.sin(d), 0],
+        tangent: [1, 0.3 * Math.cos(d), 0],
+        normal: [-0.3 * Math.cos(d), 1, 0],
+      }),
+    },
+  }).addTo(renderer);
   image = await frame();
-  assert(ink(image).count > 100 && renderer.stats.drawCalls === alongPath.texts.length, 'Path glyphs must render with their frames');
+  assert(
+    ink(image).count > 100 && renderer.stats.drawCalls === alongPath.texts.length,
+    'Path glyphs must render with their frames',
+  );
   alongPath.dispose();
   label.visible = true;
   report.checks.push('Subdivided cylindrical text and arc-distance path glyphs render with original layout and styles');
@@ -310,21 +337,43 @@ window.runTextTests = async () => {
   // Optional fitted text uses the same renderer; clipping must include every style layer.
   const { FittedText } = await import('@margoengine/text/fit');
   label.visible = false;
-  const fitted = renderer.add(new FittedText({ text: 'MMMM MMMM MMMM', font, fontSize: 2,
-    maxWidth: 5, maxLines: 1, anchorX: 'center', anchorY: 'middle',
-    outlineWidth: 0.12, outlineColor: '#ffffff', shadowOpacity: 1, shadowOffset: [0.3, -0.3],
-    clipRect: [-0.7, -0.6, 0.7, 0.6] }));
+  const fitted = renderer.add(
+    new FittedText({
+      text: 'MMMM MMMM MMMM',
+      font,
+      fontSize: 2,
+      maxWidth: 5,
+      maxLines: 1,
+      anchorX: 'center',
+      anchorY: 'middle',
+      outlineWidth: 0.12,
+      outlineColor: '#ffffff',
+      shadowOpacity: 1,
+      shadowOffset: [0.3, -0.3],
+      clipRect: [-0.7, -0.6, 0.7, 0.6],
+    }),
+  );
   image = await frame();
   const clippedInk = ink(image);
   assert(clippedInk.count > 20, 'Fitted text must remain visible');
-  assert(clippedInk.minX >= SIZE / 2 - 0.7 * PX - 1 && clippedInk.maxX <= SIZE / 2 + 0.7 * PX + 1 &&
-    clippedInk.minY >= SIZE / 2 - 0.6 * PX - 1 && clippedInk.maxY <= SIZE / 2 + 0.6 * PX + 1,
-    `Clip leaked fill, outline or shadow: ${JSON.stringify(clippedInk)}`);
+  assert(
+    clippedInk.minX >= SIZE / 2 - 0.7 * PX - 1 &&
+      clippedInk.maxX <= SIZE / 2 + 0.7 * PX + 1 &&
+      clippedInk.minY >= SIZE / 2 - 0.6 * PX - 1 &&
+      clippedInk.maxY <= SIZE / 2 + 0.6 * PX + 1,
+    `Clip leaked fill, outline or shadow: ${JSON.stringify(clippedInk)}`,
+  );
   assert(fitted.layout.truncated && fitted.layout.lines.length === 1, 'maxLines must truncate with ellipsis');
-  fitted.autoFit = true; fitted.minFontSize = 0.1; fitted.maxFontSize = 2;
-  fitted.maxHeight = 1; fitted.clipRect = null;
+  fitted.autoFit = true;
+  fitted.minFontSize = 0.1;
+  fitted.maxFontSize = 2;
+  fitted.maxHeight = 1;
+  fitted.clipRect = null;
   image = await frame();
-  assert(fitted.layout.fits && !fitted.layout.truncated && fitted.fontSize < 2, 'Auto fit must retain the complete source');
+  assert(
+    fitted.layout.fits && !fitted.layout.truncated && fitted.fontSize < 2,
+    'Auto fit must retain the complete source',
+  );
   fitted.dispose();
   label.visible = true;
   report.checks.push('Fitted text clamps lines, auto fits and clips fill, outline and shadow in local space');
@@ -378,18 +427,33 @@ window.runTextTests = async () => {
 
   // The median of linearly filtered RGB is not the filtered scalar median.
   label.visible = false;
-  const rgbFont = new BitmapFont({ pages: ['diagnostic.png'], info: { size: 2 },
-    common: { lineHeight: 2, base: 2 },
-    chars: [{ id: 65, x: 0, y: 0, width: 2, height: 2, xoffset: 0, yoffset: 0, xadvance: 2, page: 0 }],
-    distanceField: { fieldType: 'msdf', distanceRange: 2 } },
-    [{ width: 2, height: 2, data: Uint8Array.of(40,240,40,255,240,40,40,255,40,240,40,255,240,40,40,255) }]);
-  const rgbText = renderer.add(new Text({ text: 'A', font: rgbFont, fontSize: 3, anchorX: 'center', anchorY: 'middle' }));
+  const rgbFont = new BitmapFont(
+    {
+      pages: ['diagnostic.png'],
+      info: { size: 2 },
+      common: { lineHeight: 2, base: 2 },
+      chars: [{ id: 65, x: 0, y: 0, width: 2, height: 2, xoffset: 0, yoffset: 0, xadvance: 2, page: 0 }],
+      distanceField: { fieldType: 'msdf', distanceRange: 2 },
+    },
+    [
+      {
+        width: 2,
+        height: 2,
+        data: Uint8Array.of(40, 240, 40, 255, 240, 40, 40, 255, 40, 240, 40, 255, 240, 40, 40, 255),
+      },
+    ],
+  );
+  const rgbText = renderer.add(
+    new Text({ text: 'A', font: rgbFont, fontSize: 3, anchorX: 'center', anchorY: 'middle' }),
+  );
   image = await frame();
-  assert(image.at(128,128)[0] > 200, `RGB interpolation must create the inner field: ${image.at(128,128)}`);
-  assert(image.at(104,128)[0] < 80 && image.at(152,128)[0] < 80, 'MSDF exterior must remain outside');
+  assert(image.at(128, 128)[0] > 200, `RGB interpolation must create the inner field: ${image.at(128, 128)}`);
+  assert(image.at(104, 128)[0] < 80 && image.at(152, 128)[0] < 80, 'MSDF exterior must remain outside');
   rgbText.dispose();
   label.visible = true;
-  report.checks.push('True MSDF samples all three channels before median, keeping a corner diagnostic lost by scalar reduction');
+  report.checks.push(
+    'True MSDF samples all three channels before median, keeping a corner diagnostic lost by scalar reduction',
+  );
 
   label.visible = false;
   const readmeFont = await BitmapFont.load('/tests/fixtures/fonts/readme/source-sans.json');
@@ -477,16 +541,29 @@ window.runTextTests = async () => {
   label.visible = false;
   const shapedFixture = (await (await fetch('/tests/fixtures/fonts/shaping-reference.json')).json()).cases[0];
   const variableBytes = await (await fetch('/tests/fixtures/fonts/SourceSans3VF-Upright.otf')).arrayBuffer();
-  const shapedGeometry = extrudeText(shapedFixture.text, { font: variableBytes, openType, variations: shapedFixture.variations,
-    shapedRuns: shapedFixture.shapedRuns, size: 1.6, depth: 0.25 });
-  const shapedMesh = engine.createMesh().setGeometry(new Geometry(shapedGeometry.positions, shapedGeometry.normals, shapedGeometry.indices))
-    .setMaterial(new PbrMaterial({color:'#ff8800',roughness:0.4}));
-  shapedMesh.setPosition([-3,-0.6,0]);
+  const shapedGeometry = extrudeText(shapedFixture.text, {
+    font: variableBytes,
+    openType,
+    variations: shapedFixture.variations,
+    shapedRuns: shapedFixture.shapedRuns,
+    size: 1.6,
+    depth: 0.25,
+  });
+  const shapedMesh = engine
+    .createMesh()
+    .setGeometry(new Geometry(shapedGeometry.positions, shapedGeometry.normals, shapedGeometry.indices))
+    .setMaterial(new PbrMaterial({ color: '#ff8800', roughness: 0.4 }));
+  shapedMesh.setPosition([-3, -0.6, 0]);
   image = await frame();
-  assert(ink(image, ([r,g,b])=>r>180&&g>80&&b<50).count>100, 'Variable CFF2 shaped extrusion must draw real glyph pixels');
+  assert(
+    ink(image, ([r, g, b]) => r > 180 && g > 80 && b < 50).count > 100,
+    'Variable CFF2 shaped extrusion must draw real glyph pixels',
+  );
   shapedMesh.dispose();
   label.visible = true;
-  report.checks.push('Shaped variable CFF2 extrusion renders a real OFL font with substituted glyph IDs and positioning');
+  report.checks.push(
+    'Shaped variable CFF2 extrusion renders a real OFL font with substituted glyph IDs and positioning',
+  );
 
   // 4. Billboard text faces the camera after orbiting; world-oriented text turns edge-on.
   label.set({ text: 'Hello', fontSize: 1.2, anchorX: 'left', anchorY: 'middle' });

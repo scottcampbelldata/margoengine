@@ -48,7 +48,14 @@ test('IFC4 data: attributes, occurrence and type property sets, quantities in SI
   assert.equal(wall.psets.find((s) => s.name === 'Qto_WallBaseQuantities').quantities, true);
   assert.deepEqual(materialsOf(data, 25), [
     { name: 'Concrete', category: 'concrete', kind: 'layer', part: 'Core', set: 'Wall 200', thickness: 0.15 },
-    { name: 'Insulation', category: 'insulation', kind: 'layer', part: 'Insulation layer', set: 'Wall 200', thickness: 0.05 },
+    {
+      name: 'Insulation',
+      category: 'insulation',
+      kind: 'layer',
+      part: 'Insulation layer',
+      set: 'Wall 200',
+      thickness: 0.05,
+    },
   ]);
   assert.deepEqual(classificationsOf(data, 25), [{ system: 'Uniclass 2015', code: 'EF_25_10', name: 'Walls' }]);
   const window = data.elements.get(62);
@@ -77,10 +84,16 @@ test('IFC4 spatial tree: project, site, building, storey elevation in meters, sp
     const site = spatial.children[0],
       building = site.children[0],
       storey = building.children[0];
-    assert.deepEqual([site.type, building.type, storey.type, storey.name], ['IfcSite', 'IfcBuilding', 'IfcBuildingStorey', 'Level 1']);
+    assert.deepEqual(
+      [site.type, building.type, storey.type, storey.name],
+      ['IfcSite', 'IfcBuilding', 'IfcBuildingStorey', 'Level 1'],
+    );
     assert.equal(storey.elevation, 3);
     assert.deepEqual(storey.elements, [25, 60, 61, 62]);
-    assert.deepEqual(storey.children.map((n) => [n.type, n.name, n.longName]), [['IfcSpace', '101', 'Office 101']]);
+    assert.deepEqual(
+      storey.children.map((n) => [n.type, n.name, n.longName]),
+      [['IfcSpace', '101', 'Office 101']],
+    );
   } finally {
     model.close();
   }
@@ -95,7 +108,10 @@ test('IFC4 georeference: IfcMapConversion with a projected CRS; map and engine a
   assert.equal(geo.crs.name, 'EPSG:28356');
   assert.equal(geo.crs.geodeticDatum, 'GDA94');
   assert.equal(geo.crs.mapUnit, 1);
-  assert.deepEqual([geo.eastings, geo.northings, geo.orthogonalHeight, geo.scale, geo.lengthUnit], [333780.622, 6246775.891, 97.457, 0.001, 0.001]);
+  assert.deepEqual(
+    [geo.eastings, geo.northings, geo.orthogonalHeight, geo.scale, geo.lengthUnit],
+    [333780.622, 6246775.891, 97.457, 0.001, 0.001],
+  );
   close(geo.rotation, Math.atan2(-0.138731399, 0.990330045));
   assert.deepEqual(modelToMap(geo, [0, 0, 0]), [333780.622, 6246775.891, 97.457]);
   // One meter along local x lands one map unit along the rotated axis (Scale 0.001 per millimetre).
@@ -128,8 +144,16 @@ test('IFC2X3 data: feet, square feet, centi cubic metres and degrees Celsius to 
   assert.equal(custom.Span.kind, 'bounded');
   close(custom.Span.lower, 3.048);
   close(custom.Span.upper, 6.096);
-  assert.deepEqual(materialsOf(data, 30).map((m) => [m.name, m.kind]), [['Brick', 'material'], ['Mortar', 'material']]);
-  assert.deepEqual(classificationsOf(data, 30), [{ system: 'MasterFormat', code: '04 21 00', name: 'Clay Unit Masonry' }]);
+  assert.deepEqual(
+    materialsOf(data, 30).map((m) => [m.name, m.kind]),
+    [
+      ['Brick', 'material'],
+      ['Mortar', 'material'],
+    ],
+  );
+  assert.deepEqual(classificationsOf(data, 30), [
+    { system: 'MasterFormat', code: '04 21 00', name: 'Clay Unit Masonry' },
+  ]);
   close(data.spatial.children[0].children[0].elevation, 3.048);
   assert.equal(data.elements.get(30).storey, 23);
   const geo = data.georeference;
@@ -151,7 +175,8 @@ test('readIFCGeometry rebases onto an origin in float64 so far-from-origin model
     assert.deepEqual(plain.origin, [0, 0, 0]);
     const auto = readIFCGeometry(model, { origin: 'auto' });
     assert.deepEqual(auto.origin, [1, 5, -2]);
-    for (let i = 0; i < plain.positions.length; i++) close(auto.positions[i] + auto.origin[i % 3], plain.positions[i], 1e-6);
+    for (let i = 0; i < plain.positions.length; i++)
+      close(auto.positions[i] + auto.origin[i % 3], plain.positions[i], 1e-6);
     const fixed = readIFCGeometry(model, { origin: [1, 2, 3] });
     assert.deepEqual(fixed.origin, [1, 2, 3]);
     assert.throws(() => readIFCGeometry(model, { origin: [1, 2] }), /origin/);

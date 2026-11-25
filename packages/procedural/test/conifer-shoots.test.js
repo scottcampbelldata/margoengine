@@ -17,7 +17,11 @@ function coverage(canopy) {
     side = Math.round(5.2 / CELL),
     grid = new Uint8Array(side * side);
   for (let t = 0; t < I.length; t += 3) {
-    const v = [I[t], I[t + 1], I[t + 2]].map((i) => [(p[i * 3] + 2.6) / CELL, (p[i * 3 + 2] + 2.6) / CELL, p[i * 3 + 1]]);
+    const v = [I[t], I[t + 1], I[t + 2]].map((i) => [
+      (p[i * 3] + 2.6) / CELL,
+      (p[i * 3 + 2] + 2.6) / CELL,
+      p[i * 3 + 1],
+    ]);
     if ((v[0][2] + v[1][2] + v[2][2]) / 3 > 3.1) continue;
     const area = (v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) - (v[1][1] - v[0][1]) * (v[2][0] - v[0][0]);
     if (!area) continue;
@@ -160,7 +164,8 @@ function radiusAt(points, y) {
     hi = heights[k];
   return rings.get(lo) + ((rings.get(hi) - rings.get(lo)) * (y - lo)) / (hi - lo);
 }
-const points = (d) => Array.from({ length: d.positions.length / 3 }, (_, i) => [...d.positions.subarray(i * 3, i * 3 + 3)]),
+const points = (d) =>
+    Array.from({ length: d.positions.length / 3 }, (_, i) => [...d.positions.subarray(i * 3, i * 3 + 3)]),
   vertices = (g) => Array.from({ length: g.vertices.length / 6 }, (_, i) => [...g.vertices.subarray(i * 6, i * 6 + 3)]);
 
 test('a conifer stands on the measured spruce butt flare, at every height', async () => {
@@ -180,7 +185,10 @@ test('a conifer stands on the measured spruce butt flare, at every height', asyn
     const scale = engine.store.matrices[tree.root.id * 16 + 5],
       trunk = vertices(tree.trunk.geometry),
       ratio = radiusAt(trunk, 0) / radiusAt(trunk, 1.3 / scale);
-    assert.ok(Math.abs(ratio - SPRUCE_FLARE) < 0.02, `${height} m: ground over breast-height diameter ${ratio.toFixed(3)}`);
+    assert.ok(
+      Math.abs(ratio - SPRUCE_FLARE) < 0.02,
+      `${height} m: ground over breast-height diameter ${ratio.toFixed(3)}`,
+    );
     assert.ok(ratio >= 1.15 && ratio <= 1.45);
   }
   // The historical trunk, still generateTreeMesh's default, stands on about twice its breast-height diameter.
@@ -195,12 +203,17 @@ test('a conifer stands on the measured spruce butt flare, at every height', asyn
   const at2 = points(generateTreeMesh('conifer', { flare: 1.3, breastHeight: 2 }).trunk);
   assert.ok(Math.abs(radiusAt(at2, 0) / radiusAt(at2, 2) - 1.3) < 0.005, 'breastHeight moves the reference');
   for (const flare of [0.9, 3, NaN]) assert.throws(() => generateTreeMesh('conifer', { flare }), RangeError);
-  for (const breastHeight of [0.1, 7]) assert.throws(() => generateTreeMesh('conifer', { flare: 1.3, breastHeight }), RangeError);
+  for (const breastHeight of [0.1, 7])
+    assert.throws(() => generateTreeMesh('conifer', { flare: 1.3, breastHeight }), RangeError);
   // createTree takes the option; a broadleaf keeps its trunk unless asked.
   using wide = createTree(engine, 'conifer', { flare: 1.8 });
   const w = vertices(wide.trunk.geometry);
   assert.ok(Math.abs(radiusAt(w, 0) / radiusAt(w, 1.3) - 1.8) < 0.02);
   using oak = createTree(engine, 'broadleaf');
-  assert.deepEqual(vertices(oak.trunk.geometry), points(generateTreeMesh('broadleaf').trunk).map((v) => v.map(Math.fround)));
-  for (const flare of [0.5, 9, '1.3']) assert.throws(() => createTree(engine, 'conifer', { flare }), { code: 'failed' });
+  assert.deepEqual(
+    vertices(oak.trunk.geometry),
+    points(generateTreeMesh('broadleaf').trunk).map((v) => v.map(Math.fround)),
+  );
+  for (const flare of [0.5, 9, '1.3'])
+    assert.throws(() => createTree(engine, 'conifer', { flare }), { code: 'failed' });
 });

@@ -23,7 +23,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-stability/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5383, strictPort: true, watch: null },
+  server: { host: '127.0.0.1', port: 5383, strictPort: true, watch: null, hmr: false },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5383 });
@@ -185,7 +185,10 @@ try {
     `a fast camera alternates ${fast.edge.toFixed(3)} levels against ${slow.edge.toFixed(3)} for a slow one`,
   );
   assert.ok(ghost.body > 50, `the box is drawn: ${ghost.body}`);
-  assert.ok(ghost.trail < ghost.body * 0.15, `no trail behind the box: ${ghost.trail} red pixels against ${ghost.body}`);
+  assert.ok(
+    ghost.trail < ghost.body * 0.15,
+    `no trail behind the box: ${ghost.trail} red pixels against ${ghost.body}`,
+  );
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });

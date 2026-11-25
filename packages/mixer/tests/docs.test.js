@@ -9,8 +9,15 @@ import { bundleBytes } from '../../../scripts/measure-size.js';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 
 test('mixer landing documents contain no unresolved merge markers', () => {
-  for (const file of ['api-surface.md', 'clean-room.md', 'known-bugs.md', 'limits.md',
-    'whitepaper/claims.md', 'whitepaper/reproduce.md', 'whitepaper/build-record.md']) {
+  for (const file of [
+    'api-surface.md',
+    'clean-room.md',
+    'known-bugs.md',
+    'limits.md',
+    'whitepaper/claims.md',
+    'whitepaper/reproduce.md',
+    'whitepaper/build-record.md',
+  ]) {
     assert.doesNotMatch(readFileSync(join(root, 'docs', file), 'utf8'), /^(?:<{7}|={7}|>{7})(?: |\r?$)/m, file);
   }
 });
@@ -20,8 +27,14 @@ test('mixer public current entry bytes and budgets match built entries and the s
   const limits = readFileSync(join(root, 'docs/limits.md'), 'utf8');
   const manifest = JSON.parse(readFileSync(join(root, 'packages/mixer/package.json'), 'utf8'));
   const budgets = JSON.parse(readFileSync(join(root, 'scripts/quality/baselines/sizes.json'), 'utf8')).items;
-  const labels = { '.': 'Mixer root', './sidechain': 'Sidechain', './snapshots': 'Snapshots',
-    './worklet': 'Worklet', './reflections': 'Reflections', './loudness': 'Loudness' };
+  const labels = {
+    '.': 'Mixer root',
+    './sidechain': 'Sidechain',
+    './snapshots': 'Snapshots',
+    './worklet': 'Worklet',
+    './reflections': 'Reflections',
+    './loudness': 'Loudness',
+  };
   for (const [entry, label] of Object.entries(labels)) {
     const match = limits.match(new RegExp(`${label} entry: ([\\d,]+) B gzip, budget ([\\d,]+) B[.;]`));
     assert.ok(match, `Document the current ${label} entry bytes and budget`);

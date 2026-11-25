@@ -122,7 +122,8 @@ function along(piece: Piece, f: number): Rigid {
 
 /** The path's pieces with their ends and tangents; throws for a degenerate piece or a corner. */
 function resolvePath(path: Path, tolerance: number): Piece[] {
-  if (!path.segments.length) throw new RangeError(`path ${path.name} has no segments; give the path at least one line or arc`);
+  if (!path.segments.length)
+    throw new RangeError(`path ${path.name} has no segments; give the path at least one line or arc`);
   const pieces: Piece[] = [];
   let at = path.start;
   path.segments.forEach((s, k) => {
@@ -130,7 +131,8 @@ function resolvePath(path: Path, tolerance: number): Piece[] {
     if (s.kind === 'line') {
       const d = sub(s.to, at),
         l = length(d);
-      if (!(l > tolerance)) throw new RangeError(`path ${path.name}: line ${name} has no length; remove the line or move its end`);
+      if (!(l > tolerance))
+        throw new RangeError(`path ${path.name}: line ${name} has no length; remove the line or move its end`);
       const t = scale(d, 1 / l);
       pieces.push({ kind: 'line', name, from: at, to: s.to, t0: t, t1: t, length: l, source: k });
     } else {
@@ -145,14 +147,29 @@ function resolvePath(path: Path, tolerance: number): Piece[] {
       if (!axis)
         throw new RangeError(`path ${path.name}: arc ${name} needs an axis (its ends are opposite or the same)`);
       if (Math.abs(dot(a0, axis)) > tolerance || Math.abs(dot(a1, axis)) > tolerance)
-        throw new RangeError(`path ${path.name}: arc ${name} does not lie in the plane across its axis; give the arc a centre in the plane of its ends`);
+        throw new RangeError(
+          `path ${path.name}: arc ${name} does not lie in the plane across its axis; give the arc a centre in the plane of its ends`,
+        );
       let turn = Math.atan2(dot(cross(a0, a1), axis), dot(a0, a1));
       if (turn <= 0) turn += 2 * Math.PI;
       // Ends within the tolerance of each other: a whole turn.
       if (length(sub(s.to, at)) <= tolerance) turn = 2 * Math.PI;
       const t0 = unit(cross(axis, a0))!,
         t1 = unit(cross(axis, a1))!;
-      pieces.push({ kind: 'arc', name, from: at, to: s.to, t0, t1, length: r * turn, center: c, axis, radius: r, turn, source: k });
+      pieces.push({
+        kind: 'arc',
+        name,
+        from: at,
+        to: s.to,
+        t0,
+        t1,
+        length: r * turn,
+        center: c,
+        axis,
+        radius: r,
+        turn,
+        source: k,
+      });
     }
     at = s.to;
   });
@@ -283,7 +300,9 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
       profileSize(profile),
       modelSize(
         points0,
-        path.segments.flatMap((s): [XYZ, number][] => (s.kind === 'arc' && s.center ? [[s.center, length(sub(s.to, s.center))]] : [])),
+        path.segments.flatMap((s): [XYZ, number][] =>
+          s.kind === 'arc' && s.center ? [[s.center, length(sub(s.to, s.center))]] : [],
+        ),
       ),
     ),
     tolerance = 1e-9 * Math.max(size, 1);
@@ -307,14 +326,19 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
   n = T0;
   const same = (a: XYZ, b: XYZ) => length(sub(a, b)) <= tolerance;
   if (!p.segments.length || !same(p.segments[p.segments.length - 1].to, p.start))
-    throw new RangeError(`profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`);
+    throw new RangeError(
+      `profile ${profile.name} does not end where it starts; pass a closed profile that does not cross itself`,
+    );
   const area = signedArea(p, n);
-  if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
+  if (Math.abs(area) <= tolerance * tolerance)
+    throw new RangeError(`profile ${profile.name} encloses no area; pass a closed profile that does not cross itself`);
   refuseSelfContact(p, n, tolerance);
   if (area < 0) p = reversed(p);
   for (const s of [p.start, ...p.segments.map((s) => s.to), ...p.segments.flatMap((s) => (s.center ? [s.center] : []))])
     if (Math.abs(dot(sub(s, path.start), n)) > tolerance)
-      throw new RangeError(`profile ${profile.name} is not planar; put every point and arc centre of the profile in one plane`);
+      throw new RangeError(
+        `profile ${profile.name} is not planar; put every point and arc centre of the profile in one plane`,
+      );
   const count = p.segments.length,
     pointsOf = (q: Profile) => [q.start, ...q.segments.slice(0, -1).map((s) => s.to)];
   // How far the profile reaches from the path's start (an arc's whole circle bounds it).
@@ -332,12 +356,11 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
   for (const piece of pieces) joints.push(compose(along(piece, 1), joints[joints.length - 1]));
   const m = pieces.length,
     last = pieces[m - 1],
-    closed =
-      same(last.to, path.start) &&
-      length(cross(last.t1, T0)) <= 1e-9 &&
-      dot(last.t1, T0) > 0;
+    closed = same(last.to, path.start) && length(cross(last.t1, T0)) <= 1e-9 && dot(last.t1, T0) > 0;
   if (closed && !pointsOf(p).every((q) => same(moveP(joints[m], q), q)))
-    throw new RangeError(`path ${path.name} closes but turns the profile: its ends would not meet; close the path where the profile can return to its start`);
+    throw new RangeError(
+      `path ${path.name} closes but turns the profile: its ends would not meet; close the path where the profile can return to its start`,
+    );
   const sections = joints.map((j) => moveProfile(p, j));
   // Each arc must keep the whole profile on one side of its axis.
   pieces.forEach((piece, i) => {
@@ -376,7 +399,9 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
     segName = (k: number) => p.segments[k].name ?? `e${k}`,
     generated: [Name, Name[]][] = [],
     joinCount = closed ? m : m + 1,
-    vertices = sections.slice(0, joinCount).map((s, j) => pointsOf(s).map((q, k) => new Vertex(`${name}/vertex:${j}:${k}`, q))),
+    vertices = sections
+      .slice(0, joinCount)
+      .map((s, j) => pointsOf(s).map((q, k) => new Vertex(`${name}/vertex:${j}:${k}`, q))),
     vertex = (j: number, k: number) => vertices[closed ? j % m : j][k % count];
   // Section edges: each profile segment at each joint.
   const sectionEdges = sections.slice(0, joinCount).map((s, j) => {
@@ -387,7 +412,11 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
         sameSense = true;
       if (g.kind === 'line') curve = { kind: 'line', origin: from, direction: unit(sub(g.to, from))! };
       else {
-        curve = { kind: 'circle', frame: frameOf(g.center!, s.normal, sub(from, g.center!)), radius: length(sub(from, g.center!)) };
+        curve = {
+          kind: 'circle',
+          frame: frameOf(g.center!, s.normal, sub(from, g.center!)),
+          radius: length(sub(from, g.center!)),
+        };
         sameSense = !g.clockwise;
       }
       return new Edge(`${name}/edge:section:${j}:${segName(k)}`, curve, vertex(j, k), vertex(j, k + 1), sameSense);
@@ -419,7 +448,11 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
         surface =
           g.kind === 'line'
             ? { kind: 'plane', frame: frameOf(from, cross(sub(to, from), piece.t0), sub(to, from)) }
-            : { kind: 'cylinder', frame: frameOf(g.center!, piece.t0, sub(from, g.center!)), radius: length(sub(from, g.center!)) };
+            : {
+                kind: 'cylinder',
+                frame: frameOf(g.center!, piece.t0, sub(from, g.center!)),
+                radius: length(sub(from, g.center!)),
+              };
       } else {
         const c = piece.center!,
           a = piece.axis!,
@@ -463,7 +496,9 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
         outward = cross(turnV(half, tangent), tangentMid),
         e = surfaceEvaluator(surface),
         [u, v] = e.parameters(midOut),
-        face = shell.add(new Face(`${name}/face:${piece.name}/${segName(k)}`, surface, dot(e.normal(u, v), outward) > 0)),
+        face = shell.add(
+          new Face(`${name}/face:${piece.name}/${segName(k)}`, surface, dot(e.normal(u, v), outward) > 0),
+        ),
         loop = face.loop();
       loop.use(sectionEdge(i, k), true);
       loop.use(alongEdges[(k + 1) % count], true);
@@ -478,10 +513,18 @@ export function sweep(name: Name, profile: Profile, path: Path, { history }: { h
       p0 = pointsOf(s0),
       pm = pointsOf(sm),
       startFace = shell.add(
-        new Face(`${name}/face:start`, { kind: 'plane', frame: frameOf(p0[0], scale(s0.normal, -1), sub(s0.segments[0].to, p0[0])) }, true),
+        new Face(
+          `${name}/face:start`,
+          { kind: 'plane', frame: frameOf(p0[0], scale(s0.normal, -1), sub(s0.segments[0].to, p0[0])) },
+          true,
+        ),
       ),
       endFace = shell.add(
-        new Face(`${name}/face:end`, { kind: 'plane', frame: frameOf(pm[0], sm.normal, sub(sm.segments[0].to, pm[0])) }, true),
+        new Face(
+          `${name}/face:end`,
+          { kind: 'plane', frame: frameOf(pm[0], sm.normal, sub(sm.segments[0].to, pm[0])) },
+          true,
+        ),
       ),
       sl = startFace.loop(),
       el = endFace.loop();

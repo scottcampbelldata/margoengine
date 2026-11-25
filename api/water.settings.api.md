@@ -783,6 +783,7 @@ interface ShipOptions {
     pose?: ShipPose;
     lamps?: readonly ShipLamp[];
     wake?: number;
+    wakeTint?: Vec3 | null;
 }
 
 interface ShipPose {
@@ -863,6 +864,8 @@ interface TerrainHeights {
 interface TrailPoint {
     x: number;
     z: number;
+    sternX: number;
+    sternZ: number;
     t: number;
     u: number;
 }
@@ -878,6 +881,8 @@ class WakeShip {
     wake: number;
     constructor(options: ShipOptions);
     get pose(): Readonly<Required<ShipPose>>;
+    get wakeTint(): Vec3 | null;
+    set wakeTint(value: Vec3 | null);
     setPose(pose: ShipPose): this;
     follow(floater: Floater, speed: number): this;
     clearTrail(): this;
@@ -967,6 +972,7 @@ interface WaterOptions {
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;
     reflection?: () => GPUTexture | undefined;
+    reflectionEnvironment?: WaterSkyEnvironment;
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];
     spray?: boolean;
@@ -982,6 +988,12 @@ interface WaterShadowSource {
         readonly declarations: string;
     };
     bindings(): GPUBindGroupEntry[];
+}
+
+interface WaterSkyEnvironment {
+    readonly equirectTexture: GPUTexture | undefined;
+    readonly rotation?: number;
+    readonly radianceScale?: number;
 }
 
 interface WaterTerrain {

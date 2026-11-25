@@ -43,7 +43,10 @@ function face() {
     morphs.push({ name: 'shape' + t, positions: dp, normals: dn, tangents: dt });
   }
   // One target moving every vertex stays dense: sparse would be larger.
-  morphs.push({ name: 'everything', positions: Float32Array.from({ length: count * 3 }, (_, i) => (i % 7) * 0.01 + 0.001) });
+  morphs.push({
+    name: 'everything',
+    positions: Float32Array.from({ length: count * 3 }, (_, i) => (i % 7) * 0.01 + 0.001),
+  });
   return { positions, normals, tangents, indices: Uint32Array.from(indices), morphs };
 }
 
@@ -79,7 +82,8 @@ test('exportGLB writes mostly-zero morph targets sparse, smaller, with identical
           assert.equal(after.json.bufferViews[accessor.sparse[side].bufferView].target, undefined);
       } else if (accessor.bufferView === undefined) kinds.zero++;
       else kinds.dense++;
-      const expected = name === 'POSITION' ? morphs[t].positions : name === 'NORMAL' ? morphs[t].normals : morphs[t].tangents;
+      const expected =
+        name === 'POSITION' ? morphs[t].positions : name === 'NORMAL' ? morphs[t].normals : morphs[t].tangents;
       assert.deepEqual(bits(readAccessor(after, target[name]).values), bits(expected), `target ${t} ${name}`);
       assert.deepEqual(bits(readAccessor(before, was[t][name]).values), bits(expected), `dense target ${t} ${name}`);
       if (name === 'POSITION') {
@@ -96,19 +100,19 @@ test('exportGLB writes mostly-zero morph targets sparse, smaller, with identical
 
 test('the engine glTF reader decodes sparse and all-zero morph targets to the dense values bit for bit', () =>
   headlessModels(async () => {
-  const dense = await parseGLTFAsync(await headless(), exportGLB(source(), { sparseMorphs: false })),
-    sparse = await parseGLTFAsync(await headless(), exportGLB(source()));
-  const was = dense.asset.doc.meshes[0].primitives[0].targets,
-    now = sparse.asset.doc.meshes[0].primitives[0].targets;
-  assert.equal(now.length, was.length);
-  now.forEach((target, t) => {
-    for (const name of Object.keys(was[t]))
-      assert.deepEqual(
-        bits(sparse.asset.accessor(target[name])),
-        bits(dense.asset.accessor(was[t][name])),
-        `target ${t} ${name}`,
-      );
-  });
+    const dense = await parseGLTFAsync(await headless(), exportGLB(source(), { sparseMorphs: false })),
+      sparse = await parseGLTFAsync(await headless(), exportGLB(source()));
+    const was = dense.asset.doc.meshes[0].primitives[0].targets,
+      now = sparse.asset.doc.meshes[0].primitives[0].targets;
+    assert.equal(now.length, was.length);
+    now.forEach((target, t) => {
+      for (const name of Object.keys(was[t]))
+        assert.deepEqual(
+          bits(sparse.asset.accessor(target[name])),
+          bits(dense.asset.accessor(was[t][name])),
+          `target ${t} ${name}`,
+        );
+    });
   }));
 
 test('sparseMorphs must be boolean', () => {

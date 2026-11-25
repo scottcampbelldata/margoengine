@@ -30,7 +30,9 @@ try {
     assert.ok(r.lit > 0, 'the frame is lit');
     assert.equal(r.differ, 0, `seeked and continuous frames differ in ${r.differ} of ${r.values} values at n = ${n}`);
     if (n === 600) assert.ok(r.fresh > 0, 'a fresh frame without the seek differs from the continuous one');
-    console.log(`ok scatter seek n = ${n}: ${r.values} values equal, fresh start differs in ${r.fresh}, not replayed ${r.unseekable}`);
+    console.log(
+      `ok scatter seek n = ${n}: ${r.values} values equal, fresh start differs in ${r.fresh}, not replayed ${r.unseekable}`,
+    );
   }
   assert.deepEqual(pageErrors, []);
   console.log('scatter seek check passed');

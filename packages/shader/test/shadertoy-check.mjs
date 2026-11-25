@@ -6,7 +6,14 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { toyFixtures, multiFixtures, cubeFixtures, cubeDirection, vrFixture, soundFixtures } from './shadertoy-fixtures.js';
+import {
+  toyFixtures,
+  multiFixtures,
+  cubeFixtures,
+  cubeDirection,
+  vrFixture,
+  soundFixtures,
+} from './shadertoy-fixtures.js';
 
 const context = await openBrowser({ startPath: '/packages/shader/test/shadertoy-check.html', port: 'free' }),
   { page } = context,
@@ -29,7 +36,14 @@ const compare = (actual, expected) => {
     if (d > max) (max = d), (at = i);
     sum += d;
   });
-  return { max, mean: sum / actual.length, pixel: at < 0 ? '' : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})` };
+  return {
+    max,
+    mean: sum / actual.length,
+    pixel:
+      at < 0
+        ? ''
+        : ` at x ${Math.floor(at / 3) % 32}, y ${Math.floor(at / 96)} channel ${at % 3} (${actual[at]} vs ${expected[at]})`,
+  };
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
@@ -57,7 +71,11 @@ try {
   for (let i = 0; i < multiFixtures.length; i++) {
     const f = multiFixtures[i];
     for (const mode of await page.evaluate((n) => window.check.multiModes(n), i)) {
-      assert.deepEqual(await page.evaluate(([n, m]) => window.check.multi(n, m), [i, mode]), [], `${f.name} as ${mode}`);
+      assert.deepEqual(
+        await page.evaluate(([n, m]) => window.check.multi(n, m), [i, mode]),
+        [],
+        `${f.name} as ${mode}`,
+      );
       const got = await rgb(),
         want = await page.evaluate(([n, m]) => window.check.multiOracle(n, m), [i, mode]),
         d = compare(got, want),
@@ -74,7 +92,11 @@ try {
   for (let i = 0; i < cubeFixtures.length; i++) {
     const f = cubeFixtures[i];
     for (const mode of await page.evaluate((n) => window.check.multiModes(n, 'cube'), i)) {
-      assert.deepEqual(await page.evaluate(([n, m]) => window.check.multi(n, m, 'cube'), [i, mode]), [], `${f.name} as ${mode}`);
+      assert.deepEqual(
+        await page.evaluate(([n, m]) => window.check.multi(n, m, 'cube'), [i, mode]),
+        [],
+        `${f.name} as ${mode}`,
+      );
       const got = await rgb(),
         want = await page.evaluate(([n, m]) => window.check.multiOracle(n, m, 'cube'), [i, mode]),
         d = compare(got, want),
@@ -93,15 +115,24 @@ try {
             for (const c of v) expected.push(Math.round((0.5 + (0.5 * c) / l) * 255));
           }
         const a = compare(want, expected);
-        rows.push(`${f.name}: the browser's cube lookups against the directions: max ${a.max}, mean ${a.mean.toFixed(4)}${a.pixel}`);
-        assert.ok(a.max <= 1, `the faces of Cube A are laid out against the browser's cube lookups: ${a.max} levels${a.pixel}`);
+        rows.push(
+          `${f.name}: the browser's cube lookups against the directions: max ${a.max}, mean ${a.mean.toFixed(4)}${a.pixel}`,
+        );
+        assert.ok(
+          a.max <= 1,
+          `the faces of Cube A are laid out against the browser's cube lookups: ${a.max} levels${a.pixel}`,
+        );
       }
     }
   }
   // mainVR from a fixed pair of eyes, as a pass and as a mesh material.
   for (let eye = 0; eye < vrFixture.eyes.length; eye++)
     for (const mode of ['pass', 'mesh']) {
-      assert.deepEqual(await page.evaluate(([e, m]) => window.check.vr(e, m), [eye, mode]), [], `mainVR eye ${eye} as ${mode}`);
+      assert.deepEqual(
+        await page.evaluate(([e, m]) => window.check.vr(e, m), [eye, mode]),
+        [],
+        `mainVR eye ${eye} as ${mode}`,
+      );
       const got = await rgb(),
         want = await page.evaluate(([e, m]) => window.check.vrOracle(e, m), [eye, mode]),
         d = compare(got, want),

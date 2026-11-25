@@ -1,7 +1,13 @@
 // The hurricane's part of the cloud layer, loaded by import() only when a layer draws a storm (`hurricane` option or
 // `type: 'hurricane'`), so clouds without one do not carry its WGSL or its maths. `volumetric-clouds` takes it through
 // `loadStormField`; the shadows and shafts read the same one.
-import { Hurricane, hurricaneCover, resolveHurricane, type HurricaneOptions, type ResolvedHurricane } from './hurricane.js';
+import {
+  Hurricane,
+  hurricaneCover,
+  resolveHurricane,
+  type HurricaneOptions,
+  type ResolvedHurricane,
+} from './hurricane.js';
 import type { VolumetricCloudOptions } from './volumetric-clouds.js';
 const TAU = 2 * Math.PI;
 const cover = { eye: 0, eyewall: 0, outerEyewall: 0, moat: 0, band: 0, shield: 0, canopy: 0, cover: 0 };
@@ -74,7 +80,9 @@ fn cloudStormDensity(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:s
       const h = options.hurricane;
       if (h === undefined) return options.type === 'hurricane' ? resolveHurricane() : undefined;
       // A Hurricane (duck-typed, so a second copy of the package works): its options; else the options themselves.
-      return resolveHurricane(h instanceof Hurricane || 'weatherAt' in h ? (h as Hurricane).options : (h as HurricaneOptions));
+      return resolveHurricane(
+        h instanceof Hurricane || 'weatherAt' in h ? (h as Hurricane).options : (h as HurricaneOptions),
+      );
     },
     write(v, options, seconds, scale) {
       const s = this.of(options);

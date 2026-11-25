@@ -194,7 +194,8 @@ export class CorridorSearch {
       }
       return n < node;
     };
-    const before = (k: number, n: number, key: number, node: number) => k < key || (k === key && n !== node && tie(n, node));
+    const before = (k: number, n: number, key: number, node: number) =>
+      k < key || (k === key && n !== node && tie(n, node));
     // Open set as a binary heap in `before` order.
     let size = 1,
       heapKey = this.heapKey,
@@ -211,10 +212,7 @@ export class CorridorSearch {
           lastNode = heapNode[size];
         let i = 0;
         for (let child = 1; child < size; child = i * 2 + 1) {
-          if (
-            child + 1 < size &&
-            before(heapKey[child + 1], heapNode[child + 1], heapKey[child], heapNode[child])
-          )
+          if (child + 1 < size && before(heapKey[child + 1], heapNode[child + 1], heapKey[child], heapNode[child]))
             child++;
           if (before(lastKey, lastNode, heapKey[child], heapNode[child])) break;
           heapKey[i] = heapKey[child];
@@ -275,11 +273,7 @@ export class CorridorSearch {
           this.heapNode = heapNode = nodes;
         }
         let i = size++;
-        for (
-          let up = (i - 1) >> 1;
-          i > 0 && before(key, next, heapKey[up], heapNode[up]);
-          i = up, up = (i - 1) >> 1
-        ) {
+        for (let up = (i - 1) >> 1; i > 0 && before(key, next, heapKey[up], heapNode[up]); i = up, up = (i - 1) >> 1) {
           heapKey[i] = heapKey[up];
           heapNode[i] = heapNode[up];
         }

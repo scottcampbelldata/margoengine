@@ -48,8 +48,15 @@ test('scrolling builds the rows that come into view at their true place and drop
   assert.ok(last - first <= 6 + 8 + 1, `built ${last - first} rows`);
   assert.equal(rows(list).length, last - first, 'only the range is built');
   for (const row of rows(list))
-    near(row.rect.y, list.rect.y + 4 + row.index * STEP - list.scrollY, `row ${row.index} sits where it would in a full list`);
-  assert.ok(calls.every((i) => i >= first && i < last), 'row() only for built rows');
+    near(
+      row.rect.y,
+      list.rect.y + 4 + row.index * STEP - list.scrollY,
+      `row ${row.index} sits where it would in a full list`,
+    );
+  assert.ok(
+    calls.every((i) => i >= first && i < last),
+    'row() only for built rows',
+  );
   // To the end: the last row ends at the bottom of the view.
   list.wheel(1e9);
   ui.update(0);

@@ -119,16 +119,45 @@ test('GTAO sky occlusion is off by default with the plain uniform, and on writes
       off.engine.use(new PostStack([gtao]));
       off.frame();
     });
-  assert.match(kernel(log), /fn sky\(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u\)->f32 \{\n  if\(f\.size\.z<=0\.0\)\{return 1\.0;\}/);
+  assert.match(
+    kernel(log),
+    /fn sky\(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u\)->f32 \{\n  if\(f\.size\.z<=0\.0\)\{return 1\.0;\}/,
+  );
   assert.deepEqual([...written(log, 224).subarray(48, 56)], [1.5, 5, 3, 1, 1280, 720, 0, 0], 'size.zw stay 0 when off');
   gtao.options.skyRadius = 8;
   await null;
-  assert.deepEqual([...written(off.gpu.record(() => off.frame()), 224).subarray(54, 56)], [8, 16]);
+  assert.deepEqual(
+    [
+      ...written(
+        off.gpu.record(() => off.frame()),
+        224,
+      ).subarray(54, 56),
+    ],
+    [8, 16],
+  );
   gtao.options.skySteps = 24;
   await null;
-  assert.deepEqual([...written(off.gpu.record(() => off.frame()), 224).subarray(54, 56)], [8, 24]);
-  for (const bad of [{ skyRadius: -1 }, { skyRadius: 1001 }, { skyRadius: Number.NaN }, { skySteps: 0 }, { skySteps: 33 }, { skySteps: 1.5 }])
-    assert.throws(() => new GTAO(bad), { name: 'RangeError', message: /skyRadius 0 to 1000, skySteps an integer 1-32/ });
+  assert.deepEqual(
+    [
+      ...written(
+        off.gpu.record(() => off.frame()),
+        224,
+      ).subarray(54, 56),
+    ],
+    [8, 24],
+  );
+  for (const bad of [
+    { skyRadius: -1 },
+    { skyRadius: 1001 },
+    { skyRadius: Number.NaN },
+    { skySteps: 0 },
+    { skySteps: 33 },
+    { skySteps: 1.5 },
+  ])
+    assert.throws(() => new GTAO(bad), {
+      name: 'RangeError',
+      message: /skyRadius 0 to 1000, skySteps an integer 1-32/,
+    });
 });
 
 test("GTAO's sky term gives an infinite slot's floor its view factor to the opening", () => {

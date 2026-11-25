@@ -145,9 +145,9 @@ if (controls) {
   controls.maxDistance = 120;
 }
 let flight: View | null = null;
-document.querySelectorAll<HTMLButtonElement>('[data-cam]').forEach((b) =>
-  b.addEventListener('click', () => (flight = VIEWS[Number(b.dataset.cam)])),
-);
+document
+  .querySelectorAll<HTMLButtonElement>('[data-cam]')
+  .forEach((b) => b.addEventListener('click', () => (flight = VIEWS[Number(b.dataset.cam)])));
 stage.canvas.addEventListener('pointerdown', () => (flight = null));
 stage.canvas.addEventListener('wheel', () => (flight = null), { passive: true });
 
@@ -161,7 +161,11 @@ stage.use({
     if (flight && controls) {
       const k = Math.min(1, dt * 4),
         f = flight;
-      const lerp = (a: Vec3, b: Vec3): Vec3 => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+      const lerp = (a: Vec3, b: Vec3): Vec3 => [
+        a[0] + (b[0] - a[0]) * k,
+        a[1] + (b[1] - a[1]) * k,
+        a[2] + (b[2] - a[2]) * k,
+      ];
       cam.position = lerp(cam.position as Vec3, f.pos);
       cam.target = lerp(cam.target as Vec3, f.target);
       controls.target = cam.target as Vec3;

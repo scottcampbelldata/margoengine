@@ -61,7 +61,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
     if (
       typeof fog !== 'object' ||
       fog === null ||
-      typeof fog.depth !== 'function' ||
+      (fog.depth !== undefined && typeof fog.depth !== 'function') ||
       (fog.falloff !== undefined && fog.falloff !== 'exp' && fog.falloff !== 'exp2') ||
       !(Math.fround(fog.height ?? 0) >= 0) ||
       !Number.isFinite(Math.fround(fog.height ?? 0)) ||
@@ -72,7 +72,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
       (fog.start ?? 40) < 0
     )
       throw new RangeError(
-        'Invalid sky fog; give a depth function, falloff "exp" or "exp2", height and start of 0 or more, and density from 0 to 1.',
+        'Invalid sky fog; give an optional depth function, falloff "exp" or "exp2", height and start of 0 or more, and density from 0 to 1.',
       );
   },
   create(code) {
@@ -88,7 +88,8 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
       key = '';
     return {
       draw(c, fog, entries) {
-        const depth = fog.depth();
+        const target = sceneTarget(c);
+        const depth = fog.depth ? fog.depth() : target?.resolvedDepth;
         if (!depth || (fog.density ?? 0.01) === 0) return;
         const samples = c.descriptor.multisample?.count ?? 1;
         if (
@@ -103,8 +104,7 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
           throw new RangeError('Sky fog requires matching sampleable scene depth');
         // A 4x capture resolves its 1x depth only when it presents, after this pass, so that texture still holds the last
         // frame: fog over it follows every silhouette a frame behind while the view turns. Read the capture's own samples.
-        const target = sceneTarget(c),
-          live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined,
+        const live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined,
           depthSamples = live ? 4 : depth.sampleCount,
           next = c.format + ':' + samples + ':' + depthSamples;
         uniform ??= c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });

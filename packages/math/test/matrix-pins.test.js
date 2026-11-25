@@ -11,11 +11,15 @@ const nearAll = (got, want, e = 1e-12) => {
 };
 // Column-major index helpers over a plain n x n row-major reference (rows[r][c]).
 const toColumnMajor = (rows) => rows[0].map((_, c) => rows.map((row) => row[c])).flat();
-const fromColumnMajor = (e, n) => Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => e[c * n + r]));
+const fromColumnMajor = (e, n) =>
+  Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => e[c * n + r]));
 const matMul = (a, b) => a.map((row) => b[0].map((_, c) => row.reduce((s, x, k) => s + x * b[k][c], 0)));
 const det = (m) => {
   if (m.length === 1) return m[0][0];
-  return m[0].reduce((s, x, c) => s + (c % 2 ? -1 : 1) * x * det(m.slice(1).map((r) => r.filter((_, j) => j !== c))), 0);
+  return m[0].reduce(
+    (s, x, c) => s + (c % 2 ? -1 : 1) * x * det(m.slice(1).map((r) => r.filter((_, j) => j !== c))),
+    0,
+  );
 };
 const inverse = (m) => {
   const n = m.length,
@@ -67,9 +71,21 @@ test('Matrix3: set is row-major, products, determinant, inverse, transpose, scal
   nearAll(flat(rows3(new Matrix3().multiplyMatrices(m3(R3A), m3(R3B)))), flat(matMul(R3A, R3B)));
   near(m3(R3A).determinant(), det(R3A));
   nearAll(flat(rows3(m3(R3A).invert())), flat(inverse(R3A)));
-  assert.deepEqual(Array.from(m3([[1, 2, 3], [2, 4, 6], [0, 1, 1]]).invert().elements), Array(9).fill(0));
+  assert.deepEqual(
+    Array.from(
+      m3([
+        [1, 2, 3],
+        [2, 4, 6],
+        [0, 1, 1],
+      ]).invert().elements,
+    ),
+    Array(9).fill(0),
+  );
   assert.deepEqual(rows3(m3(R3A).transpose()), transpose(R3A));
-  assert.deepEqual(rows3(m3(R3A).multiplyScalar(3)), R3A.map((r) => r.map((x) => x * 3)));
+  assert.deepEqual(
+    rows3(m3(R3A).multiplyScalar(3)),
+    R3A.map((r) => r.map((x) => x * 3)),
+  );
   const copy = new Matrix3().copy(m3(R3A));
   assert.deepEqual(rows3(copy), R3A);
   assert.deepEqual(rows3(copy.clone()), R3A);
@@ -77,11 +93,33 @@ test('Matrix3: set is row-major, products, determinant, inverse, transpose, scal
 });
 
 test('Matrix3: 2D transforms, normal matrix, equals and arrays', () => {
-  assert.deepEqual(rows3(new Matrix3().makeTranslation(3, 4)), [[1, 0, 3], [0, 1, 4], [0, 0, 1]]);
-  assert.deepEqual(rows3(new Matrix3().makeScale(3, 4)), [[3, 0, 0], [0, 4, 0], [0, 0, 1]]);
+  assert.deepEqual(rows3(new Matrix3().makeTranslation(3, 4)), [
+    [1, 0, 3],
+    [0, 1, 4],
+    [0, 0, 1],
+  ]);
+  assert.deepEqual(rows3(new Matrix3().makeScale(3, 4)), [
+    [3, 0, 0],
+    [0, 4, 0],
+    [0, 0, 1],
+  ]);
   const t = 0.6;
-  nearAll(flat(rows3(new Matrix3().makeRotation(t))), [Math.cos(t), -Math.sin(t), 0, Math.sin(t), Math.cos(t), 0, 0, 0, 1]);
-  const model = new Matrix4().compose({ x: 1, y: 2, z: 3 }, new Quaternion(0.1, 0.2, 0.3, 0.9).normalize(), { x: 2, y: 3, z: 4 });
+  nearAll(flat(rows3(new Matrix3().makeRotation(t))), [
+    Math.cos(t),
+    -Math.sin(t),
+    0,
+    Math.sin(t),
+    Math.cos(t),
+    0,
+    0,
+    0,
+    1,
+  ]);
+  const model = new Matrix4().compose({ x: 1, y: 2, z: 3 }, new Quaternion(0.1, 0.2, 0.3, 0.9).normalize(), {
+    x: 2,
+    y: 3,
+    z: 4,
+  });
   const upper = [0, 1, 2].map((r) => [0, 1, 2].map((c) => model.elements[c * 4 + r]));
   nearAll(flat(rows3(new Matrix3().getNormalMatrix(model))), flat(transpose(inverse(upper))));
   assert.deepEqual(rows3(new Matrix3().setFromMatrix4(model)), upper);
@@ -114,11 +152,19 @@ test('Matrix4: products, determinant, inverse, transpose, scalar', () => {
   nearAll(flat(rows4(aliased)), flat(matMul(R4A, R4A)));
   near(m4(R4A).determinant(), det(R4A), 1e-9);
   nearAll(flat(rows4(m4(R4A).invert())), flat(inverse(R4A)), 1e-12);
-  const singular = m4([[1, 2, 3, 4], [2, 4, 6, 8], [0, 1, 1, 0], [1, 0, 0, 1]]);
+  const singular = m4([
+    [1, 2, 3, 4],
+    [2, 4, 6, 8],
+    [0, 1, 1, 0],
+    [1, 0, 0, 1],
+  ]);
   assert.equal(singular.determinant(), 0);
   assert.deepEqual(Array.from(singular.invert().elements), Array(16).fill(0));
   assert.deepEqual(rows4(m4(R4A).transpose()), transpose(R4A));
-  assert.deepEqual(rows4(m4(R4A).multiplyScalar(3)), R4A.map((r) => r.map((x) => x * 3)));
+  assert.deepEqual(
+    rows4(m4(R4A).multiplyScalar(3)),
+    R4A.map((r) => r.map((x) => x * 3)),
+  );
   assert.deepEqual(rows4(new Matrix4().copy(m4(R4A))), R4A);
   assert.deepEqual(rows4(m4(R4A).clone()), R4A);
   assert.notEqual(m4(R4A).clone().elements, m4(R4A).elements);
@@ -126,8 +172,18 @@ test('Matrix4: products, determinant, inverse, transpose, scalar', () => {
 });
 
 test('Matrix4: translation, scale, axis rotations and position', () => {
-  assert.deepEqual(rows4(new Matrix4().makeTranslation(3, 4, 5)), [[1, 0, 0, 3], [0, 1, 0, 4], [0, 0, 1, 5], [0, 0, 0, 1]]);
-  assert.deepEqual(rows4(new Matrix4().makeScale(3, 4, 5)), [[3, 0, 0, 0], [0, 4, 0, 0], [0, 0, 5, 0], [0, 0, 0, 1]]);
+  assert.deepEqual(rows4(new Matrix4().makeTranslation(3, 4, 5)), [
+    [1, 0, 0, 3],
+    [0, 1, 0, 4],
+    [0, 0, 1, 5],
+    [0, 0, 0, 1],
+  ]);
+  assert.deepEqual(rows4(new Matrix4().makeScale(3, 4, 5)), [
+    [3, 0, 0, 0],
+    [0, 4, 0, 0],
+    [0, 0, 5, 0],
+    [0, 0, 0, 1],
+  ]);
   const t = 0.6,
     c = Math.cos(t),
     s = Math.sin(t);
@@ -169,10 +225,7 @@ test('Matrix4: compose, makeRotationFromQuaternion and decompose are inverse', (
     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
   ];
-  nearAll(
-    flat(rows4(rot)),
-    [...R[0], 0, ...R[1], 0, ...R[2], 0, 0, 0, 0, 1],
-  );
+  nearAll(flat(rows4(rot)), [...R[0], 0, ...R[1], 0, ...R[2], 0, 0, 0, 0, 1]);
   const composed = new Matrix4().compose(pos, q, scl);
   const expected = [
     [R[0][0] * scl.x, R[0][1] * scl.y, R[0][2] * scl.z, pos.x],
@@ -207,20 +260,68 @@ test('Matrix4: compose, makeRotationFromQuaternion and decompose are inverse', (
 
 test('Matrix4: lookAt builds an orthonormal right-handed basis with +Z back toward the eye', () => {
   const cases = [
-    [[0, 0, 5], [0, 0, 0], [0, 1, 0]],
-    [[3, 4, 5], [1, -1, 2], [0, 1, 0]],
-    [[3, 4, 5], [1, -1, 2], [1, 0, 0]],
-    [[0, 5, 0], [0, 0, 0], [0, 1, 0]],
-    [[0, -5, 0], [0, 0, 0], [0, 1, 0]],
-    [[5, 0, 0], [0, 0, 0], [5, 0, 0]],
-    [[0, 0, 5], [0, 0, 0], [0, 0, 1]],
-    [[1, 2, 3], [1, 2, 3], [0, 1, 0]],
-    [[0, 3, 4], [0, 0, 0], [0, 0, 0]],
-    [[3, 0, 4], [0, 0, 0], [0, 0, 0]],
-    [[3, 4, 0], [0, 0, 0], [0, 0, 0]],
+    [
+      [0, 0, 5],
+      [0, 0, 0],
+      [0, 1, 0],
+    ],
+    [
+      [3, 4, 5],
+      [1, -1, 2],
+      [0, 1, 0],
+    ],
+    [
+      [3, 4, 5],
+      [1, -1, 2],
+      [1, 0, 0],
+    ],
+    [
+      [0, 5, 0],
+      [0, 0, 0],
+      [0, 1, 0],
+    ],
+    [
+      [0, -5, 0],
+      [0, 0, 0],
+      [0, 1, 0],
+    ],
+    [
+      [5, 0, 0],
+      [0, 0, 0],
+      [5, 0, 0],
+    ],
+    [
+      [0, 0, 5],
+      [0, 0, 0],
+      [0, 0, 1],
+    ],
+    [
+      [1, 2, 3],
+      [1, 2, 3],
+      [0, 1, 0],
+    ],
+    [
+      [0, 3, 4],
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
+    [
+      [3, 0, 4],
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
+    [
+      [3, 4, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
   ];
   for (const [eye, target, up] of cases) {
-    const e = new Matrix4().lookAt({ x: eye[0], y: eye[1], z: eye[2] }, { x: target[0], y: target[1], z: target[2] }, { x: up[0], y: up[1], z: up[2] }).elements;
+    const e = new Matrix4().lookAt(
+      { x: eye[0], y: eye[1], z: eye[2] },
+      { x: target[0], y: target[1], z: target[2] },
+      { x: up[0], y: up[1], z: up[2] },
+    ).elements;
     const X = [e[0], e[1], e[2]],
       Y = [e[4], e[5], e[6]],
       Z = [e[8], e[9], e[10]];
@@ -236,10 +337,20 @@ test('Matrix4: lookAt builds an orthonormal right-handed basis with +Z back towa
     const back = [eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]];
     const bl = Math.hypot(...back);
     nearAll(Z, bl === 0 ? [0, 0, 1] : back.map((c) => c / bl));
-    if (up.some((c) => c !== 0) && Math.hypot(...cross.map((_, i) => [up[1] * Z[2] - up[2] * Z[1], up[2] * Z[0] - up[0] * Z[2], up[0] * Z[1] - up[1] * Z[0]][i])) > 0) {
+    if (
+      up.some((c) => c !== 0) &&
+      Math.hypot(
+        ...cross.map(
+          (_, i) => [up[1] * Z[2] - up[2] * Z[1], up[2] * Z[0] - up[0] * Z[2], up[0] * Z[1] - up[1] * Z[0]][i],
+        ),
+      ) > 0
+    ) {
       const wantX = [up[1] * Z[2] - up[2] * Z[1], up[2] * Z[0] - up[0] * Z[2], up[0] * Z[1] - up[1] * Z[0]];
       const wl = Math.hypot(...wantX);
-      nearAll(X, wantX.map((c) => c / wl));
+      nearAll(
+        X,
+        wantX.map((c) => c / wl),
+      );
     }
     assert.equal(e[3], 0);
     assert.equal(e[12], 0);
@@ -257,7 +368,11 @@ test('Matrix4: perspective and orthographic projections map the frustum to clip 
   const clip = (m, x, y, z) => {
     const e = m.elements;
     const w = e[3] * x + e[7] * y + e[11] * z + e[15];
-    return [(e[0] * x + e[4] * y + e[8] * z + e[12]) / w, (e[1] * x + e[5] * y + e[9] * z + e[13]) / w, (e[2] * x + e[6] * y + e[10] * z + e[14]) / w];
+    return [
+      (e[0] * x + e[4] * y + e[8] * z + e[12]) / w,
+      (e[1] * x + e[5] * y + e[9] * z + e[13]) / w,
+      (e[2] * x + e[6] * y + e[10] * z + e[14]) / w,
+    ];
   };
   for (const zeroToOne of [true, false]) {
     const lo = zeroToOne ? 0 : -1;
@@ -273,9 +388,15 @@ test('Matrix4: perspective and orthographic projections map the frustum to clip 
     nearAll(clip(ortho, (l + r) / 2, (t + b) / 2, -(n + f) / 2), [0, 0, zeroToOne ? 0.5 : 0]);
   }
   const defaults = new Matrix4().makePerspective(l, r, t, b, n, f);
-  assert.deepEqual(Array.from(defaults.elements), Array.from(new Matrix4().makePerspective(l, r, t, b, n, f, true).elements));
+  assert.deepEqual(
+    Array.from(defaults.elements),
+    Array.from(new Matrix4().makePerspective(l, r, t, b, n, f, true).elements),
+  );
   const od = new Matrix4().makeOrthographic(l, r, t, b, n, f);
-  assert.deepEqual(Array.from(od.elements), Array.from(new Matrix4().makeOrthographic(l, r, t, b, n, f, true).elements));
+  assert.deepEqual(
+    Array.from(od.elements),
+    Array.from(new Matrix4().makeOrthographic(l, r, t, b, n, f, true).elements),
+  );
 });
 
 test('Matrix4: equals and arrays', () => {
@@ -297,7 +418,12 @@ test('Matrix4: equals and arrays', () => {
 });
 
 const ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'];
-const axisRot = (k, a) => (k === 'X' ? new Matrix4().makeRotationX(a) : k === 'Y' ? new Matrix4().makeRotationY(a) : new Matrix4().makeRotationZ(a));
+const axisRot = (k, a) =>
+  k === 'X'
+    ? new Matrix4().makeRotationX(a)
+    : k === 'Y'
+      ? new Matrix4().makeRotationY(a)
+      : new Matrix4().makeRotationZ(a);
 
 test('Euler: construction, set, copy, clone, vector and array forms', () => {
   const d = new Euler();
@@ -346,7 +472,10 @@ test('Euler: setFromRotationMatrix and setFromQuaternion read back the angles of
       const M = new Matrix4().multiply(axisRot(a, val[a])).multiply(axisRot(b, val[b])).multiply(axisRot(c, val[c]));
       const e = new Euler().setFromRotationMatrix(M, order);
       assert.equal(e.order, order);
-      const back = new Matrix4().multiply(axisRot(a, e[a.toLowerCase()])).multiply(axisRot(b, e[b.toLowerCase()])).multiply(axisRot(c, e[c.toLowerCase()]));
+      const back = new Matrix4()
+        .multiply(axisRot(a, e[a.toLowerCase()]))
+        .multiply(axisRot(b, e[b.toLowerCase()]))
+        .multiply(axisRot(c, e[c.toLowerCase()]));
       nearAll(Array.from(back.elements), Array.from(M.elements));
       assert.ok(Math.abs(e[b.toLowerCase()]) <= Math.PI / 2 + 1e-12);
       // the 3x3 form and the quaternion form read the same angles
@@ -368,9 +497,15 @@ test('Euler: setFromRotationMatrix and setFromQuaternion read back the angles of
   for (const order of ORDERS) {
     const [a, b, c] = order.split('');
     for (const sign of [1, -1]) {
-      const M = new Matrix4().multiply(axisRot(a, 0.8)).multiply(axisRot(b, (sign * Math.PI) / 2)).multiply(axisRot(c, 0.5));
+      const M = new Matrix4()
+        .multiply(axisRot(a, 0.8))
+        .multiply(axisRot(b, (sign * Math.PI) / 2))
+        .multiply(axisRot(c, 0.5));
       const e = new Euler().setFromRotationMatrix(M, order);
-      const back = new Matrix4().multiply(axisRot(a, e[a.toLowerCase()])).multiply(axisRot(b, e[b.toLowerCase()])).multiply(axisRot(c, e[c.toLowerCase()]));
+      const back = new Matrix4()
+        .multiply(axisRot(a, e[a.toLowerCase()]))
+        .multiply(axisRot(b, e[b.toLowerCase()]))
+        .multiply(axisRot(c, e[c.toLowerCase()]));
       nearAll(Array.from(back.elements), Array.from(M.elements), 1e-9);
     }
   }
@@ -378,7 +513,11 @@ test('Euler: setFromRotationMatrix and setFromQuaternion read back the angles of
 });
 
 test('Matrix4.decompose reads a zero scale column as a zero axis', () => {
-  for (const scale of [[0, 2, 3], [2, 0, 3], [2, 3, 0]]) {
+  for (const scale of [
+    [0, 2, 3],
+    [2, 0, 3],
+    [2, 3, 0],
+  ]) {
     const q = new Quaternion(),
       p = new Vector3(),
       s = new Vector3();
@@ -400,18 +539,43 @@ test('Matrix4.lookAt picks the perpendicular +X for a parallel up from the axis 
   };
   // [back vector, expected +X direction] (target at the origin, eye = back, up = back)
   const cases = [
-    [[1, 1, 2], [0, -2, 1]],
-    [[1, 2, 1], [0, -1, 2]],
-    [[2, 1, 1], [1, 0, -2]],
-    [[2, 3, 1], [-3, 2, 0]],
-    [[3, 2, 1], [-2, 3, 0]],
-    [[1, 3, 2], [0, -2, 3]],
-    [[2, 1, 3], [3, 0, -2]],
+    [
+      [1, 1, 2],
+      [0, -2, 1],
+    ],
+    [
+      [1, 2, 1],
+      [0, -1, 2],
+    ],
+    [
+      [2, 1, 1],
+      [1, 0, -2],
+    ],
+    [
+      [2, 3, 1],
+      [-3, 2, 0],
+    ],
+    [
+      [3, 2, 1],
+      [-2, 3, 0],
+    ],
+    [
+      [1, 3, 2],
+      [0, -2, 3],
+    ],
+    [
+      [2, 1, 3],
+      [3, 0, -2],
+    ],
   ];
   for (const [back, x] of cases) {
     const u = unit(back);
     // the same floats as the back direction, so the cross product is exactly zero
-    const e = new Matrix4().lookAt({ x: back[0], y: back[1], z: back[2] }, { x: 0, y: 0, z: 0 }, { x: u[0], y: u[1], z: u[2] }).elements;
+    const e = new Matrix4().lookAt(
+      { x: back[0], y: back[1], z: back[2] },
+      { x: 0, y: 0, z: 0 },
+      { x: u[0], y: u[1], z: u[2] },
+    ).elements;
     nearAll([e[0], e[1], e[2]], unit(x));
     nearAll([e[8], e[9], e[10]], unit(back));
   }
@@ -452,7 +616,7 @@ test('Euler.setFromRotationMatrix clamps the middle sine of an unnormalised matr
       m.elements[c * 4 + a] = sign * big;
       const e = new Euler().setFromRotationMatrix(m, order);
       const middle = [e.x, e.y, e.z][b];
-      near(middle, Math.sign(big) * Math.PI / 4, 1e-12, order + ' ' + big);
+      near(middle, (Math.sign(big) * Math.PI) / 4, 1e-12, order + ' ' + big);
     }
   }
 });

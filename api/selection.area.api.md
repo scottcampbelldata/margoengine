@@ -15,7 +15,7 @@ export class AreaPicking extends Picking {
 }
 
 export interface AreaPickingOptions {
-    maxPixels?: number;
+    maxPixels?: number ;
     capture?: boolean;
 }
 

@@ -28,7 +28,11 @@ const batches = () => {
   // Core's own matrices, so both sides hold the same floats.
   for (let n = 0; n < count; n++) transforms.set(meshes[n].matrix, n * 16);
   return [
-    { geometry: plate, material: plateColor, transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) },
+    {
+      geometry: plate,
+      material: plateColor,
+      transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+    },
     { geometry: rod, material: rodColor, transforms },
   ];
 };
@@ -58,13 +62,16 @@ const steps = [
   ['low over the plate', () => look([0, 1, 30])],
   ['under the plate: every rod shows', () => look([0, -8, 20])],
   ['frustum edge: the view skims the rods', () => look([0, -2, -30], [40, -2, -30])],
-  ['moved parts', () => {
-    meshes[3].setPosition([-12, 2, -15]);
-    b.render({ culling: false });
-    boxes.setTransform(1, 3, meshes[3].matrix);
-    spheres.setTransform(1, 3, meshes[3].matrix);
-    look([0.1, 40, 0.2]);
-  }],
+  [
+    'moved parts',
+    () => {
+      meshes[3].setPosition([-12, 2, -15]);
+      b.render({ culling: false });
+      boxes.setTransform(1, 3, meshes[3].matrix);
+      spheres.setTransform(1, 3, meshes[3].matrix);
+      look([0.1, 40, 0.2]);
+    },
+  ],
 ];
 async function step(i) {
   const [label, edit] = steps[i];

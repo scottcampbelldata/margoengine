@@ -10,7 +10,7 @@ A separate WebGPU water grid evaluates up to eight swell trains with analytical 
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
+const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0, chop: 0.35});
 ```
 
 For an open ocean, set `horizon: true`. The central 75% of each grid axis keeps
@@ -18,12 +18,19 @@ its original spacing and follows the camera in whole cells, so the swell
 surrounds the camera wherever it goes and the waves stay put in the world. Each
 outer row is a fixed ratio wider than the one inside it, out to 10 km past the
 grid's edge, and the last row lies 10,000 km out, so the sea meets the true
-horizon even from a camera kilometres up; both draw beyond the scene's far clip.
+horizon even from a camera kilometres up. Below the far clip the displaced mesh
+writes its ordinary scene depth. Beyond the far clip a flat quad fills the ocean
+at sky depth, where it cannot cover opaque terrain inside the camera's range.
 Wave displacement and normals fade
 together over those rows as the cells grow too large to resolve the wavelength.
 The default grid remains bounded and centred on the origin for ponds and finite
 surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 `size` of the camera, where the cells are regular.
+
+The five ripple layers fade according to their projected screen footprint in
+the direction of each layer. A nonzero `chop` adds two short crossing wave
+bands whose crests and strength vary across travelling wind patches. This is
+shading detail, with the swell trains still controlling the mesh, depth and buoyancy.
 
 ```ts
 import {Bloom} from 'margoengine/post/bloom';
@@ -54,12 +61,39 @@ Water.attach(engine, {
 });
 ```
 
+With `sceneColor`, Water traces the Snell-bent ray against opaque depth in the
+current view. The sampled color and attenuation use the same intersection.
+A ray that misses the capture uses the fallback seabed and water-body color.
+`foamDistance` uses the local contact depth to place foam at the shore or hull.
+See [screen-space water refraction](../../docs/limits.md#above-water-screen-space-refraction)
+for the capture limits.
+
 The borrowed sky texture must be a sampleable single-layer `rgba16float` 2D texture. The borrowed scene color must be a viewport-sized single-layer `rgba16float` texture with `COPY_SRC` usage. Water retains one GPU snapshot for depth-rejected screen refraction and seabed attenuation. Without these providers, it uses a sky gradient and an approximate seabed color. Reflections represent the atmosphere, not nearby objects.
+
+Pass an `Environment` as `reflectionEnvironment` to use the same longitude, live rotation, and HDR radiance scale as `EnvironmentBackground`. Use `() => sky.reflectionTexture` for the procedural `Sky` package. Both forms filter reflections across azimuth and elevation with a lobe widened by the wave normals' screen footprint. On open water, a down-going reflection samples horizon radiance with a softer weight to approximate occlusion by nearby waves. The HDR sky also lights the water body and refracted seabed through a cosine-weighted irradiance estimate.
+
+The same HDR environment lights the surface and appears in Snell's window below it through `@margoengine/water/underwater`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Environment, EnvironmentBackground} from 'margoengine/environment';
+import {Water} from 'margoengine/water';
+import {Underwater} from 'margoengine/water/underwater';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const sky = await Environment.attach(engine, {
+  width: 2, height: 1,
+  data: new Float32Array([0.3, 0.4, 0.6, 1, 0.8, 0.7, 0.6, 1]),
+}, {float32: false});
+EnvironmentBackground.attach(engine, sky);
+const surface = Water.attach(engine, {size: [200, 200], horizon: true, reflectionEnvironment: sky});
+Underwater.attach(engine, {surface, skyEnvironment: sky});
+engine.render({delta: 0});
+```
 
 For reflections of nearby geometry, attach the optional planar adapter with a
 horizontal capture aligned to the water surface. The adapter fades across the
-capture edge into the base reflection using the filter footprint and projected wave
-offset, so an open surface does not show a hard rectangular edge.
+capture edge and toward the horizon into the base reflection using the filter footprint
+and projected wave offset, so an open surface does not show a hard rectangular edge.
 
 ```ts
 import {Engine} from '@margoengine/core';
@@ -95,7 +129,9 @@ strength. Pass `shadows: shadows` (a `Shadows` from `@margoengine/shadows` attac
 to the same engine) to darken glints and foam where the engine light is blocked.
 Water binds the cascades at group 1 and samples them with the same PCSS filter as
 the scene, only where a glint or foam shows. All glint lights take that one shadow
-map, as the scene's single blended light does.
+map, as the scene's single blended light does. The depth-based contact band uses
+`foamDistance` in metres. Screen-space edge filtering is restricted to that
+local band, so a deeply submerged object's silhouette produces no contact foam.
 
 `whitecaps` (0 to 1, default 0) breaks steep crests into white foam: where the summed slope of a crest's
 components passes a threshold that falls as the amount rises, read a little ahead of the crest where spilling foam
@@ -135,7 +171,11 @@ numerical wave maker), and the flow carries the bores up the sand: it carries th
 2003) and drags on the sand (Manning n 0.02), so a 1 m, 60 m swell on a 1:50 beach runs 0.126 m up it on 0.78 m cells,
 near Hunt's 0.155 m for regular waves (more on finer cells), and a solitary wave runs up within 1.5% of Synolakis 1987.
 The flow spins up over the surf's last 40 s before its first frame, so the swash and the wet sand are there from the
-first frame (about 0.4 s more on the first frame on WebGPU for a 512 x 82 map, 3 s on the WebGL2 layer). Still water
+first frame (about 0.4 s more on the first frame on WebGPU for a 512 x 82 map, 3 s on the WebGL2 layer; about 4.5 s of
+GPU time for a 512 x 512 map on a laptop GPU). That set-up goes to the GPU ahead of the frame in pieces of at most
+2^18 workgroups, each its own submission, so no single submission runs past the 2 s after which Windows resets the GPU
+(KB-SCENES-DUNE-ARCHANG1). It reads the heightmap as uploaded; a heightmap you write on the GPU in the same frame's
+command encoder is not ready for it, so write it in an earlier frame or submission. Still water
 (`still`) and `water/rivers` get no surf field. The surf follows the train with the most height (the peak of the sea), so a wind sea (`wind`, no `waves`) breaks
 too; until 2026-11-17 its near-empty long trains set the field and its waves never broke (KB-WATER-SURFFIELD1).
 
@@ -239,8 +279,9 @@ very small cells require more substeps.
 without rebuilding anything. With terrain coupling the flow's map edge and open-sea cells follow it, so a level raised
 slowly floods the land below it from the sea and a fall drains it again: a storm surge or a tide. The open sea, the surf
 and the wave queries ride on the new level. `test/surge.browser.mjs` raises a beach's sea by 1 m over 10 s: a cell at
-0.45 m floods to 0.55 m within 0.1 m, ground at 1.45 m stays dry, and after the fall the beach drains to under 0.02 m
-and the sea returns to its volume within 2%, on WebGPU and the WebGL2 layer.
+0.45 m floods to 0.55 m within 0.1 m, ground at 1.45 m stays dry, the sea holds its still-water volume at rest (within
+1%) and at the raised level (within 2%), and after the fall the beach drains to under 0.02 m and the sea returns to its
+volume within 2%, on WebGPU and the WebGL2 layer.
 
 `water.setFarField({sides, profile, range, spread})` (null by default, read every frame) makes the open sea past the
 terrain's sea sides a long wave instead of one level: `profile` is the rise over the sea level at 2 to 64 evenly spaced
@@ -296,9 +337,9 @@ The water body uses the scene's ambient floor; a borrowed sky environment carrie
 the matching night sky into Fresnel reflections.
 
 Physical WebGPU all-shore run-up/recession, beach surf (shoaling, depth-limited breaking, foam), deep isolated-basin retention, curved-crest/normal, zero-amplitude, channel, spray, whitecaps and chop, triangle-order, coastal-seam,
-refraction and device-restoration checks. Run every Water browser suite from the repository root with
+refraction (depth-checked bent rays), HDR sky radiance, contact foam and device-restoration checks. Run every Water browser suite from the repository root with
 `npm run check:gpu-packages -- --only=water`. Set `MARGO_COMPAT=1` for the WebGL2 compatibility layer.
-(build core, post and terrain packages first).
+(build core, post and terrain packages first). Each suite runs with its own time limit.
 
 ## A sea from the wind
 
@@ -1260,8 +1301,22 @@ console.log(fronts.length, fronts[0].count, geometry.positions.length / 3, mater
   It draws up to 8 ships and 16 lamps:
   - The Kelvin wake has bow and stern wave systems. Its brightest ray sits at 19.47 degrees up to a hull Froude number of
     0.49. Above that it narrows as `wakeAngle(Fr)` (Rabaud and Moisy 2013), about 1 / (2 sqrt(2 pi) Fr).
+    The crest phase uses the aft travel distance and opposing lateral wavevector projection. The outer waves spread away
+    from the hull while the waterline rise and the propeller trail remain attached to their own sources.
   - The bow wave follows `bowWave(speed, hull)` (Noblesse et al. 2008) and never passes the stagnation head U^2 / 2g.
-  - Foam runs along the waterline, in the turbulent wake and where the bow wave breaks.
+    Its crest sweeps aft away from the hull as it loses height. Breaking foam follows that crest, including when the ship turns.
+    The moving hull lifts a lower band of water along both shoulders, with a shallow trough just outside it. This motion
+    follows the current hull, fades toward the stern, and uses the same `bowWave` multiplier as the crest.
+    At harbor speeds the bow and side profiles have broader support so the narrow pressure rise remains visible on the
+    Water mesh. Its height falls with speed and is zero at rest.
+  - Foam runs along the waterline, in the turbulent wake and where the bow wave breaks. The turbulent trail follows
+    where the stern has passed. Fresh foam spreads and decays downstream with `foamLife`, even on long hulls at low speed.
+    The surface shader concentrates faint foam into sparse patches as it disperses. `ShipWakes.sample` reports the
+    underlying foam density before this shading step.
+  - `ShipOptions.wakeTint` is optional linear RGB in the range 0 to 1, with `null` as the default. It colours water
+    and foam along this ship's turbulent stern trail. The tint spreads and fades with the turbulence. Change
+    `WakeShip.wakeTint` to recolour the current trail, including on a paused frame. Where tinted trails overlap,
+    the strongest local contribution supplies the colour. The tint leaves the height and foam-density queries intact.
   - Ships' and shore lamps leave glints on a night sea.
   - A ship with a `path` (time to [x, z]) draws the same wake after a seek as after playing to that time. A ship placed
     with `setPose` leaves the trail it has passed through. Either way a turning ship's wake bends with its track.
@@ -1288,6 +1343,7 @@ const wakes = ShipWakes.attach(engine, {
   lamps: [{position: [60, 8, 100], color: [1, 0.9, 0.7], intensity: 400}], // a harbour light
 });
 applyShipSettings(wakes, SHIP_LOOKS.calmNight);
+wakes.ships[0].wakeTint = [0.56, 0.15, 0.065]; // illustrative suspended sediment, linear RGB
 // A small boat rides the ship's wake and the sea; the bow spray goes to any emitter with options and burst().
 const boat = new Floater({hull: {length: 6, beam: 2, draft: 0.5}, position: [20, 0, 0], heading: 45});
 const spray = {options: {}, burst: (count: number) => count};
@@ -1303,7 +1359,8 @@ console.log(boat.matrix(), wakes.sample(10, -60), (wakeAngle(hullFroude(6, 40)) 
 On a Flood, ride `floodSurface(await flood.read(), {origin, size})` (the Water's terrain extent), or `WaveQuery.capture`
 of its Water, which already holds the flood. The GPU check (`test/ships.browser.mjs`, WebGPU and MARGO_COMPAT=1) holds
 the drawn wake to `wakes.sample` within 4e-6 m on the open sea and on a flood, and a Floater's ride to the CPU law within
-1e-7. It also checks that a lamp's glint stands on the mirror line and spreads on a rougher sea. `test/ships.test.js`
+1e-7. It also checks the stern tint in a fixed frame, the untouched water outside the trail, and the lamp glint
+at the mirror line and across a rougher sea. `test/ships.test.js`
 measures the bounds: the brightest ray of the drawn wake at 19.47 degrees below Fr 0.49 and at Rabaud and Moisy's angle
 at Fr 0.8 to 2, the bow wave law, the Floater's least-squares pitch and its damped overshoot exp(-zeta pi / sqrt(1 -
 zeta^2)), and the slam threshold. `examples/test-pages/ships.html` runs all of it in one scene.

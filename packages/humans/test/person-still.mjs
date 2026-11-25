@@ -21,7 +21,8 @@ try {
   assert.deepEqual(hand.errors, []);
   assert.deepEqual(person.errors, []);
   let differ = 0;
-  for (let i = 0; i < Math.max(hand.bytes.length, person.bytes.length); i++) if (hand.bytes[i] !== person.bytes[i]) differ++;
+  for (let i = 0; i < Math.max(hand.bytes.length, person.bytes.length); i++)
+    if (hand.bytes[i] !== person.bytes[i]) differ++;
   console.log('frame:', hand.bytes.length, 'PNG bytes,', differ, 'differ from the hand-wired frame');
   assert.equal(differ, 0, 'addPerson draws the hand-wired frame exactly');
   // The figure is in the frame: not just the #30333a background.
@@ -29,18 +30,25 @@ try {
     channels = image.data.length / (image.width * image.height);
   let figure = 0;
   for (let i = 0; i < image.data.length; i += channels)
-    if (Math.abs(image.data[i] - 0x30) + Math.abs(image.data[i + 1] - 0x33) + Math.abs(image.data[i + 2] - 0x3a) > 30) figure++;
+    if (Math.abs(image.data[i] - 0x30) + Math.abs(image.data[i + 1] - 0x33) + Math.abs(image.data[i + 2] - 0x3a) > 30)
+      figure++;
   console.log('figure covers', ((100 * figure) / (image.width * image.height)).toFixed(1), 'percent of the frame');
   assert.ok(figure > image.width * image.height * 0.02, 'the figure is drawn');
   // Under an overcast sky the person is lit by the sky of its scene: diffuse light and reflections blurred by each
   // material's roughness, so a rougher skin reads differently. A model left out of the sky has only the flat built-in
   // ambient, which reads no roughness: the two roughnesses then draw the same frame (the round 5 Wilbur frames).
   const sky = {};
-  for (const [key, rough, option] of [['smooth', 0.3], ['rough', 0.8], ['smoothOff', 0.3, false], ['roughOff', 0.8, false]])
+  for (const [key, rough, option] of [
+    ['smooth', 0.3],
+    ['rough', 0.8],
+    ['smoothOff', 0.3, false],
+    ['roughOff', 0.8, false],
+  ])
     sky[key] = await page.evaluate(([r, o]) => window.check.sky(r, o), [rough, option]);
   for (const v of Object.values(sky)) assert.deepEqual(v.errors, []);
   const change = (a, b) => {
-    let sum = 0, n = 0;
+    let sum = 0,
+      n = 0;
     for (let i = 0; i < a.length; i += 4)
       if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) {
         n++;
@@ -48,16 +56,34 @@ try {
       }
     return { pixels: n, mean: n ? sum / n / 3 : 0 };
   };
-  const joined = change(sky.smooth.pixels, sky.rough.pixels), left = change(sky.smoothOff.pixels, sky.roughOff.pixels);
-  console.log('overcast sky, skin roughness 0.3 to 0.8: lit by the sky', JSON.stringify(joined), '; left out', JSON.stringify(left));
-  assert.deepEqual([sky.smooth.joined, sky.smooth.left], [true, false], "addPerson joins the scene's sky, dispose leaves it");
+  const joined = change(sky.smooth.pixels, sky.rough.pixels),
+    left = change(sky.smoothOff.pixels, sky.roughOff.pixels);
+  console.log(
+    'overcast sky, skin roughness 0.3 to 0.8: lit by the sky',
+    JSON.stringify(joined),
+    '; left out',
+    JSON.stringify(left),
+  );
+  assert.deepEqual(
+    [sky.smooth.joined, sky.smooth.left],
+    [true, false],
+    "addPerson joins the scene's sky, dispose leaves it",
+  );
   assert.equal(sky.smoothOff.joined, false, 'sky: false leaves the sky out');
-  assert.ok(joined.pixels > left.pixels * 2 && joined.pixels > 2000, 'the sky reflection on the skin reads its roughness');
+  assert.ok(
+    joined.pixels > left.pixels * 2 && joined.pixels > 2000,
+    'the sky reflection on the skin reads its roughness',
+  );
   // KB-GLTF-SCENESKY1: the person's outfit (a second glTF on the right) and a prop (Lantern, on the left) given no
   // sky.add are lit by the scene's sky all the same, so their roughness reads under the overcast sky as the skin's
   // does. Left out (model.sceneSky false) they had the flat built-in ambient: the two roughnesses drew alike.
   const dressed = {};
-  for (const [key, rough, off] of [['smooth', 0.3, false], ['rough', 0.8, false], ['smoothOff', 0.3, true], ['roughOff', 0.8, true]])
+  for (const [key, rough, off] of [
+    ['smooth', 0.3, false],
+    ['rough', 0.8, false],
+    ['smoothOff', 0.3, true],
+    ['roughOff', 0.8, true],
+  ])
     dressed[key] = await page.evaluate(([r, o]) => window.check.outfit(r, o), [rough, off]);
   for (const v of Object.values(dressed)) assert.deepEqual(v.errors, []);
   const third = (a, b, x0, x1) => {
@@ -68,13 +94,31 @@ try {
     }
     return n;
   };
-  const prop = { lit: third(dressed.smooth.pixels, dressed.rough.pixels, 0, 160), off: third(dressed.smoothOff.pixels, dressed.roughOff.pixels, 0, 160) },
-    outfit = { lit: third(dressed.smooth.pixels, dressed.rough.pixels, 320, 480), off: third(dressed.smoothOff.pixels, dressed.roughOff.pixels, 320, 480) };
-  console.log('overcast sky, roughness 0.3 to 0.8, pixels changed: prop', JSON.stringify(prop), 'outfit', JSON.stringify(outfit));
-  assert.deepEqual(dressed.smooth.joined, { outfit: true, prop: true }, "the outfit and the prop join their scene's sky by themselves");
+  const prop = {
+      lit: third(dressed.smooth.pixels, dressed.rough.pixels, 0, 160),
+      off: third(dressed.smoothOff.pixels, dressed.roughOff.pixels, 0, 160),
+    },
+    outfit = {
+      lit: third(dressed.smooth.pixels, dressed.rough.pixels, 320, 480),
+      off: third(dressed.smoothOff.pixels, dressed.roughOff.pixels, 320, 480),
+    };
+  console.log(
+    'overcast sky, roughness 0.3 to 0.8, pixels changed: prop',
+    JSON.stringify(prop),
+    'outfit',
+    JSON.stringify(outfit),
+  );
+  assert.deepEqual(
+    dressed.smooth.joined,
+    { outfit: true, prop: true },
+    "the outfit and the prop join their scene's sky by themselves",
+  );
   assert.equal(dressed.smooth.left, false, 'a disposed model leaves the sky');
   assert.deepEqual(dressed.smoothOff.joined, { outfit: false, prop: false }, 'sceneSky false leaves them out');
-  for (const [name, v] of [['prop', prop], ['outfit', outfit]])
+  for (const [name, v] of [
+    ['prop', prop],
+    ['outfit', outfit],
+  ])
     assert.ok(v.lit > v.off * 2 && v.lit > 1000, `the sky reflection on the ${name} reads its roughness`);
   // Skin colour in sun: the person's skin against the same figure drawn by the plain PBR shader under the same noon sky
   // (blue sky fill and warm sun), over the figure's pixels, in linear light. Left out of the sky, the person had a warm
@@ -88,17 +132,36 @@ try {
   const linear = (c) => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const mask = [];
   for (let i = 0; i < tone.empty.pixels.length; i += 4)
-    if (Math.abs(tone.plain.pixels[i] - tone.empty.pixels[i]) + Math.abs(tone.plain.pixels[i + 1] - tone.empty.pixels[i + 1]) + Math.abs(tone.plain.pixels[i + 2] - tone.empty.pixels[i + 2]) > 24)
+    if (
+      Math.abs(tone.plain.pixels[i] - tone.empty.pixels[i]) +
+        Math.abs(tone.plain.pixels[i + 1] - tone.empty.pixels[i + 1]) +
+        Math.abs(tone.plain.pixels[i + 2] - tone.empty.pixels[i + 2]) >
+      24
+    )
       mask.push(i);
   const ratios = (px) => {
     const s = [0, 0, 0];
     for (const i of mask) for (let k = 0; k < 3; k++) s[k] += linear(px[i + k]);
     return { rg: s[0] / s[1], bg: s[2] / s[1] };
   };
-  const plain = ratios(tone.plain.pixels), skinned = ratios(tone.person.pixels), off = ratios(tone.off.pixels);
-  console.log('noon sky, figure', mask.length, 'px, r/g and b/g: plain PBR', JSON.stringify(plain), 'skin', JSON.stringify(skinned), 'skin left out of the sky', JSON.stringify(off));
+  const plain = ratios(tone.plain.pixels),
+    skinned = ratios(tone.person.pixels),
+    off = ratios(tone.off.pixels);
+  console.log(
+    'noon sky, figure',
+    mask.length,
+    'px, r/g and b/g: plain PBR',
+    JSON.stringify(plain),
+    'skin',
+    JSON.stringify(skinned),
+    'skin left out of the sky',
+    JSON.stringify(off),
+  );
   assert.ok(mask.length > 5000, 'the figure is drawn');
-  assert.ok(Math.abs(skinned.bg / plain.bg - 1) < 0.05 && Math.abs(skinned.rg / plain.rg - 1) < 0.05, "the skin keeps the colour the scene's light gives its albedo");
+  assert.ok(
+    Math.abs(skinned.bg / plain.bg - 1) < 0.05 && Math.abs(skinned.rg / plain.rg - 1) < 0.05,
+    "the skin keeps the colour the scene's light gives its albedo",
+  );
   assert.ok(off.bg < plain.bg * 0.9, 'left out of the sky, the same skin reads orange: the check tells the two apart');
   const b = await page.evaluate(() => window.check.behaviour());
   console.log('behaviour', JSON.stringify(b));
@@ -108,7 +171,10 @@ try {
   assert.equal(b.materials, true, 'no material is named for a look');
   assert.ok(Math.abs(b.stand - 0.1) < 1e-5, `stand seeked to 0.5 s: ${b.stand}`);
   assert.equal(b.time, 0.5, 'play starts the clip at its at time');
-  assert.ok(Math.abs(b.mid - 0.42) < 1e-5, `halfway through the fade, half stand at 0.7 s and half wave at 0.7 s: ${b.mid}`);
+  assert.ok(
+    Math.abs(b.mid - 0.42) < 1e-5,
+    `halfway through the fade, half stand at 0.7 s and half wave at 0.7 s: ${b.mid}`,
+  );
   assert.ok(Math.abs(b.end - 0.95) < 1e-5, `the fade ends on wave at 0.95 s: ${b.end}`);
   for (const [at, angle] of b.seeks) assert.ok(Math.abs(angle - at) < 1e-5, `wave seeked to ${at}: ${angle}`);
   assert.equal(b.unknown, 'RangeError');

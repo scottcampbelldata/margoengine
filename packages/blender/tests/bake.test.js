@@ -30,14 +30,22 @@ test('baked materials carry their channels as textures and their constants as fa
   assert.ok(Math.abs(plain.pbrMetallicRoughness.roughnessFactor - 0.7) < 1e-6);
   assert.equal(asset.images.length, 4, 'two images for each of the two baked materials');
   for (const texture of asset.document.textures)
-    assert.deepEqual(asset.document.samplers[texture.sampler], { wrapS: 10497, wrapT: 10497, magFilter: 9729, minFilter: 9729 });
+    assert.deepEqual(asset.document.samplers[texture.sampler], {
+      wrapS: 10497,
+      wrapT: 10497,
+      magFilter: 9729,
+      minFilter: 9729,
+    });
 });
 
 test('every baked texel matches the node maths of its UV coordinates', async () => {
   const { size, errors, bounds } = await bakeErrors(asset);
   assert.equal(size, 32, 'the fixture bakes at 32 x 32');
   for (const channel of ['r', 'g', 'b'])
-    assert.ok(errors[channel] <= bounds.color, `base colour ${channel} is off by ${errors[channel]} (bound ${bounds.color})`);
+    assert.ok(
+      errors[channel] <= bounds.color,
+      `base colour ${channel} is off by ${errors[channel]} (bound ${bounds.color})`,
+    );
   for (const channel of ['roughness', 'metallic'])
     assert.ok(errors[channel] <= bounds.linear, `${channel} is off by ${errors[channel]} (bound ${bounds.linear})`);
   // glTF reads roughness from green and metallic from blue; red (occlusion) stays 0.

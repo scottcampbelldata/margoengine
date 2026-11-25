@@ -50,7 +50,11 @@ export function TexturedShape({
     if (scene.world) {
       report(
         scene,
-        fault('unsupported', 'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>', 'react-usage'),
+        fault(
+          'unsupported',
+          'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>',
+          'react-usage',
+        ),
         error.current,
       );
       return;
@@ -106,6 +110,20 @@ export function TexturedShape({
         model.dispose();
       }
     };
-  }, [scene.engine, scene.world, scene.shadows, registry, kind, key, map, colorKey, roughness, metalness, castShadow, receiveShadow, baked]);
+  }, [
+    scene.engine,
+    scene.world,
+    scene.shadows,
+    registry,
+    kind,
+    key,
+    map,
+    colorKey,
+    roughness,
+    metalness,
+    castShadow,
+    receiveShadow,
+    baked,
+  ]);
   return null;
 }

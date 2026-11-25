@@ -15,7 +15,11 @@ async function seekMatches(make, label, { scale = 1, after = () => {} } = {}) {
       for (let step = 0; step < n; step++) b.clock.advanceTime(1 / 60);
       b.clock.onPreUpdate(1 / 60);
       assert.ok(Object.is(b.clock.time, a.clock.time), `${label} at ${n} steps`);
-      if (scale) assert.ok(Math.abs(a.clock.time - ((n + 1) / 60) * scale) <= 1e-6 * (n + 1) * scale, `${label} counts its clock`);
+      if (scale)
+        assert.ok(
+          Math.abs(a.clock.time - ((n + 1) / 60) * scale) <= 1e-6 * (n + 1) * scale,
+          `${label} counts its clock`,
+        );
       after(a, b, n);
     } finally {
       a.close?.();

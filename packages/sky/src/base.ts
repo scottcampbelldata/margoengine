@@ -135,8 +135,11 @@ export interface SkyCloudOptions {
  * throw RangeError.
  */
 export interface SkyFogOptions {
-  /** Returns the scene's sampleable depth texture each frame (no fog while it returns undefined). */
-  depth: () => GPUTexture | undefined;
+  /**
+   * Override the active scene capture's sampleable depth. Omit to read the current frame from a PostStack or other
+   * scene capture. There is no fog when the chosen source has no depth texture.
+   */
+  depth?: () => GPUTexture | undefined;
   /** Density per metre, 0..1 (0 turns fog off). Default 0.01. */
   density?: number;
   /** Distance from the camera, in metres, where fog starts, >= 0. Default 40. */
@@ -965,10 +968,9 @@ export class Sky implements EnginePlugin {
       look = l?.moon ? this.look(l.moon) : undefined,
       brightness = look?.light ?? 1,
       set = typeof l?.moon?.color === 'object' ? l.moon.color : undefined,
-      moonColor = set ?? (lit ? moonlightColor(lit.illuminance * brightness, this.aboveColor, look!.source) : UNLIT_MOON_COLOR),
-      moonIntensity = l?.moon
-        ? (l.moon.intensity ?? lit!.illuminance / (luminance(moonColor) || 1)) * brightness
-        : 0;
+      moonColor =
+        set ?? (lit ? moonlightColor(lit.illuminance * brightness, this.aboveColor, look!.source) : UNLIT_MOON_COLOR),
+      moonIntensity = l?.moon ? (l.moon.intensity ?? lit!.illuminance / (luminance(moonColor) || 1)) * brightness : 0;
     this.disc = look;
     // Under the cloud: Kasten and Czeplak's share of the illuminance, its colour for that level (moonlight.ts).
     const cover = l?.moon?.cloudCover ?? (this.options.clouds ? (this.options.clouds.coverage ?? 0.45) : 0),
@@ -1029,7 +1031,7 @@ export class Sky implements EnginePlugin {
       t2[0] = flat > 0 ? this.sun[0] / flat : 0;
       t2[1] = flat > 0 ? Math.SQRT1_2 : 1;
       t2[2] = flat > 0 ? this.sun[2] / flat : 0;
-      t2[3] = (((lux / SUN_ILLUMINANCE) * (l!.intensity ?? 1)) / t2[1]) / (luminance(c) || 1);
+      t2[3] = ((lux / SUN_ILLUMINANCE) * (l!.intensity ?? 1)) / t2[1] / (luminance(c) || 1);
       this.twilightLight.radiance.set(c);
     }
     // The light map is in the sky's own units; the engine's sun is lighting.intensity times its share of the zenith
@@ -1041,8 +1043,7 @@ export class Sky implements EnginePlugin {
     // the sun on level ground, and a brighter sun only diluted it (KB-SKY-SUNUNITS1).
     const zenith =
       this.options.model === 'bruneton'
-        ? 20 *
-          zenithTransmittance(eye, this.options.turbidity ?? 2, a && this.features.look ? this.air : undefined)
+        ? 20 * zenithTransmittance(eye, this.options.turbidity ?? 2, a && this.features.look ? this.air : undefined)
         : PREETHAM_SUN;
     this.zenithSun = zenith;
     this.lightScale = zenith > 0 ? (l ? (l.intensity ?? 1) : (this.engine?.lighting?.direction[3] ?? 0)) / zenith : 0;
@@ -1157,7 +1158,10 @@ export class Sky implements EnginePlugin {
   private bindUniform(d: GPUDevice): GPUBufferBinding {
     let b = this.extended ? this.wide : this.plain;
     if (!b) {
-      b = d.createBuffer({ size: this.extended ? 256 + LOOK_FLOATS * 4 : 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      b = d.createBuffer({
+        size: this.extended ? 256 + LOOK_FLOATS * 4 : 256,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       if (this.extended) this.wide = b;
       else this.plain = b;
     }
@@ -1232,7 +1236,9 @@ export class Sky implements EnginePlugin {
           n > 1
             ? d.createTexture({ size, format: 'r8unorm', sampleCount: n, usage: GPUTextureUsage.RENDER_ATTACHMENT })
             : undefined,
-        module = d.createShaderModule({ code: fullscreen + '@fragment fn fragment()->@location(0) vec4f{return vec4f(1);}' });
+        module = d.createShaderModule({
+          code: fullscreen + '@fragment fn fragment()->@location(0) vec4f{return vec4f(1);}',
+        });
       this.cover = [
         key,
         texture,
@@ -1251,7 +1257,13 @@ export class Sky implements EnginePlugin {
     const [, , view, pipeline, many] = this.cover!,
       pass = c.encoder.beginRenderPass({
         colorAttachments: [
-          { view: many ?? view, resolveTarget: many && view, loadOp: viewLoadOp(c), clearValue: [0, 0, 0, 0], storeOp: 'store' },
+          {
+            view: many ?? view,
+            resolveTarget: many && view,
+            loadOp: viewLoadOp(c),
+            clearValue: [0, 0, 0, 0],
+            storeOp: 'store',
+          },
         ],
         depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
       });

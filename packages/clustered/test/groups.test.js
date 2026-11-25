@@ -47,15 +47,29 @@ test('LightGroups: each group replaces only its own lights, in the order the gro
     mine = groups.group('mine');
   fire.setLights([at(0), at(1)]);
   mine.setLights([at(5)]);
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [0, 1, 5]);
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [0, 1, 5],
+  );
   fire.setLights([at(2)]);
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [2, 5], "the fire's change keeps my light");
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [2, 5],
+    "the fire's change keeps my light",
+  );
   assert.equal(groups.group('fire'), fire, 'one group per name');
   assert.deepEqual(groups.names, ['fire', 'mine']);
-  assert.deepEqual(groups.list.map((l) => l.position[0]), [2, 5]);
+  assert.deepEqual(
+    groups.list.map((l) => l.position[0]),
+    [2, 5],
+  );
   assert.ok(Object.isFrozen(fire.lights));
   fire.dispose();
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [5], 'a disposed group takes its lights with it');
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [5],
+    'a disposed group takes its lights with it',
+  );
   assert.deepEqual(groups.names, ['mine']);
   assert.throws(() => fire.setLights([]), { name: 'MargoError', code: 'disposed' });
   assert.notEqual(groups.group('fire'), fire, 'the name can be used again');
@@ -69,10 +83,19 @@ test('LightGroups: invalid lights throw at the call and leave every group and th
     a = groups.group('a').setLights([at(0)]),
     b = groups.group('b').setLights([at(1)]);
   assert.throws(() => b.setLights([{ position: [0, 0, 0], range: -1 }]), RangeError);
-  assert.deepEqual(b.lights.map((l) => l.position[0]), [1]);
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [0, 1]);
+  assert.deepEqual(
+    b.lights.map((l) => l.position[0]),
+    [1],
+  );
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [0, 1],
+  );
   a.setLights([at(3)]);
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [3, 1]);
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [3, 1],
+  );
 });
 
 test('LightGroups attached: changes made during a frame go in one setLights before it renders', () => {
@@ -84,7 +107,11 @@ test('LightGroups attached: changes made during a frame go in one setLights befo
     lamp = groups.group('lamp'),
     user = groups.group('user').setLights([at(9)]);
   // Two flickering owners and a steady one: before groups, each animateFlicker replaced the whole list.
-  const stopFire = animateFlicker(engine, fire, lineLights({ start: [0, 1, 0], end: [1, 1, 0], range: 5, intensity: 4, flicker: { curve: 'fire' } })),
+  const stopFire = animateFlicker(
+      engine,
+      fire,
+      lineLights({ start: [0, 1, 0], end: [1, 1, 0], range: 5, intensity: 4, flicker: { curve: 'fire' } }),
+    ),
     stopLamp = animateFlicker(engine, lamp, [at(4, { intensity: 2, flicker: { curve: 'candle' } })]);
   assert.equal(clustered.list.length, 4, 'fire (2), lamp and user all lit at once');
   const before = clustered.calls,
@@ -120,8 +147,14 @@ test('LightGroups: a group changed in a frame that fails to apply goes back, and
     a = groups.group('a').setLights([at(0)]);
   engine.onFrame(() => a.setLights([{ position: [0, 0, 0], range: -1 }]));
   assert.throws(() => engine.frame(), RangeError);
-  assert.deepEqual(a.lights.map((l) => l.position[0]), [0]);
-  assert.deepEqual(clustered.list.map((l) => l.position[0]), [0]);
+  assert.deepEqual(
+    a.lights.map((l) => l.position[0]),
+    [0],
+  );
+  assert.deepEqual(
+    clustered.list.map((l) => l.position[0]),
+    [0],
+  );
 });
 
 // KB-FLICKER-DISPOSE1: closing the Cabin Hearth page disposed the Clustered (with the engine) before the page's own
@@ -177,7 +210,11 @@ test('LightGroups: a group disposed after its Clustered goes quietly, in or out 
     assert.doesNotThrow(() => fire.dispose());
     assert.doesNotThrow(() => engine.frame());
     assert.deepEqual(groups.names, ['lamp']);
-    assert.throws(() => lamp.setLights([at(2)]), { code: 'disposed' }, 'setting lights of a disposed Clustered still throws');
+    assert.throws(
+      () => lamp.setLights([at(2)]),
+      { code: 'disposed' },
+      'setting lights of a disposed Clustered still throws',
+    );
     assert.doesNotThrow(() => lamp.dispose());
     assert.deepEqual(groups.names, []);
     groups.dispose();

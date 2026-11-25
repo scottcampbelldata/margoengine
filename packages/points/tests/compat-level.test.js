@@ -79,7 +79,8 @@ test('surfels at 4x on the compatibility level draw with formats the level multi
   const shaders = code(log).join();
   assert.match(shaders, /packDepth\(-dot\(i\.world,frame\.back\.xyz\)\)/);
   assert.match(shaders, /unpackDepth\(textureLoad\(front,vec2i\(i\.clip\.xy\),0\)\)/);
-  for (const sample of [0, 1, 2, 3]) assert.ok(shaders.includes(`textureLoad(rest,q,${sample})`), `resolve reads sample ${sample}`);
+  for (const sample of [0, 1, 2, 3])
+    assert.ok(shaders.includes(`textureLoad(rest,q,${sample})`), `resolve reads sample ${sample}`);
   // The front clear is NOTHING (3e38) as its four bytes, which unpack to the same float.
   const clear = log.find((e) => e[0] === 'beginRenderPass')[1].colorAttachments[0].clearValue,
     bytes = Uint8Array.from([clear.r, clear.g, clear.b, clear.a], (v) => Math.round(Math.fround(v) * 255));
@@ -88,7 +89,9 @@ test('surfels at 4x on the compatibility level draw with formats the level multi
   assert.equal(resolves.length, 4, 'four resolve draws');
 });
 
-test('surfels at 4x on a full device keep r32float, rgba16float and one sample_index resolve', () => {
+// KB2481 (2026-11-21): on the Intel Arc 140V the one sample_index resolve over 4x additive rgba16float sums does not
+// repeat itself, while a masked draw per sample does; the full level takes the masked draws too (4 draws for 1).
+test('surfels at 4x on a full device keep r32float and rgba16float, resolved by a masked draw per sample', () => {
   const log = rig(new SurfelPlugin(), { compatibility: false });
   assert.deepEqual(
     textures(log)
@@ -96,9 +99,13 @@ test('surfels at 4x on a full device keep r32float, rgba16float and one sample_i
       .map((t) => t.format),
     ['r32float', 'rgba16float'],
   );
-  assert.deepEqual(masks(log), []);
-  assert.ok(code(log).some((shader) => shader.includes('@builtin(sample_index)')));
-  assert.equal(log.filter((e) => e[0] === 'pass.draw' && e[1] === 3).length, 1);
+  assert.deepEqual(masks(log), [1, 2, 4, 8]);
+  for (const shader of code(log)) assert.doesNotMatch(shader, /sample_index/);
+  const shaders = code(log).join();
+  for (const sample of [0, 1, 2, 3])
+    assert.ok(shaders.includes(`textureLoad(sums,q,${sample})`), `resolve reads sample ${sample}`);
+  assert.doesNotMatch(shaders, /var rest:/);
+  assert.equal(log.filter((e) => e[0] === 'pass.draw' && e[1] === 3).length, 4);
 });
 
 test('packed depth keeps every float bit', () => {
@@ -177,12 +184,22 @@ for (const samples of [1, 4]) {
       ['rgba8unorm', 'rgba16float'],
     );
     const [depth, blend] = surfelPipelines(log);
-    assert.deepEqual(depth.fragment.targets.map((t) => t.format), ['rgba8unorm']);
-    assert.deepEqual(blend.fragment.targets.map((t) => t.format), ['rgba16float']);
+    assert.deepEqual(
+      depth.fragment.targets.map((t) => t.format),
+      ['rgba8unorm'],
+    );
+    assert.deepEqual(
+      blend.fragment.targets.map((t) => t.format),
+      ['rgba16float'],
+    );
     const shaders = code(log).join();
     assert.match(shaders, /packDepth\(-dot\(i\.world,frame\.back\.xyz\)\)/);
     assert.match(shaders, /unpackDepth\(textureLoad\(front,vec2i\(i\.clip\.xy\),0\)\)/);
-    assert.match(shaders, /->@location\(0\) vec4f\{\n  if\(cut\(i\)\)\{discard;\}\n  let behind/, 'one rgba16float sum');
+    assert.match(
+      shaders,
+      /->@location\(0\) vec4f\{\n  if\(cut\(i\)\)\{discard;\}\n  let behind/,
+      'one rgba16float sum',
+    );
     const clear = log.find((e) => e[0] === 'beginRenderPass')[1].colorAttachments[0].clearValue,
       bytes = Uint8Array.from([clear.r, clear.g, clear.b, clear.a], (v) => Math.round(Math.fround(v) * 255));
     assert.equal(new Float32Array(bytes.buffer)[0], Math.fround(3e38));

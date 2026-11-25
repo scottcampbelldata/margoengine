@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import test from 'node:test';
-import { checkExampleTypes } from '../scripts/check-example-types.mjs';
+import { checkExampleTypes, staleBuildHint } from '../scripts/check-example-types.mjs';
 import { planContext, planFiles } from '../scripts/check-merge.mjs';
 import { exampleClosure, exampleScopes } from '../scripts/support/affected-packages.mjs';
 import { EXAMPLE_FOLDERS, PROJECTS } from '../scripts/support/example-projects.mjs';
@@ -55,6 +55,23 @@ test('a wrong engine call planted in an example fails the check, and the same fi
     rmSync(right.dir, { recursive: true, force: true });
     rmSync(wrong.dir, { recursive: true, force: true });
   }
+});
+
+test('imports of unbuilt Margo packages give one coded error naming the fix, not one TS2307 each', async () => {
+  const fixture = plant("export * from 'margoengine/not-built-yet';\nexport * from '@margoengine/not-built-either';\n");
+  try {
+    const [result] = await checkExampleTypes({ ids: ['planted'], projects: fixture.projects });
+    assert.equal(result.ok, false);
+    assert.match(
+      result.output,
+      /^EXAMPLE_TYPES_PACKAGES_NOT_BUILT: 2 Margo imports .*first: margoengine\/not-built-yet.*npm run build:packages/,
+    );
+    assert.doesNotMatch(result.output, /TS2307/);
+  } finally {
+    rmSync(fixture.dir, { recursive: true, force: true });
+  }
+  const mixed = "a.ts(1,1): error TS2307: Cannot find module 'margoengine/x'.\na.ts(2,1): error TS2322: bad.";
+  assert.equal(staleBuildHint(mixed), undefined);
 });
 
 test('a project that never finishes is ended at its time limit and reported as failed', async () => {

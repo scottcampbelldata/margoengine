@@ -20,7 +20,9 @@ test('every Controls wrapper registration retains the object used for scene clea
           // The registered object itself is kept, in a local or a field of the wrapper (`this.overlayPlugin`), so
           // dispose can find its owning scene with sceneOf; an inline object literal or a call result would be lost.
           const [arg] = node.arguments;
-          const kept = arg.type === 'Identifier' || (arg.type === 'MemberExpression' && arg.object.type === 'ThisExpression' && !arg.computed);
+          const kept =
+            arg.type === 'Identifier' ||
+            (arg.type === 'MemberExpression' && arg.object.type === 'ThisExpression' && !arg.computed);
           assert.ok(kept, `${file}: preserve registration identity (got ${arg.type})`);
         }
         if (method === 'sceneOf') resolutions++;

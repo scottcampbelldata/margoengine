@@ -1090,6 +1090,22 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `CubeCamera(options)` (`/cube-camera`) | `size` (256, power of two 8..2048), `position` ([0, 0, 0]), `near` (0.05), `far` (1000), `mips` (false), `facesPerFrame` (0), `layers` (all), `exclude`, `passes` (`scenePasses`), `background` (none: the scene's), `name` (`'cube-camera-N'`) |
 | `Lightformer(options)` (`/lightformer`) | `form` (`'rect'`; `'circle'`, `'ring'`, `'box'`), `color` (white), `intensity` (1), `parent` (scene root), `order` (1), `name` (`'lightformer-N'`) |
 
+### Entries without the decoders: `/main` and `/loaders`
+
+The root re-exports two files, so a bundler that takes the root namespace keeps both. `@margoengine/environment/main` is everything the root exports except the image decoders (`Environment`, the backgrounds, `AmbientLight`, `Fog`, the lighting plugins); `@margoengine/environment/loaders` is the decoders alone (`parseHDR`, `parseEXR`, `parseUltraHDR`, `decodeUltraHDR`, `loadEnvironmentImage`). Code that reads no image file imports `/main`, and the 36 KB of decoders stay out of its build. An app that loads files pays for the formats it meets only: `@margoengine/environment/load` is `loadEnvironmentImage` alone, and it picks the decoder from the file's signature and imports it (`dist/hdr.js`, `exr.js` or `ultrahdr.js`) on first use, so an app that loads `.hdr` files never requests the EXR or UltraHDR decoders. `/loaders` and the root export the same function beside the decoders, so a bundler that keeps their static imports keeps every decoder (Vite's bundler does, even for unused ones). `parseEnvironmentImage` is synchronous and holds the HDR and EXR parsers. `@margoengine/react` does this: only `<Environment src>` fetches `/loaders`.
+
+```js
+import { Fog } from '@margoengine/environment/main';
+
+console.log(typeof Fog); // 'function', and no decoder is in the build
+```
+
+```js
+import { loadEnvironmentImage } from '@margoengine/environment/load';
+
+console.log(typeof loadEnvironmentImage); // 'function'; a .hdr file requests the HDR decoder alone
+```
+
 ## Limits
 
 WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE`, `GAMMA` and `COLORCORR` headers are reported (`image.exposure`, `image.gamma`, `image.colorCorrection`), not applied. A Radiance `PRIMARIES` line other than sRGB / Rec.709 or the Radiance standard primaries is converted to linear sRGB (D65) with the RP 177 RGB to XYZ matrix and a Bradford white adaptation; `diagnostics.primaries` and `diagnostics.primariesConverted` report it, and colours outside sRGB keep negative components (lighting reads them as 0). OpenEXR `chromaticities` are converted the same way (`image.primaries`, `image.primariesConverted`). Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression). `iblShade` adds back the energy single-scattering GGX loses between microfacets (Fdez-Aguera, "A Multiple-Scattering Microfacet Model for Real-Time Image Based Lighting", JCGT 8(1), 2019, https://jcgt.org/published/0008/01/03/); `iblPrefiltered` and `iblBrdfTerms` on their own are single scattering. Source and specular sizes must be powers of two.

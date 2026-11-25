@@ -259,7 +259,8 @@ export function wgslModule(text, globals = {}) {
       expect(';');
       continue;
     }
-    if (!peek('fn')) throw new SyntaxError(`wgsl-eval: only functions and constants are supported, found ${tokens[p].value}`);
+    if (!peek('fn'))
+      throw new SyntaxError(`wgsl-eval: only functions and constants are supported, found ${tokens[p].value}`);
     p++;
     const name = tokens[p++].value,
       params = [];

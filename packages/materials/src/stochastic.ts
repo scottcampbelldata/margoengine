@@ -73,7 +73,9 @@ function callEnd(code: string, from: number): { end: number; commas: number[] } 
     else if (c === ')' && --depth === 0) return { end: k, commas };
     else if (c === ',' && depth === 1) commas.push(k);
   }
-  throw new TypeError('stochasticTiling found an unfinished texture read; use matching gltf/pbr and materials versions');
+  throw new TypeError(
+    'stochasticTiling found an unfinished texture read; use matching gltf/pbr and materials versions',
+  );
 }
 /** The material map a read of texture `map` at `uv` serves, if any. */
 const slotOf = (map: string, uv: string) => named[map] ?? (mapSlots[+(physical.exec(uv)?.[1] ?? -1)] as StochasticMap);
@@ -125,7 +127,9 @@ export function stochasticTiling(options: StochasticOptions = {}): MaterialFeatu
     shader(source, _group, material: Material) {
       const list = material.features;
       if (list.findIndex((v) => v.name === 'layered') > list.findIndex((v) => v.name === 'stochasticTiling'))
-        throw new TypeError('stochasticTiling reads what comes before it; list layered() ahead of it in Material.features');
+        throw new TypeError(
+          'stochasticTiling reads what comes before it; list layered() ahead of it in Material.features',
+        );
       for (const slot of maps) {
         const texture = material[slot as keyof Material] as Texture | null;
         if (texture && (texture.wrapS === 'clamp' || texture.wrapT === 'clamp'))

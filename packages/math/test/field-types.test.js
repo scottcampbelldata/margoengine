@@ -11,5 +11,9 @@ test('no built class declares a bare field before its constructor assigns it', (
   const files = readdirSync(dist).filter((name) => name.endsWith('.js'));
   assert.ok(files.includes('quaternion.js') && files.includes('vector3.js') && files.includes('euler.js'));
   for (const name of files)
-    assert.doesNotMatch(readFileSync(new URL(name, dist), 'utf8'), /(?:^|[{;}])\s*[a-zA-Z_$][\w$]*;\s*constructor\(/m, name);
+    assert.doesNotMatch(
+      readFileSync(new URL(name, dist), 'utf8'),
+      /(?:^|[{;}])\s*[a-zA-Z_$][\w$]*;\s*constructor\(/m,
+      name,
+    );
 });

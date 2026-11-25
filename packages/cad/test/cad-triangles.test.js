@@ -96,7 +96,11 @@ const facet = (corners) =>
 
 for (const smoothing of [false, true])
   test(`CAD worker (smoothing ${smoothing}): zero-area and micrometre triangles load, none left out`, async () => {
-    const result = await cadWorker(`solid nist\n${facet(box)}${facet(screw)}${facet(good)}endsolid nist\n`, 'stl', smoothing);
+    const result = await cadWorker(
+      `solid nist\n${facet(box)}${facet(screw)}${facet(good)}endsolid nist\n`,
+      'stl',
+      smoothing,
+    );
     assert.equal(result.error, undefined, result.error);
     assert.equal(result.done, true);
     assert.deepEqual(

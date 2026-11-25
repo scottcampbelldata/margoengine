@@ -44,7 +44,11 @@ import { WEATHER_LOOKS, WEATHER_SETTINGS, applyWeatherSettings, weatherStateOf }
 
 const near = (a, b, tolerance = 1e-9) => assert.ok(Math.abs(a - b) <= tolerance, `${a} vs ${b}`);
 const rel = (a, b, r) => assert.ok(Math.abs(a / b - 1) <= r, `${a} vs ${b} (${((a / b - 1) * 100).toFixed(3)}%)`);
-const engineOf = (...plugins) => ({ plugins: new Map(plugins.map((p) => [p.name, p])), use: () => {}, removePlugin: () => {} });
+const engineOf = (...plugins) => ({
+  plugins: new Map(plugins.map((p) => [p.name, p])),
+  use: () => {},
+  removePlugin: () => {},
+});
 
 test('coarse grains extinguish twice their cross section: 3 C / (2 rho r), so ash at 1 leaves about 114 m', () => {
   // 1 g/m3 of 1 micrometre grains of 1,000 kg/m3: 1.5 per metre.
@@ -66,10 +70,14 @@ test('coarse grains extinguish twice their cross section: 3 C / (2 rho r), so as
   assert.throws(() => ashForExtinction(NaN), RangeError);
 });
 
-test('an eruption\'s falling ash at the camera becomes the weather\'s ash, with the same visibility as the eruption gives', () => {
+test("an eruption's falling ash at the camera becomes the weather's ash, with the same visibility as the eruption gives", () => {
   const eruption = new Eruption({ vent: [0, 0, 0], wind: 10, windDirection: 90, start: 0, massRate: 1e7 });
   eruption.seek(3000);
-  const drive = new WeatherDrive({ weather: new WeatherMachine('clear', { seed: 3 }), eruptions: eruption, advance: false });
+  const drive = new WeatherDrive({
+    weather: new WeatherMachine('clear', { seed: 3 }),
+    eruptions: eruption,
+    advance: false,
+  });
   let checked = 0;
   for (const x of [5000, 15000, 30000, 60000]) {
     const v = eruption.visibility(x, 0);
@@ -93,12 +101,20 @@ test('an eruption\'s falling ash at the camera becomes the weather\'s ash, with 
 
 test('Eruption.attach names it eruption:N and steps it, and a drive in the scene finds it by that name', () => {
   const plugins = new Map(),
-    engine = { plugins, use: (p) => (plugins.set(p.name, p), p.setup?.(engine)), removePlugin: (n) => plugins.delete(n) };
+    engine = {
+      plugins,
+      use: (p) => (plugins.set(p.name, p), p.setup?.(engine)),
+      removePlugin: (n) => plugins.delete(n),
+    };
   const eruption = Eruption.attach(engine, { vent: [0, 0, 0], wind: 10, windDirection: 90 });
   assert.match(eruption.name, /^eruption:\d+$/);
   eruption.onPreUpdate(2000);
   assert.equal(eruption.time, 2000);
-  const drive = WeatherDrive.attach(engine, { weather: new WeatherMachine('clear', { seed: 3 }), position: [15000, 0, 0], advance: false });
+  const drive = WeatherDrive.attach(engine, {
+    weather: new WeatherMachine('clear', { seed: 3 }),
+    position: [15000, 0, 0],
+    advance: false,
+  });
   drive.setup(engine);
   assert.ok(drive.update(0).ash > 0, 'the drive takes the ash of an attached eruption by itself');
   eruption.dispose();
@@ -157,15 +173,27 @@ test('sea spray: Lovett 1978 over the open sea, up to 30 times that at the break
 });
 
 test('load 0 is bit for bit the air before ash and spray, in the extinction, the fog and the drive', () => {
-  for (const state of [WEATHER_PRESETS.clear, WEATHER_PRESETS.storm, { ...WEATHER_PRESETS.fog, dust: 0.3, smoke: 0.2 }]) {
+  for (const state of [
+    WEATHER_PRESETS.clear,
+    WEATHER_PRESETS.storm,
+    { ...WEATHER_PRESETS.fog, dust: 0.3, smoke: 0.2 },
+  ]) {
     const old =
-      CLEAR_AIR_EXTINCTION + 0.0002 * (100 ** state.fog - 1) + 3.65e-4 * rainRate(state) ** 0.63 + snowExtinction(state.snow) + dustExtinction(state.dust) + smokeExtinction(state.smoke);
+      CLEAR_AIR_EXTINCTION +
+      0.0002 * (100 ** state.fog - 1) +
+      3.65e-4 * rainRate(state) ** 0.63 +
+      snowExtinction(state.snow) +
+      dustExtinction(state.dust) +
+      smokeExtinction(state.smoke);
     assert.equal(airExtinction(state), old);
     assert.equal(airExtinction({ ...state, ash: 0, spray: 0 }), old);
     assert.equal(visibility(state), KOSCHMIEDER / old);
     assert.equal(fogForVisibility(500, state), fogForVisibility(500, { ...state, ash: undefined, spray: undefined }));
     const thickness = Math.min(1, state.fog + 0.15 * Math.max(state.rain, state.snow, state.hail));
-    assert.equal(fogDensity(state), 0.0002 * (0.02 / 0.0002) ** thickness + dustExtinction(state.dust) + smokeExtinction(state.smoke));
+    assert.equal(
+      fogDensity(state),
+      0.0002 * (0.02 / 0.0002) ** thickness + dustExtinction(state.dust) + smokeExtinction(state.smoke),
+    );
   }
   assert.deepEqual(STATE_FIELDS.ash, [0, 1]);
   assert.deepEqual(STATE_FIELDS.spray, [0, 1]);
@@ -192,7 +220,10 @@ test('the drive raises spray over a sea and thickens it near the surf line; spra
   drive.setup(engine);
   near(drive.update(0).spray, sprayFromWind(14), 1e-12);
   // A breaker line along z = 0 from x = -1 km to 1 km; the camera 500 m off it, then 10 km.
-  drive.options.surf = [[-1000, 0], [1000, 0]];
+  drive.options.surf = [
+    [-1000, 0],
+    [1000, 0],
+  ];
   drive.options.position = [0, 5, 500];
   near(drive.update(0).spray, sprayFromWind(14, 500), 1e-12);
   drive.options.position = [3000, 5, 0];
@@ -208,11 +239,16 @@ test('the drive raises spray over a sea and thickens it near the surf line; spra
   // Surf alone, with no sea found, is a coast too.
   const coast = new WeatherDrive({ weather: machine, surf: [[0, 0]], position: [0, 0, 0], advance: false });
   near(coast.update(0).spray, sprayFromWind(14, 0), 1e-12);
-  for (const bad of [[], [[0]], [[0, NaN]], 'line']) assert.throws(() => new WeatherDrive({ weather: machine, surf: bad }), TypeError);
+  for (const bad of [[], [[0]], [[0, NaN]], 'line'])
+    assert.throws(() => new WeatherDrive({ weather: machine, surf: bad }), TypeError);
 });
 
 test('the sky fog takes the ash or spray colour, each by its share of the load, and the sun dims grey', () => {
-  const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} }, sun: new Float32Array([0, 1, 0]) },
+  const sky = {
+      name: 'sky',
+      options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} },
+      sun: new Float32Array([0, 1, 0]),
+    },
     machine = new WeatherMachine('clear', { seed: 8 }),
     engine = engineOf(sky),
     drive = WeatherDrive.attach(engine, { weather: machine });
@@ -255,11 +291,19 @@ test('the haze is lit by the light that reaches it through the layer: the fog da
   assert.deepEqual(hazeLight({}, 0.5), [1, 1, 1]);
   assert.deepEqual(hazeLight({ smoke: 0, ash: 0, spray: 0 }, 1), [1, 1, 1]);
   const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-  for (const [key, color] of [['smoke', smokeColor], ['ash', ashColor], ['spray', sprayColor]]) {
+  for (const [key, color] of [
+    ['smoke', smokeColor],
+    ['ash', ashColor],
+    ['spray', sprayColor],
+  ]) {
     let last = Infinity,
       lastLight = [1, 1, 1];
     for (const load of [0.25, 0.35, 0.5, 0.65, 0.8, 1]) {
-      const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} }, sun: new Float32Array([0, Math.sin(0.8), Math.cos(0.8)]) },
+      const sky = {
+          name: 'sky',
+          options: { fog: { density: 0.01, falloff: 'exp' }, atmosphere: {} },
+          sun: new Float32Array([0, Math.sin(0.8), Math.cos(0.8)]),
+        },
         machine = new WeatherMachine('clear', { seed: 8 }),
         engine = engineOf(sky),
         drive = WeatherDrive.attach(engine, { weather: machine });
@@ -269,7 +313,10 @@ test('the haze is lit by the light that reaches it through the layer: the fog da
       const fog = sky.options.fog.color,
         light = hazeLight({ [key]: load }, Math.asin(sky.sun[1]));
       for (let i = 0; i < 3; i++) {
-        assert.ok(light[i] > 0 && light[i] < lastLight[i], `${key} ${load}: the light on the haze falls, channel ${i}: ${light} after ${lastLight}`);
+        assert.ok(
+          light[i] > 0 && light[i] < lastLight[i],
+          `${key} ${load}: the light on the haze falls, channel ${i}: ${light} after ${lastLight}`,
+        );
         assert.ok(light[i] >= sunTransmittance({ [key]: load }, 0.8)[i], 'at least the direct sun that gets through');
         near(fog[i], color()[i] * light[i], 1e-12);
       }
@@ -367,7 +414,12 @@ test('a fog volume takes the colour of its dust, smoke, ash and spray by their s
 
 // Sheet row 8: the surf line was given by hand only; a Water with `terrain.heights` now reports its own breaker line.
 test('the drive finds the breaker line of the seas in the scene when no surf line is given; a surf line overrides it', () => {
-  const line = [[[-100, 50], [100, 50]]],
+  const line = [
+      [
+        [-100, 50],
+        [100, 50],
+      ],
+    ],
     water = { name: 'water:0', options: { waves: [] }, setWind() {}, breakerLine: () => line },
     machine = new WeatherMachine('clear', { seed: 8 });
   applyWeatherSettings(machine, { wind: 12 });
@@ -409,7 +461,10 @@ test('the sky under smoke, ash or spray takes the light the layer scatters down,
       h = hazeLight(state, e),
       want = h.map((v, i) => (v - t[i]) * Math.sin(e));
     for (let i = 0; i < 3; i++) near(sky.options.atmosphere.scatteredLight[i], want[i], 1e-12);
-    assert.ok(want.every((v) => v > 0), `${JSON.stringify(state)} scatters light down: ${want}`);
+    assert.ok(
+      want.every((v) => v > 0),
+      `${JSON.stringify(state)} scatters light down: ${want}`,
+    );
   }
   // A thicker ash scatters less down: the sky darkens with the load.
   applyWeatherSettings(machine, { ash: 0.35 });
@@ -417,7 +472,10 @@ test('the sky under smoke, ash or spray takes the light the layer scatters down,
   const thin = [...sky.options.atmosphere.scatteredLight];
   applyWeatherSettings(machine, { ash: 1 });
   drive.update(0);
-  assert.ok(sky.options.atmosphere.scatteredLight.every((v, i) => v < thin[i]), 'more ash, a dimmer sky');
+  assert.ok(
+    sky.options.atmosphere.scatteredLight.every((v, i) => v < thin[i]),
+    'more ash, a dimmer sky',
+  );
   applyWeatherSettings(machine, {});
   drive.update(0);
   assert.equal(sky.options.atmosphere.scatteredLight, undefined, 'cleared: the value it had comes back');

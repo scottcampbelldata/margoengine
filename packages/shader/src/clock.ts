@@ -45,7 +45,8 @@ export class ShaderClock implements EnginePlugin {
   /** @internal The engine's clock; without one, it attaches after this frame (a plugin cannot attach while a frame draws). */
   static find(engine: Kernel | undefined): ShaderClock | undefined {
     const clock = engine && clocks.get(engine);
-    if (engine && !clock) queueMicrotask(() => (engine as EngineKernel).disposed || ShaderClock.attach(engine as EngineKernel));
+    if (engine && !clock)
+      queueMicrotask(() => (engine as EngineKernel).disposed || ShaderClock.attach(engine as EngineKernel));
     return clock;
   }
   /** Seconds of frame deltas since the clock started: shader `time`. */

@@ -9,7 +9,8 @@ export function knotVector(knots: readonly number[], multiplicities: readonly nu
   const out: number[] = [];
   for (let i = 0; i < knots.length; i++) {
     const m = multiplicities[i];
-    if (!Number.isInteger(m) || m < 1 || m > 64) throw new TypeError('Invalid STEP B-spline: a knot multiplicity; export it again from the CAD tool');
+    if (!Number.isInteger(m) || m < 1 || m > 64)
+      throw new TypeError('Invalid STEP B-spline: a knot multiplicity; export it again from the CAD tool');
     if (i && knots[i] < knots[i - 1]) throw new TypeError('Invalid STEP B-spline: knots must not decrease');
     for (let k = 0; k < m; k++) out.push(knots[i]);
   }
@@ -175,7 +176,11 @@ const uBasis: BasisCache = {
     values: new Float64Array(MAX_DEGREE + 1),
     derivatives: new Float64Array(MAX_DEGREE + 1),
   },
-  vBasis: BasisCache = { ...uBasis, values: new Float64Array(MAX_DEGREE + 1), derivatives: new Float64Array(MAX_DEGREE + 1) };
+  vBasis: BasisCache = {
+    ...uBasis,
+    values: new Float64Array(MAX_DEGREE + 1),
+    derivatives: new Float64Array(MAX_DEGREE + 1),
+  };
 
 /** The span and basis of `n` control points of degree p at t over knots U: from `cache` when it holds them. */
 function basisAt(cache: BasisCache, n: number, p: number, t: number, U: readonly number[]): BasisCache {

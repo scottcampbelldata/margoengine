@@ -269,7 +269,11 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   const edgeElement = header.elements.find((e) => e.name === 'edge'),
     e1 = edgeElement ? find(edgeElement.properties, ['vertex1']) : -1,
     e2 = edgeElement ? find(edgeElement.properties, ['vertex2']) : -1;
-  if (edgeElement && edgeElement.count > 0 && (e1 < 0 || e2 < 0 || edgeElement.properties[e1].list || edgeElement.properties[e2].list))
+  if (
+    edgeElement &&
+    edgeElement.count > 0 &&
+    (e1 < 0 || e2 < 0 || edgeElement.properties[e1].list || edgeElement.properties[e2].list)
+  )
     throw new LoaderError(F, 'header', 'edge element needs scalar vertex1 and vertex2 properties');
   const lines = uints(edgeElement ? edgeElement.count * 2 : 0);
   const storeEdge = (i: number): void => {

@@ -424,7 +424,12 @@ export class PartPacks {
     // The rectangles core's draw of the same call uses: the call's own, else the view's viewport and scissor.
     const view = c.view?.viewport,
       viewport = options.viewport === undefined ? view : options.viewport,
-      scissor = options.scissor === undefined ? (options.viewport === undefined ? (c.view?.scissor ?? view) : undefined) : options.scissor;
+      scissor =
+        options.scissor === undefined
+          ? options.viewport === undefined
+            ? (c.view?.scissor ?? view)
+            : undefined
+          : options.scissor;
     const pass = c.encoder.beginRenderPass(this.pass);
     if (viewport) pass.setViewport(...viewport, 0, 1);
     if (scissor) pass.setScissorRect(...scissor);

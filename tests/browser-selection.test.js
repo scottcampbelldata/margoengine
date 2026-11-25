@@ -164,7 +164,11 @@ const fakeFirefox = (path = 'C:/redirected/ms-playwright/firefox-1/firefox/firef
 test('a WebGPU step in Firefox launches headed with the WebGPU prefs, by the real path of the install', async () => {
   const { launched, launcher } = fakeFirefox();
   const real = (path) => path.replace('C:/redirected/', 'C:/real/');
-  const options = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }), { headless: true, timeout: 5 }, { launcher, realpath: real });
+  const options = firefoxLaunchOptions(
+    pick({ MARGO_BROWSER: 'firefox' }),
+    { headless: true, timeout: 5 },
+    { launcher, realpath: real },
+  );
   assert.deepEqual(options, {
     headless: false,
     timeout: 5,
@@ -197,7 +201,11 @@ test('Firefox: a step that needs no WebGPU keeps its headless choice; caller pre
   const { launcher } = fakeFirefox('/pw/firefox');
   const same = (path) => path;
   const firefox = pick({ MARGO_BROWSER: 'firefox' });
-  const none = firefoxLaunchOptions(firefox, { headless: true, firefoxUserPrefs: { 'dom.webgpu.enabled': false, 'x.y': 1 } }, { needs: 'none', launcher, realpath: same });
+  const none = firefoxLaunchOptions(
+    firefox,
+    { headless: true, firefoxUserPrefs: { 'dom.webgpu.enabled': false, 'x.y': 1 } },
+    { needs: 'none', launcher, realpath: same },
+  );
   assert.equal(none.headless, true);
   assert.deepEqual(none.firefoxUserPrefs, {
     'dom.webgpu.enabled': false,
@@ -208,19 +216,33 @@ test('Firefox: a step that needs no WebGPU keeps its headless choice; caller pre
   assert.equal(none.executablePath, '/pw/firefox');
   const fromEnv = pick({ MARGO_BROWSER: 'firefox', BROWSER_EXECUTABLE: '/own/firefox' });
   assert.equal(firefoxLaunchOptions(fromEnv, {}, { launcher, realpath: same }).executablePath, '/own/firefox');
-  assert.equal(firefoxLaunchOptions(fromEnv, { executablePath: '/replay/firefox' }, { launcher, realpath: same }).executablePath, '/replay/firefox');
+  assert.equal(
+    firefoxLaunchOptions(fromEnv, { executablePath: '/replay/firefox' }, { launcher, realpath: same }).executablePath,
+    '/replay/firefox',
+  );
 });
 
 test('Firefox on macOS starts with a private home, so it never needs ~/Library/Application Support/Firefox (regression: exit 3, "Could not find profile folder.")', async () => {
   const { launcher, launched } = fakeFirefox('/pw/firefox');
   const same = (path) => path;
   const home = '/tmp/margo-firefox-home-x';
-  const mac = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, 'darwin'), { env: { PATH: '/bin' } }, { launcher, realpath: same, home });
+  const mac = firefoxLaunchOptions(
+    pick({ MARGO_BROWSER: 'firefox' }, 'darwin'),
+    { env: { PATH: '/bin' } },
+    { launcher, realpath: same, home },
+  );
   assert.deepEqual(mac.env, { PATH: '/bin', CFFIXED_USER_HOME: home });
-  const own = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, 'darwin'), { env: { CFFIXED_USER_HOME: '/mine' } }, { launcher, realpath: same, home });
+  const own = firefoxLaunchOptions(
+    pick({ MARGO_BROWSER: 'firefox' }, 'darwin'),
+    { env: { CFFIXED_USER_HOME: '/mine' } },
+    { launcher, realpath: same, home },
+  );
   assert.deepEqual(own.env, { CFFIXED_USER_HOME: '/mine' });
   for (const platform of ['win32', 'linux'])
-    assert.equal(firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, platform), {}, { launcher, realpath: same }).env, undefined);
+    assert.equal(
+      firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, platform), {}, { launcher, realpath: same }).env,
+      undefined,
+    );
   // Through launchBrowser, as every suite calls it.
   const opened = await launchBrowser({
     env: { MARGO_BROWSER: 'firefox' },
@@ -312,24 +334,47 @@ const attempt = async (env, launchers = { chromium: missing('chromium'), firefox
 
 test('Chromium uses an owned loopback launch server and terminates through its driver API', async () => {
   const closed = [];
-  const client = { close: async () => { closed.push('client'); } };
+  const client = {
+    close: async () => {
+      closed.push('client');
+    },
+  };
   const hosted = [];
   const host = {
     pid: 10,
     wsEndpoint: 'ws://127.0.0.1:1234/owned',
     process: { pid: 999 },
-    end: async (children) => { closed.push(['host end', children]); return { browser: 10, children: children ?? [] }; },
+    end: async (children) => {
+      closed.push(['host end', children]);
+      return { browser: 10, children: children ?? [] };
+    },
     finished: async () => ({ done: true, survivors: [], elapsedMs: 1 }),
     release: () => closed.push('host released'),
   };
   const browser = await launchBrowser({
-    env: { MARGO_BROWSER: 'chromium' }, platform: 'linux', argv: [], needs: 'none', headless: true,
-    launchers: { chromium: {
-      launch: async () => assert.fail('a launch client cannot own forced process cleanup'),
-      connect: async (endpoint, options) => { assert.equal(endpoint, host.wsEndpoint); assert.equal(options.timeout, 30000); return client; },
-    } },
-    hosting: async (options) => { assert.equal(options.host, '127.0.0.1'); assert.equal(options.headless, true); hosted.push(options); return host; },
-    report: (message) => assert.fail(message), exit: (code) => assert.fail(`launch failed ${code}`),
+    env: { MARGO_BROWSER: 'chromium' },
+    platform: 'linux',
+    argv: [],
+    needs: 'none',
+    headless: true,
+    launchers: {
+      chromium: {
+        launch: async () => assert.fail('a launch client cannot own forced process cleanup'),
+        connect: async (endpoint, options) => {
+          assert.equal(endpoint, host.wsEndpoint);
+          assert.equal(options.timeout, 30000);
+          return client;
+        },
+      },
+    },
+    hosting: async (options) => {
+      assert.equal(options.host, '127.0.0.1');
+      assert.equal(options.headless, true);
+      hosted.push(options);
+      return host;
+    },
+    report: (message) => assert.fail(message),
+    exit: (code) => assert.fail(`launch failed ${code}`),
   });
   assert.equal(hosted.length, 1);
   await browser.close();
@@ -358,7 +403,10 @@ test('webkit is Playwright WebKit: it has WebGPU, takes no Chromium switches, an
   });
   assert.equal(typeof opened.close, 'function');
   assert.deepEqual(launched, [{ headless: false }]);
-  const { text } = await attempt({ MARGO_BROWSER: 'webkit' }, { chromium: missing('chromium'), webkit: missing('webkit') });
+  const { text } = await attempt(
+    { MARGO_BROWSER: 'webkit' },
+    { chromium: missing('chromium'), webkit: missing('webkit') },
+  );
   assert.ok(text.includes('npx playwright install webkit'), text);
 });
 
@@ -390,7 +438,10 @@ const fakeChromium = (path = 'C:/redirected/ms-playwright/chromium-1/chrome-win6
   const launched = [];
   return {
     launched,
-    launcher: { executablePath: () => path, launch: async (options) => (launched.push(options), { close: async () => {} }) },
+    launcher: {
+      executablePath: () => path,
+      launch: async (options) => (launched.push(options), { close: async () => {} }),
+    },
   };
 };
 const realOf = (path) => path.replace('C:/redirected/', 'C:/real/');
@@ -423,21 +474,55 @@ test('Chromium: headless, Edge, Chrome, an explicit executable and a missing ins
   const chromium = pick({ MARGO_BROWSER: 'chromium' });
   // Headless Playwright Chromium keeps its own headless shell (no executablePath), set or unset.
   assert.equal(chromiumExecutablePath(chromium, undefined, {}, { launcher, realpath: same }), undefined);
-  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: true }, { launcher, realpath: same }), undefined);
+  assert.equal(
+    chromiumExecutablePath(chromium, undefined, { headless: true }, { launcher, realpath: same }),
+    undefined,
+  );
   // A channel (Edge, Chrome) with no install under the env's roots starts through Playwright's own channel lookup
   // (an install that is found starts from its version folder: tests/browser-channel-install.test.js).
   assert.equal(chromiumExecutablePath(pick(), 'msedge', { headless: false }, { launcher, realpath: same }), undefined);
-  assert.equal(chromiumExecutablePath(pick({ MARGO_BROWSER: 'chrome' }), 'chrome', { headless: false }, { launcher, realpath: same }), undefined);
+  assert.equal(
+    chromiumExecutablePath(
+      pick({ MARGO_BROWSER: 'chrome' }),
+      'chrome',
+      { headless: false },
+      { launcher, realpath: same },
+    ),
+    undefined,
+  );
   // An executable the caller or BROWSER_EXECUTABLE names wins.
   const own = pick({ MARGO_BROWSER: 'chromium', BROWSER_EXECUTABLE: '/own/chrome' });
-  assert.equal(chromiumExecutablePath(own, undefined, { headless: false }, { launcher, realpath: same }), '/own/chrome');
-  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: false, executablePath: '/mine' }, { launcher, realpath: same }), '/mine');
+  assert.equal(
+    chromiumExecutablePath(own, undefined, { headless: false }, { launcher, realpath: same }),
+    '/own/chrome',
+  );
+  assert.equal(
+    chromiumExecutablePath(
+      chromium,
+      undefined,
+      { headless: false, executablePath: '/mine' },
+      { launcher, realpath: same },
+    ),
+    '/mine',
+  );
   // No launcher path: Playwright's own launch reports it.
-  assert.equal(chromiumExecutablePath(chromium, undefined, { headless: false }, { launcher: {}, realpath: same }), undefined);
+  assert.equal(
+    chromiumExecutablePath(chromium, undefined, { headless: false }, { launcher: {}, realpath: same }),
+    undefined,
+  );
   // launchBrowser: a headless chromium and an Edge launch carry no executablePath.
-  for (const [env, headless] of [[{ MARGO_BROWSER: 'chromium' }, true], [{ MARGO_BROWSER: 'edge' }, false]]) {
+  for (const [env, headless] of [
+    [{ MARGO_BROWSER: 'chromium' }, true],
+    [{ MARGO_BROWSER: 'edge' }, false],
+  ]) {
     const { launched, launcher: fake } = fakeChromium();
-    await launchBrowser({ env, platform: 'win32', argv: [], headless, launchers: { chromium: fake, firefox: missing('firefox') } });
+    await launchBrowser({
+      env,
+      platform: 'win32',
+      argv: [],
+      headless,
+      launchers: { chromium: fake, firefox: missing('firefox') },
+    });
     assert.equal('executablePath' in launched[0], false, JSON.stringify(env));
   }
 });

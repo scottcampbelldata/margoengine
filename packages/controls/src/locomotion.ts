@@ -46,7 +46,10 @@ export function stepLocomotion(
         bounds[0] >= bounds[1] ||
         bounds[2] >= bounds[3]))
   )
-    throw rangeError('Invalid locomotion inputs; pass finite numbers and bounds with min below max', 'controls-arguments');
+    throw rangeError(
+      'Invalid locomotion inputs; pass finite numbers and bounds with min below max',
+      'controls-arguments',
+    );
   const dt = Math.min(0.05, delta);
   const yaw = state[4] - actions[2],
     pitch = Math.max(-1.4, Math.min(0.9, state[5] + actions[3]));

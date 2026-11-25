@@ -128,14 +128,20 @@ test('3DS: a mesh, its UVs, a material after it and a face list', () => {
 });
 
 test('3DS: two meshes share one index space, and one without UVs stays aligned', () => {
-  const plain = chunk(0x4100, chunk(0x4110, u16(3), f32(0, 0, 0, 1, 0, 0, 0, 1, 0)), chunk(0x4120, u16(1), u16(0, 1, 2, 0)));
+  const plain = chunk(
+    0x4100,
+    chunk(0x4110, u16(3), f32(0, 0, 0, 1, 0, 0, 0, 1, 0)),
+    chunk(0x4120, u16(1), u16(0, 1, 2, 0)),
+  );
   const textured = chunk(
     0x4100,
     chunk(0x4110, u16(3), f32(0, 0, 1, 1, 0, 1, 0, 1, 1)),
     chunk(0x4140, u16(3), f32(0, 0, 1, 0, 0, 1)),
     chunk(0x4120, u16(1), u16(0, 1, 2, 0)),
   );
-  const model = parse3DS(chunk(0x4d4d, chunk(0x3d3d, chunk(0x4000, cstr('a'), plain), chunk(0x4000, cstr('b'), textured))));
+  const model = parse3DS(
+    chunk(0x4d4d, chunk(0x3d3d, chunk(0x4000, cstr('a'), plain), chunk(0x4000, cstr('b'), textured))),
+  );
   assert.deepEqual([...model.indices], [0, 1, 2, 3, 4, 5]);
   assert.equal(model.uvs.length, 12);
   near(model.uvs.subarray(6), [0, 1, 1, 1, 0, 0]);
@@ -149,7 +155,17 @@ test('3DS: bad files are named errors, and TDS is the same reader', () => {
   assert.throws(() => parse3DS(chunk(0x4d4d, chunk(0x3d3d))), isError('3DS', 'syntax'));
   assert.throws(() => parse3DS(studio(), { maxVertices: 2 }), isError('3DS', 'limit'));
   assert.throws(() => parse3DS(studio(), { maxTriangles: 1 }), isError('3DS', 'limit'));
-  const badFace = chunk(0x4d4d, chunk(0x3d3d, chunk(0x4000, cstr('a'), chunk(0x4100, chunk(0x4110, u16(1), f32(0, 0, 0)), chunk(0x4120, u16(1), u16(0, 1, 2, 0))))));
+  const badFace = chunk(
+    0x4d4d,
+    chunk(
+      0x3d3d,
+      chunk(
+        0x4000,
+        cstr('a'),
+        chunk(0x4100, chunk(0x4110, u16(1), f32(0, 0, 0)), chunk(0x4120, u16(1), u16(0, 1, 2, 0))),
+      ),
+    ),
+  );
   assert.throws(() => parse3DS(badFace), isError('3DS', 'range'));
   const lying = Buffer.from(studio());
   lying.writeUInt32LE(9, 8);
@@ -163,27 +179,55 @@ const u32 = (...values) => {
   return out;
 };
 const track = (id, ...keys) =>
-  chunk(id, u16(0), Buffer.alloc(8), u32(keys.length), ...keys.flatMap(([frame, mask, ...floats]) => [u32(frame), u16(mask), f32(...floats)]));
-const BOX = chunk(0x4000, cstr('box'), chunk(0x4100, chunk(0x4110, u16(3), f32(0, 0, 0, 1, 0, 0, 0, 1, 0)), chunk(0x4120, u16(1), u16(0, 1, 2, 0))));
-const scene = (...parts) => chunk(0x4d4d, chunk(0x3d3d, BOX, ...parts.filter((part) => part.readUInt16LE(0) !== 0xb000)), ...parts.filter((part) => part.readUInt16LE(0) === 0xb000));
+  chunk(
+    id,
+    u16(0),
+    Buffer.alloc(8),
+    u32(keys.length),
+    ...keys.flatMap(([frame, mask, ...floats]) => [u32(frame), u16(mask), f32(...floats)]),
+  );
+const BOX = chunk(
+  0x4000,
+  cstr('box'),
+  chunk(0x4100, chunk(0x4110, u16(3), f32(0, 0, 0, 1, 0, 0, 0, 1, 0)), chunk(0x4120, u16(1), u16(0, 1, 2, 0))),
+);
+const scene = (...parts) =>
+  chunk(
+    0x4d4d,
+    chunk(0x3d3d, BOX, ...parts.filter((part) => part.readUInt16LE(0) !== 0xb000)),
+    ...parts.filter((part) => part.readUInt16LE(0) === 0xb000),
+  );
 
 test('3DS: cameras, lights and the ambient colour', () => {
   const model = parse3DS(
     scene(
       chunk(0x2100, chunk(0x0010, f32(0.5, 0.25, 0))),
       chunk(0x4000, cstr('Cam'), chunk(0x4700, f32(1, 2, 3, 4, 5, 6, 15, 35), chunk(0x4720, f32(1, 100)))),
-      chunk(0x4000, cstr('Bulb'), chunk(0x4600, f32(7, 8, 9), chunk(0x0010, f32(1, 0.5, 0)), chunk(0x4620), chunk(0x465b, f32(2)))),
+      chunk(
+        0x4000,
+        cstr('Bulb'),
+        chunk(0x4600, f32(7, 8, 9), chunk(0x0010, f32(1, 0.5, 0)), chunk(0x4620), chunk(0x465b, f32(2))),
+      ),
       chunk(0x4000, cstr('Spot'), chunk(0x4600, f32(0, 0, 9), chunk(0x4610, f32(1, 1, 0, 30, 45)))),
     ),
   );
   assert.deepEqual(model.cameras, [{ name: 'Cam', position: [1, 2, 3], target: [4, 5, 6], roll: 15, lens: 35 }]);
-  assert.deepEqual(model.lights[0], { name: 'Bulb', position: [7, 8, 9], color: [1, 0.5, 0], on: false, multiplier: 2 });
+  assert.deepEqual(model.lights[0], {
+    name: 'Bulb',
+    position: [7, 8, 9],
+    color: [1, 0.5, 0],
+    on: false,
+    multiplier: 2,
+  });
   assert.deepEqual(model.lights[1].spot, { target: [1, 1, 0], hotspot: 30, falloff: 45 });
   assert.deepEqual(model.lights[1].color, [1, 1, 1]);
   assert.equal(model.lights[1].on, true);
   assert.deepEqual(model.ambient, [0.5, 0.25, 0]);
   assert.equal(model.groups.length, 1, 'the mesh still reads');
-  assert.deepEqual([parse3DS(studio()).cameras, parse3DS(studio()).lights, parse3DS(studio()).keyframes], [[], [], undefined]);
+  assert.deepEqual(
+    [parse3DS(studio()).cameras, parse3DS(studio()).lights, parse3DS(studio()).keyframes],
+    [[], [], undefined],
+  );
 });
 
 test('3DS: keyframer nodes, their hierarchy and tracks with spline values', () => {
@@ -202,9 +246,23 @@ test('3DS: keyframer nodes, their hierarchy and tracks with spline values', () =
     chunk(0xb010, cstr('$$$DUMMY'), u16(0, 0, 4)),
     chunk(0xb011, cstr('handle')),
   );
-  const camera = chunk(0xb003, chunk(0xb010, cstr('Cam'), u16(0, 0, 0xffff)), track(0xb023, [0, 0, 45]), track(0xb024, [3, 0, 10]));
+  const camera = chunk(
+    0xb003,
+    chunk(0xb010, cstr('Cam'), u16(0, 0, 0xffff)),
+    track(0xb023, [0, 0, 45]),
+    track(0xb024, [3, 0, 10]),
+  );
   const model = parse3DS(
-    scene(chunk(0xb000, chunk(0xb00a, u16(5), cstr('MAXSCENE'), u32(100)), chunk(0xb008, u32(10, 90)), object, child, camera)),
+    scene(
+      chunk(
+        0xb000,
+        chunk(0xb00a, u16(5), cstr('MAXSCENE'), u32(100)),
+        chunk(0xb008, u32(10, 90)),
+        object,
+        child,
+        camera,
+      ),
+    ),
   );
   const { start, end, length, nodes } = model.keyframes;
   assert.deepEqual([start, end, length, nodes.length], [10, 90, 100, 3]);
@@ -215,14 +273,20 @@ test('3DS: keyframer nodes, their hierarchy and tracks with spline values', () =
   assert.deepEqual(box.tracks.rotation.keys[1], { frame: 10, value: [1.5, 0, 1, 0] });
   assert.deepEqual(box.tracks.scale.keys, [{ frame: 0, value: [1, 1, 1] }]);
   assert.deepEqual([dummy.parent, dummy.name, dummy.instance], [4, '$$$DUMMY', 'handle']);
-  assert.deepEqual([cam.id, cam.kind, cam.tracks.fov.keys[0].value, cam.tracks.roll.keys[0].frame], [2, 'camera', [45], 3]);
+  assert.deepEqual(
+    [cam.id, cam.kind, cam.tracks.fov.keys[0].value, cam.tracks.roll.keys[0].frame],
+    [2, 'camera', [45], 3],
+  );
 });
 
 test('3DS: broken camera, light and track chunks are named errors', () => {
   const truncated = isError('3DS', 'truncated');
   assert.throws(() => parse3DS(scene(chunk(0x4000, cstr('c'), chunk(0x4700, f32(1, 2))))), truncated);
   assert.throws(() => parse3DS(scene(chunk(0x4000, cstr('l'), chunk(0x4600, f32(1))))), truncated);
-  assert.throws(() => parse3DS(scene(chunk(0x4000, cstr('l'), chunk(0x4600, f32(1, 2, 3), chunk(0x4610, f32(1, 2)))))), truncated);
+  assert.throws(
+    () => parse3DS(scene(chunk(0x4000, cstr('l'), chunk(0x4600, f32(1, 2, 3), chunk(0x4610, f32(1, 2)))))),
+    truncated,
+  );
   const lying = chunk(0xb020, u16(0), Buffer.alloc(8), u32(0xffffffff), u32(0), u16(0));
   assert.throws(() => parse3DS(scene(chunk(0xb000, chunk(0xb002, lying)))), truncated);
   assert.throws(() => parse3DS(scene(chunk(0xb000, chunk(0xb002, chunk(0xb010, cstr('x')))))), truncated);
@@ -281,7 +345,9 @@ test('LWO: a polygon triangulates, turns right-handed and takes its surface colo
 });
 
 test('LWO: a z coordinate changes sign, from left-handed to right-handed', () => {
-  const model = parseLWO(lwo(iff('PNTS', beF32(0, 0, 2, 1, 0, 2, 0, 1, 2)), iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1, 2))));
+  const model = parseLWO(
+    lwo(iff('PNTS', beF32(0, 0, 2, 1, 0, 2, 0, 1, 2)), iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1, 2))),
+  );
   near(model.positions.subarray(0, 3), [0, 0, -2]);
 });
 
@@ -326,7 +392,10 @@ test('LWO: layers keep their own point numbers, a large index reads, and the old
     ),
   );
   assert.deepEqual([...twoLayers.indices], [0, 1, 2, 3, 4, 5]);
-  assert.deepEqual(twoLayers.groups.map((g) => g.objectId), ['a', 'b']);
+  assert.deepEqual(
+    twoLayers.groups.map((g) => g.objectId),
+    ['a', 'b'],
+  );
   const wideIndex = Buffer.from([0xff, 0, 0, 2]);
   const wide = parseLWO(
     lwo(iff('PNTS', beF32(0, 0, 0, 1, 0, 0, 0, 1, 0)), iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1), wideIndex)),
@@ -353,19 +422,49 @@ test('LWO: bad files are named errors, and other polygon kinds warn', () => {
   assert.throws(() => parseLWO(Buffer.from('NOPE\0\0\0\x04LWO2')), isError('LWO', 'header'));
   assert.throws(() => parseLWO(lwo(LWO_POINTS)), isError('LWO', 'syntax'));
   assert.throws(() => parseLWO(lwo(iff('PNTS', beF32(0, 0)))), isError('LWO', 'syntax'));
-  assert.throws(() => parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1, 9)))), isError('LWO', 'range'));
-  assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('PTAG', Buffer.from('SURF'), beU16(5, 0)))), isError('LWO', 'range'));
-  assert.throws(() => parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('FACE'), beU16(4, 0)))), isError('LWO', 'truncated'));
+  assert.throws(
+    () => parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1, 9)))),
+    isError('LWO', 'range'),
+  );
+  assert.throws(
+    () => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('PTAG', Buffer.from('SURF'), beU16(5, 0)))),
+    isError('LWO', 'range'),
+  );
+  assert.throws(
+    () => parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('FACE'), beU16(4, 0)))),
+    isError('LWO', 'truncated'),
+  );
   assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE), { maxVertices: 3 }), isError('LWO', 'limit'));
   assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE), { maxTriangles: 1 }), isError('LWO', 'limit'));
-  const model = parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('CURV'), beU16(4, 0, 1, 2, 3)), LWO_FACE, iff('CLIP', beU32(1), subchunk('ANIM', even('a.mov')))));
+  const model = parseLWO(
+    lwo(
+      LWO_POINTS,
+      iff('POLS', Buffer.from('CURV'), beU16(4, 0, 1, 2, 3)),
+      LWO_FACE,
+      iff('CLIP', beU32(1), subchunk('ANIM', even('a.mov'))),
+    ),
+  );
   assert.deepEqual(model.warnings, ['CURV polygons are not read', 'ANIM clips are not read']);
   assert.equal(model.indices.length, 6);
   assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('CLIP', beU16(0)))), isError('LWO', 'truncated'));
-  assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(3, 0, 1, 2)))), isError('LWO', 'range'));
-  assert.throws(() => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(2, 0, 9)))), isError('LWO', 'range'));
   assert.throws(
-    () => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(2, 0, 1)), iff('PTAG', Buffer.from('BONE'), beU16(4, 0)))),
+    () => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(3, 0, 1, 2)))),
+    isError('LWO', 'range'),
+  );
+  assert.throws(
+    () => parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(2, 0, 9)))),
+    isError('LWO', 'range'),
+  );
+  assert.throws(
+    () =>
+      parseLWO(
+        lwo(
+          LWO_POINTS,
+          LWO_FACE,
+          iff('POLS', Buffer.from('BONE'), beU16(2, 0, 1)),
+          iff('PTAG', Buffer.from('BONE'), beU16(4, 0)),
+        ),
+      ),
     isError('LWO', 'range'),
   );
 });
@@ -384,7 +483,13 @@ const subchunk = (id, ...parts) => {
   return Buffer.concat([head, body, Buffer.alloc(body.length % 2)]);
 };
 const uvMap = (name, offset) =>
-  iff('VMAP', Buffer.from('TXUV'), beU16(2), even(name), ...[0, 1, 2, 3].flatMap((point) => [beU16(point), beF32(point / 4 + offset, 0)]));
+  iff(
+    'VMAP',
+    Buffer.from('TXUV'),
+    beU16(2),
+    even(name),
+    ...[0, 1, 2, 3].flatMap((point) => [beU16(point), beF32(point / 4 + offset, 0)]),
+  );
 
 test('LWO: every UV map comes through, and a seam in any of them splits the vertex for all', () => {
   const model = parseLWO(
@@ -402,7 +507,8 @@ test('LWO: every UV map comes through, and a seam in any of them splits the vert
   const at = (map, x, y) => {
     const found = [];
     for (let v = 0; v < model.positions.length / 3; v++)
-      if (model.positions[v * 3] === x && model.positions[v * 3 + 1] === y) found.push(Math.round(map[v * 2] * 100) / 100);
+      if (model.positions[v * 3] === x && model.positions[v * 3 + 1] === y)
+        found.push(Math.round(map[v * 2] * 100) / 100);
     return found.sort();
   };
   assert.deepEqual(at(model.uvMaps.first, 1, 1), [0.5, 0.5], 'the first map holds the point value on both copies');
@@ -415,7 +521,16 @@ test('LWO: corners with the same seam value share a vertex', () => {
       iff('PNTS', beF32(0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0)),
       iff('POLS', Buffer.from('FACE'), beU16(3, 0, 1, 2), beU16(3, 0, 2, 3)),
       uvMap('uv', 0),
-      iff('VMAD', Buffer.from('TXUV'), beU16(2), even('uv'), beU16(2, 0), beF32(0.9, 0.5), beU16(2, 1), beF32(0.9, 0.5)),
+      iff(
+        'VMAD',
+        Buffer.from('TXUV'),
+        beU16(2),
+        even('uv'),
+        beU16(2, 0),
+        beF32(0.9, 0.5),
+        beU16(2, 1),
+        beF32(0.9, 0.5),
+      ),
     ),
   );
   assert.equal(model.positions.length / 3, 4);
@@ -440,7 +555,13 @@ test('LWO: a map in one layer leaves the other layer at zero and aligned', () =>
 
 test('LWO: a surface image map names its clip, channel, projection and UV map', () => {
   const imap = subchunk('IMAP', even('\x80'), subchunk('CHAN', 'BUMP'), subchunk('ENAB', beU16(0)));
-  const blok = subchunk('BLOK', imap, subchunk('PROJ', beU16(5)), subchunk('IMAG', beU16(3)), subchunk('VMAP', even('uv')));
+  const blok = subchunk(
+    'BLOK',
+    imap,
+    subchunk('PROJ', beU16(5)),
+    subchunk('IMAG', beU16(3)),
+    subchunk('VMAP', even('uv')),
+  );
   const gradient = subchunk('BLOK', subchunk('GRAD', even('\x80')));
   const model = parseLWO(
     lwo(
@@ -511,8 +632,13 @@ test('LWO: skelegons become bones with names, parents and weight maps', () => {
 });
 
 test('LWO: a loop of bones still ends at a root', () => {
-  const { bones } = parseLWO(lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(2, 0, 1), beU16(2, 1, 0))));
-  assert.deepEqual(bones.map((bone) => bone.parent), [1, -1]);
+  const { bones } = parseLWO(
+    lwo(LWO_POINTS, LWO_FACE, iff('POLS', Buffer.from('BONE'), beU16(2, 0, 1), beU16(2, 1, 0))),
+  );
+  assert.deepEqual(
+    bones.map((bone) => bone.parent),
+    [1, -1],
+  );
 });
 
 test('LWO: tags after a patch list stay off the faces, and patches and subdivision polygons come in as their cage', () => {
@@ -527,12 +653,18 @@ test('LWO: tags after a patch list stay off the faces, and patches and subdivisi
       iff('POLS', Buffer.from('PTCH'), beU16(3, 0, 2, 3)),
     ),
   );
-  assert.deepEqual(model.groups.map((group) => [group.name, group.count]), [
-    ['Face', 6],
-    ['Patch', 3],
-    ['', 3],
+  assert.deepEqual(
+    model.groups.map((group) => [group.name, group.count]),
+    [
+      ['Face', 6],
+      ['Patch', 3],
+      ['', 3],
+    ],
+  );
+  assert.deepEqual(model.warnings, [
+    'SUBD polygons are read as their control cage',
+    'PTCH polygons are read as their control cage',
   ]);
-  assert.deepEqual(model.warnings, ['SUBD polygons are read as their control cage', 'PTCH polygons are read as their control cage']);
   assert.equal(parseLWO(lwo(LWO_POINTS, iff('POLS', Buffer.from('SUBD'), beU16(4, 0, 1, 2, 3)))).indices.length, 6);
 });
 
@@ -547,11 +679,20 @@ test('loadTextures: tries each spelling, keeps what it finds and lists what is l
       throw new Error(`no ${path}`);
     },
   );
-  assert.deepEqual(asked.slice(0, 5), ['players\\MALE\\SKIN.PCX', 'players/MALE/SKIN.PCX', 'players/male/skin.pcx', 'SKIN.PCX', 'skin.pcx']);
+  assert.deepEqual(asked.slice(0, 5), [
+    'players\\MALE\\SKIN.PCX',
+    'players/MALE/SKIN.PCX',
+    'players/male/skin.pcx',
+    'SKIN.PCX',
+    'skin.pcx',
+  ]);
   assert.deepEqual([...textures.keys()], ['players\\MALE\\SKIN.PCX', 'Images:skin.pcx', 'maps\\brick.tga']);
   assert.deepEqual([...textures.get('Images:skin.pcx')], [1]);
   assert.deepEqual([...textures.get('maps\\brick.tga')], [...text('text')]);
-  assert.deepEqual(missing.map(({ path, error }) => [path, error.message]), [['gone.png', 'no gone.png']]);
+  assert.deepEqual(
+    missing.map(({ path, error }) => [path, error.message]),
+    [['gone.png', 'no gone.png']],
+  );
   assert.equal(asked.filter((path) => path === 'gone.png').length, 1, 'one path, one read of each spelling');
 });
 
@@ -560,10 +701,14 @@ test('loadTextures: a resolver that throws nothing still lists the file, and an 
   assert.deepEqual(none.missing, [{ path: 'a.png', error: undefined }]);
   const controller = new AbortController();
   await rejects(
-    loadTextures(['a.png'], async () => {
-      controller.abort();
-      throw new Error('stopped');
-    }, { signal: controller.signal }),
+    loadTextures(
+      ['a.png'],
+      async () => {
+        controller.abort();
+        throw new Error('stopped');
+      },
+      { signal: controller.signal },
+    ),
     'textures',
     'aborted',
   );
@@ -572,7 +717,9 @@ test('loadTextures: a resolver that throws nothing still lists the file, and an 
 test('loadTextures: reads the names 3DS, LWO and MD2 give', async () => {
   const read = async () => new Uint8Array(1),
     names = (list) => loadTextures(list, read).then(({ textures }) => [...textures.keys()]);
-  assert.deepEqual(await names(parse3DS(studio()).materials.flatMap((material) => material.texture ?? [])), ['brick.png']);
+  assert.deepEqual(await names(parse3DS(studio()).materials.flatMap((material) => material.texture ?? [])), [
+    'brick.png',
+  ]);
   assert.deepEqual(await names(parseMD2(md2()).skins), ['models/skin.pcx']);
   const model = parseLWO(lwo(iff('CLIP', beU32(1), subchunk('STIL', even('a.jpg'))), LWO_POINTS, LWO_FACE));
   assert.deepEqual(await names(model.images.map((image) => image.path)), ['a.jpg']);
@@ -612,11 +759,14 @@ test('AMF: volume, material, object and vertex colours', async () => {
   );
   // ISO/ASTM 52915: colour takes priority in reverse order of material, object, volume, vertex and triangle, so the
   // object's red outranks the material the first volume names.
-  assert.deepEqual(model.groups.map((g) => g.color), [
-    [1, 0, 0, 1],
-    [0, 0, 1, 1],
-    [1, 0, 0, 1],
-  ]);
+  assert.deepEqual(
+    model.groups.map((g) => g.color),
+    [
+      [1, 0, 0, 1],
+      [0, 0, 1, 1],
+      [1, 0, 0, 1],
+    ],
+  );
   const ranked = await parseAMF(
     amf(
       `<object id="1"><mesh><vertices>${vertex(0, 0, 0, color(1, 0, 0))}${vertex(1, 0, 0)}${vertex(0, 1, 0)}${vertex(1, 1, 0)}</vertices>` +
@@ -669,7 +819,14 @@ test('AMF: bad files are named errors', async () => {
 });
 
 // MD2.
-function md2({ version = 8, frames = ['run1', 'run2', 'stand'], tris = [[0, 1, 2, 0, 1, 2], [0, 2, 3, 3, 2, 1]] } = {}) {
+function md2({
+  version = 8,
+  frames = ['run1', 'run2', 'stand'],
+  tris = [
+    [0, 1, 2, 0, 1, 2],
+    [0, 2, 3, 3, 2, 1],
+  ],
+} = {}) {
   const vertices = 4,
     coords = [
       [0, 0],
@@ -685,9 +842,24 @@ function md2({ version = 8, frames = ['run1', 'run2', 'stand'], tris = [[0, 1, 2
     framesAt = trisAt + tris.length * 12,
     out = Buffer.alloc(framesAt + frames.length * frameSize);
   out.write('IDP2', 0, 'latin1');
-  [version, 64, 32, frameSize, 1, vertices, coords.length, tris.length, 0, frames.length, skinsAt, coordsAt, trisAt, framesAt, 0, out.length].forEach(
-    (value, i) => out.writeInt32LE(value, 4 + i * 4),
-  );
+  [
+    version,
+    64,
+    32,
+    frameSize,
+    1,
+    vertices,
+    coords.length,
+    tris.length,
+    0,
+    frames.length,
+    skinsAt,
+    coordsAt,
+    trisAt,
+    framesAt,
+    0,
+    out.length,
+  ].forEach((value, i) => out.writeInt32LE(value, 4 + i * 4));
   out.write('models/skin.pcx', skinsAt, 'latin1');
   coords.forEach(([s, t], i) => {
     out.writeInt16LE(s, coordsAt + i * 4);
@@ -767,19 +939,40 @@ test('PDB: atoms read by column, with labels, colours and radii', () => {
   );
   near(molecule.positions, [1.5, 2.5, -3.5, 0, 0, 9]);
   assert.equal(molecule.title, 'A SMALL MOLECULE');
-  assert.deepEqual(molecule.atoms[0], { serial: 1, name: 'N', element: 'N', residue: 'ALA', sequence: 1, chain: 'A', hetero: false });
+  assert.deepEqual(molecule.atoms[0], {
+    serial: 1,
+    name: 'N',
+    element: 'N',
+    residue: 'ALA',
+    sequence: 1,
+    chain: 'A',
+    hetero: false,
+  });
   assert.equal(molecule.atoms[1].hetero, true);
   near(molecule.colors.subarray(0, 3), [0x30 / 255, 0x50 / 255, 0xf8 / 255]);
   near(molecule.radii, [0.71, 1.32]);
 });
 
 test('PDB: an empty element column falls back on the name, where the columns tell carbon from calcium', () => {
-  const molecule = parsePDB([atom(1, ' CA', 'ALA', 'A', 1, 0, 0, 0), atom(2, 'CA', ' CA', 'A', 2, 9, 0, 0), atom(3, '1HB', 'ALA', 'A', 1, 20, 0, 0)].join('\n'));
-  assert.deepEqual(molecule.atoms.map((a) => a.element), ['C', 'CA', 'H']);
+  const molecule = parsePDB(
+    [
+      atom(1, ' CA', 'ALA', 'A', 1, 0, 0, 0),
+      atom(2, 'CA', ' CA', 'A', 2, 9, 0, 0),
+      atom(3, '1HB', 'ALA', 'A', 1, 20, 0, 0),
+    ].join('\n'),
+  );
+  assert.deepEqual(
+    molecule.atoms.map((a) => a.element),
+    ['C', 'CA', 'H'],
+  );
 });
 
 test('PDB: CONECT rows and distance both give bonds, each once', () => {
-  const lines = [atom(1, ' C', 'ALA', 'A', 1, 0, 0, 0, 'C'), atom(2, ' C', 'ALA', 'A', 1, 1.5, 0, 0, 'C'), atom(3, ' C', 'ALA', 'A', 1, 50, 0, 0, 'C')];
+  const lines = [
+    atom(1, ' C', 'ALA', 'A', 1, 0, 0, 0, 'C'),
+    atom(2, ' C', 'ALA', 'A', 1, 1.5, 0, 0, 'C'),
+    atom(3, ' C', 'ALA', 'A', 1, 50, 0, 0, 'C'),
+  ];
   assert.deepEqual([...parsePDB(lines.join('\n')).bonds], [0, 1]);
   const linked = [...lines, 'CONECT    1    2    3', 'CONECT    2    1'].join('\n');
   assert.deepEqual([...parsePDB(linked).bonds], [0, 1, 0, 2]);
@@ -810,7 +1003,10 @@ test('PDB: only the first model loads, its CONECT rows still do, and alternate l
 test('PDB: bad files are named errors', () => {
   assert.throws(() => parsePDB('HEADER    NOTHING\n'), isError('PDB', 'syntax'));
   assert.throws(() => parsePDB('ATOM      1  N   ALA A   1      abcdefgh   0.000   0.000\n'), isError('PDB', 'syntax'));
-  assert.throws(() => parsePDB(atom(1, ' C', 'ALA', 'A', 1, 0, 0, 0, 'C'), { maxVertices: 0 }), isError('PDB', 'limit'));
+  assert.throws(
+    () => parsePDB(atom(1, ' C', 'ALA', 'A', 1, 0, 0, 0, 'C'), { maxVertices: 0 }),
+    isError('PDB', 'limit'),
+  );
 });
 
 // KMZ.
@@ -819,7 +1015,9 @@ const KML = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark><n
 
 test('KMZ: a model with its place on the Earth, and the archive stays readable', async () => {
   const image = new Uint8Array([1, 2, 3]);
-  const { models, files, read } = await parseKMZ(zip({ 'doc.kml': KML, 'models/tower.dae': DAE, 'images/a.png': image }));
+  const { models, files, read } = await parseKMZ(
+    zip({ 'doc.kml': KML, 'models/tower.dae': DAE, 'images/a.png': image }),
+  );
   assert.equal(models.length, 1);
   const [tower] = models;
   assert.equal(tower.name, 'Tower');
@@ -836,11 +1034,15 @@ test('KMZ: a model with its place on the Earth, and the archive stays readable',
 const apply = (m, [x, y, z]) => [0, 1, 2].map((r) => m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r]);
 const placedKML = (longitude, latitude, altitude, extra = '') =>
   `<Placemark><Model><altitudeMode>absolute</altitudeMode><Location><longitude>${longitude}</longitude><latitude>${latitude}</latitude><altitude>${altitude}</altitude></Location>${extra}<Link><href>m.dae</href></Link></Model></Placemark>`;
-const placedKMZ = async (kml, options) => (await parseKMZ(zip({ 'doc.kml': `<kml><Document>${kml}</Document></kml>`, 'm.dae': DAE }), options)).models;
+const placedKMZ = async (kml, options) =>
+  (await parseKMZ(zip({ 'doc.kml': `<kml><Document>${kml}</Document></kml>`, 'm.dae': DAE }), options)).models;
 
 test('KMZ: origin places models by location, east and up and south in metres', async () => {
   const origin = { longitude: 0, latitude: 0, altitude: 100 };
-  const [north, east, up] = await placedKMZ(placedKML(0, 0.001, 100) + placedKML(0.001, 0, 100) + placedKML(0, 0, 150), { origin });
+  const [north, east, up] = await placedKMZ(
+    placedKML(0, 0.001, 100) + placedKML(0.001, 0, 100) + placedKML(0, 0, 150),
+    { origin },
+  );
   // On the equator 0.001 degrees of longitude is 111.321 m at this height, and of latitude the published 110.574 m plus
   // 2 mm for the height. The Earth curves about 1 mm below the origin's plane over that distance.
   near(north.matrix.slice(12, 15), [0, -0.001, -110.576], 1e-3);
@@ -869,11 +1071,15 @@ test('KMZ: orientation follows KML: heading clockwise from north, tilt and roll 
 test('KMZ: a model far from the origin turns with the curve of the Earth', async () => {
   const [, far] = await placedKMZ(placedKML(0, 0, 0) + placedKML(90, 0, 0), { origin: 'first' });
   near(apply(far.matrix, [0, 0, 0]), [6378137, -6378137, 0], 1e-3);
-  near(apply(far.matrix, [0, 1, 0]).map((v, i) => v - far.matrix[12 + i]), [1, 0, 0]); // Up there is east here.
+  near(
+    apply(far.matrix, [0, 1, 0]).map((v, i) => v - far.matrix[12 + i]),
+    [1, 0, 0],
+  ); // Up there is east here.
 });
 
 test('KMZ: clampToGround ignores altitude, the default mode, and no origin or location means no matrix', async () => {
-  const clamped = '<Placemark><Model><Location><longitude>0</longitude><latitude>0</latitude><altitude>500</altitude></Location><Link><href>m.dae</href></Link></Model></Placemark>';
+  const clamped =
+    '<Placemark><Model><Location><longitude>0</longitude><latitude>0</latitude><altitude>500</altitude></Location><Link><href>m.dae</href></Link></Model></Placemark>';
   const [first] = await placedKMZ(clamped, { origin: { longitude: 0, latitude: 0, altitude: 20 } });
   assert.equal(first.altitudeMode, 'clampToGround');
   near(first.matrix.slice(12, 15), [0, -20, 0], 1e-6);
@@ -885,10 +1091,15 @@ test('KMZ: clampToGround ignores altitude, the default mode, and no origin or lo
 });
 
 test('KMZ: a document in a folder finds its model beside it; no document gives every dae', async () => {
-  const nested = await parseKMZ(zip({ 'files/doc.kml': KML.replace('models/tower.dae', 'tower.dae'), 'files/tower.dae': DAE }));
+  const nested = await parseKMZ(
+    zip({ 'files/doc.kml': KML.replace('models/tower.dae', 'tower.dae'), 'files/tower.dae': DAE }),
+  );
   assert.equal(nested.models[0].path, 'files/tower.dae');
   const bare = await parseKMZ(zip({ 'a.dae': DAE, 'b.DAE': DAE, 'note.txt': 'x' }));
-  assert.deepEqual(bare.models.map((m) => m.path), ['a.dae', 'b.DAE']);
+  assert.deepEqual(
+    bare.models.map((m) => m.path),
+    ['a.dae', 'b.DAE'],
+  );
   assert.equal(bare.models[0].location, undefined);
 });
 

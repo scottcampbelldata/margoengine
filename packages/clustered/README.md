@@ -525,7 +525,23 @@ The method, from four papers:
    faces are skipped, triangles nearer a VPL than 0.02 m are its own patch (the map's near plane), and meshes a
    package draws itself (`@margoengine/materials` glass, gltf-pro, terrain) occlude only through the captures. A receiver is compared where its own
    tangent plane meets the texel's centre ray (adaptive depth bias, Dou et al. 2014), so a floor does not shadow
-   itself and a 0.3 m wall keeps a lit room's bounce out of the next.
+   itself and a 0.3 m wall keeps a lit room's bounce out of the next. That plane stands in for the receiver only
+   where the texel holds the receiver's own surface: each texel keeps its surface's normal beside its depth (one
+   float, hemi-octahedral, Meyer et al. 2010; Cigolle et al. 2014), as an object-ID shadow buffer keeps which surface
+   it holds (Hourcade and Nicolas 1985), and a receiver past the texel's depth is lit only if one flat or convex
+   surface can join it to the texel's surface point: the two normals within 60 degrees, and that point behind the
+   receiver's tangent plane by no more than the chord times the sine of the angle between them, plus 2 cm (a convex
+   surface's chord runs between its two tangents). A 0.15 m log's crest keeps the snow's bounce its own lower face
+   stands in for; at a concave corner, snow 0.2 to 0.6 m outside a wall's foot, the plane runs on through the wall
+   into the room and the texel holds the wall (90 degrees) or the floor under that plane (parallel, 5 cm down), so the
+   snow no longer takes the room's bounce through the wall (KB-BOUNCE-SHADOWSNOW1). Snow 1 to 2 cm above a floor on
+   the other side of the wall is, to that one depth, on the floor's own plane, so the joined surface is checked to run
+   on unbroken: the texel beside it on each axis, toward the ray to the receiver, is asked too, and where the two
+   texels' points form a valley (each in front of the other's plane by over 2 cm: the floor and the wall standing on
+   it) and the receiver lies over 2 cm behind the second one's plane, the ray meets that wall between them, as a
+   silhouette map places an edge inside a texel (Sen, Cammarano and Hanrahan 2003). A convex edge is never a valley,
+   so the crest keeps its bounce. A receiver within the 2 cm and 2% depth slack behind a surface still takes it, as
+   any shadow map's bias lets through (docs/limits.md).
 
 `sampleSurfaces(meshes, vpls, {resolution, budget})` is the occluder sampling on its own (`LightBounce` calls it with
 the frame's batches): vertices in core's layout (position, normal), a column-major world matrix, and `budget` 16384
@@ -549,7 +565,7 @@ In Cabin Hearth (`examples/cabin-hearth`, `scripts/cabin-hearth-browser-test.mjs
 A6000, fire off, the lantern steady: with clear glazing the lantern's bounce is 0.1274 R, 0.0302 G irradiance, 10% over
 a quadrature over the test's snow surface (0.1155, 0.0274: the lantern's 6.5 cd through the window's opening, bars and
 sill, albedo 0.9 / 0.92 / 0.95, the form factor to the crest); with the scene's frosted glass the lantern bounces
-nothing outside and the window's light, its opening given `recess: 0.218` and `sill: 0.09`, gives 0.0624 R, 3.6% under
+nothing outside and the window's light, its opening given `recess: 0.218` and `sill: 0.09`, gives 0.0624 R (measured 2026-11-20 on an Intel Arc 140V laptop GPU, WebGPU and the WebGL2 layer alike), 3.6% under
 the quadrature with the window's reveal, sill and bars shading the snow (0.0647; 0.1196 without them, and 0.1035
 before the scene passed the recess and sill; docs/known-bugs.md KB-BOUNCE-REVEAL1). Read in float at the crest's own point (the HDR capture
 over TAA's 8-frame jitter cycle, bilinear between pixel centres), the frame equals the JS twin to 0.1% (0.9989 clear,

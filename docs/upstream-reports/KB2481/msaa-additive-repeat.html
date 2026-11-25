@@ -1,0 +1,163 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>4x MSAA additive blend repeat</title>
+<pre id="out">running</pre>
+<script type="module">
+// Draws the same frame again and again on one device and compares the results. No library, no engine code.
+// Frame, one encoder: (1) the source, a 4x rgba16float target, is cleared and 576 overlapping instanced discs are added
+// into it (blend one + one, colour and alpha); (2) a 4x bgra8unorm target is cleared and the source is alpha-blended
+// over it by a full-screen draw that reads its own sample of the source; (3) that target resolves; (4) a compute pass
+// copies every sample of the source. Nothing changes between frames, and blending happens in primitive order, so every
+// frame must give the same bytes and the same source samples.
+//
+// Query: ?frames=N (60)
+//        ?route=index|mask (index: one draw shaded per sample, @builtin(sample_index); mask: four draws, sample k a constant,
+//        multisample.mask = 1 << k)
+//        ?source=discs|fixed|refill (discs: step 1 above; fixed: four masked non-blended writes once before the loop;
+//        refill: those four writes in every frame's encoder)
+// Result: window.result = { gpu, route, source, changedFrames, mostChangedPixels, largestDifference,
+//         sourceChangedFrames, sourceSamplesMostChanged (of W x H x 4 x 4 floats), distinctResults, example }.
+const q = new URLSearchParams(location.search);
+const frames = Number(q.get('frames') ?? 60);
+const route = q.get('route') ?? 'index';
+const sourceMode = q.get('source') ?? 'discs';
+const W = 64, H = 64;
+const hash = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+
+async function run() {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+  const device = await adapter.requestDevice();
+  const info = adapter.info ?? {};
+  const usage = GPUTextureUsage;
+  const source = device.createTexture({ size: [W, H], sampleCount: 4, format: 'rgba16float', usage: usage.RENDER_ATTACHMENT | usage.TEXTURE_BINDING });
+  const color = device.createTexture({ size: [W, H], sampleCount: 4, format: 'bgra8unorm', usage: usage.RENDER_ATTACHMENT });
+  const target = device.createTexture({ size: [W, H], format: 'bgra8unorm', usage: usage.RENDER_ATTACHMENT | usage.COPY_SRC });
+  const full = '@vertex fn vertex(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i & 1u) * 4.0 - 1.0, f32(i >> 1u) * 4.0 - 1.0, 0.0, 1.0); }';
+
+  // source=fixed|refill: sample s of pixel (x, y) gets weight 0 on some samples, another weight and colour on the others.
+  const fills = [0, 1, 2, 3].map((s) => {
+    const module = device.createShaderModule({ code: `${full}
+@fragment fn fragment(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  let h = (u32(p.x) * 7u + u32(p.y) * 13u + ${s}u * 5u) % 9u;
+  if (h < 3u) { return vec4f(0.0); }
+  let w = f32(h) / 30.0;
+  return vec4f(w * fract(p.x / 17.0), w * 0.3, w * fract(p.y / 11.0), w);
+}` });
+    return device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'vertex' }, fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rgba16float' }] }, multisample: { count: 4, mask: 1 << s } });
+  });
+  // source=discs: a 24 x 24 grid of discs, each Gaussian-weighted, red on the left half and blue on the right.
+  const discModule = device.createShaderModule({ code: `
+struct V { @builtin(position) p: vec4f, @location(0) quad: vec2f, @location(1) @interpolate(flat) c: vec3f }
+@vertex fn vertex(@builtin(vertex_index) i: u32, @builtin(instance_index) k: u32) -> V {
+  let corner = array<vec2f, 4>(vec2f(-1, -1), vec2f(1, -1), vec2f(-1, 1), vec2f(1, 1))[i];
+  let g = vec2f(f32(k % 24u), f32(k / 24u)) / 23.0 * 1.8 - 0.9;
+  let center = g + vec2f(0.013 * sin(f32(k) * 1.7), 0.011 * cos(f32(k) * 2.3));
+  var v: V; v.p = vec4f(center + corner * 0.07, 0.5, 1.0); v.quad = corner;
+  v.c = select(vec3f(0.0, 0.3, 1.0), vec3f(1.0, 0.3, 0.0), center.x < 0.0); return v;
+}
+@fragment fn fragment(v: V) -> @location(0) vec4f {
+  if (dot(v.quad, v.quad) > 1.0) { discard; }
+  let w = exp(-2.0 * dot(v.quad, v.quad));
+  return vec4f(v.c * w, w);
+}` });
+  const add = { srcFactor: 'one', dstFactor: 'one', operation: 'add' };
+  const discs = device.createRenderPipeline({ layout: 'auto', vertex: { module: discModule, entryPoint: 'vertex' },
+    fragment: { module: discModule, entryPoint: 'fragment', targets: [{ format: 'rgba16float', blend: { color: add, alpha: add } }] },
+    primitive: { topology: 'triangle-strip' }, multisample: { count: 4 } });
+  const writeSource = (encoder) => {
+    const pass = encoder.beginRenderPass({ colorAttachments: [{ view: source.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] });
+    if (sourceMode === 'discs') { pass.setPipeline(discs); pass.draw(4, 576); }
+    else for (const pipeline of fills) { pass.setPipeline(pipeline); pass.draw(3); }
+    pass.end();
+  };
+  if (sourceMode === 'fixed') {
+    const encoder = device.createCommandEncoder();
+    writeSource(encoder);
+    device.queue.submit([encoder.finish()]);
+  }
+
+  // The over draw: colour = sum.rgb / sum.a, opacity sum.a / 0.25, nothing where the sample holds no weight.
+  const layout = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float', multisampled: true } }] });
+  const group = device.createBindGroup({ layout, entries: [{ binding: 0, resource: source.createView() }] });
+  const alphaBlend = { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } };
+  const overPipeline = (sample) => {
+    const module = device.createShaderModule({ code: `${full}
+@group(0) @binding(0) var sums: texture_multisampled_2d<f32>;
+@fragment fn fragment(@builtin(position) p: vec4f${sample === undefined ? ', @builtin(sample_index) s: u32' : ''}) -> @location(0) vec4f {
+  let sum = textureLoad(sums, vec2i(p.xy), ${sample === undefined ? 'i32(s)' : sample});
+  if (sum.a <= 0.0) { discard; }
+  return vec4f(sum.rgb / sum.a, clamp(sum.a / 0.25, 0.0, 1.0));
+}` });
+    return device.createRenderPipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }), vertex: { module, entryPoint: 'vertex' },
+      fragment: { module, entryPoint: 'fragment', targets: [{ format: 'bgra8unorm', blend: alphaBlend }] },
+      multisample: { count: 4, ...(sample === undefined ? {} : { mask: 1 << sample }) } });
+  };
+  const overs = route === 'mask' ? [0, 1, 2, 3].map(overPipeline) : [overPipeline()];
+
+  const copyModule = device.createShaderModule({ code: `
+@group(0) @binding(0) var ms: texture_multisampled_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> out: array<vec4f>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) g: vec3u) {
+  if (g.x >= ${W}u || g.y >= ${H}u) { return; }
+  for (var s = 0u; s < 4u; s++) { out[(g.y * ${W}u + g.x) * 4u + s] = textureLoad(ms, vec2i(g.xy), i32(s)); }
+}` });
+  const copy = device.createComputePipeline({ layout: 'auto', compute: { module: copyModule, entryPoint: 'main' } });
+  const sampleBytes = W * H * 64;
+  const samples = device.createBuffer({ size: sampleBytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+  const copyGroup = device.createBindGroup({ layout: copy.getBindGroupLayout(0), entries: [{ binding: 0, resource: source.createView() }, { binding: 1, resource: { buffer: samples } }] });
+  const bytesPerRow = Math.ceil((W * 4) / 256) * 256;
+
+  const frame = async () => {
+    const e = device.createCommandEncoder();
+    if (sourceMode !== 'fixed') writeSource(e);
+    const p = e.beginRenderPass({ colorAttachments: [{ view: color.createView(), resolveTarget: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0.1, 0.12, 0.15, 1] }] });
+    p.setBindGroup(0, group);
+    for (const pipeline of overs) { p.setPipeline(pipeline); p.draw(3); }
+    p.end();
+    const c = e.beginComputePass();
+    c.setPipeline(copy);
+    c.setBindGroup(0, copyGroup);
+    c.dispatchWorkgroups(W / 8, H / 8);
+    c.end();
+    const pixels = device.createBuffer({ size: bytesPerRow * H, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const sampled = device.createBuffer({ size: sampleBytes, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    e.copyTextureToBuffer({ texture: target }, { buffer: pixels, bytesPerRow }, [W, H]);
+    e.copyBufferToBuffer(samples, 0, sampled, 0, sampleBytes);
+    device.queue.submit([e.finish()]);
+    await Promise.all([pixels.mapAsync(GPUMapMode.READ), sampled.mapAsync(GPUMapMode.READ)]);
+    const shot = { pixels: new Uint8Array(pixels.getMappedRange().slice(0)), samples: new Float32Array(sampled.getMappedRange().slice(0)) };
+    pixels.destroy();
+    sampled.destroy();
+    return shot;
+  };
+
+  let first, example, changedFrames = 0, mostChangedPixels = 0, largestDifference = 0, sourceChangedFrames = 0, sourceSamplesMostChanged = 0;
+  const distinct = new Set();
+  for (let k = 0; k < frames; k++) {
+    const shot = await frame();
+    distinct.add(await hash(shot.pixels));
+    if (!first) { first = shot; continue; }
+    let m = 0;
+    for (let i = 0; i < shot.samples.length; i++) m += +(shot.samples[i] !== first.samples[i]);
+    if (m) sourceChangedFrames++;
+    sourceSamplesMostChanged = Math.max(sourceSamplesMostChanged, m);
+    let n = 0;
+    for (let i = 0; i < shot.pixels.length; i += 4) {
+      let d = 0;
+      for (let c = 0; c < 3; c++) d = Math.max(d, Math.abs(shot.pixels[i + c] - first.pixels[i + c]));
+      if (!d) continue;
+      n++;
+      largestDifference = Math.max(largestDifference, d);
+      if (!example) example = { frame: k, pixel: [(i % bytesPerRow) / 4, Math.floor(i / bytesPerRow)], frame0: [...first.pixels.slice(i, i + 4)], thisFrame: [...shot.pixels.slice(i, i + 4)] };
+    }
+    if (n) changedFrames++;
+    mostChangedPixels = Math.max(mostChangedPixels, n);
+  }
+  return { gpu: [info.vendor, info.architecture, info.description].filter(Boolean).join(' '), changedFrames, mostChangedPixels, largestDifference, sourceChangedFrames, sourceSamplesMostChanged, distinctResults: distinct.size, example };
+}
+
+const result = { route, source: sourceMode, frames, size: `${W}x${H}`, userAgent: navigator.userAgent };
+try { Object.assign(result, await run()); } catch (e) { result.error = String(e); }
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>

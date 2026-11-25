@@ -48,21 +48,32 @@ test('a case falls into the next until a statement that cannot complete; WGSL ca
     es3('switch(1){case 1:}return vec4(0.0);'),
     es3('int k=1;switch(1){case k:break;}return vec4(0.0);'),
   ])
-    assert.throws(() => translateGLSLTransition(bad), (e) => e.code === 'failed', bad);
+    assert.throws(
+      () => translateGLSLTransition(bad),
+      (e) => e.code === 'failed',
+      bad,
+    );
 });
 test('shifts take an unsigned amount of the left operand width; signed literals keep their 32-bit pattern', () => {
   const code = translateGLSLTransition(
-    es3('ivec2 v=ivec2(1)<<2;int a=0xFFFFFFFF;int b=-2147483648;uint c=4294967295u;return vec4(float(v.x+a+b)+float(c));'),
+    es3(
+      'ivec2 v=ivec2(1)<<2;int a=0xFFFFFFFF;int b=-2147483648;uint c=4294967295u;return vec4(float(v.x+a+b)+float(c));',
+    ),
   );
   check(code);
   assert.match(code, /<<vec2<u32>\(u32\(i32\(2\)\)\)/);
   assert.match(code, /bitcast<i32>\(4294967295u\)/);
   assert.match(code, /i32\(-2147483648\)/);
-  assert.throws(() => translateGLSLTransition(es3('int a=0x1FFFFFFFF;return vec4(0.0);')), (e) => e.code === 'failed');
+  assert.throws(
+    () => translateGLSLTransition(es3('int a=0x1FFFFFFFF;return vec4(0.0);')),
+    (e) => e.code === 'failed',
+  );
 });
 test('matrix products take GLSL ES 3.00 result shapes; non-square matrices and mixed constructors lower', () => {
   const code = translateGLSLTransition(
-    es3('mat2x3 m=mat2x3(1.0);vec3 a=m*uv;vec2 b=a*m;mat3x2 t=transpose(m);mat3 p=m*t;mat2 q=t*m;vec4 f=vec4(q);mat3 r=mat3(uv,1.0,vec3(0.0),vec2(1.0),0.0);return vec4(a+b.xyx+p[0]+r[1]+f.xyz,1.0);'),
+    es3(
+      'mat2x3 m=mat2x3(1.0);vec3 a=m*uv;vec2 b=a*m;mat3x2 t=transpose(m);mat3 p=m*t;mat2 q=t*m;vec4 f=vec4(q);mat3 r=mat3(uv,1.0,vec3(0.0),vec2(1.0),0.0);return vec4(a+b.xyx+p[0]+r[1]+f.xyz,1.0);',
+    ),
   );
   check(code);
   assert.match(code, /var user_m:mat2x3<f32>/);
@@ -71,11 +82,18 @@ test('matrix products take GLSL ES 3.00 result shapes; non-square matrices and m
 test('ES 3.00 adds array equality and inverse; ES 1.00 sources keep refusing them', () => {
   const arrays = 'float a[2]=float[2](1.0,2.0);float b[2]=float[](1.0,2.0);return vec4(a==b?1.0:0.0);';
   check(translateGLSLTransition(es3(arrays)));
-  assert.throws(() => translateGLSLTransition(`vec4 transition(vec2 uv){${arrays}}`), (e) => e.code === 'failed');
-  const inverse = 'mat3 m=inverse(mat3(2.0));mat4 n=inverse(mat4(2.0));mat2 o=inverse(mat2(2.0));return vec4(m[0],n[1][1]+o[0][0]);';
+  assert.throws(
+    () => translateGLSLTransition(`vec4 transition(vec2 uv){${arrays}}`),
+    (e) => e.code === 'failed',
+  );
+  const inverse =
+    'mat3 m=inverse(mat3(2.0));mat4 n=inverse(mat4(2.0));mat2 o=inverse(mat2(2.0));return vec4(m[0],n[1][1]+o[0][0]);';
   assert.match(translateGLSLTransition(es3(inverse)), /fn margo_inverse3\(m:mat3x3<f32>\)/);
   check(translateGLSLTransition(es3(inverse)));
-  assert.throws(() => translateGLSLTransition(`vec4 transition(vec2 uv){${inverse}}`), (e) => /inverse/.test(e.message));
+  assert.throws(
+    () => translateGLSLTransition(`vec4 transition(vec2 uv){${inverse}}`),
+    (e) => /inverse/.test(e.message),
+  );
 });
 test('unsized arrays need a constructor of their type; array constructors check their element count', () => {
   for (const bad of [
@@ -84,11 +102,17 @@ test('unsized arrays need a constructor of their type; array constructors check 
     es3('float a[2]=float[2](1.0);return vec4(0.0);'),
     es3('float x=1.0;return vec4(x.length());'),
   ])
-    assert.throws(() => translateGLSLTransition(bad), (e) => e.code === 'failed', bad);
+    assert.throws(
+      () => translateGLSLTransition(bad),
+      (e) => e.code === 'failed',
+      bad,
+    );
 });
 test('isnan and isinf decide on the IEEE 754 bit pattern; bit casts and modf lower to WGSL builtins', () => {
   const code = translateGLSLTransition(
-    es3('vec2 w;vec2 f=modf(uv,w);bvec2 n=isnan(uv);bool i=isinf(uv.x);return vec4(f+w,float(n.x||i)+intBitsToFloat(floatBitsToInt(uv.y)),1.0);'),
+    es3(
+      'vec2 w;vec2 f=modf(uv,w);bvec2 n=isnan(uv);bool i=isinf(uv.x);return vec4(f+w,float(n.x||i)+intBitsToFloat(floatBitsToInt(uv.y)),1.0);',
+    ),
   );
   check(code);
   assert.match(code, /0x7fffffffu\)\)>vec2<u32>\(0x7f800000u\)/);
@@ -99,7 +123,10 @@ test('isnan and isinf decide on the IEEE 754 bit pattern; bit casts and modf low
 test('texelFetch numbers rows from the bottom under the y flip; textureSize is the level size', () => {
   const code = translateGLSLTransition(es3('ivec2 s=textureSize(from,0);return texelFetch(to,s-1,0);'));
   check(code);
-  assert.match(code, /textureLoad\(after,vec2i\(temporary_\d+\.x,i32\(textureDimensions\(after,temporary_\d+\)\.y\)-1-temporary_\d+\.y\)/);
+  assert.match(
+    code,
+    /textureLoad\(after,vec2i\(temporary_\d+\.x,i32\(textureDimensions\(after,temporary_\d+\)\.y\)-1-temporary_\d+\.y\)/,
+  );
   const flat = translateGLSLTransition(es3('return texelFetch(to,ivec2(1),0);'), { flipY: false });
   assert.match(flat, /textureLoad\(after,temporary_\d+\.xy,temporary_\d+\)/);
 });

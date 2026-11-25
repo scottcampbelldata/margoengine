@@ -65,7 +65,7 @@
   "viewcube": ["./up","./fit","./compass"],
   "voxel-edit": ["./formats-extra"],
   "voxel-net": ["./rooms","./replay","./webrtc","./server-runtimes"],
-  "water": ["./ripples","./underwater","./rivers"],
+  "water": ["./ripples","./rivers"],
   "weather": ["./gltf"],
   "wfc": ["./assemble","./tileset","./overlapping3d","./hex"],
   "worker": ["./rpc","./auto"]

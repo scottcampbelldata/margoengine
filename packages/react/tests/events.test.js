@@ -224,7 +224,9 @@ test('a bordered canvas picks and reports x/y from the padding box, as engine.pi
   s.element.getBoundingClientRect = () => ({ left: 100, top: 50 });
   s.engine.pick = async (x, y) => (picked.push([x, y]), leaf);
   s.on(leaf, { onPointerDown: (event) => seen.push([event.x, event.y]) });
-  s.element.dispatchEvent(Object.assign(new window.MouseEvent('pointerdown', { clientX: 120, clientY: 60, button: 0 })));
+  s.element.dispatchEvent(
+    Object.assign(new window.MouseEvent('pointerdown', { clientX: 120, clientY: 60, button: 0 })),
+  );
   await s.settle();
   assert.deepEqual(picked, [[13, 7]]);
   assert.deepEqual(seen, [[13, 7]]);
@@ -237,7 +239,11 @@ test('paused hover picks nothing on move but presses and clicks still pick, and 
     log = [];
   let picks = 0;
   s.setUnder(() => (picks++, a));
-  s.on(a, { onPointerOver: () => log.push('over'), onPointerMove: () => log.push('move'), onClick: () => log.push('click') });
+  s.on(a, {
+    onPointerOver: () => log.push('over'),
+    onPointerMove: () => log.push('move'),
+    onClick: () => log.push('click'),
+  });
   const resume = pauseHover(s.engine);
   s.send('pointermove', 10);
   await s.settle();

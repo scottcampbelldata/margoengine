@@ -70,7 +70,11 @@ const AXES = [
 ];
 
 const faceOf = (d: readonly number[]): number => (d[0] ? +(d[0] < 0) : d[1] ? 2 + +(d[1] < 0) : 4 + +(d[2] < 0));
-const add = (a: readonly number[], b: readonly number[], s = 1): Vec => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
+const add = (a: readonly number[], b: readonly number[], s = 1): Vec => [
+  a[0] + b[0] * s,
+  a[1] + b[1] * s,
+  a[2] + b[2] * s,
+];
 const cross = (a: readonly number[], b: readonly number[]): Vec => [
   a[1] * b[2] - a[2] * b[1],
   a[2] * b[0] - a[0] * b[2],
@@ -78,14 +82,19 @@ const cross = (a: readonly number[], b: readonly number[]): Vec => [
 ];
 const dot = (a: readonly number[], b: readonly number[]): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const same = (a: readonly number[], b: readonly number[]): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-const mid = (a: readonly number[], b: readonly number[]): Vec => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+const mid = (a: readonly number[], b: readonly number[]): Vec => [
+  (a[0] + b[0]) / 2,
+  (a[1] + b[1]) / 2,
+  (a[2] + b[2]) / 2,
+];
 const axis = (a: number, s: number): Vec => {
   const v: Vec = [0, 0, 0];
   v[a] = s;
   return v;
 };
 // Unit face id: cell and face packed into one exact integer (cells within ±1024 of the origin).
-const idOf = (c: readonly number[], f: number): number => (((c[0] + 1024) * 2048 + c[1] + 1024) * 2048 + c[2] + 1024) * 8 + f;
+const idOf = (c: readonly number[], f: number): number =>
+  (((c[0] + 1024) * 2048 + c[1] + 1024) * 2048 + c[2] + 1024) * 8 + f;
 const cellOf = (id: number): Vec => {
   const f = Math.floor(id / 8);
   return [Math.floor(f / 4194304) - 1024, (Math.floor(f / 2048) % 2048) - 1024, (f % 2048) - 1024];
@@ -148,7 +157,8 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
       diagonal = add(out, n);
     if (owner.has(idOf(c, faceOf(o)))) return [c, faceOf(o), n];
     if (owner.has(idOf(out, f))) return [out, f, [-o[0], -o[1], -o[2]]];
-    if (owner.has(idOf(diagonal, faceOf([-o[0], -o[1], -o[2]])))) return [diagonal, faceOf([-o[0], -o[1], -o[2]]), [-n[0], -n[1], -n[2]]];
+    if (owner.has(idOf(diagonal, faceOf([-o[0], -o[1], -o[2]]))))
+      return [diagonal, faceOf([-o[0], -o[1], -o[2]]), [-n[0], -n[1], -n[2]]];
   };
   const pairs = new Map<number, [Vec, number, Vec] | null>(),
     partner = (c: Vec, f: number, o: Vec): [Vec, number, Vec] | undefined => {
@@ -211,7 +221,11 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
     }
     // The panel: rectangles split where an edge's crease flag changes, each inset from its creased sides. Their
     // corners on shared sides go into each other's edges later, so the panel stays one closed surface.
-    const cuts = (a: boolean[], b: boolean[]) => [0, ...a.flatMap((x, i) => (i && (x !== a[i - 1] || b[i] !== b[i - 1]) ? [i] : [])), a.length];
+    const cuts = (a: boolean[], b: boolean[]) => [
+      0,
+      ...a.flatMap((x, i) => (i && (x !== a[i - 1] || b[i] !== b[i - 1]) ? [i] : [])),
+      a.length,
+    ];
     const columns = cuts(bottom, top),
       rows = cuts(left, right);
     for (let c = 1; c < columns.length; c++)
@@ -225,15 +239,19 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
           b = v0 === 0 && bottom[u0] ? bevel : 0,
           t = v1 === q.h && top[u0] ? bevel : 0;
         piece(
-          [pointAt(q, u0 + l, v0 + b), pointAt(q, u1 - rr, v0 + b), pointAt(q, u1 - rr, v1 - t), pointAt(q, u0 + l, v1 - t)],
+          [
+            pointAt(q, u0 + l, v0 + b),
+            pointAt(q, u1 - rr, v0 + b),
+            pointAt(q, u1 - rr, v1 - t),
+            pointAt(q, u0 + l, v1 - t),
+          ],
           index,
           NORMALS[f],
         );
       }
     if (!bevel) return;
     for (let i = 0; i <= q.w; i++)
-      for (let j = 0; j <= q.h; j++)
-        if (!i || !j || i === q.w || j === q.h) lattice.add(pointAt(q, i, j).join());
+      for (let j = 0; j <= q.h; j++) if (!i || !j || i === q.w || j === q.h) lattice.add(pointAt(q, i, j).join());
     // Chamfer strips: on each creased unit edge, the half between this face's panel and the strip's middle line,
     // merged along a run while both lines go on straight.
     const sides: [number, number, number, number, Vec][] = [
@@ -321,7 +339,12 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
     for (const first of around) {
       if (seen.has(first)) continue;
       let start = first;
-      for (let s = prev.get(start), steps = 0; s !== undefined && s !== first && steps < around.length; s = prev.get(s), steps++) start = s;
+      for (
+        let s = prev.get(start), steps = 0;
+        s !== undefined && s !== first && steps < around.length;
+        s = prev.get(s), steps++
+      )
+        start = s;
       const chain: number[] = [];
       for (let id: number | undefined = start; id !== undefined && !seen.has(id); id = next.get(id)) {
         seen.add(id);
@@ -395,7 +418,9 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
         line = lines.get(lineKey(p, a))!,
         lo = Math.min(p[a], q[a]),
         hi = Math.max(p[a], q[a]),
-        inside = line.filter((x, k) => round(x) > round(lo) && round(x) < round(hi) && (!k || round(line[k - 1]) !== round(x)));
+        inside = line.filter(
+          (x, k) => round(x) > round(lo) && round(x) < round(hi) && (!k || round(line[k - 1]) !== round(x)),
+        );
       if (q[a] < p[a]) inside.reverse();
       for (const x of inside) {
         const r: Vec = [...p];
@@ -445,7 +470,8 @@ export function bevelQuads(quads: readonly CubeFace[], bevel: number, context: r
       };
     points.forEach((p, i) => {
       const index = owners[i];
-      if (index < meshed) indices.push(shared(p, index), shared(points[(i + 1) % points.length], index), shared(middle, index));
+      if (index < meshed)
+        indices.push(shared(p, index), shared(points[(i + 1) % points.length], index), shared(middle, index));
     });
   }
   return {

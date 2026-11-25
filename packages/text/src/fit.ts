@@ -36,7 +36,10 @@ export interface FittedLayout extends TextLayout {
 }
 
 const invalid = (message: string): never => {
-  throw new MargoError('failed', `${message}; use positive bounds and an ordered finite clip rectangle (https://margoengine.com/llms/packages/text.md)`);
+  throw new MargoError(
+    'failed',
+    `${message}; use positive bounds and an ordered finite clip rectangle (https://margoengine.com/llms/packages/text.md)`,
+  );
 };
 
 /** Pure fitted layout. Whole graphemes are removed and the final line is reshaped with the ellipsis. */
@@ -56,23 +59,26 @@ export function fitText(text: string, options: FitOptions, measurer: TextMeasure
   if (clip && (clip.length !== 4 || !clip.every(Number.isFinite) || clip[0] > clip[2] || clip[1] > clip[3]))
     invalid('Invalid clipRect');
   const measure = (source: string, size: number) => layoutText(source, { ...options, fontSize: size }, measurer);
-  const fits = (l: TextLayout) => l.lines.length <= maxLines && l.lines.length * l.lineHeight <= maxHeight &&
-    l.bounds.right - l.bounds.left <= width;
+  const fits = (l: TextLayout) =>
+    l.lines.length <= maxLines && l.lines.length * l.lineHeight <= maxHeight && l.bounds.right - l.bounds.left <= width;
   let size = options.fontSize ?? 1;
   if (options.autoFit) {
-    let lo = min, hi = max;
+    let lo = min,
+      hi = max;
     if (fits(measure(text, hi))) lo = hi;
-    else for (let i = 0; i < 32; i++) {
-      const mid = (lo + hi) / 2;
-      if (fits(measure(text, mid))) lo = mid;
-      else hi = mid;
-    }
+    else
+      for (let i = 0; i < 32; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(measure(text, mid))) lo = mid;
+        else hi = mid;
+      }
     size = lo;
   }
   let result = measure(text, size);
   const fullFits = fits(result);
   const count = Math.min(maxLines, Math.floor(maxHeight / result.lineHeight), result.lines.length);
-  let end = text.length, display = text;
+  let end = text.length,
+    display = text;
   if (count === 0) {
     result = { ...result, glyphs: [], lines: [], bounds: { left: 0, right: 0, top: 0, bottom: 0 } };
     end = 0;
@@ -80,7 +86,7 @@ export function fitText(text: string, options: FitOptions, measurer: TextMeasure
   } else if (!fullFits) {
     const suffix = options.ellipsis === false ? '' : typeof options.ellipsis === 'string' ? options.ellipsis : '\u2026';
     const cutoff = result.lines[count - 1].end;
-    const boundaries = [0, ...graphemes(text.slice(0, cutoff)).map(g => g.index + g.cluster.length)];
+    const boundaries = [0, ...graphemes(text.slice(0, cutoff)).map((g) => g.index + g.cluster.length)];
     let candidate: TextLayout | undefined;
     // Measure each candidate: kerning and shaping can change at the new boundary.
     for (let i = boundaries.length - 1; i >= 0; i--) {
@@ -102,15 +108,25 @@ export function fitText(text: string, options: FitOptions, measurer: TextMeasure
   }
   const visibleEnd = end;
   for (const g of result.glyphs) {
-    if (g.index >= visibleEnd) { g.index = visibleEnd; g.length = 0; g.carets = undefined; }
-    else g.length = Math.min(g.length, visibleEnd - g.index);
+    if (g.index >= visibleEnd) {
+      g.index = visibleEnd;
+      g.length = 0;
+      g.carets = undefined;
+    } else g.length = Math.min(g.length, visibleEnd - g.index);
   }
   for (const line of result.lines) {
     line.start = Math.min(line.start, visibleEnd);
     line.end = Math.min(line.end, visibleEnd);
   }
-  return { ...result, text, displayText: display, visibleEnd, truncated: end < text.length, fits: fullFits,
-    clipRect: clip ?? undefined };
+  return {
+    ...result,
+    text,
+    displayText: display,
+    visibleEnd,
+    truncated: end < text.length,
+    fits: fullFits,
+    clipRect: clip ?? undefined,
+  };
 }
 
 /** Text options plus optional overflow and auto-fit controls. */
@@ -132,16 +148,37 @@ export class FittedText extends Text {
     super(options);
     this.maxFontSize = options.maxFontSize ?? options.fontSize ?? 1;
     Object.assign(this, {
-      maxLines: options.maxLines ?? Infinity, maxHeight: options.maxHeight ?? Infinity,
-      ellipsis: options.ellipsis ?? true, clipRect: options.clipRect ?? null,
-      autoFit: options.autoFit ?? false, minFontSize: options.minFontSize ?? 0.1,
+      maxLines: options.maxLines ?? Infinity,
+      maxHeight: options.maxHeight ?? Infinity,
+      ellipsis: options.ellipsis ?? true,
+      clipRect: options.clipRect ?? null,
+      autoFit: options.autoFit ?? false,
+      minFontSize: options.minFontSize ?? 0.1,
     });
   }
   override get layout(): FittedLayout {
-    const key = JSON.stringify([this.text, this.font.revision, this.fontSize, this.lineHeight, this.letterSpacing,
-      this.maxWidth, this.textAlign, this.anchorX, this.anchorY, this.direction, this.whiteSpace, this.overflowWrap,
-      this.ligatures, this.maxLines, this.maxHeight, this.ellipsis, this.clipRect, this.autoFit, this.minFontSize,
-      this.maxFontSize]);
+    const key = JSON.stringify([
+      this.text,
+      this.font.revision,
+      this.fontSize,
+      this.lineHeight,
+      this.letterSpacing,
+      this.maxWidth,
+      this.textAlign,
+      this.anchorX,
+      this.anchorY,
+      this.direction,
+      this.whiteSpace,
+      this.overflowWrap,
+      this.ligatures,
+      this.maxLines,
+      this.maxHeight,
+      this.ellipsis,
+      this.clipRect,
+      this.autoFit,
+      this.minFontSize,
+      this.maxFontSize,
+    ]);
     if (!this.fitted || this.fitKey !== key || this.fitFont !== this.font) {
       this.fitted = fitText(this.text, this, this.font);
       this.fontSize = this.fitted.fontSize;
@@ -152,5 +189,7 @@ export class FittedText extends Text {
     return this.fitted;
   }
   private fitFont?: Text['font'];
-  override get layoutVersion(): number { return this.fitRevision; }
+  override get layoutVersion(): number {
+    return this.fitRevision;
+  }
 }

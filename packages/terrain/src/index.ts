@@ -25,6 +25,7 @@ import {
 import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { surfaceHeight } from './surface-height.js';
 export { clipmapGrid } from './grid.js';
 export {
   TerrainColors,
@@ -153,6 +154,11 @@ export interface TerrainOptions {
   resolution?: number;
   /** Clipmap rings, 1-12. Default 6. */
   levels?: number;
+  /** World XZ centre for the rings. Defaults to the main camera's initial world XZ and stays fixed. Use `'camera'`
+   * for an unbounded route that needs to select a moving window on the world lattice. */
+  readonly clipmapAnchor?: readonly [number, number] | 'camera';
+  /** Rasterize the drawn clipmap heights before vegetation placement. Default false. */
+  readonly captureSurfaceHeight?: boolean;
   /** Surface roughness (GGX, 0-1), for the sun's highlight and screen-space reflections (`ssr.add(terrain)`). Default
    * 0.9; leaving it out keeps the shader as it was. */
   roughness?: number;
@@ -256,6 +262,8 @@ export class Terrain implements EnginePlugin {
   /** The shift the layer rules were last written with, and the scratch eye and ring plan of `prepare`. */
   private readonly rulesShift = new Float64Array(3);
   private readonly eye = new Float64Array(3);
+  private anchoredEye?: readonly [number, number, number];
+  private capturedSurface?: ReturnType<typeof surfaceHeight>;
   private plan = new Float64Array(0);
   private unfollow?: () => void;
   /**
@@ -265,6 +273,8 @@ export class Terrain implements EnginePlugin {
   readonly anchor?: readonly [number, number];
   constructor(readonly options: TerrainOptions) {
     this.validate();
+    const anchor = options.clipmapAnchor;
+    if (anchor && anchor !== 'camera') this.anchoredEye = [anchor[0], 0, anchor[1]];
     const o = options.floatingOrigin;
     if (o) {
       this.anchor = [options.origin?.[0] ?? 0, options.origin?.[1] ?? 0];
@@ -278,6 +288,10 @@ export class Terrain implements EnginePlugin {
    */
   get shift(): ArrayLike<number> {
     return this.shiftValues;
+  }
+  /** World heights of the rendered triangles, with the heightmap's UVs. Available after the first captured frame. */
+  get surfaceHeightTexture(): GPUTexture | undefined {
+    return this.capturedSurface?.texture;
   }
   static attach(instance: EngineKernel, options: TerrainOptions): Terrain {
     const terrain = new Terrain(options);
@@ -308,6 +322,8 @@ export class Terrain implements EnginePlugin {
         'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
+    if (o.clipmapAnchor !== undefined && o.clipmapAnchor !== 'camera')
+      finiteVector(o.clipmapAnchor, 2, 'Terrain clipmap anchor');
     const f = o.floatingOrigin;
     if (f !== undefined && (typeof f?.onRebase !== 'function' || f.origin?.length !== 3))
       throw new TypeError('Invalid terrain floatingOrigin; pass a FloatingOrigin from @margoengine/cameras/origin.');
@@ -570,7 +586,7 @@ export class Terrain implements EnginePlugin {
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name + ':prepare',
-      order: -6,
+      order: this.options.captureSurfaceHeight ? -11 : -6,
       execute: (c) => {
         if (c.backend === 'webgpu') this.prepare(c);
       },
@@ -608,7 +624,11 @@ export class Terrain implements EnginePlugin {
       }
     }
     if (this.plan.length !== this.rings.length * 2) this.plan = new Float64Array(this.rings.length * 2);
-    const plan = planRings(eye, s, cell, this.rings.length, this.plan);
+    if (!this.anchoredEye && this.options.clipmapAnchor !== 'camera') {
+      const initial = this.engine?.camera?.position ?? c.camera.position;
+      this.anchoredEye = [initial[0] + s[0], 0, initial[2] + s[2]];
+    }
+    const plan = planRings(this.anchoredEye ?? eye, s, cell, this.rings.length, this.plan);
     let previousX = 0,
       previousZ = 0,
       changed = false;
@@ -651,6 +671,23 @@ export class Terrain implements EnginePlugin {
       previousZ = z;
     }
     if (changed) this.invalidate();
+    if (this.options.captureSurfaceHeight) {
+      this.capturedSurface ??= surfaceHeight(
+        c.device,
+        this.textures!.heightmap,
+        this.layout!,
+        floating ? originShader(terrainVertex) : terrainVertex,
+        (code) => this.clip(code),
+        !!floating,
+      );
+      this.capturedSurface?.draw(c.encoder, this.shadowVersion, this.rings, {
+        vertex: this.vertex!,
+        center: this.center!,
+        ring: this.ring!,
+        centerCount: this.centerCount,
+        ringCount: this.ringCount,
+      });
+    }
   }
   /** The lit shader: terrain's own (with `roughness`, when given) through every lighting effect. */
   private shader(): string {
@@ -1001,6 +1038,8 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     queue.writeBuffer(buffer, 0, values as Float32Array<ArrayBuffer>);
   }
   private release(): void {
+    this.capturedSurface?.texture.destroy();
+    this.capturedSurface = undefined;
     for (const texture of new Set(
       this.textures
         ? [

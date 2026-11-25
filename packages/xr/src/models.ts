@@ -168,7 +168,8 @@ export class XRModels {
   }
 
   private part(parent: Mesh, size: [number, number, number], position: [number, number, number]): Mesh {
-    return this.scope.run(() => this.engine.createMesh())
+    return this.scope
+      .run(() => this.engine.createMesh())
       .setGeometry(this.geometry.cylinder)
       .setMaterial(this.materials.body)
       .setScale(size)
@@ -196,7 +197,10 @@ export class XRModels {
     let parts = this.handParts.get(source);
     if (parts) return parts;
     const mesh = (geometry: Geometry) =>
-      this.scope.run(() => this.engine.createMesh()).setGeometry(geometry).setMaterial(this.materials.hand);
+      this.scope
+        .run(() => this.engine.createMesh())
+        .setGeometry(geometry)
+        .setMaterial(this.materials.hand);
     parts = {
       joints: Array.from({ length: 25 }, () => mesh(this.geometry.sphere)),
       bones: HAND_BONES.map(() => mesh(this.geometry.cylinder)),

@@ -434,7 +434,11 @@ async function open2(
       checkNumbers(box?.min, 3, 'boundingBox.min'),
       checkNumbers(box?.max, 3, 'boundingBox.max'),
     ),
-    scale = checkNumbers(typeof meta.scale === 'number' ? [meta.scale, meta.scale, meta.scale] : meta.scale, 3, 'scale'),
+    scale = checkNumbers(
+      typeof meta.scale === 'number' ? [meta.scale, meta.scale, meta.scale] : meta.scale,
+      3,
+      'scale',
+    ),
     offset = checkNumbers(meta.offset, 3, 'offset'),
     hierarchy = meta.hierarchy as { firstChunkSize?: unknown } | undefined,
     attributes = meta.attributes as (Attribute & { min?: number[]; max?: number[] })[] | undefined,
@@ -535,7 +539,12 @@ async function open1(
     finish = colorStep(options);
   if (inline) readInline(root, inline);
   else
-    await readHrc(root, step, (node, pageSignal) => readWhole(fetcher, `${path(node)}.hrc`, pageSignal ?? signal), signal);
+    await readHrc(
+      root,
+      step,
+      (node, pageSignal) => readWhole(fetcher, `${path(node)}.hrc`, pageSignal ?? signal),
+      signal,
+    );
   prune(root);
   const opened = { root, version, points: Number(meta.points) || 0, origin },
     wanted = wantedBy(options);
@@ -559,7 +568,11 @@ async function open1(
   const layout = layoutOf(
     fields.map((name: string): Attribute => {
       const size = V1_SIZES[name];
-      if (!size) throw new MargoError('unsupported', `Potree point attribute ${name} is not read; convert the folder without it`);
+      if (!size)
+        throw new MargoError(
+          'unsupported',
+          `Potree point attribute ${name} is not read; convert the folder without it`,
+        );
       const [type, numElements] = V1_TYPES[name] ?? [];
       return { name, size, type, numElements };
     }),
@@ -614,8 +627,7 @@ function readField(view: DataView, n: number, stride: number, field: Field): Pot
                 : type === 'float'
                   ? (o: number) => view.getFloat32(o, true)
                   : (o: number) => view.getFloat64(o, true);
-  for (let i = 0; i < n; i++)
-    for (let e = 0; e < count; e++) out[i * count + e] = get(at + i * stride + e * width);
+  for (let i = 0; i < n; i++) for (let e = 0; e < count; e++) out[i * count + e] = get(at + i * stride + e * width);
   return out;
 }
 
@@ -723,7 +735,9 @@ function decode(
   const n = node.count,
     { stride, position, color, colorSize, scale, fields } = layout;
   if (bytes.byteLength < n * stride)
-    throw new RangeError(`Potree node ${node.id} holds ${bytes.byteLength} bytes for ${n} points; the file is cut short`);
+    throw new RangeError(
+      `Potree node ${node.id} holds ${bytes.byteLength} bytes for ${n} points; the file is cut short`,
+    );
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     positions = new Float32Array(n * 3);
   for (let i = 0; i < n; i++)
@@ -746,7 +760,6 @@ function decode(
         colors[i * 3 + c] = wide ? value >> 8 : value;
       }
   } else
-    for (let i = 0; i < n; i++)
-      for (let c = 0; c < 3; c++) colors[i * 3 + c] = view.getUint8(i * stride + color + c);
+    for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) colors[i * 3 + c] = view.getUint8(i * stride + color + c);
   return { positions, colors, colorComponents: 3, attributes };
 }

@@ -53,33 +53,61 @@ export class AudioMusic {
   private next = 0;
   private disposed = false;
 
-  constructor(listener: AudioListener, stems: Readonly<Record<string, AudioBuffer>>,
-    states: Readonly<Record<string, MusicState>>, options: AudioMusicOptions = {}) {
+  constructor(
+    listener: AudioListener,
+    stems: Readonly<Record<string, AudioBuffer>>,
+    states: Readonly<Record<string, MusicState>>,
+    options: AudioMusicOptions = {},
+  ) {
     this.listener = listener;
-    const bpm = options.bpm ?? 120, beatsPerBar = options.beatsPerBar ?? 4, loopBeats = options.loopBeats ?? 4;
-    if (!Number.isFinite(bpm) || bpm <= 0 || !Number.isInteger(beatsPerBar) || beatsPerBar < 1 ||
-      !Number.isInteger(loopBeats) || loopBeats < 1)
+    const bpm = options.bpm ?? 120,
+      beatsPerBar = options.beatsPerBar ?? 4,
+      loopBeats = options.loopBeats ?? 4;
+    if (
+      !Number.isFinite(bpm) ||
+      bpm <= 0 ||
+      !Number.isInteger(beatsPerBar) ||
+      beatsPerBar < 1 ||
+      !Number.isInteger(loopBeats) ||
+      loopBeats < 1
+    )
       throw rangeError('Music needs positive finite bpm and positive integer beatsPerBar/loopBeats', 'state');
     this.beat = 60 / bpm;
     this.bar = this.beat * beatsPerBar;
     this.loop = this.beat * loopBeats;
     if (!Number.isFinite(this.bar) || !Number.isFinite(this.loop) || this.beat <= 0)
-      throw rangeError('Music grid must fit finite audio-clock seconds; use a practical tempo and loop length', 'state');
+      throw rangeError(
+        'Music grid must fit finite audio-clock seconds; use a practical tempo and loop length',
+        'state',
+      );
     this.leadTime = nonnegative(options.leadTime ?? 0.05, 'leadTime');
     this.fade = nonnegative(options.fade ?? 0.02, 'fade');
     this.stems = Object.entries(stems);
-    if (!this.stems.length || this.stems.some(([name, buffer]) => !name || !Number.isFinite(buffer?.duration) || buffer.duration < this.loop))
+    if (
+      !this.stems.length ||
+      this.stems.some(([name, buffer]) => !name || !Number.isFinite(buffer?.duration) || buffer.duration < this.loop)
+    )
       throw fault('state', 'Music needs named decoded stems covering loopBeats; load buffers before construction');
     const names = new Set(this.stems.map(([name]) => name));
     for (const [name, state] of Object.entries(states)) {
-      if (!name || !state || Object.entries(state).some(([stem, db]) => !names.has(stem) ||
-        (db !== -Infinity && (!Number.isFinite(db) || !Number.isFinite(Math.fround(10 ** (db / 20)))))))
+      if (
+        !name ||
+        !state ||
+        Object.entries(state).some(
+          ([stem, db]) =>
+            !names.has(stem) ||
+            (db !== -Infinity && (!Number.isFinite(db) || !Number.isFinite(Math.fround(10 ** (db / 20))))),
+        )
+      )
         throw fault('state', 'Music states need known stem names and finite float32 gains in dB, or -Infinity');
-      this.states.set(name, this.stems.map(([stem]) => Object.hasOwn(state, stem) ? state[stem] : -Infinity));
+      this.states.set(
+        name,
+        this.stems.map(([stem]) => (Object.hasOwn(state, stem) ? state[stem] : -Infinity)),
+      );
     }
     if (!this.states.size) throw fault('state', 'Music needs at least one named state with stem dB levels');
-    this.mixer = new Mixer(listener.context, {destination: listener.input});
-    this.stems.forEach((_, i) => this.mixer.createBus(String(i), {gain: -Infinity}));
+    this.mixer = new Mixer(listener.context, { destination: listener.input });
+    this.stems.forEach((_, i) => this.mixer.createBus(String(i), { gain: -Infinity }));
     listener.addSource(this);
   }
 
@@ -90,14 +118,23 @@ export class AudioMusic {
    */
   start(state: string, at = this.listener.context.currentTime + this.leadTime): number {
     this.assertLive();
-    const levels = this.levels(state), context = this.listener.context;
+    const levels = this.levels(state),
+      context = this.listener.context;
     nonnegative(at, 'start time');
     if (this.origin !== null || at < context.currentTime || !Number.isFinite(at + this.loop))
-      throw fault('state', 'Music start needs a stopped transport and a finite future time; stop first or use transition');
-    this.stems.forEach((_, i) => this.mixer.bus(String(i)).setGain(levels[i], {at: context.currentTime, seconds: 0}));
+      throw fault(
+        'state',
+        'Music start needs a stopped transport and a finite future time; stop first or use transition',
+      );
+    this.stems.forEach((_, i) => this.mixer.bus(String(i)).setGain(levels[i], { at: context.currentTime, seconds: 0 }));
     this.origin = at;
     this.next = 0;
-    try { this.schedule(); } catch (error) { this.stop(); throw error; }
+    try {
+      this.schedule();
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
     return at;
   }
 
@@ -113,15 +150,20 @@ export class AudioMusic {
     const grid = quantize === 'beat' ? this.beat : this.bar;
     const earliest = Math.max(this.origin, after, this.listener.context.currentTime + this.leadTime);
     const at = this.origin + Math.ceil((earliest - this.origin) / grid) * grid;
-    if (!Number.isFinite(at)) throw rangeError('Music transition time overflow; use a nearer audio-clock time', 'state');
-    levels.forEach((db, i) => this.mixer.bus(String(i)).setGain(db, {at, seconds: fade}));
+    if (!Number.isFinite(at))
+      throw rangeError('Music transition time overflow; use a nearer audio-clock time', 'state');
+    levels.forEach((db, i) => this.mixer.bus(String(i)).setGain(db, { at, seconds: fade }));
     return at;
   }
 
   /** Stop immediately, including scheduled starts. A later start resets the grid and all pending state automation. */
   stop(): void {
     this.assertLive();
-    for (const source of this.sources) { source.onended = null; source.stop(); source.disconnect(); }
+    for (const source of this.sources) {
+      source.onended = null;
+      source.stop();
+      source.disconnect();
+    }
     this.sources.clear();
     this.origin = null;
   }
@@ -135,10 +177,14 @@ export class AudioMusic {
    * thread) starts now at its matching offset, so the grid holds.
    */
   private schedule(): void {
-    const context = this.listener.context, origin = this.origin!, now = context.currentTime;
+    const context = this.listener.context,
+      origin = this.origin!,
+      now = context.currentTime;
     const offline = context as Partial<OfflineAudioContext>;
-    const horizon = typeof offline.startRendering === 'function' && typeof offline.length === 'number'
-      ? offline.length / context.sampleRate : now + this.leadTime + Math.max(1, 2 * this.loop);
+    const horizon =
+      typeof offline.startRendering === 'function' && typeof offline.length === 'number'
+        ? offline.length / context.sampleRate
+        : now + this.leadTime + Math.max(1, 2 * this.loop);
     for (let when = origin + this.next * this.loop; when < horizon; when = origin + ++this.next * this.loop) {
       const late = Math.max(0, now - when);
       if (late >= this.loop) continue;
@@ -151,8 +197,12 @@ export class AudioMusic {
           source.disconnect();
           this.update();
         };
-        try { source.start(when + late, late, this.loop - late); }
-        catch (error) { source.disconnect(); throw error; }
+        try {
+          source.start(when + late, late, this.loop - late);
+        } catch (error) {
+          source.disconnect();
+          throw error;
+        }
         this.sources.add(source);
       });
     }
@@ -174,5 +224,7 @@ export class AudioMusic {
     if (this.disposed) throw fault('disposed', 'AudioMusic is disposed; create a new transport');
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

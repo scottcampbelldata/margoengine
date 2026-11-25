@@ -96,7 +96,8 @@ export class SceneFade implements EnginePlugin {
     readonly duration = 180,
     private readonly clock: () => number = () => performance.now(),
   ) {
-    if (typeof clock !== 'function') throw new TypeError('Invalid scene fade clock; pass a function returning milliseconds.');
+    if (typeof clock !== 'function')
+      throw new TypeError('Invalid scene fade clock; pass a function returning milliseconds.');
     if (!Number.isFinite(duration) || duration < 0 || duration > 1000)
       throw new RangeError('Invalid scene fade duration; pass a finite number of milliseconds from 0 to 1000.');
     this.finished = new Promise((resolve) => {
@@ -212,11 +213,7 @@ export class SceneFade implements EnginePlugin {
   private draw(c: Extract<PassContext, { backend: 'webgpu' }>): void {
     if (!this.pipeline || this.disposed) return;
     const t =
-      this.started === undefined
-        ? 0
-        : this.duration
-          ? Math.min(1, (this.clock() - this.started) / this.duration)
-          : 1;
+      this.started === undefined ? 0 : this.duration ? Math.min(1, (this.clock() - this.started) / this.duration) : 1;
     this.values.set([c.width, c.height, 1 - t * t * (3 - 2 * t), 0]);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     if (t === 1) {

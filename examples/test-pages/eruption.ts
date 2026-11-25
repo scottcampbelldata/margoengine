@@ -22,17 +22,28 @@ const button = (id: string) => document.getElementById(id) as HTMLButtonElement;
 // A cone 1,500 m high, 12 km across, with a crater at its top and gentle ridges.
 const cone = (x: number, z: number) => {
   const r = Math.hypot(x, z);
-  return Math.max(0, 1500 * (1 - r / 6000)) - 200 * Math.exp(-((r / 300) ** 2)) + 30 * Math.sin(x / 700) * Math.cos(z / 900);
+  return (
+    Math.max(0, 1500 * (1 - r / 6000)) - 200 * Math.exp(-((r / 300) ** 2)) + 30 * Math.sin(x / 700) * Math.cos(z / 900)
+  );
 };
-const grid = { size: [60000, 60000] as [number, number], origin: [-30000, -30000] as [number, number], resolution: 256 };
+const grid = {
+  size: [60000, 60000] as [number, number],
+  origin: [-30000, -30000] as [number, number],
+  resolution: 256,
+};
 
 async function start() {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   canvas.width = canvas.clientWidth * devicePixelRatio;
   canvas.height = canvas.clientHeight * devicePixelRatio;
-  const engine = await Engine.create(canvas, { camera: { position: [-26000, 2500, -14000], target: [0, 7000, 4000], near: 10, far: 400000 } });
+  const engine = await Engine.create(canvas, {
+    camera: { position: [-26000, 2500, -14000], target: [0, 7000, 4000], near: 10, far: 400000 },
+  });
   engine.lighting.direction.set([0.4, 0.8, 0.45, 3]);
-  const ground = engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(cone, grid))).setMaterial(new PbrMaterial({ color: [0.3, 0.27, 0.24], roughness: 0.95 }));
+  const ground = engine
+    .createMesh()
+    .setGeometry(toGeometry(heightfieldGeometry(cone, grid)))
+    .setMaterial(new PbrMaterial({ color: [0.3, 0.27, 0.24], roughness: 0.95 }));
   const weather = new WeatherMachine('clear', { seed: 4 });
   const eruption = new Eruption({ vent: [0, 1300, 0], weather, start: 2, seed: 4 });
   // The ground's covers follow the eruption's film time.
@@ -67,7 +78,8 @@ async function start() {
     stepped.seek(0);
     for (let k = 0; k < 100; k++) stepped.update(time / 100);
     stepped.seek(time);
-    if (JSON.stringify(stepped.column()) !== JSON.stringify(c)) console.warn('BUG: stepping drew another column than a seek');
+    if (JSON.stringify(stepped.column()) !== JSON.stringify(c))
+      console.warn('BUG: stepping drew another column than a seek');
     say(
       `Film ${eruption.time.toFixed(0)} s: ${(c.massRate / 1e6).toFixed(1)} Mt/s, ${c.collapse ? 'collapsing fountain' : 'buoyant column'} top ${(c.top / 1000).toFixed(1)} km of ${(c.steadyTop / 1000).toFixed(1)} km (Mastin ${(fit / 1000).toFixed(1)} km), umbrella ${u ? (u.radius / 1000).toFixed(1) + ' km' : 'not yet'}, ash at the vent ${(e.thickness * 100).toFixed(1)} cm when it ends, ${eruption.strikes(0, eruption.time).length} strikes so far.`,
     );
@@ -92,7 +104,8 @@ async function start() {
   button('btnWind').onclick = look({ ...ERUPTION_LOOKS.plinian, wind: 15, windDirection: 90 });
   button('btnWeather').onclick = async () => {
     applyEruptionSettings(eruption, { ...ERUPTION_LOOKS.plinian, start: 2, wind: null, windDirection: null });
-    if (eruption.options.wind !== undefined) console.warn('BUG: a null wind row did not hand the wind back to the weather');
+    if (eruption.options.wind !== undefined)
+      console.warn('BUG: a null wind row did not hand the wind back to the weather');
     refreshAsh();
     await check(eruption.time);
   };

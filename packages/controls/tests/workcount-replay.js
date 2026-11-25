@@ -10,8 +10,14 @@ export async function controlReplay() {
   const hash = createHash('sha256');
   const record = (values) => hash.update(Buffer.from(values.buffer, values.byteOffset, values.byteLength));
   for (const damping of [false, true]) {
-    for (const position of [[0, 0, 10], [3, 5, -9], [0, 10, 0]]) {
-      const cam = camera({ position }), el = new FakeElement(), control = new ArcballControls(cam, el);
+    for (const position of [
+      [0, 0, 10],
+      [3, 5, -9],
+      [0, 10, 0],
+    ]) {
+      const cam = camera({ position }),
+        el = new FakeElement(),
+        control = new ArcballControls(cam, el);
       control.enableDamping = damping;
       let changes = 0;
       control.addEventListener('change', () => changes++);
@@ -35,11 +41,19 @@ export async function controlReplay() {
   }
   for (const mode of ['translate', 'rotate']) {
     const canvas = Object.assign(new FakeElement(), { width: 800, height: 600 });
-    const engine = new Engine(canvas, await TransformStore.create(32),
+    const engine = new Engine(
+      canvas,
+      await TransformStore.create(32),
       { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
-      { position: [0, 0, 10], target: [0, 0, 0] }, null);
+      { position: [0, 0, 10], target: [0, 0, 0] },
+      null,
+    );
     const objects = Array.from({ length: 4 }, (_, i) =>
-      engine.createMesh().setGeometry(box()).setPosition([i * 2, 0, 0]));
+      engine
+        .createMesh()
+        .setGeometry(box())
+        .setPosition([i * 2, 0, 0]),
+    );
     const control = new DragControls(engine, objects, { group: objects, mode });
     engine.store.tick(false);
     if (!control.pointerDown(400, 300)) throw new Error('replay missed its box');

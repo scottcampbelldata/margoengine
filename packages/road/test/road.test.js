@@ -54,7 +54,18 @@ test('roadPath gives the centreline and the full width covered, the shape Scatte
   ]);
   assert.equal(path.width, 2 * (3 + 0.2 + 0.5), 'both curbs and the default 0.5 margin each side');
   assert.equal(roadPath(curve, { width: 4, curbWidth: 0.5, margin: 0, segments: 1 }).width, 5);
-  assert.equal(roadPath(curve, { crossSection: [[-5, 0], [2, 0.1]], margin: 1, segments: 1 }).width, 12, 'the wider side, on both sides');
+  assert.equal(
+    roadPath(curve, {
+      crossSection: [
+        [-5, 0],
+        [2, 0.1],
+      ],
+      margin: 1,
+      segments: 1,
+    }).width,
+    12,
+    'the wider side, on both sides',
+  );
   for (const bad of [{ width: 0 }, { margin: -1 }, { segments: 0 }, { segments: 1.5 }, { crossSection: [[0, 0]] }])
     assert.throws(() => roadPath(curve, bad), RangeError, JSON.stringify(bad));
 });

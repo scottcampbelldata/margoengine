@@ -43,12 +43,15 @@ export function optionalGPU() {
     bufferWrites.push({ buffer: b, offset, bytes });
   };
   // A standalone encoder (buffer copies run at once, passes record like the frame's) and queue completion, as animation's
-  // shared buffers and mip generation use them.
+  // shared buffers, mip generation and water's coastal set-up (KB-SCENES-DUNE-ARCHANG1) use them.
   engine.gpu.createCommandEncoder ??= () => ({
     copyBufferToBuffer: (source, from, target, to, size) =>
       new Uint8Array(target.data, to, size).set(new Uint8Array(source.data, from, size)),
     beginRenderPass: () => pass,
-    beginComputePass: () => pass,
+    beginComputePass: () => {
+      counts.compute++;
+      return { ...pass };
+    },
     clearBuffer() {},
     finish: () => ({}),
   });

@@ -45,7 +45,8 @@ export function parseLibrary(data: unknown, root = ''): Library {
   const byId = new Map<string, LibraryAsset>();
   for (const [i, a] of (d.assets as Record<string, unknown>[]).entries()) {
     const id = a?.id;
-    if (typeof id !== 'string' || !id) throw new RangeError(`Library asset ${i} has no id; give each asset a unique id.`);
+    if (typeof id !== 'string' || !id)
+      throw new RangeError(`Library asset ${i} has no id; give each asset a unique id.`);
     if (byId.has(id)) throw new RangeError(`Library asset ${id} is listed twice; ids are unique across the library.`);
     if (!ASSET_TYPES.includes(a.type as AssetType))
       throw new RangeError(`Library asset ${id} has type ${String(a.type)}; use ${ASSET_TYPES.join(', ')}.`);
@@ -109,4 +110,9 @@ export function findAssets(
 }
 
 export { libraryMesh, type LibraryMeshOptions, type LibraryMeshPart } from './library-mesh.js';
-export { libraryParts, type LibraryGeometry, type LibraryPartsOptions, type LibraryTexturedPart } from './library-parts.js';
+export {
+  libraryParts,
+  type LibraryGeometry,
+  type LibraryPartsOptions,
+  type LibraryTexturedPart,
+} from './library-parts.js';

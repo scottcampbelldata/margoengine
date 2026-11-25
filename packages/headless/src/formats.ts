@@ -26,18 +26,49 @@ export interface JPEGOptions {
 }
 
 const LUMA_QUANT = [
-    16, 11, 10, 16, 24, 40, 51, 61, 12, 12, 14, 19, 26, 58, 60, 55, 14, 13, 16, 24, 40, 57, 69, 56, 14, 17, 22, 29, 51, 87,
-    80, 62, 18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92, 49, 64, 78, 87, 103, 121, 120, 101, 72, 92,
-    95, 98, 112, 100, 103, 99,
+    16, 11, 10, 16, 24, 40, 51, 61, 12, 12, 14, 19, 26, 58, 60, 55, 14, 13, 16, 24, 40, 57, 69, 56, 14, 17, 22, 29, 51,
+    87, 80, 62, 18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92, 49, 64, 78, 87, 103, 121, 120, 101,
+    72, 92, 95, 98, 112, 100, 103, 99,
   ],
   CHROMA_QUANT = [
-    17, 18, 24, 47, 99, 99, 99, 99, 18, 21, 26, 66, 99, 99, 99, 99, 24, 26, 56, 99, 99, 99, 99, 99, 47, 66, 99, 99, 99, 99,
-    99, 99, ...new Array<number>(32).fill(99),
+    17,
+    18,
+    24,
+    47,
+    99,
+    99,
+    99,
+    99,
+    18,
+    21,
+    26,
+    66,
+    99,
+    99,
+    99,
+    99,
+    24,
+    26,
+    56,
+    99,
+    99,
+    99,
+    99,
+    99,
+    47,
+    66,
+    99,
+    99,
+    99,
+    99,
+    99,
+    99,
+    ...new Array<number>(32).fill(99),
   ],
   ZIGZAG = [
-    0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7, 14, 21, 28, 35,
-    42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62,
-    63,
+    0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7, 14, 21,
+    28, 35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54,
+    47, 55, 62, 63,
   ],
   DC_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   DC_LUMA_BITS = [0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -439,7 +470,8 @@ function writeImage(out: WebPBits, argb: Uint32Array, top: boolean): void {
   const lengthsOut: number[] = [],
     distances: number[] = [],
     heads = new Int32Array(1 << HASH_BITS).fill(-1),
-    hash = (i: number) => (Math.imul(argb[i] ^ Math.imul(argb[i + 1], 0x9e3779b1), 0x85ebca6b) ^ argb[i + 2]) >>> (32 - HASH_BITS),
+    hash = (i: number) =>
+      (Math.imul(argb[i] ^ Math.imul(argb[i + 1], 0x9e3779b1), 0x85ebca6b) ^ argb[i + 2]) >>> (32 - HASH_BITS),
     size = argb.length,
     remember = (i: number) => {
       if (i + 2 < size) heads[hash(i) & ((1 << HASH_BITS) - 1)] = i;
@@ -521,8 +553,8 @@ const channelsMinus = (a: number, b: number): number =>
   (((a & 255) - (b & 255)) & 255);
 const average = (a: number, b: number): number =>
   (((((a >>> 24) + (b >>> 24)) >> 1) & 255) << 24) |
-  (((((a >>> 16 & 255) + (b >>> 16 & 255)) >> 1) & 255) << 16) |
-  (((((a >>> 8 & 255) + (b >>> 8 & 255)) >> 1) & 255) << 8) |
+  ((((((a >>> 16) & 255) + ((b >>> 16) & 255)) >> 1) & 255) << 16) |
+  ((((((a >>> 8) & 255) + ((b >>> 8) & 255)) >> 1) & 255) << 8) |
   (((a & 255) + (b & 255)) >> 1);
 
 const PREDICT_LEFT = 1,
@@ -580,11 +612,10 @@ export async function encodeWebP(pixels: HeadlessPixels, { quality }: WebPOption
   if (width > 16384 || height > 16384) throw rangeError('Image too large for this format', 'headless');
   if (quality !== undefined) {
     if (!(quality >= 0 && quality <= 1)) throw rangeError('Invalid WebP quality', 'headless');
-    if (typeof OffscreenCanvas !== 'function') throw fault('unsupported', 'Lossy WebP needs OffscreenCanvas', 'headless');
+    if (typeof OffscreenCanvas !== 'function')
+      throw fault('unsupported', 'Lossy WebP needs OffscreenCanvas', 'headless');
     const canvas = new OffscreenCanvas(width, height);
-    canvas
-      .getContext('2d')!
-      .putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
+    canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
     const blob = await canvas.convertToBlob({ type: 'image/webp', quality });
     // A runtime with no WebP encoder quietly gives a PNG.
     if (blob.type !== 'image/webp') throw fault('unsupported', 'This runtime cannot encode lossy WebP', 'headless');
@@ -620,7 +651,11 @@ export async function encodeWebP(pixels: HeadlessPixels, { quality }: WebPOption
   const padded = out.length + (out.length & 1),
     file = new Uint8Array(20 + padded),
     view = new DataView(file.buffer),
-    tag = (text: string, at: number) => file.set([...text].map((c) => c.charCodeAt(0)), at);
+    tag = (text: string, at: number) =>
+      file.set(
+        [...text].map((c) => c.charCodeAt(0)),
+        at,
+      );
   tag('RIFF', 0);
   view.setUint32(4, 12 + padded, true);
   tag('WEBP', 8);
@@ -668,7 +703,10 @@ export function linearPixels({ width, height, data }: HeadlessPixels): HDRPixels
  * Float RGBA pixels as an uncompressed OpenEXR file, written by `@margoengine/environment/exr-write`, an optional peer
  * loaded on first use. Rejects with `Install @margoengine/environment` when it is missing.
  */
-export async function encodeEXR({ width, height, data }: HDRPixels, { type = 'half', signal }: EXROptions = {}): Promise<Uint8Array> {
+export async function encodeEXR(
+  { width, height, data }: HDRPixels,
+  { type = 'half', signal }: EXROptions = {},
+): Promise<Uint8Array> {
   if (!(data instanceof Float32Array) || data.length !== width * height * 4)
     throw rangeError('Frame data does not match its size', 'headless');
   if (type !== 'half' && type !== 'float') throw typeError('EXR type: half or float', 'headless');

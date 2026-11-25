@@ -60,9 +60,15 @@ try {
   assert.ok(weather.snowChanged > 200, `snow changed ${weather.snowChanged} of ${weather.pixels} pixels`);
   // Snow exposure (lane SC5, Whiteout Pass): flakes in an 18 m/s wind summed over eight sub-frames showed as rows of
   // dots; swept over the exposure they streak, spreading about the same light over more pixels.
-  assert.ok(weather.sweptPixels > 2 * weather.stillPixels, `swept flakes cover ${weather.sweptPixels} pixels, discs ${weather.stillPixels}`);
+  assert.ok(
+    weather.sweptPixels > 2 * weather.stillPixels,
+    `swept flakes cover ${weather.sweptPixels} pixels, discs ${weather.stillPixels}`,
+  );
   const light = weather.sweptLight / weather.stillLight;
-  assert.ok(light > 0.8 && light < 1.25, `swept flakes keep the discs' light: ${weather.sweptLight} against ${weather.stillLight}`);
+  assert.ok(
+    light > 0.8 && light < 1.25,
+    `swept flakes keep the discs' light: ${weather.sweptLight} against ${weather.stillLight}`,
+  );
   assert.equal(weather.afterNone, 0, 'precipitation none draws nothing');
   assert.equal(weather.dry, 0, 'intensity 0 draws nothing');
   assert.ok(weather.flashGain > 0, `the flash lit the frame: ${JSON.stringify(weather)}`);
@@ -82,6 +88,8 @@ try {
     assert.deepEqual(r.errors, []);
     assert.ok(r.fogged > 1000, `fog drew too little: ${JSON.stringify(r)}`);
     assert.ok(r.moved > 100, `the turn moved too little: ${JSON.stringify(r)}`);
+    assert.equal(r.matchesExplicit, true, `${samples}x automatic fog differs from the live depth callback`);
+    assert.equal(r.overrideUnavailable, true, 'an explicit unavailable depth keeps fog off');
     assert.equal(r.differing, 0, `${samples}x fog lags a turning view: ${JSON.stringify(r)}`);
     console.log(`ok ${samples}x fog while turning: 0 of ${r.pixels} pixels differ from the still frame`);
   }

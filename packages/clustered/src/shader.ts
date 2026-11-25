@@ -169,7 +169,12 @@ export function clusteredSampling(
   group: number,
   shadow?:
     | boolean
-    | { declarations(group: number): string; readonly directionalShadow?: string; readonly areaShadow?: string; readonly shapeShadow?: string },
+    | {
+        declarations(group: number): string;
+        readonly directionalShadow?: string;
+        readonly areaShadow?: string;
+        readonly shapeShadow?: string;
+      },
   area?: { declarations(group: number, shadow?: string): string },
   integratedShadows = false,
   decay = false,

@@ -103,7 +103,8 @@ export class Lightformer {
   constructor(options: LightformerOptions = {}) {
     this.name = options.name ?? `lightformer-${count++}`;
     this.order = options.order ?? 1;
-    if (!Number.isFinite(this.order)) throw new RangeError('Lightformer order must be a finite number; pass a frame-graph order such as 1');
+    if (!Number.isFinite(this.order))
+      throw new RangeError('Lightformer order must be a finite number; pass a frame-graph order such as 1');
     this.parent = options.parent;
     this.formValue = formOf(options.form ?? 'rect');
     this.colorValue = linearColor(options.color ?? '#ffffff');
@@ -149,7 +150,8 @@ export class Lightformer {
         'unsupported',
         `${this.name} requires WebGPU or the WebGL2 compatibility layer; select one of those backends; see https://margoengine.com/errors#unsupported`,
       );
-    if (this.engine) throw new MargoError('attached', `${this.name} is attached to an engine; create another Lightformer`);
+    if (this.engine)
+      throw new MargoError('attached', `${this.name} is attached to an engine; create another Lightformer`);
     this.engine = engine;
     this.nodeValue = engine.createMesh(this.parent);
     this.nodeValue.name = this.name;
@@ -226,7 +228,11 @@ export class Lightformer {
     this.releaseState();
     this.state = {
       device,
-      uniform: device.createBuffer({ label: 'lightformer', size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+      uniform: device.createBuffer({
+        label: 'lightformer',
+        size: 160,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      }),
       pipelines: new Map(),
       groups: new WeakMap(),
     };

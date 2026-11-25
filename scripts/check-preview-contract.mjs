@@ -16,7 +16,10 @@ export const previewRoutes = {
   'packages/inspector/src/index.ts:Inspector': [5, 'packages/inspector/test/inspector.test.js'],
   'packages/labels/src/gpu.ts:GPULabelLayer': [1, 'packages/labels/tests/gpu-browser.js'],
   'packages/lod/src/index.ts:LODSystem': [2, 'packages/lod/test/preview.test.js'],
-  'packages/machinery/src/overlays.ts:EngineeringAnnotations': [1, 'packages/machinery/test/annotations-preview.test.js'],
+  'packages/machinery/src/overlays.ts:EngineeringAnnotations': [
+    1,
+    'packages/machinery/test/annotations-preview.test.js',
+  ],
   'packages/selection/src/picking.ts:Picking': [2, 'packages/webgl2-compat/test/preview-browser-check.mjs'],
   'packages/stats/src/geometry.ts:GeometryStats': [1, 'packages/stats/test/preview.test.js'],
   'packages/stats/src/gl.ts:GLStats': [2, 'packages/stats/test/gl.test.js'],

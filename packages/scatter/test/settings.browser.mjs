@@ -52,7 +52,11 @@ await postBrowser(
         for (const r of rows) {
           if (r.kind === 'color')
             values[r.name] = r.default.map((x) => Math.max(r.min, Math.min(r.max, x + 0.4 * u * (1 - x) - 0.02 * u)));
-          else values[r.name] = Math.max(r.min, Math.min(r.max, r.default * (1 + 0.6 * u) + (r.default === 0 ? 0.3 * u : 0)));
+          else
+            values[r.name] = Math.max(
+              r.min,
+              Math.min(r.max, r.default * (1 + 0.6 * u) + (r.default === 0 ? 0.3 * u : 0)),
+            );
         }
         values['scatter.density'] = 1 - 0.5 * u;
         values['wind.directionZ'] = 0.5 * u;
@@ -85,7 +89,13 @@ await postBrowser(
       t((values) => {
         const w = window.t;
         w.field?.dispose();
-        w.field = w.Scatter.attach(w.engine, w.box(0.08, 0.6, 0.08), { count: 40000, area: [24, 24], blades: {}, lod: [30, 60, 120], seed: 3 });
+        w.field = w.Scatter.attach(w.engine, w.box(0.08, 0.6, 0.08), {
+          count: 40000,
+          area: [24, 24],
+          blades: {},
+          lod: [30, 60, 120],
+          seed: 3,
+        });
         if (values) w.settings.applyScatterSettings(w.field, values);
       }, values);
     const result = {};
@@ -100,8 +110,18 @@ await postBrowser(
       await t((name) => {
         const w = window.t,
           row = w.rows.find((r) => r.name === name),
-          v = name === 'wind.directionX' ? -0.5 : name === 'wind.strength' ? 0.8 : name === 'wind.directionZ' ? 0.9 : w.at(1)[name];
-        w.settings.applyScatterSettings(w.field, { ...(name.startsWith('wind.direction') ? { 'wind.strength': 0.8 } : {}), [name]: v });
+          v =
+            name === 'wind.directionX'
+              ? -0.5
+              : name === 'wind.strength'
+                ? 0.8
+                : name === 'wind.directionZ'
+                  ? 0.9
+                  : w.at(1)[name];
+        w.settings.applyScatterSettings(w.field, {
+          ...(name.startsWith('wind.direction') ? { 'wind.strength': 0.8 } : {}),
+          [name]: v,
+        });
         void row;
       }, name);
       result.rows[name] = diff(plain, await frame());
@@ -179,14 +199,17 @@ await postBrowser(
     await frame();
     const litBefore = await t(() => ({ ...window.t.made }));
     // fixed-wait: 60 deliberate frames, each with new row values (no readiness is awaited): the sweep counts what they create.
-    await t(async (values) => {
-      const w = window.t;
-      for (let i = 0; i < 60; i++) {
-        w.settings.applyScatterSettings(w.field, values[i]);
-        w.engine.render({ delta: 0 });
-      }
-      await w.device.queue.onSubmittedWorkDone();
-    }, Array.from({ length: 60 }, (_, i) => litAt(i / 59)));
+    await t(
+      async (values) => {
+        const w = window.t;
+        for (let i = 0; i < 60; i++) {
+          w.settings.applyScatterSettings(w.field, values[i]);
+          w.engine.render({ delta: 0 });
+        }
+        await w.device.queue.onSubmittedWorkDone();
+      },
+      Array.from({ length: 60 }, (_, i) => litAt(i / 59)),
+    );
     result.litCounts = { before: litBefore, after: await t(() => ({ ...window.t.made })) };
     const litSwept = await frame();
     await lit({}, litAt(1));
@@ -199,12 +222,21 @@ await postBrowser(
     });
     console.log(JSON.stringify({ result, validation }));
     assert.equal(validation, undefined, `validation error: ${validation}`);
-    assert.deepEqual(result.counts.after, result.counts.before, `60 frames of every row made GPU objects: ${JSON.stringify(result.counts)}`);
-    assert.deepEqual(result.litCounts.after, result.litCounts.before, `60 frames of the lit rows made GPU objects: ${JSON.stringify(result.litCounts)}`);
+    assert.deepEqual(
+      result.counts.after,
+      result.counts.before,
+      `60 frames of every row made GPU objects: ${JSON.stringify(result.counts)}`,
+    );
+    assert.deepEqual(
+      result.litCounts.after,
+      result.litCounts.before,
+      `60 frames of the lit rows made GPU objects: ${JSON.stringify(result.litCounts)}`,
+    );
     assert.equal(result.litDefaultsDiffer, 0, 'the lit defaults written leave the frame exact');
     assert.equal(result.litOnceDiffers, 0, "the lit sweep's last frame is what writing its values once draws");
     assert.ok(result.pipelinesOnTurnOn >= 1, 'turning translucency on from 0 builds a pipeline (the row is not live)');
-    for (const [name, count] of Object.entries(result.litRows)) assert.ok(count > 20, `${name} changes the lit frame (${count})`);
+    for (const [name, count] of Object.entries(result.litRows))
+      assert.ok(count > 20, `${name} changes the lit frame (${count})`);
     assert.equal(result.defaultsDiffer, 0, 'the defaults written leave the frame exact');
     assert.equal(result.onceDiffers, 0, "the sweep's last frame is what writing its values once draws");
     assert.ok(result.changed > 500, `the swept rows change the frame (${result.changed})`);

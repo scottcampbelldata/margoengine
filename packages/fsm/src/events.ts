@@ -21,22 +21,36 @@ export interface EventTransition<C, D = unknown> extends Omit<Transition<C>, 'gu
 export class EventMachine<C, D = unknown> extends StateMachine<C> {
   private readonly delivery: { data: D | undefined };
   /** Build and enter the machine. Data is passed by reference, never cloned or merged into context. */
-  constructor(states: Readonly<Record<string, EventState<C, D>>>, initial: string, context: C,
-    transitions: readonly EventTransition<C, D>[] = []) {
+  constructor(
+    states: Readonly<Record<string, EventState<C, D>>>,
+    initial: string,
+    context: C,
+    transitions: readonly EventTransition<C, D>[] = [],
+  ) {
     const delivery: { data: D | undefined } = { data: undefined };
-    const adapted = Object.fromEntries(Object.entries(states).map(([name, state]) => [name, {
-      ...state,
-      enter: state.enter && ((c: C) => state.enter!(c, delivery.data)),
-      exit: state.exit && ((c: C) => state.exit!(c, delivery.data)),
-      plan: state.plan && ((event: string) => state.plan!(event, delivery.data)),
-    }]));
-    super(adapted, initial, context, transitions.map(t => ({ ...t,
-      guard: t.guard && ((c: C) => t.guard!(c, delivery.data)),
-    })));
+    const adapted = Object.fromEntries(
+      Object.entries(states).map(([name, state]) => [
+        name,
+        {
+          ...state,
+          enter: state.enter && ((c: C) => state.enter!(c, delivery.data)),
+          exit: state.exit && ((c: C) => state.exit!(c, delivery.data)),
+          plan: state.plan && ((event: string) => state.plan!(event, delivery.data)),
+        },
+      ]),
+    );
+    super(
+      adapted,
+      initial,
+      context,
+      transitions.map((t) => ({ ...t, guard: t.guard && ((c: C) => t.guard!(c, delivery.data)) })),
+    );
     this.delivery = delivery;
   }
   /** Payload of the delivery currently running; undefined outside delivery. */
-  get data(): D | undefined { return this.delivery.data; }
+  get data(): D | undefined {
+    return this.delivery.data;
+  }
   /** Choose with this payload and retain it in the returned action, even if other events intervene. */
   override plan(event: string, data?: D): (() => void) | null {
     const action = this.deliver(data, () => super.plan(event));
@@ -51,7 +65,11 @@ export class EventMachine<C, D = unknown> extends StateMachine<C> {
   private deliver<T>(data: D | undefined, action: () => T): T {
     const previous = this.delivery.data;
     this.delivery.data = data;
-    try { return action(); } finally { this.delivery.data = previous; }
+    try {
+      return action();
+    } finally {
+      this.delivery.data = previous;
+    }
   }
 }
 
@@ -73,5 +91,7 @@ export class EventTrace<C, D = unknown> extends MachineTrace<C> {
     };
   }
   /** Records oldest first, including the exact payload of each accepted transition. */
-  override get records(): EventTraceRecord<D>[] { return super.records as EventTraceRecord<D>[]; }
+  override get records(): EventTraceRecord<D>[] {
+    return super.records as EventTraceRecord<D>[];
+  }
 }

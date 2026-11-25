@@ -169,7 +169,10 @@ export async function gpuChecks(report) {
     ]);
   assert(Math.abs(axis.distance[0] - 3) < 1e-6 && axis.frontFace[0] === 1, 'axis ray from the front');
   assert(Math.abs(axis.distance[1] - 3) < 1e-6 && axis.frontFace[1] === 0, 'axis ray from the back');
-  assert(axis.faceIndex[2] === 0, `a ray through the shared diagonal answers the lowest face, not ${axis.faceIndex[2]}`);
+  assert(
+    axis.faceIndex[2] === 0,
+    `a ray through the shared diagonal answers the lowest face, not ${axis.faceIndex[2]}`,
+  );
   assert(axis.faceIndex[3] < 0, 'a ray in the plane of the mesh misses');
   assert(axis.faceIndex[4] < 0, 'a zero direction misses');
   report.checks.push('gpu: axis-aligned rays, the lowest face on a shared edge, in-plane and zero rays');
@@ -198,7 +201,10 @@ export async function gpuChecks(report) {
       all[i * 8 + 7] = GPU_FAR;
     }
     const answers = await gpu.raycast(all);
-    assert(answers.faceIndex[count - 1] >= 0 && answers.faceIndex[0] >= 0, 'the last ray of a two-row dispatch was traced');
+    assert(
+      answers.faceIndex[count - 1] >= 0 && answers.faceIndex[0] >= 0,
+      'the last ray of a two-row dispatch was traced',
+    );
     assert(answers.distance[count - 1] === answers.distance[0], 'every ray of the batch is the same ray');
     report.checks.push(`gpu: ${count} rays span two dispatch rows`);
   }
@@ -223,12 +229,12 @@ export async function gpuChecks(report) {
   pass.setPipeline(pipeline);
   pass.setBindGroup(
     0,
-    device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: out } }] }),
+    device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [{ binding: 0, resource: { buffer: out } }],
+    }),
   );
-  pass.setBindGroup(
-    1,
-    device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries: gpu.bindings(2) }),
-  );
+  pass.setBindGroup(1, device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries: gpu.bindings(2) }));
   pass.dispatchWorkgroups(1);
   pass.end();
   encoder.copyBufferToBuffer(out, 0, read, 0, 16);

@@ -10,7 +10,14 @@ import test from 'node:test';
 const root = resolve(import.meta.dirname, '..');
 // The names are built here, so this file does not name them itself.
 const gone = ['gpu', 'lock'].join('-'),
-  pattern = [`${gone}\\.mjs`, `${gone}-env`, 'gpu-queue\\.mjs', 'gpu-lease\\.mjs', 'check-gpu-policy', 'MARGO_GPU_(LOCK|EXCLUSIVE|SLOTS)'].join('|');
+  pattern = [
+    `${gone}\\.mjs`,
+    `${gone}-env`,
+    'gpu-queue\\.mjs',
+    'gpu-lease\\.mjs',
+    'check-gpu-policy',
+    'MARGO_GPU_(LOCK|EXCLUSIVE|SLOTS)',
+  ].join('|');
 const HISTORY = [
   ':!docs/whitepaper/results',
   ':!benchmarks/records',
@@ -30,7 +37,12 @@ test('no tracked file names or imports the GPU lock', () => {
 });
 
 test('the lock script and its helpers are deleted', () => {
-  for (const file of [`scripts/${gone}.mjs`, 'scripts/gpu-queue.mjs', 'scripts/support/gpu-lease.mjs', 'scripts/check-gpu-policy.mjs'])
+  for (const file of [
+    `scripts/${gone}.mjs`,
+    'scripts/gpu-queue.mjs',
+    'scripts/support/gpu-lease.mjs',
+    'scripts/check-gpu-policy.mjs',
+  ])
     assert.equal(existsSync(resolve(root, file)), false, file);
   assert.equal(existsSync(resolve(root, 'scripts/run-with-timeout.mjs')), true);
 });

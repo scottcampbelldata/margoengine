@@ -77,7 +77,12 @@ test('focusOutput hands the focus to a real PhysicalCamera and on to a DOF, thro
     brain = new CameraBrain({ blend: { duration: 1, ease: (u) => u } });
   brain.stages.push(focusOutput({ physical, dof }));
   brain.add({ position: [0, 0, 10], target: [0, 0, 0], stages: [new FocusTracker([0, 0, 8])] });
-  const b = brain.add({ priority: -1, position: [0, 0, 10], target: [0, 0, 0], stages: [new FocusTracker([0, 0, -2])] });
+  const b = brain.add({
+    priority: -1,
+    position: [0, 0, 10],
+    target: [0, 0, 0],
+    stages: [new FocusTracker([0, 0, -2])],
+  });
   brain.update(0);
   near(physical.focusDistance, 2);
   near(dof.options.focalDistance, 2);

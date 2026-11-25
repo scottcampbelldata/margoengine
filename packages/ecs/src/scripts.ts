@@ -1,20 +1,20 @@
-import { MargoError } from "@margoengine/math/errors";
-import { hexColor } from "@margoengine/math/color";
-import type { Entity, World } from "./index.js";
-import type { Schedule } from "./schedule.js";
+import { MargoError } from '@margoengine/math/errors';
+import { hexColor } from '@margoengine/math/color';
+import type { Entity, World } from './index.js';
+import type { Schedule } from './schedule.js';
 
 /** Value kinds of a script attribute. `vec2`, `vec3` and `vec4` hold number arrays; `color` is `[r, g, b, a]` in 0..1; `asset` is an id string. */
 export type AttributeType =
-  | "number"
-  | "boolean"
-  | "string"
-  | "enum"
-  | "vec2"
-  | "vec3"
-  | "vec4"
-  | "color"
-  | "entity"
-  | "asset";
+  | 'number'
+  | 'boolean'
+  | 'string'
+  | 'enum'
+  | 'vec2'
+  | 'vec3'
+  | 'vec4'
+  | 'color'
+  | 'entity'
+  | 'asset';
 /** One declared attribute. `default` is validated when the script is defined. */
 export interface AttributeSpec {
   type: AttributeType;
@@ -65,12 +65,7 @@ export interface ScriptHooks {
   onEnable?(this: ScriptInstance): void;
   onDisable?(this: ScriptInstance): void;
   /** An attribute was assigned a different value. */
-  onAttributeChange?(
-    this: ScriptInstance,
-    name: string,
-    value: any,
-    previous: any,
-  ): void;
+  onAttributeChange?(this: ScriptInstance, name: string, value: any, previous: any): void;
   /** Instance removed, entity destroyed, or registry disposed; `onDisable` ran first when it was enabled. */
   destroy?(this: ScriptInstance): void;
   /** Hot reload: called on the instance of the NEW type with the type it replaces, to migrate `state`. */
@@ -88,9 +83,7 @@ export interface ScriptDefinition extends ScriptHooks {
 export interface ScriptType extends ScriptHooks {
   readonly name: string;
   readonly priority: number;
-  readonly attributes: Readonly<
-    Record<string, Readonly<AttributeSpec & { title: string }>>
-  >;
+  readonly attributes: Readonly<Record<string, Readonly<AttributeSpec & { title: string }>>>;
 }
 /** The hook that failed, for {@link ScriptsOptions.onError}. */
 export type ScriptHook = keyof ScriptHooks;
@@ -100,10 +93,7 @@ export interface ScriptsOptions {
    * Called for every error a script throws, so one failing script never stops the others. Default: errors are
    * collected and rethrown after the pass as one MargoError `'failed'` whose `cause` is the first.
    */
-  onError?: (
-    error: unknown,
-    info: { script: ScriptInstance; hook: ScriptHook },
-  ) => void;
+  onError?: (error: unknown, info: { script: ScriptInstance; hook: ScriptHook }) => void;
 }
 /** Options of {@link Scripts.add}. */
 export interface AddScriptOptions {
@@ -114,26 +104,18 @@ export interface AddScriptOptions {
 }
 
 const VEC: Record<string, number> = { vec2: 2, vec3: 3, vec4: 4, color: 4 };
-const KINDS = [
-  "number",
-  "boolean",
-  "string",
-  "enum",
-  "entity",
-  "asset",
-  ...Object.keys(VEC),
-];
+const KINDS = ['number', 'boolean', 'string', 'enum', 'entity', 'asset', ...Object.keys(VEC)];
 const HOOKS = [
-  "initialize",
-  "postInitialize",
-  "update",
-  "postUpdate",
-  "fixedUpdate",
-  "onEnable",
-  "onDisable",
-  "onAttributeChange",
-  "destroy",
-  "swap",
+  'initialize',
+  'postInitialize',
+  'update',
+  'postUpdate',
+  'fixedUpdate',
+  'onEnable',
+  'onDisable',
+  'onAttributeChange',
+  'destroy',
+  'swap',
 ] as const;
 /** [r, g, b, 1] of '#rgb' or '#rrggbb' (math/color's one hex parser, without the alpha form). */
 const hex = (s: string): number[] | undefined => (s.length <= 7 ? hexColor(s) : undefined);
@@ -143,78 +125,64 @@ const bad = (name: string, spec: { type: string }, why: string): RangeError =>
 /** Validate and normalise one attribute value. @throws RangeError naming the attribute. */
 function coerce(name: string, spec: AttributeSpec, value: unknown): any {
   const { type, min = -Infinity, max = Infinity } = spec;
-  if (type === "number") {
-    if (typeof value !== "number" || !Number.isFinite(value))
-      throw bad(name, spec, "use a finite number");
-    if (value < min || value > max)
-      throw bad(name, spec, `${value} is outside ${min}..${max}`);
+  if (type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw bad(name, spec, 'use a finite number');
+    if (value < min || value > max) throw bad(name, spec, `${value} is outside ${min}..${max}`);
     return value;
   }
-  if (type === "boolean") {
-    if (typeof value !== "boolean") throw bad(name, spec, "use true or false");
+  if (type === 'boolean') {
+    if (typeof value !== 'boolean') throw bad(name, spec, 'use true or false');
     return value;
   }
-  if (type === "string") {
-    if (typeof value !== "string") throw bad(name, spec, "use a string");
+  if (type === 'string') {
+    if (typeof value !== 'string') throw bad(name, spec, 'use a string');
     return value;
   }
-  if (type === "enum") {
-    if (!spec.options!.includes(value as string))
-      throw bad(name, spec, `use one of ${spec.options!.join(", ")}`);
+  if (type === 'enum') {
+    if (!spec.options!.includes(value as string)) throw bad(name, spec, `use one of ${spec.options!.join(', ')}`);
     return value;
   }
-  if (type === "entity") {
+  if (type === 'entity') {
     if (value !== null && !(Number.isInteger(value) && (value as number) >= 0))
-      throw bad(name, spec, "use an entity id or null");
+      throw bad(name, spec, 'use an entity id or null');
     return value;
   }
-  if (type === "asset") {
-    if (value !== null && (typeof value !== "string" || !value))
-      throw bad(name, spec, "use an asset id string or null");
+  if (type === 'asset') {
+    if (value !== null && (typeof value !== 'string' || !value))
+      throw bad(name, spec, 'use an asset id string or null');
     return value;
   }
   const size = VEC[type];
-  const list =
-    type === "color" && typeof value === "string" ? hex(value) : value;
-  if (
-    !(Array.isArray(list) || ArrayBuffer.isView(list)) ||
-    (list as ArrayLike<number>).length !== size
-  )
-    throw bad(
-      name,
-      spec,
-      `use ${size} numbers${type === "color" ? " or a #rrggbb string" : ""}`,
-    );
+  const list = type === 'color' && typeof value === 'string' ? hex(value) : value;
+  if (!(Array.isArray(list) || ArrayBuffer.isView(list)) || (list as ArrayLike<number>).length !== size)
+    throw bad(name, spec, `use ${size} numbers${type === 'color' ? ' or a #rrggbb string' : ''}`);
   const out = Array.from(list as ArrayLike<number>);
-  const lo = type === "color" ? Math.max(min, 0) : min,
-    hi = type === "color" ? Math.min(max, 1) : max;
+  const lo = type === 'color' ? Math.max(min, 0) : min,
+    hi = type === 'color' ? Math.min(max, 1) : max;
   for (const n of out) {
-    if (typeof n !== "number" || !Number.isFinite(n))
-      throw bad(name, spec, "use finite numbers");
+    if (typeof n !== 'number' || !Number.isFinite(n)) throw bad(name, spec, 'use finite numbers');
     if (n < lo || n > hi) throw bad(name, spec, `${n} is outside ${lo}..${hi}`);
   }
   return out;
 }
 const same = (a: unknown, b: unknown): boolean =>
-  Array.isArray(a) && Array.isArray(b)
-    ? a.length === b.length && a.every((v, i) => v === b[i])
-    : a === b;
+  Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((v, i) => v === b[i]) : a === b;
 const clone = (v: any): any => (Array.isArray(v) ? [...v] : v);
 
 function defaultOf(spec: AttributeSpec): unknown {
   switch (spec.type) {
-    case "number":
+    case 'number':
       return 0;
-    case "boolean":
+    case 'boolean':
       return false;
-    case "string":
-      return "";
-    case "enum":
+    case 'string':
+      return '';
+    case 'enum':
       return spec.options![0];
-    case "color":
+    case 'color':
       return [1, 1, 1, 1];
-    case "entity":
-    case "asset":
+    case 'entity':
+    case 'asset':
       return null;
     default:
       return new Array(VEC[spec.type]).fill(0);
@@ -227,27 +195,18 @@ function defaultOf(spec: AttributeSpec): unknown {
  * @throws RangeError for a default outside its own min/max or options.
  */
 export function defineScript(def: ScriptDefinition): ScriptType {
-  if (!def || typeof def.name !== "string" || !def.name)
-    throw new TypeError("Invalid script; give it a non-empty name");
+  if (!def || typeof def.name !== 'string' || !def.name)
+    throw new TypeError('Invalid script; give it a non-empty name');
   const attributes: Record<string, AttributeSpec & { title: string }> = {};
   for (const [key, raw] of Object.entries(def.attributes ?? {})) {
     if (!raw || !KINDS.includes(raw.type))
       throw new TypeError(
         `Unknown attribute type for ${def.name}.${key}; use number, boolean, string, enum, vec2, vec3, vec4, color, entity or asset`,
       );
-    if (
-      raw.type === "enum" &&
-      (!Array.isArray(raw.options) || !raw.options.length)
-    )
-      throw new TypeError(
-        `Enum attribute ${def.name}.${key} needs a non-empty options list`,
-      );
+    if (raw.type === 'enum' && (!Array.isArray(raw.options) || !raw.options.length))
+      throw new TypeError(`Enum attribute ${def.name}.${key} needs a non-empty options list`);
     const spec = { ...raw, title: raw.title ?? key };
-    spec.default = coerce(
-      key,
-      spec,
-      raw.default === undefined ? defaultOf(spec) : raw.default,
-    );
+    spec.default = coerce(key, spec, raw.default === undefined ? defaultOf(spec) : raw.default);
     attributes[key] = Object.freeze(spec);
   }
   const type: Record<string, unknown> = {
@@ -257,7 +216,7 @@ export function defineScript(def: ScriptDefinition): ScriptType {
   };
   for (const hook of HOOKS) {
     if (def[hook] === undefined) continue;
-    if (typeof def[hook] !== "function")
+    if (typeof def[hook] !== 'function')
       throw new TypeError(`Script ${def.name} hook ${hook} is not a function; pass a function or leave the hook out`);
     type[hook] = def[hook];
   }
@@ -303,9 +262,7 @@ export class Scripts {
   register(type: ScriptType): this {
     this.live();
     if (this.types.has(type.name))
-      throw new TypeError(
-        `Script ${type.name} is already registered; use reload to replace it`,
-      );
+      throw new TypeError(`Script ${type.name} is already registered; use reload to replace it`);
     this.types.set(type.name, type);
     return this;
   }
@@ -327,9 +284,7 @@ export class Scripts {
     return [...this.types.values()].map((t) => ({
       name: t.name,
       priority: t.priority,
-      attributes: Object.entries(t.attributes).map(([name, s]) =>
-        JSON.parse(JSON.stringify({ name, ...s })),
-      ),
+      attributes: Object.entries(t.attributes).map(([name, s]) => JSON.parse(JSON.stringify({ name, ...s }))),
     }));
   }
   /**
@@ -344,18 +299,12 @@ export class Scripts {
   ): ScriptInstance {
     this.live();
     this.world.check(entity);
-    const name = typeof type === "string" ? type : type.name;
+    const name = typeof type === 'string' ? type : type.name;
     const t = this.types.get(name);
-    if (!t)
-      throw new MargoError(
-        "state",
-        `Script ${name} is not registered; call register first`,
-      );
+    if (!t) throw new MargoError('state', `Script ${name} is not registered; call register first`);
     for (const key of Object.keys(values))
       if (!(key in t.attributes))
-        throw new RangeError(
-          `Unknown attribute ${key} for script ${t.name}; declare it in attributes`,
-        );
+        throw new RangeError(`Unknown attribute ${key} for script ${t.name}; declare it in attributes`);
     const inst: Inst = {
       entity,
       world: this.world,
@@ -369,11 +318,7 @@ export class Scripts {
       isEnabled: !!enabled,
     };
     for (const [key, spec] of Object.entries(t.attributes))
-      inst.values[key] = coerce(
-        key,
-        spec,
-        key in values ? values[key] : spec.default,
-      );
+      inst.values[key] = coerce(key, spec, key in values ? values[key] : spec.default);
     this.shape(inst);
     Object.defineProperties(inst, {
       enabled: {
@@ -401,12 +346,9 @@ export class Scripts {
    */
   remove(target: ScriptInstance | Entity, type?: ScriptType | string): number {
     this.live();
-    if (typeof target !== "number")
-      return this.kill(target as unknown as Inst) ? 1 : 0;
-    const name = typeof type === "string" ? type : type?.name;
-    const list = (this.byEntity.get(target) ?? []).filter(
-      (i) => name === undefined || i.type.name === name,
-    );
+    if (typeof target !== 'number') return this.kill(target as unknown as Inst) ? 1 : 0;
+    const name = typeof type === 'string' ? type : type?.name;
+    const list = (this.byEntity.get(target) ?? []).filter((i) => name === undefined || i.type.name === name);
     this.pass(() => list.forEach((i) => this.kill(i)));
     return list.length;
   }
@@ -418,36 +360,31 @@ export class Scripts {
         const batch = this.pending.filter((i) => !i.dead && i.isEnabled);
         if (!batch.length) break;
         this.pending = this.pending.filter((i) => !i.dead && !i.isEnabled);
-        batch.sort(
-          (a, b) => a.type.priority - b.type.priority || a.seq - b.seq,
-        );
+        batch.sort((a, b) => a.type.priority - b.type.priority || a.seq - b.seq);
         for (const i of batch) {
           if (i.dead || i.isInitialized) continue;
-          this.call(i, "onEnable");
+          this.call(i, 'onEnable');
           i.isInitialized = true;
-          this.call(i, "initialize");
+          this.call(i, 'initialize');
         }
-        for (const i of batch) if (!i.dead) this.call(i, "postInitialize");
+        for (const i of batch) if (!i.dead) this.call(i, 'postInitialize');
       }
     });
   }
   /** One frame: flush, then `update` of every enabled instance, then `postUpdate`. @throws RangeError for a negative or non-finite `dt`. */
   update(dt: number): void {
-    this.step(dt, ["update", "postUpdate"]);
+    this.step(dt, ['update', 'postUpdate']);
   }
   /** One fixed step: flush, then `fixedUpdate` of every enabled instance. */
   fixedUpdate(step: number): void {
-    this.step(step, ["fixedUpdate"]);
+    this.step(step, ['fixedUpdate']);
   }
   /** Add a frame system `scripts` (update, postUpdate) and a fixed system `scripts.fixed` (fixedUpdate) to a {@link Schedule}. */
-  install(
-    schedule: Schedule,
-    options: { before?: readonly string[]; after?: readonly string[] } = {},
-  ): this {
-    schedule.add("scripts.fixed", (t) => this.fixedUpdate(t.delta), {
+  install(schedule: Schedule, options: { before?: readonly string[]; after?: readonly string[] } = {}): this {
+    schedule.add('scripts.fixed', (t) => this.fixedUpdate(t.delta), {
       fixed: true,
     });
-    schedule.add("scripts", (t) => this.update(t.delta), options);
+    schedule.add('scripts', (t) => this.update(t.delta), options);
     return this;
   }
   /**
@@ -457,10 +394,7 @@ export class Scripts {
    * only with `reinitialize: true` (after `onDisable` and `destroy` of the old version, with `state` cleared).
    * A type that is not registered yet is just registered. Returns the number of instances swapped.
    */
-  reload(
-    next: ScriptType,
-    { reinitialize = false }: { reinitialize?: boolean } = {},
-  ): number {
+  reload(next: ScriptType, { reinitialize = false }: { reinitialize?: boolean } = {}): number {
     this.live();
     const old = this.types.get(next.name);
     this.types.set(next.name, next);
@@ -470,16 +404,15 @@ export class Scripts {
       for (const inst of this.all.filter((i) => i.type === old)) {
         const again = reinitialize && inst.isInitialized;
         if (again) {
-          if (inst.isEnabled) this.call(inst, "onDisable");
-          this.call(inst, "destroy");
+          if (inst.isEnabled) this.call(inst, 'onDisable');
+          this.call(inst, 'destroy');
         }
         const kept = inst.values;
         inst.type = next;
         inst.values = {};
         for (const [key, spec] of Object.entries(next.attributes)) {
           try {
-            inst.values[key] =
-              key in kept ? coerce(key, spec, kept[key]) : clone(spec.default);
+            inst.values[key] = key in kept ? coerce(key, spec, kept[key]) : clone(spec.default);
           } catch {
             inst.values[key] = clone(spec.default);
           }
@@ -490,7 +423,7 @@ export class Scripts {
           inst.state = {};
           this.pending.push(inst);
         }
-        this.call(inst, "swap", old);
+        this.call(inst, 'swap', old);
         n++;
       }
       this.sortAll();
@@ -510,11 +443,7 @@ export class Scripts {
   }
 
   private live(): void {
-    if (this.disposed)
-      throw new MargoError(
-        "disposed",
-        "Scripts is disposed; create a new Scripts",
-      );
+    if (this.disposed) throw new MargoError('disposed', 'Scripts is disposed; create a new Scripts');
   }
   private sortAll(): void {
     this.all.sort((a, b) => a.type.priority - b.type.priority || a.seq - b.seq);
@@ -531,15 +460,7 @@ export class Scripts {
           if (same(prev, next)) return;
           inst.values[key] = next;
           if (inst.isInitialized && !inst.dead)
-            this.pass(() =>
-              this.call(
-                inst,
-                "onAttributeChange",
-                key,
-                clone(next),
-                clone(prev),
-              ),
-            );
+            this.pass(() => this.call(inst, 'onAttributeChange', key, clone(next), clone(prev)));
         },
       });
     }
@@ -552,31 +473,27 @@ export class Scripts {
       if (on && !this.pending.includes(inst)) this.pending.push(inst);
       return; // the first enable happens in flush: onEnable, then initialize
     }
-    this.pass(() => this.call(inst, on ? "onEnable" : "onDisable"));
+    this.pass(() => this.call(inst, on ? 'onEnable' : 'onDisable'));
   }
   private kill(inst: Inst): boolean {
     if (inst.dead) return false;
     inst.dead = true;
     this.all = this.all.filter((i) => i !== inst);
     this.pending = this.pending.filter((i) => i !== inst);
-    const list = (this.byEntity.get(inst.entity) ?? []).filter(
-      (i) => i !== inst,
-    );
+    const list = (this.byEntity.get(inst.entity) ?? []).filter((i) => i !== inst);
     if (list.length) this.byEntity.set(inst.entity, list);
     else this.byEntity.delete(inst.entity);
     if (inst.isInitialized) {
       this.pass(() => {
-        if (inst.isEnabled) this.call(inst, "onDisable");
-        this.call(inst, "destroy");
+        if (inst.isEnabled) this.call(inst, 'onDisable');
+        this.call(inst, 'destroy');
       });
       inst.isInitialized = false;
     }
     return true;
   }
   private removeAll(entity: Entity): void {
-    this.pass(() =>
-      [...(this.byEntity.get(entity) ?? [])].forEach((i) => this.kill(i)),
-    );
+    this.pass(() => [...(this.byEntity.get(entity) ?? [])].forEach((i) => this.kill(i)));
   }
   private call(inst: Inst, hook: ScriptHook, ...args: any[]): void {
     const fn = inst.type[hook] as ((...a: any[]) => void) | undefined;
@@ -592,21 +509,15 @@ export class Scripts {
       else this.errors.push(error);
     }
   }
-  private step(
-    dt: number,
-    hooks: ("update" | "postUpdate" | "fixedUpdate")[],
-  ): void {
+  private step(dt: number, hooks: ('update' | 'postUpdate' | 'fixedUpdate')[]): void {
     this.live();
     if (!Number.isFinite(dt) || dt < 0)
-      throw new RangeError(
-        "Invalid script delta; pass a finite number of seconds, 0 or more",
-      );
+      throw new RangeError('Invalid script delta; pass a finite number of seconds, 0 or more');
     this.flush();
     this.pass(() => {
       for (const hook of hooks)
         for (const inst of [...this.all])
-          if (!inst.dead && inst.isEnabled && inst.isInitialized)
-            this.call(inst, hook, dt);
+          if (!inst.dead && inst.isEnabled && inst.isInitialized) this.call(inst, hook, dt);
     });
   }
   /** Run `body`; errors collected without an onError handler are rethrown once, at the end of the outermost pass. */
@@ -621,10 +532,10 @@ export class Scripts {
     if (this.errors.length) {
       const n = this.errors.length;
       const error = new MargoError(
-        "failed",
-        `${n} script hook${n > 1 ? "s" : ""} threw; the first error is in cause, or pass onError to handle each`,
+        'failed',
+        `${n} script hook${n > 1 ? 's' : ''} threw; the first error is in cause, or pass onError to handle each`,
       );
-      Object.defineProperty(error, "cause", { value: this.errors[0] });
+      Object.defineProperty(error, 'cause', { value: this.errors[0] });
       this.errors = [];
       throw error;
     }

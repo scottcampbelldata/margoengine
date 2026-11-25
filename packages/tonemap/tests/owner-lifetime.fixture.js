@@ -42,13 +42,26 @@ export async function fixtures(load = (entry) => import(entry)) {
     entry('Tonemap.Grade', (engine) => Tonemap.attach(engine, { extensions: [new Grade({ saturation: 1.2 })] })),
     entry('Tonemap.HueGrade', (engine) => Tonemap.attach(engine, { extensions: [new HueGrade()] })),
     entry('Tonemap.Grade+HueGrade', (engine) =>
-      Tonemap.attach(engine, { extensions: [new Grade({ shadows: [0.05, 0, 0] }), new HueGrade({ hueShift: 20 })] })),
+      Tonemap.attach(engine, { extensions: [new Grade({ shadows: [0.05, 0, 0] }), new HueGrade({ hueShift: 20 })] }),
+    ),
     entry('Tonemap.CustomCurve.wgsl', (engine) =>
-      Tonemap.attach(engine, { extensions: [new CustomCurve({ wgsl: 'fn film(x: vec3f) -> vec3f { return x / (x + vec3f(curveParams[0].x)); }', params: [1] })] })),
+      Tonemap.attach(engine, {
+        extensions: [
+          new CustomCurve({
+            wgsl: 'fn film(x: vec3f) -> vec3f { return x / (x + vec3f(curveParams[0].x)); }',
+            params: [1],
+          }),
+        ],
+      }),
+    ),
     entry('Tonemap.CustomCurve.wgsl-no-params', (engine) =>
-      Tonemap.attach(engine, { extensions: [new CustomCurve({ wgsl: 'fn reinhard(x: vec3f) -> vec3f { return x / (x + vec3f(1.0)); }' })] })),
+      Tonemap.attach(engine, {
+        extensions: [new CustomCurve({ wgsl: 'fn reinhard(x: vec3f) -> vec3f { return x / (x + vec3f(1.0)); }' })],
+      }),
+    ),
     entry('Tonemap.CustomCurve.sampled', (engine) =>
-      Tonemap.attach(engine, { extensions: [new CustomCurve({ curve: (x) => x / (x + 1) })] })),
+      Tonemap.attach(engine, { extensions: [new CustomCurve({ curve: (x) => x / (x + 1) })] }),
+    ),
     entry('Tonemap.LocalExposure', (engine) => Tonemap.attach(engine, { extensions: [new LocalExposure()] })),
   ];
 }

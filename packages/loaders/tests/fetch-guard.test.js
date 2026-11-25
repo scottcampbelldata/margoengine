@@ -68,9 +68,16 @@ test('protocols and publicOnly refuse the link and every redirect, followed by h
   const guard = { fetch, protocols: ['https:'], publicOnly: true };
   await rejects(fetchBytes('http://a.test/', guard), 'url', /uses http:; allowed: https:/);
   await rejects(fetchBytes('https://a.test/start', guard), 'url', /a redirect to http:\/\/c\.test\/plain uses http:/);
-  await rejects(fetchBytes('https://a.test/inside', guard), 'url', /redirect to https:\/\/127\.0\.0\.1\/admin is this computer/);
+  await rejects(
+    fetchBytes('https://a.test/inside', guard),
+    'url',
+    /redirect to https:\/\/127\.0\.0\.1\/admin is this computer/,
+  );
   await rejects(fetchBytes('https://user:pw@a.test/ok', guard), 'url', /user name or password/);
-  assert.ok(seen.every(([, redirect]) => redirect === 'manual'), 'guarded fetches follow redirects by hand');
+  assert.ok(
+    seen.every(([, redirect]) => redirect === 'manual'),
+    'guarded fetches follow redirects by hand',
+  );
   const got = await fetchResource('https://a.test/ok', guard);
   assert.deepEqual(
     { ...got, bytes: new TextDecoder().decode(got.bytes) },

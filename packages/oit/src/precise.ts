@@ -58,7 +58,9 @@ ${[0, 1, 2, 3, 4].map((i) => `@group(0) @binding(${i}) var map${i}:${samples > 1
 const compositeLinear = (samples: number) =>
   linearComposite(
     [0, 1, 2, 3, 4]
-      .map((i) => `@group(0) @binding(${i}) var map${i}:${samples > 1 ? 'texture_multisampled_2d' : 'texture_2d'}<f32>;`)
+      .map(
+        (i) => `@group(0) @binding(${i}) var map${i}:${samples > 1 ? 'texture_multisampled_2d' : 'texture_2d'}<f32>;`,
+      )
       .join('\n'),
     `var sum=vec4f(0.0); var reveal=vec2f(0.0);
   for(var s=0;s<${samples};s+=1){
@@ -207,7 +209,11 @@ export class PreciseOIT extends TransparentPass {
             label: linear ? 'oit:precise:composite-linear' : 'oit:precise:composite',
             layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
             vertex: { module, entryPoint: 'vertex' },
-            fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: linear ? undefined : alphaBlend }] },
+            fragment: {
+              module,
+              entryPoint: 'fragment',
+              targets: [{ format: c.format, blend: linear ? undefined : alphaBlend }],
+            },
             multisample: { count: samples },
           })),
         );
@@ -241,7 +247,10 @@ export class PreciseOIT extends TransparentPass {
           pipeline: linear,
           group: device.createBindGroup({
             layout: linear.getBindGroupLayout(0),
-            entries: [...this.views.map((resource, binding) => ({ binding, resource })), { binding: 9, resource: scene }],
+            entries: [
+              ...this.views.map((resource, binding) => ({ binding, resource })),
+              { binding: 9, resource: scene },
+            ],
           }),
         };
       out.setPipeline(linear);

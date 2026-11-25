@@ -139,14 +139,27 @@ try {
               layout: 'auto',
               vertex: { module, entryPoint: 'vertex' },
               fragment: { module, entryPoint: 'transparent', targets: [...hook.targets] },
-              depthStencil: { format: c.descriptor.depthStencil.format, depthWriteEnabled: false, depthCompare: 'always' },
+              depthStencil: {
+                format: c.descriptor.depthStencil.format,
+                depthWriteEnabled: false,
+                depthCompare: 'always',
+              },
               multisample: { count: c.descriptor.multisample?.count ?? 1 },
             });
           }
           const pass = hook.begin();
           pass.setPipeline(panePipeline);
-          pass.setBindGroup(0, device.createBindGroup({ layout: panePipeline.getBindGroupLayout(0), entries: hook.bindings() }));
-          pass.setBindGroup(1, device.createBindGroup({ layout: panePipeline.getBindGroupLayout(1), entries: [{ binding: 0, resource: { buffer: camera } }] }));
+          pass.setBindGroup(
+            0,
+            device.createBindGroup({ layout: panePipeline.getBindGroupLayout(0), entries: hook.bindings() }),
+          );
+          pass.setBindGroup(
+            1,
+            device.createBindGroup({
+              layout: panePipeline.getBindGroupLayout(1),
+              entries: [{ binding: 0, resource: { buffer: camera } }],
+            }),
+          );
           pass.draw(6);
         },
       };
@@ -188,21 +201,32 @@ try {
   // L_0 (the fog off) and L (on) for one fog.
   // `own`: the fog given no `depth`, so it must find the depth the water drew this frame by itself.
   const pair = (options, own = false) =>
-    page.evaluate(async ({ options, own }) => {
-      const t = window.farTest,
-        { VolumetricFog } = await import('/packages/environment/dist/volumetric.js');
-      t.fog?.dispose();
-      t.fog = VolumetricFog.attach(t.engine, own ? options : { ...options, depth: () => t.water.depthTexture });
-      t.fog.options.enabled = false;
-      const clear = await t.frame();
-      t.fog.options.enabled = true;
-      return { clear, fogged: await t.frame() };
-    }, { options, own });
+    page.evaluate(
+      async ({ options, own }) => {
+        const t = window.farTest,
+          { VolumetricFog } = await import('/packages/environment/dist/volumetric.js');
+        t.fog?.dispose();
+        t.fog = VolumetricFog.attach(t.engine, own ? options : { ...options, depth: () => t.water.depthTexture });
+        t.fog.options.enabled = false;
+        const clear = await t.frame();
+        t.fog.options.enabled = true;
+        return { clear, fogged: await t.frame() };
+      },
+      { options, own },
+    );
   const base = { range: RANGE, temporal: 0, sky: null },
     report = { hardware, compat, checks: [], cases: {} };
   const cases = [
-    { name: 'uniform-1km', fog: { ...base, visibility: 1000, heightFalloff: 0 }, medium: { visibility: 1000, falloff: 0, height: 0 } },
-    { name: 'uniform-10km', fog: { ...base, visibility: 10000, heightFalloff: 0 }, medium: { visibility: 10000, falloff: 0, height: 0 } },
+    {
+      name: 'uniform-1km',
+      fog: { ...base, visibility: 1000, heightFalloff: 0 },
+      medium: { visibility: 1000, falloff: 0, height: 0 },
+    },
+    {
+      name: 'uniform-10km',
+      fog: { ...base, visibility: 10000, heightFalloff: 0 },
+      medium: { visibility: 10000, falloff: 0, height: 0 },
+    },
     {
       name: 'height-2km',
       fog: { ...base, visibility: 2000, heightFalloff: 0.004, height: 50 },
@@ -248,12 +272,15 @@ try {
         if (distance < Infinity) sea++;
         else sky++;
         if (name === 'uniform-1km' && Math.abs(distance - 1000) <= 15) koschmieder.push(got);
-        if (name === 'uniform-10km' && Math.abs(distance - 3000) <= 40) at3km.push({ got, want: Math.exp(-density * 3000) });
+        if (name === 'uniform-10km' && Math.abs(distance - 3000) <= 40)
+          at3km.push({ got, want: Math.exp(-density * 3000) });
       }
     report.cases[name] = { worst, compared, past, sea, sky };
     assert.ok(past > 5000 && sea > 5000, `${name}: ${past} pixels past range, ${sea} sea pixels`);
     assert.ok(worst <= 0.01, `${name}: transmittance off the integral by ${worst.toFixed(4)} at worst`);
-    report.checks.push(`${name}: ${compared} sea and sky pixels (${past} past range) within 0.01 of exp(-optical depth)`);
+    report.checks.push(
+      `${name}: ${compared} sea and sky pixels (${past} past range) within 0.01 of exp(-optical depth)`,
+    );
     if (name === 'uniform-1km') {
       const contrast = koschmieder.reduce((a, b) => a + b, 0) / koschmieder.length;
       report.cases[name].contrast = contrast;
@@ -281,7 +308,9 @@ try {
       const seam = Math.max(step(at - 1), step(at), step(at + 1)) - around / 8;
       report.cases[name].rangeSeam = seam;
       assert.ok(seam < 1, `luma step at range ${seam.toFixed(2)} codes`);
-      report.checks.push(`the luma step where the view depth crosses range is ${seam.toFixed(2)} codes beyond its neighbours`);
+      report.checks.push(
+        `the luma step where the view depth crosses range is ${seam.toFixed(2)} codes beyond its neighbours`,
+      );
     }
   }
 
@@ -292,7 +321,14 @@ try {
     const t = window.farTest,
       { VolumetricFog } = await import('/packages/environment/dist/volumetric.js');
     t.fog?.dispose();
-    t.fog = VolumetricFog.attach(t.engine, { range: RANGE, temporal: 0, sky: null, visibility: 1000, heightFalloff: 0, depth: () => t.water.depthTexture });
+    t.fog = VolumetricFog.attach(t.engine, {
+      range: RANGE,
+      temporal: 0,
+      sky: null,
+      visibility: 1000,
+      heightFalloff: 0,
+      depth: () => t.water.depthTexture,
+    });
     t.fog.add(t.pane);
     return t.frame();
   }, RANGE);
@@ -358,7 +394,8 @@ try {
   };
   const mapRow = 90 - (180 * 15.5) / 32;
   let above = -1;
-  for (let y = horizonRow - 1; y > 0 && above < 0; y--) if (elevation(y - 1) >= mapRow && elevation(y) < mapRow) above = y - 1;
+  for (let y = horizonRow - 1; y > 0 && above < 0; y--)
+    if (elevation(y - 1) >= mapRow && elevation(y) < mapRow) above = y - 1;
   assert.ok(above > 0, `the sky ${mapRow} degrees up is in the view (row ${above})`);
   // Linear between the two rows that straddle 2.8125 degrees.
   const share = (mapRow - elevation(above + 1)) / (elevation(above) - elevation(above + 1));
@@ -382,15 +419,32 @@ try {
     gapLeast = Math.min(gapLeast, gap);
     gapMost = Math.max(gapMost, gap);
   }
-  report.cases.sky = { horizonRow, seam: seamWorst, worst: skyWorst, model: modelWorst, gap: [gapLeast, gapMost], mapRow: above };
+  report.cases.sky = {
+    horizonRow,
+    seam: seamWorst,
+    worst: skyWorst,
+    model: modelWorst,
+    gap: [gapLeast, gapMost],
+    mapRow: above,
+  };
   // No step where the sea meets the sky: the fully fogged far sea is the fogged sky just above it.
-  assert.ok(seamWorst <= 0.01, `a fully fogged far sea differs from the fogged sky above it by ${(seamWorst * 100).toFixed(2)}%`);
-  report.checks.push(`with a Sky, the fully fogged far sea is within ${(seamWorst * 100).toFixed(2)}% of the fogged sky above it`);
+  assert.ok(
+    seamWorst <= 0.01,
+    `a fully fogged far sea differs from the fogged sky above it by ${(seamWorst * 100).toFixed(2)}%`,
+  );
+  report.checks.push(
+    `with a Sky, the fully fogged far sea is within ${(seamWorst * 100).toFixed(2)}% of the fogged sky above it`,
+  );
   // The far sea is the sky 2.8 degrees up, within 2%: 1% for the composite (the same bound as the seam above) and 1%
   // for the map's half floats and its linear blend across 5.6 degree texels in azimuth, where the screen samples each
   // pixel's own direction. The engine's ambient of 1 would be 55 times too bright.
-  assert.ok(modelWorst <= 0.02, `a fully fogged far sea differs from the sky 2.8 degrees up by ${(modelWorst * 100).toFixed(2)}%`);
-  report.checks.push(`with a Sky, the fully fogged far sea is within ${(modelWorst * 100).toFixed(2)}% of the unfogged sky 2.8 degrees up`);
+  assert.ok(
+    modelWorst <= 0.02,
+    `a fully fogged far sea differs from the sky 2.8 degrees up by ${(modelWorst * 100).toFixed(2)}%`,
+  );
+  report.checks.push(
+    `with a Sky, the fully fogged far sea is within ${(modelWorst * 100).toFixed(2)}% of the unfogged sky 2.8 degrees up`,
+  );
   // So its gap to the horizon sky is the sky's own gradient, gap +- 2%, never more.
   assert.ok(
     skyWorst <= gapMost + 0.02,
@@ -414,8 +468,13 @@ try {
       paneSky = Math.max(paneSky, Math.abs(skyPane[i] / skyRun.fogged[i] - 1));
     }
   report.cases.paneSky = paneSky;
-  assert.ok(paneSky <= 0.01, `with a Sky, a fully fogged transparent past range differs from the fogged sea under it by ${(paneSky * 100).toFixed(2)}%`);
-  report.checks.push(`with a Sky, a fully fogged transparent past range is within ${(paneSky * 100).toFixed(2)}% of the fogged sea under it`);
+  assert.ok(
+    paneSky <= 0.01,
+    `with a Sky, a fully fogged transparent past range differs from the fogged sea under it by ${(paneSky * 100).toFixed(2)}%`,
+  );
+  report.checks.push(
+    `with a Sky, a fully fogged transparent past range is within ${(paneSky * 100).toFixed(2)}% of the fogged sea under it`,
+  );
 
   const validation = await page.evaluate(async () => (await window.farTest.engine.gpu.popErrorScope())?.message);
   assert.equal(validation, undefined, `validation error: ${validation}`);

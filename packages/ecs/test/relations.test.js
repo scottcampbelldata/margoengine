@@ -34,7 +34,11 @@ test('pairs read both ways, in the order they were made', () => {
   assert.deepEqual(list(likes.sources.bind(likes), b), [a, c]);
   const pairs = [];
   likes.forEach((source, target) => pairs.push([source, target]));
-  assert.deepEqual(pairs, [[a, b], [a, c], [c, b]]);
+  assert.deepEqual(pairs, [
+    [a, b],
+    [a, c],
+    [c, b],
+  ]);
   assert.equal(likes.remove(a, b), true);
   assert.equal(likes.remove(a, b), false);
   assert.equal(likes.size, 2);

@@ -113,7 +113,11 @@ test('a member has its own clips, offsets, speeds and blend', async () => {
 test('poseBone gives one bone of a member as the shader poses it: what a rider or a held rifle follows', async () => {
   const { animation, positions } = await strip({ extraClip: true }),
     bake = bakeBones(animation, { fps: 16 }),
-    apply = (m, [x, y, z]) => [m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7], m[8] * x + m[9] * y + m[10] * z + m[11]];
+    apply = (m, [x, y, z]) => [
+      m[0] * x + m[1] * y + m[2] * z + m[3],
+      m[4] * x + m[5] * y + m[6] * z + m[7],
+      m[8] * x + m[9] * y + m[10] * z + m[11],
+    ];
   // Every vertex of the strip's far half follows joint 1 alone: poseBone(1) carries its bind position where poseBones puts it.
   for (const [instance, time] of [
     [{ clip: 0 }, 0.3],
@@ -125,7 +129,12 @@ test('poseBone gives one bone of a member as the shader poses it: what a rider o
     let checked = 0;
     for (let v = 0; v < bake.vertexCount; v++) {
       if (bake.weights[v * 8] !== 1 || bake.joints[v * 8] !== 1) continue;
-      near(apply(bone, [...bake.vertices.subarray(v * 6, v * 6 + 3)]), [...all.subarray(v * 3, v * 3 + 3)], 1e-5, `vertex ${v}`);
+      near(
+        apply(bone, [...bake.vertices.subarray(v * 6, v * 6 + 3)]),
+        [...all.subarray(v * 3, v * 3 + 3)],
+        1e-5,
+        `vertex ${v}`,
+      );
       checked++;
     }
     assert.ok(checked > 0, 'some vertices follow joint 1 alone');
@@ -189,7 +198,9 @@ test('SkinnedCrowd draws every member in one indexed call, and a member takes it
     crowd = new SkinnedCrowd(bake),
     host = {
       gpu: gpu.device,
-      sceneOf() { return undefined; },
+      sceneOf() {
+        return undefined;
+      },
       lighting: { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.2]) },
       stats: { visible: 0, drawCalls: 0 },
     };

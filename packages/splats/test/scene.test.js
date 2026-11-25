@@ -69,7 +69,9 @@ test('an aborted SplatModifier.attach in a second scene leaves nothing in either
   withEngine(async (engine) => {
     const controller = new AbortController(),
       cloud = new Splats(data()),
-      { scene, started } = inSecondScene(engine, () => SplatModifier.attach(engine, cloud, { signal: controller.signal }));
+      { scene, started } = inSecondScene(engine, () =>
+        SplatModifier.attach(engine, cloud, { signal: controller.signal }),
+      );
     controller.abort(new Error('stop'));
     await assert.rejects(started, /stop/);
     for (const each of [scene, engine.scene]) assert.deepEqual(owned(each), [], `scene ${each.name} holds plugins`);

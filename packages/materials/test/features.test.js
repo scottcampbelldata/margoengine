@@ -5,7 +5,15 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { LambertMaterial, Material, PbrMaterial, Texture, UnlitMaterial, createInstancedMesh, createMesh } from '../dist/index.js';
+import {
+  LambertMaterial,
+  Material,
+  PbrMaterial,
+  Texture,
+  UnlitMaterial,
+  createInstancedMesh,
+  createMesh,
+} from '../dist/index.js';
 import { alphaHash } from '../dist/alpha-hash.js';
 import { objectNormal } from '../dist/object-normal.js';
 import { stochasticTiling } from '../dist/stochastic.js';
@@ -109,7 +117,12 @@ test('objectNormal replaces the tangent frame only while a normalMap is set, and
   assert.match(code, /mat3x3f\(i\.margoObjectX,i\.margoObjectY,i\.margoObjectZ\)\*\(sampledNormal\)/);
   assert.doesNotMatch(code, /s\.n=normalize\(t\*sampledNormal/);
   const other = await scene();
-  createInstancedMesh(other.engine, quad, new PbrMaterial({ normalMap: flat(), features: [objectNormal({ up: 'z' })] }), 2);
+  createInstancedMesh(
+    other.engine,
+    quad,
+    new PbrMaterial({ normalMap: flat(), features: [objectNormal({ up: 'z' })] }),
+    2,
+  );
   const instanced = modules(other.frame()).find((c) => c.includes('margoObjectX'));
   assert.match(instanced, /let margoObjectModel=margoI;/);
   assert.match(instanced, /sampledNormal\.xzy\*vec3f\(1,1,-1\)/);
@@ -139,7 +152,10 @@ test('loadKTX2Texture: a layer decoder brings a cube, an array or a refusal for 
   assert.ok(array instanceof Texture);
   assert.equal(array.dimension, '2d-array');
   assert.equal(array.depth, 3);
-  await assert.rejects(loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube-array', 12)), fetch }), /no material slot/);
+  await assert.rejects(
+    loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube-array', 12)), fetch }),
+    /no material slot/,
+  );
   await assert.rejects(
     loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube', 6)), fetch, colorSpace: 'linear' }),
     /comes from the file's format/,
@@ -175,8 +191,16 @@ test('layered: textures shared between layers bind once, and only its users see 
   const { layered } = await import('../dist/layered.js');
   const { Texture } = await import('../dist/index.js');
   const mask = new Texture({ data: new Uint8Array(4), width: 1, height: 1 });
-  const f = layered({ layers: [{ mask, maskChannel: 'r' }, { mask, maskChannel: 'g' }] });
-  const code = f.shader('fn surface(i:Out,front:bool)->Surface {\n  if(!facing&&f.settings.z<0.5){discard;}\n*f.base*i.color;', 2);
+  const f = layered({
+    layers: [
+      { mask, maskChannel: 'r' },
+      { mask, maskChannel: 'g' },
+    ],
+  });
+  const code = f.shader(
+    'fn surface(i:Out,front:bool)->Surface {\n  if(!facing&&f.settings.z<0.5){discard;}\n*f.base*i.color;',
+    2,
+  );
   assert.equal(code.match(/var margoLayerMap\d+:/g).length, 1);
   assert.match(code, /margoLayerRows\.rows\[3\]/);
   assert.match(code, /\*f\.base\*i\.color;/, 'colours keep tinting without a vertexChannel');
@@ -195,13 +219,24 @@ test('mipTexture: a chain must halve, hold enough texels and match its format', 
   assert.equal(t.width, 4);
   assert.equal(t.mipmaps, true);
   assert.equal(mipTexture([level(4)]).mipmaps, false);
-  assert.equal(mipTexture([{ data: new Uint8Array(8 * 2 * 4), width: 8, height: 2 }, { data: new Uint8Array(4 * 1 * 4), width: 4, height: 1 }, { data: new Uint8Array(2 * 4), width: 2, height: 1 }]).width, 8);
+  assert.equal(
+    mipTexture([
+      { data: new Uint8Array(8 * 2 * 4), width: 8, height: 2 },
+      { data: new Uint8Array(4 * 1 * 4), width: 4, height: 1 },
+      { data: new Uint8Array(2 * 4), width: 2, height: 1 },
+    ]).width,
+    8,
+  );
   assert.throws(() => mipTexture([]), /needs mip levels/);
   assert.throws(() => mipTexture([level(4), level(1)]), /level 1 must be 2 x 2, not 1 x 1/);
   assert.throws(() => mipTexture([{ data: new Uint8Array(4), width: 4, height: 4 }]), /level 0 needs 64 values/);
   assert.throws(() => mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }]), /must hold bytes/);
   assert.throws(() => mipTexture([level(4)], { format: 'rgba16float' }), /half-float bits/);
-  assert.throws(() => mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }], { format: 'rgba16float', colorSpace: 'srgb' }), /are linear/);
+  assert.throws(
+    () =>
+      mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }], { format: 'rgba16float', colorSpace: 'srgb' }),
+    /are linear/,
+  );
 });
 
 test('alphaToCoverage: a material asks for it through the render state, and only a boolean goes', async () => {
@@ -341,7 +376,10 @@ test('skin with subsurface drops the wrap and lets the directional light through
   material.subsurface = 0;
   assert.ok(modules(frame()).every((c) => !c.includes('margoSkinThrough')));
   assert.throws(() => skin({ thickness: 0 }), RangeError);
-  assert.deepEqual(skin({ unitsPerMeter: 100, thickness: 0.5 }).serialization(), { unitsPerMeter: 100, thickness: 0.5 });
+  assert.deepEqual(skin({ unitsPerMeter: 100, thickness: 0.5 }).serialization(), {
+    unitsPerMeter: 100,
+    thickness: 0.5,
+  });
 });
 
 test('skin transmittance is the profile integrated over the back of a slab', () => {
@@ -353,7 +391,8 @@ test('skin transmittance is the profile integrated over the back of a slab', () 
       for (let c = 0; c < 3; c++) total[c] += p[c] * 2 * Math.PI * r * 0.0005;
     }
     const t = skinTransmittance(depth);
-    for (let c = 0; c < 3; c++) assert.ok(Math.abs(total[c] - t[c]) < 1e-5, `${depth} mm channel ${c}: ${total[c]} ${t[c]}`);
+    for (let c = 0; c < 3; c++)
+      assert.ok(Math.abs(total[c] - t[c]) < 1e-5, `${depth} mm channel ${c}: ${total[c]} ${t[c]}`);
     assert.ok(t[0] > t[1] && t[1] >= t[2], 'red passes furthest');
   }
 });
@@ -406,7 +445,10 @@ test('dithering compiles in only while set, on the 8-bit path, and is live', asy
   assert.ok(modules(frame()).every((c) => !c.includes('margoDither')));
   const { engine: second, frame: draw } = await scene();
   createMesh(second, quad, new UnlitMaterial({ dithering: true }));
-  assert.match(modules(draw()).find((c) => c.includes('fn surface(')), /return vec4f\(margoDither\(mat_out\(/);
+  assert.match(
+    modules(draw()).find((c) => c.includes('fn surface(')),
+    /return vec4f\(margoDither\(mat_out\(/,
+  );
   const clone = new PbrMaterial({ dithering: true }).clone();
   assert.equal(clone.dithering, true);
   assert.throws(() => (material.dithering = 1), TypeError);
@@ -415,7 +457,9 @@ test('dithering compiles in only while set, on the 8-bit path, and is live', asy
 test('clipping planes cut in the rasterizer only on a device with clip-distances, a union and room for the distances', async () => {
   const fitted = async (features) => {
       const made = await scene();
-      Object.defineProperty(made.gpu.device, 'limits', { value: { ...made.gpu.device.limits, maxInterStageShaderVariables: 16 } });
+      Object.defineProperty(made.gpu.device, 'limits', {
+        value: { ...made.gpu.device.limits, maxInterStageShaderVariables: 16 },
+      });
       for (const name of features) made.gpu.device.features.add(name);
       return made;
     },
@@ -450,7 +494,10 @@ test('clipping planes cut in the rasterizer only on a device with clip-distances
     const { engine, frame } = await fitted(['clip-distances']);
     createMesh(engine, quad, new PbrMaterial({ clippingPlanes: plane, features: [eye()] }));
     const code = surface(frame());
-    assert.ok(!code.includes('clip_distances') && code.includes('materialClipBehind'), 'an eye fills the inter-stage slots');
+    assert.ok(
+      !code.includes('clip_distances') && code.includes('materialClipBehind'),
+      'an eye fills the inter-stage slots',
+    );
   }
   {
     // WGSL's clip_distances holds 8: past 8 planes the material discards, and back at 8 it cuts in the rasterizer again.
@@ -543,8 +590,14 @@ test('the eye wears an upper lid by default, measured from its up, and false lea
   const { engine, frame } = await scene();
   createMesh(engine, quad, new PbrMaterial({ features: [eye()] }));
   const code = modules(frame()).find((c) => c.includes('fn margoEyeSurface('));
-  assert.match(code, /s\.occlusion\*=select\(1\.0,\(0\.2015\+0\.7985\*\(1\.0-1\.0\/\(1\.0\+0\.44\*lq\+1\.15\*lq\*lq\)\)\),lid\.w>0\.0\)\+select\(0\.0,/);
-  assert.match(code, /let lit=select\(1\.0,1\.0-smoothstep\(0\.0,0\.02,margoEyeDepth\*dot\(l,margoEyeUp\)-margoEyeBelow\*dot\(l,margoEyeLook\)\)/);
+  assert.match(
+    code,
+    /s\.occlusion\*=select\(1\.0,\(0\.2015\+0\.7985\*\(1\.0-1\.0\/\(1\.0\+0\.44\*lq\+1\.15\*lq\*lq\)\)\),lid\.w>0\.0\)\+select\(0\.0,/,
+  );
+  assert.match(
+    code,
+    /let lit=select\(1\.0,1\.0-smoothstep\(0\.0,0\.02,margoEyeDepth\*dot\(l,margoEyeUp\)-margoEyeBelow\*dot\(l,margoEyeLook\)\)/,
+  );
 });
 
 // The lower lid is the same ledge turned over: its row follows the upper lid's, and its ambient term takes off only the
@@ -622,7 +675,12 @@ test('a mesh-axis hair direction turns with a follow matrix, so skinned strands 
     made = [],
     device = {
       createBuffer: () => {
-        const b = { destroyed: false, destroy() { this.destroyed = true; } };
+        const b = {
+          destroyed: false,
+          destroy() {
+            this.destroyed = true;
+          },
+        };
         made.push(b);
         return b;
       },
@@ -630,7 +688,10 @@ test('a mesh-axis hair direction turns with a follow matrix, so skinned strands 
     };
   let matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   const feature = hair({ direction: [0, -1, 0], follow: () => matrix });
-  assert.deepEqual(feature.bindings(device).map((e) => e.binding), [135]);
+  assert.deepEqual(
+    feature.bindings(device).map((e) => e.binding),
+    [135],
+  );
   assert.deepEqual([...written.at(-1).slice(0, 3)], [0, -1, 0]);
   // A steady frame uploads nothing.
   feature.bindings(device);

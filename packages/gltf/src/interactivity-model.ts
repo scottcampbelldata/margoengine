@@ -177,7 +177,9 @@ export class ObjectModel {
         keyed = values.length / (interpolation === 'CUBICSPLINE' ? 3 : 1);
       channels.push({ pointer, times, values, width: keyed / times.length, interpolation });
     }
-    return channels.length ? { ...state, minTime: min, maxTime: max } : { ...state, playhead: NaN, virtualPlayhead: NaN };
+    return channels.length
+      ? { ...state, minTime: min, maxTime: max }
+      : { ...state, playhead: NaN, virtualPlayhead: NaN };
   }
   private channelPointer(target: Json | undefined): string | undefined {
     if (target?.path === 'pointer') return target.extensions?.KHR_animation_pointer?.pointer;
@@ -300,13 +302,19 @@ export class ObjectModel {
       if (!skin) return undefined;
       if (key === '/skins/#/joints.length') return this.count(skin.joints);
       if (key === '/skins/#/joints/#') return this.member(skin.joints, ids[1]);
-      if (key === '/skins/#/skeleton') return this.refTo(skin.skeleton === undefined ? undefined : `/nodes/${skin.skeleton}`);
+      if (key === '/skins/#/skeleton')
+        return this.refTo(skin.skeleton === undefined ? undefined : `/nodes/${skin.skeleton}`);
       return undefined;
     }
-    const drive = /^\/extensions\/KHR_physics_rigid_bodies\/physicsJoints\/#\/drives\/#\/(maxForce|positionTarget|velocityTarget|stiffness|damping)$/.exec(key);
+    const drive =
+      /^\/extensions\/KHR_physics_rigid_bodies\/physicsJoints\/#\/drives\/#\/(maxForce|positionTarget|velocityTarget|stiffness|damping)$/.exec(
+        key,
+      );
     if (drive) {
       const own = this.doc.extensions?.KHR_physics_rigid_bodies?.physicsJoints?.[ids[0]]?.drives?.[ids[1]];
-      return own ? this.stored(pointer, 'float', () => own[drive[1]] ?? (drive[1] === 'maxForce' ? Infinity : 0)) : undefined;
+      return own
+        ? this.stored(pointer, 'float', () => own[drive[1]] ?? (drive[1] === 'maxForce' ? Infinity : 0))
+        : undefined;
     }
     const light = /^\/extensions\/KHR_lights_punctual\/lights\/#\/(.+)$/.exec(key);
     if (light) {
@@ -331,7 +339,9 @@ export class ObjectModel {
       targets: number = mesh?.primitives?.[0]?.targets?.length ?? 0;
     switch (tail) {
       case 'translation':
-        return this.stored(pointer, 'float3', () => (node.matrix ? node.matrix.slice(12, 15) : (node.translation ?? [0, 0, 0]).slice()));
+        return this.stored(pointer, 'float3', () =>
+          node.matrix ? node.matrix.slice(12, 15) : (node.translation ?? [0, 0, 0]).slice(),
+        );
       case 'rotation':
         return node.matrix ? undefined : this.stored(pointer, 'float4', () => (node.rotation ?? [0, 0, 0, 1]).slice());
       case 'scale':
@@ -362,7 +372,8 @@ export class ObjectModel {
         return this.refTo(light === undefined ? undefined : `/extensions/KHR_lights_punctual/lights/${light}`);
       }
     }
-    const motion = /^extensions\/KHR_physics_rigid_bodies\/motion\/(linearVelocity|angularVelocity|gravityFactor)$/.exec(tail);
+    const motion =
+      /^extensions\/KHR_physics_rigid_bodies\/motion\/(linearVelocity|angularVelocity|gravityFactor)$/.exec(tail);
     if (motion) {
       const own = node.extensions?.KHR_physics_rigid_bodies?.motion;
       if (!own) return undefined;
@@ -370,7 +381,9 @@ export class ObjectModel {
         ? this.stored(pointer, 'float', () => own.gravityFactor ?? 1)
         : this.stored(pointer, 'float3', () => (own[motion[1]] ?? [0, 0, 0]).slice());
     }
-    const flag = /^extensions\/KHR_node_(visibility\/visible|selectability\/selectable|hoverability\/hoverable)$/.exec(tail);
+    const flag = /^extensions\/KHR_node_(visibility\/visible|selectability\/selectable|hoverability\/hoverable)$/.exec(
+      tail,
+    );
     if (!flag) return undefined;
     return this.stored(pointer, 'bool', () => lookup(node, tail) ?? true);
   }
@@ -442,7 +455,10 @@ export class ObjectModel {
 
   private animationProperty(key: string, ids: number[]): ModelProperty | undefined {
     const state = this.animations[ids[0]],
-      field = /^\/animations\/#\/extensions\/KHR_interactivity\/(isPlaying|minTime|maxTime|playhead|virtualPlayhead)$/.exec(key)?.[1];
+      field =
+        /^\/animations\/#\/extensions\/KHR_interactivity\/(isPlaying|minTime|maxTime|playhead|virtualPlayhead)$/.exec(
+          key,
+        )?.[1];
     if (!state || !field) return undefined;
     return { type: field === 'isPlaying' ? 'bool' : 'float', get: () => state[field as 'minTime'] };
   }

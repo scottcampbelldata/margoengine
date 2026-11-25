@@ -28,7 +28,7 @@ const LIST_FIELDS: Record<string, string> = {
 const WORD = /[\p{L}\p{N}_:.!|-]/u;
 /** Single-letter escapes; any other escaped character stands for itself. */
 const ESCAPES: Record<string, string> = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
-const isSpace =(c: number) => c === 32 || c === 9 || c === 10 || c === 13;
+const isSpace = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
 const isDigitStart = (c: number) => (c >= 48 && c <= 57) || c === 45 || c === 43 || c === 46;
 
 /** One absolute path from a path as written, which may be relative to the prim that holds it. */

@@ -66,7 +66,10 @@ test('reset clears the recorded points and restarts the recording clock, so a se
   h.context.delta = 0.1;
   h.frame();
   effect.reset();
-  assert.ok(new Uint8Array(history.data).every((byte) => byte === 0), 'no point from before the reset is left');
+  assert.ok(
+    new Uint8Array(history.data).every((byte) => byte === 0),
+    'no point from before the reset is left',
+  );
   assert.deepEqual(run(), fresh, 'the same recording frames as from the start');
   effect.dispose();
 });

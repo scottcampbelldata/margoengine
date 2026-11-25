@@ -15,8 +15,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
-const near = (a, b, label) =>
-  a.forEach((v, c) => assert.ok(Math.abs(v - b[c]) <= 2, `${label}: [${a}] vs [${b}]`));
+const near = (a, b, label) => a.forEach((v, c) => assert.ok(Math.abs(v - b[c]) <= 2, `${label}: [${a}] vs [${b}]`));
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -35,7 +34,10 @@ try {
     near(r.fnAfter, r.expected, `${name}: the function pair draws after the restore`);
     assert.equal(r.reportsOther, 0, `${name}: no report for a function pair`);
   }
-  assert.ok(reported.every((m) => /^state .*#borrowed-lost/.test(m)), `only borrowed-lost reports: ${reported}`);
+  assert.ok(
+    reported.every((m) => /^state .*#borrowed-lost/.test(m)),
+    `only borrowed-lost reports: ${reported}`,
+  );
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/pixel-restore-check.json', JSON.stringify({ hardware, result }, null, 1));

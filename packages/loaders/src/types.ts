@@ -111,7 +111,8 @@ export class LoaderError extends Error {
 export function httpRefusal(response: Response, now = Date.now()): { status: number; retryAfter?: number } {
   const value = response.headers.get('retry-after')?.trim();
   if (!value) return { status: response.status };
-  if (/^\d+$/.test(value)) return { status: response.status, retryAfter: Math.min(Number(value), Number.MAX_SAFE_INTEGER) };
+  if (/^\d+$/.test(value))
+    return { status: response.status, retryAfter: Math.min(Number(value), Number.MAX_SAFE_INTEGER) };
   const at = Date.parse(value);
   return Number.isNaN(at)
     ? { status: response.status }

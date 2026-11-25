@@ -60,7 +60,10 @@ function element(line: string, name: string): string {
   const written = line.slice(76, 78).trim().toUpperCase();
   if (/^[A-Z]{1,2}$/.test(written)) return written;
   // Older files leave the column empty: the element ends the name's first two columns, so " CA " is carbon, "CA  " calcium.
-  const letters = name.slice(0, 2).replace(/[^A-Za-z]/g, '').toUpperCase();
+  const letters = name
+    .slice(0, 2)
+    .replace(/[^A-Za-z]/g, '')
+    .toUpperCase();
   return name[0] === ' ' || /\d/.test(name[0]) ? letters.slice(-1) : letters;
 }
 

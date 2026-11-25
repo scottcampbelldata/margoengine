@@ -58,7 +58,14 @@ export interface Batch {
 /** A dirty-row words array (`Batch.rows`) with the 16-bit view of it that `uploadRows` reads, made once. */
 type Halves = Uint32Array & { h?: Uint16Array };
 /** Writes rows [start, stop) of `instances` (clamped to `end` floats), when any are left. */
-const send = (queue: GPUQueue, buffer: GPUBuffer, instances: Float32Array, start: number, stop: number, end: number) => {
+const send = (
+  queue: GPUQueue,
+  buffer: GPUBuffer,
+  instances: Float32Array,
+  start: number,
+  stop: number,
+  end: number,
+) => {
   start *= 24;
   stop = stop * 24 > end ? end : stop * 24;
   if (stop > start) queue.writeBuffer(buffer, start * 4, instances as Float32Array<ArrayBuffer>, start, stop - start);
@@ -343,21 +350,21 @@ export class GPURenderer implements Renderer {
     if (!adapter) throw fault('unsupported', 'WebGPU adapter unavailable', 'webgpu');
     const limits = adapter.limits,
       device = await settle(
-      adapter.requestDevice({
-        // The adapter's own buffer limits, not WebGPU's 256 MiB / 128 MiB defaults: large meshes and instance counts.
-        requiredLimits: {
-          maxTextureArrayLayers: limits?.maxTextureArrayLayers,
-          maxBufferSize: limits?.maxBufferSize,
-          maxStorageBufferBindingSize: limits?.maxStorageBufferBindingSize,
-        },
-        requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
-          adapter.features.has(feature),
-        ),
-      }),
-      'requestDevice',
-      startup,
-      (late) => late.destroy(),
-    );
+        adapter.requestDevice({
+          // The adapter's own buffer limits, not WebGPU's 256 MiB / 128 MiB defaults: large meshes and instance counts.
+          requiredLimits: {
+            maxTextureArrayLayers: limits?.maxTextureArrayLayers,
+            maxBufferSize: limits?.maxBufferSize,
+            maxStorageBufferBindingSize: limits?.maxStorageBufferBindingSize,
+          },
+          requiredFeatures: ['depth32float-stencil8' as GPUFeatureName, ...features].filter((feature) =>
+            adapter.features.has(feature),
+          ),
+        }),
+        'requestDevice',
+        startup,
+        (late) => late.destroy(),
+      );
     try {
       const format = navigator.gpu.getPreferredCanvasFormat();
       const module = device.createShaderModule({ code: wgsl });
@@ -737,7 +744,14 @@ export class GPURenderer implements Renderer {
             depth.stencilStoreOp = 'store';
           }
         }
-        if (!last || !this.passContext!.last || !this.preserveMSAA || this.holdColor || color.view !== this.msaa || depth.view !== this.depthView)
+        if (
+          !last ||
+          !this.passContext!.last ||
+          !this.preserveMSAA ||
+          this.holdColor ||
+          color.view !== this.msaa ||
+          depth.view !== this.depthView
+        )
           return;
         color.resolveTarget = this.resolveTarget;
         color.storeOp = 'discard';

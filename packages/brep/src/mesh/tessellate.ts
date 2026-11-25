@@ -222,7 +222,8 @@ export class Tessellator {
   private bound(id: number, deflection: number): { points: XYZ[]; pole?: XYZ } {
     const [, loopRef, orientation] = this.file.get(id).args,
       loop = ref(loopRef);
-    if (loop === undefined) throw new TypeError(`Invalid STEP file: face bound #${id} has no loop; export it again from the CAD tool`);
+    if (loop === undefined)
+      throw new TypeError(`Invalid STEP file: face bound #${id} has no loop; export it again from the CAD tool`);
     const type = this.file.get(loop).type;
     if (type === 'VERTEX_LOOP') return { points: [], pole: this.vertex(ref(this.file.get(loop).args[1])) };
     let points: XYZ[] = [];
@@ -370,7 +371,9 @@ export class Tessellator {
     // --- the domain: closed loops, a band cut open at a seam, or a cap closed at a pole -------------------------------
     const domain: LoopPoint[][] = [];
     if (wraps.some((w) => w.ku && w.kv))
-      throw new TypeError(`Unsupported STEP face #${id}: a bound wraps both ways round its surface; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+      throw new TypeError(
+        `Unsupported STEP face #${id}: a bound wraps both ways round its surface; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+      );
     const transposed = wraps.length > 0 && !!wraps[0].kv,
       period = transposed ? s.vPeriod : s.uPeriod;
     // Work in (a, b) with a the coordinate the bounds wrap in.
@@ -411,7 +414,10 @@ export class Tessellator {
           if (near === undefined) break;
         }
       }
-      if (found < 0) throw new TypeError(`STEP face #${id}: could not cut a wrapping bound at its seam; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+      if (found < 0)
+        throw new TypeError(
+          `STEP face #${id}: could not cut a wrapping bound at its seam; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+        );
       const q0 = pts[found],
         q1 = pts[(found + 1) % n],
         crossing = make(
@@ -494,7 +500,9 @@ export class Tessellator {
         side = (-Math.sign(k) * left) as 1 | -1,
         uPole = s.uPole?.(side) ?? (poles.length ? s.parameters(poles[0], [run[0].u, run[0].v])[0] : undefined);
       if (uPole === undefined)
-        throw new TypeError(`STEP face #${id}: a bound wraps round a surface that does not close at a pole; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+        throw new TypeError(
+          `STEP face #${id}: a bound wraps round a surface that does not close at a pole; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+        );
       const b0 = run[0].v,
         b1 = run[run.length - 1].v,
         pole = poles[0] ?? spot(uPole, b0);
@@ -507,14 +515,18 @@ export class Tessellator {
       let vPole = s.pole(side);
       if (vPole === undefined && poles.length) vPole = s.parameters(poles[0], [run[0].u, run[0].v])[1];
       if (vPole === undefined)
-        throw new TypeError(`STEP face #${id}: a bound wraps round a surface that does not close at a pole; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+        throw new TypeError(
+          `STEP face #${id}: a bound wraps round a surface that does not close at a pole; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+        );
       const a0 = run[0].u,
         a1 = run[run.length - 1].u,
         pole = poles[0] ?? spot(a0, vPole);
       run[run.length - 1].line = true;
       domain.push([...run, { p: pole, u: a1, v: vPole, line: true }, { p: pole, u: a0, v: vPole, line: true }]);
     } else if (wraps.length > 2)
-      throw new TypeError(`Unsupported STEP face #${id}: three or more bounds wrap round it; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+      throw new TypeError(
+        `Unsupported STEP face #${id}: three or more bounds wrap round it; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+      );
     loops.sort((a, b) => boxArea(b) - boxArea(a));
     // Only holes (a sphere less a cap): the face is the whole closed surface less them, cut open where none crosses.
     const holesOnly =
@@ -535,7 +547,9 @@ export class Tessellator {
             period,
           );
           if (free === undefined)
-            throw new TypeError(`STEP face #${id}: its holes cover a whole period of its surface; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+            throw new TypeError(
+              `STEP face #${id}: its holes cover a whole period of its surface; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+            );
           return free;
         },
         u0 = s.uPeriod ? cut(s.uPeriod, s.uDomain[0], 0) : s.uDomain[0],
@@ -543,7 +557,9 @@ export class Tessellator {
         v0 = s.vPeriod ? cut(s.vPeriod, s.vDomain[0], 2) : s.vDomain[0],
         v1 = s.vPeriod ? v0 + s.vPeriod : s.vDomain[1];
       if (![u0, u1, v0, v1].every(Number.isFinite))
-        throw new TypeError(`Invalid STEP file: face #${id} has no bounds on an unbounded surface; export it again from the CAD tool`);
+        throw new TypeError(
+          `Invalid STEP file: face #${id} has no bounds on an unbounded surface; export it again from the CAD tool`,
+        );
       const corner = (u: number, v: number): LoopPoint => ({ p: spot(u, v), u, v, line: true }),
         corners = [corner(u0, v0), corner(u1, v0), corner(u1, v1), corner(u0, v1)];
       // Corners on one pole are one point. A torus's corners meet too, but its sides are seam circles, not poles.
@@ -807,7 +823,9 @@ export class Tessellator {
     // --- output: triangles wound to face outward, collapsed ones (at a pole) dropped, unused points removed -------------
     // A point the surface could not evaluate would drop every triangle on it and leave the face empty without a word.
     if (xyz.some((p) => !Number.isFinite(p[0] + p[1] + p[2])))
-      throw new TypeError(`STEP face #${id}: its surface gave no point at some (u, v) of the face; export the part again, or as AP242 tessellated geometry, to mesh this face`);
+      throw new TypeError(
+        `STEP face #${id}: its surface gave no point at some (u, v) of the face; export the part again, or as AP242 tessellated geometry, to mesh this face`,
+      );
     const outward = sameSense !== inverted,
       count = uv.length / 2,
       kept: number[] = [];
@@ -979,7 +997,9 @@ export class Tessellator {
           pnindex = ints(a[set ? 4 : 5]),
           local = pnindex.length ? pnindex.map((i) => coordinates[i - 1]) : coordinates;
         if (local.some((p) => !p || p.length !== 3 || !p.every(Number.isFinite)))
-          throw new TypeError(`Invalid STEP file: #${id} indexes outside its coordinates list; export it again from the CAD tool`);
+          throw new TypeError(
+            `Invalid STEP file: #${id} indexes outside its coordinates list; export it again from the CAD tool`,
+          );
         const triangles: number[] = [],
           add = (i: number, j: number, k: number) => {
             written++;
@@ -994,7 +1014,9 @@ export class Tessellator {
             for (let t = 1; t + 1 < fan.length; t++) add(fan[0], fan[t], fan[t + 1]);
         } else for (const triangle of list(a[set ? 5 : 6]).map(ints)) add(triangle[0], triangle[1], triangle[2]);
         if (triangles.some((i) => !(i >= 0 && i < local.length)))
-          throw new TypeError(`Invalid STEP file: #${id} has a triangle index outside its points; export it again from the CAD tool`);
+          throw new TypeError(
+            `Invalid STEP file: #${id} has a triangle index outside its points; export it again from the CAD tool`,
+          );
         const base = positions.length / 3,
           first = indices.length,
           vertexNormals = new Float64Array(local.length * 3);

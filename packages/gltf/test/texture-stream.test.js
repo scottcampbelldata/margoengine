@@ -11,7 +11,13 @@ import { measureSurface, scaleOf } from '../../shared/texture-density.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+globalThis.GPUTextureUsage ??= {
+  COPY_SRC: 1,
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+  STORAGE_BINDING: 8,
+  RENDER_ATTACHMENT: 16,
+};
 globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
 const file = new Uint8Array(
   await readFile(new URL('./fixtures/streaming/FlightHelmet_Materials_LensesMat_BaseColor.ktx2', import.meta.url)),

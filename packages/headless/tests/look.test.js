@@ -93,7 +93,10 @@ test('with no sky mask, skyClip reads the sky package coverage and says so; grai
     { name: 'close', frame, results: covered },
     { name: 'far', frame, results: bare },
   ]);
-  assert.match(report.markdown, /\nMasks:\n- skyClip inside `sky-coverage`, the pixels `@margoengine\/sky` drew \(no page sky mask\): mid, close\n- skyClip over the whole frame \(no sky mask\): far\n$/);
+  assert.match(
+    report.markdown,
+    /\nMasks:\n- skyClip inside `sky-coverage`, the pixels `@margoengine\/sky` drew \(no page sky mask\): mid, close\n- skyClip over the whole frame \(no sky mask\): far\n$/,
+  );
   assert.equal(report.json.probes[0].results.find((r) => r.check === 'skyClip').mask, 'sky-coverage');
 });
 
@@ -109,8 +112,22 @@ test('bounds: a number is a ceiling, a pair a range; every check has a default',
 });
 
 test('luma uses the BT.709 weights on the encoded values', () => {
-  const y = luma(image(3, 1, (x) => [[255, 0, 0], [0, 255, 0], [0, 0, 255]][x]));
-  assert.deepEqual([...y].map((v) => Math.round(v * 1000) / 1000), [54.213, 182.376, 18.411]);
+  const y = luma(
+    image(
+      3,
+      1,
+      (x) =>
+        [
+          [255, 0, 0],
+          [0, 255, 0],
+          [0, 0, 255],
+        ][x],
+    ),
+  );
+  assert.deepEqual(
+    [...y].map((v) => Math.round(v * 1000) / 1000),
+    [54.213, 182.376, 18.411],
+  );
 });
 
 test('skyClip counts clipped sky pixels only', () => {
@@ -119,7 +136,13 @@ test('skyClip counts clipped sky pixels only', () => {
   const clipped = skyClip(frame, { sky: top });
   assert.equal(clipped.value, 25);
   assert.equal(clipped.pass, false);
-  assert.equal(skyClip(image(20, 20, () => 120), { sky: top }).value, 0);
+  assert.equal(
+    skyClip(
+      image(20, 20, () => 120),
+      { sky: top },
+    ).value,
+    0,
+  );
   assert.throws(() => skyClip(frame, { sky: mask(10, 10, () => true) }), RangeError);
   assert.equal(clipped.empty, undefined, 'a mask with sky in it measured something');
 });
@@ -139,7 +162,11 @@ test('a sky mask with no sky in it says it measured 0 sky pixels: the pass is ne
   assert.equal(skyClip(frame).empty, undefined);
   const rows = checkProbe({ name: 'kettle', frame, masks: { sky: none } }, { skyClip: 0.5 });
   assert.equal(rows.find((row) => row.check === 'skyClip').empty, '0 sky pixels');
-  assert.equal(checkProbe({ name: 'kettle', frame }, { skyClip: 0.5 }).find((row) => row.check === 'skyClip').pass, false, 'with no mask the whole frame clips');
+  assert.equal(
+    checkProbe({ name: 'kettle', frame }, { skyClip: 0.5 }).find((row) => row.check === 'skyClip').pass,
+    false,
+    'with no mask the whole frame clips',
+  );
   const report = lookReport([{ name: 'kettle', frame, results: rows }]);
   assert.match(report.markdown, /\| kettle \| skyClip \| 0 % \| <= 0\.500 % \| pass \(measured 0 sky pixels\) \|/);
   assert.equal(report.json.probes[0].results.find((row) => row.check === 'skyClip').empty, '0 sky pixels');
@@ -159,7 +186,9 @@ test('grain estimates the noise standard deviation and ignores ramps', () => {
 
 test('speckle finds isolated hot and dead pixels', () => {
   const clean = image(100, 100, (x, y) => clamp(80 + x * 0.3 + y * 0.2)),
-    hot = image(100, 100, (x, y) => ((x === 20 && y === 30) || (x === 70 && y === 60) ? 255 : (x === 50 && y === 50 ? 0 : clamp(80 + x * 0.3 + y * 0.2))));
+    hot = image(100, 100, (x, y) =>
+      (x === 20 && y === 30) || (x === 70 && y === 60) ? 255 : x === 50 && y === 50 ? 0 : clamp(80 + x * 0.3 + y * 0.2),
+    );
   assert.equal(speckle(clean).value, 0);
   const found = speckle(hot);
   assert.equal(found.detail.speckles, 3);
@@ -211,14 +240,25 @@ test('blocks finds steps at the froxel pitch, not at another pitch, in noise or 
   assert.equal(blocks(tower).value, 0, 'the two edges of one tower are no pattern');
   assert.equal(blocks(sky(256, 320)).value, 0, 'nor the rim of a moon');
   // Blocks in one corner only: that corner's tiles.
-  const corner = image(256, 256, (x, y) => clamp(base(x, y) + (x < 128 && y < 128 ? ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) * 3 : 0)));
+  const corner = image(256, 256, (x, y) =>
+    clamp(base(x, y) + (x < 128 && y < 128 ? ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) * 3 : 0)),
+  );
   assert.equal(blocks(corner).value, 25);
   // Blocks of another size are found at their own pitch.
   const sixteen = image(256, 256, (x, y) => clamp(base(x, y) + ((Math.floor(x / 16) + Math.floor(y / 16)) % 2) * 3));
   assert.equal(blocks(sixteen, { pitch: 16 }).value, 100);
   assert.equal(blocks(sixteen, { pitch: 12 }).value, 0, 'their steps wander across the phases of a 12-pixel pitch');
   assert.equal(blocks(sixteen).value, 0, 'and fall in only half the periods of an 8-pixel one');
-  assert.equal(blocks(sky(90, 160, [[0.3, 0.3], [0.7, 0.32]])).value, 0, 'two moons in one tile are no pattern');
+  assert.equal(
+    blocks(
+      sky(90, 160, [
+        [0.3, 0.3],
+        [0.7, 0.32],
+      ]),
+    ).value,
+    0,
+    'two moons in one tile are no pattern',
+  );
 });
 
 /** A column-major perspective times a view looking along -z from the origin, pitched by `pitch` radians. */
@@ -280,8 +320,14 @@ test('horizonSeam counts only columns where the sky meets the line: a wall acros
   assert.ok(seamed.value > 12, `seam where the sky is ${seamed.value}`);
   // checkProbe runs it only with a sky mask; named in the bounds without one, it fails as missing.
   const probe = { name: 'hearth', frame: wall, viewProjection: vp };
-  assert.equal(checkProbe(probe).find((row) => row.check === 'horizonSeam'), undefined);
-  assert.equal(checkProbe(probe, { horizonSeam: 6 }).find((row) => row.check === 'horizonSeam').missing, 'the sky mask');
+  assert.equal(
+    checkProbe(probe).find((row) => row.check === 'horizonSeam'),
+    undefined,
+  );
+  assert.equal(
+    checkProbe(probe, { horizonSeam: 6 }).find((row) => row.check === 'horizonSeam').missing,
+    'the sky mask',
+  );
   assert.equal(checkProbe({ ...probe, masks: { sky: noSky } }).find((row) => row.check === 'horizonSeam').value, 0);
 });
 
@@ -291,7 +337,10 @@ test('waterSeam reads the water line off the water mask', () => {
     line = (x) => 30 + Math.round(4 * Math.sin(x / 8)),
     water = mask(width, height, (x, y) => y >= line(x)),
     edge = maskTopEdge(water);
-  assert.deepEqual([...edge], Array.from({ length: width }, (_, x) => line(x)));
+  assert.deepEqual(
+    [...edge],
+    Array.from({ length: width }, (_, x) => line(x)),
+  );
   const seamed = image(width, height, (x, y) => (y >= line(x) ? 40 : 100)),
     smooth = image(width, height, (x, y) => clamp(100 - y));
   assert.ok(waterSeam(seamed, { water }).value >= 59);
@@ -301,15 +350,31 @@ test('waterSeam reads the water line off the water mask', () => {
 
 test('lights counts one moon, and a doubled moon fails', () => {
   const one = lights(sky(180, 320)),
-    two = lights(sky(180, 320, [[0.3, 0.3], [0.7, 0.32]]));
+    two = lights(
+      sky(180, 320, [
+        [0.3, 0.3],
+        [0.7, 0.32],
+      ]),
+    );
   assert.equal(one.value, 1);
   assert.equal(one.pass, true);
   assert.equal(two.value, 2);
   assert.equal(two.pass, false);
-  assert.equal(lights(sky(180, 320, [[0.3, 0.3], [0.7, 0.32]]), { expected: 2 }).pass, true);
+  assert.equal(
+    lights(
+      sky(180, 320, [
+        [0.3, 0.3],
+        [0.7, 0.32],
+      ]),
+      { expected: 2 },
+    ).pass,
+    true,
+  );
   assert.ok(Math.abs(one.discs[0].x - 90) < 0.5 && Math.abs(one.discs[0].y - 96) < 0.5);
   // A bolt of lightning is bright but no disc; single stars are too small.
-  const bolt = image(180, 320, (x, y) => (Math.abs(x - 40 - y * 0.3) < 2 && y < 200 ? 255 : (x % 37 === 0 && y % 41 === 0 ? 255 : 30)));
+  const bolt = image(180, 320, (x, y) =>
+    Math.abs(x - 40 - y * 0.3) < 2 && y < 200 ? 255 : x % 37 === 0 && y % 41 === 0 ? 255 : 30,
+  );
   assert.equal(lights(bolt).value, 0);
   // A dim moon (luma 200, under the clip) in a dark sky still counts: it stands clear of the sky round it.
   const dim = image(180, 320, (x, y) => (Math.hypot(x - 90, y - 96) < 8 ? 200 : 25));
@@ -319,7 +384,13 @@ test('lights counts one moon, and a doubled moon fails', () => {
 // KB-LOOK-LIGHTS-CLOUD1: a sky of sunlit cumulus (the Kitty Hawk film's volumetric clouds) failed with 5 to 14 "lights":
 // the brightest puffs clear 0.85 of the brightest luma as round blobs, but shade smoothly into the cloud round them.
 test('lights does not count the sunlit puffs of cumulus, and still finds a sun among them', () => {
-  const puffs = [[40, 60, 14], [120, 50, 10], [80, 140, 12], [150, 200, 9], [50, 240, 11]],
+  const puffs = [
+      [40, 60, 14],
+      [120, 50, 10],
+      [80, 140, 12],
+      [150, 200, 9],
+      [50, 240, 11],
+    ],
     cloud = (x, y) => {
       let v = 120 + (40 * y) / 320;
       for (const [px, py, r] of puffs) {
@@ -339,7 +410,11 @@ test('lights does not count the sunlit puffs of cumulus, and still finds a sun a
 test('foamEdges fails thresholded foam and passes soft foam', () => {
   const width = 128,
     height = 128,
-    blobs = [[30, 40, 12], [80, 70, 16], [60, 105, 10]],
+    blobs = [
+      [30, 40, 12],
+      [80, 70, 16],
+      [60, 105, 10],
+    ],
     distance = (x, y) => Math.min(...blobs.map(([bx, by, r]) => Math.hypot(x - bx, y - by) - r)),
     foam = mask(width, height, (x, y) => distance(x, y) < 0),
     hard = image(width, height, (x, y) => (distance(x, y) < 0 ? 230 : 40)),
@@ -400,7 +475,11 @@ test('flip is 0 for identical frames, small for a slight change and large for a 
   const random = noise(9),
     reference = image(96, 96, (x, y) => [clamp(60 + x), clamp(40 + y), clamp(120 + 40 * Math.sin(x / 9))]),
     slight = image(96, 96, (x, y) => [clamp(61 + x), clamp(40 + y), clamp(120 + 40 * Math.sin(x / 9))]),
-    noisy = image(96, 96, (x, y) => [clamp(60 + x + (random() - 0.5) * 80), clamp(40 + y), clamp(120 + 40 * Math.sin(x / 9))]);
+    noisy = image(96, 96, (x, y) => [
+      clamp(60 + x + (random() - 0.5) * 80),
+      clamp(40 + y),
+      clamp(120 + 40 * Math.sin(x / 9)),
+    ]);
   const same = flip(reference, reference);
   assert.equal(same.mean, 0);
   assert.equal(same.max, 0);
@@ -426,7 +505,8 @@ test('checkProbe runs what a probe has inputs for and fails a named check it can
   const frame = sky(90, 160),
     rows = checkProbe({ name: 'opening', frame }, { reference: 0.05, lights: 1, glare: 2 });
   const byName = Object.fromEntries(rows.map((row) => [row.check, row]));
-  for (const name of ['skyClip', 'grain', 'speckle', 'banding', 'flat', 'blocks', 'lights', 'crush']) assert.ok(byName[name], name);
+  for (const name of ['skyClip', 'grain', 'speckle', 'banding', 'flat', 'blocks', 'lights', 'crush'])
+    assert.ok(byName[name], name);
   assert.equal(byName.reference.pass, false);
   assert.equal(byName.reference.missing, 'the 16-sample reference frame');
   assert.equal(byName.glare.pass, false);
@@ -438,7 +518,11 @@ test('checkProbe runs what a probe has inputs for and fails a named check it can
       frame,
       reference: frame,
       compat: frame,
-      masks: { sky: mask(90, 160, (x, y) => y < 80), water: mask(90, 160, (x, y) => y >= 80), foam: mask(90, 160, () => false) },
+      masks: {
+        sky: mask(90, 160, (x, y) => y < 80),
+        water: mask(90, 160, (x, y) => y >= 80),
+        foam: mask(90, 160, () => false),
+      },
       hdr: { width: 90, height: 160, data: new Float32Array(90 * 160 * 4) },
       viewProjection: viewProjection(0),
       still: [frame, frame, frame],
@@ -446,14 +530,33 @@ test('checkProbe runs what a probe has inputs for and fails a named check it can
     { lights: [1, 1] },
   );
   // The clean-frame checks that need their own inputs (look-clean.test.js) and the night checks a shot names are not in this probe.
-  const needInputs = ['penumbra', 'shimmerMoving', 'motionBlur', 'silhouette', 'silhouetteShape', 'bounce', 'shadowTint', 'nightLuma', 'nightPeak'];
+  const needInputs = [
+    'penumbra',
+    'shimmerMoving',
+    'motionBlur',
+    'silhouette',
+    'silhouetteShape',
+    'bounce',
+    'shadowTint',
+    'nightLuma',
+    'nightPeak',
+  ];
   assert.equal(full.length, Object.keys(LOOK_CHECKS).length - needInputs.length);
-  assert.ok(full.every((row) => row.pass), full.filter((row) => !row.pass).map((row) => `${row.check} ${row.value}`).join(', '));
+  assert.ok(
+    full.every((row) => row.pass),
+    full
+      .filter((row) => !row.pass)
+      .map((row) => `${row.check} ${row.value}`)
+      .join(', '),
+  );
 });
 
 test('lookReport makes one table and one contact sheet, failures marked', async () => {
   const good = sky(90, 160),
-    bad = sky(90, 160, [[0.3, 0.3], [0.7, 0.32]]),
+    bad = sky(90, 160, [
+      [0.3, 0.3],
+      [0.7, 0.32],
+    ]),
     probes = [
       { name: 'opening', frame: good, results: checkProbe({ name: 'opening', frame: good, reference: good }) },
       { name: 'strike', frame: bad, results: checkProbe({ name: 'strike', frame: bad }) },
@@ -472,7 +575,9 @@ test('lookReport makes one table and one contact sheet, failures marked', async 
   assert.match(report.markdown, /\| strike \| lights \| 2 discs \| 0 to 1 discs \| \*\*FAIL\*\* \|/);
   // Three tiles (the opening, its FLIP map, the strike), each 45 wide plus border and gap.
   assert.equal(report.sheet.width, 3 * (45 + 6 + 8) + 8);
-  const at = (x, y) => [...report.sheet.data.subarray((y * report.sheet.width + x) * 4, (y * report.sheet.width + x) * 4 + 3)];
+  const at = (x, y) => [
+    ...report.sheet.data.subarray((y * report.sheet.width + x) * 4, (y * report.sheet.width + x) * 4 + 3),
+  ];
   assert.deepEqual(at(8, 8), [46, 160, 67], 'the passing probe is framed green');
   assert.deepEqual(at(8 + 2 * (45 + 6 + 8), 8), [211, 47, 47], 'the failing probe is framed red');
   const png = await encodePNG(report.sheet);
@@ -494,7 +599,15 @@ test('checkShot reads a shot tool manifest and its probe files', async () => {
     manifest = {
       id: 'storm-light-tour',
       header: { lookBounds: { lights: 1, nan: 0 } },
-      probes: { opening: { frame: 0, file: 'probes/opening.png', aovs: { sky: 'probes/opening.sky.png' }, reference: 'probes/opening.ref.png', hdr: 'probes/opening.rgba32f' } },
+      probes: {
+        opening: {
+          frame: 0,
+          file: 'probes/opening.png',
+          aovs: { sky: 'probes/opening.sky.png' },
+          reference: 'probes/opening.ref.png',
+          hdr: 'probes/opening.rgba32f',
+        },
+      },
     };
   const report = await checkShot({ manifest, read, thumbWidth: 45 });
   assert.equal(report.pass, true, report.markdown);

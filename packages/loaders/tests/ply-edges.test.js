@@ -30,13 +30,24 @@ test('PLY: edge elements become line segments in ASCII and binary', async () => 
   assert.deepEqual([...a.lineIndices], [0, 1, 1, 2]);
 
   const head = new TextEncoder().encode(
-    ['ply', 'format binary_little_endian 1.0', ...vertexHeader, 'element edge 1', 'property int vertex1', 'property int vertex2', 'element face 1', 'property list uchar uint vertex_indices', 'end_header', ''].join('\n'),
+    [
+      'ply',
+      'format binary_little_endian 1.0',
+      ...vertexHeader,
+      'element edge 1',
+      'property int vertex1',
+      'property int vertex2',
+      'element face 1',
+      'property list uchar uint vertex_indices',
+      'end_header',
+      '',
+    ].join('\n'),
   );
   const out = new Uint8Array(head.length + 36 + 8 + 13),
     view = new DataView(out.buffer);
   out.set(head);
   let o = head.length;
-  for (const v of [0, 0, 0, 1, 0, 0, 1, 1, 0]) (view.setFloat32(o, v, true), (o += 4));
+  for (const v of [0, 0, 0, 1, 0, 0, 1, 1, 0]) view.setFloat32(o, v, true), (o += 4);
   view.setInt32(o, 2, true);
   view.setInt32(o + 4, 0, true);
   o += 8;
@@ -49,6 +60,22 @@ test('PLY: edge elements become line segments in ASCII and binary', async () => 
 });
 
 test('PLY: an edge naming a missing vertex is a range error', async () => {
-  const text = ['ply', 'format ascii 1.0', ...vertexHeader, 'element edge 1', 'property int vertex1', 'property int vertex2', 'end_header', '0 0 0', '1 0 0', '1 1 0', '0 3', ''].join('\n');
-  await assert.rejects(async () => parsePLY(new TextEncoder().encode(text)), (error) => error instanceof LoaderError && error.code === 'range');
+  const text = [
+    'ply',
+    'format ascii 1.0',
+    ...vertexHeader,
+    'element edge 1',
+    'property int vertex1',
+    'property int vertex2',
+    'end_header',
+    '0 0 0',
+    '1 0 0',
+    '1 1 0',
+    '0 3',
+    '',
+  ].join('\n');
+  await assert.rejects(
+    async () => parsePLY(new TextEncoder().encode(text)),
+    (error) => error instanceof LoaderError && error.code === 'range',
+  );
 });

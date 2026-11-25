@@ -37,13 +37,16 @@ await runSuite(
       for (let z = 0; z < n; z++)
         for (let x = 0; x < n; x++)
           heights[z * n + x] =
-            0.06 * Math.sin(x * 0.9) * Math.cos(z * 0.7) + 0.04 * Math.sin((x - z) * 0.37) + 0.02 * Math.cos(x * 2.3 + z);
+            0.06 * Math.sin(x * 0.9) * Math.cos(z * 0.7) +
+            0.04 * Math.sin((x - z) * 0.37) +
+            0.02 * Math.cos(x * 2.3 + z);
       const terrain = Terrain.attach(engine, {
         origin: [-512, -512],
         size: [1024, 1024],
         heightScale: 100,
         cellSize: 0.37,
         resolution: 32,
+        clipmapAnchor: 'camera',
         layers: Array.from({ length: 4 }, () => ({ height: [-100, 100], slope: [0, 1], scale: 0.25 })),
         textures(gpu) {
           const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 }),
@@ -85,7 +88,9 @@ await runSuite(
         worst = Math.max(worst, open);
         total += open;
       }
-      const centre = Array.from(read().subarray(((size / 2) * size + size / 2) * 4, ((size / 2) * size + size / 2) * 4 + 3)),
+      const centre = Array.from(
+          read().subarray(((size / 2) * size + size / 2) * 4, ((size / 2) * size + size / 2) * 4 + 3),
+        ),
         error = await device.popErrorScope();
       terrain.dispose();
       engine.dispose();

@@ -24,12 +24,26 @@ export interface CCDEulerLimit {
   min: Vec3;
   max: Vec3;
 }
-/** A revolute joint: it turns only about `axis` (in the rest frame) by an angle from `min` to `max` (radians, default ±π, a full turn). */
+/** A revolute joint about `axis` in the rest frame, with optional roll about a perpendicular axis. */
 export interface CCDHingeLimit {
+  /** Selects the hinge limit. */
   type: 'hinge';
+  /** Flexion axis in the joint's rest frame. */
   axis: Vec3;
+  /** Minimum flexion angle in radians. Defaults to −π. */
   min?: number;
+  /** Maximum flexion angle in radians. Defaults to π. */
   max?: number;
+  /** Optional axial rotation after flexion, measured about the bone direction in the rest frame. */
+  twist?: CCDHingeTwist;
+}
+
+/** Bounded roll about a hinge's longitudinal axis, such as pronation and supination of a flexed forearm. */
+export interface CCDHingeTwist {
+  /** Rest-frame roll axis, perpendicular to the flexion axis. */
+  axis: Vec3;
+  /** Minimum and maximum roll angles in radians, within ±π. */
+  range: readonly [number, number];
 }
 /**
  * A ball joint: the bone axis stays within `angle` (radians) of its rest direction (swing), and the turn about the bone
@@ -61,6 +75,8 @@ const FREE = 0,
   EULER = 1,
   HINGE = 2,
   CONE = 3,
+  HINGE_TWIST = 4,
+  LIMIT_STRIDE = 10,
   EPSILON = 1e-9,
   STRAIGHT = 0.02,
   MAX_JOINTS = 256,
@@ -84,6 +100,7 @@ const DELTA = 0,
   MAX_ANGLE = 48,
   PHI = 49,
   CHORD = 50,
+  ROLL_ANGLE = 51,
   SLOTS = 52;
 const finiteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const finiteArray = (v: ArrayLike<number> | null | undefined, size: number): boolean => {
@@ -131,7 +148,14 @@ function multiplyConjugate(
   out[o + 3] = aw * bw - ax * bx - ay * by - az * bz;
 }
 // out = a * conj(b)
-export function multiplyByConjugate(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number) {
+export function multiplyByConjugate(
+  out: Float64Array,
+  o: number,
+  a: Float64Array,
+  ao: number,
+  b: Float64Array,
+  bo: number,
+) {
   const ax = a[ao],
     ay = a[ao + 1],
     az = a[ao + 2],
@@ -285,7 +309,7 @@ export class CCDSolver {
     this.worldRotations = new Float64Array(n * 4);
     this.worldScales = new Float64Array(n);
     this.types = new Uint8Array(n);
-    this.limits = new Float64Array(n * 8);
+    this.limits = new Float64Array(n * LIMIT_STRIDE);
     this.saved = new Float64Array(n * 4);
     this.bends = new Float64Array(n * 4);
     this.tip = new Float64Array(3);
@@ -309,16 +333,16 @@ export class CCDSolver {
   setLimit(index: number, limit: CCDJointLimit | null): void {
     if (!Number.isInteger(index) || index < 0 || index >= this.joints)
       throw new RangeError(`CCD joint index must be an integer from 0 to ${this.joints - 1}`);
-    const o = index * 8,
+    const o = index * LIMIT_STRIDE,
       l = this.limits;
     if (limit === null || limit === undefined) {
       this.types[index] = FREE;
       return;
     }
-    const unit = (axis: unknown, label: string) => {
-      const length = finiteArray(axis as Vec3, 3) ? Math.hypot(...(axis as Vec3)) : 0;
+    const unit = (axis: Vec3, label: string) => {
+      const length = finiteArray(axis, 3) ? Math.hypot(...axis) : 0;
       if (length < EPSILON) throw new TypeError(`CCD ${label} must be a nonzero finite [x, y, z]`);
-      for (let k = 0; k < 3; k++) l[o + k] = (axis as Vec3)[k] / length;
+      return axis.map((x) => x / length);
     };
     if (limit.type === 'euler') {
       if (
@@ -335,10 +359,22 @@ export class CCDSolver {
         max = limit.max ?? PI;
       if (!finiteNumber(min) || !finiteNumber(max) || min > max || min < -PI || max > PI)
         throw new RangeError('CCD hinge limit needs finite min <= max within [-π, π]');
-      unit(limit.axis, 'hinge axis');
+      const axis = unit(limit.axis, 'hinge axis');
+      const twist = limit.twist;
+      if (twist !== undefined) {
+        const roll = unit(twist.axis, 'hinge twist axis'),
+          range = twist.range;
+        if (Math.abs(axis[0] * roll[0] + axis[1] * roll[1] + axis[2] * roll[2]) > 1e-6)
+          throw new RangeError('CCD hinge flexion and twist axes must be perpendicular');
+        if (!finiteArray(range, 2) || range[0] > range[1] || range[0] < -PI || range[1] > PI)
+          throw new RangeError('CCD hinge twist range needs finite min <= max within [-π, π]');
+        l.set(roll, o + 5);
+        l.set(range, o + 8);
+      }
+      l.set(axis, o);
       l[o + 3] = min;
       l[o + 4] = max;
-      this.types[index] = HINGE;
+      this.types[index] = twist === undefined ? HINGE : HINGE_TWIST;
     } else if (limit.type === 'cone') {
       const twist = limit.twist ?? [-PI, PI];
       if (!finiteNumber(limit.angle) || limit.angle < 0 || limit.angle > PI)
@@ -346,7 +382,7 @@ export class CCDSolver {
       if (!finiteArray(twist, 2) || twist[0] > twist[1] || twist[0] < -PI || twist[1] > PI)
         throw new RangeError('CCD cone twist must be [min, max] with min <= max within [-π, π]');
       if (limit.axis === undefined) l[o] = l[o + 1] = l[o + 2] = NaN;
-      else unit(limit.axis, 'cone axis (or omit it)');
+      else l.set(unit(limit.axis, 'cone axis (or omit it)'), o);
       l[o + 3] = limit.angle;
       l[o + 4] = twist[0];
       l[o + 5] = twist[1];
@@ -356,6 +392,14 @@ export class CCDSolver {
   /** Copies the current `rotations` into `rest`, so limits are measured from this pose. */
   captureRest(): void {
     this.rest.set(this.rotations);
+  }
+  /** Projects the stored local rotations into their calibrated joint limits without moving an effector. */
+  projectRotations(): void {
+    for (let i = 0; i < this.joints; i++) {
+      normalize(this.rotations, i * 4);
+      normalize(this.rest, i * 4);
+      this.constrain(i);
+    }
   }
   /**
    * Sets the parent frame from a column-major world matrix with a positive uniform scale (a parent bone's matrix).
@@ -426,11 +470,7 @@ export class CCDSolver {
     s[MAX_ANGLE] = maxAngle;
     normalize(this.parentRotation, 0);
     // Start inside the limits.
-    for (let i = 0; i < this.joints; i++) {
-      normalize(this.rotations, i * 4);
-      normalize(this.rest, i * 4);
-      this.constrain(i);
-    }
+    this.projectRotations();
     this.forward(0);
     const oriented = rotation !== null && rotation !== undefined,
       bend = pole !== null && pole !== undefined,
@@ -491,7 +531,7 @@ export class CCDSolver {
     if (this.types[i] === HINGE) {
       // World hinge axis: parent * rest * axis.
       multiply(s, WORLD, parent, po, this.rest, i * 4);
-      rotate(s, AXIS, s, WORLD, this.limits, i * 8);
+      rotate(s, AXIS, s, WORLD, this.limits, i * LIMIT_STRIDE);
       const wx = s[AXIS],
         wy = s[AXIS + 1],
         wz = s[AXIS + 2];
@@ -520,7 +560,7 @@ export class CCDSolver {
       const most = s[MAX_ANGLE];
       delta = delta < -most ? -most : delta > most ? most : delta;
       multiplyConjugate(s, LOCAL, this.rest, i * 4, this.rotations, i * 4);
-      twistAngle(s, LOCAL, this.limits, i * 8, s, HINGE_ANGLE);
+      twistAngle(s, LOCAL, this.limits, i * LIMIT_STRIDE, s, HINGE_ANGLE);
       s[HINGE_ANGLE] += delta;
       this.setHinge(i, true);
       this.forward(i);
@@ -741,10 +781,10 @@ export class CCDSolver {
   // chord and to the target's direction off it (or any perpendicular).
   private bendAxis(last: number): void {
     for (let j = 1; j <= last; j++) {
-      if (this.types[j] !== HINGE) continue;
+      if (this.types[j] !== HINGE && this.types[j] !== HINGE_TWIST) continue;
       const s = this.scratch,
         l = this.limits,
-        o = j * 8;
+        o = j * LIMIT_STRIDE;
       multiply(s, WORLD, this.worldRotations, (j - 1) * 4, this.rest, j * 4);
       rotate(s, AXIS, s, WORLD, l, o);
       multiplyConjugate(s, LOCAL, this.rest, j * 4, this.rotations, j * 4);
@@ -907,7 +947,7 @@ export class CCDSolver {
   // projected pose takes the limit nearest around the circle; a full-turn hinge wraps.
   private setHinge(i: number, travel: boolean): void {
     const l = this.limits,
-      o = i * 8,
+      o = i * LIMIT_STRIDE,
       min = l[o + 3],
       max = l[o + 4],
       s = this.scratch,
@@ -937,13 +977,26 @@ export class CCDSolver {
     if (type === FREE) return;
     const s = this.scratch,
       l = this.limits,
-      o = i * 8,
+      o = i * LIMIT_STRIDE,
       q = this.rotations,
       qo = i * 4;
     multiplyConjugate(s, LOCAL, this.rest, qo, q, qo);
     if (type === HINGE) {
       twistAngle(s, LOCAL, l, o, s, HINGE_ANGLE);
       this.setHinge(i, false);
+      return;
+    }
+    if (type === HINGE_TWIST) {
+      // Peel off roll about the longitudinal axis, then project the remaining bend onto the hinge.
+      twistAngle(s, LOCAL, l, o + 5, s, ROLL_ANGLE);
+      axisAngle(s, TWIST, l, o + 5, s, ROLL_ANGLE);
+      multiplyByConjugate(s, LOCAL, s, LOCAL, s, TWIST);
+      twistAngle(s, LOCAL, l, o, s, HINGE_ANGLE);
+      this.setHinge(i, false);
+      s[ROLL_ANGLE] = Math.max(l[o + 8], Math.min(l[o + 9], s[ROLL_ANGLE]));
+      axisAngle(s, TWIST, l, o + 5, s, ROLL_ANGLE);
+      multiply(q, qo, q, qo, s, TWIST);
+      normalize(q, qo);
       return;
     }
     if (type === EULER) {

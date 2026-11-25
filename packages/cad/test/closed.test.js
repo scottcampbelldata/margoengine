@@ -36,5 +36,14 @@ test('corners split per face (as the B-rep worker writes them) still weld into a
       indices.push(positions.length / 3);
       positions.push(corners[v * 3], corners[v * 3 + 1], corners[v * 3 + 2]);
     }
-  assert.equal(capsAsSolid(new Geometry(positions, positions.map(() => 0), indices)), true);
+  assert.equal(
+    capsAsSolid(
+      new Geometry(
+        positions,
+        positions.map(() => 0),
+        indices,
+      ),
+    ),
+    true,
+  );
 });

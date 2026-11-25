@@ -59,7 +59,10 @@ test('anisotropy alone weights the diffuse by the dielectric Fresnel of the Appe
     base.forEach((c, k) => {
       const mixed = (1 - metal) * dielectric + metal * (c + (1 - c) * w),
         expected = ((1 - dielectric) * (1 - metal) * (c / Math.PI) + mixed * specular) * nl;
-      assert.ok(Math.abs(actual[k] - expected) < 1e-6 * Math.max(1, expected), `metal ${metal} channel ${k}: ${actual[k]} != ${expected}`);
+      assert.ok(
+        Math.abs(actual[k] - expected) < 1e-6 * Math.max(1, expected),
+        `metal ${metal} channel ${k}: ${actual[k]} != ${expected}`,
+      );
     });
   }
 });

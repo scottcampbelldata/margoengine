@@ -319,7 +319,11 @@ export function installWebGPU(gpu, size = 64) {
   device.addEventListener = () => {};
   device.destroy = () => {};
   device.createRenderPipelineAsync = async (descriptor) => device.createRenderPipeline(descriptor);
-  const adapter = { features: new Set(['depth32float-stencil8']), limits: device.limits, requestDevice: async () => device };
+  const adapter = {
+    features: new Set(['depth32float-stencil8']),
+    limits: device.limits,
+    requestDevice: async () => device,
+  };
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: {

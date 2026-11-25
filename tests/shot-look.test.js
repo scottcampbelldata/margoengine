@@ -36,7 +36,14 @@ async function shotFolder(lookBounds, probe = {}) {
     }
     writeFileSync(join(out, probe.aovs.sky), await encodePNG({ width: WIDTH, height: HEIGHT, data: sky }));
   }
-  return { out, manifest: { id: 'look-test', header: { lookBounds }, probes: { open: { frame: 0, file: 'probes/open.png', ...probe } } } };
+  return {
+    out,
+    manifest: {
+      id: 'look-test',
+      header: { lookBounds },
+      probes: { open: { frame: 0, file: 'probes/open.png', ...probe } },
+    },
+  };
 }
 
 test('lookShot writes look.md, look.json and look.png, and a crushed flat probe fails by default', async () => {
@@ -52,8 +59,14 @@ test('lookShot writes look.md, look.json and look.png, and a crushed flat probe 
     const sheet = await decodePNG(readFileSync(join(out, 'look.png')));
     assert.ok(sheet.width > 0 && sheet.height > 0, 'an empty contact sheet');
     const failures = lookFailures(report);
-    assert.ok(failures.some((line) => line.startsWith(`open crush: ${(100 * (HEIGHT - GREY)) / HEIGHT} %`)), failures.join('\n'));
-    assert.ok(failures.some((line) => line.startsWith('open flat: ')), failures.join('\n'));
+    assert.ok(
+      failures.some((line) => line.startsWith(`open crush: ${(100 * (HEIGHT - GREY)) / HEIGHT} %`)),
+      failures.join('\n'),
+    );
+    assert.ok(
+      failures.some((line) => line.startsWith('open flat: ')),
+      failures.join('\n'),
+    );
     // No view-projection, no horizon seam row: a check without its input is left out unless lookBounds asks for it.
     assert.ok(!report.json.probes[0].results.some((row) => row.check === 'horizonSeam'));
   } finally {
@@ -66,7 +79,10 @@ test("the shot file's lookBounds reach the checks, and a probe's view-projection
   const f = 1 / Math.tan(Math.PI / 6),
     aspect = WIDTH / HEIGHT,
     viewProjection = [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, -1, -1, 0, 0, -0.1, 0];
-  const { out, manifest } = await shotFolder({ crush: 100, flat: 100 }, { viewProjection, aovs: { sky: 'probes/open-sky.png' } });
+  const { out, manifest } = await shotFolder(
+    { crush: 100, flat: 100 },
+    { viewProjection, aovs: { sky: 'probes/open-sky.png' } },
+  );
   const interior = await shotFolder({ crush: 100, flat: 100 }, { viewProjection });
   try {
     // No sky mask: the line may run across walls, so no horizon seam row (Cabin Hearth's mantel failed at 15.8 codes).
@@ -97,7 +113,11 @@ test("a probe's own lookBounds replace the shot's for the checks it names, on th
     assert.deepEqual(lookFailures(report), [`open crush: ${(100 * (HEIGHT - GREY)) / HEIGHT} %, bound -Infinity to 0`]);
     assert.deepEqual(open.results.find((row) => row.check === 'crush').bound, [-Infinity, 0]);
     assert.deepEqual(open.results.find((row) => row.check === 'flat').bound, [-Infinity, 100], "the shot's flat bound");
-    assert.deepEqual(late.results.find((row) => row.check === 'crush').bound, [-Infinity, 100], 'the other probe keeps the shot bound');
+    assert.deepEqual(
+      late.results.find((row) => row.check === 'crush').bound,
+      [-Infinity, 100],
+      'the other probe keeps the shot bound',
+    );
     assert.equal(report.pass, false);
   } finally {
     rmSync(out, { recursive: true, force: true });
@@ -130,10 +150,16 @@ test('a probe whose sky mask holds no sky says skyClip measured 0 sky pixels (KB
     assert.equal(row.value, 0);
     assert.equal(row.pass, true);
     assert.equal(row.empty, '0 sky pixels');
-    assert.match(readFileSync(join(out, 'look.md'), 'utf8'), /\| open \| skyClip \| 0 % \| <= 0\.500 % \| pass \(measured 0 sky pixels\) \|/);
+    assert.match(
+      readFileSync(join(out, 'look.md'), 'utf8'),
+      /\| open \| skyClip \| 0 % \| <= 0\.500 % \| pass \(measured 0 sky pixels\) \|/,
+    );
     // The same frame without the sky mask counts the whole frame, and it fails.
     delete manifest.probes.open.aovs;
-    assert.equal((await lookShot(out, manifest)).json.probes[0].results.find((result) => result.check === 'skyClip').pass, false);
+    assert.equal(
+      (await lookShot(out, manifest)).json.probes[0].results.find((result) => result.check === 'skyClip').pass,
+      false,
+    );
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -155,19 +181,27 @@ test('with no sky mask, skyClip measures inside the sky coverage and look.md say
       if (i >= WIDTH * GREY) sky.fill(255, i * 4, i * 4 + 3);
       sky[i * 4 + 3] = 255;
     }
-    writeFileSync(join(out, 'probes/open.sky-coverage.png'), await encodePNG({ width: WIDTH, height: HEIGHT, data: sky }));
+    writeFileSync(
+      join(out, 'probes/open.sky-coverage.png'),
+      await encodePNG({ width: WIDTH, height: HEIGHT, data: sky }),
+    );
     manifest.probes.open.aovs = { 'sky-coverage': 'probes/open.sky-coverage.png' };
     const report = await lookShot(out, manifest),
       row = report.json.probes[0].results.find((result) => result.check === 'skyClip');
     assert.equal(row.mask, 'sky-coverage');
     assert.equal(row.value, 0);
     assert.equal(row.detail.pixels, WIDTH * (HEIGHT - GREY));
-    assert.match(readFileSync(join(out, 'look.md'), 'utf8'), /\nMasks:\n- skyClip inside `sky-coverage`, the pixels `@margoengine\/sky` drew \(no page sky mask\): open\n/);
+    assert.match(
+      readFileSync(join(out, 'look.md'), 'utf8'),
+      /\nMasks:\n- skyClip inside `sky-coverage`, the pixels `@margoengine\/sky` drew \(no page sky mask\): open\n/,
+    );
     // lights and grain do not read it: the same rows as with no mask.
     for (const check of ['lights', 'grain'])
       assert.deepEqual(
         report.json.probes[0].results.find((result) => result.check === check),
-        (await lookShot(out, { ...manifest, probes: { open: { ...manifest.probes.open, aovs: {} } } })).json.probes[0].results.find((result) => result.check === check),
+        (
+          await lookShot(out, { ...manifest, probes: { open: { ...manifest.probes.open, aovs: {} } } })
+        ).json.probes[0].results.find((result) => result.check === check),
         check,
       );
   } finally {

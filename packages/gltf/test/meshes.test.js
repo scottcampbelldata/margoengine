@@ -28,7 +28,11 @@ test('PBRModel.meshes lists the nodes that draw its primitives, once each, as th
     // The light loader's shape: an array of mesh handles that draw, one per primitive for this file.
     const light = await loadLight(engine, 'https://test.invalid/box.glb');
     assert.ok(Array.isArray(light.meshes) && light.meshes.length > 0);
-    assert.equal(meshes.length, light.meshes.length, 'the same file gives the same number of meshes from either loader');
+    assert.equal(
+      meshes.length,
+      light.meshes.length,
+      'the same file gives the same number of meshes from either loader',
+    );
     light.dispose();
     model.dispose();
   } finally {

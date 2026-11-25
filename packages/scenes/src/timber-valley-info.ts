@@ -25,8 +25,17 @@ export const timberValleyInfo: SceneInfo = {
       options: ['none', 'running', 'burnt'],
       about: 'no fire, a fire burning since `fireTime`, or the burned valley after it',
     },
-    fireTime: { default: 1800, range: [0, 21600], unit: 's', about: 'seconds the fire has burned when the scene opens' },
-    houses: { default: 48, range: [0, 256], about: 'town lots along the rail line (no buildings drawn until models exist)' },
+    fireTime: {
+      default: 1800,
+      range: [0, 21600],
+      unit: 's',
+      about: 'seconds the fire has burned when the scene opens',
+    },
+    houses: {
+      default: 48,
+      range: [0, 256],
+      about: 'town lots along the rail line (no buildings drawn until models exist)',
+    },
     quality: { default: 'film', options: ['film', 'preview'], about: 'draw distance, shadow map and fire detail' },
     seed: { default: 1910, about: 'seed of the valley, forest, town and embers' },
   },
@@ -89,7 +98,16 @@ export const timberValleyInfo: SceneInfo = {
       name: 'ridge-smoke',
       seconds: 12,
       camera: ['ridge', 'ridge-pan'],
-      settings: { weather: { wind: { keys: [{ time: 0, value: 12 }, { time: 12, value: 16, ease: 'inOut' }] } } },
+      settings: {
+        weather: {
+          wind: {
+            keys: [
+              { time: 0, value: 12 },
+              { time: 12, value: 16, ease: 'inOut' },
+            ],
+          },
+        },
+      },
       probes: ['column', 'sun', 'far-ridges'],
       about: 'wide pan from the north ridge across the valley to the smoke columns leaning in the wind',
     },
@@ -104,7 +122,16 @@ export const timberValleyInfo: SceneInfo = {
       name: 'blowup',
       seconds: 12,
       camera: ['blowup', 'blowup-push'],
-      settings: { weather: { wind: { keys: [{ time: 0, value: 16 }, { time: 12, value: 24, ease: 'in' }] } } },
+      settings: {
+        weather: {
+          wind: {
+            keys: [
+              { time: 0, value: 16 },
+              { time: 12, value: 24, ease: 'in' },
+            ],
+          },
+        },
+      },
       probes: ['crown-fire', 'embers', 'town'],
       about: 'push in from the valley floor as the gale drives the fire down the wall toward the town',
     },

@@ -16,7 +16,11 @@ const options = () => ({
   initialCount: 40,
   rate: 37.3,
   lifetime: [1, 2],
-  schedule: { prewarm: 0.25, seed: 9, bursts: [{ time: 0.1, count: 25, cycles: 4000, interval: 0.5, probability: 0.7 }] },
+  schedule: {
+    prewarm: 0.25,
+    seed: 9,
+    bursts: [{ time: 0.1, count: 25, cycles: 4000, interval: 0.5, probability: 0.7 }],
+  },
 });
 function world() {
   const h = optionalGPU(),
@@ -161,7 +165,8 @@ function fireWorld(make) {
 }
 const replay = (w, n) => {
   for (let step = 0; step < n; step++)
-    for (const plugin of w.h.engine.plugins.values()) if (typeof plugin.advanceTime === 'function') plugin.advanceTime(1 / FPS);
+    for (const plugin of w.h.engine.plugins.values())
+      if (typeof plugin.advanceTime === 'function') plugin.advanceTime(1 / FPS);
 };
 
 for (const n of [1, 600, 54000])
@@ -180,7 +185,8 @@ for (const n of [1, 600, 54000])
 
 for (const n of [1, 600, 54000])
   test(`a Smoke column replayed ${n} steps draws what a continuous run draws (curves, wind, puff counters)`, () => {
-    const make = (engine) => Smoke.attach(engine, { position: [0, 0, 0], heat: 5e6, prewarm: false, rate: 13.7, wind: gusts });
+    const make = (engine) =>
+      Smoke.attach(engine, { position: [0, 0, 0], heat: 5e6, prewarm: false, rate: 13.7, wind: gusts });
     const a = fireWorld(make),
       b = fireWorld(make);
     assert.equal(b.it.time, 0);

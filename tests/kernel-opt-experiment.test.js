@@ -24,7 +24,10 @@ test('kernel-opt-experiment bundles core + stage with the measure:size externals
   const experiment = readFileSync(new URL('../scripts/kernel-opt-experiment.js', import.meta.url), 'utf8');
   assert.match(experiment, /external: coreStageExternal/);
   const { coreStageExternal, external } = await import('../scripts/measure-size.js');
-  assert.ok(external.some((name) => name instanceof RegExp), 'measure:size keeps RegExp externals');
+  assert.ok(
+    external.some((name) => name instanceof RegExp),
+    'measure:size keeps RegExp externals',
+  );
   assert.ok(!coreStageExternal.some((name) => typeof name === 'string' && name.startsWith('@margoengine/core')));
   assert.deepEqual(
     coreStageExternal.filter((name) => name instanceof RegExp),

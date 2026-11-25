@@ -5,7 +5,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addMotionMatching, MotionDatabase, motionStates } from '../packages/animator/dist/motion-matching.js';
-import { animatorDocument, animatorGLB, animatorRun, BIPED, bipedWalk, FOX, largestGap } from './support/animator-rig.js';
+import {
+  animatorDocument,
+  animatorGLB,
+  animatorRun,
+  BIPED,
+  bipedWalk,
+  FOX,
+  largestGap,
+} from './support/animator-rig.js';
 
 const CLIPS = {
   Idle: { duration: 1, tracks: { 'Hips.translation': (t) => [0, 1 + 0.003 * Math.sin(2 * Math.PI * t), 0] } },
@@ -16,7 +24,10 @@ const CLIPS = {
 const DT = 1 / 60;
 async function rig() {
   const document = animatorDocument(BIPED, CLIPS),
-    f = await animatorRun(document, { initial: 'Idle', states: { Idle: 'Idle', Walk: 'Walk', Run: 'Run', Strafe: 'Strafe' } }),
+    f = await animatorRun(document, {
+      initial: 'Idle',
+      states: { Idle: 'Idle', Walk: 'Walk', Run: 'Run', Strafe: 'Strafe' },
+    }),
     i = (name) => f.index.get(name);
   f.options = { root: i('Hips'), bones: [i('LeftFoot'), i('RightFoot')] };
   f.database = MotionDatabase.build(f.animator, f.options);
@@ -44,7 +55,10 @@ test('every row of a clip is a row of the table, with features centred and scale
   const { database } = f;
   assert.equal(database.width, 2 * 6 + 3 + 3 * 4);
   assert.equal(database.rows, 30 + 30 + 9 + 30);
-  assert.deepEqual(database.clips.map((block) => block.clip), ['Idle', 'Walk', 'Run', 'Strafe']);
+  assert.deepEqual(
+    database.clips.map((block) => block.clip),
+    ['Idle', 'Walk', 'Run', 'Strafe'],
+  );
   for (let i = 0; i < database.width; i++) {
     let sum = 0;
     for (let r = 0; r < database.rows; r++) sum += database.features[r * database.width + i];
@@ -77,8 +91,10 @@ test('a loop reads straight over its seam', async (t) => {
   assert.equal(database.frameAt('Walk', 1), first);
   const path = database.trajectoryAt,
     real = (frame) => Array.from(row(database, frame), (v, i) => v / database.scales[i] + database.centres[i]);
-  for (let i = path; i < database.width; i++) assert.ok(Math.abs(real(last)[i] - real(first)[i]) < 0.01, `path ${i} changes at the seam`);
-  for (let i = 0; i < 6; i++) assert.ok(Math.abs(real(last)[i] - real(first)[i]) <= 0.04, `foot place ${i} changes at the seam`);
+  for (let i = path; i < database.width; i++)
+    assert.ok(Math.abs(real(last)[i] - real(first)[i]) < 0.01, `path ${i} changes at the seam`);
+  for (let i = 0; i < 6; i++)
+    assert.ok(Math.abs(real(last)[i] - real(first)[i]) <= 0.04, `foot place ${i} changes at the seam`);
   assert.notEqual(last, next);
 });
 
@@ -117,7 +133,10 @@ test('rows of a clip with no loop that run past its end are not landed on, and i
   t.after(() => f.release());
   const database = MotionDatabase.build(f.animator, {
       ...f.options,
-      clips: [{ clip: 'Idle', loop: true }, { clip: 'Walk', loop: false }],
+      clips: [
+        { clip: 'Idle', loop: true },
+        { clip: 'Walk', loop: false },
+      ],
       trajectory: [0.5],
     }),
     block = database.clips[1];
@@ -133,7 +152,9 @@ test('a clip told its speed gets the journey it does not have', async (t) => {
   t.after(() => f.release());
   const database = MotionDatabase.build(f.animator, { ...f.options, clips: [{ clip: 'Idle', speed: 2 }, 'Walk'] }),
     path = database.trajectoryAt,
-    real = database.features[(database.clips[0].start + 5) * database.width + path + 5] / database.scales[path + 5] + database.centres[path + 5];
+    real =
+      database.features[(database.clips[0].start + 5) * database.width + path + 5] / database.scales[path + 5] +
+      database.centres[path + 5];
   assert.ok(Math.abs(real - 2) < 0.01, `told 2, read ${real}`);
 });
 

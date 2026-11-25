@@ -442,7 +442,9 @@ const stopFlicker = animateFlicker(engine, groups.group('lamp'), [lantern], { em
 // the lantern, with the bars dark across it and their shadows on the frost (KB-CABIN-FROST2), and the patch on the snow
 // is a soft glow with no window-bar lines in it. The pane stops the lights' beams in their shadow maps; its faces and
 // the light it sends out come from the same opening, on the glass's outdoor face. Behind the frost the frame's sides
-// reach 0.118 m into the room (to z 2.33), the reveal that can shade it.
+// reach 0.118 m into the room (to z 2.33), the reveal that can shade it. Outside, the frame's sides and head stand
+// 0.218 m in front of the opening (to z 2.67) and the sill 0.09 m further (to z 2.76): the light's `recess` and `sill`,
+// so the snow and logs it lights see it only past them (KB-BOUNCE-REVEAL1).
 const inner = { width: width - log, depth: depth - log, height: wallTop - 0.075 - 0.15 },
   walls = 2 * (inner.width + inner.depth) * inner.height - (windowX[1] - windowX[0]) * (windowY[1] - windowY[0]),
   opening = {

@@ -80,7 +80,9 @@ export class SplatSet {
     const count = validateSplats(data),
       at = this.free.findIndex(([, n]) => n >= count);
     if (at < 0)
-      throw new RangeError(`No free range of ${count} splats in this SplatSet (${this.capacity - this.used} free); remove clouds or raise capacity`);
+      throw new RangeError(
+        `No free range of ${count} splats in this SplatSet (${this.capacity - this.used} free); remove clouds or raise capacity`,
+      );
     const first = this.free[at][0];
     // Writing checks the SH count before the range is taken.
     this.cloud.write(first, options.matrix ? transformSplats(data, options.matrix) : data);
@@ -93,7 +95,8 @@ export class SplatSet {
       factor = 1;
     const apply = () => set.cloud.setOpacities(first, alphas, shown ? factor : 0),
       check = () => {
-        if (!live) throw new MargoError('disposed', 'This cloud was removed from its SplatSet; add it again with set.add');
+        if (!live)
+          throw new MargoError('disposed', 'This cloud was removed from its SplatSet; add it again with set.add');
       };
     const member: SplatSetMember = {
       first,

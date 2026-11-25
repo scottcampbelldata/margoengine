@@ -12,7 +12,8 @@ import { pathToFileURL } from 'node:url';
 
 const root = resolve(import.meta.dirname, '..');
 // NODE_TEST_CONTEXT would make the inner runner report to this one instead of printing its results.
-const outsideRunner = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'));
+const outsideRunner = () =>
+  Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'));
 
 test('package-browser-root passes when a probe is slower than any step limit would allow', { timeout: 180_000 }, () => {
   const folder = mkdtempSync(join(tmpdir(), 'browser-root-slow-')),

@@ -32,7 +32,9 @@ try {
     let differing = 0;
     for (let k = 0; k < a.data.length; k += 4)
       if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) differing++;
-    console.log(`${label}${compat ? ' (compat)' : ''}: ${differing} differ, ${r.drawn} of ${r.total} drawn, wall ${r.wallMs.toFixed(1)} ms`);
+    console.log(
+      `${label}${compat ? ' (compat)' : ''}: ${differing} differ, ${r.drawn} of ${r.total} drawn, wall ${r.wallMs.toFixed(1)} ms`,
+    );
     assert.equal(differing, 0, `${label}: culled frame differs from core`);
     drawn.push(r.drawn);
   }

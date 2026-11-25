@@ -34,8 +34,7 @@ function frame(index) {
       data[at + 3] = 255;
     }
   // A small square walks across, so that the frames differ and order shows.
-  for (let y = 0; y < 16; y++)
-    for (let x = 0; x < 16; x++) data.set([0, 0, 0], (y * width + index * 16 + x) * 4);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) data.set([0, 0, 0], (y * width + index * 16 + x) * 4);
   return { width, height, data };
 }
 
@@ -97,7 +96,9 @@ try {
       assert.ok(decoded.stdout[at] < 48, `${name}: frame ${n} is out of order`);
     }
     assert.ok(worst <= 8, `${name}: a colour is ${worst} levels off`);
-    console.log(`PASS ${name}: ${count} frames, ${codec}, BT.709 and sRGB tags, worst colour ${worst} of 255 levels off`);
+    console.log(
+      `PASS ${name}: ${count} frames, ${codec}, BT.709 and sRGB tags, worst colour ${worst} of 255 levels off`,
+    );
   }
   // One second of a 440 Hz tone in stereo, the frames lasting one second too (12 at 12 fps).
   const rate = 48_000,
@@ -128,7 +129,9 @@ try {
     let peak = 0;
     for (let i = rate / 4; i < (rate * 3) / 4; i++) peak = Math.max(peak, Math.abs(heard[i]));
     assert.ok(Math.abs(peak - 0.5) < 0.05, `${name}: peak ${peak}`);
-    console.log(`PASS ${name}: ${count} frames and ${heard.length} samples of ${codec}, 440 Hz, peak ${peak.toFixed(3)}`);
+    console.log(
+      `PASS ${name}: ${count} frames and ${heard.length} samples of ${codec}, 440 Hz, peak ${peak.toFixed(3)}`,
+    );
   }
   {
     const output = join(folder, 'alpha.webm'),

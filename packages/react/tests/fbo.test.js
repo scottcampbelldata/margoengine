@@ -55,7 +55,16 @@ async function setup() {
   engine.onError = (e) => errors.push(e);
   const frames = { callbacks: new FrameCallbacks(), elapsed: 0, last: null, mode: 'always' },
     views = createViews(engine);
-  const scene = { engine, frames, views, registry: null, world: null, resources: { models: new Set(), lighting: new Map() }, pointerHandlers: new Map(), cameraOverrides: new Set() };
+  const scene = {
+    engine,
+    frames,
+    views,
+    registry: null,
+    world: null,
+    resources: { models: new Set(), lighting: new Map() },
+    pointerHandlers: new Map(),
+    cameraOverrides: new Set(),
+  };
   return { engine, frames, scene, textures, errors, gpu };
 }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -67,7 +76,12 @@ test('useFBO follows the canvas size, keeps a fixed size, frees replaced and unm
     seen.push(useFBO(...props.args));
     return null;
   }
-  const tree = (args) => React.createElement(StrictMode, null, React.createElement(Context.Provider, { value: scene }, React.createElement(Probe, { args })));
+  const tree = (args) =>
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(Context.Provider, { value: scene }, React.createElement(Probe, { args })),
+    );
   let view;
   try {
     await act(async () => {
@@ -101,9 +115,15 @@ test('useFBO follows the canvas size, keeps a fixed size, frees replaced and unm
     assert.equal(seen.at(-1), fbo, 'a fixed size ignores the canvas');
     await act(async () => view.unmount());
     await act(flush);
-    assert.ok(textures.every((t) => t.destroyed), 'every texture is freed');
+    assert.ok(
+      textures.every((t) => t.destroyed),
+      'every texture is freed',
+    );
     assert.equal(frames.callbacks.size, 0);
-    assert.equal([...engine.scene.plugins.keys()].some((name) => name.startsWith('react-fbo')), false);
+    assert.equal(
+      [...engine.scene.plugins.keys()].some((name) => name.startsWith('react-fbo')),
+      false,
+    );
   } finally {
     cleanup();
     engine.dispose();

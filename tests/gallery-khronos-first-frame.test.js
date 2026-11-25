@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 // first frame and the page passed the gallery check's 120,000 B budget. The loader now comes with the first model.
 test('the Khronos gallery page loads gltf/pbr with its first model, not before the first frame', () => {
   const text = readFileSync(new URL('../examples/gallery/khronos.ts', import.meta.url), 'utf8');
-  const statics = [...text.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'(@margoengine\/gltf\/pbr[^']*)'/gm)].map((m) => m[1]);
+  const statics = [...text.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'(@margoengine\/gltf\/pbr[^']*)'/gm)].map(
+    (m) => m[1],
+  );
   assert.deepEqual(statics, [], 'no value import of gltf/pbr at the top of khronos.ts');
   assert.match(text, /const pro = import\('@margoengine\/gltf\/pbr'\)/, 'the loader is a dynamic import');
   assert.match(text, /await pro;/, 'show() waits for it');

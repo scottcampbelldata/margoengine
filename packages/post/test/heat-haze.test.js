@@ -22,7 +22,12 @@ test('air refractivity: Gladstone-Dale K rho with the ideal gas, 2.72e-4 at 20 C
   // Dry air at 20 C and 101.325 kPa: rho = 1.204 kg/m^3; the published refractivity for visible light is about 2.71e-4.
   near(airRefractivity(293.15), 2.72e-4, 0.01, 'n - 1 at 20 C');
   near(airRefractivity(1000) / airRefractivity(500), 0.5, 1e-12, 'twice as hot, half the refractivity');
-  near(airRefractivity(293.15, 50662.5), airRefractivity(293.15) / 2, 1e-12, 'half the pressure, half the refractivity');
+  near(
+    airRefractivity(293.15, 50662.5),
+    airRefractivity(293.15) / 2,
+    1e-12,
+    'half the pressure, half the refractivity',
+  );
   assert.throws(() => airRefractivity(0), RangeError);
   assert.throws(() => airRefractivity(NaN), RangeError);
 });
@@ -32,7 +37,7 @@ test("plume temperature: McCaffrey's three regions, about 850 K in the flame, co
   near(plumeExcess(0.1, L), 853, 0.01, 'the continuous flame');
   near(plumeExcess(1, L), 853, 0.01, 'still the continuous flame at a quarter of the length');
   // Intermittent: 66.6 K / z* with z* = 0.235 z / L.
-  near(plumeExcess(2, L), (293.15 / (2 * 9.80665) / 0.81) * 3.61 / (0.235 * 2 / L), 1e-9, 'the intermittent flame');
+  near(plumeExcess(2, L), ((293.15 / (2 * 9.80665) / 0.81) * 3.61) / ((0.235 * 2) / L), 1e-9, 'the intermittent flame');
   near(plumeExcess(12, L) / plumeExcess(6, L), 2 ** (-5 / 3), 1e-9, 'the plume falls as z^(-5/3)');
   for (let h = 0.01; h < 4 * L; h += 0.01)
     assert.ok(Math.abs(plumeExcess(h + 0.01, L) / plumeExcess(h, L) - 1) < 0.01, `no jump at ${h.toFixed(2)} m`);
@@ -60,7 +65,8 @@ test('the bend of a ray past a plume matches a fine quadrature of the Gaussian p
       let want = 0;
       const step = 0.001,
         e = 1e-5;
-      for (let x = -10; x < 10; x += step) want += ((dn(Math.hypot(x, d + e)) - dn(Math.hypot(x, d - e))) / (2 * e)) * step;
+      for (let x = -10; x < 10; x += step)
+        want += ((dn(Math.hypot(x, d + e)) - dn(Math.hypot(x, d - e))) / (2 * e)) * step;
       const got = plumeBend(plume, [-60, h, d], [1, 0, 0], { ambient: T0 });
       near(got[2], want, 0.03, `bend at ${h} m, ${(d / b).toFixed(1)} b off the axis`);
       assert.ok(got[2] > 0, 'the ray turns away from the hot (less refractive) axis');
@@ -104,7 +110,14 @@ test('the eddy noise has zero mean and unit root-mean-square', () => {
 test('HeatHaze options: ranges, kinds, and a stack is needed to set up', () => {
   assert.doesNotThrow(() => new HeatHaze());
   assert.doesNotThrow(() => new HeatHaze({ sources: () => [], strength: 100, turbulence: 0, ambient: 200, steps: 4 }));
-  for (const bad of [{ strength: -1 }, { strength: 101 }, { turbulence: 1.5 }, { ambient: 100 }, { steps: 3 }, { steps: 8.5 }])
+  for (const bad of [
+    { strength: -1 },
+    { strength: 101 },
+    { turbulence: 1.5 },
+    { ambient: 100 },
+    { steps: 3 },
+    { steps: 8.5 },
+  ])
     assert.throws(() => new HeatHaze(bad), RangeError, JSON.stringify(bad));
   assert.throws(() => new HeatHaze({ sources: 4 }), TypeError);
   assert.throws(() => new HeatHaze({ enabled: 'yes' }), TypeError);

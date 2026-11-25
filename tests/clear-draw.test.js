@@ -11,23 +11,23 @@ function recorder() {
       return object;
     };
   const device = {
-    createBindGroupLayout: make('bindGroupLayout'),
-    createPipelineLayout: make('pipelineLayout'),
-    createBuffer: (descriptor) => {
-      const buffer = make('buffer')(descriptor);
-      buffer.destroyed = 0;
-      buffer.destroy = () => buffer.destroyed++;
-      return buffer;
+      createBindGroupLayout: make('bindGroupLayout'),
+      createPipelineLayout: make('pipelineLayout'),
+      createBuffer: (descriptor) => {
+        const buffer = make('buffer')(descriptor);
+        buffer.destroyed = 0;
+        buffer.destroy = () => buffer.destroyed++;
+        return buffer;
+      },
+      createBindGroup: make('bindGroup'),
+      createShaderModule: make('module'),
+      createRenderPipeline: make('pipeline'),
+      queue: {
+        writeBuffer: (buffer, offset, data) => log.push({ kind: 'write', buffer, offset, data: [...data] }),
+        // Work finishes only when the test calls `finish()`.
+        onSubmittedWorkDone: () => new Promise((resolve) => waiting.push(resolve)),
+      },
     },
-    createBindGroup: make('bindGroup'),
-    createShaderModule: make('module'),
-    createRenderPipeline: make('pipeline'),
-    queue: {
-      writeBuffer: (buffer, offset, data) => log.push({ kind: 'write', buffer, offset, data: [...data] }),
-      // Work finishes only when the test calls `finish()`.
-      onSubmittedWorkDone: () => new Promise((resolve) => waiting.push(resolve)),
-    },
-  },
     waiting = [];
   const calls = [],
     pass = new Proxy(
@@ -39,7 +39,15 @@ function recorder() {
             calls.push([name, ...args]),
       },
     );
-  return { device, pass, log, calls, finish: () => waiting.splice(0).forEach((f) => f()), pending: () => waiting.length, of: (kind) => log.filter((e) => e.kind === kind) };
+  return {
+    device,
+    pass,
+    log,
+    calls,
+    finish: () => waiting.splice(0).forEach((f) => f()),
+    pending: () => waiting.length,
+    of: (kind) => log.filter((e) => e.kind === kind),
+  };
 }
 
 const options = { formats: ['bgra8unorm'], depthFormat: 'depth32float-stencil8', writeDepth: true, samples: 4 };
@@ -134,11 +142,19 @@ test('clearDraw destroys an evicted colour buffer after submitted work, never be
   assert.equal(r.pending(), 0, 'no wait is queued before an eviction');
   clearDraw(r.device, cache, r.pass, { ...options, tint: tint(64) });
   assert.equal(r.of('buffer').length, 65);
-  assert.deepEqual(buffers.map((b) => b.destroyed), new Array(64).fill(0), 'nothing is freed while work is pending');
+  assert.deepEqual(
+    buffers.map((b) => b.destroyed),
+    new Array(64).fill(0),
+    'nothing is freed while work is pending',
+  );
   r.finish();
   await Promise.resolve();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(buffers.map((b) => b.destroyed), [1, ...new Array(63).fill(0)], 'only the oldest is destroyed, once');
+  assert.deepEqual(
+    buffers.map((b) => b.destroyed),
+    [1, ...new Array(63).fill(0)],
+    'only the oldest is destroyed, once',
+  );
   assert.equal(r.of('buffer')[64].destroyed, 0);
 });
 
@@ -152,7 +168,11 @@ test('releaseClears hands back every cached colour buffer of the device and forg
   clearDraw(r.device, cache, r.pass, { ...options, tint: defaultClear });
   const made = r.of('buffer');
   assert.deepEqual(releaseClears(r.device), made, 'both colour buffers are returned');
-  assert.deepEqual(made.map((b) => b.destroyed), [0, 0], 'the caller destroys them (with retire)');
+  assert.deepEqual(
+    made.map((b) => b.destroyed),
+    [0, 0],
+    'the caller destroys them (with retire)',
+  );
   assert.deepEqual(releaseClears(r.device), [], 'nothing is returned twice');
   assert.deepEqual(releaseClears(recorder().device), [], 'a device with no clears has none');
   const pipelines = r.of('pipeline').length;

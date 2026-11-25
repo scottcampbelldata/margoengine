@@ -8,6 +8,7 @@ import { Mesh, type MeshProps } from './components.js';
 import { casters } from './casters.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useMesh, useScene, type Registry } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { rangeError } from '../../shared/errors.js';
 
@@ -88,7 +89,10 @@ export interface RandomizedLightProps {
   frames?: number;
 }
 type Light = Required<
-  Pick<RandomizedLightProps, 'position' | 'radius' | 'amount' | 'intensity' | 'ambient' | 'bias' | 'mapSize' | 'size' | 'near' | 'far'>
+  Pick<
+    RandomizedLightProps,
+    'position' | 'radius' | 'amount' | 'intensity' | 'ambient' | 'bias' | 'mapSize' | 'size' | 'near' | 'far'
+  >
 >;
 const Lights = /* @__PURE__ */ createContext<Set<{ current: Light | null }> | null>(null);
 // A light this many times its own distance from the group: the drei lights are directional, and at 1000 times the
@@ -104,11 +108,28 @@ export function accumulativeOptions(
   lights: readonly Light[],
   props: Pick<
     AccumulativeShadowsProps,
-    | 'frames' | 'blend' | 'limit' | 'scale' | 'temporal' | 'opacity' | 'color' | 'resolution' | 'alphaTest' | 'colorBlend' | 'toneMapped'
+    | 'frames'
+    | 'blend'
+    | 'limit'
+    | 'scale'
+    | 'temporal'
+    | 'opacity'
+    | 'color'
+    | 'resolution'
+    | 'alphaTest'
+    | 'colorBlend'
+    | 'toneMapped'
   >,
 ): AmbientShadowOptions {
-  const { frames = 40, blend = 100, limit = Infinity, scale = 10, temporal = false, opacity = 1, resolution = 1024 } =
-    props;
+  const {
+    frames = 40,
+    blend = 100,
+    limit = Infinity,
+    scale = 10,
+    temporal = false,
+    opacity = 1,
+    resolution = 1024,
+  } = props;
   const sx = length(m, 0),
     up = [m[4], m[5], m[6]].map((v) => v / length(m, 4)),
     origin = [m[12], m[13], m[14]];
@@ -245,7 +266,7 @@ function Binding({
         optionalPeer('@margoengine/studio', () => import('@margoengine/studio/accumulate-ambient'))
           .then((api) => {
             if (!active || scene.engine.disposed) return;
-            const made = api.AmbientShadows.attach(scene.engine, options);
+            const made = inScene(scene, () => api.AmbientShadows.attach(scene.engine, options));
             shadows = control.shadows = made;
             seen = key;
             control.reset = false;
@@ -325,7 +346,19 @@ export const AccumulativeShadows = /* @__PURE__ */ forwardRef<AccumulativeShadow
       [c],
     );
     const options = {
-      frames, blend, limit, scale, temporal, opacity, color, resolution, alphaTest, colorBlend, toneMapped, onReady, onError,
+      frames,
+      blend,
+      limit,
+      scale,
+      temporal,
+      opacity,
+      color,
+      resolution,
+      alphaTest,
+      colorBlend,
+      toneMapped,
+      onReady,
+      onError,
     };
     return (
       <Mesh {...props} ref={(m) => void (c.group = m)}>
@@ -356,7 +389,9 @@ export function RandomizedLight({
   const set = useContext(Lights),
     light = useRef<{ current: Light | null }>(null!);
   light.current ??= { current: null };
-  light.current.current = castShadow ? { position, radius, amount, intensity, ambient, bias, mapSize, size, near, far } : null;
+  light.current.current = castShadow
+    ? { position, radius, amount, intensity, ambient, bias, mapSize, size, near, far }
+    : null;
   useEffect(() => {
     if (!set) return;
     const l = light.current;

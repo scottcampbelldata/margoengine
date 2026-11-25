@@ -35,22 +35,44 @@ export interface RoadGraphOptions {
 /** Build a caller-owned compute graph with travel seconds as weights; reuse compute/graph for routing. */
 export function roadGraph(gpu: ComputeContext, { vertices, roads = [], signal }: RoadGraphOptions): CsrMatrix {
   signal?.throwIfAborted();
-  const invalid = () => fault('failed', 'Road graph needs 0..65536 vertices/roads, valid junction indices, positive finite lengths/speeds and normal float32 travel seconds', 'road');
-  if (!Number.isInteger(vertices) || vertices < 0 || vertices > 65536 || !Array.isArray(roads) || roads.length > 65536) throw invalid();
-  const sources: number[] = [], targets: number[] = [], weights: number[] = [];
+  const invalid = () =>
+    fault(
+      'failed',
+      'Road graph needs 0..65536 vertices/roads, valid junction indices, positive finite lengths/speeds and normal float32 travel seconds',
+      'road',
+    );
+  if (!Number.isInteger(vertices) || vertices < 0 || vertices > 65536 || !Array.isArray(roads) || roads.length > 65536)
+    throw invalid();
+  const sources: number[] = [],
+    targets: number[] = [],
+    weights: number[] = [];
   for (const link of roads) {
     if (!link) throw invalid();
     const { from, to, curve, speed = 50 / 3.6, direction = 'both', traffic = 1, delay = 0 } = link;
     const length = curve?.length;
-    if (![from, to].every(v => Number.isInteger(v) && v >= 0 && v < vertices) ||
-      ![length, speed].every(v => Number.isFinite(v) && v > 0) ||
-      !Number.isFinite(traffic) || traffic < 1 || !Number.isFinite(delay) || delay < 0 ||
-      !['both', 'forward', 'reverse'].includes(direction)) throw invalid();
-    const weight = Math.fround(length / speed * traffic + delay);
+    if (
+      ![from, to].every((v) => Number.isInteger(v) && v >= 0 && v < vertices) ||
+      ![length, speed].every((v) => Number.isFinite(v) && v > 0) ||
+      !Number.isFinite(traffic) ||
+      traffic < 1 ||
+      !Number.isFinite(delay) ||
+      delay < 0 ||
+      !['both', 'forward', 'reverse'].includes(direction)
+    )
+      throw invalid();
+    const weight = Math.fround((length / speed) * traffic + delay);
     // Keep every simple path's sum finite and avoid backend-dependent subnormal flushing.
     if (!(weight >= 2 ** -126 && weight <= 2 ** 127 / Math.max(1, vertices))) throw invalid();
-    if (direction !== 'reverse') { sources.push(from); targets.push(to); weights.push(weight); }
-    if (direction !== 'forward') { sources.push(to); targets.push(from); weights.push(weight); }
+    if (direction !== 'reverse') {
+      sources.push(from);
+      targets.push(to);
+      weights.push(weight);
+    }
+    if (direction !== 'forward') {
+      sources.push(to);
+      targets.push(from);
+      weights.push(weight);
+    }
   }
   signal?.throwIfAborted();
   return graph(gpu, { vertices, sources, targets, weights });

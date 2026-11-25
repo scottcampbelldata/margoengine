@@ -62,10 +62,18 @@ export class AudioVoicePool {
     if (this.disposed) throw margoError('disposed', 'AudioVoicePool is disposed; create a new AudioVoicePool');
     const volume = options.volume ?? this.volume,
       playbackRate = options.playbackRate ?? this.playbackRate;
-    if (position.length !== 3 || !Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2]))
+    if (
+      position.length !== 3 ||
+      !Number.isFinite(position[0]) ||
+      !Number.isFinite(position[1]) ||
+      !Number.isFinite(position[2])
+    )
       throw rangeError('AudioVoicePool position needs three finite coordinates; pass [x, y, z] in metres', 'state');
     if (!Number.isFinite(volume) || volume < 0 || !Number.isFinite(playbackRate))
-      throw rangeError('AudioVoicePool needs finite playbackRate and nonnegative finite volume; pass valid play options', 'state');
+      throw rangeError(
+        'AudioVoicePool needs finite playbackRate and nonnegative finite volume; pass valid play options',
+        'state',
+      );
     let index = this.voices.findIndex((voice) => !voice.isPlaying);
     if (index < 0) index = this.started.indexOf(Math.min(...this.started));
     const voice = this.voices[index],

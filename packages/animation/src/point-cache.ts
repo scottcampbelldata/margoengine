@@ -46,8 +46,14 @@ function sizes(frames: number, vertices: number, limit: number, room: number): n
     throw bad('has no frames or no vertices');
   const count = frames * vertices * 3;
   if (count * 4 > room)
-    throw bad(`is cut off or is not a PC2 or MDD file: its header asks for ${frames} frames of ${vertices} vertices, more than it holds`);
-  if (count > limit) throw new MargoError('failed', `Point cache holds ${count} floats, over maxFloats ${limit}; raise maxFloats or export fewer frames`);
+    throw bad(
+      `is cut off or is not a PC2 or MDD file: its header asks for ${frames} frames of ${vertices} vertices, more than it holds`,
+    );
+  if (count > limit)
+    throw new MargoError(
+      'failed',
+      `Point cache holds ${count} floats, over maxFloats ${limit}; raise maxFloats or export fewer frames`,
+    );
   return count;
 }
 

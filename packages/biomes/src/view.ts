@@ -9,7 +9,7 @@
 // entry costs nothing until it is used.
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
-import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
+import type { Terrain, TerrainColorOptions, TerrainOptions } from '@margoengine/terrain';
 import type { WetGround, WetGroundLook } from '@margoengine/terrain/wet-ground';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -21,6 +21,7 @@ import { horizonHeights } from './horizon.js';
 export { horizonHeights, HORIZON_SKIRT, type HorizonHeights, type HorizonSource } from './horizon.js';
 import type { PlantStates, PlantStateSource } from '@margoengine/scatter/states';
 import type { DisturbanceStatesOptions } from './disturbance.js';
+import type { PlacementGraph } from './graph.js';
 import type { PlacedTile } from './placement.js';
 import type { BiomeSample } from './sample.js';
 import type { BiomeSeasons } from './seasons.js';
@@ -49,7 +50,13 @@ export interface BiomeViewOptions {
   /** Clipmap settings passed to the terrain. Default cell 1 m, 64 cells per ring, and as many rings as the world and
    * `radius` need (`clipmapLevels`: 9 for a 4 km world). Explicit settings that reach less than `radius` are a
    * RangeError. */
-  readonly clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number };
+  readonly clipmap?: {
+    readonly cellSize?: number;
+    readonly resolution?: number;
+    readonly levels?: number;
+    /** World XZ centre for terrain and horizon. Defaults to the starting camera XZ. Use `'camera'` for a moving window. */
+    readonly anchor?: TerrainOptions['clipmapAnchor'];
+  };
   /**
    * How far tree crowns darken the ground, 0 to 1: a material `'canopy'` (its look in `MATERIALS`) takes this share of
    * the ground weight times `canopyCover`, on far hills and on the forest floor, and `materials` lists it last. Nothing
@@ -135,6 +142,8 @@ export interface BiomeViewOptions {
    * `layoutSettlements(...).exclusions` and `pathExclusions(paths)`). Default none.
    */
   readonly exclusions?: readonly import('./placement.js').Exclusion[];
+  /** Density rules for the view's placed species. Default none. Load the graph entry or use a graph builder. */
+  readonly graph?: PlacementGraph;
   /**
    * Meshes by key drawn in place of the procedural ones (`BiomeObjectsOptions.meshes`): library plants and rocks drawn
    * by the key their species name. Default none.
@@ -845,6 +854,7 @@ export class BiomeView implements Disposable {
   /** CPU copies of the weight textures, 4 bytes per texel each. */
   readonly #weights: Uint8Array[];
   readonly #radius: number;
+  readonly #farEnabled: boolean;
   /** Share of the ground the canopy material takes under full crowns (0: no canopy material). */
   readonly #canopy: number;
   readonly #cover?: typeof import('@margoengine/biomes/cover');
@@ -940,6 +950,7 @@ export class BiomeView implements Disposable {
     this.#world = world;
     this.#signal = combineSignals(this.#lifetime.signal, options.signal);
     this.#radius = options.radius ?? 1000;
+    this.#farEnabled = (options.objects ?? true) && options.far !== false && (!!options.far || this.#radius < 2500);
     this.#lookahead = options.lookahead ?? 3;
     this.#budget = options.budget ?? 0.25;
     this.#maxSteps = options.maxSteps;
@@ -1026,13 +1037,26 @@ export class BiomeView implements Disposable {
       () => new Uint8Array(this.#width * this.#depth * 4),
     );
     const view = this;
+    const anchor = options.clipmap?.anchor ?? ([engine.camera.position[0], engine.camera.position[2]] as const);
+    const extent =
+      anchor === 'camera' || options.clipmap?.levels !== undefined
+        ? this.#radius
+        : Math.max(
+            this.#radius,
+            Math.abs(anchor[0] - x0),
+            Math.abs(anchor[0] - x1),
+            Math.abs(anchor[1] - z0),
+            Math.abs(anchor[1] - z1),
+          );
     this.terrain = terrainModule.Terrain.attach(engine, {
       origin: [x0, z0],
       size: [x1 - x0, z1 - z0],
       heightScale: 1,
       cellSize: options.clipmap?.cellSize ?? 1,
       resolution: options.clipmap?.resolution ?? 64,
-      levels: clipmapLevels(world.bounds, this.#radius, options.clipmap),
+      levels: clipmapLevels(world.bounds, extent, options.clipmap),
+      clipmapAnchor: anchor,
+      captureSurfaceHeight: this.#farEnabled,
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0, repeat = 4 } = looks[Math.min(i, looks.length - 1)];
@@ -1084,8 +1108,11 @@ export class BiomeView implements Disposable {
     if (horizon !== true && horizon !== false && horizon !== 'auto')
       throw typeError("BiomeView horizon must be true, false or 'auto'", 'biomes');
     // The ring takes the world's edge weights, so it is made when the overview weights are in.
-    if (horizon)
-      this.#makeHorizon = () => this.#horizonTerrain(world, horizon, terrainModule, layerKeys, looks, pixels);
+    if (horizon) {
+      const horizonAnchor = anchor === 'camera' ? anchor : ([anchor[0], anchor[1]] as const);
+      this.#makeHorizon = () =>
+        this.#horizonTerrain(world, horizon, terrainModule, layerKeys, looks, pixels, horizonAnchor);
+    }
     // A world change repaints the tint over its rectangle too (the world's region fields are rebuilt before it tells
     // listeners, and reading them there is allowed); each `seasons.set` repaints all of it.
     this.#off = world.onChange((rect) => {
@@ -1266,7 +1293,7 @@ export class BiomeView implements Disposable {
           ]),
           t = view.textureResolution / 2,
           [x0, z0, x1, z1] = world.bounds;
-        const placement = BiomePlacement.attach(world, options.exclusions ? { exclusions: options.exclusions } : {}),
+        const placement = BiomePlacement.attach(world, { exclusions: options.exclusions, graph: options.graph }),
           bounds = [x0 - t, z0 - t, x1 + t, z1 + t] as const;
         view.#placement = placement;
         // Detail maps start at the terrain's texel and coarsen by halves until they fit the budget and the device.
@@ -1286,9 +1313,17 @@ export class BiomeView implements Disposable {
             ...(seasons ? { seasons } : {}),
             ...(options.meshes ? { meshes: options.meshes } : {}),
             ...(view.#statesOf ? { states: view.#statesOf } : options.states ? { states: options.states } : {}),
-            ...(options.far === false || (!options.far && view.#radius >= 2500)
-              ? {}
-              : { far: { radius: 2500, ...options.far, world } }),
+            ...(view.#farEnabled && options.far !== false
+              ? {
+                  far: {
+                    radius: 2500,
+                    ...options.far,
+                    world,
+                    graph: options.graph,
+                    heightmap: () => view.terrain.surfaceHeightTexture ?? view.#textures?.height,
+                  },
+                }
+              : {}),
           }),
         );
         view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
@@ -1914,6 +1949,7 @@ export class BiomeView implements Disposable {
     layerKeys: readonly string[],
     looks: readonly MaterialLook[],
     pixels: readonly Uint8Array[][],
+    anchor: NonNullable<TerrainOptions['clipmapAnchor']>,
   ): Terrain | undefined {
     const sea = world.climate.sea / 1000, // float division: mm to metres
       w = this.#width,
@@ -1958,6 +1994,7 @@ export class BiomeView implements Disposable {
       cellSize: 8,
       resolution: 64,
       levels,
+      clipmapAnchor: anchor,
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
         const scale = 1 / far.texel; // float division: one repeat per ring texel

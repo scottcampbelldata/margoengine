@@ -22,7 +22,8 @@ try {
     configFile: false,
     root: external,
     cacheDir: resolve(root, 'test-results/bp-169-vite'),
-    plugins: [noFileWatcher(),
+    plugins: [
+      noFileWatcher(),
       {
         name: 'bp169-oracle-page',
         configureServer(srv) {

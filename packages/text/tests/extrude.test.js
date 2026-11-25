@@ -189,5 +189,8 @@ test('extrudeText validates arguments with descriptive errors', () => {
     () => extrudeText('test', { font: fontBuffer, depth: -0.1 }),
     /extrudeText depth must be a non-negative finite number/,
   );
-  assert.throws(() => parseFontOutlines(new Uint8Array([0, 1, 2])), /TTF: font header at byte 0 runs past the end of the 3-byte file/);
+  assert.throws(
+    () => parseFontOutlines(new Uint8Array([0, 1, 2])),
+    /TTF: font header at byte 0 runs past the end of the 3-byte file/,
+  );
 });

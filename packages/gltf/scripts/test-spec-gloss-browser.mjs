@@ -131,7 +131,7 @@ await runSuite(
         }
         row.meanAbsoluteChannelError = sum / pictures[0].data.length;
         row.maxChannelError = max;
-      assert.ok(row.meanAbsoluteChannelError < 1, `standard workflows diverged: ${row.meanAbsoluteChannelError}`);
+        assert.ok(row.meanAbsoluteChannelError < 1, `standard workflows diverged: ${row.meanAbsoluteChannelError}`);
       } else if (row.real) {
         writeFileSync(
           `test-results/batch201-spec-gloss${process.argv.includes('--compat') ? '-compat' : ''}.png`,

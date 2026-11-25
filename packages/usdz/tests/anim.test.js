@@ -15,15 +15,20 @@ const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'),
 const open = (file, extensions = [animation()], text) => {
   const path = join(fixtures, ...file.split('/')),
     folder = dirname(path);
-  return parseUSDFiles(path.split(sep).at(-1), (id) => {
-    if (text) return new TextEncoder().encode(text);
-    const at = resolve(folder, id);
-    return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
-  }, { extensions });
+  return parseUSDFiles(
+    path.split(sep).at(-1),
+    (id) => {
+      if (text) return new TextEncoder().encode(text);
+      const at = resolve(folder, id);
+      return existsSync(at) ? new Uint8Array(readFileSync(at)) : undefined;
+    },
+    { extensions },
+  );
 };
 const multiply = (a, b) => {
   const out = new Array(16).fill(0);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return out;
 };
 const keysOf = (asset, id, path) => {
@@ -75,7 +80,9 @@ test('neighbouring keys take the same side, so no channel spins the long way rou
     const sampler = doc.animations[0].samplers[i],
       data = buffers[doc.bufferViews[doc.accessors[sampler.output].bufferView].buffer];
     for (let k = 4; k < data.length; k += 4)
-      assert.ok(data[k] * data[k - 4] + data[k + 1] * data[k - 3] + data[k + 2] * data[k - 2] + data[k + 3] * data[k - 1] >= 0);
+      assert.ok(
+        data[k] * data[k - 4] + data[k + 1] * data[k - 3] + data[k + 2] * data[k - 2] + data[k + 3] * data[k - 1] >= 0,
+      );
   }
 });
 
@@ -93,7 +100,10 @@ test('a prim that starts invisible stays in the scene only with animation(), and
   assert.equal(nodeAt(still, '/Show/Late'), undefined);
   assert.equal(nodeAt(played, '/Show/NeverShown'), undefined);
   assert.equal(played.document.nodes[nodeAt(played, '/Show/Late')].extensions.KHR_node_visibility.visible, false);
-  assert.deepEqual(played.document.extensionsUsed.filter((name) => /visibility|pointer/.test(name)).sort(), ['KHR_animation_pointer', 'KHR_node_visibility']);
+  assert.deepEqual(played.document.extensionsUsed.filter((name) => /visibility|pointer/.test(name)).sort(), [
+    'KHR_animation_pointer',
+    'KHR_node_visibility',
+  ]);
 });
 
 test('visibility is a boolean pointer channel: STEP and unsigned bytes', async () => {
@@ -114,7 +124,10 @@ test('samples that never change make no channel and leave the matrix alone', asy
 
 test('shear over time is listed, and the file still opens', async () => {
   const { issues } = await open('anim/cases.usda');
-  assert.deepEqual(issues.map((i) => i.message.split(' ').slice(0, 4).join(' ')), ['the transform of /Show/Sheared']);
+  assert.deepEqual(
+    issues.map((i) => i.message.split(' ').slice(0, 4).join(' ')),
+    ['the transform of /Show/Sheared'],
+  );
 });
 
 test('one clip carries transforms and joints', async () => {

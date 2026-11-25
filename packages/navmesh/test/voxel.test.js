@@ -85,7 +85,11 @@ test('tiles split a shared edge at the same points on both sides (KB2604b)', () 
   }
   assert.ok(seams.size >= 14);
   for (const [key, { low, high }] of seams)
-    assert.deepEqual([...low].sort((a, b) => a - b), [...high].sort((a, b) => a - b), key);
+    assert.deepEqual(
+      [...low].sort((a, b) => a - b),
+      [...high].sort((a, b) => a - b),
+      key,
+    );
   mesh.dispose();
 });
 

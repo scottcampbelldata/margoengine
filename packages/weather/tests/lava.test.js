@@ -29,7 +29,10 @@ test('the glow is a blackbody through the CIE observer: the 2042 K candela and i
     X = 0.4124 * r + 0.3576 * g + 0.1805 * b,
     Y = 0.2126 * r + 0.7152 * g + 0.0722 * b,
     Z = 0.0193 * r + 0.1192 * g + 0.9505 * b;
-  assert.ok(Math.abs(X / (X + Y + Z) - 0.4476) < 0.003 && Math.abs(Y / (X + Y + Z) - 0.4074) < 0.003, `illuminant A at ${X / (X + Y + Z)}, ${Y / (X + Y + Z)}`);
+  assert.ok(
+    Math.abs(X / (X + Y + Z) - 0.4476) < 0.003 && Math.abs(Y / (X + Y + Z) - 0.4074) < 0.003,
+    `illuminant A at ${X / (X + Y + Z)}, ${Y / (X + Y + Z)}`,
+  );
   // Hotter lava is brighter and yellower; below 500 K it is dark.
   const cool = lavaGlow(1100),
     hot = lavaGlow(1450);
@@ -48,7 +51,9 @@ test('the crust grows within 30 percent of Hon et al. (1994) from an hour to a d
     assert.ok(Math.abs(stefan - hon) / hon < 0.06, `${hours} h: Stefan crust ${stefan} m against ${hon}`);
   }
   // The surface cools within minutes (Keszthelyi and Denlinger 1996): under 1,150 K in a minute, under 800 K in an hour.
-  assert.ok(lava.surfaceTemperature(60) < 1150 && lava.surfaceTemperature(3600) < 800 && lava.surfaceTemperature(1) > 1380);
+  assert.ok(
+    lava.surfaceTemperature(60) < 1150 && lava.surfaceTemperature(3600) < 800 && lava.surfaceTemperature(1) > 1380,
+  );
 });
 
 test('the sheet flows as Jeffreys (1925) with Hulme (1974) plug correction, and its thickness carries the flux', () => {
@@ -60,7 +65,11 @@ test('the sheet flows as Jeffreys (1925) with Hulme (1974) plug correction, and 
   const hy = 1000 / (rho * G * sin);
   assert.equal(binghamSpeed(hy * 0.99, sin, rho, eta, 1000), 0, 'below the plug thickness it cannot flow');
   const x = hy / h;
-  assert.ok(Math.abs(binghamSpeed(h, sin, rho, eta, 1000) - ((rho * G * h * h * sin) / (3 * eta)) * (1 - 1.5 * x + 0.5 * x ** 3)) < 1e-12);
+  assert.ok(
+    Math.abs(
+      binghamSpeed(h, sin, rho, eta, 1000) - ((rho * G * h * h * sin) / (3 * eta)) * (1 - 1.5 * x + 0.5 * x ** 3),
+    ) < 1e-12,
+  );
   const q = 3,
     t = binghamThickness(q, sin, rho, eta, 1000);
   assert.ok(Math.abs(t * binghamSpeed(t, sin, rho, eta, 1000) - q) < 1e-9, 'thickness times speed is the flux');
@@ -68,14 +77,23 @@ test('the sheet flows as Jeffreys (1925) with Hulme (1974) plug correction, and 
 });
 
 test('the path runs down the steepest descent: along a valley floor, and outward from a cone', () => {
-  const valley = new LavaFlow({ vent: [0, 1000, 0], ground: (x, z) => 1000 - 0.05 * z + 0.2 * Math.abs(x), maxLength: 2000 }),
+  const valley = new LavaFlow({
+      vent: [0, 1000, 0],
+      ground: (x, z) => 1000 - 0.05 * z + 0.2 * Math.abs(x),
+      maxLength: 2000,
+    }),
     p = valley.path();
   assert.ok(p.length > 300);
   for (let i = 1; i < p.length; i++) {
     assert.ok(Math.abs(p[i].position[0]) < 3 * 5, `point ${i} leaves the valley floor: x ${p[i].position[0]}`);
     assert.ok(p[i].position[1] < p[i - 1].position[1] + 0.5, `point ${i} climbs`);
   }
-  const cone = new LavaFlow({ vent: [0, 500, 0], ground: (x, z) => 500 - 0.3 * Math.hypot(x - 1, z - 0.5), maxLength: 500, wander: 0 }),
+  const cone = new LavaFlow({
+      vent: [0, 500, 0],
+      ground: (x, z) => 500 - 0.3 * Math.hypot(x - 1, z - 0.5),
+      maxLength: 500,
+      wander: 0,
+    }),
     end = cone.path().at(-1).position;
   const off = Math.abs(Math.atan2(end[2] - 0, end[0] - 0) - Math.atan2(-0.5, -1));
   assert.ok(Math.min(off, 2 * Math.PI - off) < 0.1, `the flow runs straight down the cone: ${off} rad off`);
@@ -97,7 +115,9 @@ test('a cooling-limited flow stops where its Graetz number reaches 300 (Pinkerto
   // With a solidus close to the vent temperature the core freezes first: the flow stops with its core at the solidus.
   const frozen = new LavaFlow({ ground: slope(0.03), effusionRate: 2, maxLength: 200000, step: 20, solidus: 1400 });
   assert.equal(frozen.stop, 'cooled');
-  assert.ok(frozen.path().at(-1).temperature <= 1400 && frozen.path().at(-1).graetz >= 300 && frozen.length < lengths[1]);
+  assert.ok(
+    frozen.path().at(-1).temperature <= 1400 && frozen.path().at(-1).graetz >= 300 && frozen.length < lengths[1],
+  );
   const stiff = new LavaFlow({ ground: slope(0.03), yieldStrength: 1e4, yieldRise: 0.2, maxLength: 200000, step: 20 });
   assert.ok(['stalled', 'cooled'].includes(stiff.stop));
 });
@@ -109,14 +129,24 @@ test('a flow on flat ground ponds and spreads as Huppert (1982): R = 0.715 (g Q^
   lava.seek(1001);
   const r = lava.pondRadius(),
     want = 0.715 * Math.pow((G * 125) / (3 * (eta / 2600)), 1 / 8) * Math.sqrt(lava.supplied());
-  assert.ok(Math.abs(r - want) < 1e-9 * want && Math.abs(pondRadius(5, 1000, 2600, eta) * 2 - pondRadius(5, 4000, 2600, eta)) < 1e-9);
+  assert.ok(
+    Math.abs(r - want) < 1e-9 * want &&
+      Math.abs(pondRadius(5, 1000, 2600, eta) * 2 - pondRadius(5, 4000, 2600, eta)) < 1e-9,
+  );
   // The ground event of a ponded flow is still valid.
   const ev = lava.lavaEvent();
   assert.ok(ev.path.length >= 2 && ev.arrival.every(Number.isFinite));
 });
 
 test('the front follows the supply: it advances while the vent runs and stops when the supply is spent', () => {
-  const lava = new LavaFlow({ ground: slope(0.05), effusionRate: 20, rise: 10, duration: 600, wane: 10, maxLength: 100000 });
+  const lava = new LavaFlow({
+    ground: slope(0.05),
+    effusionRate: 20,
+    rise: 10,
+    duration: 600,
+    wane: 10,
+    maxLength: 100000,
+  });
   assert.equal(lava.front(0).distance, 0);
   const a = lava.front(200),
     b = lava.front(400);
@@ -145,7 +175,10 @@ test('the surface glows through cracks that close as it ages (Crisp and Baloga 1
   assert.ok(near[0] >= near[1] && near[1] >= near[2], 'red-orange');
   assert.ok(lava.crackShare(2) > lava.crackShare(100) && lava.crackShare(100) >= 0.05);
   lava.seek(lava.end + 86400);
-  assert.ok(lava.radiance(2)[0] < near[0] * 1e-3 && lava.crackShare(2) < 1e-6, 'a day after the vent stops the glow has gone');
+  assert.ok(
+    lava.radiance(2)[0] < near[0] * 1e-3 && lava.crackShare(2) < 1e-6,
+    'a day after the vent stops the glow has gone',
+  );
   assert.deepEqual(lava.radiance(9999), [0, 0, 0]);
 });
 
@@ -170,15 +203,28 @@ test('bombs fly as ballistics: without drag they land at their launch speed afte
     hits = free.impacts(0, 300);
   assert.ok(hits.length > 50);
   for (const h of hits) {
-    assert.ok(Math.abs(h.speed - h.launchSpeed) < 1e-6 * h.launchSpeed, `impact ${h.speed} against launch ${h.launchSpeed}`);
+    assert.ok(
+      Math.abs(h.speed - h.launchSpeed) < 1e-6 * h.launchSpeed,
+      `impact ${h.speed} against launch ${h.launchSpeed}`,
+    );
     assert.ok(Math.abs(h.time - h.launch - (2 * h.launchSpeed) / G) < 1e-6, 'flight time 2 v / g');
   }
   // Drag: a 0.1 m bomb thrown at 300 m/s comes down near its terminal speed sqrt(2 m g / (rho Cd A)).
-  const drag = new LavaFlow({ bombRate: 6, bombSpread: 0, bombSpeed: 300, bombSize: 0.1, drag: 0.8, fountainHeight: 0 });
+  const drag = new LavaFlow({
+    bombRate: 6,
+    bombSpread: 0,
+    bombSpeed: 300,
+    bombSize: 0.1,
+    drag: 0.8,
+    fountainHeight: 0,
+  });
   for (const h of drag.impacts(0, 600)) {
     const d = Math.cbrt((6 * h.mass) / (Math.PI * 2500)),
-      terminal = Math.sqrt((2 * h.mass * G) / (1.225 * 0.8 * (Math.PI * d * d) / 4));
-    assert.ok(h.speed < h.launchSpeed && h.speed < terminal * 1.05 && h.speed > terminal * 0.7, `impact ${h.speed}, terminal ${terminal}`);
+      terminal = Math.sqrt((2 * h.mass * G) / ((1.225 * 0.8 * (Math.PI * d * d)) / 4));
+    assert.ok(
+      h.speed < h.launchSpeed && h.speed < terminal * 1.05 && h.speed > terminal * 0.7,
+      `impact ${h.speed}, terminal ${terminal}`,
+    );
   }
   const lava = new LavaFlow({ rise: 1 });
   lava.seek(400);
@@ -209,14 +255,19 @@ test('glow lights: at most maxLights, over the fountain and along the flow, scal
   const lava = new LavaFlow({ ground: slope(0.05), rise: 1, maxLights: 5, lights: { setLights: (l) => (set = l) } });
   lava.seek(900);
   assert.equal(set.length, 5);
-  assert.ok(set.every((l) => l.intensity > 0 && l.range === 400 && l.decay === 2 && l.color[0] === 1 && l.color[1] < 0.6));
+  assert.ok(
+    set.every((l) => l.intensity > 0 && l.range === 400 && l.decay === 2 && l.color[0] === 1 && l.color[1] < 0.6),
+  );
   assert.ok(Math.abs(set[0].position[1] - 20) < 1e-9, 'the first light is over the 40 m fountain');
   const bright = set.map((l) => l.intensity);
   lava.options.glow = 3;
   lava.seek(900);
   set.forEach((l, i) => assert.ok(Math.abs(l.intensity - 3 * bright[i]) < 1e-9 * bright[i]));
   lava.seek(lava.end + 3 * 86400);
-  assert.ok(set.reduce((s, l) => s + l.intensity, 0) < 1e-3 * bright.reduce((s, b) => s + b, 0), 'cooled lava lights almost nothing');
+  assert.ok(
+    set.reduce((s, l) => s + l.intensity, 0) < 1e-3 * bright.reduce((s, b) => s + b, 0),
+    'cooled lava lights almost nothing',
+  );
   lava.dispose();
   assert.deepEqual(set, []);
 });
@@ -224,7 +275,10 @@ test('glow lights: at most maxLights, over the fountain and along the flow, scal
 test('the flow lays its lava cover on a GroundChange: thick and glowing where reached, nothing past the front', async () => {
   const { GroundChange } = await import('../../terrain/dist/ground-change.js');
   const lava = new LavaFlow({ vent: [0, 1000, -150], ground: slope(0.05), rise: 1, maxLength: 2000 }),
-    change = new GroundChange({ grid: { size: [400, 400], origin: [-200, -200], resolution: 201 }, events: [lava.lavaEvent()] });
+    change = new GroundChange({
+      grid: { size: [400, 400], origin: [-200, -200], resolution: 201 },
+      events: [lava.lavaEvent()],
+    });
   lava.seek(120);
   const front = lava.front(),
     behind = lava.path()[Math.floor(front.distance / 5 / 2)].position;
@@ -235,29 +289,102 @@ test('the flow lays its lava cover on a GroundChange: thick and glowing where re
 });
 
 test('every slider row is read: a value off its default changes the lava; null wind rows follow the weather', async () => {
-  const { LAVA_SETTINGS, LAVA_LOOKS, applyLavaSettings, lavaSettingDefaults, lavaSettingValues } = await import('../dist/lava-settings.js');
+  const { LAVA_SETTINGS, LAVA_LOOKS, applyLavaSettings, lavaSettingDefaults, lavaSettingValues } = await import(
+    '../dist/lava-settings.js'
+  );
   const weather = { state: { wind: 6, windDirection: 0 } };
   // With breakouts on, for the roof row: when the blocked tube's roof bursts.
-  const burst = (l) => new LavaFlow({ ...tubed(l).options, breakoutHeight: l.options.breakoutHeight || 20 }).branches().map((b) => b.path[0].travel);
+  const burst = (l) =>
+    new LavaFlow({ ...tubed(l).options, breakoutHeight: l.options.breakoutHeight || 20 })
+      .branches()
+      .map((b) => b.path[0].travel);
   const make = (values) => {
     const l = new LavaFlow({ weather, vent: [0, 1000, 0], ground: slope(0.05) });
     applyLavaSettings(l, values);
     l.seek(l.options.start ?? 0);
     l.update(400);
     const p = l.path();
-    return JSON.stringify([l.time, l.end, l.length, l.stop, p.length, p[3], p.at(-1), l.front(), l.radiance(3), l.radiance(40), l.clots(), l.bombs(), l.glowLights(), l.crustThickness(3600), l.surfaceTemperature(100), l.coreTemperature(3, l.end + 30 * 86400), l.leveeShare(3), l.tubeTemperatures()[40], l.radiance(2), wedged(l).branches().map((b) => [b.flux, b.path.length]), tubed(l).length, tubed(l).branches().length, l.lavaEvent(8).skylights, isled(l).branches().map((b) => [b.stop, b.path.length]), burst(l)]);
+    return JSON.stringify([
+      l.time,
+      l.end,
+      l.length,
+      l.stop,
+      p.length,
+      p[3],
+      p.at(-1),
+      l.front(),
+      l.radiance(3),
+      l.radiance(40),
+      l.clots(),
+      l.bombs(),
+      l.glowLights(),
+      l.crustThickness(3600),
+      l.surfaceTemperature(100),
+      l.coreTemperature(3, l.end + 30 * 86400),
+      l.leveeShare(3),
+      l.tubeTemperatures()[40],
+      l.radiance(2),
+      wedged(l)
+        .branches()
+        .map((b) => [b.flux, b.path.length]),
+      tubed(l).length,
+      tubed(l).branches().length,
+      l.lavaEvent(8).skylights,
+      isled(l)
+        .branches()
+        .map((b) => [b.stop, b.path.length]),
+      burst(l),
+    ]);
   };
   // The same lava on a wedge it splits round, for the branch rows.
   // And a small flow on gentle ground fed for months, whose front tubes feed on, for the run-on rows.
-  const tubed = (l) => new LavaFlow({ ...l.options, ground: slope(Math.tan(Math.PI / 180)), effusionRate: 1, width: 4, maxWidth: 4, rise: 1, duration: 1e7, wander: 0, maxLength: 60000, step: 10 });
-  const wedged = (l) => new LavaFlow({ ...l.options, ground: (x, z) => 1000 - 0.05 * z + Math.max(0, 0.3 * (z - 200) - 0.6 * Math.abs(x)), wander: 0 });
+  const tubed = (l) =>
+    new LavaFlow({
+      ...l.options,
+      ground: slope(Math.tan(Math.PI / 180)),
+      effusionRate: 1,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e7,
+      wander: 0,
+      maxLength: 60000,
+      step: 10,
+    });
+  const wedged = (l) =>
+    new LavaFlow({
+      ...l.options,
+      ground: (x, z) => 1000 - 0.05 * z + Math.max(0, 0.3 * (z - 200) - 0.6 * Math.abs(x)),
+      wander: 0,
+    });
   // The flow parting round an island in a valley and meeting below it, for the join row.
-  const isled = (l) => new LavaFlow({ ...l.options, vent: [0, diamond(0, 0), 0], ground: diamond, wander: 0, maxLength: 20000 });
+  const isled = (l) =>
+    new LavaFlow({ ...l.options, vent: [0, diamond(0, 0), 0], ground: diamond, wander: 0, maxLength: 20000 });
   const base = make({});
   for (const row of LAVA_SETTINGS) {
     const d = row.default ?? row.min,
       v = d === row.max ? row.min : Math.min(row.max, d === 0 ? row.max / 4 : d * (d < row.max / 2 ? 2 : 0.5));
-    const special = { emissivity: 0.6, stopGraetz: 3000, start: 100, duration: 300, timeScale: 2, airTemperature: 250, maxLength: 800, temperature: 1373, crustTemperature: 1300, solidus: 1200, bombLife: 20, rise: 20, wane: 20, maxWidth: 20, branchShare: 1, maxBranches: 0, tubeTime: 60, tubeSlope: 2, maxRunOns: 0 };
+    const special = {
+      emissivity: 0.6,
+      stopGraetz: 3000,
+      start: 100,
+      duration: 300,
+      timeScale: 2,
+      airTemperature: 250,
+      maxLength: 800,
+      temperature: 1373,
+      crustTemperature: 1300,
+      solidus: 1200,
+      bombLife: 20,
+      rise: 20,
+      wane: 20,
+      maxWidth: 20,
+      branchShare: 1,
+      maxBranches: 0,
+      tubeTime: 60,
+      tubeSlope: 2,
+      maxRunOns: 0,
+    };
     const value = row.default === null ? row.max / 4 : (special[row.name] ?? v);
     assert.notEqual(make({ [row.name]: value }), base, `${row.name} = ${value} changes nothing`);
   }
@@ -305,18 +432,53 @@ test("flow lengths fit mapped flows: Mauna Loa 1984, Pu'u O'o 1997, Etna 1998 an
   // 1984 at 400 m^3/s (25 to 27 km), Pu'u O'o 16 May 1997 at about 30 m^3/s (4 km), Etna 1998 at 6 to 8.4 m^3/s (755 m).
   // Literature scatter for one effusion rate is up to 7 times (Harris and Rowland 2009), so each must land within 2 times.
   const mapped = [
-    [{ effusionRate: 400, width: 31, temperature: 1413, ground: (x, z) => 1000 - Math.tan(0.105) * Math.min(z, 1e4) - Math.tan(0.061) * Math.max(z - 1e4, 0) }, 26000],
+    [
+      {
+        effusionRate: 400,
+        width: 31,
+        temperature: 1413,
+        ground: (x, z) => 1000 - Math.tan(0.105) * Math.min(z, 1e4) - Math.tan(0.061) * Math.max(z - 1e4, 0),
+      },
+      26000,
+    ],
     // 2 to 10 degree slopes (Cashman et al. 1999): 10 degrees off the cone's flank, then 5, then 2.
-    [{ effusionRate: 30, width: 8, temperature: 1420, ground: (x, z) => 1000 - 0.176 * Math.min(z, 1000) - 0.087 * Math.min(Math.max(z - 1000, 0), 1000) - 0.035 * Math.max(z - 2000, 0) }, 4000],
+    [
+      {
+        effusionRate: 30,
+        width: 8,
+        temperature: 1420,
+        ground: (x, z) =>
+          1000 -
+          0.176 * Math.min(z, 1000) -
+          0.087 * Math.min(Math.max(z - 1000, 0), 1000) -
+          0.035 * Math.max(z - 2000, 0),
+      },
+      4000,
+    ],
     [{ effusionRate: 7, width: 20, temperature: 1360, ground: ground(10) }, 755],
   ];
   for (const [options, metres] of mapped) {
     const lava = new LavaFlow({ ...options, wander: 0, step: 20, maxLength: 80000 });
     assert.equal(lava.stop, 'cooled');
-    assert.ok(lava.length > metres / 2 && lava.length < metres * 2, `${options.effusionRate} m^3/s ran ${lava.length} m, mapped ${metres} m`);
+    assert.ok(
+      lava.length > metres / 2 && lava.length < metres * 2,
+      `${options.effusionRate} m^3/s ran ${lava.length} m, mapped ${metres} m`,
+    );
   }
   // Calvari and Pinkerton 1998, 17 simple Etna 'a'a flows: L = 10^3.11 TADR^0.47 metres (R^2 0.86).
-  const etna = [1, 2.5, 8, 30].map((q, i) => new LavaFlow({ effusionRate: q, width: [3, 5, 10, 20][i], temperature: 1360, viscosity: 1000, ground: ground(5), wander: 0, step: 10, maxLength: 80000 }).length);
+  const etna = [1, 2.5, 8, 30].map(
+    (q, i) =>
+      new LavaFlow({
+        effusionRate: q,
+        width: [3, 5, 10, 20][i],
+        temperature: 1360,
+        viscosity: 1000,
+        ground: ground(5),
+        wander: 0,
+        step: 10,
+        maxLength: 80000,
+      }).length,
+  );
   etna.forEach((L, i) => {
     const law = 10 ** 3.11 * [1, 2.5, 8, 30][i] ** 0.47;
     assert.ok(L > law / 2 && L < law * 2, `Etna ${[1, 2.5, 8, 30][i]} m^3/s: ${L} m against ${law} m`);
@@ -331,11 +493,15 @@ test('the channel widens as it slows and keeps its mass: Q = w d u (Harris and R
     lava = new LavaFlow({ effusionRate: 20, ground: broken, wander: 0, step: 10 }),
     fixed = new LavaFlow({ effusionRate: 20, ground: broken, wander: 0, step: 10, maxWidth: 12 });
   for (const flow of [lava, fixed])
-    for (const p of flow.path().slice(1)) assert.ok(Math.abs(p.width * p.thickness * p.speed - 20) < 0.02, `w d u = ${p.width * p.thickness * p.speed}`);
+    for (const p of flow.path().slice(1))
+      assert.ok(Math.abs(p.width * p.thickness * p.speed - 20) < 0.02, `w d u = ${p.width * p.thickness * p.speed}`);
   const at = (s) => lava.path().find((p) => p.distance >= s);
   assert.ok(at(330).width > 3 * at(270).width, `${at(270).width} m on the steep, ${at(330).width} m on the flat`);
   assert.ok(at(330).thickness === at(270).thickness, 'it keeps its depth');
-  assert.ok(fixed.path().every((p) => p.width === 12), 'maxWidth at the vent width keeps one width');
+  assert.ok(
+    fixed.path().every((p) => p.width === 12),
+    'maxWidth at the vent width keeps one width',
+  );
   assert.ok(fixed.path().find((p) => p.distance >= 330).thickness > at(330).thickness, 'one width thickens instead');
   assert.ok(lava.path().every((p) => p.width <= 1000));
 });
@@ -354,8 +520,28 @@ test('the crust breaks open with speed (FLOWGO eq. 8) and the base conducts heat
     thick = new LavaFlow({ effusionRate: 10, ground: ground(5), wander: 0, baseCrust: 0.3 }).length;
   assert.ok(thick > thin, `${thick} m with a thick basal crust, ${thin} m with a thin one`);
   // Without the speed law and the hot offset the core cools less: the old budget ran several times too far.
-  const old = new LavaFlow({ effusionRate: 30, width: 20, temperature: 1360, ground: ground(8), wander: 0, crackSpeed: 0, hotOffset: 0, baseCrust: 0.5, maxWidth: 20, step: 20, maxLength: 80000 }).length,
-    now = new LavaFlow({ effusionRate: 30, width: 20, temperature: 1360, ground: ground(8), wander: 0, step: 20, maxLength: 80000 }).length;
+  const old = new LavaFlow({
+      effusionRate: 30,
+      width: 20,
+      temperature: 1360,
+      ground: ground(8),
+      wander: 0,
+      crackSpeed: 0,
+      hotOffset: 0,
+      baseCrust: 0.5,
+      maxWidth: 20,
+      step: 20,
+      maxLength: 80000,
+    }).length,
+    now = new LavaFlow({
+      effusionRate: 30,
+      width: 20,
+      temperature: 1360,
+      ground: ground(8),
+      wander: 0,
+      step: 20,
+      maxLength: 80000,
+    }).length;
   assert.ok(old > 1.5 * now, `old budget ${old} m, FLOWGO budget ${now} m`);
 });
 
@@ -381,8 +567,12 @@ test('after the vent stops the core cools by conduction to the air and the groun
   };
   let stefan = 0;
   while (lava.stefanCrust(stefan * 86400) < 1) stefan += 0.05;
-  const days = cross({}), hon = (2 / 0.0779) ** 2 / 24;
-  assert.ok(days >= 0.7 * stefan && days <= hon, `core below 1,343 K after ${days} days (Stefan ${stefan}, Hon ${hon})`);
+  const days = cross({}),
+    hon = (2 / 0.0779) ** 2 / 24;
+  assert.ok(
+    days >= 0.7 * stefan && days <= hon,
+    `core below 1,343 K after ${days} days (Stefan ${stefan}, Hon ${hon})`,
+  );
   // Ground that conducts better takes the heat faster.
   assert.ok(cross({ groundConductivity: 5 }) < days);
   // The glow follows the core: two weeks after the vent stops the cracks show nothing (the crust has closed).
@@ -398,8 +588,15 @@ test('a flow that ponds fills a pond on the GroundChange: its edge at pondRadius
   const change = new GroundChange({ grid: { size: [300, 300], origin: [-150, -150], resolution: 151 }, events: [ev] });
   lava.seek(1001);
   const R = lava.pondRadius();
-  assert.ok(change.sample(R * 0.98, 0, 1001).change > 0 && change.sample(R * 1.02, 0, 1001).change === 0, `pond edge at ${R} m`);
-  assert.ok(change.sample(R * 0.95, 0, 1001).heat > 0.5 && change.sample(R * 0.95, 0, 1001).heat > change.sample(R * 0.2, 0, 1001).heat, 'the pond glows, brightest at its fresh edge');
+  assert.ok(
+    change.sample(R * 0.98, 0, 1001).change > 0 && change.sample(R * 1.02, 0, 1001).change === 0,
+    `pond edge at ${R} m`,
+  );
+  assert.ok(
+    change.sample(R * 0.95, 0, 1001).heat > 0.5 &&
+      change.sample(R * 0.95, 0, 1001).heat > change.sample(R * 0.2, 0, 1001).heat,
+    'the pond glows, brightest at its fresh edge',
+  );
   // No pond for a flow that runs on down a slope.
   assert.equal(new LavaFlow({ vent: [0, 1000, 0], ground: slope(0.05), rise: 1 }).lavaEvent().pond, undefined);
 });
@@ -417,7 +614,10 @@ test("levees rise behind the front to Hulme's (1974) yield height of the cooling
     let last = 0;
     for (const a of ages) {
       const share = lava.leveeShare(i, t0 + a);
-      assert.ok(share >= last - 1e-12 && share <= 0.35 + 1e-12, `levee share ${share} at age ${a} s (monotone, at most leveeMax)`);
+      assert.ok(
+        share >= last - 1e-12 && share <= 0.35 + 1e-12,
+        `levee share ${share} at age ${a} s (monotone, at most leveeMax)`,
+      );
       last = share;
     }
     // Hulme's h_c at the crust's mean temperature, as a share of the sheet.
@@ -436,12 +636,18 @@ test("levees rise behind the front to Hulme's (1974) yield height of the cooling
     ev = gentle.lavaEvent(256, t);
   assert.ok(ev.levees.length === ev.path.length && Math.abs(ev.levees[i] - mid(gentle)) < 1e-12);
   const p = gentle.path()[i],
-    ground = new GroundChange({ grid: { size: [200, 800], origin: [-100, -50], resolution: 401 }, events: [{ ...ev, roughness: 0 }] }),
-    rim = ground.sample(p.position[0] + 0.82 * p.width / 2, p.position[2], t).change,
+    ground = new GroundChange({
+      grid: { size: [200, 800], origin: [-100, -50], resolution: 401 },
+      events: [{ ...ev, roughness: 0 }],
+    }),
+    rim = ground.sample(p.position[0] + (0.82 * p.width) / 2, p.position[2], t).change,
     middle = ground.sample(p.position[0], p.position[2], t).change;
   // At the levee crest (0.82 of the half width) the flat-topped sheet has fallen by 0.82^16 of its thickness.
   const want = (ev.levees[i] - 0.82 ** 16) * p.thickness;
-  assert.ok(Math.abs(rim - middle - want) < 1e-3 * p.thickness, `levee ${rim - middle} m over the sheet, ${want} wanted`);
+  assert.ok(
+    Math.abs(rim - middle - want) < 1e-3 * p.thickness,
+    `levee ${rim - middle} m over the sheet, ${want} wanted`,
+  );
 });
 
 test('a ridge splits a flow (Dietterich and Cashman 2014): two arms either side, fluxes shared by the drops and summing to Q', () => {
@@ -467,17 +673,39 @@ test('a ridge splits a flow (Dietterich and Cashman 2014): two arms either side,
   assert.ok(events[1].arrival[0] >= events[0].arrival[0] && events[1].path.length >= 2);
   const single = new LavaFlow({ ...lava.options, branchShare: 1 });
   assert.equal(single.branches().length, 1, 'branchShare 1 keeps one channel');
-  assert.equal(new LavaFlow({ ...lava.options, maxBranches: 0 }).branches().length, 1, 'maxBranches 0 keeps one channel');
+  assert.equal(
+    new LavaFlow({ ...lava.options, maxBranches: 0 }).branches().length,
+    1,
+    'maxBranches 0 keeps one channel',
+  );
   // An even slope and a cone never split.
   assert.equal(new LavaFlow({ vent: [0, 1000, 0], ground: slope(0.05), rise: 1 }).branches().length, 1);
-  assert.equal(new LavaFlow({ vent: [0, 1000, 0], ground: (x, z) => 1000 - 0.1 * Math.hypot(x, z), rise: 1, maxLength: 3000 }).branches().length, 1);
+  assert.equal(
+    new LavaFlow({
+      vent: [0, 1000, 0],
+      ground: (x, z) => 1000 - 0.1 * Math.hypot(x, z),
+      rise: 1,
+      maxLength: 3000,
+    }).branches().length,
+    1,
+  );
   assert.throws(() => new LavaFlow({ maxBranches: 1.5 }), RangeError);
 });
 
-test("a channel on gentle ground roofs into a tube: about 1 K/km inside (Keszthelyi 1995; Helz et al. 2003), several in the open", () => {
+test('a channel on gentle ground roofs into a tube: about 1 K/km inside (Keszthelyi 1995; Helz et al. 2003), several in the open', () => {
   // Kupaianaha-like: 4 m^3/s down 3 degrees, a 4 m channel, fed for months.
   const grade = Math.tan((3 * Math.PI) / 180),
-    lava = new LavaFlow({ vent: [0, 1000, 0], ground: slope(grade), effusionRate: 4, width: 4, maxWidth: 4, rise: 1, duration: 1e7, wander: 0, maxLength: 12000 }),
+    lava = new LavaFlow({
+      vent: [0, 1000, 0],
+      ground: slope(grade),
+      effusionRate: 4,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e7,
+      wander: 0,
+      maxLength: 12000,
+    }),
     p = lava.path(),
     tube = lava.tubeTemperatures(),
     km = (i, j) => (p[j].distance - p[i].distance) / 1000,
@@ -505,7 +733,18 @@ test("a channel on gentle ground roofs into a tube: about 1 K/km inside (Keszthe
 
 test('a tube-fed front runs on past where the open channel stopped (Keszthelyi 1995; Calvari and Pinkerton 1998)', () => {
   // 1 m^3/s down 1 degree in a 4 m channel, fed for months: the open channel cools to a stop in about 7 km.
-  const options = { vent: [0, 1000, 0], ground: slope(Math.tan(Math.PI / 180)), effusionRate: 1, width: 4, maxWidth: 4, rise: 1, duration: 1e7, wander: 0, maxLength: 60000, step: 10 },
+  const options = {
+      vent: [0, 1000, 0],
+      ground: slope(Math.tan(Math.PI / 180)),
+      effusionRate: 1,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e7,
+      wander: 0,
+      maxLength: 60000,
+      step: 10,
+    },
     lava = new LavaFlow(options),
     open = new LavaFlow({ ...options, tubeSlope: 0 }),
     p = lava.path(),
@@ -518,9 +757,15 @@ test('a tube-fed front runs on past where the open channel stopped (Keszthelyi 1
   for (let i = 0; i < j; i++) assert.equal(p[i].temperature, q[i].temperature);
   let roofed = j - 1;
   while (lava.roofTime(roofed) === Infinity) roofed--;
-  assert.ok(Math.abs(lava.arrival(j) - lava.roofTime(roofed)) < 1e-6, `it waits for the roof: ${lava.arrival(j)} against ${lava.roofTime(roofed)}`);
+  assert.ok(
+    Math.abs(lava.arrival(j) - lava.roofTime(roofed)) < 1e-6,
+    `it waits for the roof: ${lava.arrival(j)} against ${lava.roofTime(roofed)}`,
+  );
   const waiting = lava.front((lava.arrival(j - 1) + lava.arrival(j)) / 2);
-  assert.ok(waiting.distance === p[j].distance && waiting.speed === 0 && waiting.stop === 'cooled', JSON.stringify(waiting));
+  assert.ok(
+    waiting.distance === p[j].distance && waiting.speed === 0 && waiting.stop === 'cooled',
+    JSON.stringify(waiting),
+  );
   assert.ok(lava.front(lava.arrival(j) + 3600).distance > p[j].distance + 100, 'then it flows on');
   // The tube's lava comes out at the tube's temperature, hotter than the open channel brought it, with a fresh surface.
   const tube = lava.tubeTemperatures();
@@ -544,16 +789,33 @@ test('a tube-fed front runs on past where the open channel stopped (Keszthelyi 1
   for (let k = 0; k < 40; k++) stepped.update(t / 40);
   stepped.seek(t);
   lava.seek(t);
-  assert.equal(JSON.stringify([stepped.front(), stepped.lavaEvents(64)]), JSON.stringify([lava.front(), lava.lavaEvents(64)]));
+  assert.equal(
+    JSON.stringify([stepped.front(), stepped.lavaEvents(64)]),
+    JSON.stringify([lava.front(), lava.lavaEvents(64)]),
+  );
   const event = lava.lavaEvent(64),
     at = event.path.findIndex((x, i) => i > 0 && x[0] === event.path[i - 1][0] && x[1] === event.path[i - 1][1]);
-  assert.ok(at > 0 && event.arrival[at] > event.arrival[at - 1], 'the ground event holds the stop while the front waits');
+  assert.ok(
+    at > 0 && event.arrival[at] > event.arrival[at - 1],
+    'the ground event holds the stop while the front waits',
+  );
 });
 
 test('the ground event carries the tube roofs, when each tube drains and the skylight spacing (Kauahikaua et al. 1998)', async () => {
   const { GroundChange } = await import('../../terrain/dist/ground-change.js');
   const grade = Math.tan((3 * Math.PI) / 180),
-    lava = new LavaFlow({ vent: [0, 1000, 0], ground: slope(grade), effusionRate: 4, width: 4, maxWidth: 4, rise: 1, duration: 1e6, wane: 300, wander: 0, maxLength: 6000 }),
+    lava = new LavaFlow({
+      vent: [0, 1000, 0],
+      ground: slope(grade),
+      effusionRate: 4,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e6,
+      wane: 300,
+      wander: 0,
+      maxLength: 6000,
+    }),
     p = lava.path(),
     event = lava.lavaEvent(p.length + 1);
   assert.equal(event.roofs.length, event.path.length);
@@ -586,20 +848,31 @@ test('the ground event carries the tube roofs, when each tube drains and the sky
 
 // A diamond island in a shallow valley: the flow parts round its upper tip and the valley brings the arms back together
 // below its lower tip.
-const diamond = (x, z) => 1000 - 0.05 * z + 0.03 * Math.abs(x) + Math.max(0, 30 - 0.4 * (Math.abs(x) + Math.abs(z - 300)));
+const diamond = (x, z) =>
+  1000 - 0.05 * z + 0.03 * Math.abs(x) + Math.max(0, 30 - 0.4 * (Math.abs(x) + Math.abs(z - 300)));
 test('arms that part round an island run together again below it (Dietterich and Cashman 2014)', () => {
   const options = { vent: [0, diamond(0, 0), 0], ground: diamond, wander: 0, maxLength: 20000, duration: 7200 },
     lava = new LavaFlow(options),
     apart = new LavaFlow({ ...options, joinDistance: 0 }),
     arms = lava.branches(),
     joined = arms.filter((b) => b.stop === 'joined');
-  assert.ok(apart.branches().length >= 2 && apart.branches().every((b) => b.stop !== 'joined'), 'joinDistance 0: the arms never meet');
-  assert.ok(joined.length >= 1, `an arm runs into the other: ${JSON.stringify(arms.map((b) => [b.parent, b.at, b.stop, b.joins]))}`);
+  assert.ok(
+    apart.branches().length >= 2 && apart.branches().every((b) => b.stop !== 'joined'),
+    'joinDistance 0: the arms never meet',
+  );
+  assert.ok(
+    joined.length >= 1,
+    `an arm runs into the other: ${JSON.stringify(arms.map((b) => [b.parent, b.at, b.stop, b.joins]))}`,
+  );
   for (const b of joined) {
     const into = arms[b.joins.arm].path[b.joins.at],
       end = b.path.at(-1);
     assert.ok(into.position[2] > 300 + 75 - 1, `they meet below the island: z ${into.position[2]}`);
-    assert.ok(Math.hypot(into.position[0] - end.position[0], into.position[2] - end.position[2]) <= (into.width + end.width) / 2 + 1e-9, 'within their half-widths summed');
+    assert.ok(
+      Math.hypot(into.position[0] - end.position[0], into.position[2] - end.position[2]) <=
+        (into.width + end.width) / 2 + 1e-9,
+      'within their half-widths summed',
+    );
   }
   // The arm that carries both runs on further than either arm apart, and thicker or wider with both fluxes.
   const longest = (f) => Math.max(...f.branches().map((b) => b.path.at(-1).distance));
@@ -608,7 +881,13 @@ test('arms that part round an island run together again below it (Dietterich and
   const q = lava.options.effusionRate ?? 20,
     ends = arms.flatMap((b, k) => (b.stop === 'joined' ? [] : [lava.endFlux(k)]));
   assert.ok(Math.abs(ends.reduce((a, b) => a + b, 0) - q) < 1e-9 * q, `end fluxes ${ends} sum to ${q}`);
-  assert.equal(apart.branches().reduce((f, _, k) => f + apart.endFlux(k), 0).toFixed(9), q.toFixed(9));
+  assert.equal(
+    apart
+      .branches()
+      .reduce((f, _, k) => f + apart.endFlux(k), 0)
+      .toFixed(9),
+    q.toFixed(9),
+  );
   // The lava past the join is the mix: its flux both arms', its temperature between theirs, weighted by flux.
   const [b] = joined,
     receiver = arms[b.joins.arm],
@@ -620,7 +899,10 @@ test('arms that part round an island run together again below it (Dietterich and
   for (let k = 0; k < 30; k++) stepped.update(t / 30);
   stepped.seek(t);
   lava.seek(t);
-  assert.equal(JSON.stringify([stepped.branches(), stepped.lavaEvents(64)]), JSON.stringify([lava.branches(), lava.lavaEvents(64)]));
+  assert.equal(
+    JSON.stringify([stepped.branches(), stepped.lavaEvents(64)]),
+    JSON.stringify([lava.branches(), lava.lavaEvents(64)]),
+  );
   assert.throws(() => new LavaFlow({ joinDistance: 5 }), RangeError);
   assert.throws(() => lava.endFlux(99), RangeError);
 });
@@ -630,20 +912,42 @@ test('arms that come alongside each other under their levees run side by side, b
   // 12 m channels: the arms come alongside each other at a shallow angle.
   const c = (z) => (z < 300 ? 60 : Math.max(5.5, 60 - 0.15 * (z - 300))),
     ground = (x, z) => 1000 - 0.05 * z + 0.1 * Math.abs(Math.abs(x) - c(z)),
-    options = { vent: [0, ground(0, 0), 0], ground, wander: 0, width: 12, maxWidth: 12, maxLength: 2500, duration: 7200 },
+    options = {
+      vent: [0, ground(0, 0), 0],
+      ground,
+      wander: 0,
+      width: 12,
+      maxWidth: 12,
+      maxLength: 2500,
+      duration: 7200,
+    },
     lava = new LavaFlow(options),
     arms = lava.branches(),
     bare = new LavaFlow({ ...options, leveeMax: 0 }).branches();
   // Without levees the second arm runs into the first and ends there; with them both run on to the end.
-  assert.ok(bare.some((b) => b.stop === 'joined'), `no levees: ${bare.map((b) => b.stop)}`);
+  assert.ok(
+    bare.some((b) => b.stop === 'joined'),
+    `no levees: ${bare.map((b) => b.stop)}`,
+  );
   assert.equal(arms.length, 2);
-  assert.ok(arms.every((b) => b.stop !== 'joined' && b.path.at(-1).distance > 2400), `braided: ${arms.map((b) => [b.stop, b.path.at(-1).distance])}`);
+  assert.ok(
+    arms.every((b) => b.stop !== 'joined' && b.path.at(-1).distance > 2400),
+    `braided: ${arms.map((b) => [b.stop, b.path.at(-1).distance])}`,
+  );
   // Side by side: over more than a kilometre the second arm's edge stays within 2 m of the first's, never more than
   // half a step over it.
   const [a, b] = arms,
-    gap = (p) => Math.min(...a.path.map((q) => Math.hypot(q.position[0] - p.position[0], q.position[2] - p.position[2]) - (q.width + p.width) / 2)),
+    gap = (p) =>
+      Math.min(
+        ...a.path.map(
+          (q) => Math.hypot(q.position[0] - p.position[0], q.position[2] - p.position[2]) - (q.width + p.width) / 2,
+        ),
+      ),
     beside = b.path.filter((p) => p.position[2] > 800).map(gap);
-  assert.ok(beside.length * 5 > 1000 && beside.every((g) => g > -0.6 && g < 2), `edges ${Math.min(...beside)} to ${Math.max(...beside)} m apart`);
+  assert.ok(
+    beside.length * 5 > 1000 && beside.every((g) => g > -0.6 && g < 2),
+    `edges ${Math.min(...beside)} to ${Math.max(...beside)} m apart`,
+  );
   assert.ok(Math.sign(a.path.at(-1).position[0]) * Math.sign(b.path.at(-1).position[0]) < 0, 'each in its own trough');
   // Each carries its own lava to its end: the end fluxes sum to the effusion rate.
   assert.ok(Math.abs(lava.endFlux(0) + lava.endFlux(1) - 20) < 1e-9);
@@ -653,7 +957,19 @@ test('a stalled, still-fed front inflates and breaks out through its levee as a 
   // 1 m^3/s down 1 degree in a 4 m channel, the ground falling away to +x across it, no tubes: the open channel cools
   // to a stop in about 7 km while the vent feeds it for months.
   const ground = (x, z) => 1000 - Math.tan(Math.PI / 180) * z - 0.02 * x,
-    options = { vent: [0, ground(0, 0), 0], ground, effusionRate: 1, width: 4, maxWidth: 4, rise: 1, duration: 1e7, wander: 0, maxLength: 60000, step: 10, tubeSlope: 0 },
+    options = {
+      vent: [0, ground(0, 0), 0],
+      ground,
+      effusionRate: 1,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e7,
+      wander: 0,
+      maxLength: 60000,
+      step: 10,
+      tubeSlope: 0,
+    },
     still = new LavaFlow(options),
     lava = new LavaFlow({ ...options, breakoutHeight: 2 }),
     arms = lava.branches(),
@@ -662,7 +978,10 @@ test('a stalled, still-fed front inflates and breaks out through its levee as a 
   assert.equal(still.branches().length, 1, 'breakoutHeight 0: the front just stops');
   assert.deepEqual(trunk.path, still.path(), 'the stalled arm is the same lava up to its stop');
   assert.equal(trunk.stop, 'cooled');
-  assert.ok(out > 0 && arms[out].parent === 0, `a breakout arm: ${JSON.stringify(arms.map((b) => [b.parent, b.at, b.stop, b.breakout]))}`);
+  assert.ok(
+    out > 0 && arms[out].parent === 0,
+    `a breakout arm: ${JSON.stringify(arms.map((b) => [b.parent, b.at, b.stop, b.breakout]))}`,
+  );
   const b = arms[out],
     p = trunk.path,
     start = b.path[0],
@@ -671,15 +990,22 @@ test('a stalled, still-fed front inflates and breaks out through its levee as a 
   const [sx, , sz] = start.position,
     [ax, , az] = at.position;
   assert.ok(Math.abs(Math.hypot(sx - ax, sz - az) - at.width) < 1e-9, 'one width out');
-  assert.ok(ground(sx, sz) < ground(2 * ax - sx, 2 * az - sz), `on the low side: ${ground(sx, sz)} against ${ground(2 * ax - sx, 2 * az - sz)}`);
+  assert.ok(
+    ground(sx, sz) < ground(2 * ax - sx, 2 * az - sz),
+    `on the low side: ${ground(sx, sz)} against ${ground(2 * ax - sx, 2 * az - sz)}`,
+  );
   assert.ok(at.graetz < 2 * 300, `from the stalled stretch: Graetz ${at.graetz}`);
   // When: the supply lifting the stalled stretch by 2 m (Q t / area), after the front stopped.
   let m = p.length - 1;
   while (m > 0 && p[m - 1].graetz < 600) m--;
   let area = 0;
-  for (let i = m; i + 1 < p.length; i++) area += 0.5 * (p[i].width + p[i + 1].width) * (p[i + 1].distance - p[i].distance);
+  for (let i = m; i + 1 < p.length; i++)
+    area += 0.5 * (p[i].width + p[i + 1].width) * (p[i + 1].distance - p[i].distance);
   const end = p.at(-1);
-  assert.ok(Math.abs(start.travel - (end.travel + (2 * area) / 1)) < 1e-6, `opens after ${start.travel - end.travel} s of inflation`);
+  assert.ok(
+    Math.abs(start.travel - (end.travel + (2 * area) / 1)) < 1e-6,
+    `opens after ${start.travel - end.travel} s of inflation`,
+  );
   assert.ok(Math.abs(lava.arrival(p.length - 1, 0) - still.arrival(p.length - 1)) < 1e-9);
   // Its lava is the fluid core fed under the inflated crust (Hon et al. 1994), not the stalled lava: hotter than the
   // stalled core where it leaves, no hotter than the channel's core at the head of the stretch, and losing far less per
@@ -688,16 +1014,25 @@ test('a stalled, still-fed front inflates and breaks out through its levee as a 
   const head = p[m],
     openLoss = (p[0].temperature - end.temperature) / (end.distance / 1000),
     coveredLoss = (head.temperature - start.temperature) / ((at.distance - head.distance) / 1000);
-  assert.ok(start.temperature > at.temperature + 5, `breakout core ${start.temperature} K against the stalled ${at.temperature} K`);
+  assert.ok(
+    start.temperature > at.temperature + 5,
+    `breakout core ${start.temperature} K against the stalled ${at.temperature} K`,
+  );
   assert.ok(start.temperature <= head.temperature, `no hotter than the head of the stretch, ${head.temperature} K`);
-  assert.ok(coveredLoss >= 0 && coveredLoss < 0.5 * openLoss, `under the crust ${coveredLoss} K/km against ${openLoss} K/km open`);
+  assert.ok(
+    coveredLoss >= 0 && coveredLoss < 0.5 * openLoss,
+    `under the crust ${coveredLoss} K/km against ${openLoss} K/km open`,
+  );
   // It runs as far as published breakout lobes: on Kilauea's June 27th flow a lobe that broke out 700 m behind the
   // stalled tip advanced about 350 m in two days and about 45 m a day for a week more before it stalled, some 0.7 to
   // 0.8 km (USGS HVO, January 2015; Poland et al. 2016); inflated sheet lobes run hundreds of metres (Hon et al.
   // 1994). The stalled core alone ran 450 m.
   const lobe = b.path.at(-1).distance - start.distance;
   assert.ok(lobe >= 500 && lobe <= 2500, `the breakout runs ${lobe} m`);
-  assert.ok(Math.abs(lava.endFlux(0)) < 1e-12 && Math.abs(lava.endFlux(out) - 1) < 1e-12, 'the stalled arm passes nothing on');
+  assert.ok(
+    Math.abs(lava.endFlux(0)) < 1e-12 && Math.abs(lava.endFlux(out) - 1) < 1e-12,
+    'the stalled arm passes nothing on',
+  );
   // The tube feeds the front on first when it roofs sooner than the flow inflates (roofs closing two hours after the
   // front passes); a taller breakout waits longer.
   const tubed = new LavaFlow({ ...options, tubeSlope: 4, tubeTime: 7200, breakoutHeight: 20 }),
@@ -707,15 +1042,23 @@ test('a stalled, still-fed front inflates and breaks out through its levee as a 
   const tp = tubed.path();
   assert.equal(JSON.stringify(tp), JSON.stringify(open.path().slice(0, tp.length)), 'the run-on as before');
   assert.ok(tp.at(-1).distance > p.at(-1).distance + 1000, `tube-fed on to ${tp.at(-1).distance} m`);
-  assert.ok(tubed.branches().every((x) => !x.breakout || x.path[0].travel > end.travel), 'no breakout before the run-on');
-  assert.ok(new LavaFlow({ ...options, breakoutHeight: 4 }).branches().find((x) => x.breakout).path[0].travel > start.travel);
+  assert.ok(
+    tubed.branches().every((x) => !x.breakout || x.path[0].travel > end.travel),
+    'no breakout before the run-on',
+  );
+  assert.ok(
+    new LavaFlow({ ...options, breakoutHeight: 4 }).branches().find((x) => x.breakout).path[0].travel > start.travel,
+  );
   // A seek and steps agree; the events stay valid.
   const stepped = new LavaFlow({ ...options, breakoutHeight: 2 }),
     t = lava.supplyTime(start.travel) + 3600;
   for (let k = 0; k < 40; k++) stepped.update(t / 40);
   stepped.seek(t);
   lava.seek(t);
-  assert.equal(JSON.stringify([stepped.branches(), stepped.lavaEvents(64)]), JSON.stringify([lava.branches(), lava.lavaEvents(64)]));
+  assert.equal(
+    JSON.stringify([stepped.branches(), stepped.lavaEvents(64)]),
+    JSON.stringify([lava.branches(), lava.lavaEvents(64)]),
+  );
   assert.throws(() => new LavaFlow({ breakoutHeight: 21 }), RangeError);
 });
 
@@ -724,7 +1067,19 @@ test('a stalled front blocks the tube behind it: the backed-up lava bursts a roo
   // supply backs up the tube; the level rises over the front's top as the sluggish stretch lifts, and the first closed
   // roof whose weight and strength (rho g d + 2 sigma d^2 / w^2) the lava's head beats bursts.
   const ground = (x, z) => 1000 - Math.tan(Math.PI / 180) * z - 0.02 * x,
-    options = { vent: [0, 1000, 0], ground, effusionRate: 1, width: 4, maxWidth: 4, rise: 1, duration: 1e7, wander: 0, maxLength: 60000, step: 10, breakoutHeight: 20 },
+    options = {
+      vent: [0, 1000, 0],
+      ground,
+      effusionRate: 1,
+      width: 4,
+      maxWidth: 4,
+      rise: 1,
+      duration: 1e7,
+      wander: 0,
+      maxLength: 60000,
+      step: 10,
+      breakoutHeight: 20,
+    },
     lava = new LavaFlow(options),
     arms = lava.branches(),
     p = arms[0].path,
@@ -732,7 +1087,10 @@ test('a stalled front blocks the tube behind it: the backed-up lava bursts a roo
     b = arms[1],
     at = p[b.at],
     start = b.path[0];
-  assert.ok(b.breakout && b.parent === 0, `a breakout off the stalled trunk: ${JSON.stringify(arms.map((a) => [a.parent, a.at, a.breakout]))}`);
+  assert.ok(
+    b.breakout && b.parent === 0,
+    `a breakout off the stalled trunk: ${JSON.stringify(arms.map((a) => [a.parent, a.at, a.breakout]))}`,
+  );
   // Through a roof closed by then, upstream of the front: on Kilauea's June 27th flow lobes broke out 0.7 and 2 km
   // behind the stalled tip (USGS HVO, January 2015).
   const burst = lava.supplyTime(start.travel);
@@ -747,7 +1105,8 @@ test('a stalled front blocks the tube behind it: the backed-up lava bursts a roo
   let m = p.length - 1;
   while (m > 0 && p[m - 1].graetz < 600) m--;
   let area = 0;
-  for (let i = m; i + 1 < p.length; i++) area += 0.5 * (p[i].width + p[i + 1].width) * (p[i + 1].distance - p[i].distance);
+  for (let i = m; i + 1 < p.length; i++)
+    area += 0.5 * (p[i].width + p[i + 1].width) * (p[i + 1].distance - p[i].distance);
   const rho = 2600,
     rise = ((start.travel - end.travel) * 1) / Math.max(area, end.width * end.width),
     pressure = rho * G * (end.position[1] + end.thickness + rise - (at.position[1] + at.thickness * 1.35)),
@@ -760,6 +1119,9 @@ test('a stalled front blocks the tube behind it: the backed-up lava bursts a roo
   // A stronger roof holds longer; without breakouts the tube feeds the front on as before.
   const strong = new LavaFlow({ ...options, roofStrength: 1e7 }).branches()[1];
   assert.ok(strong.path[0].travel > start.travel, 'a stronger roof bursts later');
-  assert.equal(JSON.stringify(new LavaFlow({ ...options, breakoutHeight: 0 }).path()), JSON.stringify(new LavaFlow({ ...options, breakoutHeight: 0, roofStrength: 1e5 }).path()));
+  assert.equal(
+    JSON.stringify(new LavaFlow({ ...options, breakoutHeight: 0 }).path()),
+    JSON.stringify(new LavaFlow({ ...options, breakoutHeight: 0, roofStrength: 1e5 }).path()),
+  );
   assert.throws(() => new LavaFlow({ roofStrength: 1e3 }), RangeError);
 });

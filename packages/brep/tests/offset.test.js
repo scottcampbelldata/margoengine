@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { model } from '../dist/index.js';
 
-const { box, boolean, checkBody, cylinder, draft, extrude, frameOf, massProperties, offsetFaces, shell, validateBody } = model;
+const { box, boolean, checkBody, cylinder, draft, extrude, frameOf, massProperties, offsetFaces, shell, validateBody } =
+  model;
 const mm = 0.001;
 
 /** Volume, first and second moments (about the origin, mm) of boxes, each [x0, y0, z0, x1, y1, z1] with a sign. */
@@ -57,7 +58,10 @@ function expectMass(body, { volume, area, centroid, inertia }, tolerance = 1e-12
   );
   const trace = inertia[0] + inertia[1] + inertia[2];
   inertia.forEach((x, k) =>
-    assert.ok(Math.abs(m.inertia[k] / mm ** 5 - x) <= tolerance * trace, `inertia ${k}: ${m.inertia[k] / mm ** 5} vs ${x}`),
+    assert.ok(
+      Math.abs(m.inertia[k] / mm ** 5 - x) <= tolerance * trace,
+      `inertia ${k}: ${m.inertia[k] / mm ** 5} vs ${x}`,
+    ),
   );
 }
 
@@ -70,7 +74,9 @@ test('offset: a face moved out and in, its neighbours re-solved; the faces keep 
   assert.deepEqual(checkBody(up), []);
   assert.deepEqual(
     up.faces.map((f) => f.name).sort(),
-    cube().faces.map((f) => f.name).sort(),
+    cube()
+      .faces.map((f) => f.name)
+      .sort(),
   );
   expectMass(up, { ...boxes([[1, [0, 0, 0, 10, 10, 12]]]), area: 2 * 100 + 4 * 120 });
   // Two faces in: -x by 3 and +y by 1.5.
@@ -109,10 +115,21 @@ test('offset: a slanted face of a prism, and a step of an L-shaped block', () =>
   assert.ok(Math.abs(m.volume / mm ** 3 - ((10 + s + 6 + s) / 2) * 8 * 5) <= 1e-12 * 500);
   // An L: a 20 x 10 x 5 slab and a 10 x 10 x 15 tower; the slab's top raised from 5 to 8.
   const L = boolean('L', 'union', box('low', [20 * mm, 10 * mm, 5 * mm]), box('high', [10 * mm, 10 * mm, 15 * mm])),
-    step = L.faces.find((f) => f.surface.kind === 'plane' && Math.abs(f.surface.frame.origin[2] - 5 * mm) < 1e-12 && f.surface.frame.z[2] !== 0),
+    step = L.faces.find(
+      (f) =>
+        f.surface.kind === 'plane' &&
+        Math.abs(f.surface.frame.origin[2] - 5 * mm) < 1e-12 &&
+        f.surface.frame.z[2] !== 0,
+    ),
     raised = offsetFaces('r', L, [step.name], 3 * mm);
   assert.deepEqual(checkBody(raised), []);
-  expectMass(raised, boxes([[1, [0, 0, 0, 20, 10, 8]], [1, [0, 0, 8, 10, 10, 15]]]));
+  expectMass(
+    raised,
+    boxes([
+      [1, [0, 0, 0, 20, 10, 8]],
+      [1, [0, 0, 8, 10, 10, 15]],
+    ]),
+  );
   // Raised past the tower's top the step's edges would turn round: refused, naming the change.
   assert.throws(() => offsetFaces('r', L, [step.name], 11 * mm), { name: 'RangeError', message: /topology/ });
 });
@@ -172,7 +189,17 @@ test('shell and offset refuse what they cannot make', () => {
   // A ruled spline face (a loft between turned squares) has no offset of its own kind: refused by name, not a wrong body.
   const sq = (h, z, t) => {
     const p = (x, y) => [(x * Math.cos(t) - y * Math.sin(t)) * mm, (x * Math.sin(t) + y * Math.cos(t)) * mm, z * mm];
-    return { name: 'sq' + z, start: p(-h, -h), normal: [0, 0, 1], segments: [[h, -h], [h, h], [-h, h], [-h, -h]].map(([x, y]) => ({ kind: 'line', to: p(x, y) })) };
+    return {
+      name: 'sq' + z,
+      start: p(-h, -h),
+      normal: [0, 0, 1],
+      segments: [
+        [h, -h],
+        [h, h],
+        [-h, h],
+        [-h, -h],
+      ].map(([x, y]) => ({ kind: 'line', to: p(x, y) })),
+    };
   };
   const twisted = model.loft('l', [sq(5, 0, 0), sq(3, 10, 0.5)]);
   assert.throws(() => offsetFaces('o', twisted, ['l/face:end'], 1 * mm), {
@@ -208,16 +235,25 @@ test('draft: the sides of a cube against the frustum of a square pyramid; zero i
     t = Math.tan(a);
   check(draft('d', cube(), sides, base, [0, 0, 1], a), frustum(10, 10 - 20 * t, a));
   // Hinged at the top instead: the base opens out to 10 + 20 tan 5.
-  check(draft('d', cube(), sides, { origin: [0, 0, 10 * mm], normal: [0, 0, 1] }, [0, 0, 1], a), frustum(10 + 20 * t, 10, a));
+  check(
+    draft('d', cube(), sides, { origin: [0, 0, 10 * mm], normal: [0, 0, 1] }, [0, 0, 1], a),
+    frustum(10 + 20 * t, 10, a),
+  );
   // A negative angle flares the sides out along the pull.
   check(draft('d', cube(), sides, base, [0, 0, 1], -a), frustum(10, 10 + 20 * t, a));
   // Zero: the cube.
   check(draft('d', cube(), sides, base, [0, 0, 1], 0), frustum(10, 10, 0));
   // Refused: a right angle, the top face (parallel to the neutral plane), unknown names, and so steep the top would
   // turn inside out (the topology would change).
-  assert.throws(() => draft('d', cube(), sides, base, [0, 0, 1], Math.PI / 2), { name: 'RangeError', message: /angle/ });
+  assert.throws(() => draft('d', cube(), sides, base, [0, 0, 1], Math.PI / 2), {
+    name: 'RangeError',
+    message: /angle/,
+  });
   assert.throws(() => draft('d', cube(), [top], base, [0, 0, 1], a), { name: 'RangeError', message: /parallel/ });
-  assert.throws(() => draft('d', cube(), ['a/face:nope'], base, [0, 0, 1], a), { name: 'RangeError', message: /no face/ });
+  assert.throws(() => draft('d', cube(), ['a/face:nope'], base, [0, 0, 1], a), {
+    name: 'RangeError',
+    message: /no face/,
+  });
   assert.throws(() => draft('d', cube(), sides, base, [0, 0, 1], (50 * Math.PI) / 180), {
     name: 'RangeError',
     message: /topology/,

@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import type { Sky as SkyPlugin, SkyOptions } from '@margoengine/sky';
 import { useScene, useCommit, useLiveRef, assignRef, report } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { sceneOwner } from './scene-owner.js';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
@@ -26,7 +27,7 @@ export const Sky = /* @__PURE__ */ forwardRef<SkyPlugin, SkyProps>(function Sky(
       .then(({ Sky }) => {
         if (!active || scene.engine.disposed) return;
         current = new Sky({ ...latest.current.options });
-        scene.engine.use(current);
+        sceneOwner(scene).use(current);
         assignRef(handle.current, current);
         setSky(current);
       })
@@ -39,11 +40,11 @@ export const Sky = /* @__PURE__ */ forwardRef<SkyPlugin, SkyProps>(function Sky(
         const made = current;
         assignRef(handle.current, null);
         setSky((state) => (state === made ? null : state));
-        scene.engine.removePlugin(made.name);
+        sceneOwner(scene).removePlugin(made.name);
         made.dispose();
       }
     };
-  }, [scene.engine]);
+  }, [scene.engine, scene.world]);
   useCommit(() => {
     if (!sky) return;
     for (const key of Object.keys(sky.options)) delete (sky.options as Record<string, unknown>)[key];

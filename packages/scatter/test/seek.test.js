@@ -47,7 +47,9 @@ const replay = (w, steps) => {
 // What the last draw uploaded: Scatter's uniform values and the instances' frame and shadow blocks.
 const uploads = (w) => [
   Array.from(w.scatter['values']),
-  ...w.h.resources.filter((r) => r.data && r.usage === 72 && (r.size === 144 || r.size === 80)).map((r) => Array.from(new Float32Array(r.data))),
+  ...w.h.resources
+    .filter((r) => r.data && r.usage === 72 && (r.size === 144 || r.size === 80))
+    .map((r) => Array.from(new Float32Array(r.data))),
 ];
 
 for (const n of [1, 600, 54000])

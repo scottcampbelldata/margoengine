@@ -249,7 +249,10 @@ try {
       for (let x = 0; x < 24; x++) {
         check(at(x, 16, 2) < 0.001, `Background leaked onto foreground at x ${x}: ${rgbAt(x, 16)}`);
         if (x + 0.5 + radius <= 16)
-          check(at(x, 16, 0) > 0.999 && at(x, 16, 1) < 0.001, `Focus leaked onto foreground at x ${x}: ${rgbAt(x, 16)}`);
+          check(
+            at(x, 16, 0) > 0.999 && at(x, 16, 1) < 0.001,
+            `Focus leaked onto foreground at x ${x}: ${rgbAt(x, 16)}`,
+          );
         else
           check(
             Math.abs(at(x, 16, 0) - foreground(x)) < 2 / 64 + 0.001 &&
@@ -257,10 +260,7 @@ try {
             `Near-field edge at x ${x} is ${rgbAt(x, 16)}, the disk share is ${foreground(x).toFixed(4)}`,
           );
       }
-      check(
-        at(18, 16, 0) > 0 && at(18, 16, 2) < 0.001,
-        `Near-field spread missing or contaminated: ${rgbAt(18, 16)}`,
-      );
+      check(at(18, 16, 0) > 0 && at(18, 16, 2) < 0.001, `Near-field spread missing or contaminated: ${rgbAt(18, 16)}`);
       let litNeighbors = 0;
       for (let y = 9; y < 24; y++)
         for (let x = 39; x < 54; x++) if ((x !== 46 || y !== 16) && at(x, y, 0) > 0) litNeighbors++;

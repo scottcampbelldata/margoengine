@@ -20,10 +20,13 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
   const r = await page.evaluate(() => window.check.run());
   console.log(JSON.stringify(r));
-  assert.deepEqual(r.skirted.stats.lod.nodes.map((n) => n > 0), [true, true, true]);
+  assert.deepEqual(
+    r.skirted.stats.lod.nodes.map((n) => n > 0),
+    [true, true, true],
+  );
   assert.ok(r.skirted.sky > 100, `the sky should show past the far levels: ${r.skirted.sky}`);
   assert.equal(r.skirted.holes, 0, `${r.skirted.holes} sky pixels show through the ground`);
-  assert.ok(r.bare.holes > 0, "without caps the seams should let the sky through: the check would miss cracks");
+  assert.ok(r.bare.holes > 0, 'without caps the seams should let the sky through: the check would miss cracks');
   console.log(`ok smooth far levels: 0 holes with caps, ${r.bare.holes} without`);
   assert.deepEqual(await page.evaluate(() => window.check.errors()), []);
   assert.deepEqual(pageErrors, []);

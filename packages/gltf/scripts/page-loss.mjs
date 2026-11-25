@@ -33,7 +33,8 @@ export async function watchPageLoss(page, { now = () => Date.now() } = {}) {
       if (cdp) {
         const { metrics } = await cdp.send('Performance.getMetrics');
         for (const { name: key, value } of metrics)
-          if (key === 'JSHeapUsedSize' || key === 'JSHeapTotalSize' || key === 'Documents' || key === 'Nodes') row[key] = value;
+          if (key === 'JSHeapUsedSize' || key === 'JSHeapTotalSize' || key === 'Documents' || key === 'Nodes')
+            row[key] = value;
       } else row.JSHeapUsedSize = await page.evaluate(() => performance.memory?.usedJSHeapSize);
     } catch (error) {
       row.unavailable = String(error?.message ?? error).split('\n')[0];

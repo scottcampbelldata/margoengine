@@ -40,7 +40,9 @@ function texels(level: MipLevel, format: 'rgba8unorm' | 'rgba16float', count: nu
     return new Uint8Array(data.buffer, data.byteOffset, count * 4);
   }
   if (!(data instanceof Uint16Array || data instanceof Float32Array))
-    throw new TypeError(`mipTexture level ${k} must be a Uint16Array of half-float bits or a Float32Array for rgba16float`);
+    throw new TypeError(
+      `mipTexture level ${k} must be a Uint16Array of half-float bits or a Float32Array for rgba16float`,
+    );
   const half = data instanceof Float32Array ? toHalfArray(data.subarray(0, count * 4)) : data;
   return new Uint8Array(half.buffer, half.byteOffset, count * 8);
 }
@@ -49,8 +51,12 @@ function texels(level: MipLevel, format: 'rgba8unorm' | 'rgba16float', count: nu
  * The chain may stop before 1 x 1; nothing is generated past it, so a far surface keeps the last level given.
  * @throws TypeError for no levels or a wrong array type; RangeError for a level of the wrong size or too short.
  */
-export function mipTexture(levels: readonly MipLevel[], { format = 'rgba8unorm', ...options }: MipTextureOptions = {}): Texture {
-  if (!Array.isArray(levels) || !levels.length) throw new TypeError('mipTexture needs mip levels, largest first; pass an array');
+export function mipTexture(
+  levels: readonly MipLevel[],
+  { format = 'rgba8unorm', ...options }: MipTextureOptions = {},
+): Texture {
+  if (!Array.isArray(levels) || !levels.length)
+    throw new TypeError('mipTexture needs mip levels, largest first; pass an array');
   if (format !== 'rgba8unorm' && format !== 'rgba16float')
     throw new TypeError("mipTexture format must be 'rgba8unorm' or 'rgba16float'; pass one");
   if (format === 'rgba16float' && options.colorSpace !== undefined && options.colorSpace !== 'linear')

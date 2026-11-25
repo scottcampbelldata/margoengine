@@ -30,7 +30,10 @@ test('Ray.intersectsBox: an unbounded box keeps the exact slab test', () => {
   assert.equal(ray([0, 30, 0], [1, 1, 0.5]).intersectsBox(slab), false);
   assert.equal(ray([0, 0, 0], [1, 1, 0.5]).intersectsBox(slab), true);
   const hit = ray([0, 0, 0], [2, 1, 2]).intersectBox(slab, new Vector3());
-  assert.ok(Math.abs(hit.x - 20) < 1e-12 && Math.abs(hit.y - 10) < 1e-12 && Math.abs(hit.z - 20) < 1e-12, JSON.stringify(hit));
+  assert.ok(
+    Math.abs(hit.x - 20) < 1e-12 && Math.abs(hit.y - 10) < 1e-12 && Math.abs(hit.z - 20) < 1e-12,
+    JSON.stringify(hit),
+  );
   // Unbounded along x only, starting 0.5 above the ray in z.
   const bar = box([-inf, -1, 0.5], [inf, 1, 2]);
   assert.equal(ray([0, 0, 0], [1, 0.25, 1e-3]).intersectsBox(bar), false);

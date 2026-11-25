@@ -29,11 +29,7 @@ function tree(cloud) {
       if (rest[index].length)
         node.children[index] = split(
           rest[index],
-          [
-            corner[0] + (index & 4 ? half : 0),
-            corner[1] + (index & 2 ? half : 0),
-            corner[2] + (index & 1 ? half : 0),
-          ],
+          [corner[0] + (index & 4 ? half : 0), corner[1] + (index & 2 ? half : 0), corner[2] + (index & 1 ? half : 0)],
           half,
           name + index,
         );

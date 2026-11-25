@@ -162,7 +162,9 @@ try {
       else if (demo.name === 'afterlight') assert(await page.locator('#explore').isEnabled());
       else assert(await page.locator('#status').isHidden());
       const style =
-        demo.name === 'afterlight' ? 'main > :not(canvas) {visibility:hidden!important}' : 'aside {visibility:hidden!important}';
+        demo.name === 'afterlight'
+          ? 'main > :not(canvas) {visibility:hidden!important}'
+          : 'aside {visibility:hidden!important}';
       const image = await page.locator('canvas').first().screenshot({ style }),
         pixels = await decodePNG(image);
       const { data, width, height } = pixels,

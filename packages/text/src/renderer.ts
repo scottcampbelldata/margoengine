@@ -353,7 +353,7 @@ export class TextRenderer implements EnginePlugin {
       if (g.whitespace) continue;
       const bitmap = font.glyph(g.cluster);
       if (!bitmap) continue;
-      const atlas = (bitmap.color || bitmap.msdf) ? this._colorAtlas! : this._sdfAtlas!,
+      const atlas = bitmap.color || bitmap.msdf ? this._colorAtlas! : this._sdfAtlas!,
         slot = atlas.place(bitmap),
         size = atlas.size,
         o = count * GLYPH_FLOATS;

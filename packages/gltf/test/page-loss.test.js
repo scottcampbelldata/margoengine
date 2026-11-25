@@ -12,7 +12,13 @@ function fakePage({ cdp = true } = {}) {
   page.evaluate = async () => 1234;
   session.send = async (method) =>
     method === 'Performance.getMetrics'
-      ? { metrics: [{ name: 'JSHeapUsedSize', value: 5e8 }, { name: 'Nodes', value: 40 }, { name: 'Other', value: 1 }] }
+      ? {
+          metrics: [
+            { name: 'JSHeapUsedSize', value: 5e8 },
+            { name: 'Nodes', value: 40 },
+            { name: 'Other', value: 1 },
+          ],
+        }
       : {};
   page.context = () => ({
     newCDPSession: async () => {
@@ -32,7 +38,10 @@ test('a renderer exit is recorded with its status and code, and the failure line
   page.emit('crash');
   page.emit('framenavigated', frame);
   page.emit('framenavigated', { url: () => 'about:blank#child' }); // a child frame is not the page
-  const line = watch.report('lights: the real EnvironmentTest', new Error('page.evaluate: Execution context was destroyed'));
+  const line = watch.report(
+    'lights: the real EnvironmentTest',
+    new Error('page.evaluate: Execution context was destroyed'),
+  );
   assert.match(line, /^page-loss /);
   const info = JSON.parse(line.slice('page-loss '.length));
   assert.equal(info.lost, true);
@@ -54,7 +63,10 @@ test('without CDP (another browser) the JS heap still comes from the page', asyn
   page.emit('close');
   const info = JSON.parse(watch.report('a', new Error('pixels differ')).slice(10));
   assert.equal(info.lost, false);
-  assert.deepEqual(info.events.map((e) => e.event), ['close']);
+  assert.deepEqual(
+    info.events.map((e) => e.event),
+    ['close'],
+  );
 });
 
 test('a sample on a page that cannot answer is kept as unavailable, not thrown', async () => {

@@ -7,8 +7,11 @@ declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number; UNIFORM: numb
 export const waterFrame = `
 struct Wave {wave:vec4f,shape:vec4f}
 struct Light {direction:vec4f,radiance:vec4f}
-struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>,grid:vec4f,foam:vec4f,shallow:vec4f,far:array<vec4f,18>}
+struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>,grid:vec4f,foam:vec4f,shallow:vec4f,viewport:vec4f,far:array<vec4f,18>}
 @group(0) @binding(0) var<uniform> frame:Frame;
+// Use the unused alpha of each light's RGB radiance for the shared HDR sky transform.
+fn hdrSkyTurn()->f32 {return frame.lights[0].radiance.w;}
+fn hdrSkyScale()->f32 {return frame.lights[1].radiance.w;}
 `;
 // Margo's swell (swell-wgsl.ts) on the frame's wave clock.
 export const oceanWaves =
@@ -29,11 +32,23 @@ export interface CoastSurf {
   /** Frames of three steps the flow spins up for before its first frame (surf.ts `SURF_SPIN`). */
   readonly spinFrames: number;
 }
+/**
+ * The compute pass to record the next dispatch of `groups` workgroups into (all of a grid's when not given). The first
+ * step hands out a new command buffer whenever the one it fills would pass {@link SETUP_WORKGROUPS}.
+ */
+export type NextPass = (groups?: number) => GPUComputePassEncoder;
 /** The surf field's builder and the spin-up clock it keeps in the `connected` buffer (surf.ts). */
 interface SurfBuilder {
-  build(pass: GPUComputePassEncoder, width: number, height: number): void;
+  build(next: NextPass, width: number, height: number): void;
   clock(pass: GPUComputePassEncoder, phase: 0 | 1 | 2): void;
 }
+/**
+ * The most workgroups one command buffer of the first step's set-up holds: 64 dispatches over a 512 x 512 grid. The
+ * set-up (topology, surf field, spin-up) is about 4,600 dispatches there; recorded into the frame's one command buffer
+ * it held the GPU 4.4 s on an Intel xe-2lpg laptop GPU, past the 2 s Windows lets one submission run before it resets
+ * the device (KB-SCENES-DUNE-ARCHANG1). The same commands in order, in submissions of under 90 ms there.
+ */
+export const SETUP_WORKGROUPS = 1 << 18;
 // The sea a coastal cell is driven toward with the surf: (surface height, relaxation weight, flux); see surfSea.
 const surfOcean = (waves: string) =>
   oceanWaves +
@@ -293,7 +308,7 @@ export class CoastalFlow {
   // Frames of three steps it spins up for before its first frame (KB-WATER-SWASH1).
   private readonly spinFrames: number = 0;
   current = 0;
-  private device?: GPUDevice;
+  private readonly device: GPUDevice;
   private sources?: GPUBuffer;
   constructor(
     device: GPUDevice,
@@ -308,6 +323,7 @@ export class CoastalFlow {
     // Breaking surf on open-sea shores (Water passes surf.ts); unused for still water and rivers.
     coastSurf?: CoastSurf,
   ) {
+    this.device = device;
     try {
       const cells = terrain.width * terrain.height,
         surf = still || river ? undefined : coastSurf;
@@ -341,7 +357,6 @@ export class CoastalFlow {
         river?.integrate ?? (sea ? integrateShader('coastStep(size)', '', sea) : integrate),
       );
       if (river) {
-        this.device = device;
         this.sources = device.createBuffer({
           size: river.sources.byteLength,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -415,49 +430,70 @@ export class CoastalFlow {
   }
   step(encoder: GPUCommandEncoder): void {
     if (this.still && this.initialized) return;
-    const pass = encoder.beginComputePass(this.descriptor),
-      x = Math.ceil(this.terrain.width / 8),
+    const x = Math.ceil(this.terrain.width / 8),
       y = Math.ceil(this.terrain.height / 8);
-    if (!this.initialized) {
-      pass.setPipeline(this.initializer);
-      pass.setBindGroup(0, this.initialGroup);
-      pass.dispatchWorkgroups(x, y);
-      pass.setPipeline(this.connector);
-      pass.setBindGroup(0, this.connectGroup);
-      pass.dispatchWorkgroups(x, y);
-      pass.setPipeline(this.compressor);
-      pass.setBindGroup(0, this.compressGroup);
-      pass.dispatchWorkgroups(x, y);
-      this.surf?.build(pass, this.terrain.width, this.terrain.height);
-      if (this.filling) {
-        pass.setPipeline(this.filling);
-        pass.setBindGroup(0, this.fillGroup!);
-        pass.dispatchWorkgroups(x, y);
-      }
-      this.initialized = true;
-      // The surf's spin-up: the flow runs the sea of the seconds before its first frame (surf.ts, KB-WATER-SWASH1).
-      if (this.surf && !this.still && this.spinFrames > 0) {
-        this.surf.clock(pass, 0);
-        for (let f = 0; f < this.spinFrames; f++) {
-          for (let i = 0; i < 3; i++) this.substep(pass, x, y);
-          this.surf.clock(pass, 1);
-        }
-        this.surf.clock(pass, 2);
-      }
-    }
-    if (this.still) {
-      pass.end();
-      return;
-    }
-    if (this.river) this.device!.queue.writeBuffer(this.sources!, 0, this.river.sources as Float32Array<ArrayBuffer>);
+    if (!this.initialized) this.setUp(x, y);
+    if (this.still) return;
+    const pass = encoder.beginComputePass(this.descriptor),
+      next = () => pass;
+    if (this.river) this.device.queue.writeBuffer(this.sources!, 0, this.river.sources as Float32Array<ArrayBuffer>);
     // shortcut: three substeps suit coastal cells >= 0.5m, increase substeps for finer maps.
-    for (let i = 0; i < (this.river?.substeps ?? 3); i++) this.substep(pass, x, y);
+    for (let i = 0; i < (this.river?.substeps ?? 3); i++) this.substep(next, x, y);
     pass.end();
   }
-  private substep(pass: GPUComputePassEncoder, x: number, y: number): void {
+  /**
+   * The first step's set-up: the initial state, the sea's connectivity, the surf field, the fill and the spin-up. It is
+   * submitted ahead of the frame's own commands in command buffers of at most {@link SETUP_WORKGROUPS} workgroups, so it
+   * reads the heightmap and the uniform as the queue holds them now: the heightmap's upload, and the uniform written
+   * just before `step`, but not a heightmap the same frame's command encoder writes earlier on the GPU.
+   */
+  private setUp(x: number, y: number): void {
+    let encoder: GPUCommandEncoder | undefined,
+      pass: GPUComputePassEncoder | undefined,
+      held = 0;
+    const flush = () => {
+        if (!encoder) return;
+        pass!.end();
+        // One submit per command buffer: Dawn records the buffers of one submit into one D3D12 command list.
+        this.device.queue.submit([encoder.finish()]);
+        encoder = pass = undefined;
+        held = 0;
+      },
+      next: NextPass = (groups = x * y) => {
+        if (held + groups > SETUP_WORKGROUPS) flush();
+        held += groups;
+        if (!pass) pass = (encoder = this.device.createCommandEncoder()).beginComputePass(this.descriptor);
+        return pass;
+      },
+      grid = (pipeline: GPUComputePipeline, bindGroup: GPUBindGroup) => {
+        const pass = next();
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.dispatchWorkgroups(x, y);
+      };
+    grid(this.initializer, this.initialGroup);
+    grid(this.connector, this.connectGroup);
+    grid(this.compressor, this.compressGroup);
+    this.surf?.build(next, this.terrain.width, this.terrain.height);
+    if (this.filling) grid(this.filling, this.fillGroup!);
+    // The surf's spin-up: the flow runs the sea of the seconds before its first frame (surf.ts, KB-WATER-SWASH1).
+    if (this.surf && !this.still && this.spinFrames > 0) {
+      this.surf.clock(next(1), 0);
+      for (let f = 0; f < this.spinFrames; f++) {
+        for (let i = 0; i < 3; i++) this.substep(next, x, y);
+        this.surf.clock(next(1), 1);
+      }
+      this.surf.clock(next(1), 2);
+    }
+    flush();
+    this.initialized = true;
+  }
+  private substep(next: NextPass, x: number, y: number): void {
+    let pass = next();
     pass.setPipeline(this.flowing);
     pass.setBindGroup(0, this.flowGroups[this.current]);
     pass.dispatchWorkgroups(x, y);
+    pass = next();
     pass.setPipeline(this.integrating);
     pass.setBindGroup(0, this.integrateGroups[this.current]);
     pass.dispatchWorkgroups(x, y);

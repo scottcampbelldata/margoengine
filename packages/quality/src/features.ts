@@ -179,9 +179,7 @@ export class FeatureScaler {
   private lower(need: number): Knob | undefined {
     const open = this.knobs.filter((k) => k.level < k.levels - 1 && !k.resting[k.level]),
       saving = (k: Knob) => k.saved[k.level],
-      enough = open
-        .filter((k) => saving(k)! >= need)
-        .sort((a, b) => a.weight - b.weight || saving(a)! - saving(b)!);
+      enough = open.filter((k) => saving(k)! >= need).sort((a, b) => a.weight - b.weight || saving(a)! - saving(b)!);
     return (
       enough[0] ??
       open.find((k) => saving(k) === undefined) ??
@@ -339,7 +337,9 @@ export function featureKnobs({
     const { resolution = 2048, cascades = 4 } = options,
       smaller = (by: number) => {
         const edge = (size: number) => Math.max(16, size / by);
-        return typeof resolution === 'number' ? edge(resolution) : ([edge(resolution[0]), edge(resolution[1])] as const);
+        return typeof resolution === 'number'
+          ? edge(resolution)
+          : ([edge(resolution[0]), edge(resolution[1])] as const);
       },
       sizes = [resolution, smaller(2), smaller(4)].filter(
         (size, i, all) => !i || JSON.stringify(size) !== JSON.stringify(all[i - 1]),

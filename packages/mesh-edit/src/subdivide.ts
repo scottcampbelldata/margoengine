@@ -265,7 +265,6 @@ function subdivideOnce(mesh: Loops, uvMode: 'smooth' | 'linear', boundary: 'smoo
   return { vertices: out, faces };
 }
 
-
 function average<T extends readonly number[]>(points: readonly T[]): number[] {
   const sum = new Array(points[0].length).fill(0);
   for (const p of points) for (let i = 0; i < sum.length; i++) sum[i] += p[i];

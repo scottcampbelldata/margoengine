@@ -1,6 +1,7 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Camera, RenderView as CoreView } from '@margoengine/core/extension';
 import { Context, useCommit, useScene, type World } from './internal.js';
+import { useSceneShadows } from './scene-shadows.js';
 import { fault } from '../../shared/errors.js';
 
 /** Props of `<Scene>`. */
@@ -14,8 +15,9 @@ export interface SceneProps {
 /**
  * A separate set of meshes drawn only by the `<RenderView>`s that name it: a HUD overlay, an item preview, a picture in
  * picture (core's `engine.createScene`). `<Mesh>`, `Box`, `Sphere`, `Plane` and `Group` inside are created in it;
- * `<Sun>`, the lights, Fog, Line, Points, Outline and Splat inside apply to it, and so do glTF and FBX models. Other
- * plugins stay in the default scene. Disposed with its meshes on unmount.
+ * `<Sun>`, the lights, Fog, `<Environment>`, `<Shadows>`, Sky, Clouds, the post stack, Line, Points, Outline and Splat
+ * inside apply to it, and models and the other scene bindings are built in it; the per-canvas bindings (Html, devtools, picking, the audio
+ * listener, ViewCube, CameraShake) stay canvas-wide. Disposed with its meshes on unmount.
  */
 export function Scene({ name, background, children }: SceneProps) {
   const parent = useScene(),
@@ -39,7 +41,11 @@ export function Scene({ name, background, children }: SceneProps) {
   useCommit(() => {
     if (world) world.background = background;
   }, [world, background]);
-  const value = useMemo(() => (world ? { ...parent, world, registry: null } : null), [parent, world]);
+  const { requestShadows, shadows } = useSceneShadows(engine, world);
+  const value = useMemo(
+    () => (world ? { ...parent, world, registry: null, shadows, requestShadows } : null),
+    [parent, world, shadows, requestShadows],
+  );
   return value ? <Context.Provider value={value}>{children}</Context.Provider> : null;
 }
 

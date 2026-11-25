@@ -18,11 +18,14 @@ const fake = (name) => {
   };
   return device;
 };
-const one = fake('one'), two = fake('two');
-const view = (device) => ({ view: device.name }), sampler = (device) => ({ sampler: device.name });
+const one = fake('one'),
+  two = fake('two');
+const view = (device) => ({ view: device.name }),
+  sampler = (device) => ({ sampler: device.name });
 
 test('plain extension textures are lost with the device: a white stand-in is bound and the loss is reported once', () => {
-  const errors = [], engine = { onError: (e) => errors.push(e) };
+  const errors = [],
+    engine = { onError: (e) => errors.push(e) };
   const plain = { view: { own: 'one' }, sampler: { own: 'one' } };
   const extension = { textures: [plain] };
   let resource = prepareMaterialExtension(one, extension, undefined, engine);
@@ -35,21 +38,42 @@ test('plain extension textures are lost with the device: a white stand-in is bou
   assert.deepEqual(two.made, ['texture', 'sampler'], 'made once per device');
   assert.equal(errors.length, 2, 'one report for the view, one for the sampler');
   assert.equal(errors[0].code, 'state');
-  assert.match(errors[0].message, /MaterialExtension textures\[0\]\.view lost with the device; pass a function or call give the material a new MaterialExtension/);
+  assert.match(
+    errors[0].message,
+    /MaterialExtension textures\[0\]\.view lost with the device; pass a function or call give the material a new MaterialExtension/,
+  );
   assert.match(errors[1].message, /textures\[0\]\.sampler lost/);
 });
 
 test('(device) => view and sampler are called once per device and never reported', () => {
-  const errors = [], engine = { onError: (e) => errors.push(e) }, calls = [];
+  const errors = [],
+    engine = { onError: (e) => errors.push(e) },
+    calls = [];
   const extension = {
-    textures: [{ view: (d) => (calls.push(['view', d.name]), view(d)), sampler: (d) => (calls.push(['sampler', d.name]), sampler(d)) }],
+    textures: [
+      {
+        view: (d) => (calls.push(['view', d.name]), view(d)),
+        sampler: (d) => (calls.push(['sampler', d.name]), sampler(d)),
+      },
+    ],
   };
   let resource = prepareMaterialExtension(one, extension, undefined, engine);
   resource = prepareMaterialExtension(one, extension, resource, engine);
-  assert.deepEqual(resource.entries.map((e) => e.resource), [{ view: 'one' }, { sampler: 'one' }]);
+  assert.deepEqual(
+    resource.entries.map((e) => e.resource),
+    [{ view: 'one' }, { sampler: 'one' }],
+  );
   resource = prepareMaterialExtension(two, extension, resource, engine);
-  assert.deepEqual(resource.entries.map((e) => e.resource), [{ view: 'two' }, { sampler: 'two' }]);
-  assert.deepEqual(calls, [['view', 'one'], ['sampler', 'one'], ['view', 'two'], ['sampler', 'two']]);
+  assert.deepEqual(
+    resource.entries.map((e) => e.resource),
+    [{ view: 'two' }, { sampler: 'two' }],
+  );
+  assert.deepEqual(calls, [
+    ['view', 'one'],
+    ['sampler', 'one'],
+    ['view', 'two'],
+    ['sampler', 'two'],
+  ]);
   assert.deepEqual(errors, []);
 });
 

@@ -160,7 +160,10 @@ export class ArcballControls extends Controls {
     super(source, element);
     const projection = options.projection;
     if (projection != null && typeof projection.zoom !== 'number')
-      throw typeError('ArcballControls projection has no numeric zoom; pass a CameraProjection or null', 'controls-arguments');
+      throw typeError(
+        'ArcballControls projection has no numeric zoom; pass a CameraProjection or null',
+        'controls-arguments',
+      );
     this.projectionOption = projection;
     this.pick = options.pick ?? null;
     this.saveState();

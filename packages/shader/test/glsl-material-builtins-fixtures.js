@@ -13,12 +13,31 @@ const big = {
   indices: [0, 1, 2, 0, 2, 3],
 };
 // Column-major: a turn of a about y, then a move of (tx, ty, tz).
-const turn = (a, tx = 0, ty = 0, tz = 0) => [Math.cos(a), 0, -Math.sin(a), 0, 0, 1, 0, 0, Math.sin(a), 0, Math.cos(a), 0, tx, ty, tz, 1];
-const oracleOf = (g, map) => Object.fromEntries(Object.entries(map).map(([name, [stream, size]]) => [name, { size, data: g[stream] }]));
+const turn = (a, tx = 0, ty = 0, tz = 0) => [
+  Math.cos(a),
+  0,
+  -Math.sin(a),
+  0,
+  0,
+  1,
+  0,
+  0,
+  Math.sin(a),
+  0,
+  Math.cos(a),
+  0,
+  tx,
+  ty,
+  tz,
+  1,
+];
+const oracleOf = (g, map) =>
+  Object.fromEntries(Object.entries(map).map(([name, [stream, size]]) => [name, { size, data: g[stream] }]));
 const prefix = {
   vertex:
     'uniform mat4 modelMatrix;\nuniform mat4 modelViewMatrix;\nuniform mat4 projectionMatrix;\nuniform mat4 viewMatrix;\nuniform mat3 normalMatrix;\nuniform vec3 cameraPosition;\nuniform bool isOrthographic;\n',
-  fragment: 'precision highp float;\nuniform mat4 viewMatrix;\nuniform vec3 cameraPosition;\nuniform bool isOrthographic;\n',
+  fragment:
+    'precision highp float;\nuniform mat4 viewMatrix;\nuniform vec3 cameraPosition;\nuniform bool isOrthographic;\n',
 };
 // The display transform the built-in chunks and outputColorSpace 'linear' stand for, written out in GLSL for the
 // oracle: Khronos PBR Neutral (2024) then the sRGB encoding (IEC 61966-2-1).
@@ -37,7 +56,11 @@ vec3 oracleSRGB(vec3 x) {
   return mix(x * 12.92, 1.055 * pow(x, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), x));
 }
 `;
-const screen = { positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], uvs: [0, 0, 1, 0, 1, 1, 0, 1], indices: [0, 1, 2, 0, 2, 3] };
+const screen = {
+  positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],
+  uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+  indices: [0, 1, 2, 0, 2, 3],
+};
 
 export const builtinFixtures = [
   {
@@ -64,13 +87,25 @@ void main() {
   vec3 seen = (viewMatrix * vec4(toEye, 0.0)).xyz;
   gl_FragColor = vec4(gain * (vColor * 0.25 + vec3(vUv, 0.0) * 0.5 + abs(vNormal) * 0.125 + abs(seen) * (isOrthographic ? 0.0 : 0.125)), 1.0);
 }`,
-    oracle: { vertex: prefix.vertex + 'attribute vec3 position;\nattribute vec3 normal;\nattribute vec2 uv;\nattribute vec3 color;\n', fragment: prefix.fragment },
+    oracle: {
+      vertex:
+        prefix.vertex + 'attribute vec3 position;\nattribute vec3 normal;\nattribute vec2 uv;\nattribute vec3 color;\n',
+      fragment: prefix.fragment,
+    },
     camera,
     matrix: turn(0.35, 0.1, -0.05, -0.5),
     geometry: big,
     attributes: oracleOf(big, { position: ['positions', 3], normal: ['normals', 3], uv: ['uvs', 2] }),
     generic: { color: [1, 1, 1] },
-    engine: ['modelMatrix', 'modelViewMatrix', 'projectionMatrix', 'viewMatrix', 'normalMatrix', 'cameraPosition', 'isOrthographic'],
+    engine: [
+      'modelMatrix',
+      'modelViewMatrix',
+      'projectionMatrix',
+      'viewMatrix',
+      'normalMatrix',
+      'cameraPosition',
+      'isOrthographic',
+    ],
     index: big.indices,
     uniforms: { gain: ['float', 1, 0.75] },
   },
@@ -157,7 +192,17 @@ void main() {
     matrix: turn(0.2, 0, 0, -0.25),
     geometry: big,
     attributes: oracleOf(big, { vertex_position: ['positions', 3], vertex_normal: ['normals', 3], aUv0: ['uvs', 2] }),
-    engine: ['matrix_model', 'matrix_viewProjection', 'matrix_normal', 'matrix_viewInverse', 'matrix_view3', 'view_position', 'camera_params', 'screen_size', 'matrix_projection'],
+    engine: [
+      'matrix_model',
+      'matrix_viewProjection',
+      'matrix_normal',
+      'matrix_viewInverse',
+      'matrix_view3',
+      'view_position',
+      'camera_params',
+      'screen_size',
+      'matrix_projection',
+    ],
     index: big.indices,
     uniforms: { gain: ['float', 1, 0.5] },
   },
@@ -178,10 +223,29 @@ in vec2 vUv;
 uniform float gain;
 out vec4 outColor;
 void main() { outColor = vec4(gain * (vColor * 0.75 + vec3(vUv, 0.0) * 0.25), 1.0); }`,
-    oracle: { vertex: '#version 300 es\nin vec3 position;\nin vec2 uv;\nin mat4 instanceMatrix;\nin vec3 instanceColor;\n' },
+    oracle: {
+      vertex: '#version 300 es\nin vec3 position;\nin vec2 uv;\nin mat4 instanceMatrix;\nin vec3 instanceColor;\n',
+    },
     geometry: screen,
     instances: {
-      instanceMatrix: [-0.5, -0.5, 0.5, 0.5].flatMap((x, i) => [0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1, 0, x, i % 2 ? 0.5 : -0.5, 0, 1]),
+      instanceMatrix: [-0.5, -0.5, 0.5, 0.5].flatMap((x, i) => [
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        x,
+        i % 2 ? 0.5 : -0.5,
+        0,
+        1,
+      ]),
       instanceColor: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0],
     },
     attributes: oracleOf(screen, { position: ['positions', 3], uv: ['uvs', 2] }),
@@ -211,7 +275,10 @@ void main() {
         ['#include <colorspace_fragment>', 'gl_FragColor.rgb = oracleSRGB(max(gl_FragColor.rgb, vec3(0.0)));'],
       ],
     },
-    options: { builtins: false, includes: { ramp: 'vec3 ramp(vec2 p) { return vec3(p.x * 2.0, p.y * 1.5, (1.0 - p.x) * 0.25); }' } },
+    options: {
+      builtins: false,
+      includes: { ramp: 'vec3 ramp(vec2 p) { return vec3(p.x * 2.0, p.y * 1.5, (1.0 - p.x) * 0.25); }' },
+    },
     geometry: screen,
     attributes: oracleOf(screen, { position: ['positions', 3], uv: ['uvs', 2] }),
     index: screen.indices,
@@ -233,7 +300,10 @@ void main() { outColor = vec4(vec3(vUv.x * 1.8, vUv.y * 0.9, 0.05) * exposure, 1
     oracle: {
       replace: [
         ['out vec4 outColor;', 'out vec4 outColor;\n' + display],
-        ['* exposure, 1.0); }', '* exposure, 1.0); outColor.rgb = oracleSRGB(oracleNeutral(max(outColor.rgb, vec3(0.0)))); }'],
+        [
+          '* exposure, 1.0); }',
+          '* exposure, 1.0); outColor.rgb = oracleSRGB(oracleNeutral(max(outColor.rgb, vec3(0.0)))); }',
+        ],
       ],
     },
     options: { builtins: false, outputColorSpace: 'linear' },

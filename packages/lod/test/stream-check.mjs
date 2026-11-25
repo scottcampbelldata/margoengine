@@ -27,7 +27,10 @@ try {
   assert.ok(r.far.red >= 30, `the coarse level draws: ${JSON.stringify(r.far)}`);
   assert.equal(r.near.level, 0, 'near, the fetched level shows');
   assert.equal(r.near.requests, 1);
-  assert.ok(r.near.red < r.near.pixels * 0.01 && r.near.pixels > 1000, `and the coarse level goes: ${JSON.stringify(r.near)}`);
+  assert.ok(
+    r.near.red < r.near.pixels * 0.01 && r.near.pixels > 1000,
+    `and the coarse level goes: ${JSON.stringify(r.near)}`,
+  );
   assert.ok(r.near.bytes > 100_000, `it counts what it holds: ${r.near.bytes}`);
   assert.equal(r.bad.state, 'failed');
   assert.equal(r.bad.level, 1, 'a failed level leaves the coarse one on show');

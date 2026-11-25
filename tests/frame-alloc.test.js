@@ -68,7 +68,13 @@ const tierProbeAt = (opt, script, ...args) =>
   JSON.parse(
     execFileSync(
       process.execPath,
-      ['--expose-gc', ...HEAP, `--max-opt=${opt}`, fileURLToPath(new URL(`./support/${script}`, import.meta.url)), ...args],
+      [
+        '--expose-gc',
+        ...HEAP,
+        `--max-opt=${opt}`,
+        fileURLToPath(new URL(`./support/${script}`, import.meta.url)),
+        ...args,
+      ],
       { encoding: 'utf8', timeout: 240_000 },
     ),
   ).bytes;

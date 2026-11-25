@@ -238,7 +238,12 @@ export function craterField(options: CraterFieldOptions = {}): CraterField {
     }
     // Insertion sort by age, oldest first (a handful of craters).
     for (let i = 1; i < n; i++) {
-      const k0 = dia[i]!, k1 = dist[i]!, k2 = age[i]!, k3 = cx[i]!, k4 = cy[i]!, k5 = cz[i]!;
+      const k0 = dia[i]!,
+        k1 = dist[i]!,
+        k2 = age[i]!,
+        k3 = cx[i]!,
+        k4 = cy[i]!,
+        k5 = cz[i]!;
       let j = i - 1;
       for (; j >= 0 && age[j]! > k2; j--) {
         dia[j + 1] = dia[j]!;

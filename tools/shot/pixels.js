@@ -88,7 +88,11 @@ export function resolveFrame({ sum, width, height, count, outWidth, outHeight, n
       let r = 0,
         g = 0,
         b = 0;
-      for (let k = 0, at = (y * width + across.first[j]) * 3, w = across.offset[j]; k < across.count[j]; k++, at += 3, w++) {
+      for (
+        let k = 0, at = (y * width + across.first[j]) * 3, w = across.offset[j];
+        k < across.count[j];
+        k++, at += 3, w++
+      ) {
         const weight = across.weights[w];
         r += sum[at] * weight;
         g += sum[at + 1] * weight;
@@ -141,7 +145,10 @@ export function resampleMask({ grey, width, height, outWidth, outHeight }) {
       let v = 0;
       for (let a = 0; a < down.count[i]; a++)
         for (let b = 0; b < across.count[j]; b++)
-          v += grey[(down.first[i] + a) * width + across.first[j] + b] * down.weights[down.offset[i] + a] * across.weights[across.offset[j] + b];
+          v +=
+            grey[(down.first[i] + a) * width + across.first[j] + b] *
+            down.weights[down.offset[i] + a] *
+            across.weights[across.offset[j] + b];
       out[i * outWidth + j] = Math.round(v);
     }
   return out;

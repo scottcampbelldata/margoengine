@@ -132,7 +132,7 @@ try {
   await shows('parallaxOneStep', [0.04 * 5, 0, 0], 3);
   await shows('parallaxTop', [0, 0, 0], 1);
   // A ramp, height = u from u0 = 0.5, moving left as depth grows: d = 1 - u0 + 0.1 d, so d = 0.5 / 0.9 and u moves 0.1 d.
-  await shows('parallaxRamp', [(0.1 * 0.5) / 0.9 * 5, 0, 0], 3);
+  await shows('parallaxRamp', [((0.1 * 0.5) / 0.9) * 5, 0, 0], 3);
   const nodes = [await pixel('matcapNode'), await pixel('matcapNode', 0.35, 0.6)],
     material = [await pixel('matcapMaterial'), await pixel('matcapMaterial', 0.35, 0.6)];
   assert.ok(

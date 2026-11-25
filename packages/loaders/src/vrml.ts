@@ -472,7 +472,17 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
             ay = Math.abs(ny),
             az = Math.abs(nz),
             [u, w] =
-              az >= ax && az >= ay ? (nz >= 0 ? [0, 1] : [1, 0]) : ax >= ay ? (nx >= 0 ? [1, 2] : [2, 1]) : ny >= 0 ? [2, 0] : [0, 2];
+              az >= ax && az >= ay
+                ? nz >= 0
+                  ? [0, 1]
+                  : [1, 0]
+                : ax >= ay
+                  ? nx >= 0
+                    ? [1, 2]
+                    : [2, 1]
+                  : ny >= 0
+                    ? [2, 0]
+                    : [0, 2];
           flat.length = 0;
           for (let c = 0; c < corners; c++) flat.push(p[(base + c) * 3 + u], p[(base + c) * 3 + w]);
           const triangles = triangulate(flat, [], 2);

@@ -78,7 +78,9 @@ const unit = (v: number): number => Math.min(1, Math.max(0, v));
 /** sRGB 0 to 255 to linear (IEC 61966-2-1). */
 const linear = (c: number): number => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const rgb = (v: unknown, fallback: readonly number[]): number[] =>
-  Array.isArray(v) && v.length >= 3 && v.every((c) => typeof c === 'number') ? v.slice(0, 3).map(linear) : fallback.map(linear);
+  Array.isArray(v) && v.length >= 3 && v.every((c) => typeof c === 'number')
+    ? v.slice(0, 3).map(linear)
+    : fallback.map(linear);
 const luminance = (c: readonly number[]): number => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 const smooth = (a: number, b: number, x: number): number => {
   const t = b > a ? unit((x - a) / (b - a)) : x < a ? 0 : 1;
@@ -97,7 +99,9 @@ function materialsOf(json: unknown): Map<string, CCMaterial> {
           if (material && typeof material === 'object') out.set(name, material as CCMaterial);
   }
   if (!out.size)
-    throw new TypeError('Character Creator json has no materials; pass the .json Character Creator wrote beside the FBX');
+    throw new TypeError(
+      'Character Creator json has no materials; pass the .json Character Creator wrote beside the FBX',
+    );
   return out;
 }
 
@@ -124,7 +128,11 @@ export function eyeOcclusionAlpha(
       const u = (x + 0.5) / width,
         t = (y + 0.5) / height,
         top = edge(t, v('Shadow Top', 0.26) * arc(u, v('Shadow Top Arc', 1)), v('Shadow Top Range', 1)),
-        bottom = edge(1 - t, v('Shadow Bottom', 0.05) * arc(u, v('Shadow Bottom Arc', 2)), v('Shadow Bottom Range', 0.3)),
+        bottom = edge(
+          1 - t,
+          v('Shadow Bottom', 0.05) * arc(u, v('Shadow Bottom Arc', 2)),
+          v('Shadow Bottom Range', 0.3),
+        ),
         outer = edge(u, v('Shadow Outer Corner', 0.2), v('Shadow Outer Corner Range', 0.5)),
         inner = edge(1 - u, v('Shadow Inner Corner', 0.25), v('Shadow Inner Corner Range', 0.5)),
         top2 = edge(t, v('Shadow2 Top', 0.09) * arc(u, v('Shadow Top Arc', 1)), v('Shadow2 Top Range', 1)),
@@ -205,7 +213,13 @@ export function characterCreator(json: unknown, options: CharacterCreatorOptions
     );
     const micro = await microRoughness(cc, variables, map, variances, picture);
     if (rough || metal || micro) {
-      out.metallicRoughnessTexture = await pack(String(out.name), rough && decode(rough), metal && decode(metal), out, micro);
+      out.metallicRoughnessTexture = await pack(
+        String(out.name),
+        rough && decode(rough),
+        metal && decode(metal),
+        out,
+        micro,
+      );
       out.roughness = 1;
       out.metalness = 1;
     }
@@ -241,7 +255,8 @@ export function characterCreator(json: unknown, options: CharacterCreatorOptions
         const m = world.get(mesh.node),
           p = mesh.geometry.positions,
           out = new Float64Array(p.length);
-        for (let i = 0; i < p.length; i += 3) out.set(m ? transformPoint(m, p[i], p[i + 1], p[i + 2]) : [p[i], p[i + 1], p[i + 2]], i);
+        for (let i = 0; i < p.length; i += 3)
+          out.set(m ? transformPoint(m, p[i], p[i + 1], p[i + 2]) : [p[i], p[i + 1], p[i + 2]], i);
         return out;
       };
     // The head's skin as one triangle list, and its centre: the face is in front of it.
@@ -278,7 +293,11 @@ export function characterCreator(json: unknown, options: CharacterCreatorOptions
       }
       for (let i = 0; i < p.length; i++) middle[i % 3] += (3 * p[i]) / p.length;
       const away = front.reduce((s, f, k) => s + f * (middle[k] - centre[k]), 0) < 0 ? -1 : 1;
-      const anchored = anchorLidShadow({ positions: p, indices: idx, uvs }, skin, front.map((f) => f * away));
+      const anchored = anchorLidShadow(
+        { positions: p, indices: idx, uvs },
+        skin,
+        front.map((f) => f * away),
+      );
       if (anchored) mesh.geometry.uvs = anchored.uvs;
     }
     return false;
@@ -315,7 +334,9 @@ const sample = (p: Pixels, u: number, v: number, channel: number): number => {
   const step = p.data.length / (p.width * p.height);
   return (
     p.data[
-      (Math.min(p.height - 1, Math.max(0, (v * p.height) | 0)) * p.width + Math.min(p.width - 1, Math.max(0, (u * p.width) | 0))) * step +
+      (Math.min(p.height - 1, Math.max(0, (v * p.height) | 0)) * p.width +
+        Math.min(p.width - 1, Math.max(0, (u * p.width) | 0))) *
+        step +
         Math.min(step - 1, channel)
     ] / 255
   );
@@ -419,7 +440,11 @@ async function pack(
     height = Math.max(rough?.height ?? 1, metal?.height ?? 1),
     data = new Uint8Array(width * height * 4),
     at = (p: Pixels, x: number, y: number) =>
-      p.data[(Math.min(p.height - 1, ((y * p.height) / height) | 0) * p.width + Math.min(p.width - 1, ((x * p.width) / width) | 0)) * 4],
+      p.data[
+        (Math.min(p.height - 1, ((y * p.height) / height) | 0) * p.width +
+          Math.min(p.width - 1, ((x * p.width) / width) | 0)) *
+          4
+      ],
     flatRough = Math.round(unit(num(out.roughness, 1)) * 255),
     flatMetal = Math.round(unit(num(out.metalness, 0)) * 255);
   for (let y = 0, i = 0; y < height; y++)
@@ -428,7 +453,9 @@ async function pack(
         [
           255,
           roughen
-            ? Math.round(255 * roughen((rough ? at(rough, x, y) : flatRough) / 255, (x + 0.5) / width, (y + 0.5) / height))
+            ? Math.round(
+                255 * roughen((rough ? at(rough, x, y) : flatRough) / 255, (x + 0.5) / width, (y + 0.5) / height),
+              )
             : rough
               ? at(rough, x, y)
               : flatRough,
@@ -442,7 +469,13 @@ async function pack(
 
 async function occlusion(out: MaterialData, variables: Record<string, unknown>): Promise<void> {
   const alpha = eyeOcclusionAlpha(variables);
-  out.baseColorTexture = { name: `${out.name} lid shadow`, mimeType: 'image/png', image: await encodePNG(alpha), wrapS: 'clamp', wrapT: 'clamp' };
+  out.baseColorTexture = {
+    name: `${out.name} lid shadow`,
+    mimeType: 'image/png',
+    image: await encodePNG(alpha),
+    wrapS: 'clamp',
+    wrapT: 'clamp',
+  };
   delete out.baseColorTextureTransform;
   out.color = [1, 1, 1, 1];
   out.alphaMode = 'BLEND';

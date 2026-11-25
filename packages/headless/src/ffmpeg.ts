@@ -160,7 +160,16 @@ const MATRICES: readonly string[] = ['bt709', 'bt601', 'bt2020'];
 /** `'#rgb'`, `'#rrggbb'` or `'#rrggbbaa'` as ffmpeg's `0xRRGGBBAA`, or undefined when it is none of them. */
 function padColour(colour: string): string | undefined {
   const rgba = hexColor(colour);
-  return rgba && `0x${rgba.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')}`;
+  return (
+    rgba &&
+    `0x${rgba
+      .map((c) =>
+        Math.round(c * 255)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`
+  );
 }
 
 /** Checks the layers against a `width` x `height` frame and fills in their defaults. */
@@ -169,8 +178,19 @@ function checkLayers(width: number, height: number, layers: readonly FFmpegLayer
   if (!Array.isArray(layers)) throw typeError('layers must be an array', 'headless');
   return layers.map((layer: FFmpegLayer, i) => {
     const at = `Layer ${i}`,
-      { input, rect, start = 0, duration, in: from = 0, speed = 1, fit = 'contain', crop, pad, matrix, range } =
-        layer ?? ({} as FFmpegLayer);
+      {
+        input,
+        rect,
+        start = 0,
+        duration,
+        in: from = 0,
+        speed = 1,
+        fit = 'contain',
+        crop,
+        pad,
+        matrix,
+        range,
+      } = layer ?? ({} as FFmpegLayer);
     if (typeof input !== 'string' || !input) throw typeError(`${at} needs an input file`, 'headless');
     const { x, y, width: w, height: h } = rect ?? ({} as FFmpegLayer['rect']);
     if (![x, y, w, h].every(Number.isInteger) || x < 0 || y < 0 || w < 1 || h < 1 || x + w > width || y + h > height)
@@ -180,7 +200,8 @@ function checkLayers(width: number, height: number, layers: readonly FFmpegLayer
       throw rangeError(`${at} duration must be above 0 seconds`, 'headless');
     if (!(from >= 0) || !Number.isFinite(from)) throw rangeError(`${at} in must be 0 or more seconds`, 'headless');
     if (!(speed > 0) || !Number.isFinite(speed)) throw rangeError(`${at} speed must be above 0`, 'headless');
-    if (!['contain', 'cover', 'fill'].includes(fit)) throw rangeError(`${at} fit is 'contain', 'cover' or 'fill'`, 'headless');
+    if (!['contain', 'cover', 'fill'].includes(fit))
+      throw rangeError(`${at} fit is 'contain', 'cover' or 'fill'`, 'headless');
     if (
       crop !== undefined &&
       (!Array.isArray(crop) ||
@@ -192,8 +213,10 @@ function checkLayers(width: number, height: number, layers: readonly FFmpegLayer
       throw rangeError(`${at} crop is [x, y, width, height] in even whole pixels, width and height from 2`, 'headless');
     const padding = pad === undefined ? '0x00000000' : typeof pad === 'string' ? padColour(pad) : undefined;
     if (!padding) throw rangeError(`${at} pad is a colour '#rgb', '#rrggbb' or '#rrggbbaa'`, 'headless');
-    if (matrix !== undefined && !MATRICES.includes(matrix)) throw rangeError(`${at} matrix is 'bt709', 'bt601' or 'bt2020'`, 'headless');
-    if (range !== undefined && range !== 'tv' && range !== 'pc') throw rangeError(`${at} range is 'tv' or 'pc'`, 'headless');
+    if (matrix !== undefined && !MATRICES.includes(matrix))
+      throw rangeError(`${at} matrix is 'bt709', 'bt601' or 'bt2020'`, 'headless');
+    if (range !== undefined && range !== 'tv' && range !== 'pc')
+      throw rangeError(`${at} range is 'tv' or 'pc'`, 'headless');
     return { input, x, y, w, h, start, duration, from, speed, fit, crop, padding, matrix, range };
   });
 }
@@ -204,7 +227,13 @@ function checkLayers(width: number, height: number, layers: readonly FFmpegLayer
  * stepped to the film's rate by nearest time, scaled into its box with its matrix and range, and overlaid while it
  * shows: frame k shows it when start <= k / fps < start + duration. The graph's output is `[v]`.
  */
-function layerGraph(layers: ReturnType<typeof checkLayers>, firstInput: number, fps: number, chain: string, base = '0:v') {
+function layerGraph(
+  layers: ReturnType<typeof checkLayers>,
+  firstInput: number,
+  fps: number,
+  chain: string,
+  base = '0:v',
+) {
   const inputs: string[] = [],
     parts: string[] = [],
     half = 0.5 / fps;
@@ -240,8 +269,12 @@ function layerGraph(layers: ReturnType<typeof checkLayers>, firstInput: number, 
     // (a still picture is one frame) and it ends there, so it never runs past the rendered frames; without one it
     // shows until its file ends.
     const end = l.duration ? l.start + l.duration : undefined,
-      hold = end === undefined ? '' : `,tpad=stop_mode=clone:stop_duration=${number(l.duration!)},trim=end=${number(end)}`,
-      enable = end === undefined ? `gte(t,${number(l.start - half)})` : `between(t,${number(l.start - half)},${number(end - half)})`;
+      hold =
+        end === undefined ? '' : `,tpad=stop_mode=clone:stop_duration=${number(l.duration!)},trim=end=${number(end)}`,
+      enable =
+        end === undefined
+          ? `gte(t,${number(l.start - half)})`
+          : `between(t,${number(l.start - half)},${number(end - half)})`;
     parts.push(
       `[${firstInput + i}:v]${crop}setpts=(PTS-STARTPTS)/${number(l.speed)}+${number(l.start)}/TB,fps=${number(fps)}:round=near${hold},${fit},setsar=1[l${i}]`,
     );
@@ -297,10 +330,24 @@ function parseProbe(report: string): VideoProbe | undefined {
 }
 
 /** Runs ffmpeg and gives back what it wrote on standard error, whatever its exit code. */
-function ffmpegReport(ffmpeg: string | readonly string[], args: readonly string[], signal?: AbortSignal): Promise<string>;
+function ffmpegReport(
+  ffmpeg: string | readonly string[],
+  args: readonly string[],
+  signal?: AbortSignal,
+): Promise<string>;
 /** With `failures`, gives back the report only when ffmpeg exits with an error, else undefined. */
-function ffmpegReport(ffmpeg: string | readonly string[], args: readonly string[], signal: AbortSignal | undefined, failures: true): Promise<string | undefined>;
-function ffmpegReport(ffmpeg: string | readonly string[], args: readonly string[], signal?: AbortSignal, failures = false): Promise<string | undefined> {
+function ffmpegReport(
+  ffmpeg: string | readonly string[],
+  args: readonly string[],
+  signal: AbortSignal | undefined,
+  failures: true,
+): Promise<string | undefined>;
+function ffmpegReport(
+  ffmpeg: string | readonly string[],
+  args: readonly string[],
+  signal?: AbortSignal,
+  failures = false,
+): Promise<string | undefined> {
   signal?.throwIfAborted();
   const [program, ...first] = typeof ffmpeg === 'string' ? [ffmpeg] : ffmpeg;
   return new Promise<string | undefined>((done, fail) => {
@@ -311,7 +358,11 @@ function ffmpegReport(ffmpeg: string | readonly string[], args: readonly string[
     child.stderr!.setEncoding('utf8').on('data', (chunk: string) => (text += chunk));
     child.once('error', (error: NodeJS.ErrnoException) => {
       signal?.removeEventListener('abort', stop);
-      fail(error.code === 'ENOENT' ? Object.assign(fault('unsupported', 'ffmpeg was not found', 'headless'), { cause: error }) : error);
+      fail(
+        error.code === 'ENOENT'
+          ? Object.assign(fault('unsupported', 'ffmpeg was not found', 'headless'), { cause: error })
+          : error,
+      );
     });
     child.once('close', (code) => {
       signal?.removeEventListener('abort', stop);
@@ -334,7 +385,9 @@ export async function probeVideo(
   const report = await ffmpegReport(ffmpeg, ['-hide_banner', '-nostdin', '-i', input], signal),
     probe = parseProbe(report);
   if (!probe)
-    throw Object.assign(fault('failed', `ffmpeg found no video stream in ${input}`, 'headless'), { cause: report.slice(-MOST_LOG) });
+    throw Object.assign(fault('failed', `ffmpeg found no video stream in ${input}`, 'headless'), {
+      cause: report.slice(-MOST_LOG),
+    });
   return probe;
 }
 
@@ -354,7 +407,8 @@ export async function resolveLayers(
   const probes = new Map<string, Promise<VideoProbe>>();
   return Promise.all(
     layers.map(async (layer: FFmpegLayer, i) => {
-      if (typeof layer?.input !== 'string' || !layer.input) throw typeError(`Layer ${i} needs an input file`, 'headless');
+      if (typeof layer?.input !== 'string' || !layer.input)
+        throw typeError(`Layer ${i} needs an input file`, 'headless');
       if (layer.matrix && layer.range && !layer.crop) return { ...layer };
       if (!probes.has(layer.input)) probes.set(layer.input, probeVideo(layer.input, { ffmpeg, signal }));
       const probe = await probes.get(layer.input)!,
@@ -391,7 +445,16 @@ export function ffmpegArguments(
   const webm = /\.webm$/i.test(output),
     sound = audio
       ? {
-          input: ['-f', 'f32le', '-ar', String(audio.sampleRate), '-ac', String(audio.channels.length), '-i', `pipe:${SOUND_PIPE}`],
+          input: [
+            '-f',
+            'f32le',
+            '-ar',
+            String(audio.sampleRate),
+            '-ac',
+            String(audio.channels.length),
+            '-i',
+            `pipe:${SOUND_PIPE}`,
+          ],
           map: ['-map', '0:v:0', '-map', '1:a:0'],
           codec: [
             ...(webm ? ['-c:a', 'libopus'] : ['-c:a', 'aac']),
@@ -400,7 +463,19 @@ export function ffmpegArguments(
           ],
         }
       : undefined;
-  const frames = ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${width}x${height}`, '-r', String(fps), '-i', 'pipe:0'],
+  const frames = [
+      '-y',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgba',
+      '-s',
+      `${width}x${height}`,
+      '-r',
+      String(fps),
+      '-i',
+      'pipe:0',
+    ],
     out = args ?? [...(webm ? [...colour(alpha ? 'yuva420p' : 'yuv420p'), ...VP9] : H264), ...(sound?.codec ?? [])];
   if (!boxes.length) return [...frames, ...(sound ? [...sound.input, ...sound.map] : ['-an']), ...out, output];
   // The output's -vf (the colour chain) moves to the end of the layer graph, which replaces it.
@@ -428,7 +503,13 @@ export function ffmpegArguments(
 export function layersPictureArguments(
   width: number,
   height: number,
-  { picture, output, fps = 30, frame, layers }: { picture: string; output: string; fps?: number; frame: number; layers: readonly FFmpegLayer[] },
+  {
+    picture,
+    output,
+    fps = 30,
+    frame,
+    layers,
+  }: { picture: string; output: string; fps?: number; frame: number; layers: readonly FFmpegLayer[] },
 ): string[] {
   if (typeof picture !== 'string' || !picture) throw typeError('layersOverPicture needs a picture file', 'headless');
   if (typeof output !== 'string' || !output) throw typeError('layersOverPicture needs an output file', 'headless');
@@ -463,7 +544,11 @@ export function layersPictureArguments(
  * read as {@link resolveLayers} reads them. A failure rejects with code `'failed'` and the end of ffmpeg's log in
  * `cause`.
  */
-export async function layersOverPicture(picture: string, output: string, options: LayersOverPictureOptions): Promise<void> {
+export async function layersOverPicture(
+  picture: string,
+  output: string,
+  options: LayersOverPictureOptions,
+): Promise<void> {
   const { fps = 30, frame, layers, ffmpeg = 'ffmpeg', signal } = options ?? ({} as LayersOverPictureOptions);
   const size = await probeVideo(picture, { ffmpeg, signal }),
     args = layersPictureArguments(size.width, size.height, {
@@ -474,11 +559,18 @@ export async function layersOverPicture(picture: string, output: string, options
       layers: await resolveLayers(layers, { ffmpeg, signal }),
     });
   const log = await ffmpegReport(ffmpeg, ['-hide_banner', '-nostdin', '-v', 'error', ...args], signal, true);
-  if (log !== undefined) throw Object.assign(fault('failed', 'ffmpeg failed', 'headless'), { cause: log.slice(-MOST_LOG) });
+  if (log !== undefined)
+    throw Object.assign(fault('failed', 'ffmpeg failed', 'headless'), { cause: log.slice(-MOST_LOG) });
 }
 
 /** An RGBA frame grown to `codedWidth` x `codedHeight` by repeating its last column and row. */
-function padFrame(data: Uint8Array, width: number, height: number, codedWidth: number, codedHeight: number): Uint8Array {
+function padFrame(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  codedWidth: number,
+  codedHeight: number,
+): Uint8Array {
   const out = new Uint8Array(codedWidth * codedHeight * 4);
   for (let y = 0; y < codedHeight; y++) {
     const from = Math.min(y, height - 1) * width * 4,
@@ -559,7 +651,13 @@ export async function encodeWithFFmpeg(
         finished.catch(() => {}); // Read below; it may settle while a frame is still being made.
         // The sound goes down its own pipe while the frames go down theirs, each waiting only for its own room, so
         // ffmpeg reading one input ahead of the other never stalls both.
-        if (audio) sounding = writeSound(running.stdio[SOUND_PIPE] as NodeJS.WritableStream, audio.channels, soundLength, () => gone);
+        if (audio)
+          sounding = writeSound(
+            running.stdio[SOUND_PIPE] as NodeJS.WritableStream,
+            audio.channels,
+            soundLength,
+            () => gone,
+          );
       } else if (frame.width !== width || frame.height !== height)
         throw rangeError('Video frames must all be one size', 'headless');
       if (frame.data.length !== width * height * 4) throw rangeError('Frame data does not match its size', 'headless');

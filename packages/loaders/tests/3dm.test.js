@@ -111,7 +111,10 @@ test('a mesh object reads, in metres by the file unit, and every handle is freed
   assert.equal(model.metersPerUnit, 1e-3);
   assert.equal(rhino.state.live, 0);
   assert.equal(rhino.state.bytes, BYTES);
-  assert.deepEqual([...parse3DM(runtime({ objects: [{ mesh: QUAD }] }), BYTES, { units: 'file' }).positions.subarray(3, 6)], [1000, 0, 0]);
+  assert.deepEqual(
+    [...parse3DM(runtime({ objects: [{ mesh: QUAD }] }), BYTES, { units: 'file' }).positions.subarray(3, 6)],
+    [1000, 0, 0],
+  );
 });
 
 test('a triangle face repeats its last corner and gives one triangle', () => {
@@ -146,7 +149,16 @@ test('attributes, user strings, layers and draw colours reach the group', () => 
         {
           mesh: TRIANGLE,
           color: { r: 0, g: 255, b: 0, a: 255 },
-          attributes: { name: 'door', id: 'abc', layerIndex: 0, materialIndex: 3, getUserStrings: () => [['__proto__', 'x'], ['part', '12']] },
+          attributes: {
+            name: 'door',
+            id: 'abc',
+            layerIndex: 0,
+            materialIndex: 3,
+            getUserStrings: () => [
+              ['__proto__', 'x'],
+              ['part', '12'],
+            ],
+          },
         },
         { mesh: TRIANGLE, attributes: { layerIndex: 0 } },
       ],
@@ -220,7 +232,11 @@ test('other surfaces use their saved render meshes; objects with none are counte
 test('hidden objects and hidden layers stay out unless asked for', () => {
   const scene = () => ({
     layers: [{ name: 'off', visible: false }],
-    objects: [{ mesh: TRIANGLE, attributes: { layerIndex: 0 } }, { mesh: TRIANGLE, attributes: { visible: false } }, { mesh: TRIANGLE }],
+    objects: [
+      { mesh: TRIANGLE, attributes: { layerIndex: 0 } },
+      { mesh: TRIANGLE, attributes: { visible: false } },
+      { mesh: TRIANGLE },
+    ],
   });
   assert.equal(parse3DM(runtime(scene()), BYTES).groups.length, 1);
   assert.equal(parse3DM(runtime(scene()), BYTES, { hidden: true }).groups.length, 3);

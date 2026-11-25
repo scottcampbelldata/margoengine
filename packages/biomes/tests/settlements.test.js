@@ -45,11 +45,17 @@ test('sites: flat, dry, low and near water win; spacing holds; the count is a mo
   };
   const one = layoutSettlements(world, { villages: 1, houses: 0 });
   assert.equal(one.villages.length, 1);
-  assert.ok(Math.hypot(one.villages[0].centre[0] + 500, one.villages[0].centre[1] - 300) < 100, 'the low disc by the river');
+  assert.ok(
+    Math.hypot(one.villages[0].centre[0] + 500, one.villages[0].centre[1] - 300) < 100,
+    'the low disc by the river',
+  );
   const two = layoutSettlements(world, { villages: 5, houses: 0, spacing: 300 });
   assert.equal(two.villages.length, 2, 'only the two discs are flat enough');
   for (const v of two.villages) {
-    assert.ok(discs.some((d) => Math.hypot(v.centre[0] - d.x, v.centre[1] - d.z) < 100), `${v.centre} on a disc`);
+    assert.ok(
+      discs.some((d) => Math.hypot(v.centre[0] - d.x, v.centre[1] - d.z) < 100),
+      `${v.centre} on a disc`,
+    );
     assert.equal(v.height, world.heightAt(...v.centre));
   }
   const near = layoutSettlements(world, { villages: 5, houses: 0, spacing: 1500 });
@@ -74,10 +80,13 @@ test('roads follow the terrain: through the pass, not over the ridge', () => {
   assert.equal(straight, 70, 'the straight way goes over the top');
   assert.ok(top < 22, `the road stays low: ${top.toFixed(1)} m`);
   // Sites snap to the 16 m grid from the world's corner.
-  assert.deepEqual(s.villages.map((v) => v.centre), [
-    [-696, -296],
-    [696, -296],
-  ]);
+  assert.deepEqual(
+    s.villages.map((v) => v.centre),
+    [
+      [-696, -296],
+      [696, -296],
+    ],
+  );
   assert.deepEqual(s.roads[0].points[0], s.villages[0].centre);
   assert.deepEqual(s.roads[0].points.at(-1), s.villages[1].centre);
   // A steeper grade allowed: the road takes a shorter way, higher on the flank.
@@ -88,7 +97,16 @@ test('roads follow the terrain: through the pass, not over the ridge', () => {
 
 test('a river is crossed once, on a short bridge; the sea is never crossed', () => {
   const river = Int32Array.from([-1000000, 0, 1000000, 0]);
-  const s = layoutSettlements({ ...flat(), rivers: [river] }, { sites: [[-300, -500], [200, 500]], houses: 0 });
+  const s = layoutSettlements(
+    { ...flat(), rivers: [river] },
+    {
+      sites: [
+        [-300, -500],
+        [200, 500],
+      ],
+      houses: 0,
+    },
+  );
   const p = s.roads[0].points;
   let crossings = 0;
   for (let k = 0; k + 1 < p.length; k++) if (Math.sign(p[k][1]) !== Math.sign(p[k + 1][1])) crossings++;
@@ -99,7 +117,12 @@ test('a river is crossed once, on a short bridge; the sea is never crossed', () 
     heightAt: (x) => (Math.abs(x) > 300 ? 10 : -5),
     climate: { sea: 0 },
   };
-  const apart = layoutSettlements(islands, { sites: [[-600, 0], [600, 0]] });
+  const apart = layoutSettlements(islands, {
+    sites: [
+      [-600, 0],
+      [600, 0],
+    ],
+  });
   assert.equal(apart.villages.length, 2);
   assert.equal(apart.roads.length, 0);
 });
@@ -120,24 +143,45 @@ test('a network: a spanning tree joins every village, plus a link where the tree
     index = (p) => s.villages.findIndex((v) => v.centre[0] === p[0] && v.centre[1] === p[1]);
   for (const r of s.roads) parent[find(index(r.points[0]))] = find(index(r.points.at(-1)));
   assert.equal(new Set(sites.map((_, i) => find(i))).size, 1, 'connected');
-  const ring = layoutSettlements(flat(), { sites: [[-500, 0], [500, 0], [0, 600], [0, -600]], houses: 0 });
+  const ring = layoutSettlements(flat(), {
+    sites: [
+      [-500, 0],
+      [500, 0],
+      [0, 600],
+      [0, -600],
+    ],
+    houses: 0,
+  });
   assert.ok(ring.roads.length >= 4, 'a link closes a long detour');
 });
 
 test('houses: dry level lots, clear of roads, lanes and each other, facing their lane', () => {
   const river = Int32Array.from([-1000000, 150000, 1000000, 150000]);
   const world = { bounds: [-1000, -1000, 1000, 1000], heightAt: (x, z) => 10 + 0.01 * x + 0.004 * z, rivers: [river] };
-  const s = layoutSettlements(world, { sites: [[-400, -100], [400, -100]], houses: 24 });
+  const s = layoutSettlements(world, {
+    sites: [
+      [-400, -100],
+      [400, -100],
+    ],
+    houses: 24,
+  });
   const all = s.villages.flatMap((v) => v.houses);
-  assert.ok(s.villages.every((v) => v.houses.length >= 12), `houses: ${s.villages.map((v) => v.houses.length)}`);
+  assert.ok(
+    s.villages.every((v) => v.houses.length >= 12),
+    `houses: ${s.villages.map((v) => v.houses.length)}`,
+  );
   for (const h of all) {
-    assert.ok(h.corners.every(([, z]) => Math.abs(z - 150) > 8), 'not in the river');
+    assert.ok(
+      h.corners.every(([, z]) => Math.abs(z - 150) > 8),
+      'not in the river',
+    );
     assert.ok(Math.abs(h.floor - world.heightAt(...h.centre)) < 1e-9);
     for (const r of s.roads)
       for (let k = 0; k + 1 < r.points.length; k++)
         for (const c of [h.centre, ...h.corners])
           assert.ok(seg2(...c, r.points[k], r.points[k + 1]) >= 5.5 - 1e-9, 'off the road and its edge');
-    for (const l of s.lanes) for (const c of h.corners) assert.ok(seg2(...c, ...l.points) >= 2.5 - 1e-9, 'off the lanes');
+    for (const l of s.lanes)
+      for (const c of h.corners) assert.ok(seg2(...c, ...l.points) >= 2.5 - 1e-9, 'off the lanes');
     const [ux, uz] = h.along,
       [a, b] = h.corners;
     assert.ok(Math.abs(Math.hypot(b[0] - a[0], b[1] - a[1]) - h.size[0]) < 1e-9, 'width along the lane');
@@ -183,7 +227,10 @@ test('placement keeps every tree and shrub off the roads and houses; the roads c
     return p;
   });
   const onRoad = (o) => lines.some((p) => p.slice(1).some((q, k) => seg2(o.x, o.z, p[k], q) < 2.5 - 0.01));
-  assert.ok(all.some(onRoad) && all.some((o) => houses.some((h) => inside(o, h.corners))), 'without them trees stand there');
+  assert.ok(
+    all.some(onRoad) && all.some((o) => houses.some((h) => inside(o, h.corners))),
+    'without them trees stand there',
+  );
   for (const o of kept) {
     assert.ok(!houses.some((h) => inside(o, h.corners)), `object inside a house at ${o.x}, ${o.z}`);
     assert.ok(!onRoad(o), `object on the road at ${o.x}, ${o.z}`);
@@ -264,8 +311,20 @@ const crosses = (p, q) => {
 
 test('lanes: the default layout keeps its bytes, and pads and drives are off', async () => {
   const { createHash } = await import('node:crypto');
-  const w = { bounds: [-1000, -1000, 1000, 1000], heightAt: (x, z) => 10 + 0.01 * x + 3 * Math.sin(z / 90), climate: { sea: 0 } };
-  const out = layoutSettlements(w, { villages: 2, spacing: 400, houses: 24, sites: [[0, 0], [500, 300]] });
+  const w = {
+    bounds: [-1000, -1000, 1000, 1000],
+    heightAt: (x, z) => 10 + 0.01 * x + 3 * Math.sin(z / 90),
+    climate: { sea: 0 },
+  };
+  const out = layoutSettlements(w, {
+    villages: 2,
+    spacing: 400,
+    houses: 24,
+    sites: [
+      [0, 0],
+      [500, 300],
+    ],
+  });
   assert.equal(createHash('sha256').update(JSON.stringify(out)).digest('hex').slice(0, 16), 'b50a0b0c41137391');
   assert.equal(out.pads, undefined);
   assert.equal(out.drives, undefined);
@@ -315,7 +374,10 @@ test('grid: each house is a dry level lot that fronts a street, off every street
     // Centre to its street's centre line: half the depth, the setback (4) and half the street (4).
     assert.ok(Math.abs(dist(h.centre, street) - (h.size[1] / 2 + 4 + 4)) < 1e-6, `${dist(h.centre, street)}`);
     const d = h.size[1] / 2 + 8;
-    assert.ok(dist([h.centre[0] + h.front[0] * d, h.centre[1] + h.front[1] * d], street) < 1e-6, 'front faces the street');
+    assert.ok(
+      dist([h.centre[0] + h.front[0] * d, h.centre[1] + h.front[1] * d], street) < 1e-6,
+      'front faces the street',
+    );
     assert.ok(Math.abs(h.along[0] * h.front[0] + h.along[1] * h.front[1]) < 1e-12, 'frontage is square to the front');
     for (const [x, z] of [h.centre, ...h.corners]) assert.ok(coast.heightAt(x, z) > 0, `dry at ${x}, ${z}`);
     for (const s of v.streets)
@@ -342,12 +404,18 @@ test('grid: pads level the ground under each house and drives run from its front
   let moved = 0;
   v.houses.forEach((h, n) => {
     for (const [x, z] of [h.centre, ...h.corners])
-      assert.ok(Math.abs(carved.heightAt(x, z) - h.floor) < 0.05, `house ${n} ground ${carved.heightAt(x, z)} floor ${h.floor}`);
+      assert.ok(
+        Math.abs(carved.heightAt(x, z) - h.floor) < 0.05,
+        `house ${n} ground ${carved.heightAt(x, z)} floor ${h.floor}`,
+      );
     if (Math.abs(probe.heightAt(...h.corners[0]) - h.floor) > 0.05) moved++;
     const drive = town.drives[n],
       [p0, p1] = drive.points,
       street = v.streets[h.street];
-    assert.ok(Math.abs(Math.hypot(p0[0] - h.centre[0], p0[1] - h.centre[1]) - (h.size[1] / 2 - 0.5)) < 1e-6, 'starts inside the front');
+    assert.ok(
+      Math.abs(Math.hypot(p0[0] - h.centre[0], p0[1] - h.centre[1]) - (h.size[1] / 2 - 0.5)) < 1e-6,
+      'starts inside the front',
+    );
     assert.ok(Math.abs(dist(p1, street) - (4 - 0.5)) < 1e-6, 'ends half a metre into the street edge');
     assert.equal(drive.width, 3);
     assert.equal(drive.mask, 'roads');
@@ -357,7 +425,11 @@ test('grid: pads level the ground under each house and drives run from its front
 });
 
 test('lanes with pads and drives: each house gets both, its floor is the pad level, its drive meets the lane', () => {
-  const w = { bounds: [-1000, -1000, 1000, 1000], heightAt: (x, z) => 10 + 0.02 * x + 0.5 * Math.sin(z / 30), climate: { sea: 0 } };
+  const w = {
+    bounds: [-1000, -1000, 1000, 1000],
+    heightAt: (x, z) => 10 + 0.02 * x + 0.5 * Math.sin(z / 30),
+    climate: { sea: 0 },
+  };
   const plain = layoutSettlements(w, { villages: 1, houses: 12, sites: [[0, 0]] });
   const town = layoutSettlements(w, { villages: 1, houses: 12, sites: [[0, 0]], pads: true, drives: true });
   const houses = town.villages[0].houses;
@@ -381,11 +453,13 @@ test('grid options: toward, above, block, lot and street, and a land with no wat
   assert.ok(Math.abs(b[0] - a[0]) < 1e-9 && b[1] > a[1], 'the main street runs along +z');
   const high = gridTown({ grid: { above: 5 }, houses: 20 }).villages[0];
   assert.ok(high.houses.length > 0);
-  for (const h of high.houses) for (const [x, z] of h.corners) assert.ok(coast.heightAt(x, z) >= 5, 'five metres over the sea');
+  for (const h of high.houses)
+    for (const [x, z] of h.corners) assert.ok(coast.heightAt(x, z) >= 5, 'five metres over the sea');
   const sized = gridTown({ grid: { block: [80, 50], street: 12, lot: 20, setback: 6 }, houses: 20 }).villages[0];
   assert.ok(sized.houses.length > 0);
   assert.ok(sized.streets.every((s) => s.width === 12));
-  for (const h of sized.houses) assert.ok(Math.abs(dist(h.centre, sized.streets[h.street]) - (h.size[1] / 2 + 6 + 6)) < 1e-6);
+  for (const h of sized.houses)
+    assert.ok(Math.abs(dist(h.centre, sized.streets[h.street]) - (h.size[1] / 2 + 6 + 6)) < 1e-6);
   const opts = { villages: 1, houses: 20, pattern: 'grid', sites: [[0, 0]] };
   const dryLand = layoutSettlements(flat(10), opts);
   assert.equal(dryLand.villages[0].houses.length, 20, 'a seeded direction without water');
@@ -424,8 +498,24 @@ test('grid: bad settings throw with what is allowed', () => {
 // and the creek, which layoutSettlements did not know of. A house whose footprint touches an avoided line or polygon is
 // not built, in both patterns; the same layout without it still crosses the line.
 test('avoid keeps every house footprint off the given lines and polygons, in both patterns', () => {
-  const rail = { kind: 'line', points: [[-1000, 20], [1000, 20]], width: 10, verge: 1 },
-    yard = { kind: 'polygon', points: [[-160, -80], [-120, -80], [-120, -40], [-160, -40]] },
+  const rail = {
+      kind: 'line',
+      points: [
+        [-1000, 20],
+        [1000, 20],
+      ],
+      width: 10,
+      verge: 1,
+    },
+    yard = {
+      kind: 'polygon',
+      points: [
+        [-160, -80],
+        [-120, -80],
+        [-120, -40],
+        [-160, -40],
+      ],
+    },
     touches = (h) => {
       const pts = [...h.corners, h.centre];
       for (let i = 0; i < 4; i++) {
@@ -433,9 +523,7 @@ test('avoid keeps every house footprint off the given lines and polygons, in bot
           b = h.corners[(i + 1) % 4];
         pts.push([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
       }
-      return pts.some(
-        ([x, z]) => Math.abs(z - 20) <= 6 || (x >= -160 && x <= -120 && z >= -80 && z <= -40),
-      );
+      return pts.some(([x, z]) => Math.abs(z - 20) <= 6 || (x >= -160 && x <= -120 && z >= -80 && z <= -40));
     };
   for (const [name, layout] of [
     ['grid', (extra) => gridTown(extra)],
@@ -447,6 +535,19 @@ test('avoid keeps every house footprint off the given lines and polygons, in bot
     assert.ok(after.length > 0, `${name}: houses are still built`);
     assert.deepEqual(after.filter(touches), [], `${name}: no house touches the line or the yard`);
   }
-  for (const bad of [{}, [{ kind: 'line', points: [[0, 0]], width: 4 }], [{ kind: 'line', points: [[0, 0], [1, 1]] }], [{ kind: 'ring', points: [] }]])
+  for (const bad of [
+    {},
+    [{ kind: 'line', points: [[0, 0]], width: 4 }],
+    [
+      {
+        kind: 'line',
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
+    ],
+    [{ kind: 'ring', points: [] }],
+  ])
     assert.throws(() => gridTown({ avoid: bad }), TypeError, JSON.stringify(bad));
 });

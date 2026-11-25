@@ -78,7 +78,8 @@ function validateVfx(track: Record<string, unknown>, check: TrackCheck): void {
 
 function validateActivation(track: Record<string, unknown>, check: TrackCheck): void {
   check.target();
-  if ('invert' in track && typeof track.invert !== 'boolean') check.add(`${check.path}.invert`, 'must be true or false');
+  if ('invert' in track && typeof track.invert !== 'boolean')
+    check.add(`${check.path}.invert`, 'must be true or false');
   check.clips(() => {});
 }
 
@@ -218,7 +219,8 @@ export class VfxDirector {
     options: VfxDirectorOptions,
   ) {
     const { step, stepSize = 1 / 60, longest = 10 } = options ?? {};
-    if (typeof cutscene?.evaluate !== 'function') throw new TypeError('VfxDirector needs the Cutscene as its first argument');
+    if (typeof cutscene?.evaluate !== 'function')
+      throw new TypeError('VfxDirector needs the Cutscene as its first argument');
     if (typeof step !== 'function') throw new TypeError('VfxDirector needs step(delta), which draws one frame');
     if (!(stepSize > 0) || !Number.isFinite(stepSize)) throw new RangeError('VfxDirector stepSize must be above 0');
     if (!(longest >= 0) || !Number.isFinite(longest)) throw new RangeError('VfxDirector longest must be 0 or more');

@@ -334,7 +334,8 @@ function keepCluster(
     cx = a0 * sx + b0 * sy + e0 * sz + m[at + 12],
     cy = a1 * sx + b1 * sy + e1 * sz + m[at + 13],
     cz = a2 * sx + b2 * sy + e2 * sz + m[at + 14];
-  let r = sr * Math.sqrt(Math.max(a0 * a0 + a1 * a1 + a2 * a2, b0 * b0 + b1 * b1 + b2 * b2, e0 * e0 + e1 * e1 + e2 * e2));
+  let r =
+    sr * Math.sqrt(Math.max(a0 * a0 + a1 * a1 + a2 * a2, b0 * b0 + b1 * b1 + b2 * b2, e0 * e0 + e1 * e1 + e2 * e2));
   r += 1e-5 * (Math.sqrt(cx * cx + cy * cy + cz * cz) + r);
   for (let p = 0; p < 24; p += 4)
     if (planes[p] * cx + planes[p + 1] * cy + planes[p + 2] * cz + planes[p + 3] < -r) return false;

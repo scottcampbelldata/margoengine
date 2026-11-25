@@ -18,6 +18,7 @@ import {
 } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
+import { sceneOwner } from './scene-owner.js';
 
 interface ErrorProps {
   onError?: (error: unknown) => void;
@@ -27,9 +28,10 @@ interface TextRendererLease {
   users: number;
   promise: Promise<{ renderer: TextRenderer; api: typeof import('@margoengine/text') }>;
 }
-const renderers = new WeakMap<Scene['engine'], TextRendererLease>();
+// One renderer per scene the Text sits in: the enclosing <Scene>'s world, else the engine's default scene.
+const renderers = new WeakMap<object, TextRendererLease>();
 function acquireTextRenderer(scene: Scene): TextRendererLease {
-  let entry = renderers.get(scene.engine);
+  let entry = renderers.get(sceneOwner(scene));
   if (!entry) {
     entry = {
       users: 0,
@@ -37,11 +39,11 @@ function acquireTextRenderer(scene: Scene): TextRendererLease {
         if (scene.engine.disposed)
           throw fault('disposed', 'Canvas is disposed; render the component inside a live <Canvas>', 'react-usage');
         const renderer = new api.TextRenderer({ name: 'margoengine-react:text' });
-        scene.engine.use(renderer);
+        sceneOwner(scene).use(renderer);
         return { renderer, api };
       }),
     };
-    renderers.set(scene.engine, entry);
+    renderers.set(sceneOwner(scene), entry);
   }
   entry.users++;
   return entry;
@@ -49,11 +51,11 @@ function acquireTextRenderer(scene: Scene): TextRendererLease {
 function releaseTextRenderer(scene: Scene, entry: TextRendererLease): void {
   if (--entry.users) return;
   queueMicrotask(() => {
-    if (entry.users || renderers.get(scene.engine) !== entry) return;
-    renderers.delete(scene.engine);
+    if (entry.users || renderers.get(sceneOwner(scene)) !== entry) return;
+    renderers.delete(sceneOwner(scene));
     void entry.promise.then(
       ({ renderer }) => {
-        scene.engine.removePlugin(renderer.name);
+        sceneOwner(scene).removePlugin(renderer.name);
         renderer.dispose();
       },
       () => {},
@@ -158,7 +160,7 @@ export const Text = /* @__PURE__ */ forwardRef<TextBlock, TextProps>(function Te
       }
       releaseTextRenderer(scene, entry);
     };
-  }, [scene.engine, scene.registry]);
+  }, [scene.engine, scene.world, scene.registry]);
   useCommit(() => {
     if (item) apply.current(item);
   });

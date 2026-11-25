@@ -129,7 +129,12 @@ test('getIrradianceAt matches a numerically integrated clamped cosine', () => {
     samples.push([d, w]);
   });
   const out = black();
-  for (const n of [new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector3(1, 1, 0).normalize(), new Vector3(0, 0, 1)]) {
+  for (const n of [
+    new Vector3(0, 1, 0),
+    new Vector3(0, -1, 0),
+    new Vector3(1, 1, 0).normalize(),
+    new Vector3(0, 0, 1),
+  ]) {
     let expected = 0;
     for (const [d, w] of samples) expected += light(d) * Math.max(0, d.dot(n)) * w;
     near(sh.getIrradianceAt(n, out).r, expected, 2e-3);
@@ -172,10 +177,22 @@ test('rotate: light from d shines from the rotated d, in every band', () => {
   const before = { r: 0, g: 0, b: 0 },
     after = { r: 0, g: 0, b: 0 };
   for (const [d, r] of [
-    [{ x: 0, y: 0, z: 1 }, { x: 1, y: 0, z: 0 }],
-    [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }],
-    [{ x: 0, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }],
-    [{ x: 0.6, y: 0, z: 0.8 }, { x: 0.8, y: 0, z: -0.6 }],
+    [
+      { x: 0, y: 0, z: 1 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    [
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 0, z: -1 },
+    ],
+    [
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: 1, z: 0 },
+    ],
+    [
+      { x: 0.6, y: 0, z: 0.8 },
+      { x: 0.8, y: 0, z: -0.6 },
+    ],
   ]) {
     sh.getAt(d, before);
     turned.getAt(r, after);

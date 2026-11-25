@@ -10,7 +10,10 @@ const ctx = await openBrowser({ startPath: '/scripts/reference-rendering/mip-ble
 await runSuite(
   async () => {
     await ctx.page.waitForFunction(() => window.probe, null, { timeout: 30000 });
-    const r = await ctx.page.evaluate((powerPreference) => window.probe({ powerPreference }), ctx.hardware.powerPreference);
+    const r = await ctx.page.evaluate(
+      (powerPreference) => window.probe({ powerPreference }),
+      ctx.hardware.powerPreference,
+    );
     const shown = [8, 16, 24, 32, 40, 48, 56];
     const pick = (w) => w && shown.map((i) => +w[i].toFixed(5));
     const worst = (w) => w && Math.max(...w.map((x, i) => Math.abs(x - r.lods[i])));

@@ -75,6 +75,14 @@ const SPIN_STEP = 1 / 45;
 /** Frames of three steps in the spin-up. */
 export const SURF_SPIN_FRAMES = Math.round(SURF_SPIN / (3 * SPIN_STEP));
 
+// Bounded tanh (KB-WATER-SURGEVOL1). Every tanh in the surf's WGSL takes its argument through min(x, 10). Native
+// WebGPU on an Intel xe-2lpg laptop GPU returns NaN for tanh(x) once sinh and cosh overflow f32 (x over about 88.7;
+// measured 1 at x = 50, NaN at 100), and the Ruessink et al. phase's 0.815 / Ur^0.672 passes that in calm deep water
+// (Ur under about 1e-3): the surf drove the open sea toward NaN, the relaxation's max(0, NaN) read 0, and the sea near
+// the map's deep edge drained (a beach at rest held 1,431 of its 2,880 m^3). Fenton and McKee's tanh((k0 d)^0.75)
+// passes it at k0 d over 397 (a 20 m swell over 1.26 km of water). For x over 9.01, 1 - tanh x = 2 / (e^2x + 1) is
+// under 2^-25, half an f32 ulp below 1, so tanh x rounds to 1 (IEEE 754-2019, round to nearest) and the clamp changes
+// no correctly rounded value; Ruessink's phase psi then reads 0, the symmetric wave of its Ur -> 0 limit.
 /** WGSL shared by the water surface, its probes and the coastal flow; needs `frame`, `swell` and `connected`. */
 export const surfWaves = `
 // The shift of the surf's clock from the Water's (s): 0, except in the coastal flow's spin-up (surfClock).
@@ -86,7 +94,7 @@ const SURF_GAMMA=0.78;
 // Depths (m) over which the coastal flow takes the surf over: the inner surf zone and the swash are the flow's.
 const SURF_SWASH=vec2f(0.35,0.9);
 // Local wavenumber at depth d of a component of deep wavenumber k0 (Fenton and McKee 1990).
-fn surfK(k0:f32,d:f32)->f32 {return k0/pow(tanh(pow(k0*max(d,0.01),0.75)),0.6666667);}
+fn surfK(k0:f32,d:f32)->f32 {return k0/pow(tanh(min(pow(k0*max(d,0.01),0.75),10.0)),0.6666667);}
 // Linear shoaling coefficient sqrt(cg0 / cg).
 fn surfShoal(k0:f32,d:f32)->f32 {let k=surfK(k0,d);let kh=min(k*max(d,0.01),10.0);return sqrt(0.5*k/((0.5+kh/sinh(2.0*kh))*k0));}
 // The field's wavenumber: the lowest component of the train with the most height, the peak of the sea (KB-WATER-SURFFIELD1:
@@ -165,7 +173,7 @@ fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Sur
   let phase=atan2(envelope.y,envelope.x);let turn=(gCos*envelope.x+gSin*envelope.y)/(size*size);
   let grow=-(envelope.x*gSin-envelope.y*gCos)/size;
   k/=weight;let kd=k*d;let ursell=max(0.375*high*saturate*k/(kd*kd*kd),1e-6);
-  let big=0.857/(1.0+exp((-0.471-log(ursell)*0.4342945)/0.297));let psi=-1.5707963+1.5707963*tanh(0.815/pow(ursell,0.672));
+  let big=0.857/(1.0+exp((-0.471-log(ursell)*0.4342945)/0.297));let psi=-1.5707963+1.5707963*tanh(min(0.815/pow(ursell,0.672),10.0));
   let b=big*sqrt(2.0/(9.0+2.0*big*big));let r=2.0*b/(1.0+b*b);let phi=-1.5707963-psi;
   let profile=surfProfile(phase,r,phi);let slope=saturate*(grow*profile.value+size*profile.slope*turn);
   result.offset.y=saturate*size*profile.value;result.dx.y=slope.x;result.dz.y=slope.y;
@@ -232,7 +240,7 @@ fn word(i:u32)->u32 {return ${atomic ? 'atomicLoad(&cells[i])' : 'cells[i]'};}
 fn put(i:u32,v:u32){${atomic ? 'atomicStore(&cells[i],v);' : 'cells[i]=v;'}}
 fn cellCount()->u32 {let s=textureDimensions(terrain);return s.x*s.y;}
 fn fieldK()->f32 {var k=1e9;var top=0.0;for(var j=0u;j<u32(frame.settings.w);j++){if(frame.waves[j].wave.z>top){top=frame.waves[j].wave.z;k=frame.waves[j].wave.w*0.84;}}return k;}
-fn waveK(k0:f32,d:f32)->f32 {return k0/pow(tanh(pow(k0*max(d,0.01),0.75)),0.6666667);}
+fn waveK(k0:f32,d:f32)->f32 {return k0/pow(tanh(min(pow(k0*max(d,0.01),0.75),10.0)),0.6666667);}
 fn depthAt(p:vec2i)->f32 {return frame.settings.y-textureLoad(terrain,p,0).r;}
 fn root(p:vec2i)->u32 {return word(u32(p.y)*textureDimensions(terrain).x+u32(p.x)+1u);}
 // Open sea, or ground up to 1.5 m above the sea next to it (the swash); never an enclosed basin.
@@ -244,12 +252,12 @@ fn store(base:u32,source:vec2f,tau:f32){put(base,bitcast<u32>(source.x));put(bas
 fn load(base:u32)->vec3f {return vec3f(bitcast<f32>(word(base)),bitcast<f32>(word(base+1u)),bitcast<f32>(word(base+2u)));}
 fn edge(p:vec2i)->bool {let s=vec2i(textureDimensions(terrain));return p.x==0||p.y==0||p.x==s.x-1||p.y==s.y-1;}
 ${
-    atomic
-      ? `@compute @workgroup_size(8,8) fn deepest(@builtin(global_invocation_id) id:vec3u){
+  atomic
+    ? `@compute @workgroup_size(8,8) fn deepest(@builtin(global_invocation_id) id:vec3u){
  let s=textureDimensions(terrain);if(any(id.xy>=s)){return;}let p=vec2i(id.xy);
  if(edge(p)&&root(p)==0u&&depthAt(p)>0.0){atomicMax(&cells[cellCount()*9u+2u],bitcast<u32>(depthAt(p)));}
 }`
-      : `@compute @workgroup_size(8,8) fn seed(@builtin(global_invocation_id) id:vec3u){
+    : `@compute @workgroup_size(8,8) fn seed(@builtin(global_invocation_id) id:vec3u){
  let s=textureDimensions(terrain);if(any(id.xy>=s)){return;}let p=vec2i(id.xy);let n=cellCount();
  let d=depthAt(p);let deepest=bitcast<f32>(word(n*9u+2u));
  let source=root(p)==0u&&(d>=3.14159265/fieldK()||(edge(p)&&d>=0.7*deepest));
@@ -277,7 +285,7 @@ fn relax(id:vec3u,fromField:u32,toField:u32){
 @compute @workgroup_size(1) fn spinEnd(){let at=cellCount()*9u+3u;put(at,0u);put(at+1u,0u);}
 @compute @workgroup_size(8,8) fn forward(@builtin(global_invocation_id) id:vec3u){let n=cellCount();relax(id,n+1u,n*5u+1u);}
 @compute @workgroup_size(8,8) fn backward(@builtin(global_invocation_id) id:vec3u){let n=cellCount();relax(id,n*5u+1u,n+1u);}`
-  }
+}
 `;
 
 /** Builds the surf field of a coastal grid in the flow's `connected` buffer, once, on the flow's first step. */
@@ -288,7 +296,10 @@ export class SurfFieldBuilder {
     const atomic = device.createShaderModule({ code: surfFieldShader(waterFrame, true) }),
       plain = device.createShaderModule({ code: surfFieldShader(waterFrame, false) });
     this.pipelines = ['deepest', 'seed', 'forward', 'backward', 'spinStart', 'spinTick', 'spinEnd'].map((entryPoint) =>
-      device.createComputePipeline({ layout: 'auto', compute: { module: entryPoint === 'deepest' ? atomic : plain, entryPoint } }),
+      device.createComputePipeline({
+        layout: 'auto',
+        compute: { module: entryPoint === 'deepest' ? atomic : plain, entryPoint },
+      }),
     );
     // The clock's kernels read no frame: their groups hold only the heightmap and the buffer.
     this.groups = this.pipelines.map((pipeline, i) =>
@@ -303,28 +314,26 @@ export class SurfFieldBuilder {
           }),
     );
   }
-  /**
-   * Records the build into `pass`: the deepest edge, the sources, then relaxation sweeps, as many as the grid has
-   * cells along both sides (no ray is longer), in an even count so the result ends in field A.
-   */
   /** Records the spin-up clock's start (0), one frame's advance (1) or its end (2) into `pass`. */
   clock(pass: GPUComputePassEncoder, phase: 0 | 1 | 2): void {
     pass.setPipeline(this.pipelines[4 + phase]);
     pass.setBindGroup(0, this.groups[4 + phase]);
     pass.dispatchWorkgroups(1);
   }
-  build(pass: GPUComputePassEncoder, width: number, height: number): void {
+  /**
+   * Records the build, each dispatch into the pass `next` gives (coastal.ts `NextPass`): the deepest edge, the
+   * sources, then relaxation sweeps, as many as the grid has cells along both sides (no ray is longer), in an even
+   * count so the result ends in field A.
+   */
+  build(next: (groups?: number) => GPUComputePassEncoder, width: number, height: number): void {
     const x = Math.ceil(width / 8),
-      y = Math.ceil(height / 8);
-    for (let i = 0; i < 2; i++) {
-      pass.setPipeline(this.pipelines[i]);
-      pass.setBindGroup(0, this.groups[i]);
-      pass.dispatchWorkgroups(x, y);
-    }
-    const sweeps = (width + height + 1) & ~1;
-    for (let i = 0; i < sweeps; i++) {
-      pass.setPipeline(this.pipelines[2 + (i & 1)]);
-      pass.setBindGroup(0, this.groups[2 + (i & 1)]);
+      y = Math.ceil(height / 8),
+      sweeps = (width + height + 1) & ~1;
+    for (let i = 0; i < 2 + sweeps; i++) {
+      const pass = next(x * y),
+        k = i < 2 ? i : 2 + (i & 1);
+      pass.setPipeline(this.pipelines[k]);
+      pass.setBindGroup(0, this.groups[k]);
       pass.dispatchWorkgroups(x, y);
     }
   }

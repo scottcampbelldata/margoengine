@@ -132,7 +132,8 @@ function eachTextureInfo(value: unknown, visit: (info: JSONObject) => void): voi
  * texture and image lists (materials, primitive and node extensions), and EXT_structural_metadata property textures.
  */
 function eachTextureReference(json: JSONObject, visit: (holder: JSONObject) => void): void {
-  for (const [key, value] of Object.entries(json)) if (key !== 'textures' && key !== 'images') eachTextureInfo(value, visit);
+  for (const [key, value] of Object.entries(json))
+    if (key !== 'textures' && key !== 'images') eachTextureInfo(value, visit);
   for (const property of json.extensions?.EXT_structural_metadata?.propertyTextures ?? [])
     if (Number.isSafeInteger(property?.index)) visit(property);
 }

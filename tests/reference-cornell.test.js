@@ -101,7 +101,10 @@ for (const [family, rows, compatRows] of [
     });
     assert.equal(d.compat.hardware.webgpu.vendor, 'margo-webgl2');
     const variants = cornellDecomposition(point);
-    assert.deepEqual(variants.map((v) => v.name), Object.keys(rows));
+    assert.deepEqual(
+      variants.map((v) => v.name),
+      Object.keys(rows),
+    );
     for (const [side, expected] of [
       ['native', rows],
       ['compat', compatRows],

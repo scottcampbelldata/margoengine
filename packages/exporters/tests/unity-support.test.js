@@ -64,7 +64,12 @@ test('Unity generator preserves interpolated, verbatim and raw strings without i
   await writeFile(join(scratch, 'src/unity/Editor/Sample.cs'), sample);
   await promisify(execFile)(process.execPath, [generator], { timeout: 30_000, windowsHide: true });
   const output = await readFile(join(scratch, 'src/unity-support.generated.ts'), 'utf8');
-  const payloads = JSON.parse(output.slice(output.indexOf(' = ') + 3).trim().slice(0, -1));
+  const payloads = JSON.parse(
+    output
+      .slice(output.indexOf(' = ') + 3)
+      .trim()
+      .slice(0, -1),
+  );
   assert.deepEqual(payloads, [{ name: 'Editor/Sample.cs', text: sample }]);
 });
 
@@ -81,6 +86,12 @@ test('the Unity package manifest names the one editor the companion accepts, and
   for (const extension of ['.jar', '.aar', '.jslib', '.jspre', '.a', '.m', '.mm', '.c', '.cpp'])
     assert.ok(profile.includes(`"${extension}"`), extension);
   // A failing setup releases its path inside its own catch, before the generation try takes over.
-  const setup = companion.slice(companion.indexOf('generating.Add(sourcePath)'), companion.indexOf('ValidateInputs(run)'));
-  assert.match(setup, /run = new Generation\(sourcePath, cancellationToken\);[\s\S]*\} catch \{[\s\S]*generating\.Remove\(sourcePath\);\s*throw;/);
+  const setup = companion.slice(
+    companion.indexOf('generating.Add(sourcePath)'),
+    companion.indexOf('ValidateInputs(run)'),
+  );
+  assert.match(
+    setup,
+    /run = new Generation\(sourcePath, cancellationToken\);[\s\S]*\} catch \{[\s\S]*generating\.Remove\(sourcePath\);\s*throw;/,
+  );
 });

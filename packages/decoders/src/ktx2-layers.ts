@@ -11,7 +11,22 @@ import { formatBlock, levelBytes, uploadTexture, type TextureFile, type UploadTe
 export type { TextureFile, TextureFileLevel, UploadTextureOptions } from './texture-file.js';
 export { uploadTexture } from './texture-file.js';
 
-const ASTC = ['4x4', '5x4', '5x5', '6x5', '6x6', '8x5', '8x6', '8x8', '10x5', '10x6', '10x8', '10x10', '12x10', '12x12'],
+const ASTC = [
+    '4x4',
+    '5x4',
+    '5x5',
+    '6x5',
+    '6x6',
+    '8x5',
+    '8x6',
+    '8x8',
+    '10x5',
+    '10x6',
+    '10x8',
+    '10x10',
+    '12x10',
+    '12x12',
+  ],
   // The Vulkan formats a WebGPU texture can hold, by VkFormat number.
   VK: Record<number, string> = {
     9: 'r8unorm',
@@ -171,7 +186,9 @@ export class KTX2LayerDecoder extends KTX2Decoder {
    */
   async decode(data: ArrayBuffer | ArrayBufferView, options: KTX2LayerDecodeOptions = {}): Promise<TextureFile> {
     const bytes =
-      data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+      data instanceof ArrayBuffer
+        ? new Uint8Array(data)
+        : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     if (readKTX2Index(bytes).vkFormat) return parseKTX2(bytes, options);
     const target = (options.exactTarget ?? this.target) as TranscodeTarget;
     return this.job<TextureFile>('ktx2-layers', target, data, options, options.exactTarget !== undefined);

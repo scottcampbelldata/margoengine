@@ -133,10 +133,15 @@ const smoother = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 const num = (what: string, ...v: number[]) => {
-  if (!v.every(Number.isFinite)) throw rangeError(`${what} needs finite numbers (radians and metres)`, 'controls-arguments');
+  if (!v.every(Number.isFinite))
+    throw rangeError(`${what} needs finite numbers (radians and metres)`, 'controls-arguments');
 };
 const dot3 = (a: readonly number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
-const along = (o: readonly number[], d: readonly number[], t: number): V => [o[0]! + d[0]! * t, o[1]! + d[1]! * t, o[2]! + d[2]! * t];
+const along = (o: readonly number[], d: readonly number[], t: number): V => [
+  o[0]! + d[0]! * t,
+  o[1]! + d[1]! * t,
+  o[2]! + d[2]! * t,
+];
 
 /** Distance along a unit ECEF ray to the ellipsoid raised by `h` metres (first hit in front), or null on a miss. */
 function rayEllipsoid(o: readonly number[], d: readonly number[], h: number): number | null {
@@ -195,7 +200,8 @@ export class GeospatialControls extends Controls {
   private lifted = 0;
   private reachRange = 0;
   private flight: Flight | null = null;
-  private dragging: { id: number; x: number; y: number; rotate: boolean; grab: V | null; grabHeight: number } | null = null;
+  private dragging: { id: number; x: number; y: number; rotate: boolean; grab: V | null; grabHeight: number } | null =
+    null;
   private dead = false;
   private changed = false;
   protected override get kind(): string {
@@ -208,7 +214,12 @@ export class GeospatialControls extends Controls {
       minRange = options.minRange ?? 1,
       maxRange = options.maxRange ?? 4 * WGS84_A,
       clearance = options.clearance ?? 2;
-    if (!(minPitch >= 0 && maxPitch <= Math.PI / 2 && minPitch <= maxPitch) || !(minRange > 0 && maxRange >= minRange) || !(clearance >= 0) || !Number.isFinite(clearance))
+    if (
+      !(minPitch >= 0 && maxPitch <= Math.PI / 2 && minPitch <= maxPitch) ||
+      !(minRange > 0 && maxRange >= minRange) ||
+      !(clearance >= 0) ||
+      !Number.isFinite(clearance)
+    )
       throw rangeError(
         'Use 0 <= minPitch <= maxPitch <= PI/2, 0 < minRange <= maxRange and a finite clearance >= 0',
         'controls-arguments',
@@ -227,7 +238,12 @@ export class GeospatialControls extends Controls {
     this.raycast = options.raycast;
     this.raycaster = options.raycaster ?? new Raycaster();
     this.underground = options.underground ?? false;
-    this.v = this.sanitize({ ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 }, longitude: 0, latitude: 0, ...options.view } as Required<GeospatialView>);
+    this.v = this.sanitize({
+      ...{ height: 0, heading: 0, pitch: Math.PI / 2, range: 2e7 },
+      longitude: 0,
+      latitude: 0,
+      ...options.view,
+    } as Required<GeospatialView>);
     this.commit();
     this.init();
   }
@@ -253,7 +269,10 @@ export class GeospatialControls extends Controls {
   private sanitize(v: Required<GeospatialView>): Required<GeospatialView> {
     num('Geospatial view', v.longitude, v.latitude, v.height, v.heading, v.pitch, v.range);
     if (Math.abs(v.latitude) > Math.PI / 2 + 1e-12)
-      throw rangeError('Geospatial latitude is in radians within [-PI/2, PI/2]; convert degrees with degToRad', 'controls-arguments');
+      throw rangeError(
+        'Geospatial latitude is in radians within [-PI/2, PI/2]; convert degrees with degToRad',
+        'controls-arguments',
+      );
     return {
       longitude: wrap(v.longitude),
       latitude: clamp(v.latitude, -Math.PI / 2, Math.PI / 2),
@@ -298,7 +317,8 @@ export class GeospatialControls extends Controls {
       w = h * aspect,
       out: V[] = [e];
     for (const sx of [-1, 1])
-      for (const sy of [-1, 1]) out.push([0, 1, 2].map((i) => e[i]! + fw[i]! * near + r[i]! * sx * w + u[i]! * sy * h) as V);
+      for (const sy of [-1, 1])
+        out.push([0, 1, 2].map((i) => e[i]! + fw[i]! * near + r[i]! * sx * w + u[i]! * sy * h) as V);
     return out;
   }
   /**
@@ -394,7 +414,8 @@ export class GeospatialControls extends Controls {
   /** Multiply the range by `factor` (below 1 zooms in) about the centre. */
   zoom(factor: number): void {
     this.alive();
-    if (!(factor > 0) || !Number.isFinite(factor)) throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
+    if (!(factor > 0) || !Number.isFinite(factor))
+      throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
     this.setView({ range: this.v.range * factor });
   }
 
@@ -413,7 +434,13 @@ export class GeospatialControls extends Controls {
     return Math.sqrt(h * (h + 2 * WGS84_A)) + 4e5;
   }
   /** The nearest surface along a unit ECEF ray within `far`: scene meshes, your raycast and the heightAt terrain. */
-  private castSurface(o: V, d: V, far: number, terrain = true, refresh = true): { t: number; source: GeospatialPickSource } | null {
+  private castSurface(
+    o: V,
+    d: V,
+    far: number,
+    terrain = true,
+    refresh = true,
+  ): { t: number; source: GeospatialPickSource } | null {
     let best = far,
       source: GeospatialPickSource | null = null;
     const wo = this.toWorld(o),
@@ -431,7 +458,9 @@ export class GeospatialControls extends Controls {
       if (!terrain) r.side = 'front';
       let hit;
       try {
-        [hit] = this.colliders ? r.intersectObjects(this.engine, this.colliders, options) : r.intersectEngine(this.engine, options);
+        [hit] = this.colliders
+          ? r.intersectObjects(this.engine, this.colliders, options)
+          : r.intersectEngine(this.engine, options);
       } finally {
         r.side = side;
       }
@@ -488,7 +517,13 @@ export class GeospatialControls extends Controls {
     const t = rayEllipsoid(o, d, this.v.height);
     if (t === null) return null;
     const point = along(o, d, t);
-    return { ...ecefToCartographic(point[0], point[1], point[2]), height: this.v.height, distance: t, source: 'ellipsoid', point };
+    return {
+      ...ecefToCartographic(point[0], point[1], point[2]),
+      height: this.v.height,
+      distance: t,
+      source: 'ellipsoid',
+      point,
+    };
   }
   /**
    * The surface under CSS pixel (x, y): the nearest hit of the engine scene (bvh), your `raycast` and the `heightAt`
@@ -499,7 +534,13 @@ export class GeospatialControls extends Controls {
     const r = this.screenRay(x, y),
       hit = r && this.hitAlong(r.o, r.d);
     if (!hit) return null;
-    return { longitude: hit.longitude, latitude: hit.latitude, height: hit.height, distance: hit.distance, source: hit.source };
+    return {
+      longitude: hit.longitude,
+      latitude: hit.latitude,
+      height: hit.height,
+      distance: hit.distance,
+      source: hit.source,
+    };
   }
   /** The camera now in ECEF: eye, unit forward and screen-up. */
   private eyeFrame(): { eye: V; forward: V; up: V } {
@@ -534,7 +575,8 @@ export class GeospatialControls extends Controls {
   /** Zoom by `factor` keeping the surface point under CSS pixel (x, y) under the cursor (sky: about the centre). */
   zoomAt(x: number, y: number, factor: number): void {
     this.alive();
-    if (!(factor > 0) || !Number.isFinite(factor)) throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
+    if (!(factor > 0) || !Number.isFinite(factor))
+      throw rangeError('Geospatial zoom needs a positive finite factor', 'controls-arguments');
     const r = this.screenRay(x, y),
       hit = r && this.hitAlong(r.o, r.d),
       range = clamp(this.v.range * factor, this.minRange, this.maxRange);
@@ -604,7 +646,8 @@ export class GeospatialControls extends Controls {
   flyTo(destination: GeospatialView, options: FlightOptions = {}): Promise<boolean> {
     this.alive();
     const duration = options.duration ?? 3;
-    if (!(duration >= 0) || !Number.isFinite(duration)) throw rangeError('Flight duration is finite seconds >= 0', 'controls-arguments');
+    if (!(duration >= 0) || !Number.isFinite(duration))
+      throw rangeError('Flight duration is finite seconds >= 0', 'controls-arguments');
     this.cancel();
     const to = this.sanitize({ ...this.v, height: 0, ...destination } as Required<GeospatialView>);
     if (options.signal?.aborted) return Promise.resolve(false);

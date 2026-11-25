@@ -12,13 +12,18 @@ const xyz = (p) => p.flatMap((v, i) => (i % 2 ? [v, 0] : [v]));
 export function dataImage(seed) {
   const bytes = new Uint8Array(8 * 8 * 4);
   for (let y = 0; y < 8; y++)
-    for (let x = 0; x < 8; x++) bytes.set([(x * 29 + seed * 40) % 256, (y * 31 + 16) % 256, ((x + 2 * y + seed) % 5) * 60 + 8, 255], (y * 8 + x) * 4);
+    for (let x = 0; x < 8; x++)
+      bytes.set(
+        [(x * 29 + seed * 40) % 256, (y * 31 + 16) % 256, ((x + 2 * y + seed) % 5) * 60 + 8, 255],
+        (y * 8 + x) * 4,
+      );
   return bytes;
 }
 /** 8 x 8 unsigned integer texels (rgba8uint). */
 export function countImage() {
   const bytes = new Uint8Array(8 * 8 * 4);
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bytes.set([x * 30 + 5, y * 31 + 3, (x * 7 + y * 13) % 200, 1], (y * 8 + x) * 4);
+  for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 8; x++) bytes.set([x * 30 + 5, y * 31 + 3, (x * 7 + y * 13) % 200, 1], (y * 8 + x) * 4);
   return bytes;
 }
 /** 8 x 8 depths (depth16unorm) from 20000 to 41000 in steps of 3000, none within 767 of the 0.5 reference. */
@@ -65,7 +70,10 @@ void main() {
     // GL sets a block's members from a buffer; the oracle reads the same values as a struct and plain uniforms.
     oracle: {
       replace: [
-        ['uniform Tone { vec3 lift; float scale; } tone;', 'struct Tone { vec3 lift; float scale; };\nuniform Tone tone;'],
+        [
+          'uniform Tone { vec3 lift; float scale; } tone;',
+          'struct Tone { vec3 lift; float scale; };\nuniform Tone tone;',
+        ],
         ['uniform Plain { float bias; };', 'uniform float bias;'],
       ],
     },
@@ -74,7 +82,10 @@ void main() {
     uniforms: {},
     values: [
       {
-        shift: [[0, 0], [0.03125, 0]],
+        shift: [
+          [0, 0],
+          [0.03125, 0],
+        ],
         rig: {
           key: light([0.5, 0.25, 0.125], 1, true, [1, 0, 0, 1]),
           fill: [light([0, 0.5, 0], 0.5, true, [0, 1, 1, 0]), light([0, 0, 1], 1, false, [1, 0, 0, 1])],
@@ -82,22 +93,38 @@ void main() {
         },
         gains: [0.25, 0.5, 0.75, 1],
         offsets: [0.125, 0.25, 0.375, -0.125],
-        steps: [[1, 2], [3, 4]],
-        palette: [[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1]],
+        steps: [
+          [1, 2],
+          [3, 4],
+        ],
+        palette: [
+          [1, 0, 0, 1],
+          [0, 1, 0, 1],
+          [0, 0, 1, 1],
+        ],
         skew: [1, 0, 0, 0, 1, 0],
         tone: { lift: [0.0625, 0.0625, 0.0625], scale: 0.75 },
         bias: 0.0625,
       },
       {
-        shift: [[0, 0], [0, 0.0625]],
+        shift: [
+          [0, 0],
+          [0, 0.0625],
+        ],
         rig: {
           key: light([0.25, 0.5, 0.75], 0.5, true, [0, 1, 1, 0]),
           fill: [light([0.5, 0, 0], 1, false, [1, 0, 0, 1]), light([0, 0.25, 0.5], 1, true, [0.5, 0, 0, 0.5])],
           weights: [1, 0.5, 0],
         },
         gains: [1, 0.75, 0.5, 0.25],
-        offsets: [[0, 0.125], [0.25, 0]],
-        steps: [[0, 0], [5, 8]],
+        offsets: [
+          [0, 0.125],
+          [0.25, 0],
+        ],
+        steps: [
+          [0, 0],
+          [5, 8],
+        ],
         palette: [0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1],
         skew: [0, 0.5, 0, 0.5, 0, 0.25],
         tone: { lift: [0, 0, 0.125], scale: 1 },
@@ -179,7 +206,11 @@ void main() { vec4 t = texture(map, gl_PointCoord); color = vec4(vTint * 0.5 + t
     // Centres on pixel corners, sizes 8 and 16, so every square ends on pixel boundaries and no texel edge meets a centre.
     geometry: { positions: xyz([-0.5, -0.5, 0.5, 0.25, 0.25, -0.625]) },
     meshAttributes: { size: [8, 16, 8], tint: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
-    attributes: { position: { size: 2, data: [-0.5, -0.5, 0.5, 0.25, 0.25, -0.625] }, size: { size: 1, data: [8, 16, 8] }, tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1] } },
+    attributes: {
+      position: { size: 2, data: [-0.5, -0.5, 0.5, 0.25, 0.25, -0.625] },
+      size: { size: 1, data: [8, 16, 8] },
+      tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
+    },
     topology: 'point-list',
     uniforms: {},
     textures: [{ uniform: 'map', kind: 'rgba8', seed: 4 }],
@@ -202,7 +233,10 @@ void main() { color = vec4(vTint * vShade, 1.0); }`,
     // The diagonal from (0, 0) to (31, 32) in pixels meets no pixel centre.
     geometry: { positions: xyz([-1, -1, 0.9375, -1, 0.9375, 1, -1, 1]), indices: quadIndex },
     meshAttributes: { tint: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] },
-    attributes: { position: { size: 3, data: xyz([-1, -1, 0.9375, -1, 0.9375, 1, -1, 1]) }, tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] } },
+    attributes: {
+      position: { size: 3, data: xyz([-1, -1, 0.9375, -1, 0.9375, 1, -1, 1]) },
+      tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] },
+    },
     index: quadIndex,
     uniforms: {},
   },
@@ -220,7 +254,10 @@ out vec4 color;
 void main() { color = vec4(vTint, 1.0); }`,
     geometry: { positions: xyz([-1, -1, 0.9375, -1, -1, 1, 0.9375, 1]) },
     meshAttributes: { tint: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] },
-    attributes: { position: { size: 3, data: xyz([-1, -1, 0.9375, -1, -1, 1, 0.9375, 1]) }, tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] } },
+    attributes: {
+      position: { size: 3, data: xyz([-1, -1, 0.9375, -1, -1, 1, 0.9375, 1]) },
+      tint: { size: 3, data: [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0] },
+    },
     topology: 'triangle-strip',
     cull: 'none',
     uniforms: {},
@@ -234,7 +271,9 @@ void main() { vUv = position * 0.5 + 0.5; gl_Position = vec4(position, 0.0, 1.0)
 varying vec2 vUv;
 void main() { gl_FragColor = vec4(vUv, 0.5, 1.0); }`,
     // Corners on pixel centres (4.5 and 27.5 pixels), so the edges and the diagonal run through centres.
-    attributes: { position: { size: 2, data: [-0.71875, -0.71875, 0.71875, -0.71875, 0.71875, 0.71875, -0.71875, 0.71875] } },
+    attributes: {
+      position: { size: 2, data: [-0.71875, -0.71875, 0.71875, -0.71875, 0.71875, 0.71875, -0.71875, 0.71875] },
+    },
     index: quadIndex,
     uniforms: {},
     options: { wireframe: true },

@@ -38,7 +38,10 @@ test('Environment and EnvironmentLighting leave the image decoders to a chunk lo
   });
   const chunks = (Array.isArray(out) ? out[0] : out).output.filter((o) => o.type === 'chunk'),
     app = chunks.find((c) => c.isEntry),
-    lazy = chunks.filter((c) => !c.isEntry).map((c) => c.code).join('\n');
+    lazy = chunks
+      .filter((c) => !c.isEntry)
+      .map((c) => c.code)
+      .join('\n');
   for (const text of ['Invalid EXR', 'Invalid HDR', '#\\?(RADIANCE|RGBE)']) {
     assert.ok(!app.code.includes(text), `the app's own chunk carries ${text}`);
     assert.ok(lazy.includes(text), `no lazy chunk holds ${text}`);

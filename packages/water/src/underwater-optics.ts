@@ -1,6 +1,7 @@
 // Clean-room dielectric boundary and projective pixel traversal. Research: docs/clean-room.md, batch 234 job 3.
 // Kept separate so the numerical GPU oracle executes the identical production functions.
-export const underwaterOptics = `
+import { skyCoordinates } from './sky-radiance.js';
+export const underwaterOptics = `${skyCoordinates}
 // Propagation direction (pointing down) of sunlight (toward-sun unit vector) through a surface with normal n.
 fn sunRefracted(n:vec3f,toSun:vec3f,ior:f32)->vec3f {
  let i=-toSun;let eta=1.0/ior;let c=-dot(n,i);let k=1.0-eta*eta*(1.0-c*c);
@@ -84,7 +85,7 @@ fn trace(origin:vec3f,ray:vec3f)->vec4f {
  return vec4f(0,0,0,-1);
 }
 fn sky(ray:vec3f)->vec3f {
- if(u[23].w>0.5){return textureSampleLevel(environment,skySampler,vec2f(atan2(ray.z,ray.x)/6.283185307+0.5,acos(clamp(ray.y,-1.0,1.0))/3.141592654),0).rgb;}
+ if(u[23].w>0.5){return textureSampleLevel(environment,skySampler,seaSkyUv(ray,u[21].z),0).rgb*u[21].w;}
  return mix(u[22].rgb,u[23].rgb,clamp(ray.y,0.0,1.0));
 }
 `;

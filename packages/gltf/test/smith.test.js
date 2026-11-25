@@ -35,6 +35,9 @@ test("the extended isotropic path's D V is GGX D times G2 / (4 nl nv)", () => {
     const nh = 0.9,
       d = a2 / (Math.PI * (nh * nh * (a2 - 1) + 1) ** 2),
       want = (d * correlatedG2(nl, nv, a2)) / (4 * nl * nv);
-    assert.ok(Math.abs(spec(nl, nv, nh, a2, { n: [0, 0, 1] }, [Math.sqrt(1 - nh * nh), 0, nh]) / want - 1) < 1e-6, `spec at nl ${nl}, nv ${nv}, a2 ${a2}`);
+    assert.ok(
+      Math.abs(spec(nl, nv, nh, a2, { n: [0, 0, 1] }, [Math.sqrt(1 - nh * nh), 0, nh]) / want - 1) < 1e-6,
+      `spec at nl ${nl}, nv ${nv}, a2 ${a2}`,
+    );
   }
 });

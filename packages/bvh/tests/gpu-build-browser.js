@@ -293,11 +293,14 @@ export async function gpuBuildChecks(report) {
   const bent = bend(mesh.positions, 1.2),
     refitAgreed = await compare(refit, MeshBVH.build({ positions: bent, indices: mesh.indices }), rays, 'refit');
   await checkTree(device, refit, new Float32Array(await read(device, pose)), mesh.indices);
-  report.checks.push(`gpu refit: ${refitAgreed} of ${rays.length} rays through a pose only the GPU wrote match the CPU`);
+  report.checks.push(
+    `gpu refit: ${refitAgreed} of ${rays.length} rays through a pose only the GPU wrote match the CPU`,
+  );
 
   // Interleaved vertices, a mesh of one triangle, of a count that pads the sort, and of many triangles at one place.
   const interleaved = new Float32Array((mesh.positions.length / 3) * 8);
-  for (let i = 0; i < mesh.positions.length / 3; i++) interleaved.set(mesh.positions.subarray(i * 3, i * 3 + 3), i * 8 + 2);
+  for (let i = 0; i < mesh.positions.length / 3; i++)
+    interleaved.set(mesh.positions.subarray(i * 3, i * 3 + 3), i * 8 + 2);
   const wide = await GPUDynamicBVH.create(device, {
     vertices: storage(device, interleaved),
     indices: mesh.indices,
@@ -320,7 +323,9 @@ export async function gpuBuildChecks(report) {
   await small(triangle, new Uint32Array(Array.from({ length: 5 * 3 }, (_, i) => i % 3)));
   const stacked = await small(triangle, new Uint32Array(Array.from({ length: 1000 * 3 }, (_, i) => i % 3)));
   await small(new Float32Array(9), new Uint32Array([0, 1, 2, 0, 1, 2, 0, 1, 2]));
-  report.checks.push(`gpu build: lone, padded and coincident triangles build whole trees, 1000 at one place ${stacked} deep`);
+  report.checks.push(
+    `gpu build: lone, padded and coincident triangles build whole trees, 1000 at one place ${stacked} deep`,
+  );
 
   // Two updates in one encoder each start clean.
   const twice = device.createCommandEncoder();
@@ -338,6 +343,8 @@ export async function gpuBuildChecks(report) {
   vertices.destroy();
   device.destroy();
   const skinned = await skinnedChecks();
-  report.checks.push(`gpu build: Fox.glb skinned by Animation, ${skinned.trees} tree, ${skinned.agreed} rays agree with the pose read back`);
+  report.checks.push(
+    `gpu build: Fox.glb skinned by Animation, ${skinned.trees} tree, ${skinned.agreed} rays agree with the pose read back`,
+  );
   return true;
 }

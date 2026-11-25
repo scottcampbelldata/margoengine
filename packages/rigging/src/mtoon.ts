@@ -687,12 +687,7 @@ export class MToon implements EnginePlugin {
             srgb = [0, 2, 3].includes(i);
           if ('streamed' in image) {
             const fallback = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
-            device.queue.writeTexture(
-              { texture: fallback },
-              fallbackTexel(fields[i]),
-              { bytesPerRow: 4 },
-              [1, 1],
-            );
+            device.queue.writeTexture({ texture: fallback }, fallbackTexel(fields[i]), { bytesPerRow: 4 }, [1, 1]);
             texture = fallback;
           } else if ('ktx2' in image || 'mipmaps' in image) texture = this.model.uploadImage(source, device, srgb);
           else {
@@ -730,12 +725,7 @@ export class MToon implements EnginePlugin {
           });
         } else {
           texture = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
-          device.queue.writeTexture(
-            { texture },
-            fallbackTexel(fields[i]),
-            { bytesPerRow: 4 },
-            [1, 1],
-          );
+          device.queue.writeTexture({ texture }, fallbackTexel(fields[i]), { bytesPerRow: 4 }, [1, 1]);
           owned.push(texture);
           sampler = device.createSampler();
         }

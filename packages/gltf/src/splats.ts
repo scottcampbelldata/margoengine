@@ -38,7 +38,9 @@ const ROTATION: readonly (readonly [number, boolean])[] = [
   COEFFICIENT: readonly (readonly [number, boolean])[] = [[FLOAT, false]];
 
 const invalid = (what: string) =>
-  new TypeError(`Invalid glTF ${NAME} ${what}; the file is not valid, re-export it and check it with the glTF Validator`);
+  new TypeError(
+    `Invalid glTF ${NAME} ${what}; the file is not valid, re-export it and check it with the glTF Validator`,
+  );
 
 /** A module of @margoengine/splats, which a file with splats needs. */
 const splats = <T>(load: Promise<T>): Promise<T> =>
@@ -61,7 +63,9 @@ function accessor(
   if (id === undefined) throw invalid(`primitive: ${semantic} is missing`);
   const def = asset.doc.accessors?.[id];
   if (!allowed.some(([kind, normalized]) => kind === def?.componentType && normalized === !!def?.normalized))
-    throw invalid(`accessor for ${semantic}: componentType ${def?.componentType}${def?.normalized ? ' normalized' : ''}`);
+    throw invalid(
+      `accessor for ${semantic}: componentType ${def?.componentType}${def?.normalized ? ' normalized' : ''}`,
+    );
   const values = asset.accessor(id, type);
   if (def?.count !== count) throw invalid(`accessor for ${semantic}: its count differs from POSITION`);
   return values;

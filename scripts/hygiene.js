@@ -306,7 +306,8 @@ if (!quick) {
       const home = slash(join(root, 'packages', dir)).toLowerCase() + '/';
       const file = await program.getSourceFile(dts);
       // A package build beside the gate empties its dist while the project opens (KB6254a): say so, by name.
-      if (!file) throw missingDeclaration(dts, changedDeclarations(declarations, stamps, declarationStamps(declarations)));
+      if (!file)
+        throw missingDeclaration(dts, changedDeclarations(declarations, stamps, declarationStamps(declarations)));
       const module = await checker.getSymbolAtLocation(file);
       for (const symbol of await checker.getExportsOfModule(module)) {
         const target = symbol.flags & SymbolFlags.Alias ? await checker.getAliasedSymbol(symbol) : symbol;

@@ -156,13 +156,24 @@ export function browserLabel(options) {
  * copy, for example one installed in a throwaway fixture project. Skips the suite like {@link launchBrowser} when the
  * browser is not Chromium-based. `webgpu: false` leaves the WebGPU switches out.
  */
-export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, platform, argv, files = nodeFiles, ...options } = {}) {
+export function chromiumLaunchOptions({
+  name,
+  args = [],
+  webgpu = true,
+  env,
+  platform,
+  argv,
+  files = nodeFiles,
+  ...options
+} = {}) {
   const browser = resolveBrowser({ name, env, platform, argv }),
     reason = unsupportedReason(browser, 'chromium');
   if (reason) return skipSuite(reason);
   // A Windows channel starts from its version folder, as launchBrowser starts it (channelExecutable, KB-C34i).
   const executablePath =
-    browser.executablePath ?? options.executablePath ?? (browser.channel ? channelExecutable(browser, browser.channel, { files }) : undefined);
+    browser.executablePath ??
+    options.executablePath ??
+    (browser.channel ? channelExecutable(browser, browser.channel, { files }) : undefined);
   return {
     ...options,
     args: launchArgs(browser, args, { webgpu }),
@@ -283,7 +294,11 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
   child.once('exit', (code, signal) => (ended = signal ?? code));
   lines.once('close', () => {
     if (!released)
-      fail(Object.assign(new Error(`browser host ${child.pid} ended (${ended ?? 'stdout closed'}) before it answered`), { code: 'HOST_GONE' }));
+      fail(
+        Object.assign(new Error(`browser host ${child.pid} ended (${ended ?? 'stdout closed'}) before it answered`), {
+          code: 'HOST_GONE',
+        }),
+      );
   });
   child.once('error', (error) => fail(error));
   const release = () => {
@@ -311,14 +326,23 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
     process: child,
     async end(children) {
       // A host that has already exited cannot be written to: say so, instead of a bare `write EPIPE` (KB-NA1b).
-      if (gone || child.exitCode !== null || child.signalCode !== null || child.stdin.destroyed || !child.stdin.writable)
+      if (
+        gone ||
+        child.exitCode !== null ||
+        child.signalCode !== null ||
+        child.stdin.destroyed ||
+        !child.stdin.writable
+      )
         throw Object.assign(
-          new Error(`browser host ${child.pid} had already exited before the end request (${child.signalCode ?? child.exitCode ?? 'stdin closed'})`),
+          new Error(
+            `browser host ${child.pid} had already exited before the end request (${child.signalCode ?? child.exitCode ?? 'stdin closed'})`,
+          ),
           { code: 'HOST_GONE' },
         );
       child.stdin.write(`${JSON.stringify({ end: true, children })}\n`);
       const answer = await next();
-      if (!answer?.terminated) throw new Error(`browser host ${child.pid} did not acknowledge the end: ${JSON.stringify(answer)}`);
+      if (!answer?.terminated)
+        throw new Error(`browser host ${child.pid} did not acknowledge the end: ${JSON.stringify(answer)}`);
       return answer.terminated;
     },
     finished: next,
@@ -428,8 +452,9 @@ export function withBoundedClose(
         const pids = await step('Chromium process listing', () => listOwnedPids(browser, listMs));
         const children = pids ? pids.filter((pid) => pid !== host.pid) : null;
         const results = await Promise.allSettled([
-          step(`Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`, () =>
-            host.end(children),
+          step(
+            `Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`,
+            () => host.end(children),
           ),
           step('Playwright client close', () => close(...args)),
         ]);
@@ -706,7 +731,9 @@ export async function launchBrowser({
     if (browser.engine === 'firefox') {
       const home = browser.platform === 'darwin' ? makeHome() : undefined;
       return withBoundedClose(
-        await launchers.firefox.launch(firefoxLaunchOptions(browser, options, { needs, launcher: launchers.firefox, home })),
+        await launchers.firefox.launch(
+          firefoxLaunchOptions(browser, options, { needs, launcher: launchers.firefox, home }),
+        ),
       );
     }
     if (browser.engine !== 'chromium') return withBoundedClose(await launchers[browser.engine].launch({ ...options }));
@@ -734,7 +761,9 @@ export async function launchBrowser({
           } finally {
             host.release();
           }
-          throw ending ? new Error(`${error.message}; and ending its host failed: ${ending.message}`, { cause: error }) : error;
+          throw ending
+            ? new Error(`${error.message}; and ending its host failed: ${ending.message}`, { cause: error })
+            : error;
         }
         ownedHosts.set(browser, host);
         return browser;
@@ -752,4 +781,3 @@ export async function launchBrowser({
     return exit(LAUNCH_FAILED);
   }
 }
-

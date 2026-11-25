@@ -19,7 +19,12 @@ const left = { position: [-4, 1, 0], target: [0, 1, 0], fov: 30 };
 const right = { position: [4, 1, 0], target: [0, 1, 0], fov: 50, roll: 0.2 };
 
 test('a shot without blendIn cuts, and a blend starts and ends on the two cameras', () => {
-  const cut = build([shots({ left, right }, [{ start: 0, duration: 2, camera: 'left' }, { start: 2, duration: 2, camera: 'right' }])]);
+  const cut = build([
+    shots({ left, right }, [
+      { start: 0, duration: 2, camera: 'left' },
+      { start: 2, duration: 2, camera: 'right' },
+    ]),
+  ]);
   assert.deepEqual(cut.evaluate(1.999).camera.position, left.position);
   assert.deepEqual(cut.evaluate(2).camera.position, right.position);
   const blended = build([
@@ -59,13 +64,10 @@ test('both cameras keep moving through a blend', () => {
 
 test('a direct blend between facing cameras never puts the target on the camera', () => {
   const cutscene = build([
-    shots(
-      { a: { position: [0, 0, 0], target: [0, 0, -6] }, b: { position: [0, 0, -6], target: [0, 0, 0] } },
-      [
-        { start: 0, duration: 1, camera: 'a' },
-        { start: 1, duration: 4, camera: 'b', blendIn: 4, ease: 'linear' },
-      ],
-    ),
+    shots({ a: { position: [0, 0, 0], target: [0, 0, -6] }, b: { position: [0, 0, -6], target: [0, 0, 0] } }, [
+      { start: 0, duration: 1, camera: 'a' },
+      { start: 1, duration: 4, camera: 'b', blendIn: 4, ease: 'linear' },
+    ]),
   ]);
   for (let t = 1; t <= 5; t += 0.05) {
     const { position, target, up } = cutscene.evaluate(t).camera;
@@ -79,13 +81,10 @@ test('a direct blend between facing cameras never puts the target on the camera'
 
 test('the view turns at even speed', () => {
   const cutscene = build([
-    shots(
-      { a: { position: [0, 0, 0], target: [1, 0, 0] }, b: { position: [0, 0, 0], target: [0, 3, 0] } },
-      [
-        { start: 0, duration: 1, camera: 'a' },
-        { start: 1, duration: 1, camera: 'b', blendIn: 1, ease: 'linear' },
-      ],
-    ),
+    shots({ a: { position: [0, 0, 0], target: [1, 0, 0] }, b: { position: [0, 0, 0], target: [0, 3, 0] } }, [
+      { start: 0, duration: 1, camera: 'a' },
+      { start: 1, duration: 1, camera: 'b', blendIn: 1, ease: 'linear' },
+    ]),
   ]);
   for (const u of [0.1, 0.25, 0.5, 0.9]) {
     const { position, target } = cutscene.evaluate(1 + u).camera;
@@ -124,10 +123,9 @@ test('scrubbing into a blend shows what playing to it shows', () => {
 
 test('a shot follows and aims at objects a transform track moves, wherever that track sits', () => {
   const cutscene = build([
-    shots(
-      { chase: { follow: 'car', position: [0, 2, 5], lookAt: 'car', lookOffset: [0, 1, 0] } },
-      [{ start: 0, duration: 10, camera: 'chase' }],
-    ),
+    shots({ chase: { follow: 'car', position: [0, 2, 5], lookAt: 'car', lookOffset: [0, 1, 0] } }, [
+      { start: 0, duration: 10, camera: 'chase' },
+    ]),
     {
       type: 'transform',
       id: 'drive',
@@ -175,7 +173,10 @@ test('a live camera blends out of play and back, and reads the game at each eval
   x = 8;
   close(cutscene.evaluate(5).camera.position, [8, 1, 0]);
   assert.throws(
-    () => new Cutscene(doc([shots({ game: { live: 'game' } }, [{ start: 0, duration: 1, camera: 'game' }])]), { tracks: [shotTrack()] }).evaluate(0),
+    () =>
+      new Cutscene(doc([shots({ game: { live: 'game' } }, [{ start: 0, duration: 1, camera: 'game' }])]), {
+        tracks: [shotTrack()],
+      }).evaluate(0),
     /No live camera 'game'/,
   );
 });
@@ -231,9 +232,7 @@ test('the player fires shot starts and ends in order, and a nested timeline cuts
       },
     },
   );
-  const fired = cutscene.instants
-    .filter((e) => e.type === 'shot')
-    .map((e) => [e.kind, e.name, e.time, e.track]);
+  const fired = cutscene.instants.filter((e) => e.type === 'shot').map((e) => [e.kind, e.name, e.time, e.track]);
   assert.deepEqual(fired, [
     ['enter', 'left', 1, 'scene/edit'],
     ['exit', 'left', 2, 'scene/edit'],
@@ -247,7 +246,10 @@ test('the player fires shot starts and ends in order, and a nested timeline cuts
   player.on('enter', (event) => seen.push(event.name));
   void player.play();
   player.skip();
-  assert.deepEqual(seen.filter((name) => name !== 'inner'), ['left', 'right']);
+  assert.deepEqual(
+    seen.filter((name) => name !== 'inner'),
+    ['left', 'right'],
+  );
 });
 
 test('the document survives JSON and a player builds it with the tracks option', () => {
@@ -268,20 +270,38 @@ test('every bad shot is reported with its path', () => {
   };
   const expect = (track, pattern) => {
     const found = issues(track);
-    assert.ok(found.some((line) => pattern.test(line)), `${pattern} in ${found.join(' | ')}`);
+    assert.ok(
+      found.some((line) => pattern.test(line)),
+      `${pattern} in ${found.join(' | ')}`,
+    );
   };
   const one = [{ start: 0, duration: 1, camera: 'left' }];
   assert.deepEqual(issues(shots({ left }, one)), []);
   expect(shots(3, one), /cameras: must be an object/);
   expect(shots({ left: 3 }, one), /cameras\.left: must be an object/);
-  expect(shots({ left }, [{ start: 0, duration: 1, camera: 'gone' }]), /clips\[0\]\.camera: must name one of the track's cameras \(left\)/);
+  expect(
+    shots({ left }, [{ start: 0, duration: 1, camera: 'gone' }]),
+    /clips\[0\]\.camera: must name one of the track's cameras \(left\)/,
+  );
   expect(shots({ left }, [{ start: 0, duration: 1, camera: 'constructor' }]), /clips\[0\]\.camera/);
   expect(shots({ a: {} }, [{ start: 0, duration: 1, camera: 'a' }]), /cameras\.a: must say what it looks at/);
-  expect(shots({ a: { target: [0, 0] } }, [{ start: 0, duration: 1, camera: 'a' }]), /cameras\.a\.target: must be \[x, y, z\]/);
+  expect(
+    shots({ a: { target: [0, 0] } }, [{ start: 0, duration: 1, camera: 'a' }]),
+    /cameras\.a\.target: must be \[x, y, z\]/,
+  );
   expect(shots({ a: { ...left, fov: 200 } }, [{ start: 0, duration: 1, camera: 'a' }]), /cameras\.a\.fov/);
-  expect(shots({ a: { keys: [] } }, [{ start: 0, duration: 1, camera: 'a' }]), /cameras\.a\.keys: must hold at least one key/);
-  expect(shots({ a: { live: 'x', position: [0, 0, 0] } }, [{ start: 0, duration: 1, camera: 'a' }]), /cameras\.a\.position: cannot go with/);
-  expect(shots({ left }, [{ start: 0, duration: 1, camera: 'left', blendIn: 0.5 }]), /clips\[0\]\.blendIn: has no shot before it/);
+  expect(
+    shots({ a: { keys: [] } }, [{ start: 0, duration: 1, camera: 'a' }]),
+    /cameras\.a\.keys: must hold at least one key/,
+  );
+  expect(
+    shots({ a: { live: 'x', position: [0, 0, 0] } }, [{ start: 0, duration: 1, camera: 'a' }]),
+    /cameras\.a\.position: cannot go with/,
+  );
+  expect(
+    shots({ left }, [{ start: 0, duration: 1, camera: 'left', blendIn: 0.5 }]),
+    /clips\[0\]\.blendIn: has no shot before it/,
+  );
   expect(
     shots({ left }, [
       { start: 0, duration: 1, camera: 'left' },
@@ -296,6 +316,12 @@ test('every bad shot is reported with its path', () => {
     ]),
     /clips\[1\]\.start: overlaps the shot before/,
   );
-  expect(shots({ left }, [{ start: 0, duration: 1, camera: 'left', blend: 'wipe' }]), /clips\[0\]\.blend: must be 'direct' or 'orbit'/);
-  expect(shots({ left }, [{ start: 0, duration: 1, camera: 'left', ease: 'nope' }]), /clips\[0\]\.ease: unknown easing/);
+  expect(
+    shots({ left }, [{ start: 0, duration: 1, camera: 'left', blend: 'wipe' }]),
+    /clips\[0\]\.blend: must be 'direct' or 'orbit'/,
+  );
+  expect(
+    shots({ left }, [{ start: 0, duration: 1, camera: 'left', ease: 'nope' }]),
+    /clips\[0\]\.ease: unknown easing/,
+  );
 });

@@ -196,10 +196,16 @@ test('mesh: the newcomer offers, each step waits for the one before it, and chan
   assert.deepEqual(errors, []);
   assert.equal(offerer.log[0], 'local offer');
   assert.deepEqual(answerer.log.slice(0, 2), ['remote offer', 'local answer']);
-  assert.ok(answerer.log.some((l) => l === 'candidate after offer: from offer'), 'the candidate waited for the offer');
+  assert.ok(
+    answerer.log.some((l) => l === 'candidate after offer: from offer'),
+    'the candidate waited for the offer',
+  );
   offerer.open();
   answerer.open();
-  assert.deepEqual(linked.map(([me, peer]) => [me, peer]).sort(), [['one', two.id], ['two', one.id]]);
+  assert.deepEqual(linked.map(([me, peer]) => [me, peer]).sort(), [
+    ['one', two.id],
+    ['two', one.id],
+  ]);
   assert.equal(first.connections.get(two.id).open, true);
   two.close();
   await until(() => !one.peers.has(two.id));

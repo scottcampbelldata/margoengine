@@ -11,7 +11,10 @@ export class FrameCallbacks extends Set<FrameCallback> {
   private sorted: FrameCallback[] = [];
   private positive = false;
   override add(callback: FrameCallback): this {
-    if (!this.has(callback)) { super.add(callback); this.revision++; }
+    if (!this.has(callback)) {
+      super.add(callback);
+      this.revision++;
+    }
     return this;
   }
   override delete(callback: FrameCallback): boolean {
@@ -20,7 +23,10 @@ export class FrameCallbacks extends Set<FrameCallback> {
     return removed;
   }
   override clear(): void {
-    if (this.size) { super.clear(); this.revision++; }
+    if (this.size) {
+      super.clear();
+      this.revision++;
+    }
   }
   /** The snapshot for this revision, never edited in place while a dispatch reads it. */
   ordered(): readonly FrameCallback[] {
@@ -32,7 +38,10 @@ export class FrameCallbacks extends Set<FrameCallback> {
     return this.sorted;
   }
   /** Whether a live subscription has a positive priority. */
-  takeover(): boolean { this.ordered(); return this.positive; }
+  takeover(): boolean {
+    this.ordered();
+    return this.positive;
+  }
 }
 interface Bridge {
   depth: number;
@@ -52,10 +61,14 @@ export function frameTakeover(frames: Frames): boolean {
 }
 /** Subscribe in stable registration order, with a finite ascending numeric priority. */
 export function subscribeFrame(frames: Frames, callback: FrameCallback, priority = 0): () => void {
-  if (!Number.isFinite(priority)) throw rangeError('useFrame priority must be finite; use 0 for automatic rendering', 'react-arguments');
+  if (!Number.isFinite(priority))
+    throw rangeError('useFrame priority must be finite; use 0 for automatic rendering', 'react-arguments');
   priorities.set(callback, priority);
   frames.callbacks.add(callback);
-  return () => { frames.callbacks.delete(callback); priorities.delete(callback); };
+  return () => {
+    frames.callbacks.delete(callback);
+    priorities.delete(callback);
+  };
 }
 /** Snapshot before dispatch: additions start next frame, removals take effect immediately. */
 export function advanceFrames(frames: Frames, engine: Engine, delta: number, desktop = false): boolean {
@@ -63,7 +76,10 @@ export function advanceFrames(frames: Frames, engine: Engine, delta: number, des
   const bridge = bridges.get(frames);
   if (bridge) bridge.depth++;
   try {
-    const callbacks = frames.callbacks instanceof FrameCallbacks ? frames.callbacks.ordered() : [...frames.callbacks].sort((a, b) => (priorities.get(a) ?? 0) - (priorities.get(b) ?? 0));
+    const callbacks =
+      frames.callbacks instanceof FrameCallbacks
+        ? frames.callbacks.ordered()
+        : [...frames.callbacks].sort((a, b) => (priorities.get(a) ?? 0) - (priorities.get(b) ?? 0));
     for (const callback of callbacks) if (frames.callbacks.has(callback)) callback(engine as never, delta);
   } finally {
     if (bridge) bridge.depth--;
@@ -72,20 +88,28 @@ export function advanceFrames(frames: Frames, engine: Engine, delta: number, des
   if (bridge && desktop) {
     bridge.skip = !automatic;
     const stamp = ++bridge.stamp;
-    queueMicrotask(() => { if (stamp === bridge.stamp) bridge.skip = false; });
+    queueMicrotask(() => {
+      if (stamp === bridge.stamp) bridge.skip = false;
+    });
   }
   return automatic;
 }
 /** Adapt public render/onFrame methods for this Canvas. Manual draws remain available inside every native callback. */
 export function bridgeFrames(engine: Engine, frames: Frames): () => void {
-  const render = engine.render, onFrame = engine.onFrame;
-  const renderProperty = Object.getOwnPropertyDescriptor(engine, 'render'), frameProperty = Object.getOwnPropertyDescriptor(engine, 'onFrame');
+  const render = engine.render,
+    onFrame = engine.onFrame;
+  const renderProperty = Object.getOwnPropertyDescriptor(engine, 'render'),
+    frameProperty = Object.getOwnPropertyDescriptor(engine, 'onFrame');
   const state: Bridge = { depth: 0, skip: false, stamp: 0, drawingXR: false };
   bridges.set(frames, state);
   const draw: Engine['render'] = function (this: Engine, options) {
     if (state.depth && state.xr && !state.drawingXR && !options?.views) {
       state.drawingXR = true;
-      try { state.xr(); } finally { state.drawingXR = false; }
+      try {
+        state.xr();
+      } finally {
+        state.drawingXR = false;
+      }
       return;
     }
     if (!state.depth && state.skip) {
@@ -98,13 +122,18 @@ export function bridgeFrames(engine: Engine, frames: Frames): () => void {
   const subscribe: Engine['onFrame'] = function (this: Engine, callback) {
     return onFrame.call(this, (engine, delta) => {
       state.depth++;
-      try { callback(engine, delta); } finally { state.depth--; }
+      try {
+        callback(engine, delta);
+      } finally {
+        state.depth--;
+      }
     });
   };
   engine.render = draw;
   engine.onFrame = subscribe;
   return () => {
-    state.skip = false; state.xr = undefined;
+    state.skip = false;
+    state.xr = undefined;
     if (engine.render === draw) {
       if (renderProperty) Object.defineProperty(engine, 'render', renderProperty);
       else Reflect.deleteProperty(engine, 'render');
@@ -119,17 +148,37 @@ export function bridgeFrames(engine: Engine, frames: Frames): () => void {
 /** Optional presentation work runs only when a frame actually draws, after takeover and XR routing. */
 export function frameOutput(frames: Frames, output: FrameOutput): () => void {
   const state = bridges.get(frames);
-  if (!state) throw fault('state', 'Canvas frame bridge is unavailable; mount AdaptiveDpr inside an active Canvas', 'react-usage');
-  if (state.output) throw fault('attached', 'Canvas already has a presentation owner; release it before attaching another', 'react-usage');
+  if (!state)
+    throw fault(
+      'state',
+      'Canvas frame bridge is unavailable; mount AdaptiveDpr inside an active Canvas',
+      'react-usage',
+    );
+  if (state.output)
+    throw fault(
+      'attached',
+      'Canvas already has a presentation owner; release it before attaching another',
+      'react-usage',
+    );
   state.output = output;
-  return () => { if (state.output === output) state.output = undefined; };
+  return () => {
+    if (state.output === output) state.output = undefined;
+  };
 }
-export function inXRFrame(frames: Frames): boolean { return !!bridges.get(frames)?.xr; }
+export function inXRFrame(frames: Frames): boolean {
+  return !!bridges.get(frames)?.xr;
+}
 /** Route a manual full-scene draw through the XR manager's current eyes, scoped to its frame callback. */
 export function xrFrameScope<T>(frames: Frames, draw: () => void, callback: () => T): T {
   const state = bridges.get(frames);
   if (!state) return callback();
   const previous = state.xr;
-  state.xr = draw; state.depth++;
-  try { return callback(); } finally { state.depth--; state.xr = previous; }
+  state.xr = draw;
+  state.depth++;
+  try {
+    return callback();
+  } finally {
+    state.depth--;
+    state.xr = previous;
+  }
 }

@@ -182,7 +182,8 @@ export const scalarOf = (t: Type): Scalar =>
     ? 'f32'
     : vectorRe.exec(t)?.[2] === '<bool>'
       ? 'bool'
-      : (({ f: 'f32', h: 'f16', i: 'i32', u: 'u32' } as Record<string, Scalar>)[vectorRe.exec(t)?.[2] ?? ''] ?? (t as Scalar));
+      : (({ f: 'f32', h: 'f16', i: 'i32', u: 'u32' } as Record<string, Scalar>)[vectorRe.exec(t)?.[2] ?? ''] ??
+        (t as Scalar));
 /** Runtime {@link Size}: 2-4 for vectors, 1 for scalars and matrices. */
 export const sizeOf = (t: Type): number => +(vectorRe.exec(t)?.[1] ?? 1);
 /** True for `mat2x2f`, `mat3x3f` and `mat4x4f`. */

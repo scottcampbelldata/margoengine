@@ -26,13 +26,17 @@ self.onmessage = async ({ data }) => {
     await api.Init();
     const model = openIFC(api, new Uint8Array(buffer), options);
     try {
-      for (const chunk of meshChunks(model, options)) self.postMessage({ chunk }, [...transferables(chunk)] as Transferable[]);
+      for (const chunk of meshChunks(model, options))
+        self.postMessage({ chunk }, [...transferables(chunk)] as Transferable[]);
     } finally {
       model.close();
     }
     self.postMessage({ done: true });
   } catch (error) {
-    const reply = { name: (error as Error)?.name ?? 'Error', message: error instanceof Error ? error.message : String(error) };
+    const reply = {
+      name: (error as Error)?.name ?? 'Error',
+      message: error instanceof Error ? error.message : String(error),
+    };
     try {
       self.postMessage({ error: { ...(error as object), ...reply } });
     } catch {

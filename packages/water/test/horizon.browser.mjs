@@ -190,6 +190,38 @@ try {
     }
     gaps[name] = worst;
   }
+  // The last horizon triangles cover the scene's far plane. Their raster coverage must not give them an artificially
+  // near depth in front of a dry plateau that is well inside that plane.
+  const surveyEye = [-121000, 26000, 92000];
+  const surveyAim = [9000, 1000, 8000];
+  await page.evaluate(
+    async ({ position, target }) => {
+      const { box, PbrMaterial } = await import('/packages/core/dist/index.js');
+      const { engine, water } = window.horizonTest;
+      water.dispose();
+      engine.camera.near = 500;
+      engine.camera.far = 1100000;
+      engine.camera.position = position;
+      engine.camera.target = target;
+      engine
+        .createMesh()
+        .setGeometry(box(115000, 1000, 115000))
+        .setPosition([9000, 500, 8000])
+        .setMaterial(new PbrMaterial({ color: '#cf6951', roughness: 0.9 }));
+      engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
+    },
+    { position: surveyEye, target: surveyAim },
+  );
+  const dry = await decodePNG(await page.locator('canvas').screenshot());
+  const protectedLand = await shoot('horizon-depth', { ...sea, size: [3400, 3400] }, surveyEye, surveyAim);
+  const centrePixel = ((HEIGHT >> 1) * WIDTH + (WIDTH >> 1)) * 4;
+  assert.ok(dry.data[centrePixel] > 1.5 * dry.data[centrePixel + 2], 'the centre ray must first hit the dry plateau');
+  assert.deepEqual(
+    protectedLand.data.slice(centrePixel, centrePixel + 4),
+    dry.data.slice(centrePixel, centrePixel + 4),
+    'a horizon triangle must not cover dry terrain within the original camera depth range',
+  );
   const validation = await page.evaluate(async () => {
     const { engine } = window.horizonTest,
       error = await engine.gpu.popErrorScope();

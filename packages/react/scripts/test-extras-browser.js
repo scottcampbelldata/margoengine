@@ -16,7 +16,8 @@ const warnings = [];
 page.on('console', (message) => {
   if (message.type() === 'warning') warnings.push(message.text());
   // React's own complaint about the <mesh> the hints check renders on purpose.
-  if (message.type() === 'error' && !/is unrecognized in this browser.* mesh$/.test(message.text())) errors.push(message.text());
+  if (message.type() === 'error' && !/is unrecognized in this browser.* mesh$/.test(message.text()))
+    errors.push(message.text());
 });
 // Mean colour of a square of the screenshot around (x, y), in fractions of its size.
 const sample = (image, x, y, half = 6) => {
@@ -62,8 +63,7 @@ try {
 
   const greenPixels = (image) => {
     let count = 0;
-    for (let i = 0; i < image.data.length; i += 4)
-      if (dominant(image.data.slice(i, i + 3), 1)) count++;
+    for (let i = 0; i < image.data.length; i += 4) if (dominant(image.data.slice(i, i + 3), 1)) count++;
     return count;
   };
   image = await shot('grid-scene', (image) => greenPixels(image) > 0);

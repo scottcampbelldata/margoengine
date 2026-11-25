@@ -182,7 +182,7 @@ export interface BoulderOptions {
   cell?: number;
   /** Fracture planes that cut the block, integer 4 to 32. Default 9. */
   facets?: number;
-  /** How rounded its edges are, 0 (sharp) to 1, as a share of the radius. Default 0.25. */
+  /** How rounded its edges are, 0 (sharp) to 1. Default 0.18. */
   rounding?: number;
   /** Rough bumps as a share of the radius, 0 to 0.5. Default 0.06. */
   roughness?: number;
@@ -286,9 +286,7 @@ export function rockGround(ground: RockGround): GroundSampler {
         j = Math.min(Math.floor(v), nz - 2),
         s = u - i,
         t = v - j;
-      return (
-        (at(i, j) * (1 - s) + at(i + 1, j) * s) * (1 - t) + (at(i, j + 1) * (1 - s) + at(i + 1, j + 1) * s) * t
-      );
+      return (at(i, j) * (1 - s) + at(i + 1, j) * s) * (1 - t) + (at(i, j + 1) * (1 - s) + at(i + 1, j + 1) * s) * t;
     },
   };
 }
@@ -428,7 +426,11 @@ export function findRockSites(ground: RockGround, options: RockSiteOptions = {})
       gz[k] = sz / (8 * dz);
       slope[k] = (Math.atan(Math.hypot(gx[k], gz[k])) * 180) / Math.PI;
     }
-  const relief = localRelief(ground, Math.max(1, Math.round(reliefRadius / dx)), Math.max(1, Math.round(reliefRadius / dz)));
+  const relief = localRelief(
+    ground,
+    Math.max(1, Math.round(reliefRadius / dx)),
+    Math.max(1, Math.round(reliefRadius / dz)),
+  );
   const bilinear = (field: Float32Array, x: number, z: number) => {
     const u = clamp((x - ox) / dx, 0, nx - 1),
       v = clamp((z - oz) / dz, 0, nz - 1),
@@ -445,20 +447,22 @@ export function findRockSites(ground: RockGround, options: RockSiteOptions = {})
   // Cliffs.
   const cliffScore = new Float32Array(n);
   for (let k = 0; k < n; k++) cliffScore[k] = relief[k] * Math.sin((slope[k] * Math.PI) / 180);
-  const [cOrder, cCount] = sortBy(
-    cliffScore,
-    (k) => {
-      // Clear of the grid's edge by half a piece, so a piece never hangs past the ground it was found on.
-      const i = k % nx,
-        j = Math.floor(k / nx),
-        mx = Math.ceil(cliffWidth / 2 / dx),
-        mz = Math.ceil(cliffWidth / 2 / dz);
-      return (
-        i >= mx && j >= mz && i < nx - mx && j < nz - mz &&
-        slope[k] >= cliffSlope && relief[k] >= cliffRelief && g.at(i, j) >= sea - dMax
-      );
-    },
-  );
+  const [cOrder, cCount] = sortBy(cliffScore, (k) => {
+    // Clear of the grid's edge by half a piece, so a piece never hangs past the ground it was found on.
+    const i = k % nx,
+      j = Math.floor(k / nx),
+      mx = Math.ceil(cliffWidth / 2 / dx),
+      mz = Math.ceil(cliffWidth / 2 / dz);
+    return (
+      i >= mx &&
+      j >= mz &&
+      i < nx - mx &&
+      j < nz - mz &&
+      slope[k] >= cliffSlope &&
+      relief[k] >= cliffRelief &&
+      g.at(i, j) >= sea - dMax
+    );
+  });
   const cliffs: CliffSite[] = [],
     step = Math.min(dx, dz) / 2,
     run = 4 * reliefRadius + 4 * Math.max(dx, dz);
@@ -842,14 +846,20 @@ export function cliffField(site: CliffSite, ground: RockGround, options?: CliffO
     if (o.joints > 0 && o.crackDepth > 0) {
       // Joints shift by bed (brick-like jointing of bedded rock) and wander a little up the face.
       const k = Math.floor(b),
-        a = (u + hash(k, 5, 1, o.seed) * o.joints + 0.25 * o.joints * valueNoise(x * 0.2, y * 0.1, z * 0.2, o.seed + 9)) / o.joints,
+        a =
+          (u + hash(k, 5, 1, o.seed) * o.joints + 0.25 * o.joints * valueNoise(x * 0.2, y * 0.1, z * 0.2, o.seed + 9)) /
+          o.joints,
         dj = Math.abs(a - Math.round(a)) * o.joints;
       face -= o.crackDepth * (1 - smooth(0, Math.max(o.cell, 0.08 * o.joints), dj));
     }
     face -= smooth(0.55, 1, Math.abs(u) / w) * out;
     let d = v - face + o.roughness * fbm(x / 3, y / 3, z / 3, o.seed + 17, 3) * 2;
     d = Math.max(d, c - o.thickness - v);
-    d = smax(d, y - (site.top - 0.25 + 0.5 * o.roughness * valueNoise(x * 0.15, 3.5, z * 0.15, o.seed + 3)), 0.3 * o.cell);
+    d = smax(
+      d,
+      y - (site.top - 0.25 + 0.5 * o.roughness * valueNoise(x * 0.15, 3.5, z * 0.15, o.seed + 3)),
+      0.3 * o.cell,
+    );
     d = Math.max(d, site.base - o.embed - y, Math.abs(u) - w);
     return d;
   };
@@ -899,7 +909,8 @@ function seaOptions(options: SeaRockOptions | undefined, site: SeaRockSite) {
  * still water, Trenhaile 1987), strata ledges, joints around it and a rounded top.
  */
 export function seaRockField(site: SeaRockSite, options?: SeaRockOptions): RockField {
-  if (!site || (site.kind !== 'stack' && site.kind !== 'skerry')) bad('sea rock site: pass one of findRockSites(...).seaRocks');
+  if (!site || (site.kind !== 'stack' && site.kind !== 'skerry'))
+    bad('sea rock site: pass one of findRockSites(...).seaRocks');
   const o = seaOptions(options, site),
     [px, bedY, pz] = site.position,
     R0 = site.radius,
@@ -930,7 +941,13 @@ export function seaRockField(site: SeaRockSite, options?: SeaRockOptions): RockF
     return Math.max(d, lo - y);
   };
   const reach = R0 * (1 + o.lobes) + o.ledges + 2 * o.roughness + 2 * o.cell;
-  return { sd, lo: [-reach, lo - o.cell, -reach], hi: [reach, top + o.roughness + 2 * o.cell, reach], cell: o.cell, frame: [1, 0, 0, 1, bedY] };
+  return {
+    sd,
+    lo: [-reach, lo - o.cell, -reach],
+    hi: [reach, top + o.roughness + 2 * o.cell, reach],
+    cell: o.cell,
+    frame: [1, 0, 0, 1, bedY],
+  };
 }
 /**
  * Builds a stack or skerry as a closed mesh about its site's `position` (x, bed height, z). Its notch sits at the sea
@@ -939,7 +956,11 @@ export function seaRockField(site: SeaRockSite, options?: SeaRockOptions): RockF
  * @example for (const s of sites.seaRocks) { const r = buildSeaRock(s); engine.createMesh().setGeometry(r.geometry).setPosition(r.position); }
  */
 export function buildSeaRock(site: SeaRockSite, options?: SeaRockOptions): RockMesh<SeaRockSite> {
-  return { geometry: polygonize(seaRockField(site, options)), position: [...site.position] as [number, number, number], site };
+  return {
+    geometry: polygonize(seaRockField(site, options)),
+    position: [...site.position] as [number, number, number],
+    site,
+  };
 }
 
 function boulderOptions(options: BoulderOptions | undefined, site: BoulderSite) {
@@ -947,15 +968,15 @@ function boulderOptions(options: BoulderOptions | undefined, site: BoulderSite) 
   return {
     cell: num(o.cell ?? Math.max(0.04, site.radius / 10), 0.02, 10, 'cell'),
     facets: int(o.facets ?? 9, 4, 32, 'facets'),
-    rounding: num(o.rounding ?? 0.25, 0, 1, 'rounding'),
+    rounding: num(o.rounding ?? 0.18, 0, 1, 'rounding'),
     roughness: num(o.roughness ?? 0.06, 0, 0.5, 'roughness'),
     embed: num(o.embed ?? 0.3, 0, 0.9, 'embed'),
     seed: seedOf(o.seed),
   };
 }
 /**
- * The signed distance field of a boulder about its centre (the site's position raised by (1 - embed) of its radius):
- * the cell cut by `facets` fracture planes, their edges rounded, inside a sphere a little larger than its radius.
+ * The signed distance field of a boulder about its centre. The seed varies the proportions, joint orientation and
+ * fracture planes. The bed face and principal joints keep broad faces between the rounded edges.
  */
 export function boulderField(site: BoulderSite, options?: BoulderOptions): RockField {
   if (!site || site.kind !== 'boulder') bad('boulder site: pass one of findRockSites(...).boulders');
@@ -963,22 +984,37 @@ export function boulderField(site: BoulderSite, options?: BoulderOptions): RockF
     r = num(site.radius, 0, 1e4, 'boulder radius', true),
     planes: number[] = [],
     key = Math.round(site.position[0] * 7) ^ Math.round(site.position[2] * 13) ^ o.seed;
-  for (let k = 0; k < o.facets; k++) {
-    // Spread over the sphere (golden-angle spiral), jittered per boulder; flattened a little (blocks lie on a face).
-    const y = 1 - (2 * (k + 0.5)) / o.facets + 0.25 * hash(k, 1, key, 3) / o.facets,
-      a = k * 2.399963 + hash(k, 2, key, 3),
-      s = Math.sqrt(Math.max(0, 1 - y * y)),
-      d = r * (0.72 + 0.18 * rand(k, 3, key, 3));
-    planes.push(Math.cos(a) * s, y, Math.sin(a) * s, y < -0.7 ? d * 0.85 : d);
+  const angle = 2 * Math.PI * rand(0, 1, key, 3),
+    c = Math.cos(angle),
+    s = Math.sin(angle),
+    xSpan = 0.92 + 0.25 * rand(1, 1, key, 3),
+    zSpan = 0.63 + 0.35 * rand(2, 1, key, 3),
+    pitch = 0.12 + 0.73 * rand(3, 1, key, 3),
+    roof = 0.71 + 0.23 * rand(4, 1, key, 3);
+  // Keep a bearing face below ground and a pitched fracture above it, then cut the sides and corners in local axes.
+  planes.push(0, -1, 0, 0.84 * r, pitch, 1, 0.12 * hash(3, 2, key, 3), roof * r);
+  for (let k = 2; k < o.facets; k++) {
+    const side = k < 6,
+      a = (k - 2) * (side ? Math.PI / 2 : 2.399963) + 0.24 * hash(k, 2, key, 3),
+      y = side ? 0.32 * hash(k, 4, key, 3) : 0.39 + 0.5 * hash(k, 4, key, 3),
+      distance = r * (0.73 + 0.25 * rand(k, 3, key, 3));
+    planes.push(Math.cos(a) / xSpan, y, Math.sin(a) / zSpan, distance);
   }
   const k = o.rounding * r * 0.25,
     sd = (u: number, y: number, v: number) => {
-      let d = Math.hypot(u, y * 1.15, v) - r * 1.05;
-      for (let p = 0; p < planes.length; p += 4) d = smax(d, u * planes[p] + y * planes[p + 1] + v * planes[p + 2] - planes[p + 3], k);
-      return d + o.roughness * r * fbm(u / (0.45 * r), y / (0.45 * r), v / (0.45 * r), o.seed + key, 3) * 2;
+      const x = u * c + v * s,
+        z = v * c - u * s;
+      // The envelope closes sparsely cut rocks; on most faces the fractures lie well inside the envelope.
+      let d = Math.hypot(x / xSpan, y * 0.89, z / zSpan) - r * 1.105;
+      for (let p = 0; p < planes.length; p += 4)
+        d = smax(d, x * planes[p] + y * planes[p + 1] + z * planes[p + 2] - planes[p + 3], k);
+      return d + o.roughness * r * fbm(x / (0.45 * r), y / (0.34 * r), z / (0.45 * r), o.seed + key, 3) * 2;
     };
-  const e = r * (1.1 + 2 * o.roughness) + 2 * o.cell;
-  return { sd, lo: [-e, -e, -e], hi: [e, e, e], cell: o.cell, frame: [1, 0, 0, 1, 0] };
+  const e = r * (1.105 + 1.75 * o.roughness),
+    ex = e * Math.hypot(c * xSpan, s * zSpan) + 2 * o.cell,
+    ez = e * Math.hypot(s * xSpan, c * zSpan) + 2 * o.cell,
+    down = Math.min(e / 0.89, r * (0.84 + 1.75 * o.roughness)) + 2 * o.cell;
+  return { sd, lo: [-ex, -down, -ez], hi: [ex, e / 0.89 + 2 * o.cell, ez], cell: o.cell, frame: [1, 0, 0, 1, 0] };
 }
 /**
  * Builds a boulder as a closed mesh about its centre, which lies `embed` of its radius above the ground point of its site
@@ -988,7 +1024,11 @@ export function boulderField(site: BoulderSite, options?: BoulderOptions): RockF
 export function buildBoulder(site: BoulderSite, options?: BoulderOptions): RockMesh<BoulderSite> {
   const o = boulderOptions(options, site),
     [x, y, z] = site.position;
-  return { geometry: polygonize(boulderField(site, options)), position: [x, y + site.radius * (1 - o.embed) * 0.87, z], site };
+  return {
+    geometry: polygonize(boulderField(site, options)),
+    position: [x, y + site.radius * (1 - o.embed) * 0.87, z],
+    site,
+  };
 }
 
 /**

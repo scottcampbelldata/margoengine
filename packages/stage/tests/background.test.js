@@ -46,6 +46,9 @@ test('background null keeps the colour below and an unset background keeps core 
 test('an invalid background rejects createStage and removes the canvas it made', async (t) => {
   const { host } = rig(t);
   await assert.rejects(createStage(host, { ...options, background: '#12' }), RangeError);
-  await assert.rejects(createStage(host, { ...options, background: 5 }), { name: 'TypeError', message: /errors#arguments/ });
+  await assert.rejects(createStage(host, { ...options, background: 5 }), {
+    name: 'TypeError',
+    message: /errors#arguments/,
+  });
   assert.equal(host.querySelector('canvas'), null);
 });

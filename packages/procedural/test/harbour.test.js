@@ -45,7 +45,11 @@ test('a tetrapod: V = 0.28 H^3 (SPM 1984), stands on three legs with one straigh
     for (let i = 0; i < N; i++)
       for (let j = 0; j < N; j++)
         for (let k = 0; k < N; k++) {
-          const p = [((i + 0.5) / N - 0.5) * span, ((j + 0.5) / N - 0.5) * span + t.centre, ((k + 0.5) / N - 0.5) * span],
+          const p = [
+              ((i + 0.5) / N - 0.5) * span,
+              ((j + 0.5) / N - 0.5) * span + t.centre,
+              ((k + 0.5) / N - 0.5) * span,
+            ],
             q = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
           if (
             t.legs.some((leg) => {
@@ -89,7 +93,12 @@ test('tetrapod armour: two layers at n k_D (1 - P) / V^(2/3) units per m2, layer
     assert.ok(c[1] > -6 - a.thickness && c[1] < 4 + a.thickness, `unit ${i} height ${c[1]}`);
     assert.ok(off > 0 && off < a.thickness * 1.05, `unit ${i} off the bed by ${off}`);
     // Each rotation is orthonormal.
-    for (const [p, q] of [[0, 4], [0, 8], [4, 8]]) assert.ok(Math.abs(m[p] * m[q] + m[p + 1] * m[q + 1] + m[p + 2] * m[q + 2]) < 1e-5);
+    for (const [p, q] of [
+      [0, 4],
+      [0, 8],
+      [4, 8],
+    ])
+      assert.ok(Math.abs(m[p] * m[q] + m[p + 1] * m[q + 1] + m[p + 2] * m[q + 2]) < 1e-5);
   }
   assert.equal(a.placement, 'pattern');
   assert.equal(a.settling, undefined);
@@ -110,7 +119,10 @@ test('settled tetrapod armour: SPM thickness and porosity, no overlaps, determin
   assert.ok(s, 'settled armour reports its settling');
   assert.ok(s.minGap >= 0, `least clearance ${s.minGap}`);
   assert.ok(s.supported >= 0.98 * a.count, `${s.supported} of ${a.count} units rest on something`);
-  assert.ok(Math.abs(s.measuredThickness - a.thickness) <= 0.25 * a.thickness, `thickness ${s.measuredThickness} for ${a.thickness}`);
+  assert.ok(
+    Math.abs(s.measuredThickness - a.thickness) <= 0.25 * a.thickness,
+    `thickness ${s.measuredThickness} for ${a.thickness}`,
+  );
   assert.ok(s.porosity >= 0.4 && s.porosity <= 0.6, `porosity ${s.porosity}`);
   assert.ok(a.matrices.every(Number.isFinite));
   // Every unit is down on the armour: no centre stands above the bed, or more than 1.5 layer thicknesses off it.
@@ -142,7 +154,8 @@ test('sea wall: a Sanriku crest, a recurved wave return, joints and stairs of co
   const flat = generateSeaWall({ recurve: false });
   let top = -Infinity;
   for (let i = 0; i < flat.parts.concrete.positions.length; i += 3)
-    if (flat.parts.concrete.positions[i + 1] > flat.crest - 0.01) top = Math.max(top, flat.parts.concrete.positions[i + 2]);
+    if (flat.parts.concrete.positions[i + 1] > flat.crest - 0.01)
+      top = Math.max(top, flat.parts.concrete.positions[i + 2]);
   assert.ok(Math.abs(top - flat.seaward[0]) < 1e-5);
   assert.ok(w.parts.trim && w.parts.stairs && w.parts.rails);
   // Stairs: (crest - land) / risers at most 0.18 m.

@@ -186,7 +186,8 @@ export function riggedTestBody(pose = 'T', { jaw = false, lean = false, armRoots
       return w;
     },
   );
-  if (armRoots) for (let v = 0; v < P.length / 3; v++) P[v * 3] += Math.sign(P[v * 3]) * 0.025 * root(P[v * 3], P[v * 3 + 1]);
+  if (armRoots)
+    for (let v = 0; v < P.length / 3; v++) P[v * 3] += Math.sign(P[v * 3]) * 0.025 * root(P[v * 3], P[v * 3 + 1]);
   // Neck and head.
   tube(
     10,
@@ -232,7 +233,8 @@ export function riggedTestBody(pose = 'T', { jaw = false, lean = false, armRoots
       24,
       (t) => {
         const d = lerp(-0.04, 0.56, t),
-          r = d < 0.06 ? 0.05 : d < 0.29 ? lerp(0.047, 0.039, (d - 0.06) / 0.23) : lerp(0.042, 0.028, (d - 0.29) / 0.27),
+          r =
+            d < 0.06 ? 0.05 : d < 0.29 ? lerp(0.047, 0.039, (d - 0.06) / 0.23) : lerp(0.042, 0.028, (d - 0.29) / 0.27),
           e = ends(t, 0.08);
         return { c: sh.map((v, i) => v + dir[i] * d), x: across, y: front, a: r * e, b: r * e };
       },
@@ -241,7 +243,12 @@ export function riggedTestBody(pose = 'T', { jaw = false, lean = false, armRoots
           root = 1 - smooth(-0.04, 0.03, d),
           elbow = smooth(0.25, 0.33, d),
           wrist = smooth(0.52, 0.56, d);
-        return { [`${side}Shoulder`]: root * 0.5, [`${side}UpperArm`]: (1 - root * 0.5) * (1 - elbow), [`${side}LowerArm`]: elbow * (1 - wrist), [`${side}Hand`]: wrist };
+        return {
+          [`${side}Shoulder`]: root * 0.5,
+          [`${side}UpperArm`]: (1 - root * 0.5) * (1 - elbow),
+          [`${side}LowerArm`]: elbow * (1 - wrist),
+          [`${side}Hand`]: wrist,
+        };
       },
     );
     tube(
@@ -249,7 +256,13 @@ export function riggedTestBody(pose = 'T', { jaw = false, lean = false, armRoots
       16,
       (t) => {
         const sn = Math.sin(t * Math.PI);
-        return { c: wr.map((v, i) => v + dir[i] * lerp(0.0, 0.18, t)), x: across, y: front, a: 0.045 * sn, b: 0.02 * sn };
+        return {
+          c: wr.map((v, i) => v + dir[i] * lerp(0.0, 0.18, t)),
+          x: across,
+          y: front,
+          a: 0.045 * sn,
+          b: 0.02 * sn,
+        };
       },
       () => ({ [`${side}Hand`]: 1 }),
     );
@@ -284,7 +297,12 @@ export function riggedTestBody(pose = 'T', { jaw = false, lean = false, armRoots
         const top = smooth(0.86, 0.98, y),
           kn = 1 - smooth(0.44, 0.52, y),
           an = 1 - smooth(0.06, 0.12, y);
-        return { hips: top * 0.7, [`${side}UpperLeg`]: (1 - top * 0.7) * (1 - kn), [`${side}LowerLeg`]: kn * (1 - an), [`${side}Foot`]: an };
+        return {
+          hips: top * 0.7,
+          [`${side}UpperLeg`]: (1 - top * 0.7) * (1 - kn),
+          [`${side}LowerLeg`]: kn * (1 - an),
+          [`${side}Foot`]: an,
+        };
       },
     );
     // Foot: heel to toe along z, sole at the floor.
@@ -358,11 +376,29 @@ export const posesFor = (pose = 'T') => ({
 export const POSES = posesFor('T');
 const rotation = (q) => {
   const [x, y, z, w] = q;
-  return [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 0, 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 0, 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y), 0, 0, 0, 0, 1];
+  return [
+    1 - 2 * (y * y + z * z),
+    2 * (x * y + z * w),
+    2 * (x * z - y * w),
+    0,
+    2 * (x * y - z * w),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z + x * w),
+    0,
+    2 * (x * z + y * w),
+    2 * (y * z - x * w),
+    1 - 2 * (x * x + y * y),
+    0,
+    0,
+    0,
+    0,
+    1,
+  ];
 };
 const mul = (a, b) => {
   const o = new Array(16).fill(0);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return o;
 };
 const translate = (t) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, t[0], t[1], t[2], 1];
@@ -432,7 +468,11 @@ export function riggedTestGLB(pose = 'T', clipPose = POSES['arms lowered, elbows
     channels = [],
     samplers = [];
   for (const name of posed) {
-    samplers.push({ input: times, output: acc(new Float32Array([0, 0, 0, 1, ...clipPose[name]]), 'VEC4', 2, 5126), interpolation: 'LINEAR' });
+    samplers.push({
+      input: times,
+      output: acc(new Float32Array([0, 0, 0, 1, ...clipPose[name]]), 'VEC4', 2, 5126),
+      interpolation: 'LINEAR',
+    });
     channels.push({ sampler: samplers.length - 1, target: { node: BONES.indexOf(name), path: 'rotation' } });
   }
   const bin = new Uint8Array(length);
@@ -447,7 +487,12 @@ export function riggedTestGLB(pose = 'T', clipPose = POSES['arms lowered, elbows
     scenes: [{ nodes: [0, nodes.length - 1] }],
     nodes,
     meshes: [{ name: 'body', primitives: [{ attributes, indices, material: 0 }] }],
-    materials: [{ name: 'Skin', pbrMetallicRoughness: { baseColorFactor: [0.9, 0.05, 0.6, 1], metallicFactor: 0, roughnessFactor: 0.6 } }],
+    materials: [
+      {
+        name: 'Skin',
+        pbrMetallicRoughness: { baseColorFactor: [0.9, 0.05, 0.6, 1], metallicFactor: 0, roughnessFactor: 0.6 },
+      },
+    ],
     skins: [{ joints: BONES.map((_, i) => i), inverseBindMatrices: binds }],
     animations: [{ name: 'pose', channels, samplers }],
     accessors,

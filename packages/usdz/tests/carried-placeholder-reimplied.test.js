@@ -20,7 +20,9 @@ import { composeUSDFiles } from '../dist/compose.js';
 import { markStage } from './prim-stack-marks.js';
 import { stackOrder } from './prim-stack-order.js';
 
-const stages = JSON.parse(readFileSync(new URL('./fixtures/carried-placeholder-reimplied.json', import.meta.url), 'utf8'));
+const stages = JSON.parse(
+  readFileSync(new URL('./fixtures/carried-placeholder-reimplied.json', import.meta.url), 'utf8'),
+);
 const encoder = new TextEncoder();
 
 for (const [name, { files, prims }] of Object.entries(stages)) {

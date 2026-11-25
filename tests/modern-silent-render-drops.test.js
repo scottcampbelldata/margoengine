@@ -335,7 +335,10 @@ for (const fixture of loadedPBRFixtures) {
         const changed = draw(left);
         assert.match(changed.pipeline.vertex.module.code, /0\.125,0\.25,0\.5/);
         primitive.extension = { textures: [{ view: {} }] };
-        assert.throws(() => left.prepare(context), /material extension textures given as \(device\) => view or sampler/);
+        assert.throws(
+          () => left.prepare(context),
+          /material extension textures given as \(device\) => view or sampler/,
+        );
         primitive.extension = undefined;
         draw(left);
         assert.throws(() => left.prepare({ ...context, device: engine.gpu }), /another GPU device/);

@@ -15,7 +15,10 @@ export const SHUTDOWN_STEPS = Symbol('shutdown steps');
 export function traceShutdown(name, run, report = process.env.MARGO_TRACE_SHUTDOWN === '1' ? console.error : null) {
   if (!report) return run();
   const begun = Date.now();
-  const emit = (outcome) => report?.(`[shutdown] ${JSON.stringify({ at: new Date().toISOString(), pid: process.pid, name, outcome, elapsedMs: Date.now() - begun })}`);
+  const emit = (outcome) =>
+    report?.(
+      `[shutdown] ${JSON.stringify({ at: new Date().toISOString(), pid: process.pid, name, outcome, elapsedMs: Date.now() - begun })}`,
+    );
   emit('start');
   return (async () => {
     try {
@@ -107,8 +110,7 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', script],
       { timeout: waitMs + 10_000, windowsHide: true },
-      (error, stdout) =>
-        resolve(error ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
+      (error, stdout) => resolve(error ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
     );
   });
 }

@@ -285,7 +285,10 @@ test('clone and copy carry the surface options and share their maps', () => {
 test('triplanar tiles a map whose wrap is unset instead of clamping its edges (KB-TRIPLANAR-SIDES1)', async () => {
   const s = await scene(),
     map = solid(200),
-    mirror = new Texture({ data: new Uint8Array(16).fill(128), width: 2, height: 2 }, { mipmaps: false, wrapS: 'mirror' }),
+    mirror = new Texture(
+      { data: new Uint8Array(16).fill(128), width: 2, height: 2 },
+      { mipmaps: false, wrapS: 'mirror' },
+    ),
     material = new PbrMaterial({ map, normalMap: mirror, aoMap: map, triplanar: true }),
     mesh = createMesh(s.engine, quad, material);
   const address = () => {

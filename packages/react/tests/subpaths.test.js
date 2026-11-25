@@ -454,6 +454,9 @@ async function bundle(directory, name, source, expected = []) {
         external: (id) =>
           id === 'react' || id.startsWith('react/') || id === 'react-dom' || id.startsWith('react-dom/'),
         onwarn: record,
+        // The bundler's plugin timings report says how slow the build was, which follows machine load, not the
+        // code under test; every other warning stays asserted.
+        checks: { pluginTimings: false },
       },
     },
   });
@@ -605,6 +608,66 @@ test('an Environment without children loads none of the capture binding, CubeCam
         assert.equal(initial.includes(marker), false, `${name}: ${marker} stays off the initial chunk graph`);
       assert.ok(code.includes('function EnvironmentCapture('), `${name}: the capture binding is a lazy chunk`);
       assert.equal(code.includes('function Lightformer('), children, `${name}: Lightformer is emitted only when used`);
+      // The src file needs a decoder, but only on demand: none is on the initial chunk graph.
+      assert.ok(code.includes('Invalid HDR: '), `${name}: the src environment loads its decoders`);
+      assert.equal(initial.includes('Invalid HDR: '), false, `${name}: the decoders stay off the initial chunk graph`);
+    }
+  }));
+
+test('the bindings that read no environment file bundle none of the image decoders (KB-REACT-ENVDECODERS1)', async () =>
+  temporary(async (directory) => {
+    // Each binding took the whole environment root, which re-exports the Radiance HDR, OpenEXR and UltraHDR decoders
+    // (36 KB raw), so a build kept them (and Vite warned) for an app that lights from colours alone. They load
+    // @margoengine/environment/main now; bundle() fails on any warning, which covers the ineffective dynamic import.
+    const outputs = await bundle(
+      directory,
+      'environment-no-file',
+      `import {createElement as h} from 'react';
+  import {Environment,CubeCamera,Lightformer,AmbientLight,Fog} from '@margoengine/react/environment';
+  export const App=()=>h(Environment,null,h(Lightformer),h(CubeCamera),h(AmbientLight),h(Fog));`,
+    );
+    // The decoders stay a chunk of their own (EnvironmentLighting.load imports it on a first URL, which none of
+    // these bindings calls): no initial chunk and no chunk of the environment classes holds them.
+    const decoders = outputs.filter((chunk) => chunk.type === 'chunk' && chunk.code.includes('Invalid HDR: '));
+    assert.ok(decoders.length > 0, 'the decoders are emitted as a lazy chunk');
+    assert.equal(
+      decoders.some((chunk) => chunk.code.includes('is disposed; create a new one')),
+      false,
+      'the decoders share no chunk with the environment classes',
+    );
+    assert.equal(
+      staticChunks(outputs).some((chunk) => decoders.includes(chunk)),
+      false,
+      'the decoders are on no initial chunk graph',
+    );
+  }));
+
+test('<Environment src> keeps the decoders a file does not need in lazy chunks it never requests (KB-ENVDECODERS2)', async () =>
+  temporary(async (directory) => {
+    // It imported @margoengine/environment/loaders, which holds all three decoders in one chunk, so loading x.hdr
+    // fetched the OpenEXR and UltraHDR decoders too. /load imports only the decoder a file's signature names.
+    const outputs = await bundle(
+      directory,
+      'environment-src',
+      `import {createElement as h} from 'react';
+  import {Environment} from '@margoengine/react/environment';
+  export const App=()=>h(Environment,{src:'x.hdr'});`,
+    );
+    const chunks = outputs.filter((chunk) => chunk.type === 'chunk'),
+      initial = staticChunks(outputs);
+    const markers = { hdr: 'Invalid HDR: ', exr: 'Invalid EXR', ultrahdr: 'no hdrgm gain-map metadata' };
+    for (const [name, text] of Object.entries(markers)) {
+      const holders = chunks.filter((chunk) => chunk.code.includes(text));
+      assert.ok(holders.length > 0, `the ${name} decoder is emitted`);
+      assert.equal(
+        holders.some((chunk) => initial.includes(chunk)),
+        false,
+        `the ${name} decoder is on no initial chunk graph`,
+      );
+    }
+    for (const chunk of chunks) {
+      const held = Object.entries(markers).filter(([, text]) => chunk.code.includes(text));
+      assert.ok(held.length <= 1, `a chunk holds ${held.map(([name]) => name).join(' and ')} together`);
     }
   }));
 

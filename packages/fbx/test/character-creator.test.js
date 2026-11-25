@@ -33,7 +33,10 @@ function fbx(name) {
 }
 /** A json as Character Creator writes it, for one mesh and these materials. */
 const json = (materials) => ({
-  man: { Version: '1.10', Object: { man: { Generation: 'RL_CC3_Plus', Meshes: { CC_Base_Body: { Materials: materials } } } } },
+  man: {
+    Version: '1.10',
+    Object: { man: { Generation: 'RL_CC3_Plus', Meshes: { CC_Base_Body: { Materials: materials } } } },
+  },
 });
 const files = (map) => async (url) => map[new URL(url).pathname.replace(/^\//, '')];
 const material = async (name, cc, map = {}) => {
@@ -153,8 +156,14 @@ test('head roughness takes the region scales over their Targa masks, and the unm
       const got = await material('Std_Skin_Head', head(variables), files);
       return got.image(got.m.pbrMetallicRoughness.metallicRoughnessTexture).data[1];
     };
-  assert.equal(await green({ 'UpperLid Roughness Scale': -0.3, 'Nose Roughness Scale': 0.2 }, lid), Math.round(255 * (140 / 255 - 0.3)));
-  assert.equal(await green({ 'UpperLid Roughness Scale': -0.3, 'Unmasked Roughness Scale': 0.1 }, bare), Math.round(255 * (140 / 255 + 0.1)));
+  assert.equal(
+    await green({ 'UpperLid Roughness Scale': -0.3, 'Nose Roughness Scale': 0.2 }, lid),
+    Math.round(255 * (140 / 255 - 0.3)),
+  );
+  assert.equal(
+    await green({ 'UpperLid Roughness Scale': -0.3, 'Unmasked Roughness Scale': 0.1 }, bare),
+    Math.round(255 * (140 / 255 + 0.1)),
+  );
 });
 
 test('a material the json does not name, and a missing map, leave the FBX material as it was', async () => {
@@ -192,7 +201,10 @@ test('eye occlusion: a soft shadow under the top lid fading to clear in the midd
   // The tear duct corner keeps more shadow than the outer one at mid height (0.25 against 0.2 of the width).
   assert.ok(alpha(0.83, 0.5) > alpha(0.17, 0.5), `inner ${alpha(0.83, 0.5)} outer ${alpha(0.17, 0.5)}`);
   const cc = json({
-    Std_Eye_Occlusion_R: { 'Two Side': true, 'Custom Shader': { 'Shader Name': 'RLEyeOcclusion', Variable: variables } },
+    Std_Eye_Occlusion_R: {
+      'Two Side': true,
+      'Custom Shader': { 'Shader Name': 'RLEyeOcclusion', Variable: variables },
+    },
   });
   const { m, image } = await material('Std_Eye_Occlusion_R', cc);
   assert.equal(m.alphaMode, 'BLEND');
@@ -202,7 +214,9 @@ test('eye occlusion: a soft shadow under the top lid fading to clear in the midd
 });
 
 test('tear line: a clear glossy strip with the shader roughness', async () => {
-  const cc = json({ Std_Tearline_L: { 'Custom Shader': { 'Shader Name': 'RLEyeTearline', Variable: { _Roughness: 0.1 } } } });
+  const cc = json({
+    Std_Tearline_L: { 'Custom Shader': { 'Shader Name': 'RLEyeTearline', Variable: { _Roughness: 0.1 } } },
+  });
   const { m } = await material('Std_Tearline_L', cc);
   assert.equal(m.alphaMode, 'BLEND');
   assert.ok(Math.abs(m.pbrMetallicRoughness.roughnessFactor - 0.1) < 1e-6);

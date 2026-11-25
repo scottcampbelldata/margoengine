@@ -21,12 +21,24 @@ async function scene() {
         add() {},
         remove() {},
         render(_c, _l, batches) {
-          draws.push(batches.filter((b) => b.count).map((b) => b.count).sort());
+          draws.push(
+            batches
+              .filter((b) => b.count)
+              .map((b) => b.count)
+              .sort(),
+          );
         },
         dispose() {},
       }),
     });
-  const value = { engine, world: null, registry: null, shadows: null, pointerHandlers: new Map(), frames: { callbacks: new Set() } };
+  const value = {
+    engine,
+    world: null,
+    registry: null,
+    shadows: null,
+    pointerHandlers: new Map(),
+    frames: { callbacks: new Set() },
+  };
   scenes.push(value);
   const frame = () => {
     for (const f of value.frames.callbacks) f(engine, 0);
@@ -78,7 +90,10 @@ test('Merged with a record hands children a record of components, and refuses a 
   const s = await scene(),
     ref = createRef();
   const view = render(
-    tree(s, h(Merged, { meshes: { Box: { geometry: box() } } }, ({ Box }) => h(Box, { ref, scale: [2, 2, 2] }))),
+    tree(
+      s,
+      h(Merged, { meshes: { Box: { geometry: box() } } }, ({ Box }) => h(Box, { ref, scale: [2, 2, 2] })),
+    ),
   );
   await act(async () => {});
   s.frame();

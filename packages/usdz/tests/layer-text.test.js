@@ -36,7 +36,10 @@ test('a variant set with no variants is a syntax error, as the text grammar and 
   for (const inside of ['', ' # none'])
     await assert.rejects(
       compose(`#usda 1.0\ndef "A" (\n    variantSets = "vs"\n)\n{\n    variantSet "vs" = {${inside}\n    }\n}\n`),
-      (error) => error.name === 'LoaderError' && error.code === 'syntax' && /variant set "vs" on \/A has no variants/.test(error.message),
+      (error) =>
+        error.name === 'LoaderError' &&
+        error.code === 'syntax' &&
+        /variant set "vs" on \/A has no variants/.test(error.message),
     );
   const specs = await compose('#usda 1.0\ndef "A"\n{\n    variantSet "vs" = {\n        "x" {\n        }\n    }\n}\n');
   assert.equal(specs['/A'].fields.specifier, 0);

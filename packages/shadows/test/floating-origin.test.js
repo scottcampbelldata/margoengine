@@ -6,7 +6,10 @@ import { mockGPU, context, passes } from '../../../examples/package-benchmarks/p
 // A world point's texel coordinate on one axis of one cascade: the local point (world less origin) through the
 // float32 light matrix, in texels. Two fits put the point on the same world texel phase when these differ by whole texels.
 const texelAt = (m, offset, axis, local, resolution) =>
-  ((m[offset + axis] * local[0] + m[offset + 4 + axis] * local[1] + m[offset + 8 + axis] * local[2] + m[offset + 12 + axis]) *
+  ((m[offset + axis] * local[0] +
+    m[offset + 4 + axis] * local[1] +
+    m[offset + 8 + axis] * local[2] +
+    m[offset + 12 + axis]) *
     resolution) /
   2;
 const phase = (a, b) => Math.abs(a - b - Math.round(a - b));
@@ -34,7 +37,19 @@ test('anchored cascade fits keep a world point on the same texel phase across 32
       far: 200,
     };
     const m = new Float32Array(64);
-    fitCascades(camera, 16 / 9, light, resolution, splits, m, new Float32Array(4), 100, undefined, 4, anchored ? origin : undefined);
+    fitCascades(
+      camera,
+      16 / 9,
+      light,
+      resolution,
+      splits,
+      m,
+      new Float32Array(4),
+      100,
+      undefined,
+      4,
+      anchored ? origin : undefined,
+    );
     return { m, local: point.map((v, i) => v - origin[i]) };
   };
   let worstAnchored = 0,
@@ -48,11 +63,17 @@ test('anchored cascade fits keep a world point on the same texel phase across 32
       for (const axis of [0, 1]) {
         worstAnchored = Math.max(
           worstAnchored,
-          phase(texelAt(a.m, c * 16, axis, a.local, resolution), texelAt(firstA.m, c * 16, axis, firstA.local, resolution)),
+          phase(
+            texelAt(a.m, c * 16, axis, a.local, resolution),
+            texelAt(firstA.m, c * 16, axis, firstA.local, resolution),
+          ),
         );
         worstLocal = Math.max(
           worstLocal,
-          phase(texelAt(l.m, c * 16, axis, l.local, resolution), texelAt(firstL.m, c * 16, axis, firstL.local, resolution)),
+          phase(
+            texelAt(l.m, c * 16, axis, l.local, resolution),
+            texelAt(firstL.m, c * 16, axis, firstL.local, resolution),
+          ),
         );
       }
   }
@@ -63,7 +84,19 @@ test('anchored cascade fits keep a world point on the same texel phase across 32
   const zero = [0, 0, 0],
     camera = { position: [3, 2, 1], target: [0, 0, 0], fov: 50, near: 0.1, far: 200 },
     plain = fitCascades(camera, 1.5, light, resolution, splits).matrices,
-    zeroed = fitCascades(camera, 1.5, light, resolution, splits, undefined, undefined, 100, undefined, 4, zero).matrices;
+    zeroed = fitCascades(
+      camera,
+      1.5,
+      light,
+      resolution,
+      splits,
+      undefined,
+      undefined,
+      100,
+      undefined,
+      4,
+      zero,
+    ).matrices;
   assert.deepEqual([...zeroed], [...plain]);
 });
 
@@ -82,7 +115,12 @@ test('Shadows floatingOrigin validates, follows rebases for bounds fits and unsu
     },
     local = (at) => ({ min: world.min.map((v, i) => v - at[i]), max: world.max.map((v, i) => v - at[i]) }),
     gpu = mockGPU(),
-    engine = { gpu: gpu.device, lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) }, removePlugin() {}, sceneOf() {} },
+    engine = {
+      gpu: gpu.device,
+      lighting: { direction: new Float32Array([-3, 3.5, 2.5, 4]) },
+      removePlugin() {},
+      sceneOf() {},
+    },
     resolution = 512,
     shadows = new Shadows({ bounds: local(start), resolution, casterMargin: 0.1, floatingOrigin: origin }),
     view = context(gpu, { shader: 'let linear=direct*vec3f(1);' }),

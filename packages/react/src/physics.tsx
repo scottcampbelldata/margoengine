@@ -14,6 +14,7 @@ import type {
 import { Mesh, type MeshProps } from './components.js';
 import { splitPointerHandlers } from './events.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
+import { sceneOwner } from './scene-owner.js';
 import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import { optionalPeer } from './optional.js';
@@ -41,7 +42,8 @@ export function Physics({
   timeScale = 1,
   ...options
 }: PhysicsProps) {
-  const { engine } = useScene(),
+  const scene = useScene(),
+    { engine } = scene,
     [world, setWorld] = useState<PhysicsWorld | null>(null),
     sync = useMemo(() => new Set<() => void>(), [engine]);
   const latest = useRef({ onReady, onError, gravity, paused, timeScale });
@@ -58,7 +60,7 @@ export function Physics({
           const instance = current;
           // The wrapper's update runs after the solver's step, before the engine ticks transforms.
           // The engine owns the wrapper, not the world, so unmount removes the wrapper from its scene.
-          engine.use(
+          sceneOwner(scene).use(
             (plugin = {
               name: instance.name,
               setup: () => instance.setup(engine as unknown as EngineKernel),
@@ -91,6 +93,7 @@ export function Physics({
     },
     [
       engine,
+      scene.world,
       sync,
       options.name,
       options.fixedTimestep,

@@ -24,11 +24,23 @@ await postBrowser(
       engine.stop();
       const white = new PbrMaterial({ color: '#ffffff', roughness: 1 }),
         dark = new PbrMaterial({ color: '#202020', roughness: 1 });
-      engine.createMesh().setGeometry(box(60, 30, 0.2)).setPosition([0, 5, -30.3]).setMaterial(dark);
+      engine
+        .createMesh()
+        .setGeometry(box(60, 30, 0.2))
+        .setPosition([0, 5, -30.3])
+        .setMaterial(dark);
       for (let i = -40; i <= 40; i++)
-        engine.createMesh().setGeometry(box(0.25, 30, 0.2)).setPosition([i * 0.5, 5, -30]).setMaterial(white);
+        engine
+          .createMesh()
+          .setGeometry(box(0.25, 30, 0.2))
+          .setPosition([i * 0.5, 5, -30])
+          .setMaterial(white);
       // The box in front of the plume, low on its left side.
-      engine.createMesh().setGeometry(box(0.6, 0.6, 0.6)).setPosition([-0.4, 1.5, 6]).setMaterial(dark);
+      engine
+        .createMesh()
+        .setGeometry(box(0.6, 0.6, 0.6))
+        .setPosition([-0.4, 1.5, 6])
+        .setMaterial(dark);
       const plume = { position: [0, 0, 0], length: 3, footprint: [1, 1], time: 0 },
         haze = HeatHaze.attach(engine, { sources: () => [plume] });
       window.t = {
@@ -40,7 +52,7 @@ await postBrowser(
         project: (p) => {
           const m = engine.camera.matrix,
             c = [0, 1, 2, 3].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
-          return [(c[0] / c[3] * 0.5 + 0.5) * 320, (0.5 - c[1] / c[3] * 0.5) * 240];
+          return [((c[0] / c[3]) * 0.5 + 0.5) * 320, (0.5 - (c[1] / c[3]) * 0.5) * 240];
         },
       };
     });

@@ -268,7 +268,10 @@ test('ports, outputs and the Vite cache are read from a file, comments left out'
 import { noFileWatcher } from '../scripts/support/no-file-watcher.js'; createServer({ plugins: [noFileWatcher()], server: { port: 0 } })`),
     true,
   );
-  assert.equal(usesDefaultViteCache(`import { createServer } from 'vite'; createServer({ plugins: [noFileWatcher()], cacheDir })`), false);
+  assert.equal(
+    usesDefaultViteCache(`import { createServer } from 'vite'; createServer({ plugins: [noFileWatcher()], cacheDir })`),
+    false,
+  );
   assert.equal(usesDefaultViteCache(`import { createServer } from 'node:http';`), false);
 });
 
@@ -392,11 +395,7 @@ test('runStepsParallel: verify first and alone, then the rest; a skip stays a sk
   });
   assert.equal(snapped, 1);
   assert.equal(failed, undefined);
-  assert.deepEqual(seen, [
-    'npm run verify',
-    'npm run build:site',
-    'npm run check:gpu-packages -- --no-build',
-  ]);
+  assert.deepEqual(seen, ['npm run verify', 'npm run build:site', 'npm run check:gpu-packages -- --no-build']);
   assert.deepEqual(
     results.map((r) => r.command),
     planned.map((p) => p.command),
@@ -453,10 +452,7 @@ const runs = (over = {}) => ({
   parallelMerge: mergeFile({ parallel: true }),
   parallelGpu: {
     parallel: true,
-    results: [
-      suite('a', { startedAt: 1, endedAt: 5 }),
-      suite('fly', { startedAt: 6, endedAt: 9 }),
-    ],
+    results: [suite('a', { startedAt: 1, endedAt: 5 }), suite('fly', { startedAt: 6, endedAt: 9 })],
   },
   ...over,
 });
@@ -490,4 +486,3 @@ test('compare: a missing, failed, not-run or excluded suite, or a lost step, is 
   assert.match(change((r) => (r.parallelMerge.mode = 'affected')).problems.join(), /modes differ/);
   assert.match(change((r) => delete r.parallelMerge.parallel).problems.join(), /not from a side-by-side run/);
 });
-

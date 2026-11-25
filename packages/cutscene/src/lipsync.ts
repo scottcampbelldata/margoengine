@@ -6,7 +6,23 @@ import type { CutsceneState, CutsceneTrackType, TrackInstant } from './cutscene.
 import type { ClipBase, TrackCheck } from './document.js';
 
 /** The 15 viseme names people know from game and avatar tools. */
-export const VISEMES = ['sil', 'PP', 'FF', 'TH', 'DD', 'kk', 'CH', 'SS', 'nn', 'RR', 'aa', 'E', 'ih', 'oh', 'ou'] as const;
+export const VISEMES = [
+  'sil',
+  'PP',
+  'FF',
+  'TH',
+  'DD',
+  'kk',
+  'CH',
+  'SS',
+  'nn',
+  'RR',
+  'aa',
+  'E',
+  'ih',
+  'oh',
+  'ou',
+] as const;
 /** A mouth position for a group of sounds. */
 export type Viseme = (typeof VISEMES)[number];
 
@@ -234,7 +250,10 @@ const SHAPES: Readonly<Record<'vrm' | 'arkit', Partial<Record<Viseme, Readonly<R
  * Weights as blend shapes to set: `'visemes'` (default) names them `viseme_aa` and so on, as avatar tools do, `'vrm'`
  * gives the five VRM 1.0 mouth presets, `'arkit'` Apple's face shape names. A shape absent from the result is 0.
  */
-export function mouthShapes(weights: VisemeWeights, set: 'visemes' | 'vrm' | 'arkit' = 'visemes'): Record<string, number> {
+export function mouthShapes(
+  weights: VisemeWeights,
+  set: 'visemes' | 'vrm' | 'arkit' = 'visemes',
+): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [viseme, weight] of Object.entries(weights) as [Viseme, number][]) {
     if (set === 'visemes') out[`viseme_${viseme}`] = weight;
@@ -341,7 +360,8 @@ const median = (values: readonly number[]): number => {
  */
 export function analyseSpeech(samples: Float32Array, sampleRate: number, options: SpeechOptions = {}): PhonemeKey[] {
   const { step = 0.01, floor = 35, shortest = 0.04 } = options;
-  if (!(sampleRate >= 8000) || !Number.isFinite(sampleRate)) throw new RangeError('analyseSpeech needs a sampleRate of 8000 or more');
+  if (!(sampleRate >= 8000) || !Number.isFinite(sampleRate))
+    throw new RangeError('analyseSpeech needs a sampleRate of 8000 or more');
   if (!(step > 0) || !(floor > 0) || !(shortest >= 0)) throw new RangeError('analyseSpeech options must be above 0');
   // Averaging down to about FORMANT_RATE; what it does to the top of the band is above any formant read here.
   const factor = Math.max(1, Math.floor(sampleRate / FORMANT_RATE)),
@@ -412,7 +432,8 @@ export function analyseSpeech(samples: Float32Array, sampleRate: number, options
   // A running vote over five frames takes out one-frame flips between neighbours on the chart.
   const voted = labels.map((label, f) => {
     const seen = new Map<Viseme, number>();
-    for (let i = Math.max(0, f - 2); i <= Math.min(count - 1, f + 2); i++) seen.set(labels[i], (seen.get(labels[i]) ?? 0) + 1);
+    for (let i = Math.max(0, f - 2); i <= Math.min(count - 1, f + 2); i++)
+      seen.set(labels[i], (seen.get(labels[i]) ?? 0) + 1);
     let top = label,
       most = 0;
     for (const [name, votes] of seen)

@@ -81,12 +81,7 @@ class FakeBackground {
     this.disposed = true;
   }
 }
-// The bindings load the decoder-free entry; the tests stand in for both it and the root.
-const mockEnvironment = (options) => {
-  mock.module('@margoengine/environment', options);
-  mock.module('@margoengine/environment/main', options);
-};
-mockEnvironment({
+const environmentMock = {
   namedExports: {
     Fog: FakeFog,
     EnvironmentBackground: FakeBackground,
@@ -102,12 +97,19 @@ mockEnvironment({
       }),
     },
   },
-});
+};
+// The bindings import /main and /load (KB-REACT-ENVDECODERS1); mock every specifier they may use.
+for (const id of [
+  '@margoengine/environment',
+  '@margoengine/environment/main',
+  '@margoengine/environment/loaders',
+  '@margoengine/environment/load',
+])
+  mock.module(id, environmentMock);
 
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Engine, TransformStore } = await import('@margoengine/core/extension');
 const { Context } = await import('../dist/internal.js');
-const { Mesh, BoxGeometry } = await import('../dist/index.js');
 const { CubeCamera, Fog } = await import('../dist/environment.js');
 const { advanceFrames } = await import('../dist/frame-priority.js');
 const h = React.createElement;

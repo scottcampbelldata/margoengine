@@ -76,7 +76,11 @@ export function readWebM(bytes: Uint8Array): Movie {
     const n =
       e.end === e.start
         ? fallback
-        : e.end - e.start === 4 ? view.getFloat32(e.start) : e.end - e.start === 8 ? view.getFloat64(e.start) : invalid();
+        : e.end - e.start === 4
+          ? view.getFloat32(e.start)
+          : e.end - e.start === 8
+            ? view.getFloat64(e.start)
+            : invalid();
     return Number.isFinite(n) ? n : invalid();
   };
   const text = (e: Element): string => new TextDecoder().decode(bytes.subarray(e.start, e.end));

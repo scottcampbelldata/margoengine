@@ -81,7 +81,10 @@ test('a container listed in exceptions or colouring applies to its parts (aggreg
       '<CameraUpVector><X>0</X><Y>0</Y><Z>1</Z></CameraUpVector><FieldOfView>60</FieldOfView><AspectRatio>2</AspectRatio></PerspectiveCamera></VisualizationInfo>',
   );
   const view = viewFromBCF(vp, data);
-  assert.deepEqual(view.visible, [wall, ...parts].sort((a, b) => a - b));
+  assert.deepEqual(
+    view.visible,
+    [wall, ...parts].sort((a, b) => a - b),
+  );
   assert.deepEqual(view.selected, view.visible);
   assert.deepEqual(view.colors.get(parts[0]), [1, 0, 0, 128 / 255]);
   assert.equal(view.colors.size, parts.length + 1);
@@ -93,7 +96,9 @@ test('a container listed in exceptions or colouring applies to its parts (aggreg
 });
 
 test('bcfFromView encodes with the BCF 3.0 rules and viewFromBCF reads the same view back', () => {
-  const products = [...viewFromBCF({ ...blank(), defaultVisibility: true, spacesVisible: true, openingsVisible: true }, data).visible];
+  const products = [
+    ...viewFromBCF({ ...blank(), defaultVisibility: true, spacesVisible: true, openingsVisible: true }, data).visible,
+  ];
   assert.equal(products.length, 220);
   // Only one space shown: the official case's encoding (DefaultVisibility false, hints false, the space as exception).
   const one = bcfFromView({ hidden: products.filter((id) => id !== SPACE) }, data);
@@ -102,7 +107,9 @@ test('bcfFromView encodes with the BCF 3.0 rules and viewFromBCF reads the same 
   assert.deepEqual(one.exceptions, [{ ifcGuid: '1bbI761TbBCOoIa5Kt6PXt' }]);
   // One wall hidden, spaces and openings hidden: default true, the hints hide spaces and openings, one exception.
   const wall = [...data.elements.values()].find((e) => e.type === 'IfcWallStandardCase').id;
-  const hiddenSet = products.filter((id) => id === wall || /^Ifc(Space|OpeningElement)$/.test(data.elements.get(id).type));
+  const hiddenSet = products.filter(
+    (id) => id === wall || /^Ifc(Space|OpeningElement)$/.test(data.elements.get(id).type),
+  );
   const vp = bcfFromView(
     {
       hidden: hiddenSet,
@@ -126,7 +133,10 @@ test('bcfFromView encodes with the BCF 3.0 rules and viewFromBCF reads the same 
   // The clipped side: the plane keeps y <= 3 in engine axes, so BCF's direction (into the clipped side) is IFC +Z.
   assert.ok(close(vp.clippingPlanes[0].direction, [0, 0, 1]));
   const back = viewFromBCF(parseBCFViewpoint(writeBCFViewpoint(vp)), data, { origin: [100, 0, -50] });
-  assert.deepEqual(back.hidden, [...hiddenSet].sort((a, b) => a - b));
+  assert.deepEqual(
+    back.hidden,
+    [...hiddenSet].sort((a, b) => a - b),
+  );
   assert.deepEqual(back.selected, [PLATE]);
   assert.deepEqual(back.colors.get(PLATE), [0, 128 / 255, 1, 64 / 255]);
   assert.ok(close(back.camera.position, [10, 5, -3]));
@@ -137,7 +147,9 @@ test('bcfFromView encodes with the BCF 3.0 rules and viewFromBCF reads the same 
   assert.ok(close(back.lines[0].end, [1, 2, 3]));
   // A camera looking straight down with the default up still gets a valid, perpendicular up vector.
   const down = bcfFromView({ camera: { position: [0, 10, 0], target: [0, 0, 0] } }, data).camera;
-  assert.ok(Math.abs(down.up[0] * down.direction[0] + down.up[1] * down.direction[1] + down.up[2] * down.direction[2]) < 1e-12);
+  assert.ok(
+    Math.abs(down.up[0] * down.direction[0] + down.up[1] * down.direction[1] + down.up[2] * down.direction[2]) < 1e-12,
+  );
 });
 
 function blank() {
@@ -202,18 +214,29 @@ test('archives round-trip through writeBCF: markup, comments, documents, snippet
 test('viewpoints: BCF 3.0 and 2.1 XML, BCF-API JSON with snapshots and bitmaps, BCF 1.0 components', () => {
   const vp = {
     ...blank(),
-    camera: { type: 'perspective', position: [1, 2, 3], direction: [0, 1, 0], up: [0, 0, 1], fieldOfView: 50, aspectRatio: 1.5 },
+    camera: {
+      type: 'perspective',
+      position: [1, 2, 3],
+      direction: [0, 1, 0],
+      up: [0, 0, 1],
+      fieldOfView: 50,
+      aspectRatio: 1.5,
+    },
     selection: [{ ifcGuid: '1bbI761TbBCOoIa5Kt6PXt', originatingSystem: 'Tool <A&B>' }],
     exceptions: [{ authoringToolId: '4711' }],
     spacesVisible: true,
     coloring: [{ color: 'FF0000', components: [{ ifcGuid: '32HeOfyn55zOiSkf6rlfHs' }] }],
     lines: [{ start: [0, 0, 0], end: [1, 1, 1] }],
     clippingPlanes: [{ location: [0, 0, 2], direction: [0, 0, 1] }],
-    bitmaps: [{ format: 'jpg', reference: 'note.jpg', location: [1, 1, 1], normal: [0, 0, 1], up: [0, 1, 0], height: 2 }],
+    bitmaps: [
+      { format: 'jpg', reference: 'note.jpg', location: [1, 1, 1], normal: [0, 0, 1], up: [0, 1, 0], height: 2 },
+    ],
   };
   assert.deepEqual(parseBCFViewpoint(writeBCFViewpoint(vp)), vp);
   const v21 = writeBCFViewpoint(vp, { version: '2.1' });
-  assert.ok(!v21.includes('AspectRatio') && !v21.includes('<Components><Component') && /<Components><ViewSetupHints/.test(v21));
+  assert.ok(
+    !v21.includes('AspectRatio') && !v21.includes('<Components><Component') && /<Components><ViewSetupHints/.test(v21),
+  );
   assert.deepEqual(parseBCFViewpoint(v21), { ...vp, camera: { ...vp.camera, aspectRatio: 1 } });
   const withImages = {
     ...vp,
@@ -248,7 +271,10 @@ test('malformed or incomplete input rejects with a named LoaderError', async () 
   assert.throws(() => parseBCFViewpoint('<VisualizationInfo><Components>'), { name: 'LoaderError', code: 'syntax' });
   assert.throws(() => parseBCFViewpoint('<Markup/>'), { code: 'syntax' });
   assert.throws(
-    () => parseBCFViewpoint('<VisualizationInfo><PerspectiveCamera><CameraViewPoint><X>a</X></CameraViewPoint></PerspectiveCamera></VisualizationInfo>'),
+    () =>
+      parseBCFViewpoint(
+        '<VisualizationInfo><PerspectiveCamera><CameraViewPoint><X>a</X></CameraViewPoint></PerspectiveCamera></VisualizationInfo>',
+      ),
     { code: 'syntax' },
   );
   assert.throws(() => writeBCFViewpoint(blank()), { code: 'range' }, 'BCF 3.0 needs a camera');

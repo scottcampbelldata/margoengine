@@ -80,6 +80,8 @@ export type NoiseFunction = (x: number, y: number, z?: number, w?: number) => nu
 
 export const ROOF_PITCH: number;
 
+export type RockForm = 'block' | 'slab' | 'wedge' | 'shard' | 'pebble';
+
 export const SIMPLEX_SCALE: readonly number[];
 
 export interface TreeMesh {
@@ -159,7 +161,7 @@ export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateReedMesh(stems?: number): GeometryData;
 
-export function generateRockMesh(): GeometryData;
+export function generateRockMesh(seed?: number, form?: RockForm): GeometryData;
 
 export function generateShrubMesh(options?: MeshDetailOptions): GeometryData;
 

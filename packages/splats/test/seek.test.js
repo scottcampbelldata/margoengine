@@ -17,7 +17,11 @@ async function seekMatches(make, label, { scale = 1, after = () => {} } = {}) {
       for (let step = 0; step < n; step++) b.clock.advanceTime(1 / 60);
       b.clock.onPreUpdate(1 / 60);
       assert.ok(Object.is(b.clock.time, a.clock.time), `${label} at ${n} steps`);
-      if (scale) assert.ok(Math.abs(a.clock.time - ((n + 1) / 60) * scale) <= 1e-6 * (n + 1) * scale, `${label} counts its clock`);
+      if (scale)
+        assert.ok(
+          Math.abs(a.clock.time - ((n + 1) / 60) * scale) <= 1e-6 * (n + 1) * scale,
+          `${label} counts its clock`,
+        );
       after(a, b, n);
     } finally {
       a.close?.();
@@ -26,11 +30,21 @@ async function seekMatches(make, label, { scale = 1, after = () => {} } = {}) {
   }
 }
 
-const frame = () => ({ positions: new Float32Array(6), covariances: Float32Array.from({ length: 12 }, (_, i) => ([0, 3, 5].includes(i % 6) ? 0.01 : 0)), colors: new Float32Array(8).fill(0.5) });
+const frame = () => ({
+  positions: new Float32Array(6),
+  covariances: Float32Array.from({ length: 12 }, (_, i) => ([0, 3, 5].includes(i % 6) ? 0.01 : 0)),
+  colors: new Float32Array(8).fill(0.5),
+});
 
 test('a splat sequence and a splat modifier replayed equal a continuous run', async () => {
-  await seekMatches(() => ({ clock: new SplatSequence(Splats.reserve(2), [frame(), frame()], { fps: 10 }) }), 'SplatSequence');
-  await seekMatches(() => ({ clock: Object.assign(Object.create(SplatModifier.prototype), { time: 0, playing: true, speed: 1 }) }), 'SplatModifier');
+  await seekMatches(
+    () => ({ clock: new SplatSequence(Splats.reserve(2), [frame(), frame()], { fps: 10 }) }),
+    'SplatSequence',
+  );
+  await seekMatches(
+    () => ({ clock: Object.assign(Object.create(SplatModifier.prototype), { time: 0, playing: true, speed: 1 }) }),
+    'SplatModifier',
+  );
   const paused = Object.assign(Object.create(SplatModifier.prototype), { time: 0, playing: true, speed: 1 });
   paused.playing = false;
   paused.onPreUpdate(1);

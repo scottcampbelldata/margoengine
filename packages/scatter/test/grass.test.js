@@ -39,7 +39,10 @@ test('grassRings: the mesh box holds every blade the GPU builds', () => {
   for (const ring of grassRings({ ...shape, blades: 1 })) {
     const single = bounds(ring);
     for (const a of [0, 2])
-      assert.ok(Math.abs(single.max[a] - reach) < 1e-6 && Math.abs(single.min[a] + reach) < 1e-6, `one blade, axis ${a}`);
+      assert.ok(
+        Math.abs(single.max[a] - reach) < 1e-6 && Math.abs(single.min[a] + reach) < 1e-6,
+        `one blade, axis ${a}`,
+      );
   }
 });
 
@@ -121,15 +124,32 @@ test('GrassScatter: a Scatter with no mesh input, blades shading on', () => {
 
 test('grassPoseCode: a covered ring keeps every blade, widened across its screen axis by the filter radius (KB-SCATTER-SUBPIXEL1)', () => {
   const stage =
-    coverDeclaration + 'struct ScatterPose {world:vec3f}\nfn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f)->ScatterPose {}\n';
+    coverDeclaration +
+    'struct ScatterPose {world:vec3f}\nfn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f)->ScatterPose {}\n';
   const code = grassPoseCode(stage, { width: 0.05 });
   // Across as the screen shows it: perpendicular to the spine and the eye, on the side of right.
-  assert.match(code, /var perp=cross\(tangent,view\);perp=select\(right,perp\/length\(perp\),dot\(perp,perp\)>1e-12\);/);
-  assert.match(code, /perp=select\(perp,-perp,dot\(perp,right\)<0\.0\);let rp=dot\(right,perp\);let h=0\.5\*wt\*rp\/max\(pix,1e-30\);/);
+  assert.match(
+    code,
+    /var perp=cross\(tangent,view\);perp=select\(right,perp\/length\(perp\),dot\(perp,perp\)>1e-12\);/,
+  );
+  assert.match(
+    code,
+    /perp=select\(perp,-perp,dot\(perp,right\)<0\.0\);let rp=dot\(right,perp\);let h=0\.5\*wt\*rp\/max\(pix,1e-30\);/,
+  );
   // A blade under 8 pixels tall turns to the two-pixel filter over 4 pixels, and is drawn that much wider.
-  assert.match(code, /let far=clamp\(\(8\.0-height\/max\(pix,1e-30\)\)\/4\.0,0\.0,1\.0\);let fr=select\(1\.0,2\.0,far>0\.0\);/);
-  assert.match(code, /let across=select\(right\*\(side\*0\.5\*wt\),right\*\(side\*0\.5\*wt\)\+perp\*\(side\*fr\*pix\),pix>0\.0\);/);
-  assert.match(code, /scatterCover=select\(vec3f\(0\.0,65536\.0,0\.0\),vec3f\(side\*\(h\+fr\),h,far\),pix>0\.0\);/);
+  assert.match(
+    code,
+    /let far=clamp\(\(8\.0-height\/max\(pix,1e-30\)\)\/4\.0,0\.0,1\.0\);let fr=select\(1\.0,2\.0,far>0\.0\);/,
+  );
+  assert.match(
+    code,
+    /let across=select\(right\*\(side\*0\.5\*wt\),right\*\(side\*0\.5\*wt\)\+perp\*\(side\*fr\*pix\),pix>0\.0\);/,
+  );
+  // w: the blade's hashed depth threshold for the coverage-depth stage (KB-SCENES-DUNE-GTAO1).
+  assert.match(
+    code,
+    /scatterCover=select\(vec4f\(0\.0,65536\.0,0\.0,0\.5\),vec4f\(side\*\(h\+fr\),h,far,grassHash\(seed\^0x3c6ef372u\)\),pix>0\.0\);/,
+  );
   // scatterPose widens x and z by wide afterwards, so across's height is widened to match.
   assert.match(code, /\+vec3f\(across\.x,across\.y\*wide,across\.z\);/);
   assert.match(code, /let grow=1\.0;let t=along;/);
@@ -140,16 +160,26 @@ test('grassPoseCode: a split ring draws each blade opaque a filter radius in fro
   const stage =
     'struct ScatterPose {world:vec3f}\nfn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f)->ScatterPose {}\n';
   const body = grassPoseCode(splitDeclaration + stage, { width: 0.05 });
-  assert.match(body, /let across=right\*\(side\*select\(0\.5\*wt,max\(h-fr,0\.0\)\*pix\/max\(rp,1e-3\),pix>0\.0\)\);/, 'the opaque core');
+  assert.match(
+    body,
+    /let across=right\*\(side\*select\(0\.5\*wt,max\(h-fr,0\.0\)\*pix\/max\(rp,1e-3\),pix>0\.0\)\);/,
+    'the opaque core',
+  );
   assert.doesNotMatch(body, /scatterCover=|var keep=|grow<=0\.0/, 'opaque, every blade, no hashed keep');
   const tip = grassPoseCode(splitDeclaration + coverDeclaration + stage, { width: 0.05 });
   assert.match(tip, /right\*\(side\*0\.5\*wt\)\+perp\*\(side\*fr\*pix\)/, 'the covered stage draws the whole blade');
   assert.match(tip, /scatterCover=select\(/);
   // GrassScatter splits the near ring and covers the middle and far ones; a plain Scatter draws every ring opaque.
   const grass = new GrassScatter({ count: 64 });
-  assert.deepEqual([0, 1, 2].map((i) => grass.coverRing(i)), ['split', 'cover', 'cover']);
+  assert.deepEqual(
+    [0, 1, 2].map((i) => grass.coverRing(i)),
+    ['split', 'cover', 'cover'],
+  );
   const plain = new Scatter(grassRings(), { count: 64 });
-  assert.deepEqual([0, 1, 2].map((i) => plain.coverRing(i)), ['opaque', 'opaque', 'opaque']);
+  assert.deepEqual(
+    [0, 1, 2].map((i) => plain.coverRing(i)),
+    ['opaque', 'opaque', 'opaque'],
+  );
 });
 
 test('coverCode: the tent filters of a strip sum to its true width over pixel centres one apart (KB-SCATTER-SUBPIXEL1)', () => {
@@ -163,7 +193,7 @@ test('coverCode: the tent filters of a strip sum to its true width over pixel ce
     code.includes(
       'fn scatterTent(u:f32)->f32 {let v=clamp(u,-1.0,1.0);return select(1.0-(1.0-v)*(1.0-v)*0.5,(1.0+v)*(1.0+v)*0.5,v<0.0);}\n' +
         'fn scatterStrip(s:f32,h:f32,r:f32)->f32 {return clamp(scatterTent((h-s)/r)-scatterTent((-h-s)/r),0.0,1.0);}\n' +
-        'fn scatterCoverage(e:vec3f)->f32 {return mix(scatterStrip(e.x,e.y,1.0),scatterStrip(e.x,e.y,2.0),e.z);}\n',
+        'fn scatterCoverage(e:vec4f)->f32 {return mix(scatterStrip(e.x,e.y,1.0),scatterStrip(e.x,e.y,2.0),e.z);}\n',
     ),
   );
   const tent = (u) => {
@@ -196,7 +226,7 @@ test('coverCode: the vertex hands scatterCover to the fragment, which writes it 
     '@fragment fn fragment(i:Output)->@location(0) vec4f {let color=vec3f(1);return vec4f(color,1);}';
   const u = coverCode(unlit, false);
   assert.ok(u.startsWith(coverDeclaration));
-  assert.match(u, /shade:f32,@location\(4\) cover:vec3f\}/);
+  assert.match(u, /shade:f32,@location\(4\) cover:vec4f\}/);
   assert.match(u, /struct ScatterPose \{world:vec3f,shade:f32\}/, 'the pose struct is left alone');
   assert.match(u, /pose\.shade,scatterCover\);/);
   assert.match(u, /return vec4f\(color,scatterCoverage\(i\.cover\)\);\}/);
@@ -205,7 +235,7 @@ test('coverCode: the vertex hands scatterCover to the fragment, which writes it 
     '@vertex fn vertex(@location(0) p:vec3f)->Output {var o:Output;return o;}\n' +
     '@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {\nif(!front){discard;}return vec4f(1);\n}';
   const l = coverCode(lit, true, 5);
-  assert.match(l, /@location\(3\) material:vec4f ,@location\(5\) cover:vec3f\}/);
+  assert.match(l, /@location\(3\) material:vec4f ,@location\(5\) cover:vec4f\}/);
   assert.match(l, /o\.cover=scatterCover;return o;/);
   assert.match(l, /fn scatterOpaque\(i:Output,front:bool\)->vec4f \{\nif\(!front\)\{discard;\}/);
   assert.match(
@@ -215,4 +245,35 @@ test('coverCode: the vertex hands scatterCover to the fragment, which writes it 
   // A stage this cannot wrap (several targets) stays opaque.
   assert.equal(coverCode(lit.replace('->@location(0) vec4f', '->Targets'), true, 5), undefined);
   assert.equal(coverCode(unlit.replace('return vec4f(color,1);}', 'return out;}'), false), undefined);
+});
+
+test('coverCode depth: the coverage-depth stage keeps a fragment above its threshold and discards the rest (KB-SCENES-DUNE-GTAO1)', () => {
+  // Blended blades wrote no depth, so GTAO found no grass to occlude the sand and the dune coast's camp view lost its
+  // shade. The depth stage is drawn after the blending: the same pose and coverage, depth only.
+  assert.ok(
+    coverDeclaration.includes('var<private> scatterCover:vec4f=vec4f(0.0,65536.0,0.0,0.5);'),
+    'default: above half',
+  );
+  const unlit =
+    'struct Output {@builtin(position) clip:vec4f,@location(3) shade:f32}\n' +
+    '@vertex fn vertex()->Output{return Output(vec4f(0),pose.ground,pose.shade);}\n' +
+    '@fragment fn fragment(i:Output)->@location(0) vec4f {let color=vec3f(1);return vec4f(color,1);}';
+  const u = coverCode(unlit, false, 0, true);
+  assert.match(u, /if\(scatterCoverage\(i\.cover\)<=i\.cover\.w\)\{discard;\}return vec4f\(color,1\);\}/);
+  assert.doesNotMatch(u, /return vec4f\(color,scatterCoverage/, 'no blended alpha');
+  assert.match(
+    coverCode(unlit, false),
+    /return vec4f\(color,scatterCoverage\(i\.cover\)\);\}/,
+    'the colour stage blends',
+  );
+  const lit =
+    'struct Output { @builtin(position) clip:vec4f,@location(3) material:vec4f }\n' +
+    '@vertex fn vertex(@location(0) p:vec3f)->Output {var o:Output;return o;}\n' +
+    '@fragment fn fragment(varyings:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {\nreturn vec4f(1);\n}';
+  const l = coverCode(lit, true, 5, true);
+  assert.match(l, /o\.cover=scatterCover;return o;/);
+  assert.match(
+    l,
+    /let c=scatterOpaque\(varyings,front\);if\(c\.a\*scatterCoverage\(varyings\.cover\)<=varyings\.cover\.w\)\{discard;\}return c;\}/,
+  );
 });

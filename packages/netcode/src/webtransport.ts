@@ -52,7 +52,10 @@ export interface OpenWebTransportOptions extends WebTransportConnectionOptions {
   /** `'low-latency'` (the default here) or `'throughput'`. */
   congestionControl?: 'default' | 'throughput' | 'low-latency';
   /** The WebTransport class (default the global one). */
-  WebTransport?: new (url: string, options?: object) => WebTransportSession;
+  WebTransport?: new (
+    url: string,
+    options?: object,
+  ) => WebTransportSession;
 }
 
 class SessionConnection implements Connection {
@@ -222,8 +225,7 @@ export async function acceptWebTransport(
 export async function openWebTransport(url: string, options: OpenWebTransportOptions = {}): Promise<Connection> {
   const { signal, serverCertificateHashes, congestionControl = 'low-latency' } = options,
     Class =
-      options.WebTransport ??
-      (globalThis as { WebTransport?: OpenWebTransportOptions['WebTransport'] }).WebTransport;
+      options.WebTransport ?? (globalThis as { WebTransport?: OpenWebTransportOptions['WebTransport'] }).WebTransport;
   signal?.throwIfAborted();
   if (!Class) throw fault('unsupported', 'WebTransport is not available here; use openWebSocket instead');
   const session = new Class(url, {

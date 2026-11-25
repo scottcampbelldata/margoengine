@@ -83,7 +83,10 @@ test('a Loop range counts up or down and rejects a useless step', () => {
       Loop({ from: 8, to: 0, step: -2 }, (i) => s.addAssign(i.toFloat()));
       return s;
     });
-  assert.match(new NodeMaterial({ roughnessNode: body() }).fragmentCode, /for \(var nd\d+ = 8i; nd\d+ > nd\d+; nd\d+ \+= -2i\)/);
+  assert.match(
+    new NodeMaterial({ roughnessNode: body() }).fragmentCode,
+    /for \(var nd\d+ = 8i; nd\d+ > nd\d+; nd\d+ \+= -2i\)/,
+  );
   assert.throws(() => block(() => (Loop({ to: 4, step: 0 }, () => {}), float(0))), /non-zero integer/);
   assert.throws(() => block(() => (Loop({ to: 4, step: 0.5 }, () => {}), float(0))), /non-zero integer/);
 });
@@ -355,10 +358,7 @@ test('statements outside a body, and Break or Continue outside a loop, say what 
   assert.throws(() => If(true, () => {}), /If runs inside block\(\)/);
   assert.throws(() => Loop(1, () => {}), /Loop runs inside block\(\)/);
   assert.throws(() => Break(), /Break runs inside/);
-  assert.throws(
-    () => block(() => (If(true, () => {}), 1)),
-    /must return the node/,
-  );
+  assert.throws(() => block(() => (If(true, () => {}), 1)), /must return the node/);
   assert.throws(() => new NodeMaterial({ roughnessNode: block(() => (Break(), float(0))) }), /needs a Loop/);
   assert.throws(() => new NodeMaterial({ roughnessNode: block(() => (Continue(), float(0))) }), /needs a Loop/);
   // A block is a value: it cannot break a loop around it.

@@ -381,7 +381,10 @@ test('the wet-sand record dries by the frame clock: each pass gets exactly the s
     });
   const mesh = engine.createMesh(),
     texture = h.engine.gpu.createTexture({ size: [4, 4], format: 'rgba32float', usage: GPUTextureUsage.COPY_SRC }),
-    colors = new TerrainColors(mesh, { ...options, wetness: { texture: () => texture, origin: [-2, -2], size: [4, 4] } });
+    colors = new TerrainColors(mesh, {
+      ...options,
+      wetness: { texture: () => texture, origin: [-2, -2], size: [4, 4] },
+    });
   engine.use(colors);
   // One draw of the frame graph, and the drying uniform its record pass was handed: [seconds, dryTime, glossTime, 0].
   const draw = () => {

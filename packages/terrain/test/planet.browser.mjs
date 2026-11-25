@@ -61,13 +61,13 @@ await runSuite(
     // 3. Near the ground, without and with a floating origin.
     const up = norm([0.3, 0.8, 0.52]),
       ahead = norm([up[1], -up[0], 0]),
-      start = (await page.evaluate(
-        async (u) => {
+      start =
+        (await page.evaluate(async (u) => {
           const { PlanetTerrain } = await import('/packages/terrain/dist/planet.js');
           return new PlanetTerrain().heightAt(u);
-        },
-        up,
-      )) + R + 300,
+        }, up)) +
+        R +
+        300,
       near = up.map((v) => v * start),
       target = near.map((v, k) => v + ahead[k] * 2000 - up[k] * 400),
       plain = await shot({ eye: near, target }),
@@ -93,7 +93,10 @@ await runSuite(
     assert.ok(plain.ground > 0.4 * W * H, `ground fills the lower view: ${plain.ground}`);
     assert.deepEqual([plain.gaps, floating.gaps], [0, 0], 'no sky through the ground');
     assert.ok(floating.rebases >= 1, 'the floating origin rebased');
-    assert.ok(over / (W * H) <= 0.001 && sum / (W * H) <= 0.25, `with a floating origin: ${JSON.stringify(out.ground)}`);
+    assert.ok(
+      over / (W * H) <= 0.001 && sum / (W * H) <= 0.25,
+      `with a floating origin: ${JSON.stringify(out.ground)}`,
+    );
 
     // 4. Orbit to ground.
     const flight = await page.evaluate(() => window.planet.flight());
@@ -105,7 +108,8 @@ await runSuite(
     assert.ok(Math.abs(last.under - last.altitude) < 0.01, JSON.stringify(last));
     assert.ok(Math.max(...flight.frames.map((f) => f.level)) >= 18);
     assert.deepEqual(pageErrors, []);
-    for (const k of ['orbit', 'horizon', 'ground', 'flight']) console.log(`planet ${k}: ${JSON.stringify(k === 'flight' ? { rebases: out.flight.rebases, last } : out[k])}`);
+    for (const k of ['orbit', 'horizon', 'ground', 'flight'])
+      console.log(`planet ${k}: ${JSON.stringify(k === 'flight' ? { rebases: out.flight.rebases, last } : out[k])}`);
     await writeFile('test-results/terrain-planet.json', JSON.stringify({ hardware, out }, null, 1));
     console.log('ok planet terrain');
   },

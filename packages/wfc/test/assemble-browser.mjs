@@ -8,7 +8,8 @@ import { closeAll } from '../../../scripts/support/shutdown.mjs';
 const server = await createServer({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   configFile: false,
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'wfc-assembly-page',
       configureServer(s) {

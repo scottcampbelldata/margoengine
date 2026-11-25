@@ -78,11 +78,12 @@ export function roomReflections(options: ReflectionOptions = {}): EarlyReflectio
   const arrivals: EarlyReflection[] = [];
   for (let channel = 0; channel < channels; channel++) {
     const ear = [...listener];
-    ear[0] += channels === 1 ? 0 : (channel === 0 ? -spacing / 2 : spacing / 2);
+    ear[0] += channels === 1 ? 0 : channel === 0 ? -spacing / 2 : spacing / 2;
     bounded(ear[0], 0.01, room[0] - 0.01, 'Room ear position; reduce earSpacing or move the listener');
     const direct = Math.hypot(...source.map((value, i) => value - ear[i]));
     for (let wall = 0; wall < 6; wall++) {
-      const axis = Math.floor(wall / 2), image = [...source];
+      const axis = Math.floor(wall / 2),
+        image = [...source];
       image[axis] = wall % 2 === 0 ? -source[axis] : 2 * room[axis] - source[axis];
       const distance = Math.hypot(...image.map((value, i) => value - ear[i]));
       arrivals.push({ channel, wall: walls[wall], delay: (distance - direct) / speed, gain: coefficient / distance });
@@ -94,8 +95,10 @@ export function roomReflections(options: ReflectionOptions = {}): EarlyReflectio
 /** Combine fractional-sample wall impulses and the existing seeded synthetic tail; preserves physical early gains. */
 export function roomImpulseResponse(sampleRate: number, options: RoomImpulseOptions = {}): Float32Array[] {
   bounded(sampleRate, 8000, 192000, 'Room sampleRate');
-  if (!Number.isInteger(sampleRate)) throw new RangeError('Room sampleRate needs an integer; pass the context sampleRate');
-  const arrivals = roomReflections(options), channels = options.channels ?? 2;
+  if (!Number.isInteger(sampleRate))
+    throw new RangeError('Room sampleRate needs an integer; pass the context sampleRate');
+  const arrivals = roomReflections(options),
+    channels = options.channels ?? 2;
   const seconds = bounded(options.seconds ?? 2, 0.05, 20, 'Room seconds');
   const decay = bounded(options.decay ?? seconds / 2, 0.01, 20, 'Room decay');
   const tailGain = bounded(options.tailGain ?? 0.35, 0, 1, 'Room tailGain');
@@ -107,19 +110,25 @@ export function roomImpulseResponse(sampleRate: number, options: RoomImpulseOpti
   const length = Math.max(Math.ceil(last * sampleRate) + 2, tail ? start + tail[0].length : 0);
   const out = Array.from({ length: channels }, () => new Float32Array(length));
   for (const arrival of arrivals) {
-    const frame = arrival.delay * sampleRate, at = Math.floor(frame), fraction = frame - at;
+    const frame = arrival.delay * sampleRate,
+      at = Math.floor(frame),
+      fraction = frame - at;
     out[arrival.channel][at] += arrival.gain * (1 - fraction);
     out[arrival.channel][at + 1] += arrival.gain * fraction;
   }
-  if (tail) for (let channel = 0; channel < channels; channel++)
-    for (let i = 0; i < tail[channel].length; i++) out[channel][start + i] += tail[channel][i] * tailGain;
+  if (tail)
+    for (let channel = 0; channel < channels; channel++)
+      for (let i = 0; i < tail[channel].length; i++) out[channel][start + i] += tail[channel][i] * tailGain;
   return out;
 }
 
 /** Create a disposable Web Audio convolution reverb with early room reflections; works beside WebGPU and WebGL2. */
 export function createRoomReverb(context: BaseAudioContext, options: RoomReverbOptions = {}): Effect {
   if (!context || typeof context.createConvolver !== 'function' || typeof context.createBuffer !== 'function')
-    throw new MargoError('unsupported', 'Room reverb needs Web Audio; use an AudioContext or OfflineAudioContext. https://margoengine.com/llms/packages/mixer.md');
+    throw new MargoError(
+      'unsupported',
+      'Room reverb needs Web Audio; use an AudioContext or OfflineAudioContext. https://margoengine.com/llms/packages/mixer.md',
+    );
   const mix = bounded(options.mix ?? 0.25, 0, 1, 'Room mix');
   const channels = roomImpulseResponse(context.sampleRate, options);
   const buffer = context.createBuffer(channels.length, channels[0].length, context.sampleRate);

@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  RadianceCascade2D,
-  evaluate2DGI,
-  GILighting2D,
-} from '../dist/gi.js';
+import { RadianceCascade2D, evaluate2DGI, GILighting2D } from '../dist/gi.js';
 import { Light2D } from '../dist/index.js';
 
 test('RadianceCascade2D options validation and defaults', () => {

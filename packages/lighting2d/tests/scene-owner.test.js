@@ -8,7 +8,14 @@ import { GILighting2D } from '../dist/gi.js';
 import { HeightLighting2D } from '../dist/height.js';
 import { SoftLighting2D } from '../dist/soft.js';
 
-const target = () => ({ width: 64, height: 64, format: 'rgba8unorm', usage: 0x1f, createView: () => ({}), destroy() {} });
+const target = () => ({
+  width: 64,
+  height: 64,
+  format: 'rgba8unorm',
+  usage: 0x1f,
+  createView: () => ({}),
+  destroy() {},
+});
 for (const [label, make] of [
   ['CookieLighting2D', () => new CookieLighting2D({ target: target(), name: 'owner-cookie' })],
   ['EmissiveLighting2D', () => new EmissiveLighting2D({ target: target(), name: 'owner-emissive' })],

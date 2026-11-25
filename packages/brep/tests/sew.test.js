@@ -27,7 +27,12 @@ function quad(name, corners, inward = false) {
       const q = pts[(k + 1) % pts.length],
         d = sub(q, p),
         l = Math.hypot(...d);
-      return new Edge(`${name}/e${k}`, { kind: 'line', origin: p, direction: d.map((x) => x / l) }, vs[k], vs[(k + 1) % pts.length]);
+      return new Edge(
+        `${name}/e${k}`,
+        { kind: 'line', origin: p, direction: d.map((x) => x / l) },
+        vs[k],
+        vs[(k + 1) % pts.length],
+      );
     }),
     loop = face.loop();
   if (inward) for (let k = edges.length - 1; k >= 0; k--) loop.use(edges[k], false);
@@ -39,12 +44,60 @@ function quad(name, corners, inward = false) {
 function cubeFaces(a = 10, lift = 0, inward = []) {
   const t = a + lift,
     faces = [
-      ['-z', [[0, 0, 0], [0, a, 0], [a, a, 0], [a, 0, 0]]],
-      ['+z', [[0, 0, t], [a, 0, t], [a, a, t], [0, a, t]]],
-      ['-y', [[0, 0, 0], [a, 0, 0], [a, 0, a], [0, 0, a]]],
-      ['+y', [[0, a, 0], [0, a, a], [a, a, a], [a, a, 0]]],
-      ['-x', [[0, 0, 0], [0, 0, a], [0, a, a], [0, a, 0]]],
-      ['+x', [[a, 0, 0], [a, a, 0], [a, a, a], [a, 0, a]]],
+      [
+        '-z',
+        [
+          [0, 0, 0],
+          [0, a, 0],
+          [a, a, 0],
+          [a, 0, 0],
+        ],
+      ],
+      [
+        '+z',
+        [
+          [0, 0, t],
+          [a, 0, t],
+          [a, a, t],
+          [0, a, t],
+        ],
+      ],
+      [
+        '-y',
+        [
+          [0, 0, 0],
+          [a, 0, 0],
+          [a, 0, a],
+          [0, 0, a],
+        ],
+      ],
+      [
+        '+y',
+        [
+          [0, a, 0],
+          [0, a, a],
+          [a, a, a],
+          [a, a, 0],
+        ],
+      ],
+      [
+        '-x',
+        [
+          [0, 0, 0],
+          [0, 0, a],
+          [0, a, a],
+          [0, a, 0],
+        ],
+      ],
+      [
+        '+x',
+        [
+          [a, 0, 0],
+          [a, a, 0],
+          [a, a, a],
+          [a, 0, a],
+        ],
+      ],
     ];
   return faces.map(([n, c]) => quad(n, c, inward.includes(n)));
 }
@@ -59,7 +112,12 @@ function close(actual, expected, what, tolerance) {
 /** A box's closed forms (mm): volume, area, centroid, moments about the centroid. */
 function boxMass(a, b, c) {
   const V = a * b * c;
-  return { V, A: 2 * (a * b + b * c + c * a), centroid: [a / 2, b / 2, c / 2], I: [(V * (b * b + c * c)) / 12, (V * (a * a + c * c)) / 12, (V * (a * a + b * b)) / 12] };
+  return {
+    V,
+    A: 2 * (a * b + b * c + c * a),
+    centroid: [a / 2, b / 2, c / 2],
+    I: [(V * (b * b + c * c)) / 12, (V * (a * a + c * c)) / 12, (V * (a * a + b * b)) / 12],
+  };
 }
 
 function expectBox(body, [a, b, c], tolerance) {
@@ -69,7 +127,9 @@ function expectBox(body, [a, b, c], tolerance) {
   close(m.area, x.A * mm ** 2, 'area', tolerance);
   x.centroid.forEach((v, k) => assert.ok(Math.abs(m.centroid[k] - v * mm) <= tolerance * a * mm, `centroid ${k}`));
   const trace = (x.I[0] + x.I[1] + x.I[2]) * mm ** 5;
-  x.I.forEach((v, k) => assert.ok(Math.abs(m.inertia[k] - v * mm ** 5) <= tolerance * trace, `inertia ${k}: ${m.inertia[k]}`));
+  x.I.forEach((v, k) =>
+    assert.ok(Math.abs(m.inertia[k] - v * mm ** 5) <= tolerance * trace, `inertia ${k}: ${m.inertia[k]}`),
+  );
   for (let k = 3; k < 6; k++) assert.ok(Math.abs(m.inertia[k]) <= tolerance * trace, `product ${k}: ${m.inertia[k]}`);
 }
 
@@ -145,12 +205,25 @@ test('sew: one edge against two is split where the other face has a vertex', () 
   // The -y side in two halves (x 0 to 4, 4 to 10): the bottom's and top's edges along y = 0 each meet two edges.
   const faces = cubeFaces().filter((f) => f.name !== '-y');
   faces.push(
-    quad('-y0', [[0, 0, 0], [4, 0, 0], [4, 0, 10], [0, 0, 10]]),
-    quad('-y1', [[4, 0, 0], [10, 0, 0], [10, 0, 10], [4, 0, 10]]),
+    quad('-y0', [
+      [0, 0, 0],
+      [4, 0, 0],
+      [4, 0, 10],
+      [0, 0, 10],
+    ]),
+    quad('-y1', [
+      [4, 0, 0],
+      [10, 0, 0],
+      [10, 0, 10],
+      [4, 0, 10],
+    ]),
   );
   const r = sew('cube', faces, 1e-6);
   assert.equal(r.closed, true, JSON.stringify(r.problems));
-  assert.deepEqual(r.split.map((s) => s.into.length), [2, 2]);
+  assert.deepEqual(
+    r.split.map((s) => s.into.length),
+    [2, 2],
+  );
   assert.deepEqual([r.body.faces.length, r.body.edges.length, r.body.vertices.length], [7, 15, 10]);
   assert.deepEqual(checkBody(r.body), []);
   expectBox(r.body, [10, 10, 10], 1e-13);
@@ -158,7 +231,12 @@ test('sew: one edge against two is split where the other face has a vertex', () 
 
 test('sew: three faces on one edge are refused, and no faces or a bad tolerance throw', () => {
   // Two cubes' faces sharing the plane x = 10 would be fine as a sheet; a fin on a cube's edge is not manifold.
-  const fin = quad('fin', [[10, 0, 10], [10, 10, 10], [15, 10, 15], [15, 0, 15]]),
+  const fin = quad('fin', [
+      [10, 0, 10],
+      [10, 10, 10],
+      [15, 10, 15],
+      [15, 0, 15],
+    ]),
     r = sew('cube', [...cubeFaces(), fin], 1e-6);
   assert.equal(r.closed, false);
   assert.equal(r.body.kind, 'sheet');
@@ -211,12 +289,60 @@ test('sew: trimmed IGES faces (144) of a cube read as loose faces and sew into a
     },
     a = 10;
   for (const [, c] of [
-    ['-z', [[0, 0, 0], [0, a, 0], [a, a, 0], [a, 0, 0]]],
-    ['+z', [[0, 0, a], [a, 0, a], [a, a, a], [0, a, a]]],
-    ['-y', [[0, 0, 0], [a, 0, 0], [a, 0, a], [0, 0, a]]],
-    ['+y', [[0, a, 0], [0, a, a], [a, a, a], [a, a, 0]]],
-    ['-x', [[0, 0, 0], [0, 0, a], [0, a, a], [0, a, 0]]],
-    ['+x', [[a, 0, 0], [a, a, 0], [a, a, a], [a, 0, a]]],
+    [
+      '-z',
+      [
+        [0, 0, 0],
+        [0, a, 0],
+        [a, a, 0],
+        [a, 0, 0],
+      ],
+    ],
+    [
+      '+z',
+      [
+        [0, 0, a],
+        [a, 0, a],
+        [a, a, a],
+        [0, a, a],
+      ],
+    ],
+    [
+      '-y',
+      [
+        [0, 0, 0],
+        [a, 0, 0],
+        [a, 0, a],
+        [0, 0, a],
+      ],
+    ],
+    [
+      '+y',
+      [
+        [0, a, 0],
+        [0, a, a],
+        [a, a, a],
+        [a, a, 0],
+      ],
+    ],
+    [
+      '-x',
+      [
+        [0, 0, 0],
+        [0, 0, a],
+        [0, a, a],
+        [0, a, 0],
+      ],
+    ],
+    [
+      '+x',
+      [
+        [a, 0, 0],
+        [a, a, 0],
+        [a, a, a],
+        [a, 0, a],
+      ],
+    ],
   ]) {
     // Corners p00, p10, p01, p11 of the patch: u along the first side, v along the last (outward normal Su x Sv).
     const [p0, p1, p2, p3] = c,
@@ -244,9 +370,24 @@ test('sew: trimmed IGES faces (144) of a cube read as loose faces and sew into a
 test('sew: an edge and a face within the tolerance are dropped; vertices chained past it are refused', () => {
   // The +x face with an extra corner 0.01 micrometre from (10, 0, 0): the edge between them drops, the cube closes.
   const faces = cubeFaces().filter((f) => f.name !== '+x');
-  faces.push(quad('+x', [[10, 0, 0], [10, 10, 0], [10, 10, 10], [10, 0, 10], [10, 0, 1e-5]]));
+  faces.push(
+    quad('+x', [
+      [10, 0, 0],
+      [10, 10, 0],
+      [10, 10, 10],
+      [10, 0, 10],
+      [10, 0, 1e-5],
+    ]),
+  );
   // And a sliver face 0.01 micrometre across, inside the tolerance everywhere.
-  faces.push(quad('sliver', [[3, 3, 3], [3 + 1e-5, 3, 3], [3 + 1e-5, 3 + 1e-5, 3], [3, 3 + 1e-5, 3]]));
+  faces.push(
+    quad('sliver', [
+      [3, 3, 3],
+      [3 + 1e-5, 3, 3],
+      [3 + 1e-5, 3 + 1e-5, 3],
+      [3, 3 + 1e-5, 3],
+    ]),
+  );
   const r = sew('cube', faces, 1e-6);
   assert.equal(r.closed, true, JSON.stringify(r.problems));
   assert.ok(r.dropped.includes('+x/e4'));
@@ -256,14 +397,33 @@ test('sew: an edge and a face within the tolerance are dropped; vertices chained
   expectBox(r.body, [10, 10, 10], 1e-12);
   // Four corners 0.9 micrometre apart in a row, each within the tolerance of the next: 1.35 micrometres from where
   // they would meet, past the tolerance.
-  const row = [0, 1, 2, 3].map((k) => quad(`q${k}`, [[k * 9e-4, 0, 0], [k * 9e-4 + 5, -5 - k, 0], [k * 9e-4 + 5, -5 - k, 5], [k * 9e-4, 0, 5]])),
+  const row = [0, 1, 2, 3].map((k) =>
+      quad(`q${k}`, [
+        [k * 9e-4, 0, 0],
+        [k * 9e-4 + 5, -5 - k, 0],
+        [k * 9e-4 + 5, -5 - k, 5],
+        [k * 9e-4, 0, 5],
+      ]),
+    ),
     chained = sew('row', row, 1e-6);
   assert.equal(chained.closed, false);
-  assert.ok(chained.problems.some((p) => /spread .* more than the tolerance/.test(p.problem)), JSON.stringify(chained.problems));
+  assert.ok(
+    chained.problems.some((p) => /spread .* more than the tolerance/.test(p.problem)),
+    JSON.stringify(chained.problems),
+  );
 });
 
 test('sew: closed shells nested in others are sorted into cavities and solids inside them', () => {
-  const B = (n, o, s) => model.box(n, [s * mm, s * mm, s * mm], frameOf(o.map((x) => x * mm), [0, 0, 1], [1, 0, 0]));
+  const B = (n, o, s) =>
+    model.box(
+      n,
+      [s * mm, s * mm, s * mm],
+      frameOf(
+        o.map((x) => x * mm),
+        [0, 0, 1],
+        [1, 0, 0],
+      ),
+    );
   const expectSorted = (r, kinds, volume) => {
     assert.equal(r.closed, true, JSON.stringify(r.problems));
     assert.equal(r.body.kind, 'solid');

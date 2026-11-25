@@ -70,6 +70,7 @@ class Terrain implements EnginePlugin {
     readonly anchor?: readonly [number, number];
     constructor(options: TerrainOptions);
     get shift(): ArrayLike<number>;
+    get surfaceHeightTexture(): GPUTexture | undefined;
     static attach(instance: EngineKernel, options: TerrainOptions): Terrain;
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
@@ -140,6 +141,8 @@ interface TerrainOptions {
     cellSize?: number;
     resolution?: number;
     levels?: number;
+    readonly clipmapAnchor?: readonly [number, number] | 'camera';
+    readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
 }

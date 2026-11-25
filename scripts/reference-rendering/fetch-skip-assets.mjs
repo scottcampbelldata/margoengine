@@ -12,11 +12,13 @@ const deadline = setTimeout(() => {
 }, 15 * 60_000);
 deadline.unref();
 for (let i = 0; i < externalAssets.length; i += 6) {
-  await Promise.all(externalAssets.slice(i, i + 6).map(async ({ file, url, sha256, size }) => {
-    const path = resolve(root, file);
-    if (existsSync(path) && createHash('sha256').update(readFileSync(path)).digest('hex') === sha256) return;
-    await fetchFixture(url, path, sha256, { maxBytes: size });
-  }));
+  await Promise.all(
+    externalAssets.slice(i, i + 6).map(async ({ file, url, sha256, size }) => {
+      const path = resolve(root, file);
+      if (existsSync(path) && createHash('sha256').update(readFileSync(path)).digest('hex') === sha256) return;
+      await fetchFixture(url, path, sha256, { maxBytes: size });
+    }),
+  );
 }
 requireExternalAssets();
 clearTimeout(deadline);

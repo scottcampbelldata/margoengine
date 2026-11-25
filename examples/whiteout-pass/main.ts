@@ -214,14 +214,25 @@ const stovepipe = add(cylinderGeometry(0.09, 0.09, 1.4, 12), iron, [-1.1, ridge 
 // Inside: a table under the window with the oil lamp, a bench, a shelf and a hanging blanket on the back wall, a
 // cast-iron stove in the corner. They catch the lamp's light, so the window shows a warm room, not a flat glow.
 block([1.1, 0.05, 0.6], planks, [0.7, 0.78, 1.15]);
-for (const [dx, dz] of [[-0.48, -0.24], [0.48, -0.24], [-0.48, 0.24], [0.48, 0.24]]) block([0.05, 0.75, 0.05], planks, [0.7 + dx, 0.39, 1.15 + dz]);
+for (const [dx, dz] of [
+  [-0.48, -0.24],
+  [0.48, -0.24],
+  [-0.48, 0.24],
+  [0.48, 0.24],
+])
+  block([0.05, 0.75, 0.05], planks, [0.7 + dx, 0.39, 1.15 + dz]);
 const lampAt: Vec3 = [0.55, 0.9, 1.25];
 add(cylinderGeometry(0.055, 0.075, 0.07, 16), brass, lampAt);
 add(cylinderGeometry(0.03, 0.04, 0.15, 16), glass, [lampAt[0], lampAt[1] + 0.11, lampAt[2]]);
 add(cylinderGeometry(0.04, 0.035, 0.09, 16), material('#c9c2b0', 0.4), [0.95, 0.85, 1.05]);
 block([1.4, 0.05, 0.35], planks, [-0.9, 0.45, 1.2]);
 block([1.6, 0.04, 0.25], planks, [0.3, 1.45, -depth / 2 + 0.28]);
-for (const [x, h] of [[-0.25, 0.22], [0, 0.16], [0.45, 0.2], [0.75, 0.12]])
+for (const [x, h] of [
+  [-0.25, 0.22],
+  [0, 0.16],
+  [0.45, 0.2],
+  [0.75, 0.12],
+])
   block([0.12, h, 0.12], material('#8f7a5c', 0.6), [x, 1.47 + h / 2, -depth / 2 + 0.28]);
 block([0.9, 0.85, 0.03], cloth, [1.2, 1.05, -depth / 2 + 0.17]);
 block([0.55, 0.6, 0.5], iron, [-1.45, 0.4, -1.05]);
@@ -230,7 +241,7 @@ const hut = built.length;
 // The trail: snow stakes every six metres marking the pass, each with an orange top, leaning a little. In the storm the
 // far ones fade out one by one, which is how far you can see.
 let seed = 4242;
-const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 for (let i = 0; i < 12; i++) {
   const z = 4.5 + i * 6,
     x = -3.2 - Math.sin(i * 0.7) * 1.1,
@@ -266,7 +277,10 @@ const weather = Weather.attach(engine, {
 });
 falling.weather = weather;
 if (on('snow')) drive.options.precipitation = weather;
-PrecipitationCover.attach(engine, new WeatherFX({ weather, occluders: [...roof, stovepipe], splashes: 0, lensDrops: 0 }));
+PrecipitationCover.attach(
+  engine,
+  new WeatherFX({ weather, occluders: [...roof, stovepipe], splashes: 0, lensDrops: 0 }),
+);
 const snow = on('cover') ? Snow.attach(engine, { ...kit.cover }) : undefined;
 
 // The lamp: one shadowed point light on the table, flickering on the candle curve. The log walls hold its light in,
@@ -302,14 +316,20 @@ const lines = debug === 'wireframe' || debug === 'wind' ? new Lines() : undefine
 if (lines) engine.use(lines);
 if (lines && debug === 'wireframe') {
   const edge = new LineMaterial({ color: '#7fd4ff', width: 1 });
-  for (const { mesh, data } of built) lines.add(new Line({ mode: 'segments', positions: wireframePositions(data), material: edge, mesh }));
+  for (const { mesh, data } of built)
+    lines.add(new Line({ mode: 'segments', positions: wireframePositions(data), material: edge, mesh }));
 }
 let arrows: { line: Line; points: Float32Array; at: Vec3[] } | undefined;
 if (lines && debug === 'wind') {
   const at: Vec3[] = [];
-  for (let i = -3; i <= 4; i++) for (let k = 0; k < 6; k++) for (const y of [0.4, 1.6, 2.8]) at.push([i * 1.6, y, 3 + k * 2.6]);
+  for (let i = -3; i <= 4; i++)
+    for (let k = 0; k < 6; k++) for (const y of [0.4, 1.6, 2.8]) at.push([i * 1.6, y, 3 + k * 2.6]);
   const points = new Float32Array(at.length * 6);
-  arrows = { line: new Line({ mode: 'segments', positions: points, material: new LineMaterial({ color: '#ffb86b', width: 2 }) }), points, at };
+  arrows = {
+    line: new Line({ mode: 'segments', positions: points, material: new LineMaterial({ color: '#ffb86b', width: 2 }) }),
+    points,
+    at,
+  };
   lines.add(arrows.line);
 }
 const sample: [number, number, number] = [0, 0, 0];
@@ -356,6 +376,17 @@ const apply = (state: { properties?: Record<string, Record<string, number | numb
   const level = state.properties?.weather?.storm;
   if (typeof level === 'number') storm(level);
 };
-(window as unknown as Record<string, unknown>).whiteoutPass = { engine, kit, machine, drive, sky, weather, snow, fog, lights, apply };
+(window as unknown as Record<string, unknown>).whiteoutPass = {
+  engine,
+  kit,
+  machine,
+  drive,
+  sky,
+  weather,
+  snow,
+  fog,
+  lights,
+  apply,
+};
 engine.start();
 window.addEventListener('pagehide', () => stage.dispose(), { once: true });

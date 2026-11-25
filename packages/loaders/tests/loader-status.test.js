@@ -7,7 +7,10 @@ import assert from 'node:assert/strict';
 import { LoaderError, fetchBytes, fetchResource } from '../dist/index.js';
 import { resolveFromURL } from '../dist/ldraw.js';
 
-const answer = (status, headers = {}) => async () => new Response(status === 204 ? null : 'no', { status, headers });
+const answer =
+  (status, headers = {}) =>
+  async () =>
+    new Response(status === 204 ? null : 'no', { status, headers });
 const caught = async (promise) => {
   try {
     await promise;

@@ -29,7 +29,10 @@ test('Splats.read returns the data of an unattached cloud, as written', async ()
   });
   const data = await cloud.read();
   assert.deepEqual([...data.positions], [0, 0, 0, 1, 2, 3]);
-  assert.deepEqual([...data.covariances].map((v) => Math.fround(v)), [1, 0, 0, 1, 0, 1, 1, 0.1, 0, 2, 0, 3].map(Math.fround));
+  assert.deepEqual(
+    [...data.covariances].map((v) => Math.fround(v)),
+    [1, 0, 0, 1, 0, 1, 1, 0.1, 0, 2, 0, 3].map(Math.fround),
+  );
   assert.deepEqual([...data.colors], [0, 0, 0, 0, 0.5, 0.25, 0.75, Math.fround(0.8)]);
   assert.equal(data.sphericalHarmonics.length, 24);
   assert.equal(data.sphericalHarmonics[23], 0.125);
@@ -40,7 +43,11 @@ test('Splats.read returns the data of an unattached cloud, as written', async ()
 });
 
 test('the brush shader orders depth keys and keeps the SH convention', () => {
-  assert.match(brushShader, /select\(bits\^0x80000000u,~bits,\(bits>>31u\)==1u\)/, 'negative depths sort below positive');
+  assert.match(
+    brushShader,
+    /select\(bits\^0x80000000u,~bits,\(bits>>31u\)==1u\)/,
+    'negative depths sort below positive',
+  );
   assert.match(brushShader, /0\.2820947918/, 'DC term of the 3DGS colour');
   assert.match(brushShader, /positions\[i\]\.w=0;colors\[i\]\.a=0;/, 'erase hides as Splats.clear');
 });

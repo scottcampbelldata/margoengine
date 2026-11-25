@@ -150,6 +150,10 @@
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
     },
+    "./treeline": {
+      "types": "./dist/treeline.d.ts",
+      "import": "./dist/treeline.js"
+    },
     "./ecosystem": {
       "types": "./dist/ecosystem.d.ts",
       "import": "./dist/ecosystem.js"

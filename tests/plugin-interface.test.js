@@ -22,7 +22,9 @@ const takesExtensionPlugin = (code) =>
 
 test('the check sees an EnginePlugin imported from the extension entry, in either import form', () => {
   assert.ok(takesExtensionPlugin("import type { EnginePlugin } from '@margoengine/core/extension';"));
-  assert.ok(takesExtensionPlugin("import {\n  engineRuntime,\n  type EnginePlugin,\n} from '@margoengine/core/extension';"));
+  assert.ok(
+    takesExtensionPlugin("import {\n  engineRuntime,\n  type EnginePlugin,\n} from '@margoengine/core/extension';"),
+  );
   assert.ok(!takesExtensionPlugin("import type { EnginePlugin } from '@margoengine/core';"));
 });
 
@@ -32,7 +34,11 @@ test('a plugin whose setup takes an EngineKernel implements the EngineKernel Eng
     if (name === 'core' || !readdirSync(join(packages, name)).includes('src')) continue;
     for (const file of sources(name)) {
       const code = readFileSync(file, 'utf8');
-      if (/\bsetup\(engine: EngineKernel\b/.test(code) && /implements [^{]*\bEnginePlugin\b/.test(code) && takesExtensionPlugin(code))
+      if (
+        /\bsetup\(engine: EngineKernel\b/.test(code) &&
+        /implements [^{]*\bEnginePlugin\b/.test(code) &&
+        takesExtensionPlugin(code)
+      )
         wrong.push(file);
     }
   }

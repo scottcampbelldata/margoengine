@@ -55,7 +55,12 @@ export function clipOf(read: SceneRead): Clip {
       add({ node, path }, times, read.accessor(values, widths[path]), interpolation);
     },
     pointer(pointer, times, values) {
-      add({ path: 'pointer', extensions: { KHR_animation_pointer: { pointer } } }, times, read.accessor(values, 'SCALAR'), 'STEP');
+      add(
+        { path: 'pointer', extensions: { KHR_animation_pointer: { pointer } } },
+        times,
+        read.accessor(values, 'SCALAR'),
+        'STEP',
+      );
     },
   };
   clips.set(read.document, clip);
@@ -86,7 +91,9 @@ export function streamOf(read: SceneRead, path: string, name: string): Stream | 
     });
     if (times.length) return { times, values };
   }
-  return fields.default === undefined || fields.default === null ? undefined : { times: [], values: [flat(fields.default)] };
+  return fields.default === undefined || fields.default === null
+    ? undefined
+    : { times: [], values: [flat(fields.default)] };
 }
 /** The sample pair around `t` and how far between them `t` lies; held at both ends. */
 export function bracket(times: readonly number[], t: number): [number, number, number] {
@@ -103,7 +110,13 @@ export function bracket(times: readonly number[], t: number): [number, number, n
   return [low, high, (t - times[low]) / (times[high] - times[low])];
 }
 /** Spherical interpolation of `a` and `b` at `at` into `out` at `offset`, `[x, y, z, w]`, the short way. */
-export function slerp(a: ArrayLike<number>, b: ArrayLike<number>, f: number, out: Float32Array | number[], offset: number) {
+export function slerp(
+  a: ArrayLike<number>,
+  b: ArrayLike<number>,
+  f: number,
+  out: Float32Array | number[],
+  offset: number,
+) {
   let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
   const sign = dot < 0 ? -1 : 1;
   dot *= sign;

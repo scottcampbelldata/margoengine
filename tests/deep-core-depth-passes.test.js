@@ -50,7 +50,7 @@ test('setParent counts the moved subtree, so no chain passes depth 64', async ()
   }
 });
 
-test('a frame graph runs the caller\'s own pass objects, class instances included', () => {
+test("a frame graph runs the caller's own pass objects, class instances included", () => {
   class Counter {
     name = 'counter';
     order = 1;
@@ -80,7 +80,7 @@ test('a frame graph runs the caller\'s own pass objects, class instances include
   graph.execute(context);
   assert.equal(instance.calls, 1, 'the class instance ran on itself');
   assert.equal(instance.prepared, 1, 'its prototype prepare ran');
-  assert.equal(literal.calls, 1, 'the object literal ran with this bound to the caller\'s object');
+  assert.equal(literal.calls, 1, "the object literal ran with this bound to the caller's object");
   remove();
   graph.execute(context);
   assert.equal(literal.calls, 1, 'a removed pass does not run');

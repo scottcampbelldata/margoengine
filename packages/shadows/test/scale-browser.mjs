@@ -46,7 +46,10 @@ process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const virtual = process.argv.includes('--virtual'),
   name = virtual ? 'shadows-virtual-scale' : 'shadows-scale';
 await mkdir('test-results', { recursive: true });
-const context = await openBrowser({ startPath: `/packages/shadows/test/scale.html${virtual ? '?virtual' : ''}`, port: virtual ? 5403 : 5402 }),
+const context = await openBrowser({
+    startPath: `/packages/shadows/test/scale.html${virtual ? '?virtual' : ''}`,
+    port: virtual ? 5403 : 5402,
+  }),
   { page } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -79,7 +82,11 @@ try {
     let W = 0,
       H = 0;
     for (const state of ['soft', 'open', 'dark']) {
-      assert.deepEqual(await page.evaluate(([s, o]) => window.check.show(s, o), [state, options]), [], `${c.name} ${state}`);
+      assert.deepEqual(
+        await page.evaluate(([s, o]) => window.check.show(s, o), [state, options]),
+        [],
+        `${c.name} ${state}`,
+      );
       const png = await page
         .locator('canvas')
         .screenshot(state === 'soft' ? { path: `test-results/${name}-${c.name}.png` } : {});

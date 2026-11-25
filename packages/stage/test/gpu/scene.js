@@ -25,14 +25,35 @@ const document_ = {
       components: { mesh: { shape: 'box', size: [12, 0.5, 8] }, material: { color: floorColor, roughness: 0.8 } },
     },
     ...spots.map((x, i) => ({ id: `crate${i}`, transform: { position: [x, 0, 0] }, components: { mesh: url } })),
-    { id: 'sun', transform: { rotation: turn }, components: { light: { intensity: 2, color: [1, 0.95, 0.9], ambient: 0.2 } } },
-    { id: 'lamp', transform: { position: lamp.position }, components: { light: { type: 'point', color: lamp.color, intensity: lamp.intensity, range: lamp.range } } },
+    {
+      id: 'sun',
+      transform: { rotation: turn },
+      components: { light: { intensity: 2, color: [1, 0.95, 0.9], ambient: 0.2 } },
+    },
+    {
+      id: 'lamp',
+      transform: { position: lamp.position },
+      components: { light: { type: 'point', color: lamp.color, intensity: lamp.intensity, range: lamp.range } },
+    },
     {
       id: 'cone',
       transform: { position: cone.position, rotation: [-Math.SQRT1_2, 0, 0, Math.SQRT1_2] },
-      components: { light: { type: 'spot', color: cone.color, intensity: cone.intensity, range: cone.range, innerConeAngle: 0.3, outerConeAngle: 0.6 } },
+      components: {
+        light: {
+          type: 'spot',
+          color: cone.color,
+          intensity: cone.intensity,
+          range: cone.range,
+          innerConeAngle: 0.3,
+          outerConeAngle: 0.6,
+        },
+      },
     },
-    { id: 'view', transform: { position: camera.position }, components: { camera: { target: camera.target, fov: camera.fov, near: camera.near, far: camera.far } } },
+    {
+      id: 'view',
+      transform: { position: camera.position },
+      components: { camera: { target: camera.target, fov: camera.fov, near: camera.near, far: camera.far } },
+    },
   ],
 };
 let fetched = 0;
@@ -50,7 +71,10 @@ async function run() {
     forA = fetched;
   fetched = 0;
   // B: every step by hand, and a load of its own for each copy.
-  b.createMesh().setGeometry(box(12, 0.5, 8)).setMaterial(new PbrMaterial({ color: floorColor, roughness: 0.8 })).setPosition([0, -0.75, 0]);
+  b.createMesh()
+    .setGeometry(box(12, 0.5, 8))
+    .setMaterial(new PbrMaterial({ color: floorColor, roughness: 0.8 }))
+    .setPosition([0, -0.75, 0]);
   const lights = Clustered.attach(b);
   for (const x of spots) {
     const holder = b.createMesh().setPosition([x, 0, 0]),

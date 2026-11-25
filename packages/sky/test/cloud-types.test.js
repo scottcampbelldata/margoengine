@@ -27,7 +27,10 @@ test('an overcast sky with no rain is stratus: 300 to 900 m, all cover', () => {
 });
 
 test('rain or lightning under a full sky is a storm: 600 to 8,000 m, the densest cloud', () => {
-  for (const weather of [{ cloud: 1, rain: 1 }, { cloud: 1, lightning: 1 }]) {
+  for (const weather of [
+    { cloud: 1, rain: 1 },
+    { cloud: 1, lightning: 1 },
+  ]) {
     const layer = cloudLayerFor(weather);
     assert.equal(layer.bottom, 600);
     assert.equal(layer.top, 8000);
@@ -54,7 +57,12 @@ test('types blend continuously: the weights add to 1 and every layer value stays
 
 test('the two-stream bound: T = 1 / (1 + tau (1 - g) / 2), g 0.85', () => {
   assert.ok(Math.abs(cloudTransmission(0) - 1) < 1e-12);
-  for (const [tau, t] of [[5, 0.7273], [20, 0.4], [80, 0.1429]]) assert.ok(Math.abs(cloudTransmission(tau) - t) < 1e-3, `tau ${tau}`);
+  for (const [tau, t] of [
+    [5, 0.7273],
+    [20, 0.4],
+    [80, 0.1429],
+  ])
+    assert.ok(Math.abs(cloudTransmission(tau) - t) < 1e-3, `tau ${tau}`);
   assert.throws(() => cloudTransmission(-1), RangeError);
 });
 
@@ -103,9 +111,21 @@ test('a forced type overrides the weather pick, in the layer and in the options'
   const sunny = { cloud: 0.3 };
   assert.deepEqual(cloudLayerFor(sunny, undefined, 'storm'), { coverage: 1, bottom: 600, top: 8000, density: 0.1 });
   assert.deepEqual(cloudLayerFor(sunny, undefined, 'stratus'), { coverage: 0.3, bottom: 300, top: 900, density: 0.08 });
-  assert.deepEqual(cloudLayerFor({ cloud: 1, rain: 1 }, undefined, 'cumulus'), { coverage: 0.5, bottom: 1000, top: 2500, density: 0.03 });
-  assert.deepEqual(layerOf({ weather: { cloud: 1, rain: 1 }, type: 'cumulus' }), cloudLayerFor({ cloud: 1 }, undefined, 'cumulus'));
-  assert.deepEqual(layerOf({ type: 'storm' }), { coverage: 1, bottom: 600, top: 8000, density: 0.1 }, 'a type needs no weather');
+  assert.deepEqual(cloudLayerFor({ cloud: 1, rain: 1 }, undefined, 'cumulus'), {
+    coverage: 0.5,
+    bottom: 1000,
+    top: 2500,
+    density: 0.03,
+  });
+  assert.deepEqual(
+    layerOf({ weather: { cloud: 1, rain: 1 }, type: 'cumulus' }),
+    cloudLayerFor({ cloud: 1 }, undefined, 'cumulus'),
+  );
+  assert.deepEqual(
+    layerOf({ type: 'storm' }),
+    { coverage: 1, bottom: 600, top: 8000, density: 0.1 },
+    'a type needs no weather',
+  );
   assert.equal(layerOf({ type: 'storm', top: 5000 }).top, 5000, 'a value set still wins');
   assert.throws(() => cloudLayerFor(sunny, undefined, 'cirrus'), RangeError);
   assert.throws(() => new VolumetricClouds({ type: 'cirrus' }), RangeError);
@@ -169,7 +189,10 @@ test('the deck dims the sky sun and its moonlight under the cloud by cloudDeckTr
   frame();
   const want = cloudDeckTransmittance(cloudLayerFor({ cloud: 1 }), sky.sun[1]);
   assert.ok(want < 0.6 && want > 0.3, String(want));
-  assert.ok(Math.abs(sky.lights[0].direction[3] / clear - want) < 1e-5, `${sky.lights[0].direction[3] / clear} vs ${want}`);
+  assert.ok(
+    Math.abs(sky.lights[0].direction[3] / clear - want) < 1e-5,
+    `${sky.lights[0].direction[3] / clear} vs ${want}`,
+  );
   clouds.options.dimLight = false;
   frame();
   assert.ok(Math.abs(sky.lights[0].direction[3] - clear) < 1e-6 * clear, 'dimLight false leaves the sun');

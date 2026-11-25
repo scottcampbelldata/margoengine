@@ -8,7 +8,10 @@ import { PostStack } from '../../post/dist/stack.js';
 import { NodePass, inputColor, vec4 } from '../dist/index.js';
 import { ShaderPass } from '../dist/glsl-pass.js';
 
-const program = { fragmentShader: 'uniform sampler2D tDiffuse;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = vec4(1.0 - texture2D(tDiffuse, vUv).rgb, 1.0); }' };
+const program = {
+  fragmentShader:
+    'uniform sampler2D tDiffuse;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = vec4(1.0 - texture2D(tDiffuse, vUv).rgb, 1.0); }',
+};
 const kinds = [
   ['NodePass', (e, options) => NodePass.attach(e, vec4(inputColor().rgb.oneMinus(), 1), options)],
   ['ShaderPass', (e, options) => ShaderPass.attach(e, program, options)],

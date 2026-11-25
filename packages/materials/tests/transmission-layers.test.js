@@ -239,7 +239,10 @@ test('KHR_materials_specular on the native paths: the weight scales F90 and the 
     assert.ok(Math.abs(share(c) - spec(c)) < 2e-5, name);
   const code = transmissiveShader();
   assert.ok(code.includes('let fresnel=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);'), 'direct light F90');
-  assert.ok(code.includes('((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'), 'direct light base');
+  assert.ok(
+    code.includes('((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'),
+    'direct light base',
+  );
 });
 
 /** gltf/pbr's surface tint (loaded materials): what is left of the light behind, read from the sampled surface. */
@@ -267,10 +270,19 @@ test('the surface tint reads metal, sheen and coat from the surface, maps includ
 
 test('the surface tint draw multiplies by the sampled base colour and transmission, and thin film reaches it', () => {
   const code = surfaceTintPBR(transmissiveShader());
-  assert.ok(code.includes('let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz)));'));
+  assert.ok(
+    code.includes(
+      'let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*margoVolumeTint(i,s,mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz)));',
+    ),
+  );
   assert.ok(code.includes('fn margoVolumeTint('));
   assert.ok(code.includes('return select(exp(-max(depth,vec3f(0))*(determinant/projected)),vec3f(0),depth<vec3f(0));'));
-  const film = extendedShader({ slots: Array(18).fill(-1), iridescence: true, anisotropy: false, diffuseTransmission: false });
+  const film = extendedShader({
+    slots: Array(18).fill(-1),
+    iridescence: true,
+    anisotropy: false,
+    diffuseTransmission: false,
+  });
   assert.ok(film.includes('mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'));
 });
 

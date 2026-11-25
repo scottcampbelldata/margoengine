@@ -11,7 +11,12 @@ import {
   settingIndex,
   type SettingRow,
 } from '../../shared/settings.js';
-import { BUILDING_STYLES, BUILDING_STYLE_SETS, type BuildingRuleOptions, type BuildingStyle } from './building-rules.js';
+import {
+  BUILDING_STYLES,
+  BUILDING_STYLE_SETS,
+  type BuildingRuleOptions,
+  type BuildingStyle,
+} from './building-rules.js';
 import type { BuildingPlanOptions } from './building-plans.js';
 import type {
   BreakwaterOptions,
@@ -30,8 +35,16 @@ export type BuildingSettingValues = Readonly<Record<string, BuildingSettingValue
 export interface BuildingSetting extends SettingRow {
   readonly default: BuildingSettingValue;
 }
-const n = (name: string, group: string, value: number, min: number, max: number, step: number, unit: string, about: string) =>
-  numberSetting(name, group, value, min, max, step, unit, about, false) as BuildingSetting;
+const n = (
+  name: string,
+  group: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+) => numberSetting(name, group, value, min, max, step, unit, about, false) as BuildingSetting;
 const c = (name: string, group: string, choices: readonly string[], about: string) =>
   choiceSetting(name, group, choices, about, false) as BuildingSetting;
 const onOff = ['on', 'off'] as const,
@@ -47,8 +60,22 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   n('plinth', 'mass', 0.5, 0, 2, 0.01, 'm', 'Ground floor height above the ground.'),
   c('roof', 'roof', ['hip', 'gable', 'hip-gable', 'shed', 'flat'], 'Roof shape; hip-gable is the irimoya.'),
   n('pitch', 'roof', 24.2, 2, 60, 0.1, 'deg', 'Roof pitch.'),
-  c('ridge', 'roof', ['auto', 'x', 'z'], 'Ridge direction: auto along the longer side, x along the front, z front to back.'),
-  n('gableInset', 'roof', 0.5, 0.1, 0.9, 0.01, '', 'Hip-gable: how far in the small gable sits, as a share of half the depth.'),
+  c(
+    'ridge',
+    'roof',
+    ['auto', 'x', 'z'],
+    'Ridge direction: auto along the longer side, x along the front, z front to back.',
+  ),
+  n(
+    'gableInset',
+    'roof',
+    0.5,
+    0.1,
+    0.9,
+    0.01,
+    '',
+    'Hip-gable: how far in the small gable sits, as a share of half the depth.',
+  ),
   n('overhang', 'roof', 0.6, 0, 3, 0.01, 'm', 'Eaves and verge overhang.'),
   c('roofing', 'roof', ['tile', 'shingle', 'metal', 'membrane'], 'Roof covering and its courses.'),
   n('parapet', 'roof', 0, 0, 3, 0.05, 'm', 'Flat roofs: parapet height.'),
@@ -80,11 +107,27 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   c('cornice', 'trim', offOn, 'A cornice at the wall or false front top.'),
   c('brackets', 'trim', offOn, 'Knee braces under the eaves.'),
   c('detail', 'detail', ['mid', 'far', 'near'], 'How much small geometry.'),
-  c('interior', 'detail', ['rooms', 'cells', 'none'], 'Behind the windows: furnished rooms, one room cell per window, or nothing.'),
+  c(
+    'interior',
+    'detail',
+    ['rooms', 'cells', 'none'],
+    'Behind the windows: furnished rooms, one room cell per window, or nothing.',
+  ),
   n('seed', 'detail', 1, 0, 1_000_000, 1, '', 'Seed for small differences.'),
 ];
 const BUILDING_INDEX = settingIndex(BUILDING_SETTINGS);
-const FLAGS = ['sideWindows', 'storefront', 'awning', 'chimney', 'gutters', 'cornerBoards', 'casings', 'bands', 'cornice', 'brackets'];
+const FLAGS = [
+  'sideWindows',
+  'storefront',
+  'awning',
+  'chimney',
+  'gutters',
+  'cornerBoards',
+  'casings',
+  'bands',
+  'cornice',
+  'brackets',
+];
 /** Every building setting at its default, as a fresh object to edit. */
 export function buildingSettingDefaults(): Record<string, BuildingSettingValue> {
   return settingDefaults(BUILDING_SETTINGS) as Record<string, BuildingSettingValue>;
@@ -106,7 +149,9 @@ export function buildingOptionsFromSettings(values: BuildingSettingValues): Buil
   const set = BUILDING_STYLE_SETS[(v.style as BuildingStyle | undefined) ?? 'japan-2011-house'];
   return {
     ...out,
-    ...pair(v, 'storeys', 'storeyHeight', [set.storeys.length, set.storeys[0]], (count, h) => ({ storeys: Array(count).fill(h) })),
+    ...pair(v, 'storeys', 'storeyHeight', [set.storeys.length, set.storeys[0]], (count, h) => ({
+      storeys: Array(count).fill(h),
+    })),
     ...pair(v, 'windowWidth', 'windowHeight', set.window, (w, h) => ({ window: [w, h] })),
     ...pair(v, 'doorWidth', 'doorHeight', set.door, (w, h) => ({ door: [w, h] })),
   } as BuildingRuleOptions;
@@ -136,7 +181,12 @@ export const HARBOUR_SETTINGS: readonly BuildingSetting[] = [
   n('tetrapod.mass', 'tetrapods', 10, 0.5, 100, 0.5, 't', 'Tetrapod mass (sets the size).'),
   n('tetrapod.slope', 'tetrapods', 1.5, 0, 4, 0.05, 'cot', 'Armour slope, run over rise.'),
   n('tetrapod.layers', 'tetrapods', 2, 1, 3, 1, '', 'Armour layers.'),
-  c('tetrapod.placement', 'tetrapods', ['settled', 'pattern'], 'Settled: each unit lowered until it rests, none overlapping; pattern: on layer lines.'),
+  c(
+    'tetrapod.placement',
+    'tetrapods',
+    ['settled', 'pattern'],
+    'Settled: each unit lowered until it rests, none overlapping; pattern: on layer lines.',
+  ),
   n('quay.crest', 'quay', 2, 0.5, 6, 0.05, 'm', 'Quay crown above sea level.'),
   n('quay.bottom', 'quay', -4, -30, -0.5, 0.1, 'm', 'Sea bed at the quay face.'),
   n('quay.bollards', 'quay', 15, 0, 50, 0.5, 'm', 'Bollard spacing (0 none).'),
@@ -149,7 +199,16 @@ export const HARBOUR_SETTINGS: readonly BuildingSetting[] = [
   n('slipway.gradient', 'slipway', 8, 4, 20, 0.1, '', 'Slipway gradient, run over rise.'),
   n('boat.length', 'fishing boat', 14.5, 5, 40, 0.1, 'm', 'Fishing boat length overall.'),
   n('boat.beamRatio', 'fishing boat', 0.245, 0.2, 0.33, 0.005, '', 'Beam over length.'),
-  n('boat.wheelhouse', 'fishing boat', 0.42, 0.15, 0.7, 0.01, '', 'Wheelhouse position from the stern, as a share of the length.'),
+  n(
+    'boat.wheelhouse',
+    'fishing boat',
+    0.42,
+    0.15,
+    0.7,
+    0.01,
+    '',
+    'Wheelhouse position from the stern, as a share of the length.',
+  ),
   c('boat.mast', 'fishing boat', onOff, 'A mast.'),
   c('boat.lamps', 'fishing boat', offOn, 'A row of fishing lamps.'),
 ];
@@ -168,7 +227,10 @@ export function harbourOptionsFromSettings(values: BuildingSettingValues): {
   boat: FishingBoatOptions;
 } {
   checkSettings(HARBOUR_INDEX, values, 'harbour', 'the rows in @margoengine/procedural/building-settings');
-  const out = { seaWall: {}, tetrapod: {}, quay: {}, breakwater: {}, slipway: {}, boat: {} } as Record<string, Record<string, unknown>>;
+  const out = { seaWall: {}, tetrapod: {}, quay: {}, breakwater: {}, slipway: {}, boat: {} } as Record<
+    string,
+    Record<string, unknown>
+  >;
   for (const [name, value] of Object.entries(values)) {
     const [piece, key] = name.split('.');
     out[piece][key] = value === 'on' ? true : value === 'off' ? false : value;

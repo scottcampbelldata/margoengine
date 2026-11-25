@@ -1989,6 +1989,10 @@ export const entries = [
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',
     messages: [
+      'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
+      'Provide at least one selector for both mature and stunted trees',
+      'Treeline cohorts require distinct, nonempty species selectors',
+      'A species canopyKind must be broadleaf, conifer or palm',
       'Biome cells are exact only within 137,000 km',
       'A polygon edit needs 3 to 65,536 finite [x, z] points within 1,100 km',
       'farmland: pass a world with bounds and heightAt (a BiomeWorld)',
@@ -2668,6 +2672,7 @@ export const entries = [
       'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}',
       'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>',
       'AdaptiveDpr requires the WebGPU renderer or WebGL2 compatibility layer; use one of those renderers',
+      "Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry's MappedPbrMaterial",
       'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one',
       'Animation: this model already has an animation plugin; mount one <Animation> per model',
       'Animation: this model already has an animator plugin; mount one <Animation> per model',

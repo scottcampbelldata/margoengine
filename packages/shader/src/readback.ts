@@ -2,8 +2,14 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { ComputePass, StorageBuffer, observeDeviceLoss, type ComputeBody,
-  type ComputeCount, type StorageType } from './compute.js';
+import {
+  ComputePass,
+  StorageBuffer,
+  observeDeviceLoss,
+  type ComputeBody,
+  type ComputeCount,
+  type StorageType,
+} from './compute.js';
 import { scalarOf, type Node } from './node.js';
 declare const GPUBufferUsage: { MAP_READ: number; COPY_DST: number };
 declare const GPUMapMode: { READ: number };

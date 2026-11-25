@@ -591,7 +591,6 @@ test('physical options set after createMesh switch that material to the physical
   s.engine.dispose();
 });
 
-
 // createMesh made the scene's draw queue (a 'materials:' plugin) before runtime.use(model); when use threw for the
 // scene's first mesh, the queue stayed registered with no member, a pass drawing nothing every frame.
 test('a first mesh whose model fails to register leaves no empty draw queue behind', async () => {

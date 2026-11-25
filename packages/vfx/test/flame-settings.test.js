@@ -52,11 +52,20 @@ test('the animatedFeature look makes larger softer flames with a ramp, and fewer
   assert.ok(Math.abs(fo.intensity - f.intensity * 0.75) < 1e-9, 'a lower peak radiance, no blowout');
   assert.ok(Math.abs(fo.color[3] - f.color[3] * 0.85) < 1e-9, 'softer opacity');
   const stops = fo.curves.color;
-  assert.deepEqual(stops[0].color, [...f.curves.color[0].color].map((v, i) => v + (FLAME_LOOKS.animatedFeature['flames.edgeColor'][i] - v) * 0.6 * f.curves.color[0].at));
+  assert.deepEqual(
+    stops[0].color,
+    [...f.curves.color[0].color].map(
+      (v, i) => v + (FLAME_LOOKS.animatedFeature['flames.edgeColor'][i] - v) * 0.6 * f.curves.color[0].at,
+    ),
+  );
   const last = stops.length - 1,
     from = f.curves.color[last];
   from.color.forEach((v, i) =>
-    assert.ok(Math.abs(stops[last].color[i] - (v + (FLAME_LOOKS.animatedFeature['flames.edgeColor'][i] - v) * 0.6 * from.at)) < 1e-9, `edge channel ${i}`),
+    assert.ok(
+      Math.abs(stops[last].color[i] - (v + (FLAME_LOOKS.animatedFeature['flames.edgeColor'][i] - v) * 0.6 * from.at)) <
+        1e-9,
+      `edge channel ${i}`,
+    ),
   );
   assert.ok(eo.size > e.size * 2 && eo.rate < e.rate * 0.6, 'fewer, larger embers');
   assert.ok(Math.abs(eo.intensity - e.intensity * 0.8) < 1e-9);
@@ -76,7 +85,11 @@ test('values are checked against their rows', () => {
 test('a real Fire takes the look and keeps drawing', () => {
   const h = optionalGPU();
   h.engine.stats = { drawCalls: 0 };
-  h.engine.lighting = { direction: new Float32Array([0, 3, 4, 2]), radiance: new Float32Array([1, 0.5, 0.25, 0.2]), ambient: new Float32Array([1, 2, 3]) };
+  h.engine.lighting = {
+    direction: new Float32Array([0, 3, 4, 2]),
+    radiance: new Float32Array([1, 0.5, 0.25, 0.2]),
+    ambient: new Float32Array([1, 2, 3]),
+  };
   const fire = Fire.attach(h.engine, { position: [0, 0, 0] }),
     size = fire.particles.flames.options.size;
   applyFlameSettings(fire, FLAME_LOOKS.animatedFeature);
@@ -92,7 +105,13 @@ test('core, edge and peak give hearth flames the blackbody ramp after attach; fl
     t = target(),
     before = snapshot(t),
     f = hearth.fire;
-  applyFlameSettings(t, { 'flames.core': 2800, 'flames.edge': 900, 'flames.peak': 0.8, 'flames.flicker': 2, 'flames.tongues': 0.5 });
+  applyFlameSettings(t, {
+    'flames.core': 2800,
+    'flames.edge': 900,
+    'flames.peak': 0.8,
+    'flames.flicker': 2,
+    'flames.tongues': 0.5,
+  });
   const fo = t.particles.flames.options,
     ramp = flameRamp({ core: 2800, edge: 900, peak: 0.8 });
   fo.curves.color.forEach((s, k) => {

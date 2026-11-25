@@ -591,6 +591,18 @@
       "types": "./dist/environment/exr-codecs.d.ts",
       "import": "./dist/environment/exr-codecs.js"
     },
+    "./environment/main": {
+      "types": "./dist/environment/main.d.ts",
+      "import": "./dist/environment/main.js"
+    },
+    "./environment/loaders": {
+      "types": "./dist/environment/loaders.d.ts",
+      "import": "./dist/environment/loaders.js"
+    },
+    "./environment/load": {
+      "types": "./dist/environment/load.d.ts",
+      "import": "./dist/environment/load.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
@@ -1066,6 +1078,10 @@
     "./lines/tiles": {
       "types": "./dist/lines/tiles.d.ts",
       "import": "./dist/lines/tiles.js"
+    },
+    "./lines/flow": {
+      "types": "./dist/lines/flow.d.ts",
+      "import": "./dist/lines/flow.js"
     },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
@@ -2166,6 +2182,10 @@
     "./terrain/ground-change-settings": {
       "types": "./dist/terrain/ground-change-settings.d.ts",
       "import": "./dist/terrain/ground-change-settings.js"
+    },
+    "./terrain/relief-lighting": {
+      "types": "./dist/terrain/relief-lighting.d.ts",
+      "import": "./dist/terrain/relief-lighting.js"
     },
     "./terrain/wet-ground": {
       "types": "./dist/terrain/wet-ground.d.ts",

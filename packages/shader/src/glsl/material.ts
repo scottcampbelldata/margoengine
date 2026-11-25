@@ -126,7 +126,13 @@ const zero = (glsl: string): ShaderUniformValue => {
   if (array) return Array.from({ length: +array[2]! }, () => zero(array[1]!));
   const m = /^mat([234])(?:x([234]))?$/.exec(glsl);
   if (m) return new Array(+m[1]! * +(m[2] ?? m[1])!).fill(0);
-  return /sampler/.test(glsl) ? null : glsl === 'bool' ? false : /^[ibu]?vec(\d)$/.test(glsl) ? new Array(Number(glsl.at(-1))).fill(0) : 0;
+  return /sampler/.test(glsl)
+    ? null
+    : glsl === 'bool'
+      ? false
+      : /^[ibu]?vec(\d)$/.test(glsl)
+        ? new Array(Number(glsl.at(-1))).fill(0)
+        : 0;
 };
 // The value of a leaf of a struct or array uniform: its root's value, then field names and [element, numbers per
 // element] steps (a flat list of numbers holds its elements one after another).
@@ -137,7 +143,9 @@ function leaf(value: unknown, path: GLSLProgramUniform['path'] = []): ShaderUnif
     if (typeof step === 'string') v = v[step] as typeof v;
     else {
       const [k, n] = step;
-      v = (n && typeof v[0] !== 'object' ? (n === 1 ? v[k] : Array.prototype.slice.call(v, k * n, k * n + n)) : v[k]) as typeof v;
+      v = (
+        n && typeof v[0] !== 'object' ? (n === 1 ? v[k] : Array.prototype.slice.call(v, k * n, k * n + n)) : v[k]
+      ) as typeof v;
     }
   }
   return (v ?? null) as ShaderUniformValue;
@@ -160,9 +168,14 @@ function rootZero(leaves: readonly GLSLProgramUniform[]): ShaderUniformValue {
 function stored(value: ShaderUniformValue, u: GLSLProgramUniform): number | string | number[] | number[][] {
   if (u.count) {
     // An array held as it is: its elements, or all their numbers in a row.
-    const list = value === null || typeof value !== 'object' || !('length' in value) ? (zero(u.glsl) as ShaderUniformValue[]) : (value as ArrayLike<ShaderUniformValue>);
+    const list =
+      value === null || typeof value !== 'object' || !('length' in value)
+        ? (zero(u.glsl) as ShaderUniformValue[])
+        : (value as ArrayLike<ShaderUniformValue>);
     const element = { ...u, glsl: u.glsl.replace(/\[\d+\]$/, ''), count: undefined };
-    return typeof list[0] === 'number' ? Array.from(list as ArrayLike<number>) : Array.from(list, (e) => [stored(e, element)].flat(2) as number[]);
+    return typeof list[0] === 'number'
+      ? Array.from(list as ArrayLike<number>)
+      : Array.from(list, (e) => [stored(e, element)].flat(2) as number[]);
   }
   const rect = /^mat([234])x([234])$/.exec(u.glsl);
   if (rect) {
@@ -177,13 +190,16 @@ function stored(value: ShaderUniformValue, u: GLSLProgramUniform): number | stri
   const one = (x: unknown, at: string): number => {
     if (typeof x === 'boolean') return +x;
     if (typeof x === 'number') return bool ? +(x !== 0) : x;
-    throw new RangeError(`ShaderMaterial uniform ${u.name}${at} needs numbers or booleans for ${u.glsl}; assign a matching value`);
+    throw new RangeError(
+      `ShaderMaterial uniform ${u.name}${at} needs numbers or booleans for ${u.glsl}; assign a matching value`,
+    );
   };
   if (value === null || value === undefined) return stored(zero(u.glsl), u);
   if (typeof value === 'number' || typeof value === 'boolean') return one(value, '');
   if (typeof value === 'string') return u.glsl === 'vec3' ? value : one(value, '');
   const v = value as Record<string, unknown> & ArrayLike<unknown>;
-  const list = typeof v.length === 'number' ? Array.from(v) : 'x' in v ? [v.x, v.y, v.z, v.w].filter((x) => x !== undefined) : [];
+  const list =
+    typeof v.length === 'number' ? Array.from(v) : 'x' in v ? [v.x, v.y, v.z, v.w].filter((x) => x !== undefined) : [];
   return list.map((x, i) => one(x, `[${i}]`));
 }
 
@@ -214,7 +230,8 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
   private source: GLSLProgramSource;
   /** @param scene The scene options' code (ShaderMaterial passes it). */
   constructor(options: ShaderMaterialOptions, scene?: GLSLMaterialScene) {
-    if (!options || typeof options !== 'object') throw new TypeError('ShaderMaterial needs {vertexShader, fragmentShader}');
+    if (!options || typeof options !== 'object')
+      throw new TypeError('ShaderMaterial needs {vertexShader, fragmentShader}');
     const {
       uniforms: given = {},
       builtins,
@@ -247,8 +264,10 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
       fragmentShader: _f,
       ...state
     } = options;
-    if (!given || typeof given !== 'object') throw new TypeError('ShaderMaterial uniforms must be an object of {value}');
-    if (side !== undefined && state.cull !== undefined) throw new TypeError('ShaderMaterial takes side or cull, not both; pass only one of them');
+    if (!given || typeof given !== 'object')
+      throw new TypeError('ShaderMaterial uniforms must be an object of {value}');
+    if (side !== undefined && state.cull !== undefined)
+      throw new TypeError('ShaderMaterial takes side or cull, not both; pass only one of them');
     const source: GLSLProgramSource = {
       vertexShader: options.vertexShader,
       fragmentShader: options.fragmentShader,
@@ -272,7 +291,8 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
       values: Record<string, ShaderUniform> = {},
       holder: { material?: GLSLMaterial } = {};
     for (const [name, u] of Object.entries(given)) {
-      if (!u || typeof u !== 'object' || !('value' in u)) throw new TypeError(`ShaderMaterial uniform ${name} must be {value}`);
+      if (!u || typeof u !== 'object' || !('value' in u))
+        throw new TypeError(`ShaderMaterial uniform ${name} must be {value}`);
       values[name] = u;
     }
     scene?.uniforms(linked, values, holder);
@@ -282,7 +302,11 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
         ? {
             blending: {
               color: { srcFactor: blendSrc, dstFactor: blendDst, operation: blendEquation },
-              alpha: { srcFactor: blendSrcAlpha ?? blendSrc, dstFactor: blendDstAlpha ?? blendDst, operation: blendEquationAlpha ?? blendEquation },
+              alpha: {
+                srcFactor: blendSrcAlpha ?? blendSrc,
+                dstFactor: blendDstAlpha ?? blendDst,
+                operation: blendEquationAlpha ?? blendEquation,
+              },
             },
           }
         : blending !== undefined
@@ -308,7 +332,8 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
   // GL adds factor x slope + units x step to depth; with reversed Z that is a negative WebGPU depth bias.
   private applyOffset(): void {
     const [on, factor, units] = this.offset;
-    if (!Number.isFinite(factor) || !Number.isFinite(units)) throw new RangeError('ShaderMaterial polygonOffsetFactor and polygonOffsetUnits must be finite');
+    if (!Number.isFinite(factor) || !Number.isFinite(units))
+      throw new RangeError('ShaderMaterial polygonOffsetFactor and polygonOffsetUnits must be finite');
     this.depthBias = on ? -units : 0;
     this.depthBiasSlopeScale = on ? -factor : 0;
   }
@@ -380,7 +405,10 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
       // The value, an element of an array's list, or the texture of a {texture, sampler} pair.
       const given = () => {
         const v = values[name]?.value as unknown;
-        return (t.index === undefined ? v : (v as ArrayLike<unknown> | null)?.[t.index]) as { texture?: unknown; sampler?: GPUSamplerDescriptor } | null;
+        return (t.index === undefined ? v : (v as ArrayLike<unknown> | null)?.[t.index]) as {
+          texture?: unknown;
+          sampler?: GPUSamplerDescriptor;
+        } | null;
       };
       const pair = () => {
         const v = given();
@@ -440,7 +468,9 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
   }
   /** The WGSL of `stage` for `mesh`: the prelude, the translated GLSL and the entry for the mesh's attributes. */
   override code(stage: 'vertex' | 'fragment', mesh?: RawMesh): string {
-    return this.prelude(mesh) + (stage === 'fragment' ? this.linked.fragment : this.linked.vertexFor(mesh?.layout ?? []));
+    return (
+      this.prelude(mesh) + (stage === 'fragment' ? this.linked.fragment : this.linked.vertexFor(mesh?.layout ?? []))
+    );
   }
   private relink(source: GLSLProgramSource): void {
     const linked = linkGLSLProgram(source, this.scene?.link),
@@ -453,9 +483,14 @@ export class GLSLMaterial extends RawShaderMaterial<ShaderUniform> {
     const signature = (l: GLSLLinked) => JSON.stringify([l.uniforms, l.textures]);
     if (signature(linked) !== signature(this.linked)) {
       // New uniforms or textures: the block layout and bindings of a fresh material replace this one's.
-      const fresh = new RawShaderMaterial({ ...parts, vertexEntry: 'margoGLSLVertex', fragmentEntry: 'margoGLSLFragment' }) as unknown as Record<string, unknown>;
+      const fresh = new RawShaderMaterial({
+        ...parts,
+        vertexEntry: 'margoGLSLVertex',
+        fragmentEntry: 'margoGLSLFragment',
+      }) as unknown as Record<string, unknown>;
       this.dispose();
-      for (const key of ['members', 'size', 'bytes', 'data', 'textures', 'uniforms']) Object.defineProperty(self, key, { value: fresh[key], writable: true, configurable: true });
+      for (const key of ['members', 'size', 'bytes', 'data', 'textures', 'uniforms'])
+        Object.defineProperty(self, key, { value: fresh[key], writable: true, configurable: true });
       this.publish(values);
     }
     this.linked = linked;
@@ -518,9 +553,14 @@ const typeOf = (glsl: string, size: number): RawAttribute['type'] => {
  * points with its own matrices, so `frustumCulled` defaults to false).
  * @throws TypeError or RangeError for data of the wrong length or a stream count that differs between attributes.
  */
-export function shaderMesh<M extends GLSLMaterial>(geometry: ShaderGeometry, material: M, options: ShaderMeshOptions = {}): RawMesh<M> {
+export function shaderMesh<M extends GLSLMaterial>(
+  geometry: ShaderGeometry,
+  material: M,
+  options: ShaderMeshOptions = {},
+): RawMesh<M> {
   if (!(material instanceof GLSLMaterial)) throw new TypeError('shaderMesh needs a ShaderMaterial');
-  if (!geometry || typeof geometry !== 'object') throw new TypeError('shaderMesh needs geometry: {positions, ...} or a core Geometry');
+  if (!geometry || typeof geometry !== 'object')
+    throw new TypeError('shaderMesh needs geometry: {positions, ...} or a core Geometry');
   const { attributes: extra = {}, instances = {}, index, ...rest } = options,
     program = material.program,
     interleaved = geometry.vertices,
@@ -546,7 +586,11 @@ export function shaderMesh<M extends GLSLMaterial>(geometry: ShaderGeometry, mat
       matrix = a.glsl.startsWith('mat'),
       perInstance = instances[a.name] ?? (a.semantic ? instances[a.semantic] : undefined),
       given = perInstance ?? extra[a.name],
-      found = given ? ([given, matrix ? n * n : n] as [ArrayLike<number>, number]) : a.semantic ? stream(a.semantic) : undefined;
+      found = given
+        ? ([given, matrix ? n * n : n] as [ArrayLike<number>, number])
+        : a.semantic
+          ? stream(a.semantic)
+          : undefined;
     if (!found) continue;
     const [data, size] = found,
       step = perInstance ? 'instance' : 'vertex';
@@ -565,9 +609,13 @@ export function shaderMesh<M extends GLSLMaterial>(geometry: ShaderGeometry, mat
     } else out[a.name] = { data, type: typeOf(a.glsl, size), step };
   }
   if (counts.vertex.size > 1)
-    throw new RangeError(`shaderMesh per-vertex attributes hold ${[...counts.vertex].join(' and ')} vertices; give each one element a vertex`);
+    throw new RangeError(
+      `shaderMesh per-vertex attributes hold ${[...counts.vertex].join(' and ')} vertices; give each one element a vertex`,
+    );
   if (counts.instance.size > 1)
-    throw new RangeError(`shaderMesh per-instance attributes hold ${[...counts.instance].join(' and ')} instances; give each one element an instance`);
+    throw new RangeError(
+      `shaderMesh per-instance attributes hold ${[...counts.instance].join(' and ')} instances; give each one element an instance`,
+    );
   const instanceCount = rest.instanceCount ?? [...counts.instance][0];
   let bounds = rest.bounds;
   if (bounds === undefined && positions && !counts.instance.size && positions.length) {
@@ -581,7 +629,10 @@ export function shaderMesh<M extends GLSLMaterial>(geometry: ShaderGeometry, mat
     const center = [0, 1, 2].map((c) => (min[c]! + max[c]!) / 2) as [number, number, number];
     let radius = 0;
     for (let i = 0; i < positions.length; i += 3)
-      radius = Math.max(radius, Math.hypot(positions[i]! - center[0], positions[i + 1]! - center[1], positions[i + 2]! - center[2]));
+      radius = Math.max(
+        radius,
+        Math.hypot(positions[i]! - center[0], positions[i + 1]! - center[1], positions[i + 2]! - center[2]),
+      );
     // Rounded up so a float32 vertex on the sphere stays inside it.
     bounds = { center, radius: radius * (1 + 1e-6) + 1e-7 };
   }
@@ -618,11 +669,18 @@ export function shaderMesh<M extends GLSLMaterial>(geometry: ShaderGeometry, mat
   if (topology === 'point-list' && program.points) {
     // A sized point is a square (OpenGL ES 3.0.6 3.4) and WebGPU's points are one pixel: each point is drawn as an
     // instance of six corners, its attributes stepping once per instance.
-    if (counts.instance.size) throw new RangeError('shaderMesh draws sized points one instance a point; give a point list with gl_PointSize no per-instance attributes');
+    if (counts.instance.size)
+      throw new RangeError(
+        'shaderMesh draws sized points one instance a point; give a point list with gl_PointSize no per-instance attributes',
+      );
     const picked = order;
     for (const [name, a] of Object.entries(out)) {
       const n = Number(/vec([234])/.exec(a.type)?.[1] ?? 1),
-        data = picked ? Float32Array.from(picked.flatMap((i) => Array.from({ length: n }, (_, c) => (a.data as ArrayLike<number>)[i * n + c]!))) : a.data;
+        data = picked
+          ? Float32Array.from(
+              picked.flatMap((i) => Array.from({ length: n }, (_, c) => (a.data as ArrayLike<number>)[i * n + c]!)),
+            )
+          : a.data;
       out[name] = { ...a, data, step: 'instance' };
     }
     out.gl_PointCorner = { data: [-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1], type: 'vec2f' };

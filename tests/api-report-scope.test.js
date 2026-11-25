@@ -82,8 +82,10 @@ test('the Gzip column follows entry-sizes.json, and measuring sizes rewrites it'
   refreshApiSurfaceGzip(root);
   assert.equal(readFileSync(join(root, 'docs/api-surface.md'), 'utf8'), refreshed);
 
-  const measure = readFileSync(new URL('../examples/package-benchmarks/entry-sizes.mjs', import.meta.url), 'utf8')
-    .replaceAll('\r\n', '\n');
+  const measure = readFileSync(
+    new URL('../examples/package-benchmarks/entry-sizes.mjs', import.meta.url),
+    'utf8',
+  ).replaceAll('\r\n', '\n');
   assert.match(
     measure,
     /await writeFile\(resolve\(import\.meta\.dirname, 'results\/entry-sizes\.json'\)[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*refreshApiSurfaceGzip\(root\);/,

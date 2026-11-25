@@ -6,11 +6,15 @@ import { timeStretch } from '../dist/stretch.js';
 
 const rate = 48000;
 const tone = (seconds, hz, amplitude = 0.5) =>
-  Float32Array.from({ length: Math.round(rate * seconds) }, (_, i) => amplitude * Math.sin((2 * Math.PI * hz * i) / rate));
+  Float32Array.from(
+    { length: Math.round(rate * seconds) },
+    (_, i) => amplitude * Math.sin((2 * Math.PI * hz * i) / rate),
+  );
 /** Frequency from upward zero crossings between two samples, interpolated, over [from, to). */
 const pitch = (x, from, to) => {
   const crossings = [];
-  for (let i = from + 1; i < to; i++) if (x[i - 1] < 0 && x[i] >= 0) crossings.push(i - 1 + -x[i - 1] / (x[i] - x[i - 1]));
+  for (let i = from + 1; i < to; i++)
+    if (x[i - 1] < 0 && x[i] >= 0) crossings.push(i - 1 + -x[i - 1] / (x[i] - x[i - 1]));
   return ((crossings.length - 1) * rate) / (crossings.at(-1) - crossings[0]);
 };
 const rms = (x, from, to) => {
@@ -40,7 +44,8 @@ test('speech-like audio: two voices of a chord keep their pitches, and stereo ch
   assert.equal(out.channels.length, 2);
   assert.equal(out.sampleRate, rate);
   // The right channel is the left one scaled by -0.5, sample for sample: the same frames were taken for both.
-  for (let i = 0; i < out.channels[0].length; i += 97) assert.ok(Math.abs(out.channels[1][i] + 0.5 * out.channels[0][i]) < 1e-6, `sample ${i}`);
+  for (let i = 0; i < out.channels[0].length; i += 97)
+    assert.ok(Math.abs(out.channels[1][i] + 0.5 * out.channels[0][i]) < 1e-6, `sample ${i}`);
   // The sum of 180 and 270 Hz repeats at 90 Hz; its autocorrelation peaks at that period after the stretch too.
   const x = out.channels[0],
     lag = (period) => {

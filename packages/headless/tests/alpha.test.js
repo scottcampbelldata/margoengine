@@ -149,9 +149,16 @@ test('alpha: a second encoder codes the alpha as luma, and WebM carries it as Bl
   const alphas = log.pictures.filter((p) => p.encoder === 1);
   assert.equal(alphas.length, 5);
   alphas.forEach((picture, n) => {
-    assert.deepEqual([...picture.data.subarray(0, 8)], [0, 1, 2, 3, 4, 5, 6, 7].map((i) => 10 * n + i));
+    assert.deepEqual(
+      [...picture.data.subarray(0, 8)],
+      [0, 1, 2, 3, 4, 5, 6, 7].map((i) => 10 * n + i),
+    );
     assert.deepEqual([...picture.data.subarray(8)], [128, 128, 128, 128]);
-    assert.equal(picture.keyFrame, log.pictures.filter((p) => p.encoder === 0)[n].keyFrame, 'key frames asked together');
+    assert.equal(
+      picture.keyFrame,
+      log.pictures.filter((p) => p.encoder === 0)[n].keyFrame,
+      'key frames asked together',
+    );
   });
 
   const { bytes } = video,
@@ -237,7 +244,10 @@ test('alpha: refused with a code where no binding carries it, and an encoder out
     refused = { code: 'unsupported', message: /Alpha video needs WebM with VP9 or VP8/ };
   await assert.rejects(encodeVideo(frames(1), { alpha: true, format: 'mp4', webCodecs }), refused);
   await assert.rejects(encodeVideo(frames(1), { alpha: true, codec: 'av01.0.13M.08', webCodecs }), refused);
-  await assert.rejects(encodeVideo(frames(1), { alpha: true, format: 'mp4', codec: 'avc1.640033', webCodecs }), refused);
+  await assert.rejects(
+    encodeVideo(frames(1), { alpha: true, format: 'mp4', codec: 'avc1.640033', webCodecs }),
+    refused,
+  );
   await assert.rejects(streamVideo(frames(1), { alpha: true, webCodecs }).next(), refused);
   // Without alpha, nothing changes: one encoder, SimpleBlocks, no AlphaMode.
   const { webCodecs: plain, log } = codecs(),

@@ -41,7 +41,8 @@ function install(product, exe, files) {
     app = (...parts) => win32.join(root, ...product, 'Application', ...parts),
     entries = new Map();
   const addDir = (path) => {
-    for (let dir = path; dir !== win32.dirname(dir) && !entries.has(dir); dir = win32.dirname(dir)) entries.set(dir, 'dir');
+    for (let dir = path; dir !== win32.dirname(dir) && !entries.has(dir); dir = win32.dirname(dir))
+      entries.set(dir, 'dir');
   };
   for (const [path, version] of Object.entries(files)) {
     const full = app(...path.split('/'));
@@ -52,7 +53,9 @@ function install(product, exe, files) {
   const layer = {
     exists: (path) => entries.has(path),
     list: (path) =>
-      entries.get(path) === 'dir' ? [...entries.keys()].filter((p) => win32.dirname(p) === path && p !== path).map((p) => win32.basename(p)) : [],
+      entries.get(path) === 'dir'
+        ? [...entries.keys()].filter((p) => win32.dirname(p) === path && p !== path).map((p) => win32.basename(p))
+        : [],
     read: (path) => {
       const entry = entries.get(path);
       return entry instanceof Buffer ? entry : undefined;
@@ -79,7 +82,11 @@ test('mid-update (two version folders, a pending new_msedge.exe): Edge starts fr
     const browser = resolveBrowser({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [] });
     const expected = fake.app('157.0.4341.42', 'msedge.exe');
     assert.equal(chromiumExecutablePath(browser, 'msedge', {}, { files: fake.files }), expected);
-    assert.equal(chromiumLaunchOptions({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [], files: fake.files }).executablePath, expected);
+    assert.equal(
+      chromiumLaunchOptions({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [], files: fake.files })
+        .executablePath,
+      expected,
+    );
     // Through launchBrowser, as every suite starts it: the channel stays (records still say msedge), the exe is the folder's.
     const launched = [];
     await launchBrowser({
@@ -107,7 +114,10 @@ test('after the swap, with the old folder still on disk, Edge starts from the ne
     '157.0.4341.46/msedge.exe': '157.0.4341.46',
   });
   try {
-    assert.equal(installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }), fake.app('157.0.4341.46', 'msedge.exe'));
+    assert.equal(
+      installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }),
+      fake.app('157.0.4341.46', 'msedge.exe'),
+    );
   } finally {
     fake.done();
   }
@@ -123,7 +133,10 @@ test('an unreadable top-level version takes the newest folder that is not the pe
     'SetupMetrics/msedge.exe': '1.0.0.0',
   });
   try {
-    assert.equal(installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }), fake.app('157.0.4341.42', 'msedge.exe'));
+    assert.equal(
+      installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }),
+      fake.app('157.0.4341.42', 'msedge.exe'),
+    );
   } finally {
     fake.done();
   }
@@ -139,12 +152,27 @@ test('no version folder with the exe (Chrome keeps only a stub at the top), anot
   const bare = edge({ 'msedge.exe': '157.0.4341.42' });
   try {
     const env = { LOCALAPPDATA: chrome.root, MARGO_BROWSER: 'chrome' };
-    assert.equal(channelExecutable(resolveBrowser({ env, platform: 'win32', argv: [] }), 'chrome', { files: chrome.files }), chrome.app('chrome.exe'));
+    assert.equal(
+      channelExecutable(resolveBrowser({ env, platform: 'win32', argv: [] }), 'chrome', { files: chrome.files }),
+      chrome.app('chrome.exe'),
+    );
     assert.equal(installedVersionExecutable(bare.app('msedge.exe'), { files: bare.files }), bare.app('msedge.exe'));
-    assert.equal(channelExecutable(resolveBrowser({ env: { LOCALAPPDATA: bare.root }, platform: 'linux', argv: [] }), 'msedge', { files: bare.files }), undefined);
-    assert.equal(channelExecutable(resolveBrowser({ env: {}, platform: 'win32', argv: [] }), 'msedge', { files: bare.files }), undefined);
+    assert.equal(
+      channelExecutable(resolveBrowser({ env: { LOCALAPPDATA: bare.root }, platform: 'linux', argv: [] }), 'msedge', {
+        files: bare.files,
+      }),
+      undefined,
+    );
+    assert.equal(
+      channelExecutable(resolveBrowser({ env: {}, platform: 'win32', argv: [] }), 'msedge', { files: bare.files }),
+      undefined,
+    );
     // An executable the caller or BROWSER_EXECUTABLE names still wins over the install.
-    const own = resolveBrowser({ env: { LOCALAPPDATA: bare.root, BROWSER_EXECUTABLE: 'D:/own/msedge.exe' }, platform: 'win32', argv: [] });
+    const own = resolveBrowser({
+      env: { LOCALAPPDATA: bare.root, BROWSER_EXECUTABLE: 'D:/own/msedge.exe' },
+      platform: 'win32',
+      argv: [],
+    });
     assert.equal(chromiumExecutablePath(own, 'msedge', {}, { files: bare.files }), 'D:/own/msedge.exe');
   } finally {
     chrome.done();

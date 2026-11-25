@@ -10,14 +10,16 @@ import { FrameGraph } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { Shadertoy } from '../dist/shadertoy.js';
 
-const reads = 'void mainImage(out vec4 f, in vec2 c) { f = texture(iChannel0, c / iResolution.xy) + vec4(iChannelResolution[0], 0.0); }';
+const reads =
+  'void mainImage(out vec4 f, in vec2 c) { f = texture(iChannel0, c / iResolution.xy) + vec4(iChannelResolution[0], 0.0); }';
 
 /** A mock engine with the real FrameGraph; `swap()` moves it to a fresh mock device (device restoration). */
 function harness() {
   const graph = new FrameGraph(),
     plugins = new Map(),
     h = { graph, plugins, index: 0, errors: [] };
-  const view = () => context(h.gpu, { samples: 1, shader: wgsl, format: 'rgba8unorm', depthFormat: 'depth24plus-stencil8' });
+  const view = () =>
+    context(h.gpu, { samples: 1, shader: wgsl, format: 'rgba8unorm', depthFormat: 'depth24plus-stencil8' });
   h.gpu = mockGPU();
   h.engine = {
     gpu: h.gpu.device,
@@ -81,13 +83,20 @@ test('a plain texture channel across a device restore: dropped and reported once
   assert.deepEqual(resolution(), [4, 4, 1]);
   // A steady frame makes no view, sampler or bind group (the blanks of the three unbound channels made both each frame).
   let log = h.gpu.record(() => h.frame());
-  assert.deepEqual([calls(log, 'view'), calls(log, 'sampler'), calls(log, 'group')], [0, 0, 0], 'nothing made on a steady frame');
+  assert.deepEqual(
+    [calls(log, 'view'), calls(log, 'sampler'), calls(log, 'group')],
+    [0, 0, 0],
+    'nothing made on a steady frame',
+  );
   h.swap();
   log = h.gpu.record(() => h.frame());
   assert.deepEqual(viewed, [['plain', '2d']], 'nothing of the lost texture is bound on the new device');
   assert.equal(h.lost().length, 1, 'one report');
   assert.equal(h.lost()[0].code, 'state');
-  assert.match(h.lost()[0].message, /Shadertoy iChannel0 lost with the device; pass a function or call toy\.setChannel\(0, texture\)/);
+  assert.match(
+    h.lost()[0].message,
+    /Shadertoy iChannel0 lost with the device; pass a function or call toy\.setChannel\(0, texture\)/,
+  );
   assert.deepEqual(resolution(), [0, 0, 0], 'an unbound channel has no size');
   h.frame();
   assert.equal(h.lost().length, 1, 'reported once');
@@ -100,11 +109,16 @@ test('a plain texture channel across a device restore: dropped and reported once
   toy.dispose();
 });
 
-test('a function texture channel is made once per device with no report; its size is the made texture\'s', async () => {
+test("a function texture channel is made once per device with no report; its size is the made texture's", async () => {
   const h = harness(),
     viewed = [],
     made = [],
-    toy = new Shadertoy({ image: { source: reads, iChannel0: (device) => (made.push(device), watched(viewed, device, 'made' + made.length, [16, 8])) } });
+    toy = new Shadertoy({
+      image: {
+        source: reads,
+        iChannel0: (device) => (made.push(device), watched(viewed, device, 'made' + made.length, [16, 8])),
+      },
+    });
   h.engine.use(toy);
   void toy.texture;
   const material = toy.material();
@@ -113,13 +127,20 @@ test('a function texture channel is made once per device with no report; its siz
   h.frame();
   h.frame();
   assert.equal(made.length, 1, 'made once per device');
-  assert.deepEqual(material.uniforms.iChannelResolution.value.slice(0, 3), [16, 8, 1], 'iChannelResolution of the made texture');
+  assert.deepEqual(
+    material.uniforms.iChannelResolution.value.slice(0, 3),
+    [16, 8, 1],
+    'iChannelResolution of the made texture',
+  );
   h.swap();
   h.frame();
   h.frame();
   assert.equal(made.length, 2);
   assert.equal(made[1], h.gpu.device, 'called with the new device');
-  assert.deepEqual(viewed, [['made1', '2d'], ['made2', '2d']]);
+  assert.deepEqual(viewed, [
+    ['made1', '2d'],
+    ['made2', '2d'],
+  ]);
   assert.equal(h.lost().length, 0, 'no report');
   toy.dispose();
 });
@@ -129,22 +150,43 @@ test('3D and cube texture channels: the view of their sampler type, a function o
     viewed = [],
     toy = new Shadertoy({
       image: {
-        source: 'void mainImage(out vec4 f, in vec2 c) { f = texture(iChannel0, vec3(c, 0.5)) + texture(iChannel1, vec3(c, 1.0)) + vec4(iChannelResolution[0], 0.0); }',
-        iChannel0: { texture: (device) => watched(viewed, device, 'volume', [4, 4, 2], { dimension: '3d' }), type: '3d' },
+        source:
+          'void mainImage(out vec4 f, in vec2 c) { f = texture(iChannel0, vec3(c, 0.5)) + texture(iChannel1, vec3(c, 1.0)) + vec4(iChannelResolution[0], 0.0); }',
+        iChannel0: {
+          texture: (device) => watched(viewed, device, 'volume', [4, 4, 2], { dimension: '3d' }),
+          type: '3d',
+        },
         iChannel1: { texture: (device) => watched(viewed, device, 'cube', [2, 2, 6]), type: 'cube' },
       },
     });
-  assert.throws(() => new Shadertoy({ image: { source: reads, iChannel0: { texture: h.gpu.device.createTexture({ size: [2, 2, 12], format: 'rgba8unorm', usage: 4 }), type: 'cube' } } }), /iChannel0 is a samplerCube channel; give it a 2D texture of six layers/);
+  assert.throws(
+    () =>
+      new Shadertoy({
+        image: {
+          source: reads,
+          iChannel0: {
+            texture: h.gpu.device.createTexture({ size: [2, 2, 12], format: 'rgba8unorm', usage: 4 }),
+            type: 'cube',
+          },
+        },
+      }),
+    /iChannel0 is a samplerCube channel; give it a 2D texture of six layers/,
+  );
   h.engine.use(toy);
   void toy.texture;
   const material = toy.material();
   h.frame();
   await toy.ready();
   h.frame();
-  assert.deepEqual(viewed, [['volume', '3d'], ['cube', 'cube']]);
+  assert.deepEqual(viewed, [
+    ['volume', '3d'],
+    ['cube', 'cube'],
+  ]);
   assert.equal(h.errors.length, 0);
   // A function with no type is a sampler2D channel, so the 3D texture it makes does not fit.
-  const flat = new Shadertoy({ image: { source: reads, iChannel0: (device) => watched(viewed, device, 'deep', [4, 4, 4], { dimension: '3d' }) } });
+  const flat = new Shadertoy({
+    image: { source: reads, iChannel0: (device) => watched(viewed, device, 'deep', [4, 4, 4], { dimension: '3d' }) },
+  });
   h.engine.use(flat);
   void flat.texture;
   h.frame();
@@ -164,7 +206,13 @@ test('toy.setChannel takes what each kind of channel reads and refuses the rest'
   const plainTexture = { width: 2, height: 2, depthOrArrayLayers: 1, dimension: '2d', createView() {} },
     image = { width: 3, height: 5 },
     toy = new Shadertoy({
-      image: { source: 'void mainImage(out vec4 f, in vec2 c) { f = vec4(0.0); }', iChannel0: plainTexture, iChannel1: 'A', iChannel2: image, iChannel3: 'keyboard' },
+      image: {
+        source: 'void mainImage(out vec4 f, in vec2 c) { f = vec4(0.0); }',
+        iChannel0: plainTexture,
+        iChannel1: 'A',
+        iChannel2: image,
+        iChannel3: 'keyboard',
+      },
       bufferA: { source: 'void mainImage(out vec4 f, in vec2 c) { f = vec4(1.0); }', iChannel0: null },
       keyboard: new EventTarget(),
     });
@@ -174,11 +222,23 @@ test('toy.setChannel takes what each kind of channel reads and refuses the rest'
   toy.setChannel(0, plainTexture, 'image');
   toy.setChannel(0, plainTexture, 'bufferA');
   toy.setChannel(2, { width: 7, height: 1 });
-  assert.throws(() => toy.setChannel(0, { width: 2, height: 2, depthOrArrayLayers: 2, dimension: '3d', createView() {} }), /iChannel0 is a sampler2D channel; give it a 2D texture/);
-  assert.throws(() => toy.setChannel(1, plainTexture), /iChannel1 reads Buffer A, which the toy draws itself; make a new Shadertoy/);
+  assert.throws(
+    () => toy.setChannel(0, { width: 2, height: 2, depthOrArrayLayers: 2, dimension: '3d', createView() {} }),
+    /iChannel0 is a sampler2D channel; give it a 2D texture/,
+  );
+  assert.throws(
+    () => toy.setChannel(1, plainTexture),
+    /iChannel1 reads Buffer A, which the toy draws itself; make a new Shadertoy/,
+  );
   assert.throws(() => toy.setChannel(3, plainTexture), /iChannel3 reads the keyboard, which the toy draws itself/);
-  assert.throws(() => toy.setChannel(2, plainTexture), /iChannel2 reads a video or image; setChannel gives it a video or image/);
-  assert.throws(() => toy.setChannel(0, image), /iChannel0 reads a texture; setChannel gives it a texture, a function or null/);
+  assert.throws(
+    () => toy.setChannel(2, plainTexture),
+    /iChannel2 reads a video or image; setChannel gives it a video or image/,
+  );
+  assert.throws(
+    () => toy.setChannel(0, image),
+    /iChannel0 reads a texture; setChannel gives it a texture, a function or null/,
+  );
   assert.throws(() => toy.setChannel(0, plainTexture, 'cubeA'), /Shadertoy has no cubeA tab/);
   assert.throws(() => toy.setChannel(4, plainTexture), RangeError);
   toy.dispose();

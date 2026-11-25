@@ -231,10 +231,17 @@ test('under a weak ETag, blocks of two versions are never combined in one answer
   await cache.flush();
   // Same size, same weak tag, new bytes: nothing tells the cache the first block is stale.
   files['/weak.glb'] = { body: bytes(4000, 2), etag: 'W/"same"' };
-  assert.deepEqual(await read(await get(cache, 'weak.glb', 'bytes=1100-1109')), files['/weak.glb'].body.slice(1100, 1110));
+  assert.deepEqual(
+    await read(await get(cache, 'weak.glb', 'bytes=1100-1109')),
+    files['/weak.glb'].body.slice(1100, 1110),
+  );
   await cache.flush();
   const both = await read(await get(cache, 'weak.glb', 'bytes=0-1500'));
-  assert.deepEqual(both, files['/weak.glb'].body.slice(0, 1501), 'every byte of one answer comes from the same version');
+  assert.deepEqual(
+    both,
+    files['/weak.glb'].body.slice(0, 1501),
+    'every byte of one answer comes from the same version',
+  );
 });
 
 test('under a strong ETag block requests carry If-Range with it', async () => {
@@ -296,7 +303,8 @@ test('request cache modes: no-store skips the store, reload replaces the blocks,
   const files = { '/m.glb': { body: bytes(3000), etag: '"v1"', control: 'max-age=3600' } },
     network = server(files),
     cache = new RangeCache({ name: 'modes', block: B, fetch: network }),
-    at = (init, range = 'bytes=0-1023') => cache.fetch(base + 'm.glb', { ...init, headers: { range, ...init?.headers } });
+    at = (init, range = 'bytes=0-1023') =>
+      cache.fetch(base + 'm.glb', { ...init, headers: { range, ...init?.headers } });
   // no-store: the range goes to the network as asked (not widened) and nothing is kept.
   assert.deepEqual(await read(await at({ cache: 'no-store' }, 'bytes=10-19')), files['/m.glb'].body.slice(10, 20));
   assert.deepEqual(ranges(network), ['bytes=10-19']);
@@ -351,7 +359,14 @@ test('a stale must-revalidate file whose server answers 503 is served from its b
   await read(await warm.fetch(base + 'm.glb', { headers: { range: 'bytes=0-1023' } }));
   await warm.flush();
   // Accepted difference for offline play (docs/limits.md, "Stale copies on failure"): looser than RFC 9111 5.2.2.2.
-  const down = new RangeCache({ name: 'stale-503', block: B, fetch: async () => new Response('down', { status: 503 }) });
-  assert.deepEqual(await read(await down.fetch(base + 'm.glb', { headers: { range: 'bytes=0-99' } })), body.slice(0, 100));
+  const down = new RangeCache({
+    name: 'stale-503',
+    block: B,
+    fetch: async () => new Response('down', { status: 503 }),
+  });
+  assert.deepEqual(
+    await read(await down.fetch(base + 'm.glb', { headers: { range: 'bytes=0-99' } })),
+    body.slice(0, 100),
+  );
   assert.equal(down.stats.offline, 1);
 });

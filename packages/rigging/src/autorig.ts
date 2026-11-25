@@ -72,7 +72,11 @@ const MIN_RESOLUTION = 32;
 const MAX_RESOLUTION = 384;
 
 const sub = (a: readonly number[], b: readonly number[]): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a: readonly number[], b: readonly number[], s = 1): Vec3 => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
+const add = (a: readonly number[], b: readonly number[], s = 1): Vec3 => [
+  a[0] + b[0] * s,
+  a[1] + b[1] * s,
+  a[2] + b[2] * s,
+];
 const mix = (a: readonly number[], b: readonly number[], t: number): Vec3 => add(a, sub(b, a), t);
 const dot = (a: readonly number[], b: readonly number[]): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const length = (a: readonly number[]): number => Math.hypot(a[0], a[1], a[2]);
@@ -317,7 +321,7 @@ function slab(solid: Solid, sole: number, height: number): number[][] {
     top = sole + Math.max(1, SOLE * height),
     seen = new Uint8Array(mask.length),
     parts: number[][] = [];
-  const inSlab = (i: number): boolean => mask[i] === 1 && (((i / nx) | 0) % ny) <= top;
+  const inSlab = (i: number): boolean => mask[i] === 1 && ((i / nx) | 0) % ny <= top;
   for (let i = 0; i < mask.length; i++) {
     if (!inSlab(i) || seen[i]) continue;
     const part: number[] = [],
@@ -355,7 +359,12 @@ function nearest(solid: Solid, voxels: readonly number[], point: readonly number
 }
 
 /** A cut through the solid at `point` across `normal`: how many voxels it holds and their middle. */
-function section(solid: Solid, point: readonly number[], normal: readonly number[], reach: number): { area: number; middle: Vec3 } {
+function section(
+  solid: Solid,
+  point: readonly number[],
+  normal: readonly number[],
+  reach: number,
+): { area: number; middle: Vec3 } {
   const { grid, mask } = solid,
     { nx, ny } = grid,
     x0 = Math.round(point[0]),
@@ -609,7 +618,11 @@ function place(solid: Solid, body: Body, forwardHint: Vec3 | null) {
       flat: Vec3 = [ankle[0], sole + 0.02 * height, ankle[2]];
     return { toes: mix(flat, tip, 0.68), end: tip };
   };
-  const hips: Vec3 = [(a.leg.upper[0] + b.leg.upper[0]) / 2, hipY + 0.02 * height, (a.leg.upper[2] + b.leg.upper[2]) / 2];
+  const hips: Vec3 = [
+    (a.leg.upper[0] + b.leg.upper[0]) / 2,
+    hipY + 0.02 * height,
+    (a.leg.upper[2] + b.leg.upper[2]) / 2,
+  ];
   const spineY = (t: number): number => hips[1] + (shoulderY - hips[1]) * t,
     headJoint = onTrunk(neckY + 0.012 * height),
     neck = onTrunk(shoulderY + (neckY - shoulderY) * 0.45);
@@ -716,9 +729,7 @@ function even(named: [string, string | null, Vec3][], side: Vec3, height: number
     middle = dot(hips, side);
   const mirror = (p: Vec3): Vec3 => add(p, side, 2 * (middle - dot(p, side)));
   const pairs = named.filter((row) => row[0].startsWith('left'));
-  const worst = Math.max(
-    ...pairs.map((row) => length(sub(mirror(row[2]), byName.get(`right${row[0].slice(4)}`)![2]))),
-  );
+  const worst = Math.max(...pairs.map((row) => length(sub(mirror(row[2]), byName.get(`right${row[0].slice(4)}`)![2]))));
   if (worst > 0.08 * height) return;
   for (const row of pairs) {
     const other = byName.get(`right${row[0].slice(4)}`)!,
@@ -748,8 +759,7 @@ export async function autoRig(mesh: WeightMesh, options: AutoRigOptions = {}): P
     throw new RangeError(`autoRig resolution must be an integer from ${MIN_RESOLUTION} to ${MAX_RESOLUTION}`);
   if (!Number.isInteger(closing) || closing < 0 || closing > 8)
     throw new RangeError('autoRig closing must be an integer from 0 to 8');
-  if (weights !== 'voxel' && weights !== 'none')
-    throw new RangeError("autoRig weights must be 'voxel' or 'none'");
+  if (weights !== 'voxel' && weights !== 'none') throw new RangeError("autoRig weights must be 'voxel' or 'none'");
   const upLength = up && length(up);
   if (!(upLength > 0) || !Number.isFinite(upLength)) throw new RangeError('autoRig up must be a nonzero vector');
   const forwardGiven = options.forward,
@@ -798,8 +808,7 @@ export async function autoRig(mesh: WeightMesh, options: AutoRigOptions = {}): P
   const count = solid.count,
     { named, forward, facingFound } = place(solid, body, forwardGiven ? flat(toFrame(forwardGiven)) : null);
   if (symmetric) even(named, body.side, body.height);
-  const toMesh = (p: readonly number[]): Vec3 =>
-    fromFrame(add(grid.origin, add(p, [0.5, 0.5, 0.5]), grid.cell));
+  const toMesh = (p: readonly number[]): Vec3 => fromFrame(add(grid.origin, add(p, [0.5, 0.5, 0.5]), grid.cell));
   const index = new Map(named.map((row, i) => [row[0], i]));
   const joints: RigJoint[] = named.map(([name, parent, position]) => ({
     name,

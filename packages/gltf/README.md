@@ -318,6 +318,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/model.glb');
 console.log(model.meshes.length); // the drawn nodes, as from the light loader
 Shadows.attach(engine).add(model.root); // the root is a group: every node below it casts
+
+model.root.setParent(engine.createMesh()); // root and nodes are the public `Mesh`: parent to and from your meshes, no cast
 ```
 
 The root and every node are also core's public `Mesh`, the type `engine.createMesh()` returns, so a model parents to a

@@ -16,8 +16,8 @@ export async function gltfRoute(target: URL, signal: AbortSignal) {
   // A pointer from a clone without Git LFS would otherwise fail below as invalid JSON.
   rejectLFSPointer(bytes, target.href);
   const doc = parseJSON<GLTFDocument>(
-      new TextDecoder('utf-8', { fatal: true }).decode(isGLB(bytes) ? glbChunks(bytes)[0].data : bytes),
-    );
+    new TextDecoder('utf-8', { fatal: true }).decode(isGLB(bytes) ? glbChunks(bytes)[0].data : bytes),
+  );
   let feature = '',
     animation = '',
     vertices = 0;

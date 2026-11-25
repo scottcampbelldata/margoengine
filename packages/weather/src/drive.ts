@@ -92,7 +92,12 @@ export interface SceneFogTarget {
 }
 /** A fog volume (`VolumetricFog` from `@margoengine/environment`): extinction per metre and its scattering colour. */
 export interface FogVolumeTarget {
-  readonly options: { density?: number; visibility?: number; wind?: readonly [number, number, number]; color?: readonly [number, number, number] };
+  readonly options: {
+    density?: number;
+    visibility?: number;
+    wind?: readonly [number, number, number];
+    color?: readonly [number, number, number];
+  };
 }
 /** Scatter (`Scatter` from `@margoengine/scatter`), with or without a `wind` option: the drive writes its wind. */
 export interface ScatterTarget {
@@ -367,9 +372,15 @@ export function validateDrive(o: DriveOptions): void {
     (typeof o.windAloft !== 'number' || !Number.isFinite(o.windAloft) || o.windAloft < 0 || o.windAloft > 20)
   )
     throw new RangeError('WeatherDrive windAloft must be a number from 0 to 20; pass a finite value in range');
-  if (o.dustLight !== undefined && (typeof o.dustLight !== 'number' || !Number.isFinite(o.dustLight) || o.dustLight < 0 || o.dustLight > 100))
+  if (
+    o.dustLight !== undefined &&
+    (typeof o.dustLight !== 'number' || !Number.isFinite(o.dustLight) || o.dustLight < 0 || o.dustLight > 100)
+  )
     throw new RangeError('WeatherDrive dustLight must be a number from 0 to 100; pass a finite value in range');
-  if (o.smokeLight !== undefined && (typeof o.smokeLight !== 'number' || !Number.isFinite(o.smokeLight) || o.smokeLight < 0 || o.smokeLight > 100))
+  if (
+    o.smokeLight !== undefined &&
+    (typeof o.smokeLight !== 'number' || !Number.isFinite(o.smokeLight) || o.smokeLight < 0 || o.smokeLight > 100)
+  )
     throw new RangeError('WeatherDrive smokeLight must be a number from 0 to 100; pass a finite value in range');
   for (const key of ['ashLight', 'sprayLight'] as const) {
     const v = o[key];
@@ -377,23 +388,37 @@ export function validateDrive(o: DriveOptions): void {
       throw new RangeError(`WeatherDrive ${key} must be a number from 0 to 100; pass a finite value in range`);
   }
   for (const key of ['ashFromEruption', 'sprayFromSea'] as const)
-    if (o[key] !== undefined && typeof o[key] !== 'boolean') throw new TypeError(`WeatherDrive ${key} must be true or false`);
+    if (o[key] !== undefined && typeof o[key] !== 'boolean')
+      throw new TypeError(`WeatherDrive ${key} must be true or false`);
   for (const e of list(o.eruptions))
     if (typeof e !== 'object' || e === null || typeof e.visibility !== 'function')
       throw new TypeError('WeatherDrive eruptions need visibility(x, z); pass an Eruption');
   if (
     o.surf !== undefined &&
-    (!Array.isArray(o.surf) || o.surf.length === 0 || !o.surf.every((q) => Array.isArray(q) && q.length === 2 && Number.isFinite(q[0]) && Number.isFinite(q[1])))
+    (!Array.isArray(o.surf) ||
+      o.surf.length === 0 ||
+      !o.surf.every((q) => Array.isArray(q) && q.length === 2 && Number.isFinite(q[0]) && Number.isFinite(q[1])))
   )
     throw new TypeError('WeatherDrive surf must be a list of [x, z] world points; pass at least one finite point');
-  if (o.smokeWidth !== undefined && (typeof o.smokeWidth !== 'number' || !Number.isFinite(o.smokeWidth) || !(o.smokeWidth > 0)))
+  if (
+    o.smokeWidth !== undefined &&
+    (typeof o.smokeWidth !== 'number' || !Number.isFinite(o.smokeWidth) || !(o.smokeWidth > 0))
+  )
     throw new RangeError('WeatherDrive smokeWidth must be a number above 0 metres; pass a finite value in range');
   if (o.smokeFromFire !== undefined && typeof o.smokeFromFire !== 'boolean')
     throw new TypeError('WeatherDrive smokeFromFire must be true or false');
   if (o.fuelMoistureFromWeather !== undefined && typeof o.fuelMoistureFromWeather !== 'boolean')
     throw new TypeError('WeatherDrive fuelMoistureFromWeather must be true or false');
-  if (o.fuelTimeScale !== undefined && (typeof o.fuelTimeScale !== 'number' || !Number.isFinite(o.fuelTimeScale) || o.fuelTimeScale < 0 || o.fuelTimeScale > 1e6))
-    throw new RangeError('WeatherDrive fuelTimeScale must be a number from 0 to 1,000,000; pass a finite value in range');
+  if (
+    o.fuelTimeScale !== undefined &&
+    (typeof o.fuelTimeScale !== 'number' ||
+      !Number.isFinite(o.fuelTimeScale) ||
+      o.fuelTimeScale < 0 ||
+      o.fuelTimeScale > 1e6)
+  )
+    throw new RangeError(
+      'WeatherDrive fuelTimeScale must be a number from 0 to 1,000,000; pass a finite value in range',
+    );
   if (o.dustFromSand !== undefined && typeof o.dustFromSand !== 'boolean')
     throw new TypeError('WeatherDrive dustFromSand must be true or false');
   for (const [name, target] of [
@@ -526,7 +551,12 @@ export class WeatherDrive {
           ? list(o.blownSand)
           : found
             ? ([...found]
-                .filter(([n, p]) => n.startsWith('blown-sand:') && typeof (p as BlownSandTarget).options === 'object' && (p as BlownSandTarget).options !== null)
+                .filter(
+                  ([n, p]) =>
+                    n.startsWith('blown-sand:') &&
+                    typeof (p as BlownSandTarget).options === 'object' &&
+                    (p as BlownSandTarget).options !== null,
+                )
                 .map(([, p]) => p) as BlownSandTarget[])
             : [];
     let state = o.weather.state;
@@ -554,12 +584,15 @@ export class WeatherDrive {
       o.eruptions !== undefined
         ? list(o.eruptions)
         : found
-          ? ([...found].filter(([n, p]) => n.startsWith('eruption:') && typeof (p as EruptionTarget).visibility === 'function').map(([, p]) => p) as EruptionTarget[])
+          ? ([...found]
+              .filter(([n, p]) => n.startsWith('eruption:') && typeof (p as EruptionTarget).visibility === 'function')
+              .map(([, p]) => p) as EruptionTarget[])
           : [];
     if (eruptions.length > 0 && (o.ashFromEruption ?? true)) {
       // Each eruption's ash extinction at the camera (its visibility holds the clear air, taken off here); they add.
       let extinction = 0;
-      for (const e of eruptions) extinction += Math.max(0, KOSCHMIEDER / e.visibility(here[0]!, here[2]!) - CLEAR_AIR_EXTINCTION);
+      for (const e of eruptions)
+        extinction += Math.max(0, KOSCHMIEDER / e.visibility(here[0]!, here[2]!) - CLEAR_AIR_EXTINCTION);
       const raised = ashForExtinction(extinction);
       if (raised > state.ash) state = { ...state, ash: raised };
     }
@@ -571,18 +604,24 @@ export class WeatherDrive {
           : [];
     if ((coasts.length > 0 || o.surf !== undefined) && (o.sprayFromSea ?? true)) {
       // The surf line given, else every sea's own breaker line (a Water with `terrain.heights`).
-      const lines = o.surf !== undefined ? [o.surf] : coasts.flatMap((w) => (typeof w.breakerLine === 'function' ? w.breakerLine() : []));
+      const lines =
+        o.surf !== undefined
+          ? [o.surf]
+          : coasts.flatMap((w) => (typeof w.breakerLine === 'function' ? w.breakerLine() : []));
       let distance = Infinity;
-      for (const line of lines) if (line.length > 0) distance = Math.min(distance, surfDistance(line, here[0]!, here[2]!));
+      for (const line of lines)
+        if (line.length > 0) distance = Math.min(distance, surfDistance(line, here[0]!, here[2]!));
       const raised = sprayFromWind(state.wind, distance);
       if (raised > state.spray) state = { ...state, spray: raised };
     }
-    if (fires.length > 0 && (o.fuelMoistureFromWeather ?? true)) this.wetFuel(fires, state, delta, o.sky ?? (found?.get(FOUND.sky) as SkyTarget | undefined));
+    if (fires.length > 0 && (o.fuelMoistureFromWeather ?? true))
+      this.wetFuel(fires, state, delta, o.sky ?? (found?.get(FOUND.sky) as SkyTarget | undefined));
     const s = driveSettings(state, o.windAloft),
-
       find = <T extends { options: object }>(name: string): T | undefined => {
         const p = found?.get(name) as T | undefined;
-        return p !== undefined && p !== (this as object) && typeof p.options === 'object' && p.options !== null ? p : undefined;
+        return p !== undefined && p !== (this as object) && typeof p.options === 'object' && p.options !== null
+          ? p
+          : undefined;
       },
       skyTarget = o.sky ?? find<SkyTarget>(FOUND.sky),
       cloudTargets = o.clouds !== undefined ? list(o.clouds) : list(find<CloudLayerTarget>(FOUND.clouds)),
@@ -594,7 +633,13 @@ export class WeatherDrive {
       if (sky.clouds) put(sky.clouds, 'coverage', s.coverage);
       if (sky.fog) {
         put(sky.fog, 'density', Math.min(1, sky.fog.falloff === 'exp' ? s.extinction : s.squaredDensity));
-        this.tintFog(sky.fog, state, s.extinction, [o.dustLight ?? 1, o.smokeLight ?? 1, o.ashLight ?? 1, o.sprayLight ?? 1], sunElevation(skyTarget));
+        this.tintFog(
+          sky.fog,
+          state,
+          s.extinction,
+          [o.dustLight ?? 1, o.smokeLight ?? 1, o.ashLight ?? 1, o.sprayLight ?? 1],
+          sunElevation(skyTarget),
+        );
       }
       this.dimSun(skyTarget, state);
     }
@@ -603,7 +648,12 @@ export class WeatherDrive {
         ? list(o.grounds)
         : found
           ? ([...found]
-              .filter(([n, p]) => (n.startsWith('ground-change:') || n.startsWith('terrain:rocks:')) && typeof (p as GroundTarget).look === 'object' && (p as GroundTarget).look !== null)
+              .filter(
+                ([n, p]) =>
+                  (n.startsWith('ground-change:') || n.startsWith('terrain:rocks:')) &&
+                  typeof (p as GroundTarget).look === 'object' &&
+                  (p as GroundTarget).look !== null,
+              )
               .map(([, p]) => p) as GroundTarget[])
           : [];
     for (const ground of grounds) if (!heldFromWeather(ground.look, 'rain')) ground.look.rain = state.rain;
@@ -612,7 +662,12 @@ export class WeatherDrive {
       // of a person's (unset, or a speed of 0).
       const now = sand.options.wind as { speed?: number } | undefined,
         mine = this.sandWinds.get(sand);
-      if (!heldFromWeather(sand.options, 'wind') && (now === undefined || now === mine || (typeof now === 'object' && now !== null && !('options' in now) && now.speed === 0))) {
+      if (
+        !heldFromWeather(sand.options, 'wind') &&
+        (now === undefined ||
+          now === mine ||
+          (typeof now === 'object' && now !== null && !('options' in now) && now.speed === 0))
+      ) {
         const w = (now === mine && mine ? mine : {}) as { speed: number; direction: number; gust: number };
         w.speed = state.wind;
         w.direction = state.windDirection;
@@ -620,7 +675,10 @@ export class WeatherDrive {
         this.sandWinds.set(sand, w);
         (sand.options as { wind?: unknown }).wind = w;
       }
-      if (!heldFromWeather(sand.options, 'fog') && (sand.options.fog === undefined || sand.options.fog === this.fogs.get(sand))) {
+      if (
+        !heldFromWeather(sand.options, 'fog') &&
+        (sand.options.fog === undefined || sand.options.fog === this.fogs.get(sand))
+      ) {
         const fog = Math.min(1, s.extinction);
         this.fogs.set(sand, fog);
         sand.options.fog = fog;
@@ -679,9 +737,14 @@ export class WeatherDrive {
         putAll(g, w);
       }
       const effects: VfxTarget[] =
-        o.vfx !== undefined ? [...list(o.vfx)] : [
+        o.vfx !== undefined
+          ? [...list(o.vfx)]
+          : [
               ...named<VfxTarget>('vfx:', (p) => typeof p.setWind === 'function' && typeof p.options === 'object'),
-              ...named<VfxTarget>('fire-front:', (p) => typeof p.setWind === 'function' && typeof p.options === 'object'),
+              ...named<VfxTarget>(
+                'fire-front:',
+                (p) => typeof p.setWind === 'function' && typeof p.options === 'object',
+              ),
             ];
       // The fires given by hand spread in the same wind as those found by name (a front stepped without an engine, as a
       // scene rolls a fire's past, is found by nobody).
@@ -692,7 +755,12 @@ export class WeatherDrive {
         // A wind a person gave the effect (not the one this drive wrote, and not [0, 0], which is no wind) overrides the weather.
         const now = effect.options.wind;
         if (heldFromWeather(effect.options, 'wind')) continue;
-        if (now !== undefined && now !== this.winds.get(effect) && !(Array.isArray(now) && now[0] === 0 && now[1] === 0)) continue;
+        if (
+          now !== undefined &&
+          now !== this.winds.get(effect) &&
+          !(Array.isArray(now) && now[0] === 0 && now[1] === 0)
+        )
+          continue;
         const own: [number, number] = [wind[0], wind[1]];
         this.winds.set(effect, own);
         effect.options.wind = own;
@@ -756,7 +824,11 @@ export class WeatherDrive {
       const f = fire.options as Record<string, unknown>,
         last = this.fuelWrote.get(fire);
       for (const key of ['moisture', 'moisture10', 'moisture100'] as const)
-        if (!heldFromWeather(f, key) && (f[key] === undefined || f[key] === null || (last !== undefined && f[key] === last[key]))) f[key] = now[key];
+        if (
+          !heldFromWeather(f, key) &&
+          (f[key] === undefined || f[key] === null || (last !== undefined && f[key] === last[key]))
+        )
+          f[key] = now[key];
       this.fuelWrote.set(fire, now);
     }
   }
@@ -765,10 +837,21 @@ export class WeatherDrive {
   // each by its share of their extinction (one alone gives its own colour exactly), lit by the light that still reaches
   // the air through the smoke, ash and spray (`hazeLight`), so a thick layer darkens the haze; the colour the fog had
   // comes back when they are not. A colour a person set meanwhile is kept as the one to come back to.
-  private tintFog(fog: { color?: readonly [number, number, number] }, state: WeatherState, extinction: number, lights: readonly number[], elevation: number): void {
+  private tintFog(
+    fog: { color?: readonly [number, number, number] },
+    state: WeatherState,
+    extinction: number,
+    lights: readonly number[],
+    elevation: number,
+  ): void {
     if (heldFromWeather(fog, 'color')) return;
     const record = this.fogColors.get(fog),
-      parts = [dustExtinction(state.dust), smokeExtinction(state.smoke), ashExtinction(state.ash), sprayExtinction(state.spray)],
+      parts = [
+        dustExtinction(state.dust),
+        smokeExtinction(state.smoke),
+        ashExtinction(state.ash),
+        sprayExtinction(state.spray),
+      ],
       total = parts[0]! + parts[1]! + parts[2]! + parts[3]!;
     if (total > 0 && total >= 0.5 * extinction) {
       const colors = [dustColor, smokeColor, ashColor, sprayColor],
@@ -805,7 +888,12 @@ export class WeatherDrive {
   private tintVolume(options: FogVolumeTarget['options'], state: WeatherState, extinction: number): void {
     if (heldFromWeather(options, 'color')) return;
     const record = this.fogColors.get(options),
-      parts = [dustExtinction(state.dust), smokeExtinction(state.smoke), ashExtinction(state.ash), sprayExtinction(state.spray)],
+      parts = [
+        dustExtinction(state.dust),
+        smokeExtinction(state.smoke),
+        ashExtinction(state.ash),
+        sprayExtinction(state.spray),
+      ],
       total = parts[0]! + parts[1]! + parts[2]! + parts[3]!;
     if (total > 0) {
       const all = Math.max(extinction, total),
@@ -844,7 +932,9 @@ export class WeatherDrive {
     const record = this.sunColors.get(atm);
     if (loaded) {
       const t = sunTransmittance(state, sunElevation(sky)),
-        original = (record && atm.sunColor === record.wrote ? record.original : atm.sunColor) as readonly [number, number, number] | undefined,
+        original = (record && atm.sunColor === record.wrote ? record.original : atm.sunColor) as
+          | readonly [number, number, number]
+          | undefined,
         base = original ?? [1, 1, 1],
         color: readonly [number, number, number] = [base[0] * t[0], base[1] * t[1], base[2] * t[2]];
       this.sunColors.set(atm, { original, wrote: color });
@@ -863,7 +953,12 @@ export class WeatherDrive {
   // layer lit from above does (`scatteredLight`, a share of the zenith sun on the ground, times the sun colour above the
   // air), while `sunColor` takes the dome down by t with the sun. So under a thick load the dome, its reflections, its
   // light on the scene and a fog volume's ambient are the layer's dim grey glow, not the clear sky. Cleared as sunColor is.
-  private lightSky(atm: NonNullable<SkyTarget['options']['atmosphere']>, state: WeatherState, sky: SkyTarget, loaded: boolean): void {
+  private lightSky(
+    atm: NonNullable<SkyTarget['options']['atmosphere']>,
+    state: WeatherState,
+    sky: SkyTarget,
+    loaded: boolean,
+  ): void {
     if (heldFromWeather(atm, 'scatteredLight')) return;
     const record = this.skyLights.get(atm);
     if (loaded) {
@@ -872,10 +967,16 @@ export class WeatherDrive {
         light = hazeLight(state, elevation),
         up = Math.max(0, Math.sin(elevation)),
         sunRecord = this.sunColors.get(atm),
-        above = ((sunRecord && atm.sunColor === sunRecord.wrote ? sunRecord.original : atm.sunColor) ?? [1, 1, 1]) as readonly number[],
-        original = (record && atm.scatteredLight === record.wrote ? record.original : atm.scatteredLight) as readonly [number, number, number] | undefined,
+        above = ((sunRecord && atm.sunColor === sunRecord.wrote ? sunRecord.original : atm.sunColor) ?? [
+          1, 1, 1,
+        ]) as readonly number[],
+        original = (record && atm.scatteredLight === record.wrote ? record.original : atm.scatteredLight) as
+          | readonly [number, number, number]
+          | undefined,
         base = original ?? [0, 0, 0],
-        color = [0, 1, 2].map((i) => Math.min(4, base[i]! + Math.max(0, light[i]! - t[i]!) * up * above[i]!)) as unknown as readonly [number, number, number];
+        color = [0, 1, 2].map((i) =>
+          Math.min(4, base[i]! + Math.max(0, light[i]! - t[i]!) * up * above[i]!),
+        ) as unknown as readonly [number, number, number];
       this.skyLights.set(atm, { original, wrote: color });
       atm.scatteredLight = color;
     } else if (record) {

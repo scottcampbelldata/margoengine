@@ -78,7 +78,8 @@ export function splitTriangles(
   flat: boolean,
   limit = CORE_MAX_VERTICES,
 ): { start: number; count: number }[] {
-  if (!Number.isSafeInteger(limit) || limit < 3) throw new LoaderError(F, 'range', 'limit must be an integer of 3 or more');
+  if (!Number.isSafeInteger(limit) || limit < 3)
+    throw new LoaderError(F, 'range', 'limit must be an integer of 3 or more');
   const ranges: { start: number; count: number }[] = [];
   if (flat) {
     const step = Math.min(Math.floor(limit / 3) * 3, CORE_MAX_INDICES);

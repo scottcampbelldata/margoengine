@@ -19,7 +19,10 @@ function apply(): void {
  */
 export function capPixelRatio(value: number): () => void {
   if (typeof value !== 'number' || !(value > 0) || !Number.isFinite(value))
-    throw rangeError(`Canvas maxDpr must be a number above 0 (got ${String(value)}); try maxDpr={1}`, 'react-arguments');
+    throw rangeError(
+      `Canvas maxDpr must be a number above 0 (got ${String(value)}); try maxDpr={1}`,
+      'react-arguments',
+    );
   if (value >= 2) return () => {};
   const hold = { value };
   if (!holds.size) saved = globalThis.margoLow;

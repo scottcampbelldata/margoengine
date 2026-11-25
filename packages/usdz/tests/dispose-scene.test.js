@@ -107,7 +107,8 @@ test('curves() puts its lines and points plugins in the model scene and removes 
         name: 'usd-curves-model',
         setup() {},
         asset: {
-          accessor: (index) => (index === 1 ? new Float32Array([1, 1, 1]) : index === 2 ? new Float32Array(12).fill(1) : data),
+          accessor: (index) =>
+            index === 1 ? new Float32Array([1, 1, 1]) : index === 2 ? new Float32Array(12).fill(1) : data,
           doc: {
             meshes: [
               {

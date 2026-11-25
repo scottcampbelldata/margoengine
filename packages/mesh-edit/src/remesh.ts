@@ -124,9 +124,7 @@ function quadSkew(corners: readonly Vec3[]): number {
       u[0] * v[1] - u[1] * v[0],
     ],
     dot = (u: Vec3, v: Vec3) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2],
-    turns = corners.map((corner, i) =>
-      cross(sub(corners[(i + 1) % 4], corner), sub(corners[(i + 3) % 4], corner)),
-    ),
+    turns = corners.map((corner, i) => cross(sub(corners[(i + 1) % 4], corner), sub(corners[(i + 3) % 4], corner))),
     axis = turns.reduce((sum, turn) => [sum[0] + turn[0], sum[1] + turn[1], sum[2] + turn[2]], [0, 0, 0]);
   let worst = 0;
   for (let i = 0; i < 4; i++) {
@@ -170,7 +168,13 @@ function pairTriangles(
         size = Math.hypot(n[0], n[1], n[2]) || 1;
       return [n[0] / size, n[1] / size, n[2] / size];
     },
-    pairs: { skew: number; first: number; second: number; quad: [number, number, number, number]; uv: MutableVec2[] }[] = [];
+    pairs: {
+      skew: number;
+      first: number;
+      second: number;
+      quad: [number, number, number, number];
+      uv: MutableVec2[];
+    }[] = [];
   for (const list of edges.values()) {
     if (list.length !== 2) continue;
     const [[first, i], [second, j]] = list,

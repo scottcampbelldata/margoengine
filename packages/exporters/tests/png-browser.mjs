@@ -14,7 +14,7 @@ const server = await createServer({
   root: fileURLToPath(new URL('..', import.meta.url)),
   configFile: false,
   logLevel: 'error',
-  server: { port: 0 },
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
 });
 await server.listen();
 let browser;

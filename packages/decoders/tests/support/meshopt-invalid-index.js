@@ -12,6 +12,11 @@ export const invalidIndexStreams = [
   ['TRIANGLES', 3, [0xe1, 0xfe, 0x00, 0xf0, ...new Uint8Array(15)], /invalid codeaux table/],
   ['TRIANGLES', 3, [0xe1, 0xfe, 0x00, ...new Uint8Array(15), 0x01], /invalid codeaux table/],
   // A varint of six bytes: the fifth still has its high bit set.
-  ['TRIANGLES', 3, [0xe1, 0xff, 0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00, ...new Uint8Array(16)], /longer than 5 bytes/],
+  [
+    'TRIANGLES',
+    3,
+    [0xe1, 0xff, 0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00, ...new Uint8Array(16)],
+    /longer than 5 bytes/,
+  ],
   ['INDICES', 1, [0xd1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00, 0, 0, 0, 0], /longer than 5 bytes/],
 ];

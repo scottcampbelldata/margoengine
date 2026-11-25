@@ -155,7 +155,10 @@ try {
         const values = {};
         for (const s of rows) {
           if (s.kind === 'color')
-            values[s.name] = s.default === null ? [s.max * (0.5 + 0.5 * t), s.max * 0.5, s.max * 0.5] : s.default.map((x) => x * (0.5 + 0.5 * t));
+            values[s.name] =
+              s.default === null
+                ? [s.max * (0.5 + 0.5 * t), s.max * 0.5, s.max * 0.5]
+                : s.default.map((x) => x * (0.5 + 0.5 * t));
           else if (s.kind === 'choice') values[s.name] = 'on';
           else if (s.name === 'air.multipleScattering') values[s.name] = 100 + 100 * t;
           else if (s.name === 'air.visibility') values[s.name] = 300 + 700 * t;

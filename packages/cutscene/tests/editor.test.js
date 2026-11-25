@@ -19,8 +19,25 @@ const scene = () => ({
         { time: 4, position: [4, 0, 5], target: [0, 0, 0], fov: 40 },
       ],
     },
-    { type: 'transform', id: 'door', target: 'door', keys: [{ time: 1, position: [0, 0, 0] }, { time: 3, position: [2, 0, 0] }] },
-    { type: 'property', id: 'fade', target: 'screen', property: 'opacity', keys: [{ time: 0, value: 1 }, { time: 2, value: 0 }] },
+    {
+      type: 'transform',
+      id: 'door',
+      target: 'door',
+      keys: [
+        { time: 1, position: [0, 0, 0] },
+        { time: 3, position: [2, 0, 0] },
+      ],
+    },
+    {
+      type: 'property',
+      id: 'fade',
+      target: 'screen',
+      property: 'opacity',
+      keys: [
+        { time: 0, value: 1 },
+        { time: 2, value: 0 },
+      ],
+    },
     { type: 'event', id: 'cues', events: [{ time: 2, name: 'bang' }] },
     { type: 'audio', id: 'music', clips: [{ start: 1, duration: 3, sound: 'theme' }] },
   ],
@@ -30,11 +47,24 @@ const times = (model, track) => rowOf(model, track).items.map((item) => item.tim
 
 test('rows show every track and the markers, with what each item is', () => {
   const rows = new TimelineModel(scene()).rows;
-  assert.deepEqual(rows.map((row) => row.track), ['cam', 'door', 'fade', 'cues', 'music', MARKERS]);
-  assert.deepEqual(rows.map((row) => row.keyable), [true, true, true, true, false, true]);
+  assert.deepEqual(
+    rows.map((row) => row.track),
+    ['cam', 'door', 'fade', 'cues', 'music', MARKERS],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.keyable),
+    [true, true, true, true, false, true],
+  );
   assert.deepEqual(rows[3].items[0], { track: 'cues', index: 0, kind: 'event', time: 2, duration: 0, label: 'bang' });
   assert.deepEqual(rows[4].items[0], { track: 'music', index: 0, kind: 'clip', time: 1, duration: 3, label: 'theme' });
-  assert.deepEqual(rows[5].items[0], { track: MARKERS, index: 0, kind: 'marker', time: 5, duration: 0, label: 'reveal' });
+  assert.deepEqual(rows[5].items[0], {
+    track: MARKERS,
+    index: 0,
+    kind: 'marker',
+    time: 5,
+    duration: 0,
+    label: 'reveal',
+  });
   assert.equal(rows[1].label, 'door');
 });
 
@@ -52,9 +82,13 @@ test('a new key holds what the track gives there, so the scene does not change',
   for (let t = 0; t <= 10; t += 0.25) {
     const a = before.evaluate(t),
       b = after.evaluate(t);
-    a.camera.position.forEach((value, i) => assert.ok(Math.abs(value - b.camera.position[i]) < 1e-12, `camera at ${t}`));
+    a.camera.position.forEach((value, i) =>
+      assert.ok(Math.abs(value - b.camera.position[i]) < 1e-12, `camera at ${t}`),
+    );
     assert.ok(Math.abs(a.camera.fov - b.camera.fov) < 1e-12, `fov at ${t}`);
-    a.transforms.door.position.forEach((value, i) => assert.ok(Math.abs(value - b.transforms.door.position[i]) < 1e-12, `door at ${t}`));
+    a.transforms.door.position.forEach((value, i) =>
+      assert.ok(Math.abs(value - b.transforms.door.position[i]) < 1e-12, `door at ${t}`),
+    );
     assert.ok(Math.abs(a.properties.screen.opacity - b.properties.screen.opacity) < 1e-12, `fade at ${t}`);
   }
   assert.deepEqual(times(model, 'door'), [1, 2, 3]);
@@ -73,7 +107,10 @@ test('events and markers add with a name; clips add whole', () => {
   assert.throws(() => model.addKey('nope', 1), /No track/);
   assert.throws(() => model.addKey('cam', 11), /outside the timeline/);
   assert.throws(() => model.addKey('cam', Number.NaN), /finite/);
-  assert.deepEqual(model.document.markers.map((marker) => marker.name), ['reveal', 'end']);
+  assert.deepEqual(
+    model.document.markers.map((marker) => marker.name),
+    ['reveal', 'end'],
+  );
 });
 
 test('moves keep lists sorted and give refs that follow the items', () => {
@@ -82,13 +119,23 @@ test('moves keep lists sorted and give refs that follow the items', () => {
   assert.deepEqual(moved, { track: 'door', index: 1 });
   assert.deepEqual(times(model, 'door'), [3, 4]);
   // Clips move by their start, markers and events by their time, all at once.
-  model.moveItems([{ track: 'music', index: 0 }, { track: MARKERS, index: 0 }, { track: 'cues', index: 0 }], 1);
+  model.moveItems(
+    [
+      { track: 'music', index: 0 },
+      { track: MARKERS, index: 0 },
+      { track: 'cues', index: 0 },
+    ],
+    1,
+  );
   assert.deepEqual([times(model, 'music'), times(model, MARKERS), times(model, 'cues')], [[2], [6], [3]]);
 });
 
 test('a group stops at the ends of the timeline together, keeping its shape', () => {
   const model = new TimelineModel(scene()),
-    group = [{ track: 'door', index: 0 }, { track: 'door', index: 1 }];
+    group = [
+      { track: 'door', index: 0 },
+      { track: 'door', index: 1 },
+    ];
   model.moveItems(group, -5);
   assert.deepEqual(times(model, 'door'), [0, 2]);
   model.moveItems(group, 50);
@@ -150,7 +197,10 @@ test('what the document refuses is refused whole: two shots may not overlap, a t
         type: 'shot',
         id: 'edit',
         cameras: { a: { position: [0, 0, 5], target: [0, 0, 0] }, b: { position: [5, 0, 0], target: [0, 0, 0] } },
-        clips: [{ start: 0, duration: 2, camera: 'a' }, { start: 2, duration: 2, camera: 'b' }],
+        clips: [
+          { start: 0, duration: 2, camera: 'a' },
+          { start: 2, duration: 2, camera: 'b' },
+        ],
       },
     ],
   };
@@ -166,7 +216,14 @@ test('what the document refuses is refused whole: two shots may not overlap, a t
   assert.equal(model.setItem(ref, { duration: 1 }), true);
   assert.equal(model.cutscene().evaluate(1).camera !== null, true);
   const plain = new TimelineModel(scene());
-  assert.equal(plain.deleteItems([{ track: 'door', index: 0 }, { track: 'door', index: 1 }]), false, 'a key track needs a key');
+  assert.equal(
+    plain.deleteItems([
+      { track: 'door', index: 0 },
+      { track: 'door', index: 1 },
+    ]),
+    false,
+    'a key track needs a key',
+  );
   assert.equal(plain.history.undoCount, 0);
 });
 
@@ -179,7 +236,11 @@ test('snap pulls to items, then the grid, and leaves out what is dragged', () =>
   assert.equal(model.snap(6.72), 6.7, 'the grid');
   assert.equal(model.snap(6.72, { step: 0 }), 6.72, 'no grid');
   assert.equal(model.snap(2.97, { reach: 0, step: 0.5 }), 3, 'no pull, a coarser grid');
-  assert.equal(model.snap(2.97, { ignore: [{ track: 'door', index: 1 }], step: 0.25 }), 3, 'the clip end pulls no more, the grid does');
+  assert.equal(
+    model.snap(2.97, { ignore: [{ track: 'door', index: 1 }], step: 0.25 }),
+    3,
+    'the clip end pulls no more, the grid does',
+  );
   assert.equal(model.snap(6.52, { times: [6.5] }), 6.5, 'a given time');
   assert.equal(model.snap(0.3), 0.3, 'grid times stay tidy');
 });

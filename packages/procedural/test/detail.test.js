@@ -200,7 +200,8 @@ test('a far tree is 14 triangles and fits the full mesh within 10 percent of its
   }
   assert.throws(() => generateTreeStandIn('fir'), RangeError);
   // An inherited key is not a kind (before, 'constructor' passed and gave NaN positions).
-  for (const kind of ['constructor', 'toString', '__proto__']) assert.throws(() => generateTreeStandIn(kind), RangeError);
+  for (const kind of ['constructor', 'toString', '__proto__'])
+    assert.throws(() => generateTreeStandIn(kind), RangeError);
 });
 test('a tree stand-in faces out everywhere: a single-sided material shows trunk and crown from every side', async () => {
   const { generateTreeStandIn } = await import('../dist/standin.js');
@@ -217,7 +218,10 @@ test('a tree stand-in faces out everywhere: a single-sided material shows trunk 
       // Counter-clockwise from outside (core culls back faces with front face 'ccw'): the winding agrees with every
       // vertex normal of the triangle. Before, the eight canopy triangles wound the other way.
       for (const v of [a, b, c])
-        assert.ok(f[0] * n[v * 3] + f[1] * n[v * 3 + 1] + f[2] * n[v * 3 + 2] > 0, `${kind} triangle ${t / 3} faces in`);
+        assert.ok(
+          f[0] * n[v * 3] + f[1] * n[v * 3 + 1] + f[2] * n[v * 3 + 2] > 0,
+          `${kind} triangle ${t / 3} faces in`,
+        );
       faces.push({ f, trunk: Math.max(A[1], B[1], C[1]) <= p[6 * 3 + 1] && Math.min(A[1], B[1], C[1]) === 0 });
     }
     // Seen level from any of 32 directions, some trunk triangle faces the eye (before, the two-quad cross showed its

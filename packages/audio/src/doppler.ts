@@ -27,7 +27,9 @@ export class AudioDoppler {
   private disposed = false;
   private writing = false;
   private readonly live: boolean;
-  private readonly onStateChange = (): void => { this.reset(); };
+  private readonly onStateChange = (): void => {
+    this.reset();
+  };
 
   constructor(sound: PositionalAudio, options: AudioDopplerOptions = {}) {
     this.sound = sound;
@@ -38,22 +40,30 @@ export class AudioDoppler {
     this.rate = options.playbackRate ?? sound.playbackRate;
     this.validateRate(this.rate);
     this.checkSource();
-    if (playbackRateModifiers.has(sound)) throw fault('attached', 'This sound already has Doppler; dispose its controller first', 'state');
+    if (playbackRateModifiers.has(sound))
+      throw fault('attached', 'This sound already has Doppler; dispose its controller first', 'state');
     sound.playbackRate = this.rate;
-    playbackRateModifiers.set(sound, {validate: this.validateRate, apply: value => {
-      if (this.writing) return value;
-      this.validateRate(value);
-      this.rate = value;
-      return value * this.amount;
-    }});
+    playbackRateModifiers.set(sound, {
+      validate: this.validateRate,
+      apply: (value) => {
+        if (this.writing) return value;
+        this.validateRate(value);
+        this.rate = value;
+        return value * this.amount;
+      },
+    });
     if (this.live) sound.context.addEventListener('statechange', this.onStateChange);
     sound.listener.addSource(this);
   }
 
   /** Current Doppler multiplier, independent of the authored playback rate. */
-  get ratio(): number { return this.amount; }
+  get ratio(): number {
+    return this.amount;
+  }
   /** Authored rate; writes on the sound and pool/event plays also update this value. */
-  get playbackRate(): number { return this.rate; }
+  get playbackRate(): number {
+    return this.rate;
+  }
   set playbackRate(value: number) {
     this.assertLive();
     this.validateRate(value);
@@ -73,18 +83,28 @@ export class AudioDoppler {
       return;
     }
     const now = this.live ? performance.now() / 1000 : context.currentTime;
-    const source = this.sound.worldPosition, listener = this.sound.listener.position;
+    const source = this.sound.worldPosition,
+      listener = this.sound.listener.position;
     if (this.time !== undefined && now === this.time) return;
     let ratio = 1;
     if (this.time !== undefined && now > this.time) {
       const dt = now - this.time;
-      const sourceStep = Math.hypot(source[0]-this.previousSource[0],source[1]-this.previousSource[1],source[2]-this.previousSource[2]);
-      const listenerStep = Math.hypot(listener[0]-this.previousListener[0],listener[1]-this.previousListener[1],listener[2]-this.previousListener[2]);
+      const sourceStep = Math.hypot(
+        source[0] - this.previousSource[0],
+        source[1] - this.previousSource[1],
+        source[2] - this.previousSource[2],
+      );
+      const listenerStep = Math.hypot(
+        listener[0] - this.previousListener[0],
+        listener[1] - this.previousListener[1],
+        listener[2] - this.previousListener[2],
+      );
       // A long render gap or motion outside the subsonic model is a cut, not a velocity sample.
       const cut = this.live && (dt > 0.25 || Math.max(sourceStep, listenerStep) / dt > 0.95 * this.speedOfSound);
       const distance = Math.hypot(source[0] - listener[0], source[1] - listener[1], source[2] - listener[2]);
       if (!cut && distance > 0) {
-        let vs = 0, vl = 0;
+        let vs = 0,
+          vl = 0;
         for (let i = 0; i < 3; i++) {
           const direction = (source[i] - listener[i]) / distance;
           vs += ((source[i] - this.previousSource[i]) / dt) * direction;
@@ -121,7 +141,11 @@ export class AudioDoppler {
     const value = this.rate * this.amount;
     if (this.sound.playbackRate === value) return;
     this.writing = true;
-    try { this.sound.playbackRate = value; } finally { this.writing = false; }
+    try {
+      this.sound.playbackRate = value;
+    } finally {
+      this.writing = false;
+    }
   }
   private checkSource(): void {
     if (this.sound.isDisposed || !this.sound.buffer || this.sound.sourceType !== 'buffer')
@@ -136,5 +160,7 @@ export class AudioDoppler {
     if (this.disposed) throw fault('disposed', 'AudioDoppler is disposed; create a new controller');
   }
   declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void { this.dispose(); }
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
 }

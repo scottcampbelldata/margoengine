@@ -36,7 +36,24 @@ export const errorPageUrl = (id: string): string => `https://margoengine.com/err
 const LINK = /margoengine\.com\/errors#([a-z0-9-]+)/i;
 const WORD = /[a-z0-9]+/g;
 // Words every message has, which say nothing about which one it is.
-const STOP = new Set(['a', 'an', 'the', 'is', 'are', 'be', 'to', 'of', 'or', 'and', 'in', 'on', 'it', 'its', 'for', 'see']);
+const STOP = new Set([
+  'a',
+  'an',
+  'the',
+  'is',
+  'are',
+  'be',
+  'to',
+  'of',
+  'or',
+  'and',
+  'in',
+  'on',
+  'it',
+  'its',
+  'for',
+  'see',
+]);
 
 const words = (text: string): string[] => (text.toLowerCase().match(WORD) ?? []).filter((word) => !STOP.has(word));
 
@@ -54,7 +71,8 @@ function bare(text: string): string {
  * failing that the entries whose listed messages share the most words with it (half of the asked words at least).
  */
 export function lookupError(entries: readonly ErrorEntry[], query: string, limit = 3): ErrorMatch[] {
-  if (typeof query !== 'string' || !query.trim()) throw typeError('lookupError needs an error code, message or link', 'mcp');
+  if (typeof query !== 'string' || !query.trim())
+    throw typeError('lookupError needs an error code, message or link', 'mcp');
   const max = Math.max(1, Math.min(10, Math.floor(limit)));
   const link = LINK.exec(query)?.[1]?.toLowerCase();
   if (link) {
@@ -127,7 +145,12 @@ export function createErrorTool(entries: readonly ErrorEntry[]): ToolDefinition 
       type: 'object',
       properties: {
         error: { type: 'string', description: 'The message, the errors#<id> link, the id or the error code.' },
-        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Entries to return when the text matches several. Default 3.' },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 10,
+          description: 'Entries to return when the text matches several. Default 3.',
+        },
       },
       required: ['error'],
       additionalProperties: false,

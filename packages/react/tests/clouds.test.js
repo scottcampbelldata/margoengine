@@ -187,3 +187,17 @@ test('a texture URL loads through the Canvas tracker, and each decoded bitmap is
   delete globalThis.fetch;
   delete globalThis.createImageBitmap;
 });
+
+test('Clouds inside a named <Scene> attaches its native Clouds to that scene, not the default one', async () => {
+  const s = await scene(),
+    world = s.engine.createScene('item'),
+    ready = [];
+  s.world = world;
+  render(tree(s, h(Clouds, { onReady: (c) => ready.push(c) }, h(Cloud, {}))));
+  await frames(s);
+  const named = (plugins) => [...plugins.values()].filter((p) => p.name.startsWith('clouds:'));
+  assert.equal(named(world.plugins).length, 1, 'the native Clouds is in the named scene');
+  assert.equal(named(s.engine.plugins).length, 0, 'none in the default scene');
+  cleanup();
+  assert.equal(named(world.plugins).length, 0, 'unmount removes it from the named scene');
+});

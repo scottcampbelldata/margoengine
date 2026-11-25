@@ -79,7 +79,9 @@ export class EditHistory {
       typeof edit.redo !== 'function' ||
       (edit.discard !== undefined && typeof edit.discard !== 'function')
     )
-      throw new TypeError('History edit needs a label, undo, redo and optional discard function; pass callable actions');
+      throw new TypeError(
+        'History edit needs a label, undo, redo and optional discard function; pass callable actions',
+      );
     if (this.running) throw new MargoError('state', 'History is replaying an edit; record edits outside undo and redo');
     const time = this.now(),
       previous = this.done.at(-1);

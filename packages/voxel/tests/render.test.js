@@ -1781,7 +1781,10 @@ test('lightmap atlas across a device restore: a plain one is dropped and reporte
       positions,
       uv,
     });
-    await settle(frame, () => made.length === 1 && baked(fresh)?.entries.find((e) => e.binding === 8).resource.texture === made[0]);
+    await settle(
+      frame,
+      () => made.length === 1 && baked(fresh)?.entries.find((e) => e.binding === 8).resource.texture === made[0],
+    );
     for (let i = 0; i < 3; i++) frame();
     assert.equal(made.length, 1, 'made once per device');
     const third = restore();

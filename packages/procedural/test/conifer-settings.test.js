@@ -11,7 +11,14 @@ test('conifer slider rows: shared shape, defaults the generator, every row reach
   const d = coniferSettingDefaults();
   assert.equal(d.species, 'douglas-fir');
   assert.equal(d.age, 100);
-  const { species, options } = coniferOptionsFromSettings({ species: 'western-larch', age: 40, condition: 'burnt', imposterSize: '128', seed: 3, basalArea: 20 });
+  const { species, options } = coniferOptionsFromSettings({
+    species: 'western-larch',
+    age: 40,
+    condition: 'burnt',
+    imposterSize: '128',
+    seed: 3,
+    basalArea: 20,
+  });
   assert.equal(species, 'western-larch');
   assert.deepEqual(options, { age: 40, basalArea: 20, condition: 'burnt', seed: 3, imposterSize: 128 });
   const l = coniferLevels('grand-fir', coniferOptionsFromSettings({ imposterSize: '64' }).options);

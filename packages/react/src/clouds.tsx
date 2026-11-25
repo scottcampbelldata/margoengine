@@ -12,6 +12,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { subscribeFrame } from './frame-priority.js';
 import { live, report, useCommit, useMesh, useScene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { trackedFetch } from './assets.js';
 import { fault } from '../../shared/errors.js';
@@ -106,7 +107,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
     optionalPeer('@margoengine/vfx', () => import('@margoengine/vfx/clouds'))
       .then(({ Clouds: Native }) => {
         if (!active || scene.engine.disposed) return;
-        made = Native.attach(scene.engine as unknown as EngineKernel, { range: 0 });
+        made = inScene(scene, () => Native.attach(scene.engine as unknown as EngineKernel, { range: 0 }));
         setClouds(made);
         latest.current.onReady?.(made);
       })
@@ -116,7 +117,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       setClouds(null);
       made?.dispose();
     };
-  }, [scene.engine]);
+  }, [scene.engine, scene.world]);
   // Bitmaps this component decoded: each is closed once the native Clouds draws another texture, or on unmount.
   const decoded = useRef(new Set<ImageBitmap>());
   // A URL is fetched through the Canvas's tracked fetch (so `useProgress` counts it) and decoded; nothing is drawn until
@@ -165,7 +166,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
     optionalPeer('@margoengine/post', () => import('@margoengine/post/depth'))
       .then((api) => {
         if (!active || scene.engine.disposed) return;
-        made = api.DepthTexture.attach(scene.engine as unknown as EngineKernel);
+        made = inScene(scene, () => api.DepthTexture.attach(scene.engine as unknown as EngineKernel));
         setDepth(made);
       })
       .catch((error) => active && fail(error));
@@ -174,7 +175,7 @@ export const Clouds = /* @__PURE__ */ forwardRef<MeshRef, CloudsProps>(function 
       setDepth(null);
       made?.dispose();
     };
-  }, [scene.engine, soft]);
+  }, [scene.engine, scene.world, soft]);
   useCommit(() => {
     if (!clouds) return;
     const waiting = image === undefined || (soft && !depth);

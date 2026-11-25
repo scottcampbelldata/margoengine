@@ -216,7 +216,10 @@ test('clips that share a name, or names that clean up alike, stay apart in every
     lava = { name: 'lava' },
     first = {},
     second = {},
-    cel = (material, x) => [channel(material, 'scale', [0, 0.5], [0.5, 0.5, 0.5, 0.5]), channel(material, 'offset', [0, 0.5], [x, 0, x, 0.5])],
+    cel = (material, x) => [
+      channel(material, 'scale', [0, 0.5], [0.5, 0.5, 0.5, 0.5]),
+      channel(material, 'offset', [0, 0.5], [x, 0, x, 0.5]),
+    ],
     s = {
       nodes: [
         { name: 'pool', material: water },
@@ -241,14 +244,22 @@ test('clips that share a name, or names that clean up alike, stay apart in every
       ['CON', '_CON'],
     ],
   );
-  assert.deepEqual(unity[0].curves.map((c) => c.path).filter((p, i, all) => all.indexOf(p) === i), ['pool']);
+  assert.deepEqual(
+    unity[0].curves.map((c) => c.path).filter((p, i, all) => all.indexOf(p) === i),
+    ['pool'],
+  );
   assert.match(createUnityUVClips(s)[0].data, /Root \+ "\/" \+ clip\.file \+ "\.anim"/);
   const data = new Uint8Array(4 * 4 * 4),
     cels = (await createRobloxUVSwap(s, { texture: () => ({ data, width: 4, height: 4 }) }))
       .map((f) => f.name)
       .filter((n) => n.startsWith('cels/'));
   assert.equal(new Set(cels.map((n) => n.toLowerCase())).size, cels.length);
-  for (const name of ['cels/CON_material0_0.png', 'cels/CON_material0_1.png', 'cels/CON_material1_0.png', 'cels/CON_material1_1.png'])
+  for (const name of [
+    'cels/CON_material0_0.png',
+    'cels/CON_material0_1.png',
+    'cels/CON_material1_0.png',
+    'cels/CON_material1_1.png',
+  ])
     assert.ok(cels.includes(name), name);
   const assets = unrealFlipbooks(s).map((book) => book.asset);
   assert.deepEqual(assets, ['M_a_b_water', 'M_a_b_lava', 'M_a_b_water_2', 'M_CON_material0', 'M_CON_material1']);

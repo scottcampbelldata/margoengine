@@ -116,7 +116,11 @@ async function makeEngine(capacity = 16) {
 
 /** A one-triangle geometry, 72 bytes of vertices: small enough that only the instance buffer meets the limit below. */
 const triangle = () =>
-  new Geometry(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), new Uint32Array([0, 1, 2]));
+  new Geometry(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    new Uint32Array([0, 1, 2]),
+  );
 
 /** Fails the next `renderer.add` the way each failure mode does; `instance` reaches the third buffer of the add. */
 const failures = {
@@ -604,7 +608,8 @@ test('an out-of-memory uncaptured error is reported once and the device is rebui
         gpu.fire(new GPUOutOfMemoryError('a second failure'));
         assert.deepEqual(draw(engine, gpu), [], 'no frame throws or draws on the failed device');
         // The loss starts core's own restore; nothing else calls rebootDevice.
-        for (let i = 0; i < 50 && engine.gpu !== next.device; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+        for (let i = 0; i < 50 && engine.gpu !== next.device; i++)
+          await new Promise((resolve) => setTimeout(resolve, 0));
       },
     );
     assert.equal(gpu.device.destroyed, true, 'the failed device is destroyed');

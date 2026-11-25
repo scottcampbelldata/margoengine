@@ -75,7 +75,10 @@ export class OrbitControls extends Orbit {
       !Number.isFinite(this.returnTime) ||
       this.returnTime < 0
     )
-      throw rangeError('Orbit collision delta, clearance and returnTime must be finite and nonnegative', 'controls-arguments');
+      throw rangeError(
+        'Orbit collision delta, clearance and returnTime must be finite and nonnegative',
+        'controls-arguments',
+      );
     const cam = this.camera,
       old = [...cam.position] as V3,
       oldTarget = [...cam.target] as V3;

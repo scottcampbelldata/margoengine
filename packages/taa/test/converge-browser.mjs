@@ -29,7 +29,7 @@ const server = await createServer({
   configFile: false,
   cacheDir: 'test-results/taa-converge/vite-cache',
   optimizeDeps: { noDiscovery: true },
-  server: { host: '127.0.0.1', port: 5388, strictPort: true, watch: null },
+  server: { host: '127.0.0.1', port: 5388, strictPort: true, watch: null, hmr: false },
   logLevel: 'error',
 });
 await listenWhenFree(() => server.listen(), { port: 5388 });

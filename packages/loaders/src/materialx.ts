@@ -691,7 +691,14 @@ export function parseMaterialX(input: BinaryInput | string, options: XMLExternal
   const materials = Object.values(nodes)
     .filter((node) => node.category === 'surfacematerial')
     .map((node) => ({ name: node.name, shader: surface(node) }));
-  const doc = materialXDocument({ version: root.attributes.version ?? '', nodes, graphs, materials, assignments, includes });
+  const doc = materialXDocument({
+    version: root.attributes.version ?? '',
+    nodes,
+    graphs,
+    materials,
+    assignments,
+    includes,
+  });
   if (root.attributes.colorspace !== undefined) doc.colorspace = root.attributes.colorspace;
   return doc;
 }

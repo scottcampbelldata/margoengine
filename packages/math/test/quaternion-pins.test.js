@@ -76,15 +76,24 @@ test('setFromRotationMatrix reads a 4x4 and a 3x3 rotation', () => {
   const q = new Quaternion(...P);
   const [x, y, z, w] = P;
   const e3 = [
-    1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
-    2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
-    2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
+    1 - 2 * (y * y + z * z),
+    2 * (x * y + z * w),
+    2 * (x * z - y * w),
+    2 * (x * y - z * w),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z + x * w),
+    2 * (x * z + y * w),
+    2 * (y * z - x * w),
+    1 - 2 * (x * x + y * y),
   ];
   const e4 = [e3[0], e3[1], e3[2], 0, e3[3], e3[4], e3[5], 0, e3[6], e3[7], e3[8], 0, 0, 0, 0, 1];
   const sign = Math.sign(q.w);
   for (const e of [e3, e4]) {
     const r = new Quaternion().setFromRotationMatrix({ elements: e });
-    nearQ(r, P.map((c) => c * sign));
+    nearQ(
+      r,
+      P.map((c) => c * sign),
+    );
   }
 });
 
@@ -94,16 +103,46 @@ test('setFromUnitVectors: general, parallel and the three opposite branches', ()
     return r.slice(0, 3);
   };
   const cases = [
-    [[1, 0, 0], [0, 1, 0]],
-    [[0, 0, 1], [1, 0, 0]],
-    [[1, 0, 0], [1, 0, 0]],
-    [[1, 0, 0], [-1, 0, 0]],
-    [[0, 1, 0], [0, -1, 0]],
-    [[0, 0, 1], [0, 0, -1]],
-    [[0.6, 0.8, 0], [-0.6, -0.8, 0]],
-    [[0.3, 0.5, Math.sqrt(1 - 0.34)], [-0.3, -0.5, -Math.sqrt(1 - 0.34)]],
-    [[0.8, 0.1, Math.sqrt(1 - 0.65)], [-0.8, -0.1, -Math.sqrt(1 - 0.65)]],
-    [[0.1, 0.8, Math.sqrt(1 - 0.65)], [-0.1, -0.8, -Math.sqrt(1 - 0.65)]],
+    [
+      [1, 0, 0],
+      [0, 1, 0],
+    ],
+    [
+      [0, 0, 1],
+      [1, 0, 0],
+    ],
+    [
+      [1, 0, 0],
+      [1, 0, 0],
+    ],
+    [
+      [1, 0, 0],
+      [-1, 0, 0],
+    ],
+    [
+      [0, 1, 0],
+      [0, -1, 0],
+    ],
+    [
+      [0, 0, 1],
+      [0, 0, -1],
+    ],
+    [
+      [0.6, 0.8, 0],
+      [-0.6, -0.8, 0],
+    ],
+    [
+      [0.3, 0.5, Math.sqrt(1 - 0.34)],
+      [-0.3, -0.5, -Math.sqrt(1 - 0.34)],
+    ],
+    [
+      [0.8, 0.1, Math.sqrt(1 - 0.65)],
+      [-0.8, -0.1, -Math.sqrt(1 - 0.65)],
+    ],
+    [
+      [0.1, 0.8, Math.sqrt(1 - 0.65)],
+      [-0.1, -0.8, -Math.sqrt(1 - 0.65)],
+    ],
   ];
   for (const [f, t] of cases) {
     const q = new Quaternion().setFromUnitVectors({ x: f[0], y: f[1], z: f[2] }, { x: t[0], y: t[1], z: t[2] });
@@ -135,7 +174,10 @@ test('angleTo, slerp, slerpQuaternions and rotateTowards', () => {
   // the other hemisphere runs toward -q
   const neg = new Quaternion(...axis('z', 1.4).map((c) => -c));
   nearQ(a.clone().slerp(neg, 0.5), axis('z', 0.8));
-  nearQ(a.clone().slerp(neg, 1), axis('z', 1.4).map((c) => -c));
+  nearQ(
+    a.clone().slerp(neg, 1),
+    axis('z', 1.4).map((c) => -c),
+  );
   // nearly identical quaternions take the straight-line branch
   const tiny = new Quaternion(...axis('z', 0.2 + 1e-9));
   nearQ(a.clone().slerp(tiny, 0.5), axis('z', 0.2 + 5e-10), 1e-9);
@@ -167,7 +209,9 @@ test('setFromUnitVectors picks the half-turn axis from the least aligned world a
   const opposite = (f) => {
     const l = Math.hypot(...f);
     const u = f.map((c) => c / l);
-    return new Quaternion().setFromUnitVectors({ x: u[0], y: u[1], z: u[2] }, { x: -u[0], y: -u[1], z: -u[2] }).toArray();
+    return new Quaternion()
+      .setFromUnitVectors({ x: u[0], y: u[1], z: u[2] }, { x: -u[0], y: -u[1], z: -u[2] })
+      .toArray();
   };
   const unitOf = (v) => {
     const l = Math.hypot(...v);
@@ -204,6 +248,10 @@ test('slerp of two nearly equal general rotations takes the straight-line branch
   for (const t of [0.5, 0.25, 2]) {
     const lin = a.map((c, i) => c + (b[i] - c) * t);
     const l = Math.hypot(...lin);
-    nearQ(new Quaternion(...a).slerp(new Quaternion(...b), t), lin.map((c) => c / l), 1e-13);
+    nearQ(
+      new Quaternion(...a).slerp(new Quaternion(...b), t),
+      lin.map((c) => c / l),
+      1e-13,
+    );
   }
 });

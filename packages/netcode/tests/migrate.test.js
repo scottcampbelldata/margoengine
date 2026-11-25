@@ -358,19 +358,41 @@ test('a follower that hears the handoff target leave before the transfer still j
     [ac, ca] = network.pair(),
     [bc, cb] = network.pair();
   const make = (local, peers) =>
-    new HostMigration({ schema, stateType: 'State', local, peers, initial: { score: 0, label: 'start' }, timeout: 2000 });
+    new HostMigration({
+      schema,
+      stateType: 'State',
+      local,
+      peers,
+      initial: { score: 0, label: 'start' },
+      timeout: 2000,
+    });
   const errors = [],
-    a = make(1, new Map([[2, ab], [3, ac]])),
+    a = make(
+      1,
+      new Map([
+        [2, ab],
+        [3, ac],
+      ]),
+    ),
     b = new HostMigration({
       schema,
       stateType: 'State',
       local: 2,
-      peers: new Map([[1, ba], [3, bc]]),
+      peers: new Map([
+        [1, ba],
+        [3, bc],
+      ]),
       initial: { score: 0, label: 'start' },
       timeout: 2000,
       onerror: (error) => errors.push(error),
     }),
-    c = make(3, new Map([[1, ca], [2, cb]]));
+    c = make(
+      3,
+      new Map([
+        [1, ca],
+        [2, cb],
+      ]),
+    );
   t.after(() => [a, b, c].forEach((s) => s.close()));
   const failed = assert.rejects(a.handoff(3), /target left/);
   c.close();

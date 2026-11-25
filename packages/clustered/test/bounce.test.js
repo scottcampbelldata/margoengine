@@ -777,6 +777,105 @@ test('a wall no source sees still hides the room: the scene triangles are occlud
       }
   });
 });
+// KB-BOUNCE-SHADOWSNOW1, the concave-corner receiver plane: a receiver 0.2 to 0.6 m outside the wall's foot is compared
+// where its tangent plane meets the texel's centre ray, which runs on through the wall's foot into the room; the texel
+// there holds the wall or the floor under that plane, both nearer than the receiver, so the plane alone lit the ground
+// behind the wall (0.9% to 5.5% of the unblocked bounce here, flat or on a drift tilted 20 degrees). Each texel's normal
+// tells its surface from the receiver's own.
+test("a receiver behind a wall's foot takes no bounce through it: the texel's surface must be its own", () => {
+  const scene = [
+      ...box([0, 0, 0], [6, 2.5, 4], [0.6, 0.6, 0.6]),
+      rect([1.5, 0.97, 3.6], [1, 0, 0], [0, 0, 0.4], [0.5, 0.4, 0.3]),
+    ],
+    { vpls, points } = reduceBounce(capture(scene, nearWall, 32), nearWall, { vpls: 32, near: 0.15 }),
+    maps = buildVisibility(vpls, points, {
+      resolution: 32,
+      occluders: sampleSurfaces(scene.map(asMesh), vpls, { resolution: 32 }),
+    }),
+    texels = vpls.length * 1024,
+    open = packBounce([[1, 1, 1]], vpls, new Float32Array(texels).fill(OPEN), 32),
+    // The depths alone: no normal codes, the plane test as before the fix.
+    depths = packBounce([[1, 1, 1]], vpls, maps.subarray(0, texels), 32),
+    full = packBounce([[1, 1, 1]], vpls, maps, 32);
+  let leaked = 0;
+  for (const tilt of [0, 20])
+    for (const [x, z] of [
+      [2, 4.2],
+      [0.3, 4.4],
+      [0.6, 4.6],
+      [5.7, 4.3],
+    ]) {
+      const p = [x, 0.05, z],
+        n = [0, Math.cos((tilt * Math.PI) / 180), Math.sin((tilt * Math.PI) / 180)],
+        unblocked = bounceIrradiance(open, p, n)[0],
+        after = bounceIrradiance(full, p, n)[0];
+      assert.ok(traced(scene, vpls, p, n) === 0 && unblocked > 0.01, `${p}: traced 0, unblocked ${unblocked}`);
+      leaked = Math.max(leaked, bounceIrradiance(depths, p, n)[0] / unblocked);
+      assert.ok(after < 0.002 * unblocked, `${p} tilted ${tilt}: ${after} of unblocked ${unblocked}`);
+    }
+  assert.ok(leaked > 0.03, `the depths alone leak at the corner (${leaked} of unblocked), as before the fix`);
+  // On the lit side the texels hold the receiver's own floor, and the maps still give the traced visibility.
+  for (const p of [
+    [1, 0, 3.8],
+    [4.5, 0, 3.9],
+    [3, 0, 2],
+  ]) {
+    const got = bounceIrradiance(full, p, [0, 1, 0])[0],
+      ray = traced(scene, vpls, p, [0, 1, 0]);
+    console.log(`${p}: ${got} vs traced ${ray}`);
+    assert.ok(Math.abs(got / ray - 1) < 0.1, `${p}: ${got} vs traced ${ray}`);
+  }
+});
+// A convex receiver keeps its bounce: a log 0.15 m in radius (16 facets) over lit snow, its crest facing the snow. A
+// texel of a VPL on the snow below spans about 0.1 m at the crest, so its centre ray meets the log's own lower face,
+// bent 20 to 40 degrees from the crest and nearer the VPL than the crest is; a test of the normal alone (within 26
+// degrees) hid 29% of Cabin Hearth's window bounce at its log crest this way, and an offset from the texel's own
+// plane (its normal 9 degrees off on a faceted log) 10% of this crest's with the light at (1.5, 2, 4.5).
+test('a log crest past its texel depth keeps the bounce of the snow below it: one convex surface joins them', () => {
+  const R = 0.15,
+    axis = [0, 1.35, 2.5],
+    log = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8,
+      n = [0, Math.sin(a), Math.cos(a)],
+      t = [0, Math.cos(a), -Math.sin(a)],
+      h = R * Math.tan(Math.PI / 16);
+    log.push(
+      rect(
+        [0, 1, 2].map((k) => axis[k] + n[k] * R),
+        [1, 0, 0],
+        t.map((c) => c * h),
+        [0.5, 0.4, 0.3],
+      ),
+    );
+  }
+  const snow = rect([0, 0, 4], [3, 0, 0], [0, 0, 3], [0.9, 0.9, 0.9]),
+    scene = [...log, snow];
+  for (const position of [
+    [0.4, 3, 5],
+    [1.5, 2, 4.5],
+    [1, 3, 3.5],
+  ]) {
+    const light = { kind: 'point', position, range: 0 },
+      { vpls, points } = reduceBounce(capture(scene, light, 32), light, { vpls: 32, near: 0.15 }),
+      data = packBounce(
+        [[1, 1, 1]],
+        vpls,
+        buildVisibility(vpls, points, {
+          resolution: 32,
+          occluders: sampleSurfaces(scene.map(asMesh), vpls, { resolution: 32 }),
+        }),
+        32,
+      );
+    for (const x of [0, -0.8]) {
+      const crest = [x, 1.35, 2.5 + R],
+        got = bounceIrradiance(data, crest, [0, 0, 1])[0],
+        ray = traced(scene, vpls, crest, [0, 0, 1]);
+      assert.ok(ray > 1e-3, `the snow lights the crest: ${ray}`);
+      assert.ok(Math.abs(got / ray - 1) < 0.1, `light at ${position}: the crest at x ${x} ${got} vs traced ${ray}`);
+    }
+  }
+});
 test('sampleSurfaces merges small far triangles into covering surfels and leaves out what no VPL faces', () => {
   // A 1 m sheet of 2 x 20 x 20 triangles 20 m from a VPL facing it, and one behind the VPL.
   const sheet = (z) => {
@@ -912,11 +1011,14 @@ test('buildVisibility skips the map tiles a triangle cannot cover, with the same
     const stats = { rays: 0 },
       maps = buildVisibility(vpls, [], { resolution: res, occluders, stats }),
       want = brute(vpls, occluders, res);
-    assert.deepEqual(maps, want.maps, `resolution ${res}: the tiles change no texel`);
+    const depths = maps.subarray(0, want.maps.length);
+    assert.deepEqual(depths, want.maps, `resolution ${res}: the tiles change no texel`);
     assert.ok(
-      maps.some((d) => d < OPEN),
+      depths.some((d) => d < OPEN),
       'the walls are in the maps',
     );
+    // The normal codes follow: one for every texel a surface holds, 0 where none does.
+    depths.forEach((d, k) => assert.equal(maps[depths.length + k] > 0, d < OPEN, `texel ${k}`));
     // The brute force tests 1,024 rays at 32 for each triangle beside a VPL; the tiles about a quarter of its 2 million
     // rays (0.66 of them at 13, where a tile is a third of the map's width).
     console.log(`resolution ${res}: ${stats.rays} rays of the brute force's ${want.rays}`);
@@ -924,6 +1026,103 @@ test('buildVisibility skips the map tiles a triangle cannot cover, with the same
       stats.rays > 0 && stats.rays < share * want.rays,
       `resolution ${res}: ${stats.rays} rays of the brute force's ${want.rays}`,
     );
+  }
+});
+// KB-BOUNCE-SHADOWSNOW1, a receiver level with a floor behind the wall: Cabin Hearth's front wall (logs 0.3 m thick,
+// z 2.35 to 2.65, a plank door 2.48 to 2.56 in its opening at x -2.1 to -1.1), its plank floor at y 0.15 and the snow
+// outside 1 to 2 cm above it, with VPLs over the back and side walls (the cabin's back-wall VPL (-1.33, 1.55, -2.23)
+// among them). A texel whose centre ray meets the floor just inside the wall holds, to one depth sample, the snow's own
+// plane, so the snow at (-1.5, 3.0) and (-2.5, 2.9) took the room's bounce through the wall; the texel beside it, toward
+// the ray to the snow, holds the wall standing on that floor.
+const plank = [0.6, 0.6, 0.6],
+  slab = (lo, hi) => {
+    const c = lo.map((l, k) => (l + hi[k]) / 2),
+      h = hi.map((x, k) => (x - lo[k]) / 2),
+      flat = h.indexOf(0),
+      u = [0, 0, 0],
+      v = [0, 0, 0];
+    u[(flat + 1) % 3] = h[(flat + 1) % 3];
+    v[(flat + 2) % 3] = h[(flat + 2) % 3];
+    return rect(c, u, v, plank);
+  },
+  hearthScene = [
+    // The room's floor, ceiling, back and side walls; the front wall's two faces round the door's opening.
+    ...box([-2.85, 0.15, -2.35], [2.85, 2.6, 2.35], plank).slice(0, 5),
+    ...[2.35, 2.65].flatMap((z) => [
+      slab([-2.85, 0, z], [-2.1, 2.6, z]),
+      slab([-1.1, 0, z], [2.85, 2.6, z]),
+      slab([-2.1, 2.15, z], [-1.1, 2.6, z]),
+    ]),
+    slab([-2.1, 0, 2.35], [-1.1, 0.15, 2.35]),
+    slab([-2.1, 0, 2.35], [-2.1, 2.15, 2.65]),
+    slab([-1.1, 0, 2.35], [-1.1, 2.15, 2.65]),
+    slab([-2.1, 2.15, 2.35], [-1.1, 2.15, 2.65]),
+    slab([-2.1, 0, 2.48], [-1.1, 2.15, 2.48]),
+    slab([-2.1, 0, 2.56], [-1.1, 2.15, 2.56]),
+    slab([-6, 0.16, 2.65], [6, 0.16, 8]),
+  ];
+test('snow level with the floor behind a wall takes no bounce through it: the texel beside holds the wall', () => {
+  const vpls = [],
+    at = (position, normal) => vpls.push({ position, normal, flux: [1, 1, 1], area: 0.05, source: 0 });
+  for (let x = -2.7; x <= 2.7; x += 0.15) for (let y = 0.3; y <= 2.5; y += 0.15) at([x, y, -2.23], [0, 0, 1]);
+  for (let z = -2.2; z <= 2.2; z += 0.15)
+    for (let y = 0.3; y <= 2.5; y += 0.15) {
+      at([-2.72, y, z], [1, 0, 0]);
+      at([2.72, y, z], [-1, 0, 0]);
+    }
+  at([-1.33, 1.55, -2.23], [0, 0, 1]);
+  const maps = buildVisibility(vpls, [], {
+      resolution: 32,
+      occluders: sampleSurfaces(hearthScene.map(asMesh), vpls, { resolution: 32 }),
+    }),
+    full = packBounce([[1, 1, 1]], vpls, maps, 32),
+    open = packBounce([[1, 1, 1]], vpls, new Float32Array(vpls.length * 1024).fill(OPEN), 32),
+    up = [0, 1, 0];
+  for (const p of [
+    [-1.5, 0.163, 3.0],
+    [-2.5, 0.172, 2.9],
+  ]) {
+    const unblocked = bounceIrradiance(open, p, up)[0],
+      got = bounceIrradiance(full, p, up)[0],
+      ray = traced(hearthScene, vpls, p, up);
+    console.log(`${p}: ${got} of unblocked ${unblocked}, traced ${ray}`);
+    assert.ok(ray === 0 && unblocked > 0.1, `${p}: traced ${ray}, unblocked ${unblocked}`);
+    assert.ok(got < 0.001 * unblocked, `${p}: ${got} of unblocked ${unblocked}, traced 0`);
+  }
+  // The snow along the wall, 0.1 to 0.55 m out and 0 to 1.2 cm over the floor's plane.
+  let leak = 0,
+    all = 0;
+  for (let x = -2.8; x <= 2.8; x += 0.2)
+    for (const [z, y] of [
+      [2.75, 0.162],
+      [2.9, 0.172],
+      [3.0, 0.165],
+      [3.2, 0.168],
+    ]) {
+      leak += bounceIrradiance(full, [x, y, z], up)[0];
+      all += bounceIrradiance(open, [x, y, z], up)[0];
+    }
+  console.log(`the snow along the wall: ${leak} of unblocked ${all}`);
+  assert.ok(leak < 0.002 * all, `the snow along the wall takes ${leak} of unblocked ${all}`);
+  // Inside, the floor and the wall's foot keep the traced bounce.
+  for (const [p, n] of [
+    [[-1.5, 0.15, 2.0], up],
+    [[-2.5, 0.15, 1.8], up],
+    [[0, 0.15, 1.0], up],
+    [[1.5, 0.15, 2.2], up],
+    [
+      [-2.5, 0.5, 2.35],
+      [0, 0, -1],
+    ],
+    [
+      [0.5, 0.5, 2.35],
+      [0, 0, -1],
+    ],
+  ]) {
+    const got = bounceIrradiance(full, p, n)[0],
+      ray = traced(hearthScene, vpls, p, n);
+    console.log(`${p}: ${got} vs traced ${ray}`);
+    assert.ok(Math.abs(got / ray - 1) < 0.1, `${p}: ${got} vs traced ${ray}`);
   }
 });
 

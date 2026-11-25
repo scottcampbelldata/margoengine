@@ -34,7 +34,11 @@ import { WEATHER_LOOKS, WEATHER_SETTINGS, applyWeatherSettings, weatherStateOf }
 
 const near = (a, b, tolerance = 1e-9) => assert.ok(Math.abs(a - b) <= tolerance, `${a} vs ${b}`);
 const deg = (d) => (d * Math.PI) / 180;
-const engineOf = (...plugins) => ({ plugins: new Map(plugins.map((p) => [p.name, p])), use: () => {}, removePlugin: () => {} });
+const engineOf = (...plugins) => ({
+  plugins: new Map(plugins.map((p) => [p.name, p])),
+  use: () => {},
+  removePlugin: () => {},
+});
 
 test('the extinction of smoke is 4 m2/g of the PM2.5 mass and the visibility is Koschmieder over it', () => {
   assert.equal(SMOKE_MASS_EXTINCTION, 4);
@@ -115,9 +119,15 @@ test('the smoke colour is a grey brown, red over green over blue, a little less 
   const c = smokeColor(),
     d = dustColor();
   assert.ok(c[0] > c[1] && c[1] > c[2], `${c}`);
-  assert.ok(c.every((x) => x > 0.2 && x < 0.7), `${c}`);
+  assert.ok(
+    c.every((x) => x > 0.2 && x < 0.7),
+    `${c}`,
+  );
   // Smoke is darker than desert dust: its albedo is lower (0.84 to 0.89 against 0.92 to 0.96).
-  assert.ok(c.every((x, i) => x < d[i]), `${c} vs ${d}`);
+  assert.ok(
+    c.every((x, i) => x < d[i]),
+    `${c} vs ${d}`,
+  );
   assert.deepEqual(smokeColor(), c, 'a pure function');
 });
 
@@ -197,13 +207,21 @@ test('a sky with a look but no atmosphere gets one for the sun; a sky with neith
   applyWeatherSettings(machine, { smoke: 0.2 });
   const looked = { name: 'sky', options: { look: {} } },
     plain = { name: 'sky', options: { clouds: { coverage: 0.1 } } };
-  for (const [sky, made] of [[looked, true], [plain, false]]) {
+  for (const [sky, made] of [
+    [looked, true],
+    [plain, false],
+  ]) {
     const engine = engineOf(sky),
       drive = WeatherDrive.attach(engine, { weather: machine });
     drive.setup(engine);
     drive.update(0.5);
     assert.equal(sky.options.atmosphere !== undefined, made);
-    if (made) assert.deepEqual(sky.options.atmosphere.sunColor, smokeSunTransmittance(0.2, Math.PI / 2), 'no sun vector: the zenith');
+    if (made)
+      assert.deepEqual(
+        sky.options.atmosphere.sunColor,
+        smokeSunTransmittance(0.2, Math.PI / 2),
+        'no sun vector: the zenith',
+      );
   }
 });
 
@@ -218,7 +236,10 @@ test('the sky fog takes the smoke colour while smoke is most of the air, and a m
   // Lit by the light that reaches the air through the smoke (no sun vector: the zenith).
   const up = Math.PI / 2,
     l5 = hazeLight({ smoke: 0.5 }, up);
-  assert.deepEqual(sky.options.fog.color, smokeColor().map((c, i) => c * l5[i]));
+  assert.deepEqual(
+    sky.options.fog.color,
+    smokeColor().map((c, i) => c * l5[i]),
+  );
   near(sky.options.fog.density, Math.min(1, drive.settings.extinction), 1e-12);
   assert.ok(drive.settings.extinction > smokeExtinction(0.5));
   // Dust and smoke together: a blend weighted by extinction.
@@ -283,7 +304,11 @@ test('a fire front in the scene raises the weather smoke by its emission; none, 
   out.update(0);
   assert.equal(out.settings.smoke, 0);
   // A target handed in is used; one without a number is a TypeError of the drive's options.
-  const given = WeatherDrive.attach(engineOf(sky), { weather: machine, fires: { options: {}, smokeEmission: 4000 }, advance: false });
+  const given = WeatherDrive.attach(engineOf(sky), {
+    weather: machine,
+    fires: { options: {}, smokeEmission: 4000 },
+    advance: false,
+  });
   given.setup(engineOf(sky));
   given.update(0);
   assert.ok(given.settings.smoke > 0.05);

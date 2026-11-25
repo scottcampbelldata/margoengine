@@ -6,7 +6,10 @@ import { test } from 'node:test';
 import { desktopTierURL } from '../scripts/support/desktop-tier.mjs';
 
 test('desktopTierURL pins the full quality tier and keeps the query', () => {
-  assert.equal(desktopTierURL('/demos/orrery/?seed=2', 'http://127.0.0.1:4173'), 'http://127.0.0.1:4173/demos/orrery/?seed=2&quality=high');
+  assert.equal(
+    desktopTierURL('/demos/orrery/?seed=2', 'http://127.0.0.1:4173'),
+    'http://127.0.0.1:4173/demos/orrery/?seed=2&quality=high',
+  );
   assert.equal(desktopTierURL('/x/?quality=light', 'http://h/'), 'http://h/x/?quality=high');
 });
 
@@ -21,6 +24,12 @@ test('the pinned URL gives the full tier on a fresh profile, the bare URL the li
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
   const base = 'http://127.0.0.1:4173';
   const pinned = new URL(desktopTierURL('/demos/orrery/', base));
-  assert.equal(applyQualityTier({ search: pinned.search, page: pinned.pathname, storage: fresh, session: fresh, userAgent }), 'high');
-  assert.equal(applyQualityTier({ search: '', page: '/demos/orrery/', storage: fresh, session: fresh, userAgent }), 'light');
+  assert.equal(
+    applyQualityTier({ search: pinned.search, page: pinned.pathname, storage: fresh, session: fresh, userAgent }),
+    'high',
+  );
+  assert.equal(
+    applyQualityTier({ search: '', page: '/demos/orrery/', storage: fresh, session: fresh, userAgent }),
+    'light',
+  );
 });

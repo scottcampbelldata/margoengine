@@ -19,7 +19,7 @@ const server = await createServer({
   plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
-  server: { port: 0 },
+  server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
 });
 await server.listen();
 const url = `${server.resolvedUrls.local[0]}tests/walk.html`,

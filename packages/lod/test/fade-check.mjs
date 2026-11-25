@@ -42,7 +42,10 @@ try {
   assert.equal(g.left, 0);
   assert.ok(g.during.green > 0 && g.after.green > 0);
   assert.equal(r.ghosts, 4, 'the shape, a keeper per geometry and one pooled ghost');
-  assert.ok(r.none.middle.green > 0 && r.none.end.green === 0, `a level to nothing dissolves: ${JSON.stringify(r.none)}`);
+  assert.ok(
+    r.none.middle.green > 0 && r.none.end.green === 0,
+    `a level to nothing dissolves: ${JSON.stringify(r.none)}`,
+  );
   assert.equal(r.noneHidden, true);
   assert.equal(r.doomed, 0, 'a level disposed in its fade ends it quietly');
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);

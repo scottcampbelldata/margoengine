@@ -46,24 +46,55 @@ test('Triangle: set, positions, copy, clone, equals, area, midpoint, normal, pla
   assert.equal(tri(A, A, A).getArea(), 0);
   nearV(t.getMidpoint(new Vector3()), [1 / 3, 2 / 3, 1]);
   const n = cross(ab, ac);
-  nearV(t.getNormal(new Vector3()), n.map((x) => x / len(n)));
+  nearV(
+    t.getNormal(new Vector3()),
+    n.map((x) => x / len(n)),
+  );
   assert.deepEqual(arr(tri(A, A, A).getNormal(new Vector3(9, 9, 9))), [0, 0, 0]);
   const plane = { normal: new Vector3(), constant: 0 };
   assert.equal(t.getPlane(plane), plane);
-  nearV(plane.normal, n.map((x) => x / len(n)));
-  near(plane.constant, -dot(n.map((x) => x / len(n)), A));
+  nearV(
+    plane.normal,
+    n.map((x) => x / len(n)),
+  );
+  near(
+    plane.constant,
+    -dot(
+      n.map((x) => x / len(n)),
+      A,
+    ),
+  );
   assert.equal(tri(A, A, A).getPlane({ normal: new Vector3(), constant: 5 }).constant, -0);
   const m = new Matrix4().makeTranslation(1, 2, 3);
   const moved = t.clone().applyMatrix4(m);
-  assert.deepEqual([arr(moved.a), arr(moved.b), arr(moved.c)], [[2, 2, 3], [1, 4, 3], [1, 2, 6]]);
+  assert.deepEqual(
+    [arr(moved.a), arr(moved.b), arr(moved.c)],
+    [
+      [2, 2, 3],
+      [1, 4, 3],
+      [1, 2, 6],
+    ],
+  );
 });
 
 test('Triangle: barycentric weights, containment, interpolation and facing', () => {
   const t = tri(A, B, C);
-  for (const w of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.2, 0.3, 0.5], [-0.5, 0.75, 0.75], [0.5, 0.5, 0], [1.5, -0.25, -0.25]]) {
+  for (const w of [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [0.2, 0.3, 0.5],
+    [-0.5, 0.75, 0.75],
+    [0.5, 0.5, 0],
+    [1.5, -0.25, -0.25],
+  ]) {
     const p = [0, 1, 2].map((i) => A[i] * w[0] + B[i] * w[1] + C[i] * w[2]);
     nearV(t.getBarycoord(v3(p), new Vector3()), w);
-    assert.equal(t.containsPoint(v3(p)), w.every((x) => x >= 0), w.join());
+    assert.equal(
+      t.containsPoint(v3(p)),
+      w.every((x) => x >= 0),
+      w.join(),
+    );
   }
   // a point off the plane takes the weights of its projection
   const mid = [0.2, 0.3, 0.5].map((_, i) => 0.2 * A[i] + 0.3 * B[i] + 0.5 * C[i]);
@@ -85,7 +116,11 @@ test('Triangle: barycentric weights, containment, interpolation and facing', () 
     vc = { x: -1, y: 0, z: 5 };
   const w = [0.2, 0.3, 0.5];
   const out = tri(A, B, C).getInterpolation(v3(mid), va, vb, vc, new Vector3());
-  nearV(out, [va.x * w[0] + vb.x * w[1] + vc.x * w[2], va.y * w[0] + vb.y * w[1] + vc.y * w[2], va.z * w[0] + vb.z * w[1] + vc.z * w[2]]);
+  nearV(out, [
+    va.x * w[0] + vb.x * w[1] + vc.x * w[2],
+    va.y * w[0] + vb.y * w[1] + vc.y * w[2],
+    va.z * w[0] + vb.z * w[1] + vc.z * w[2],
+  ]);
   assert.equal(tri(A, A, B).getInterpolation(v3(A), va, vb, vc, new Vector3()), null);
   const ccw = tri([0, 0, 0], [1, 0, 0], [0, 1, 0]);
   assert.equal(ccw.isFrontFacing(v3([0, 0, -1])), true);
@@ -106,12 +141,20 @@ const refClosest = (p, a, b, c) => {
   const nn = dot(n, n);
   if (nn > 1e-12) {
     const proj = p.map((x, i) => x - (n[i] * dot(n, sub(p, a))) / nn);
-    const inside = [[a, b], [b, c], [c, a]].every(([u, w]) => dot(cross(sub(w, u), sub(proj, u)), n) >= 0);
+    const inside = [
+      [a, b],
+      [b, c],
+      [c, a],
+    ].every(([u, w]) => dot(cross(sub(w, u), sub(proj, u)), n) >= 0);
     if (inside) return proj;
   }
   let best = null,
     bd = Infinity;
-  for (const [u, w] of [[a, b], [b, c], [c, a]]) {
+  for (const [u, w] of [
+    [a, b],
+    [b, c],
+    [c, a],
+  ]) {
     const q = pointSegment(p, u, w);
     const d = len(sub(q, p));
     if (d < bd) {
@@ -134,8 +177,19 @@ test('Triangle: closest point and distance match plane-projection-plus-segments,
   }
   // a point outside each vertex and edge region, and inside
   const t = tri([0, 0, 0], [4, 0, 0], [0, 4, 0]);
-  const cases = [[1, 1, 3], [-2, -2, 0], [6, -1, 1], [-1, 6, 0], [3, 3, 2], [2, -3, 0], [-3, 2, 1], [3, 2, -1], [1, 1, 0]];
-  for (const p of cases) nearV(t.closestPointToPoint(v3(p), new Vector3()), refClosest(p, [0, 0, 0], [4, 0, 0], [0, 4, 0]), 1e-12);
+  const cases = [
+    [1, 1, 3],
+    [-2, -2, 0],
+    [6, -1, 1],
+    [-1, 6, 0],
+    [3, 3, 2],
+    [2, -3, 0],
+    [-3, 2, 1],
+    [3, 2, -1],
+    [1, 1, 0],
+  ];
+  for (const p of cases)
+    nearV(t.closestPointToPoint(v3(p), new Vector3()), refClosest(p, [0, 0, 0], [4, 0, 0], [0, 4, 0]), 1e-12);
   // collapsed to a segment or a point
   nearV(tri([0, 0, 0], [4, 0, 0], [2, 0, 0]).closestPointToPoint(v3([5, 1, 0]), new Vector3()), [4, 0, 0]);
   nearV(tri([0, 0, 0], [0, 0, 0], [4, 0, 0]).closestPointToPoint(v3([2, 1, 0]), new Vector3()), [2, 0, 0]);
@@ -167,16 +221,28 @@ const segTri = (p, q, a, b, c) => {
   if ((dp > 0 && dq > 0) || (dp < 0 && dq < 0) || dp === dq) return false;
   const t = dp / (dp - dq);
   const x = p.map((v, i) => v + (q[i] - v) * t);
-  return [[a, b], [b, c], [c, a]].every(([u, w]) => dot(cross(sub(w, u), sub(x, u)), n) >= 0);
+  return [
+    [a, b],
+    [b, c],
+    [c, a],
+  ].every(([u, w]) => dot(cross(sub(w, u), sub(x, u)), n) >= 0);
 };
 const refBoxTri = (a, b, c, lo, hi) => {
   const inside = (p) => p.every((x, i) => x >= lo[i] && x <= hi[i]);
   if ([a, b, c].some(inside)) return true;
-  if ([[a, b], [b, c], [c, a]].some(([u, w]) => segBox(u, w, lo, hi))) return true;
+  if (
+    [
+      [a, b],
+      [b, c],
+      [c, a],
+    ].some(([u, w]) => segBox(u, w, lo, hi))
+  )
+    return true;
   const cs = [];
   for (const x of [lo[0], hi[0]]) for (const y of [lo[1], hi[1]]) for (const z of [lo[2], hi[2]]) cs.push([x, y, z]);
   const edges = [];
-  for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) if (((i ^ j) & (i ^ j) - 1) === 0) edges.push([cs[i], cs[j]]);
+  for (let i = 0; i < 8; i++)
+    for (let j = i + 1; j < 8; j++) if (((i ^ j) & ((i ^ j) - 1)) === 0) edges.push([cs[i], cs[j]]);
   return edges.some(([u, w]) => segTri(u, w, a, b, c));
 };
 
@@ -247,9 +313,30 @@ test('mathutils: clamp, lerp, ranges, easing, modulo, powers of two', () => {
   assert.equal(mu.euclideanModulo(-1, 5), 4);
   assert.equal(mu.euclideanModulo(7, 5), 2);
   assert.equal(mu.euclideanModulo(-10, 5) + 0, 0);
-  for (const [v, want] of [[1, true], [2, true], [1024, true], [2 ** 50, true], [3, false], [0, false], [-4, false], [1.5, false], [2 ** 50 + 1, false], [6, false]])
+  for (const [v, want] of [
+    [1, true],
+    [2, true],
+    [1024, true],
+    [2 ** 50, true],
+    [3, false],
+    [0, false],
+    [-4, false],
+    [1.5, false],
+    [2 ** 50 + 1, false],
+    [6, false],
+  ])
     assert.equal(mu.isPowerOfTwo(v), want, String(v));
-  for (const [v, c, f] of [[1, 1, 1], [3, 4, 2], [4, 4, 4], [5, 8, 4], [1000, 1024, 512], [2 ** 50 + 1, 2 ** 51, 2 ** 50], [2 ** 50, 2 ** 50, 2 ** 50], [0.3, 0.5, 0.25], [0.5, 0.5, 0.5]]) {
+  for (const [v, c, f] of [
+    [1, 1, 1],
+    [3, 4, 2],
+    [4, 4, 4],
+    [5, 8, 4],
+    [1000, 1024, 512],
+    [2 ** 50 + 1, 2 ** 51, 2 ** 50],
+    [2 ** 50, 2 ** 50, 2 ** 50],
+    [0.3, 0.5, 0.25],
+    [0.5, 0.5, 0.5],
+  ]) {
     assert.equal(mu.ceilPowerOfTwo(v), c, 'ceil ' + v);
     assert.equal(mu.floorPowerOfTwo(v), f, 'floor ' + v);
   }
@@ -273,13 +360,34 @@ test('mathutils: seeded generators are fixed sequences, ranges hold', () => {
   assert.equal(s1, first[0]);
   assert.equal(mu.seededRandom(), first[1]);
   assert.equal(mu.seededRandom(7), first[0]);
-  assert.equal(mu.randFloat(2, 4, () => 0.25), 2.5);
-  assert.equal(mu.randFloat(2, 4, () => 0), 2);
-  assert.equal(mu.randInt(3, 7, () => 0), 3);
-  assert.equal(mu.randInt(3, 7, () => 0.9999), 7);
-  assert.equal(mu.randInt(3, 7, () => 0.5), 5);
-  assert.equal(mu.randFloatSpread(10, () => 0.25), 2.5);
-  assert.equal(mu.randFloatSpread(10, () => 0.5), 0);
+  assert.equal(
+    mu.randFloat(2, 4, () => 0.25),
+    2.5,
+  );
+  assert.equal(
+    mu.randFloat(2, 4, () => 0),
+    2,
+  );
+  assert.equal(
+    mu.randInt(3, 7, () => 0),
+    3,
+  );
+  assert.equal(
+    mu.randInt(3, 7, () => 0.9999),
+    7,
+  );
+  assert.equal(
+    mu.randInt(3, 7, () => 0.5),
+    5,
+  );
+  assert.equal(
+    mu.randFloatSpread(10, () => 0.25),
+    2.5,
+  );
+  assert.equal(
+    mu.randFloatSpread(10, () => 0.5),
+    0,
+  );
   const m = Math.random;
   Math.random = () => 0.75;
   try {
@@ -316,7 +424,16 @@ test('Triangle: area, centroid, interpolation and facing with generic coordinate
   assert.equal(t.isFrontFacing(dir(-1)), false);
   const slanted = v3(nn.map((x, i) => -x + [0.3, -0.5, 0.2][i]));
   assert.equal(t.isFrontFacing(slanted), dot(nn, arr(slanted)) < 0);
-  for (const d of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1], [1, 2, 3], [-3, 2, -1]])
+  for (const d of [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [-1, 0, 0],
+    [0, -1, 0],
+    [0, 0, -1],
+    [1, 2, 3],
+    [-3, 2, -1],
+  ])
     assert.equal(t.isFrontFacing(v3(d)), dot(nn, d) < 0, d.join());
 });
 
@@ -326,9 +443,18 @@ test('Triangle.intersectsBox treats a point box as a box and a box empty on one 
   assert.equal(t.intersectsBox(point), true);
   assert.equal(t.intersectsBox(new Box3(v3([0, 0, 1]), v3([0, 0, 1]))), false);
   for (const [lo, hi] of [
-    [[1, 0, -1], [0, 1, 1]],
-    [[0, 1, -1], [1, 0, 1]],
-    [[0, 0, 1], [1, 1, 0]],
+    [
+      [1, 0, -1],
+      [0, 1, 1],
+    ],
+    [
+      [0, 1, -1],
+      [1, 0, 1],
+    ],
+    [
+      [0, 0, 1],
+      [1, 1, 0],
+    ],
   ])
     assert.equal(t.intersectsBox(new Box3(v3(lo), v3(hi))), false, lo.join() + '|' + hi.join());
   assert.equal(t.intersectsBox(new Box3(v3([-3, -3, -3]), v3([3, 3, 3]))), true);

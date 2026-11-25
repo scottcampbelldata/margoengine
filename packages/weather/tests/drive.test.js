@@ -48,7 +48,13 @@ test('update writes every target and steps the weather', () => {
   // The deck drifts with the wind field's own vector at the camera, grown to its 1,500 m base by the 1/7 power law.
   const field = weather.wind.sample(0, 0, 0, weather.time),
     aloft = windProfile(1, 1500);
-  assert.deepEqual(layers[0].options, { weather: weather.state, coverage: 1, density: s.cloudDensity, wind: [field[0] * aloft, field[2] * aloft], steps: 64 });
+  assert.deepEqual(layers[0].options, {
+    weather: weather.state,
+    coverage: 1,
+    density: s.cloudDensity,
+    wind: [field[0] * aloft, field[2] * aloft],
+    steps: 64,
+  });
   assert.equal(layers[1].options.coverage, 1);
   near(fog.density, s.squaredDensity);
   assert.equal(volume.options.density, s.extinction);
@@ -136,7 +142,8 @@ test('attach runs it before each frame; bad options throw by name; dispose ends 
 // it back (holdFromWeather false, which a null settings row does) lets the weather write it again.
 import { holdFromWeather } from '../../shared/settings.js';
 
-const stormy = () => new WeatherMachine({ wind: 12, gust: 0.4, rain: 0.8, cloud: 0.9, fog: 0.3, hail: 0.5, dust: 0.4 }, { seed: 3 });
+const stormy = () =>
+  new WeatherMachine({ wind: 12, gust: 0.4, rain: 0.8, cloud: 0.9, fog: 0.3, hail: 0.5, dust: 0.4 }, { seed: 3 });
 const frames = (drive, n = 5) => {
   for (let i = 0; i < n; i++) drive.update(0.1);
 };
@@ -144,12 +151,24 @@ const frames = (drive, n = 5) => {
 const OVERRIDES = {
   'sky cloud coverage': (w) => {
     const sky = { options: { clouds: { coverage: 0.123 } } };
-    return { drive: new WeatherDrive({ weather: w, sky }), obj: sky.options.clouds, key: 'coverage', read: () => sky.options.clouds.coverage, set: 0.123 };
+    return {
+      drive: new WeatherDrive({ weather: w, sky }),
+      obj: sky.options.clouds,
+      key: 'coverage',
+      read: () => sky.options.clouds.coverage,
+      set: 0.123,
+    };
   },
   'sky fog density': (w) => {
     const fog = { density: 0.0123 },
       sky = { options: { fog } };
-    return { drive: new WeatherDrive({ weather: w, sky }), obj: fog, key: 'density', read: () => fog.density, set: 0.0123 };
+    return {
+      drive: new WeatherDrive({ weather: w, sky }),
+      obj: fog,
+      key: 'density',
+      read: () => fog.density,
+      set: 0.0123,
+    };
   },
   'sky fog colour': (w) => {
     const color = [0.1, 0.2, 0.3],
@@ -159,69 +178,162 @@ const OVERRIDES = {
   },
   'cloud layer density': (w) => {
     const layer = { options: { density: 0.0321 } };
-    return { drive: new WeatherDrive({ weather: w, clouds: layer }), obj: layer.options, key: 'density', read: () => layer.options.density, set: 0.0321 };
+    return {
+      drive: new WeatherDrive({ weather: w, clouds: layer }),
+      obj: layer.options,
+      key: 'density',
+      read: () => layer.options.density,
+      set: 0.0321,
+    };
   },
   'cloud layer coverage': (w) => {
     const layer = { options: { coverage: 0.0321 } };
-    return { drive: new WeatherDrive({ weather: w, clouds: layer }), obj: layer.options, key: 'coverage', read: () => layer.options.coverage, set: 0.0321 };
+    return {
+      drive: new WeatherDrive({ weather: w, clouds: layer }),
+      obj: layer.options,
+      key: 'coverage',
+      read: () => layer.options.coverage,
+      set: 0.0321,
+    };
   },
   'cloud layer wind': (w) => {
     const wind = [1, 2],
       layer = { options: { wind } };
-    return { drive: new WeatherDrive({ weather: w, clouds: layer }), obj: layer.options, key: 'wind', read: () => layer.options.wind, set: wind };
+    return {
+      drive: new WeatherDrive({ weather: w, clouds: layer }),
+      obj: layer.options,
+      key: 'wind',
+      read: () => layer.options.wind,
+      set: wind,
+    };
   },
   'scene fog density': (w) => {
     const fog = { density: 0.0042 };
-    return { drive: new WeatherDrive({ weather: w, fog }), obj: fog, key: 'density', read: () => fog.density, set: 0.0042 };
+    return {
+      drive: new WeatherDrive({ weather: w, fog }),
+      obj: fog,
+      key: 'density',
+      read: () => fog.density,
+      set: 0.0042,
+    };
   },
   'fog volume density': (w) => {
     const volume = { options: { density: 0.0042 } };
-    return { drive: new WeatherDrive({ weather: w, fogVolumes: volume }), obj: volume.options, key: 'density', read: () => volume.options.density, set: 0.0042 };
+    return {
+      drive: new WeatherDrive({ weather: w, fogVolumes: volume }),
+      obj: volume.options,
+      key: 'density',
+      read: () => volume.options.density,
+      set: 0.0042,
+    };
   },
   'fog volume wind': (w) => {
     const wind = [3, 0, 4],
       volume = { options: { wind } };
-    return { drive: new WeatherDrive({ weather: w, fogWind: volume }), obj: volume.options, key: 'wind', read: () => volume.options.wind, set: wind };
+    return {
+      drive: new WeatherDrive({ weather: w, fogWind: volume }),
+      obj: volume.options,
+      key: 'wind',
+      read: () => volume.options.wind,
+      set: wind,
+    };
   },
   'scatter wind': (w) => {
     const wind = [0.3, 0.4, 0.5],
       scatter = { options: { wind } };
-    return { drive: new WeatherDrive({ weather: w, scatter }), obj: scatter.options, key: 'wind', read: () => scatter.options.wind, set: wind };
+    return {
+      drive: new WeatherDrive({ weather: w, scatter }),
+      obj: scatter.options,
+      key: 'wind',
+      read: () => scatter.options.wind,
+      set: wind,
+    };
   },
   'grass wind strength': (w) => {
     const grass = { windDirection: [1, 0.35], windStrength: 0.0777, windSpeed: 0.5 };
-    return { drive: new WeatherDrive({ weather: w, grass }), obj: grass, key: 'windStrength', read: () => grass.windStrength, set: 0.0777 };
+    return {
+      drive: new WeatherDrive({ weather: w, grass }),
+      obj: grass,
+      key: 'windStrength',
+      read: () => grass.windStrength,
+      set: 0.0777,
+    };
   },
   'grass wind speed': (w) => {
     const grass = { windDirection: [1, 0.35], windStrength: 0.2, windSpeed: 0.0777 };
-    return { drive: new WeatherDrive({ weather: w, grass }), obj: grass, key: 'windSpeed', read: () => grass.windSpeed, set: 0.0777 };
+    return {
+      drive: new WeatherDrive({ weather: w, grass }),
+      obj: grass,
+      key: 'windSpeed',
+      read: () => grass.windSpeed,
+      set: 0.0777,
+    };
   },
   'grass wind direction': (w) => {
     const dir = [0, 1],
       grass = { windDirection: dir, windStrength: 0.2, windSpeed: 0.5 };
-    return { drive: new WeatherDrive({ weather: w, grass }), obj: grass, key: 'windDirection', read: () => grass.windDirection, set: dir };
+    return {
+      drive: new WeatherDrive({ weather: w, grass }),
+      obj: grass,
+      key: 'windDirection',
+      read: () => grass.windDirection,
+      set: dir,
+    };
   },
   'vfx wind': (w) => {
     const wind = [5, 6],
       fx = { options: { wind }, setWind() {} };
-    return { drive: new WeatherDrive({ weather: w, vfx: fx }), obj: fx.options, key: 'wind', read: () => fx.options.wind, set: wind, unset: () => delete fx.options.wind };
+    return {
+      drive: new WeatherDrive({ weather: w, vfx: fx }),
+      obj: fx.options,
+      key: 'wind',
+      read: () => fx.options.wind,
+      set: wind,
+      unset: () => delete fx.options.wind,
+    };
   },
   'rain intensity': (w) => {
     const rain = { options: { intensity: 0.0123 } };
-    return { drive: new WeatherDrive({ weather: w, precipitation: rain }), obj: rain.options, key: 'intensity', read: () => rain.options.intensity, set: 0.0123 };
+    return {
+      drive: new WeatherDrive({ weather: w, precipitation: rain }),
+      obj: rain.options,
+      key: 'intensity',
+      read: () => rain.options.intensity,
+      set: 0.0123,
+    };
   },
   'hail intensity': (w) => {
     const hail = { options: { intensity: 0.0123 } };
-    return { drive: new WeatherDrive({ weather: w, hail }), obj: hail.options, key: 'intensity', read: () => hail.options.intensity, set: 0.0123 };
+    return {
+      drive: new WeatherDrive({ weather: w, hail }),
+      obj: hail.options,
+      key: 'intensity',
+      read: () => hail.options.intensity,
+      set: 0.0123,
+    };
   },
   'blown sand wind': (w) => {
     const wind = { speed: 9, direction: 1 },
       sand = { options: { wind } };
-    return { drive: new WeatherDrive({ weather: w, blownSand: sand }), obj: sand.options, key: 'wind', read: () => sand.options.wind, set: wind, unset: () => (sand.options.wind = { speed: 0 }) };
+    return {
+      drive: new WeatherDrive({ weather: w, blownSand: sand }),
+      obj: sand.options,
+      key: 'wind',
+      read: () => sand.options.wind,
+      set: wind,
+      unset: () => (sand.options.wind = { speed: 0 }),
+    };
   },
   'blown sand fog': (w) => {
     const sand = { options: { fog: 0.0042 } };
-    return { drive: new WeatherDrive({ weather: w, blownSand: sand }), obj: sand.options, key: 'fog', read: () => sand.options.fog, set: 0.0042, unset: () => delete sand.options.fog };
+    return {
+      drive: new WeatherDrive({ weather: w, blownSand: sand }),
+      obj: sand.options,
+      key: 'fog',
+      read: () => sand.options.fog,
+      set: 0.0042,
+      unset: () => delete sand.options.fog,
+    };
   },
 };
 for (const [name, build] of Object.entries(OVERRIDES))
@@ -336,7 +448,7 @@ test('rock (terrain:rocks:*, a RockSurface) takes the weather rain as its wetnes
   assert.equal(rock.look.rain, 0.2, 'a held rain is never written');
 });
 
-test('the drive merges its lightning rate into the weather\'s lightning option and leaves the light, deck flash and link', () => {
+test("the drive merges its lightning rate into the weather's lightning option and leaves the light, deck flash and link", () => {
   const weather = new WeatherMachine('thunderstorm', { seed: 4 }),
     mine = { seed: 9, hold: 0.3, light: { scale: 2 }, cloud: { base: 700 }, link: { fog: false } },
     rain = { options: { lightning: mine } },
@@ -386,7 +498,10 @@ test("a storm's cloud layer gets the weather only: its cover, density and turnin
   assert.equal(plain.options.coverage, weather.state.cloud);
   for (const layer of [storm, typed]) {
     assert.deepEqual(layer.options.weather, weather.state);
-    assert.ok(!('coverage' in layer.options) && !('density' in layer.options) && !('wind' in layer.options), JSON.stringify(layer.options));
+    assert.ok(
+      !('coverage' in layer.options) && !('density' in layer.options) && !('wind' in layer.options),
+      JSON.stringify(layer.options),
+    );
   }
   assert.equal(held.options.coverage, 0.7, 'a value held by hand stays');
 });

@@ -10,6 +10,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { parseColor, type ColorInput } from './color.js';
 import { fillFrame, finiteArray, identity, type Mat4 } from './math.js';
 import { alphaBlend, attachableMesh, overlayPass } from '../../shared/pass.js';
+import { createFrameUniform } from '../../shared/frame-uniform.js';
 import { applyView } from '../../shared/view-rect.js';
 import { lineFrame } from './extension.js';
 
@@ -385,11 +386,12 @@ export class LineBatches implements EnginePlugin {
       style = device.createBindGroupLayout({ entries: [uniform(STYLE_BYTES)] });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
     this.module = device.createShaderModule({ code: batchShader });
-    this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.frameGroup = device.createBindGroup({
-      layout: frame,
-      entries: [{ binding: 0, resource: { buffer: this.frameBuffer } }],
-    });
+    [this.frameBuffer, this.frameGroup] = createFrameUniform(
+      device,
+      frame,
+      96,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
   }
 
   registerPasses(graph: FrameGraph): void {

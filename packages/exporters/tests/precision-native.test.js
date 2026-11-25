@@ -158,7 +158,10 @@ test('the Unreal helper compiles with a checkMasterAtlas hook that has no final 
   const python = findPython();
   if (!python) return; // no Python on this machine; the text assertion above still holds
   const { spawnSync } = await import('node:child_process');
-  const run = spawnSync(python, ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: text, encoding: 'utf8' });
+  const run = spawnSync(python, ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
+    input: text,
+    encoding: 'utf8',
+  });
   assert.ifError(run.error);
   assert.equal(run.status, 0, run.stderr);
 });

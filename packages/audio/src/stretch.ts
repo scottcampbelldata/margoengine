@@ -115,7 +115,6 @@ export function timeStretch(audio: StretchInput, factor: number, options: Stretc
       for (let c = 0; c < channels.length; c++) out[c][o] += window[i] * channels[c][x];
     }
   }
-  for (let o = 0; o < outLength; o++)
-    if (weight[o] > 1e-9) for (const c of out) c[o] /= weight[o];
+  for (let o = 0; o < outLength; o++) if (weight[o] > 1e-9) for (const c of out) c[o] /= weight[o];
   return { sampleRate, channels: out };
 }

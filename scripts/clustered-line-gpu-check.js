@@ -90,24 +90,34 @@ try {
       profile = mean(values),
       measured = largestStep(profile),
       // Blocker depth H - 1.5, receiver H: ratio 1, so copy i's edge is at 1 - x_i and its penumbra R wide each side.
-      analytic = xs.map((x) => lights.reduce((v, l) => v + 0.5 * disc(R ? (x - (1 - l.position[0])) / R : x > 1 - l.position[0] ? 1 : -1), 0)),
+      analytic = xs.map((x) =>
+        lights.reduce((v, l) => v + 0.5 * disc(R ? (x - (1 - l.position[0])) / R : x > 1 - l.position[0] ? 1 : -1), 0),
+      ),
       expected = largestStep(analytic);
     // The per-pixel noise around the mean, for the record.
     let spread = 0;
     values.forEach((v, i) => (spread = Math.max(spread, Math.abs(v - profile[i % xs.length]))));
     results[label] = { radius: R, measured, analytic: expected, noise: spread };
     check(`${label}: each point renders its six cube faces`, rendered.stats.layers === 12, rendered.stats);
-    check(
-      `${label}: under the bar dark, past both copies lit`,
-      profile[0] < 0.05 && profile[xs.length - 1] > 0.95,
-      { first: profile[0], last: profile[xs.length - 1] },
-    );
+    check(`${label}: under the bar dark, past both copies lit`, profile[0] < 0.05 && profile[xs.length - 1] > 0.95, {
+      first: profile[0],
+      last: profile[xs.length - 1],
+    });
     if (radius === undefined) {
-      check(`${label}: largest shadow step ${measured.step.toFixed(3)} <= ${STEP}`, measured.step <= STEP, results[label]);
+      check(
+        `${label}: largest shadow step ${measured.step.toFixed(3)} <= ${STEP}`,
+        measured.step <= STEP,
+        results[label],
+      );
       let worst = 0;
       profile.forEach((v, i) => (worst = Math.max(worst, Math.abs(v - analytic[i]))));
       check(`${label}: mean within 0.05 of two disc lights' analytic shadow everywhere`, worst <= 0.05, { worst });
-    } else check(`${label}: the step the merged shadow removes (${measured.step.toFixed(3)} > 0.3)`, measured.step > 0.3, results[label]);
+    } else
+      check(
+        `${label}: the step the merged shadow removes (${measured.step.toFixed(3)} > 0.3)`,
+        measured.step > 0.3,
+        results[label],
+      );
   }
   const compiled = await call('compile');
   check('WGSL compiles without errors or warnings', !compiled.core.length && !compiled.probe.length, compiled);

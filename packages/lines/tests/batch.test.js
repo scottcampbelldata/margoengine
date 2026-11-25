@@ -34,12 +34,35 @@ function rig({ samples = 1, maxBufferSize } = {}) {
   };
 }
 const two = [0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0];
-const end = (batch, segment, which) =>
-  Array.from(new Float32Array(batch.data, segment * 32 + which * 16, 3));
-const colour = (batch, segment, which) =>
-  Array.from(new Uint8Array(batch.data, segment * 32 + which * 16 + 12, 4));
+const end = (batch, segment, which) => Array.from(new Float32Array(batch.data, segment * 32 + which * 16, 3));
+const colour = (batch, segment, which) => Array.from(new Uint8Array(batch.data, segment * 32 + which * 16 + 12, 4));
 const draws = (log) => log.filter((e) => e[0] === 'pass.draw');
 const writes = (log, size) => log.filter((e) => e[0] === 'writeBuffer' && e[3].length === size * 2);
+
+test('line setup releases its frame uniform if the GPU rejects the bind group', () => {
+  const gpu = mockGPU();
+  const create = gpu.device.createBuffer.bind(gpu.device);
+  const failure = new Error('bind group rejected');
+  let destroyed = false;
+  gpu.device.createBuffer = (descriptor) => {
+    const buffer = create(descriptor);
+    const destroy = buffer.destroy.bind(buffer);
+    buffer.destroy = () => {
+      destroyed = true;
+      destroy();
+    };
+    return buffer;
+  };
+  gpu.device.createBindGroup = () => {
+    throw failure;
+  };
+  const batches = new LineBatches();
+  assert.throws(
+    () => batches.setup({ backend: 'webgpu', gpu: gpu.device }),
+    (error) => error === failure,
+  );
+  assert.equal(destroyed, true);
+});
 
 test('segments pack as two ends of position and rgba8, white by default', () => {
   const batch = new LineBatch({ positions: two });
@@ -69,7 +92,10 @@ test('one draw of 6 vertices per batch, instanced on a 32-byte vertex buffer', (
   const { batches, frame } = rig();
   batches.add(new LineBatch({ positions: two }));
   const log = frame();
-  assert.deepEqual(draws(log).map((e) => [e[1], e[2]]), [[6, 2]]);
+  assert.deepEqual(
+    draws(log).map((e) => [e[1], e[2]]),
+    [[6, 2]],
+  );
   const pipeline = log.find((e) => e[0] === 'renderPipeline')[2];
   assert.equal(pipeline.vertex.buffers[0].arrayStride, 32);
   assert.equal(pipeline.vertex.buffers[0].stepMode, 'instance');
@@ -84,7 +110,10 @@ test('a batch past maxBufferSize splits into one draw per buffer', () => {
     positions = new Float32Array(5 * 6);
   batches.add(new LineBatch({ positions }));
   const log = frame();
-  assert.deepEqual(draws(log).map((e) => e[2]), [2, 2, 1]);
+  assert.deepEqual(
+    draws(log).map((e) => e[2]),
+    [2, 2, 1],
+  );
   assert.equal(log.filter((e) => e[0] === 'pass.setVertexBuffer').length, 3);
   assert.equal(batches.stats.drawCalls, 3);
 });
@@ -128,7 +157,10 @@ test('onTop batches draw after depth-tested ones; hidden and empty batches draw 
   const log = frame(),
     made = log.filter((e) => e[0] === 'renderPipeline').map((e) => e[2].depthStencil.depthCompare);
   assert.deepEqual(made, ['greater-equal', 'always']);
-  assert.deepEqual(draws(log).map((e) => e[2]), [1, 2]);
+  assert.deepEqual(
+    draws(log).map((e) => e[2]),
+    [1, 2],
+  );
 });
 
 test('a restored device refills every batch from the CPU copy', () => {

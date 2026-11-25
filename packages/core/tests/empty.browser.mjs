@@ -20,7 +20,8 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [noFileWatcher(),
+  plugins: [
+    noFileWatcher(),
     {
       name: 'empty-geometry-page',
       configureServer(s) {

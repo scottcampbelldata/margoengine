@@ -155,7 +155,9 @@ test('a bump height in the node space keeps its primitives out of static batches
           buffers: [...f.doc.buffers, { byteLength: uv.byteLength }],
           bufferViews: [...f.doc.bufferViews, { buffer: 3, byteLength: uv.byteLength }],
           accessors: [...f.doc.accessors, { bufferView: 3, componentType: 5126, count: 4, type: 'VEC2' }],
-          meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 3 }, indices: 2, material: 0 }] }],
+          meshes: [
+            { primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 3 }, indices: 2, material: 0 }] },
+          ],
           materials: [{ extensions }],
           textures: [{ source: 0 }],
           images: [{}],

@@ -82,7 +82,10 @@ test('TAA settles by default: hash slots, a word, two means and a 16-byte unifor
   assert.deepEqual(slots.size, [96, 64, 3]);
   assert.equal(made.filter((t) => t.format === 'r32uint').length, 2, 'the slots and this frame word');
   assert.equal(made.filter((t) => t.label?.startsWith('TAA settle mean')).length, 2);
-  assert.ok(log.some((c) => c[0] === 'copyTextureToTexture'), 'the word goes back into its slot');
+  assert.ok(
+    log.some((c) => c[0] === 'copyTextureToTexture'),
+    'the word goes back into its slot',
+  );
   const off = rig(TAA, { settle: false }),
     plain = off.gpu.record(() => off.frame(0));
   assert.equal(textures(plain).filter((t) => t.format === 'r32uint' || t.label?.startsWith('TAA settle')).length, 0);

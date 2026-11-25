@@ -21,7 +21,14 @@
 //   vending machine's coin slot, bill slot, change return and selection buttons. Japan Vending Machine Manufacturers
 //   Association: outdoor drink machines about 1,830 mm high, 700 to 750 mm deep.
 import type { GeometryData } from '@margoengine/geometry/utils';
-import { checkSettings, choiceSetting, numberSetting, settingDefaults, settingIndex, type SettingRow } from '../../shared/settings.js';
+import {
+  checkSettings,
+  choiceSetting,
+  numberSetting,
+  settingDefaults,
+  settingIndex,
+  type SettingRow,
+} from '../../shared/settings.js';
 import { MeshBuilder, add, scale, type V3 } from './mesh-builder.js';
 
 /** A material hint: linear albedo, roughness, metalness. */
@@ -37,8 +44,20 @@ export interface Vehicle<P extends string = string> {
   /** Overall length (x), width (z) and height (y) of every part, metres. */
   readonly size: readonly [number, number, number];
 }
-const mat = (color: [number, number, number], roughness: number, metalness = 0): VehicleMaterial => ({ color, roughness, metalness });
-function num(what: string, o: Record<string, unknown>, name: string, lo: number, hi: number, fallback: number, int = false): number {
+const mat = (color: [number, number, number], roughness: number, metalness = 0): VehicleMaterial => ({
+  color,
+  roughness,
+  metalness,
+});
+function num(
+  what: string,
+  o: Record<string, unknown>,
+  name: string,
+  lo: number,
+  hi: number,
+  fallback: number,
+  int = false,
+): number {
   const v = o[name];
   if (v === undefined) return fallback;
   if (typeof v !== 'number') throw new TypeError(`Invalid ${what} ${name}; pass a number from ${lo} to ${hi}.`);
@@ -46,10 +65,17 @@ function num(what: string, o: Record<string, unknown>, name: string, lo: number,
     throw new RangeError(`Invalid ${what} ${name}; pass ${int ? 'an integer' : 'a number'} from ${lo} to ${hi}.`);
   return v;
 }
-function pick<T extends string>(what: string, o: Record<string, unknown>, name: string, choices: readonly T[], fallback: T): T {
+function pick<T extends string>(
+  what: string,
+  o: Record<string, unknown>,
+  name: string,
+  choices: readonly T[],
+  fallback: T,
+): T {
   const v = o[name];
   if (v === undefined) return fallback;
-  if (typeof v !== 'string' || !choices.includes(v as T)) throw new RangeError(`Invalid ${what} ${name}; pass one of ${choices.join(', ')}.`);
+  if (typeof v !== 'string' || !choices.includes(v as T))
+    throw new RangeError(`Invalid ${what} ${name}; pass one of ${choices.join(', ')}.`);
   return v as T;
 }
 function obj(o: unknown, what: string): Record<string, unknown> {
@@ -69,7 +95,10 @@ function finish<K extends string>(p: Record<K, MeshBuilder>): Partial<Record<K, 
   return out;
 }
 /** Bounds of some parts: low corner and high corner. */
-export function vehicleBounds(parts: Readonly<Partial<Record<string, GeometryData>>>, only?: readonly string[]): { lo: V3; hi: V3 } {
+export function vehicleBounds(
+  parts: Readonly<Partial<Record<string, GeometryData>>>,
+  only?: readonly string[],
+): { lo: V3; hi: V3 } {
   const lo = [Infinity, Infinity, Infinity],
     hi = [-Infinity, -Infinity, -Infinity];
   for (const [k, g] of Object.entries(parts))
@@ -89,12 +118,27 @@ const X: V3 = [1, 0, 0],
   Y: V3 = [0, 1, 0],
   Z: V3 = [0, 0, 1];
 const box = (m: MeshBuilder, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) =>
-  m.box([(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], [Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, Math.abs(z1 - z0) / 2]);
+  m.box(
+    [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2],
+    [Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, Math.abs(z1 - z0) / 2],
+  );
 const ring = (c: V3, r: number, n: number, z: number): V3[] =>
-  Array.from({ length: n }, (_, k): V3 => [c[0] + r * Math.cos((2 * Math.PI * k) / n), c[1] + r * Math.sin((2 * Math.PI * k) / n), z]);
+  Array.from(
+    { length: n },
+    (_, k): V3 => [c[0] + r * Math.cos((2 * Math.PI * k) / n), c[1] + r * Math.sin((2 * Math.PI * k) / n), z],
+  );
 // A spoked wheel on an axle along z, centre c, tread radius r, width w. The flange (railway wheels) is on the inner
 // face, toward z = 0; `counter` adds a driver's crescent counterweight opposite the crank pin.
-function wheel(m: MeshBuilder, c: V3, r: number, w: number, spokes: number, segments: number, flange = 0, counter = false) {
+function wheel(
+  m: MeshBuilder,
+  c: V3,
+  r: number,
+  w: number,
+  spokes: number,
+  segments: number,
+  flange = 0,
+  counter = false,
+) {
   const inner = c[2] > 0 ? -1 : 1,
     a = add(c, [0, 0, -w / 2]),
     b = add(c, [0, 0, w / 2]);
@@ -120,7 +164,13 @@ function wheel(m: MeshBuilder, c: V3, r: number, w: number, spokes: number, segm
   if (spokes > 0)
     for (let k = 0; k < spokes; k++) {
       const t = (2 * Math.PI * k) / spokes;
-      m.beam(add(c, [r * 0.15 * Math.cos(t), r * 0.15 * Math.sin(t), 0]), add(c, [r * 0.87 * Math.cos(t), r * 0.87 * Math.sin(t), 0]), w * 0.45, r * 0.09, Z);
+      m.beam(
+        add(c, [r * 0.15 * Math.cos(t), r * 0.15 * Math.sin(t), 0]),
+        add(c, [r * 0.87 * Math.cos(t), r * 0.87 * Math.sin(t), 0]),
+        w * 0.45,
+        r * 0.09,
+        Z,
+      );
     }
   else m.frustum(add(c, [0, 0, -w * 0.2]), add(c, [0, 0, w * 0.2]), r * 0.87, r * 0.87, segments);
   if (counter) {
@@ -145,7 +195,11 @@ function wheel(m: MeshBuilder, c: V3, r: number, w: number, spokes: number, segm
 function rail(m: MeshBuilder, a: V3, b: V3, posts: number, drop: number) {
   m.frustum(a, b, 0.016, 0.016, 8);
   for (let k = 0; k <= posts; k++) {
-    const p: V3 = [a[0] + ((b[0] - a[0]) * k) / posts, a[1] + ((b[1] - a[1]) * k) / posts, a[2] + ((b[2] - a[2]) * k) / posts];
+    const p: V3 = [
+      a[0] + ((b[0] - a[0]) * k) / posts,
+      a[1] + ((b[1] - a[1]) * k) / posts,
+      a[2] + ((b[2] - a[2]) * k) / posts,
+    ];
     m.frustum(p, add(p, [0, -drop, 0]), 0.012, 0.012, 6, false);
   }
 }
@@ -172,12 +226,27 @@ export interface LocomotiveOptions {
   readonly fuel?: 'wood' | 'coal';
 }
 /** The locomotive's parts, one geometry and material each. */
-export type LocomotivePart = 'boiler' | 'smokebox' | 'running' | 'wheels' | 'rods' | 'cab' | 'glass' | 'tender' | 'load' | 'brass' | 'pipes';
+export type LocomotivePart =
+  | 'boiler'
+  | 'smokebox'
+  | 'running'
+  | 'wheels'
+  | 'rods'
+  | 'cab'
+  | 'glass'
+  | 'tender'
+  | 'load'
+  | 'brass'
+  | 'pipes';
 /** A locomotive and tender, with its wheel sets and measured sizes. */
 export interface Locomotive extends Vehicle<LocomotivePart> {
   readonly arrangement: LocomotiveArrangement;
   /** Every wheel set: centre x, diameter, kind. Treads sit on the rail top (y = 0). */
-  readonly wheels: readonly { readonly x: number; readonly diameter: number; readonly kind: 'leading' | 'driver' | 'trailing' | 'tender' }[];
+  readonly wheels: readonly {
+    readonly x: number;
+    readonly diameter: number;
+    readonly kind: 'leading' | 'driver' | 'trailing' | 'tender';
+  }[];
   /** First to last driving axle, metres. */
   readonly drivingWheelbase: number;
   /** Track gauge and wheel back-to-back, metres. */
@@ -213,9 +282,22 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
     D = num('locomotive', o, 'driver', 1.1, 1.9, arr === '4-4-0' ? 1.73 : arr === '4-6-0' ? 1.6 : 1.32),
     stack = pick('locomotive', o, 'stack', ['diamond', 'straight'] as const, 'diamond'),
     fuel = pick('locomotive', o, 'fuel', ['wood', 'coal'] as const, 'wood');
-  if (o.tender !== undefined && typeof o.tender !== 'boolean') throw new TypeError('Invalid locomotive tender; pass true or false.');
+  if (o.tender !== undefined && typeof o.tender !== 'boolean')
+    throw new TypeError('Invalid locomotive tender; pass true or false.');
   const hasTender = o.tender !== false,
-    m = builders(['boiler', 'smokebox', 'running', 'wheels', 'rods', 'cab', 'glass', 'tender', 'load', 'brass', 'pipes'] as const),
+    m = builders([
+      'boiler',
+      'smokebox',
+      'running',
+      'wheels',
+      'rods',
+      'cab',
+      'glass',
+      'tender',
+      'load',
+      'brass',
+      'pipes',
+    ] as const),
     wheels: { x: number; diameter: number; kind: 'leading' | 'driver' | 'trailing' | 'tender' }[] = [],
     seg = 28;
   // Drivers spaced by their diameter plus 0.2 m (Baldwin 1910 Consolidations: 52 in drivers on a 15 ft driving
@@ -229,7 +311,8 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
     front = Math.max(cyl + 0.75, ...leads.map((x) => x + leadD / 2 + 0.6));
   for (const x of drivers) wheels.push({ x, diameter: D, kind: 'driver' });
   for (const x of leads) wheels.push({ x, diameter: leadD, kind: 'leading' });
-  for (let i = 0; i < trail / 2; i++) wheels.push({ x: lastDriver - pitch / 2 - 0.7 - i * 1.1, diameter: 0.9, kind: 'trailing' });
+  for (let i = 0; i < trail / 2; i++)
+    wheels.push({ x: lastDriver - pitch / 2 - 0.7 - i * 1.1, diameter: 0.9, kind: 'trailing' });
   const rear = Math.min(lastDriver - D / 2 - 1.3, ...wheels.map((w) => w.x - w.diameter / 2 - 0.5));
   // Boiler: centreline about 9 ft (2.75 m) above the rail, smokebox ahead, the firebox and cab behind.
   const bc = 2.75,
@@ -275,21 +358,50 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
   dome(sandDome, 0.32, 0.36, m.boiler);
   m.brass.frustum([bell, bc + br + 0.32, 0], [bell, bc + br + 0.58, 0], 0.21, 0.13, 20);
   m.brass.frustum([bell, bc + br + 0.58, 0], [bell, bc + br + 0.62, 0], 0.13, 0.04, 12);
-  for (const s of [-1, 1]) m.boiler.beam([bell, bc + br - 0.05, s * 0.24], [bell, bc + br + 0.55, s * 0.24], 0.04, 0.04);
+  for (const s of [-1, 1])
+    m.boiler.beam([bell, bc + br - 0.05, s * 0.24], [bell, bc + br + 0.55, s * 0.24], 0.04, 0.04);
   m.boiler.beam([bell, bc + br + 0.55, -0.24], [bell, bc + br + 0.55, 0.24], 0.04, 0.04, X);
   m.brass.frustum([steamDome + 0.5, bc + br - 0.05, 0.15], [steamDome + 0.5, bc + br + 0.32, 0.15], 0.035, 0.035, 10);
   m.brass.frustum([steamDome + 0.5, bc + br + 0.32, 0.15], [steamDome + 0.5, bc + br + 0.5, 0.15], 0.05, 0.05, 12);
-  for (const s of [-1, 1]) m.brass.frustum([fireF + 0.25, bc + br - 0.02, s * 0.15], [fireF + 0.25, bc + br + 0.22, s * 0.15], 0.05, 0.04, 12);
+  for (const s of [-1, 1])
+    m.brass.frustum([fireF + 0.25, bc + br - 0.02, s * 0.15], [fireF + 0.25, bc + br + 0.22, s * 0.15], 0.05, 0.04, 12);
   box(m.running, smoke - 0.15, smoke + 0.05, bc + br - 0.05, bc + br + 0.08, -0.12, 0.12);
   box(m.brass, smoke - 0.28, smoke + 0.24, bc + br + 0.08, bc + br + 0.58, -0.26, 0.26);
   m.brass.frustum([smoke - 0.05, bc + br + 0.58, 0], [smoke - 0.05, bc + br + 0.72, 0], 0.07, 0.03, 10);
-  m.glass.poly([[smoke + 0.245, bc + br + 0.16, -0.18], [smoke + 0.245, bc + br + 0.16, 0.18], [smoke + 0.245, bc + br + 0.5, 0.18], [smoke + 0.245, bc + br + 0.5, -0.18]], X);
+  m.glass.poly(
+    [
+      [smoke + 0.245, bc + br + 0.16, -0.18],
+      [smoke + 0.245, bc + br + 0.16, 0.18],
+      [smoke + 0.245, bc + br + 0.5, 0.18],
+      [smoke + 0.245, bc + br + 0.5, -0.18],
+    ],
+    X,
+  );
   // Sand pipes from the sand dome to the drivers, boiler handrails, the injector and check valve pipes.
   for (const s of [-1, 1]) {
-    for (const x of drivers.slice(0, 2)) m.pipes.frustum([sandDome, bc + br * 0.6, s * br * 0.8], [x + D * 0.55, D * 0.75, s * (ZW + 0.08)], 0.02, 0.02, 6);
-    rail(m.pipes, [fireF + 0.1, bc + br * 0.55, s * (br + 0.12)], [smoke - 0.1, bc + br * 0.55, s * (br + 0.12)], 6, 0.12);
+    for (const x of drivers.slice(0, 2))
+      m.pipes.frustum(
+        [sandDome, bc + br * 0.6, s * br * 0.8],
+        [x + D * 0.55, D * 0.75, s * (ZW + 0.08)],
+        0.02,
+        0.02,
+        6,
+      );
+    rail(
+      m.pipes,
+      [fireF + 0.1, bc + br * 0.55, s * (br + 0.12)],
+      [smoke - 0.1, bc + br * 0.55, s * (br + 0.12)],
+      6,
+      0.12,
+    );
     m.pipes.frustum([fireF - 0.1, bc - 0.3, s * 0.95], [tubes - 0.6, bc - 0.15, s * (br + 0.05)], 0.035, 0.035, 8);
-    m.brass.frustum([tubes - 0.6, bc - 0.15, s * (br + 0.05)], [tubes - 0.6, bc - 0.15, s * (br + 0.12)], 0.06, 0.06, 10);
+    m.brass.frustum(
+      [tubes - 0.6, bc - 0.15, s * (br + 0.05)],
+      [tubes - 0.6, bc - 0.15, s * (br + 0.12)],
+      0.06,
+      0.06,
+      10,
+    );
     // Steam pipe from the smokebox down to the steam chest.
     m.pipes.frustum([tubes + 0.4, bc - 0.3, s * br * 0.9], [cyl, 1.55, s * 1.0], 0.1, 0.1, 12);
   }
@@ -303,7 +415,8 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
     box(m.running, fireF, smoke - 0.2, bc - 0.72, bc - 0.68, s * 0.8, s * 1.38);
     box(m.running, fireF, smoke - 0.2, bc - 0.82, bc - 0.68, s * 1.36, s * 1.38);
     m.running.frustum([cyl - 0.5, 1.05, s * 1.0], [cyl + 0.5, 1.05, s * 1.0], 0.3, 0.3, 24);
-    for (const x of [cyl - 0.5, cyl + 0.5]) m.running.frustum([x - 0.03, 1.05, s * 1.0], [x + 0.03, 1.05, s * 1.0], 0.34, 0.34, 24);
+    for (const x of [cyl - 0.5, cyl + 0.5])
+      m.running.frustum([x - 0.03, 1.05, s * 1.0], [x + 0.03, 1.05, s * 1.0], 0.34, 0.34, 24);
     box(m.running, cyl - 0.42, cyl + 0.42, 1.38, 1.7, s * 0.85, s * 1.18);
     box(m.running, cyl - 0.35, cyl + 0.35, 1.05, bc - 0.55, s * 0.55, s * 0.9);
   }
@@ -315,19 +428,30 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
   // Wheels, axles, crank pins; side rods, main rod, crosshead on its guides, valve rod.
   for (const w of wheels) {
     for (const s of [-1, 1])
-      wheel(m.wheels, [w.x, w.diameter / 2, s * ZW], w.diameter / 2, TYRE, w.kind === 'driver' ? 18 : w.kind === 'tender' ? 0 : 10, seg, FLANGE, w.kind === 'driver');
+      wheel(
+        m.wheels,
+        [w.x, w.diameter / 2, s * ZW],
+        w.diameter / 2,
+        TYRE,
+        w.kind === 'driver' ? 18 : w.kind === 'tender' ? 0 : 10,
+        seg,
+        FLANGE,
+        w.kind === 'driver',
+      );
     m.wheels.frustum([w.x, w.diameter / 2, -ZW], [w.x, w.diameter / 2, ZW], 0.09, 0.09, 12, false);
   }
   const crank = D * 0.18;
   for (const s of [-1, 1]) {
     const zr = s * (ZW + 0.13);
-    for (const x of drivers) m.rods.frustum([x, D / 2 + crank, s * (ZW + 0.05)], [x, D / 2 + crank, s * (ZW + 0.17)], 0.05, 0.05, 10);
+    for (const x of drivers)
+      m.rods.frustum([x, D / 2 + crank, s * (ZW + 0.05)], [x, D / 2 + crank, s * (ZW + 0.17)], 0.05, 0.05, 10);
     m.rods.beam([drivers[0] + 0.05, D / 2 + crank, zr], [lastDriver - 0.05, D / 2 + crank, zr], 0.04, 0.11, Y);
     const main = drivers[Math.min(1, drivers.length - 1)],
       head = cyl - 0.5 - 0.35;
     m.rods.beam([head, 1.05, s * (ZW + 0.2)], [main, D / 2 + crank, s * (ZW + 0.2)], 0.05, 0.13, Y);
     box(m.rods, head - 0.15, head + 0.15, 0.95, 1.15, s * (ZW + 0.16), s * (ZW + 0.26));
-    for (const y of [0.92, 1.18]) box(m.running, head - 0.45, cyl - 0.5, y - 0.02, y + 0.02, s * (ZW + 0.15), s * (ZW + 0.27));
+    for (const y of [0.92, 1.18])
+      box(m.running, head - 0.45, cyl - 0.5, y - 0.02, y + 0.02, s * (ZW + 0.15), s * (ZW + 0.27));
     m.rods.beam([cyl - 0.45, 1.55, s * 1.0], [drivers[0] + 0.25, D / 2 + 0.1, s * (ZW + 0.3)], 0.025, 0.04, Y);
   }
   // Cab: steel sides with windows, front windows either side of the firebox, roof with an overhang and ventilator.
@@ -347,20 +471,56 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
     ])
       m.glass.poly(
         s > 0
-          ? [[x0, 2.3, s * cw], [x1, 2.3, s * cw], [x1, 3.15, s * cw], [x0, 3.15, s * cw]]
-          : [[x1, 2.3, s * cw], [x0, 2.3, s * cw], [x0, 3.15, s * cw], [x1, 3.15, s * cw]],
+          ? [
+              [x0, 2.3, s * cw],
+              [x1, 2.3, s * cw],
+              [x1, 3.15, s * cw],
+              [x0, 3.15, s * cw],
+            ]
+          : [
+              [x1, 2.3, s * cw],
+              [x0, 2.3, s * cw],
+              [x0, 3.15, s * cw],
+              [x1, 3.15, s * cw],
+            ],
         [0, 0, s],
       );
     box(m.cab, cab1 - 0.06, cab1, 1.25, cabTop, s * 0.9, s * cw);
-    m.glass.poly([[cab1 + 0.001, 3.0, s * 0.95], [cab1 + 0.001, 3.0, s * 1.35], [cab1 + 0.001, 3.6, s * 1.35], [cab1 + 0.001, 3.6, s * 0.95]], X);
+    m.glass.poly(
+      [
+        [cab1 + 0.001, 3.0, s * 0.95],
+        [cab1 + 0.001, 3.0, s * 1.35],
+        [cab1 + 0.001, 3.6, s * 1.35],
+        [cab1 + 0.001, 3.6, s * 0.95],
+      ],
+      X,
+    );
     // Grab irons and steps at the cab door.
     m.pipes.frustum([cab0 + 0.05, 1.3, s * (cw + 0.08)], [cab0 + 0.05, 3.0, s * (cw + 0.08)], 0.015, 0.015, 6);
     box(m.running, cab0 - 0.1, cab0 + 0.35, 0.55, 0.6, s * (cw - 0.2), s * (cw + 0.05));
     box(m.running, cab0 - 0.1, cab0 + 0.35, 0.95, 1.0, s * (cw - 0.2), s * (cw + 0.05));
   }
   box(m.cab, cab1 - 0.06, cab1, 3.65, cabTop, -0.9, 0.9);
-  m.cab.slab([[cab0 - 0.3, cabTop, -1.6], [cab1 + 0.15, cabTop, -1.6], [cab1 + 0.15, cabTop + 0.12, 0], [cab0 - 0.3, cabTop + 0.12, 0]], 0.05, Y);
-  m.cab.slab([[cab0 - 0.3, cabTop + 0.12, 0], [cab1 + 0.15, cabTop + 0.12, 0], [cab1 + 0.15, cabTop, 1.6], [cab0 - 0.3, cabTop, 1.6]], 0.05, Y);
+  m.cab.slab(
+    [
+      [cab0 - 0.3, cabTop, -1.6],
+      [cab1 + 0.15, cabTop, -1.6],
+      [cab1 + 0.15, cabTop + 0.12, 0],
+      [cab0 - 0.3, cabTop + 0.12, 0],
+    ],
+    0.05,
+    Y,
+  );
+  m.cab.slab(
+    [
+      [cab0 - 0.3, cabTop + 0.12, 0],
+      [cab1 + 0.15, cabTop + 0.12, 0],
+      [cab1 + 0.15, cabTop, 1.6],
+      [cab0 - 0.3, cabTop, 1.6],
+    ],
+    0.05,
+    Y,
+  );
   box(m.cab, cab0 + 0.4, cab1 - 0.4, cabTop + 0.12, cabTop + 0.3, -0.35, 0.35);
   // Tender: a water tank with flared coping, the fuel space at the front, a water hatch, two four-wheel trucks.
   let tail = rear - 0.2;
@@ -370,8 +530,27 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
     tail = t0;
     box(m.tender, t0, t1, 1.1, 1.3, -1.45, 1.45);
     box(m.tender, t0, t1, 1.3, 2.7, -1.42, 1.42);
-    for (const s of [-1, 1]) m.tender.slab([[t0, 2.7, s * 1.42], [t1, 2.7, s * 1.42], [t1, 2.95, s * 1.56], [t0, 2.95, s * 1.56]], 0.03, [0, 0, s]);
-    m.tender.slab([[t0, 2.7, -1.42], [t0, 2.7, 1.42], [t0 - 0.12, 2.95, 1.56], [t0 - 0.12, 2.95, -1.56]], 0.03, [-1, 0, 0]);
+    for (const s of [-1, 1])
+      m.tender.slab(
+        [
+          [t0, 2.7, s * 1.42],
+          [t1, 2.7, s * 1.42],
+          [t1, 2.95, s * 1.56],
+          [t0, 2.95, s * 1.56],
+        ],
+        0.03,
+        [0, 0, s],
+      );
+    m.tender.slab(
+      [
+        [t0, 2.7, -1.42],
+        [t0, 2.7, 1.42],
+        [t0 - 0.12, 2.95, 1.56],
+        [t0 - 0.12, 2.95, -1.56],
+      ],
+      0.03,
+      [-1, 0, 0],
+    );
     m.tender.frustum([t0 + 0.9, 2.7, 0], [t0 + 0.9, 2.95, 0], 0.32, 0.32, 20);
     for (const s of [-1, 1]) m.pipes.frustum([t0 + 0.05, 1.35, s * 1.3], [t0 + 0.05, 2.9, s * 1.3], 0.015, 0.015, 6);
     const rnd = seeded(7);
@@ -381,10 +560,26 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
           const z = -1.12 + j * 0.45 + (k % 2) * 0.1,
             y = 2.8 + k * 0.19,
             r = 0.09 + 0.02 * rnd();
-          m.load.frustum([t1 - 3.4 + 0.2 * rnd(), y, z], [t1 - 0.15 - 0.2 * rnd(), y, z + 0.06 * (rnd() - 0.5)], r, r, 7);
+          m.load.frustum(
+            [t1 - 3.4 + 0.2 * rnd(), y, z],
+            [t1 - 0.15 - 0.2 * rnd(), y, z + 0.06 * (rnd() - 0.5)],
+            r,
+            r,
+            7,
+          );
         }
     else
-      for (let k = 0; k < 7; k++) m.load.slab([[t1 - 3.4, 2.7, -1.35 + k * 0.4], [t1 - 0.2, 2.7, -1.35 + k * 0.4], [t1 - 0.2, 3.05 + 0.1 * Math.sin(k), -1.15 + k * 0.4], [t1 - 3.4, 3.0 + 0.1 * Math.cos(k), -1.15 + k * 0.4]], 0.4, Y);
+      for (let k = 0; k < 7; k++)
+        m.load.slab(
+          [
+            [t1 - 3.4, 2.7, -1.35 + k * 0.4],
+            [t1 - 0.2, 2.7, -1.35 + k * 0.4],
+            [t1 - 0.2, 3.05 + 0.1 * Math.sin(k), -1.15 + k * 0.4],
+            [t1 - 3.4, 3.0 + 0.1 * Math.cos(k), -1.15 + k * 0.4],
+          ],
+          0.4,
+          Y,
+        );
     for (const tc of [t0 + 1.5, t1 - 1.5]) truck(m.running, m.wheels, tc, wheels.push.bind(wheels));
     coupler(m.running, t0 - 0.36, -1);
     tail = t0 - 0.36;
@@ -417,7 +612,12 @@ export function generateLocomotive(options: LocomotiveOptions = {}): Locomotive 
 }
 // A diamond (arch bar) freight truck centred at x: arch bars, column bolts, bolster, journal boxes and two wheel sets
 // on a 5 ft (1.524 m) wheelbase with 33 in wheels.
-function truck(frame: MeshBuilder, wheelPart: MeshBuilder, tc: number, add1: (w: { x: number; diameter: number; kind: 'tender' }) => void) {
+function truck(
+  frame: MeshBuilder,
+  wheelPart: MeshBuilder,
+  tc: number,
+  add1: (w: { x: number; diameter: number; kind: 'tender' }) => void,
+) {
   const r = TRUCK_WHEEL / 2,
     half = 0.762,
     zs = ZW + TYRE / 2 + 0.12;
@@ -479,14 +679,20 @@ export function generateWagon(options: WagonOptions = {}): Wagon {
     deck = 1.12,
     wheels: { x: number; diameter: number }[] = [];
   // Underframe: centre and side sills, needle beams, end sills, truss rods with queen posts and turnbuckles.
-  for (const z of [-W / 2 + 0.06, -0.2, 0.2, W / 2 - 0.06]) box(m.frame, -L / 2, L / 2, deck - 0.32, deck - 0.05, z - 0.06, z + 0.06);
-  for (const s of [-1, 1]) box(m.frame, s * L / 2 - 0.1, s * L / 2 + 0.1, deck - 0.35, deck, -W / 2, W / 2);
+  for (const z of [-W / 2 + 0.06, -0.2, 0.2, W / 2 - 0.06])
+    box(m.frame, -L / 2, L / 2, deck - 0.32, deck - 0.05, z - 0.06, z + 0.06);
+  for (const s of [-1, 1]) box(m.frame, (s * L) / 2 - 0.1, (s * L) / 2 + 0.1, deck - 0.35, deck, -W / 2, W / 2);
   for (const x of [-L / 6, L / 6]) {
     box(m.frame, x - 0.08, x + 0.08, deck - 0.3, deck - 0.05, -W / 2, W / 2);
     for (const z of [-0.65, 0.65]) box(m.frame, x - 0.04, x + 0.04, deck - 0.75, deck - 0.3, z - 0.04, z + 0.04);
   }
   for (const z of [-0.65, -0.25, 0.25, 0.65]) {
-    const pts: V3[] = [[-L / 2 + 0.3, deck - 0.2, z], [-L / 6, deck - 0.75, z], [L / 6, deck - 0.75, z], [L / 2 - 0.3, deck - 0.2, z]];
+    const pts: V3[] = [
+      [-L / 2 + 0.3, deck - 0.2, z],
+      [-L / 6, deck - 0.75, z],
+      [L / 6, deck - 0.75, z],
+      [L / 2 - 0.3, deck - 0.2, z],
+    ];
     for (let i = 0; i < 3; i++) m.frame.frustum(pts[i], pts[i + 1], 0.016, 0.016, 6, false);
     m.irons.frustum([-0.12, deck - 0.75, z], [0.12, deck - 0.75, z], 0.03, 0.03, 8);
   }
@@ -494,39 +700,95 @@ export function generateWagon(options: WagonOptions = {}): Wagon {
     coupler(m.frame, s * (L / 2 + 0.45), s);
     // Brake wheel on a staff at the B end, grab irons and sill steps at each corner.
     if (s > 0) {
-      m.irons.frustum([L / 2 + 0.06, deck - 0.2, W / 2 - 0.35], [L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.75 : 1.4), W / 2 - 0.35], 0.018, 0.018, 6);
-      m.irons.frustum([L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.75 : 1.4), W / 2 - 0.35], [L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.77 : 1.42), W / 2 - 0.35], 0.24, 0.24, 18);
+      m.irons.frustum(
+        [L / 2 + 0.06, deck - 0.2, W / 2 - 0.35],
+        [L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.75 : 1.4), W / 2 - 0.35],
+        0.018,
+        0.018,
+        6,
+      );
+      m.irons.frustum(
+        [L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.75 : 1.4), W / 2 - 0.35],
+        [L / 2 + 0.06, deck + (kind === 'boxcar' ? 2.77 : 1.42), W / 2 - 0.35],
+        0.24,
+        0.24,
+        18,
+      );
     }
     for (const t of [-1, 1]) {
-      box(m.irons, s * (L / 2 - 0.35), s * (L / 2 - 0.05), deck - 0.55, deck - 0.52, t * (W / 2 + 0.02), t * (W / 2 + 0.06));
-      for (const h of [0.3, 0.7]) m.irons.frustum([s * (L / 2 - 0.4), deck + h, t * (W / 2 + 0.05)], [s * (L / 2 - 0.1), deck + h, t * (W / 2 + 0.05)], 0.012, 0.012, 6);
+      box(
+        m.irons,
+        s * (L / 2 - 0.35),
+        s * (L / 2 - 0.05),
+        deck - 0.55,
+        deck - 0.52,
+        t * (W / 2 + 0.02),
+        t * (W / 2 + 0.06),
+      );
+      for (const h of [0.3, 0.7])
+        m.irons.frustum(
+          [s * (L / 2 - 0.4), deck + h, t * (W / 2 + 0.05)],
+          [s * (L / 2 - 0.1), deck + h, t * (W / 2 + 0.05)],
+          0.012,
+          0.012,
+          6,
+        );
     }
   }
   // Arch bar trucks inset 1.6 m from the car ends.
-  for (const tc of [-L / 2 + 1.6, L / 2 - 1.6]) truck(m.trucks, m.trucks, tc, (w) => wheels.push({ x: w.x, diameter: w.diameter }));
+  for (const tc of [-L / 2 + 1.6, L / 2 - 1.6])
+    truck(m.trucks, m.trucks, tc, (w) => wheels.push({ x: w.x, diameter: w.diameter }));
   if (kind === 'boxcar') {
     // MCB 1910: 8 ft inside height; outside sheathing in vertical boards, exterior posts and braces, sliding doors.
     const H = 2.55;
     box(m.body, -L / 2, L / 2, deck, deck + H, -W / 2, W / 2);
     for (const s of [-1, 1]) {
-      for (let x = -L / 2 + 0.05; x <= L / 2; x += 0.9) box(m.body, x - 0.05, x + 0.05, deck, deck + H, s * (W / 2) - 0.02, s * (W / 2) + 0.03);
+      for (let x = -L / 2 + 0.05; x <= L / 2; x += 0.9)
+        box(m.body, x - 0.05, x + 0.05, deck, deck + H, s * (W / 2) - 0.02, s * (W / 2) + 0.03);
       box(m.body, -L / 2, L / 2, deck + H - 0.12, deck + H, s * (W / 2) - 0.02, s * (W / 2) + 0.04);
       box(m.doors, -0.95, 0.95, deck + 0.05, deck + H - 0.18, s * (W / 2 + 0.04), s * (W / 2 + 0.08));
-      for (const x of [-0.95, 0.95]) box(m.doors, x - 0.05, x + 0.05, deck + 0.05, deck + H - 0.18, s * (W / 2 + 0.07), s * (W / 2 + 0.1));
+      for (const x of [-0.95, 0.95])
+        box(m.doors, x - 0.05, x + 0.05, deck + 0.05, deck + H - 0.18, s * (W / 2 + 0.07), s * (W / 2 + 0.1));
       box(m.irons, -1.0, 2.2, deck + H - 0.17, deck + H - 0.13, s * (W / 2 + 0.03), s * (W / 2 + 0.08));
       box(m.irons, -1.0, 2.2, deck + 0.02, deck + 0.06, s * (W / 2 + 0.03), s * (W / 2 + 0.08));
       // End ladder rungs.
-      for (let k = 0; k < 7; k++) m.irons.frustum([s * (L / 2 + 0.05), deck + 0.25 + k * 0.33, -W / 2 + 0.2], [s * (L / 2 + 0.05), deck + 0.25 + k * 0.33, -W / 2 + 0.6], 0.012, 0.012, 6);
+      for (let k = 0; k < 7; k++)
+        m.irons.frustum(
+          [s * (L / 2 + 0.05), deck + 0.25 + k * 0.33, -W / 2 + 0.2],
+          [s * (L / 2 + 0.05), deck + 0.25 + k * 0.33, -W / 2 + 0.6],
+          0.012,
+          0.012,
+          6,
+        );
     }
-    m.roof.slab([[-L / 2 - 0.1, deck + H, -W / 2 - 0.1], [L / 2 + 0.1, deck + H, -W / 2 - 0.1], [L / 2 + 0.1, deck + H + 0.22, 0], [-L / 2 - 0.1, deck + H + 0.22, 0]], 0.05, Y);
-    m.roof.slab([[-L / 2 - 0.1, deck + H + 0.22, 0], [L / 2 + 0.1, deck + H + 0.22, 0], [L / 2 + 0.1, deck + H, W / 2 + 0.1], [-L / 2 - 0.1, deck + H, W / 2 + 0.1]], 0.05, Y);
+    m.roof.slab(
+      [
+        [-L / 2 - 0.1, deck + H, -W / 2 - 0.1],
+        [L / 2 + 0.1, deck + H, -W / 2 - 0.1],
+        [L / 2 + 0.1, deck + H + 0.22, 0],
+        [-L / 2 - 0.1, deck + H + 0.22, 0],
+      ],
+      0.05,
+      Y,
+    );
+    m.roof.slab(
+      [
+        [-L / 2 - 0.1, deck + H + 0.22, 0],
+        [L / 2 + 0.1, deck + H + 0.22, 0],
+        [L / 2 + 0.1, deck + H, W / 2 + 0.1],
+        [-L / 2 - 0.1, deck + H, W / 2 + 0.1],
+      ],
+      0.05,
+      Y,
+    );
     // Running board along the ridge.
     box(m.roof, -L / 2, L / 2, deck + H + 0.25, deck + H + 0.3, -0.25, 0.25);
   } else if (kind === 'gondola') {
     for (const s of [-1, 1]) {
-      box(m.body, -L / 2, L / 2, deck, deck + 1.0, s * W / 2 - 0.05, s * W / 2 + 0.05);
-      box(m.body, s * L / 2 - 0.05, s * L / 2 + 0.05, deck, deck + 1.0, -W / 2, W / 2);
-      for (let x = -L / 2 + 0.6; x < L / 2; x += 1.2) box(m.body, x - 0.06, x + 0.06, deck, deck + 1.0, s * (W / 2 + 0.05), s * (W / 2 + 0.11));
+      box(m.body, -L / 2, L / 2, deck, deck + 1.0, (s * W) / 2 - 0.05, (s * W) / 2 + 0.05);
+      box(m.body, (s * L) / 2 - 0.05, (s * L) / 2 + 0.05, deck, deck + 1.0, -W / 2, W / 2);
+      for (let x = -L / 2 + 0.6; x < L / 2; x += 1.2)
+        box(m.body, x - 0.06, x + 0.06, deck, deck + 1.0, s * (W / 2 + 0.05), s * (W / 2 + 0.11));
     }
     box(m.body, -L / 2 + 0.05, L / 2 - 0.05, deck, deck + 0.06, -W / 2 + 0.05, W / 2 - 0.05);
     // Heaped coal or rock: a ridge of lumps.
@@ -538,9 +800,13 @@ export function generateWagon(options: WagonOptions = {}): Wagon {
   } else {
     // Flat car deck planks; a log car carries a load of logs chained down between stakes.
     for (let x = -L / 2 + 0.05; x < L / 2 - 0.1; x += 0.2) box(m.body, x, x + 0.19, deck, deck + 0.07, -W / 2, W / 2);
-    for (const s of [-1, 1]) for (let x = -L / 2 + 0.6; x < L / 2; x += 1.2) box(m.irons, x - 0.05, x + 0.05, deck - 0.2, deck + 0.04, s * (W / 2 + 0.01), s * (W / 2 + 0.05));
+    for (const s of [-1, 1])
+      for (let x = -L / 2 + 0.6; x < L / 2; x += 1.2)
+        box(m.irons, x - 0.05, x + 0.05, deck - 0.2, deck + 0.04, s * (W / 2 + 0.01), s * (W / 2 + 0.05));
     if (kind === 'log-car') {
-      for (const s of [-1, 1]) for (let x = -L / 2 + 0.8; x < L / 2; x += 2.4) box(m.frame, x - 0.07, x + 0.07, deck, deck + 1.9, s * W / 2 - 0.14, s * W / 2);
+      for (const s of [-1, 1])
+        for (let x = -L / 2 + 0.8; x < L / 2; x += 2.4)
+          box(m.frame, x - 0.07, x + 0.07, deck, deck + 1.9, (s * W) / 2 - 0.14, (s * W) / 2);
       let y = deck + 0.07;
       for (let row = 0; row < 4; row++) {
         const n = 5 - (row % 2),
@@ -589,7 +855,17 @@ export interface TouringCarOptions {
   readonly top?: 'up' | 'down';
 }
 /** The touring car's parts, one geometry and material each. */
-export type TouringCarPart = 'body' | 'fenders' | 'wheels' | 'tyres' | 'brass' | 'top' | 'seats' | 'glass' | 'chassis' | 'spare';
+export type TouringCarPart =
+  | 'body'
+  | 'fenders'
+  | 'wheels'
+  | 'tyres'
+  | 'brass'
+  | 'top'
+  | 'seats'
+  | 'glass'
+  | 'chassis'
+  | 'spare';
 /** A touring car, with its wheelbase, track and wheel size. */
 export interface TouringCar extends Vehicle<TouringCarPart> {
   /** Wheelbase, track and wheel diameter, metres (100 in, 56 in, 30 in). */
@@ -601,7 +877,18 @@ export interface TouringCar extends Vehicle<TouringCarPart> {
 export function generateTouringCar(options: TouringCarOptions = {}): TouringCar {
   const o = obj(options, 'touring car'),
     top = pick('touring car', o, 'top', ['up', 'down'] as const, 'up');
-  const m = builders(['body', 'fenders', 'wheels', 'tyres', 'brass', 'top', 'seats', 'glass', 'chassis', 'spare'] as const),
+  const m = builders([
+      'body',
+      'fenders',
+      'wheels',
+      'tyres',
+      'brass',
+      'top',
+      'seats',
+      'glass',
+      'chassis',
+      'spare',
+    ] as const),
     wb = 2.54,
     tr = 1.4224,
     R = 0.381,
@@ -619,7 +906,11 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
           inn = ring([x, R, 0], R - tw, 32, (s * tr) / 2 + zf);
         for (let k = 0; k < 32; k++) {
           const k1 = (k + 1) % 32;
-          m.tyres.poly(zf > 0 ? [out[k], out[k1], inn[k1], inn[k]] : [out[k1], out[k], inn[k], inn[k1]], [0, 0, zf > 0 ? 1 : -1]);
+          m.tyres.poly(zf > 0 ? [out[k], out[k1], inn[k1], inn[k]] : [out[k1], out[k], inn[k], inn[k1]], [
+            0,
+            0,
+            zf > 0 ? 1 : -1,
+          ]);
         }
       }
     }
@@ -627,7 +918,8 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
   for (const s of [-1, 1]) box(m.chassis, rx - 0.3, fx + 0.12, 0.5, 0.6, s * 0.38 - 0.03, s * 0.38 + 0.03);
   for (const x of [fx, rx]) {
     m.chassis.beam([x, R, -tr / 2], [x, R, tr / 2], 0.05, 0.05);
-    for (let k = 0; k < 5; k++) m.chassis.beam([x, 0.6 + k * 0.02, -0.4 + k * 0.05], [x, 0.6 + k * 0.02, 0.4 - k * 0.05], 0.05, 0.015);
+    for (let k = 0; k < 5; k++)
+      m.chassis.beam([x, 0.6 + k * 0.02, -0.4 + k * 0.05], [x, 0.6 + k * 0.02, 0.4 - k * 0.05], 0.05, 0.015);
   }
   for (const s of [-1, 1]) m.chassis.beam([fx, R, s * 0.6], [fx - 0.9, 0.45, 0], 0.03, 0.03);
   m.chassis.frustum([fx - 0.9, 0.45, 0], [rx, R, 0], 0.05, 0.08, 10);
@@ -638,7 +930,9 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
   box(m.glass, fx + 0.2, fx + 0.205, 0.62, 1.18, -0.27, 0.27);
   box(m.body, fx - 0.75, fx + 0.1, 0.62, 1.18, -0.3, 0.3);
   m.body.frustum([fx - 0.75, 1.15, 0], [fx + 0.1, 1.15, 0], 0.3, 0.29, 20, true);
-  for (const s of [-1, 1]) for (let k = 0; k < 6; k++) box(m.chassis, fx - 0.55 + k * 0.08, fx - 0.52 + k * 0.08, 0.8, 1.0, s * 0.301, s * 0.31);
+  for (const s of [-1, 1])
+    for (let k = 0; k < 6; k++)
+      box(m.chassis, fx - 0.55 + k * 0.08, fx - 0.52 + k * 0.08, 0.8, 1.0, s * 0.301, s * 0.31);
   box(m.body, fx - 0.85, fx - 0.75, 0.6, 1.3, -0.45, 0.45);
   box(m.body, rx + 0.35, fx - 0.85, 0.62, 1.05, -0.8, 0.8);
   // Rounded rear of the tonneau.
@@ -651,7 +945,16 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
         const a0 = from + (to - from) * (k / 10),
           a1 = from + (to - from) * ((k + 1) / 10),
           rr = R + 0.07;
-        m.fenders.slab([[x + rr * Math.cos(a0), R + rr * Math.sin(a0), s * 0.62], [x + rr * Math.cos(a1), R + rr * Math.sin(a1), s * 0.62], [x + rr * Math.cos(a1), R + rr * Math.sin(a1), s * 0.86], [x + rr * Math.cos(a0), R + rr * Math.sin(a0), s * 0.86]], 0.012, Y);
+        m.fenders.slab(
+          [
+            [x + rr * Math.cos(a0), R + rr * Math.sin(a0), s * 0.62],
+            [x + rr * Math.cos(a1), R + rr * Math.sin(a1), s * 0.62],
+            [x + rr * Math.cos(a1), R + rr * Math.sin(a1), s * 0.86],
+            [x + rr * Math.cos(a0), R + rr * Math.sin(a0), s * 0.86],
+          ],
+          0.012,
+          Y,
+        );
       }
     };
     arc(fx, 0.15, Math.PI);
@@ -666,7 +969,15 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
     box(m.body, rx - 0.05, rx + 0.55, 0.66, 1.0, s * 0.8, s * 0.815);
   }
   m.brass.frustum([fx - 0.8, 1.15, -0.55], [fx - 0.4, 1.15, -0.62], 0.02, 0.06, 12);
-  m.glass.poly([[fx - 0.85, 1.32, -0.44], [fx - 0.85, 1.32, 0.44], [fx - 0.85, 1.73, 0.44], [fx - 0.85, 1.73, -0.44]], X);
+  m.glass.poly(
+    [
+      [fx - 0.85, 1.32, -0.44],
+      [fx - 0.85, 1.32, 0.44],
+      [fx - 0.85, 1.73, 0.44],
+      [fx - 0.85, 1.73, -0.44],
+    ],
+    X,
+  );
   // Seats: front bench and rear tonneau, buttoned leather; steering column and wheel; the three foot pedals.
   for (const [x0, x1] of [
     [fx - 1.45, fx - 0.95],
@@ -682,7 +993,16 @@ export function generateTouringCar(options: TouringCarOptions = {}): TouringCar 
   // Spare tyre on the running board.
   m.spare.frustum([fx - 1.2, 0.95, 0.9], [fx - 1.2, 0.95, 0.98], R, R, 28, true);
   if (top === 'up') {
-    m.top.slab([[rx - 0.4, 2.0, -0.82], [fx - 0.85, 2.0, -0.82], [fx - 0.85, 2.0, 0.82], [rx - 0.4, 2.0, 0.82]], 0.03, Y);
+    m.top.slab(
+      [
+        [rx - 0.4, 2.0, -0.82],
+        [fx - 0.85, 2.0, -0.82],
+        [fx - 0.85, 2.0, 0.82],
+        [rx - 0.4, 2.0, 0.82],
+      ],
+      0.03,
+      Y,
+    );
     for (const s of [-1, 1]) {
       m.top.beam([rx - 0.2, 1.05, s * 0.8], [rx - 0.4, 2.0, s * 0.8], 0.03, 0.03);
       m.top.beam([rx + 0.3, 1.05, s * 0.8], [rx - 0.2, 2.0, s * 0.8], 0.03, 0.03);
@@ -723,7 +1043,17 @@ export interface KeiTruckOptions {
   readonly color?: readonly [number, number, number];
 }
 /** The kei truck's parts, one geometry and material each. */
-export type KeiTruckPart = 'cab' | 'glass' | 'bed' | 'chassis' | 'wheels' | 'tyres' | 'lights' | 'trim' | 'mirrors' | 'spare';
+export type KeiTruckPart =
+  | 'cab'
+  | 'glass'
+  | 'bed'
+  | 'chassis'
+  | 'wheels'
+  | 'tyres'
+  | 'lights'
+  | 'trim'
+  | 'mirrors'
+  | 'spare';
 /** A kei truck, with its wheelbase, wheel size and bed. */
 export interface KeiTruck extends Vehicle<KeiTruckPart> {
   readonly wheelbase: number;
@@ -741,7 +1071,18 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
     color = o.color === undefined ? ([0.8, 0.8, 0.78] as const) : (o.color as readonly [number, number, number]);
   if (!Array.isArray(color) || color.length !== 3 || !color.every((c) => typeof c === 'number' && c >= 0 && c <= 1))
     throw new RangeError('Invalid kei truck color; pass three numbers from 0 to 1.');
-  const m = builders(['cab', 'glass', 'bed', 'chassis', 'wheels', 'tyres', 'lights', 'trim', 'mirrors', 'spare'] as const),
+  const m = builders([
+      'cab',
+      'glass',
+      'bed',
+      'chassis',
+      'wheels',
+      'tyres',
+      'lights',
+      'trim',
+      'mirrors',
+      'spare',
+    ] as const),
     L = 3.395,
     W = 1.475,
     Ht = 1.765,
@@ -762,7 +1103,11 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
           inn = ring([x, R, 0], 0.16, 32, s * zt + zf);
         for (let k = 0; k < 32; k++) {
           const k1 = (k + 1) % 32;
-          m.tyres.poly(zf > 0 ? [out[k], out[k1], inn[k1], inn[k]] : [out[k1], out[k], inn[k], inn[k1]], [0, 0, zf > 0 ? 1 : -1]);
+          m.tyres.poly(zf > 0 ? [out[k], out[k1], inn[k1], inn[k]] : [out[k1], out[k], inn[k], inn[k1]], [
+            0,
+            0,
+            zf > 0 ? 1 : -1,
+          ]);
         }
       }
       // Steel wheel with four lug nuts and a hub cap.
@@ -770,16 +1115,42 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
       m.wheels.frustum([x, R, s * (zt + 0.07)], [x, R, s * (zt + 0.09)], 0.06, 0.05, 16, true);
       for (let k = 0; k < 4; k++) {
         const t = (k * Math.PI) / 2 + Math.PI / 4;
-        m.wheels.frustum([x + 0.05 * Math.cos(t), R + 0.05 * Math.sin(t), s * (zt + 0.07)], [x + 0.05 * Math.cos(t), R + 0.05 * Math.sin(t), s * (zt + 0.085)], 0.01, 0.01, 6);
+        m.wheels.frustum(
+          [x + 0.05 * Math.cos(t), R + 0.05 * Math.sin(t), s * (zt + 0.07)],
+          [x + 0.05 * Math.cos(t), R + 0.05 * Math.sin(t), s * (zt + 0.085)],
+          0.01,
+          0.01,
+          6,
+        );
       }
       // Wheel arches.
       const arch: V3[] = [];
-      for (let k = 0; k <= 10; k++) arch.push([x + (R + 0.05) * Math.cos((Math.PI * k) / 10), R + (R + 0.05) * Math.sin((Math.PI * k) / 10), s * (W / 2 - 0.005)]);
-      for (let k = 0; k < 10; k++) m.trim.slab([arch[k], arch[k + 1], add(arch[k + 1], [0, 0, -s * 0.2]), add(arch[k], [0, 0, -s * 0.2])], 0.01, Y);
+      for (let k = 0; k <= 10; k++)
+        arch.push([
+          x + (R + 0.05) * Math.cos((Math.PI * k) / 10),
+          R + (R + 0.05) * Math.sin((Math.PI * k) / 10),
+          s * (W / 2 - 0.005),
+        ]);
+      for (let k = 0; k < 10; k++)
+        m.trim.slab(
+          [arch[k], arch[k + 1], add(arch[k + 1], [0, 0, -s * 0.2]), add(arch[k], [0, 0, -s * 0.2])],
+          0.01,
+          Y,
+        );
     }
   // Ladder frame, leaf springs at the rear, fuel tank, exhaust and the spare wheel under the bed.
   for (const s of [-1, 1]) box(m.chassis, -L / 2 + 0.05, front - 0.25, 0.3, 0.42, s * 0.42 - 0.03, s * 0.42 + 0.03);
-  for (const s of [-1, 1]) for (let k = 0; k < 4; k++) box(m.chassis, rx - 0.5 + k * 0.03, rx + 0.5 - k * 0.03, 0.26 + k * 0.012, 0.272 + k * 0.012, s * 0.42 - 0.03, s * 0.42 + 0.03);
+  for (const s of [-1, 1])
+    for (let k = 0; k < 4; k++)
+      box(
+        m.chassis,
+        rx - 0.5 + k * 0.03,
+        rx + 0.5 - k * 0.03,
+        0.26 + k * 0.012,
+        0.272 + k * 0.012,
+        s * 0.42 - 0.03,
+        s * 0.42 + 0.03,
+      );
   m.chassis.beam([rx, R, -zt], [rx, R, zt], 0.07, 0.07);
   box(m.chassis, rx + 0.4, rx + 0.85, 0.3, 0.5, -0.55, -0.2);
   m.chassis.frustum([fx - 0.8, 0.25, 0.2], [-L / 2 + 0.05, 0.22, 0.3], 0.025, 0.025, 8);
@@ -791,16 +1162,68 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
   // Sheet metal 5 mm inside the catalogue width, so trim and glass stand proud of it within the width.
   const ws = W / 2 - 0.005;
   box(m.cab, cabBack, front - 0.03, cy0, belt, -ws, ws);
-  m.cab.slab([[cabBack, belt, -ws], [front - 0.03, belt, -ws], [front - 0.28, roof - 0.04, -W / 2 + 0.07], [cabBack, roof - 0.04, -W / 2 + 0.07]], 0.04, [0, 0, -1]);
-  m.cab.slab([[cabBack, belt, ws], [front - 0.03, belt, ws], [front - 0.28, roof - 0.04, W / 2 - 0.07], [cabBack, roof - 0.04, W / 2 - 0.07]], 0.04, Z);
+  m.cab.slab(
+    [
+      [cabBack, belt, -ws],
+      [front - 0.03, belt, -ws],
+      [front - 0.28, roof - 0.04, -W / 2 + 0.07],
+      [cabBack, roof - 0.04, -W / 2 + 0.07],
+    ],
+    0.04,
+    [0, 0, -1],
+  );
+  m.cab.slab(
+    [
+      [cabBack, belt, ws],
+      [front - 0.03, belt, ws],
+      [front - 0.28, roof - 0.04, W / 2 - 0.07],
+      [cabBack, roof - 0.04, W / 2 - 0.07],
+    ],
+    0.04,
+    Z,
+  );
   box(m.cab, cabBack, front - 0.27, roof - 0.07, roof, -W / 2 + 0.06, W / 2 - 0.06);
   box(m.cab, cabBack - 0.04, cabBack, belt, roof - 0.04, -W / 2 + 0.07, W / 2 - 0.07);
-  m.cab.slab([[front - 0.03, belt, -W / 2 + 0.03], [front - 0.03, belt, W / 2 - 0.03], [front - 0.28, roof - 0.06, W / 2 - 0.09], [front - 0.28, roof - 0.06, -W / 2 + 0.09]], 0.01, [1, 0.2, 0], true);
-  m.glass.poly([[front - 0.02, belt + 0.04, -W / 2 + 0.1], [front - 0.02, belt + 0.04, W / 2 - 0.1], [front - 0.265, roof - 0.1, W / 2 - 0.13], [front - 0.265, roof - 0.1, -W / 2 + 0.13]], [1, 0.25, 0]);
-  m.glass.poly([[cabBack - 0.045, belt + 0.15, W / 2 - 0.25], [cabBack - 0.045, belt + 0.15, -W / 2 + 0.25], [cabBack - 0.045, roof - 0.15, -W / 2 + 0.25], [cabBack - 0.045, roof - 0.15, W / 2 - 0.25]], [-1, 0, 0]);
+  m.cab.slab(
+    [
+      [front - 0.03, belt, -W / 2 + 0.03],
+      [front - 0.03, belt, W / 2 - 0.03],
+      [front - 0.28, roof - 0.06, W / 2 - 0.09],
+      [front - 0.28, roof - 0.06, -W / 2 + 0.09],
+    ],
+    0.01,
+    [1, 0.2, 0],
+    true,
+  );
+  m.glass.poly(
+    [
+      [front - 0.02, belt + 0.04, -W / 2 + 0.1],
+      [front - 0.02, belt + 0.04, W / 2 - 0.1],
+      [front - 0.265, roof - 0.1, W / 2 - 0.13],
+      [front - 0.265, roof - 0.1, -W / 2 + 0.13],
+    ],
+    [1, 0.25, 0],
+  );
+  m.glass.poly(
+    [
+      [cabBack - 0.045, belt + 0.15, W / 2 - 0.25],
+      [cabBack - 0.045, belt + 0.15, -W / 2 + 0.25],
+      [cabBack - 0.045, roof - 0.15, -W / 2 + 0.25],
+      [cabBack - 0.045, roof - 0.15, W / 2 - 0.25],
+    ],
+    [-1, 0, 0],
+  );
   for (const s of [-1, 1]) {
     const side = (pts: V3[]) => (s > 0 ? pts : [...pts].reverse());
-    m.glass.poly(side([[cabBack + 0.12, belt + 0.05, s * (W / 2 - 0.002)], [front - 0.32, belt + 0.05, s * (W / 2 - 0.002)], [front - 0.45, roof - 0.12, s * (W / 2 - 0.055)], [cabBack + 0.12, roof - 0.12, s * (W / 2 - 0.055)]]), [0, 0, s]);
+    m.glass.poly(
+      side([
+        [cabBack + 0.12, belt + 0.05, s * (W / 2 - 0.002)],
+        [front - 0.32, belt + 0.05, s * (W / 2 - 0.002)],
+        [front - 0.45, roof - 0.12, s * (W / 2 - 0.055)],
+        [cabBack + 0.12, roof - 0.12, s * (W / 2 - 0.055)],
+      ]),
+      [0, 0, s],
+    );
     // Door seams, handle, step; headlamps and turn signals on the front panel; wipers.
     box(m.trim, cabBack + 0.08, cabBack + 0.09, cy0 + 0.05, belt, s * (W / 2 - 0.006), s * (W / 2 - 0.001));
     box(m.trim, front - 0.2, front - 0.19, cy0 + 0.05, belt, s * (W / 2 - 0.006), s * (W / 2 - 0.001));
@@ -810,7 +1233,13 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
     box(m.lights, front - 0.04, front + 0.004, 0.55, 0.6, s * 0.62 - 0.05, s * 0.62 + 0.05);
     m.trim.beam([front - 0.05, belt + 0.03, s * 0.08], [front - 0.17, belt + 0.45, s * 0.3], 0.01, 0.008);
     // Door mirror on an arm (not counted in the kei width, as the makers' catalogues list it).
-    m.mirrors.frustum([front - 0.32, belt + 0.12, s * (W / 2)], [front - 0.25, belt + 0.14, s * (W / 2 + 0.14)], 0.012, 0.012, 6);
+    m.mirrors.frustum(
+      [front - 0.32, belt + 0.12, s * (W / 2)],
+      [front - 0.25, belt + 0.14, s * (W / 2 + 0.14)],
+      0.012,
+      0.012,
+      6,
+    );
     box(m.mirrors, front - 0.28, front - 0.22, belt + 0.08, belt + 0.24, s * (W / 2 + 0.11), s * (W / 2 + 0.21));
   }
   // Front panel: grille slot, emblem, bumper with licence plate.
@@ -844,10 +1273,20 @@ export function generateKeiTruck(options: KeiTruckOptions = {}): KeiTruck {
   gate([b1, by, bw / 2 + t], [b0, by, bw / 2 + t], Z);
   gate([b0 - t, by, bw / 2], [b0 - t, by, -bw / 2], [-1, 0, 0]);
   // Gate posts, the guard frame (a tube frame with bars), stake pockets.
-  for (const s of [-1, 1]) for (const x of [b0, b1]) box(m.bed, x - 0.025, x + 0.025, by, by + gh + 0.02, s * (bw / 2) - 0.025, s * (bw / 2) + 0.025);
-  for (const s of [-1, 1]) m.bed.frustum([b1 + 0.02, by, s * (bw / 2 - 0.03)], [b1 + 0.02, by + 1.0, s * (bw / 2 - 0.03)], 0.02, 0.02, 8);
+  for (const s of [-1, 1])
+    for (const x of [b0, b1])
+      box(m.bed, x - 0.025, x + 0.025, by, by + gh + 0.02, s * (bw / 2) - 0.025, s * (bw / 2) + 0.025);
+  for (const s of [-1, 1])
+    m.bed.frustum([b1 + 0.02, by, s * (bw / 2 - 0.03)], [b1 + 0.02, by + 1.0, s * (bw / 2 - 0.03)], 0.02, 0.02, 8);
   m.bed.frustum([b1 + 0.02, by + 1.0, -bw / 2 + 0.03], [b1 + 0.02, by + 1.0, bw / 2 - 0.03], 0.02, 0.02, 8);
-  for (let k = 0; k < 5; k++) m.bed.frustum([b1 + 0.02, by + 0.3 + k * 0.14, -bw / 2 + 0.05], [b1 + 0.02, by + 0.3 + k * 0.14, bw / 2 - 0.05], 0.01, 0.01, 6);
+  for (let k = 0; k < 5; k++)
+    m.bed.frustum(
+      [b1 + 0.02, by + 0.3 + k * 0.14, -bw / 2 + 0.05],
+      [b1 + 0.02, by + 0.3 + k * 0.14, bw / 2 - 0.05],
+      0.01,
+      0.01,
+      6,
+    );
   for (const s of [-1, 1]) box(m.lights, b0 - 0.04, b0 - 0.01, by - 0.25, by - 0.08, s * 0.6 - 0.08, s * 0.6 + 0.08);
   const parts = finish(m);
   return {
@@ -907,14 +1346,24 @@ export function generateVendingMachine(options: VendingMachineOptions = {}): Ven
   box(m.cabinet, -f, f - 0.06, 0.05, H, -W / 2, W / 2);
   box(m.cabinet, -f + 0.02, f - 0.08, 0, 0.05, -W / 2 + 0.03, W / 2 - 0.03);
   // Vent louvres low on each side.
-  for (const s of [-1, 1]) for (let k = 0; k < 6; k++) box(m.port, -f + 0.1, -f + 0.4, 0.15 + k * 0.04, 0.165 + k * 0.04, s * (W / 2) - 0.002, s * (W / 2) + 0.004);
+  for (const s of [-1, 1])
+    for (let k = 0; k < 6; k++)
+      box(m.port, -f + 0.1, -f + 0.4, 0.15 + k * 0.04, 0.165 + k * 0.04, s * (W / 2) - 0.002, s * (W / 2) + 0.004);
   // Door: display window over the button rows; the control strip at the right; the pick-up port at the bottom.
   const disp0 = 0.95,
     disp1 = H - 0.1,
     z0 = -W / 2 + 0.06,
     z1 = W / 2 - 0.27;
   box(m.panel, f - 0.06, f, 0.05, H - 0.02, -W / 2 + 0.01, W / 2 - 0.01);
-  m.glass.poly([[f + 0.002, disp0, z0], [f + 0.002, disp0, z1], [f + 0.002, disp1, z1], [f + 0.002, disp1, z0]], X);
+  m.glass.poly(
+    [
+      [f + 0.002, disp0, z0],
+      [f + 0.002, disp0, z1],
+      [f + 0.002, disp1, z1],
+      [f + 0.002, disp1, z0],
+    ],
+    X,
+  );
   box(m.light, f - 0.08, f - 0.07, disp0, disp1, z0, z1);
   const cols = Math.max(6, Math.round((z1 - z0) / 0.085)),
     rowH = (disp1 - disp0) / rows,

@@ -168,17 +168,32 @@ export class CRT extends ScreenPass {
         throw rangeError(`CRT ${key} must be between 0 and ${top}, got ${this[key]}`, 'pixel-options');
     for (const key of ['chromaticOffset', 'redOffset', 'greenOffset', 'blueOffset'] as const) {
       const pair = offsets(this[key]);
-      if (pair.length !== 2 || pair.some(v => !Number.isFinite(v) || Math.abs(v) > 32))
-        throw rangeError(`CRT ${key} must be finite source pixels in [-32,32], or an [x,y] pair in that range`, 'pixel-options');
+      if (pair.length !== 2 || pair.some((v) => !Number.isFinite(v) || Math.abs(v) > 32))
+        throw rangeError(
+          `CRT ${key} must be finite source pixels in [-32,32], or an [x,y] pair in that range`,
+          'pixel-options',
+        );
     }
   }
   protected fill(values: ArrayBuffer, rect: readonly number[]): void {
     this.#check();
     new Int32Array(values).set(rect, 0);
-    new Float32Array(values).set([this.curvature, this.scanlines, this.mask, this.glow, this.brightness,
-      this.colorBleed, ...offsets(this.chromaticOffset), ...offsets(this.redOffset), ...offsets(this.greenOffset),
-      ...offsets(this.blueOffset)], 4);
+    new Float32Array(values).set(
+      [
+        this.curvature,
+        this.scanlines,
+        this.mask,
+        this.glow,
+        this.brightness,
+        this.colorBleed,
+        ...offsets(this.chromaticOffset),
+        ...offsets(this.redOffset),
+        ...offsets(this.greenOffset),
+        ...offsets(this.blueOffset),
+      ],
+      4,
+    );
   }
 }
 
-const offsets = (value: ChromaticOffset): readonly number[] => typeof value === 'number' ? [value, 0] : value;
+const offsets = (value: ChromaticOffset): readonly number[] => (typeof value === 'number' ? [value, 0] : value);

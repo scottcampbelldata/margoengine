@@ -23,7 +23,10 @@ export type ScatterWindSetting = [number, number, number, number];
  * of `@margoengine/scatter`), so plants thrash in a gale. Dead calm keeps `previous` direction (default `[1, 0]`;
  * scatter needs a nonzero one) at strength and speed 0.
  */
-export function scatterWind(wind: readonly [number, number], previous: readonly [number, number] = [1, 0]): ScatterWindSetting {
+export function scatterWind(
+  wind: readonly [number, number],
+  previous: readonly [number, number] = [1, 0],
+): ScatterWindSetting {
   const speed = Math.hypot(wind[0], wind[1]);
   if (!(speed > 1e-6)) return [previous[0], previous[1], 0, 0];
   return [wind[0] / speed, wind[1] / speed, windBend(speed), Math.min(100, speed)];
@@ -40,8 +43,15 @@ export interface GrassWindSetting {
 }
 
 /** A grass field's wind settings for a wind `[x, z]` in m/s, as for {@link scatterWind}. */
-export function grassWind(wind: readonly [number, number], previous: readonly [number, number] = [1, 0.35]): GrassWindSetting {
+export function grassWind(
+  wind: readonly [number, number],
+  previous: readonly [number, number] = [1, 0.35],
+): GrassWindSetting {
   const speed = Math.hypot(wind[0], wind[1]);
   if (!(speed > 1e-6)) return { windDirection: [previous[0], previous[1]], windStrength: 0, windSpeed: 0 };
-  return { windDirection: [wind[0] / speed, wind[1] / speed], windStrength: 2 * windBend(speed), windSpeed: Math.min(100, 0.15 * speed) };
+  return {
+    windDirection: [wind[0] / speed, wind[1] / speed],
+    windStrength: 2 * windBend(speed),
+    windSpeed: Math.min(100, 0.15 * speed),
+  };
 }

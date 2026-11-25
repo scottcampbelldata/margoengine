@@ -126,7 +126,10 @@ export function readGLB(buffer) {
     let bytes = new Uint8Array(a.count * element);
     if (a.bufferView !== undefined) {
       const b = doc.bufferViews[a.bufferView];
-      bytes = bin.slice((b.byteOffset ?? 0) + (a.byteOffset ?? 0), (b.byteOffset ?? 0) + (a.byteOffset ?? 0) + a.count * element);
+      bytes = bin.slice(
+        (b.byteOffset ?? 0) + (a.byteOffset ?? 0),
+        (b.byteOffset ?? 0) + (a.byteOffset ?? 0) + a.count * element,
+      );
     }
     if (a.sparse) {
       const { count, indices, values } = a.sparse,

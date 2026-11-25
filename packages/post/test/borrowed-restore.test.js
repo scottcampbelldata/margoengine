@@ -31,11 +31,7 @@ test('Lens dirt across a device restore: a plain image is dropped and reported o
   assert.equal(custom(h.gpu.record(() => h.frame())), 1, 'custom dirt before the loss');
   assert.deepEqual(viewed, ['plain']);
   const g1 = h.lose();
-  assert.equal(
-    custom(g1.record(() => h.frame())),
-    0,
-    'the built-in smudges draw, as with no dirt',
-  );
+  assert.equal(custom(g1.record(() => h.frame())), 0, 'the built-in smudges draw, as with no dirt');
   h.frame();
   assert.deepEqual(viewed, ['plain'], 'nothing of the lost image is bound');
   assert.equal(lost(errors).length, 1, 'reported once');
@@ -61,11 +57,17 @@ test('LensFlare element textures across a device restore: a plain image draws no
     h = harness(),
     errors = [],
     plain = watched(h.gpu.device, viewed, 'plain'),
-    elements = [{ texture: plain, size: 100 }, { size: 60, distance: 0.6 }],
+    elements = [
+      { texture: plain, size: 100 },
+      { size: 60, distance: 0.6 },
+    ],
     flare = new LensFlare({ position: () => [0, 6, 0], elements });
   h.engine.onError = (e) => errors.push(e);
   h.engine.use(new PostStack([flare]));
-  const images = (log) => modules(log).find((m) => m.includes('var<storage,read> elements'))?.includes('image0');
+  const images = (log) =>
+    modules(log)
+      .find((m) => m.includes('var<storage,read> elements'))
+      ?.includes('image0');
   assert.equal(images(h.gpu.record(() => h.frame())), true);
   assert.deepEqual(viewed, ['plain']);
   const g1 = h.lose();
@@ -111,15 +113,14 @@ test('MaterialDecals atlas across a device restore: a plain one applies no decal
   assert.equal(count(h.gpu.record(() => h.frame())), 1);
   assert.deepEqual(viewed, ['plain']);
   const g1 = h.lose();
-  assert.equal(
-    count(g1.record(() => h.frame())),
-    0,
-    'no decal applies without its atlas',
-  );
+  assert.equal(count(g1.record(() => h.frame())), 0, 'no decal applies without its atlas');
   h.frame();
   assert.deepEqual(viewed, ['plain'], 'nothing of the lost atlas is bound');
   assert.equal(lost(errors).length, 1, 'reported once');
-  assert.match(errors[0].message, /MaterialDecals atlas lost with the device; pass a function or call set options\.atlas/);
+  assert.match(
+    errors[0].message,
+    /MaterialDecals atlas lost with the device; pass a function or call set options\.atlas/,
+  );
   effect.options.atlas = watched(g1.device, viewed, 'again');
   assert.equal(count(g1.record(() => h.frame())), 1, 'a new atlas brings the decals back');
   const made = [];

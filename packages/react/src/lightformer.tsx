@@ -1,7 +1,7 @@
 import { createContext, forwardRef, useContext, useEffect, useRef } from 'react';
 import type { EngineKernel } from '@margoengine/core';
 import type { Lightformer as NativeLightformer, LightformerForm } from '@margoengine/environment/lightformer';
-import type { ColorInput } from '@margoengine/environment';
+import type { ColorInput } from '@margoengine/environment/main';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
@@ -45,7 +45,10 @@ function scaleOf(value: LightformerProps['scale']): Vec3 {
           ? [...value]
           : null;
   if (!s || s.some((v) => typeof v !== 'number' || !Number.isFinite(v)))
-    throw rangeError('Lightformer scale must be a finite number, [width, height] or [x, y, z]; pass one of those', 'react-arguments');
+    throw rangeError(
+      'Lightformer scale must be a finite number, [width, height] or [x, y, z]; pass one of those',
+      'react-arguments',
+    );
   return s as Vec3;
 }
 /** Quaternion [x, y, z, w] turning +Z toward `d` with +Y kept up (a look-at basis; +Z up when `d` is vertical). */

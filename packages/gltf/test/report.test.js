@@ -53,7 +53,9 @@ function glb(doc, arrays) {
     length += bytes.length + ((4 - (bytes.length % 4)) % 4);
   }
   const bin = Buffer.concat(parts),
-    json = Buffer.from(JSON.stringify({ asset: { version: '2.0' }, ...doc, bufferViews: views, buffers: [{ byteLength: bin.length }] })),
+    json = Buffer.from(
+      JSON.stringify({ asset: { version: '2.0' }, ...doc, bufferViews: views, buffers: [{ byteLength: bin.length }] }),
+    ),
     jsonPad = Buffer.concat([json, Buffer.alloc((4 - (json.length % 4)) % 4, 0x20)]),
     out = Buffer.alloc(12 + 8 + jsonPad.length + 8 + bin.length);
   out.writeUInt32LE(0x46546c67, 0);
@@ -72,11 +74,23 @@ function cube(inward = false) {
   const positions = [],
     normals = [],
     indices = [];
-  for (const [axis, sign] of [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]]) {
+  for (const [axis, sign] of [
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [2, 1],
+    [2, -1],
+  ]) {
     const u = (axis + 1) % 3,
       v = (axis + 2) % 3,
       base = positions.length / 3;
-    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    for (const [a, b] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
       const p = [0, 0, 0];
       p[axis] = sign * 0.5;
       p[u] = a * 0.5 * sign;
@@ -89,9 +103,19 @@ function cube(inward = false) {
     const quad = [base, base + 1, base + 2, base, base + 2, base + 3];
     indices.push(...(inward ? [quad[0], quad[2], quad[1], quad[3], quad[5], quad[4]] : quad));
   }
-  return { positions: new Float32Array(positions), normals: new Float32Array(normals), indices: new Uint16Array(indices) };
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    indices: new Uint16Array(indices),
+  };
 }
-const accessor = (bufferView, componentType, count, type, extra = {}) => ({ bufferView, componentType, count, type, ...extra });
+const accessor = (bufferView, componentType, count, type, extra = {}) => ({
+  bufferView,
+  componentType,
+  count,
+  type,
+  ...extra,
+});
 
 test('a cube drawn by two nodes: counts, world bounds and no problems', async () => {
   const c = cube();
@@ -134,7 +158,10 @@ test('problems: inside-out, no normals, an unsupported required extension, not a
       nodes: [{ mesh: 0, name: 'box' }],
       meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
       materials: [{}],
-      accessors: [accessor(0, 5126, 24, 'VEC3', { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }), accessor(1, 5123, 36, 'SCALAR')],
+      accessors: [
+        accessor(0, 5126, 24, 'VEC3', { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }),
+        accessor(1, 5123, 36, 'SCALAR'),
+      ],
     },
     [c.positions, c.indices],
   );
@@ -185,9 +212,31 @@ test('a cut-out card: image size from its header, drawn bounds by texture alpha'
 });
 
 test('imageHeader reads PNG, JPEG, WebP and KTX2 sizes', async () => {
-  assert.deepEqual(imageHeader(new Uint8Array(png(5, 7, () => [0, 0, 0, 255]))), { format: 'png', width: 5, height: 7 });
+  assert.deepEqual(imageHeader(new Uint8Array(png(5, 7, () => [0, 0, 0, 255]))), {
+    format: 'png',
+    width: 5,
+    height: 7,
+  });
   // A JPEG start: SOI, APP0 of length 16, SOF0 (precision 8, height 300, width 400).
-  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, ...new Array(14).fill(0), 0xff, 0xc0, 0, 17, 8, 1, 44, 1, 144, 3]);
+  const jpeg = new Uint8Array([
+    0xff,
+    0xd8,
+    0xff,
+    0xe0,
+    0,
+    16,
+    ...new Array(14).fill(0),
+    0xff,
+    0xc0,
+    0,
+    17,
+    8,
+    1,
+    44,
+    1,
+    144,
+    3,
+  ]);
   assert.deepEqual(imageHeader(jpeg), { format: 'jpeg', width: 400, height: 300 });
   const vp8x = new Uint8Array(30);
   vp8x.set([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58]);
@@ -201,7 +250,10 @@ test('a real file: FourUV.glb reads without a GPU', async () => {
   const r = await reportGLTF(bytes);
   assert.ok(r.counts.triangles > 0);
   assert.ok(r.bounds && r.bounds.size.every((v) => v >= 0));
-  assert.deepEqual(r.problems.filter((p) => p.code === 'accessor' || p.code === 'json'), []);
+  assert.deepEqual(
+    r.problems.filter((p) => p.code === 'accessor' || p.code === 'json'),
+    [],
+  );
 });
 
 // KB-GLTFREPORT-MIRROR1, KB-GLTFREPORT-NAN1, GAP-FILM-GLTFREPORT2.
@@ -211,18 +263,30 @@ const cubeGlb = (c, nodes, extra = {}) =>
       nodes,
       meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
       materials: [{}],
-      accessors: [accessor(0, 5126, 24, 'VEC3', { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }), accessor(1, 5126, 24, 'VEC3'), accessor(2, 5123, 36, 'SCALAR')],
+      accessors: [
+        accessor(0, 5126, 24, 'VEC3', { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] }),
+        accessor(1, 5126, 24, 'VEC3'),
+        accessor(2, 5123, 36, 'SCALAR'),
+      ],
       ...extra,
     },
     [c.positions, c.normals, c.indices],
   );
 
 test('a mirroring node (negative determinant) turns the front face too, so an outward box stays outward (glTF 3.7.4)', async () => {
-  for (const scale of [[-1, 1, 1], [1, -1, 1], [-1, -1, -1]]) {
+  for (const scale of [
+    [-1, 1, 1],
+    [1, -1, 1],
+    [-1, -1, -1],
+  ]) {
     const out = await reportGLTF(cubeGlb(cube(), [{ mesh: 0, name: 'mirrored', scale }]));
     assert.deepEqual(out.problems, [], `outward under scale ${scale}`);
     const inward = await reportGLTF(cubeGlb(cube(true), [{ mesh: 0, name: 'mirrored', scale }]));
-    assert.deepEqual(inward.problems.map((p) => p.code), ['inside-out'], `inward under scale ${scale}`);
+    assert.deepEqual(
+      inward.problems.map((p) => p.code),
+      ['inside-out'],
+      `inward under scale ${scale}`,
+    );
   }
 });
 
@@ -230,17 +294,33 @@ test('a NaN in POSITION is not-finite, naming the primitive and attribute, and t
   const c = cube();
   c.positions[0] = NaN;
   const r = await reportGLTF(cubeGlb(c, [{ mesh: 0, name: 'box' }]));
-  assert.deepEqual(r.problems.map((p) => p.code), ['not-finite']);
+  assert.deepEqual(
+    r.problems.map((p) => p.code),
+    ['not-finite'],
+  );
   assert.equal(r.problems[0].where, 'box');
   assert.match(r.problems[0].detail, /primitive 0 POSITION holds NaN/);
   assert.deepEqual([r.counts.triangles, r.counts.vertices], [12, 24]);
-  assert.deepEqual([r.bounds.min, r.bounds.max], [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]], 'the finite vertices still bound it');
+  assert.deepEqual(
+    [r.bounds.min, r.bounds.max],
+    [
+      [-0.5, -0.5, -0.5],
+      [0.5, 0.5, 0.5],
+    ],
+    'the finite vertices still bound it',
+  );
 });
 
 test('zero-area triangles are listed per scene node with their mesh, not only counted for the file', async () => {
   const flat = cube();
   for (let i = 0; i < 4; i++) flat.positions[i * 3 + 1] = 0; // Face 0 (+x): every corner at y 0, so its 2 triangles have no area.
-  const r = await reportGLTF(cubeGlb(flat, [{ mesh: 0, name: 'a' }, { mesh: 0, name: 'b', translation: [3, 0, 0] }, { mesh: 0, name: 'c', scale: [2, 2, 2] }]));
+  const r = await reportGLTF(
+    cubeGlb(flat, [
+      { mesh: 0, name: 'a' },
+      { mesh: 0, name: 'b', translation: [3, 0, 0] },
+      { mesh: 0, name: 'c', scale: [2, 2, 2] },
+    ]),
+  );
   assert.equal(r.counts.zeroArea, 6);
   assert.deepEqual(r.zeroAreaByNode, [
     { node: 0, mesh: 0, where: 'a', zeroArea: 2, triangles: 12 },

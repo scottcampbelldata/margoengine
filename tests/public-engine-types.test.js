@@ -19,10 +19,14 @@ function errors(name, code) {
       join(folder, 'tsconfig.json'),
       JSON.stringify({ compilerOptions: README_OPTIONS, include: ['program.ts'] }),
     );
-    const run = spawnSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', folder, '--pretty', 'false'], {
-      encoding: 'utf8',
-      timeout: 120_000,
-    });
+    const run = spawnSync(
+      process.execPath,
+      [join(root, 'node_modules/typescript/bin/tsc'), '-p', folder, '--pretty', 'false'],
+      {
+        encoding: 'utf8',
+        timeout: 120_000,
+      },
+    );
     return run.stdout;
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -107,6 +111,24 @@ declare const skeleton: Skeleton;
 export const ik: IKSkeleton = skeleton;
 export const springs: SpringSkeleton = skeleton;
 export const solve = solveSkeletonIK;
+`,
+    ),
+    '',
+  );
+});
+
+test('regression: KB-GLTF-MESHTYPE1 a loaded model parents to and from the facade meshes with no cast', () => {
+  assert.equal(
+    errors(
+      'gltf-mesh',
+      `import type { EngineKernel } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+declare const engine: EngineKernel;
+const model = await loadGLTF(engine, 'model.glb');
+model.root.setParent(engine.createMesh());
+engine.createMesh().setParent(model.root);
+engine.createMesh().setParent(model.nodes[0]);
+export const parented = model.root.setParent(null);
 `,
     ),
     '',

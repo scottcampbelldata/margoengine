@@ -48,20 +48,24 @@ export const KIT_MODELS = {
     name: 'Flight Helmet',
     source: 'https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet',
     licence: 'CC0-1.0',
-    credit: 'Khronos glTF Sample Assets, (c) 2018, Public; conversion from Maya credited to Gary Hsu. Repacked with 1024-pixel JPEG maps and quantized attributes.',
+    credit:
+      'Khronos glTF Sample Assets, (c) 2018, Public; conversion from Maya credited to Gary Hsu. Repacked with 1024-pixel JPEG maps and quantized attributes.',
   },
   'robot-expressive.glb': {
     name: 'RobotExpressive',
     source: 'https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf/RobotExpressive',
     licence: 'CC0-1.0',
-    credit: 'Model by Tomas Laulhe (https://www.patreon.com/quaternius); facial morphs and glTF conversion by Don McCurdy.',
+    credit:
+      'Model by Tomas Laulhe (https://www.patreon.com/quaternius); facial morphs and glTF conversion by Don McCurdy.',
   },
 };
 
 /** Every `examples/assets/<file>` a document names, in order of first mention. */
 export function referencedModels(markdowns) {
   const found = new Set();
-  for (const text of markdowns) for (const match of text.matchAll(/examples\/assets\/([\w./-]+?\.(?:glb|gltf|bin|png|jpe?g|ktx2|hdr))/g)) found.add(match[1]);
+  for (const text of markdowns)
+    for (const match of text.matchAll(/examples\/assets\/([\w./-]+?\.(?:glb|gltf|bin|png|jpe?g|ktx2|hdr))/g))
+      found.add(match[1]);
   return [...found];
 }
 
@@ -73,14 +77,17 @@ export function noticeText(models) {
     'The packages in margo-packages/ and the documents in this folder are Margo Engine, Apache-2.0 (see LICENSE and NOTICE).',
     'Each package tarball carries its own licence file and any notices of its own.',
     '',
-    'The example models in examples/assets/ are other people\'s work, passed on unchanged under these licences:',
+    "The example models in examples/assets/ are other people's work, passed on unchanged under these licences:",
     '',
   ];
   for (const file of models) {
     const model = KIT_MODELS[file];
     if (!model) throw new Error(`no licence recorded for examples/assets/${file}; add it to KIT_MODELS`);
-    if (!REDISTRIBUTABLE.has(model.licence)) throw new Error(`examples/assets/${file} is ${model.licence}, which the kit may not pass on`);
-    lines.push(`- examples/assets/${file}: ${model.name}. Licence ${model.licence}. Source ${model.source}. ${model.credit}`);
+    if (!REDISTRIBUTABLE.has(model.licence))
+      throw new Error(`examples/assets/${file} is ${model.licence}, which the kit may not pass on`);
+    lines.push(
+      `- examples/assets/${file}: ${model.name}. Licence ${model.licence}. Source ${model.source}. ${model.credit}`,
+    );
   }
   lines.push('', 'CC0-1.0: https://creativecommons.org/publicdomain/zero/1.0/', '');
   return lines.join('\n');
@@ -181,9 +188,13 @@ export function unzipEntries(zip) {
  * No shell, so no npm.cmd and nothing for a shell to read into the arguments.
  */
 function npmCli() {
-  const beside = [join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'), join(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js')];
+  const beside = [
+    join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
+    join(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js'),
+  ];
   const found = [process.env.npm_execpath, ...beside].find((path) => path?.endsWith('.js') && existsSync(path));
-  if (!found) throw new Error('npm not found: run this with npm (npm exec, npm run) or from a Node install that includes npm');
+  if (!found)
+    throw new Error('npm not found: run this with npm (npm exec, npm run) or from a Node install that includes npm');
   return found;
 }
 
@@ -227,7 +238,9 @@ export function packStudentKit({
   rmSync(packs, { recursive: true, force: true });
   mkdirSync(packs, { recursive: true });
   pack(packs);
-  const tarballs = readdirSync(packs).filter((name) => name.endsWith('.tgz')).sort();
+  const tarballs = readdirSync(packs)
+    .filter((name) => name.endsWith('.tgz'))
+    .sort();
   if (!tarballs.length) throw new Error('npm pack wrote no tarballs');
   const entries = [
     ...documents.map(({ path, text }) => ({ name: `${KIT_FOLDER}/${path}`, data: text })),
@@ -240,7 +253,10 @@ export function packStudentKit({
         throw new Error(`examples/assets/${file} is a Git LFS pointer; run git lfs pull first`);
       return { name: `${KIT_FOLDER}/examples/assets/${file}`, data };
     }),
-    ...tarballs.map((name) => ({ name: `${KIT_FOLDER}/margo-packages/${name}`, data: readFileSync(join(packs, name)) })),
+    ...tarballs.map((name) => ({
+      name: `${KIT_FOLDER}/margo-packages/${name}`,
+      data: readFileSync(join(packs, name)),
+    })),
   ];
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, zipEntries(entries));
@@ -250,9 +266,11 @@ export function packStudentKit({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const outArg = process.argv.find((arg) => arg.startsWith('--out='))?.slice('--out='.length);
-  const summary = packStudentKit({ build: !process.argv.includes('--no-build'), ...(outArg ? { out: resolve(outArg) } : {}) });
+  const summary = packStudentKit({
+    build: !process.argv.includes('--no-build'),
+    ...(outArg ? { out: resolve(outArg) } : {}),
+  });
   console.log(
     `${relative(root, summary.out) || basename(summary.out)}: ${summary.bytes} bytes, ${summary.tarballs} packages, models ${summary.models.join(', ')}`,
   );
 }
-

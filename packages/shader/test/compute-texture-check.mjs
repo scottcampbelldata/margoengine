@@ -67,7 +67,10 @@ try {
     ['rgba32uint', [4000000000, 2, 3, 4], [4000000000, 2, 3, 4], 0],
     ['rgba32sint', [-2000000000, 2, 3, 4], [-2000000000, 2, 3, 4], 0],
   ];
-  const stored = await page.evaluate((list) => window.check.formats(list), formats.map((f) => [f[0], f[1]]));
+  const stored = await page.evaluate(
+    (list) => window.check.formats(list),
+    formats.map((f) => [f[0], f[1]]),
+  );
   assert.deepEqual(stored.errors, []);
   for (const [format, , expected, tolerance] of formats) {
     const { error, first } = stored.out[format];

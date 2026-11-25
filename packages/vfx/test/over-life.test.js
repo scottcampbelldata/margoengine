@@ -53,11 +53,23 @@ test('the spin curve turns the drawn billboard and mesh, and the simulation leav
   assert.ok(billboard.simulation.every((c) => !/particles\[cold\+1\]=vec4f\(rotation\.x\+/.test(c)));
   assert.ok(
     billboard.vertex.some((c) =>
-      c.includes('let angle=p.rotation.x+p.rotation.y*(p.rotation.z-p.positionLife.w)+drawnSpin(p.rotation.z,p.positionLife.w);'),
+      c.includes(
+        'let angle=p.rotation.x+p.rotation.y*(p.rotation.z-p.positionLife.w)+drawnSpin(p.rotation.z,p.positionLife.w);',
+      ),
     ),
   );
-  assert.ok(billboard.bound.some((b) => b.includes(27) && !b.includes(26)), 'the billboard group binds the curves');
+  assert.ok(
+    billboard.bound.some((b) => b.includes(27) && !b.includes(26)),
+    'the billboard group binds the curves',
+  );
   const meshed = draw({ mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0] } }, { overLife, mesh });
-  assert.ok(meshed.vertex.some((c) => c.includes('meshCorners') && c.includes('let angle=r.x+r.y*(r.z-p.w)+drawnSpin(r.z,p.w);')));
-  assert.ok(meshed.bound.some((b) => b.includes(15) && b.includes(27)), 'the mesh group binds the curves');
+  assert.ok(
+    meshed.vertex.some(
+      (c) => c.includes('meshCorners') && c.includes('let angle=r.x+r.y*(r.z-p.w)+drawnSpin(r.z,p.w);'),
+    ),
+  );
+  assert.ok(
+    meshed.bound.some((b) => b.includes(15) && b.includes(27)),
+    'the mesh group binds the curves',
+  );
 });

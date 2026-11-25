@@ -48,9 +48,7 @@ const makers = {
         lifetime: [1e6, 1e6],
         turbulence: 0,
         ground: -100,
-        ...(o.texture
-          ? { texture: { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) } }
-          : {}),
+        ...(o.texture ? { texture: { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) } } : {}),
         ...(soft ? { softness: 0.01, depth: () => soft.texture } : {}),
       });
     if (o.fog) effect.setFog(fog);
@@ -74,7 +72,12 @@ const makers = {
     effect.add(
       new PointCloud({
         positions: new Float32Array([0, 0, z]),
-        material: { ...material(o), size: 120, shading: o.sphere ? 'sphere' : 'flat', shape: o.sphere ? 'round' : 'square' },
+        material: {
+          ...material(o),
+          size: 120,
+          shading: o.sphere ? 'sphere' : 'flat',
+          shape: o.sphere ? 'round' : 'square',
+        },
       }),
     );
     return effect;

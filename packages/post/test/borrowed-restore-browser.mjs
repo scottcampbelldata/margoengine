@@ -26,7 +26,10 @@ await postBrowser(
       await page.evaluate(async (code) => {
         const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js');
         const canvas = document.querySelector('canvas'),
-          engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 3, 4], target: [0, 0, 0] } }),
+          engine = await Engine.create(canvas, {
+            backend: 'webgpu',
+            camera: { position: [0, 3, 4], target: [0, 0, 0] },
+          }),
           reported = [],
           uncaptured = [];
         engine.stop();

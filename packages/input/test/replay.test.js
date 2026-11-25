@@ -85,10 +85,14 @@ test('a replay gives the same states and rule results, tick for tick, through JS
 
 test('the session under test really used every kind of source', () => {
   const { clip, trace } = play();
-  assert.deepEqual(
-    clip.channels.map(([action, binding]) => `${action}${binding}`).sort(),
-    ['look0', 'move0', 'move1', 'move2', 'use0', 'use1'],
-  );
+  assert.deepEqual(clip.channels.map(([action, binding]) => `${action}${binding}`).sort(), [
+    'look0',
+    'move0',
+    'move1',
+    'move2',
+    'use0',
+    'use1',
+  ]);
   assert.ok(trace.some((line) => /"performed":true/.test(line)));
   assert.ok(clip.events.length / 3 < clip.channels.length * trace.length, 'only changes are stored');
   assert.equal(clip.times[0], 0, 'times start at the first tick');

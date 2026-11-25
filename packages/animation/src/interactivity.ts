@@ -22,7 +22,8 @@ import { pointerChannels, pointerWriter } from './pointer.js';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
 
 /** Options of {@link GLTFInteractivity}. */
-export interface GLTFInteractivityOptions extends Pick<BehaviorGraphOptions, 'log' | 'maxActivations' | 'maxEventsPerTick'> {
+export interface GLTFInteractivityOptions
+  extends Pick<BehaviorGraphOptions, 'log' | 'maxActivations' | 'maxEventsPerTick'> {
   /** Runs the file's `rigid_body/*` operations and trigger events. Default: they do nothing. */
   physics?: GLTFPhysics;
   /** Reports the viewer's camera under `activeCamera`. Default true; false reads as NaN, for privacy. */
@@ -40,7 +41,9 @@ export function sampleChannel(
   time: number,
 ): number[] {
   const { times, values, width, interpolation } = channel;
-  return Array.from(sampleTrackInto(times, values, width, time, interpolation, width === 4 && interpolation !== 'STEP'));
+  return Array.from(
+    sampleTrackInto(times, values, width, time, interpolation, width === 4 && interpolation !== 'STEP'),
+  );
 }
 
 interface Hit {
@@ -121,7 +124,8 @@ export class GLTFInteractivity implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw new MargoError('disposed', 'GLTFInteractivity is disposed; create a new graph before attaching');
+    if (this.disposed)
+      throw new MargoError('disposed', 'GLTFInteractivity is disposed; create a new graph before attaching');
     this.engine = engine;
     const { graph } = this,
       doc = this.model.asset.doc as Record<string, any>;
@@ -132,7 +136,12 @@ export class GLTFInteractivity implements EnginePlugin {
     if (this.options.physics)
       this.removers.push(
         this.options.physics.onTrigger(({ entered, nodeIndex, colliderNodeIndex, motionNodeIndex }) =>
-          graph.trigger(entered ? 'event/rigid_body_triggerEntered' : 'event/rigid_body_triggerExited', nodeIndex, colliderNodeIndex, motionNodeIndex),
+          graph.trigger(
+            entered ? 'event/rigid_body_triggerEntered' : 'event/rigid_body_triggerExited',
+            nodeIndex,
+            colliderNodeIndex,
+            motionNodeIndex,
+          ),
         ),
       );
     if (this.options.pointer !== false) this.listen(engine, graph);
@@ -146,7 +155,10 @@ export class GLTFInteractivity implements EnginePlugin {
       this.picker = import('@margoengine/selection').then(
         ({ Picking }) => Picking.forEngine(engine) ?? Picking.attach(engine, { capture: false }),
         () => {
-          throw new MargoError('unsupported', 'Clicks on a behaviour graph need @margoengine/selection; install it, or pass pointer: false');
+          throw new MargoError(
+            'unsupported',
+            'Clicks on a behaviour graph need @margoengine/selection; install it, or pass pointer: false',
+          );
         },
       );
     const at = (event: PointerEvent) => {
@@ -244,7 +256,8 @@ export class GLTFInteractivity implements EnginePlugin {
 
   private write(pointer: string, value: GraphValue): void {
     if (flags.test(pointer)) return;
-    const numbers = typeof value === 'boolean' ? [value ? 1 : 0] : typeof value === 'number' ? [value] : (value as number[]);
+    const numbers =
+      typeof value === 'boolean' ? [value ? 1 : 0] : typeof value === 'number' ? [value] : (value as number[]);
     if (physicsPointer.test(pointer)) {
       this.options.physics?.setPointer(pointer, numbers.length === 1 ? numbers[0] : numbers);
       return;
@@ -265,7 +278,11 @@ export class GLTFInteractivity implements EnginePlugin {
         const length = Math.hypot(...v);
         return v.map((x) => x / length);
       },
-      cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      cross = (a: number[], b: number[]) => [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+      ],
       // A glTF camera looks down its own -Z.
       z = unit(position.map((p, i) => p - target[i])),
       x = unit(cross([...up], z)),
@@ -307,7 +324,9 @@ function graphPhysics(world: GLTFPhysics): GraphPhysics {
       const direction = end.map((e, i) => e - start[i]),
         length = Math.hypot(...direction);
       if (!length) return undefined;
-      const hit = world.physics.raycast(start as [number, number, number], direction as [number, number, number], { maxDistance: length });
+      const hit = world.physics.raycast(start as [number, number, number], direction as [number, number, number], {
+        maxDistance: length,
+      });
       if (!hit) return undefined;
       const nodeIndex = [...world.bodies].find(([, body]) => body === hit.body)?.[0] ?? -1;
       return { nodeIndex, fraction: hit.distance / length, normal: [...hit.normal] };

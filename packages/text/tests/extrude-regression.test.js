@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { closed, volume } from './extrude-assertions.js';
-import { parseFontOutlines as parseLean, extrudeText as extrudeLean, triangulatePolygon, classifyLoops, polygonArea } from '../dist/extrude.js';
+import {
+  parseFontOutlines as parseLean,
+  extrudeText as extrudeLean,
+  triangulatePolygon,
+  classifyLoops,
+  polygonArea,
+} from '../dist/extrude.js';
 import { openType } from '@margoengine/loaders/font-opentype';
 // These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
 // lean TrueType path without them.
@@ -26,7 +32,9 @@ const fontLike = (loops) => ({
 // subdivision limits of this entry throw MargoError 'failed' with the text help link.
 const coded = (error) =>
   (error.code === 'failed' && error.message.includes('Help: https://margoengine.com/llms/packages/text.md')) ||
-  (error.name === 'LoaderError' && error.message.startsWith('TTF: ') && error.message.includes('https://margoengine.com/errors#loader-'));
+  (error.name === 'LoaderError' &&
+    error.message.startsWith('TTF: ') &&
+    error.message.includes('https://margoengine.com/errors#loader-'));
 const quad = simple(square.map(([x, y]) => [x * 1000, y * 1000, true]));
 
 test('F1 hostile and invalid cmap ranges stay bounded: lookups never name a glyph outside the font', () => {

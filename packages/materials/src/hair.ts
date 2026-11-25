@@ -133,8 +133,7 @@ export function hairScattering(
     // d omega = cos theta_r d theta d phi), so each Gaussian is divided by the mean of cos^2 theta_r under it, for
     // theta_r ~ N(mu, s^2) (1 + cos(2 mu) e^(-2 s^2)) / 2: then it sums to A_p over the sphere. At a narrow lobe's peak this
     // is Marschner's 1 / cos^2 theta_d.
-    spread = (centre: number, s: number) =>
-      2 / Math.max(1 + Math.cos(2 * (centre - ti)) * Math.exp(-2 * s * s), 0.005),
+    spread = (centre: number, s: number) => 2 / Math.max(1 + Math.cos(2 * (centre - ti)) * Math.exp(-2 * s * s), 0.005),
     out: [number, number, number] = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
     const t = Math.exp(-sigma[c] * path),
@@ -212,7 +211,9 @@ export function hair(options: HairOptions = {}): MaterialFeature {
   if (typeof specular !== 'number' || !(specular >= 0) || !Number.isFinite(specular))
     throw new RangeError('hair specular must be a finite number from 0 up; pass 1 for the default strength');
   if (options.follow !== undefined && typeof options.follow !== 'function')
-    throw new TypeError('hair follow must be a function returning a 4x4 matrix of 16 numbers; pass one or leave it out');
+    throw new TypeError(
+      'hair follow must be a function returning a 4x4 matrix of 16 numbers; pass one or leave it out',
+    );
   if (options.follow !== undefined && (along === 'u' || along === 'v'))
     throw new TypeError(
       "hair follow turns a direction given as three numbers; a 'u' or 'v' direction already follows the skinned tangents",
@@ -267,9 +268,11 @@ export function hair(options: HairOptions = {}): MaterialFeature {
           'hair',
         );
       out =
-        (follow ? `struct MargoHairRows {axis:vec4f}
+        (follow
+          ? `struct MargoHairRows {axis:vec4f}
 @group(${group}) @binding(135) var<uniform> margoHairRows:MargoHairRows;
-` : '') +
+`
+          : '') +
         wgsl +
         out;
       if (cached.size >= 16) cached.clear();
@@ -285,7 +288,10 @@ export function hair(options: HairOptions = {}): MaterialFeature {
         buffers.set(
           device,
           (held = {
-            buffer: device.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+            buffer: device.createBuffer({
+              size: data.byteLength,
+              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            }),
             last: new Float32Array(data.length).fill(Number.NaN),
           }),
         );
@@ -348,7 +354,9 @@ export function hairCards(options: HairCardOptions = {}): MaterialFeature {
         `let margoCardCos=max(abs(dot(normalize(i.normal),v)),${floor});\n  return vec4f(color,select(1.0,1.0-pow(1.0-clamp(s.base.a,0.0,1.0),1.0/margoCardCos),f.settings.x>1.5));`,
       );
       if (out === source)
-        throw new TypeError('hairCards needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions');
+        throw new TypeError(
+          'hairCards needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions',
+        );
       return out;
     },
   };

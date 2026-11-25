@@ -508,8 +508,7 @@ export interface ArmRobotOptions {
  */
 export function armRobot(options: ArmRobotOptions): Robot {
   const { upperLength, forearmLength, radius } = options;
-  if (!(upperLength > 0) || !(forearmLength > 0))
-    throw rangeError('armRobot needs bone lengths above 0', 'kinematics');
+  if (!(upperLength > 0) || !(forearmLength > 0)) throw rangeError('armRobot needs bone lengths above 0', 'kinematics');
   const range = (value: readonly [number, number] | undefined, low: number, high: number) => ({
     lower: value?.[0] ?? low,
     upper: value?.[1] ?? high,

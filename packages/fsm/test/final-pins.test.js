@@ -11,7 +11,10 @@ test('a final state with initial, regions, a child or an outgoing transition is 
   refused(() => new FinalMachine({ s: { final: true, initial: 'c' }, c: { parent: 's' } }, 'c', {}), 'initial');
   refused(() => new FinalMachine({ s: { final: true, regions: {} }, t: {} }, 't', {}), 'regions');
   refused(() => new FinalMachine({ s: { final: true }, c: { parent: 's' } }, 'c', {}), 'a child');
-  refused(() => new FinalMachine({ s: { final: true }, t: {} }, 't', {}, [{ from: 's', to: 't', event: 'go' }]), 'a transition');
+  refused(
+    () => new FinalMachine({ s: { final: true }, t: {} }, 't', {}, [{ from: 's', to: 't', event: 'go' }]),
+    'a transition',
+  );
   refused(() => new FinalMachine({ s: { final: 1 }, t: {} }, 't', {}), 'a final flag that is not boolean');
   const m = new FinalMachine({ s: { final: true }, t: {} }, 't', {}, [{ from: 't', to: 's', event: 'go' }]);
   assert.equal(m.send('go'), true);
@@ -20,7 +23,9 @@ test('a final state with initial, regions, a child or an outgoing transition is 
 
 class Counted extends FinalMachine {
   stable = 0;
-  onStable() { this.stable++; }
+  onStable() {
+    this.stable++;
+  }
 }
 
 test('every public call reaches one stable point: onStable once per send, none for an event refused when done', () => {
@@ -43,11 +48,22 @@ test('a hook that sends while eventless transitions settle does not settle again
   // f is entered by an eventless step; its hook sends an event nobody takes. The completion of p must be delivered by
   // the settle already running, after the hook, not by a second settle started inside the hook.
   let m;
-  m = new FinalMachine({ x: {}, p: { initial: 'a' }, a: { parent: 'p' }, f: { parent: 'p', final: true, enter: () => m.send('noop') }, out: {} }, 'x', {}, [
-    { from: 'x', to: 'p', event: 'go' },
-    { from: 'a', to: 'f', always: true },
-    { from: 'p', to: 'out', event: 'done.state.p' },
-  ]);
+  m = new FinalMachine(
+    {
+      x: {},
+      p: { initial: 'a' },
+      a: { parent: 'p' },
+      f: { parent: 'p', final: true, enter: () => m.send('noop') },
+      out: {},
+    },
+    'x',
+    {},
+    [
+      { from: 'x', to: 'p', event: 'go' },
+      { from: 'a', to: 'f', always: true },
+      { from: 'p', to: 'out', event: 'done.state.p' },
+    ],
+  );
   m.send('go');
   assert.equal(m.state, 'out');
 });
@@ -58,12 +74,14 @@ test('goto has no cross-fade by default; update refuses a negative or non-finite
   assert.deepEqual([m.state, m.previous, m.duration, m.blend], ['b', null, 0, 1]);
   m.goto('a', 0.5);
   assert.deepEqual([m.previous, m.duration], ['b', 0.5]);
-  for (const delta of [-1, -Number.MIN_VALUE, NaN, Infinity, -Infinity]) assert.throws(() => m.update(delta), RangeError);
+  for (const delta of [-1, -Number.MIN_VALUE, NaN, Infinity, -Infinity])
+    assert.throws(() => m.update(delta), RangeError);
   m.update(0);
   assert.equal(m.state, 'a');
   const done = new FinalMachine({ end: { final: true } }, 'end', {});
   assert.equal(done.done, true);
-  for (const delta of [-1, NaN]) assert.throws(() => done.update(delta), RangeError, 'a done machine still checks delta');
+  for (const delta of [-1, NaN])
+    assert.throws(() => done.update(delta), RangeError, 'a done machine still checks delta');
 });
 
 test('delays: the leaf wins over its parent, a parent delay into its own child re-arms, and a guard runs again', () => {
@@ -97,21 +115,26 @@ test('a due delay held by its guard does not stop time for the rest of the updat
 });
 
 test('runaway limits: 100,000 delayed transitions in one update are allowed, one more throws; 9,999 eventless settle', () => {
-  const pingPong = () => new FinalMachine({ a: {}, b: {} }, 'a', {}, [
-    { from: 'a', to: 'b', after: 1 },
-    { from: 'b', to: 'a', after: 1 },
-  ]);
+  const pingPong = () =>
+    new FinalMachine({ a: {}, b: {} }, 'a', {}, [
+      { from: 'a', to: 'b', after: 1 },
+      { from: 'b', to: 'a', after: 1 },
+    ]);
   const fine = pingPong();
   fine.update(100000);
   assert.deepEqual([fine.state, fine.clock], ['a', 100000]);
-  assert.throws(() => pingPong().update(100001), (e) => e.code === 'state' && /delayed/.test(e.message));
+  assert.throws(
+    () => pingPong().update(100001),
+    (e) => e.code === 'state' && /delayed/.test(e.message),
+  );
   const cycle = (n) => {
     let count = 0;
     const guard = () => count++ < n;
-    return () => new FinalMachine({ a: {}, b: {} }, 'a', {}, [
-      { from: 'a', to: 'b', always: true, guard },
-      { from: 'b', to: 'a', always: true, guard },
-    ]);
+    return () =>
+      new FinalMachine({ a: {}, b: {} }, 'a', {}, [
+        { from: 'a', to: 'b', always: true, guard },
+        { from: 'b', to: 'a', always: true, guard },
+      ]);
   };
   assert.equal(cycle(9999)().state, 'b');
   assert.throws(cycle(10000), (e) => e.code === 'state' && /settle/.test(e.message));

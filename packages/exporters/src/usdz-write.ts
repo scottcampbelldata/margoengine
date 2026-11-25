@@ -40,7 +40,10 @@ export interface Placement {
 }
 
 /** A box holding nothing. */
-export const emptyBox = (): USDZBox => ({ min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] });
+export const emptyBox = (): USDZBox => ({
+  min: [Infinity, Infinity, Infinity],
+  max: [-Infinity, -Infinity, -Infinity],
+});
 
 /** Grows `box` to hold a point. */
 export function growBox({ min, max }: USDZBox, x: number, y: number, z: number): void {

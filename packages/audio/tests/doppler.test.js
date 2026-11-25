@@ -25,7 +25,7 @@ test('source and listener radial velocities have distinct Doppler ratios, with a
   s.sound.setPosition(9, 0, 0);
   s.listener.update();
   close(s.control.ratio, 100 / 90);
-  close(s.sound.playbackRate, 1.5 * 100 / 90);
+  close(s.sound.playbackRate, (1.5 * 100) / 90);
   assert.equal(s.sound.detune, 100);
   assert.equal(s.sound.volume, 0.4);
   s.context.currentTime = 0.2;
@@ -96,7 +96,10 @@ test('same-clock updates preserve samples; reset handles teleports; supersonic p
   s.control.dispose();
   s.control.dispose();
   close(s.sound.playbackRate, 1.5);
-  assert.throws(() => s.control.update(), (e) => e.code === 'disposed' && /https:/.test(e.message));
+  assert.throws(
+    () => s.control.update(),
+    (e) => e.code === 'disposed' && /https:/.test(e.message),
+  );
   s.listener.dispose();
 });
 
@@ -107,7 +110,7 @@ test('controller follows new buffer sources and uses existing playback-rate smoo
   s.context.currentTime = 0.1;
   s.sound.setPosition(9, 0, 0);
   s.listener.update();
-  assert.deepEqual(s.sound.source.playbackRate.last(), ['target', 1.5 * 100 / 90, 0.1, 0.02]);
+  assert.deepEqual(s.sound.source.playbackRate.last(), ['target', (1.5 * 100) / 90, 0.1, 0.02]);
   s.sound.pause().play();
   close(s.sound.source.playbackRate.value, s.sound.playbackRate);
   s.control.dispose();
@@ -116,14 +119,23 @@ test('controller follows new buffer sources and uses existing playback-rate smoo
 
 test('invalid options and unsupported sources give coded help errors without attaching a controller', () => {
   const s = scene();
-  assert.throws(() => new AudioDoppler(s.sound), (e) => e.code === 'attached' && /errors#state/.test(e.message));
+  assert.throws(
+    () => new AudioDoppler(s.sound),
+    (e) => e.code === 'attached' && /errors#state/.test(e.message),
+  );
   s.control.dispose();
   for (const speedOfSound of [0, -1, NaN, Infinity])
-    assert.throws(() => new AudioDoppler(s.sound, { speedOfSound }), (e) => e instanceof RangeError && /https:/.test(e.message));
+    assert.throws(
+      () => new AudioDoppler(s.sound, { speedOfSound }),
+      (e) => e instanceof RangeError && /https:/.test(e.message),
+    );
   for (const playbackRate of [-1, NaN, Infinity, 1e38])
     assert.throws(() => new AudioDoppler(s.sound, { playbackRate }), RangeError);
   s.sound.setNodeSource(s.context.createGain());
-  assert.throws(() => new AudioDoppler(s.sound), (e) => e.code === 'unsupported');
+  assert.throws(
+    () => new AudioDoppler(s.sound),
+    (e) => e.code === 'unsupported',
+  );
   s.listener.dispose();
 });
 
@@ -131,6 +143,9 @@ test('disposing a sound unregisters its controller on the next listener frame', 
   const s = scene();
   s.sound.dispose();
   s.listener.update();
-  assert.throws(() => s.control.update(), (e) => e.code === 'disposed');
+  assert.throws(
+    () => s.control.update(),
+    (e) => e.code === 'disposed',
+  );
   s.listener.dispose();
 });

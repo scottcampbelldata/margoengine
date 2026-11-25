@@ -6,8 +6,7 @@ import { OctreeCloud, buildOctree } from '../dist/octree.js';
 // A dense 400 x 400 plane at y = 0.5 of a unit cube's worth of world: a scan's surface.
 function plane(n = 400) {
   const positions = new Float32Array(n * n * 3);
-  for (let i = 0; i < n * n; i++)
-    positions.set([((i % n) + 0.5) / n, 0.5, (Math.floor(i / n) + 0.5) / n], i * 3);
+  for (let i = 0; i < n * n; i++) positions.set([((i % n) + 0.5) / n, 0.5, (Math.floor(i / n) + 0.5) / n], i * 3);
   return { positions };
 }
 function host() {

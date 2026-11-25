@@ -47,7 +47,11 @@ test('lit writes the sun, its colour, the ambient, the wrap and the eye each fra
   effect.options.lit.ambient = [0.1, 0, 0];
   h.engine.lighting.direction.set([1, 0, 0, 0]);
   h.frame();
-  assert.deepEqual(values(), [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'no sun at intensity 0');
+  assert.deepEqual(
+    values(),
+    [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    'no sun at intensity 0',
+  );
   // A fire's glow (KB-VFX-SMOKEROPE1): position and radius, then colour and radiant power, read every frame.
   effect.options.lit.glow = { position: [1, 2, 3], power: 5e6, radius: 4 };
   h.frame();
@@ -58,7 +62,11 @@ test('lit writes the sun, its colour, the ambient, the wrap and the eye each fra
   h.frame();
   assert.deepEqual(values().slice(16), [0, 0, 0, 0, 0, 0, 0, 0], 'no glow, nothing added');
   const code = billboards(h)[0];
-  assert.ok(code.includes('fn lit(i:Out,c:vec4f)') && code.includes('@binding(21) var<uniform> litFrame') && code.includes('litFrame.glowColor.w'));
+  assert.ok(
+    code.includes('fn lit(i:Out,c:vec4f)') &&
+      code.includes('@binding(21) var<uniform> litFrame') &&
+      code.includes('litFrame.glowColor.w'),
+  );
   assert.ok(!code.includes('clusterLighting') && !code.includes('shadowLit'), 'no sources: the sun and ambient only');
   effect.options.lit = {};
   assert.throws(() => h.frame(), /fixed at attach/);

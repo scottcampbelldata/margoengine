@@ -337,8 +337,7 @@ ${result.stdout}${result.stderr}`,
         ]);
         // Only what the page imports: no package outside its graph is emitted, and nothing larger than JavaScript.
         // Installed code only: Vite stands in a three-line module for an optional peer that is not installed.
-        const extra =
-          /node_modules\/@margoengine\/(gltf|decoders|fbx|creative|sky|environment|geometry)\//;
+        const extra = /node_modules\/@margoengine\/(gltf|decoders|fbx|creative|sky|environment|geometry)\//;
         assert.deepEqual(
           scoped.files.filter((file) => !file.endsWith('.js') && !file.endsWith('.html')),
           [],

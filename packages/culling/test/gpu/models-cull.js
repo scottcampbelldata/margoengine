@@ -12,7 +12,12 @@ const errors = [],
 let a, b, ma, mb, culled;
 const translated = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 const build = (e) => {
-  const mesh = createInstancedMesh(e, boxGeometry(1, 1, 1), new Material({ color: '#4080c0', roughness: 0.6 }), count + 64);
+  const mesh = createInstancedMesh(
+    e,
+    boxGeometry(1, 1, 1),
+    new Material({ color: '#4080c0', roughness: 0.6 }),
+    count + 64,
+  );
   for (let n = 0; n < count; n++) {
     mesh.instances.setMatrixAt(n, translated((n % side) * 3 - 60, (n % 7) / 2, Math.floor(n / side) * 3 - 60));
     mesh.instances.setColorAt(n, [(n % 5) / 4, (n % 3) / 2, 1]);
@@ -63,7 +68,12 @@ async function step(i) {
   edit();
   await draw();
   const counts = [...(await culled.readCounts()).values()];
-  return { label, drawn: counts.length ? Math.max(...counts) : -1, primitives: counts.length, total: ma.instances.count };
+  return {
+    label,
+    drawn: counts.length ? Math.max(...counts) : -1,
+    primitives: counts.length,
+    total: ma.instances.count,
+  };
 }
 window.check = { setup, step, steps: steps.length, errors };
 window.ready = true;

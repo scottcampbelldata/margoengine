@@ -1,5 +1,26 @@
 # @margoengine/procedural
 
+## Coral colonies (`margoengine/procedural/coral`)
+
+`coralGeometry` returns closed, seeded Y-up geometry with a flat attachment at Y = 0, projected UVs and outward
+normals. Use the branching, table or brain forms across the reef. The diameter parameter scales in metres, and
+`resolution` controls the number of samples along the longest axis (default 100, range 48–128). Cache colonies by
+form, seed and resolution when placing them in a scene. Choose fewer samples for distant colonies and a higher
+resolution for close-ups where the surface grooves matter.
+
+```ts
+import { coralGeometry } from 'margoengine/procedural/coral';
+const colony = coralGeometry({ form: 'branching', seed: 8, diameter: 0.65, resolution: 76 });
+console.log(colony.indices.length / 3);
+```
+
+The branched forms use tapered, smoothly joined growing tips and small-scale surface relief. The massive form
+cuts an irregular field of grooves into a basal dome. These are procedural approximations of growth forms.
+References for crown, plate and groove morphology are [Kaandorp et al., Morphogenesis of the Branching Reef
+Coral Madracis mirabilis (2005)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1634949/), [Kaandorp et al.,
+Macroscopic Modelling of Environmental Influence on Growth and Form of Sponges and Corals Using the Accretive
+Growth Model (2013)](https://doi.org/10.1155/2013/159170) and the [Smithsonian 3D coral collection](https://3d.si.edu/corals/).
+
 Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
 
 Import `margoengine/procedural` from the `margoengine` package, or `@margoengine/procedural` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
@@ -116,8 +137,24 @@ Register `parts` with your shadow module. `poseHumanoid(rig, position, heading,
 phase, speed)` writes a walk pose into the existing transforms in place.
 The sandbox supplies phase/speed from the shared controls module.
 
-`generateRockMesh()` produces deformed fieldstones with smooth, averaged normals
-across split vertices while preserving UV seams and tangent frames.
+`generateRockMesh(seed = 1, form?)` builds a 180-triangle fieldstone centered at the origin, +Y up. It uses broad
+fracture faces, clipped corners and fine weathering. Choose `block`, `slab`, `wedge`, `shard` or `pebble`, or omit
+the form to let the unsigned 32-bit seed select it. The default seed selects a block. The same seed and form give
+the same positions, averaged normals, UV seams and tangent frames. Rotate and instance a few seeded meshes for
+scatter. For close-up stone shading use `@margoengine/terrain/rock-surface` with the rock type of the site.
+
+```ts
+import { generateRockMesh } from 'margoengine/procedural';
+const fieldstones = [generateRockMesh(17, 'slab'), generateRockMesh(32, 'wedge'), generateRockMesh(53, 'block')];
+```
+
+The overall form, edge rounding and surface texture are separate shape properties in the [Geological Survey of India
+*Rock Texture Atlas*](https://gsi.gov.in/RockTextureAtlas/TexturesInSedimentaryRocks/).
+The plane cuts and edge wear are a compact approximation informed by [A. Peytavie, E. Galin, J. Grosjean and S. Mérillou,
+*Procedural Generation of Rock Piles using Aperiodic Tiling* (2009)](https://perso.liris.cnrs.fr/eric.galin/Articles/2009-aperiodic.pdf)
+and [A. Paris, A. Peytavie, E. Guérin, J.-M. Dischler and E. Galin, *Modeling Rocky Scenery using Implicit Blocks*
+(2020)](https://perso.liris.cnrs.fr/aparis/public_html/projects/paris2020_Blocks.html).
+
 `generateFernMesh()` produces seven curved, tapered ribbon fronds; use a
 double-sided material. Both return `GeometryData` and are deterministic.
 For the biome presets there are more plants: `generatePalmMesh()`, `generateBirchMesh()`, `generateAcaciaMesh()` and
@@ -1171,6 +1208,34 @@ buttress most).
   `procedural:<species>/<age>`, `procedural:<species>/snag`, `procedural:<species>/burnt`, `procedural:conifer-snag`
   and `procedural:burnt-trunk` with these levels; the rockies presets use the `/pole` keys. Each part takes the wind and
   the burnt and flooded plant states like any other.
+
+### Textured fir foliage
+
+`@margoengine/procedural/fir-sprays` builds near, middle and far foliage meshes around a fir's stem. Give the generator
+normalized rectangles from a needle-spray atlas and use that atlas as a masked material. UVs run from the stem at the
+bottom to the tip at the top of each rectangle. The rings share whorl heights and main branch directions. A denser near
+mesh adds side sprays and curved sections. The far ring thins the lower whorls and keeps the crown tip.
+
+```ts
+import { generateFirSprayLevels } from '@margoengine/procedural/fir-sprays';
+
+const [near, middle, far] = generateFirSprayLevels({
+  height: 12,
+  crownBase: 3.5,
+  radius: 2.1,
+  regions: [[0, 0, 0.5, 1], [0.5, 0, 1, 1]],
+});
+console.log(near.uvs.length, middle.indices.length, far.indices.length);
+```
+
+Dimensions are in metres. The defaults are 18.64 m tall with a 5.5 m crown base and 3.29 m radius.
+Base and radius scale with height when omitted. The seed (default 730956) sets the branch directions and atlas
+selection. A missing atlas layout uses the full texture. The entry creates geometry and leaves textures and placement
+to the caller. Its branching follows the whorled fir growth descriptions in Burns and Honkala,
+[Silvics of North America](https://www.srs.fs.usda.gov/pubs/misc/ag_654/table_of_contents.htm) (1990).
+The textured levels draw on Fabrice Neyret's
+[Rendering Forest Scenes in Real-Time](https://doi.org/10.2312/EGWR/EGSR04/093-102) (2004) and Éric Bruneton and
+Fabrice Neyret's [Real-Time Realistic Rendering and Lighting of Forests](https://doi.org/10.1111/j.1467-8659.2012.03016.x) (2012).
 
 ```ts
 import {coniferLevels, generateConiferMesh, parseConiferKey} from 'margoengine/procedural/conifers';

@@ -39,9 +39,17 @@ export async function fixtures(load = (entry) => import(entry)) {
   own('Snow.field', () => new Snow({ field: drift() }));
   own('Snow.attach.field', (engine) => Snow.attach(engine, { field: drift(), band: 0.1 }));
   own('GLTFWeather', () => new GLTFWeather({ puddles: { wetness: 0.5 }, snow: { cover: 0.5 } }));
-  own('GLTFWeather.attach', (engine) => GLTFWeather.attach(engine, { puddles: { wetness: 0.5 }, snow: { cover: 0.5 } }));
+  own('GLTFWeather.attach', (engine) =>
+    GLTFWeather.attach(engine, { puddles: { wetness: 0.5 }, snow: { cover: 0.5 } }),
+  );
   // An avalanche is a plain model; its scatter maps are GPU textures the plugin owns. Snow drawing it is a Snow field.
-  const slide = () => new Avalanche({ width: 8, depth: 8, ground: new Float32Array(64).map((_, k) => -(k >> 3)), release: { at: [3, 3] } });
+  const slide = () =>
+    new Avalanche({
+      width: 8,
+      depth: 8,
+      ground: new Float32Array(64).map((_, k) => -(k >> 3)),
+      release: { at: [3, 3] },
+    });
   own('AvalancheScatter', () => new AvalancheScatter(slide()));
   own('AvalancheScatter.attach', (engine) => {
     const s = AvalancheScatter.attach(engine, slide());
@@ -69,7 +77,12 @@ export async function fixtures(load = (entry) => import(entry)) {
       const listener = await dependency(() => AudioListener.attach(engine, { context: new FakeAudioContext() }));
       // Attach in the owner's scene: the fixture's own await already returned the engine to its active scene.
       let plugin;
-      const scope = { name: 'owner-lifetime:weather-audio', setup() { plugin = WeatherAudio.attach(engine, listener, { weather }); } };
+      const scope = {
+        name: 'owner-lifetime:weather-audio',
+        setup() {
+          plugin = WeatherAudio.attach(engine, listener, { weather });
+        },
+      };
       scene.use(scope);
       scene.removePlugin(scope.name);
       return {

@@ -63,8 +63,12 @@ ${frame}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
-${search ? `@group(${group}) @binding(30) var shadowDepth:texture_2d<f32>;
-` : ''}@group(${group}) @binding(31) var shadowPages:texture_2d_array<u32>;
+${
+  search
+    ? `@group(${group}) @binding(30) var shadowDepth:texture_2d<f32>;
+`
+    : ''
+}@group(${group}) @binding(31) var shadowPages:texture_2d_array<u32>;
 ${firstLevel}
 fn shadowPage(light:vec2f,first:u32)->vec4f {
   for(var level=first;level<u32(shadowFrame.info.z);level++){

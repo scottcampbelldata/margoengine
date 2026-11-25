@@ -16,8 +16,8 @@ import { stressStages } from './stress-stages.js';
 
 /** Stages known to differ from OpenUSD, by seed; 142 of seed 1942 does not open in OpenUSD, so it has no answer. */
 const known = {
-  1942: [9, 24, 25, 48, 114],
-  7: [51, 68, 134],
+  1942: [],
+  7: [],
 };
 const refused = { 1942: [142], 7: [] };
 

@@ -50,12 +50,12 @@ async function shotEngine(position,target){
  e.gpu.addEventListener('uncapturederror',ev=>errs.push(ev.error.message));
  const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
  return {canvas,e,sky,errs,
-  async pixels(world,options={}){
+  async pixels(world,options={},inspect){
    const view=await BiomeView.attach(e,world,{objects:false,sky,...options});
    await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
    e.render({delta:1/60});
    const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);
-   view.dispose();return c.getImageData(0,0,canvas.width,canvas.height).data;
+   inspect?.(view);view.dispose();return c.getImageData(0,0,canvas.width,canvas.height).data;
   },
   ray(px,py){
    const p=position,f=norm(target.map((v,i)=>v-p[i])),r=norm([-f[2],0,f[0]]),u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]],t=Math.tan(Math.PI/6),a=canvas.width/canvas.height;
@@ -167,7 +167,8 @@ async function edited(){
  const look=(world,x,z)=>{const y=world.heightAt(x+128,z+128);e.camera.position=[x+128,y+300,z+129];e.camera.target=[x+128,y,z+128];};
  const pixels=async(view)=>{await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();e.render({delta:0});const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
  const paintAt=(tx,tz)=>(world)=>world.writeLayer('paint/desert',tx,tz,full);
- const fresh=async(tx,tz,radius)=>{const world=await BiomeWorld.create(base),[bx,bz]=world.bounds;paintAt(tx,tz)(world);look(world,bx+tx*256,bz+tz*256);const view=await BiomeView.attach(e,world,{radius});await view.ready;const data=await pixels(view);view.dispose();world.dispose();return data;};
+ // Compare tile scheduling on the same terrain triangles as the view that moved here.
+ const fresh=async(tx,tz,radius,anchor)=>{const world=await BiomeWorld.create(base),[bx,bz]=world.bounds;paintAt(tx,tz)(world);look(world,bx+tx*256,bz+tz*256);const view=await BiomeView.attach(e,world,{radius,clipmap:{anchor}});await view.ready;const data=await pixels(view);view.dispose();world.dispose();return data;};
  const apart=(a,b)=>{let n=0;for(let k=0;k<a.length;k+=4)if(Math.max(Math.abs(a[k]-b[k]),Math.abs(a[k+1]-b[k+1]),Math.abs(a[k+2]-b[k+2]))>8)n++;return n/(a.length/4);};
  {const world=await BiomeWorld.create(base),[bx,bz]=world.bounds,[tx,tz]=[7,4],pool=world.workers,run=pool.run.bind(pool);
   let gate=null,open,made=0;
@@ -184,7 +185,7 @@ async function edited(){
   // fixed-wait: frames paced under the view's 100 ms drain, one copy step each, until the new tile has arrived
   while(view.streaming.pending){e.render({delta:0});await new Promise(r=>setTimeout(r,50));}
   const data=await pixels(view);view.dispose();world.dispose();
-  out.waitingApart=apart(data,await fresh(tx,tz,1000));}
+  out.waitingApart=apart(data,await fresh(tx,tz,1000,view.terrain.options.clipmapAnchor));}
  // A prefetch made before the change must not go in after it.
  {const world=await BiomeWorld.create(base),[bx,bz]=world.bounds,[tx,tz]=[6,6],x=bx+tx*256,z=bz+tz*256;
   e.camera.position=[bx+128,900,bz+129];e.camera.target=[bx+128,0,bz+128];
@@ -192,7 +193,7 @@ async function edited(){
   const made=view.prefetch([x,z,x+256,z+256]);
   paintAt(tx,tz)(world);await made;look(world,x,z);
   const data=await pixels(view);view.dispose();world.dispose();
-  out.prefetchApart=apart(data,await fresh(tx,tz,300));}
+  out.prefetchApart=apart(data,await fresh(tx,tz,300,view.terrain.options.clipmapAnchor));}
  // A change while the first tiles load: `ready` still means they are all in.
  {const world=await BiomeWorld.create(base);e.camera.position=[0,900,1];e.camera.target=[0,0,0];
   const view=await BiomeView.attach(e,world,{radius:1000});paintAt(7,4)(world);await view.ready;
@@ -215,8 +216,9 @@ async function farForest(){
  const position=[bx+300,world.heightAt(bx+300,bz+300)+60,bz+300],target=[bx+2300,world.heightAt(bx+2300,bz+2300),bz+2300];
  const s=await shotEngine(position,target),W=s.canvas.width,H=s.canvas.height;
  const green=(d)=>{let g=0,n=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=hit(world,position,s.ray(x,y));if(!p)continue;const dist=Math.hypot(p[0]-position[0],p[2]-position[2]);if(dist<1200||dist>2400)continue;n++;const k=(y*W+x)*4;if(d[k+1]>d[k]*1.05&&d[k+1]>d[k+2]*1.05)g++;}return {share:g/Math.max(1,n),n};};
- const off=await s.pixels(world,{objects:true,far:false,canopy:0,radius:1000}),on=await s.pixels(world,{objects:true,far:{radius:2500},canopy:0,radius:1000}),both=await s.pixels(world,{objects:true,radius:1000});
- const out={off:green(off),on:green(on),both:green(both),errors:s.errs.splice(0)};
+ let surfaceFormat,farCount;
+ const off=await s.pixels(world,{objects:true,far:false,canopy:0,radius:1000}),on=await s.pixels(world,{objects:true,far:{radius:2500},canopy:0,radius:1000}),both=await s.pixels(world,{objects:true,radius:1000},view=>{surfaceFormat=view.terrain.surfaceHeightTexture?.format;farCount=view.objects.farCount;});
+ const out={off:green(off),on:green(on),both:green(both),surfaceFormat,farCount,errors:s.errs.splice(0)};
  s.dispose();world.dispose();return out;
 }
 window.check={

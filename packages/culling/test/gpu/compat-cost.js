@@ -48,7 +48,11 @@ async function run({ n, mode, frames }) {
       : mode === 'software'
         ? WebGL2Culling.attach(e)
         : CulledMeshes.attach(e, { occlusion: mode === 'occlusion' });
-  for (let i = 0; i < 9; i++) e.createMesh().setGeometry(wall).setMaterial(slab).setPosition([(i - 4) * 4, 3, 10]);
+  for (let i = 0; i < 9; i++)
+    e.createMesh()
+      .setGeometry(wall)
+      .setMaterial(slab)
+      .setPosition([(i - 4) * 4, 3, 10]);
   for (let k = 0; k < n; k++)
     e.createMesh()
       .setGeometry(k % 3 ? small : round)

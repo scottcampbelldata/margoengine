@@ -32,7 +32,10 @@ test('optional Draco hot loops stay small: optimizing-compiler peak bytes on a r
   // Same output bytes as before the restructure, which the resource campaign also matched to the opaque decoder.
   assert.match(run.stdout, /^output 1e49b28a1aaeb03deb3bac702ab6db131094e98837a45ed38125e3efafeb05cf$/m);
   const compiles = [...run.stdout.matchAll(/using TurboFan, .* and (\d+) \/ (\d+) max\/total bytes; bodysize (\d+)/g)];
-  assert.ok(compiles.length > 0, 'the decode must run long enough to reach the optimizing tier, or nothing is measured');
+  assert.ok(
+    compiles.length > 0,
+    'the decode must run long enough to reach the optimizing tier, or nothing is measured',
+  );
   const peak = compiles.reduce((sum, m) => sum + Number(m[1]), 0);
   // Node 26.12 on x64: 7,683,216 B before (six compiles, bodies up to 12,171 B), 3,241,160 B after. The opaque
   // prebuilt needs 1,626,064 B but starts 1.6 to 1.7 MB higher (16 MiB initial linear memory against 1.4 MiB), so
@@ -41,5 +44,8 @@ test('optional Draco hot loops stay small: optimizing-compiler peak bytes on a r
   // times) and the predictor 5 row loop (texture-coordinate projection inlined) were the two largest compiles. Both
   // helpers now run out of line: 2,104,424 B on arm64, 6,195,232 B for the module before KB4824a's fix. Re-measure
   // with node --trace-wasm-compilation-times on an engine update; never raise this to pass (docs/limits.md, KB4824a).
-  assert.ok(peak <= 3_300_000, `optimizing-compiler peak ${peak} B over 3,300,000 B: keep hot loops in small functions`);
+  assert.ok(
+    peak <= 3_300_000,
+    `optimizing-compiler peak ${peak} B over 3,300,000 B: keep hot loops in small functions`,
+  );
 });

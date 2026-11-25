@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { changedDeclarations, declarationStamps, missingDeclaration } from '../scripts/support/declaration-snapshot.mjs';
+import {
+  changedDeclarations,
+  declarationStamps,
+  missingDeclaration,
+} from '../scripts/support/declaration-snapshot.mjs';
 
 // KB6254a: a package build (vite emptyOutDir) beside hygiene gate 6 left an entry .d.ts out of the TypeScript project,
 // and the async API threw "getNodeId requires a RemoteNode" for the undefined source file.
@@ -38,6 +42,9 @@ test('a declaration missing with no build beside the gate asks for build:package
 test('hygiene gate 6 checks the source file before asking the checker for its symbol', async () => {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../scripts/hygiene.js', import.meta.url), 'utf8');
-  assert.match(source, /const file = await program\.getSourceFile\(dts\);\s*\n[^\n]*\n\s*if \(!file\) throw missingDeclaration/);
+  assert.match(
+    source,
+    /const file = await program\.getSourceFile\(dts\);\s*\n[^\n]*\n\s*if \(!file\) throw missingDeclaration/,
+  );
   assert.doesNotMatch(source, /getSymbolAtLocation\(await program\.getSourceFile/);
 });

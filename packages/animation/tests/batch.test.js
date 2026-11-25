@@ -138,7 +138,11 @@ test('copies of one packed array upload its vertices once, and the last holder f
       block = animations[0].resources[0].slot.source,
       info = new Uint32Array(page.info.buffer.data);
     assert.equal(uploads, 1, 'still one upload after growth');
-    assert.equal(info[animations[0].resources[0].slot.index * 12], block.range.offset, 'the slot record reads the block');
+    assert.equal(
+      info[animations[0].resources[0].slot.index * 12],
+      block.range.offset,
+      'the slot record reads the block',
+    );
     assert.deepEqual(
       new Float32Array(page.source.buffer.data, block.range.offset * 80, vertices.length),
       vertices,

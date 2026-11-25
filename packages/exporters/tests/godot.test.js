@@ -538,12 +538,24 @@ test('Godot bundle takes a default exportGLB morph mesh (sparse accessors) and w
   for (let v = 0; v < count; v++) normals[v * 3 + 2] = 1;
   delta.set([0.5, 0.25, -0.125], 7 * 3);
   const glb = exportGLB({
-    nodes: [{ name: 'Face', geometry: { positions, normals, indices, morphs: [{ name: 'smile', positions: delta }] }, morphWeights: [0] }],
+    nodes: [
+      {
+        name: 'Face',
+        geometry: { positions, normals, indices, morphs: [{ name: 'smile', positions: delta }] },
+        morphWeights: [0],
+      },
+    ],
   });
-  assert.ok(splitGLB(glb).json.accessors.some((accessor) => accessor.sparse), 'default export writes the morph sparse');
+  assert.ok(
+    splitGLB(glb).json.accessors.some((accessor) => accessor.sparse),
+    'default export writes the morph sparse',
+  );
   const bundle = await createGodotImportBundle(glb, options({ convexHelperIds: [] }));
   const { json, bin } = splitGLB(bundle.entries[0].data);
-  assert.equal(json.accessors.some((accessor) => accessor.sparse), false);
+  assert.equal(
+    json.accessors.some((accessor) => accessor.sparse),
+    false,
+  );
   const target = json.meshes[0].primitives[0].targets[0].POSITION;
   assert.deepEqual(Array.from(readAccessor({ json, bin }, target).values), Array.from(delta));
   assert.equal(bundle.manifest.glbSHA256, sha(bundle.entries[0].data));

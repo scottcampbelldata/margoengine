@@ -25,7 +25,11 @@ test('off path: without bounds, densityMap and follow the distribute shader and 
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
   assert.equal(sha(code), ORDERED);
   assert.doesNotMatch(code, /atomic/);
-  assert.equal(h.resources.filter((r) => r.size === 336).length >= 1, true, 'an 84-float frame (80 before the pixel footprint)');
+  assert.equal(
+    h.resources.filter((r) => r.size === 336).length >= 1,
+    true,
+    'an 84-float frame (80 before the pixel footprint)',
+  );
   effect.dispose();
 });
 
@@ -43,7 +47,11 @@ test('inner: only its own shader part, on an extended frame, and off at 0', () =
     effect = new Scatter(box(), { count: 16, inner: 30, innerFade: 5 });
   h.engine.use(effect);
   h.frame();
-  assert.equal(h.resources.filter((r) => r.size === 368).length >= 1, true, 'a 92-float frame (the pixel footprint before the follow offsets and bounds)');
+  assert.equal(
+    h.resources.filter((r) => r.size === 368).length >= 1,
+    true,
+    'a 92-float frame (the pixel footprint before the follow offsets and bounds)',
+  );
   effect.dispose();
   for (const bad of [{ inner: -1 }, { inner: 120 }, { inner: Number.NaN }, { inner: 10, innerFade: -1 }])
     assert.throws(() => new Scatter(box(), bad), /Scatter inner must be/, JSON.stringify(bad));

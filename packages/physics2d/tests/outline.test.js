@@ -22,10 +22,12 @@ function image(width, height, alpha) {
 }
 const solid = (test) => (x, y) => (test(x, y) ? 255 : 0);
 const area = (loop) =>
-  Math.abs(loop.reduce((sum, [x, y], i) => {
-    const [nx, ny] = loop[(i + 1) % loop.length];
-    return sum + x * ny - nx * y;
-  }, 0)) / 2;
+  Math.abs(
+    loop.reduce((sum, [x, y], i) => {
+      const [nx, ny] = loop[(i + 1) % loop.length];
+      return sum + x * ny - nx * y;
+    }, 0),
+  ) / 2;
 const pieceArea = (colliders) => colliders.reduce((sum, { points }) => sum + area(points), 0);
 const isConvex = (points) => {
   let sign = 0;
@@ -42,7 +44,14 @@ const isConvex = (points) => {
 test('a hard square lands half a pixel in from its pixel edges, cut only at its corners', () => {
   // The field is sampled at pixel centres, and threshold 128 of 255 sits just past the middle of a 0 to 255 step: the
   // edge lies at the pixel boundary, moved inward by 1/255 of a pixel at most.
-  const [island, ...rest] = traceOutlines(image(16, 16, solid((x, y) => x > 4 && x < 12 && y > 4 && y < 12)), { tolerance: 0.1 });
+  const [island, ...rest] = traceOutlines(
+    image(
+      16,
+      16,
+      solid((x, y) => x > 4 && x < 12 && y > 4 && y < 12),
+    ),
+    { tolerance: 0.1 },
+  );
   assert.equal(rest.length, 0);
   assert.equal(island.holes.length, 0);
   const xs = island.outer.map((p) => p[0]),
@@ -55,17 +64,29 @@ test('a hard square lands half a pixel in from its pixel edges, cut only at its 
 
 test('a disc traces to the area of a circle, and a soft edge lands where the alpha crosses', () => {
   const r = 40,
-    disc = image(100, 100, solid((x, y) => Math.hypot(x - 50, y - 50) < r)),
+    disc = image(
+      100,
+      100,
+      solid((x, y) => Math.hypot(x - 50, y - 50) < r),
+    ),
     [hard] = traceOutlines(disc, { tolerance: 0.25 });
   // Pixel stairs fall on both sides of the circle, and a tolerance of d changes the area by at most d times the perimeter.
   const limit = 0.25 * 2 * Math.PI * r + 2 * Math.PI * r * 0.1;
-  assert.ok(Math.abs(area(hard.outer) - Math.PI * r * r) < limit, `area ${area(hard.outer)} against ${Math.PI * r * r}`);
+  assert.ok(
+    Math.abs(area(hard.outer) - Math.PI * r * r) < limit,
+    `area ${area(hard.outer)} against ${Math.PI * r * r}`,
+  );
   // Pixel stairs stand about half a pixel high, so a tolerance of 1 smooths them and 0.25 keeps most.
   const [every] = traceOutlines(disc, { tolerance: 0 }),
     [coarse] = traceOutlines(disc, { tolerance: 1 });
-  assert.ok(coarse.outer.length < every.outer.length / 2, `thinned to ${coarse.outer.length} of ${every.outer.length} points`);
+  assert.ok(
+    coarse.outer.length < every.outer.length / 2,
+    `thinned to ${coarse.outer.length} of ${every.outer.length} points`,
+  );
   // A ramp 4 pixels wide, so no cell the edge crosses is clipped at 0 or 255.
-  const soft = image(100, 100, (x, y) => Math.max(0, Math.min(255, 255 * (0.5 + (r - Math.hypot(x - 50, y - 50)) / 4)))),
+  const soft = image(100, 100, (x, y) =>
+      Math.max(0, Math.min(255, 255 * (0.5 + (r - Math.hypot(x - 50, y - 50)) / 4))),
+    ),
     [smooth] = traceOutlines(soft, { threshold: 128, tolerance: 0 });
   // Alpha 128 of 255 sits at radius r less 0.01, and linear interpolation along a cell follows the ramp to about
   // 1 / (8 r) of a pixel, the sag of the circle across one cell.
@@ -73,7 +94,11 @@ test('a disc traces to the area of a circle, and a soft edge lands where the alp
 });
 
 test('tolerance bounds how far the thinned outline strays, and 0 only drops points on a line', () => {
-  const blob = image(64, 64, solid((x, y) => Math.hypot(x - 32, y - 32) < 20 + 6 * Math.sin(Math.atan2(y - 32, x - 32) * 5))),
+  const blob = image(
+      64,
+      64,
+      solid((x, y) => Math.hypot(x - 32, y - 32) < 20 + 6 * Math.sin(Math.atan2(y - 32, x - 32) * 5)),
+    ),
     [exact] = traceOutlines(blob, { tolerance: 0 }),
     [thin] = traceOutlines(blob, { tolerance: 2 });
   assert.ok(thin.outer.length < exact.outer.length / 2, `${thin.outer.length} of ${exact.outer.length}`);
@@ -90,20 +115,35 @@ test('tolerance bounds how far the thinned outline strays, and 0 only drops poin
 });
 
 test('a ring keeps its hole, two islands stay two, and a speck under minArea goes', () => {
-  const ring = image(64, 64, solid((x, y) => {
-      const d = Math.hypot(x - 32, y - 32);
-      return d > 12 && d < 24;
-    })),
+  const ring = image(
+      64,
+      64,
+      solid((x, y) => {
+        const d = Math.hypot(x - 32, y - 32);
+        return d > 12 && d < 24;
+      }),
+    ),
     [band, ...none] = traceOutlines(ring);
   assert.equal(none.length, 0);
   assert.equal(band.holes.length, 1);
   assert.ok(area(band.holes[0]) < area(band.outer));
   const pieces = outlineColliders(ring);
   const holeless = Math.PI * (24 * 24 - 12 * 12);
-  assert.ok(Math.abs(pieceArea(pieces) - holeless) / holeless < 0.08, `pieces cover ${pieceArea(pieces)} of ${holeless}`);
-  const two = image(40, 20, solid((x, y) => (x > 2 && x < 12 && y > 2 && y < 12) || (x > 24 && x < 36 && y > 4 && y < 16)));
+  assert.ok(
+    Math.abs(pieceArea(pieces) - holeless) / holeless < 0.08,
+    `pieces cover ${pieceArea(pieces)} of ${holeless}`,
+  );
+  const two = image(
+    40,
+    20,
+    solid((x, y) => (x > 2 && x < 12 && y > 2 && y < 12) || (x > 24 && x < 36 && y > 4 && y < 16)),
+  );
   assert.equal(traceOutlines(two).length, 2);
-  const speck = image(40, 20, solid((x, y) => (x > 2 && x < 12 && y > 2 && y < 12) || (x > 30 && x < 32 && y > 10 && y < 12)));
+  const speck = image(
+    40,
+    20,
+    solid((x, y) => (x > 2 && x < 12 && y > 2 && y < 12) || (x > 30 && x < 32 && y > 10 && y < 12)),
+  );
   assert.equal(traceOutlines(speck).length, 1);
   assert.equal(traceOutlines(speck, { minArea: 0 }).length, 2);
   assert.deepEqual(traceOutlines(image(4, 4, () => 0)), []);
@@ -111,17 +151,25 @@ test('a ring keeps its hole, two islands stay two, and a speck under minArea goe
 });
 
 test('a hole inside an island inside a hole goes to the smallest island around it', () => {
-  const nest = image(80, 80, solid((x, y) => {
-      const d = Math.max(Math.abs(x - 40), Math.abs(y - 40));
-      return (d > 28 && d < 38) || (d > 8 && d < 18);
-    })),
+  const nest = image(
+      80,
+      80,
+      solid((x, y) => {
+        const d = Math.max(Math.abs(x - 40), Math.abs(y - 40));
+        return (d > 28 && d < 38) || (d > 8 && d < 18);
+      }),
+    ),
     islands = traceOutlines(nest);
   assert.equal(islands.length, 2);
   for (const island of islands) assert.equal(island.holes.length, 1);
 });
 
 test('an L is cut into few convex pieces that add up to it', () => {
-  const ell = image(32, 32, solid((x, y) => x > 4 && x < 28 && y > 4 && y < 28 && (x < 12 || y > 20))),
+  const ell = image(
+      32,
+      32,
+      solid((x, y) => x > 4 && x < 28 && y > 4 && y < 28 && (x < 12 || y > 20)),
+    ),
     pieces = outlineColliders(ell, { tolerance: 0.1 });
   assert.ok(pieces.length >= 2 && pieces.length <= 4, `${pieces.length} pieces`);
   for (const piece of pieces) {
@@ -133,7 +181,11 @@ test('an L is cut into few convex pieces that add up to it', () => {
 });
 
 test('a filled U holds a ball in its hollow in a real world, and so do its edges', () => {
-  const cup = image(64, 64, solid((x, y) => x > 8 && x < 56 && y > 8 && y < 56 && !(x > 16 && x < 48 && y < 48)));
+  const cup = image(
+    64,
+    64,
+    solid((x, y) => x > 8 && x < 56 && y > 8 && y < 56 && !(x > 16 && x < 48 && y < 48)),
+  );
   for (const edges of [false, true]) {
     const physics = new Physics2D(null, { gravity: [0, 9.81], pixelsPerMeter: 1 }),
       colliders = outlineColliders(cup, { edges, friction: 0.5 });
@@ -149,7 +201,11 @@ test('a filled U holds a ball in its hollow in a real world, and so do its edges
 });
 
 test('a sprite places the colliders on its pivot and scale, and its rect picks the frame of an atlas', () => {
-  const atlas = image(32, 16, solid((x, y) => x > 20 && x < 28 && y > 4 && y < 12)),
+  const atlas = image(
+      32,
+      16,
+      solid((x, y) => x > 20 && x < 28 && y > 4 && y < 12),
+    ),
     sprite = { x: 0, y: 0, rotation: 0, rect: [16, 0, 16, 16], pivotX: 0.5, pivotY: 0.5, scaleX: 2, scaleY: 3 },
     [piece] = outlineColliders(atlas, { sprite, tolerance: 0.1 });
   const xs = piece.points.map((p) => p[0]),
@@ -161,11 +217,18 @@ test('a sprite places the colliders on its pivot and scale, and its rect picks t
 });
 
 test('collider settings reach every collider', () => {
-  const pieces = outlineColliders(image(16, 16, solid((x, y) => x > 4 && x < 12 && y > 4 && y < 12)), {
-    friction: 0.3,
-    restitution: 0.2,
-    sensor: true,
-  });
+  const pieces = outlineColliders(
+    image(
+      16,
+      16,
+      solid((x, y) => x > 4 && x < 12 && y > 4 && y < 12),
+    ),
+    {
+      friction: 0.3,
+      restitution: 0.2,
+      sensor: true,
+    },
+  );
   for (const piece of pieces) assert.deepEqual([piece.friction, piece.restitution, piece.sensor], [0.3, 0.2, true]);
 });
 
@@ -191,7 +254,11 @@ test('a real PNG: the doughnut traces to its filled pixels, keeps its hole, and 
   const tolerance = 0.5,
     islands = traceOutlines(decoded, { tolerance }),
     [every] = traceOutlines(decoded, { tolerance: 0 }),
-    length = (loop) => loop.reduce((sum, [x, y], i) => sum + Math.hypot(loop[(i + 1) % loop.length][0] - x, loop[(i + 1) % loop.length][1] - y), 0);
+    length = (loop) =>
+      loop.reduce(
+        (sum, [x, y], i) => sum + Math.hypot(loop[(i + 1) % loop.length][0] - x, loop[(i + 1) % loop.length][1] - y),
+        0,
+      );
   assert.equal(islands.length, 1);
   const [{ outer, holes }] = islands;
   assert.equal(holes.length, 1);
@@ -215,5 +282,8 @@ test('a real PNG: the doughnut traces to its filled pixels, keeps its hole, and 
   assert.equal(width, 128);
   assert.equal(height, 128);
   // It fell to the bottom of the hole and stayed in it.
-  assert.ok(y > middle[1] && y < Math.max(...ys) && x > Math.min(...xs) && x < Math.max(...xs), `at ${x}, ${y} in ${xs.length} points`);
+  assert.ok(
+    y > middle[1] && y < Math.max(...ys) && x > Math.min(...xs) && x < Math.max(...xs),
+    `at ${x}, ${y} in ${xs.length} points`,
+  );
 });

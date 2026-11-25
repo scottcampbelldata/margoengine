@@ -117,14 +117,21 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
   // Rough centres (the mean of each section's points) give the loft's direction at each section.
   const centres = sections.map((p) => {
     const pts = pointsOf(p);
-    return scale(pts.reduce((a, b) => add(a, b), [0, 0, 0] as XYZ), 1 / pts.length);
+    return scale(
+      pts.reduce((a, b) => add(a, b), [0, 0, 0] as XYZ),
+      1 / pts.length,
+    );
   });
   const oriented: Section[] = sections.map((p0, i) => {
     let n = unit(p0.normal);
     if (!n) throw new RangeError(`profile ${p0.name}: normal must not be zero`);
     const d = unit(i + 1 < sections.length ? sub(centres[i + 1], centres[i]) : sub(centres[i], centres[i - 1]));
-    if (!d) throw new RangeError(`loft sections ${p0.name} and its neighbour lie at one place; give the sections different positions`);
-    if (Math.abs(dot(n, d)) < 1e-9) throw new RangeError(`profile ${p0.name} lies along the loft; put each section across the loft direction`);
+    if (!d)
+      throw new RangeError(
+        `loft sections ${p0.name} and its neighbour lie at one place; give the sections different positions`,
+      );
+    if (Math.abs(dot(n, d)) < 1e-9)
+      throw new RangeError(`profile ${p0.name} lies along the loft; put each section across the loft direction`);
     let p: Profile = p0;
     if (dot(n, d) < 0) {
       n = scale(n, -1);
@@ -132,11 +139,17 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
     }
     p = { ...p, normal: n };
     if (!same(p.segments[count - 1].to, p.start, tolerance))
-      throw new RangeError(`profile ${p0.name} does not end where it starts; pass a closed profile that does not cross itself`);
+      throw new RangeError(
+        `profile ${p0.name} does not end where it starts; pass a closed profile that does not cross itself`,
+      );
     for (const q of [...pointsOf(p), ...p.segments.flatMap((s) => (s.center ? [s.center] : []))])
-      if (Math.abs(dot(sub(q, p.start), n)) > tolerance) throw new RangeError(`profile ${p0.name} is not planar; put every point and arc centre of the profile in one plane`);
+      if (Math.abs(dot(sub(q, p.start), n)) > tolerance)
+        throw new RangeError(
+          `profile ${p0.name} is not planar; put every point and arc centre of the profile in one plane`,
+        );
     const area = signedArea(p, n);
-    if (Math.abs(area) <= tolerance * tolerance) throw new RangeError(`profile ${p0.name} encloses no area; pass a closed profile that does not cross itself`);
+    if (Math.abs(area) <= tolerance * tolerance)
+      throw new RangeError(`profile ${p0.name} encloses no area; pass a closed profile that does not cross itself`);
     refuseSelfContact(p, n, tolerance);
     if (area < 0) p = reversed(p);
     return { profile: p, normal: n, points: pointsOf(p) };
@@ -148,7 +161,10 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
       b = oriented[i + 1],
       la = outline(a, PER),
       lb = outline(b, PER);
-    if (!lb.every((q) => dot(sub(q, a.points[0]), a.normal) > tolerance) || !la.every((q) => dot(sub(q, b.points[0]), b.normal) < -tolerance))
+    if (
+      !lb.every((q) => dot(sub(q, a.points[0]), a.normal) > tolerance) ||
+      !la.every((q) => dot(sub(q, b.points[0]), b.normal) < -tolerance)
+    )
       throw new RangeError(
         `loft sections ${a.profile.name} and ${b.profile.name} are not apart: each must lie beyond the other's plane`,
       );
@@ -199,7 +215,11 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
         const curve: CurveDef =
           g.kind === 'line'
             ? { kind: 'line', origin: from, direction: unit(sub(g.to, from))! }
-            : { kind: 'circle', frame: frameOf(g.center!, s.normal, sub(from, g.center!)), radius: length(sub(from, g.center!)) };
+            : {
+                kind: 'circle',
+                frame: frameOf(g.center!, s.normal, sub(from, g.center!)),
+                radius: length(sub(from, g.center!)),
+              };
         return new Edge(
           `${name}/edge:section:${i}:${segName(k)}`,
           curve,
@@ -215,7 +235,12 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
       span = `s${i}`,
       rulings = a.points.map(
         (q, k) =>
-          new Edge(`${name}/edge:ruling:${span}:${k}`, { kind: 'line', origin: q, direction: unit(sub(b.points[k], q))! }, vertices[i][k], vertices[i + 1][k]),
+          new Edge(
+            `${name}/edge:ruling:${span}:${k}`,
+            { kind: 'line', origin: q, direction: unit(sub(b.points[k], q))! },
+            vertices[i][k],
+            vertices[i + 1][k],
+          ),
       );
     for (let k = 0; k < count; k++) {
       const ga = a.profile.segments[k],
@@ -266,7 +291,9 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
         // natural normal, along u cross v, points out of the solid.
         const pieces = Math.max(
             ...[ga, gb].map((g, side) =>
-              g.kind === 'arc' ? Math.ceil(Math.abs(sweepOf(side ? b0 : a0, g, side ? b.normal : a.normal)) / (Math.PI / 2) - 1e-9) : 1,
+              g.kind === 'arc'
+                ? Math.ceil(Math.abs(sweepOf(side ? b0 : a0, g, side ? b.normal : a.normal)) / (Math.PI / 2) - 1e-9)
+                : 1,
             ),
           ),
           bilinear = ga.kind === 'line' && gb.kind === 'line',
@@ -300,10 +327,24 @@ export function loft(name: Name, sections: readonly Profile[], { history }: { hi
   const first = oriented[0],
     last = oriented[oriented.length - 1],
     startFace = shell.add(
-      new Face(`${name}/face:start`, { kind: 'plane', frame: frameOf(first.points[0], scale(first.normal, -1), sub(first.profile.segments[0].to, first.points[0])) }, true),
+      new Face(
+        `${name}/face:start`,
+        {
+          kind: 'plane',
+          frame: frameOf(first.points[0], scale(first.normal, -1), sub(first.profile.segments[0].to, first.points[0])),
+        },
+        true,
+      ),
     ),
     endFace = shell.add(
-      new Face(`${name}/face:end`, { kind: 'plane', frame: frameOf(last.points[0], last.normal, sub(last.profile.segments[0].to, last.points[0])) }, true),
+      new Face(
+        `${name}/face:end`,
+        {
+          kind: 'plane',
+          frame: frameOf(last.points[0], last.normal, sub(last.profile.segments[0].to, last.points[0])),
+        },
+        true,
+      ),
     ),
     sl = startFace.loop(),
     el = endFace.loop();

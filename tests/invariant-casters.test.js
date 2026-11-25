@@ -89,7 +89,10 @@ const DEPTH_EQUAL = {
   'packages/post/src/ssgi.ts': { 'packages/core/src/shaders.ts': ['Output'] },
   'packages/post/src/ssr.ts': { 'packages/core/src/shaders.ts': ['Output'] },
   // The selection mask redraws core meshes with shared's meshVertex against core's colour depth.
-  'packages/selection/src/index.ts': { 'packages/core/src/shaders.ts': ['Output'], 'packages/shared/gpu.js': ['Output'] },
+  'packages/selection/src/index.ts': {
+    'packages/core/src/shaders.ts': ['Output'],
+    'packages/shared/gpu.js': ['Output'],
+  },
   // TAA's object velocity redraws core meshes and gltf/pbr primitives with its own vertex, against their colour
   // depth; its world=f.model*p then camera*world matches gltf/pbr's colour vertex expression order.
   'packages/taa/src/index.ts': {
@@ -101,7 +104,7 @@ const DEPTH_EQUAL = {
   'packages/shader/src/raw.ts': { 'packages/shader/src/raw.ts': ['MargoVelocity'] },
 };
 
-test("every depth-equal replay vertex and the colour vertex it replays are @invariant (WGSL 12.10)", () => {
+test('every depth-equal replay vertex and the colour vertex it replays are @invariant (WGSL 12.10)', () => {
   const all = positions(),
     found = [];
   for (const pkg of readdirSync(join(root, 'packages'))) {

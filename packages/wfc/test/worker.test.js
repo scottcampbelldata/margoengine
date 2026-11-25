@@ -107,7 +107,11 @@ test('worker crash, malformed messages, clone failure, solver errors and watchdo
     if (mode === 'range') worker.reply({ error: { name: 'RangeError', message: 'bad grid' } });
     if (mode === 'coded')
       worker.reply({
-        error: { name: 'MargoError', code: 'failed', message: 'failed. Help: https://margoengine.com/llms/packages/wfc.md' },
+        error: {
+          name: 'MargoError',
+          code: 'failed',
+          message: 'failed. Help: https://margoengine.com/llms/packages/wfc.md',
+        },
       });
     await rejected;
     assert.equal(worker.terminated, 1, mode);

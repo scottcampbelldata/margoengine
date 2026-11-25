@@ -14,6 +14,8 @@ export interface BiomeSample {
   /** Slope as rise over run, and aspect in degrees clockwise from north (-Z). */
   slope: number;
   aspect: number;
+  /** Coarse terrain curvature in inverse metres, positive on a convex ridge. */
+  curvature?: number;
   /** Mean annual, coldest-month and warmest-month temperature in C. */
   temperature: number;
   coldest: number;
@@ -84,8 +86,17 @@ export function samplePoint(
     at = (grid: Int32Array, dx = 0, dz = 0) => bilinear(grid, region.nx, region.nz, rx + dx, rz + dz),
     e = at(region.height),
     // Central differences one region cell apart: mm over 2 cells.
-    gx = at(region.height, ONE) - at(region.height, -ONE),
-    gz = at(region.height, 0, ONE) - at(region.height, 0, -ONE),
+    east = at(region.height, ONE),
+    west = at(region.height, -ONE),
+    south = at(region.height, 0, ONE),
+    north = at(region.height, 0, -ONE),
+    gx = east - west,
+    gz = south - north,
+    curvature = clampInt(
+      divFloor((4 * e - east - west - south - north) * 10_000_000, region.step * region.step),
+      -32768,
+      32767,
+    ),
     tan = Math.min(32767, divFloor(isqrt(Math.min(68719476736, gx * gx + gz * gz) * 65536), 2 * region.step)),
     angle = gx === 0 && gz === 0 ? 0 : atan2(-gx, gz),
     rain = Math.max(0, at(region.rain)),
@@ -110,6 +121,7 @@ export function samplePoint(
   out.height = e / 1000;
   out.slope = tan / 256;
   out.aspect = (((angle >> 16) * 360) / 65536 + 360) % 360;
+  out.curvature = curvature * 0.0001;
   out.temperature = c[0] / 100;
   out.coldest = c[1] / 100;
   out.warmest = c[2] / 100;
@@ -127,7 +139,7 @@ export function samplePoint(
       height: e,
       slope: tan,
       aspect: angle >> 16,
-      curvature: 0,
+      curvature,
       tpi: 0,
       temperature: c[0],
       coldest: c[1],
@@ -177,6 +189,7 @@ export function readCell(
   out.height = value('height');
   out.slope = value('slope');
   out.aspect = (value('aspect') + 360) % 360;
+  out.curvature = value('curvature');
   out.temperature = value('temperature');
   out.coldest = value('coldest');
   out.warmest = value('warmest');

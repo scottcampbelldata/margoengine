@@ -19,7 +19,9 @@ const atHeight = (mesh, y) => {
   let best = 0,
     gap = Infinity;
   for (let v = 0; v < mesh.positions.length / 3; v++) {
-    const d = Math.abs(mesh.positions[v * 3 + 1] - y) + (Math.hypot(mesh.positions[v * 3], mesh.positions[v * 3 + 2]) < 0.1 ? 9 : 0);
+    const d =
+      Math.abs(mesh.positions[v * 3 + 1] - y) +
+      (Math.hypot(mesh.positions[v * 3], mesh.positions[v * 3 + 2]) < 0.1 ? 9 : 0);
     if (d < gap) {
       gap = d;
       best = v;
@@ -57,7 +59,9 @@ test('holes, an open end, doubled and flipped faces and split vertices give the 
     doubled = { positions: mesh.positions, indices: Uint32Array.from([...mesh.indices, ...mesh.indices]) },
     flipped = {
       positions: mesh.positions,
-      indices: Uint32Array.from(Array.from(mesh.indices, (_, i) => mesh.indices[i % 6 < 3 ? i : i - (i % 3) + 2 - (i % 3)])),
+      indices: Uint32Array.from(
+        Array.from(mesh.indices, (_, i) => mesh.indices[i % 6 < 3 ? i : i - (i % 3) + 2 - (i % 3)]),
+      ),
     };
   for (const [name, broken] of Object.entries({ open, doubled, flipped })) {
     const { weights, unreached } = await voxelWeights(broken, chain, { resolution: 48 });

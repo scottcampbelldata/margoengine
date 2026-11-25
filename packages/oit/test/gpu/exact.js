@@ -67,9 +67,9 @@ window.check = {
           ? OIT.attach(engine)
           : o.mode === 'peel'
             ? PeelOIT.attach(engine, options)
-          : o.mode === 'moment'
-            ? MomentOIT.attach(engine, o.depthRange ? { depthRange: o.depthRange } : {})
-            : ExactOIT.attach(engine, options);
+            : o.mode === 'moment'
+              ? MomentOIT.attach(engine, o.depthRange ? { depthRange: o.depthRange } : {})
+              : ExactOIT.attach(engine, options);
     const layers = o.layerData ?? [
       [[1, 0, 0], 0.6, 0.5],
       [[0, 1, 0], 0.3, 0.4],
@@ -118,7 +118,10 @@ window.check = {
         layout: 'auto',
         compute: { module: device.createShaderModule({ code }), entryPoint: 'probe' },
       });
-      const data = device.createBuffer({ size: input.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      const data = device.createBuffer({
+        size: input.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
       device.queue.writeBuffer(data, 0, input);
       const out = device.createBuffer({ size: count * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
         read = device.createBuffer({ size: count * 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),

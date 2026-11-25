@@ -1,0 +1,127 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { axisAngleToQuaternion } from '@margoengine/math/quat';
+import { LimbCollisionRig } from '../dist/contact.js';
+
+const local = (positions) => Float64Array.from(positions.flatMap((p) => [...p, 0, 0, 0, 1, 1, 1, 1]));
+
+test('a sleeve segment crossing the chest is rejected even with both arm joints outside', () => {
+  const rig = new LimbCollisionRig(
+    [-1, 0],
+    [{ start: { joint: 0 }, end: { joint: 1 }, radius: 0.14 }],
+    [{ start: 0, end: 1, radius: 0.045 }],
+  );
+  const pose = local([
+    [0, 0, 0],
+    [0, 0.5, 0],
+  ]);
+  rig.setBodyPose(pose);
+  assert.ok(Math.abs(rig.clearance([-0.4, 0.3, 0, 0.45, 0.3, 0]) + 0.185) < 1e-9);
+  assert.ok(rig.clearance([0.24, 0.3, 0, 0.5, 0.37, 0.04]) > 0.05);
+});
+
+test('human upper arm extension is bounded relative to a turning chest', () => {
+  const pose = local([
+    [0, 0, 0],
+    [0, 1, 0],
+  ]);
+  const rig = new LimbCollisionRig(
+    [-1, 0],
+    [{ start: { joint: 1, offset: [0, -1, 0] }, radius: 0.08 }],
+    [{ start: 0, end: 1, radius: 0.05 }],
+    [{ start: 0, end: 1, reference: 1, forward: [0, 0, 1], maxBackwards: Math.PI / 5 }],
+  );
+  rig.setBodyPose(pose);
+  assert.ok(rig.clearance([0.35, 1, 0, 0.36, 1, -0.3]) < 0);
+  assert.ok(rig.clearance([0.35, 1, 0, 0.36, 1, 0.3]) > 0);
+  pose.set(axisAngleToQuaternion([0, 1, 0], Math.PI / 2), 13);
+  rig.setBodyPose(pose);
+  assert.ok(rig.clearance([0.35, 1, 0, 0.05, 1, 0.02]) < 0);
+  assert.ok(rig.clearance([0.35, 1, 0, 0.65, 1, 0.02]) > 0);
+});
+
+test('a quadruped foreleg sweep catches a moving chest between two clear poses', () => {
+  const positions = local([
+    [0, 0.65, 0],
+    [0, 0, 0.77],
+    [0, 0, 0.36],
+  ]);
+  const rig = new LimbCollisionRig(
+    [-1, 0, 0],
+    [{ start: { joint: 1 }, end: { joint: 2 }, radius: 0.135 }],
+    [
+      { start: 0, end: 1, radius: 0.045, range: [0.32, 1] },
+      { start: 1, end: 2, radius: 0.04 },
+    ],
+  );
+  const foreleg = (x) => [x, 0.68, 0.74, x, 0.44, 0.67, x, 0.06, 0.65];
+  rig.setBodyPose(positions);
+  assert.ok(rig.clearance(foreleg(-0.5)) > 0.3);
+  const from = rig.snapshot(foreleg(-0.5));
+  positions[0] = -0.12;
+  rig.setBodyPose(positions);
+  const to = rig.snapshot(foreleg(0.5));
+  assert.ok(rig.clearance(foreleg(0.5)) > 0.4);
+  const swept = rig.sweep(from, to);
+  const proximalHeight = 0.68 + 0.32 * (0.44 - 0.68),
+    radialContact = Math.sqrt((0.135 + 0.045) ** 2 - (0.65 - proximalHeight) ** 2),
+    time = (0.5 - radialContact) / 1.12;
+  assert.equal(swept.clear, false);
+  assert.equal(swept.exhausted, false);
+  assert.ok(swept.time <= time && time - swept.time < 0.002, JSON.stringify(swept));
+  assert.equal(rig.sweep(from, from).clear, true);
+  assert.equal(rig.sweep(from, to, { maxSteps: 1 }).exhausted, true);
+});
+
+test('an arm sweep catches an impossible extension between two valid shoulder poses', () => {
+  const rig = new LimbCollisionRig(
+    [-1],
+    [{ start: { joint: 0 }, radius: 0.12 }],
+    [{ start: 0, end: 1, radius: 0.04 }],
+    [{ start: 0, end: 1, reference: 0, forward: [0, 0, 1], maxBackwards: Math.PI / 6 }],
+  );
+  rig.setBodyPose(local([[0, 0, 0]]));
+  const arm = (x) => [0, 1, 0, x, 1, -0.5];
+  assert.ok(rig.clearance(arm(1)) > 0);
+  assert.ok(rig.clearance(arm(-1)) > 0);
+  const from = rig.snapshot(arm(1)),
+    to = rig.snapshot(arm(-1)),
+    result = rig.sweep(from, to),
+    expected = (1 - Math.sqrt(0.75)) / 2;
+  assert.equal(result.clear, false);
+  assert.equal(result.exhausted, false);
+  assert.ok(result.time <= expected && expected - result.time < 0.001, JSON.stringify(result));
+  assert.equal(rig.sweep(from, from).clear, true);
+
+  // Saved snapshots from before the direction channel still check the capsules.
+  const legacy = ({ body, limb }) => ({ body, limb });
+  assert.equal(rig.sweep(legacy(from), legacy(to)).clear, true);
+});
+
+test('a turning chest carries its shoulder limit through the shortest axis arc', () => {
+  const rig = new LimbCollisionRig(
+    [-1],
+    [{ start: { joint: 0 }, radius: 0.12 }],
+    [{ start: 0, end: 1, radius: 0.04 }],
+    [{ start: 0, end: 1, reference: 0, forward: [0, 0, 1], maxBackwards: 0.35 }],
+  );
+  const pose = local([[0, 0, 0]]);
+  const arm = [0, 1, 0, 0, 1, 1];
+  const at = (angle, points = arm) => {
+    pose.set(axisAngleToQuaternion([0, 1, 0], angle), 3);
+    rig.setBodyPose(pose);
+    assert.ok(rig.clearance(points) > 0);
+    return rig.snapshot(points);
+  };
+  const turnedChest = (100 * Math.PI) / 180;
+  const from = at(turnedChest),
+    to = at(-turnedChest);
+  const result = rig.sweep(from, to);
+  const expected = (Math.PI / 2 + 0.35 - turnedChest) / (2 * Math.PI - 2 * turnedChest);
+  assert.equal(result.clear, false);
+  assert.equal(result.exhausted, false);
+  assert.ok(result.time <= expected && expected - result.time < 0.001, JSON.stringify(result));
+  assert.equal(rig.sweep(at(0), at(Math.PI / 2, [0, 1, 0, 1, 1, 0])).clear, true);
+  assert.equal(rig.sweep(at(0), at(Math.PI, [0, 1, 0, 0, 1, -1])).exhausted, true);
+  assert.throws(() => rig.sweep(from, { body: to.body, limb: to.limb }), /direction/i);
+});

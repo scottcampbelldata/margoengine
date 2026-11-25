@@ -15,8 +15,12 @@ class Source extends FakeNode {
     this.offset = new FakeParam(1);
     this.started = this.stopped = false;
   }
-  start() { this.started = true; }
-  stop() { this.stopped = true; }
+  start() {
+    this.started = true;
+  }
+  stop() {
+    this.stopped = true;
+  }
 }
 class Worklet extends FakeNode {
   constructor(context, name, options = {}) {
@@ -24,34 +28,59 @@ class Worklet extends FakeNode {
     this.numberOfInputs = options.numberOfInputs ?? 1;
     this.parameters = new Map(Object.entries(options.parameterData ?? {}).map(([k, v]) => [k, new FakeParam(v)]));
     const told = (this.told = []);
-    this.port = { onmessage: null, closed: false, postMessage: (data) => told.push(data), close() { this.closed = true; } };
+    this.port = {
+      onmessage: null,
+      closed: false,
+      postMessage: (data) => told.push(data),
+      close() {
+        this.closed = true;
+      },
+    };
     context.track(this);
   }
 }
 class Recording extends FakeContext {
   sources = [];
   audioWorklet = { addModule: () => new Promise((resolve) => setTimeout(resolve, 0)) };
-  createWaveShaper() { return this.track(Object.assign(new FakeNode(this, 'shaper'), { curve: null, oversample: 'none' })); }
-  createConstantSource() { const node = this.track(new Source(this)); this.sources.push(node); return node; }
-  createChannelSplitter(n = 6) { return this.track(Object.assign(new FakeNode(this, 'splitter'), { numberOfOutputs: n })); }
-  createChannelMerger(n = 6) { return this.track(Object.assign(new FakeNode(this, 'merger'), { numberOfInputs: n })); }
-  createStereoPanner() { return this.track(Object.assign(new FakeNode(this, 'stereo'), { pan: new FakeParam(0) })); }
+  createWaveShaper() {
+    return this.track(Object.assign(new FakeNode(this, 'shaper'), { curve: null, oversample: 'none' }));
+  }
+  createConstantSource() {
+    const node = this.track(new Source(this));
+    this.sources.push(node);
+    return node;
+  }
+  createChannelSplitter(n = 6) {
+    return this.track(Object.assign(new FakeNode(this, 'splitter'), { numberOfOutputs: n }));
+  }
+  createChannelMerger(n = 6) {
+    return this.track(Object.assign(new FakeNode(this, 'merger'), { numberOfInputs: n }));
+  }
+  createStereoPanner() {
+    return this.track(Object.assign(new FakeNode(this, 'stereo'), { pan: new FakeParam(0) }));
+  }
 }
 // The worklet constructor the stages call, in place while a stage is built: a browser's own needs a real context.
 async function withWorklets(fn) {
   const had = Object.getOwnPropertyDescriptor(globalThis, 'AudioWorkletNode');
   Object.defineProperty(globalThis, 'AudioWorkletNode', { configurable: true, writable: true, value: Worklet });
-  try { return await fn(); } finally {
-    if (had) Object.defineProperty(globalThis, 'AudioWorkletNode', had); else delete globalThis.AudioWorkletNode;
+  try {
+    return await fn();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'AudioWorkletNode', had);
+    else delete globalThis.AudioWorkletNode;
   }
 }
 // Nodes made before `from` are the app's own (a bus it keeps): only the entry's nodes must be gone.
 function released(context, from, what) {
   const kept = context.nodes.slice(from).filter((node) => node.outputs.size);
-  if (kept.length) lifetimeFault(`${what} leaves ${kept.length} node(s) connected (${kept.map((n) => n.kind).join(', ')})`);
+  if (kept.length)
+    lifetimeFault(`${what} leaves ${kept.length} node(s) connected (${kept.map((n) => n.kind).join(', ')})`);
   const running = context.sources.filter((s) => s.started && !s.stopped);
   if (running.length) lifetimeFault(`${what} leaves ${running.length} source(s) running`);
-  const live = context.nodes.slice(from).filter((n) => n instanceof Worklet && (!n.told.includes('dispose') || !n.port.closed));
+  const live = context.nodes
+    .slice(from)
+    .filter((n) => n instanceof Worklet && (!n.told.includes('dispose') || !n.port.closed));
   if (live.length) lifetimeFault(`${what} leaves ${live.length} worklet processor(s) running`);
 }
 const signal = () => new AbortController().signal;
@@ -59,13 +88,16 @@ const fx = [{ type: 'distortion', amount: 0.3 }, { type: 'chorus' }, { type: 'bi
 const effects = [
   { type: 'eq', bands: [{ frequency: 100, type: 'lowshelf', gain: 3 }] },
   { type: 'filter', filter: 'lowpass', frequency: 2000 },
-  { type: 'compressor' }, { type: 'limiter' }, { type: 'delay', time: 0.1, feedback: 0.3 },
+  { type: 'compressor' },
+  { type: 'limiter' },
+  { type: 'delay', time: 0.1, feedback: 0.3 },
 ];
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { Mixer, createEffect } = await load('../dist/index.js');
   const { createFXChain, createBusFX } = await load('../dist/fx.js');
-  const { createGate, createExpander, createMultibandCompressor, createBusDynamics } = await load('../dist/dynamics.js');
+  const { createGate, createExpander, createMultibandCompressor, createBusDynamics } =
+    await load('../dist/dynamics.js');
   const { createPitchShift, createBusPitchShift } = await load('../dist/pitch.js');
   const { createSidechain } = await load('../dist/sidechain.js');
   const { createDynamics } = await load('../dist/worklet.js');
@@ -73,11 +105,19 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { createStereo, createBusStereo } = await load('../dist/stereo.js');
   const { createRoomReverb } = await load('../dist/reflections.js');
   const entries = [];
-  const owned = (name, make) => entries.push({ name, async create({ scene }) {
-    const context = new Recording();
-    const { release, check } = await withWorklets(() => make(context));
-    return ownedByEngine(scene, name, release, { check({ phase }) { if (phase === 'disposed') check(); } });
-  } });
+  const owned = (name, make) =>
+    entries.push({
+      name,
+      async create({ scene }) {
+        const context = new Recording();
+        const { release, check } = await withWorklets(() => make(context));
+        return ownedByEngine(scene, name, release, {
+          check({ phase }) {
+            if (phase === 'disposed') check();
+          },
+        });
+      },
+    });
   // A whole mixer: buses with effects, a send, a duck, a routed source and an emitter. Disposal tears down every bus.
   owned('Mixer', (context) => {
     const mixer = new Mixer(context, { buses: { music: { effects }, sfx: {} } });
@@ -86,9 +126,17 @@ export async function fixtures(load = (entry) => import(entry)) {
     const source = context.createGain();
     mixer.route(source, 'music');
     const emitter = mixer.emitter('sfx');
-    return { release: () => { emitter.dispose(); mixer.dispose(); },
+    return {
+      release: () => {
+        emitter.dispose();
+        mixer.dispose();
+      },
       // The routed source is the app's, and so is its edge into the bus: drop it before counting.
-      check: () => { source.disconnect(); released(context, 0, 'a disposed mixer'); } };
+      check: () => {
+        source.disconnect();
+        released(context, 0, 'a disposed mixer');
+      },
+    };
   });
   // Stages built on a context: the app wires them, so disposal must leave nothing of them connected or running.
   const stages = {
@@ -104,16 +152,21 @@ export async function fixtures(load = (entry) => import(entry)) {
     stereo: (c) => createStereo(c),
     roomReverb: (c) => createRoomReverb(c, { seconds: 0.05 }),
   };
-  for (const [name, make] of Object.entries(stages)) owned(name, async (context) => {
-    const stage = await make(context), source = context.createGain();
-    source.connect(stage.input);
-    stage.output.connect(context.destination);
-    return { release: () => stage.dispose(), check: () => {
-      // The app's source still feeds the stage's input, which is the app's edge: drop it before counting.
-      source.disconnect();
-      released(context, 0, `a disposed ${name} stage`);
-    } };
-  });
+  for (const [name, make] of Object.entries(stages))
+    owned(name, async (context) => {
+      const stage = await make(context),
+        source = context.createGain();
+      source.connect(stage.input);
+      stage.output.connect(context.destination);
+      return {
+        release: () => stage.dispose(),
+        check: () => {
+          // The app's source still feeds the stage's input, which is the app's edge: drop it before counting.
+          source.disconnect();
+          released(context, 0, `a disposed ${name} stage`);
+        },
+      };
+    });
   // Bus stages: inserted on a bus the app keeps. Disposal removes them and wires the bus straight through again.
   const busStages = {
     busFX: (bus) => createBusFX(bus, fx, { signal: signal() }),
@@ -122,14 +175,20 @@ export async function fixtures(load = (entry) => import(entry)) {
     busAnalyser: (bus) => createBusAnalyser(bus, { signal: signal() }),
     busStereo: (bus) => createBusStereo(bus),
   };
-  for (const [name, make] of Object.entries(busStages)) owned(name, async (context) => {
-    const mixer = new Mixer(context, { buses: { music: {} } }), bus = mixer.bus('music'), from = context.nodes.length;
-    const stage = await make(bus);
-    return { release: () => stage.dispose(), check: () => {
-      released(context, from, `a disposed ${name} stage`);
-      if (!bus.gate.outputs.has(bus.output)) lifetimeFault(`a disposed ${name} stage leaves its bus unwired`);
-      mixer.dispose();
-    } };
-  });
+  for (const [name, make] of Object.entries(busStages))
+    owned(name, async (context) => {
+      const mixer = new Mixer(context, { buses: { music: {} } }),
+        bus = mixer.bus('music'),
+        from = context.nodes.length;
+      const stage = await make(bus);
+      return {
+        release: () => stage.dispose(),
+        check: () => {
+          released(context, from, `a disposed ${name} stage`);
+          if (!bus.gate.outputs.has(bus.output)) lifetimeFault(`a disposed ${name} stage leaves its bus unwired`);
+          mixer.dispose();
+        },
+      };
+    });
   return entries;
 }

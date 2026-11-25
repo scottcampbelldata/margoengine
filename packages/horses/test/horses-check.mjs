@@ -20,7 +20,8 @@ const coverage = async (bytes) => {
     channels = image.data.length / (image.width * image.height);
   let n = 0;
   for (let i = 0; i < image.data.length; i += channels)
-    if (Math.abs(image.data[i] - 0x30) + Math.abs(image.data[i + 1] - 0x33) + Math.abs(image.data[i + 2] - 0x3a) > 30) n++;
+    if (Math.abs(image.data[i] - 0x30) + Math.abs(image.data[i + 1] - 0x33) + Math.abs(image.data[i + 2] - 0x3a) > 30)
+      n++;
   return n / (image.width * image.height);
 };
 try {
@@ -28,11 +29,21 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 180000 });
   const h = await page.evaluate(() => window.check.horse());
   // HORSES_PNG_DIR=<folder> keeps the frames for a look.
-  const keep = (name, bytes) => process.env.HORSES_PNG_DIR && writeFileSync(join(process.env.HORSES_PNG_DIR, name), new Uint8Array(bytes));
+  const keep = (name, bytes) =>
+    process.env.HORSES_PNG_DIR && writeFileSync(join(process.env.HORSES_PNG_DIR, name), new Uint8Array(bytes));
   keep('horse.png', h.bytes);
   assert.deepEqual(h.errors, []);
   const c = await coverage(h.bytes);
-  console.log('horse covers', (100 * c).toFixed(1), 'percent; gait', h.played.gait, 'speed', h.played.speed.toFixed(2), 'saddle rise', h.rise.toFixed(3));
+  console.log(
+    'horse covers',
+    (100 * c).toFixed(1),
+    'percent; gait',
+    h.played.gait,
+    'speed',
+    h.played.speed.toFixed(2),
+    'saddle rise',
+    h.rise.toFixed(3),
+  );
   assert.ok(c > 0.05, 'the horse is drawn');
   assert.equal(h.played.gait, 'trot');
   assert.ok(Math.abs(h.played.speed - 4) < 1e-9);
@@ -42,6 +53,47 @@ try {
   assert.ok(h.rise > 0.03 && h.rise < 0.15, 'the rider rides the trot: the hip rises and falls with the back');
   assert.deepEqual(h.clips, ['stand', 'walk', 'trot', 'canter', 'gallop']);
   assert.equal(h.after, false, 'disposed, the Animation is off the engine');
+  const motion = await page.evaluate(() => window.check.motion());
+  assert.deepEqual(motion.errors, []);
+  assert.ok(motion.gaits.includes('gallop') && motion.gaits.includes('stand') && motion.gaits.includes('trot'));
+  assert.equal(motion.stopSpeed, 0, 'the horse came to a full stop before restarting');
+  assert.ok(
+    motion.maxRestartStep < 0.05,
+    `largest starting or restarting limb step: ${motion.maxRestartStep} m at 120 Hz (${JSON.stringify(motion.largestRestart)})`,
+  );
+  assert.ok(motion.maxGallopStep < 0.14, `largest galloping limb step: ${motion.maxGallopStep} m at 120 Hz`);
+  assert.ok(motion.tailSweep > 0.18, `the tail moved laterally by ${motion.tailSweep} m`);
+  for (const [name, bytes] of Object.entries(motion.shots)) keep(`${name}.png`, bytes);
+  assert.equal(motion.replayGallop, motion.samples[2].pose, 'a gallop pose replays through interrupted transitions');
+  assert.equal(motion.replayTail, motion.samples[0].pose, 'a tail flick replays at its original film time');
+  console.log(
+    'restart continuity',
+    motion.maxRestartStep.toFixed(4),
+    'm/step; tail sweep',
+    motion.tailSweep.toFixed(3),
+    'm',
+  );
+  const authored = await page.evaluate(() => window.check.authored());
+  assert.deepEqual(authored.errors, []);
+  assert.ok(authored.adopted, 'an imported, weighted horse is posed by the live gait controller');
+  assert.ok(
+    authored.fitted > 0.4 && authored.fitted < 0.95,
+    `tight limb reach shortens the stride: ${authored.fitted}`,
+  );
+  assert.ok(authored.lowest > -0.01, `the fitted hooves remain above the ground during a start: ${authored.lowest}`);
+  assert.ok(authored.callerOwns, 'the caller keeps its authored model after the controller is disposed');
+  const terrain = await page.evaluate(() => window.check.terrain());
+  keep('terrain.png', terrain.bytes);
+  assert.deepEqual(terrain.errors, []);
+  assert.ok(terrain.standGap < 0.002, 'standing hoof clearance: ' + terrain.standGap);
+  assert.ok(terrain.min > -0.012, 'deepest hoof penetration: ' + terrain.min);
+  assert.ok(terrain.stable > 900, 'fixed plants across the turning stride: ' + terrain.stable);
+  assert.ok(
+    terrain.worstStep < 0.065,
+    'ground contact releases smoothly across a stop and restart: ' + terrain.worstStep,
+  );
+  assert.equal(terrain.replay, terrain.played, 'ground contacts replay exactly through a seek');
+  console.log('terrain walking contacts', terrain.stable, 'fixed, minimum clearance', terrain.min.toFixed(4), 'm');
   const herd = await page.evaluate(() => window.check.herd());
   keep('herd.png', herd.bytes);
   assert.deepEqual(herd.errors, []);

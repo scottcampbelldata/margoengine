@@ -2,7 +2,7 @@
 // kind, from the region fields alone, so it answers for the whole world without placing a tree. A view darkens the
 // ground under forest with it and draws the far forest from it (trees beyond the stored-object radius).
 import { divFloor, ONE, wendland } from '@margoengine/biomes/toolkit';
-import { rangeError } from '../../shared/errors.js';
+import { fault, rangeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule } from './define.js';
 import { STRATA } from './reach.js';
 import type { BiomeSample } from './sample.js';
@@ -10,6 +10,8 @@ import { meanCrownArea, stored } from './crown.js';
 import { standAt, standsOf, type Stands, TICK } from './stands.js';
 import type { BiomeWorld } from './world.js';
 import type { OverviewCorner, ViewTile } from './view.js';
+import type { PlacementGraph } from './graph.js';
+import { graphHook } from './graph-hook.js';
 
 /** The kinds of far tree a view draws: every tree is drawn as the nearest of these. */
 export const CANOPY_KINDS = Object.freeze(['broadleaf', 'conifer', 'palm'] as const);
@@ -32,10 +34,11 @@ const TREE_MESHES = new Set(['broadleaf', 'conifer', 'palm', 'birch', 'acacia', 
 const meshName = (rule: SpeciesRule) => (rule.mesh.startsWith('procedural:') ? rule.mesh.slice(11) : rule.mesh);
 
 /** Whether a plant counts as a tree of the canopy: a tree mesh, or any crown of canopy size. */
-const isTree = (rule: SpeciesRule) => TREE_MESHES.has(meshName(rule)) || STRATA(rule.radius) === 1;
+const isTree = (rule: SpeciesRule) => !!rule.canopyKind || TREE_MESHES.has(meshName(rule)) || STRATA(rule.radius) === 1;
 
 /** The far kind a tree is drawn as: its {@link CANOPY_KINDS} index. */
 const kindOf = (rule: SpeciesRule) => {
+  if (rule.canopyKind) return CANOPY_KINDS.indexOf(rule.canopyKind);
   const name = meshName(rule);
   return name === 'conifer' ? 1 : name === 'palm' ? 2 : 0;
 };
@@ -46,13 +49,42 @@ type Tree = {
   readonly kind: number;
   readonly stands?: Stands;
   readonly dims: readonly Dimension[];
+  readonly graph?: (sample: BiomeSample, x: number, z: number) => number;
 };
 
 /** What cover reads of a biome list: the trees of each biome, by biome id. */
 export type CoverPlan = ReadonlyMap<string, readonly Tree[]>;
 
 /** The trees of each biome (biomes without trees are left out, so an empty plan means no cover anywhere). */
-export function coverPlan(biomes: readonly BiomeDefinition[]): CoverPlan {
+export function coverPlan(biomes: readonly BiomeDefinition[], graph?: PlacementGraph): CoverPlan {
+  const graphs = new Map<string, Tree['graph']>();
+  if (graph) {
+    if (!graphHook.factors)
+      throw fault(
+        'state',
+        "A placement with a graph needs the graph entry; await import('@margoengine/biomes/graph') first",
+        'biomes',
+      );
+    const species = biomes.flatMap((b) =>
+      [...(b.plants ?? []), ...(b.rocks ?? []), ...(b.props ?? [])].map((rule) => ({
+        key: b.id + '/' + rule.id,
+        id: rule.id,
+        tags: rule.tags ?? [],
+      })),
+    );
+    const factors = graphHook.factors(graph, species);
+    const fields = [
+      ...new Set(graph.nodes.flatMap((n) => (n.op === 'range' ? [fieldDimension(n.field, n.range).layer] : []))),
+    ];
+    const values = Object.fromEntries(fields.map((field) => [field, new Int32Array(1)]));
+    factors.forEach((factor, i) => {
+      if (!factor) return;
+      graphs.set(species[i].key, (sample, x, z) => {
+        for (const field of fields) values[field][0] = Math.round(stored(sample, field));
+        return factor(values, 0, x, z) / ONE;
+      });
+    });
+  }
   const plan = new Map<string, Tree[]>();
   for (const b of biomes) {
     const trees: Tree[] = [];
@@ -69,6 +101,7 @@ export function coverPlan(biomes: readonly BiomeDefinition[]): CoverPlan {
           kind: kindOf(rule),
           stands,
           dims: Object.entries(rule.suitability ?? {}).map(([f, range]) => fieldDimension(f, range!, 0.15)),
+          graph: graphs.get(b.id + '/' + rule.id),
         });
       }
     if (trees.length) plan.set(b.id, trees);
@@ -108,6 +141,7 @@ export function coverAt(
           at = Math.round(((dist + d.width / 2) / d.width) * ONE); // float division: view only
         share *= wendland(Math.max(0, Math.min(ONE, at))) / ONE; // float division: Q16
       }
+      if (share && t.graph) share *= t.graph(s, tx, tz);
       fill += share;
     }
     // Over one means crowns overlap: the ground is full, and the kinds keep their proportions.
@@ -123,6 +157,7 @@ export function coverAt(
             dist = Math.max(d.lo - v, v - d.hi);
           share *= wendland(Math.max(0, Math.min(ONE, Math.round(((dist + d.width / 2) / d.width) * ONE)))) / ONE; // float division: Q16
         }
+        if (share && t.graph) share *= t.graph(s, tx, tz);
         kinds[t.kind] += share;
       }
   }
@@ -135,9 +170,10 @@ export function coverAt(
  * capped at full ground. No tree is placed and no tile is made. A temperate world reads 255, a desert 0.
  * @param world The world.
  * @param step Metres between corners, a positive multiple of the world resolution. Default 16.
+ * @param graph Optional species density graph, sampled at the same world points as the cover.
  * @throws RangeError for a `step` that is not a positive multiple of the world resolution.
  */
-export function canopyCover(world: BiomeWorld, step = COVER_STEP): CanopyCover {
+export function canopyCover(world: BiomeWorld, step = COVER_STEP, graph?: PlacementGraph): CanopyCover {
   const fit = step / world.resolution; // float division: option check
   if (!(step > 0) || Math.round(fit) !== fit)
     throw rangeError('canopyCover step must be a positive multiple of the world resolution', 'biomes');
@@ -146,7 +182,7 @@ export function canopyCover(world: BiomeWorld, step = COVER_STEP): CanopyCover {
     depth = Math.floor((z1 - z0) / step) + 1, // float division
     data = new Uint8Array(width * depth),
     kinds = CANOPY_KINDS.map(() => new Uint8Array(width * depth)),
-    plan = coverPlan(world.biomes),
+    plan = coverPlan(world.biomes, graph),
     part = new Float64Array(CANOPY_KINDS.length);
   let s: BiomeSample | undefined;
   if (plan.size)

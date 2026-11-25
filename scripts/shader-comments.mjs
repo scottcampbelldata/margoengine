@@ -96,8 +96,8 @@ export function stripComments(source, language, anchor = none) {
     } else {
       let depth = 1;
       while (end < source.length && depth > 0)
-        if (language === 'wgsl' && source.startsWith('/*', end)) (depth++, (end += 2));
-        else if (source.startsWith('*/', end)) (depth--, (end += 2));
+        if (language === 'wgsl' && source.startsWith('/*', end)) depth++, (end += 2);
+        else if (source.startsWith('*/', end)) depth--, (end += 2);
         else end++;
       if (depth > 0) return whole(true, false);
     }
@@ -127,8 +127,28 @@ export function stripComments(source, language, anchor = none) {
 // Shader tokens, each as [line, text]; a template literal's interpolations are one opaque token. Written apart from
 // stripComments, with its own comment skipping, so the two cannot share a mistake.
 const PUNCTUATION = [
-  '>>=', '<<=', '->', '&&', '||', '==', '!=', '<=', '>=', '<<', '>>', '++', '--', '+=', '-=', '*=', '/=', '%=', '&=',
-  '|=', '^=', '##',
+  '>>=',
+  '<<=',
+  '->',
+  '&&',
+  '||',
+  '==',
+  '!=',
+  '<=',
+  '>=',
+  '<<',
+  '>>',
+  '++',
+  '--',
+  '+=',
+  '-=',
+  '*=',
+  '/=',
+  '%=',
+  '&=',
+  '|=',
+  '^=',
+  '##',
 ];
 const NUMBER =
   /^(0[xX]([0-9a-fA-F]*\.[0-9a-fA-F]*|[0-9a-fA-F]+)([pP][+-]?\d+)?[fhiu]?|(\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?[fhiulU]?)/;
@@ -156,8 +176,8 @@ export function shaderTokens(text, language) {
       let depth = 1;
       i += 2;
       while (depth > 0 && i < text.length)
-        if (language === 'wgsl' && text.startsWith('/*', i)) (depth++, (i += 2));
-        else if (text.startsWith('*/', i)) (depth--, (i += 2));
+        if (language === 'wgsl' && text.startsWith('/*', i)) depth++, (i += 2);
+        else if (text.startsWith('*/', i)) depth--, (i += 2);
         else if (lineBreak.test(text[i])) newline();
         else i++;
     } else {
@@ -191,7 +211,12 @@ function eachLiteral(program, visit) {
       return;
     }
     if (node.type === 'Literal' && typeof node.value === 'string') visit(node, [node.value], parent);
-    else if (node.type === 'TemplateLiteral') visit(node, node.quasis.map((q) => q.value.cooked), parent);
+    else if (node.type === 'TemplateLiteral')
+      visit(
+        node,
+        node.quasis.map((q) => q.value.cooked),
+        parent,
+      );
     for (const key in node) if (key !== 'type' && node[key] && typeof node[key] === 'object') walk(node[key], node);
   };
   walk(program, null);
@@ -269,7 +294,10 @@ export function stripShaderLiterals(code, filename, { anchors = [], strip = stri
     if (!count) return;
     const before = pieces.join(INTERPOLATION),
       after = results.map((r) => r.text).join(INTERPOLATION);
-    assert.ok(sameTokens(before, after, language), `${filename}:${node.start}: stripping comments changed shader tokens`);
+    assert.ok(
+      sameTokens(before, after, language),
+      `${filename}:${node.start}: stripping comments changed shader tokens`,
+    );
     comments += count;
     if (node.type === 'Literal') edits.push({ start: node.start, end: node.end, text: JSON.stringify(after) });
     else

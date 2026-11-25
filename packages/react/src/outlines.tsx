@@ -5,6 +5,7 @@ import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { MeshOutline, MeshOutlineOptions } from '@margoengine/toon/outline';
 import type { ModelOutlines } from '@margoengine/toon/models';
 import { colorKey, live, ModelContext, ModelScope, report, useMesh, useScene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { subscribeFrame } from './frame-priority.js';
 import { rangeError } from '../../shared/errors.js';
@@ -115,10 +116,12 @@ function ModelHull({
     )
       .then((api) => {
         if (!active || scene.engine.disposed || model.disposed) return;
-        outline = hull.current = api.ModelOutlines.attach(scene.engine, {
-          ...modelSettings(model, latest.current.props),
-          models: [model],
-        });
+        outline = hull.current = inScene(scene, () =>
+          api.ModelOutlines.attach(scene.engine, {
+            ...modelSettings(model, latest.current.props),
+            models: [model],
+          }),
+        );
         latest.current.onModelReady?.(outline);
       })
       .catch(fail);
@@ -201,7 +204,7 @@ function MeshHull({ onReady, onError, node, onModelReady: _model, ...props }: Ou
         }
       for (const m of meshes)
         if (!each.has(m)) {
-          const o = api.MeshOutline.attach(scene.engine, options(m, true));
+          const o = inScene(scene, () => api!.MeshOutline.attach(scene.engine, options(m, true)));
           each.set(m, o);
           latest.current.onReady?.(o);
         }
@@ -220,7 +223,7 @@ function MeshHull({ onReady, onError, node, onModelReady: _model, ...props }: Ou
         .then((api) => {
           if (!active || mesh !== target || scene.engine.disposed) return;
           if (registry.instanceMeshes) return follow();
-          outline = plugin.current = api.MeshOutline.attach(scene.engine, options(target, false));
+          outline = plugin.current = inScene(scene, () => api.MeshOutline.attach(scene.engine, options(target, false)));
           latest.current.onReady?.(outline);
         })
         .catch(fail);

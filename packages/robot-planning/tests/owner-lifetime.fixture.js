@@ -23,26 +23,36 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { GPUClearance } = await load('../dist/gpu.js');
   const { loadURDF } = await load('../dist/urdf.js');
   const { SphereVolume, ConvexHullVolume } = await load('../../kinematics-constraints/dist/index.js');
-  const arm = () => new Robot({
-    joints: [{ lower: -3, upper: 3 }, { lower: -3, upper: 3, origin: along(1, 0, 0) }],
-    shapes: [{ joint: 1, end: [1, 0, 0], radius: 0.05 }],
-  });
+  const arm = () =>
+    new Robot({
+      joints: [
+        { lower: -3, upper: 3 },
+        { lower: -3, upper: 3, origin: along(1, 0, 0) },
+      ],
+      shapes: [{ joint: 1, end: [1, 0, 0], radius: 0.05 }],
+    });
   const wall = () => new ConvexHullVolume({ points: [1.5, -0.2, -1, 1.5, -0.2, 1, 3, -0.2, -1, 3, -0.2, 1] });
   // One call the app starts with its own signal; the entry's check runs once the call has settled.
   const call = (name, run) => ({
     name,
     async create({ scene }) {
-      const timers = watchTimers(), app = new AbortController();
+      const timers = watchTimers(),
+        app = new AbortController();
       const result = await timers.scope(() => run(app.signal));
       if (!result) lifetimeFault(`${name} returned nothing`);
-      return ownedByEngine(scene, name, () => {}, { check: ({ phase }) => phase === 'disposed' && timers.expectNone(name) });
+      return ownedByEngine(scene, name, () => {}, {
+        check: ({ phase }) => phase === 'disposed' && timers.expectNone(name),
+      });
     },
   });
   return [
     {
       name: 'GPUClearance',
       async create({ engine, scene }) {
-        const clearance = new GPUClearance(engine.gpu, arm(), [new SphereVolume({ center: [3, 0, 0], radius: 0.5 }), wall()]);
+        const clearance = new GPUClearance(engine.gpu, arm(), [
+          new SphereVolume({ center: [3, 0, 0], radius: 0.5 }),
+          wall(),
+        ]);
         let evaluated = false;
         return ownedByEngine(scene, 'GPUClearance', () => clearance.dispose(), {
           async check({ phase }) {

@@ -44,11 +44,11 @@ test('picks answer for the mesh under the cursor while other meshes are created 
         hero = engine.createMesh().setGeometry(shape);
       } else if (op === 'render') engine.render();
       // A readback settles in its own task: its continuation runs before any other step.
-      else if (op === 'answer') (w.answer(), await flush(1));
+      else if (op === 'answer') w.answer(), await flush(1);
       else if (op === 'flush') await flush(2);
     }
     if (w.rng.chance(0.5)) {
-      for (let i = 0; i < 4; i++) (w.answer(), await flush(2));
+      for (let i = 0; i < 4; i++) w.answer(), await flush(2);
     }
     close(w, engine);
   }));
@@ -86,7 +86,7 @@ test('an error in each plugin and frame-graph pass is reported once and the engi
     start();
     let losses = 0;
     for (let round = 0; round < 6; round++) {
-      for (let i = w.rng.int(3); i--; ) (w.refresh(), await flush(2));
+      for (let i = w.rng.int(3); i--; ) w.refresh(), await flush(2);
       const kind = w.rng.pick(losses ? KINDS.slice(0, 4) : KINDS),
         site = w.rng.pick(SITES),
         tag = `injected ${kind} ${round}`,
@@ -137,47 +137,63 @@ const LOSS_STEPS = [
 ];
 for (const [step, create] of LOSS_STEPS)
   test(`a device lost at ${step} of ${create ? 'the first restore' : 'startup'} is restored and draws again (B3 class)`, () =>
-    stress(`startup-loss ${step}/${create}`, 0xb3 + LOSS_STEPS.findIndex(([s, c]) => s === step && c === create), 8, async (w) => {
-      // 'adapter' has no device yet: a loss there is a lost device returned by requestDevice ('device').
-      const fault = step === 'adapter' ? 'device' : step;
-      if (!['engine', 'restored'].includes(step)) w.startup.push({ step: fault, create, action: 'lose' });
-      const engine = await engineIn(w),
-        shape = box();
-      for (let i = w.rng.int(3); i--; ) engine.createMesh().setGeometry(shape);
-      let running = false;
-      engine.onError = (error) => {
-        w.report(error);
-        running = false;
-      };
-      const frames = async (n) => {
-        for (let i = 0; i < n; i++) {
-          if (!running) (engine.start(), (running = true));
-          w.refresh();
-          await flush();
-        }
-      };
-      // Live submits (on a device neither lost nor destroyed) counted when the loss happens: one must follow.
-      let live = 0;
-      if (step === 'engine') w.devices[0].lose('lost after startup');
-      await frames(w.rng.int(3));
-      if (create === 1) {
-        if (!w.live()) await frames(1);
-        w.devices[0].lose('the loss that starts the first restore');
-        live = w.live();
-        await flush();
-        if (step === 'restored') {
-          await frames(1);
+    stress(
+      `startup-loss ${step}/${create}`,
+      0xb3 + LOSS_STEPS.findIndex(([s, c]) => s === step && c === create),
+      8,
+      async (w) => {
+        // 'adapter' has no device yet: a loss there is a lost device returned by requestDevice ('device').
+        const fault = step === 'adapter' ? 'device' : step;
+        if (!['engine', 'restored'].includes(step)) w.startup.push({ step: fault, create, action: 'lose' });
+        const engine = await engineIn(w),
+          shape = box();
+        for (let i = w.rng.int(3); i--; ) engine.createMesh().setGeometry(shape);
+        let running = false;
+        engine.onError = (error) => {
+          w.report(error);
+          running = false;
+        };
+        const frames = async (n) => {
+          for (let i = 0; i < n; i++) {
+            if (!running) engine.start(), (running = true);
+            w.refresh();
+            await flush();
+          }
+        };
+        // Live submits (on a device neither lost nor destroyed) counted when the loss happens: one must follow.
+        let live = 0;
+        if (step === 'engine') w.devices[0].lose('lost after startup');
+        await frames(w.rng.int(3));
+        if (create === 1) {
+          if (!w.live()) await frames(1);
+          w.devices[0].lose('the loss that starts the first restore');
           live = w.live();
-          w.devices.at(-1).lose('lost just after the restore');
+          await flush();
+          if (step === 'restored') {
+            await frames(1);
+            live = w.live();
+            w.devices.at(-1).lose('lost just after the restore');
+          }
         }
-      }
-      await frames(8);
-      if (w.live() === live)
-        w.violate(`after a loss at ${step} of create ${create}: no frame drew on a restored device in 8 refreshes`);
-      close(w, engine);
-    }));
+        await frames(8);
+        if (w.live() === live)
+          w.violate(`after a loss at ${step} of create ${create}: no frame drew on a restored device in 8 refreshes`);
+        close(w, engine);
+      },
+    ));
 
-const ACTIONS = ['stop', 'start', 'stop start', 'start stop', 'start start', 'stop stop', 'dispose', 'dispose dispose', 'dispose start', 'throw'];
+const ACTIONS = [
+  'stop',
+  'start',
+  'stop start',
+  'start stop',
+  'start start',
+  'stop stop',
+  'dispose',
+  'dispose dispose',
+  'dispose start',
+  'throw',
+];
 
 test('stop, start and dispose re-entered from onFrame, pace, plugin callbacks, passes and onError keep one loop (B6 class)', () =>
   stress('reentrant-loop', 0xb6, RUNS, async (w) => {
@@ -194,7 +210,7 @@ test('stop, start and dispose re-entered from onFrame, pace, plugin callbacks, p
       plan.delete(hook);
       w.step(`${hook}: ${action}`);
       for (const verb of action.split(' '))
-        if (verb === 'stop') (engine.stop(), (model.running = false));
+        if (verb === 'stop') engine.stop(), (model.running = false);
         else if (verb === 'start') {
           if (model.disposed) {
             // start() on a disposed engine throws its coded error; here it is caught, as an app's handler would.
@@ -204,7 +220,7 @@ test('stop, start and dispose re-entered from onFrame, pace, plugin callbacks, p
             } catch (error) {
               if (error?.code !== 'disposed') w.violate(`start() after dispose threw ${error}`);
             }
-          } else (engine.start(), (model.running = true));
+          } else engine.start(), (model.running = true);
         } else if (verb === 'dispose') {
           engine.dispose();
           model.disposed = true;
@@ -244,7 +260,11 @@ test('stop, start and dispose re-entered from onFrame, pace, plugin callbacks, p
         // A pass may stop and start the loop; disposing inside a pass is audit row B10 (open), not this family.
         // pace runs outside the frame's try: a throw there is the page's own uncaught error, not the engine's.
         let action = w.rng.pick(
-          hook.startsWith('pass') ? ACTIONS.filter((a) => !a.includes('dispose')) : hook === 'pace' ? ACTIONS.slice(0, -1) : ACTIONS,
+          hook.startsWith('pass')
+            ? ACTIONS.filter((a) => !a.includes('dispose'))
+            : hook === 'pace'
+              ? ACTIONS.slice(0, -1)
+              : ACTIONS,
         );
         // onError runs only after a throw; plan one elsewhere so it runs.
         if (hook === 'onError') plan.set(w.rng.pick(['frame0', 'preUpdate0', 'pass1']), 'throw');
@@ -257,8 +277,10 @@ test('stop, start and dispose re-entered from onFrame, pace, plugin callbacks, p
       if (drawn > 1) w.violate(`${drawn} frames drew in one display refresh`);
       const expected = model.running && !model.disposed ? 1 : 0;
       if (w.pending() !== expected)
-        w.violate(`${w.pending()} frame callbacks wait, expected ${expected} (${model.disposed ? 'disposed' : model.running ? 'running' : 'stopped'})`);
-      if (!model.running && !model.disposed && w.rng.chance(0.5)) (engine.start(), (model.running = true));
+        w.violate(
+          `${w.pending()} frame callbacks wait, expected ${expected} (${model.disposed ? 'disposed' : model.running ? 'running' : 'stopped'})`,
+        );
+      if (!model.running && !model.disposed && w.rng.chance(0.5)) engine.start(), (model.running = true);
     }
     if (!model.disposed) close(w, engine);
     for (const k of [0, 1])

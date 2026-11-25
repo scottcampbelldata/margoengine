@@ -43,7 +43,11 @@ export async function fixtures(load = (entry) => import(entry)) {
       const build = (e) => {
         for (const m of meshes) m.dispose();
         meshes = Object.values(plan.parts).map((g) =>
-          e.createMesh().setGeometry(new Geometry(g.positions, g.normals, g.indices)).setMaterial(material).setPosition([0, -4, -30]),
+          e
+            .createMesh()
+            .setGeometry(new Geometry(g.positions, g.normals, g.indices))
+            .setMaterial(material)
+            .setPosition([0, -4, -30]),
         );
       };
       const plugin = {

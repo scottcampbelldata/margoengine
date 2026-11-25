@@ -139,8 +139,14 @@ test('at the compatibility level each bloom level is its own texture, the size o
   assert.equal(chain.length, 6 + 5, 'six levels down, five up');
   assert.ok(chain.every((descriptor) => descriptor.mipLevelCount === 1));
   const [width] = chain[0].size;
-  assert.deepEqual(chain.slice(0, 6).map(({ size }) => size[0]), [0, 1, 2, 3, 4, 5].map((i) => width >> i));
-  assert.deepEqual(chain.slice(6).map(({ size }) => size[0]), [0, 1, 2, 3, 4].map((i) => width >> i));
+  assert.deepEqual(
+    chain.slice(0, 6).map(({ size }) => size[0]),
+    [0, 1, 2, 3, 4, 5].map((i) => width >> i),
+  );
+  assert.deepEqual(
+    chain.slice(6).map(({ size }) => size[0]),
+    [0, 1, 2, 3, 4].map((i) => width >> i),
+  );
 });
 
 test('the depth copy of a 4x scene takes a masked draw per sample at the compatibility level, no sample_index', () => {
@@ -154,7 +160,8 @@ test('the depth copy of a 4x scene takes a masked draw per sample at the compati
       return createRenderPipeline.call(h.engine.gpu, descriptor);
     };
     const shader = h.engine.gpu.createShaderModule;
-    h.engine.gpu.createShaderModule = (descriptor) => Object.assign(shader.call(h.engine.gpu, descriptor), { code: descriptor.code });
+    h.engine.gpu.createShaderModule = (descriptor) =>
+      Object.assign(shader.call(h.engine.gpu, descriptor), { code: descriptor.code });
     const target = new SceneTarget(
         h.engine.gpu,
         h.engine.gpu.createTexture({ size: [4, 4], format: 'rgba16float', usage: 0 }),
@@ -177,7 +184,10 @@ test('the depth copy of a 4x scene takes a masked draw per sample at the compati
   };
   const level = copies([]),
     full = copies(['core-features-and-limits']);
-  assert.deepEqual(level.pipelines.map(({ multisample }) => multisample.mask), [1, 2, 4, 8]);
+  assert.deepEqual(
+    level.pipelines.map(({ multisample }) => multisample.mask),
+    [1, 2, 4, 8],
+  );
   assert.deepEqual(level.draws, [3, 3, 3, 3]);
   level.pipelines.forEach(({ fragment }, i) => {
     assert.doesNotMatch(fragment.module.code, /sample_index/);
@@ -193,7 +203,8 @@ test('the depth copy of a 4x scene takes a masked draw per sample at the compati
 // kept 57% of its glow (packages/post/test/bloom-energy-browser.mjs measures the energy on a GPU). `fireflies` picks
 // the damping: 'temporal' (default) keeps light its 3 x 3 coarse neighbourhood held the frame before.
 test('Bloom fireflies: validated, the prefilter reads the coarsest level and its firefly settings each frame', () => {
-  for (const fireflies of ['off', 1, 'Temporal']) assert.throws(() => new Bloom({ fireflies }), /Invalid bloom fireflies/);
+  for (const fireflies of ['off', 1, 'Temporal'])
+    assert.throws(() => new Bloom({ fireflies }), /Invalid bloom fireflies/);
   for (const [fireflies, first, later] of [
     [undefined, [1, 3e38], [1, 0]],
     ['temporal', [1, 3e38], [1, 0]],
@@ -217,7 +228,9 @@ test('Bloom fireflies: validated, the prefilter reads the coarsest level and its
     assert.equal(at(5).buffer, uniform);
     assert.equal(at(5).offset, 256);
     // 128 x 96 viewport: six levels; the view it reads is the one the sixth (last) down step writes.
-    const writer = h.groups.findIndex((g) => g !== prefilter[0] && g.entries.some((e) => e.binding === 2 && e.resource === at(3)));
+    const writer = h.groups.findIndex(
+      (g) => g !== prefilter[0] && g.entries.some((e) => e.binding === 2 && e.resource === at(3)),
+    );
     assert.equal(writer - h.groups.indexOf(prefilter[0]), 5);
     effect.dispose();
   }

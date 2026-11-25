@@ -15,7 +15,10 @@ const draco = () => ({
   meshes: [
     {
       primitives: [
-        { attributes: { POSITION: 0 }, extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } } },
+        {
+          attributes: { POSITION: 0 },
+          extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } },
+        },
       ],
     },
   ],

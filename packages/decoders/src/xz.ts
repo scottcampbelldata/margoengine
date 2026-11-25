@@ -354,7 +354,8 @@ export function decodeLzma(input: Uint8Array, options: XzOptions = {}): Uint8Arr
     known ||= input[i] !== 0xff;
     size = size * 256 + input[i];
   }
-  if (known && size > maxBytes) throw decodeFailed(`LZMA output is over maxBytes (${maxBytes}); raise it to read this file`);
+  if (known && size > maxBytes)
+    throw decodeFailed(`LZMA output is over maxBytes (${maxBytes}); raise it to read this file`);
   const out = new Output(known ? Math.max(size, 1) : Math.max(1024, input.length * 4), maxBytes),
     rc = new Range(input);
   rc.start(13, input.length);
@@ -427,7 +428,10 @@ function sha256Matches(data: Uint8Array, from: number, to: number, input: Uint8A
         const x = w[i - 15],
           y = w[i - 2];
         w[i] =
-          (rotate(x, 7) ^ rotate(x, 18) ^ (x >>> 3)) + w[i - 16] + w[i - 7] + (rotate(y, 17) ^ rotate(y, 19) ^ (y >>> 10));
+          (rotate(x, 7) ^ rotate(x, 18) ^ (x >>> 3)) +
+          w[i - 16] +
+          w[i - 7] +
+          (rotate(y, 17) ^ rotate(y, 19) ^ (y >>> 10));
       }
       let [a, b, c, d, e, f, g, h] = hash;
       for (let i = 0; i < 64; i++) {
@@ -454,7 +458,8 @@ function sha256Matches(data: Uint8Array, from: number, to: number, input: Uint8A
   return true;
 }
 
-const u32 = (d: Uint8Array, at: number): number => (d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (d[at + 3] << 24)) >>> 0;
+const u32 = (d: Uint8Array, at: number): number =>
+  (d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (d[at + 3] << 24)) >>> 0;
 const CHECK_SIZES = [0, 4, 4, 4, 8, 8, 8, 16, 16, 16, 32, 32, 32, 64, 64, 64];
 const MAGIC = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0];
 

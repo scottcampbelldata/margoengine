@@ -34,7 +34,8 @@ export interface GlobeOptions {
 }
 type Point = { x: number; y: number; tilt: boolean };
 const finite = (v: readonly number[]): V3 => {
-  if (v.length !== 3 || !v.every(Number.isFinite)) throw rangeError('Globe coordinates need three finite numbers', 'controls-arguments');
+  if (v.length !== 3 || !v.every(Number.isFinite))
+    throw rangeError('Globe coordinates need three finite numbers', 'controls-arguments');
   return [...v] as V3;
 };
 
@@ -126,12 +127,14 @@ export class GlobeControls extends Controls {
   /** Outward geodetic unit normal of a world surface point. */
   normal(point: readonly [number, number, number]): V3 {
     const p = sub(finite(point), this.centre);
-    if (!Math.hypot(...p)) throw rangeError('A surface normal needs a point different from the ellipsoid centre', 'controls-arguments');
+    if (!Math.hypot(...p))
+      throw rangeError('A surface normal needs a point different from the ellipsoid centre', 'controls-arguments');
     return normalize(p.map((v, i) => v / this.radii[i] ** 2));
   }
   /** Nearest forward ellipsoid hit at element CSS pixels; null on sky. */
   pick(x: number, y: number): V3 | null {
-    if (![x, y].every(Number.isFinite)) throw rangeError('Globe pick needs finite CSS coordinates', 'controls-arguments');
+    if (![x, y].every(Number.isFinite))
+      throw rangeError('Globe pick needs finite CSS coordinates', 'controls-arguments');
     const e = this.element;
     if (!e || !(e.clientWidth > 0 && e.clientHeight > 0)) return null;
     const r = ray(rollFrame(this.camera), x, y, e.clientWidth, e.clientHeight);
@@ -197,7 +200,8 @@ export class GlobeControls extends Controls {
   tilt(point: readonly [number, number, number], yaw: number, pitch: number): void {
     this.alive();
     const anchor = finite(point);
-    if (![yaw, pitch].every(Number.isFinite)) throw rangeError('Globe tilt needs finite angular deltas', 'controls-arguments');
+    if (![yaw, pitch].every(Number.isFinite))
+      throw rangeError('Globe tilt needs finite angular deltas', 'controls-arguments');
     const normal = this.normal(anchor),
       eye = sub(this.camera.position, anchor);
     if (!(Math.hypot(...eye) > 0)) return;

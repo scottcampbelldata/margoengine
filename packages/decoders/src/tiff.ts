@@ -105,7 +105,16 @@ export function openTIFF(bytes: Uint8Array, options: TIFFOptions = {}): TIFFFile
       signal?.throwIfAborted();
       if (!Number.isInteger(index) || index < 0 || index >= directories.length)
         throw corrupt('page index is out of range');
-      return rawTIFF(bytes, little, directories[index], descriptions[index], asciiTags[index], maxPixels, codecs, signal);
+      return rawTIFF(
+        bytes,
+        little,
+        directories[index],
+        descriptions[index],
+        asciiTags[index],
+        maxPixels,
+        codecs,
+        signal,
+      );
     },
   };
 }

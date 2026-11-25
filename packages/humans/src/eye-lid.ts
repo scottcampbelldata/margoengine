@@ -30,7 +30,11 @@ export interface EyeLidMargin {
 }
 
 const sub = (a: readonly number[], b: readonly number[]) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: readonly number[], b: readonly number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const cross = (a: readonly number[], b: readonly number[]) => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const unit = (a: readonly number[]) => {
   const l = Math.hypot(a[0], a[1], a[2]);
@@ -53,7 +57,12 @@ export function eyeLidMargin(
     axis = unit(ball.axis),
     lifted = ball.up ?? [0, 1, 0];
   if (!axis || !(radius > 0) || center.length < 3) return undefined;
-  const up = unit(sub(lifted, axis.map((c) => c * dot(lifted, axis))));
+  const up = unit(
+    sub(
+      lifted,
+      axis.map((c) => c * dot(lifted, axis)),
+    ),
+  );
   if (!up) return undefined;
   const right = cross(up, axis);
   // The skin within three radii of the ball.

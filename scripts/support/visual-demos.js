@@ -64,7 +64,7 @@ export const demos = [
     ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
   },
   // Multi-view demos (docs/multi-view-roadmap.md M7): several views of one engine in one canvas.
-  ...['split-screen', 'minimap'].map((id) => ({
+  ...['split-screen', 'minimap', 'hud-preview'].map((id) => ({
     id,
     path: `demos/${id}.html`,
     ready: "document.querySelector('#viewport')?.dataset.ready==='true'",

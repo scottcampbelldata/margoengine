@@ -77,7 +77,12 @@ function reference(rgba, width, height, keep) {
       for (let k = 0; k < 3; k++) bytes[i * 4 + k] = encode(c[i * 3 + k]);
       bytes[i * 4 + 3] = code(a[i], scale);
     }
-    levels.push({ width: nw, height: nh, bytes, passing: passing(Array.from({ length: nw * nh }, (_, i) => bytes[i * 4 + 3])) });
+    levels.push({
+      width: nw,
+      height: nh,
+      bytes,
+      passing: passing(Array.from({ length: nw * nh }, (_, i) => bytes[i * 4 + 3])),
+    });
     w = nw;
     h = nh;
     alpha = a;
@@ -89,7 +94,7 @@ function reference(rgba, width, height, keep) {
 /** Deterministic test pixels: a sparse binary cut-out (green leaves on magenta holes) or random fractional alpha. */
 function pixels(width, height, kind) {
   let seed = 12345;
-  const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+  const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++)
     if (kind === 'cutout') data.set(random() < 0.25 ? [40, 200, 60, 255] : [255, 0, 255, 0], i * 4);
@@ -178,7 +183,11 @@ await runSuite(
             all = new Uint8Array(bytes.reduce((n, b) => n + b.length, 0));
           let at = 0;
           c.doc.buffers = [{ byteLength: all.length }];
-          c.doc.bufferViews = bytes.map((b) => ({ buffer: 0, byteOffset: (at += b.length) - b.length, byteLength: b.length }));
+          c.doc.bufferViews = bytes.map((b) => ({
+            buffer: 0,
+            byteOffset: (at += b.length) - b.length,
+            byteLength: b.length,
+          }));
           bytes.forEach((b, i) => all.set(b, c.doc.bufferViews[i].byteOffset));
           const model = await light.parseGLTFAsync(instance, c.doc, [all], { extensions: [textured] });
           instance.render?.();
@@ -189,11 +198,11 @@ await runSuite(
           continue;
         }
         const image = c.bitmap
-            ? await createImageBitmap(new ImageData(data, c.width, c.height), {
-                premultiplyAlpha: 'none',
-                colorSpaceConversion: 'none',
-              })
-            : { width: c.width, height: c.height, data: new Uint8Array(c.data) };
+          ? await createImageBitmap(new ImageData(data, c.width, c.height), {
+              premultiplyAlpha: 'none',
+              colorSpaceConversion: 'none',
+            })
+          : { width: c.width, height: c.height, data: new Uint8Array(c.data) };
         const model = parseGLTF(
             instance,
             c.doc,

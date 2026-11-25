@@ -66,14 +66,57 @@ const boneName = (naming, bone) => (naming === 'mixamo' ? `mixamorig:${MIXAMO[bo
 
 /** Apple's 52 ARFaceAnchor.BlendShapeLocation names, as face trackers report them. */
 export const ARKIT_SHAPES = [
-  'browDownLeft', 'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft',
-  'cheekSquintRight', 'eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookDownLeft', 'eyeLookDownRight', 'eyeLookInLeft',
-  'eyeLookInRight', 'eyeLookOutLeft', 'eyeLookOutRight', 'eyeLookUpLeft', 'eyeLookUpRight', 'eyeSquintLeft',
-  'eyeSquintRight', 'eyeWideLeft', 'eyeWideRight', 'jawForward', 'jawLeft', 'jawOpen', 'jawRight', 'mouthClose',
-  'mouthDimpleLeft', 'mouthDimpleRight', 'mouthFrownLeft', 'mouthFrownRight', 'mouthFunnel', 'mouthLeft',
-  'mouthLowerDownLeft', 'mouthLowerDownRight', 'mouthPressLeft', 'mouthPressRight', 'mouthPucker', 'mouthRight',
-  'mouthRollLower', 'mouthRollUpper', 'mouthShrugLower', 'mouthShrugUpper', 'mouthSmileLeft', 'mouthSmileRight',
-  'mouthStretchLeft', 'mouthStretchRight', 'mouthUpperUpLeft', 'mouthUpperUpRight', 'noseSneerLeft', 'noseSneerRight',
+  'browDownLeft',
+  'browDownRight',
+  'browInnerUp',
+  'browOuterUpLeft',
+  'browOuterUpRight',
+  'cheekPuff',
+  'cheekSquintLeft',
+  'cheekSquintRight',
+  'eyeBlinkLeft',
+  'eyeBlinkRight',
+  'eyeLookDownLeft',
+  'eyeLookDownRight',
+  'eyeLookInLeft',
+  'eyeLookInRight',
+  'eyeLookOutLeft',
+  'eyeLookOutRight',
+  'eyeLookUpLeft',
+  'eyeLookUpRight',
+  'eyeSquintLeft',
+  'eyeSquintRight',
+  'eyeWideLeft',
+  'eyeWideRight',
+  'jawForward',
+  'jawLeft',
+  'jawOpen',
+  'jawRight',
+  'mouthClose',
+  'mouthDimpleLeft',
+  'mouthDimpleRight',
+  'mouthFrownLeft',
+  'mouthFrownRight',
+  'mouthFunnel',
+  'mouthLeft',
+  'mouthLowerDownLeft',
+  'mouthLowerDownRight',
+  'mouthPressLeft',
+  'mouthPressRight',
+  'mouthPucker',
+  'mouthRight',
+  'mouthRollLower',
+  'mouthRollUpper',
+  'mouthShrugLower',
+  'mouthShrugUpper',
+  'mouthSmileLeft',
+  'mouthSmileRight',
+  'mouthStretchLeft',
+  'mouthStretchRight',
+  'mouthUpperUpLeft',
+  'mouthUpperUpRight',
+  'noseSneerLeft',
+  'noseSneerRight',
   'tongueOut',
 ];
 /** Face shapes under another tool's names, for `addFace`'s `map`, on the VRM avatar. */
@@ -125,7 +168,11 @@ export function humanoidGLB({ naming = 'mixamo', shapes = ARKIT_SHAPES } = {}) {
       parent ? boneName(naming, parent) : naming === 'godot' ? 'Root' : null,
       at,
     ]),
-    ...EXTRA.map(([name, parent, at]) => [name, BODY.some(([b]) => b === parent) ? boneName(naming, parent) : parent, at]),
+    ...EXTRA.map(([name, parent, at]) => [
+      name,
+      BODY.some(([b]) => b === parent) ? boneName(naming, parent) : parent,
+      at,
+    ]),
   ];
   const index = new Map(bones.map(([name], i) => [name, i])),
     world = bones.map(([, , at]) => at);
@@ -168,7 +215,15 @@ export function humanoidGLB({ naming = 'mixamo', shapes = ARKIT_SHAPES } = {}) {
   // Face: a head box skinned to the head, one morph target per shape, each moving its own corner.
   const face = { positions: [], normals: [], indices: [], joints: [] };
   const head = index.get(name('head'));
-  add(face, box(world[head], world[head].map((v, a) => v + (a === 1 ? 0.2 : 0)), 0.1), head);
+  add(
+    face,
+    box(
+      world[head],
+      world[head].map((v, a) => v + (a === 1 ? 0.2 : 0)),
+      0.1,
+    ),
+    head,
+  );
   const faceTargets = shapes.map((shape, s) => {
     const delta = new Array(face.positions.length).fill(0),
       v = s % (face.positions.length / 3);
@@ -240,7 +295,12 @@ export function humanoidGLB({ naming = 'mixamo', shapes = ARKIT_SHAPES } = {}) {
     inverse.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -p[0], -p[1], -p[2], 1], j * 16);
   });
   const skins = [
-    { name: 'Armature', joints: bones.map((_, i) => i), skeleton: 0, inverseBindMatrices: push(inverse, 'MAT4', FLOAT) },
+    {
+      name: 'Armature',
+      joints: bones.map((_, i) => i),
+      skeleton: 0,
+      inverseBindMatrices: push(inverse, 'MAT4', FLOAT),
+    },
   ];
   const bodyNode = nodes.push({ name: 'Body', mesh: 0, skin: 0 }) - 1,
     faceNode = nodes.push({ name: 'Face', mesh: 1, skin: 0 }) - 1;
@@ -334,7 +394,9 @@ export async function writeReadmeRigs(folder) {
   const mixamo = write('humanoid-mixamo.glb', humanoidGLB({ naming: 'mixamo' })),
     godot = write('humanoid-godot.glb', humanoidGLB({ naming: 'godot' }));
   const avatarGLB = humanoidGLB({ naming: 'mixamo', shapes: AVATAR_SHAPES }),
-    json = JSON.parse(new TextDecoder().decode(avatarGLB.subarray(20, 20 + new DataView(avatarGLB.buffer).getUint32(12, true)))),
+    json = JSON.parse(
+      new TextDecoder().decode(avatarGLB.subarray(20, 20 + new DataView(avatarGLB.buffer).getUint32(12, true))),
+    ),
     names = json.nodes.map((n) => n.name),
     face = names.indexOf('Face'),
     bind = (shape) => ({ morphTargetBinds: [{ node: face, index: AVATAR_SHAPES.indexOf(shape), weight: 1 }] }),

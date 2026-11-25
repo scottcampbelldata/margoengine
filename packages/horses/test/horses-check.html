@@ -4,9 +4,11 @@
 // a key light with shadows; returns the frame as PNG bytes, the pose after chunked play and after a seek to the same
 // film time, and the saddle path a rider seat follows. window.check.herd(): 60 horses of addHorseCrowd driven by a
 // @margoengine/navmesh/formations cavalry wedge and line on the march, as PNG bytes.
-import {Engine} from '/packages/core/dist/index.js';
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {addHorse} from '/packages/horses/dist/index.js';
+import {horseDocument,horseJointTranslation,poseHooves,poseJoints} from '/packages/horses/dist/model.js';
+import {parseGLTFAsync} from '/packages/gltf/dist/pbr.js';
 import {addHorseCrowd} from '/packages/horses/dist/crowd.js';
 import {mountRider} from '/packages/horses/dist/seat.js';
 import {Army} from '/packages/navmesh/dist/formations.js';
@@ -35,11 +37,142 @@ window.check={
     const bytes=await png();
     horse.seek(1.1);horse.seek(2.5);
     const sought={d:horse.distance,t:horse.time,cs:horse.currentSpeed,pose:JSON.stringify(horse.pose),frame:JSON.stringify(horse.frame()),hip:mount.hip};
-    const ys=saddle.slice(-30),rise=Math.max(...ys)-Math.min(...ys);
+    // Measure the steady trot across its stride, independent of the phase chosen at the walk-to-trot transition.
+    const ys=saddle.slice(-180),rise=Math.max(...ys)-Math.min(...ys);
     mount.dispose();horse.dispose();
     const after=engine.plugins.has(horse.animation.name);
     engine.dispose();
     return {bytes,errors,played,sought,rise,after,clips:horse.clips.map(c=>c.name)};
+  },
+  async motion(){
+    const {engine,errors}=await make({position:[4.2,1.65,2.6],target:[0,1.0,0]});
+    const horse=await addHorse(engine,{type:'riding',coat:'chestnut',markings:{blaze:true}});
+    const samples=[], gaits=new Set();
+    const k=horse.skeleton.index('tailHair5');
+    const limbs=horse.skeleton.legs.flat();
+    const at=()=>poseJoints(horse.skeleton,horse.pose);
+    let last=at(), maxRestartStep=0, maxGallopStep=0, tailSweep=0, stopSpeed, largestRestart;
+    const shots={};
+    const frames=new Map([[34,'tail-flick'],[225,'trot'],[852,'gallop'],[1416,'restart']]);
+    for(let i=0;i<1490;i++){
+      if(i===0) horse.flickTail(1,'right');
+      if(i===76) horse.speed=4;
+      if(i===110) horse.gait='canter'; // Interrupt the walk-to-trot blend.
+      if(i===119) horse.gait='auto';
+      if(i===260) horse.speed=0;
+      if(i===476) horse.speed=12;
+      if(i===877) horse.speed=0;
+      if(i===1360){stopSpeed=horse.currentSpeed;horse.gait='trot';horse.speed=4;}
+      horse.advanceTime(1/120);
+      const joints=at();
+      for(const id of limbs) {
+        const step=Math.hypot(...joints[id].map((v,c)=>v-last[id][c]));
+        if((i<225||i>=1360)&&step>maxRestartStep){
+          maxRestartStep=step;largestRestart={i,id,speed:horse.currentSpeed,gait:horse.currentGait};
+        }
+        else if(horse.currentGait==='gallop')maxGallopStep=Math.max(maxGallopStep,step);
+      }
+      if(i<76)tailSweep=Math.max(tailSweep,Math.abs(joints[k][0]));
+      last=joints;
+      gaits.add(horse.currentGait);
+      if(frames.has(i)){
+        const pos=horse.frame().position;
+        engine.camera.position=[4.2,1.72,pos[2]+2.05];engine.camera.target=[0,0.95,pos[2]];
+        await settle(engine);
+        shots[frames.get(i)]=await png();
+        samples.push({time:horse.time,pose:JSON.stringify(horse.pose)});
+      }
+    }
+    horse.seek(samples[0].time);
+    const replayTail=JSON.stringify(horse.pose);
+    horse.seek(samples[2].time);
+    const replayGallop=JSON.stringify(horse.pose);
+    horse.dispose();engine.dispose();
+    return {gaits:[...gaits],maxRestartStep,maxGallopStep,stopSpeed,largestRestart,tailSweep,samples,replayGallop,replayTail,shots,errors};
+  },
+  async authored(){
+    const {engine,errors}=await make({position:[4.2,1.6,3.2],target:[0,1.0,0]});
+    const {doc,buffers,skeleton:nominal,clips}=horseDocument({detail:0});
+    const model=await parseGLTFAsync(engine,doc,buffers);
+    // A taller shoulder relative to the fore limb's length leaves less room to advance the hoof.
+    const foreJoints=new Set(nominal.legs.filter((_,i)=>i%2===1).flatMap(leg=>leg.slice(0,5)));
+    const skeleton={...nominal,joints:nominal.joints.map((joint,i)=>{
+      const [x,y,z]=joint.rest;
+      return foreJoints.has(i)?{...joint,rest:[x,y+.18*(y-.06),z*.38+.62*nominal.ground[1][2]]}:joint;
+    })};
+    let last;
+    const horse=await addHorse(engine,{skin:{model,skeleton,applyPose(pose){
+      last=pose;
+      pose.rotations.forEach((q,i)=>{
+        model.nodes[i].setQuaternion(q);
+        model.nodes[i].setPosition(horseJointTranslation(skeleton,pose,i));
+      });
+    }}});
+    horse.speed=3.8;
+    let lowest=Infinity;
+    const unregister=horse.onStep((_dt,current)=>{
+      if(current.currentSpeed<1) lowest=Math.min(lowest,...poseHooves(skeleton,current.pose).map(hoof=>hoof[1]));
+    });
+    horse.seek(1.7);
+    unregister();
+    await settle(engine);
+    const adopted=horse.model===model && last===horse.pose && !horse.animation.playing;
+    const fitted=horse.clips[2].strideLength/clips[2].strideLength;
+    const still=engine.sceneOf(model);
+    horse.dispose();
+    const callerOwns=engine.sceneOf(model)===still && !!still && !engine.plugins.has(horse.animation.name);
+    model.dispose();engine.dispose();
+    return {adopted,callerOwns,errors,fitted,lowest};
+  },
+  async terrain(){
+    const {engine,errors}=await make({position:[3.8,2.1,6.6],target:[0.4,.65,3.7]});
+    const ground=(x,z)=>.063*Math.sin(2.8*z)-.12*x+.028*Math.cos(1.8*x+z);
+    const n=96,positions=[],normals=[],indices=[];
+    for(let j=0;j<=n;j++) for(let i=0;i<=n;i++){
+      const x=(i/n-.5)*8,z=j/n*12-3;
+      positions.push(x,ground(x,z),z);
+      normals.push(-(ground(x+.005,z)-ground(x-.005,z))/.01,1,-(ground(x,z+.005)-ground(x,z-.005))/.01);
+      if(i<n&&j<n){const v=j*(n+1)+i;indices.push(v,v+n+1,v+1,v+1,v+n+1,v+n+2);}
+    }
+    engine.createMesh().setGeometry(new Geometry(positions,normals,indices)).setMaterial(new PbrMaterial({color:'#5c6655',roughness:.91}));
+    const horse=await addHorse(engine,{ground,type:'riding',speeds:{walk:1.52}});
+    const worldFeet=()=>{
+      const f=horse.frame(),[rx,ry,rz]=f.position,c=Math.cos(f.heading),s=Math.sin(f.heading);
+      return poseHooves(horse.skeleton,horse.pose).map(([x,y,z])=>[rx+c*x+s*z,ry+y,rz-s*x+c*z]);
+    };
+    const gap=([x,y,z])=>y-ground(x,z);
+    const standGap=Math.max(...worldFeet().map(point=>Math.abs(gap(point))));
+    horse.gait='walk';
+    horse.speed=1.52;
+    let min=0, stable=0, prior;
+    for(let i=0;i<960;i++){
+      if(i>=240) horse.heading=(i-240)/240*.18;
+      horse.advanceTime(1/240);
+      const points=worldFeet();
+      min=Math.min(min,...points.map(gap));
+      if(i>240&&prior) points.forEach((p,k)=>{
+        const old=prior[k];
+        if(Math.abs(gap(p))<.001 && Math.abs(gap(old))<.001 && Math.hypot(p[0]-old[0],p[2]-old[2])<.0002) stable++;
+      });
+      prior=points;
+    }
+    const played=JSON.stringify([horse.pose,horse.frame()]);
+    horse.seek(4);
+    const replay=JSON.stringify([horse.pose,horse.frame()]);
+    await settle(engine);
+    const bytes=await png();
+    horse.speed=0;
+    let worstStep=0;
+    prior=worldFeet();
+    for(let i=0;i<260;i++){
+      if(i===140) horse.speed=1.52;
+      horse.advanceTime(1/120);
+      const points=worldFeet();
+      points.forEach((p,k)=>{const a=prior[k];worstStep=Math.max(worstStep,Math.hypot(p[0]-a[0],p[1]-a[1],p[2]-a[2]));});
+      prior=points;
+    }
+    horse.dispose();engine.dispose();
+    return {errors,standGap,min,stable,replay,played,bytes,worstStep};
   },
   async herd(){
     const {engine,errors}=await make({position:[0,22,-48],target:[0,0,4]});

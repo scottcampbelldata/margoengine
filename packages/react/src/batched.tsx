@@ -7,6 +7,7 @@ import { composeMatrix } from '@margoengine/math/mat4';
 import { eulerToQuaternion } from '@margoengine/math/quat';
 import { useBakedShadows } from './bake-shadows.js';
 import { useCommit, useCreated, useScene } from './internal.js';
+import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
 
@@ -47,12 +48,14 @@ export const BatchedMesh = /* @__PURE__ */ forwardRef<Batch, BatchedMeshProps>(f
           optionalPeer('@margoengine/materials', () => import('@margoengine/materials')),
         ]),
       create: ([api, materials]) =>
-        api.BatchedMesh.attach(scene.engine as unknown as EngineKernel, material ?? new materials.Material(), {
-          maxItems,
-          maxVertices,
-          maxIndices,
-          renderOrder,
-        }),
+        inScene(scene, () =>
+          api.BatchedMesh.attach(scene.engine as unknown as EngineKernel, material ?? new materials.Material(), {
+            maxItems,
+            maxVertices,
+            maxIndices,
+            renderOrder,
+          }),
+        ),
       dispose: (value) => value.dispose(),
       ref,
       onError,
@@ -94,7 +97,8 @@ export function BatchedItem({
   visible = true,
 }: BatchedItemProps): null {
   const batch = useContext(BatchContext);
-  if (!batch) throw fault('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>', 'react-usage');
+  if (!batch)
+    throw fault('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>', 'react-usage');
   const id = useRef<number | null>(null),
     transform = (): ArrayLike<number> =>
       matrix ?? composeMatrix(position, eulerToQuaternion(rotation[0], rotation[1], rotation[2]), scale, scratch);

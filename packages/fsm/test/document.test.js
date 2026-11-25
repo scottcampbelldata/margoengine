@@ -151,7 +151,12 @@ test('a good document has no issues, with bindings names are checked, and anythi
   assert.deepEqual(validateMachine(document()), []);
   assert.deepEqual(validateMachine(document(), bindings()), []);
   const paths = validateMachine(document(), {}).map(({ path }) => path);
-  assert.deepEqual(paths.sort(), ['states.pause.exit', 'states.play.enter', 'states.run.update', 'transitions[0].guard']);
+  assert.deepEqual(paths.sort(), [
+    'states.pause.exit',
+    'states.play.enter',
+    'states.run.update',
+    'transitions[0].guard',
+  ]);
   for (const value of [null, 1, 'text', [], {}, { version: 2, states: {}, initial: 'a' }])
     assert.ok(validateMachine(value).length > 0);
   assert.equal(validateMachine({ version: 1, states: {}, initial: 'a' })[0].path, 'states');
@@ -163,10 +168,12 @@ test('names from Object.prototype and __proto__ are plain names, never inherited
     '{"version":1,"initial":"__proto__","states":{"__proto__":{},"constructor":{"enter":"toString"}},' +
     '"transitions":[{"from":"__proto__","to":"constructor","event":"go","guard":"valueOf"}]}';
   const value = JSON.parse(text);
-  assert.deepEqual(validateMachine(value, {}).map(({ path }) => path).sort(), [
-    'states.constructor.enter',
-    'transitions[0].guard',
-  ]);
+  assert.deepEqual(
+    validateMachine(value, {})
+      .map(({ path }) => path)
+      .sort(),
+    ['states.constructor.enter', 'transitions[0].guard'],
+  );
   const plain = JSON.parse(text.replace(',"guard":"valueOf"', '').replace('{"enter":"toString"}', '{}'));
   const machine = loadMachine(plain, {});
   assert.equal(machine.state, '__proto__');

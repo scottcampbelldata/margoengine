@@ -262,26 +262,47 @@ test('SOG v3 consumes the high byte of 24-bit palette labels', async () => {
   assert.ok(data.sphericalHarmonics[9] > 0, 'palette entry 65536, not entry 0');
 });
 test('streamed mixed-degree chunks promote neutral bands and preserve v3 opacity, including the environment', async () => {
-  const full=v3(), plain={...full}, meta=JSON.parse(new TextDecoder().decode(full['meta.json']));
-  delete meta.shN; plain['meta.json']=json(meta);
-  const manifest={version:1,lodLevels:1,filenames:['fine/meta.json'],environment:'env/meta.json',tree:{bound:bounds,lods:{0:{file:0,offset:0,count:1}}}},
-    source=await loadStreamedSog('https://local/lod-meta.json',{fetch:async url=>{
-      const path=new URL(url).pathname;
-      return new Response(path==='/lod-meta.json'?json(manifest):(path.startsWith('/env/')?plain:full)[path.split('/').at(-1)]);
-    }});
-  assert.equal(source.coefficients,25);
-  const environment=await source.load(1,signal),fine=await source.load(2,signal);
-  assert.equal(environment.colors[3],1.5625);assert.equal(fine.colors[3],1.5625);
-  assert.equal(environment.sphericalHarmonics.length,75);
-  assert.ok(environment.sphericalHarmonics.slice(3).every(x=>x===0));
-  assert.ok(fine.sphericalHarmonics[72]>0);
+  const full = v3(),
+    plain = { ...full },
+    meta = JSON.parse(new TextDecoder().decode(full['meta.json']));
+  delete meta.shN;
+  plain['meta.json'] = json(meta);
+  const manifest = {
+      version: 1,
+      lodLevels: 1,
+      filenames: ['fine/meta.json'],
+      environment: 'env/meta.json',
+      tree: { bound: bounds, lods: { 0: { file: 0, offset: 0, count: 1 } } },
+    },
+    source = await loadStreamedSog('https://local/lod-meta.json', {
+      fetch: async (url) => {
+        const path = new URL(url).pathname;
+        return new Response(
+          path === '/lod-meta.json'
+            ? json(manifest)
+            : (path.startsWith('/env/') ? plain : full)[path.split('/').at(-1)],
+        );
+      },
+    });
+  assert.equal(source.coefficients, 25);
+  const environment = await source.load(1, signal),
+    fine = await source.load(2, signal);
+  assert.equal(environment.colors[3], 1.5625);
+  assert.equal(fine.colors[3], 1.5625);
+  assert.equal(environment.sphericalHarmonics.length, 75);
+  assert.ok(environment.sphericalHarmonics.slice(3).every((x) => x === 0));
+  assert.ok(fine.sphericalHarmonics[72] > 0);
   source.dispose();
 });
 test('SOG v3 nonidentity exponential map rotates anisotropic covariance', async () => {
-  const files=v3();files.scales=encodeWebpLossless(new Uint8Array([0,1,2,192]),1,1);
-  const data=await parseSog(files),angle=64/127*Math.PI,c=Math.cos(angle),s=Math.sin(angle);
-  assert.ok(Math.abs(data.covariances[0]-(c*c*0.0001+s*s*0.0004))<1e-9);
-  assert.ok(Math.abs(data.covariances[1]-(c*s*(0.0001-0.0004)))<1e-9);
+  const files = v3();
+  files.scales = encodeWebpLossless(new Uint8Array([0, 1, 2, 192]), 1, 1);
+  const data = await parseSog(files),
+    angle = (64 / 127) * Math.PI,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  assert.ok(Math.abs(data.covariances[0] - (c * c * 0.0001 + s * s * 0.0004)) < 1e-9);
+  assert.ok(Math.abs(data.covariances[1] - c * s * (0.0001 - 0.0004)) < 1e-9);
 });
 test('SOG v3 writer round trips degree 4 and extended opacity; older formats reject unrepresentable opacity', async () => {
   const data = await parseSog(v3()),

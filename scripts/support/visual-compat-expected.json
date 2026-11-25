@@ -53,6 +53,10 @@
    "over2": 0.0116,
    "mean": 0.132
   },
+  "hud-preview": {
+   "status": "same",
+   "exact": true
+  },
   "khronos-ABeautifulGame": {
    "status": "same",
    "exact": true

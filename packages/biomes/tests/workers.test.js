@@ -10,6 +10,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
+import { canopyCover } from '../dist/cover.js';
+import { definePlacementGraph } from '../dist/graph.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets } from '../dist/presets.js';
 import { groundMaterials, overviewWeights, VIEW_LAYERS, viewTile } from '../dist/view.js';
@@ -79,6 +81,33 @@ test('worker tiles, placements and view tiles are the main thread bytes', { time
   // A world without carved paths, erosion, a placement graph or a zone classifier loads none of the part files.
   assert.deepEqual(takeLoaded(), [], 'no part script');
   remote.dispose();
+});
+
+test('the worker applies the placement graph to distant canopy on first use', async () => {
+  const fir = defineBiome({
+    id: 'firs',
+    climate: {},
+    ground: [{ material: 'grass' }],
+    plants: [{ id: 'fir', mesh: 'library:fir', canopyKind: 'conifer', density: 200, radius: 3 }],
+  });
+  const [main, remote] = await both({ size: [256, 256], workers: 1, biomes: [fir] });
+  try {
+    takeLoaded();
+    const unmasked = await remote.workers.run({ op: 'cover', step: 16 });
+    assert.ok(unmasked.kinds[1].some((cell) => cell > 0));
+    assert.deepEqual(takeLoaded(), []);
+    const graph = definePlacementGraph({
+      nodes: [{ id: 'suppress', op: 'range', field: 'height', range: [null, -5000] }],
+      outputs: { 'firs/fir': 'suppress' },
+    });
+    const masked = await remote.workers.run({ op: 'cover', step: 16, graph });
+    assert.deepEqual(masked, canopyCover(main, 16, graph));
+    assert.ok(masked.data.every((cell) => cell === 0));
+    assert.deepEqual(takeLoaded(), ['biomes-graph.js']);
+  } finally {
+    main.dispose();
+    remote.dispose();
+  }
 });
 
 test('paint writes, updates and placement changes reach the replicas in order', { timeout: 240000 }, async () => {
@@ -354,8 +383,10 @@ test('the worker and its part files hold one copy of each module, without the di
   // 40,763 B and 108,185 B raw on 2026-11-17 with the mountainValley option (+212 B gzip, +879 B raw): the worker holds only
   // its hook call, the entry's missing-hook error and the relief it returns; the valley itself is the biomes-valley.js
   // part (3,947 B gzip), loaded only for a relief that asks for it.
-  assert.ok(gzip <= 40_900, `worker ${gzip} B gzip`);
-  assert.ok(core.length <= 108_400, `worker ${core.length} B raw`);
+  // 40,935 B and 108,708 B raw with region curvature and the far canopy task's graph hook.
+  // The evaluator stays in the existing lazy graph part and the task shares the worker's region sampler.
+  assert.ok(gzip <= 41_050, `worker ${gzip} B gzip`);
+  assert.ok(core.length <= 108_900, `worker ${core.length} B raw`);
 });
 
 test('a worker asked for a part whose URL the page did not send rejects the job clearly', async () => {

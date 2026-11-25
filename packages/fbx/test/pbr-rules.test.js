@@ -28,9 +28,10 @@ function file(properties, objects = [], connections = []) {
     animation: false,
     geometric: [0, 0, 0],
     meshTranslation: [0, 0, 0],
-    extraModel: [`Material: 100, "Material::Surface", "" {\n Properties70: {\n ${properties.join('\n ')}\n }\n}`, ...objects].join(
-      '\n',
-    ),
+    extraModel: [
+      `Material: 100, "Material::Surface", "" {\n Properties70: {\n ${properties.join('\n ')}\n }\n}`,
+      ...objects,
+    ].join('\n'),
     extraConnections: ['C: "OO",100,2', ...connections].join('\n'),
   });
   return new TextEncoder().encode(
@@ -50,7 +51,9 @@ function baseTexel(glb) {
   const { doc, bin } = readGLB(glb),
     info = doc.materials[0].pbrMetallicRoughness.baseColorTexture,
     view = doc.bufferViews[doc.images[doc.textures[info.index].source].bufferView];
-  return [...decodePNG(new Uint8Array(bin.buffer, bin.byteOffset + (view.byteOffset ?? 0), view.byteLength)).data.slice(0, 4)];
+  return [
+    ...decodePNG(new Uint8Array(bin.buffer, bin.byteOffset + (view.byteOffset ?? 0), view.byteLength)).data.slice(0, 4),
+  ];
 }
 /** A layered texture on DiffuseColor over the given layers (bytes, or undefined for a lost image). */
 async function layered(layers, modes) {
@@ -122,14 +125,22 @@ test('Stingray uv_offset and uv_scale land in the GLB after the V flip: offset v
   const image = await flat(10, 20, 30),
     glb = await convert(
       file(
-        [P('Maya|base_color', 1, 1, 1), P('Maya|use_color_map', 1), P('Maya|uv_offset', 0.1, 0.2), P('Maya|uv_scale', 2, 3)],
+        [
+          P('Maya|base_color', 1, 1, 1),
+          P('Maya|use_color_map', 1),
+          P('Maya|uv_offset', 0.1, 0.2),
+          P('Maya|uv_scale', 2, 3),
+        ],
         [texture(200, image)],
         ['C: "OP",200,100,"Maya|TEX_color_map"', videoLink(200, image)],
       ),
     ),
     transform = readGLB(glb).doc.materials[0].pbrMetallicRoughness.baseColorTexture.extensions.KHR_texture_transform;
   assert.deepEqual(transform.scale, [2, 3]);
-  assert.ok(Math.abs(transform.offset[0] - 0.1) < 1e-6 && Math.abs(transform.offset[1] - (1 - 3 - 0.2)) < 1e-6, String(transform.offset));
+  assert.ok(
+    Math.abs(transform.offset[0] - 0.1) < 1e-6 && Math.abs(transform.offset[1] - (1 - 3 - 0.2)) < 1e-6,
+    String(transform.offset),
+  );
 });
 
 test('Stingray uv_offset and uv_scale reach every map the shader samples, not only the base colour', async () => {

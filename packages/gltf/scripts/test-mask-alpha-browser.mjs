@@ -89,14 +89,17 @@ await runSuite(
           texture = shadows.depthTexture,
           size = 4 * texture.width,
           row = Math.ceil(size / 256) * 256,
-          read = device.createBuffer({ size: row * texture.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+          read = device.createBuffer({
+            size: row * texture.height,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+          });
         if (texture.format !== 'depth32float') throw new Error('shadow map format ' + texture.format);
         const encoder = device.createCommandEncoder();
-        encoder.copyTextureToBuffer(
-          { texture, aspect: 'depth-only' },
-          { buffer: read, bytesPerRow: row },
-          [texture.width, texture.height, 1],
-        );
+        encoder.copyTextureToBuffer({ texture, aspect: 'depth-only' }, { buffer: read, bytesPerRow: row }, [
+          texture.width,
+          texture.height,
+          1,
+        ]);
         device.queue.submit([encoder.finish()]);
         await read.mapAsync(GPUMapMode.READ);
         const all = new Float32Array(read.getMappedRange().slice(0)),

@@ -45,7 +45,10 @@ await postBrowser(
     const built = async (names) => {
       await page.evaluate((names) => {
         const t = window.t;
-        t.built = t.PostStack.attach(t.engine, names.map((name) => t.make[name]()));
+        t.built = t.PostStack.attach(
+          t.engine,
+          names.map((name) => t.make[name]()),
+        );
       }, names);
       await frame();
       await frame();
@@ -102,7 +105,12 @@ await postBrowser(
     for (let i = 0; i < steps.length; i++) {
       const [step, names] = steps[i],
         image = images[i];
-      results.push({ step, names, worst: differ(image, await built(names)), lit: image.data.some((v, j) => j % 4 === 0 && v > 200) });
+      results.push({
+        step,
+        names,
+        worst: differ(image, await built(names)),
+        lit: image.data.some((v, j) => j % 4 === 0 && v > 200),
+      });
     }
     await page.evaluate(() => window.t.engine.dispose());
     console.log(JSON.stringify({ results, restore: differ(before, after) }));

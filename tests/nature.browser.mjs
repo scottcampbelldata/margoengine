@@ -135,11 +135,14 @@ try {
         new Float32Array([1, 0.35, 1, 0]),
         256,
       );
+      // The fragment entry's parameter is i, or varyings once positiveColor clamps the colour (scatter instances.ts).
+      const fragmentEntry =
+        /@fragment fn fragment\((\w+):Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f/;
+      // This runs in the page, where node:assert is not available.
+      if (!fragmentEntry.test(instanceShader))
+        throw new Error('the instance shader lacks the fragment entry the AO probe calls as lighting()');
       const instanceLighting = instanceShader
-        .replace(
-          '@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f',
-          'fn lighting(i:Output,front:bool)->vec4f',
-        )
+        .replace(fragmentEntry, 'fn lighting($1:Output,front:bool)->vec4f')
         .replace('discard;', 'return vec4f(0);');
       const aoCode =
         instanceLighting +

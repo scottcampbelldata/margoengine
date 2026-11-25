@@ -336,7 +336,9 @@ test('simplifyAttributes keeps vertices apart that deform apart, as a closed mou
 
 /** Fox.glb, a real skinned file, as a model of `engine`. */
 const realFox = (engine, edit = () => {}, partVertices) => {
-  const chunks = glbChunks(new Uint8Array(readFileSync(new URL('../../../examples/assets/khronos/Fox/Fox.glb', import.meta.url)))),
+  const chunks = glbChunks(
+      new Uint8Array(readFileSync(new URL('../../../examples/assets/khronos/Fox/Fox.glb', import.meta.url))),
+    ),
     doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
     bin = chunks.find((c) => c.type === GLB_BIN).data;
   doc.images = undefined;
@@ -384,7 +386,12 @@ test('a flat-shaded mesh simplifies, a box stays a box, and each kept triangle t
         w = p[2].map((v, k) => v - p[0][k]),
         m = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
         size = Math.hypot(...m);
-      for (const [x, y] of [a, b, c]) corner(x, y, m.map((v) => v / size));
+      for (const [x, y] of [a, b, c])
+        corner(
+          x,
+          y,
+          m.map((v) => v / size),
+        );
     };
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
@@ -398,7 +405,9 @@ test('a flat-shaded mesh simplifies, a box stays a box, and each kept triangle t
     );
   assert.ok(level.indices.length / 3 < (count / 3) * 0.3, `flat shading simplifies: ${level.indices.length / 3}`);
   for (let t = 0; t < level.indices.length; t += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => level.vertices.subarray(level.indices[t + k] * 20, level.indices[t + k] * 20 + 3)),
+    const [a, b, c] = [0, 1, 2].map((k) =>
+        level.vertices.subarray(level.indices[t + k] * 20, level.indices[t + k] * 20 + 3),
+      ),
       u = b.map((v, k) => v - a[k]),
       w = c.map((v, k) => v - a[k]),
       m = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
@@ -407,13 +416,28 @@ test('a flat-shaded mesh simplifies, a box stays a box, and each kept triangle t
     for (let k = 0; k < 3; k++) assert.ok(Math.abs(normal[k] - m[k] / size) < 1e-5, 'the normal of the triangle kept');
   }
   // Twelve loose triangles of a box: too few to lose any.
-  const faces = [[0, 1, 2], [0, 2, 3]],
+  const faces = [
+      [0, 1, 2],
+      [0, 2, 3],
+    ],
     boxVertices = [],
-    sides = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    sides = [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ];
   for (const side of sides) {
     const axis = side.findIndex((v) => v),
       other = [(axis + 1) % 3, (axis + 2) % 3],
-      quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => {
+      quad = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([a, b]) => {
         const p = [...side];
         p[other[0]] = a * side[axis];
         p[other[1]] = b;
@@ -456,7 +480,7 @@ test('a real Fox: each level holds the skin of the vertices it kept, and follows
         assert.deepEqual([...ids.subarray(i * 4, i * 4 + 4)], [...joints.subarray(from * 4, from * 4 + 4)]);
         assert.deepEqual([...amounts.subarray(i * 4, i * 4 + 4)], [...weights.subarray(from * 4, from * 4 + 4)]);
       }
-      assert.equal(primitive.weights, source.weights, 'morph weights are the source\'s own array');
+      assert.equal(primitive.weights, source.weights, "morph weights are the source's own array");
       assert.ok(engine.plugins.has('animation:' + level.name), 'the level plays');
     }
     model.dispose();
@@ -474,7 +498,10 @@ test('a real Fox split into parts: each level vertex holds the skin of the file 
   try {
     const system = LODSystem.attach(engine),
       model = realFox(engine, undefined, 1024);
-    assert.ok(model.primitives.length >= 2 && model.primitives.every((p) => p.part), `${model.primitives.length} parts`);
+    assert.ok(
+      model.primitives.length >= 2 && model.primitives.every((p) => p.part),
+      `${model.primitives.length} parts`,
+    );
     const attributes = model.primitives[0].definition.attributes,
       joints = model.asset.accessor(attributes.JOINTS_0, 'VEC4'),
       weights = model.asset.accessor(attributes.WEIGHTS_0, 'VEC4'),
@@ -492,7 +519,11 @@ test('a real Fox split into parts: each level vertex holds the skin of the file 
     for (let i = 0; i < ids.length / 4; i++) {
       const from = records.get(key(primitive.vertices, i * 20));
       assert.notEqual(from, undefined, 'a vertex of the source');
-      assert.deepEqual([...ids.subarray(i * 4, i * 4 + 4)], [...joints.subarray(from * 4, from * 4 + 4)], `vertex ${i}`);
+      assert.deepEqual(
+        [...ids.subarray(i * 4, i * 4 + 4)],
+        [...joints.subarray(from * 4, from * 4 + 4)],
+        `vertex ${i}`,
+      );
       assert.deepEqual([...amounts.subarray(i * 4, i * 4 + 4)], [...weights.subarray(from * 4, from * 4 + 4)]);
     }
     model.dispose();
@@ -566,7 +597,14 @@ test('autoLOD simplifies a primitive split into parts as one surface, and its le
         materials: [{ name: 'scan' }],
         meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
         accessors: [
-          { bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min: [-1, -1, -1], max: [1, 1, 1] },
+          {
+            bufferView: 0,
+            componentType: 5126,
+            count: positions.length / 3,
+            type: 'VEC3',
+            min: [-1, -1, -1],
+            max: [1, 1, 1],
+          },
           { bufferView: 1, componentType: 5126, count: normals.length / 3, type: 'VEC3' },
           { bufferView: 2, componentType: 5125, count: indices.length, type: 'SCALAR' },
         ],
@@ -583,7 +621,10 @@ test('autoLOD simplifies a primitive split into parts as one surface, and its le
       lod = await autoLOD(system, model, { ratios: [0.5], screens: [0.5] }),
       near = lod.levels[1].object;
     // One surface: about half the triangles of the whole, not half of each part with its cut edges kept.
-    assert.ok(triangles(near) <= triangles(model) * 0.55 && triangles(near) >= triangles(model) * 0.4, `${triangles(near)}`);
+    assert.ok(
+      triangles(near) <= triangles(model) * 0.55 && triangles(near) >= triangles(model) * 0.4,
+      `${triangles(near)}`,
+    );
     assert.ok(near.primitives.length >= 2, 'the level, still over 1,024 vertices, splits too');
     for (const p of near.primitives) {
       assert.ok(p.vertices.length / 20 <= 1024);
@@ -639,7 +680,12 @@ const bakeModel = (engine, material = {}, scale = 1, extra = {}, images = []) =>
     add = (data) => buffers.push(data) - 1,
     views = [],
     accessor = (data, type, componentType = 5126) => {
-      views.push({ bufferView: add(data), componentType, count: data.length / { SCALAR: 1, VEC2: 2, VEC3: 3 }[type], type });
+      views.push({
+        bufferView: add(data),
+        componentType,
+        count: data.length / { SCALAR: 1, VEC2: 2, VEC3: 3 }[type],
+        type,
+      });
       return views.length - 1;
     },
     position = accessor(new Float32Array(positions), 'VEC3');
@@ -676,7 +722,7 @@ const bakeModel = (engine, material = {}, scale = 1, extra = {}, images = []) =>
   return model;
 };
 
-test('bake gives a loaded model\'s levels their own normal map, halved a level, and leaves the source as it was', async () => {
+test("bake gives a loaded model's levels their own normal map, halved a level, and leaves the source as it was", async () => {
   const engine = await headless();
   try {
     const system = LODSystem.attach(engine),
@@ -686,7 +732,10 @@ test('bake gives a loaded model\'s levels their own normal map, halved a level, 
       map = (level) => level.primitives[0].material.maps[2];
     assert.equal(model.primitives[0].material.maps[2], undefined, 'the source draws as it did');
     assert.equal(model.asset.doc.textures, undefined, 'the source document is unchanged');
-    for (const [level, size] of [[near, 64], [far, 32]]) {
+    for (const [level, size] of [
+      [near, 64],
+      [far, 32],
+    ]) {
       const { index } = map(level),
         image = level.image(level.asset.doc.textures[index].source);
       assert.equal(image.width, size);
@@ -719,7 +768,11 @@ test('a real Fox bakes as a rigged model: its levels keep the skin and take the 
       { index } = material.maps[2];
     assert.ok(level.asset.doc.meshes[0].primitives[0].attributes.JOINTS_0 !== undefined, 'the skin stays');
     assert.equal(level.image(level.asset.doc.textures[index].source).width, 64);
-    assert.equal(material.base, model.primitives[0].material.base, 'the base colour is the same array, so an edit reaches it');
+    assert.equal(
+      material.base,
+      model.primitives[0].material.base,
+      'the base colour is the same array, so an edit reaches it',
+    );
     model.dispose();
   } finally {
     engine.dispose();
@@ -730,7 +783,12 @@ test('bake keeps a map the source has of its own, and adds occlusion when asked'
   const engine = await headless();
   try {
     const system = LODSystem.attach(engine),
-      pixel = { width: 1, height: 1, format: 'rgba8unorm', mipmaps: [{ data: new Uint8Array(4), width: 1, height: 1 }] },
+      pixel = {
+        width: 1,
+        height: 1,
+        format: 'rgba8unorm',
+        mipmaps: [{ data: new Uint8Array(4), width: 1, height: 1 }],
+      },
       model = bakeModel(
         engine,
         { normalTexture: { index: 0 } },
@@ -744,7 +802,7 @@ test('bake keeps a map the source has of its own, and adds occlusion when asked'
         bake: { size: 32, maps: ['normal', 'ao'] },
       }),
       { maps } = lod.levels[1].object.primitives[0].material;
-    assert.equal(maps[2].index, 0, 'the source\'s own normal map stays');
+    assert.equal(maps[2].index, 0, "the source's own normal map stays");
     assert.ok(maps[3].index >= 1, 'occlusion is baked');
     model.dispose();
   } finally {
@@ -877,7 +935,10 @@ test('update rebuilds a far mesh whose sources moved, and only those', async () 
   const engine = await headless(),
     system = LODSystem.attach(engine),
     a = engine.createMesh().setGeometry(box(1, 1, 1)),
-    b = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([100, 0, 0]);
+    b = engine
+      .createMesh()
+      .setGeometry(box(1, 1, 1))
+      .setPosition([100, 0, 0]);
   engine.store.tick(false);
   const built = await hierarchicalLOD(system, [a, b], { cell: 50 }),
     far = built.meshes[0],
@@ -993,7 +1054,10 @@ test('hierarchicalLOD of meshes in a second scene makes its far meshes and follo
     const system = LODSystem.attach(engine),
       other = engine.createScene('other'),
       a = other.createMesh().setGeometry(box(1, 1, 1)),
-      b = other.createMesh().setGeometry(box(1, 1, 1)).setPosition([100, 0, 0]);
+      b = other
+        .createMesh()
+        .setGeometry(box(1, 1, 1))
+        .setPosition([100, 0, 0]);
     engine.store.tick(false);
     const before = engine.scene.meshes.size,
       built = await hierarchicalLOD(system, [a, b], { cell: 50, follow: true });
@@ -1003,7 +1067,10 @@ test('hierarchicalLOD of meshes in a second scene makes its far meshes and follo
       [...other.plugins.keys()].some((name) => name.startsWith('lod-follow')),
       'the follower is not in the second scene',
     );
-    assert.ok(![...engine.scene.plugins.keys()].some((name) => name.startsWith('lod-follow')), 'the follower landed in the default scene');
+    assert.ok(
+      ![...engine.scene.plugins.keys()].some((name) => name.startsWith('lod-follow')),
+      'the follower landed in the default scene',
+    );
     assert.equal(engine.scene.meshes.size, before, 'a mesh landed in the default scene');
     built.remove();
   } finally {

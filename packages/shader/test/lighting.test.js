@@ -37,7 +37,8 @@ test('lightingNode runs after the effects, before the display steps, and keeps t
     assert.ok(body.includes('let margoNodeAmbient=ambient(s)+margoAmbient;'));
   }
   assert.ok(
-    fragment(lit(m, physicalShader())).indexOf('color=layers(') < fragment(lit(m, physicalShader())).indexOf('margoNodeAmbient='),
+    fragment(lit(m, physicalShader())).indexOf('color=layers(') <
+      fragment(lit(m, physicalShader())).indexOf('margoNodeAmbient='),
     'the final colour replaces the coated one',
   );
 });
@@ -60,7 +61,9 @@ test('lightModel replaces the sun and every clustered light, and reads stage inp
   for (const source of sources) {
     const code = lit(m, source, clustered);
     assert.ok(!code.includes('let direct=direct_light(s,v,l);'));
-    assert.ok(code.includes('let direct=margoNodeBrdf(l,v,s.n,s.base.rgb,s.roughness,s.metal)*f.radiance.rgb*f.light.w;'));
+    assert.ok(
+      code.includes('let direct=margoNodeBrdf(l,v,s.n,s.base.rgb,s.roughness,s.metal)*f.radiance.rgb*f.light.w;'),
+    );
     assert.equal(code.split('result+=margoNodeBrdf(l,v,n,base,roughness,metal)*nl').length, 1, 'no second cosine');
     assert.equal(code.split('result+=margoNodeBrdf(l,v,n,base,roughness,metal)*light.color.rgb').length, 3);
     assert.ok(code.includes('fn margoNodeBrdf(') && code.includes('i.uv.xy'));

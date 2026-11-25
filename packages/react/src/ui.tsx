@@ -25,6 +25,7 @@ import type {
 } from '@margoengine/sprites';
 import type * as UiReact from '@margoengine/ui/react';
 import type { UiRootProps } from '@margoengine/ui/react';
+import { inScene } from './scene-owner.js';
 import { live, report, useCommit, useCreated, useLiveRef, useScene, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { fault } from '../../shared/errors.js';
@@ -241,7 +242,9 @@ export const SpriteLayer = /* @__PURE__ */ forwardRef<SpriteLayerObject, SpriteL
       // atlas the props hold now, and `shown` records which one it was made with.
       create: (api) => {
         shown.current = latest.current.atlas;
-        return api.SpriteLayer.attach(scene.engine as unknown as EngineKernel, { ...options, ...latest.current });
+        return inScene(scene, () =>
+          api.SpriteLayer.attach(scene.engine as unknown as EngineKernel, { ...options, ...latest.current }),
+        );
       },
       dispose: (value) => value.dispose(),
       onError,
@@ -333,7 +336,9 @@ export const Figure = /* @__PURE__ */ forwardRef<FigureObject, FigureProps>(func
     {
       load: () => optionalPeer('@margoengine/sciviz', () => import('@margoengine/sciviz')),
       create: (api) => {
-        const made = api.Figure.attach(scene.engine as unknown as EngineKernel, latest.current.options);
+        const made = inScene(scene, () =>
+          api.Figure.attach(scene.engine as unknown as EngineKernel, latest.current.options),
+        );
         made.ready().then(
           () => latest.current.onReady?.(made),
           (error) => report(scene, error, latest.current.onError),

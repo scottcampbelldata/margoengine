@@ -128,11 +128,22 @@ await postBrowser(
       engine.dispose();
       return { shares, errors };
     });
-    for (const [name, share] of Object.entries(result.shares)) console.log(name, share.map((s) => s.toFixed(4)).join(' '));
+    for (const [name, share] of Object.entries(result.shares))
+      console.log(name, share.map((s) => s.toFixed(4)).join(' '));
     assert.deepEqual(result.errors, []);
     const within = (name, share) =>
-      assert.ok(share.every((s) => Math.abs(s - 1) <= 0.01), `${name}: the glow is strength x the light within 1% (${share.map((s) => s.toFixed(4))})`);
-    for (const name of ['kit first', 'kit steady', 'kit moved 40 px', 'defaults first', 'defaults steady', 'defaults moved 40 px'])
+      assert.ok(
+        share.every((s) => Math.abs(s - 1) <= 0.01),
+        `${name}: the glow is strength x the light within 1% (${share.map((s) => s.toFixed(4))})`,
+      );
+    for (const name of [
+      'kit first',
+      'kit steady',
+      'kit moved 40 px',
+      'defaults first',
+      'defaults steady',
+      'defaults moved 40 px',
+    ])
       within(name, result.shares[name]);
     within('spike, still there', result.shares['spike, still there']);
     within('none, spike new', result.shares['none, spike new']);
@@ -142,6 +153,9 @@ await postBrowser(
       `a new spike keeps the Karis share (${fresh.map((s) => s.toFixed(4))} against ${damped.map((s) => s.toFixed(4))})`,
     );
     for (const name of ['karis first', 'karis steady'])
-      assert.ok(result.shares[name].every((s) => s < 0.6), `${name}: the Karis average damps the steady flame as before (${result.shares[name].map((s) => s.toFixed(4))})`);
+      assert.ok(
+        result.shares[name].every((s) => s < 0.6),
+        `${name}: the Karis average damps the steady flame as before (${result.shares[name].map((s) => s.toFixed(4))})`,
+      );
   },
 );

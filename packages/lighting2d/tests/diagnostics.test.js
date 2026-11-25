@@ -16,10 +16,15 @@ function diagnostic(run, field, guidance) {
 }
 
 for (const [field, guidance, bad] of [
-  ['x', 'finite', NaN], ['y', 'finite', Infinity],
-  ['radius', 'positive', 0], ['width', 'positive', 0], ['height', 'positive', -1],
-  ['falloff', 'positive', 0], ['intensity', 'non-negative', -1],
-  ['glowRadius', 'non-negative', -1], ['bloomStrength', 'non-negative', -1],
+  ['x', 'finite', NaN],
+  ['y', 'finite', Infinity],
+  ['radius', 'positive', 0],
+  ['width', 'positive', 0],
+  ['height', 'positive', -1],
+  ['falloff', 'positive', 0],
+  ['intensity', 'non-negative', -1],
+  ['glowRadius', 'non-negative', -1],
+  ['bloomStrength', 'non-negative', -1],
   ['bloomThreshold', 'non-negative', -1],
 ]) {
   test(`emissive ${field} identifies its allowed range in constructor and CPU validation`, () => {
@@ -72,7 +77,8 @@ test('mask diagnostics identify each shape constraint', () => {
     [{ kind: 'circle', radius: 1, center: [NaN, 0] }, 'center', 'two finite coordinates'],
     [{ kind: 'polygon', points: [[0, 0]] }, 'points', 'at least three'],
     [{ kind: 'line' }, 'kind', 'rect, circle or polygon'],
-  ]) diagnostic(() => new Light2D({ mask }), field, guidance);
+  ])
+    diagnostic(() => new Light2D({ mask }), field, guidance);
 });
 
 test('camera, layer, order and ambient errors retain field-specific guidance', () => {
@@ -82,7 +88,11 @@ test('camera, layer, order and ambient errors retain field-specific guidance', (
     const pass = new Pass({ target: {}, ambient: 'bad' });
     pass.setup({
       backend: 'webgpu',
-      frameGraph: { add(frame) { execute = frame.execute; } },
+      frameGraph: {
+        add(frame) {
+          execute = frame.execute;
+        },
+      },
       removePlugin() {},
       sceneOf() {
         return this;
@@ -95,7 +105,8 @@ test('camera, layer, order and ambient errors retain field-specific guidance', (
     [{ x: NaN, y: 0, zoom: 1 }, 'camera.x', 'finite'],
     [{ x: 0, y: Infinity, zoom: 1 }, 'camera.y', 'finite'],
     [{ x: 0, y: 0, zoom: 0 }, 'camera.zoom', 'positive'],
-  ]) diagnostic(() => new EmissiveLighting2D({ camera }), field, guidance);
+  ])
+    diagnostic(() => new EmissiveLighting2D({ camera }), field, guidance);
   diagnostic(() => new EmissiveLighting2D({ layer: -1 }), 'layer', 'integer in [0, 4294967295]');
 });
 
@@ -110,7 +121,8 @@ test('soft and cookie diagnostics distinguish the failing field', () => {
     [{ cookieRotation: NaN }, 'cookieRotation', 'finite'],
     [{ cookieWrap: 'bad' }, 'cookieWrap', 'zero, clamp, repeat or mirror'],
     [{ cookieMode: 'bad' }, 'cookieMode', 'multiply, alpha or color'],
-  ]) diagnostic(() => new CookieLight2D(options), field, guidance);
+  ])
+    diagnostic(() => new CookieLight2D(options), field, guidance);
 });
 
 test('restored guidance keeps zero, positive and inclusive upper boundaries', () => {

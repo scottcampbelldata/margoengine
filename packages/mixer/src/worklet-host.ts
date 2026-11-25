@@ -12,16 +12,25 @@ export async function loadProcessor(
 ): Promise<void> {
   signal?.throwIfAborted();
   if (!context?.audioWorklet || typeof globalThis.AudioWorkletNode !== 'function')
-    throw new MargoError('unsupported', `Mixer needs AudioWorklet in a secure context; use HTTPS or localhost. ${help}`);
+    throw new MargoError(
+      'unsupported',
+      `Mixer needs AudioWorklet in a secure context; use HTTPS or localhost. ${help}`,
+    );
   let registered = modules.get(context);
   if (!registered) modules.set(context, (registered = new Map()));
   let pending = registered.get(name);
   if (!pending) {
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-    pending = context.audioWorklet.addModule(url).catch((cause: unknown) => {
-      registered.delete(name);
-      throw Object.assign(new MargoError('failed', `Mixer worklet could not load; permit blob: in script-src. ${help}`), { cause });
-    }).finally(() => URL.revokeObjectURL(url));
+    pending = context.audioWorklet
+      .addModule(url)
+      .catch((cause: unknown) => {
+        registered.delete(name);
+        throw Object.assign(
+          new MargoError('failed', `Mixer worklet could not load; permit blob: in script-src. ${help}`),
+          { cause },
+        );
+      })
+      .finally(() => URL.revokeObjectURL(url));
     registered.set(name, pending);
   }
   if (!signal) return pending;

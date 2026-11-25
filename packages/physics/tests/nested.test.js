@@ -23,7 +23,13 @@ const registerPBR = (mesh, geometry) => {
   const vertices = new Float32Array((geometry.vertices.length / 6) * 20);
   for (let i = 0; i < geometry.vertices.length / 6; i++)
     vertices.set(geometry.vertices.subarray(i * 6, i * 6 + 3), i * 20);
-  setMeshSource(mesh, { model: { disposed: false }, node: mesh, primitives: [{ vertices, indices: geometry.indices }], skinned: false, morphed: false });
+  setMeshSource(mesh, {
+    model: { disposed: false },
+    node: mesh,
+    primitives: [{ vertices, indices: geometry.indices }],
+    skinned: false,
+    morphed: false,
+  });
 };
 // World position of a mesh, from the chain of its parents' local transforms: nothing the code under test computes.
 const worldPosition = (engine, mesh) => {
@@ -35,7 +41,10 @@ const worldPosition = (engine, mesh) => {
   for (const node of chain) {
     const local = [node.position.x * s[0], node.position.y * s[1], node.position.z * s[2]];
     p = add(p, rotate(q, local));
-    q = multiply(q, node.quaternion ? [node.quaternion.x, node.quaternion.y, node.quaternion.z, node.quaternion.w] : eulerQuat(node));
+    q = multiply(
+      q,
+      node.quaternion ? [node.quaternion.x, node.quaternion.y, node.quaternion.z, node.quaternion.w] : eulerQuat(node),
+    );
     s = [s[0] * node.scale.x, s[1] * node.scale.y, s[2] * node.scale.z];
   }
   return p;
@@ -81,7 +90,10 @@ test('three levels of bodies keep their world poses whatever order they came in'
   const engine = await makeEngine(),
     physics = new Physics(engine, { gravity: [0, 0, 0] }),
     a = engine.createMesh(),
-    b = engine.createMesh(a).setPosition([0, 1, 0]).setRotation([0, Math.PI / 2, 0]),
+    b = engine
+      .createMesh(a)
+      .setPosition([0, 1, 0])
+      .setRotation([0, Math.PI / 2, 0]),
     c = engine.createMesh(b).setPosition([0, 0, 2]),
     shape = { colliders: { shape: 'sphere', radius: 0.1 } };
   const bodyB = physics.addBody(b, { ...shape, linearVelocity: [0, 0, 30] }),
@@ -132,7 +144,10 @@ test('a nested PBR node is fitted at its world scale', async () => {
 test('a geometry-free root below a turned parent keeps its parts where they are', async () => {
   const engine = await makeEngine(),
     physics = new Physics(engine),
-    parent = engine.createMesh().setPosition([10, 0, 0]).setRotation([0, Math.PI / 2, 0]),
+    parent = engine
+      .createMesh()
+      .setPosition([10, 0, 0])
+      .setRotation([0, Math.PI / 2, 0]),
     root = engine.createMesh(parent).setPosition([0, 0, 3]),
     part = engine.createMesh(root).setPosition([1, 0, 0]);
   registerPBR(part, box(2, 2, 2));

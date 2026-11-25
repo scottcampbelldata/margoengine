@@ -271,7 +271,13 @@ export class Trail extends Line {
           byLength = length + step > maxLength ? (maxLength - length) / step : 1,
           keep = Math.min(byAge, byLength);
         if (keep < 1) {
-          put(px + (x - px) * keep, py + (y - py) * keep, pz + (z - pz) * keep, length + step * keep, age + (old - age) * keep);
+          put(
+            px + (x - px) * keep,
+            py + (y - py) * keep,
+            pz + (z - pz) * keep,
+            length + step * keep,
+            age + (old - age) * keep,
+          );
           // Samples past the limit never come back: age only grows, and only the head moves.
           if (byAge < 1) {
             this.start = (this.start + i) % capacity;

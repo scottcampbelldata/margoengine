@@ -11,11 +11,15 @@ import { REVIEWED, scanPackages, scanSource } from '../scripts/check-film-time.m
 const root = resolve(import.meta.dirname, '..');
 
 test('a field that adds up deltas is found unless its file has advanceTime', () => {
-  const clock = 'class A {\n  onPreUpdate(delta) {\n    this.time += delta;\n    this.drift[0] = (this.drift[0] + w * delta) % s;\n  }\n}';
+  const clock =
+    'class A {\n  onPreUpdate(delta) {\n    this.time += delta;\n    this.drift[0] = (this.drift[0] + w * delta) % s;\n  }\n}';
   assert.deepEqual(scanSource(clock).delta, [3, 4]);
   assert.deepEqual(scanSource(`${clock}\nclass B { advanceTime(delta) {} }`).delta, []);
   // A local sum, a comment and a block comment are not fields.
-  assert.deepEqual(scanSource('let t = 0;\nt += delta;\n// this.t += delta\n/* this.t += delta\n this.u += dt */').delta, []);
+  assert.deepEqual(
+    scanSource('let t = 0;\nt += delta;\n// this.t += delta\n/* this.t += delta\n this.u += dt */').delta,
+    [],
+  );
   assert.deepEqual(scanSource('this.#age += dt * 2;\nthis.state.timer += frameDelta;').delta, [1, 2]);
 });
 
@@ -45,7 +49,10 @@ test('a field set from an expression that reads it and a delta is found in every
 });
 
 test('the wall clock and unseeded random are found in code, not in comments', () => {
-  assert.deepEqual(scanSource('const t = performance.now();\nconst r = Math.random ();\nx = Date.now();').wall, [1, 2, 3]);
+  assert.deepEqual(
+    scanSource('const t = performance.now();\nconst r = Math.random ();\nx = Date.now();').wall,
+    [1, 2, 3],
+  );
   assert.deepEqual(scanSource('// performance.now() is not used\nconst rng = mulberry(seed);').wall, []);
 });
 
@@ -58,7 +65,10 @@ test('the reviewed list names real files and hits, each with a reason', () => {
     for (const [rule, reason] of Object.entries(rules)) {
       assert.ok(rule === 'delta' || rule === 'wall', `${file}: unknown rule ${rule}`);
       assert.ok(typeof reason === 'string' && reason.length >= 12, `${file} ${rule}: give the reason`);
-      assert.ok(found.some((hit) => hit.file === file && hit.rule === rule), `${file} ${rule} no longer hits: remove it`);
+      assert.ok(
+        found.some((hit) => hit.file === file && hit.rule === rule),
+        `${file} ${rule} no longer hits: remove it`,
+      );
     }
   }
 });

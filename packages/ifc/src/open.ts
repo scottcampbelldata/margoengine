@@ -76,7 +76,8 @@ export function openIFC(api: IfcAPI, data: Uint8Array, options: IFCOpenOptions =
   const maxBytes = options.maxBytes ?? 256 * 1024 * 1024;
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) fail('range', 'limits must be non-negative integers');
   checkAbort(options.signal);
-  if (!api || typeof api.OpenModel !== 'function') fail('range', 'expected an initialized web-ifc IfcAPI; call Init() first');
+  if (!api || typeof api.OpenModel !== 'function')
+    fail('range', 'expected an initialized web-ifc IfcAPI; call Init() first');
   if (!(data instanceof Uint8Array)) fail('range', 'expected Uint8Array; pass the file bytes');
   if (data.byteLength > maxBytes) fail('limit', 'input exceeds maxBytes; raise maxBytes or pass a smaller file');
   if (!/^\s*ISO-10303-21;/i.test(new TextDecoder().decode(data.subarray(0, 128))))

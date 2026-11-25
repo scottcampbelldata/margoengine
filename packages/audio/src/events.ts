@@ -20,11 +20,21 @@ export interface AudioEventOptions {
   /** Uniform draw in [0, 1), for reproducible choices. Default Math.random. */
   random?: () => number;
   /** Shared positional/clip options. Default AudioVoicePool defaults, with looping disabled. */
-  voiceOptions?: Omit<AudioVoicePoolOptions, 'voices' | 'volume' | 'playbackRate' | 'detune' | 'loop' | 'loopStart' | 'loopEnd'>;
+  voiceOptions?: Omit<
+    AudioVoicePoolOptions,
+    'voices' | 'volume' | 'playbackRate' | 'detune' | 'loop' | 'loopStart' | 'loopEnd'
+  >;
 }
 
 function interval(value: readonly [number, number], lo: number, hi: number, name: string): readonly [number, number] {
-  if (value.length !== 2 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]) || value[0] < lo || value[1] > hi || value[0] > value[1])
+  if (
+    value.length !== 2 ||
+    !Number.isFinite(value[0]) ||
+    !Number.isFinite(value[1]) ||
+    value[0] < lo ||
+    value[1] > hi ||
+    value[0] > value[1]
+  )
     throw rangeError(`Audio event ${name} needs an ordered pair in ${lo}..${hi}; pass [minimum, maximum]`, 'state');
   return [value[0], value[1]];
 }
@@ -48,7 +58,7 @@ export class AudioEventContainer {
 
   constructor(listener: AudioListener, buffers: readonly AudioBuffer[], options: AudioEventOptions = {}) {
     this.listener = listener;
-    if (!buffers.length || buffers.some(buffer => !Number.isFinite(buffer?.duration) || buffer.duration <= 0))
+    if (!buffers.length || buffers.some((buffer) => !Number.isFinite(buffer?.duration) || buffer.duration <= 0))
       throw fault('state', 'Audio events need nonempty decoded buffers; use listener.load or context.createBuffer');
     this.mode = options.mode ?? 'random';
     if (this.mode !== 'random' && this.mode !== 'sequence')
@@ -59,12 +69,20 @@ export class AudioEventContainer {
     if (!Number.isFinite(this.cooldown) || this.cooldown < 0)
       throw rangeError('Audio event cooldown must be finite and nonnegative; use audio-clock seconds', 'state');
     this.random = options.random ?? Math.random;
-    if (typeof this.random !== 'function') throw fault('state', 'Audio event random needs a function returning a value in [0, 1)');
+    if (typeof this.random !== 'function')
+      throw fault('state', 'Audio event random needs a function returning a value in [0, 1)');
     try {
       for (const buffer of buffers)
-        this.pools.push(new AudioVoicePool(listener, buffer, {
-          ...options.voiceOptions, voices: options.voices ?? 4, volume: 1, playbackRate: 1, detune: 0, loop: false,
-        }));
+        this.pools.push(
+          new AudioVoicePool(listener, buffer, {
+            ...options.voiceOptions,
+            voices: options.voices ?? 4,
+            volume: 1,
+            playbackRate: 1,
+            detune: 0,
+            loop: false,
+          }),
+        );
       listener.addSource(this);
     } catch (error) {
       for (const pool of this.pools) pool.dispose();
@@ -80,7 +98,12 @@ export class AudioEventContainer {
   /** Play at a world position (default origin). Returns the voice, or null during cooldown. */
   play(position: Vec3 = [0, 0, 0]): PositionalAudio | null {
     this.assertLive();
-    if (position.length !== 3 || !Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2]))
+    if (
+      position.length !== 3 ||
+      !Number.isFinite(position[0]) ||
+      !Number.isFinite(position[1]) ||
+      !Number.isFinite(position[2])
+    )
       throw rangeError('Audio event position needs three finite coordinates; pass [x, y, z] in metres', 'state');
     const now = this.listener.context.currentTime;
     if (now >= this.lastTime && now - this.lastTime < this.cooldown) return null;
@@ -117,7 +140,10 @@ export class AudioEventContainer {
   private draw(): number {
     const value = this.random();
     if (!Number.isFinite(value) || value < 0 || value >= 1)
-      throw rangeError('Audio event random must return a finite value in [0, 1); use a uniform random generator', 'state');
+      throw rangeError(
+        'Audio event random must return a finite value in [0, 1); use a uniform random generator',
+        'state',
+      );
     return value;
   }
   private sample(range: readonly [number, number]): number {

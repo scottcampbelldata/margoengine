@@ -149,11 +149,22 @@ export class Stage {
  */
 export async function createStage(
   target: string | HTMLElement,
-  { controls = true, autoStart = true, label = 'Interactive 3D scene', onError, background, ...options }: StageOptions = {},
+  {
+    controls = true,
+    autoStart = true,
+    label = 'Interactive 3D scene',
+    onError,
+    background,
+    ...options
+  }: StageOptions = {},
 ): Promise<Stage> {
   if (typeof controls !== 'boolean' || typeof autoStart !== 'boolean')
     throw typeError('Invalid stage options', 'arguments');
-  if (typeof label !== 'string' || (onError !== undefined && typeof onError !== 'function') || (background && typeof background != 'string'))
+  if (
+    typeof label !== 'string' ||
+    (onError !== undefined && typeof onError !== 'function') ||
+    (background && typeof background != 'string')
+  )
     throw typeError('Invalid stage options', 'arguments');
   const element = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
   const owner = element?.ownerDocument;
