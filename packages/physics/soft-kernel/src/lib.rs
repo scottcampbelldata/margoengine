@@ -20,6 +20,7 @@ mod col;
 pub mod attach;
 mod rigid;
 pub mod collide;
+pub mod face;
 mod volume;
 pub mod fem;
 mod implicit;

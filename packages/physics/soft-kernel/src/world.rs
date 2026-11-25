@@ -16,8 +16,6 @@ pub const TORN: u32 = 1;
 pub const TENSION: u32 = 2;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
-/// The most a piece of a step may turn a body, in radians (the turn is linearised).
-pub const MAX_TURN: f32 = 0.1;
 /// Planes held for each particle.
 pub const SLOTS: usize = 4;
 
@@ -132,6 +130,9 @@ pub struct World {
     pub kvy: Col<f32>,
     pub kvz: Col<f32>,
     pub kf: Col<f32>,
+    /// Per particle slot: the collider's radius of curvature at the plane's point (0 on a flat face or a corner): the contact is
+    /// the point a radius along the normal from a centre fixed in the body, so a round body's contact stays under it as it turns.
+    pub kr: Col<f32>,
     /// Tetrahedra and clusters (src/fem.rs).
     pub fem: crate::fem::Fem,
     // Particles pinned to rigid bodies (src/attach.rs): per attachment, the particle, the body row of the contacts table plus
@@ -171,9 +172,6 @@ pub struct World {
     pub l0x: Col<f32>,
     pub l0y: Col<f32>,
     pub l0z: Col<f32>,
-    /// Per body row: how far this piece of the step's contacts have moved it (a translation of its centre and a small turn
-    /// about it), so the next contact meets the body where the last one left it (Gauss-Seidel over a body's contacts, as in
-    /// Mueller, Macklin, Chentanez, Jeschke and Kim 2020). The velocity change is this over the piece.
     /// Per body row: its angular velocity when the step began.
     pub a0x: Col<f32>,
     pub a0y: Col<f32>,
@@ -182,17 +180,61 @@ pub struct World {
     pub kj: Col<f32>,
     /// How far into the step the last passes of contacts stood, for the velocity pass that follows.
     pub tau_end: f32,
+    /// Per body row: how far this piece of the step's contacts have moved it, a translation of its centre (`dm`) and a turn
+    /// about it (the unit quaternion `tq`, x, y, z, w), so the next contact meets the body where the last one left it
+    /// (Gauss-Seidel over a body's contacts, as in Mueller, Macklin, Chentanez, Jeschke and Kim 2020). The velocity change is
+    /// this over the piece.
     pub dmx: Col<f32>,
     pub dmy: Col<f32>,
     pub dmz: Col<f32>,
-    pub thx: Col<f32>,
-    pub thy: Col<f32>,
-    pub thz: Col<f32>,
-    /// Per body row: how far it has turned over the step so far (a small-angle vector): its angular velocity over each piece
-    /// plus the turns the contacts gave it, so the host can give the body the turn its velocities do not account for.
-    pub tux: Col<f32>,
-    pub tuy: Col<f32>,
-    pub tuz: Col<f32>,
+    pub tqx: Col<f32>,
+    pub tqy: Col<f32>,
+    pub tqz: Col<f32>,
+    pub tqw: Col<f32>,
+    /// Per body row: how far it has turned since the step began, the sum of its turn over each piece (a rotation vector), so the
+    /// host can give the body the motion the step gave it (see `SoftBodies.beforeStep`).
+    pub rox: Col<f32>,
+    pub roy: Col<f32>,
+    pub roz: Col<f32>,
+    /// Per body row: its turn since the step began as a unit quaternion (x, y, z, w), each piece composed with the turn its
+    /// angular velocity makes over the piece as the rigid world turns a body (`q <- q + 1/2 [w h, 0] q`, made unit again), so a
+    /// plane found on a spinning body at the step's start turns with it.
+    pub rqx: Col<f32>,
+    pub rqy: Col<f32>,
+    pub rqz: Col<f32>,
+    pub rqw: Col<f32>,
+    /// Per body row: the turn the contacts meet it at now (unit quaternion): through a piece's contacts its turn since the step
+    /// began carried on over the piece, after it the turn it ended with. The planes' points and the inertia both go by it.
+    pub sqx: Col<f32>,
+    pub sqy: Col<f32>,
+    pub sqz: Col<f32>,
+    pub sqw: Col<f32>,
+    /// The faces of the soft bodies the host found touching a body this step (src/face.rs): per contact, the triangle's three
+    /// particles and their weights at the point facing the body, the body row of the contacts table plus one, the plane (normal
+    /// out of the body, the point on it at the step's start, the surface's velocity there), the friction coefficient, the sheet's
+    /// thickness, the normal impulse the piece's corrections gave it and the body's radius of curvature there.
+    pub fc_a: Col<u32>,
+    pub fc_b: Col<u32>,
+    pub fc_c: Col<u32>,
+    pub fc_wa: Col<f32>,
+    pub fc_wb: Col<f32>,
+    pub fc_wc: Col<f32>,
+    pub fc_row: Col<u32>,
+    pub fc_nx: Col<f32>,
+    pub fc_ny: Col<f32>,
+    pub fc_nz: Col<f32>,
+    pub fc_px: Col<f32>,
+    pub fc_py: Col<f32>,
+    pub fc_pz: Col<f32>,
+    pub fc_vx: Col<f32>,
+    pub fc_vy: Col<f32>,
+    pub fc_vz: Col<f32>,
+    pub fc_f: Col<f32>,
+    pub fc_r: Col<f32>,
+    pub fc_j: Col<f32>,
+    /// The collider's radius of curvature at each face contact's point, as `kr` is for a particle's.
+    pub fc_k: Col<f32>,
+    pub faces: usize,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -224,7 +266,7 @@ impl World {
         grow(&mut self.b_count, bodies);
         for v in [
             &mut self.knx, &mut self.kny, &mut self.knz, &mut self.kpx, &mut self.kpy, &mut self.kpz, &mut self.kvx, &mut self.kvy,
-            &mut self.kvz, &mut self.kf,
+            &mut self.kvz, &mut self.kf, &mut self.kr,
         ] {
             grow(v, particles * SLOTS);
         }
@@ -255,7 +297,7 @@ impl World {
             &mut self.sy, &mut self.sz, &mut self.friction, &mut self.lvx, &mut self.lvy, &mut self.lvz, &mut self.avx,
             &mut self.avy, &mut self.avz, &mut self.mx, &mut self.my, &mut self.mz, &mut self.jx, &mut self.jy, &mut self.jz,
             &mut self.kx, &mut self.ky, &mut self.kz, &mut self.wm, &mut self.iixx, &mut self.iixy, &mut self.iixz,
-            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.thx, &mut self.thy, &mut self.thz, &mut self.tux, &mut self.tuy, &mut self.tuz,
+            &mut self.iiyy, &mut self.iiyz, &mut self.iizz, &mut self.gs, &mut self.dom, &mut self.m0x, &mut self.m0y, &mut self.m0z, &mut self.l0x, &mut self.l0y, &mut self.l0z, &mut self.a0x, &mut self.a0y, &mut self.a0z, &mut self.dmx, &mut self.dmy, &mut self.dmz, &mut self.tqx, &mut self.tqy, &mut self.tqz, &mut self.tqw, &mut self.rox, &mut self.roy, &mut self.roz, &mut self.rqx, &mut self.rqy, &mut self.rqz, &mut self.rqw, &mut self.sqx, &mut self.sqy, &mut self.sqz, &mut self.sqw,
         ] {
             grow(v, colliders);
         }
@@ -283,9 +325,18 @@ impl World {
             self.kx[c] = 0.0;
             self.ky[c] = 0.0;
             self.kz[c] = 0.0;
-            self.tux[c] = 0.0;
-            self.tuy[c] = 0.0;
-            self.tuz[c] = 0.0;
+            self.rox[c] = 0.0;
+            self.roy[c] = 0.0;
+            self.roz[c] = 0.0;
+            self.rqx[c] = 0.0;
+            self.rqy[c] = 0.0;
+            self.rqz[c] = 0.0;
+            self.rqw[c] = 1.0;
+            self.sqx[c] = 0.0;
+            self.sqy[c] = 0.0;
+            self.sqz[c] = 0.0;
+            self.sqw[c] = 1.0;
+            self.clear_correction(c);
         }
         self.torn = 0;
         // A pinned particle with a target travels to it at a steady speed over the step.
@@ -384,7 +435,8 @@ impl World {
         }
         self.fem_end(h);
         // Every body row moves on, by its velocity and by what the contacts of this piece moved it (a kinematic one by its velocity
-        // alone), and takes the velocity that pose change implies (Mueller et al. 2020, section 3.4).
+        // alone), and takes the velocity that pose change implies: the change of its centre over the piece, and twice the vector
+        // part of its turn over the piece, the shorter way round (Mueller et al. 2020, section 3.4 and algorithm 2).
         let inv_h = 1.0 / h;
         for c in 0..self.colliders {
             self.mx[c] += self.lvx[c] * h + self.dmx[c];
@@ -393,18 +445,18 @@ impl World {
             self.lvx[c] += self.dmx[c] * inv_h;
             self.lvy[c] += self.dmy[c] * inv_h;
             self.lvz[c] += self.dmz[c] * inv_h;
-            self.tux[c] += self.avx[c] * h + self.thx[c];
-            self.tuy[c] += self.avy[c] * h + self.thy[c];
-            self.tuz[c] += self.avz[c] * h + self.thz[c];
-            self.avx[c] += self.thx[c] * inv_h;
-            self.avy[c] += self.thy[c] * inv_h;
-            self.avz[c] += self.thz[c] * inv_h;
-            self.dmx[c] = 0.0;
-            self.dmy[c] = 0.0;
-            self.dmz[c] = 0.0;
-            self.thx[c] = 0.0;
-            self.thy[c] = 0.0;
-            self.thz[c] = 0.0;
+            let way = if self.tqw[c] < 0.0 { -2.0 * inv_h } else { 2.0 * inv_h };
+            self.avx[c] += self.tqx[c] * way;
+            self.avy[c] += self.tqy[c] * way;
+            self.avz[c] += self.tqz[c] * way;
+            // The body turns through the piece at the speed it ends with, as its centre moves (semi-implicit Euler).
+            self.rox[c] += self.avx[c] * h;
+            self.roy[c] += self.avy[c] * h;
+            self.roz[c] += self.avz[c] * h;
+            let spun = self.spun(c, h);
+            (self.rqx[c], self.rqy[c], self.rqz[c], self.rqw[c]) = (spun[0], spun[1], spun[2], spun[3]);
+            (self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]) = (spun[0], spun[1], spun[2], spun[3]);
+            self.clear_correction(c);
         }
         let inv = 1.0 / h;
         for i in 0..self.particles {
@@ -495,8 +547,9 @@ impl World {
                 self.lvy[c] + self.avz[c] * rx - self.avx[c] * rz,
                 self.lvz[c] + self.avx[c] * ry - self.avy[c] * rx,
             ];
-            let mp = [self.mx[c], self.my[c], self.mz[c]];
-            self.resolve(i, c, [nx, ny, nz], -gap, surface, friction, h, mp, usize::MAX);
+            // The body is pushed at the point of its surface nearest the particle.
+            let q = [self.x[i] - nx * d - self.mx[c], self.y[i] - ny * d - self.my[c], self.z[i] - nz * d - self.mz[c]];
+            self.resolve(i, c, [nx, ny, nz], -gap, surface, friction, h, q, usize::MAX);
         }
     }
 
@@ -504,6 +557,11 @@ impl World {
     /// velocity for `tau` seconds since the start of the step: the host found them once for the step with its own query.
     pub fn apply_contacts(&mut self, h: f32, tau: f32) {
         self.tau_end = tau;
+        // Through the piece the contacts meet each body turned as it will be at the piece's end.
+        for c in 0..self.colliders {
+            let spun = self.spun(c, h);
+            (self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]) = (spun[0], spun[1], spun[2], spun[3]);
+        }
         for i in 0..self.particles {
             if self.w[i] <= 0.0 {
                 continue;
@@ -518,39 +576,93 @@ impl World {
                 let v = [self.kvx[k], self.kvy[k], self.kvz[k]];
                 let carried = [self.mx[c] + self.lvx[c] * h, self.my[c] + self.lvy[c] * h, self.mz[c] + self.lvz[c] * h];
                 let dm = [self.dmx[c], self.dmy[c], self.dmz[c]];
-                let (p, n) = self.plane_at(k, c, tau, carried, dm, [self.thx[c], self.thy[c], self.thz[c]]);
-                let mp = [carried[0] + dm[0], carried[1] + dm[1], carried[2] + dm[2]];
-                let d = (self.x[i] - p[0]) * n[0] + (self.y[i] - p[1]) * n[1] + (self.z[i] - p[2]) * n[2] - self.radius[i];
+                let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
+                let turn = [self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]];
+                let (n, q, gap) = self.meet(k, c, tau, carried, spin, dm, turn, [self.x[i], self.y[i], self.z[i]]);
+                let d = gap - self.radius[i];
                 if d < 0.0 {
                     let friction = self.kf[k];
-                    self.resolve(i, c, n, -d, v, friction, h, mp, k);
+                    self.resolve(i, c, n, -d, v, friction, h, q, k);
                 }
             }
         }
+        self.apply_faces(h, tau);
     }
 
-    /// The plane of slot `k` of body row `c` at `tau` seconds into the step, for a body whose centre is at `carried` moved by `dm` and
-    /// turned by `th` (a small angle) about it: the point on it and the unit normal.
-    fn plane_at(&self, k: usize, c: usize, tau: f32, carried: [f32; 3], dm: [f32; 3], th: [f32; 3]) -> ([f32; 3], [f32; 3]) {
+    /// Where a particle at `x` stands against the contact of slot `k` with body row `c` at `tau` seconds into the step, for a body
+    /// whose centre is at `carried` and turned by `spin` since the step began, moved by `dm` and turned by `turn` about its centre
+    /// by the corrections of this piece: the unit normal out of the body, the point where the body takes the push (from its
+    /// centre), and the gap from the body's surface to `x` along the normal.
+    #[allow(clippy::too_many_arguments)]
+    pub fn meet(&self, k: usize, c: usize, tau: f32, carried: [f32; 3], spin: [f32; 4], dm: [f32; 3], turn: [f32; 4], x: [f32; 3]) -> ([f32; 3], [f32; 3], f32) {
+        let found = [self.kpx[k], self.kpy[k], self.kpz[k]];
         let n0 = [self.knx[k], self.kny[k], self.knz[k]];
         let v = [self.kvx[k], self.kvy[k], self.kvz[k]];
-        // The plane was found at the step's start; it follows the body's own motion since, and the rest of the surface's speed (a
-        // spin, a deforming mesh); then it moves and turns with the corrections made to the body about its centre.
-        let nominal = [
-            self.kpx[k] + (v[0] - self.l0x[c]) * tau + (carried[0] - self.m0x[c]),
-            self.kpy[k] + (v[1] - self.l0y[c]) * tau + (carried[1] - self.m0y[c]),
-            self.kpz[k] + (v[2] - self.l0z[c]) * tau + (carried[2] - self.m0z[c]),
+        let surface = self.surface_at(c, found, n0, v, self.kr[k], tau, carried, spin, dm, turn);
+        surface.meet(x)
+    }
+
+    /// The surface of body row `c` where a contact was found at the step's start (a point on it, the normal out of it, the
+    /// surface's velocity there and what it is there, `rho`: -1 a flat face, else its radius of curvature), as it stands at `tau`
+    /// seconds into the step for a body whose centre is now at `carried`, turned by `spin` since the step began, then moved by
+    /// `dm` and turned by `turn` about the centre. A surface that moves besides (a deforming mesh's vertices) goes on at that part
+    /// of its speed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn surface_at(&self, c: usize, found: [f32; 3], n0: [f32; 3], v: [f32; 3], rho: f32, tau: f32, carried: [f32; 3], spin: [f32; 4], dm: [f32; 3], turn: [f32; 4]) -> Surface {
+        let r0 = [found[0] - self.m0x[c], found[1] - self.m0y[c], found[2] - self.m0z[c]];
+        // What the surface does that the body's own motion does not: its speed less the body's velocity at the point.
+        let (ax, ay, az) = (self.a0x[c], self.a0y[c], self.a0z[c]);
+        let own = [
+            v[0] - self.l0x[c] - (ay * r0[2] - az * r0[1]),
+            v[1] - self.l0y[c] - (az * r0[0] - ax * r0[2]),
+            v[2] - self.l0z[c] - (ax * r0[1] - ay * r0[0]),
         ];
-        let r = [nominal[0] - carried[0], nominal[1] - carried[1], nominal[2] - carried[2]];
-        let turn = |a: [f32; 3]| [th[1] * a[2] - th[2] * a[1], th[2] * a[0] - th[0] * a[2], th[0] * a[1] - th[1] * a[0]];
-        let (dr, dn) = (turn(r), turn(n0));
-        let p = [nominal[0] + dm[0] + dr[0], nominal[1] + dm[1] + dr[1], nominal[2] + dm[2] + dr[2]];
-        let mut n = [n0[0] + dn[0], n0[1] + dn[1], n0[2] + dn[2]];
-        let len = sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-        if len > 1e-9 {
-            n = [n[0] / len, n[1] / len, n[2] / len];
+        let centre = [carried[0] + dm[0], carried[1] + dm[1], carried[2] + dm[2]];
+        // A point fixed in the body, from its centre at the step's start to where the body has taken it (rotations, so it keeps its
+        // distance from the centre however far the body turns).
+        let place = |r: [f32; 3]| {
+            let a = rotate(spin, r[0], r[1], r[2]);
+            let a = rotate(turn, a.0, a.1, a.2);
+            [centre[0] + a.0 + own[0] * tau, centre[1] + a.1 + own[1] * tau, centre[2] + a.2 + own[2] * tau]
+        };
+        if rho < 0.0 {
+            // A face: its plane, through the point, turns with the body.
+            let n = rotate(spin, n0[0], n0[1], n0[2]);
+            let n = rotate(turn, n.0, n.1, n.2);
+            Surface { flat: true, at: place(r0), normal: [n.0, n.1, n.2], rho: 0.0, centre }
+        } else {
+            // A round place, or a corner or an edge (rho 0): its centre of curvature is fixed in the body.
+            let at = place([r0[0] - rho * n0[0], r0[1] - rho * n0[1], r0[2] - rho * n0[2]]);
+            let n = rotate(spin, n0[0], n0[1], n0[2]);
+            let n = rotate(turn, n.0, n.1, n.2);
+            Surface { flat: false, at, normal: [n.0, n.1, n.2], rho, centre }
         }
-        (p, n)
+    }
+
+    /// Body row `c`'s turn since the step began, carried on through a piece of `h` seconds at its angular velocity (the rigid
+    /// world's update of a rotation, Mueller et al. 2020 equation 8: `q + 1/2 [w h, 0] q`, made unit again).
+    pub(crate) fn spun(&self, c: usize, h: f32) -> [f32; 4] {
+        let (x, y, z, s) = (self.rqx[c], self.rqy[c], self.rqz[c], self.rqw[c]);
+        let (wx, wy, wz) = (self.avx[c] * h, self.avy[c] * h, self.avz[c] * h);
+        let nx = x + 0.5 * (s * wx + wy * z - wz * y);
+        let ny = y + 0.5 * (s * wy + wz * x - wx * z);
+        let nz = z + 0.5 * (s * wz + wx * y - wy * x);
+        let ns = s - 0.5 * (wx * x + wy * y + wz * z);
+        let len = sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
+        [nx / len, ny / len, nz / len, ns / len]
+    }
+
+    /// The velocity of body row `c`'s surface at the point `q` from its centre: the body's own (its velocity and its spin now),
+    /// and what a surface found at `found` going at `v` at the step's start does besides.
+    pub(crate) fn surface_velocity(&self, c: usize, q: [f32; 3], found: [f32; 3], v: [f32; 3]) -> [f32; 3] {
+        let r0 = [found[0] - self.m0x[c], found[1] - self.m0y[c], found[2] - self.m0z[c]];
+        let (ax, ay, az) = (self.a0x[c], self.a0y[c], self.a0z[c]);
+        let (wx, wy, wz) = (self.avx[c], self.avy[c], self.avz[c]);
+        [
+            self.lvx[c] + wy * q[2] - wz * q[1] + v[0] - self.l0x[c] - (ay * r0[2] - az * r0[1]),
+            self.lvy[c] + wz * q[0] - wx * q[2] + v[1] - self.l0y[c] - (az * r0[0] - ax * r0[2]),
+            self.lvz[c] + wx * q[1] - wy * q[0] + v[2] - self.l0z[c] - (ax * r0[1] - ay * r0[0]),
+        ]
     }
 
     /// After a piece, the speeds of the particles and the bodies they touch: a contact does not leave them separating faster than
@@ -569,28 +681,23 @@ impl World {
                 if c == NONE {
                     continue;
                 }
+                // Only a contact the piece pushed on (Mueller et al. 2020, section 3.6: the velocity pass is over the contacts the
+                // position pass made).
+                if self.kj[k] <= 0.0 {
+                    continue;
+                }
                 let c = (c - 1) as usize;
                 // A body the soft body dominates meets particles that do not give way: for it the particle has no inverse mass.
                 let wp = if self.dom[c] > 0.0 { 0.0 } else { self.w[i] };
                 let carried = [self.mx[c], self.my[c], self.mz[c]];
-                let (p, n) = self.plane_at(k, c, tau, carried, [0.0; 3], [0.0; 3]);
-                let d = (self.x[i] - p[0]) * n[0] + (self.y[i] - p[1]) * n[1] + (self.z[i] - p[2]) * n[2] - self.radius[i];
+                let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
+                let (n, q, gap) = self.meet(k, c, tau, carried, spin, [0.0; 3], [0.0, 0.0, 0.0, 1.0], [self.x[i], self.y[i], self.z[i]]);
+                let d = gap - self.radius[i];
                 if d > 0.002 {
                     continue;
                 }
-                let q = [
-                    self.x[i] - n[0] * (self.radius[i] + d) - carried[0],
-                    self.y[i] - n[1] * (self.radius[i] + d) - carried[1],
-                    self.z[i] - n[2] * (self.radius[i] + d) - carried[2],
-                ];
-                // The body's velocity at the contact: its own, the turn it has taken since the step began, and what the surface does
-                // besides (a spin from before, a deforming mesh).
-                let da = [self.avx[c] - self.a0x[c], self.avy[c] - self.a0y[c], self.avz[c] - self.a0z[c]];
-                let vb = [
-                    self.lvx[c] + da[1] * q[2] - da[2] * q[1] + self.kvx[k] - self.l0x[c],
-                    self.lvy[c] + da[2] * q[0] - da[0] * q[2] + self.kvy[k] - self.l0y[c],
-                    self.lvz[c] + da[0] * q[1] - da[1] * q[0] + self.kvz[k] - self.l0z[c],
-                ];
+                // The body's velocity at the contact, and what the surface does besides (a deforming mesh).
+                let vb = self.surface_velocity(c, q, [self.kpx[k], self.kpy[k], self.kpz[k]], [self.kvx[k], self.kvy[k], self.kvz[k]]);
                 let rel = [self.vx[i] - vb[0], self.vy[i] - vb[1], self.vz[i] - vb[2]];
                 let vn = rel[0] * n[0] + rel[1] * n[1] + rel[2] * n[2];
                 let a = [q[1] * n[2] - q[2] * n[1], q[2] * n[0] - q[0] * n[2], q[0] * n[1] - q[1] * n[0]];
@@ -641,20 +748,17 @@ impl World {
         for k in 0..self.particles * SLOTS {
             self.kj[k] = 0.0;
         }
+        self.face_velocities();
     }
 
     /// Pushes particle `i` out of the surface of body row `c` by `push` along the unit normal `n`, with friction, and gives
-    /// the body what that cost.
-    fn resolve(&mut self, i: usize, c: usize, n: [f32; 3], push: f32, surface: [f32; 3], friction: f32, h: f32, mp: [f32; 3], slot: usize) {
+    /// the body what that cost at the point `q` of its surface (from its centre of mass).
+    fn resolve(&mut self, i: usize, c: usize, n: [f32; 3], push: f32, surface: [f32; 3], friction: f32, h: f32, q: [f32; 3], slot: usize) {
         let m = 1.0 / self.w[i];
         let (nx, ny, nz) = (n[0], n[1], n[2]);
-        // The contact point, from the body's centre of mass, and how easily the body gives way there along the normal:
-        // the particle takes the share of the correction its inverse mass leaves it (Macklin et al. 2014, section 4).
-        let (qx, qy, qz) = (
-            self.x[i] - mp[0] - nx * (self.radius[i] - push),
-            self.y[i] - mp[1] - ny * (self.radius[i] - push),
-            self.z[i] - mp[2] - nz * (self.radius[i] - push),
-        );
+        // How easily the body gives way at the contact along the normal: the particle takes the share of the correction its
+        // inverse mass leaves it (Macklin et al. 2014, section 4).
+        let (qx, qy, qz) = (q[0], q[1], q[2]);
         let (ax, ay, az) = (qy * nz - qz * ny, qz * nx - qx * nz, qx * ny - qy * nx);
         let (ix, iy, iz) = self.inverse_inertia(c, ax, ay, az);
         let wb = self.wm[c] + ax * ix + ay * iy + az * iz;
@@ -664,6 +768,9 @@ impl World {
             if wb > 0.0 {
                 let lambda = push / wb;
                 self.correct_body(c, [-nx * lambda, -ny * lambda, -nz * lambda], [qx, qy, qz], h);
+                if slot != usize::MAX {
+                    self.kj[slot] += lambda / h;
+                }
             }
             return;
         }
@@ -681,16 +788,12 @@ impl World {
         uy -= ny * un;
         uz -= nz * un;
         let tl = sqrt(ux * ux + uy * uy + uz * uz);
-        let (mut fx, mut fy, mut fz) = (0.0, 0.0, 0.0);
         if tl > 1e-12 {
             let limit = friction * push;
             let k = if tl < limit { 1.0 } else { limit / tl };
-            fx = -ux * k;
-            fy = -uy * k;
-            fz = -uz * k;
-            self.x[i] += fx * share;
-            self.y[i] += fy * share;
-            self.z[i] += fz * share;
+            self.x[i] -= ux * k * share;
+            self.y[i] -= uy * k * share;
+            self.z[i] -= uz * k * share;
         }
         // The body takes the opposite correction, shared by inverse mass at the contact point, and moves on with it.
         // (The friction's reaction is a velocity impulse, given after the piece: see `contact_velocities`.)
@@ -703,51 +806,65 @@ impl World {
 
     /// Moves body row `c` by the position-level multiplier `lambda` (the reaction of a correction, a displacement times mass) at
     /// the point `q` from its centre of mass: its centre by `wm * lambda` and a turn of `I^-1 (q x lambda)`, which the next
-    /// contact of the piece meets; the host gives the real body `lambda / h` as an impulse.
-    pub(crate) fn correct_body(&mut self, c: usize, lambda: [f32; 3], q: [f32; 3], h: f32) {
+    /// contact of the piece meets; the host gives the real body `lambda / h` as an impulse. The turn is composed with the turn
+    /// already made as Mueller et al. 2020 update a rotation (their equations 8 and 9): `t <- t + 1/2 [dtheta, 0] t`, made unit
+    /// again, so it stays a rotation however large it is.
+    pub fn correct_body(&mut self, c: usize, lambda: [f32; 3], q: [f32; 3], h: f32) {
         let inv = 1.0 / h;
         let moment = [q[1] * lambda[2] - q[2] * lambda[1], q[2] * lambda[0] - q[0] * lambda[2], q[0] * lambda[1] - q[1] * lambda[0]];
-        let mut scale = 1.0f32;
-        let (mut wx, mut wy, mut wz) = (0.0, 0.0, 0.0);
+        self.jx[c] += lambda[0] * inv;
+        self.jy[c] += lambda[1] * inv;
+        self.jz[c] += lambda[2] * inv;
+        self.kx[c] += moment[0] * inv;
+        self.ky[c] += moment[1] * inv;
+        self.kz[c] += moment[2] * inv;
         if self.wm[c] > 0.0 {
-            (wx, wy, wz) = self.inverse_inertia(c, moment[0], moment[1], moment[2]);
-            // The turn is linearised, so a piece of a step may turn a body by a tenth of a radian and no more; the part of a
-            // correction past that is left for the next piece or pass (the particle still holds its share), and the body, the
-            // velocity it takes and the impulse the host gives all follow the part that was made.
-            let (tx, ty, tz) = (self.thx[c] + wx, self.thy[c] + wy, self.thz[c] + wz);
-            let (now, total, step) = (
-                sqrt(self.thx[c] * self.thx[c] + self.thy[c] * self.thy[c] + self.thz[c] * self.thz[c]),
-                sqrt(tx * tx + ty * ty + tz * tz),
-                sqrt(wx * wx + wy * wy + wz * wz),
-            );
-            if total > MAX_TURN && step > 0.0 {
-                let room = MAX_TURN - now;
-                scale = if room <= 0.0 { 0.0 } else if room >= step { 1.0 } else { room / step };
-            }
-        }
-        self.jx[c] += lambda[0] * inv * scale;
-        self.jy[c] += lambda[1] * inv * scale;
-        self.jz[c] += lambda[2] * inv * scale;
-        self.kx[c] += moment[0] * inv * scale;
-        self.ky[c] += moment[1] * inv * scale;
-        self.kz[c] += moment[2] * inv * scale;
-        if self.wm[c] > 0.0 {
-            self.dmx[c] += lambda[0] * self.wm[c] * scale;
-            self.dmy[c] += lambda[1] * self.wm[c] * scale;
-            self.dmz[c] += lambda[2] * self.wm[c] * scale;
-            self.thx[c] += wx * scale;
-            self.thy[c] += wy * scale;
-            self.thz[c] += wz * scale;
+            self.dmx[c] += lambda[0] * self.wm[c];
+            self.dmy[c] += lambda[1] * self.wm[c];
+            self.dmz[c] += lambda[2] * self.wm[c];
+            let (wx, wy, wz) = self.inverse_inertia(c, moment[0], moment[1], moment[2]);
+            let (x, y, z, s) = (self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]);
+            // [w, 0] t = [s w + w x v, -w . v] for t = [v, s].
+            let nx = x + 0.5 * (s * wx + wy * z - wz * y);
+            let ny = y + 0.5 * (s * wy + wz * x - wx * z);
+            let nz = z + 0.5 * (s * wz + wx * y - wy * x);
+            let ns = s - 0.5 * (wx * x + wy * y + wz * z);
+            let len = sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
+            self.tqx[c] = nx / len;
+            self.tqy[c] = ny / len;
+            self.tqz[c] = nz / len;
+            self.tqw[c] = ns / len;
         }
     }
 
-    /// A body's world inverse inertia applied to a vector.
-    pub(crate) fn inverse_inertia(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32) {
-        (
+    /// No correction yet this piece: the body row is where its velocity takes it, unturned.
+    fn clear_correction(&mut self, c: usize) {
+        self.dmx[c] = 0.0;
+        self.dmy[c] = 0.0;
+        self.dmz[c] = 0.0;
+        self.tqx[c] = 0.0;
+        self.tqy[c] = 0.0;
+        self.tqz[c] = 0.0;
+        self.tqw[c] = 1.0;
+    }
+
+    /// A body's world inverse inertia applied to a vector, the body turned as the contacts meet it now: the inverse inertia of the
+    /// step's start (`ii*`) turned by the body's turn since (`R I0^-1 R^T`, R its turn `sq` and this piece's corrections `tq`), the
+    /// same turn its contacts' points go by. The inertia goes with the body: on a body of very uneven inertia (a thin rod, whose inertia about its own
+    /// axis is tiny) a turn left out would read a moment across the axis it now has as one about the axis it had, and spin it.
+    pub fn inverse_inertia(&self, c: usize, x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+        let turn = [self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]];
+        let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
+        // Into the frame of the step's start, through the inverse inertia there, and back.
+        let (x, y, z) = rotate(conj(turn), x, y, z);
+        let (x, y, z) = rotate(conj(spin), x, y, z);
+        let (x, y, z) = (
             self.iixx[c] * x + self.iixy[c] * y + self.iixz[c] * z,
             self.iixy[c] * x + self.iiyy[c] * y + self.iiyz[c] * z,
             self.iixz[c] * x + self.iiyz[c] * y + self.iizz[c] * z,
-        )
+        );
+        let (x, y, z) = rotate(spin, x, y, z);
+        rotate(turn, x, y, z)
     }
 
     /// Signed distance from a point to a collider's surface, and the outward normal there.
@@ -803,6 +920,41 @@ impl World {
             }
         }
         h
+    }
+}
+
+/// A body's surface where a contact was found, as it stands now (see `World::surface_at`).
+#[derive(Clone, Copy)]
+pub struct Surface {
+    /// A flat face (`at` a point of its plane, `normal` its normal), else a round place, corner or edge (`at` its centre of
+    /// curvature, `rho` its radius, `normal` the normal it was found with).
+    pub flat: bool,
+    pub at: [f32; 3],
+    pub normal: [f32; 3],
+    pub rho: f32,
+    /// The body's centre of mass now.
+    pub centre: [f32; 3],
+}
+
+impl Surface {
+    /// Where a thing at `x` meets the surface: the unit normal out of the body toward it, the point where the body takes the push
+    /// (from its centre of mass), and the gap from the surface to `x` along the normal. On a face the thing is held where it
+    /// stands, the body pushed at the foot of `x` on the plane; on a round place, from the centre of curvature along the line to
+    /// `x`. Either way the push on the body and on the thing lie on one line, so the contact turns the body only as it should.
+    pub fn meet(&self, x: [f32; 3]) -> ([f32; 3], [f32; 3], f32) {
+        let d = [x[0] - self.at[0], x[1] - self.at[1], x[2] - self.at[2]];
+        if self.flat {
+            let n = self.normal;
+            let gap = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+            let foot = [x[0] - n[0] * gap, x[1] - n[1] * gap, x[2] - n[2] * gap];
+            return (n, [foot[0] - self.centre[0], foot[1] - self.centre[1], foot[2] - self.centre[2]], gap);
+        }
+        let length = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        let n = if length > 1e-9 { [d[0] / length, d[1] / length, d[2] / length] } else { self.normal };
+        // A thing at the centre itself (inside a ball) leaves by the normal it was found with.
+        let gap = if length > 1e-9 { length - self.rho } else { -self.rho };
+        let on = [self.at[0] + n[0] * self.rho, self.at[1] + n[1] * self.rho, self.at[2] + n[2] * self.rho];
+        (n, [on[0] - self.centre[0], on[1] - self.centre[1], on[2] - self.centre[2]], gap)
     }
 }
 

@@ -15,13 +15,15 @@ static mut WORLD: World = World {
     iiyz: Col::new(), iizz: Col::new(), particles: 0, edges: 0, bodies: 0, colliders: 0, torn: 0, fem: crate::fem::Fem::new(), rx: Col::new(), ry: Col::new(), rz: Col::new(), slx: Col::new(), sly: Col::new(),
     slz: Col::new(), sw: Col::new(), b_on: Col::new(), b_omega: Col::new(), b_zeta: Col::new(), b_first: Col::new(),
     b_count: Col::new(), bqx: Col::new(), bqy: Col::new(), bqz: Col::new(), bqw: Col::new(), kc: Col::new(), knx: Col::new(), kny: Col::new(), knz: Col::new(),
-    kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(),
+    kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(), kr: Col::new(),
     at_p: Col::new(), at_row: Col::new(), at_rx: Col::new(), at_ry: Col::new(), at_rz: Col::new(), attachments: 0,
     vtri: Col::new(), vb_on: Col::new(), vb_first: Col::new(), vb_count: Col::new(), vb_target: Col::new(), vb_omega: Col::new(),
     vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(), dom: Col::new(), bsleep: Col::new(),
     m0x: Col::new(), m0y: Col::new(), m0z: Col::new(), l0x: Col::new(), l0y: Col::new(), l0z: Col::new(),
-    dmx: Col::new(), dmy: Col::new(), dmz: Col::new(), a0x: Col::new(), a0y: Col::new(), a0z: Col::new(), kj: Col::new(), tau_end: 0.0, thx: Col::new(), thy: Col::new(), thz: Col::new(),
-    tux: Col::new(), tuy: Col::new(), tuz: Col::new(),
+    dmx: Col::new(), dmy: Col::new(), dmz: Col::new(), a0x: Col::new(), a0y: Col::new(), a0z: Col::new(), kj: Col::new(), tau_end: 0.0, tqx: Col::new(), tqy: Col::new(), tqz: Col::new(), tqw: Col::new(), rox: Col::new(), roy: Col::new(), roz: Col::new(), rqx: Col::new(), rqy: Col::new(), rqz: Col::new(), rqw: Col::new(), sqx: Col::new(), sqy: Col::new(), sqz: Col::new(), sqw: Col::new(),
+    fc_a: Col::new(), fc_b: Col::new(), fc_c: Col::new(), fc_wa: Col::new(), fc_wb: Col::new(), fc_wc: Col::new(), fc_row: Col::new(),
+    fc_nx: Col::new(), fc_ny: Col::new(), fc_nz: Col::new(), fc_px: Col::new(), fc_py: Col::new(), fc_pz: Col::new(), fc_vx: Col::new(),
+    fc_vy: Col::new(), fc_vz: Col::new(), fc_f: Col::new(), fc_r: Col::new(), fc_j: Col::new(), fc_k: Col::new(), faces: 0,
 };
 
 #[allow(static_mut_refs)]
@@ -50,7 +52,8 @@ columns! {
     rx, ry, rz, slx, sly, slz, sw, b_on, b_omega, b_zeta, b_first, b_count, bqx, bqy, bqz, bqw,
     kc, knx, kny, knz, kpx, kpy, kpz, kvx, kvy, kvz, kf,
     at_p, at_row, at_rx, at_ry, at_rz,
-    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj, tux, tuy, tuz,
+    vtri, vb_on, vb_first, vb_count, vb_target, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj, rox, roy, roz,
+    fc_a, fc_b, fc_c, fc_wa, fc_wb, fc_wc, fc_row, fc_nx, fc_ny, fc_nz, fc_px, fc_py, fc_pz, fc_vx, fc_vy, fc_vz, fc_f, fc_r, fc_j, fc_k, kr,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -70,6 +73,14 @@ pub extern "C" fn soft_attach_reserve(attachments: u32) {
     let w = world();
     w.reserve_attachments(attachments as usize);
     w.attachments = attachments as usize;
+}
+
+/// Makes room for the face contacts of a step and says how many are in use. Views over the memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_face_reserve(faces: u32) {
+    let w = world();
+    w.reserve_faces(faces as usize);
+    w.faces = faces as usize;
 }
 
 /// Makes room for the triangles of closed surfaces that keep their volume (three particle indices each in `vtri`).

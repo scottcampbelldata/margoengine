@@ -328,6 +328,8 @@ export class SoftBodyMaterial {
 export interface SoftContact {
     readonly soft: SoftBody;
     readonly particle: number;
+    readonly face: readonly [number, number, number] | null;
+    readonly weights: readonly [number, number, number] | null;
     readonly collider: PhysicsCollider;
     readonly particleVelocity: Vec3;
     normal: Vec3;

@@ -834,6 +834,7 @@ test('the builders take Rapier signatures: anisotropic cloth springs, a tube by 
 test('a deformable collider bound to a soft body follows it: direct, direct by position and skinned', async () => {
   const { physics, soft } = await create();
   const top = (collider) => collider.aabb().max[1];
+  const bottom = (collider) => collider.aabb().min[1];
   // A free 4 x 4 cloth falling; a thin mesh made of its four corner particles, bound directly.
   const cloth = soft.create(SoftBodyDesc.cloth([0, 5, 0], [0.1, 0, 0], [0, 0, 0.1], 4, 4).setParticleMass(0.05));
   const corners = [0, 3, 12, 15];
@@ -1067,11 +1068,28 @@ test('a body made with no configuration rests on rigid geometry, with no surface
   assert.ok(low > 0.15, `the ball rests on the cylinder: ${low}`);
 });
 
-test('small and thin rigid bodies dropped on a default cloth rest on it and do not slip between its particles', async () => {
+// The height of a cloth's surface over the point (x, z): the triangle of the sheet whose shadow on the ground holds the point,
+// read at its barycentric coordinates there; null where the cloth does not reach.
+const clothHeight = (cloth, x, z) => {
+  const p = cloth.particlePositions(),
+    t = cloth.triangles();
+  for (let k = 0; k < t.length; k += 3) {
+    const [a, b, c] = [t[k] * 3, t[k + 1] * 3, t[k + 2] * 3],
+      d = (p[b + 2] - p[c + 2]) * (p[a] - p[c]) + (p[c] - p[b]) * (p[a + 2] - p[c + 2]);
+    if (Math.abs(d) < 1e-12) continue;
+    const u = ((p[b + 2] - p[c + 2]) * (x - p[c]) + (p[c] - p[b]) * (z - p[c + 2])) / d,
+      v = ((p[c + 2] - p[a + 2]) * (x - p[c]) + (p[a] - p[c]) * (z - p[c + 2])) / d,
+      w = 1 - u - v;
+    if (u >= -1e-6 && v >= -1e-6 && w >= -1e-6) return u * p[a + 1] + v * p[b + 1] + w * p[c + 1];
+  }
+  return null;
+};
+
+test('small and thin rigid bodies dropped on a default cloth rest on it for five seconds and never pass through it', async () => {
   const n = 12,
     d = 0.1;
   const shapes = {
-    // Over the middle of a cell (the widest gap between four particles), of an edge, and a thin rod across a row.
+    // Over the middle of a cell (the widest gap between four particles), of an edge, and a thin rod lying between two rows.
     box: { position: [0, 1.5, 0], colliders: { shape: 'box', halfExtents: [0.02, 0.02, 0.02], density: 400 } },
     rod: {
       position: [-0.3, 1.5, 0.05],
@@ -1083,7 +1101,7 @@ test('small and thin rigid bodies dropped on a default cloth rest on it and do n
   };
   for (const [name, options] of Object.entries(shapes)) {
     const { physics, soft } = await create();
-    // A default cloth: no radius, no surface collider, no options but its four pinned corners.
+    // A default cloth: no radius, no surface collider, no damping (it rings for the whole run), only its four corners pinned.
     const cloth = soft.create(
       SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n).setPinnedParticles([
         0,
@@ -1093,35 +1111,71 @@ test('small and thin rigid bodies dropped on a default cloth rest on it and do n
       ]),
     );
     const body = physics.addBody(null, options);
-    // The cloth keeps ringing (a default body has no damping), so a light body may be tossed off it after a while; what it must
-    // never do is go through it: while it is over the cloth it stays above the cloth's lowest particle. Two and a half seconds:
-    // the bead went through at step 96 when the pose the soft step pushed it to did not reach the rigid body (KB-SOFT-LIGHT1).
-    let landed = false;
-    for (let i = 0; i < 150; i++) {
+    let landed = -1;
+    for (let i = 0; i < 330; i++) {
       physics.step();
-      const p = cloth.particlePositions();
-      let lowest = Infinity;
-      for (let k = 1; k < p.length; k += 3) lowest = Math.min(lowest, p[k]);
-      const [x, y, z] = body.position;
-      if (Math.abs(x) < 0.5 && Math.abs(z) < 0.5 && y < 1.2) landed = true;
-      if (Math.abs(x) < 0.5 && Math.abs(z) < 0.5 && landed)
-        assert.ok(y > lowest - 0.1, `step ${i}: the ${name} over the cloth went through it: ${y} under ${lowest}`);
-      assert.ok(Math.hypot(...body.linearVelocity) < 40, `the ${name} was thrown: ${body.linearVelocity}`);
+      const [x, y, z] = body.position,
+        under = clothHeight(cloth, x, z);
+      assert.ok(under !== null, `step ${i}: the ${name} left the cloth at ${body.position}`);
+      // Never below the sheet under it: the body's centre stays over the surface its triangles make.
+      assert.ok(
+        y > under,
+        `step ${i}: the ${name} went through the cloth: its centre ${y} under the sheet at ${under}`,
+      );
+      assert.ok(Math.hypot(...body.linearVelocity) < 40, `step ${i}: the ${name} was thrown: ${body.linearVelocity}`);
+      if (landed < 0 && y < under + 0.2) landed = i;
     }
-    assert.ok(landed, `the ${name} came down on the cloth`);
+    assert.ok(landed >= 0 && landed < 30, `the ${name} came down on the cloth (step ${landed})`);
   }
 });
 
-test('a contact is stable at a mass ratio of a thousand either way', async () => {
-  const run = async (particleMass, boxMass) => {
+test('a cloth draped over a sharp box edge hangs over it, never enters the box and does not pop', async () => {
+  const { physics, soft } = await create();
+  // A box whose top edge runs along x = 0 at y = 1, and a free cloth 55 cm wide falling on it with half its width past the edge.
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [-0.3, 0.5, 0],
+    colliders: { shape: 'box', halfExtents: [0.3, 0.5, 0.3] },
+  });
+  const n = 12,
+    d = 0.05;
+  const cloth = soft.create(SoftBodyDesc.cloth([-0.3, 1.2, -0.275], [d, 0, 0], [0, 0, d], n, n));
+  let fastest = 0;
+  for (let i = 0; i < 240; i++) {
+    physics.step();
+    const p = cloth.particlePositions(),
+      v = cloth.particleVelocities();
+    for (let k = 0; k < p.length; k += 3) {
+      const inside = p[k] < -0.001 && p[k] > -0.599 && p[k + 1] < 0.999 && Math.abs(p[k + 2]) < 0.299;
+      assert.ok(!inside, `step ${i}: particle ${k / 3} is inside the box at ${p[k]}, ${p[k + 1]}, ${p[k + 2]}`);
+      if (i > 40) fastest = Math.max(fastest, Math.hypot(v[k], v[k + 1], v[k + 2]));
+    }
+  }
+  // Once it has landed nothing jumps (no particle snags on the edge and springs off), and it hangs past the edge.
+  assert.ok(fastest < 1, `no particle pops once the cloth has landed: ${fastest} m/s`);
+  const p = cloth.particlePositions();
+  let lowest = Infinity,
+    highest = -Infinity;
+  for (let k = 1; k < p.length; k += 3) {
+    lowest = Math.min(lowest, p[k]);
+    highest = Math.max(highest, p[k]);
+  }
+  assert.ok(highest > 1 && highest < 1.1, `the part on the box lies on its top: ${highest}`);
+  assert.ok(lowest < 0.85, `the part past the edge hangs down over it: ${lowest}`);
+});
+
+test('a contact is stable at a mass ratio of a thousand either way, and a cloth holds a body or tears, never lets it through', async () => {
+  const run = async (particleMass, boxMass, tear = 0) => {
     const { physics, soft } = await create();
     const n = 12,
       d = 0.1;
-    const cloth = soft.create(
-      SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n)
-        .setPinnedParticles([0, n - 1, (n - 1) * n, n * n - 1])
-        .setParticleMass(particleMass),
-    );
+    const desc = SoftBodyDesc.cloth([-0.55, 1, -0.55], [d, 0, 0], [0, 0, d], n, n)
+      .setPinnedParticles([0, n - 1, (n - 1) * n, n * n - 1])
+      .setParticleMass(particleMass);
+    if (tear > 0) desc.setEdgeTearResistance(tear);
+    const cloth = soft.create(desc);
+    let tore = false;
+    soft.onTear(() => (tore = true));
     const box = physics.addBody(null, {
       position: [0, 1.4, 0],
       colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: boxMass },
@@ -1130,8 +1184,16 @@ test('a contact is stable at a mass ratio of a thousand either way', async () =>
     for (let i = 0; i < 300; i++) {
       physics.step();
       fastest = Math.max(fastest, box.linearVelocity[1]);
+      const [x, y, z] = box.position,
+        under = clothHeight(cloth, x, z);
+      // An intact cloth never lets the box between its particles: while the box is over it, its centre stays over the sheet.
+      if (!tore && under !== null)
+        assert.ok(
+          y > under,
+          `particles ${particleMass} kg, box ${boxMass} kg: step ${i}: the box passed through the cloth (${y} under ${under})`,
+        );
     }
-    return { y: box.position[1], fastest, cloth: cloth.particlePosition(6 * n + 6)[1] };
+    return { y: box.position[1], fastest, tore, under: clothHeight(cloth, box.position[0], box.position[2]) };
   };
   for (const [particleMass, boxMass] of [
     [1, 1000],
@@ -1142,5 +1204,13 @@ test('a contact is stable at a mass ratio of a thousand either way', async () =>
     const result = await run(particleMass, boxMass);
     assert.ok(Number.isFinite(result.y), `particles ${particleMass} kg, box ${boxMass} kg stays a number: ${result.y}`);
     assert.ok(result.fastest < 6, `and is never thrown upward: ${result.fastest} m/s`);
+    // Held: it ends on the cloth, over the sheet.
+    assert.ok(
+      result.under !== null && result.y > result.under,
+      `and is held on the cloth: ${result.y} over ${result.under}`,
+    );
   }
+  // A cloth that tears past a strain lets the tonne through by tearing, not by passing it between its particles.
+  const torn = await run(1, 1000, 0.05);
+  assert.ok(torn.tore, 'a cloth with a tear strain tears under a tonne');
 });

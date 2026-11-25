@@ -26,6 +26,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_cloth_reserve(triangles: number, contacts: number): number;
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_attach_reserve(attachments: number): void;
+  soft_face_reserve(faces: number): void;
   soft_volume_reserve(triangles: number): void;
   soft_volume(body: number): number;
   soft_torn(): number;
@@ -80,6 +81,10 @@ const INTEGER_COLUMNS = new Set([
   'vb_on',
   'vb_first',
   'vb_count',
+  'fc_a',
+  'fc_b',
+  'fc_c',
+  'fc_row',
 ]);
 const TORN_CELL = 1;
 const INTEGER_CELL_COLUMNS = new Set([
@@ -233,16 +238,22 @@ export class SoftMeshBinding {
 }
 
 /**
- * What a soft contact hook may edit about one contact of a particle with a collider before the step uses it (Rapier's
+ * What a soft contact hook may edit about one contact of a soft body with a collider before the step uses it (Rapier's
  * `modify_solver_contacts` for soft bodies): the plane (`normal` out of the collider, `point` on it, both at the start of
- * the step), the speed of the surface there, the friction, and whether it counts at all.
+ * the step), the speed of the surface there, the friction, and whether it counts at all. A contact is a particle's, or a
+ * face's (`face` set): the point of one of the body's triangles that faces a collider smaller than the spacing of the
+ * particles or lying between them.
  */
 export interface SoftContact {
   readonly soft: SoftBody;
-  /** The particle, by its index in the body. */
+  /** The particle, by its index in the body; for a face, the corner with the largest weight. */
   readonly particle: number;
+  /** For a face's contact, its three corners by their indices in the body; null for a particle's. */
+  readonly face: readonly [number, number, number] | null;
+  /** For a face's contact, the weights of its corners at the point facing the collider (they add to 1); null for a particle's. */
+  readonly weights: readonly [number, number, number] | null;
   readonly collider: PhysicsCollider;
-  /** The particle's velocity now. */
+  /** The particle's velocity now; for a face, the velocity of its point facing the collider. */
   readonly particleVelocity: Vec3;
   normal: Vec3;
   point: Vec3;
@@ -914,14 +925,15 @@ export class SoftBodyDesc {
 
   /**
    * Gives the body a surface collider of its own when it is created (see {@link SoftBodies.createSurfaceCollider}) with these
-   * settings; a body with triangles or a skin has one by default.
+   * settings. A body has none by default: its particles and faces meet rigid bodies in the soft step; a surface collider is for
+   * rays and queries.
    */
   setSurfaceCollider(settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {}): this {
     this.surfaceSettings = { ...settings };
     return this;
   }
 
-  /** The body has no surface collider of its own (a body with triangles or a skin has one by default). */
+  /** The body has no surface collider of its own (the default). */
   setNoSurfaceCollider(): this {
     this.surfaceSettings = null;
     return this;
@@ -1273,7 +1285,7 @@ export class SoftBodyDesc {
     this.massGiven = true;
     return this;
   }
-  /** Contact thickness of every particle in metres (default: for a body of triangles the circumradius of its widest triangle, so no triangle has a gap between its three spheres wide enough for a small thing to pass; else half the shortest structural edge, or 0.01 with none). */
+  /** Contact thickness of every particle in metres, and of the body's faces against rigid bodies (default: for a body of triangles the circumradius of its widest triangle; else half the shortest structural edge, or 0.01 with none). */
   setParticleRadius(radius: number): this {
     if (!(radius >= 0 && Number.isFinite(radius))) throw new RangeError('Particle radius must be 0 or more metres.');
     this.radius = radius;
@@ -2021,7 +2033,7 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
-  private capacity = [0, 0, 0, 0, 0, 0];
+  private capacity = [0, 0, 0, 0, 0, 0, 0];
   private rowGroups: number[] = [];
   private contactHook: ((contact: SoftContact) => void) | null = null;
   private readonly pushes = new Map<PhysicsBody, [Vec3, Vec3]>();
@@ -2158,10 +2170,10 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const buffer = this.exports.memory.buffer;
     if (this.view && this.viewBuffer === buffer) return this.view;
-    const [particles, edges, bodies, colliders, attachments, volumeTriangles] = this.capacity,
+    const [particles, edges, bodies, colliders, attachments, volumeTriangles, faces] = this.capacity,
       view: Columns = {};
     columnNames.forEach((name, id) => {
-      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!, volumeTriangles!),
+      const rows = rowsOf(name, particles!, edges!, bodies!, colliders!, attachments!, volumeTriangles!, faces!),
         at = this.exports.soft_column(id);
       view[name] = (
         INTEGER_COLUMNS.has(name) ? new Uint32Array(buffer, at, rows) : new Float32Array(buffer, at, rows)
@@ -2236,6 +2248,7 @@ export class SoftBodies implements PhysicsAttachment {
       Math.max(this.capacity[3]!, colliders),
       this.capacity[4]!,
       this.capacity[5]!,
+      this.capacity[6]!,
     ];
     this.view = null;
   }
@@ -2435,8 +2448,8 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeCellMaterial(body);
     this.syncCloth();
     this.syncVolume(desc.volumeFactor);
-    // A body with triangles or a skin has a surface collider unless it was told not to (Rapier's default): the particles are
-    // spheres, and a thing that fits between them is caught by the mesh.
+    // A surface collider only when asked: the particles and the faces meet rigid bodies in the soft step, and a mesh would answer
+    // a second time.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     return body;
   }
@@ -3139,9 +3152,8 @@ export class SoftBodies implements PhysicsAttachment {
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */
   beforeStep(dt: number): void {
-    // What the bodies were pushed with last step comes off: the soft bodies push by a force over the step, not an impulse
-    // at its start, so a body they hold up neither rises nor sinks (an impulse that cancels a step's weight at its start lets
-    // gravity pull the body back through the step, and it creeps up half a g dt squared each time).
+    // The force and torque the bodies were pushed with last step come off (the rigid world keeps a force until it is taken back;
+    // the impulse part of a push lands once).
     for (const [body, [force, torque]] of this.pushes) {
       if (!body.valid) continue;
       body.addForce([-force[0], -force[1], -force[2]], undefined, false);
@@ -3173,9 +3185,21 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.exports.soft_finish();
     this.giveToProxies(dt);
-    const c = this.columns(),
+    const c = this.columns();
+    // The rigid step moves each body the soft bodies pushed: it gets an impulse at its start and a steady force over it, chosen so
+    // the rigid world's own substeps carry a free body to the velocity and the place the soft step took it to. A push that
+    // stopped a body at the first touch lands at once (as a force spread over the step, it would let the body sink on through
+    // the step and be thrown back out the next), and a push that holds a body up is a force, which neither lifts nor drops it.
+    // The spin lands whole at the start: the change of angular velocity the soft step gave the body, which it worked out with the
+    // body's inertia turning as the body turned. A body at rest takes no turn from what holds it (gravity has no moment about its
+    // centre of mass), so nothing creeps; and handing over the angular impulse instead would have the rigid world turn it into a
+    // velocity with the inertia of another moment, which on a body of very uneven inertia (a thin rod, whose inertia about its own
+    // axis is tiny) is a spin the soft step never gave.
+    // A cluster's proxy is put where its cluster is by giveToProxies; it takes its push as a force and a torque over the step and no
+    // motion of its own.
+    const hostShare = (this.physics.substeps + 1) / (2 * this.physics.substeps),
+      softShare = (this.substeps + 1) / (2 * this.substeps),
       proxies = new Set<PhysicsBody>();
-    // A cluster's proxy is put where its cluster is by giveToProxies; it takes no shift of its own.
     for (const b of this.bodies) for (const info of b.clusterInfo) if (info.proxy) proxies.add(info.proxy);
     bodies.forEach((body, row) => {
       // A body of a higher dominance group than the soft body's is not pushed by it.
@@ -3183,20 +3207,37 @@ export class SoftBodies implements PhysicsAttachment {
       const j: Vec3 = [c.jx[row]!, c.jy[row]!, c.jz[row]!],
         k: Vec3 = [c.kx[row]!, c.ky[row]!, c.kz[row]!];
       if (j[0] === 0 && j[1] === 0 && j[2] === 0 && k[0] === 0 && k[1] === 0 && k[2] === 0) return;
-      if (!proxies.has(body)) this.shiftBody(body, c, row, dt);
-      const force: Vec3 = [j[0] / dt, j[1] / dt, j[2] / dt],
-        torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
+      if (proxies.has(body)) {
+        const force: Vec3 = [j[0] / dt, j[1] / dt, j[2] / dt],
+          torque: Vec3 = [k[0] / dt, k[1] / dt, k[2] / dt];
+        body.addForce(force);
+        body.addTorque(torque);
+        const had = this.pushes.get(body);
+        this.pushes.set(
+          body,
+          had
+            ? [
+                [had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]],
+                [had[1][0] + torque[0], had[1][1] + torque[1], had[1][2] + torque[2]],
+              ]
+            : [force, torque],
+        );
+        return;
+      }
+      const impulse = startOfStep(body, c, row, j, dt, g, hostShare, softShare),
+        force: Vec3 = [(j[0] - impulse[0]) / dt, (j[1] - impulse[1]) / dt, (j[2] - impulse[2]) / dt];
+      body.applyImpulse(impulse);
+      const spin = body.angularVelocity;
+      body.setAngularVelocity([
+        spin[0] + c.avx[row]! - c.a0x[row]!,
+        spin[1] + c.avy[row]! - c.a0y[row]!,
+        spin[2] + c.avz[row]! - c.a0z[row]!,
+      ]);
       body.addForce(force);
-      body.addTorque(torque);
       const had = this.pushes.get(body);
       this.pushes.set(
         body,
-        had
-          ? [
-              [had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]],
-              [had[1][0] + torque[0], had[1][1] + torque[1], had[1][2] + torque[2]],
-            ]
-          : [force, torque],
+        had ? [[had[0][0] + force[0], had[0][1] + force[1], had[0][2] + force[2]], had[1]] : [force, [0, 0, 0]],
       );
     });
     const cellsTorn = this.exports.soft_fem_torn();
@@ -3213,7 +3254,9 @@ export class SoftBodies implements PhysicsAttachment {
   /**
    * Asks the rigid world once for the step what each free particle will meet: up to four planes each, from the rigid world's
    * swept contact query (every shape, a moving collider swept along its own motion, a deformable mesh's vertex speeds), and
-   * hands them to the kernel, which keeps the particle outside every one at each piece of the step.
+   * hands them to the kernel, which keeps the particle outside every one at each piece of the step. Then the same for each
+   * triangle of a body (the face query): a body smaller than the spacing of the particles, or a thin one lying between them,
+   * meets the triangle under it, which the kernel holds a thickness (the particles' radius) out of it.
    */
   private findPlanes(dt: number, rows: Map<number, number>, bodies: PhysicsBody[]): void {
     let c = this.columns();
@@ -3228,6 +3271,7 @@ export class SoftBodies implements PhysicsAttachment {
       normal: Vec3;
       point: Vec3;
       velocity: Vec3;
+      curvature: number;
       friction?: number;
     }
     const found: Found[] = [];
@@ -3279,6 +3323,91 @@ export class SoftBodies implements PhysicsAttachment {
             normal: [hit.normal[at * 3]!, hit.normal[at * 3 + 1]!, hit.normal[at * 3 + 2]!],
             point: [hit.point[at * 3]!, hit.point[at * 3 + 1]!, hit.point[at * 3 + 2]!],
             velocity: [hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!],
+            curvature: hit.curvature[at]!,
+          });
+        }
+    }
+    // The faces: each triangle where its corners are and where they end the step (a pinned corner stays, or goes to its target),
+    // as thick as its corners' radius, so the corner balls and the faces make one surface.
+    interface FoundFace {
+      corners: [number, number, number];
+      weights: [number, number, number];
+      collider: number;
+      body: number;
+      soft: SoftBody;
+      normal: Vec3;
+      point: Vec3;
+      velocity: Vec3;
+      thickness: number;
+      curvature: number;
+      friction?: number;
+    }
+    const faces: FoundFace[] = [];
+    for (const soft of this.bodies) {
+      const list = soft.triangleList,
+        count = list.length / 3;
+      if (count === 0) continue;
+      const scale = c.gravity_scale[soft.handle]!,
+        from = new Float32Array(count * 9),
+        to = new Float32Array(count * 9),
+        thickness = new Float32Array(count),
+        margin = new Float32Array(count),
+        end = (row: number): Vec3 => {
+          if (c.w[row]! > 0)
+            return [
+              c.x[row]! + (c.vx[row]! + g[0] * scale * dt) * dt,
+              c.y[row]! + (c.vy[row]! + g[1] * scale * dt) * dt,
+              c.z[row]! + (c.vz[row]! + g[2] * scale * dt) * dt,
+            ];
+          if (c.pflags[row]! & TARGETED) return [c.tx[row]!, c.ty[row]!, c.tz[row]!];
+          return [c.x[row]!, c.y[row]!, c.z[row]!];
+        };
+      for (let t = 0; t < count; t++) {
+        let move = 0,
+          thick = 0;
+        for (let k = 0; k < 3; k++) {
+          const row = soft.firstParticle + list[t * 3 + k]!,
+            e = end(row);
+          from[t * 9 + k * 3] = c.x[row]!;
+          from[t * 9 + k * 3 + 1] = c.y[row]!;
+          from[t * 9 + k * 3 + 2] = c.z[row]!;
+          to[t * 9 + k * 3] = e[0];
+          to[t * 9 + k * 3 + 1] = e[1];
+          to[t * 9 + k * 3 + 2] = e[2];
+          move = Math.max(move, Math.hypot(e[0] - c.x[row]!, e[1] - c.y[row]!, e[2] - c.z[row]!));
+          thick = Math.max(thick, c.radius[row]!);
+        }
+        thickness[t] = thick;
+        // The triangle may end the step elsewhere than this guess, so contacts within twice its move past the thickness are kept.
+        margin[t] = Math.max(0.01, 2 * move);
+      }
+      const hit = this.physics.softFaceContacts({ from, to, thickness, margin }, 4, {
+        dt,
+        flags: 8,
+        groups: soft.collisionGroups,
+        exclude: soft.surface ?? undefined,
+      });
+      for (let t = 0; t < count; t++)
+        for (let slot = 0; slot < 4; slot++) {
+          const at = t * 4 + slot;
+          if (hit.collider[at] === 0xffffffff) continue;
+          if (this.bound.some((m) => m.soft === soft && m.host.row === hit.body[at])) continue;
+          if (
+            soft.asleep &&
+            Math.hypot(hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!) > 0.05
+          )
+            soft.wake();
+          faces.push({
+            corners: [list[t * 3]!, list[t * 3 + 1]!, list[t * 3 + 2]!],
+            weights: [hit.weights[at * 3]!, hit.weights[at * 3 + 1]!, hit.weights[at * 3 + 2]!],
+            collider: hit.collider[at]!,
+            body: hit.body[at]!,
+            soft,
+            normal: [hit.normal[at * 3]!, hit.normal[at * 3 + 1]!, hit.normal[at * 3 + 2]!],
+            point: [hit.point[at * 3]!, hit.point[at * 3 + 1]!, hit.point[at * 3 + 2]!],
+            velocity: [hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!],
+            thickness: thickness[t]!,
+            curvature: hit.curvature[at]!,
           });
         }
     }
@@ -3297,6 +3426,8 @@ export class SoftBodies implements PhysicsAttachment {
           contact: SoftContact = {
             soft: f.soft,
             particle: row - f.soft.firstParticle,
+            face: null,
+            weights: null,
             collider,
             particleVelocity: [c.vx[row]!, c.vy[row]!, c.vz[row]!],
             normal: [...f.normal],
@@ -3317,6 +3448,45 @@ export class SoftBodies implements PhysicsAttachment {
       }
       found.length = 0;
       found.push(...kept);
+      const keptFaces: FoundFace[] = [];
+      for (const f of faces) {
+        const collider = this.physics.colliderOf(f.collider);
+        if (!collider || !collider.activeHooks().modifyContacts) {
+          keptFaces.push(f);
+          continue;
+        }
+        const rows3 = f.corners.map((k) => f.soft.firstParticle + k),
+          heaviest =
+            f.weights[0] >= f.weights[1] && f.weights[0] >= f.weights[2] ? 0 : f.weights[1] >= f.weights[2] ? 1 : 2,
+          contact: SoftContact = {
+            soft: f.soft,
+            particle: f.corners[heaviest],
+            face: [...f.corners],
+            weights: [...f.weights],
+            collider,
+            particleVelocity: [
+              rows3.reduce((sum, row, k) => sum + f.weights[k]! * c.vx[row]!, 0),
+              rows3.reduce((sum, row, k) => sum + f.weights[k]! * c.vy[row]!, 0),
+              rows3.reduce((sum, row, k) => sum + f.weights[k]! * c.vz[row]!, 0),
+            ],
+            normal: [...f.normal],
+            point: [...f.point],
+            velocity: [...f.velocity],
+            friction: collider.friction(),
+            enabled: true,
+          };
+        hook(contact);
+        if (!contact.enabled) continue;
+        const length = Math.hypot(...contact.normal);
+        if (!(length > 0) || !Number.isFinite(length)) throw new RangeError('A contact normal must have a length.');
+        f.normal = [contact.normal[0] / length, contact.normal[1] / length, contact.normal[2] / length];
+        f.point = [...contact.point];
+        f.velocity = [...contact.velocity];
+        f.friction = contact.friction;
+        keptFaces.push(f);
+      }
+      faces.length = 0;
+      faces.push(...keptFaces);
     }
     // A row is one rigid body as one soft body's dominance group sees it, so two groups at one body have two rows.
     const key = (bodyRow: number, soft: SoftBody): number => bodyRow * 256 + ((soft.dominance + 128) & 255);
@@ -3328,7 +3498,7 @@ export class SoftBodies implements PhysicsAttachment {
       bodies.push(a.body);
       this.rowGroups.push(a.soft.dominance);
     }
-    for (const f of found) {
+    for (const f of [...found, ...faces]) {
       if (rows.has(key(f.body, f.soft))) continue;
       const owner = this.physics.bodyOfCollider(f.collider);
       if (!owner) continue;
@@ -3336,6 +3506,8 @@ export class SoftBodies implements PhysicsAttachment {
       bodies.push(owner);
       this.rowGroups.push(f.soft.dominance);
     }
+    this.exports.soft_face_reserve(faces.length);
+    this.capacity[6] = Math.max(this.capacity[6]!, faces.length);
     this.exports.soft_attach_reserve(live.length);
     this.capacity[4] = Math.max(this.capacity[4]!, live.length);
     if (bodies.length) this.reserve(this.particleCount, this.edgeCount, this.bodies.length, bodies.length);
@@ -3369,57 +3541,31 @@ export class SoftBodies implements PhysicsAttachment {
       c.kvy[k] = f.velocity[1];
       c.kvz[k] = f.velocity[2];
       c.kf[k] = f.friction ?? this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
+      c.kr[k] = f.curvature;
     }
-  }
-
-  /**
-   * Gives a body the part of the pose the soft step moved it to that the force it takes does not carry. The step corrects
-   * the body's pose at each contact and then takes out the speed that correction would leave (an inelastic contact), so a
-   * push out of a particle is a change of pose with no impulse behind it; given only the impulses as a force, the body
-   * stayed where it was pushed from and a light one sank further into the particles every step (KB-SOFT-LIGHT1). The pose
-   * the step reached, less the pose its start velocity and its velocity change spread evenly over the pieces would reach
-   * (what the force does), is given as a pose change with no velocity: the position corrections of position-based dynamics
-   * (Mueller, Heidelberger, Hennix and Ratcliff 2007; Mueller, Macklin, Chentanez, Jeschke and Kim 2020, section 3.4), handed to
-   * a velocity solver the way a split impulse hands it a pseudo-velocity (Catto 2006). A body falling free or resting on
-   * the soft body gets none.
-   */
-  private shiftBody(body: PhysicsBody, c: Columns, row: number, dt: number): void {
-    const s = this.substeps,
-      even = (dt * (s + 1)) / (2 * s),
-      move: Vec3 = [
-        c.mx[row]! - c.m0x[row]! - c.l0x[row]! * dt - (c.lvx[row]! - c.l0x[row]!) * even,
-        c.my[row]! - c.m0y[row]! - c.l0y[row]! * dt - (c.lvy[row]! - c.l0y[row]!) * even,
-        c.mz[row]! - c.m0z[row]! - c.l0z[row]! * dt - (c.lvz[row]! - c.l0z[row]!) * even,
-      ],
-      turn: Vec3 = [
-        c.tux[row]! - c.a0x[row]! * dt - (c.avx[row]! - c.a0x[row]!) * even,
-        c.tuy[row]! - c.a0y[row]! * dt - (c.avy[row]! - c.a0y[row]!) * even,
-        c.tuz[row]! - c.a0z[row]! * dt - (c.avz[row]! - c.a0z[row]!) * even,
-      ];
-    if (move.every((v) => v === 0) && turn.every((v) => v === 0)) return;
-    // The centre of mass moves by `move` and the body turns by `turn` about it.
-    const q = body.rotation,
-      [x, y, z] = [turn[0] / 2, turn[1] / 2, turn[2] / 2],
-      t: Quat = [
-        q[0] + x * q[3] + y * q[2] - z * q[1],
-        q[1] + y * q[3] + z * q[0] - x * q[2],
-        q[2] + z * q[3] + x * q[1] - y * q[0],
-        q[3] - x * q[0] - y * q[1] - z * q[2],
-      ],
-      length = Math.hypot(...t),
-      turned: Quat = [t[0] / length, t[1] / length, t[2] / length, t[3] / length],
-      before = rotate(q, body.centerOfMass),
-      after = rotate(turned, body.centerOfMass),
-      p = body.position;
-    body.setRotation(turned, false);
-    body.setPosition(
-      [
-        p[0] + before[0] + move[0] - after[0],
-        p[1] + before[1] + move[1] - after[1],
-        p[2] + before[2] + move[2] - after[2],
-      ],
-      false,
-    );
+    faces.forEach((f, k) => {
+      const table = rows.get(key(f.body, f.soft));
+      c.fc_row[k] = table === undefined ? 0 : table + 1;
+      c.fc_a[k] = f.soft.firstParticle + f.corners[0];
+      c.fc_b[k] = f.soft.firstParticle + f.corners[1];
+      c.fc_c[k] = f.soft.firstParticle + f.corners[2];
+      c.fc_wa[k] = f.weights[0];
+      c.fc_wb[k] = f.weights[1];
+      c.fc_wc[k] = f.weights[2];
+      c.fc_nx[k] = f.normal[0];
+      c.fc_ny[k] = f.normal[1];
+      c.fc_nz[k] = f.normal[2];
+      c.fc_px[k] = f.point[0];
+      c.fc_py[k] = f.point[1];
+      c.fc_pz[k] = f.point[2];
+      c.fc_vx[k] = f.velocity[0];
+      c.fc_vy[k] = f.velocity[1];
+      c.fc_vz[k] = f.velocity[2];
+      c.fc_f[k] = f.friction ?? this.physics.colliderOf(f.collider)?.friction() ?? 0.5;
+      c.fc_r[k] = f.thickness;
+      c.fc_j[k] = 0;
+      c.fc_k[k] = f.curvature;
+    });
   }
 
   /** Writes what the kernel needs to share a contact with a body: where it turns, how it moves, how heavy it is. */
@@ -3831,16 +3977,51 @@ export class SoftBodies implements PhysicsAttachment {
 }
 
 /** What a dynamic body's inverse mass and world inverse inertia are, for the kernel to share a contact's correction with it. */
+/**
+ * The part of a soft step's push `j` on a body that lands at the start of the rigid step. The soft step took the body's centre
+ * `D` past where a free body would be; the rigid step adds an impulse `I` at its start and a force `(j - I) / dt` over its `n`
+ * substeps, which move a free body by `I dt / m` plus `(j - I) dt (n + 1) / (2 n m)` (semi-implicit Euler, the rigid kernel's
+ * integration). Equal to `D` that gives `I = m (D - c dt j / m) / ((1 - c) dt)` with `c = (n + 1) / 2n`. With one substep a force
+ * and an impulse move a body alike, and all of it is a force.
+ */
+function startOfStep(
+  body: PhysicsBody,
+  c: Columns,
+  row: number,
+  j: Vec3,
+  dt: number,
+  gravity: readonly number[],
+  hostShare: number,
+  softShare: number,
+): Vec3 {
+  const wm = inverseMass(body)[0]!;
+  if (!(1 - hostShare > 1e-6) || !(wm > 0)) return [0, 0, 0];
+  const fall = (axis: number): number => gravity[axis]! * c.gs[row]! * dt * dt * softShare,
+    // Where the soft step took the centre, past a free body's fall from where it was at the speed it had.
+    beyond: Vec3 = [
+      c.mx[row]! - (c.m0x[row]! + c.l0x[row]! * dt + fall(0)),
+      c.my[row]! - (c.m0y[row]! + c.l0y[row]! * dt + fall(1)),
+      c.mz[row]! - (c.m0z[row]! + c.l0z[row]! * dt + fall(2)),
+    ],
+    split = (1 - hostShare) * dt;
+  return [0, 1, 2].map((a) => (beyond[a]! - hostShare * wm * j[a]! * dt) / (split * wm)) as unknown as Vec3;
+}
+
+/** The world rotation of a body's principal axes of inertia. */
+function inertiaAxes(body: PhysicsBody): [number, number, number, number] {
+  const f = body.inertiaFrame,
+    r = body.rotation;
+  return [
+    r[3] * f[0] + r[0] * f[3] + r[1] * f[2] - r[2] * f[1],
+    r[3] * f[1] - r[0] * f[2] + r[1] * f[3] + r[2] * f[0],
+    r[3] * f[2] + r[0] * f[1] - r[1] * f[0] + r[2] * f[3],
+    r[3] * f[3] - r[0] * f[0] - r[1] * f[1] - r[2] * f[2],
+  ];
+}
+
 function inverseMass(body: PhysicsBody): number[] {
   if (body.type !== 'dynamic' || !(body.mass > 0)) return [0, 0, 0, 0, 0, 0, 0];
-  const f = body.inertiaFrame,
-    r = body.rotation,
-    q: [number, number, number, number] = [
-      r[3] * f[0] + r[0] * f[3] + r[1] * f[2] - r[2] * f[1],
-      r[3] * f[1] - r[0] * f[2] + r[1] * f[3] + r[2] * f[0],
-      r[3] * f[2] + r[0] * f[1] - r[1] * f[0] + r[2] * f[3],
-      r[3] * f[3] - r[0] * f[0] - r[1] * f[1] - r[2] * f[2],
-    ],
+  const q = inertiaAxes(body),
     inertia = body.principalInertia,
     out = [1 / body.mass, 0, 0, 0, 0, 0, 0];
   for (let k = 0; k < 3; k++) {
@@ -3866,15 +4047,17 @@ function rowsOf(
   colliders: number,
   attachments: number,
   volumeTriangles: number,
+  faces: number,
 ): number {
   if (name === 'vtri') return volumeTriangles * 3;
+  if (name.startsWith('fc_')) return faces;
   if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
-  if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj)$/.test(name)) return particles * 4;
+  if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj|kr)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
   if (
-    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|dm[xyz]|th[xyz]|tu[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
+    /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/.test(
       name,
     )
   )
