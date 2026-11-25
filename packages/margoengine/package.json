@@ -2695,6 +2695,10 @@
       "types": "./dist/math/curve.d.ts",
       "import": "./dist/math/curve.js"
     },
+    "./math/gravity": {
+      "types": "./dist/math/gravity.d.ts",
+      "import": "./dist/math/gravity.js"
+    },
     "./mcp": {
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"

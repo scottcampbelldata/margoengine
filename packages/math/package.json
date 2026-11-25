@@ -167,6 +167,10 @@
     "./curve": {
       "types": "./dist/curve.d.ts",
       "import": "./dist/curve.js"
+    },
+    "./gravity": {
+      "types": "./dist/gravity.d.ts",
+      "import": "./dist/gravity.js"
     }
   },
   "files": [
