@@ -1118,7 +1118,7 @@ try {
         engine.camera.up = [0, 0, -1];
         engine.gpu.pushErrorScope('validation');
         const shots = [];
-        for await (const model of margoLive(engine, url, { signal: AbortSignal.timeout(120_000) })) {
+        for await (const _version of margoLive(engine, url, { signal: AbortSignal.timeout(120_000) })) {
           await waitForPipelines(async () => {
             engine.render({ culling: false });
             await engine.gpu.queue.onSubmittedWorkDone();
