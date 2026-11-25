@@ -51,6 +51,10 @@
     "./robots": {
       "types": "./dist/robots.d.ts",
       "import": "./dist/robots.js"
+    },
+    "./world": {
+      "types": "./dist/world/index.d.ts",
+      "import": "./dist/world.js"
     }
   },
   "files": [

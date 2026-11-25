@@ -1496,6 +1496,68 @@ for (let i = 0; i < 60; i++) physics.step();
 console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post,arm true
 ```
 
+### The solver contract (`@margoengine/physics/world`)
+
+`@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. The world, the field registry and the scheduler that drive these come next.
+
+```ts
+import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
+
+// A ball falling under the world's gravity, its height and speed in one f64 region.
+class Fall implements Solver<{height: number}> {
+  private state!: Region;
+  private host!: SolverHost;
+  describe() {
+    const height = {name: 'ballHeight', kind: 'scalarSeries', quantity: 'height', unit: 'm', centring: 'particle'} as const;
+    return {id: 'fall', fields: [{field: height, access: 'write'}] as const, rate: 2, stableRate: () => 2} as const;
+  }
+  init(host: SolverHost, params: {height: number}) {
+    this.host = host;
+    this.state = host.allocate('ball', 16, 'f64', 1);
+    this.words()[0] = params.height;
+  }
+  private words() {
+    return new Float64Array(this.host.memory.buffer, this.state.byteOffset, 2);
+  }
+  step(_context: unknown, dt: number) {
+    const w = this.words();
+    w[1] += this.host.gravity[1] * dt;
+    w[0] += w[1] * dt;
+  }
+  exportPorts(tick: number) {
+    return [{field: 'ballHeight', region: this.state, tick}];
+  }
+  importPorts() {}
+  stateRegions() {
+    return [this.state];
+  }
+  extraState() {
+    return [];
+  }
+  height() {
+    return this.words()[0];
+  }
+}
+
+const memory = new WebAssembly.Memory({initial: 1});
+let next = 0;
+const host: SolverHost = {
+  memory,
+  gravity: [0, -9.81, 0],
+  allocate: (name, byteLength, type, layout) => {
+    const region = {name, byteOffset: next, byteLength, type, layout};
+    next += byteLength;
+    return region;
+  },
+  port: () => undefined,
+};
+const fall = new Fall();
+fall.init(host, {height: 10});
+const level = fall.describe().rate; // 240 steps a second
+for (let tick = 0; tick < rateOf(level); tick++) fall.step({tick, level, seed: 1, inputs: new Map()}, 1 / rateOf(level));
+console.log(rateOf(level), substepsBetween(level, 0), fall.height().toFixed(2)); // 240 4 5.07
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

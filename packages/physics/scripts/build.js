@@ -31,6 +31,7 @@ await build({
         soft: resolve(root, 'src/soft.ts'),
         meshfiles: resolve(root, 'src/meshfiles.ts'),
         robots: resolve(root, 'src/robots.ts'),
+        world: resolve(root, 'src/world/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

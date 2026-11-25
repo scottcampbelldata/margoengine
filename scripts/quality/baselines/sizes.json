@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18627934,
+  "total": 18628489,
   "history": [
     {
       "date": "2026-10-24",
@@ -12599,6 +12599,7 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/world": 555,
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,

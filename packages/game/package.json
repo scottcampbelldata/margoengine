@@ -2079,6 +2079,10 @@
       "types": "./dist/physics/robots.d.ts",
       "import": "./dist/physics/robots.js"
     },
+    "./physics/world": {
+      "types": "./dist/physics/world.d.ts",
+      "import": "./dist/physics/world.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"
