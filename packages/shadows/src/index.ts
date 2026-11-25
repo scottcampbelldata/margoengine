@@ -373,6 +373,17 @@ const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
 @vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) @invariant vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+/** Frames an unmarked moving caster holds still before it rejoins the cached map. */
+const SETTLE_FRAMES = 30;
+interface Motion {
+  matrix: Float32Array;
+  serial: number;
+  /** Frames in a row whose matrix changed. */
+  streak: number;
+  /** Frames in a row a moving caster has held still. */
+  still: number;
+  moving: boolean;
+}
 /**
  * A primitive whose bounds hold still: range() made once, not a closure per caster per frame. A material's `shading`
  * (materials' createMesh gives every mesh one) changes colour only: the depth pass draws the vertices as they are, and
@@ -533,6 +544,8 @@ export class Shadows implements EnginePlugin {
   private dirty = true;
   private clipped = false;
   private stillHash = 0;
+  /** Unmarked casters' last matrix and how long they have moved or held still (GAP-FILM-SHADOWCACHE). */
+  private readonly motion = new WeakMap<object, Motion>();
   private readonly hashWord = new Uint32Array(1);
   private readonly hashFloat = new Float32Array(this.hashWord.buffer);
   private readonly objectIds = new WeakMap<object, number>();
@@ -1344,6 +1357,12 @@ export class Shadows implements EnginePlugin {
           moving = true;
           continue;
         }
+        if (this.mover(primitive.node)) {
+          // A moving caster draws in the per-frame pass; the cached map holds only what stays put.
+          moving = true;
+          hash = Math.imul(hash, 16777619) ^ ~(primitive.node.id + 1);
+          continue;
+        }
         hash = this.mixStill(hash, primitive);
       }
     }
@@ -1656,6 +1675,37 @@ export class Shadows implements EnginePlugin {
     this.hashFloat[0] = value;
     return Math.imul(hash, 16777619) ^ this.hashWord[0];
   }
+  /**
+   * Whether an unmarked caster's node counts as moving this frame. A node that moves on two frames in a row leaves the
+   * cached map (one redraw) and draws in the per-frame pass, so one moving car no longer redraws the whole still map
+   * every frame; once it holds still for SETTLE_FRAMES frames it rejoins the cache (one more redraw). A single move,
+   * such as placing an object, redraws the cache once and stays cached.
+   */
+  private mover(node: Mesh): boolean {
+    let m = this.motion.get(node);
+    if (!m) {
+      m = { matrix: new Float32Array(node.matrix), serial: this.frameSerial, streak: 0, still: 0, moving: false };
+      this.motion.set(node, m);
+      return false;
+    }
+    if (m.serial === this.frameSerial) return m.moving;
+    m.serial = this.frameSerial;
+    const matrix = node.matrix;
+    let changed = false;
+    for (let i = 0; i < 16; i++)
+      if (m.matrix[i] !== matrix[i]) {
+        changed = true;
+        m.matrix[i] = matrix[i];
+      }
+    if (changed) {
+      m.still = 0;
+      if (++m.streak >= 2) m.moving = true;
+    } else {
+      m.streak = 0;
+      if (m.moving && ++m.still >= SETTLE_FRAMES) m.moving = false;
+    }
+    return m.moving;
+  }
   /** Still-caster identity. A changed matrix, buffer, alpha map, or hidden bit redraws the whole cached atlas. */
   private mixStill(hash: number, primitive: ShadowPrimitive): number {
     hash = Math.imul(hash, 16777619) ^ this.identity(primitive.vertex);
@@ -1741,7 +1791,9 @@ export class Shadows implements EnginePlugin {
           const primitive = primitives[i],
             state = this.casterState(level, primitive.node, primitive.primitive ?? primitive.index, serial);
           // Moving wins: a primitive still in one source and moving in another is drawn with the moving ones.
-          if (state.still !== false) state.still = record.static || !(primitive.dynamic || primitive.instances);
+          if (state.still !== false)
+            state.still =
+              record.static || !(primitive.dynamic || primitive.instances || this.motion.get(primitive.node)?.moving);
         }
       }
 

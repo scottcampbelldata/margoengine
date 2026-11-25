@@ -340,6 +340,56 @@ test('unmarked casters stay cached until their matrix or dynamic flag changes', 
   }
 });
 
+test('a caster moving every frame leaves the cached map instead of redrawing it every frame (GAP-FILM-SHADOWCACHE)', () => {
+  const h = optionalGPU(),
+    engine = h.engine;
+  engine.gpu.limits.maxTextureDimension2D = 8192;
+  engine.gpu.limits.maxTextureArrayLayers = 256;
+  engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+  const vertex = engine.gpu.createBuffer({ size: 240, usage: GPUBufferUsage.VERTEX }),
+    index = engine.gpu.createBuffer({ size: 12, usage: GPUBufferUsage.INDEX }),
+    ground = { id: 0, engine, matrix: new Float32Array(h.context.camera.matrix), check() {} },
+    car = { id: 1, engine, matrix: new Float32Array(h.context.camera.matrix), check() {} },
+    shadows = new Shadows({ resolution: 64 });
+  const frame = () => {
+    h.context.shader = 'let linear=direct*vec3f(1);';
+    h.context.bindings = [];
+    engine.frameGraph.execute(h.context);
+    return { still: shadows.stats.staticDraws, moving: shadows.stats.dynamicDraws, hits: shadows.stats.cacheHits };
+  };
+  try {
+    engine.use(shadows);
+    shadows.add({ shadowPrimitives: [{ node: ground, vertex, index, count: 3, stride: 80 }] });
+    shadows.add({ shadowPrimitives: [{ node: car, vertex, index, count: 3, stride: 80 }] });
+    assert.deepEqual(frame(), { still: 8, moving: 0, hits: 0 });
+    // The first move redraws the cache once with the car in it, as placing an object does.
+    car.matrix[12] += 0.5;
+    assert.deepEqual(frame(), { still: 8, moving: 0, hits: 0 });
+    // Moving again: the car leaves the cache (one redraw of the ground) and draws in the per-frame pass.
+    car.matrix[12] += 0.5;
+    assert.deepEqual(frame(), { still: 4, moving: 4, hits: 0 });
+    let hits = 0;
+    for (let i = 0; i < 20; i++) {
+      car.matrix[12] += 0.5;
+      const f = frame();
+      assert.equal(f.still, 0, `frame ${i}: the ground is not redrawn while the car drives`);
+      assert.equal(f.moving, 4);
+      hits = f.hits;
+    }
+    assert.equal(hits, 20);
+    // Parked for 30 frames: back in the cache with one redraw, then cache hits with no per-frame pass.
+    let redraws = 0;
+    for (let i = 0; i < 30; i++) if (frame().still) redraws++;
+    assert.equal(redraws, 1);
+    assert.deepEqual(frame(), { still: 0, moving: 0, hits: 50 });
+  } finally {
+    shadows.dispose();
+    vertex.destroy();
+    index.destroy();
+    assert.ok(h.resources.every((r) => r.destroyed));
+  }
+});
+
 test('wireframe directional casters select line depth pipelines and invalidate still maps on topology changes', () => {
   const h = optionalGPU(),
     engine = h.engine;
