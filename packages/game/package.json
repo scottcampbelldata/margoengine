@@ -3547,6 +3547,10 @@
       "types": "./dist/vfx/fire-front.d.ts",
       "import": "./dist/vfx/fire-front.js"
     },
+    "./vfx/solid": {
+      "types": "./dist/vfx/solid.d.ts",
+      "import": "./dist/vfx/solid.js"
+    },
     "./vfx/gunfire": {
       "types": "./dist/vfx/gunfire.d.ts",
       "import": "./dist/vfx/gunfire.js"
