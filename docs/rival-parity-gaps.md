@@ -41,7 +41,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
 | Solid Particle System (many meshes as one mesh, per-particle transform and colour, pickable) | Babylon | MISSING | M |  |
-| Particle sub-emitters (spawn on birth, death, collision) | Babylon, PlayCanvas | MISSING | S to M |  |
+| Particle sub-emitters (spawn on birth, death, collision) | Babylon, PlayCanvas | DONE (death and collision EXISTS in `packages/vfx/src/events.ts`; birth added) | S to M | 6d04370a4 |
 | Particle fluid solver (`ParticleLiquid` only draws particles today) | three.js, Babylon fluid rendering | PARTIAL | L |  |
 | Soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1, plus a cloth render bridge | three.js, Babylon | PARTIAL | M |  |
 | Breakable / fracturing bodies | three.js `physics_ammo_break` | MISSING | M |  |
