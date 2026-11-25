@@ -245,7 +245,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | LANDED 48b593a13 |
-| AERO-02 | Membrane aerodynamics (FSI) | none | Claude | CLAIMED |
+| AERO-02 | Membrane aerodynamics (FSI) | none | Claude | LANDED 2f1860412 |
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | CLAIMED |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | CLAIMED |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | CLAIMED |
