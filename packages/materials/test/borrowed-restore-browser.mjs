@@ -86,8 +86,8 @@ await postBrowser(
           createMesh,
           boxGeometry,
         };
-        u.material = new UnlitMaterial({ color: '#ffffff' });
-        u.mesh = createMesh(engine, boxGeometry(3, 3, 3), u.material);
+        window.u.material = new UnlitMaterial({ color: '#ffffff' });
+        window.u.mesh = createMesh(engine, boxGeometry(3, 3, 3), window.u.material);
       });
     };
     const run = (code) => page.evaluate(`(async () => {const u = window.u; ${code}; await u.frame();})()`);

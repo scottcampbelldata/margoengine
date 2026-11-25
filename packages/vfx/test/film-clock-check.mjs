@@ -5,7 +5,7 @@
 // the same particle buffer, every byte, at 1 s and at 2 s: a FilmClock makes the particles a function of film time.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-const context = await openBrowser({ startPath: '/packages/vfx/test/film-clock-check.html', port: 5297 }),
+const context = await openBrowser({ startPath: '/packages/vfx/test/film-clock-check.html', port: 5420 }),
   { page, hardware } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

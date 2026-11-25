@@ -672,6 +672,8 @@ export const STEP_AFTER = {
   'check:readme-run': ['verify'],
   // cargo builds and tests the crates on its own; it reads nothing another step makes.
   'check:rust-kernels': [],
+  // Reads only git history; it needs no build.
+  'check:mass-deletion': [],
   'modern:test:packages': ['verify'],
   'modern:test:bundlers': ['modern:test:packages'],
   ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),

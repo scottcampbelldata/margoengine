@@ -35,9 +35,11 @@ for (const dir of dirs) {
         assert.match(name, NAME, `${field}: "${name}" is not a package name (a subpath cannot be installed)`);
   });
 
-  test(`${dir}: built code imports only what the manifest declares`, (t) => {
+  // Tools ship their source and have no dist; every package under packages/ is built.
+  if (dir.startsWith('tools')) continue;
+  test(`${dir}: built code imports only what the manifest declares`, () => {
     const dist = join(root, dir, 'dist');
-    if (!existsSync(dist)) return t.skip('not built');
+    assert.ok(existsSync(dist), `${dist} is missing: run npm run build:packages`);
     const declared = new Set([
       manifest.name,
       ...['dependencies', 'peerDependencies', 'optionalDependencies'].flatMap((f) => Object.keys(manifest[f] ?? {})),
