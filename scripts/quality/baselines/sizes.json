@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19147987,
+  "total": 19158124,
   "history": [
     {
       "date": "2026-10-24",
@@ -12465,6 +12465,12 @@
       "commit": "SEA-08 roll damping",
       "grew": 2,
       "reason": "@margoengine/physics/seakeeping: each section's viscous roll damping (Ikeda's eddy-making coefficient with its Lewis-form terms, Kato's skin friction on the section's girth), the hull's natural roll frequency for it, the implicit roll moment, and the load taken where a held load is energy-neutral with the radiation force carried there (KB-SEA-STEPDAMP1); measured gzip (Mac build) 10069 B, was 8701; without them a hull rolls on several times longer than a real one and every hull lost energy to its own step. Budget (measured + max(3%, 256 B)): 8962 to 10371 B. @margoengine/physics/world: the rigid solver publishes each body's substeps in the bodies port (one word); measured 16493 B on this Mac after the shared-memory loader (16490 budget), budget 16490 to 16988 B (measured + 3%)."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "c495379bb2",
+      "reason": "SPACE-02 adds the optional physics/celestial entry (9841 B gzip, budget 10137 B). The entry contains world-stepped astronomy, SPK interpolation, tide and insolation fields, and solar tracking. A separate split only moves the math and leaves the root users unchanged. Core and stage stay at 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13257,6 +13263,7 @@
     "@margoengine/physics": 618161,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 90777,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 519848,
+    "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,

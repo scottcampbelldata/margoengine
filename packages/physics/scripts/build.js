@@ -39,6 +39,7 @@ await build({
         waves: resolve(root, 'src/waves/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
+        celestial: resolve(root, 'src/space/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
       },

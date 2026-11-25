@@ -6,6 +6,10 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: missing time-varying celestial forcing and tracker backtracking (SPACE-02)
+
+Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
+
 ### Fixed 2026-11-25: native glass with the shared scene depth or a sciviz volume left the glass's own picture on screen (materials, KB-FILM-NEST2)
 
 - **Repro:** a transmissive glTF material in a scene that also holds water, `html`, clustered contact shadows (the

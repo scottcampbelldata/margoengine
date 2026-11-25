@@ -56,6 +56,10 @@ there, add a line below with the solver ID and what is needed, and build against
 - FIRE-06 uses module slot 2 for the plain and shared thermal builds. Please reserve this in the central
   module table when production solvers join it.
 
+- SPACE-02 requests shared contracts in @margoengine/math/fields for tidalPotential (m²/s² with Earth-fixed gradient
+  in m/s² at a Cartesian point) and insolation (W/m² and solar direction at a WGS 84 site) for SEA-07 and ATMO-09.
+  The celestial solver publishes both as layout-1 registry ports and supplies readers and test stand-ins.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.

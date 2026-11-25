@@ -2159,6 +2159,10 @@
       "types": "./dist/physics/seakeeping.d.ts",
       "import": "./dist/physics/seakeeping.js"
     },
+    "./physics/celestial": {
+      "types": "./dist/physics/celestial.d.ts",
+      "import": "./dist/physics/celestial.js"
+    },
     "./physics/tracers": {
       "types": "./dist/physics/tracers.d.ts",
       "import": "./dist/physics/tracers.js"

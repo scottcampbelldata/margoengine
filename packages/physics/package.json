@@ -84,6 +84,10 @@
       "types": "./dist/seakeeping/index.d.ts",
       "import": "./dist/seakeeping.js"
     },
+    "./celestial": {
+      "types": "./dist/space/index.d.ts",
+      "import": "./dist/celestial.js"
+    },
     "./tracers": {
       "types": "./dist/tracers.d.ts",
       "import": "./dist/tracers.js"

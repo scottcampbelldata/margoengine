@@ -4182,6 +4182,15 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+### Celestial ephemeris and rotation (SPACE-02)
+
+The coupling harness covers tide and solar-irradiance queries through the world ports, reproducibility across frame
+rates, and exact snapshot replay. The deterministic CPU tests exercise the IAU Earth rotation reference matrix, the
+analytical lunar and solar eclipse events, a rationalized tide gradient, and slope-aware solar tracker backtracking
+and shading. The optional JPL reader was also checked against Horizons using a full DE440s file. The combined
+ocean and atmospheric consumers will use the shared contracts requested in the physics work queue. See
+[the clean-room record](../clean-room.md#celestial-ephemeris-and-rotation-space-02).
+
 Batch 182 volume: [clean-room controls](../sciviz-rivals.md) expose public GPU counts and exact repeated frames without smoke timing. The allocation regression removes two transient matrices per prepare with identical uniform bytes, including singular transforms and restoration. Scene-depth capture and multisample composition remain supported and counted; equal shader work and quiet rival timing remain unproven.
 
 Batch 182 comparison: [sciviz-vs-rivals](../whitepaper/sciviz-vs-rivals.md) adds eight black-box rival scenes with exact repeat checks and API counts, and closed-form accuracy references (sphere isosurface, ABC streamline, isoline, pre-integrated Beer-Lambert) with second-order convergence. Rival timing and rival accuracy rows remain unproven until the quiet run.

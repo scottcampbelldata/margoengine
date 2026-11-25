@@ -2064,6 +2064,30 @@ async function load(builds: ModuleBuilds) {
 console.log(typeof load); // function
 ```
 
+### Celestial ephemeris, tides and insolation (`@margoengine/physics/celestial`)
+
+`CelestialSolver` advances the Sun, Moon and major planets with the physics world (SPACE-02). Its positions are geocentric J2000 vectors in metres. The two framework fields publish direct solar insolation and lunar/solar tidal potential. Read them through `insolationFromPort` and `tideFromPort`, passing the world memory and each solver's input port. Local samples use WGS 84 latitude and east longitude in radians, and optional ellipsoidal height in metres (default zero).
+
+The default epoch is J2000, with TT and TDB seconds zero and UT1 seconds −63.86. To set another epoch, give `epoch.ttSeconds` and `epoch.ut1Seconds` as seconds from JD 2451545.0 on their respective timescales. Supply `epoch.tdbSeconds` when known. It defaults to TT. `timeScale` defaults to one astronomical second per world second. Zero freezes the sky and negative values run it backwards. Optional `orientation` supplies IERS celestial pole and locator, polar motion and TIO locator for the run. Defaults use IAU 2006 precession, four nutation terms and zero polar motion.
+
+For high-precision or historical work, pass `ephemeris: new SpkEphemeris(bytes)` with a complete JPL planetary/lunar SPK kernel such as DE440s. The input can be an `ArrayBuffer` or `Uint8Array`. The reader copies the bytes and supports IEEE little- and big-endian J2000 type 2 and type 3 data. The default analytic mode uses JPL's fitted 1800–2050 orbit elements and the Meeus lunar series. SPK solar and lunar directions include light time and geocentric stellar aberration. Insolation is a geometric direct-beam estimate above the horizon. Clouds, atmospheric extinction and ocean response are supplied by their own solvers.
+
+`trackSolarRow` takes an east–north–up direction and returns the requested rotation, physical angle and adjacent-row shading. It defaults to a north–south horizontal axis, zero cross slope and calibration offset, a width-to-spacing ratio of 0.4, ±90° travel, backtracking enabled and a horizontal night-stow angle. To stow in wind, pass `windSpeed` (default zero) and `stowAt`, both in m/s. See `TrackerOptions` for axis, cross-slope, travel and calibration options.
+
+```ts
+import {CelestialSolver, trackSolarRow} from 'margoengine/physics/celestial';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const celestial = new CelestialSolver();
+const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(celestial, {});
+world.advance(24);
+
+const sun = celestial.insolation({latitude: 0, longitude: 0});
+const tide = celestial.tide([6378137, 0, 0]);
+const row = trackSolarRow(sun.direction, {groundCoverageRatio: 0.5, stowAt: 15, windSpeed: 8});
+console.log(sun.horizontal > 0, Number.isFinite(tide.potential), row.mode); // true true track
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
