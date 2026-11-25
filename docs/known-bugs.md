@@ -45,6 +45,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
   `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
 
+### Open 2026-11-25: the browser host sometimes exits mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
+
+- **Repro:** `npm run check:owners -- --packages=environment,lines,creative,lod,selection,shader` on the workstation (2026-11-25, lane A): after 82 fixtures passed, `creative/TextureRenderTarget (WebGL2 compatibility)` failed with `browser host <pid> ended (stdout closed) before it answered` (`HOST_GONE`). `--packages=creative` alone then passed 234 of 234. Handoff 11 of lane A recorded the same exit at `post/SSGI.attach (WebGL2 compatibility)` on 2026-11-24; post alone passed today. Not tied to one fixture: both runs had other GPU work on the machine, and both were long multi-package runs.
+- **Cause:** not found yet. The host process ends without writing its result; the earlier dropped-result cause (resolved 2026-11-15, `startHost` keeps early lines) does not fit, because no result line arrives. Next step: keep the host's stderr and exit code in the HOST_GONE error and run the multi-package list until it repeats.
+
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
 - **Repro:** `packages/post/test/ssao-silhouette-browser.mjs`: a box facing the camera with nothing near it, turned about the view axis in 12 steps, should read occlusion 1 everywhere. On WebGPU 4 silhouette pixels read down to 0.78 at 2 of the turns; on the WebGL2 layer, whose 4x sample positions leave more one-pixel tips, 1 to 3 pixels read down to 0.72 at 10 of them. Found as the 2.3 of 255 left on the WebGL2 layer by the KB-POST-ALPHARIM1 check.
