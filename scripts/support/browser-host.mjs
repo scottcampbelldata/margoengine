@@ -75,7 +75,8 @@ export function endOwned(
   const running = child && child.exitCode === null && child.signalCode === null;
   const exited = running ? new Promise((resolve) => child.once('exit', resolve)) : Promise.resolve();
   let fallback = null;
-  if (running) {
+  const killHandle = () => {
+    if (child.exitCode !== null || child.signalCode !== null) return;
     let refused;
     const onError = (error) => (refused = error);
     child.once('error', onError);
@@ -85,7 +86,14 @@ export function endOwned(
       child.removeListener('error', onError);
     }
     if (refused) log(`browser host: the browser process ${pid} refused to end: ${refused.message}`);
-  }
+  };
+  // With no list from Chromium the tree is ended by pid (`end`, taskkill /T on Windows), so the browser must still run
+  // while that runs: Windows reuses a pid once no handle to its process is left, and Node closes the handle it holds
+  // once the exit is seen. Killed first, the browser's pid was free while taskkill (which reads the process table
+  // through WMI, seconds on a loaded PC) still ran, and the next suite's browser host, or any process that took the pid
+  // or had it as parent, was ended with it (KB-HOST-COMPATEXIT1). The handle kill follows the tree's end.
+  const byTree = children === null && pid && running;
+  if (running && !byTree) killHandle();
   const listed = (children ?? []).filter((other) => Number.isInteger(other) && other > 0 && other !== pid);
   for (const other of listed) {
     try {
@@ -94,9 +102,22 @@ export function endOwned(
       if (error.code !== 'ESRCH') log(`browser host: process ${other} refused to end: ${error.message}`);
     }
   }
-  if (children === null && pid) fallback = end(pid, { waitMs: reapMs });
-  // Playwright's own transport sees its pipes close at once; the kernel cancels the reads either way.
-  for (const pipe of child?.stdio ?? []) pipe?.destroy();
+  // Playwright's own transport sees its pipes close at once; the kernel cancels the reads either way. Chromium ends
+  // itself when its pipe closes, so with a tree to end by pid the pipes close only after that, like the handle kill.
+  const closePipes = () => {
+    for (const pipe of child?.stdio ?? []) pipe?.destroy();
+  };
+  if (byTree)
+    fallback = Promise.resolve(end(pid, { waitMs: reapMs })).finally(() => {
+      killHandle();
+      closePipes();
+    });
+  else {
+    // The tree of a browser that had already exited is not ended by pid: that pid may be another process by now.
+    if (children === null && pid)
+      log(`browser host: the browser process ${pid} had exited; its tree is not ended by pid`);
+    closePipes();
+  }
   const settled = (async () => {
     let timer;
     // A timer is whole milliseconds and may fire before `reapMs` has passed on the monotonic clock: it is re-armed for

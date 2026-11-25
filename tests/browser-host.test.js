@@ -146,6 +146,48 @@ test('endOwned ends the whole tree by helper program when Chromium listed nothin
   assert.deepEqual(ended, [[77, 50]]);
 });
 
+test('endOwned ends an unlisted tree by pid while the browser still runs, and through its handle only after (KB-HOST-COMPATEXIT1)', async () => {
+  // Windows reuses a pid once no handle to its process is left. Killed through its handle first, the browser's pid was
+  // free while taskkill /T still ran, and the next suite's browser host, which had taken it, was ended with no word.
+  const child = stuckBrowser(78);
+  const pipe = new PassThrough();
+  child.stdio = [pipe];
+  const seen = [];
+  let finish;
+  const { settled } = endOwned({ process: () => child, kill: async () => {} }, null, {
+    reapMs: 50,
+    settle: null,
+    end: (pid) => {
+      seen.push(['end', pid, child.signalCode]);
+      return new Promise((resolve) => (finish = resolve));
+    },
+    log: () => {},
+  });
+  assert.deepEqual(seen, [['end', 78, null]], 'the tree end starts while the browser has not been killed');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(child.signalCode, null, 'the browser keeps its pid while the tree end runs');
+  assert.equal(pipe.destroyed, false, 'its pipes stay open too: Chromium ends itself when its pipe closes');
+  finish([]);
+  await settled;
+  assert.equal(child.signalCode, 'SIGKILL', 'killed through its handle once the tree end has finished');
+  assert.equal(pipe.destroyed, true, 'and its pipes closed then');
+});
+
+test('endOwned never ends a tree by the pid of a browser that has already exited (KB-HOST-COMPATEXIT1)', async () => {
+  const child = Object.assign(stuckBrowser(79), { exitCode: 1 });
+  const ended = [],
+    logs = [];
+  const { settled } = endOwned({ process: () => child, kill: async () => {} }, null, {
+    reapMs: 50,
+    settle: null,
+    end: async (pid) => (ended.push(pid), []),
+    log: (line) => logs.push(line),
+  });
+  await settled;
+  assert.deepEqual(ended, [], 'the pid may belong to another process by now');
+  assert.match(logs.join(' '), /79 had exited/);
+});
+
 test('hostBrowser speaks the protocol: ready, then the acknowledgement at once, then the result; a closed input ends too', async () => {
   for (const how of ['request', 'input end']) {
     const child = await fakeBrowser();

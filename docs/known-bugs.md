@@ -64,10 +64,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** not found yet. The file process ends long before its tests could finish, which points at the process being
   ended (memory or a kill) while the package runs its other test files beside it, not at a wrong value.
 
-### Open 2026-11-25: the browser host sometimes exits mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
+### Fixed 2026-11-25: the browser host sometimes exited mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
 
 - **Repro:** `npm run check:owners -- --packages=environment,lines,creative,lod,selection,shader` on the workstation (2026-11-25, lane A): after 82 fixtures passed, `creative/TextureRenderTarget (WebGL2 compatibility)` failed with `browser host <pid> ended (stdout closed) before it answered` (`HOST_GONE`). `--packages=creative` alone then passed 234 of 234. Handoff 11 of lane A recorded the same exit at `post/SSGI.attach (WebGL2 compatibility)` on 2026-11-24; post alone passed today. Not tied to one fixture: both runs had other GPU work on the machine, and both were long multi-package runs.
-- **Cause:** not found yet. The host process ends without writing its result; the earlier dropped-result cause (resolved 2026-11-15, `startHost` keeps early lines) does not fit, because no result line arrives. Next step: keep the host's stderr and exit code in the HOST_GONE error and run the multi-package list until it repeats.
+- **Cause:** the host ended with nothing on stderr, so something outside it killed it. When the suite cannot list Chromium's
+  processes within `LIST_PROCESSES_MS` (5 s, which a loaded PC misses), the host ends the tree by pid (`taskkill /T /F`).
+  `endOwned` killed the browser through its handle first and started that taskkill after, in the background, while the
+  suite moved on to its next leaf. Windows reuses a pid once no handle to its process is left, and Node closes its handle
+  when it sees the exit, so the browser's pid was free while taskkill, which reads the process table through WMI, still
+  ran. The next leaf's browser host (or any process that took the pid, or had it as parent) was ended with it.
+- **Fixed:** `endOwned` (scripts/support/browser-host.mjs) ends an unlisted tree by pid while the browser still runs and
+  kills it through its handle and closes its pipes (Chromium ends itself when its pipe closes) only after, and never ends a tree by the pid of a browser that had already exited.
+  Regression: tests/browser-host.test.js (both KB-HOST-COMPATEXIT1 cases fail on the old order). The exit was not caught
+  live with this fix in place; the listed-children kill (`process.kill` by pid, pids read moments before) keeps a far
+  smaller window of the same kind.
 
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
