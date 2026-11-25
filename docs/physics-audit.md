@@ -163,6 +163,39 @@ in the merge gate.
 | PA-91 | OPEN | P3 | `gltf/src/physics.ts:335, 374-383, 613` | glTF import approximations: soft joint limits become hard, and infinite planes become thin boxes. | Joint-limit springs in the kernel. | |
 | PA-92 | OPEN | P3 | `sciviz` | There is no time-integrated n-body, orbit, fluid or field simulator for documentary visualisation. | New simulators with symplectic integration. | Hairer, Lubich and Wanner, *Geometric Numerical Integration* |
 
+## The solver plan
+
+Fixing the findings one by one would leave the engine as it is now: systems that look right alone and never affect
+each other. So the physics is rebuilt as a set of solvers that share one clock, one set of physical fields and explicit
+coupling contracts. Each solver is research grade, deterministic on the CPU (Rust compiled to WebAssembly, bit-identical
+re-renders), steps on the film clock, supports snapshot, restore and bake, and has a "film" accuracy setting for
+offline renders. A GPU preview may follow where it helps, but the CPU path is the reference. Speed is not tuned until
+the features are complete.
+
+### Shared foundation (lands first, everything depends on it)
+
+| Quantity | Owner | Contract |
+| --- | --- | --- |
+| Film clock | the water and particles work (PA-07) | One simulated time `t` and integer step index for every solver; `advance(frame, fps)` never drops time (PA-01, PA-02). |
+| Gravity | the dynamics work (PA-08) | One gravity value in `@margoengine/math`, passed to every solver and shader as a uniform. |
+| Wind | the atmosphere solver | `WindField.sample(x, y, z, t)` returns the local air velocity (and density and temperature). Every consumer samples at its own position: bodies, cloth, sails, trees, particles, spray, smoke, the sea's wave growth. |
+| Water surface | the water solver | A pure, synchronous `seaSurface(x, z, t)` returning height, normal, orbital and current velocity, plus river and flood depth and velocity (PA-11). Bodies write back pressure and volume sources (hull displacement, impacts). |
+| Terrain | the terrain and destruction work | One bed height that erosion, slides and craters write and colliders read (PA-37). |
+| Rain | the atmosphere solver | Rain rate in mm/h with a drop-size distribution, per position (PA-23). |
+
+### The solver families
+
+| Solver | Owns | What it must do on camera | Key methods |
+| --- | --- | --- | --- |
+| Atmosphere | wind, clouds, smoke and fire plumes, dust, rain production | Wind that follows terrain, shelters behind hills, gusts in travelling eddies and shears with height. Clouds that form, grow, drift, rain and dissipate. Smoke and fire columns that rise, bend and spread. | A 3D Eulerian grid with potential temperature, vapour, cloud and rain water, buoyancy, latent heat, Kessler microphysics, MacCormack advection and vorticity confinement (Harris et al. 2003; Hädrich et al. 2020; Stam 1999; Fedkiw, Stam and Jensen 2001). A log-law boundary layer with spectral turbulence (Mann 1994). |
+| Ocean and waves | the sea surface, wave growth and swell, wakes, breaking | Seas that build with wind and fetch, swell that outlives the storm, waves that steepen, crest and crash. A hull that cuts a real wake through the water, with bow wave, transverse and diverging waves, and the wake interacting with the sea. | A spectral ocean with duration and fetch-limited growth and swell (JONSWAP; Hasselmann et al. 1973), a dispersive local surface solver around bodies driven by hull displacement (Boussinesq or wave particles; Yuksel et al. 2007; Jeschke and Wojtan 2018), and breaking detection feeding the particle fluid. |
+| Shallow water and hydrology | rivers, floods, runoff, sediment | Rain falling on a mountain runs off, gathers into channels and forms a river where physics puts it. Floods push what they reach. Rivers carve and fill their beds. | Conservative shallow water with Manning friction and wet and dry handling (Kurganov and Petrova 2007), rainfall-runoff with infiltration (Green and Ampt 1911), sediment transport and an Exner bed update (Meyer-Peter and Müller 1948; Davy and Lague 2009), stream-power erosion (Braun and Willett 2013). |
+| Particle fluid | splashes, crashing crests, spray, poured liquid | Water that leaves the surface: breaking crests, bow spray, splash columns, waterfalls, with mass, momentum and drag. | DFSPH as the accurate default (Bender and Koschier 2015, 2017), PBF as the fast mode (Macklin and Müller 2013), two-way coupling with rigid bodies (Akinci et al. 2012), surface tension (Akinci et al. 2013), hand-off to and from the surface solvers. |
+| Ships and floating bodies | seakeeping, manoeuvring, damage | A ship that rocks, heaves, pitches and rolls with real inertia, lags and rides the swell, takes green water, heels under sail and in turns, and can flood, list, capsize and sink. Debris and ice that float, tumble and drift. | 6-DOF rigid bodies with pressure integrated over the wetted hull, added mass and radiation damping, propulsion, rudder, windage and sail force (Cummins 1962; Fossen 2011; Faltinsen 1990; Yasukawa and Yoshimura 2015). |
+| Vegetation and cloth | trees, grass, crops, flags, sails, clothing, hair | Trees that bend by the wind's drag with their own frequencies, sway in travelling gusts, and break or fall in storms. Sails that fill and drive a ship. | Per-species modal response driven by drag (de Langre 2008; Habel et al. 2007; Gardiner et al. 2000), per-triangle cloth aerodynamics (Wilson et al. 2014), spring bones in SI units. |
+| Granular and terrain | dirt, sand, mud, landslides, craters, debris, destruction | Landslides and mudflows that run over real terrain, sand that slides at its angle of repose, craters and ejecta from the energy of a blast, buildings and voxels that fail under load and fall as debris that settles. | MPM for sand, mud and snow (Stomakhin et al. 2013; Klar et al. 2016), depth-averaged flow (Savage and Hutter 1989), crater scaling (Holsapple 1993), fracture (Müller, Chentanez and Kim 2013), blast waves (Kingery and Bulmash 1984). |
+| Characters, animals and crowds | horses, riders, soldiers, armies, machines | A horse that leans into turns, plants its hooves on slopes and carries a rider who rides it. Armies whose charges carry momentum, push and knock down. Bodies that fall, are thrown and are pushed by water and wind. | Grip-limited locomotion (Alexander and Jayes 1983), force-based crowds (Helbing, Farkas and Vicsek 2000), ragdoll and dynamic-character hand-off, driven mechanisms on the kernel's constraints. |
+
 ## The guard against the class
 
 Each fix lands with a regression test. Coupling tests then become a required check in `check:merge`. For every system
