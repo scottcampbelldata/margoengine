@@ -23,6 +23,8 @@ export interface FlightOptions {
     cancelOnInput?: boolean;
 }
 
+export type GeoidQuery = (longitude: number, latitude: number) => number | undefined;
+
 export class GeospatialControls extends Controls {
     enablePan: boolean;
     enableZoom: boolean;
@@ -49,6 +51,8 @@ export class GeospatialControls extends Controls {
     inertia: GeospatialInertia;
     reducedMotion: boolean;
     gamepad: boolean;
+    geoid: GeoidQuery | undefined;
+    readonly hash: boolean;
     protected get kind(): string;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: GeospatialOptions);
     get view(): Readonly<Required<GeospatialView>>;
@@ -96,9 +100,26 @@ export class GeospatialControls extends Controls {
     followPath(views: readonly GeospatialView[], options?: PathOptions): Promise<boolean>;
     cancel(): void;
     update(delta?: number): boolean;
+    saveView(): GeospatialViewState;
+    restoreView(state: Partial<GeospatialViewState>, options?: FlightOptions): Promise<boolean>;
+    toHash(): string;
+    static parseHash(hash: string): GeospatialViewState | null;
+    get heights(): GeospatialHeights;
+    get orientation(): {
+        heading: number;
+        pitch: number;
+        roll: number;
+    };
+    resetNorth(options?: FlightOptions): Promise<boolean>;
     dispose(): void;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
+}
+
+export interface GeospatialHeights {
+    ellipsoid: number;
+    terrain: number;
+    seaLevel: number | null;
 }
 
 export interface GeospatialInertia {
@@ -131,6 +152,8 @@ export interface GeospatialOptions {
     keyTarget?: EventTargetLike | null;
     preset?: GeospatialPreset;
     inertia?: Partial<GeospatialInertia>;
+    geoid?: GeoidQuery;
+    hash?: boolean;
     gamepad?: boolean;
     reducedMotion?: boolean;
 }
@@ -154,6 +177,10 @@ export interface GeospatialView {
     heading?: number;
     pitch?: number;
     range?: number;
+}
+
+export interface GeospatialViewState extends Required<GeospatialView> {
+    mode: GeospatialMode;
 }
 
 export type HeightQuery = (longitude: number, latitude: number) => number | undefined;

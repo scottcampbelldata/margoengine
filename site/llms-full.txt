@@ -11818,7 +11818,10 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   pan until it is lifted and pressed again. The gamepad is the first connected pad with four axes in the standard
   mapping (axes 0 to 3, triggers on buttons 6 and 7, boost on 10); it is read only when `gamepad` is true, and other
   pads are left to the page.
-- Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
+- Heights are above the WGS84 ellipsoid unless you pass `geoid`: Margo ships no geoid model, so `heights.seaLevel` is
+  null without one (EGM96 departs from the ellipsoid by -107 to +85 m). `orientation` is in the eye's ENU frame, so an
+  orbit camera that is level at its centre shows a roll of about range / Earth radius (5e-4 rad at 3 km). The `compass`
+  event follows the view heading. The hash keeps 7 decimal places of degrees (about 1 cm) and 0.01 m.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)
 
