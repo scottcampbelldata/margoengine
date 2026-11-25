@@ -61,7 +61,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | --- | --- | --- | --- | --- |
 | Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | DONE (scene save and load already existed: `save/src/engine.ts`) | M | f19d13852 |
 | Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | DONE (`setMaterialSortModes`: per engine, opaque and transparent material meshes) | S | 8aaf6a290 |
-| Blob shadow and planar `ShadowMesh` | three.js, drei | DONE (`@margoengine/materials/fake-shadows`; pixels not GPU-checked) | S | b139cca8a |
+| Blob shadow and planar `ShadowMesh` | three.js, drei | DONE (`@margoengine/materials/fake-shadows`; pixels not GPU-checked) | S | 196b41134 |
 | drei helpers: Float, Center, Resize, ScreenSizer, interaction prompt | drei, model-viewer | MISSING | S each |  |
 | Font formats: WOFF and WOFF2, CFF `.otf`, GPOS kerning | three.js TextGeometry, troika | DONE | M | d2f0084e2 |
 | Configurable `loadTexture` caps (fixed at 16.7 MP and 64 MiB) | three.js | DONE (`maxBytes`, `maxPixels`; cube maps and restore take them too, cd259602f, e1c8eff03) | S | 8aaf6a290 |
