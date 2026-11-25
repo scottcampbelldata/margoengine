@@ -232,7 +232,12 @@ test('PBR BLEND is written as mode 2 and glTF BLEND materials load as BLEND', as
     primitives: [{ definition: { material: 0 }, material: {} }],
     image: () => undefined,
     readPickingGeometry: async () => [
-      { primitiveIndex: 0, vertices, indices: new Uint32Array([0, 1, 2]), matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) },
+      {
+        primitiveIndex: 0,
+        vertices,
+        indices: new Uint32Array([0, 1, 2]),
+        matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+      },
     ],
   };
   const g = await traceSceneFromGLTF(model);

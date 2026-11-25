@@ -4,7 +4,21 @@ import type { TraceGeometryBuilder } from './compose-types.js';
 import type { PBRMeshTraceScene, TracePBRMesh, TracePBRMaterial, TracePBRTexture } from './mesh-pbr-types.js';
 
 const LIMIT = (128 << 20) / 4;
-const MAPS = ['baseColorTexture', 'metallicRoughnessTexture', 'normalTexture', 'emissiveTexture', 'clearcoatTexture', 'clearcoatRoughnessTexture', 'clearcoatNormalTexture', 'sheenColorTexture', 'sheenRoughnessTexture', 'specularTexture', 'specularColorTexture', 'iridescenceTexture', 'iridescenceThicknessTexture'] as const;
+const MAPS = [
+  'baseColorTexture',
+  'metallicRoughnessTexture',
+  'normalTexture',
+  'emissiveTexture',
+  'clearcoatTexture',
+  'clearcoatRoughnessTexture',
+  'clearcoatNormalTexture',
+  'sheenColorTexture',
+  'sheenRoughnessTexture',
+  'specularTexture',
+  'specularColorTexture',
+  'iridescenceTexture',
+  'iridescenceThicknessTexture',
+] as const;
 const wraps = ['repeat', 'mirror', 'clamp'];
 function finite(value: number, name: string, low = 0, high = 1): number {
   if (!Number.isFinite(value) || value < low || value > high)
@@ -16,16 +30,29 @@ function vector(a: readonly number[], size: number, name: string, high = 1): voi
   for (const n of a) finite(n, name, 0, high);
 }
 function texture(t: TracePBRTexture): void {
-  if (!t || !Number.isInteger(t.width) || !Number.isInteger(t.height) || t.width < 1 || t.height < 1 ||
-      t.width * t.height > LIMIT || !(t.data instanceof Uint8Array || t.data instanceof Uint8ClampedArray) ||
-      t.data.length !== t.width * t.height * 4)
+  if (
+    !t ||
+    !Number.isInteger(t.width) ||
+    !Number.isInteger(t.height) ||
+    t.width < 1 ||
+    t.height < 1 ||
+    t.width * t.height > LIMIT ||
+    !(t.data instanceof Uint8Array || t.data instanceof Uint8ClampedArray) ||
+    t.data.length !== t.width * t.height * 4
+  )
     throw new TypeError('Mesh PBR texture needs positive dimensions and exact RGBA8 pixels');
   if (!Number.isInteger(t.texCoord ?? 0) || (t.texCoord ?? 0) < 0 || (t.texCoord ?? 0) > 3)
     throw new RangeError('Mesh PBR texCoord must be 0 through 3');
-  if (!wraps.includes(t.wrapS ?? 'repeat') || !wraps.includes(t.wrapT ?? 'repeat') ||
-      !['nearest', 'linear'].includes(t.filter ?? 'linear'))
+  if (
+    !wraps.includes(t.wrapS ?? 'repeat') ||
+    !wraps.includes(t.wrapT ?? 'repeat') ||
+    !['nearest', 'linear'].includes(t.filter ?? 'linear')
+  )
     throw new TypeError('Mesh PBR texture needs repeat, mirror or clamp wrapping and nearest or linear filtering');
-  if (t.transform !== undefined && (t.transform.length !== 6 || t.transform.some(n => !Number.isFinite(n) || Math.abs(n) > 1e8)))
+  if (
+    t.transform !== undefined &&
+    (t.transform.length !== 6 || t.transform.some((n) => !Number.isFinite(n) || Math.abs(n) > 1e8))
+  )
     throw new TypeError('Mesh PBR texture transform needs six finite affine values');
 }
 
@@ -53,17 +80,30 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       finite(m.metallicFactor ?? 1, 'metallicFactor');
       finite(m.normalScale ?? 1, 'normalScale', -1e8, 1e8);
       finite(m.alphaCutoff ?? 0.5, 'alphaCutoff');
-      for(const name of ['clearcoatFactor','clearcoatRoughnessFactor','sheenRoughnessFactor','specularFactor','iridescenceFactor'] as const)
-        finite(m[name]??(name==='specularFactor'?1:0),name);
-      vector(m.sheenColorFactor??[0,0,0],3,'sheenColorFactor');
-      vector(m.specularColorFactor??[1,1,1],3,'specularColorFactor',1e8);
-      finite(m.clearcoatNormalScale??1,'clearcoatNormalScale',-1e8,1e8);
-      finite(m.iridescenceIor??1.3,'iridescenceIor',1,10);
-      finite(m.iridescenceThicknessMinimum??100,'iridescenceThicknessMinimum',0,1e8);
-      finite(m.iridescenceThicknessMaximum??400,'iridescenceThicknessMaximum',m.iridescenceThicknessMinimum??100,1e8);
+      for (const name of [
+        'clearcoatFactor',
+        'clearcoatRoughnessFactor',
+        'sheenRoughnessFactor',
+        'specularFactor',
+        'iridescenceFactor',
+      ] as const)
+        finite(m[name] ?? (name === 'specularFactor' ? 1 : 0), name);
+      vector(m.sheenColorFactor ?? [0, 0, 0], 3, 'sheenColorFactor');
+      vector(m.specularColorFactor ?? [1, 1, 1], 3, 'specularColorFactor', 1e8);
+      finite(m.clearcoatNormalScale ?? 1, 'clearcoatNormalScale', -1e8, 1e8);
+      finite(m.iridescenceIor ?? 1.3, 'iridescenceIor', 1, 10);
+      finite(m.iridescenceThicknessMinimum ?? 100, 'iridescenceThicknessMinimum', 0, 1e8);
+      finite(
+        m.iridescenceThicknessMaximum ?? 400,
+        'iridescenceThicknessMaximum',
+        m.iridescenceThicknessMinimum ?? 100,
+        1e8,
+      );
 
-      if (!['OPAQUE', 'MASK', 'BLEND'].includes(m.alphaMode ?? 'OPAQUE') ||
-          (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean'))
+      if (
+        !['OPAQUE', 'MASK', 'BLEND'].includes(m.alphaMode ?? 'OPAQUE') ||
+        (m.doubleSided !== undefined && typeof m.doubleSided !== 'boolean')
+      )
         throw new TypeError('Mesh PBR requires alphaMode OPAQUE, MASK or BLEND and a boolean doubleSided');
       for (const name of MAPS) {
         const t = m[name];
@@ -81,39 +121,52 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       if (m.uvSets && (!Array.isArray(m.uvSets) || m.uvSets.length > 4))
         throw new TypeError('Mesh PBR uvSets accepts at most four coordinate arrays');
       for (const [name, a, length] of [
-        ['tangents', m.tangents, count * 4], ['colors', m.colors, count * 4],
-        ...Array.from({length: 4}, (_, i) => [`uv${i}`, m.uvSets?.[i] ?? (i === 0 ? m.uvs : undefined), count * 2]),
+        ['tangents', m.tangents, count * 4],
+        ['colors', m.colors, count * 4],
+        ...Array.from({ length: 4 }, (_, i) => [`uv${i}`, m.uvSets?.[i] ?? (i === 0 ? m.uvs : undefined), count * 2]),
       ] as const) {
-        if (a !== undefined && (!(a instanceof Float32Array) || a.length !== length || a.some(n => !Number.isFinite(n) || Math.abs(n) > 1e8)))
+        if (
+          a !== undefined &&
+          (!(a instanceof Float32Array) ||
+            a.length !== length ||
+            a.some((n) => !Number.isFinite(n) || Math.abs(n) > 1e8))
+        )
           throw new TypeError(`Mesh PBR ${name} needs finite Float32Array vertex values`);
       }
-      if (m.colors?.some(n => n < 0 || n > 1)) throw new RangeError('Mesh PBR vertex colours must be in [0,1]');
-      if (m.tangents) for (let i = 0; i < count; i++) {
-        const at = i * 4, w = m.tangents[at + 3]!;
-        if (![0, 1, -1].includes(w) || (w !== 0 && Math.hypot(...m.tangents.subarray(at, at+3)) === 0))
-          throw new RangeError('Mesh PBR tangents need a nonzero direction and handedness +1 or -1, or handedness 0 for a generated frame');
-      }
+      if (m.colors?.some((n) => n < 0 || n > 1)) throw new RangeError('Mesh PBR vertex colours must be in [0,1]');
+      if (m.tangents)
+        for (let i = 0; i < count; i++) {
+          const at = i * 4,
+            w = m.tangents[at + 3]!;
+          if (![0, 1, -1].includes(w) || (w !== 0 && Math.hypot(...m.tangents.subarray(at, at + 3)) === 0))
+            throw new RangeError(
+              'Mesh PBR tangents need a nonzero direction and handedness +1 or -1, or handedness 0 for a generated frame',
+            );
+        }
       const material = materials.get(m.material);
       if (!material) throw new TypeError('Mesh PBR every mesh must name a pbrMaterials id');
-      if (material) for (const key of MAPS) {
-        const t = material[key];
-        if (t && !(m.uvSets?.[t.texCoord ?? 0] ?? ((t.texCoord ?? 0) === 0 ? m.uvs : undefined)))
-          throw new TypeError(`Mesh PBR ${key} requires its selected vertex UV set`);
-      }
+      if (material)
+        for (const key of MAPS) {
+          const t = material[key];
+          if (t && !(m.uvSets?.[t.texCoord ?? 0] ?? ((t.texCoord ?? 0) === 0 ? m.uvs : undefined)))
+            throw new TypeError(`Mesh PBR ${key} requires its selected vertex UV set`);
+        }
       meshOffsets.set(m.id, size);
       size += 4 + m.indices.length + count * 16;
     }
     if (size > LIMIT) throw new RangeError('Mesh PBR packet exceeds 128 MiB; use fewer vertices or smaller images');
     const clean = {
       ...s,
-      meshInstances: s.meshInstances ?? meshes.map(m => ({id: m.id, mesh: m.id})),
-      meshes: meshes.map(m => ({...m, material: 1})),
-      materials: [{id: 1, type: 'diffuse' as const, color: [1, 1, 1] as const}],
+      meshInstances: s.meshInstances ?? meshes.map((m) => ({ id: m.id, mesh: m.id })),
+      meshes: meshes.map((m) => ({ ...m, material: 1 })),
+      materials: [{ id: 1, type: 'diffuse' as const, color: [1, 1, 1] as const }],
     };
     const geometry = await this.#mesh.build(clean, signal);
     if (geometry.length + size > LIMIT)
       throw new RangeError('Mesh PBR geometry and materials exceed 128 MiB; reduce the scene');
-    const out = new Uint32Array(geometry.length + size), f = new Float32Array(out.buffer), base = geometry.length;
+    const out = new Uint32Array(geometry.length + size),
+      f = new Float32Array(out.buffer),
+      base = geometry.length;
     out.set(geometry);
     out[10] = base;
     for (const m of materials.values()) {
@@ -124,25 +177,49 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       f.set(m.baseColorFactor ?? [1, 1, 1, 1], at + 4);
       f.set(m.emissiveFactor ?? [0, 0, 0], at + 8);
       f[at + 11] = m.emissiveStrength ?? 1;
-      f.set([m.metallicFactor ?? 1, m.roughnessFactor ?? 1, m.normalScale ?? 1, m.alphaCutoff ?? .5], at + 12);
+      f.set([m.metallicFactor ?? 1, m.roughnessFactor ?? 1, m.normalScale ?? 1, m.alphaCutoff ?? 0.5], at + 12);
       out[at + 1] = m.alphaMode === 'MASK' ? 1 : m.alphaMode === 'BLEND' ? 2 : 0;
       out[at + 2] = m.doubleSided ? 1 : 0;
-      f.set([m.clearcoatFactor??0,m.clearcoatRoughnessFactor??0,m.clearcoatNormalScale??1,m.sheenRoughnessFactor??0],at+32);
-      f.set(m.sheenColorFactor??[0,0,0],at+36);f[at+39]=m.specularFactor??1;
-      f.set(m.specularColorFactor??[1,1,1],at+40);f[at+43]=m.iridescenceFactor??0;
-      f.set([m.iridescenceIor??1.3,m.iridescenceThicknessMinimum??100,m.iridescenceThicknessMaximum??400],at+44);
+      f.set(
+        [
+          m.clearcoatFactor ?? 0,
+          m.clearcoatRoughnessFactor ?? 0,
+          m.clearcoatNormalScale ?? 1,
+          m.sheenRoughnessFactor ?? 0,
+        ],
+        at + 32,
+      );
+      f.set(m.sheenColorFactor ?? [0, 0, 0], at + 36);
+      f[at + 39] = m.specularFactor ?? 1;
+      f.set(m.specularColorFactor ?? [1, 1, 1], at + 40);
+      f[at + 43] = m.iridescenceFactor ?? 0;
+      f.set(
+        [m.iridescenceIor ?? 1.3, m.iridescenceThicknessMinimum ?? 100, m.iridescenceThicknessMaximum ?? 400],
+        at + 44,
+      );
 
-      MAPS.forEach((key, i) => out[at + 16 + i] = m[key] ? base + textures.get(m[key]!)! : 0);
+      MAPS.forEach((key, i) => (out[at + 16 + i] = m[key] ? base + textures.get(m[key]!)! : 0));
     }
     for (const [t, offset] of textures) {
       const at = base + offset;
-      out.set([t.width, t.height, at + 16, t.texCoord ?? 0,
-        wraps.indexOf(t.wrapS ?? 'repeat'), wraps.indexOf(t.wrapT ?? 'repeat'), t.filter === 'nearest' ? 0 : 1], at);
+      out.set(
+        [
+          t.width,
+          t.height,
+          at + 16,
+          t.texCoord ?? 0,
+          wraps.indexOf(t.wrapS ?? 'repeat'),
+          wraps.indexOf(t.wrapT ?? 'repeat'),
+          t.filter === 'nearest' ? 0 : 1,
+        ],
+        at,
+      );
       f.set(t.transform ?? [1, 0, 0, 0, 1, 0], at + 8);
       new Uint8Array(out.buffer, (at + 16) * 4, t.data.byteLength).set(t.data);
     }
     for (const m of meshes) {
-      const at = base + meshOffsets.get(m.id)!, vertices = at + 4 + m.indices.length;
+      const at = base + meshOffsets.get(m.id)!,
+        vertices = at + 4 + m.indices.length;
       out.set([at + 4, vertices, m.tangents ? 1 : 0, 0], at);
       out.set(m.indices, at + 4);
       for (let i = 0; i < m.positions.length / 3; i++) {
@@ -156,7 +233,7 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
       }
     }
     const placements = clean.meshInstances;
-    const meshMaterials = new Map(meshes.map(m => [m.id, m.material]));
+    const meshMaterials = new Map(meshes.map((m) => [m.id, m.material]));
     for (let i = 0; i < out[4]!; i++) {
       const record = out[5]! + i * 32;
       const original = out[record + 26]!;
@@ -166,5 +243,7 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
     signal?.throwIfAborted();
     return out;
   }
-  dispose(): void { this.#mesh.dispose(); }
+  dispose(): void {
+    this.#mesh.dispose();
+  }
 }
