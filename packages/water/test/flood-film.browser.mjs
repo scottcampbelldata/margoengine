@@ -2,7 +2,7 @@
 // scene with a sea side, a tsunami, a reservoir behind a wall that breaches, an inflow, wind, rain and a live roughness
 // change, directed at film times. Bounds: two runs of 600 frames at 30 fps are identical bit for bit; 600 frames at 30 fps
 // equal 1,200 at 60 fps; a fresh flood that replays the clock (what `seek` from @margoengine/cutscene/seek does) and then
-// `settle()`s equals the continuous run; a device restore replays the history to the same state; the Courant number stays
+// `settle()`s equals the continuous run; a reset Water and flood run again equal a fresh run (GAP-FILM-RESET); a device restore replays the history to the same state; the Courant number stays
 // at or under 0.25 and no cell is capped; and sixty steady frames make no pipeline, buffer, texture or bind group.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -123,6 +123,26 @@ try {
       out.seekLevel = w.water.seaLevel;
       w.dispose();
     }
+    // Several cuts in one process (GAP-FILM-RESET): run the film, reset the Water and the flood, run it again. The
+    // flood drops the inputs set after tick 0 and the Water builds a fresh solver, so the second run equals a fresh one.
+    {
+      const w = world();
+      for (let i = 0; i < 600; i++) {
+        direct(w.flood);
+        engine.render({ delta: 1 / 30 });
+      }
+      out.resetBefore = w.flood.ticks;
+      w.water.resetTime();
+      w.flood.resetTime();
+      out.resetTime = [w.flood.time, w.flood.ticks, w.water.time];
+      for (let i = 0; i < 600; i++) {
+        direct(w.flood);
+        engine.render({ delta: 1 / 30 });
+      }
+      out.reset = await digest(w.flood);
+      out.resetLevel = w.water.seaLevel;
+      w.dispose();
+    }
     // A device restore replays the history to the same state.
     {
       const w = world();
@@ -170,6 +190,10 @@ try {
   assert.ok(result.afterOneFrame <= 240, `a frame runs at most 240 ticks, ran ${result.afterOneFrame}`);
   assert.equal(result.a.ticks, 2400, '20 s is 2,400 ticks');
   assert.deepEqual(pick(result.after), pick(result.before), 'a device restore replays to the same state');
+  assert.equal(result.resetBefore, 2400, 'the first cut ran');
+  assert.deepEqual(result.resetTime, [0, 0, 0], 'resetTime puts the flood and the Water at 0');
+  assert.deepEqual(pick(result.reset), pick(result.a), 'a reset flood run again equals a fresh run, bit for bit');
+  assert.equal(result.resetLevel, result.a.level, 'and drives the Water to the same level');
   assert.ok(result.restartTicks <= 240, 'the replay runs 240 ticks a frame');
   for (const r of [result.a, result.c, result.seek]) {
     assert.ok(r.courant <= 0.25, `Courant ${r.courant}`);

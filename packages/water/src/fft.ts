@@ -255,6 +255,18 @@ export class FFTOcean implements EnginePlugin {
     return this;
   }
   /**
+   * Puts the wave clock back to 0 with no span owed, and starts the foam history again at the next draw, as a fresh
+   * ocean has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives
+   * what a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.live();
+    this.elapsed = 0;
+    this.pendingDelta = 0;
+    this.initialized = false;
+    this.dirty = true;
+  }
+  /**
    * Moves the wave clock by `delta` seconds without drawing (a delta of 0 or less moves nothing); each frame update runs
    * it, so `seek` from `@margoengine/cutscene/seek` replays the waves exactly. Foam is history on the GPU: a replayed
    * span decays it over the whole span at the next draw, as a forward `setTime` does.

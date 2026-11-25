@@ -1553,6 +1553,15 @@ console.log(water.time, rain.time);
   twice.
 - History on the GPU comes from the scene's warm-up frames, not from the seek: foam (FFT foam decays with
   `foamLifetime`, 4 s), `Ripples`, rain splashes into a `Ripples` field and coastal flow.
+- Several cuts in one process: `resetTime()` puts each water clock back as a fresh one with the same options has it
+  (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock), so a later `seek` gives what a fresh world
+  seeked there gives. `Water` drops each view's foam history, its coastal flow and spray (the next frame builds them
+  again), `FFTOcean` starts its foam again, `WaterRain` owes no splash, `ShipWakes` forget each ship's trail and pose,
+  `ShotSplash` plans the source's impacts again (ones added by hand are dropped), and `Floater`, `Iceberg` and `SeaIce`
+  go back where they were built, at rest, until the next `update` gives them water. `Flood` goes back to tick 0 with
+  the inputs it had there (walls, breaches, sources, tsunamis, wave makers, wind and rain set later are dropped), puts
+  the Water's sea level back and starts a fresh solver at the next frame. Evidence: `test/reset-time.test.js` (state of
+  a reset clock equals a fresh one's, before and after a seek, for all of them).
 
 ## Rain ripples
 

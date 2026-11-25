@@ -588,6 +588,23 @@ export class ShotSplash implements EnginePlugin {
     return this.slots.flatMap((s, slot) => (s.event ? [{ event: s.event, slot, age: this.clock - s.event.time }] : []));
   }
   /**
+   * Puts the splash clock back to 0 with no splash planned or drawn and every emitter's rate at 0, as a fresh one has
+   * them; impacts the source lists are planned again as the clock reaches them, and ones added by hand are dropped,
+   * so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh
+   * world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.clock = 0;
+    this.seen = 0;
+    this.fired = 0;
+    this.events.length = 0;
+    for (const slot of this.slots) {
+      slot.event = null;
+      slot.used = -1;
+      slot.crown.options.rate = slot.column.options.rate = slot.mist.options.rate = 0;
+    }
+  }
+  /**
    * Moves the clock by `delta` seconds (CPU only, so a seek replays it): takes new impacts from the source, throws the
    * crown and mist of every splash that falls due and runs each column while its jet rises.
    */

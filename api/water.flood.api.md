@@ -21,6 +21,7 @@ export class Flood implements EnginePlugin {
     get velocityTexture(): GPUTexture | undefined;
     get wetTexture(): GPUTexture | undefined;
     get ticks(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     wall(wall: FloodWall, log?: boolean): number;
@@ -251,6 +252,7 @@ class Water implements EnginePlugin {
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
     onPreUpdate(delta: number): void;

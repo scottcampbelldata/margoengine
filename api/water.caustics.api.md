@@ -43,6 +43,7 @@ class FFTOcean implements EnginePlugin {
     static attach(engine: EngineKernel, options?: FFTOceanOptions): FFTOcean;
     get time(): number;
     setTime(seconds: number): this;
+    resetTime(): void;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
@@ -137,6 +138,7 @@ class Water implements EnginePlugin {
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
     onPreUpdate(delta: number): void;

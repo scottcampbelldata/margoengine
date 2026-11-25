@@ -135,6 +135,17 @@ export class WaterRain implements EnginePlugin {
     return this.elapsed;
   }
   /**
+   * Puts the ring clock back to 0 with no splashes owed and the splash places' sequence at its start, as a fresh rain
+   * has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what
+   * a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.elapsed = 0;
+    this.pendingTime = 0;
+    this.owed = 0;
+    this.seed = 1;
+  }
+  /**
    * Moves the ring clock by `delta` seconds without drawing (a delta of 0 or less moves nothing), so `seek` from
    * `@margoengine/cutscene/seek` replays the rings exactly. Splashes into `Ripples` are history on the GPU: a seek
    * owes none, and the scene's warm-up frames bring them back.

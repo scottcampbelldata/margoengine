@@ -2041,6 +2041,19 @@ export class Water implements EnginePlugin {
     return this.seconds;
   }
   /**
+   * Puts the wave clock back to 0 and drops what the surface keeps from earlier frames (each view's foam history, the
+   * coastal flow or its solver, the spray), so the next frame builds them as a fresh water does, so a later `seek`
+   * (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there
+   * gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.seconds = 0;
+    this.views.clear();
+    this.view = undefined;
+    // The next frame sees no flow built and builds it again, with its solver (water/flood) and spray.
+    this.coastalSource = undefined;
+  }
+  /**
    * Moves the wave clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
    * runs it, so a seek from `@margoengine/cutscene/seek` replays the waves exactly. Until 2026-11-16 the draw pass
    * moved the clock: hidden water stood still and two views in a frame moved it twice; now it keeps time either way.

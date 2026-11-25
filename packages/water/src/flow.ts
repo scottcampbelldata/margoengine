@@ -115,6 +115,14 @@ export class WaterFlow implements EnginePlugin {
     return this.elapsed;
   }
   /**
+   * Puts the flow clock back to 0, as a fresh flow has it, so a later `seek` (`resetClocks` from
+   * `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there gives
+   * (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.elapsed = 0;
+  }
+  /**
    * Moves the flow clock by `delta` seconds without drawing (a delta of 0 or less moves nothing); each frame update runs
    * it, so `seek` from `@margoengine/cutscene/seek` replays the flow exactly.
    */

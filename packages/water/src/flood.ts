@@ -452,6 +452,18 @@ interface Inputs {
   waveMaker: number;
 }
 const smooth = (x: number) => x * x * (3 - 2 * x);
+/** The settings a flood reads from `options` every frame, which `resetTime` puts back to their values at tick 0. */
+const LIVE_SETTINGS = [
+  'roughness',
+  'mud',
+  'rain',
+  'inflow',
+  'surge',
+  'surgeRise',
+  'shelf',
+  'swell',
+  'waveMaker',
+] as const;
 /**
  * A wave maker's signal in metres at flood time `t`: amplitude x sin(2 pi (t - at) / period + phase), eased in over `ramp`
  * from `at` and out over `ramp` at the end of `duration` (smoothstep), 0 outside.
@@ -492,11 +504,16 @@ export class Flood implements EnginePlugin {
   readonly options: FloodOptions;
   private engine?: Engine;
   private solver?: FloodSolver;
-  private readonly factory = (input: WaterSolverInput): WaterSolver => {
-    const solver = new FloodSolver(input, this);
-    this.solver = solver;
-    return solver;
-  };
+  // The solver factory the Water builds its flow with. resetTime gives it a new one, so the Water sees its flow
+  // changed and builds a fresh solver (tick 0, nothing wetted yet) at the next frame.
+  private factory = this.solverFactory();
+  private solverFactory(): (input: WaterSolverInput) => WaterSolver {
+    return (input) => {
+      const solver = new FloodSolver(input, this);
+      this.solver = solver;
+      return solver;
+    };
+  }
   private walls: Wall[] = [];
   private sources: Required<FloodSource>[] = [];
   private tsunamis: Tsunami[] = [];
@@ -515,6 +532,15 @@ export class Flood implements EnginePlugin {
   private farDrawn = false;
   /** The inputs by the tick they begin at, in order; the first is tick 0. */
   private readonly log: Inputs[] = [];
+  /**
+   * The wind, driven rain and frame-read settings in force at tick 0 (the log keeps only their effect): resetTime goes
+   * back to them.
+   */
+  private zero: { wind: Flood['wind']; driven: number; settings: Partial<FloodOptions> } = {
+    wind: this.wind,
+    driven: 0,
+    settings: {},
+  };
   private disposed = false;
 
   constructor(options: FloodOptions) {
@@ -631,6 +657,41 @@ export class Flood implements EnginePlugin {
   }
   get ticks(): number {
     return this.solver?.ticks ?? 0;
+  }
+  /**
+   * Puts the flood back to tick 0 with the inputs it had there, as a fresh flood given them has it, so a later `seek`
+   * (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there
+   * gives (GAP-FILM-RESET): walls, breaches, sources, tsunamis, wave makers, surge, wind and rain set after tick 0 are
+   * dropped, the settings read every frame (`roughness`, `rain`, `inflow`, `surge`, `surgeRise`, `shelf`, `swell`,
+   * `waveMaker`, `mud`) go back to their values at tick 0, the Water's sea level goes back to the start, and the next frame starts a fresh solver (the water at its
+   * start level, nothing wetted).
+   */
+  resetTime(): void {
+    this.live();
+    const first = this.log[0],
+      surface = this.options.surface as unknown as { setSeaLevel?: (y: number) => unknown };
+    this.seconds = 0;
+    this.log.length = 1;
+    this.walls = first.walls.map((w) => ({ ...w, breach: w.breach && { ...w.breach } }));
+    this.sources = first.sources.map((v) => ({ ...v }));
+    this.tsunamis = first.tsunamis.map((w) => ({ ...w }));
+    this.makers = first.makers.map((m) => ({ ...m }));
+    this.surge = { ...first.surge };
+    this.wind = { ...this.zero.wind };
+    this.driven = this.zero.driven;
+    // Settings a film changes on `options` as it runs (roughness, rain, ...) go back to their values at tick 0.
+    for (const key of LIVE_SETTINGS) {
+      const value = (this.zero.settings as Record<string, unknown>)[key];
+      if (value === undefined) delete (this.options as unknown as Record<string, unknown>)[key];
+      else (this.options as unknown as Record<string, unknown>)[key] = value;
+    }
+    if (!this.surfaceGone && this.written !== first.base && typeof surface.setSeaLevel === 'function')
+      surface.setSeaLevel(first.base);
+    this.base = this.written = first.base;
+    const old = this.factory;
+    this.factory = this.solverFactory();
+    if (waterSolvers.get(this.options.surface) === old) waterSolvers.set(this.options.surface, this.factory);
+    this.solver = undefined;
   }
   /**
    * Moves the clock by `delta` seconds; the ticks it owes run in the next frame (at most 240 a frame) or in `settle()`. It
@@ -862,6 +923,11 @@ export class Flood implements EnginePlugin {
     if (last && key(last) === key(next)) return;
     if (last && last.tick === tick) this.log[this.log.length - 1] = next;
     else this.log.push(next);
+    if (tick === 0) {
+      const settings: Partial<FloodOptions> = {};
+      for (const key of LIVE_SETTINGS) (settings as Record<string, unknown>)[key] = o[key];
+      this.zero = { wind: { ...this.wind }, driven: this.driven, settings };
+    }
   }
   /**
    * The Water's swell trains as its uniform holds them (8 floats each: direction x, z, amplitude, wavenumber, steepness,

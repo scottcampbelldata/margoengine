@@ -171,6 +171,7 @@ export class Iceberg {
     readonly floater: Floater;
     material?: IceMaterial;
     constructor(options: IcebergOptions);
+    resetTime(): void;
     advanceTime(delta: number): void;
     update(source: WaterHeightSource, dt: number, drive?: {
         position?: Vec3;
@@ -220,6 +221,7 @@ export class SeaIce {
     freeboard(thickness: number): number;
     swellShare(metres: number, thickness: number): number;
     at(i: number): [number, number];
+    resetTime(): void;
     advanceTime(delta: number): void;
     update(source: WaterHeightSource, dt: number): this;
     get matrices(): Float32Array;
@@ -300,6 +302,7 @@ class Floater {
         position?: Vec3;
         heading?: number;
     }): this;
+    resetTime(): void;
     advanceTime(delta: number): void;
     quaternion(): [number, number, number, number];
     matrix(out?: Float32Array | number[]): Float32Array | number[];
@@ -394,6 +397,7 @@ class Water implements EnginePlugin {
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
     get time(): number;
+    resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
     onPreUpdate(delta: number): void;

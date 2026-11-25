@@ -378,6 +378,15 @@ export class WakeShip {
     this.recorded = [];
     return this;
   }
+  /**
+   * Forgets the recorded trail and puts the pose back to a fresh ship's (at the origin, still): what
+   * {@link ShipWakes.resetTime} does to each ship. A ship with a path takes its pose from it at the next build, one
+   * without from the next `setPose` or `follow` (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.recorded = [];
+    this.state = { position: [0, 0, 0], heading: 0, speed: 0, pitch: 0, roll: 0 };
+  }
   /** @internal The trail at `time`, newest (the bow now) first, at most TRAIL_POINTS points over `span` metres. */
   trail(time: number, span: number): TrailPoint[] {
     const l = this.hull.length;
@@ -690,6 +699,18 @@ export class ShipWakes implements EnginePlugin {
     this.seconds = finite(seconds, -1e9, 1e9, 'time');
     this.builtAt = NaN;
     return this;
+  }
+  /**
+   * Puts the wake clock back to 0, forgets every ship's recorded trail and pose and clears the built wakes, as fresh wakes have them, so a later
+   * `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked
+   * there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.seconds = 0;
+    this.builtAt = NaN;
+    this.trails.fill(0);
+    this.values.fill(0);
+    for (const ship of this.ships) ship.resetTime();
   }
   /**
    * Moves the wake clock by `delta` seconds, the CPU part of the frame update: a film seek (`@margoengine/cutscene`
@@ -1074,6 +1095,8 @@ export class Floater {
   /** True when fewer than three sample points found water (on dry ground, or off the surface). */
   aground = false;
   private readonly axes: { heave: Axis; pitch: Axis; roll: Axis };
+  // Where the floater was built (position and heading): resetTime puts it back there.
+  private readonly start: { position: Vec3; heading: number };
   private started = false;
   private source?: WaterHeightSource;
   private lastBow = 0;
@@ -1099,6 +1122,7 @@ export class Floater {
     this.drift = finite(options.drift ?? 0, 0, 1, 'drift');
     this.position = options.position ? vec3(options.position, 'position') : [0, 0, 0];
     this.heading = finite(options.heading ?? 0, -1e6, 1e6, 'heading');
+    this.start = { position: [...this.position], heading: this.heading };
     const h = this.hull,
       heave = 2 * Math.PI * Math.sqrt((1.5 * h.draft) / G);
     const axis = (r: FloaterResponse | undefined, period: number, damping: number): Axis => ({
@@ -1262,6 +1286,20 @@ export class Floater {
     this.lastBow = bow;
     if (water) this.bowWater = water.height;
     return this;
+  }
+  /**
+   * Puts the floater back where it was built, at rest and with no water given, as a fresh one is (the next `update`
+   * sets it on the water, as the first one does), so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek`
+   * calls it on every clock) gives what a fresh world seeked there gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.position = [...this.start.position];
+    this.heading = this.start.heading;
+    this.aground = false;
+    this.started = false;
+    this.source = undefined;
+    this.lastBow = this.bowRate = this.bowWater = this.bowWaterRate = 0;
+    for (const axis of Object.values(this.axes)) axis.value = axis.rate = 0;
   }
   /**
    * Rides `delta` seconds more on the water last given to {@link update}, with no new drive: the clock a film seek

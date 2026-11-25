@@ -737,6 +737,16 @@ export class Iceberg {
     this.material = options.material;
   }
   /**
+   * Puts the berg back where it was built, at rest and with no water given, as a fresh one is, so a later `seek`
+   * (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives what a fresh world seeked there
+   * gives (GAP-FILM-RESET).
+   */
+  resetTime(): void {
+    this.floater.resetTime();
+    this.source = undefined;
+    this.plane = undefined;
+  }
+  /**
    * Rides `delta` seconds more on the water last given to {@link update}, with no new drive: the clock a film seek
    * (`@margoengine/cutscene` `seek`, the berg in its `extra`) replays. Does nothing before the first `update`.
    */
@@ -1070,9 +1080,16 @@ export class SeaIce {
     return [this.centre[0] + wrap(p.x + this.offset[0], w), this.centre[1] + wrap(p.z + this.offset[1], d)];
   }
   /**
-   * Advances the clock by `dt` (0..10 s) and sets every piece on the water `source` gives: heave and tilt from a plane
-   * through the water at the piece's centre and its rim, weakened by the swell's attenuation into the field.
+   * Puts the field's clock and drift back to 0 and forgets the water it was given and the poses set on it, as a fresh
+   * field has them, so a later `seek` (`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock) gives
+   * what a fresh world seeked there gives (GAP-FILM-RESET).
    */
+  resetTime(): void {
+    this.seconds = 0;
+    this.offset = [0, 0];
+    this.source = undefined;
+    this.poses.fill(0);
+  }
   /**
    * Moves the clock `delta` seconds and, once {@link update} has given it water, sets the pieces on that water again:
    * the clock a film seek (`@margoengine/cutscene` `seek`, the field in its `extra`) replays.
@@ -1082,6 +1099,10 @@ export class SeaIce {
     if (this.source) this.update(this.source, Math.min(delta, 10));
     else this.setTime(this.seconds + delta);
   }
+  /**
+   * Advances the clock by `dt` (0..10 s) and sets every piece on the water `source` gives: heave and tilt from a plane
+   * through the water at the piece's centre and its rim, weakened by the swell's attenuation into the field.
+   */
   update(source: WaterHeightSource, dt: number): this {
     if (!source || typeof source.sample !== 'function') throw typeError('SeaIce needs a water source with sample(x, z)', 'geometry');
     this.source = source;
