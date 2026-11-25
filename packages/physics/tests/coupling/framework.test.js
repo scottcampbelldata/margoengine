@@ -112,7 +112,7 @@ function springPair({ k = 400, ma = 1, mb = 3, level = 0, ids = ['a', 'b'], va =
 function pairWorld(scheme, { rate = { num: 24, den: 1 }, ...pair } = {}) {
   const p = springPair(pair),
     world = new PhysicsWorld({ rate }).add(p.a, {}).add(p.b, {});
-  world.couple(pair.ids ?? ['a', 'b'], scheme);
+  world.couple(pair.order ?? pair.ids ?? ['a', 'b'], scheme);
   return Object.assign(world, { pair: p });
 }
 
@@ -203,11 +203,28 @@ test('a coupled pair acts both ways, loses energy under backward Euler, and swap
       return 0.5 * pair.ma * a[1] ** 2 + 0.5 * pair.mb * b[1] ** 2 + 0.5 * pair.k * (b[0] - a[0]) ** 2;
     },
   );
-  // Staggered, which mass steps first is a first-order splitting error: ids order the members of a group.
+  // Staggered, which mass steps first is a first-order splitting error: the order given to couple() orders the members.
   orderSensitivity(
-    (swapped, level) => pairWorld('staggered', { level, ids: swapped ? ['z', 'b'] : ['a', 'b'] }),
+    (swapped, level) => pairWorld('staggered', { level, order: swapped ? ['b', 'a'] : ['a', 'b'] }),
     (world) => world.pair.a.w()[0],
   );
+});
+
+test('a staggered coupling steps its members in the order given to couple(), whatever order they were added in', () => {
+  // b before a against a before b: a different first-order splitting, so different bits.
+  const run = (order, added) => {
+    const p = springPair(),
+      world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+    for (const id of added) world.add(id === 'a' ? p.a : p.b, {});
+    world.couple(order, 'staggered');
+    world.advance(24);
+    return world.hash();
+  };
+  const bFirst = run(['b', 'a'], ['a', 'b']);
+  assert.notEqual(bFirst, run(['a', 'b'], ['a', 'b']), 'the order given is the order stepped');
+  // The same calls give the same order and the same bits, however the solvers were added.
+  assert.equal(run(['b', 'a'], ['b', 'a']), bFirst);
+  assert.equal(run(['b', 'a'], ['a', 'b']), bFirst);
 });
 
 test('an iterated coupling equals the monolithic solve of the same discretisation', () => {

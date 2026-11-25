@@ -167,6 +167,10 @@ iterate(), rollback() for strong coupling: re-run a tick from a saved start, and
 | implicit pressure | light bodies in dense fluid: the body enters the pressure solve | Batty, Bertails and Bridson 2007; Robinson-Mosher et al. 2011 |
 | iterated | strong two-way coupling, with a fixed iteration count and Anderson or Aitken acceleration | Degroote, Bathe and Vierendeels 2009; Walker and Ni 2011; Peng et al. 2018 |
 
+Inside a staggered coupling the members step in the order given to `couple()` (soft before rigid, so the soft step meets
+the bodies where the tick began and its push lands in that tick's rigid step); solvers left uncoupled step in coupling
+order, ids within a group. The same calls give the same order whatever order the solvers were added in.
+
 **Rules for the coupling.**
 
 - **Impulses, not forces.** Solvers exchange impulses (force times dt) into mirrored accumulators, so the sender's

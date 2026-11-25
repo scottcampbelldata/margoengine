@@ -264,7 +264,10 @@ export class PhysicsWorld {
   }
 
   /**
-   * Couples solvers `ids` by `scheme` (docs/physics-framework.md, section 5); solvers not coupled exchange `staggered`. Every
+   * Couples solvers `ids` by `scheme` (docs/physics-framework.md, section 5); solvers not coupled exchange `staggered`, in
+   * coupling order (ids within a group). A `staggered` coupling steps its members in the order `ids` gives (soft before
+   * rigid: `couple(['soft', 'rigid'], 'staggered')`), so the same calls give the same order whatever order solvers were
+   * added in. Every
    * scheme but `staggered` needs `ids` to be exactly one coupling group of the graph (solvers that feed each other), checked
    * at the next advance; `iterated` needs every member to have `iterate`. With `bodyMass` and `addedMass` a scheme that
    * exchanges once a tick is refused where the added mass would make it diverge. Couple at a 1/60 s boundary.
@@ -697,7 +700,6 @@ export class PhysicsWorld {
           `The '${c.scheme}' coupling of ${c.ids.join(', ')} is not one coupling group (solvers that feed each other: ${ids.join(', ')}); couple exactly a group.`,
         );
     }
-    if (c.scheme === 'staggered') members.sort((a, b) => this.order.indexOf(a) - this.order.indexOf(b));
     const shared = [
       ...new Set(
         members.flatMap((e) =>
