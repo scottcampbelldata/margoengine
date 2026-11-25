@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18920975,
+  "total": 18927349,
   "history": [
     {
       "date": "2026-10-24",
@@ -12171,6 +12171,12 @@
       "commit": "b2757feeb",
       "reason": "materials/plugins is a new optional entry: materialPlugin() and materialPluginCodec (WGSL at named points of the stock PBR shader, with depth-pass casters), its own file so apps that do not use it pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "9577948b6",
+      "reason": "SailForce (AERO-02), the vortex-lattice sail and flag load on a cloth with its stalled-panel law, in @margoengine/physics/soft (88,860 to 90,276 B gzip; base 27,968 to 29,336): it lives with the cloth it loads, so a split would add an entry every sail scene loads anyway",
+      "grew": 2
     }
   ],
   "items": {
@@ -12819,6 +12825,7 @@
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 12838,
     "@margoengine/materials/object-normal": 950,
+    "@margoengine/materials/plugins": 4715,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,
     "@margoengine/materials/retroreflection": 1855,
@@ -12960,8 +12967,8 @@
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/soft": 88860,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27968,
+    "@margoengine/physics/soft": 92985,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 30217,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
     "@margoengine/physics/world": 14716,
     "@margoengine/physics2d": 21360,

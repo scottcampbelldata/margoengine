@@ -6,6 +6,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: a cloth attached to a rigid body blows up when its free particles take impulses (KB-SOFT-ATTACHKICK1, physics soft)
+
+- **Repro:** `SoftBodies.attach(physics)`, gravity 0; a 4 by 7 cloth (`SoftBodyDesc.cloth`) whose first row is
+  `attachParticle`d to a 50 kg box; every step, before `physics.step()`, `applyParticleImpulse(p, [0.1, 0, 0])` on the 21
+  free particles. After 30 steps the box and cloth hold about (-5,743, 4,255, 19,751) kg m/s against the 63 kg m/s applied;
+  the same cloth unattached holds 63.016, and the attached cloth with no impulses stays at rest. Found while testing the
+  sail load (AERO-02), whose own conservation test therefore uses a free sail.
+- **Cause:** not yet traced; the attachment's hand-off of particle motion to the rigid body is the suspect (a kick of
+  a particle next to an attached one is passed to the body without being taken out of the cloth, or repeatedly).
+
 ### Corrected 2026-11-25: two boxes on one floor seemed to change each other's paths, but they touched (KB-PHYS-LOCALITY1, physics kernel)
 
 - **Repro (as first filed):** `packages/physics/tests/locality.test.js`, a fixed floor, box A (0.6 m) resting at the origin and box

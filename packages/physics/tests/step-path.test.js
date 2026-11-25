@@ -23,6 +23,8 @@ const stepFiles = [
   'fields.ts',
   // The panels of a body's surface, made inside a step when its colliders change (AERO-01).
   'aero.ts',
+  // The vortex-lattice load on a sail, every step (AERO-02).
+  'sail.ts',
 ];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 

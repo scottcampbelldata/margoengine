@@ -4263,3 +4263,6 @@ function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
     w3 = solve(2);
   return [1 - w1 - w2 - w3, w1, w2, w3];
 }
+
+// Sails and flags in the wind (AERO-02): the vortex-lattice load on a cloth.
+export { SailForce, type SailOptions } from './sail.js';

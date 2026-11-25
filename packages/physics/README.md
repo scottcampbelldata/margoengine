@@ -339,6 +339,25 @@ console.log(body.volume() / body.restVolume(), body.tornCells().length);
 
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 
+- **Sails and flags in the wind (AERO-02).** `new SailForce(physics, cloth, {wind, grid: [nu, nv], chord = 'u', density, stall = 0.35, drag = 1.17})` loads a cloth made by `SoftBodyDesc.cloth` with a vortex lattice on its own grid, solved again every step from where its particles are: each cell carries a horseshoe vortex (bound on its quarter chord, trailing from the leech along the apparent wind), the circulations stop the air passing through the sail at every cell's three-quarter chord, and each cell takes the Kutta-Joukowski force of its circulation, shared by its four corners. A cell the air meets more steeply than `stall` radians has separated and takes the flat plate's normal force instead (the `WindForce` law). So a sail's camber, twist and angle to the wind decide its lift (a flat sail of aspect ratio 6 has the lift slope of a wing of that aspect ratio), a sail run square before the wind is pushed, and the load reaches whatever holds the cloth. `chord` names the grid direction from the leading edge to the trailing edge; `wind` is a vector, a function of the point and the time, or a flow field such as `@margoengine/weather`'s `BoundaryLayerWind`; `sail.force` is the last step's total and `sail.circulation` each cell's. It is quasi-steady (no wake memory) and one surface thick.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SailForce, SoftBodies, SoftBodyDesc} from 'margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.gravity = [0, 0, 0];
+const soft = await SoftBodies.attach(physics);
+// A 1 m by 6 m sail, its chord along x at 5 degrees to a 10 m/s wind, held still to read its lift.
+const a = (5 * Math.PI) / 180;
+const desc = SoftBodyDesc.cloth([0, 0, 0], [Math.cos(a) / 4, -Math.sin(a) / 4, 0], [0, 0, 0.5], 5, 13);
+const sail = soft.create(desc.setPinnedParticles(Array.from({length: 65}, (_, i) => i)));
+const load = new SailForce(physics, sail, {wind: [10, 0, 0], grid: [5, 13], density: 1.2});
+physics.step();
+console.log(load.force[1] > 0); // true: lift across the wind
+```
+
 ## How it works
 
 Static meshes loaded by `@margoengine/gltf/pbr` or `@margoengine/fbx` support fitted colliders without attaching core geometry. `physics.addBody(model.root)` gathers the static core/PBR triangles beneath a geometry-free root into one fitted box, preserving the loaded hierarchy. Each descendant's world transform contributes its translation, rotation and scale; the collider uses the body's rotation/translation frame, retaining root scale exactly once because a body has no scale. A node with its own geometry fits only that node, with its scale applied once. Hidden descendants still contribute collision geometry.
@@ -1524,7 +1543,7 @@ class Fall implements Solver<{height: number}> {
   private host!: SolverHost;
   describe() {
     const height = {name: 'ballHeight', kind: 'scalarSeries', quantity: 'height', unit: 'm', centring: 'particle'} as const;
-    return {id: 'fall', fields: [{field: height, access: 'write'}] as const, rate: 2, stableRate: () => 2} as const;
+    return {id: 'fall', fields: [{field: height, access: 'write'}] as const, rate: 2, stableRate: () => 2 as const} as const;
   }
   init(host: SolverHost, params: {height: number}) {
     this.host = host;
@@ -1582,7 +1601,7 @@ import {restoreSnapshot, stateHash, takeSnapshot, type Region} from 'margoengine
 const memory = new WebAssembly.Memory({initial: 1});
 const height: Region = {name: 'height', byteOffset: 0, byteLength: 8, type: 'f64', layout: 1};
 const ball = {
-  describe: () => ({id: 'ball', fields: [], rate: 0, stableRate: () => 0}) as const,
+  describe: () => ({id: 'ball', fields: [], rate: 0, stableRate: () => 0 as const}) as const,
   stateRegions: () => [height],
   extraState: () => [],
 };
@@ -1610,7 +1629,7 @@ fields.declare('waves', [{field: impulse, access: 'accumulate'}]);
 for (const [id, push] of [['waves', 120.5], ['sail', 40.25]] as const) {
   const region = arena.allocate(`${id}Push`, 8, 'f64', 1);
   regionWords(arena.memory, region)[0] = push;
-  fields.publish(id, {field: 'hullImpulse', region, tick: 0, cell: [0, 0, 0]}, 0, [0, 0, 0]);
+  fields.publish(id, {field: 'hullImpulse', region, tick: 0, cell: [0, 0, 0]}, 0);
 }
 const total = fields.sum('hullImpulse', 0)!;
 console.log(regionWords(arena.memory, total.region)[0]); // 160.75

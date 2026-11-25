@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
+import { FlowField } from "@margoengine/math/fields";
 
 export class CellMaterial {
     youngsModulus: number;
@@ -28,6 +29,24 @@ export class CellMaterial {
 }
 
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
+
+export class SailForce implements PhysicsAttachment {
+    readonly force: [number, number, number];
+    circulation: Float64Array;
+    constructor(physics: Physics, sail: SoftBody, options: SailOptions);
+    beforeStep(dt: number): void;
+    remove(): void;
+    dispose(): void;
+}
+
+export interface SailOptions {
+    wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
+    grid: readonly [number, number];
+    chord?: 'u' | 'v';
+    density?: number;
+    stall?: number;
+    drag?: number;
+}
 
 export class SoftBodies implements PhysicsAttachment {
     steps: number;

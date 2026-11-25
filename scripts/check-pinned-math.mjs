@@ -19,6 +19,7 @@ export const ALWAYS = [
   'packages/physics/src/world/*.ts',
   'packages/physics/src/fields.ts',
   'packages/physics/src/aero.ts',
+  'packages/physics/src/sail.ts',
   'packages/math/src/atmosphere.ts',
 ];
 

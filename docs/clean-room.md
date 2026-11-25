@@ -11666,3 +11666,15 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### Sails and flags, a vortex lattice on the cloth (AERO-02, `SailForce` in `@margoengine/physics/soft`, 2026-11-25)
+
+`packages/physics/src/sail.ts` solves a vortex lattice on a cloth's grid every step. Written from M. Klein and others, "Direct
+Wing Design and Inverse Airfoil Identification with the Nonlinear Weissinger Method", arXiv:1501.04983, 2015, read in full
+(the horseshoe path: bound on the quarter chord, legs along the chord, then downstream; Biot-Savart's closed form for a
+straight segment and its limit for a leg to infinity, eqs. 1-4; Kutta-Joukowski), and the article "Vortex lattice method"
+in Wikipedia, read 2026-11-25 (collocation at three-quarter chord, the influence matrix, the flow-tangency condition and the
+force per horseshoe, after J. Katz and A. Plotkin, "Low-Speed Aerodynamics", 2001, not read here). The check against H. B.
+Helmbold's low-aspect-ratio lift slope, 2 pi AR / (2 + sqrt(AR^2 + 4)) (1942, known through the textbooks), is the test's.
+Stalled cells take the flat-plate law of AERO-01. The cloth grid as lattice, the mean apparent wind as wake direction, the
+segment core and the fixed-order elimination are this package's own. Proof: `packages/physics/tests/sail.test.js`.
+
