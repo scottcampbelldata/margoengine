@@ -79,13 +79,14 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Why it waits | Size |
 | --- | --- | --- |
-| Visual scene editor (PlayCanvas Editor, Needle, Babylon Node Geometry and Render Graph editors) | A new product, not a package fix; needs Scott's scope | XL |
-| Several canvases on one device | Needs a core change; core is frozen for features | L |
-| WebXR VR and AR, XR passes, controller poses, XR layers | Never run on a headset or AR device; needs the hardware | M |
-| WebGL2 layer: path tracers cannot finish on ANGLE D3D11, no integrated-GPU frame budget, Safari, Firefox and phones unmeasured | Needs those machines | L |
-| Swappable physics plugin, floating-origin physics regions | Margo uses its own kernel by design | M |
+| WebXR VR and AR, XR passes, controller poses, XR layers | Being built by lane B without a device (Scott, 2026-11-25: "Anything that's waiting on hardware, just build it, push it to main, and assume that it works") | M |
+| WebGL2 layer: path tracers cannot finish on ANGLE D3D11, no integrated-GPU frame budget, Safari, Firefox and phones unmeasured | The ANGLE fix is lane D's (reproducible on this laptop); the other machines are recorded as not yet measured | L |
+| Swappable physics plugin, floating-origin physics regions | Physics: built by Scott's Mac | M |
 | Deferred shading, voxel cone-traced GI | NOT PLANNED by decision; clustered forward and probes plus SSGI instead | XL |
-| Flow Graph visual editor (the runtime is `KHR_interactivity`), USDZ interactive behaviours | Editor products | L |
+| USDZ interactive behaviours | Not yet given to a lane | M |
+
+The visual scene editor, several canvases on one device and the visual flow-graph editor are in
+[do-later.md](do-later.md), out of every current list (Scott, 2026-11-25).
 
 The four audit tables behind this list (evidence paths per row) were working files and are not kept; rerun the audits
 from this page's rows when it is next checked.

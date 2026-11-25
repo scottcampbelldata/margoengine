@@ -11,6 +11,7 @@ Draco/Meshopt support in glTF PBR and synchronous parsing behavior. The core and
 [limits](limits.md).
 
 What Margo still lacks against the rival engines is listed in [Rival parity gaps](rival-parity-gaps.md).
+Work set aside on purpose is in [Do later](do-later.md).
 
 Margo is written clean room: the rule, the process and the source of every lighting and post-processing formula
 are in [clean-room.md](clean-room.md).
