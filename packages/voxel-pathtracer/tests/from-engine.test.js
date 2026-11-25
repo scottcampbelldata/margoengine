@@ -164,3 +164,42 @@ test('terrain sources become one world-space mesh each, with their material, ste
   for (const terrain of [{}, [{}], [{ query: {} }], [null]])
     assert.throws(() => traceSceneFromEngine(engine, { terrain }), TypeError);
 });
+
+test('scatter readouts become one mesh per non-empty ring, one placement per instance, one material per scatter', () => {
+  const near = box(1, 1, 1),
+    far = box(2, 2, 2),
+    t = new Float32Array(32);
+  t.set(translate(1, 2, 3));
+  t.set(translate(4, 5, 6), 16);
+  const read = {
+      rings: [
+        { geometry: near, transforms: t },
+        { geometry: far, transforms: new Float32Array(0) },
+        { geometry: far, transforms: t.slice(16) },
+      ],
+      color: [0.2, 0.5, 0.1],
+      roughness: 0.7,
+      metalness: 0,
+    },
+    scene = traceSceneFromEngine(fakeEngine([]), { scatter: [read] });
+  assert.deepEqual(
+    scene.meshes.map((m) => [m.id, m.material, m.indices.length]),
+    [
+      ['scatter-0-0', 1, near.indices.length],
+      ['scatter-0-2', 1, far.indices.length],
+    ],
+  );
+  assert.deepEqual(
+    scene.meshInstances.map((i) => [i.id, i.mesh, i.transform[12], i.transform[14]]),
+    [
+      ['engine-scatter-0-0-0', 'scatter-0-0', 1, 3],
+      ['engine-scatter-0-0-1', 'scatter-0-0', 4, 6],
+      ['engine-scatter-0-2-0', 'scatter-0-2', 4, 6],
+    ],
+  );
+  assert.deepEqual(scene.pbrMaterials, [
+    { id: 1, baseColorFactor: [0.2, 0.5, 0.1, 1], roughnessFactor: 0.7, metallicFactor: 0, doubleSided: true },
+  ]);
+  for (const scatter of [{}, [{}], [null]])
+    assert.throws(() => traceSceneFromEngine(fakeEngine([]), { scatter }), TypeError);
+});

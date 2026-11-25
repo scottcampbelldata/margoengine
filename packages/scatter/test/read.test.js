@@ -1,0 +1,55 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { instanceMatrix, readScatter } from '../dist/read.js';
+
+// The vertex stage's placement (pose.ts scatterGround and scatterTurn), written out again: the matrix must give the
+// same world point for any local point.
+function shaderPlace(v, instance, align) {
+  const [px, py, pz, scale, yaw, packed] = instance,
+    gz = Math.floor(packed / 4096),
+    gx = (packed - gz * 4096) / 2047.5 - 1,
+    gzz = gz / 2047.5 - 1,
+    g = [gx, Math.sqrt(Math.max(0, 1 - gx * gx - gzz * gzz)), gzz],
+    m = [g[0] * align, 1 + (g[1] - 1) * align, g[2] * align],
+    l = Math.hypot(...m),
+    up = m.map((x) => x / l),
+    c = Math.cos(yaw),
+    s = Math.sin(yaw),
+    r = [c * v[0] + s * v[2], v[1], -s * v[0] + c * v[2]],
+    k = [up[2], 0, -up[0]],
+    cross = [k[1] * r[2] - k[2] * r[1], k[2] * r[0] - k[0] * r[2], k[0] * r[1] - k[1] * r[0]],
+    kr = k[0] * r[0] + k[2] * r[2],
+    t = [0, 1, 2].map((a) => r[a] * up[1] + cross[a] + (k[a] * kr) / (1 + up[1]));
+  return [t[0] * scale + px, t[1] * scale + py, t[2] * scale + pz];
+}
+const pack = (nx, nz) => Math.round((nx * 0.5 + 0.5) * 4095) + Math.round((nz * 0.5 + 0.5) * 4095) * 4096;
+
+test('instanceMatrix places a local point where the vertex stage does, for yaw, scale and ground tilt', () => {
+  const out = new Float32Array(32);
+  for (const [instance, align] of [
+    [[1, 2, 3, 1.5, 0.7, pack(0, 0), 0, 0], 1],
+    [[-4, 0.5, 2, 0.8, 2.9, pack(0.4, -0.3), 0, 0], 1],
+    [[-4, 0.5, 2, 0.8, 2.9, pack(0.4, -0.3), 0, 0], 0.35],
+    [[0, 0, 0, 2, -1.2, pack(-0.6, 0.5), 0.3, 1], 0],
+  ]) {
+    instanceMatrix(instance, 0, align, out, 16);
+    for (const v of [
+      [0.3, 1.2, -0.4],
+      [0, 0, 0],
+      [-1, 0.2, 0.9],
+    ]) {
+      const want = shaderPlace(v, instance, align),
+        got = [0, 1, 2].map((a) => out[16 + a] * v[0] + out[20 + a] * v[1] + out[24 + a] * v[2] + out[28 + a]);
+      for (let a = 0; a < 3; a++) assert.ok(Math.abs(got[a] - want[a]) < 1e-5, `${got} vs ${want}`);
+    }
+    assert.deepEqual([out[19], out[23], out[27], out[31]], [0, 0, 0, 1]);
+  }
+  assert.deepEqual([...out.subarray(0, 16)], new Array(16).fill(0), 'writes only at the offset');
+});
+
+test('readScatter without a drawn scatter on a WebGPU engine is a state error', async () => {
+  await assert.rejects(readScatter({}, { velocityParts: () => undefined }), { code: 'state' });
+  await assert.rejects(readScatter(undefined, undefined), { code: 'state' });
+  const signal = AbortSignal.abort(new Error('stop'));
+  await assert.rejects(readScatter({}, {}, { signal }), /stop/);
+});

@@ -81,6 +81,10 @@
     "./velocity": {
       "types": "./dist/velocity.d.ts",
       "import": "./dist/velocity.js"
+    },
+    "./read": {
+      "types": "./dist/read.d.ts",
+      "import": "./dist/read.js"
     }
   },
   "files": [

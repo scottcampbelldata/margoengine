@@ -239,6 +239,11 @@ export interface ScatterVelocityParts {
         count(ring: number): GPUBufferBinding;
         capacity: number;
     };
+    readonly geometries: readonly Geometry[];
+    readonly cull: {
+        readonly instances: readonly GPUBuffer[];
+        readonly commands: GPUBuffer;
+    };
 }
 
 export type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];

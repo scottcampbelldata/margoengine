@@ -68,5 +68,45 @@ window.runTerrain=async(compat=false)=>{
   }
   return {errors,iou:both/either,covered:both,rasterOnly,traceOnly,meshes:scene.meshes.length,triangles:scene.meshes[0].indices.length/3};
  }finally{tracer.dispose();terrain.dispose();engine.dispose();}
+};
+// A GPU Scatter on sloped ground, aligned to it, read back through readScatter and traced: its drawn and traced
+// silhouettes must agree, so the instance transforms (position, scale, yaw, ground tilt) match the vertex stage.
+window.runScatter=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const {Scatter}=await import('/packages/scatter/dist/index.js'),{readScatter}=await import('/packages/scatter/dist/read.js');
+ const W=128,H=96;installGPU({gpu:navigator.gpu});const canvas=createHeadlessCanvas({width:W,height:H});
+ const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,7,9],target:[0,0,0],fov:50,near:0.1,far:200}});
+ engine.scene.background='#000000';
+ const errors=[];const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const n=64,heights=new Float32Array(n*n);
+ for(let z=0;z<n;z++)for(let x=0;x<n;x++)heights[z*n+x]=0.8*Math.sin(x*0.15)+0.5*Math.cos(z*0.12);
+ let heightmap;
+ const scatter=Scatter.attach(engine,box(0.3,1.6,0.6),{count:40,area:[10,8],scale:[0.6,1.2],lod:[30,40,50],alignToGround:1,seed:7,color:[0.9,0.8,0.6],
+  heightmap:()=>{if(!heightmap){heightmap=device.createTexture({size:[n,n],format:'r32float',usage:6});device.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:n*4},[n,n]);}return heightmap;}});
+ engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();engine.render({delta:1/60});
+ const raster=await readPixels(engine,{signal:AbortSignal.timeout(60000)});
+ const read=await readScatter(engine,scatter,{signal:AbortSignal.timeout(60000)});
+ const scene=traceSceneFromEngine(engine,{scatter:[read],base:{revision:1,models:[],instances:[],materials:[],environment:{ground:false,skyIntensity:0,sunIntensity:3,sunDirection:[0.4,0.8,0.3]}}});
+ const tracer=await ComposedVoxelPathTracer.create(engine,{scene,features:[meshPBR()],denoise:false,signal:AbortSignal.timeout(120000)});
+ try{
+  await tracer.ready;
+  const image=await tracer.renderImage({width:W,height:H,samples:4,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+  let both=0,either=0,rasterOnly=0,traceOnly=0;
+  for(let i=0;i<W*H;i++){
+   const r=raster.data[i*4]+raster.data[i*4+1]+raster.data[i*4+2]>0,t=image.instance[i]<=-4;
+   if(r&&t)both++;if(r||t)either++;if(r&&!t)rasterOnly++;if(t&&!r)traceOnly++;
+  }
+  // Tilt: the largest sideways lean of an instance's up axis (column 1's x and z over its length).
+  let tilt=0;for(const r of read.rings)for(let k=0;k<r.transforms.length;k+=16){const t=r.transforms;tilt=Math.max(tilt,Math.hypot(t[k+4],t[k+6])/Math.hypot(t[k+4],t[k+5],t[k+6]));}
+  // The same placement with the first LOD distance through the middle of the field: instances in the fade band are
+  // drawn in two rings (distinct ring meshes turn the cross-fade on), and the readback keeps each once.
+  const split=Scatter.attach(engine,[0,1,2].map(()=>box(0.3,1.6,0.6)),{count:40,area:[10,8],scale:[0.6,1.2],lod:[11.4,40,50],lodFade:3,alignToGround:1,seed:7,color:[0.9,0.8,0.6],heightmap:()=>heightmap});
+  engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();
+  const fade=await readScatter(engine,split,{signal:AbortSignal.timeout(60000)});
+  const copy=device.createBuffer({size:60,usage:9}),enc=device.createCommandEncoder();enc.copyBufferToBuffer(split.velocityParts().cull.commands,0,copy,0,60);device.queue.submit([enc.finish()]);
+  await copy.mapAsync(1);const raw=new Uint32Array(copy.getMappedRange().slice(0));copy.destroy();split.dispose();
+  const drawn=raw[1]+raw[6]+raw[11];
+  return {errors,tilt,drawn,fadeRings:fade.rings.map(r=>r.transforms.length/16),iou:both/either,covered:both,rasterOnly,traceOnly,rings:read.rings.map(r=>r.transforms.length/16),meshes:scene.meshes.length,color:read.color};
+ }finally{tracer.dispose();scatter.dispose();heightmap?.destroy();engine.dispose();}
 };window.ready=true;
 </script></html>

@@ -26,6 +26,18 @@ export interface TraceEngineOptions {
    * `TerrainQuery.read`) fits `query`.
    */
   terrain?: readonly TraceTerrainSource[];
+  /**
+   * Scattered instances to trace: each ring of a `readScatter` result (`@margoengine/scatter/read`) becomes one mesh
+   * with one placement per instance. Default none.
+   */
+  scatter?: readonly TraceScatterSource[];
+}
+/** What {@link traceSceneFromEngine} needs of a scatter: a `ScatterReadout` from `readScatter` fits as it is. */
+export interface TraceScatterSource {
+  readonly rings: readonly { readonly geometry: Geometry; readonly transforms: Float32Array }[];
+  readonly color: readonly [number, number, number];
+  readonly roughness: number;
+  readonly metalness: number;
 }
 /** What {@link traceSceneFromEngine} needs of a terrain: `TerrainQuery.triangles` and the settings it takes. */
 export interface TraceTerrainSource {
@@ -103,6 +115,9 @@ export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions
   const terrain = options.terrain ?? [];
   if (!Array.isArray(terrain) || terrain.some((t) => typeof t?.query?.triangles !== 'function'))
     throw new TypeError('traceSceneFromEngine terrain must be a list of { query } with a TerrainQuery');
+  const scattered: readonly TraceScatterSource[] = options.scatter ?? [];
+  if (!Array.isArray(options.scatter ?? []) || scattered.some((t) => !Array.isArray(t?.rings)))
+    throw new TypeError('traceSceneFromEngine scatter must be a list of readScatter results');
   const pbrMaterials: TracePBRMaterial[] = [...(base?.pbrMaterials ?? [])],
     meshes: TracePBRMesh[] = [...((base?.meshes ?? []) as TracePBRMesh[])],
     // A base without placements draws each of its meshes once in world space; keep that with identity placements.
@@ -155,6 +170,29 @@ export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions
     });
     meshes.push({ id: meshId, positions, normals, indices, material: id });
     meshInstances.push({ id: `engine-${meshId}`, mesh: meshId });
+  });
+  scattered.forEach((source, n) => {
+    const id = nextMaterial++;
+    pbrMaterials.push({
+      id,
+      baseColorFactor: [source.color[0], source.color[1], source.color[2], 1],
+      roughnessFactor: source.roughness,
+      metallicFactor: source.metalness,
+      doubleSided: true,
+    });
+    source.rings.forEach(({ geometry, transforms }, ring) => {
+      const count = transforms.length / 16;
+      if (!count || geometry.indices.length === 0) return;
+      const meshId = `scatter-${n}-${ring}`,
+        s = split(geometry);
+      meshes.push({ id: meshId, positions: s.positions, normals: s.normals, indices: s.indices, material: id });
+      for (let k = 0; k < count; k++)
+        meshInstances.push({
+          id: `engine-${meshId}-${k}`,
+          mesh: meshId,
+          transform: Array.from(transforms.subarray(k * 16, k * 16 + 16)),
+        });
+    });
   });
   const scene = base ?? { revision: 1, models: [], instances: [], materials: [] };
   return { ...scene, meshes, meshInstances, pbrMaterials };

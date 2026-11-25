@@ -1163,6 +1163,10 @@ engine.dispose();
   each `query`, a `TerrainQuery` from `@margoengine/terrain/query` made from the drawn terrain's heights and
   `terrain.options`, becomes one world-space mesh `terrain-<n>` through `query.triangles({ step, region })`, holes
   left out, with `material` (a trace material without its id; default grey, roughness 1, metalness 0); default none).
+- `scatter` (a list of `readScatter` results from `@margoengine/scatter/read`): each scatter gets one double-sided
+  material from its colour, roughness and metalness, and each non-empty LOD ring one mesh `scatter-<n>-<ring>` with
+  one placement per instance. The readback holds the instances the camera saw in the last frame, rigidly placed (no
+  wind bend); read again after the camera or the field moves. Default none.
 - Terrain triangles are built on every call, since a terrain's heights can change in place: build the scene once and
   reuse it while they hold. At `step` 1 the traced mesh holds the heightmap's exact samples; the drawn clipmap
   triangulates at its own cell spacing, so match `cellSize` to the texel spacing for the two to agree.
@@ -1186,14 +1190,15 @@ engine.dispose();
   so call it after `engine.render()` (or a frame) when transforms change, then `setScene` the result. Each geometry's
   arrays are made once per `Geometry` object, so a second call hands the tracer the same arrays and its BVH is reused.
 - Not carried over: the engine's sun and ambient light (give the trace scene its own `environment`), plugin-drawn
-  content other than terrain given as a `terrain` source (scatter, particles, skinned or morphed meshes), a terrain's
+  content other than terrain and scatter given as sources (particles, skinned or morphed meshes), a terrain's
   layer colours and maps (give it a `material`), and textures; core materials have none.
 - Evidence: `tests/from-engine.test.js` (grouping, materials, geometry split, base merge, filter, errors) and
   `tests/from-engine-browser.mjs` (`npm run test:gpu:from-engine`, WebGPU and the WebGL2 layer): the raster silhouette
   of four placed, scaled and turned meshes (one hidden mesh left out) against the traced one: intersection over union
   1.000 over 3,037 covered pixels at 128 x 96, the same on both; and a drawn 33 x 33 `Terrain` with a round hole
   (`cellSize` on the texel spacing) against its traced `TerrainQuery`: IoU 0.998 over 5,314 covered pixels (3 drawn
-  only, 10 traced only, along the outline), the same on both.
+  only, 10 traced only, along the outline), the same on both; and a GPU `Scatter` of 40 boxes aligned to sloped ground,
+  read back by `readScatter`: IoU 0.9996 over 2,430 covered pixels, the same on both.
 
 ## Heterogeneous coloured media
 

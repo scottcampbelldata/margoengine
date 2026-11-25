@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18930530,
+  "total": 18926672,
   "history": [
     {
       "date": "2026-10-24",
@@ -12183,6 +12183,12 @@
       "commit": "lane-d",
       "reason": "geospatial geoid option; new entry controls/geoid (EGM96 lookup and loader)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "d0628d7a85",
+      "reason": "FG-17 piece 5c new entry scatter/read 1,159 B gzip: readScatter (one copy and map of the frame cull's three ring buffers and commands, fade-band copies kept once) and instanceMatrix (the vertex stage's yaw and ground-tilt placement as a 4 x 4); optional, only voxel-pathtracer/from-engine's scatter source reads its result, structurally",
+      "grew": 1
     }
   ],
   "items": {
@@ -12399,6 +12405,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
+    "@margoengine/controls/geoid": 1811,
     "@margoengine/controls/geospatial": 15903,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
@@ -12503,7 +12510,7 @@
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/ecs/scripts": 3150,
     "@margoengine/ecs/serialize": 4260,
-    "@margoengine/environment": 39799,
+    "@margoengine/environment": 34659,
     "@margoengine/environment dist/workers/exr-codecs.js": 2813,
     "@margoengine/environment/blend": 4907,
     "@margoengine/environment/cube-camera": 6181,
@@ -12516,7 +12523,7 @@
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/lightformer": 4556,
     "@margoengine/environment/load": 11915,
-    "@margoengine/environment/loaders": 12345,
+    "@margoengine/environment/loaders": 12212,
     "@margoengine/environment/main": 33519,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,
@@ -13181,6 +13188,7 @@
     "@margoengine/scatter/occlusion": 1433,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
+    "@margoengine/scatter/read": 1415,
     "@margoengine/scatter/settings": 2444,
     "@margoengine/scatter/simplify": 1643,
     "@margoengine/scatter/states": 8223,
@@ -13999,7 +14007,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/controls/geoid": 1811
+    "margoengine/web": 577
   }
 }

@@ -561,6 +561,41 @@ console.log(left.length / 16, indices.length, boundsOf(new Float32Array([0, 0, 0
   transforms. An instance scaled to 0 is never hit. The picker keeps a copy of the transforms (64 bytes an instance)
   plus 125 bytes of world box, inverse and flags an instance, and 4 bytes a grid entry.
 
+## Reading instances back: `@margoengine/scatter/read`
+
+`readScatter(engine, scatter, { signal? })` reads the instances a GPU `Scatter` culled in its last frame back to the
+CPU, one list per LOD ring (near, middle, far), as column-major 4 x 4 world transforms: position, scale, yaw and the
+ground tilt of `alignToGround`, the same placement the vertex stage applies. It also gives the scatter's colour,
+roughness and metalness. `@margoengine/voxel-pathtracer/from-engine` takes the result as a `scatter` source, so a
+path-traced frame holds the field the camera sees; `InstancePicker` takes a ring's `transforms` as they are.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { readScatter } from '@margoengine/scatter/read';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 6, 10], target: [0, 0, 0] },
+});
+const stones = Scatter.attach(engine, box(0.4, 0.3, 0.5), { count: 200, area: [12, 12], scale: [0.5, 1.5], seed: 3 });
+engine.render();
+const { rings } = await readScatter(engine, stones, { signal: AbortSignal.timeout(10_000) });
+console.log(rings.map((r) => r.transforms.length / 16)); // instances the camera saw, by ring
+stones.dispose();
+engine.dispose();
+```
+
+- What is read: the frame cull's output, the instances within the camera's view and the last LOD distance that pass
+  the height, slope, density, exclusion and path rules, before any occlusion pass. An instance cross-fading between two
+  rings is kept once, in the nearer ring. Render a frame first; until then, after `dispose` or on a WebGL engine it
+  throws MargoError `'state'`.
+- Rigid only: the wind's bend, grass blades' distance widening and plant-state poses are per vertex and left out. The
+  readback is one copy of the three ring buffers (32 bytes an instance slot) and one map.
+- `instanceMatrix(floats, offset, alignToGround, out, at?)` turns one instance record (8 floats) into its transform.
+- Evidence: `test/read.test.js` (the matrix against the vertex stage's placement written out again, errors) and
+  `packages/voxel-pathtracer/tests/from-engine-browser.mjs` (40 instances aligned to sloped ground drawn and traced:
+  silhouette IoU 0.9996; a field split by the fade band, 55 draws, read as 40 instances; WebGPU and the WebGL2 layer).
+
 ## Interaction and trampling: `@margoengine/scatter/interact`
 
 `TrampledScatter` is a `Scatter` whose grass bends away from players, animals and vehicles and springs back. A square

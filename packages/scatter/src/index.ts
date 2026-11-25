@@ -90,6 +90,10 @@ export interface ScatterVelocityParts {
   entries(): { buffer: GPUBuffer }[];
   /** The WebGL2 layer's route: a counted vertex stage with each ring's count at binding 2, drawn `capacity` times. */
   readonly route?: { vertex(code: string): string; count(ring: number): GPUBufferBinding; capacity: number };
+  /** Each ring's mesh, near to far. */
+  readonly geometries: readonly Geometry[];
+  /** The frame cull's own rings and commands before any occlusion pass, readable (COPY_SRC): `@margoengine/scatter/read`. */
+  readonly cull: { readonly instances: readonly GPUBuffer[]; readonly commands: GPUBuffer };
 }
 /** Grass-blade shading for GPU `Scatter` (see `ScatterOptions.blades`). */
 export interface ScatterBlades {
@@ -858,7 +862,9 @@ export class Scatter implements EnginePlugin {
       this.indices.push(index);
       d.queue.writeBuffer(v, 0, data as Float32Array<ArrayBuffer>);
       d.queue.writeBuffer(index, 0, g.indices as Uint32Array<ArrayBuffer>);
-      this.instances.push(d.createBuffer({ size: this.ringCapacity() * 32, usage: GPUBufferUsage.STORAGE }));
+      this.instances.push(
+        d.createBuffer({ size: this.ringCapacity() * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+      );
     }
     d.queue.writeBuffer(this.commands, 0, commands);
     if (this.options.textures) {
@@ -1710,6 +1716,8 @@ export class Scatter implements EnginePlugin {
       stages: [0, 1, 2].map((i) => (this.drawsRing(i) ? this.coverRing(i) : undefined)),
       pose: (code, binding) => this.poseCode(code, 0, binding),
       entries: () => this.poseEntries(),
+      geometries: this.geometries,
+      cull: { instances: this.instances, commands: this.commands },
       route: route && {
         vertex: (code) => route.vertex(code, false),
         count: (ring) => route.ringCount(ring),
