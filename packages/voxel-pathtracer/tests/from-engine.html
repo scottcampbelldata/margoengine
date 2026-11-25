@@ -1,0 +1,39 @@
+<!doctype html><html><meta charset="utf-8"><title>Engine meshes traced</title><script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {createHeadlessCanvas,installGPU,readPixels} from '/packages/headless/dist/index.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+import {meshPBR} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
+import {traceSceneFromEngine} from '/packages/voxel-pathtracer/dist/from-engine.js';
+// The same core meshes drawn by the raster renderer and traced through traceSceneFromEngine: their silhouettes must
+// agree (intersection over union), so placements, scales, rotations and shared geometry carry over.
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const W=128,H=96;installGPU({gpu:navigator.gpu});const canvas=createHeadlessCanvas({width:W,height:H});
+ const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[2.2,2.6,4.6],target:[0,0.4,0],fov:45}});
+ engine.scene.background='#000000';
+ const errors=[];const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const white=new PbrMaterial({color:[0.9,0.9,0.9],roughness:0.6}),metal=new PbrMaterial({color:[0.8,0.6,0.2],metalness:1,roughness:0.3});
+ const cube=box(1,1,1),slab=box(3,0.25,2);
+ const make=(g,m)=>engine.createMesh().setGeometry(g).setMaterial(m);
+ const a=make(cube,white).setPosition([-1.5,0.5,0]).setRotation([0,0.6,0]);
+ const b=make(cube,metal).setPosition([1.4,0.9,-0.5]).setScale([0.8,1.8,0.8]).setRotation([0.3,0,0.2]);
+ const c=make(cube,white).setPosition([0.2,0.4,1.6]).setRotation([0,-0.4,0]).setScale([0.6,0.6,0.6]);
+ const floor=make(slab,white).setPosition([0,-0.2,0]);
+ const hidden=make(cube,white).setPosition([0,2,0]);hidden.visible=false;
+ engine.render();
+ const raster=await readPixels(engine,{signal:AbortSignal.timeout(60000)});
+ const scene=traceSceneFromEngine(engine,{base:{revision:1,models:[],instances:[],materials:[],environment:{ground:false,skyIntensity:0,sunIntensity:3,sunDirection:[0.4,0.8,0.3]}}});
+ const tracer=await ComposedVoxelPathTracer.create(engine,{scene,features:[meshPBR()],denoise:false,signal:AbortSignal.timeout(120000)});
+ try{
+  await tracer.ready;
+  const image=await tracer.renderImage({width:W,height:H,samples:4,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+  let both=0,either=0,rasterOnly=0,traceOnly=0;
+  for(let i=0;i<W*H;i++){
+   const r=raster.data[i*4]+raster.data[i*4+1]+raster.data[i*4+2]>0,t=image.instance[i]<=-4;
+   if(r&&t)both++;if(r||t)either++;if(r&&!t)rasterOnly++;if(t&&!r)traceOnly++;
+  }
+  return {errors,iou:both/either,covered:both,rasterOnly,traceOnly,meshes:scene.meshes.length,instances:scene.meshInstances.length,materials:scene.pbrMaterials.length};
+ }finally{tracer.dispose();engine.dispose();}
+};window.ready=true;
+</script></html>

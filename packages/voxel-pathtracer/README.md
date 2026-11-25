@@ -1119,6 +1119,57 @@ engine.dispose();
   and its centroid moved 3.98 px toward its previous place (4 expected); frame 0 is sharp; `pixels()` equals the
   decoded `capture` PNG of the same render exactly, with exposure, AgX and vignette set.
 
+## Engine meshes traced (`@margoengine/voxel-pathtracer/from-engine`)
+
+`margoengine/voxel-pathtracer/from-engine` (or `@margoengine/voxel-pathtracer/from-engine`) exports
+`traceSceneFromEngine(engine, options?)`, which turns the core meshes of an engine scene into a `PBRMeshTraceScene` for
+`ComposedVoxelPathTracer` with `meshPBR()`: one trace mesh per (geometry, material) pair, one placement per visible mesh
+at its world matrix, and one metallic-roughness material per `PbrMaterial` (linear colour, roughness, metalness,
+double-sided). The scene you already draw can be path traced without describing it twice.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { ComposedVoxelPathTracer } from '@margoengine/voxel-pathtracer/compose';
+import { meshPBR } from '@margoengine/voxel-pathtracer/mesh-pbr';
+import { traceSceneFromEngine } from '@margoengine/voxel-pathtracer/from-engine';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [3, 3, 6], target: [0, 0.5, 0] },
+});
+engine.createMesh()
+  .setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({ color: '#c08040', roughness: 0.4 }))
+  .setPosition([0, 0.5, 0])
+  .setRotation([0, 0.6, 0]);
+engine.createMesh().setGeometry(box(6, 0.1, 6)).setMaterial(new PbrMaterial({ color: '#d0d0d0' }));
+engine.render(); // world matrices are those of the last frame
+const scene = traceSceneFromEngine(engine, {
+  base: { revision: 1, models: [], instances: [], materials: [], environment: { sunIntensity: 3, sunDirection: [0.4, 0.8, 0.3] } },
+});
+const tracer = await ComposedVoxelPathTracer.create(engine, {
+  scene, features: [meshPBR()], signal: AbortSignal.timeout(30_000),
+});
+await tracer.ready;
+const image = await tracer.renderImage({ width: 64, height: 64, samples: 16, signal: AbortSignal.timeout(30_000) });
+console.log(scene.meshes.length, scene.meshInstances!.length, image.width); // 2 2 64
+tracer.dispose();
+engine.dispose();
+```
+
+- Options: `scene` (an engine `Scene`, default `engine.scene`), `filter(mesh)` (keep a mesh when it returns true;
+  default every mesh) and `base` (a trace scene whose voxel models, instances, palette, environment, lights, meshes and
+  mesh materials are kept; new material ids follow the base's; base meshes without `meshInstances` keep their world
+  placement; default an empty scene, revision 1).
+- Left out: meshes with no geometry or empty geometry, and hidden meshes. Matrices are the ones the last update wrote,
+  so call it after `engine.render()` (or a frame) when transforms change, then `setScene` the result. Each geometry's
+  arrays are made once per `Geometry` object, so a second call hands the tracer the same arrays and its BVH is reused.
+- Not carried over: the engine's sun and ambient light (give the trace scene its own `environment`), plugin-drawn
+  content (terrain, scatter, particles, skinned or morphed meshes) and textures; core materials have none.
+- Evidence: `tests/from-engine.test.js` (grouping, materials, geometry split, base merge, filter, errors) and
+  `tests/from-engine-browser.mjs` (`npm run test:gpu:from-engine`, WebGPU and the WebGL2 layer): the raster silhouette
+  of four placed, scaled and turned meshes (one hidden mesh left out) against the traced one: intersection over union
+  1.000 over 3,037 covered pixels at 128 x 96, the same on both.
+
 ## Heterogeneous coloured media
 
 `margoengine/voxel-pathtracer/media` (or `@margoengine/voxel-pathtracer/media`) exports

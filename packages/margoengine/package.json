@@ -5835,6 +5835,10 @@
       "types": "./dist/voxel-pathtracer/sequence.d.ts",
       "import": "./dist/voxel-pathtracer/sequence.js"
     },
+    "./voxel-pathtracer/from-engine": {
+      "types": "./dist/voxel-pathtracer/from-engine.d.ts",
+      "import": "./dist/voxel-pathtracer/from-engine.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

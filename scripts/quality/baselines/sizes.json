@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18907682,
+  "total": 18908554,
   "history": [
     {
       "date": "2026-10-24",
@@ -12141,6 +12141,12 @@
       "commit": "lane-d",
       "reason": "geospatial heights, orientation, events and saved views",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-17d",
+      "reason": "FG-17 piece 5a new entry voxel-pathtracer/from-engine 872 B gzip: traceSceneFromEngine, core meshes as a PBR mesh trace scene (geometry split cached per Geometry, one placement per visible mesh, PbrMaterial to metallic-roughness); optional, nothing else imports it",
+      "grew": 1
     }
   ],
   "items": {
@@ -13608,6 +13614,7 @@
     "@margoengine/voxel-pathtracer": 94957,
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/voxel-pathtracer/denoise-ml": 7023,
+    "@margoengine/voxel-pathtracer/from-engine": 872,
     "@margoengine/voxel-pathtracer/guiding": 2791,
     "@margoengine/voxel-pathtracer/media": 2210,
     "@margoengine/voxel-pathtracer/mesh": 41562,
