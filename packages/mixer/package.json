@@ -70,6 +70,10 @@
     "./pitch": {
       "types": "./dist/pitch.d.ts",
       "import": "./dist/pitch.js"
+    },
+    "./pcm": {
+      "types": "./dist/pcm.d.ts",
+      "import": "./dist/pcm.js"
     }
   },
   "files": [

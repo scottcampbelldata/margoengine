@@ -3302,6 +3302,18 @@ Howler, Web Audio API implementations in browsers, FMOD, Wwise, JUCE and the lik
 | Loop delay | The Web Audio API specification's rules for cycles in the graph (a loop needs a DelayNode and costs one render quantum of 128 frames) |
 | Mute, solo and sends | Common mixing-desk behaviour (solo-in-place, solo-safe returns, pre and post fader sends); our own tree rule in `audibleBuses` |
 
+### Offline mix in plain code (`mixer/pcm`, 2026-11-25)
+
+Written from published descriptions; no code of any mixer, audio library or paper companion was read. Giannoulis,
+Massberg and Reiss, [Digital Dynamic Range Compressor Design: A Tutorial and Analysis](https://aes2.org/publications/elibrary-page/?id=16354),
+JAES 60(6), 2012 (feed-forward gain, log-domain smoothing with separate attack and release);
+[ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770) Annex 2 (true-peak interpolator, already in the mixer);
+Lemire, [Streaming maximum-minimum filter using no more than three comparisons per element](https://arxiv.org/abs/cs/0610046),
+2006 (sliding minimum with a monotonic queue); EBU R 128 (the -1 dBTP default ceiling). Considered: Hamalainen,
+Smoothing of the control signals without clipped output in digital peak limiters, DAFx-02, which smooths the control
+signal and still needs a clipper behind it; the minimum-then-mean pair used here bounds the sample peaks by
+construction. Combining the minimum hold with an equal-length mean and a one-pole return is Margo's own.
+
 ## WebGL2 compatibility layer: `@margoengine/webgl2-compat`
 
 Written clean room from the specifications below. No source code of shader translators or WebGPU-on-WebGL layers

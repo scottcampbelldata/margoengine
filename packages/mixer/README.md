@@ -69,7 +69,8 @@ The reverb room is synthetic by default: seeded noise that falls 60 dB over `dec
 
 ## Offline rendering
 
-`renderOffline({seconds, sampleRate, channels, mixer, signal}, setup)` builds a mixer on an `OfflineAudioContext`, runs your (possibly async) `setup` to create and schedule sources, renders faster than real time and returns the AudioBuffer. The same graph and inputs give the same samples, which is how this package tests its chains against the filter formulas. `bufferChannels(buffer)` copies the channels out.
+`renderOffline({seconds, sampleRate, channels, mixer, signal}, setup)` builds a mixer on an `OfflineAudioContext`, runs your (possibly async) `setup` to create and schedule sources, renders faster than real time and returns the AudioBuffer. The same graph and inputs give the same samples, which is how this package tests its chains against the filter formulas. `bufferChannels(buffer)` copies the channels out. Without Web Audio (in Node), use the optional
+[`mixer/pcm`](#mixing-in-plain-code-margoenginemixerpcm) entry.
 
 ## Maths you can use without Web Audio
 
@@ -295,3 +296,54 @@ cost proportionate memory/CPU. WebGPU and WebGL2 use the same independent maths;
 calibration and normalisation pass beside both in Edge. Generated EBU tone/offset cases are
 stand-ins, not the downloaded compliance corpus or authentic programme recordings. Other
 browsers, recorded programmes, full certification and performance are unmeasured.
+
+## Mixing in plain code (`@margoengine/mixer/pcm`)
+
+`mixPCM` mixes Float32Array audio on a timeline without Web Audio, so it runs in Node (a film render, a build script, a
+test) as well as in a browser or a worker. The same input gives the same samples. Decode the files first (for example
+with ffmpeg to 32-bit float at the mix's sample rate); the mix does not resample.
+
+```ts
+import {mixPCM} from 'margoengine/mixer/pcm';
+
+const rate = 48000;
+const music = new Float32Array(rate * 4).map((_, n) => 0.4 * Math.sin((2 * Math.PI * 220 * n) / rate));
+const voice = new Float32Array(rate).map((_, n) => 0.6 * Math.sin((2 * Math.PI * 330 * n) / rate));
+
+const mix = mixPCM({
+  sampleRate: rate,
+  buses: {
+    music: {gain: -6, duck: {key: 'voice', amount: 12, attack: 0.05, release: 0.4}},
+    voice: {},
+  },
+  clips: [
+    {channels: [music], bus: 'music', fadeIn: 0.5, fadeOut: 1},
+    {channels: [voice], bus: 'voice', at: 1.5, pan: -0.2},
+  ],
+  limiter: {ceiling: -1},
+});
+console.log(mix.channels.length, mix.channels[0].length, mix.truePeak, mix.reduction);
+```
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `sampleRate` | 48000 | Rate of every source and of the result |
+| `channels` | 2 | Output channels, 1 to 32 |
+| `seconds` | end of the last clip | Length of the result |
+| `gain` | 0 dB | Master level, before the limiter |
+| `limiter` | `{ceiling: -1, lookahead: 0.005, release: 0.1}` | True-peak limiter; `false` for none |
+| clip `at`, `offset`, `duration` | 0, 0, the rest | Placement on the timeline and in the source, seconds |
+| clip `gain`, `pan`, `fadeIn`, `fadeOut` | 0 dB, 0, 0, 0 | Level, -1 to 1 pan, linear fades in seconds |
+| bus `gain`, `duck` | 0 dB, none | Level and ducking rules; the deepest rule wins |
+| duck `amount`, `threshold` | 12 dB, -40 dBFS | How far down, and the key peak that triggers it |
+| duck `attack`, `release`, `hold`, `lookahead` | 0.05, 0.4, 0.25 s, three attacks | Time constants; the move starts before the key |
+
+`duckGain(key, sampleRate, options)` returns the gain curve a duck applies, and `limitPCM(channels, sampleRate,
+options)` limits audio you mixed yourself, in place. A pan keeps a mono source at its level in the centre and at
+constant power elsewhere, so hard left is 3 dB louder in that one channel.
+
+The limiter takes the gain each sample needs from its own value and from the ITU-R BS.1770 four-phase interpolator,
+holds the minimum over the look-ahead (Lemire 2006) and averages it over the same length, so the gain is a ramp that is
+fully down when the peak arrives; the return follows the release time constant. Ducking follows Giannoulis, Massberg and
+Reiss, "Digital Dynamic Range Compressor Design" (JAES 60(6), 2012): the gain is smoothed in decibels with separate
+attack and release.

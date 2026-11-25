@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18863606,
+  "total": 18866551,
   "history": [
     {
       "date": "2026-10-24",
@@ -11997,6 +11997,12 @@
       "commit": "FG-17b",
       "reason": "FG-17 piece 2: headless/accumulate 4,414 to 4,620 B gzip for startFrame, the clock pair that keeps one sample at exactly 1 / fps, and subFrameSteps for seeks of a sub-framed span",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "898f981ee9",
+      "reason": "New optional @margoengine/mixer/pcm (offline mix in plain code, GAP-FILM-MIX): new entry measured by this run; no other entry grows, core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12724,6 +12730,7 @@
     "@margoengine/mixer/dynamics": 3112,
     "@margoengine/mixer/fx": 3936,
     "@margoengine/mixer/loudness": 2362,
+    "@margoengine/mixer/pcm": 2945,
     "@margoengine/mixer/pitch": 2622,
     "@margoengine/mixer/reflections": 3483,
     "@margoengine/mixer/sidechain": 1815,

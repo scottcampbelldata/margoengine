@@ -1895,6 +1895,10 @@
       "types": "./dist/mixer/pitch.d.ts",
       "import": "./dist/mixer/pitch.js"
     },
+    "./mixer/pcm": {
+      "types": "./dist/mixer/pcm.d.ts",
+      "import": "./dist/mixer/pcm.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"
