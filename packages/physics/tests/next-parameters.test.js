@@ -291,27 +291,47 @@ test('the solver settings do what they say: stiffness, allowed depth, push-out s
     loose = rest((physics) => physics.setSolver({ allowedPenetration: 0.03 })),
     cold = rest((physics) => physics.setSolver({ warmStart: 0 }));
   // A soft contact is a spring per kilogram of effective mass (Catto, "Soft Constraints", GDC 2011): at rest it gives by g over omega
-  // squared past the allowed depth, whatever the mass, with omega = 2 pi f. The implicit scheme keeps the spring's own equilibrium, so
-  // the resting depth is the allowed penetration plus that give: 0.0002 + 17.3 micrometres at the default 120 Hz.
+  // squared past the allowed depth, whatever the mass, with omega = 2 pi f. The soft step keeps the spring's own equilibrium for any
+  // damping ratio (its update, with the substep ending at rest, gives C = g / omega^2: the product of mass_scale / impulse_scale =
+  // h omega (2 zeta + h omega) and bias_rate = omega / (2 zeta + h omega) is h omega^2), so the resting depth is the allowed
+  // penetration plus that give: 0.0002 + 17.3 micrometres at the default 120 Hz. The depth is read from a position near 0.5 m in
+  // float32, whose spacing there is 3e-8 m, and the gap is a few such operations: the box's depth agrees to 4e-7 m, 13 spacings
+  // (KB-PHYS-SOFTGIVE1: the shortfall of up to 0.4 micrometre scales with the magnitude of the coordinates, checked below).
   const give = (hertz) => 9.81 / (2 * Math.PI * hertz) ** 2;
   assert.ok(
-    Math.abs(normal - (0.0002 + give(120))) < 0.02 * give(120),
+    Math.abs(normal - (0.0002 + give(120))) < 4e-7,
     `a resting box sinks the allowed 0.0002 plus g / omega^2 = ${give(120)} (${normal})`,
   );
   assert.ok(soft > normal * 5 && soft > 0.005, `a soft contact lets it sink further (${soft} against ${normal})`);
   assert.ok(
-    Math.abs(loose - (0.03 + give(120))) < 0.02 * give(120),
+    Math.abs(loose - (0.03 + give(120))) < 4e-7,
     `a depth left alone is not pushed out, and the box rests there plus g / omega^2 (${loose} against ${0.03 + give(120)})`,
   );
-  // At the default damping ratio of 10 the depth falls 0.6 to 1.2 percent short of that value (KB-PHYS-SOFTGIVE1, open), so the two
-  // checks above allow 2 percent of the give, which is under 0.4 micrometres.
-  // At a damping ratio of 1 the resting depth meets the same value to float32 resolution of a position near 0.5 (a few 0.03
-  // micrometres), at 60 Hz where the give is 69 micrometres.
   const unit = rest((physics) => physics.setSolver({ contactHertz: 60, contactDamping: 1, allowedPenetration: 0.03 }));
   assert.ok(
     Math.abs(unit - (0.03 + give(60))) < 2e-7,
     `at a damping ratio of 1 the box rests at the analytic depth (${unit} against ${0.03 + give(60)})`,
   );
+  // The same scene at a tenth of the size, with the default damping ratio of 10: float32 spacing is ten times finer, and the depth
+  // agrees ten times closer (0.05 micrometre against 0.36), which is what rounding, and not a fault of the solver, does.
+  const small = new Physics(null);
+  small.setSolver({ contactHertz: 60, allowedPenetration: 0.003 });
+  small.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.05, 0],
+    colliders: { shape: 'box', halfExtents: [2, 0.05, 2] },
+  });
+  const ball = small.addBody(null, {
+    position: [0, 0.06, 0],
+    canSleep: false,
+    colliders: { shape: 'sphere', radius: 0.05, density: 1000 },
+  });
+  steps(small, 900);
+  assert.ok(
+    Math.abs(0.05 - ball.position[1] - 0.003 - give(60)) < 1e-7,
+    `a tenth the size, the default damping ratio: ${0.05 - ball.position[1] - 0.003} against ${give(60)}`,
+  );
+  small.dispose();
   assert.ok(cold < 0.005, `a cold start still settles it (${cold})`);
 
   // How fast a depth is pushed out: two boxes started 0.5 m into each other leave no faster than the cap.
