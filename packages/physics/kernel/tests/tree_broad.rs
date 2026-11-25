@@ -328,3 +328,46 @@ fn a_batch_built_top_down_or_by_clustering_is_a_cheaper_tree_than_one_inserted_l
     let rotated = cost(0, 1);
     assert!(rotated <= incremental, "rotations do not make it dearer: {rotated} against {incremental}");
 }
+
+/// A crowd of sensor bodies bouncing in a cube, none created or removed; the pairs each step finds, with the broad phase set up by `set`.
+fn crowd(set: &dyn Fn(&mut World), seed: u32, bodies: u32, steps: u32) -> Vec<BTreeSet<(u32, u32)>> {
+    let mut w = World::new(bodies + 8, bodies * 4 + 8).unwrap();
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    set(&mut w);
+    let mut r = Random(seed);
+    let size = 14.0;
+    let alive: Vec<u32> = (0..bodies)
+        .map(|_| {
+            let b = random_body(&mut w, &mut r, DYNAMIC, size);
+            made(&mut w, b, true)
+        })
+        .collect();
+    let mut trace = vec![];
+    for _ in 0..steps {
+        for &body in &alive {
+            bounce(&mut w, body as usize, size);
+        }
+        w.step(1.0 / 60.0);
+        assert_eq!(w.header().failed, 0);
+        let mut pairs = BTreeSet::new();
+        for row in 0..w.header().pair_rows {
+            let a = w.uu(PAIR_A, row as usize);
+            if a != NONE {
+                pairs.insert((a, w.uu(PAIR_B, row as usize)));
+            }
+        }
+        trace.push(pairs);
+    }
+    trace
+}
+
+#[test]
+fn a_thousand_moving_bodies_keep_the_same_pairs_in_the_tree_and_the_sweep_for_five_hundred_steps() {
+    let sweep = crowd(&|_| {}, 99, 1000, 500);
+    let tree = crowd(&|w| w.header_mut().broad_kind = 1, 99, 1000, 500);
+    assert!(sweep.iter().any(|pairs| pairs.len() > 200), "the crowd is dense enough to prove something");
+    assert_eq!(sweep.len(), tree.len());
+    for (step, (a, b)) in sweep.iter().zip(&tree).enumerate() {
+        assert_eq!(a, b, "the pairs differ at step {step}");
+    }
+}
