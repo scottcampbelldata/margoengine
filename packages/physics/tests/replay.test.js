@@ -16,18 +16,27 @@ test('the hashes on file were made by the kernel as it stands', () => {
 });
 
 test('10,000 steps of the kernel give the hashes on file', () => {
-  assert.deepEqual(kernelScene(KernelWorld), golden.kernel);
+  const arena = [];
+  assert.deepEqual(
+    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, undefined, arena),
+    golden.kernel,
+  );
+  assert.deepEqual(arena, golden.kernelArena, 'the order the steps solved in');
 });
 
 test('10,000 steps of the kernel with the block solver on give the hashes on file', () => {
+  const arena = [];
   assert.deepEqual(
-    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, { blockSolver: true }),
+    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, { blockSolver: true }, arena),
     golden.kernelBlock,
   );
+  assert.deepEqual(arena, golden.kernelBlockArena);
 });
 
 test('10,000 steps through Physics give the hashes on file', () => {
-  assert.deepEqual(physicsScene(Physics), golden.physics);
+  const arena = [];
+  assert.deepEqual(physicsScene(Physics, REPLAY_STEPS, arena), golden.physics);
+  assert.deepEqual(arena, golden.physicsArena);
 });
 
 test('the kernel scene reaches what it claims to cover', () => {

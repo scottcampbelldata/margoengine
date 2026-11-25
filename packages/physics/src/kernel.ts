@@ -15,6 +15,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_columns(): number;
   world_reserve(bodies: number, colliders: number): number;
   world_hash(): number;
+  world_arena_hash(): number;
   world_set_gravity(x: number, y: number, z: number): void;
   world_gravity(axis: number): number;
   world_set_substeps(substeps: number): void;
@@ -3071,7 +3072,15 @@ export class KernelWorld {
   get bytes(): number {
     return this.api.world_bytes() >>> 0;
   }
-  /** FNV-1a of the world's bytes: equal in every browser, in Node and on any machine for the same inputs. */
+  /** FNV-1a of every word of the world, scratch included: it moves when the order a step solved in moves. */
+  get arenaHash(): number {
+    return this.api.world_arena_hash() >>> 0;
+  }
+  /**
+   * FNV-1a of the world's state, equal in every browser, in Node and on any machine for the same inputs: the header and every
+   * column but those that only hold the order a step solved in (the pairs and joints it solved, the impacts it found, the
+   * islands it numbered). Bodies, colliders, joints, manifolds and carried impulses are all in it.
+   */
   get hash(): number {
     return this.api.world_hash() >>> 0;
   }

@@ -38,13 +38,18 @@ for (const simd of [false, true]) {
   test(`the replay scenes give the committed hashes in the ${simd ? 'SIMD' : 'scalar'} build`, async () => {
     await loadKernel({ simd });
     assert.equal(Physics.kernelVariant, simd ? 'simd' : 'scalar');
-    assert.deepEqual(kernelScene(KernelWorld), golden.kernel);
+    const [arena, blockArena, physicsArena] = [[], [], []];
+    assert.deepEqual(kernelScene(KernelWorld, undefined, undefined, undefined, arena), golden.kernel);
     assert.deepEqual(
-      kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
+      kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, blockArena),
       golden.kernelBlock,
       'the block solver on',
     );
-    assert.deepEqual(physicsScene(Physics), golden.physics);
+    assert.deepEqual(physicsScene(Physics, undefined, physicsArena), golden.physics);
+    assert.deepEqual(
+      [arena, blockArena, physicsArena],
+      [golden.kernelArena, golden.kernelBlockArena, golden.physicsArena],
+    );
     assert.equal(golden.steps, REPLAY_STEPS);
   });
 }

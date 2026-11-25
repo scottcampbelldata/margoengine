@@ -63,9 +63,10 @@ class Stream {
  * row, adds and removes bodies, moves fixed ones by hand, drives kinematic ones, sets forces and impulses, changes gravity
  * and substeps, and lets islands sleep and wakes them.
  * @param visit Called after each step with the world and the step's number.
+ * @param arena An array that gets the hash of every word of the world, scratch included, each time the state hash is taken.
  * @param solver Solver settings given to the world before the first step, for a scene run another way (`{blockSolver: true}`).
  */
-export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {}, solver = undefined) {
+export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {}, solver = undefined, arena = []) {
   const random = new Stream(0x4d415247),
     world = new KernelWorld(1, 1),
     c = world.columns,
@@ -229,7 +230,10 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {},
       }
     }
     world.step(DT);
-    if ((i + 1) % REPLAY_EVERY === 0) hashes.push(world.hash);
+    if ((i + 1) % REPLAY_EVERY === 0) {
+      hashes.push(world.hash);
+      arena.push(world.arenaHash);
+    }
     visit(world, i);
   }
   return hashes;
@@ -239,7 +243,7 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {},
  * The same kind of scene through the `Physics` surface, on a world with no engine: every call a game makes on a step, in
  * the browser's own double-precision arithmetic before the kernel rounds it.
  */
-export function physicsScene(Physics, steps = REPLAY_STEPS) {
+export function physicsScene(Physics, steps = REPLAY_STEPS, arena = []) {
   const random = new Stream(0x4d415248),
     physics = new Physics(null),
     bodies = [],
@@ -310,7 +314,10 @@ export function physicsScene(Physics, steps = REPLAY_STEPS) {
       }
     }
     physics.step();
-    if ((i + 1) % REPLAY_EVERY === 0) hashes.push(physics.kernel.hash);
+    if ((i + 1) % REPLAY_EVERY === 0) {
+      hashes.push(physics.kernel.hash);
+      arena.push(physics.kernel.arenaHash);
+    }
   }
   physics.dispose();
   return hashes;

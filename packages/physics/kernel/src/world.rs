@@ -870,8 +870,31 @@ impl World {
         true
     }
 
-    /// FNV-1a over the world's 32-bit words, the replay proof's fingerprint: everything a step can change is inside.
+    /// FNV-1a over the world's state, the replay proof's fingerprint: the header and every column but those of `SCRATCH`, which
+    /// hold the order a step happens to solve in (the lists of pairs and joints it solves, the impacts it found, the islands it
+    /// numbered). Two worlds with the same bodies, colliders, joints, couplings, manifolds and carried impulses hash alike
+    /// whatever order their steps took the independent parts in.
     pub fn hash(&self) -> u32 {
+        let data: *const u32 = self.arena.base.cast();
+        let mut hash = 0x811C_9DC5u32;
+        let mut take = |from: usize, words: usize| {
+            for word in from..from + words {
+                hash = (hash ^ unsafe { *data.add(word) }).wrapping_mul(0x0100_0193);
+            }
+        };
+        take(0, HEADER_BYTES as usize / 4);
+        for column in 0..COLUMNS {
+            if !SCRATCH.contains(&column) {
+                let header = self.header();
+                take(header.offsets[column] as usize / 4, header.capacity[COLUMN_ROWS[column] as usize] as usize);
+            }
+        }
+        hash
+    }
+
+    /// FNV-1a over every 32-bit word of the world, scratch and padding included: the fingerprint `hash` used to be. It also sees
+    /// the order a step solved in, so it moves when that order does, with every body where it was.
+    pub fn arena_hash(&self) -> u32 {
         let words = (self.header().bytes / 4) as usize;
         let data: *const u32 = self.arena.base.cast();
         let mut hash = 0x811C_9DC5u32;

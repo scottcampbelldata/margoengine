@@ -4,9 +4,11 @@ import { kernelScene, physicsScene } from './replay-scene.js';
 
 window.runReplay = async () => {
   await Physics.load();
+  const arena = { kernel: [], kernelBlock: [], physics: [] };
   return {
-    kernel: kernelScene(KernelWorld),
-    kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
-    physics: physicsScene(Physics),
+    kernel: kernelScene(KernelWorld, undefined, undefined, undefined, arena.kernel),
+    kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, arena.kernelBlock),
+    physics: physicsScene(Physics, undefined, arena.physics),
+    arena,
   };
 };

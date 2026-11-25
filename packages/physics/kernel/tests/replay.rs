@@ -97,16 +97,16 @@ fn spawn(w: &mut World, random: &mut Stream, rows: &mut Vec<u32>, hull: f32) {
 }
 
 fn scene() -> Vec<u32> {
-    run(false)
+    run(false).0
 }
 
 /// The scene with the block solver of the manifolds' normal rows on or off.
-fn run(block_solver: bool) -> Vec<u32> {
+fn run(block_solver: bool) -> (Vec<u32>, Vec<u32>) {
     let mut random = Stream(0x4D41_5247);
     let mut w = World::new(1, 1).unwrap();
     w.header_mut().block_solver = block_solver as u32;
     let mut rows = Vec::new();
-    let mut hashes = Vec::new();
+    let (mut hashes, mut arena) = (Vec::new(), Vec::new());
     let hull = w.add_hull(&OCTAHEDRON, &OCTAHEDRON_FACES) as f32;
     for _ in 0..48 {
         spawn(&mut w, &mut random, &mut rows, hull);
@@ -246,9 +246,10 @@ fn run(block_solver: bool) -> Vec<u32> {
         w.step((1.0f64 / 60.0) as f32);
         if (i + 1) % EVERY == 0 {
             hashes.push(w.hash());
+            arena.push(w.arena_hash());
         }
     }
-    hashes
+    (hashes, arena)
 }
 
 /// The `"kernel"` list of the fixture: a flat array of numbers, read without a JSON library.
@@ -269,11 +270,15 @@ fn native_code_matches_the_wasm_build_bit_for_bit() {
     let hashes = scene();
     assert_eq!(hashes.len() as u32, STEPS / EVERY);
     assert_eq!(hashes, fixture());
+    // Every word of the world, the order of the step included: moves when that order moves, with the state hash as it was.
+    assert_eq!(run(false).1, list("kernelArena"));
 }
 
 #[test]
 fn native_code_matches_the_wasm_build_with_the_block_solver_on() {
-    assert_eq!(run(true), list("kernelBlock"));
+    let (state, arena) = run(true);
+    assert_eq!(state, list("kernelBlock"));
+    assert_eq!(arena, list("kernelBlockArena"));
 }
 
 /// The block solve answers every manifold of the scene: the sweeps are never needed (feature `counts`).

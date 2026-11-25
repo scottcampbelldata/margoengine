@@ -1270,6 +1270,7 @@ class KernelWorld {
     get quarantinedCount(): number;
     quarantinedBodies(): number[];
     get bytes(): number;
+    get arenaHash(): number;
     get hash(): number;
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;

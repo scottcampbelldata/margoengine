@@ -8,6 +8,13 @@ import { REPLAY_EVERY, REPLAY_STEPS, kernelScene, physicsScene } from '../tests/
 await Physics.load();
 const folder = new URL('../tests/fixtures/', import.meta.url);
 mkdirSync(folder, { recursive: true });
+const [kernelArena, kernelBlockArena, physicsArena] = [[], [], []];
+// The state hashes (`kernel`, `kernelBlock`, `physics`) leave out the order a step solved in; the arena hashes see every word
+// of the world, so they move when that order does. A change that only reorders independent work moves the arena lists and
+// leaves the state ones as they were.
+const kernel = kernelScene(KernelWorld, undefined, undefined, undefined, kernelArena);
+const kernelBlock = kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, kernelBlockArena);
+const physics = physicsScene(Physics, undefined, physicsArena);
 writeFileSync(
   new URL('replay-hash.json', folder),
   `${JSON.stringify(
@@ -15,9 +22,12 @@ writeFileSync(
       kernelSource: kernelSourceHash(),
       steps: REPLAY_STEPS,
       every: REPLAY_EVERY,
-      kernel: kernelScene(KernelWorld),
-      kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }),
-      physics: physicsScene(Physics),
+      kernel,
+      kernelBlock,
+      physics,
+      kernelArena,
+      kernelBlockArena,
+      physicsArena,
     },
     null,
     1,

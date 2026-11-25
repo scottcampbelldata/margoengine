@@ -923,3 +923,11 @@ pub const JOINT_DRIVE: u32 = 1 << 30;
 pub const JOINT_DISABLED: u32 = 1 << 31;
 /// Any reason a joint solves nothing.
 pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
+
+/// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
+/// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
+/// their list. `World::hash` leaves them out; `World::arena_hash` does not.
+pub const SCRATCH: [usize; 12] = [
+    SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
+    SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE,
+];
