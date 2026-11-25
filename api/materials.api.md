@@ -988,7 +988,7 @@ export function installNodeMaterial(model: PBRModel, graph: MaterialGraph): Node
 
 export function iridescence(options?: IridescenceOptions, base?: MaterialExtension): MaterialExtension;
 
-export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], { signal, fetch: get, ...options }?: CubeTextureOptions & {
+export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], { signal, fetch: get, maxBytes, maxPixels: pixels, ...options }?: CubeTextureOptions & TextureLimits & {
     signal?: AbortSignal;
     fetch?: typeof fetch;
 }): Promise<CubeTexture>;

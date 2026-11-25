@@ -441,7 +441,8 @@ draws by material); transparent ones keep their back-to-front order.
 
 `loadTexture(url, { maxBytes, maxPixels })` raises or lowers the two caps: 64 MiB downloaded (default
 67,108,864) and 16,777,216 decoded pixels (4096 x 4096). Each takes a positive integer, else a RangeError. `maxBytes`
-also works on `loadKTX2Texture`. The device's own texture size limit still applies at upload.
+also works on `loadKTX2Texture`; `loadCubeTexture` takes both, with `maxBytes` one budget shared by its six faces. The
+device's own texture size limit still applies at upload.
 
 ```ts
 import { loadTexture } from '@margoengine/materials';
