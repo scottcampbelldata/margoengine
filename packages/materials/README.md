@@ -1380,6 +1380,66 @@ takes, so the mix is bounded too. It follows the surface's normal map, answers t
 directional lights and image-based lighting, works on a loaded glTF model through `install(model, {features})`, and is
 saved by `/serialization`. Like `hair()` and `eye()` it needs a `PbrMaterial` without anisotropy or a thin film.
 
+### Material plugins (`@margoengine/materials/plugins`)
+
+`materialPlugin()` adds your WGSL to the stock PBR shader at named points, with your own uniforms and textures, as a shader hook
+or material plugin extends a built-in material in other web engines. Put plugins in a material's
+`features` (`PbrMaterial` or any class of this package); several run in list order, and the material keeps all of its
+own maps, options, lighting, shadows and instancing.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { materialPlugin } from 'margoengine/materials/plugins';
+import { planeGeometry } from 'margoengine/geometry';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const ripple = materialPlugin({
+  name: 'ripple',
+  uniforms: { time: 0, height: 0.05, tint: [0.2, 0.5, 1] },
+  vertex: 'position += normal * ripple.height * sin(position.x * 8.0 + ripple.time);',
+  surface: 's.base = vec4f(s.base.rgb * ripple.tint, s.base.a); s.roughness = 0.2;',
+});
+const rim = materialPlugin({
+  name: 'rim',
+  uniforms: { strength: 0.5 },
+  light: 'color += vec3f(rim.strength) * pow(1.0 - max(dot(s.n, v), 0.0), 3.0);',
+});
+createMesh(engine, planeGeometry(2, 2, 32, 32), new PbrMaterial({ features: [ripple, rim] }));
+engine.onFrame((_, delta) => {
+  ripple.uniforms.time += delta; // live from the next frame
+});
+```
+
+| Point | Runs | Your WGSL edits | It may read |
+| --- | --- | --- | --- |
+| `vertex` | in mesh space, before the model and instance matrices, in the colour pass and in every depth pass (shadows, picking, TAA velocity) | `var position: vec3f`, `var normal: vec3f` | the plugin's uniforms and textures (`textureSampleLevel`) |
+| `surface` | after the material's maps, before lighting and before the face and alpha tests, in every pass | `var s: Surface`: `base` (linear RGBA), `n` (world normal), `roughness`, `metal`, `occlusion`, `emissive` | `i: Out` (`position` and `normal` in world space, `color`, `uv` on textured meshes) |
+| `light` | after all light is summed (sun, `Clustered` lights, image light, emission), before an `envMap` combine, fog and tone mapping | `var color: vec3f` (linear radiance) | `i`, `s`, `v` (unit vector to the eye) |
+| `output` | last, before the pass writes | `var color: vec3f` (display-encoded when the engine tone-maps in the shader, linear when a post chain does) | `i`, `s`, `v` |
+
+| Option | Meaning |
+| --- | --- |
+| `name` | Required. Letters and digits, starting with a letter, not a WGSL keyword or a name the PBR shader uses. Uniforms read as `<name>.<uniform>`, textures as `<name>_<texture>` with `<name>_<texture>Sampler`. A material holds one plugin of each name |
+| `uniforms` | Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f` (default none). Assign `plugin.uniforms.k = v` (same size) or write an array uniform's elements in place |
+| `textures` | Up to 4 filterable Textures by name (default none); a Texture's own colour space wins, sRGB otherwise. Live: assign another Texture of the same dimension |
+| `declarations` | Module-scope WGSL helpers; prefix their names with the plugin's name (default none). They may not declare bindings |
+| `vertex`, `surface`, `light`, `output` | The WGSL of each point, the body of a function (at least one) |
+
+The WGSL and names are fixed at creation and checked then: `TypeError` for an unknown option, an unusable name, a point
+that is not text or a texture that is not a Texture, `RangeError` for a non-finite uniform or more than 4 textures. Each
+message links to https://margoengine.com/errors#material-plugins. A material takes up to 8 plugins (`RangeError` on
+its first draw past that), and a shader that lacks a point (a mismatched gltf/pbr version, or `light` on a material
+whose shader has no lighting sum) throws a `MargoError` `'unsupported'`. Errors inside your WGSL are WebGPU's own: a
+validation error when the shader first draws. A material without plugins keeps its shader text, bindings and uniforms
+exactly. The composed shader is cached by the plugins in the list and their order; changing a uniform or texture never
+recompiles. Plugins also work on a loaded glTF model through `install(model, {features})`, and on `WgslMaterial`
+(after its `shade`). Saving: pass `materialPluginCodec` in `codecs` to `captureMaterialLibrary` and
+`restoreMaterialLibrary`; it stores the WGSL, the current uniforms and the textures. Without it a capture refuses the
+plugin rather than drop it. A plugin's GPU buffers go when the last material using it drops it, and a restored device
+gets new ones with the current values.
+
 ### Soot and presets (`@margoengine/materials/soot`, `/presets`)
 
 `soot()` darkens a surface where a fire's smoke reaches it and returns a `layered()` layer, so firelight, shadows and

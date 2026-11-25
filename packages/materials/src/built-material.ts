@@ -1731,6 +1731,11 @@ export interface MaterialFeature {
    * shadow package carries no hash WGSL of its own.
    */
   castHashed?(code: string): string;
+  /**
+   * What depth passes (shadows, picking, TAA velocity) draw for a feature that moves vertices; `map` is the material's
+   * own `displacementMap` record. The first feature that has one speaks for the material, after a subclass's `caster`.
+   */
+  caster?(device: GPUDevice, material: Material, map: CasterDisplacement | undefined): CasterDisplacement | undefined;
   /** Called when the feature joins a material. */
   attach?(material: Material): void;
   /** Called when the feature leaves a material. */
@@ -4532,7 +4537,11 @@ const surfaceFields: PropertyDescriptorMap = {
   displacement: live((m, g) => {
     const device = g[recordRuntime].gpu;
     const map = displacementOf(m, device, g[recordRuntime]);
-    return (device && m.caster(device, g[recordRuntime], map)) ?? map;
+    return (
+      (device &&
+        (m.caster(device, g[recordRuntime], map) ?? m['added'].find((v) => v.caster)?.caster!(device, m, map))) ??
+      map
+    );
   }),
   clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   clipHardware: live((m, g) => hardwareClip(m, g[recordRuntime].gpu)),

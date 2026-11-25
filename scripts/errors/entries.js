@@ -40,6 +40,20 @@ export const entries = [
     fix: 'Read the error cause. Inline or serve same-origin images and fonts (resourceInliner from @margoengine/html/inline does this), fix the element, then call surface.invalidate() to draw it again. Set engine.onError to handle the report yourself.',
   },
   {
+    id: 'material-plugins',
+    title: '@margoengine/materials/plugins: material plugin WGSL, names and points',
+    kind: 'family',
+    messages: [
+      "Material plugin name 'x' is not usable; pass letters and digits starting with a letter, not a WGSL keyword or a name the PBR shader uses (f, s, color, margo...); see https://margoengine.com/errors#material-plugins",
+      "Material plugin option 'x' is unknown; use name, uniforms, textures, declarations, vertex, surface, light or output; see https://margoengine.com/errors#material-plugins",
+      'Material plugin vertex needs the standard PBR shader; use matching @margoengine/materials and gltf/pbr versions; see https://margoengine.com/errors#material-plugins',
+      'A material takes at most 8 plugins; merge some of them; see https://margoengine.com/errors#material-plugins',
+    ],
+    cause:
+      'materialPlugin() checks its options when it is made: the name, uniform and texture names must be WGSL identifiers the PBR shader does not use, each point must be WGSL text, uniforms 1 to 4 finite numbers, at most 4 textures, and declarations may not bind resources. When a material first draws, a shader without the named point (a mismatched gltf/pbr version, or a light point on a material without a lighting sum) throws a MargoError with code unsupported, and a ninth plugin on one material throws RangeError.',
+    fix: 'Rename the plugin, uniform or texture (letters and digits, starting with a letter), fix the option name, pass WGSL strings, move bindings into uniforms and textures, merge plugins so a material has at most 8, and keep @margoengine/materials and @margoengine/gltf at matching versions. Errors inside your WGSL itself are WebGPU validation errors when the shader first draws.',
+  },
+  {
     id: 'wav',
     title: '@margoengine/audio/wav: reading and writing WAV files',
     kind: 'family',

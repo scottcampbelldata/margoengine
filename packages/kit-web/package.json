@@ -1307,6 +1307,10 @@
       "types": "./dist/materials/retroreflection.d.ts",
       "import": "./dist/materials/retroreflection.js"
     },
+    "./materials/plugins": {
+      "types": "./dist/materials/plugins.d.ts",
+      "import": "./dist/materials/plugins.js"
+    },
     "./materials/soot": {
       "types": "./dist/materials/soot.d.ts",
       "import": "./dist/materials/soot.js"

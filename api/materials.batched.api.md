@@ -408,6 +408,7 @@ interface MaterialFeature {
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
     castHashed?(code: string): string;
+    caster?(device: GPUDevice, material: Material, map: CasterDisplacement | undefined): CasterDisplacement | undefined;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }

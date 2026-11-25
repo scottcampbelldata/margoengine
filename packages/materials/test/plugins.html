@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Material plugins</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body>
+<script type="module">
+// Real-adapter checks of material plugins; plugins-browser.mjs judges the numbers. Each check draws a small scene and
+// returns canvas bytes read back from a copy of the frame.
+import {Engine} from '/packages/core/dist/index.js';
+import {PbrMaterial,UnlitMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {materialPlugin} from '/packages/materials/dist/plugins.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const size=256,front={position:[0,0,5],target:[0,0,0],fov:60},half=5*Math.tan(Math.PI/6);
+const scene=async()=>{
+  document.querySelector('canvas')?.remove();
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=size;document.body.append(canvas);
+  const engine=await Engine.create(canvas,{backend:'webgpu',camera:front}),errors=[];
+  engine.stop();engine.onError=e=>errors.push(String(e));
+  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  const render=async(n=3)=>{for(let i=0;i<n;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}};
+  const bytes=async()=>{await render(2);engine.render({delta:1/60});const b=await createImageBitmap(canvas),c=new OffscreenCanvas(size,size),x=c.getContext('2d');x.drawImage(b,0,0);return x.getImageData(0,0,size,size).data;};
+  return {engine,errors,render,bytes};
+};
+const quad=(h=2,z=0,x=0)=>({positions:[x-h,-h,z,x+h,-h,z,x+h,h,z,x-h,h,z],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+// RGB bytes at world point (x, y) on the z = 0 plane.
+const at=(data,x,y)=>{const px=Math.min(size-1,Math.floor((x/half+1)*size/2)),py=Math.min(size-1,Math.floor((1-y/half)*size/2)),k=(py*size+px)*4;return [data[k],data[k+1],data[k+2]];};
+window.check={
+  // output: a written colour reaches the canvas exactly, live, and two plugins apply in list order.
+  async output(){
+    const {engine,errors,bytes}=await scene();
+    const paint=materialPlugin({name:'paint',uniforms:{tint:[0.2,0.6,1]},output:'color = paint.tint;'}),
+      halve=materialPlugin({name:'halve',output:'color = color * 0.5;'}),
+      material=new PbrMaterial({features:[paint]});
+    createMesh(engine,quad(),material);
+    const first=at(await bytes(),0,0);
+    paint.uniforms.tint=[1,0,0];const live=at(await bytes(),0,0);
+    material.features=[paint,halve];const ordered=at(await bytes(),0,0);
+    material.features=[halve,paint];const swapped=at(await bytes(),0,0);
+    material.features=[];const removed=at(await bytes(),0,0);
+    // A texture of the plugin, read at its binding block (after another plugin's) and swapped live.
+    const solid=(...c)=>new Texture({data:new Uint8Array([...c,...c,...c,...c]),width:2,height:2},{colorSpace:'linear',mipmaps:false}),
+      green=solid(0,255,0,255),blue=solid(0,0,255,255),
+      read=materialPlugin({name:'read',textures:{mask:green},output:'color = textureSampleLevel(read_mask, read_maskSampler, vec2f(0.5), 0.0).rgb;'});
+    material.features=[halve,read];const textured=at(await bytes(),0,0);
+    read.textures.mask=blue;const swappedTexture=at(await bytes(),0,0);
+    engine.dispose();green.dispose();blue.dispose();return {errors,first,live,ordered,swapped,removed,textured,swappedTexture};
+  },
+  // surface: a plugin's base colour lights exactly as the same material colour; light: added radiance brightens it.
+  async surface(){
+    const {engine,errors,bytes}=await scene();
+    const tint=materialPlugin({name:'tint',uniforms:{rgb:[0.9,0.3,0.1]},surface:'s.base = vec4f(s.base.rgb * tint.rgb, s.base.a);'}),
+      lift=materialPlugin({name:'lift',uniforms:{add:0.3},light:'color += vec3f(lift.add) * s.base.rgb;'});
+    const material=new PbrMaterial({roughness:0.6,features:[tint]});createMesh(engine,quad(),material);
+    const a=at(await bytes(),0,0);
+    material.features=[tint,lift];const lifted=at(await bytes(),0,0);
+    // The same surface at the same place with the colour as a material option and no plugin.
+    material.features=[];material.color=[0.9,0.3,0.1,1];const b=at(await bytes(),0,0);
+    engine.dispose();return {errors,plugged:a,plain:b,lifted};
+  },
+  // vertex: the move draws the quad elsewhere, live, on a plain and an instanced mesh.
+  async vertex(instanced){
+    const {engine,errors,bytes}=await scene();
+    const shift=materialPlugin({name:'shift',uniforms:{dx:1.5},vertex:'position.x += shift.dx;'}),
+      material=new UnlitMaterial({color:[1,1,1,1],features:[shift]});
+    if(instanced){const m=createInstancedMesh(engine,quad(0.5),material,1);m.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));}
+    else createMesh(engine,quad(0.5),material);
+    const moved=await bytes(),a={centre:at(moved,0,0),there:at(moved,1.5,0)};
+    shift.uniforms.dx=0;const back=await bytes(),b={centre:at(back,0,0),there:at(back,1.5,0)};
+    engine.dispose();return {errors,moved:a,back:b};
+  },
+  // shadows: the caster's shadow follows the plugin's vertex move.
+  async shadow(moved){
+    const {engine,errors,bytes}=await scene();
+    engine.lighting.direction.set([1,0,1,2]);engine.lighting.radiance.set([1,1,1,0]);
+    const shift=materialPlugin({name:'shift',uniforms:{dx:moved?1:0},vertex:'position.x += shift.dx;'});
+    const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),
+      wall=createMesh(engine,quad(half*2),new PbrMaterial({roughness:1,toneMapped:false})),
+      caster=createMesh(engine,quad(0.5,1,1),new PbrMaterial({features:[shift]}));
+    shadows.add(wall);shadows.add(caster);
+    const data=await bytes();
+    const out={errors,atZero:at(data,0,0),atOne:at(data,1,0),open:at(data,-1.5,1.5)};
+    engine.dispose();return out;
+  },
+};
+window.ready=true;
+</script></body></html>
