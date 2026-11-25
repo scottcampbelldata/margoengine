@@ -53,7 +53,8 @@ use crate::error::PhysicsError;
 use alloc::vec::Vec;
 use margoengine_physics_kernel_common::colour::{COLOURS, Colouring, NONE, float_key};
 
-use crate::joint::{self, Pass};
+use crate::joint::{self, Pass, Paths};
+use self::wide::Blocks;
 use crate::math::{Rot, V2};
 use crate::world::{Kind, World, gravity_length};
 
@@ -504,6 +505,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     let max_push = settings.contact_max_push;
     let mut support = core::mem::take(&mut world.scratch.support);
     let mut support_plan = path_support::plan(world, &ids, &constraints, &bounces, &mut support);
+    let extra = extra_passes(world, &constraints, &ids);
     // Whether the bodies have moved since the four-lane solve last worked out its gaps (see wide::solve).
     let mut fresh = true;
     let mut substep_pose_speed = alloc::vec![0.0f32;world.bodies.len()];
@@ -574,6 +576,13 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 block += b;
                 sequential += s;
             }
+        }
+        if extra.most > 0 {
+            let pass = Pass { biased: true, ..joint_pass };
+            let sync = lanes.then_some((&mut blocks, &starts[..]));
+            let (b, sq) = run_extra(world, &mut paths, &mut bodies, &ids, &mut constraints, &surfaces, order, &extra, sync, &pass, max_push, &springs)?;
+            block += b;
+            sequential += sq;
         }
         if want_force {
             if lanes {
@@ -676,6 +685,12 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
                 sequential += s;
             }
         }
+        if extra.most > 0 {
+            let sync = lanes.then_some((&mut blocks, &starts[..]));
+            let (b, sq) = run_extra(world, &mut paths, &mut bodies, &ids, &mut constraints, &surfaces, order, &extra, sync, &joint_pass, max_push, &springs)?;
+            block += b;
+            sequential += sq;
+        }
         crate::world::tick(&mut world.timing, 9, &mut inner);
         for (observed, &substep) in pose_speed.iter_mut().zip(&substep_pose_speed) {
             *observed = observed.max(substep);
@@ -751,6 +766,59 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32) -> Result<(), PhysicsE
     Ok(())
 }
 
+/// The extra passes of the islands that ask for them, after the world's passes of one kind (`biased` or relaxing): pass k works the
+/// contacts and joints of the islands asking for more than k, each contact one at a time, in the colour order the base passes use.
+/// The blocks of the four-lane solve hold their contacts' impulses, so those are written down to the contacts first and read back
+/// after; a contact no island asks for is not visited, and its impulses make the round trip unchanged.
+fn run_extra(
+    world: &mut World,
+    paths: &mut Paths,
+    bodies: &mut [SolverBody],
+    ids: &[u32],
+    constraints: &mut [Constraint],
+    surfaces: &[f32],
+    order: &[u32],
+    extra: &Extra,
+    sync: Option<(&mut Blocks, &[u32])>,
+    pass: &Pass,
+    max_push: f32,
+    springs: &[Soft; 2],
+) -> Result<(u64, u64), PhysicsError> {
+    let (mut block, mut sequential) = (0u64, 0u64);
+    let mut sync = sync;
+    if let Some((blocks, starts)) = sync.as_mut() {
+        let mut first = 0;
+        for k in 0..COLOURS {
+            first += blocks.write_back(first, constraints, &order[starts[k] as usize..starts[k + 1] as usize]);
+        }
+    }
+    let joints = !world.joints.is_empty();
+    for k in 0..extra.most {
+        if joints {
+            paths.selected.clear();
+            paths.selected.extend(extra.joints.iter().map(|&n| n > k));
+            write_velocities(world, bodies, ids);
+            joint::solve(world, paths, pass);
+            read_velocities(world, bodies, ids);
+        }
+        for &i in order {
+            if extra.constraints[i as usize] > k {
+                let (b, s) = solve_contact(bodies, &mut constraints[i as usize], surface_of(surfaces, i), pass.biased, pass.inv_h, max_push, springs)?;
+                block += b;
+                sequential += s;
+            }
+        }
+    }
+    paths.selected.clear();
+    if let Some((blocks, starts)) = sync.as_mut() {
+        let mut first = 0;
+        for k in 0..COLOURS {
+            first += blocks.read_impulses(first, constraints, &order[starts[k] as usize..starts[k + 1] as usize]);
+        }
+    }
+    Ok((block, sequential))
+}
+
 /// sqrt(a b): the friction of two materials.
 #[inline]
 fn sqrt_product(a: f32, b: f32) -> f32 {
@@ -762,6 +830,38 @@ fn sqrt_product(a: f32, b: f32) -> f32 {
     // In this branch smaller>1, so the ratio cannot underflow to zero; ratio<=1 proves the result<=larger.
     let (larger, smaller) = if a > b { (a, b) } else { (b, a) };
     larger * crate::math::sqrt(smaller / larger)
+}
+
+/// The extra passes each island asks for (`Body::extra_passes`, Rapier's additional solver iterations), as the contacts and joints see
+/// them: an island runs the most any of its awake dynamic bodies asks for, and every contact and joint of it that many more times.
+#[derive(Default)]
+struct Extra {
+    /// Per contact (by constraint index) and per joint: the extra passes of its island; 0 for the islands that do not ask.
+    constraints: Vec<u32>,
+    joints: Vec<u32>,
+    /// The most any island asks for: 0 when none does, and then nothing here runs.
+    most: u32,
+}
+
+fn extra_passes(world: &World, constraints: &[Constraint], ids: &[u32]) -> Extra {
+    let mut extra = Extra::default();
+    let asks = |b: &crate::world::Body| b.extra_passes > 0 && b.is_dynamic() && b.awake;
+    if !world.bodies.iter().any(asks) {
+        return extra;
+    }
+    // Per island root: the most its awake dynamic bodies ask for. Static and kinematic bodies are islands of their own, asking nothing.
+    let mut island = alloc::vec![0u32; world.counts.islands as usize];
+    for (i, body) in world.bodies.iter().enumerate() {
+        if asks(body) {
+            let slot = &mut island[world.island_of[i] as usize];
+            *slot = (*slot).max(body.extra_passes);
+        }
+    }
+    let of = |body: u32| island[world.island_of[body as usize] as usize];
+    extra.constraints = constraints.iter().map(|c| of(ids[c.a as usize]).max(of(ids[c.b as usize]))).collect();
+    extra.joints = world.joints.iter().map(|j| of(j.def.a).max(of(j.def.b))).collect();
+    extra.most = extra.constraints.iter().chain(&extra.joints).copied().max().unwrap_or(0);
+    extra
 }
 
 /// The solver bodies contact `c` writes, `NONE` for one it only reads (static, kinematic): what `store` writes.

@@ -104,6 +104,9 @@ pub struct Body {
     /// The most the body may turn at, in radians a second; 0 for no limit (the default: a fast spinner is swept by continuous
     /// collision, so Rapier's default cap is not needed).
     pub max_angular_speed: f32,
+    /// Solver passes the body's island takes beyond the world's, each substep (Rapier's additional solver iterations); 0 for none. An
+    /// island runs the most any of its awake bodies asks for, on its contacts and joints only.
+    pub extra_passes: u32,
     pub can_sleep: bool,
     pub fixed_rotation: bool,
     pub ccd: bool,
@@ -603,7 +606,7 @@ pub struct World {
     /// Body pairs a joint keeps from colliding, sorted, rebuilt each step.
     apart: Vec<(u32, u32)>,
     union: UnionFind,
-    island_of: Vec<u32>,
+    pub(crate) island_of: Vec<u32>,
     /// Reused linear-time witness that current public shape lists name every shape exactly once.
     shape_marks: Vec<bool>,
     pub(crate) scratch: solver::Scratch,
@@ -699,6 +702,7 @@ impl World {
             angular_damping: def.angular_damping,
             gravity_scale: def.gravity_scale,
             max_angular_speed: 0.0,
+            extra_passes: 0,
             can_sleep: def.can_sleep,
             fixed_rotation: def.fixed_rotation,
             ccd: def.ccd,
@@ -1152,6 +1156,14 @@ impl World {
         if !speed.is_finite() { return Err(PhysicsError::NotFinite); }
         if speed < 0.0 { return Err(PhysicsError::InvalidParameter); }
         self.live_body(body)?.max_angular_speed = speed;
+        self.wake(body)
+    }
+
+    /// Gives the body's island `passes` more solver passes each substep than the world's setting (0 takes them away): its contacts and
+    /// joints are solved that many extra times, one at a time, and the other islands are not. The island takes the most any of its
+    /// awake bodies asks for. The body wakes.
+    pub fn set_extra_passes(&mut self, body: u32, passes: u32) -> Result<(), PhysicsError> {
+        self.live_body(body)?.extra_passes = passes;
         self.wake(body)
     }
 

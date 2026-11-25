@@ -529,12 +529,23 @@ pub struct Paths {
     inv_i: Vec<f32>,
     /// The trees with a branch, solved whole by `tree::solve`.
     trees: tree::Trees,
+    /// Per joint: whether `solve` works it; empty to work every one. An island's joints are all in or all out, so a path or a tree is
+    /// never half solved. Set by the solver for the extra passes of the islands that ask for them.
+    pub(crate) selected: Vec<bool>,
     /// Paths built and joints in them, for the tests.
     pub count: u32,
     pub joints: u32,
     /// Trees built and joints in them, for the tests.
     pub tree_count: u32,
     pub tree_joints: u32,
+}
+
+impl Paths {
+    /// Whether the joint is one the pass works.
+    #[inline]
+    pub(crate) fn works(&self, joint: usize) -> bool {
+        self.selected.is_empty() || self.selected[joint]
+    }
 }
 
 #[inline]
@@ -880,7 +891,7 @@ fn stiffen(world: &World, paths: &mut Paths, h: f32, geometric: bool) {
 pub(crate) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
     for i in 0..world.joints.len() {
         let def = world.joints[i].def;
-        if !active(world, &def) {
+        if !active(world, &def) || !paths.works(i) {
             continue;
         }
         let mut pair = Pair::of(world, &paths.inv_i, &def);
@@ -902,6 +913,9 @@ pub(crate) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
     }
     for p in 0..paths.count as usize {
         let (s, e) = (paths.starts[p] as usize, paths.starts[p + 1] as usize);
+        if !paths.works(paths.order[s] as usize) {
+            continue;
+        }
         sweep(world, paths, s, e, pass);
     }
     tree::solve(world, paths, pass);

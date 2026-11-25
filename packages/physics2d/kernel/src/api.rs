@@ -272,13 +272,13 @@ pub extern "C" fn body_remove(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| w.remove_body(body).map(|()| 0))
 }
 
-/// Writes x, y, cos, sin, vx, vy, angular velocity, mass, awake (u32), the world centre of mass and whether the body is enabled (u32) to the buffer.
+/// Writes x, y, cos, sin, vx, vy, angular velocity, mass, awake (u32), the world centre of mass whether the body is enabled (u32), its angular speed limit and its extra solver passes (u32) to the buffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| {
         let b = w.bodies.get(body as usize).filter(|b| !b.dead).ok_or(PhysicsError::InvalidHandle)?;
-        let (xf, v, av, mass, awake, center, enabled, cap) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed);
-        ensure(13);
+        let (xf, v, av, mass, awake, center, enabled, cap, extra) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed, b.extra_passes);
+        ensure(14);
         for (i, value) in [xf.p.x, xf.p.y, xf.q.c, xf.q.s, v.x, v.y, av, mass].into_iter().enumerate() {
             put(i, value);
         }
@@ -287,6 +287,7 @@ pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
         put(10, center.y);
         io()[11] = enabled as u32;
         put(12, cap);
+        io()[13] = extra;
         Ok(0)
     })
 }
@@ -642,6 +643,12 @@ pub extern "C" fn shape_cast(handle: i32, kind: u32) -> i32 {
         }
         Ok(hits.len() as i32)
     })
+}
+
+/// Gives a body's island solver passes beyond the world's each substep (0 for none).
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_extra_passes(handle: i32, body: u32, passes: u32) -> i32 {
+    with_world!(handle, |w| w.set_extra_passes(body, passes).map(|()| 0))
 }
 
 /// Takes a body out of the simulation (0) or puts it back (1).

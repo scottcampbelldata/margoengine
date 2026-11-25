@@ -66,6 +66,7 @@ interface Exports {
   body_set_additional_mass(world: number, body: number, mass: number): number;
   body_set_enabled(world: number, body: number, enabled: number): number;
   body_set_max_angular_speed(world: number, body: number, speed: number): number;
+  body_set_extra_passes(world: number, body: number, passes: number): number;
   body_set_additional_mass_properties(
     world: number,
     body: number,

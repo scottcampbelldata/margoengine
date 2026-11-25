@@ -212,7 +212,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
     t.x.clear();
     t.x.resize(nj, [0.0; 3]);
     for j in 0..nj {
-        if !t.member[j] {
+        if !t.member[j] || !paths.works(j) {
             continue;
         }
         let def: JointDef = world.joints[j].def;
@@ -230,7 +230,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
     // Deepest bodies first: assemble each body's S, invert it and reduce the joint above.
     for bi in (0..t.bodies.len()).rev() {
         let v = t.bodies[bi];
-        let kids: Vec<u32> = t.kids[t.kid_start[v as usize] as usize..t.kid_start[v as usize + 1] as usize].to_vec();
+        let kids: Vec<u32> = t.kids[t.kid_start[v as usize] as usize..t.kid_start[v as usize + 1] as usize].iter().copied().filter(|&c| paths.works(c as usize)).collect();
         let sizes: Vec<usize> = kids.iter().map(|&c| n_of(&t, c)).collect();
         let total: usize = sizes.iter().sum();
         if total > 0 {
@@ -268,7 +268,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
             t.work = work;
             t.chol = chol;
             // Reduce the joint above: D_j -= K_jC S^-1 K_Cj, y_j -= K_jC S^-1 y_C.
-            let j = t.above[v as usize];
+            let j = Some(t.above[v as usize]).filter(|&a| a != u32::MAX && paths.works(a as usize)).unwrap_or(u32::MAX);
             if j != u32::MAX {
                 let dj = world.joints[j as usize].def;
                 let nj_rows = n_of(&t, j);
@@ -324,7 +324,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
         if start == usize::MAX {
             continue;
         }
-        let kids: Vec<u32> = t.kids[t.kid_start[v as usize] as usize..t.kid_start[v as usize + 1] as usize].to_vec();
+        let kids: Vec<u32> = t.kids[t.kid_start[v as usize] as usize..t.kid_start[v as usize + 1] as usize].iter().copied().filter(|&c| paths.works(c as usize)).collect();
         let sizes: Vec<usize> = kids.iter().map(|&c| n_of(&t, c)).collect();
         let total: usize = sizes.iter().sum();
         let mut offsets = Vec::with_capacity(kids.len());
@@ -339,7 +339,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
                 rhs[offsets[b] + c] = t.y[cb as usize][c];
             }
         }
-        let j = t.above[v as usize];
+        let j = Some(t.above[v as usize]).filter(|&a| a != u32::MAX && paths.works(a as usize)).unwrap_or(u32::MAX);
         if j != u32::MAX {
             let dj = world.joints[j as usize].def;
             let xj = t.x[j as usize];
@@ -365,7 +365,7 @@ pub(super) fn solve(world: &mut World, paths: &mut Paths, pass: &Pass) {
         }
     }
     for j in 0..nj {
-        if !t.member[j] {
+        if !t.member[j] || !paths.works(j) {
             continue;
         }
         let def = world.joints[j].def;

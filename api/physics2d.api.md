@@ -106,6 +106,8 @@ export class Body2D {
     set enabled(value: boolean);
     set maxAngularSpeed(value: number);
     get maxAngularSpeed(): number;
+    set additionalSolverIterations(value: number);
+    get additionalSolverIterations(): number;
     get centerOfMass(): [number, number];
     setAdditionalMassProperties(mass: number, centre?: Vec2D, inertia?: number): this;
     get sleeping(): boolean;
@@ -756,6 +758,7 @@ interface Exports {
     body_set_additional_mass(world: number, body: number, mass: number): number;
     body_set_enabled(world: number, body: number, enabled: number): number;
     body_set_max_angular_speed(world: number, body: number, speed: number): number;
+    body_set_extra_passes(world: number, body: number, passes: number): number;
     body_set_additional_mass_properties(world: number, body: number, mass: number, x: number, y: number, inertia: number): number;
     body_set_kind(world: number, body: number, kind: number): number;
     body_set_soft_ccd(world: number, body: number, distance: number): number;
