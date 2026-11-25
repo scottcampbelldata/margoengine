@@ -101,14 +101,35 @@ export interface GeospatialOptions {
 
 /** Options for {@link GeospatialControls.flyTo}. */
 export interface FlightOptions {
-  /** Seconds. Default 3; 0 applies at once. */
+  /** Seconds; 0 applies at once. Default from the path length: `pathLength / speed`, within 1 s and `maxDuration`. */
   duration?: number;
+  /** Path length per second when `duration` is not given, in screen heights (van Wijk and Nuij's units). Default 1.2. */
+  speed?: number;
+  /** Longest automatic duration, seconds. Default 10. */
+  maxDuration?: number;
+  /**
+   * The zoom-out of the path (van Wijk and Nuij's rho): larger climbs higher sooner, near 0 is a straight pan. Default
+   * 1.42, their measured optimum (about the square root of 2).
+   */
+  curve?: number;
   /** Progress to eased progress, both in [0, 1]. Default smootherstep. */
   easing?: (t: number) => number;
   /** Cancels the flight where it is; an already aborted signal does nothing. */
   signal?: AbortSignal;
-  /** Raise the range mid-flight so the path is an arc over long hops. Default true. */
+  /** Follow the optimal zoom-and-pan path (climb, cross, descend). False pans along the surface with a log zoom. Default true. */
   arc?: boolean;
+  /** A pointer press or the wheel on the element cancels the flight. Default true. */
+  cancelOnInput?: boolean;
+}
+
+/** Fly to a bounding sphere: {@link GeospatialControls.flyToBoundingSphere}. */
+export interface BoundingSphereFlight extends FlightOptions {
+  /** Compass direction to look toward, radians. Default keeps the current heading. */
+  heading?: number;
+  /** Angle below the horizon, radians. Default keeps the current pitch. */
+  pitch?: number;
+  /** Extra room around the sphere: 1 just fits, 1.2 leaves a fifth more. Default 1.1. */
+  padding?: number;
 }
 
 interface Flight {
@@ -119,9 +140,48 @@ interface Flight {
   elapsed: number;
   duration: number;
   easing: (t: number) => number;
-  arc: boolean;
+  path: ZoomPanPath | null;
+  /** Range per unit of path width w (w = range * 2 tan(fov / 2)). */
+  scale: number;
+  cancelOnInput: boolean;
   finish: (done: boolean) => void;
   off: () => void;
+}
+
+/** The van Wijk and Nuij path: its length S (in widths) and the pan u and width w at path parameter s in [0, S]. */
+export interface ZoomPanPath {
+  S: number;
+  at(s: number): { u: number; w: number };
+}
+
+/**
+ * The optimal zoom-and-pan path of van Wijk and Nuij, "Smooth and efficient zooming and panning", IEEE InfoVis 2003
+ * (https://doi.org/10.1109/INFVIS.2003.1249004), section 4: from width `w0` to `w1` over a pan of `u1` (same units)
+ * with curvature `rho`. Our own code from the paper's equations.
+ */
+export function zoomPanPath(w0: number, w1: number, u1: number, rho = 1.42): ZoomPanPath {
+  num('zoomPanPath', w0, w1, u1, rho);
+  if (!(w0 > 0 && w1 > 0 && u1 >= 0 && rho > 0))
+    throw rangeError('zoomPanPath needs widths above 0, a pan of 0 or more and rho above 0', 'controls-arguments');
+  const r2 = rho * rho;
+  // No pan to speak of: a pure zoom, w = w0 exp(+-rho s) (the paper's u1 = 0 case).
+  if (u1 < 1e-9 * Math.max(w0, w1)) {
+    const k = w1 < w0 ? -1 : 1,
+      S = Math.abs(Math.log(w1 / w0)) / rho;
+    return { S, at: (t) => ({ u: S ? (u1 * t) / S : u1, w: w0 * Math.exp(k * rho * t) }) };
+  }
+  const b = (wi: number, sign: number) => (w1 * w1 - w0 * w0 + sign * r2 * r2 * u1 * u1) / (2 * wi * r2 * u1),
+    // ln(sqrt(b^2 + 1) - b) is -asinh(b), without the cancellation at large b (a city hop at street level).
+    r = (bi: number) => -Math.asinh(bi),
+    r0 = r(b(w0, 1)),
+    r1 = r(b(w1, -1)),
+    S = (r1 - r0) / rho,
+    c0 = Math.cosh(r0),
+    s0 = Math.sinh(r0);
+  return {
+    S,
+    at: (t) => ({ u: (w0 / r2) * (c0 * Math.tanh(rho * t + r0) - s0), w: (w0 * c0) / Math.cosh(rho * t + r0) }),
+  };
 }
 
 type V = [number, number, number];
@@ -639,24 +699,44 @@ export class GeospatialControls extends Controls {
   }
 
   /**
-   * Fly to a view along the shortest geodesic, easing height, heading and range, with a range arc over long hops.
-   * Resolves true on arrival, false when cancelled (signal, another flight, setView, dispose). Advance it with
-   * `update(delta)` (done for you when attached to an engine).
+   * Fly to a view on the optimal zoom-and-pan path of van Wijk and Nuij (2003): it climbs, crosses along the shortest
+   * geodesic and descends so the apparent speed stays even, and its length sets the duration unless you give one.
+   * Height, heading and pitch ease along. Resolves true on arrival, false when cancelled (signal, a pointer press or
+   * the wheel, another flight, setView, dispose). Advance it with `update(delta)` (done for you on an engine).
    */
   flyTo(destination: GeospatialView, options: FlightOptions = {}): Promise<boolean> {
     this.alive();
-    const duration = options.duration ?? 3;
-    if (!(duration >= 0) || !Number.isFinite(duration))
+    const speed = options.speed ?? 1.2,
+      maxDuration = options.maxDuration ?? 10,
+      curve = options.curve ?? 1.42;
+    if (options.duration !== undefined && (!(options.duration >= 0) || !Number.isFinite(options.duration)))
       throw rangeError('Flight duration is finite seconds >= 0', 'controls-arguments');
+    if (
+      !(speed > 0 && Number.isFinite(speed)) ||
+      !(maxDuration >= 0 && Number.isFinite(maxDuration)) ||
+      !(curve > 0 && Number.isFinite(curve))
+    )
+      throw rangeError(
+        'Flight speed and curve are finite and above 0, maxDuration finite and 0 or more',
+        'controls-arguments',
+      );
     this.cancel();
     const to = this.sanitize({ ...this.v, height: 0, ...destination } as Required<GeospatialView>);
     if (options.signal?.aborted) return Promise.resolve(false);
+    const g = geodesicInverse(this.v.longitude, this.v.latitude, to.longitude, to.latitude),
+      scale = 1 / (2 * Math.tan(((this.camera.fov ?? 60) * Math.PI) / 180 / 2)),
+      path = options.arc === false ? null : zoomPanPath(this.v.range / scale, to.range / scale, g.distance, curve),
+      length = path
+        ? path.S
+        : Math.abs(Math.log(to.range / this.v.range)) + (g.distance * scale) / Math.max(this.v.range, to.range),
+      turn = Math.abs(wrap(to.heading - this.v.heading)) + Math.abs(to.pitch - this.v.pitch),
+      duration =
+        options.duration ?? (length > 1e-9 || turn > 1e-9 ? Math.min(maxDuration, Math.max(1, length / speed)) : 0);
     if (duration === 0) {
       this.v = to;
       this.commit();
       return Promise.resolve(true);
     }
-    const g = geodesicInverse(this.v.longitude, this.v.latitude, to.longitude, to.latitude);
     return new Promise<boolean>((resolve) => {
       const abort = () => this.cancel();
       options.signal?.addEventListener('abort', abort, { once: true });
@@ -668,10 +748,74 @@ export class GeospatialControls extends Controls {
         elapsed: 0,
         duration,
         easing: options.easing ?? smoother,
-        arc: options.arc ?? true,
+        path,
+        scale,
+        cancelOnInput: options.cancelOnInput ?? true,
         finish: resolve,
         off: () => options.signal?.removeEventListener('abort', abort),
       };
+    });
+  }
+  /** Seconds flown and the flight's duration, or null when not flying. */
+  get flightTime(): { elapsed: number; duration: number } | null {
+    const f = this.flight;
+    return f ? { elapsed: f.elapsed, duration: f.duration } : null;
+  }
+  /**
+   * Fly so a sphere (geodetic centre, radius in metres) fills the view with `padding` room, looking at its centre from
+   * `heading` and `pitch`: for framing a model, a site or a tile.
+   */
+  flyToBoundingSphere(
+    centre: { longitude: number; latitude: number; height?: number },
+    radius: number,
+    options: BoundingSphereFlight = {},
+  ): Promise<boolean> {
+    this.alive();
+    num('Bounding sphere', centre.longitude, centre.latitude, centre.height ?? 0, radius);
+    const padding = options.padding ?? 1.1;
+    if (!(radius >= 0) || !(padding > 0 && Number.isFinite(padding)))
+      throw rangeError('A bounding sphere needs a radius of 0 or more and a padding above 0', 'controls-arguments');
+    const e = this.element,
+      aspect = e && e.clientWidth > 0 && e.clientHeight > 0 ? e.clientWidth / e.clientHeight : 16 / 9,
+      half = ((this.camera.fov ?? 60) * Math.PI) / 180 / 2,
+      // The narrower of the vertical and horizontal half angles bounds the sphere.
+      fit = Math.min(half, Math.atan(Math.tan(half) * aspect)),
+      range = Math.max(this.minRange, (radius * padding) / Math.sin(fit));
+    return this.flyTo(
+      {
+        ...centre,
+        height: centre.height ?? 0,
+        heading: options.heading ?? this.v.heading,
+        pitch: options.pitch ?? this.v.pitch,
+        range,
+      },
+      options,
+    );
+  }
+  /**
+   * Fly so a longitude/latitude box (radians, west to east may cross the antimeridian) fits the view, from straight
+   * above unless `pitch` says otherwise. `height` is the box's ground height, metres (default 0).
+   */
+  fitBounds(
+    bounds: { west: number; south: number; east: number; north: number; height?: number },
+    options: BoundingSphereFlight = {},
+  ): Promise<boolean> {
+    this.alive();
+    const { west, south, north } = bounds,
+      height = bounds.height ?? 0;
+    num('Bounds', west, south, bounds.east, north, height);
+    if (!(south <= north) || Math.abs(south) > Math.PI / 2 || Math.abs(north) > Math.PI / 2)
+      throw rangeError('Bounds need south <= north within [-PI/2, PI/2], in radians', 'controls-arguments');
+    let east = bounds.east;
+    while (east < west) east += 2 * Math.PI;
+    const lons = [west, (west + east) / 2, east],
+      lats = [south, (south + north) / 2, north],
+      points = lons.flatMap((lon) => lats.map((lat) => cartographicToEcef(lon, lat, height))),
+      mid = cartographicToEcef(lons[1]!, lats[1]!, height),
+      radius = Math.max(...points.map((q) => Math.hypot(q[0] - mid[0], q[1] - mid[1], q[2] - mid[2])));
+    return this.flyToBoundingSphere({ longitude: wrap(lons[1]!), latitude: lats[1]!, height }, radius, {
+      pitch: Math.PI / 2,
+      ...options,
     });
   }
   /** Stop a flight where it is; its promise resolves false. */
@@ -692,9 +836,11 @@ export class GeospatialControls extends Controls {
         this.cancel();
         throw rangeError('A flight easing must return a finite number', 'controls-arguments');
       }
-      const mid = geodesicDirect(f.from.longitude, f.from.latitude, f.bearing, f.distance * e),
-        lr = Math.log(f.from.range) * (1 - e) + Math.log(f.to.range) * e,
-        hop = f.arc ? Math.sin(Math.PI * e) * f.distance * 0.5 : 0;
+      // On the van Wijk path the eased progress runs the path parameter; without it, pan and log zoom ease together.
+      const p = f.path?.at(f.path.S * e),
+        u = p ? clamp(p.u, 0, f.distance) : f.distance * e,
+        mid = geodesicDirect(f.from.longitude, f.from.latitude, f.bearing, u),
+        range = p ? p.w * f.scale : Math.exp(Math.log(f.from.range) * (1 - e) + Math.log(f.to.range) * e);
       const last = t >= 1;
       this.v = this.sanitize({
         longitude: last ? f.to.longitude : mid.longitude,
@@ -702,7 +848,7 @@ export class GeospatialControls extends Controls {
         height: f.from.height + (f.to.height - f.from.height) * e,
         heading: f.from.heading + wrap(f.to.heading - f.from.heading) * e,
         pitch: f.from.pitch + (f.to.pitch - f.from.pitch) * e,
-        range: Math.exp(lr) + hop,
+        range: last ? f.to.range : range,
       });
       this.commit();
       if (last) {
@@ -737,8 +883,14 @@ export class GeospatialControls extends Controls {
   protected override onDisconnect(): void {
     this.dragging = null;
   }
+  /** A press or the wheel takes the camera back from a flight that allows it. */
+  private interrupt(): void {
+    if (this.flight?.cancelOnInput) this.cancel();
+  }
   private down = (event: PointerEvent): void => {
-    if (!this.enabled || this.dragging || event.button > 2) return;
+    if (!this.enabled) return;
+    this.interrupt();
+    if (this.dragging || event.button > 2) return;
     const rotate = event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey;
     if ((rotate && !this.enableRotate) || (!rotate && !this.enablePan)) return;
     const p = this.local(event),
@@ -778,7 +930,9 @@ export class GeospatialControls extends Controls {
     this.dispatchEvent({ type: 'end' });
   };
   private wheel = (event: WheelEvent): void => {
-    if (!this.enabled || !this.enableZoom) return;
+    if (!this.enabled) return;
+    this.interrupt();
+    if (!this.enableZoom) return;
     const p = this.local(event),
       px = event.deltaY * (event.deltaMode === 1 ? 100 / 3 : event.deltaMode === 2 ? 800 : 1);
     this.zoomAt(p.x, p.y, 2 ** clamp((px * this.zoomSpeed) / 500, -32, 32));

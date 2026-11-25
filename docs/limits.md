@@ -8657,6 +8657,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   degrees across one step can be crossed unseen, and a grazing ray past 512 steps misses; pass an exact `raycast`
   (terrain/query) for cliffs. Scene picks are float32 in core: about 0.5 m at Earth-centred coordinates until the
   floating origin row lands. Zoom keeps the cursor point to a tenth of a pixel (the view re-levels at its new centre).
+- Flights follow van Wijk and Nuij's path in the plane of the geodesic: the pan u runs along the ground geodesic and the
+  path width becomes the range (range = w / (2 tan(fov / 2))), so the climb ignores the globe's curvature (a hop of
+  thousands of km climbs a little less than the paper's flat-plane optimum would over a sphere). Height, heading and
+  pitch ease linearly with the eased progress, not along the path. The automatic duration is the path length over
+  `speed` within [1 s, `maxDuration`]; a press or the wheel cancels a flight unless `cancelOnInput` is false, keys do not.
+  `fitBounds` frames a sphere around nine points of the box, so a thin long box is framed looser than its outline.
 - Height is above the WGS84 ellipsoid, not a geoid; angles are radians.
 
 ### Overlay effects (`@margoengine/post/overlays`, 2026-11-25)

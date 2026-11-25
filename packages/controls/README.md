@@ -721,7 +721,7 @@ including initialization failures and scene/engine disposal.
 ## Geospatial camera: `@margoengine/controls/geospatial`
 
 `GeospatialControls` orbits a geodetic point on the WGS84 globe by heading, pitch and range. Drag pans along the surface,
-right or modified drag turns and tilts, the wheel zooms toward the cursor, and `flyTo` flies a geodesic with an arc.
+right or modified drag turns and tilts, the wheel zooms toward the cursor, and `flyTo` flies the optimal zoom-and-pan path.
 The eye is kept `clearance` metres (default 2) above the ground height your `heightAt(longitude, latitude)` returns; it
 is a height query only (a function over a terrain, a height grid or a raycast), never a physics body. Angles are
 radians and lengths metres everywhere; convert with `degToRad`. The geodesy (geodetic/ECEF, ENU, Karney geodesics,
@@ -772,6 +772,39 @@ console.log(camera.collisionRange < 600); // true: the tower stands between the 
 camera.underground = true; // look from below the ground: no floor, no sweeps
 ```
 
+### Flights and framing
+
+`flyTo` follows the optimal zoom-and-pan path of van Wijk and Nuij (2003): it climbs, crosses the shortest geodesic and
+descends so the apparent speed stays even, and the path length sets the duration (`speed` 1.2 screen heights a
+second, at least 1 s, at most `maxDuration` 10 s) unless you give `duration`. `curve` (1.42) is their rho: higher climbs
+sooner, near 0 pans flat. A pointer press or the wheel cancels it (`cancelOnInput`, default true), as do `signal`,
+another flight, `setView` and `dispose`; the promise then resolves false. `zoomPanPath(w0, w1, u1, rho)` exposes the
+path itself. `flyToBoundingSphere(centre, radius)` frames a sphere with `padding` (1.1) room, and `fitBounds(box)` frames
+a longitude/latitude box from above (`pitch` overrides it); both take every flight option.
+
+```ts
+import {GeospatialControls, zoomPanPath} from 'margoengine/controls/geospatial';
+import {degToRad} from 'margoengine/math/geo';
+import {Engine} from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const camera = new GeospatialControls(engine, undefined, {
+  view: {longitude: degToRad(-87.6), latitude: degToRad(41.9), range: 2000, pitch: degToRad(45)},
+});
+// Chicago to Detroit: the duration comes from the path length; the engine's frames advance it.
+camera
+  .flyTo({longitude: degToRad(-83.05), latitude: degToRad(42.33), range: 1500})
+  // Then Lake Michigan from above, with a fifth more room.
+  .then(() =>
+    camera.fitBounds(
+      {west: degToRad(-88), south: degToRad(41.6), east: degToRad(-84.8), north: degToRad(46.1)},
+      {padding: 1.2, duration: 2},
+    ),
+  );
+console.log(camera.flightTime?.duration); // seconds, between 1 and 10
+console.log(zoomPanPath(1000, 1000, 1e6).S); // the path length in screen widths
+```
+
 ### Surface-true picking
 
 Zoom, pan and turn grab the real surface, not the ellipsoid. `pick(x, y)` returns the nearest hit of the engine's
@@ -803,7 +836,9 @@ everything visible), `raycast` (none), `raycaster` (a new one), `underground` (f
 Karney, "Algorithms for geodesics", J. Geodesy 87, 2013; Bowring, Survey Review
 23 (181), 1976; Jankowski and Hachet, "A Survey of Interaction Techniques for Interactive 3D Environments", Eurographics
 STAR 2013, https://doi.org/10.2312/conf/EG2013/stars/065-093 (grab-the-surface pan and point-of-interest zoom); Khan et
-al., "HoverCam", I3D 2005, https://doi.org/10.1145/1053427.1053439 (orbiting about the surface under the view). Limits: `docs/limits.md`, "Geospatial camera".
+al., "HoverCam", I3D 2005, https://doi.org/10.1145/1053427.1053439 (orbiting about the surface under the view); van Wijk
+and Nuij, "Smooth and efficient zooming and panning", IEEE InfoVis 2003, https://doi.org/10.1109/INFVIS.2003.1249004
+(the flight path, equations 9 to 12). Limits: `docs/limits.md`, "Geospatial camera".
 
 ## Globe navigation: `@margoengine/controls/globe`
 
