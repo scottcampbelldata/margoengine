@@ -1,11 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-<<<<<<< HEAD
-  "total": 18512199,
-=======
-  "total": 18582126,
->>>>>>> 9a8fabfda (chore(gltf): generated files after the rebase: api surface, all-entries, the soft-mesh size baseline, llms)
+  "total": 18586095,
   "history": [
     {
       "date": "2026-10-24",
@@ -11806,7 +11802,7 @@
     },
     {
       "date": "2026-11-25",
-      "commit": "bc509f4d2",
+      "commit": "606261f00",
       "reason": "new optional entry @margoengine/gltf/soft-mesh (drawSoftBody, SoftSurface): about 2.5 KB of its own code over the PBRModel chunk it shares with @margoengine/gltf/pbr-model, which an app drawing a soft body as a PBR mesh pays once either way; physics is a type import",
       "grew": 1
     }
