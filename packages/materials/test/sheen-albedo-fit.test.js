@@ -139,10 +139,10 @@ test('the table is a finite energy fraction, 1 at grazing for smooth sheen and n
 
 // The GPU check compares the shipped table with the closed form it replaced. That reference was once taken as the
 // parent of the last commit touching packages/shared/sheen.js, so a later, unrelated sheen fix to that file made the
-// reference the shipped table itself and the check failed on a correct tree. It is now pinned.
-// coefficients are polynomials in roughness and a knee, a fit of the sheen albedo E of Estevez and Kulla 2017). It is
-// held here because the commit that held it is not in every checkout's history, and a test must not need history.
-// Never edit it to follow the script: it is the reference the script's copy is checked against.
+// reference the shipped table itself and the check failed on a correct tree. It is now pinned: its coefficients are
+// polynomials in roughness and a knee, a fit of the sheen albedo E of Estevez and Kulla 2017. It is held here too
+// because the commit that held it is not in every checkout's history, and a test must not need history. Never edit
+// it to follow the script: it is the reference the script's copy is checked against.
 const original = `fn materialLobesSheenAlbedo(mu:f32,roughness:f32)->f32 {
   let sheenR2=roughness*roughness;let sheenKnee=sheenR2/(sheenR2+0.046698);
   let sheenBasis=vec4f(1.0,sheenKnee,roughness,sheenKnee*roughness);let sheenX=mu/max(roughness,0.0001);
