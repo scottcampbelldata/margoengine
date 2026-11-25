@@ -118,6 +118,7 @@ class Scatter implements EnginePlugin {
     protected ringCapacity(): number;
     protected release(): void;
     onDeviceRestored(engine: Engine): void;
+    velocityParts(): ScatterVelocityParts | undefined;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -193,6 +194,26 @@ interface ScatterTextures {
 interface ScatterVariation {
     hue?: number;
     value?: number;
+}
+
+interface ScatterVelocityParts {
+    readonly values: Float32Array;
+    readonly instances: readonly GPUBuffer[];
+    readonly commands: GPUBuffer;
+    readonly vertices: readonly GPUBuffer[];
+    readonly indices: readonly GPUBuffer[];
+    readonly counts: readonly number[];
+    readonly stride: number;
+    readonly stages: readonly ('opaque' | 'cover' | 'split' | undefined)[];
+    pose(code: string, binding: number): string;
+    entries(): {
+        buffer: GPUBuffer;
+    }[];
+    readonly route?: {
+        vertex(code: string): string;
+        count(ring: number): GPUBufferBinding;
+        capacity: number;
+    };
 }
 
 type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];

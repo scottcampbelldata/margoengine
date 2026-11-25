@@ -3899,6 +3899,10 @@
       "types": "./dist/scatter/grass.d.ts",
       "import": "./dist/scatter/grass.js"
     },
+    "./scatter/velocity": {
+      "types": "./dist/scatter/velocity.d.ts",
+      "import": "./dist/scatter/velocity.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

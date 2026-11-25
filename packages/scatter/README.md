@@ -856,6 +856,48 @@ engine.start();
 Each record places a clump; the GPU picks the near, middle and far mesh by distance and fades between them. Manage
 the held set with `setTile` and `removeTile`; the coordinate range alone does not allocate records for unheld chunks.
 
+## Motion vectors and motion blur in wind: `@margoengine/scatter/velocity`
+
+A swaying field is still to TAA and `MotionBlur` unless its motion reaches their velocity buffer. `new
+ScatterVelocity(scatter)` is a `TAAVelocityPass`: `taa.add(velocity)` makes TAA draw it in its object velocity pass each
+frame (FG-16). Every vertex is posed twice with the scatter's own pose (blades, ground fit, wind bend), with this
+frame's wind clock, eye and pixel footprint and with the last frame's, and projected with TAA's current and previous
+view-projections, so a blade's vector is its own sway plus the camera's move. TAA keeps sharper history on the blades
+and `MotionBlur` smears them along the gust at film shutters.
+
+- Every stage that writes depth takes a vector, drawn as the colour pass draws it (TAA tests depth for equality):
+  opaque rings, the opaque core of a `GrassScatter`'s near ring, and the coverage-depth stage of its covered tips and
+  middle and far rings, which keeps the same hashed pixels the colour pass gave depth. A pixel a covered blade only
+  blends into (no depth there) keeps the surface behind it and that surface's motion.
+- Plant states (`@margoengine/scatter/states`) and interaction bends are posed as they are now in both frames: their
+  own change between frames is not in the vector.
+- WebGPU and the full WebGL2 layer. Nothing is drawn before the scatter's first frame or after `dispose()`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {PostStack} from 'margoengine/post';
+import {MotionBlur} from 'margoengine/post/motion-blur';
+import {GrassScatter} from 'margoengine/scatter/grass';
+import {ScatterVelocity} from 'margoengine/scatter/velocity';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: {position: [0, 3, 6], target: [0, 0, 0], near: 0.1, far: 200},
+});
+// 700,000 clumps of blades in a 12 m/s wind.
+const grass = GrassScatter.attach(engine, {count: 700_000, area: [60, 60], wind: [1, 0.3, 0.8, 12]});
+let taa: TAA | undefined;
+const stack = PostStack.attach(engine, [new MotionBlur({velocity: () => taa?.velocity, shutter: 0.5})]);
+taa = TAA.attach(engine, {depth: () => stack.depthTexture});
+taa.add(new ScatterVelocity(grass));
+for (let i = 0; i < 4; i++) engine.render({delta: 1 / 24});
+```
+
+Real-GPU proof: `node packages/scatter/test/velocity.browser.mjs` (and with `MARGO_COMPAT=1`): a still camera over a
+meadow in wind has no vectors without the pass, vectors along the wind with it (diffuse and PBR, 4,000 and 700,000
+clumps), and none at wind strength 0.
+
 ## Film time: seeking the wind to a cut
 
 A film rendered scene by scene starts each scene in a fresh process, and the wind clock of every `Scatter` (grass

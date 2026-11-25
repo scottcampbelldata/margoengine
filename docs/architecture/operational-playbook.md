@@ -192,6 +192,25 @@ texture equal to the reading within 2.4e-7, and a bore run-up of 0.89 m under Sh
 one more dispatch a tick and 32 B a cell; Water's spray now spawns from the breaker at any depth (the coast flow's breaker
 is 0 past 1.8 m, so its spray is unchanged).
 
+### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
+
+New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object
+velocity pass through its `TAAVelocityPass` contract; core, TAA and the Scatter colour pass are unchanged (Scatter gains
+`velocityParts()`, read-only plumbing). Each vertex runs the scatter's own pose (`scatterPose` with every `poseCode`
+patch: grass blades, plant states) twice, with this frame's wind clock, eye and pixel footprint and with the last
+frame's kept per TAA view, and both world points are projected with TAA's current and previous view-projections; the
+fragment writes TAA's (velocity, previous depth) pair, with -1 depth on a frame without history. Clip positions are
+`@invariant` and the pass tests depth for equality, so it draws each depth-writing stage as the colour pass does: a
+split grass ring's body (the split declaration), and the coverage-depth stage of covered tips and rings (the cover
+declaration, discarding at or under the pose's hashed threshold, Wyman and McGuire 2017), posing the previous frame
+first so `scatterCover` is this frame's. Evidence: `packages/scatter/test/velocity.browser.mjs` (RTX A6000, WebGPU and
+`--compat`): a still camera, TAA velocityOnly with MotionBlur in a PostStack; no vectors over a windy meadow without the
+pass, 39,020 moving pixels (38,929 on the WebGL2 layer) along the wind with it, diffuse and PBR alike, the largest move
+0.89 px a frame at 30 fps; none at wind strength 0; 700,000 clumps draw their motion (47,497 pixels) with no GPU error.
+Drawing the near core alone, before the coverage-depth stages, gave 72 pixels once covered parts wrote depth.
+Missing: a pixel a covered blade only blends into keeps the motion behind it; state and interaction changes between
+frames are not in the vector.
+
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 
 GPU maths change in `packages/water/src/flood-shaders.ts` (`floodRecord`), both backends from one WGSL source, only when

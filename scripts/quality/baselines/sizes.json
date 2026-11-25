@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18780484,
+  "total": 18783130,
   "history": [
     {
       "date": "2026-10-24",
@@ -11943,6 +11943,12 @@
       "commit": "e896fdce5c",
       "reason": "new headless/frames entry and shared readback module reused by readPixels",
       "grew": 6
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-16",
+      "reason": "FG-16 new entry scatter/velocity 3,319 B gzip: ScatterVelocity, a TAAVelocityPass drawing a scatter's wind motion (two poses a vertex) into TAA's object velocity pass, its coverage-depth stages included; optional, nothing else imports it",
+      "grew": 1
     }
   ],
   "items": {
@@ -12939,6 +12945,7 @@
     "@margoengine/scatter/surface": 1515,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/scatter/tiles": 3606,
+    "@margoengine/scatter/velocity": 3319,
     "@margoengine/scene": 1974,
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
@@ -13435,8 +13442,8 @@
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 9013,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 14307,
-    "@margoengine/water/flood-bake": 4615,
+    "@margoengine/water/flood": 13890,
+    "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,
     "@margoengine/water/liquid": 18041,

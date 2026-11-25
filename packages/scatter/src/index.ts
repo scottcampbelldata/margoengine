@@ -68,6 +68,29 @@ declare const GPUBufferUsage: {
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8unorm'];
+/**
+ * What `Scatter.velocityParts` hands `@margoengine/scatter/velocity`: this frame's culled instances and how each LOD ring
+ * is drawn. Internal plumbing between the two entries; its shape may change with the package.
+ */
+export interface ScatterVelocityParts {
+  /** The frame values: camera 0-15, eye 16-18, wind 68-71, ground fit 72-75, blades 76-79, pixel footprint 80. */
+  readonly values: Float32Array;
+  readonly instances: readonly GPUBuffer[];
+  readonly commands: GPUBuffer;
+  readonly vertices: readonly GPUBuffer[];
+  readonly indices: readonly GPUBuffer[];
+  /** Index counts per ring, for the route's direct draws. */
+  readonly counts: readonly number[];
+  /** Vertex stride in bytes (32 with texture uvs). */
+  readonly stride: number;
+  /** How the colour pass draws each ring; undefined for a ring it does not draw. */
+  readonly stages: readonly ('opaque' | 'cover' | 'split' | undefined)[];
+  /** Applies the scatter's pose patches (grass blades, plant states) to a vertex stage, its extra bindings from `binding`. */
+  pose(code: string, binding: number): string;
+  entries(): { buffer: GPUBuffer }[];
+  /** The WebGL2 layer's route: a counted vertex stage with each ring's count at binding 2, drawn `capacity` times. */
+  readonly route?: { vertex(code: string): string; count(ring: number): GPUBufferBinding; capacity: number };
+}
 /** Grass-blade shading for GPU `Scatter` (see `ScatterOptions.blades`). */
 export interface ScatterBlades {
   /** Albedo lost at the root, 0-1 (default 0.5): blades darken linearly from the tip (1) to the root (1 - rootShade). */
@@ -1671,6 +1694,28 @@ export class Scatter implements EnginePlugin {
   onDeviceRestored(engine: Engine): void {
     this.release();
     this.setup(engine);
+  }
+  /** The parts `@margoengine/scatter/velocity` draws this frame's motion with; undefined before the first frame or once disposed. */
+  velocityParts(): ScatterVelocityParts | undefined {
+    if (this.#disposed || !this.commands) return undefined;
+    const route = this.route;
+    return {
+      values: this.values,
+      instances: this.colourInstances(),
+      commands: this.colourCommands(),
+      vertices: this.vertices,
+      indices: this.indices,
+      counts: this.geometries.map((g) => g.indices.length),
+      stride: this.uvs ? 32 : 24,
+      stages: [0, 1, 2].map((i) => (this.drawsRing(i) ? this.coverRing(i) : undefined)),
+      pose: (code, binding) => this.poseCode(code, 0, binding),
+      entries: () => this.poseEntries(),
+      route: route && {
+        vertex: (code) => route.vertex(code, false),
+        count: (ring) => route.ringCount(ring),
+        capacity: this.ringCapacity(),
+      },
+    };
   }
   dispose(): void {
     if (this.#disposed) return;

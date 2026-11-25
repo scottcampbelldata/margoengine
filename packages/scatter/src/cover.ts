@@ -28,7 +28,7 @@ export const splitDeclaration = 'const scatterSplit=true;\n';
  * pixels at distance s from a strip's centre line that the strip, h pixels either side of it, covers, and
  * `scatterCoverage` mixes the one- and two-pixel filters by `cover.z`.
  */
-const coverageShader =
+export const coverageShader =
   'fn scatterTent(u:f32)->f32 {let v=clamp(u,-1.0,1.0);return select(1.0-(1.0-v)*(1.0-v)*0.5,(1.0+v)*(1.0+v)*0.5,v<0.0);}\n' +
   'fn scatterStrip(s:f32,h:f32,r:f32)->f32 {return clamp(scatterTent((h-s)/r)-scatterTent((-h-s)/r),0.0,1.0);}\n' +
   'fn scatterCoverage(e:vec4f)->f32 {return mix(scatterStrip(e.x,e.y,1.0),scatterStrip(e.x,e.y,2.0),e.z);}\n';
