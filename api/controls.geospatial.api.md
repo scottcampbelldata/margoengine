@@ -45,6 +45,9 @@ export class GeospatialControls extends Controls {
     eyeHeight: number;
     walkSpeed: number;
     flySpeed: number;
+    keyPanSpeed: number;
+    inertia: GeospatialInertia;
+    reducedMotion: boolean;
     protected get kind(): string;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: GeospatialOptions);
     get view(): Readonly<Required<GeospatialView>>;
@@ -62,6 +65,10 @@ export class GeospatialControls extends Controls {
     zoom(factor: number): void;
     pick(x: number, y: number): GeospatialPick | null;
     private get lookRange();
+    get preset(): GeospatialPreset;
+    applyPreset(preset: GeospatialPreset): void;
+    setInertia(inertia: Partial<GeospatialInertia>): void;
+    stopGlide(): void;
     get mode(): GeospatialMode;
     setMode(mode: GeospatialMode, options?: ModeSwitchOptions): Promise<boolean>;
     look(heading: number, pitch: number): void;
@@ -93,6 +100,12 @@ export class GeospatialControls extends Controls {
     protected onDisconnect(): void;
 }
 
+export interface GeospatialInertia {
+    pan: number;
+    rotate: number;
+    zoom: number;
+}
+
 export type GeospatialMode = 'globe' | 'local' | 'map' | 'fly' | 'walk';
 
 export interface GeospatialOptions {
@@ -115,6 +128,9 @@ export interface GeospatialOptions {
     walkSpeed?: number;
     flySpeed?: number;
     keyTarget?: EventTargetLike | null;
+    preset?: GeospatialPreset;
+    inertia?: Partial<GeospatialInertia>;
+    reducedMotion?: boolean;
 }
 
 export interface GeospatialPick {
@@ -126,6 +142,8 @@ export interface GeospatialPick {
 }
 
 export type GeospatialPickSource = 'scene' | 'raycast' | 'terrain' | 'ellipsoid';
+
+export type GeospatialPreset = 'globe' | 'map' | 'dcc';
 
 export interface GeospatialView {
     longitude: number;

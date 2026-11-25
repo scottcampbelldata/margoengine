@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18900535,
+  "total": 18901835,
   "history": [
     {
       "date": "2026-10-24",
@@ -12117,6 +12117,12 @@
       "commit": "FG-17c",
       "reason": "FG-17 piece 3 new entry voxel-pathtracer/sequence 3,058 B gzip: traceFrames (per-frame update, scene, shutter and previous camera, per-frame seeds, motion fill of instance previousMatrix, option restore) and the display mapping it shares with capture (display.ts, moved out of tracer.ts, root unchanged); optional, nothing else imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial feel (glide, presets, keys, reduced motion)",
+      "grew": 1
     }
   ],
   "items": {
@@ -12333,7 +12339,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 10800,
+    "@margoengine/controls/geospatial": 12100,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
