@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18586095,
+  "total": 18586497,
   "history": [
     {
       "date": "2026-10-24",
@@ -5389,6 +5389,12 @@
       "date": "2026-11-25",
       "commit": "gap-lane-d",
       "reason": "New optional netcode/media: 2931 B gzip (ceiling 3100 B), previously absent; voice, screen share, speaking detection and per-peer volume kept in one import. netcode/signal 3230 B, under its 3320 B ceiling. Core and stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "8092aaee6",
+      "reason": "@margoengine/netcode/signal: 3466 B gzip measured on main (ceiling 3320 -> 3722 B, measured + 256 B). 8092aaee6 put perfect negotiation (W3C WebRTC 1.0 polite/impolite roles, rollback on glare) and renegotiation on negotiationneeded into PeerMesh, with onlink/onunlink and peerConnections. The bytes are worth it: without them adding or removing a media track on a live link fails or deadlocks on glare. A split would have cost a second PeerMesh entry duplicating the offer/answer path, or every netcode/signal user paying a dynamic import round trip on the first renegotiation. The earlier 3230 B figure in the netcode/media row was measured from a stale build. Core and stage unchanged.",
       "grew": 1
     },
     {
@@ -12555,7 +12561,7 @@
     "@margoengine/netcode/relay": 3617,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 6007,
-    "@margoengine/netcode/signal": 3320,
+    "@margoengine/netcode/signal": 3722,
     "@margoengine/netcode/smoothing": 1758,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
