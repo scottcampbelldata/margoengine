@@ -1,0 +1,133 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>WebGL2 MRT first-draw compile repro</title>
+<!--
+  Raw WebGL2, no Margo code (KB-L5a-10, KB6016e in docs/known-bugs.md). Builds fragment programs from new text each run
+  (a nonce in the source, so no program cache serves them), links them with KHR_parallel_shader_compile, and times each
+  program's link (polled with COMPLETION_STATUS_KHR) and its first and second draw (the draw, then a 1-pixel readPixels,
+  which waits until the browser's GPU thread has run the draw). Driven by d3d11-mrt-compile-repro.mjs.
+-->
+<script>
+  'use strict';
+  // A fragment shader of `outputs` vec4 outputs, all of them reading one shared result, so every output needs the
+  // same code: `size` blocks of straight-line code with a branch each (a shader compiler's time grows with it).
+  function fragment(outputs, size, nonce) {
+    const decl = [],
+      body = [],
+      writes = [];
+    for (let i = 0; i < outputs; i++) {
+      decl.push(`layout(location = ${i}) out vec4 o${i};`);
+      writes.push(`  o${i} = c * ${(i + 1).toFixed(1)} + vec4(${i}.0);`);
+    }
+    for (let i = 0; i < size; i++)
+      body.push(
+        `  c = fract(c * 1.37 + vec4(${(i * 0.0137).toFixed(4)}, 0.02, 0.03, 0.04));`,
+        `  if (c.x > 0.5) c.yz += sin(c.wx * 3.1) * ${nonce}; else c.zw -= cos(c.xy * 2.7);`,
+      );
+    return `#version 300 es
+precision highp float;
+${decl.join('\n')}
+uniform vec4 u;
+void main() {
+  vec4 c = gl_FragCoord + u;
+${body.join('\n')}
+${writes.join('\n')}
+}`;
+  }
+  const VERTEX = `#version 300 es
+void main() {
+  vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  window.runRepro = async ({ size = 60, programs = 3 } = {}) => {
+    const canvas = document.createElement('canvas'),
+      gl = canvas.getContext('webgl2'),
+      info = gl.getExtension('WEBGL_debug_renderer_info'),
+      parallel = gl.getExtension('KHR_parallel_shader_compile');
+    const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    const shader = (type, text) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, text);
+      gl.compileShader(s);
+      return s;
+    };
+    const vertex = shader(gl.VERTEX_SHADER, VERTEX);
+    // Links `count` programs of `outputs` outputs at once and resolves when every link is complete.
+    const linkAll = async (count, outputs) => {
+      const list = [];
+      const t0 = performance.now();
+      for (let i = 0; i < count; i++) {
+        const nonce = (Math.random() * 0.5 + 0.25).toFixed(9),
+          p = gl.createProgram();
+        gl.attachShader(p, vertex);
+        gl.attachShader(p, shader(gl.FRAGMENT_SHADER, fragment(outputs, size, nonce)));
+        gl.linkProgram(p);
+        list.push({ program: p, outputs, linkMs: 0 });
+      }
+      for (let open = list.slice(); open.length; ) {
+        open = open.filter((e) => {
+          if (parallel && !gl.getProgramParameter(e.program, parallel.COMPLETION_STATUS_KHR)) return true;
+          e.linkMs = performance.now() - t0;
+          if (!gl.getProgramParameter(e.program, gl.LINK_STATUS))
+            throw new Error(`link failed: ${gl.getProgramInfoLog(e.program)}`);
+          return false;
+        });
+        if (open.length) await sleep(1);
+      }
+      return { list, wallMs: performance.now() - t0 };
+    };
+    // A framebuffer of `attachments` 1 x 1 RGBA8 targets at COLOR_ATTACHMENT0.., each with its draw buffer on.
+    const target = (attachments) => {
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      for (let i = 0; i < attachments; i++) {
+        const t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 1, 1);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0);
+      }
+      gl.drawBuffers(Array.from({ length: attachments }, (_, i) => gl.COLOR_ATTACHMENT0 + i));
+      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+      return fbo;
+    };
+    const pixel = new Uint8Array(4);
+    const drawMs = (program, fbo) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.viewport(0, 0, 1, 1);
+      gl.useProgram(program);
+      const t0 = performance.now();
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      return performance.now() - t0;
+    };
+    const round = (x) => Math.round(x * 10) / 10;
+    // One case: `count` new programs of `outputs` outputs linked together, then each drawn twice into a framebuffer
+    // of `attachments` targets (an output with no target is dropped).
+    const run = async (name, count, outputs, attachments) => {
+      const { list, wallMs } = await linkAll(count, outputs),
+        fbo = target(attachments);
+      const first = list.map((e) => drawMs(e.program, fbo)),
+        second = list.map((e) => drawMs(e.program, fbo));
+      return {
+        name,
+        programs: count,
+        outputs,
+        attachments,
+        linkWallMs: round(wallMs),
+        firstDrawMs: first.map(round),
+        firstDrawSumMs: round(first.reduce((a, b) => a + b, 0)),
+        secondDrawMs: second.map(round),
+      };
+    };
+    const cases = [
+      await run('1 output, 1 target', programs, 1, 1),
+      await run('7 outputs, 7 targets', programs, 7, 7),
+      await run('7 outputs, 1 target', programs, 7, 1),
+    ];
+    return { renderer, parallel: !!parallel, size, cases };
+  };
+  window.reproReady = true;
+</script>

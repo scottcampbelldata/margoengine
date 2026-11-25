@@ -6788,7 +6788,7 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   one filter call in a loop bounded by the record (KB5451)" (fails on the old build: 11 calls) and "pbrMaterial gives
   the same values as one filter call per slot (KB5451)" (24 values bit-identical on the CPU WGSL interpreter).
 
-### Open: `MARGO_COMPAT=1` voxel-pathtracer steps cannot finish on ANGLE Direct3D 11, on main too (KB-L5a-10)
+### Open: `MARGO_COMPAT=1` voxel-pathtracer steps cannot finish on ANGLE Direct3D 11, on main too; the serial compile is ANGLE's, proven 2026-11-25 (KB-L5a-10)
 
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-package-tests.mjs --no-build --keep-going
   --select=voxel-pathtracer/test:gpu:<step>` on the dev PC (RTX A6000, Edge 157) for the steps below. Under
@@ -6961,11 +6961,38 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-semantics ; The Chromium Projects,
   "GPU Command Buffer" (synchronous calls wait for the GPU process),
   https://www.chromium.org/developers/design-documents/gpu-command-buffer/ .
+- **Proven below Margo 2026-11-25 (the draw-time compile; standalone repro, no Margo code):**
+  `node scripts/run-with-timeout.mjs --max 10 -- node packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs`
+  (page `packages/webgl2-compat/test/d3d11-mrt-compile-repro.html`, raw WebGL2; options `--angle`, `--size`,
+  `--programs`, `--trace=<file>`). It links three programs of new text at once (KHR_parallel_shader_compile, polled)
+  and times each one's first and second draw (a 1-pixel `readPixels` after it). Intel Arc 140V laptop, Chrome 157:
+  - ANGLE Direct3D 11: 1 output into 1 target, first draws 1,351, 373 and 166 ms (1.9 s in all; the compiles ran side
+    by side at link and the first draw waits for them); 7 outputs into 7 targets, 1,921, 1,917 and 1,794 ms (5.6 s, one
+    after another); the same 7-output programs drawn into 1 target, 1,506, 796 and 161 ms (like 1 output). Second
+    draws 1 to 2 ms in every case.
+  - ANGLE Vulkan, same machine and page: 3.13, 3.05 and 3.08 s in all for the three cases, the first program of each
+    paying it and the other two 2 to 18 ms; more outputs cost nothing extra.
+  - Its Chrome trace (`--trace`, category `gpu.angle`, whose D3DCompile events carry the HLSL as `source`): all nine
+    links compile their pixel shader on ThreadPoolForegroundWorker with one `SV_TARGET` in the output struct (146 to
+    169 ms each); only the three 7-target draws compile again, on CrGpuMain with seven `SV_TARGET` (169, 176 and
+    206 ms). Those draws hold CrGpuMain about 1.9 s each, so most of their time is the driver building the new shader
+    for the GPU at that draw, after fxc; both are behind ANGLE's draw-time compile.
+  So the serial cost is ANGLE's Direct3D back end: it compiles at link for a default output layout of one render target
+  and compiles again at the first draw for the layout of the bound targets, on the browser's one GPU thread. ANGLE's
+  own design note says so (The ANGLE Project, "Dynamic Shader Compilation",
+  https://chromium.googlesource.com/angle/angle/+/main/doc/DynamicShaderCompilation.md : "Changing render target
+  setups may trigger a shader recompile at draw time"). No upstream bug number was found for the one-target link
+  layout; nothing was filed from here. A program with one output avoids it, but splitting the staged programs (seven
+  outputs a page) into 1-output programs would multiply each sample's passes and the fxc work by up to seven, which
+  the repro's 1-output figures do not pay back, so the layer keeps its pages. Margo-side causes found on this path
+  (the reverted warm draw, the synchronous query behind a warm draw) are fixed above. What stays open here is the
+  serial compile's length against limits sized on WebGPU (`stall`: a single program compiles longer than its 10 s
+  window) and the denoise references' pass cost, which is speed work under the build phase.
 - **Next:** make the staged route cheaper per sample on Direct3D 11 (fewer passes an iteration, or more samples a
   pass) and its programs cheaper to compile (`hit` and `sample`, the largest), or share one reference between the WebGPU and compat legs, then rerun the repro. The tests, their samples and their limits stay as they are. A driver reset (nvlddmkm 153) at 06:03 local
   on 2026-11-15 came during the first of these runs.
 
-### Open: `MARGO_COMPAT=1 test:gpu:compose-native` cannot finish on ANGLE Direct3D 11 (KB6016e)
+### Open: `MARGO_COMPAT=1 test:gpu:compose-native` cannot finish on ANGLE Direct3D 11; the serial compile is ANGLE's, proven 2026-11-25 (KB6016e)
 
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-package-tests.mjs --no-build --select=voxel-pathtracer/test:gpu:compose-native`
   on the dev PC (RTX A6000, Edge 157, GPU shared). Under MARGO_COMPAT=1 the test's "native" leg runs on the WebGL2
@@ -7031,6 +7058,13 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   - So at this rate the 32 subsets need about 85 minutes against the 12 minute limit, about 7 times over. Nothing
     hangs: each compile finishes, and every subset that rendered passed its checks. No Margo-side defect was found
     beyond the program sizes the entry already names.
+- **Proven below Margo 2026-11-25:** the compile that counts here is ANGLE Direct3D 11's draw-time compile of each
+  multiple-output program on the browser's one GPU thread, one program after another, which a raw WebGL2 page with no
+  Margo code reproduces (`packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs`, Intel Arc 140V, Chrome 157:
+  three 7-output programs drawn into 7 targets 5.6 s one after another, the same programs into 1 target or three
+  1-output programs about 1.9 to 2.5 s side by side, and no difference on ANGLE Vulkan). KB-L5a-10 has the figures,
+  the trace and the upstream design note. The 289 distinct programs of the 32 subsets each pay it once; the step's
+  scope or limit on Direct3D 11 stays Scott's decision (escalated 2026-11-21).
 - **Next:** cut the compile work per program further (`surface`, `hit`, `shadow`, `vertex`) and prove it with a
   program-size or call-site count, then rerun the repro. The test and its limits stay as they are. A gap of about 7
   times will not close by trimming alone, so changing the step's scope or limit on Direct3D 11 is a decision for

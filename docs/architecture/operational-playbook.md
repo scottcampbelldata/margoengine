@@ -2958,7 +2958,17 @@ warm draws' fences): the same trace's longest page-thread task went from 18.0 s 
 passes (traversal 105 s, analytic 87 s, determinism 2.9 s). Evidence: `packages/webgl2-compat/test/d3d11-warm.test.js`
 ("a linked program makes no synchronous query while another program warms", fails on the code before). Still missing:
 the serial GPU-thread compile itself, which is ANGLE's design (docs/known-bugs.md, KB-L5a-10), and the 16384-sample
-denoise references, which cost the staged route's passes, not compiles. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
+denoise references, which cost the staged route's passes, not compiles. Evidence for the first (2026-11-25): a raw WebGL2 repro
+with no Margo code, `packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs` (run directly, not a gate; Intel Arc
+140V, Chrome 157). Three new programs a case, linked together: on ANGLE Direct3D 11 the 7-output programs drawn into 7
+targets take 1.8 to 1.9 s each at their first draw, one after another (5.6 s), the 1-output programs and the same
+7-output programs drawn into 1 target 1.9 and 2.5 s in all (their compiles run side by side at link); on ANGLE Vulkan
+every case takes about 3.1 s in all. Its Chrome trace (`--trace`, category `gpu.angle`) shows every link's D3DCompile
+on a worker thread with one `SV_TARGET` and a second one, with seven, on CrGpuMain for the 7-target draws only; most of
+each such draw's 1.9 s comes after fxc, in the driver's build of the new shader. ANGLE documents draw-time recompiles on
+a change of render targets (The ANGLE Project, "Dynamic Shader Compilation",
+https://chromium.googlesource.com/angle/angle/+/main/doc/DynamicShaderCompilation.md). Missing: the same repro on
+another Direct3D GPU (the RTX A6000) and an upstream bug for the one-target link layout. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
 `coverage` kernel's 64-ray loop around `closest()` never finished its first compile in 22 minutes (89.4 s for the whole
 `transparent` case with the bound read from the frame uniform, the same image hashes); `tests/compat-staged.test.js`
 checks every layer-compiled kernel for it, and since KB-L5a-3 every staged program too, and that no staged program

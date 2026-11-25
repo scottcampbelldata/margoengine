@@ -196,6 +196,8 @@ const TOOLS = {
     'by-hand proof against an HTTP/3 server on the outside tool aioquic, which needs Python; run directly',
   'packages/webgl2-compat/test/metal-dropped-draw-repro.mjs':
     'raw WebGL2 repro of the ANGLE Metal dropped draw, not a gate: it prints what the browser does (test:gpu checks the fix in compute-browser.mjs scatterAfterWrite); run directly',
+  'packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs':
+    'raw WebGL2 repro of the ANGLE Direct3D 11 draw-time MRT pixel shader compile, not a gate: it prints link and first-draw times per back end (test:gpu checks the warm draw in first-draw-browser.mjs); run directly',
   'packages/sciviz/tests/webgl-long-invocation-repro.mjs':
     'raw WebGL2 repro of the ANGLE Metal draw dropped for a long single invocation, not a gate: it prints what the browser does (test:browser:aggregate checks the sliced aggregation); run directly',
   'packages/sky/test/compat-night-probe.mjs':
