@@ -50,7 +50,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | WebXR AR GPU depth occlusion (real objects hide virtual ones; only CPU depth today) | three.js, Babylon | EXISTS (`packages/xr/src/occlusion.ts`: CPU and `gpu-optimized` depth, `feather` soft edge, `npm run test:gpu:occlusion`; not yet run on a device) | M | 25c4bbbfe |
 | WebXR AR reflection cube map from light estimation, as the environment's specular | three.js, Babylon | DONE (`@margoengine/xr/reflection`; not yet run on a device) | M | dbbd7fc7f |
 | WebXR VR and AR passes, controller poses and XR layers not covered by the stand-in sessions | three.js, Babylon | DONE (`@margoengine/xr/session`: blend mode, visibility, frame rate, play-area bounds; layer `quality`, `blendTextureSourceAlpha`, `chromaticAberrationCorrection`, `mipLevels`. Multiview not built, see limits.md; not yet run on a headset) | M | 5f1f6ca25 |
-| AR Quick Look and Scene Viewer launch where WebXR is absent | model-viewer | MISSING | S |  |
+| AR Quick Look and Scene Viewer launch where WebXR is absent | model-viewer | DONE (`@margoengine/xr/launch`: Quick Look `rel="ar"` link, Scene Viewer intent, fallback; URL scheme checks; not yet run on a phone) | S | 73d8e2269 |
 | USDZ interactive behaviours (Quick Look tap and trigger actions in the USDZ exporter) | Apple AR Quick Look | MISSING | M |  |
 | SVG from an engine scene (sciviz writes SVG from supplied geometry only) | three.js SVGRenderer | PARTIAL | M |  |
 | WebXR multiview (both eyes in one pass where the device and binding offer it, a view per eye otherwise) | three.js, Babylon | MISSING | M |  |
