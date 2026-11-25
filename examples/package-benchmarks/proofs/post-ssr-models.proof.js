@@ -5,13 +5,13 @@
 // gltf/pbr's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pbr-lighting-hooks.proof.js
 // run with the commit before the capture as ref.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
-// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; e2177dc6e5 before it) against the working tree;
+// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: e29764081c (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5 (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; e2177dc6e5 before it) against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('3cf1453', '838ae6e', 'e2177dc6e5'),
+const { ref, pin } = refs('3cf1453', '838ae6e', 'e29764081c'),
   { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 const ibl =
