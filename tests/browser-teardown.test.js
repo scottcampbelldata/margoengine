@@ -570,6 +570,34 @@ test('Windows waiter with kill: a child already terminating (Kill throws access 
   }
 });
 
+test('Windows waiter with kill: a child Kill could not end that stays running is still a survivor', {
+  timeout: 15_000,
+}, async () => {
+  if (process.platform !== 'win32') return;
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  await new Promise((resolve, reject) => child.once('spawn', resolve).once('error', reject));
+  try {
+    // Kill fails (access denied) and nothing else ends the child: the caught exception must not hide it.
+    const survivors = await waitSignaled(
+      [child.pid],
+      800,
+      Date.now() + 60_000,
+      (file, args, options, callback) =>
+        execFile(
+          file,
+          [...args.slice(0, 3), args[3].replace('$p.Kill()', 'throw (New-Object ComponentModel.Win32Exception 5)')],
+          options,
+          callback,
+        ),
+      { kill: true },
+    );
+    assert.deepEqual(survivors, [child.pid], 'WaitForExit still reports a child that did not end');
+    assert.equal(child.exitCode, null);
+  } finally {
+    child.kill();
+  }
+});
+
 test('Windows waiter: a pid held by a process this user cannot query is not reported as ours', {
   timeout: 15_000,
 }, async () => {
