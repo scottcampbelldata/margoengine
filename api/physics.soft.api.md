@@ -404,7 +404,10 @@ interface BodyOwner {
     readonly kernel: KernelWorld;
     addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
     removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
-    removeBody(body: PhysicsBody): void;
+    removeBody(body: PhysicsBody, options?: {
+        keepColliders?: boolean;
+    }): void;
+    jointsOf?(body: PhysicsBody): PhysicsJoint[];
     moved(body: PhysicsBody): void;
 }
 
@@ -971,6 +974,12 @@ interface KernelDistance {
     pointB: [number, number, number];
 }
 
+interface KernelHandle {
+    readonly kind: 'body' | 'collider' | 'joint';
+    readonly row: number;
+    readonly generation: number;
+}
+
 interface KernelHeightfieldOptions {
     fixInternalEdges?: boolean;
     cellStatus?: ArrayLike<number>;
@@ -1201,6 +1210,7 @@ class KernelWorld {
     colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null;
     setColliderShape(collider: number, shape: KernelShape, size: readonly number[]): void;
     setColliderBorder(collider: number, border: number): void;
+    moveCollider(collider: number, body: number, position: readonly number[], rotation: readonly number[]): void;
     setColliderPose(collider: number, position: readonly number[], rotation: readonly number[]): void;
     intersectAabb(low: readonly number[], high: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     colliderRay(collider: number, origin: readonly number[], direction: readonly number[], max: number, solid: boolean): KernelRayHit | null;
@@ -1244,6 +1254,9 @@ class KernelWorld {
     stepSeconds: number;
     step(dt: number): this;
     detect(): this;
+    handle(kind: KernelHandle['kind'], row: number): KernelHandle;
+    isLive(handle: KernelHandle): boolean;
+    assertLive(handle: KernelHandle): void;
     get quarantinedCount(): number;
     quarantinedBodies(): number[];
     get bytes(): number;
@@ -1394,9 +1407,13 @@ class Physics implements EnginePlugin, BodyOwner {
     bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined;
     supportsShape(shape: ShapeOptions['shape']): boolean;
     getBodies(): PhysicsBody[];
+    addFreeCollider(options: ColliderOptions): PhysicsCollider;
     addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
     removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
-    removeBody(body: PhysicsBody): void;
+    removeBody(body: PhysicsBody, options?: {
+        keepColliders?: boolean;
+    }): void;
+    jointsOf(body: PhysicsBody): PhysicsJoint[];
     moved(body: PhysicsBody): void;
     owns(body: PhysicsBody): boolean;
     attach(attachment: PhysicsAttachment): void;
@@ -1492,6 +1509,7 @@ class PhysicsBody {
     row: number, mesh: Mesh | null, kind: BodyType);
     get type(): BodyType;
     get valid(): boolean;
+    joints(): PhysicsJoint[];
     markRemoved(): void;
     private get columns();
     setType(type: BodyType, wakeUp?: boolean): this;
@@ -1609,6 +1627,9 @@ class PhysicsCollider {
     handle: number,
     body: PhysicsBody,
     shape: ColliderShape);
+    free: boolean;
+    reparent(body: PhysicsBody): void;
+    get parent(): PhysicsBody | null;
     reshape: ((options: ColliderOptions) => void) | null;
     get valid(): boolean;
     markRemoved(): void;

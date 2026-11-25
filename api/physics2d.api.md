@@ -386,6 +386,11 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     set gravity(value: Vec2D);
     get alpha(): number;
     get bodyCount(): number;
+    getBodies(): Body2D[];
+    getColliders(): Collider2D[];
+    get colliderCount(): number;
+    getJoints(): Joint2D[];
+    get jointCount(): number;
     setup(engine: EngineKernel): void;
     onPreUpdate(delta: number): void;
     update(delta: number): number;

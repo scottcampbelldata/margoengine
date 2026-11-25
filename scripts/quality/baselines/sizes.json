@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 17863371,
+  "total": 17866820,
   "history": [
     {
       "date": "2026-10-24",
@@ -11673,6 +11673,12 @@
       "commit": "72b47ff89",
       "reason": "physics gains the robots entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "fd5c925a1",
+      "reason": "free colliders, kept colliders, body joints, kernel handles (physics base 75,653 to 75,670 B) and the world lists of Physics2D (physics2d 18,716 to 18,729 B, its loader 17,101 to 17,171 B)",
+      "grew": 3
     }
   ],
   "items": {
@@ -12431,7 +12437,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 305130,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 75653,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 77941,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 224757,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/meshfiles": 2857,
@@ -12439,8 +12445,8 @@
     "@margoengine/physics/soft": 80691,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 25940,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 54981,
-    "@margoengine/physics2d": 18716,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17101,
+    "@margoengine/physics2d": 19291,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 17687,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
