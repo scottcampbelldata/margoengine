@@ -54,3 +54,12 @@ export {
   type FrameRate,
   type PhysicsWorldOptions,
 } from './world.js';
+export {
+  Aitken,
+  Anderson,
+  coupling,
+  staggeringStable,
+  type Coupling,
+  type CouplingOptions,
+  type CouplingScheme,
+} from './scheduler.js';

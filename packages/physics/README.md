@@ -1664,6 +1664,22 @@ const height = world.fields.port('height')!;
 console.log(world.time, height.tick, regionWords(world.memory, height.region)[0].toFixed(3)); // 1 239 0.999
 ```
 
+`world.couple(ids, scheme, options)` sets how a coupling group (solvers that feed each other) exchanges data within a tick ([docs/physics-framework.md](../../docs/physics-framework.md), section 5); solvers not coupled exchange `'staggered'`, each stepping in coupling order and publishing at once. `'strang'` takes two solvers, the first stepping two half steps around the second's whole one (one rate level above it). `'predicted'` steps every member on the others' values extrapolated linearly to its step's end, then publishes them all. `'implicitPressure'` steps the members that own bodies, then the member that adds to their fields (the solve that takes the bodies in), and the bodies take its impulses in the same tick. `'iterated'` re-runs the group's tick `iterations` times (default 4) on shared values moved between runs by Anderson acceleration (`accelerator: 'anderson'`, `depth` 5) or Aitken's relaxation (`'aitken'`, `relaxation` 0.5); every member needs `iterate()`, and the count is fixed, so the result is the same bits on every machine. Every scheme but `'staggered'` needs `ids` to be exactly one coupling group, and its members step at one level (the fastest any of them chooses). With `bodyMass` and `addedMass` (the added-mass coefficient times the fluid's density times the displaced volume) a scheme that exchanges once a tick is refused where the added mass would make it diverge: `staggeringStable(bodyMass, addedMass, margin = 2)` is that test. `world.schemeOf(id)` says how a solver is coupled. The coupling-test harness (`packages/physics/tests/coupling/harness.js`) holds a solver or a coupling to the framework's properties: `frameRateIndependent`, `seekEqualsContinuous`, `conservesMomentum`, `energyNeverRises`, `effectBothWays`, `orderSensitivity` and `addedMassStable`; `npm run check:coupling` (part of `verify`, so of `check:merge`) refuses a framework solver that no test in a `tests/coupling/` folder runs through it.
+
+```ts
+import {staggeringStable, Anderson} from 'margoengine/physics/world';
+
+// A 1 kg balloon of 1 litre in water: 0.5 kg of added mass (a sphere's), so plain staggering would diverge.
+console.log(staggeringStable(1, 0.5 * 1000 * 0.001)); // false
+console.log(staggeringStable(7.85, 0.5 * 1000 * 0.001)); // true: a steel ball of the same size
+
+// Anderson acceleration on its own: the fixed point of x = 3 - 1.5 x, which plain iteration never reaches.
+const anderson = new Anderson(1, 2);
+const x = new Float64Array([0]);
+for (let k = 0; k < 4; k++) anderson.next(x, [3 - 1.5 * x[0]], x);
+console.log(x[0].toFixed(6)); // 1.200000
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

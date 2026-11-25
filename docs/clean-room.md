@@ -11326,6 +11326,37 @@ Written from:
 - Standard gravity 9.80665 m/s^2: the value fixed by the 3rd CGPM (1901) and ISO 80000-3.
 
 Proof: `packages/physics/tests/world.test.js`.
+### The coupling scheduler and its harness (`@margoengine/physics/world`, 2026-11-25)
+
+`packages/physics/src/world/scheduler.ts` and the world's `couple()` give a coupling group one of five schemes
+(docs/physics-framework.md, section 5); `packages/physics/tests/coupling/harness.js` and `scripts/check-coupling.mjs` are the
+guard of section 10. Written from:
+
+- H. F. Walker and P. Ni, "Anderson Acceleration for Fixed-Point Iterations", SIAM Journal on Numerical Analysis 49(4), 2011,
+  https://doi.org/10.1137/10078356X, read in full (the unconstrained least-squares form, m_k = min(m, k), solved here by
+  modified Gram-Schmidt QR with dependent columns given no weight).
+- U. Langer and H. Yang, "Partitioned solution algorithms for fluid-structure interaction problems with hyperelastic models",
+  arXiv:1312.5561, 2013, read in full (eqs. 52-53: Aitken's dynamic relaxation as Kuttler and Wall give it). U. Kuttler and W.
+  A. Wall, "Fixed-point fluid-structure interaction solvers with dynamic relaxation", Computational Mechanics 43, 2008, could not be read here; the formula is taken from Langer and Yang.
+- P. Causin, J.-F. Gerbeau and F. Nobile, "Added-mass effect in the design of partitioned algorithms for fluid-structure
+  problems", Computer Methods in Applied Mechanics and Engineering 194, 2005, could
+  not be read here; the staggered amplification factor -m_a / m_s used by `staggeringStable` was derived here for a rigid
+  body in a fluid that reacts with -m_a times its acceleration, which is the paper's known result for this model.
+- G. Strang, "On the Construction and Comparison of Difference Schemes", SIAM Journal on Numerical Analysis 5(3), 1968,
+  https://doi.org/10.1137/0705041 (the symmetric splitting A(dt/2) B(dt) A(dt/2)).
+- C. Farhat, K. G. van der Zee and P. Geuzaine, "Provably second-order time-accurate loosely-coupled solution algorithms for
+  transient nonlinear computational aeroelasticity", Computer Methods in Applied Mechanics and Engineering 195, 2006 (the predicted interface state; known through the framework's survey).
+- C. Batty, F. Bertails and R. Bridson, "A Fast Variational Framework for Accurate Solid-Fluid Coupling", ACM Transactions on
+  Graphics 26(3), 2007, and A. Robinson-Mosher, C. Schroeder and R. Fedkiw, "A
+  symmetric positive definite formulation for monolithic fluid structure interaction", Journal of Computational Physics
+  230(4), 2011 (bodies inside the pressure solve; known through the survey).
+- J. Degroote, K.-J. Bathe and J. Vierendeels, "Performance of a new partitioned procedure versus a monolithic procedure in
+  fluid-structure interaction", Computers and Structures 87, 2009 (iterated
+  coupling against a monolithic solve; known through the survey).
+
+The scheme loop (Jacobi runs of a group over saved registry regions, the predicted extrapolation to each step's end, the
+implicit-pressure re-import) is this framework's own arrangement. Proof: `packages/physics/tests/world-scheduler.test.js`,
+`packages/physics/tests/coupling/framework.test.js` and `tests/check-coupling.test.js`.
 ### Pinned elementary functions and fixed-order sums (`kernel-common`, 2026-11-25, K01)
 
 `kernel-common/src/pinned.rs` has `exp`, `ln`, `sin`, `cos`, `pow` and a fixed-partition sum over f64, built only from + - * / and integer operations, so every build gives the same bits. The methods are the textbook ones: argument reduction by the leading and trailing parts of ln 2 and of pi / 2 (W. J. Cody and W. Waite, "Software Manual for the Elementary Functions", Prentice-Hall, 1980; the parts are split here with exact arithmetic from the decimal digits of pi and ln 2, not copied) and Taylor series on the reduced interval (J.-M. Muller, "Elementary Functions: Algorithms and Implementation", 3rd ed., Birkhauser, 2016, chapters 4 and 11); `pow` carries ln x and the product y ln x as pairs of doubles (TwoSum, T. J. Dekker's split product, "A floating-point technique for extending the available precision", Numerische Mathematik 18, 1971; Muller 2016, section 4.3). The sum adds blocks of 256 in order and the blocks' sums by a balanced tree over their indices, the fixed-partition idea of J. Demmel and H. D. Nguyen, "Parallel reproducible summation", IEEE Transactions on Computers 64(7), 2015. Accuracy is held against the host's functions by `kernel-common/tests/pinned.rs`: within 2 ulp for exp, ln, sin and cos, within 4 ulp for pow.

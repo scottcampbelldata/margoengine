@@ -229,9 +229,13 @@ export class FieldRegistry {
         throw new RangeError(
           `Field "${port.field}" was published at tick ${port.tick} (level ${level}), before its current tick ${meta[1]} (level ${meta[2]}); publish in time order.`,
         );
-      const next = meta[0] === 1 ? 1 - meta[12]! : meta[12]!;
+      // A port for the tick the current value ends at replaces it (a coupling group re-running its tick); a later one
+      // moves the current value to previous.
+      const again =
+          meta[0] === 1 && (port.tick + 1) * 2 ** (TOP_LEVEL - level) === (meta[1]! + 1) * 2 ** (TOP_LEVEL - meta[2]!),
+        next = again ? meta[12]! : meta[0] === 1 ? 1 - meta[12]! : meta[12]!;
       this.words(entry.mirrors[next]!).set(data);
-      meta.copyWithin(6, 0, 6);
+      if (!again) meta.copyWithin(6, 0, 6);
       meta.set([1, port.tick, level, cell[0], cell[1], cell[2]], 0);
       meta[12] = next;
       return;
@@ -276,20 +280,23 @@ export class FieldRegistry {
     return { field: name, region: entry.sum, tick, cell: [cell[0], cell[1], cell[2]] };
   }
 
+  /** The regions of field `name` (meta, mirrors, sum, contributions by contributor id), or none for an unknown field. */
+  regionsOf(name: string): Region[] {
+    const e = this.fields.get(name);
+    if (!e) return [];
+    const out = [e.meta];
+    if (e.mirrors) out.push(e.mirrors[0], e.mirrors[1]);
+    if (e.sum) out.push(e.sum);
+    for (const id of [...e.from.keys()].sort(byText)) out.push(e.from.get(id)!);
+    return out;
+  }
+
   /**
    * The registry's regions in canonical order (fields by name; per field its meta, mirrors, sum and contributions by
    * contributor id), for the world's snapshot, restore and state hash.
    */
   stateRegions(): Region[] {
-    const out: Region[] = [];
-    for (const name of this.names()) {
-      const e = this.fields.get(name)!;
-      out.push(e.meta);
-      if (e.mirrors) out.push(e.mirrors[0], e.mirrors[1]);
-      if (e.sum) out.push(e.sum);
-      for (const id of [...e.from.keys()].sort(byText)) out.push(e.from.get(id)!);
-    }
-    return out;
+    return this.names().flatMap((name) => this.regionsOf(name));
   }
 
   private names(): string[] {

@@ -24,6 +24,7 @@ import { FieldRegistry, TransferRegistry } from './fields.js';
 import { type CouplingGraph, couplingGraph } from './graph.js';
 import { Arena, regionWords } from './memory.js';
 import { solverNumber } from './random.js';
+import { Aitken, Anderson, type Coupling, type CouplingOptions, type CouplingScheme, coupling } from './scheduler.js';
 import {
   restoreSnapshot as restoreRegions,
   type Snapshot,
@@ -135,6 +136,21 @@ interface Entry {
   readonly reads: readonly string[];
 }
 
+/** A solver alone, or a coupling group, in the order a tick runs them. */
+type Unit =
+  | { readonly kind: 'one'; readonly entry: Entry }
+  | {
+      readonly kind: 'group';
+      readonly coupling: Coupling;
+      /** Members in coupling order (for Strang, [half-stepped, whole-stepped]). */
+      readonly members: readonly Entry[];
+      /** Fields a member writes and another member reads, by name. */
+      readonly shared: readonly string[];
+      /** Per shared field, a region the group's readers read during a tick (predicted or iterated values). */
+      readonly scratch: Map<string, Region>;
+      readonly accelerator: Aitken | Anderson | undefined;
+    };
+
 /**
  * A world of solvers on one clock and one memory. Add solvers with {@link PhysicsWorld.add}, then ask for frames with
  * {@link PhysicsWorld.advance}: every step owed runs in coupling order, and nothing is dropped. A cap on the ticks of one
@@ -156,6 +172,8 @@ export class PhysicsWorld {
   private order: Entry[] = [];
   private graph: CouplingGraph | undefined;
   private checked = false;
+  private couplings: Coupling[] = [];
+  private units: Unit[] = [];
 
   constructor(options: PhysicsWorldOptions = {}) {
     const { rate = DEFAULT_RATE, seed = 1, gravity = [0, -9.80665, 0], cellSize = 4096, memory } = options;
@@ -269,9 +287,42 @@ export class PhysicsWorld {
   remove(id: string): boolean {
     if (!this.entries.some((e) => e.id === id)) return false;
     this.entries = this.entries.filter((e) => e.id !== id);
+    this.couplings = this.couplings.filter((c) => !c.ids.includes(id));
     this.fields.remove(id);
     this.reorder();
     return true;
+  }
+
+  /**
+   * Couples solvers `ids` by `scheme` (docs/physics-framework.md, section 5); solvers not coupled exchange `staggered`. Every
+   * scheme but `staggered` needs `ids` to be exactly one coupling group of the graph (solvers that feed each other), checked
+   * at the next advance; `iterated` needs every member to have `iterate`. With `bodyMass` and `addedMass` a scheme that
+   * exchanges once a tick is refused where the added mass would make it diverge. Couple at a 1/60 s boundary.
+   * @throws RangeError for unknown ids, ids already coupled or bad options; MargoError `state` off a 1/60 s boundary or for
+   * an unstable once-a-tick exchange.
+   */
+  couple(ids: readonly string[], scheme: CouplingScheme, options: CouplingOptions = {}): this {
+    const c = coupling(ids, scheme, options);
+    for (const id of c.ids) {
+      this.entry(id);
+      if (this.couplings.some((other) => other.ids.includes(id)))
+        throw new RangeError(`Solver "${id}" is already coupled; a solver belongs to one coupling.`);
+    }
+    if (this.tick % HYPER_PERIOD !== 0)
+      throw new MargoError(
+        'state',
+        `The world is ${this.tick % HYPER_PERIOD} base ticks into a 1/60 s step; couple solvers on a 1/60 s boundary, where every level meets.`,
+      );
+    this.couplings.push(c);
+    this.chooseLevels();
+    this.checked = false;
+    return this;
+  }
+
+  /** The scheme solver `id` is coupled by: `staggered` unless {@link PhysicsWorld.couple} said otherwise. */
+  schemeOf(id: string): CouplingScheme {
+    this.entry(id);
+    return this.couplings.find((c) => c.ids.includes(id))?.scheme ?? 'staggered';
   }
 
   /** The rate level solver `id` steps at now. @throws RangeError for an unknown solver. */
@@ -400,15 +451,12 @@ export class PhysicsWorld {
       start = clock[0]!;
     let ran = start;
     for (;;) {
-      if (ran % HYPER_PERIOD === 0) for (const e of this.entries) this.words(e.record)[0] = this.chooseLevel(e);
+      if (ran % HYPER_PERIOD === 0) this.chooseLevels();
       const fine = this.fineStride(),
         t = ran + fine - (ran % fine);
       if (t > until) break;
       if (!this.checked) this.check();
-      for (const e of this.order) {
-        const stride = 2 ** (TOP - this.levelOf(e.id));
-        if (t % stride === 0) this.stepOne(e, t / stride - 1, stride / BASE_HZ);
-      }
+      for (const unit of this.units) this.visit(unit, t);
       ran = t;
       this.time64()[0] = ran;
     }
@@ -417,25 +465,181 @@ export class PhysicsWorld {
 
   /** One step of one solver: sums into what it owns, imports, steps and publishes. */
   private stepOne(e: Entry, tick: number, dt: number): void {
+    this.begin(e, tick);
+    e.solver.step(this.context(e, tick), dt);
+    this.publish(e, tick);
+  }
+
+  /** Sums what others added to the fields `e` owns, and lets it import them. */
+  private begin(e: Entry, tick: number): void {
     e.sums.clear();
     for (const name of e.summed) {
       const sum = this.fields.sum(name, tick, this.cellOf(e.id));
       if (sum) e.sums.set(name, sum);
     }
     e.solver.importPorts(tick);
+  }
+
+  /** The step context of `e`: its readers' ports as published, or from `scratch` for the fields a group shares. */
+  private context(e: Entry, tick: number, scratch?: ReadonlyMap<string, Region>) {
     const inputs = new Map<string, Port>();
     for (const name of e.reads) {
-      const port = this.fields.port(name);
+      const own = scratch?.get(name),
+        port = own ? { field: name, region: own, tick, cell: this.fields.port(name)!.cell } : this.fields.port(name);
       if (port) inputs.set(name, port);
     }
-    e.solver.step({ tick, level: this.levelOf(e.id), seed: this.seed, inputs, cell: this.cellOf(e.id) }, dt);
-    this.publish(e, tick);
+    return { tick, level: this.levelOf(e.id), seed: this.seed, inputs, cell: this.cellOf(e.id) };
+  }
+
+  private stride(e: Entry): number {
+    return 2 ** (TOP - this.levelOf(e.id));
+  }
+
+  /** Runs `unit`'s steps that end at base tick `t`. */
+  private visit(unit: Unit, t: number): void {
+    if (unit.kind === 'one') {
+      const s = this.stride(unit.entry);
+      if (t % s === 0) this.stepOne(unit.entry, t / s - 1, s / BASE_HZ);
+      return;
+    }
+    const { coupling: c, members } = unit;
+    if (c.scheme === 'staggered' || c.scheme === 'strang') {
+      // Strang: the whole-stepped member first on shared ticks, so it falls between the half steps of the other.
+      for (const e of c.scheme === 'strang' ? [members[1]!, members[0]!] : members) {
+        const s = this.stride(e);
+        if (t % s === 0) this.stepOne(e, t / s - 1, s / BASE_HZ);
+      }
+      return;
+    }
+    // The other schemes step their members at one level, together.
+    const s = this.stride(members[0]!);
+    if (t % s !== 0) return;
+    const tick = t / s - 1,
+      dt = s / BASE_HZ;
+    if (c.scheme === 'predicted') {
+      for (const name of unit.shared) this.predict(name, unit.scratch.get(name)!, t);
+      for (const e of members) {
+        this.begin(e, tick);
+        e.solver.step(this.context(e, tick, unit.scratch), dt);
+      }
+      for (const e of members) this.publish(e, tick);
+    } else if (c.scheme === 'implicitPressure') {
+      const solvers = members.filter((e) => this.addsToGroup(e, members)),
+        bodies = members.filter((e) => !solvers.includes(e));
+      for (const e of bodies) this.stepOne(e, tick, dt);
+      for (const e of solvers) this.stepOne(e, tick, dt);
+      // The bodies take the impulses of this tick's solve now.
+      for (const e of bodies) this.begin(e, tick);
+    } else this.iterate(unit, tick, dt);
+  }
+
+  /** Whether `e` adds to a field another member of `members` owns. */
+  private addsToGroup(e: Entry, members: readonly Entry[]): boolean {
+    return e.description.fields.some(
+      (u) =>
+        u.access === 'accumulate' && members.some((m) => m !== e && this.fields.field(u.field.name)?.owner === m.id),
+    );
+  }
+
+  /** Writes field `name` extrapolated linearly from its last two values to base tick `t` into `into`. */
+  private predict(name: string, into: Region, t: number): void {
+    const f = this.fields.field(name)!,
+      out = regionWords(this.memory, into),
+      current = regionWords(this.memory, f.current!.port.region),
+      end = (p: { port: Port; level: RateLevel }) => (p.port.tick + 1) * 2 ** (TOP - p.level),
+      tc = end(f.current!),
+      tp = f.previous ? end(f.previous) : tc;
+    if (tp === tc) {
+      out.set(current);
+      return;
+    }
+    const previous = regionWords(this.memory, f.previous!.port.region),
+      k = (t - tc) / (tc - tp);
+    for (let i = 0; i < out.length; i++) out[i] = current[i]! + (current[i]! - previous[i]!) * k;
+  }
+
+  /**
+   * Runs a strongly coupled group's tick a fixed number of times: each run every member steps on the shared values (Jacobi),
+   * then all publish; between runs the registry goes back to the tick's start and the shared values move by the accelerator.
+   */
+  private iterate(unit: Unit & { kind: 'group' }, tick: number, dt: number): void {
+    const { coupling: c, members, shared, scratch } = unit,
+      accelerator = unit.accelerator!,
+      regions = [...new Set(members.flatMap((e) => e.description.fields.map((u) => u.field.name)))]
+        .sort()
+        .flatMap((name) => this.fields.regionsOf(name)),
+      saved = regions.map((r) => new Uint8Array(this.memory.buffer, r.byteOffset, r.byteLength).slice());
+    const gather = (out: Float64Array) => {
+      let at = 0;
+      for (const name of shared) {
+        const words = regionWords(this.memory, this.fields.field(name)!.current!.port.region);
+        for (let i = 0; i < words.length; i++) out[at++] = words[i]!;
+      }
+    };
+    const n = this.sharedLength(shared),
+      x = new Float64Array(n),
+      g = new Float64Array(n);
+    gather(x);
+    accelerator.reset();
+    for (let run = 0; run < c.iterations; run++) {
+      if (run > 0)
+        regions.forEach((r, i) => new Uint8Array(this.memory.buffer, r.byteOffset, r.byteLength).set(saved[i]!));
+      let at = 0;
+      for (const name of shared) {
+        const words = regionWords(this.memory, scratch.get(name)!);
+        for (let i = 0; i < words.length; i++) words[i] = x[at++]!;
+      }
+      for (const e of members) {
+        this.begin(e, tick);
+        const context = this.context(e, tick, scratch);
+        if (run === 0) e.solver.step(context, dt);
+        else e.solver.iterate!(context, dt);
+      }
+      for (const e of members) this.publish(e, tick);
+      if (run < c.iterations - 1) {
+        gather(g);
+        accelerator.next(x, g, x);
+      }
+    }
+  }
+
+  private sharedLength(shared: readonly string[]): number {
+    let n = 0;
+    for (const name of shared) n += regionWords(this.memory, this.fields.field(name)!.current!.port.region).length;
+    return n;
   }
 
   private publish(e: Entry, tick: number): void {
     const level = this.levelOf(e.id),
       cell = this.cellOf(e.id);
     for (const port of e.solver.exportPorts(tick)) this.fields.publish(e.id, { ...port, cell }, level);
+  }
+
+  /**
+   * Each solver's level from its state: the faster of its rate and its stability limit; the members of a coupling that steps
+   * together at the fastest of theirs, and a Strang pair's half-stepped member one level above the other.
+   * @throws MargoError `state` for a Strang pair whose whole-stepped member needs level 7.
+   */
+  private chooseLevels(): void {
+    const level = new Map(this.entries.map((e) => [e.id, this.chooseLevel(e)]));
+    for (const c of this.couplings) {
+      if (c.scheme === 'staggered') continue;
+      if (c.scheme === 'strang') {
+        const [a, b] = c.ids as [string, string];
+        if (level.get(b)! >= 7)
+          throw new MargoError(
+            'state',
+            `Strang pair "${a}" and "${b}": "${b}" needs level 7, so "${a}" cannot step at half its step; couple them another way.`,
+          );
+        const half = Math.max(level.get(a)!, level.get(b)! + 1);
+        level.set(a, half as RateLevel);
+        level.set(b, (half - 1) as RateLevel);
+        continue;
+      }
+      const top = Math.max(...c.ids.map((id) => level.get(id)!)) as RateLevel;
+      for (const id of c.ids) level.set(id, top);
+    }
+    for (const e of this.entries) this.words(e.record)[0] = level.get(e.id)!;
   }
 
   /** The faster of a solver's preferred rate and its stability limit, from its state now. */
@@ -479,7 +683,10 @@ export class PhysicsWorld {
     this.checked = false;
   }
 
-  /** Every field read or added to has a writer, before the first step. */
+  /**
+   * Before the first step after a change: every field read or added to has a writer, every coupling is one coupling group,
+   * and the order of units a tick runs is built.
+   */
   private check(): void {
     for (const f of this.fields.list())
       if (f.owner === undefined)
@@ -487,7 +694,79 @@ export class PhysicsWorld {
           'state',
           `No solver writes field "${f.descriptor.name}", which ${[...f.readers, ...f.contributors].join(', ')} use; add the solver that owns it.`,
         );
+    const graph = couplingGraph(this.nodes()),
+      units: Unit[] = [],
+      placed = new Set<Coupling>();
+    for (const e of this.order) {
+      const c = this.couplings.find((x) => x.ids.includes(e.id));
+      if (!c) {
+        units.push({ kind: 'one', entry: e });
+        continue;
+      }
+      if (placed.has(c)) continue;
+      placed.add(c);
+      units.push(this.groupUnit(c, graph));
+    }
+    this.units = units;
     this.checked = true;
+  }
+
+  private groupUnit(c: Coupling, graph: CouplingGraph): Unit {
+    const members = c.ids.map((id) => this.entry(id));
+    if (c.scheme !== 'staggered') {
+      const group = graph.groupOf.get(c.ids[0]!)!,
+        ids = [...graph.groups[group]!];
+      if (ids.length !== c.ids.length || !c.ids.every((id) => ids.includes(id)))
+        throw new MargoError(
+          'state',
+          `The '${c.scheme}' coupling of ${c.ids.join(', ')} is not one coupling group (solvers that feed each other: ${ids.join(', ')}); couple exactly a group.`,
+        );
+    }
+    if (c.scheme === 'staggered') members.sort((a, b) => this.order.indexOf(a) - this.order.indexOf(b));
+    const shared = [
+      ...new Set(
+        members.flatMap((e) =>
+          e.reads.filter((name) => members.some((m) => m !== e && this.fields.field(name)?.owner === m.id)),
+        ),
+      ),
+    ].sort();
+    if (c.scheme === 'iterated') {
+      for (const e of members)
+        if (typeof e.solver.iterate !== 'function')
+          throw new MargoError(
+            'state',
+            `Solver "${e.id}" is coupled 'iterated' and has no iterate(); give it one or couple it another way.`,
+          );
+      if (shared.length === 0)
+        throw new MargoError(
+          'state',
+          `The 'iterated' coupling of ${c.ids.join(', ')} shares no field a member writes and another reads; nothing to iterate on.`,
+        );
+    }
+    if (c.scheme === 'implicitPressure' && !members.some((e) => this.addsToGroup(e, members)))
+      throw new MargoError(
+        'state',
+        `The 'implicitPressure' coupling of ${c.ids.join(', ')} has no member that adds to another's fields (the solve that takes the bodies in).`,
+      );
+    const scratch = new Map<string, Region>();
+    if (c.scheme === 'predicted' || c.scheme === 'iterated')
+      for (const name of shared) {
+        const mirror = this.fields.field(name)!.current!.port.region;
+        if (c.scheme === 'predicted' && mirror.type !== 'f32' && mirror.type !== 'f64')
+          throw new MargoError(
+            'state',
+            `Field "${name}" holds ${mirror.type} words, which cannot be extrapolated; couple it another way.`,
+          );
+        scratch.set(name, this.arena.allocate(`${c.scheme}:${name}`, mirror.byteLength, mirror.type, mirror.layout));
+      }
+    const n = c.scheme === 'iterated' ? this.sharedLength(shared) : 0,
+      accelerator =
+        c.scheme !== 'iterated'
+          ? undefined
+          : c.accelerator === 'aitken'
+            ? new Aitken(n, c.relaxation)
+            : new Anderson(n, c.depth);
+    return { kind: 'group', coupling: c, members, shared, scratch, accelerator };
   }
 
   private nodes() {

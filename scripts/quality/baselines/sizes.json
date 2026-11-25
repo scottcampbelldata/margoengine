@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18665753,
+  "total": 18668878,
   "history": [
     {
       "date": "2026-10-24",
@@ -11865,6 +11865,12 @@
       "commit": "f6e4ecb1c",
       "reason": "physics advance() step counting moved to src/film.ts so physics.ts stays free of Math (274b4ad5c): +7 B on @margoengine/physics; also records controls/geospatial and math/geo, new on main and unrecorded",
       "grew": 4
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "f6e4ecb1c",
+      "reason": "@margoengine/physics/world: 9,098 to 12,132 B gzip for the coupling scheduler (section 5): Strang, predicted, implicit-pressure and iterated schemes, Anderson and Aitken acceleration, the added-mass test and every refusal; it is part of the world every solver lane drives, so a split would only move the bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12640,7 +12646,7 @@
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
-    "@margoengine/physics/world": 9371,
+    "@margoengine/physics/world": 12496,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

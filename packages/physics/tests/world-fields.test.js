@@ -184,3 +184,26 @@ test('transfers are registered once by name', () => {
   );
   assert.deepEqual(transfers.names(), ['apic']);
 });
+
+test("a port for the tick the current value ends at replaces it; regionsOf lists a field's regions", () => {
+  const arena = new Arena(),
+    fields = new FieldRegistry(arena);
+  fields.declare('atmosphere', [{ field: velocity, access: 'write' }]);
+  fields.declare('tree', [{ field: velocity, access: 'read' }]);
+  const own = port(arena, 'wind', 0, [1, 2, 3]);
+  fields.publish('atmosphere', own, 0, [0, 0, 0]);
+  regionWords(arena.memory, own.region).set([4, 5, 6]);
+  fields.publish('atmosphere', { ...own, tick: 1 }, 0, [0, 0, 0]);
+  // A coupling group re-runs tick 1 (and tick 3 of level 1 ends with it): the current value is replaced, the previous kept.
+  regionWords(arena.memory, own.region).set([7, 8, 9]);
+  fields.publish('atmosphere', { ...own, tick: 3 }, 1, [0, 0, 0]);
+  const wind = fields.field('wind');
+  assert.deepEqual(words(arena, wind.current.port), [7, 8, 9]);
+  assert.deepEqual(words(arena, wind.previous.port), [1, 2, 3]);
+  assert.deepEqual(
+    fields.regionsOf('wind').map((r) => r.name),
+    ['wind/meta', 'wind/a', 'wind/b'],
+  );
+  assert.deepEqual(fields.regionsOf('nothing'), []);
+  assert.deepEqual(fields.stateRegions(), fields.regionsOf('wind'));
+});
