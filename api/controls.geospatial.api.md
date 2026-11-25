@@ -85,6 +85,7 @@ export class GeospatialControls extends Controls {
         north: number;
         height?: number;
     }, options?: BoundingSphereFlight): Promise<boolean>;
+    followPath(views: readonly GeospatialView[], options?: PathOptions): Promise<boolean>;
     cancel(): void;
     update(delta?: number): boolean;
     dispose(): void;
@@ -141,6 +142,14 @@ export interface ModeSwitchOptions {
     duration?: number;
     easing?: (t: number) => number;
     signal?: AbortSignal;
+}
+
+export interface PathOptions {
+    duration?: number;
+    speed?: number;
+    easing?: (t: number) => number;
+    signal?: AbortSignal;
+    cancelOnInput?: boolean;
 }
 
 export type SurfaceRaycast = (origin: readonly [number, number, number], direction: readonly [number, number, number], far: number) => number | undefined;
