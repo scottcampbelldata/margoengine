@@ -4,14 +4,14 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-195 three.js features in 19 areas (recounted from the rows 2026-11-18; 52 of the COVERED rows are marked †):
+195 three.js features in 19 areas (recounted from the rows 2026-11-24; 52 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
 | COVERED | 185 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 3 | Some of it exists, but a common use case is missing. The notes say what. |
+| PARTIAL | 7 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 0 | Worth having and not written yet. Listed below with what to do. |
-| NOT PLANNED | 7 | Out of scope by decision. The note says why and what to use instead. |
+| NOT PLANNED | 3 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
 
@@ -59,9 +59,9 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Deferred shading pipeline | NOT PLANNED | clustered, post `SceneTargets` | | Clustered forward lighting is the architecture; MRT serves G-buffer uses. |
 | Meshlet (cluster) rendering with per-cluster culling | COVERED | culling `MeshletMesh` (`@margoengine/culling/meshlets`, `packages/culling/src/meshlets.ts`) | | One mesh drawn as up to 65,535 instances, each with its own matrix: per-instance and per-cluster frustum and normal-cone culling, and two-pass Hi-Z occlusion per cluster (last frame's clusters are the occluders, then every cluster is tested). Kept clusters share one pool; a part past it draws whole. One indirect draw per instance (WebGPU has no multi-draw); a pick draws the whole mesh. On the WebGL2 layer the frustum and cone tests run on the CPU, one draw per run of kept clusters, no Hi-Z ([limits](limits.md)). Tests: `packages/culling/test/meshlets.test.js`, `test/gpu/meshlets-check.mjs` (GPU, both backends). |
 | SVGRenderer (vector output of a scene) | NOT PLANNED |  | | Margo draws with WebGPU. SVG is read, not written as a frame. |
-| Triangle-mesh path tracer | NOT PLANNED | voxel-pathtracer | | The path tracer traces voxel scenes only; a mesh tracer would be a later package. |
+| Triangle-mesh path tracer | PARTIAL | voxel-pathtracer `@margoengine/voxel-pathtracer/mesh` (`MeshPathTracer`, `packages/voxel-pathtracer/src/mesh.ts`) and `/mesh-pbr` (glTF PBR through `traceSceneFromGLTF`, `packages/voxel-pathtracer/src/mesh-pbr.ts`); studio `ProgressiveStill` (`packages/studio/src/pathtrace.ts`) | | Indexed static triangles traced with voxels, shadows and the root BSDFs; `/mesh-pbr` adds glTF PBR textures, UV sets and OPAQUE/MASK alpha. Missing: instancing and skinning (the `/mesh` README says meshes have neither), emissive-triangle light sampling (mesh emission is reached by path sampling only), glTF BLEND alpha, and a README section for `/mesh-pbr`. |
 | Voxel cone-traced global illumination | NOT PLANNED | environment probes, post `SSGI` | | Probes and one-bounce SSGI are the indirect light. |
-| Real-time caustics | NOT PLANNED |  | | Not planned for v1.0.0. |
+| Real-time caustics | PARTIAL | water `Caustics` (`packages/water/src/caustics.ts`); studio `ProductCaustics` (`packages/studio/src/caustics.ts`); lightmap `@margoengine/lightmap/refracted` (baked rough glass, dispersion and bounce caustics); voxel-pathtracer caustic path guiding (`/guiding`) | | Caustics exist for water surfaces, studio product meshes, baked lightmaps and the path tracer. No package casts caustics from arbitrary scene glass in real time; the path tracer finds them by progressive sampling. |
 | Transpiling GLSL to node code | COVERED | shader `glslFn`, `toGLSL` (`@margoengine/shader/glsl`, `packages/shader/src/glsl/`) | | `glslFn` turns a GLSL ES 3.00 or 1.00 function (with its helpers, structs and constants) into a node, so existing GLSL joins a graph; `toGLSL` shows the GLSL a graph becomes. Whole GLSL programs are not translated: WGSL stays the shader language. |
 
 ### 3. Cameras
@@ -291,8 +291,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Decals | COVERED | post `Decals`, entry `@margoengine/post/decals` (`packages/post/src/decals.ts`) | | Screen-space projected decals (box projector, depth-reconstructed, normal-angle fade, one texture atlas; multiply or over), up to 4,096; needs a post capture for scene depth. Colour only. DecalGeometry itself (mesh decals) is not provided. Real-GPU checked (`results/decals-gpu.json`). |
 | MarchingCubes add-on | COVERED † | procedural `marchingCubes` (`packages/procedural/src/`) | | Own Marching Cubes with asymptotic-decider faces (closed indexed mesh, no dependency) behind the same `marchingCubes` call; a density function's vertices are its exact roots on the grid edges. |
 | Soft particles fading against scene depth | COVERED | vfx `softness` option (`packages/vfx/src/base.ts`) | | `softness` (world units) fades a particle over that distance in front of the opaque surface behind it, read from a depth texture the caller passes (`depth`, e.g. post `DepthTexture`); 0 costs nothing. Test: `packages/vfx/test/clouds.test.js` ("softness samples the scene depth"). |
-| Cloth simulation | NOT PLANNED | physics | | Out of scope for v1.0.0 ([limits](limits.md)); `Rope` exists. |
-| Particle fluids and soft bodies | NOT PLANNED | vfx, physics | | Out of scope for v1.0.0 ([limits](limits.md)). |
+| Cloth simulation | PARTIAL | physics `margoengine/physics/soft` / `@margoengine/physics/soft` (`packages/physics/src/soft.ts`; README "Soft bodies" in `packages/physics/README.md`) | | `SoftBodyDesc.cloth`, `clothTube`, `clothAnisotropic` and `trimesh` build sheets with stretch, shear and bend edges, with tearing, self-contacts and collision with every rigid shape. Missing: a cloth render bridge. No package in the repository draws a soft body as a deforming mesh. |
+| Particle fluids and soft bodies | PARTIAL | physics `margoengine/physics/soft` (soft bodies); water `ParticleLiquid` (`packages/water/src/liquid.ts`) | | Soft bodies are as in the cloth row, with two open defects in [known bugs](known-bugs.md): KB-SOFT-LIGHT1 (a 1 cm bead tunnels a default cloth after about a second) and KB-SOFT-ITER1 (a rigid chain's stiffness depends on iterations, substeps and mass ratio). Particle fluid has a screen-space surface renderer, `ParticleLiquid`, and no fluid solver. |
 
 ### 18. Audio
 
@@ -313,12 +313,16 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-18): 3 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-24): 7 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. The AR reflection cube map waits on a WebGPU form in the Lighting Estimation draft. | Test on a device first (`examples/xr-device-check`). |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer runs on it, slowly compiled on ANGLE Direct3D, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
+| Cloth simulation | PARTIAL. Soft bodies simulate cloth, but no render bridge draws them. | Add a render bridge to `@margoengine/physics/soft` that reads a body's particles as a mesh, with a test. |
+| Particle fluids and soft bodies | PARTIAL. `ParticleLiquid` draws fluid particles; there is no fluid solver. The soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1 are open. | Research a particle fluid solver first and build it as an optional package; fix the two soft defects in `@margoengine/physics` with regression tests. |
+| Triangle-mesh path tracer | PARTIAL. No instancing, skinning, emissive-triangle light sampling or glTF BLEND alpha, and no README section for `/mesh-pbr`. | Add each in `packages/voxel-pathtracer` with a test, and document `/mesh-pbr` in its README. |
+| Real-time caustics | PARTIAL. Caustics exist for water surfaces, studio product meshes and baked lightmaps, not for arbitrary scene glass. | See [rival parity gaps](rival-parity-gaps.md). |
 
 ## Leave as the documented limit
 

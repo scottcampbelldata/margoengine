@@ -1211,9 +1211,16 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels | Missing, planned before v1.0.0 (shadows, materials) |
-| Picking fat lines, soft particles | Missing, planned before v1.0.0 (lines, vfx) |
-| Rendering in a worker, render into layers, compute writing textures, environment blend, KTX2 arrays and cubes, subsurface blur | Missing, after v1.0.0 |
-| WebXR GPU depth occlusion and reflection cube maps | Missing (`@margoengine/xr/ar` reads CPU depth and spherical-harmonic light only) |
-| WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
-| Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, cloth, fluids | Not planned for v1.0.0 |
+| WebXR reflection cube maps (AR light) | Missing. The WebXR Lighting Estimation draft defines it for WebGL only; `@margoengine/xr/ar` gives the room's light as spherical harmonics instead. |
+| WebXR VR and AR | PARTIAL: untested on a headset or AR device. AR occlusion from CPU or GPU depth is `AROcclusion` (`@margoengine/xr/occlusion`). |
+| WebGL2 for every package | PARTIAL: `@margoengine/webgl2-compat`, still in development. |
+| Cloth and soft bodies | PARTIAL: `@margoengine/physics/soft` simulates them; no render bridge draws them yet. |
+| Particle fluids | PARTIAL: `ParticleLiquid` (`@margoengine/water`) draws fluid particles; there is no fluid solver. |
+| Triangle-mesh path tracing: instancing, skinning, emissive-triangle lights, glTF BLEND alpha | PARTIAL: `@margoengine/voxel-pathtracer/mesh` and `/mesh-pbr`. |
+| Real-time caustics for arbitrary scene glass | PARTIAL: water surfaces, studio product meshes and lightmaps have caustics. |
+| Deferred shading pipeline, SVG output, voxel cone-traced global illumination, G-code writer | NOT PLANNED, by decision (see the rows in [threejs-parity.md](threejs-parity.md); the G-code writer is noted under KTX2Exporter). |
+
+Everything else on the earlier list is COVERED now, each in its row of [threejs-parity.md](threejs-parity.md): rendering in a
+worker, layers, cube, array and 3D render targets, compute writing textures, environment blending, KTX2 arrays and cubes,
+subsurface blur, shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels, picking fat lines,
+soft particles, Draco and KTX2 read and write, the long-tail loaders, and stereo on a flat screen.
