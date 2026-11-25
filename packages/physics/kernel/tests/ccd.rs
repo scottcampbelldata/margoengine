@@ -321,3 +321,35 @@ fn a_fast_ball_through_a_thin_sensor_in_one_step_says_it_entered_and_left() {
         }
     }
 }
+
+/// Regression: CCD swept a body's turn as the angle between its poses, at most pi. A bar turning a circle and a little more each step
+/// was swept as turning that little, and one turning exactly a circle (the same pose at both ends) as not turning at all, so its tips,
+/// sweeping through a wall in the circle they make, were never checked. The sweep takes the angle the substeps turned through.
+#[test]
+fn a_bar_turning_whole_circles_a_step_is_checked_by_ccd() {
+    let checked = |turns: f32| {
+        let mut w = World::new(4, 4).unwrap();
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let bar = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(bar, SHAPE_BOX, [0.02, 1.0, 0.02], [0.0; 3], IDENTITY, 1000.0).unwrap();
+        w.update_mass(bar);
+        w.set_u(FLAGS, bar as usize, (w.flags(bar as usize) | CCD) & !CAN_SLEEP);
+        w.set_v(ANGULAR_X, bar as usize, v3(0.0, 0.0, turns * 2.0 * core::f32::consts::PI / DT));
+        w.step(DT);
+        w.flags(bar as usize) & CCD_ACTIVE != 0
+    };
+    assert!(checked(1.0), "a bar whose tips go once round a step is not checked");
+    assert!(checked(2.0), "a bar whose tips go twice round a step is not checked");
+    assert!(checked(0.25), "a bar turning a quarter circle a step is checked, as before");
+    let still = {
+        let mut w = World::new(4, 4).unwrap();
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let bar = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(bar, SHAPE_BOX, [0.02, 1.0, 0.02], [0.0; 3], IDENTITY, 1000.0).unwrap();
+        w.update_mass(bar);
+        w.set_u(FLAGS, bar as usize, w.flags(bar as usize) | CCD);
+        w.step(DT);
+        w.flags(bar as usize) & CCD_ACTIVE != 0
+    };
+    assert!(!still, "a bar at rest is checked");
+}

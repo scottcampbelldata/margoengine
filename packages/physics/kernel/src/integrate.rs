@@ -336,6 +336,7 @@ impl World {
             }
             self.set_v(PREVIOUS_X, at, position);
             self.set_q(PREVIOUS_ROTATION_X, at, rotation);
+            self.set_s(TURNED, at, 0.0);
             self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
             if kind == DYNAMIC {
                 let frame = rotation.mul(self.q(INERTIA_FRAME_X, at));
@@ -437,7 +438,9 @@ impl World {
                 continue;
             }
             let center = self.v(CENTER_X, at).add(self.v(LINEAR_X, at).scale(h));
-            let turn = Q::from_rotation_vector(self.v(ANGULAR_X, at).scale(h));
+            let spin = self.v(ANGULAR_X, at).scale(h);
+            self.set_s(TURNED, at, self.s(TURNED, at) + sqrt(spin.dot(spin)));
+            let turn = Q::from_rotation_vector(spin);
             let rotation = turn.mul(self.q(ROTATION_X, at)).normalized();
             self.set_v(CENTER_X, at, center);
             self.set_q(ROTATION_X, at, rotation);

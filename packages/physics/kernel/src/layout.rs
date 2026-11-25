@@ -71,6 +71,9 @@ columns! {
     PREVIOUS_ROTATION_Y f32 Body,
     PREVIOUS_ROTATION_Z f32 Body,
     PREVIOUS_ROTATION_W f32 Body,
+    // The angle the body turned through in the last step, every substep's turn added: a pose cannot tell a turn from the turn
+    // and whole circles more, and CCD must sweep the whole of it.
+    TURNED f32 Body,
     // Velocity of the centre of mass and angular velocity, world space.
     LINEAR_X f32 Body,
     LINEAR_Y f32 Body,

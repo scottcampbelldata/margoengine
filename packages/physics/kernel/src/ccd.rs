@@ -29,6 +29,7 @@ use crate::world::{NONE, World};
 /// of the header start at these).
 pub const TOUCH: f32 = 1e-3;
 pub const STEPS: u32 = 64;
+const TAU: f32 = 6.283_185_5;
 
 /// A body's motion over the step: the centre of mass from `c0` to `c1`, the turn `turn` (a rotation vector) from `q0`.
 #[derive(Clone, Copy)]
@@ -75,7 +76,28 @@ impl World {
         let local = self.v(LOCAL_CENTER_X, at);
         let (q0, q1) = (self.q(PREVIOUS_ROTATION_X, at), self.q(ROTATION_X, at));
         let (c0, c1) = (self.v(PREVIOUS_X, at).add(q0.rotate(local)), self.v(POSITION_X, at).add(q1.rotate(local)));
-        Motion { c0, c1, q0, q1, turn: q1.mul(q0.conjugate()).to_rotation_vector(), local }
+        Motion { c0, c1, q0, q1, turn: self.swept_turn(at, q0, q1), local }
+    }
+
+    /// The turn a body made over the step as a rotation vector: the rotation from `q0` to `q1` about its own axis, with whole
+    /// circles added to its angle until it is the nearest to the angle the substeps turned through (`TURNED`). The poses alone
+    /// give an angle of at most pi, so a body turning 29 rad a step was swept as turning less than 3, and CCD let its tips
+    /// through a wall (`a_thousand_bullets_at_300_m_s_never_pass_a_thin_wall`). Whole circles end at the same pose, so the
+    /// sweep still ends where the step did.
+    fn swept_turn(&self, at: usize, q0: Q, q1: Q) -> V3 {
+        let turn = q1.mul(q0.conjugate()).to_rotation_vector();
+        let (angle, turned) = (sqrt(turn.dot(turn)), self.s(TURNED, at));
+        let circles = ((turned - angle) / TAU + 0.5) as i32;
+        if circles <= 0 {
+            return turn;
+        }
+        // A turn of whole circles leaves no axis in the poses; the angular velocity has one.
+        let axis = if angle > 1e-6 { turn.scale(1.0 / angle) } else {
+            let spin = self.v(ANGULAR_X, at);
+            let length = sqrt(spin.dot(spin));
+            if length > 0.0 { spin.scale(1.0 / length) } else { return turn }
+        };
+        axis.scale(angle + circles as f32 * TAU)
     }
 
     /// The motion of a body the sweep meets: a fixed or sleeping body did not move this step, whatever its last step did.
