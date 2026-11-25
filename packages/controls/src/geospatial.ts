@@ -61,6 +61,7 @@ export interface GeospatialView {
   range?: number;
 }
 
+/** Options of {@link GeospatialControls}; every field is optional. Angles are radians, lengths metres. */
 export interface GeospatialOptions {
   /** Initial view. Default: longitude 0, latitude 0, height 0, heading 0, pitch PI/2 (straight down), range 2e7 m. */
   view?: GeospatialView;
