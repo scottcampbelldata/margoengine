@@ -87,7 +87,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| 1. Surface-true picking: zoom-to-cursor, rotate-around and pan grab the real surface hit (BVH on terrain, tiles, meshes), anchored drag | CesiumJS, 3D Tiles renderer GlobeControls, Google 3D map controls | MISSING | M |  |
+| 1. Surface-true picking: zoom-to-cursor, rotate-around and pan grab the real surface hit (BVH on terrain, tiles, meshes), anchored drag | CesiumJS, 3D Tiles renderer GlobeControls, Google 3D map controls | DONE | M | 5f77e327e |
 | 2. Collision of the whole near plane against terrain, tiles and meshes; minimum clearance; underground mode; collision while flying and during flyTo | CesiumJS, Babylon geospatial camera | MISSING | M |  |
 | 3. Navigation modes with smooth switches: globe orbit, local orbit, first-person fly, walk/drive with ground following, top-down map, cinematic path | CesiumJS, deck.gl views, Google 3D map controls | MISSING | L |  |
 | 4. flyTo on the van Wijk and Nuij 2003 optimal path, duration from distance, easing, AbortSignal, cancel on input; flyToBoundingSphere, fit-to-bounds | CesiumJS, MapLibre GL `flyTo`, deck.gl `FlyToInterpolator` | MISSING | M |  |
