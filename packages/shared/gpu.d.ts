@@ -13,6 +13,14 @@ export function render(
   format: GPUTextureFormat,
   extra?: Partial<GPURenderPipelineDescriptor>,
 ): GPURenderPipeline;
+/** Caustic beam pipeline: `beamVertex`/`beamFragment` summed into three rgba16float targets, no culling. */
+export function beamPipeline(device: GPUDevice, code: string): GPURenderPipeline;
+/** Render pass clearing and storing one array layer of each texture. */
+export function layerPass(
+  encoder: GPUCommandEncoder,
+  textures: readonly GPUTexture[],
+  layer: number,
+): GPURenderPassEncoder;
 export function compute(device: GPUDevice, code: string, entryPoint?: string): GPUComputePipeline;
 export function draw(c: Context, pipeline: GPURenderPipeline, bindGroup: GPUBindGroup, loadOp?: GPULoadOp): void;
 export function dispatch(

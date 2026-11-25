@@ -9,7 +9,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { accumulateNormals } from '../../shared/normals.js';
-import { group, render } from '../../shared/gpu.js';
+import { beamPipeline, group, layerPass, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
 import {
@@ -290,22 +290,8 @@ export class SurfaceCaustics implements EnginePlugin {
       this.dirty = false;
     }
     if (key === this.beamKey) return;
-    const surface = meshSurface(triangles),
-      module = c.device.createShaderModule({ code: causticBeams(surface, shadow) }),
-      blend = {
-        color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-        alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-      } as const;
-    this.beam = c.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'beamVertex' },
-      fragment: {
-        module,
-        entryPoint: 'beamFragment',
-        targets: Array.from({ length: 3 }, () => ({ format: 'rgba16float', blend })),
-      },
-      primitive: { cullMode: 'none' },
-    });
+    const surface = meshSurface(triangles);
+    this.beam = beamPipeline(c.device, causticBeams(surface, shadow));
     const range = c.device.createShaderModule({ code: causticRange(surface) });
     this.measure = c.device.createComputePipeline({
       layout: 'auto',
@@ -404,13 +390,7 @@ export class SurfaceCaustics implements EnginePlugin {
       entries: [...settings, { binding: 2, resource: { buffer: this.range! } }],
     });
     for (let layer = 0; layer < this.layers; layer++) {
-      const pass = c.encoder.beginRenderPass({
-        colorAttachments: this.maps.map((map) => ({
-          view: map.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }),
-          loadOp: 'clear',
-          storeOp: 'store',
-        })),
-      });
+      const pass = layerPass(c.encoder, this.maps, layer);
       pass.setPipeline(this.beam!);
       pass.setBindGroup(0, device.createBindGroup({ layout: this.beam!.getBindGroupLayout(0), entries: [] }));
       pass.setBindGroup(1, beams);

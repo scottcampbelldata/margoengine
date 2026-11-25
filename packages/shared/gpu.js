@@ -29,6 +29,31 @@ export function render(device, code, format, extra = {}) {
     ...extra,
   });
 }
+const add = { srcFactor: 'one', dstFactor: 'one', operation: 'add' };
+/** Caustic beam pipeline (post and water): beamVertex/beamFragment summed into three rgba16float targets, no culling. */
+export function beamPipeline(device, code) {
+  const module = device.createShaderModule({ code });
+  return device.createRenderPipeline({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'beamVertex' },
+    fragment: {
+      module,
+      entryPoint: 'beamFragment',
+      targets: Array.from({ length: 3 }, () => ({ format: 'rgba16float', blend: { color: add, alpha: add } })),
+    },
+    primitive: { cullMode: 'none' },
+  });
+}
+/** Render pass clearing and storing one array layer of each texture (caustic maps in post and water). */
+export function layerPass(encoder, textures, layer) {
+  return encoder.beginRenderPass({
+    colorAttachments: textures.map((texture) => ({
+      view: texture.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }),
+      loadOp: 'clear',
+      storeOp: 'store',
+    })),
+  });
+}
 export function compute(device, code, entryPoint = 'main') {
   return device.createComputePipeline({
     layout: 'auto',

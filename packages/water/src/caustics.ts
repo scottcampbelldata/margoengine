@@ -6,7 +6,7 @@ import { PostStack } from '@margoengine/post/stack';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
-import { group, render } from '../../shared/gpu.js';
+import { beamPipeline, group, layerPass, render } from '../../shared/gpu.js';
 import type { Water, WaterShadowSource } from './index.js';
 import type { FFTOcean } from './fft.js';
 import { queryStates, type QueryState } from './query-state.js';
@@ -192,21 +192,7 @@ export class Caustics implements EnginePlugin {
       });
       c.device.queue.writeBuffer(this.coordinates, 0, state.positions as Float32Array<ArrayBuffer>);
     }
-    const module = c.device.createShaderModule({ code: causticBeams(state, shadow) });
-    const blend = {
-      color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-      alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-    } as const;
-    this.beam = c.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'beamVertex' },
-      fragment: {
-        module,
-        entryPoint: 'beamFragment',
-        targets: Array.from({ length: 3 }, () => ({ format: 'rgba16float', blend })),
-      },
-      primitive: { cullMode: 'none' },
-    });
+    this.beam = beamPipeline(c.device, causticBeams(state, shadow));
     this.token = state.token;
     this.beamShadow = shadow;
     this.beamShader = state.shader;
@@ -321,13 +307,7 @@ export class Caustics implements EnginePlugin {
     reduce.dispatchWorkgroups(1);
     reduce.end();
     for (let layer = 0; layer < this.layers; layer++) {
-      const pass = c.encoder.beginRenderPass({
-        colorAttachments: this.maps.map((map) => ({
-          view: map.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }),
-          loadOp: 'clear',
-          storeOp: 'store',
-        })),
-      });
+      const pass = layerPass(c.encoder, this.maps, layer);
       pass.setPipeline(this.beam!);
       pass.setBindGroup(0, first);
       pass.setBindGroup(1, second);
