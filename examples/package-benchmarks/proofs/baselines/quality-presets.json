@@ -1,8 +1,8 @@
 {
  "proof": "quality-presets",
- "ref": "a7ab55ea49",
- "revision": "a7ab55ea492bb34407fcdd76e289572388e59d42",
- "capturedAt": "a7ab55ea492bb34407fcdd76e289572388e59d42",
+ "ref": "374aa47b9e",
+ "revision": "374aa47b9e7a2ed6186631dc766a3d10929220d0",
+ "capturedAt": "fb4f4b91d43e70a0cb5e32ad31d711913e780fb2",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
@@ -10,8 +10,8 @@
   "shadows 4x": "b2c3254ae4186edfff74ddb41cf502f8f9c2db35a9f3e17be5dfe9fb51465572",
   "ssao 1x": "620f4611784a999f0303de695bcc09b72ec58ed48e535a73ef4bd47198247b43",
   "ssao 4x": "fcf088ed6c05a9cfd6efe69a8451f00f95a3dc9067f6645db894490502aa6d4d",
-  "ssr 1x": "4ceb23a39193b4b693387815cdeea9f09658272205614f32755b1e2aa7c57d40",
-  "ssr 4x": "81d4e1e9e54b33351fcf88bc0267fb389b759939832c7ce34f170db5cb8ae62f",
+  "ssr 1x": "df186a1ca2b8a84d38f9d7077ce21e176604a97c1f3606f07521bf84a41aee21",
+  "ssr 4x": "b92021170646f677cdb8c5dd7edb4a05ac237ea07a3306b4623f2749cc4c26ca",
   "volumetric 1x": "c906e3b1e6d72d8af6a39ebd3f7fd33da53a5e76383429c9c6990058d1336338",
   "volumetric 4x": "901f054126a8dc77b7d848de7d9b8c593393b1ebf6347faeab604cc5fe53c126",
   "localShadows 1x": "4e1b4842e3c8b3fddbd2202780c8908265aed4c0cd6d938b7af4a5fbe77ffd34",
