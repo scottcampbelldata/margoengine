@@ -60,3 +60,30 @@ for (const name of ['core', 'stage'])
       rmSync(temp, { recursive: true, force: true });
     }
   });
+
+// KB-SIZE-PLATFORM2: on Linux and macOS the bundler took an entry's import of a sibling entry into its own graph and
+// moved the sibling's code into a hashed chunk behind a facade; Windows left the import alone, so core + stage differed
+// by 12 B between the machines. An import between entries stays that import on every platform.
+for (const name of ['core', 'stage'])
+  test(`${name} keeps each entry's code in its own file and its imports of other entries as written`, {
+    timeout: 180_000,
+  }, async () => {
+    const temp = mkdtempSync(join(tmpdir(), `compact-siblings-${name}-`));
+    try {
+      const out = join(temp, 'dist');
+      emit(name, out);
+      const emitted = files(out);
+      await compactPackage(name, resolve(root, `packages/${name}`), out);
+      const built = files(out),
+        entries = Object.keys(emitted);
+      for (const entry of entries) {
+        const stem = entry.slice(0, -3),
+          facade = Object.keys(built).find((file) => new RegExp(`^${stem}-[\w-]{8}\.js$`).test(file));
+        assert.equal(facade, undefined, `${entry} was moved into ${facade}`);
+        for (const [, sibling] of emitted[entry].matchAll(/^import [^;]*?from '\.\/([\w-]+\.js)';/gm))
+          assert.ok(built[entry].includes(`"./${sibling}"`), `${entry} still imports ./${sibling}`);
+      }
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });

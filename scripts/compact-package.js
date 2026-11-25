@@ -39,11 +39,25 @@ export async function compactPackage(
         await readFile(`${root}/${file}`, 'utf8'),
       ),
     );
-  // Keep entry paths and identities intact, including the extension entry point.
+  // Keep entry paths and identities intact, including the extension entry point: an import of one dist file by another
+  // stays that import. It is resolved here to an id that names no file, because given the relative path itself the
+  // bundler recognised the sibling entry on Linux and macOS (and bundled it behind a facade) but not on Windows, so
+  // core + stage built to different bytes (KB-SIZE-PLATFORM2, tests/compact-package-order.test.js).
+  const sibling = 'margo-sibling:',
+    distRoot = real(root),
+    isSibling = (id, importer) => id.startsWith('.') && real(dirname(resolve(dirname(importer), id))) === distRoot;
   const output = await build({
     configFile: false,
     publicDir: false,
     logLevel: 'warn',
+    plugins: [
+      {
+        name: 'margo-sibling-entries',
+        enforce: 'pre',
+        resolveId: (id, importer) =>
+          importer && isSibling(id, importer) ? { id: sibling + id.slice(2), external: true } : null,
+      },
+    ],
     build: {
       write: false,
       minify: true,
@@ -55,8 +69,15 @@ export async function compactPackage(
       },
       rollupOptions: {
         external: (id, importer) =>
-          !!importer && ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
-        output: { ...compactOutput, comments: { annotation: true } },
+          !!importer &&
+          !id.startsWith(sibling) &&
+          !isSibling(id, importer) &&
+          ((name !== 'stage' && name !== 'core') || !isShared(resolve(dirname(importer), id))),
+        output: {
+          ...compactOutput,
+          comments: { annotation: true },
+          paths: (id) => (id.startsWith(sibling) ? `./${id.slice(sibling.length)}` : id),
+        },
       },
     },
   });
