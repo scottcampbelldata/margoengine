@@ -49,7 +49,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Smart Filters runtime: a node graph of image filters run on an image, video or camera input with no scene, and a block-merging optimizer that fuses passes | Babylon Smart Filters | PARTIAL | M |  |
 | Mesh blending post process: soften seams where separate meshes meet (rocks on terrain), per-mesh tag and radius, depth-slope rejection | Babylon | MISSING | M |  |
 | Single-frame spatial upscaler (FSR 1 style edge-adaptive upscale plus sharpen) for devices without history (`taa/src/upscale.ts` is temporal) | Babylon | PARTIAL | S |  |
-| Mesh data debug view material: normals, tangents, UV sets, UV checker, vertex colours, bone weights, material ids on any mesh | Babylon MeshDebugPluginMaterial | PARTIAL | S |  |
+| Mesh data debug view material (page read 2026-11-25): wireframe, vertex dots, both together, a checker on UV set 0 or 1 (colours, scale), vertex colours, a distinct colour per material id, plus a plain camera-lit shading mode. Margo has wireframe and normals only; no vertex dots, UV checker, vertex-colour or material-id view | Babylon MeshDebugPluginMaterial | PARTIAL | S |  |
 | Colour Enhance and channel mixer in the grade: shadows/highlights/midtones, vibrance, dehaze, 3x3 RGB mixer | PlayCanvas CameraFrame | PARTIAL | S |  |
 
 ## Lane B: particles, simulation and physics
@@ -83,6 +83,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
+| Smart assets: a per-scene registry mapping stable string keys to asset URLs, with load, unload, reload and swap by key (a texture swap rebinds existing materials), a JSON asset map that loads from URL, file or object and serialises back, and a missing-asset callback that can return a replacement URL or file | Babylon Smart Assets | MISSING | M |  |
 | Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | DONE (scene save and load already existed: `save/src/engine.ts`) | M | f19d13852 |
 | Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | DONE (`setMaterialSortModes`: per engine, opaque and transparent material meshes) | S | 8aaf6a290 |
 | Blob shadow and planar `ShadowMesh` | three.js, drei | DONE (`@margoengine/materials/fake-shadows`; pixels checked on WebGPU and the WebGL2 layer, `features-browser.mjs fakeShadows`) | S | 196b41134, 2ed1a656d |
@@ -159,7 +160,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Declarative action manager: triggers on a node (pick, long pick, pointer over/out, intersect enter/exit, every frame, keys) with chained actions | Babylon ActionManager | PARTIAL | S to M |  |
 | Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | PARTIAL | S |  |
 | Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | PARTIAL | S |  |
-| Coroutines: multi-frame logic as a generator the scene steps each frame, with cancel | Babylon | MISSING | S |  |
+| Coroutines (page read 2026-11-25): a generator stepped once per frame; a bare `yield` waits one frame, yielding a promise waits for it, yielding another coroutine's promise waits for that coroutine; an async run form returns a promise that resolves on completion and rejects on cancel | Babylon | MISSING | S |  |
 | Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | MISSING | M |  |
 | Mobile app wrapper publish (Capacitor-style project from a built scene, safe area and orientation) | PlayCanvas | MISSING | M |  |
 
