@@ -1864,15 +1864,16 @@ export class KernelWorld {
   /**
    * Follows the vertices of a deformable trimesh collider's mesh, written into the mesh's vertex rows, with no rebuild: every
    * node's box is refit once, edge classes and bounds are recomputed, the broad phase is told, what rests on it wakes, and
-   * contacts reach `motion` (how far the farthest vertex moved) further until the next refit.
-   * @returns The nodes it touched, each once.
-   * @throws RangeError for a collider that is not a deformable trimesh or a vertex that is not finite.
+   * contacts reach `motion` (how far the farthest vertex moved) further until the next refit. A height field collider follows
+   * the heights written in place into its vertex rows' y the same way: its bounds are recomputed, and it has no tree.
+   * @returns The nodes it touched, each once (a height field: its points).
+   * @throws RangeError for a collider that is not a deformable trimesh or a height field, or a vertex that is not finite.
    */
   refitCollider(collider: number, motion: number): number {
     const touched = this.api.collider_refit(collider, motion);
     if (touched < 0)
       throw new RangeError(
-        `Collider ${collider} cannot be refit (code ${touched}); it must be a trimesh made with deformable: true, with finite vertices.`,
+        `Collider ${collider} cannot be refit (code ${touched}); it must be a trimesh made with deformable: true or a heightfield, with finite vertices.`,
       );
     return touched;
   }

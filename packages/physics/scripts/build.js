@@ -32,6 +32,7 @@ await build({
         meshfiles: resolve(root, 'src/meshfiles.ts'),
         robots: resolve(root, 'src/robots.ts'),
         world: resolve(root, 'src/world/index.ts'),
+        earth: resolve(root, 'src/earth/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

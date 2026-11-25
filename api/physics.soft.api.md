@@ -1815,6 +1815,7 @@ class PhysicsCollider {
     cellStatus(row: number, column: number): number;
     cellStatuses(): Uint8Array;
     setCellStatus(row: number, column: number, status: number): this;
+    setHeights(heights: ArrayLike<number>, start?: number): number;
     friction(): number;
     setFriction(friction: number): this;
     restitution(): number;

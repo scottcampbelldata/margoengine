@@ -1682,6 +1682,28 @@ for (let k = 0; k < 4; k++) anderson.next(x, [3 - 1.5 * x[0]], x);
 console.log(x[0].toFixed(6)); // 1.200000
 ```
 
+### The terrain bed (`@margoengine/physics/earth`)
+
+One grid of ground elevations that erosion, slides and craters change and that colliders, water and hooves read (PA-37). `TerrainBed` is the framework solver that owns the field `bed`: it keeps the elevations in f64, adds each tick what writers accumulated into the field `bedChange` (metres of change a vertex, summed by contributor id then vertex, so the result is the same bits whatever order the writers were added in), keeps the bed above an optional bedrock, and publishes the elevations as f32. Its ledger holds the volume writers asked for and the volume the bedrock refused, so `volume() - startVolume = requestedVolume() + refusedVolume()`. `bedVertexAreas` gives each vertex's area exactly for the triangulation, so a writer that removes a volume here and puts it there conserves it. The grid is laid out as the kernel's height field (rows along z, columns along x, column major) and cut into the same triangles, so `Bed.sample`, a kernel ray and a contact see one surface. `BedCollider` puts the bed in a `Physics` world as a height field and `sync(bed)` writes the changed heights into the field's own memory (`PhysicsCollider.setHeights`): editing the ground every step allocates nothing, and what rests on it wakes, so a ball on ground that a crater opens under falls in.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {BedCollider, bedSurface} from 'margoengine/physics/earth';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, -9.81, 0]});
+const grid = {columns: 8, rows: 8, width: 16, depth: 16, centre: [0, 0] as [number, number]};
+const heights = new Float32Array(9 * 9); // flat ground at 0 m
+const ground = new BedCollider(physics, bedSurface(grid, heights));
+const ball = physics.addBody(null, {position: [0, 0.5, 0], colliders: {shape: 'sphere', radius: 0.5}});
+for (let i = 0; i < 60; i++) physics.step();
+heights[4 + 9 * 4] = -2; // a pit under the ball
+console.log(ground.sync(bedSurface(grid, heights))); // 1: one height moved
+for (let i = 0; i < 120; i++) physics.step();
+console.log(ball.position[1] < 0); // true: it fell in
+console.log(bedSurface(grid, heights).sample(0, 0).elevation); // -2
+```
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

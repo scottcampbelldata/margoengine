@@ -344,6 +344,39 @@ impl World {
         nodes as i32
     }
 
+    /// Follows a height field whose heights were written in place into its MESH_VERTEX_Y rows (its x and z never move): the
+    /// field's box and radius again, the edge classes and cell tree it has none of. `motion` is how far the farthest height
+    /// moved; contacts and the search reach that much further until the next step, as for a refit mesh. The field keeps its
+    /// rows: an edit of the ground every step allocates nothing. The vertices, or a MESH_ code (-1 not a height field, -3 a
+    /// height that is not finite).
+    pub fn refit_grid(&mut self, mesh: usize, motion: f32) -> i32 {
+        if mesh >= self.header().mesh_rows[0] as usize || self.grid_size(mesh).is_none() || !(motion >= 0.0 && motion.is_finite()) {
+            return MESH_EMPTY;
+        }
+        let (v0, vertices) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, self.uu(MESH_VERTICES, mesh) as usize);
+        let (mut low, mut high) = (v3(f32::INFINITY, f32::INFINITY, f32::INFINITY), v3(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY));
+        for i in v0..v0 + vertices {
+            let p = self.v(MESH_VERTEX_X, i);
+            if !p.y.is_finite() {
+                return MESH_NOT_FINITE;
+            }
+            low = low.min(p);
+            high = high.max(p);
+        }
+        let center = low.add(high).scale(0.5);
+        let mut radius = 0.0f32;
+        for i in v0..v0 + vertices {
+            let off = self.v(MESH_VERTEX_X, i).sub(center);
+            radius = radius.max(off.dot(off));
+        }
+        self.set_v(MESH_BOX_X, mesh, center);
+        self.set_v(MESH_HALF_X, mesh, high.sub(low).scale(0.5));
+        self.set_s(MESH_RADIUS, mesh, sqrt(radius));
+        self.set_s(MESH_MOTION, mesh, motion);
+        self.set_u(MESH_STAMP, mesh, self.header().steps);
+        vertices as i32
+    }
+
     /// How far a deformable mesh's surface moves in the step now being made, as aimed before it: 0 for any mesh after.
     #[inline(always)]
     pub(crate) fn mesh_reach(&self, mesh: usize) -> f32 {

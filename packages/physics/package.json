@@ -55,6 +55,10 @@
     "./world": {
       "types": "./dist/world/index.d.ts",
       "import": "./dist/world.js"
+    },
+    "./earth": {
+      "types": "./dist/earth/index.d.ts",
+      "import": "./dist/earth.js"
     }
   },
   "files": [

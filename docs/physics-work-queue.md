@@ -137,7 +137,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
   - Habel, Kusternig and Wimmer 2009 (CGF 28(2):523-532).
 - **Still to check:** Blevins' cantilever mode constants, Morison et al. 1950, and Raupach, Finnigan and Brunet 1996.
 
-### The terrain bed field, PA-37 (being finished by Claude; for the EARTH and HYDRO solvers that build on it)
+### The terrain bed field, PA-37 (LANDED; for the EARTH and HYDRO solvers that build on it)
 
 - **Contract:** `bed.ts`, types only, in `@margoengine/math/fields`.
   - `TerrainBed` owns the field `bed`, a vertex grid in the rigid kernel's height-field layout, kept in f64 and
@@ -147,8 +147,8 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
     volume.
   - `bedVertexAreas` is exact for the kernel's triangulation, so contributors can conserve mass.
 - **Readers:** `BedSurface` and `bedFromPort` sample elevation and normal on the kernel's own triangles.
-- **Collider:** a fixed body with a deformable trimesh. A native height edit in the rigid kernel is still needed, so
-  that edits don't leak mesh rows.
+- **Collider:** `BedCollider`, a fixed body holding the kernel's height field, edited in place through
+  `PhysicsCollider.setHeights` (the kernel's `refit_grid`): editing the ground every step allocates nothing.
 
 ## Open
 

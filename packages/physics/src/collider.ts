@@ -741,6 +741,37 @@ export class PhysicsCollider {
     this.kernel.setCellStatus(this.handle, row, column, status);
     return this;
   }
+  /**
+   * Sets a height field's heights in place, as `heightfieldHeights()` reads them (in the collider's frame, already scaled), from
+   * point `start` on (default 0; point r of column c is `r + (rows + 1) * c`). The field keeps its memory, so editing the
+   * ground every step allocates nothing; its box is refit, contacts reach as far as the farthest height moved, and what rests
+   * on it wakes: a body on ground that sinks falls, and one on ground that rises is lifted.
+   * @returns How far the farthest height moved, m.
+   * @throws RangeError for another shape, a start or a count that runs off the field, or a height that is not finite.
+   */
+  setHeights(heights: ArrayLike<number>, start = 0): number {
+    const { rows, columns } = this.grid(),
+      count = (rows + 1) * (columns + 1);
+    if (!Number.isInteger(start) || start < 0 || start + heights.length > count)
+      throw new RangeError(
+        `setHeights got ${heights.length} heights from point ${start} on a field of ${count} points; pass points 0 to ${count - 1}.`,
+      );
+    const c = this.columns(),
+      first = c.meshFirstVertex[c.colliderHull[this.handle]] + start;
+    for (let i = 0; i < heights.length; i++)
+      if (!Number.isFinite(heights[i]))
+        throw new RangeError(`Height ${start + i} is ${heights[i]}; pass finite heights.`);
+    let farthest = 0;
+    for (let i = 0; i < heights.length; i++) {
+      const was = c.meshVertexY[first + i],
+        now = Math.fround(heights[i]),
+        move = now > was ? now - was : was - now;
+      if (move > farthest) farthest = move;
+      c.meshVertexY[first + i] = now;
+    }
+    this.kernel.refitCollider(this.handle, farthest);
+    return farthest;
+  }
   private cell(row: number, column: number): void {
     const { rows, columns } = this.grid();
     if (

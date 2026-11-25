@@ -11588,3 +11588,11 @@ normal leans away from, the snap is dropped if it makes the contact deeper than 
 nearer side. Plain geometry on top of the ghost rule of Catto, "Ghost Collisions" (box2d.org, 2020); no other source. Proof:
 `kernel/tests/voxel.rs`.
 
+## The terrain bed field (2026-11-25, PA-37)
+
+`packages/physics/src/earth/` and `packages/math/src/fields/bed.ts`: a regular grid of elevations sampled on the kernel's own
+triangulation (barycentric interpolation of a triangle, its normal from the two edge slopes), with each vertex's share of the
+triangulated volume worked out as a triangle's area times the mean of its corner heights; elementary geometry, no source.
+The bed's layout and triangle split are the kernel's height field's (already recorded). Proof: `tests/earth-bed.test.js` and
+`tests/coupling/earth-bed.test.js`.
+

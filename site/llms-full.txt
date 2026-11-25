@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,042 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,044 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11861,6 +11861,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: one moving caster made Shadows redraw its whole cached still map every frame (GAP-FILM-SHADOWCACHE, shadows)
+
+- **Repro:** `Shadows` with a terrain or road caster and a car added without `static`, the
+  car moved every frame: `stats.staticDraws` counted every still caster in every cascade on every frame, and
+  `cacheHits` stayed at 0. Output was right; the cost landed on every film frame with a moving object.
+- **Cause:** an unmarked caster is cached "while it stays put": its world matrix is part of the still-map hash, so a
+  caster that moves every frame changed the hash every frame and redrew the whole cached array.
+- **Fix:** `Shadows` tracks each unmarked caster's matrix. One that moves on two frames in a row leaves the cached map
+  (one redraw) and draws in the per-frame pass; after 30 frames held still it rejoins the cache (one more redraw). A
+  single move, such as placing an object, still redraws the cache once and keeps it cached. A caster added with
+  `static: true` is the caller's promise and is not tracked: move it with `invalidate()`. Regression:
+  `packages/shadows/test/cache.test.js`, "a caster moving every frame leaves the cached map instead of redrawing it
+  every frame".
+
 ### Fixed 2026-11-25: a port big enough to grow the world's memory at its first publish crashed the field registry (KB-PHYS-REGISTRYGROW1, physics world)
 
 - **Repro:** a `FieldRegistry` over a memory of one page; publish a 24 KiB port of a field (its two mirrors do not fit), or
@@ -20619,6 +20633,10 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline without output (KB1042e). Not reproduced on current main (2026-11-12): the full grid passes on
   the WebGL2 layer and on native WebGPU (256 captures, no failures; earlier 79 s compat and 62 s native).
   Pin: scripts/material-back-side-gpu-check.js, unchanged.
+  Closed 2026-11-25: the unchanged script ran the full grid in 12 s on the WebGL2 layer and 16 s natively
+  (RTX A6000, ANGLE D3D11, 256 captures, 840 checks, no failures). The same script took 62 s natively then, so the
+  79 s was that run's loaded machine, not the grid; the 60 s body deadline is gone (GPU tests have a 10 minute hard
+  limit, scripts/gpu-package-tests.mjs).
 - `materials/test:gpu:dispersion`: its circular-resource fixture failure is
   repaired by shallow field identity/value comparison. The complete native grid
   passes 278 checks/254 captures. The complete full-compat grid now reaches all

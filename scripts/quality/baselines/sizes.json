@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18858142,
+  "total": 18861598,
   "history": [
     {
       "date": "2026-10-24",
@@ -11973,6 +11973,12 @@
       "commit": "FG-17a",
       "reason": "FG-17 piece 1 new entries post/accumulate 6,903 B gzip (Accumulate, an HDR PostStack stage: rgba32float ping-pong sum and rgba16float mean in one pass, presents alone through the display curve) and headless/accumulate 4,414 B (subFrames schedule, Owen-scrambled Sobol offsets through the filter inverse CDF, renderAccumulated driver); both optional, nothing else imports them",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "eed022063",
+      "reason": "new entry @margoengine/physics/earth: the terrain bed field (PA-37), TerrainBed, BedSurface and BedCollider",
+      "grew": 1
     }
   ],
   "items": {
@@ -12756,6 +12762,7 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 87409,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 513179,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/earth": 3456,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/soft": 88860,
