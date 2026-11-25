@@ -745,6 +745,7 @@ export interface KernelSolverOptions {
     bvhBuildStrategy?: 'incremental' | 'binned' | 'ploc';
     bvhOptimizationStrategy?: 'none' | 'rotations';
     adaptiveChangeDetectionMargin?: boolean;
+    blockSolver?: boolean;
 }
 
 export interface KernelTrimeshOptions {

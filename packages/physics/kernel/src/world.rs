@@ -143,6 +143,8 @@ pub struct Header {
     pub tree_root: u32,
     pub tree_free: u32,
     pub tree_used: u32,
+    /// Not zero: a manifold's normal rows are solved exactly in one block (solver.rs, `block_normal`) in place of by sweeps.
+    pub block_solver: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -278,6 +280,7 @@ impl World {
                 tree_root: NONE,
                 tree_free: NONE,
                 tree_used: 0,
+                block_solver: 0,
             });
         }
         Some(world)

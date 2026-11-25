@@ -1,6 +1,6 @@
 {
-  "commit": "68e20446a",
-  "dirty": false,
+  "commit": "3fd9c8653",
+  "dirty": true,
   "browser": "chromium 156.0.8078.4 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {

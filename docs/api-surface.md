@@ -70,8 +70,8 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/navmesh | `.` 17, `./build` 5, `./codec` 5, `./links` 7, `./hierarchy` 2, `./debug` 9, `./voxel` 2, `./volume` 2, `./tiles` 4, `./agents` 4, `./queries` 10, `./wasm` 5, `./obstacles` 4, `./formations` 12, `./formation-settings` 7 | 229 |  | 8,551 |
 | @margoengine/netcode | `.` 48, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./smoothing` 2, `./webtransport` 7, `./signal` 6, `./extrapolate` 2, `./relay` 7, `./hitboxes` 5, `./interest` 4, `./generate` 2, `./lobby` 6, `./presence` 11, `./generate-rust` 2, `./migrate` 3, `./interpolation` 3, `./interpolation-delay` 2, `./interpolation-fields` 5, `./interpolation-timeline` 5 | 181 | 1 | 13,182 |
 | @margoengine/oit | `.` 2, `./meshes` 2, `./exact` 4, `./moments` 3, `./depth` 3, `./vfx` 3, `./peel` 2, `./precise` 2 | 29 |  | 4,375 |
-| @margoengine/physics | `.` 152, `./decomposition` 4, `./soft` 14, `./meshfiles` 6, `./robots` 4 | 229 |  | 542,617 |
-| @margoengine/physics2d | `.` 43, `./outline` 6 | 15 |  | 19,697 |
+| @margoengine/physics | `.` 152, `./decomposition` 4, `./soft` 14, `./meshfiles` 6, `./robots` 4 | 229 |  | 550,187 |
+| @margoengine/physics2d | `.` 43, `./outline` 6 | 15 |  | 19,755 |
 | @margoengine/pixel | `.` 13, `./palette` 18, `./render3d` 8, `./scale` 9, `./follow` 5, `./crt` 7 | 11 |  | 4,482 |
 | @margoengine/points | `.` 56, `./las` 21, `./laz` 7, `./e57` 17, `./copc` 4, `./octree` 12, `./surfels` 4, `./potree` 5, `./pick` 5, `./clip` 11, `./style` 14 | 126 |  | 26,438 |
 | @margoengine/post | `.` 33, `./bloom` 5, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 3, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./outline` 2, `./mrt` 6, `./depth` 2, `./contact-shadows` 2, `./heat-haze` 11, `./sss` 3, `./anamorphic` 2, `./blur` 3, `./lens` 2, `./material-decals` 5, `./selective-bloom` 2, `./mask` 2, `./pixelate` 2, `./halftone` 3, `./stylize` 3, `./curvature` 2, `./settings` 13 | 96 |  | 45,726 |

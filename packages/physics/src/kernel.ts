@@ -907,6 +907,13 @@ export interface KernelSolverOptions {
    * candidate pairs for the narrow phase to refuse. Both broad phases use it.
    */
   adaptiveChangeDetectionMargin?: boolean;
+  /**
+   * Solve a manifold's two to four normal rows together in one exact block (default false), Rapier's block solver: the loads that meet every
+   * contact's conditions at once (none negative, none pulling, the points that press holding the gap shut), found by trying which points
+   * are free, at zero or at their cap, in place of sweeping the points one at a time. A manifold no assignment settles to rounding goes
+   * to the sweeps. Friction is still solved a point at a time.
+   */
+  blockSolver?: boolean;
 }
 
 /**
@@ -1107,6 +1114,7 @@ export class KernelWorld {
       bvhBuildStrategy: (['incremental', 'binned', 'ploc'] as const)[read(22)] ?? 'incremental',
       bvhOptimizationStrategy: read(23) === 0 ? 'none' : 'rotations',
       adaptiveChangeDetectionMargin: read(24) !== 0,
+      blockSolver: read(25) !== 0,
     };
   }
   /**
@@ -1224,6 +1232,7 @@ export class KernelWorld {
       this.api.world_set_solver(23, bvhOptimizationStrategy === 'rotations' ? 1 : 0);
     if (adaptiveChangeDetectionMargin !== undefined)
       this.api.world_set_solver(24, adaptiveChangeDetectionMargin ? 1 : 0);
+    if (options.blockSolver !== undefined) this.api.world_set_solver(25, options.blockSolver ? 1 : 0);
     if (broadPhase !== undefined) {
       this.api.world_set_solver(21, broadPhase === 'bvh' ? 1 : 0);
       // The switch makes the tree's rows and moves the columns.

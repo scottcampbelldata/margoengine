@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18377320,
+  "total": 18394996,
   "history": [
     {
       "date": "2026-10-24",
@@ -11715,6 +11715,12 @@
       "commit": "68e20446a",
       "reason": "physics2d base entry grows from 17,687 B to 18,026 B (+339 B): setSolver and solver, fourteen named settings with their checks and fix messages, which Rapier's integration parameters need; no smaller form keeps the names, ranges and messages",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "ca2386622",
+      "reason": "physics grows from 547,193 B to 548,416 B (+1,223 B): the block solve of a manifold's normal rows (block_normal) in both Wasm blueprints, the SIMD and the scalar one, whose sizes the figure sums; a page loads one",
+      "grew": 1
     }
   ],
   "items": {
@@ -12473,7 +12479,7 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 547193,
+    "@margoengine/physics": 564869,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 82354,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 467900,
     "@margoengine/physics/decomposition": 11130,

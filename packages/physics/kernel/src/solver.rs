@@ -42,10 +42,17 @@ const TAU: f32 = 6.283_185_5;
 /// settled last, the shares four points take of one load among themselves, moves no body and is now solved exactly each sweep
 /// (`normal_rows`), so a pass settles in 3 to 4 sweeps on average where it ran out at 16.
 const SWEEPS: u32 = 16;
+/// The share of a point's own stiffness added to its diagonal in the block solve, the square root of f32 rounding. Four points of
+/// one plane push the bodies through three numbers, so their matrix has rank three; this makes it positive definite and the
+/// split of the load among them the even one, the least squares answer, as the null-space step of the sweeps gives.
+const REGULARISE: f32 = 3.452_669_8e-4;
 
 /// Work counts for `examples/profile.rs`, native only (feature `counts`): one-point normal updates in biased passes [0]
 /// and relaxing passes [1], every sweep counted. The Wasm build has no such feature, so its code is untouched.
 #[cfg(feature = "counts")]
+/// Manifolds the block solve answered exactly, and manifolds it left to the sweeps for want of an accepted active set.
+#[cfg(feature = "counts")]
+pub static BLOCK_SOLVES: [core::sync::atomic::AtomicU64; 2] = [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)];
 pub static NORMAL_UPDATES: [core::sync::atomic::AtomicU64; 2] = [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)];
 
 /// At one pass a substep, a contact between two movable bodies takes the soft constraint at an eighth of the substep rate
@@ -688,8 +695,28 @@ impl World {
             }
             along_null = curve > 0.0;
         }
+        // The exact solve of the manifold's normal rows, when the world asks for it: no sweeps then, unless no active set holds.
+        let blocked = self.header().block_solver != 0 && count >= 2 && {
+            let mut k = [[0.0f32; MANIFOLD]; MANIFOLD];
+            let (mut g, mut c) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD]);
+            for i in 0..count {
+                for j in 0..count {
+                    k[i][j] = along + turn_a[j].dot(spin_a[i]) + turn_b[j].dot(spin_b[i]);
+                }
+                let mass = self.s(CONTACT_NORMAL_MASS, row * MANIFOLD + i);
+                let cfm = if mass * scale[i] > 0.0 { leak[i] / (mass * scale[i]) } else { 0.0 };
+                c[i] = cfm + REGULARISE * k[i][i];
+            }
+            for i in 0..count {
+                g[i] = speed[i] + bias[i] - (0..count).map(|j| k[i][j] * hold[j]).sum::<f32>();
+            }
+            let found = block_normal(count, &k, &g, &c, &most, &mut hold);
+            #[cfg(feature = "counts")]
+            BLOCK_SOLVES[(!found) as usize].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+            found
+        };
         let mut sweeps = 0;
-        loop {
+        while !blocked {
             let (mut moved, mut largest) = (0.0f32, 0.0f32);
             for k in 0..count {
                 let i = (k + turn) % count;
@@ -844,4 +871,114 @@ impl RoundCore {
         let t = if t < -1.0 { -1.0 } else if t > 1.0 { 1.0 } else { t };
         self.middle.add(self.half.scale(t))
     }
+}
+
+/// Solves a manifold's normal rows exactly: the loads `hold` in [0, most] with, for every point, `w = g + (K hold)_i + c_i hold_i`
+/// zero where the load is between its bounds, not below zero where it is zero and not above zero where it is at `most`. Each
+/// assignment of points to free, at zero or at `most` (a point with no finite `most` is never at it) is tried in a fixed order,
+/// the free block solved by Cholesky (Baraff 1994, principal pivoting; Catto 2006 and 2024 for two points), and the first that
+/// meets all three conditions within a few roundings of the terms it adds is taken. `c` is positive, so `K + diag(c)` is
+/// positive definite and the answer is the only one. False, with `hold` as it was, when none is accepted.
+fn block_normal(count: usize, k: &[[f32; MANIFOLD]; MANIFOLD], g: &[f32; MANIFOLD], c: &[f32; MANIFOLD], most: &[f32; MANIFOLD], hold: &mut [f32; MANIFOLD]) -> bool {
+    let slack = 16.0 * f32::EPSILON;
+    let mut combinations = 1usize;
+    for _ in 0..count {
+        combinations *= 3;
+    }
+    for code in 0..combinations {
+        // The state of each point: 0 free, 1 at zero, 2 at its most.
+        let (mut state, mut rest) = ([0u8; MANIFOLD], code);
+        for slot in state.iter_mut().take(count) {
+            *slot = (rest % 3) as u8;
+            rest /= 3;
+        }
+        if (0..count).any(|i| state[i] == 2 && !(most[i] < f32::MAX)) {
+            continue;
+        }
+        let mut lambda = [0.0f32; MANIFOLD];
+        let (mut free, mut n) = ([0usize; MANIFOLD], 0);
+        for i in 0..count {
+            match state[i] {
+                0 => {
+                    free[n] = i;
+                    n += 1;
+                }
+                2 => lambda[i] = most[i],
+                _ => {}
+            }
+        }
+        // The free block, A lambda_F = -g - K_FX x_X, by Cholesky.
+        let mut a = [[0.0f32; MANIFOLD]; MANIFOLD];
+        let mut r = [0.0f32; MANIFOLD];
+        for p in 0..n {
+            let i = free[p];
+            r[p] = -g[i] - (0..count).filter(|&j| state[j] != 0).map(|j| k[i][j] * lambda[j]).sum::<f32>();
+            for q in 0..n {
+                a[p][q] = k[i][free[q]] + if p == q { c[i] } else { 0.0 };
+            }
+        }
+        let mut sound = true;
+        for p in 0..n {
+            for q in 0..=p {
+                let mut sum = a[p][q];
+                for t in 0..q {
+                    sum -= a[p][t] * a[q][t];
+                }
+                if p == q {
+                    if !(sum > 0.0) || !sum.is_finite() {
+                        sound = false;
+                    }
+                    a[p][p] = sqrt(if sum > 0.0 { sum } else { 1.0 });
+                } else {
+                    a[p][q] = sum / a[q][q];
+                }
+            }
+        }
+        if !sound {
+            continue;
+        }
+        for p in 0..n {
+            let mut sum = r[p];
+            for t in 0..p {
+                sum -= a[p][t] * r[t];
+            }
+            r[p] = sum / a[p][p];
+        }
+        for p in (0..n).rev() {
+            let mut sum = r[p];
+            for t in p + 1..n {
+                sum -= a[t][p] * r[t];
+            }
+            r[p] = sum / a[p][p];
+        }
+        for p in 0..n {
+            lambda[free[p]] = r[p];
+        }
+        let mut accepted = true;
+        for i in 0..count {
+            let mut terms = g[i].abs();
+            let mut w = g[i] + c[i] * lambda[i];
+            for j in 0..count {
+                let push = k[i][j] * lambda[j];
+                w += push;
+                terms += push.abs();
+            }
+            let room = slack * terms;
+            accepted &= match state[i] {
+                0 => lambda[i] >= -slack * lambda[i].abs().max(terms) && !(lambda[i] > most[i] + slack * lambda[i].abs()),
+                1 => w >= -room,
+                _ => w <= room,
+            };
+            if !accepted {
+                break;
+            }
+        }
+        if accepted {
+            for i in 0..count {
+                hold[i] = if lambda[i] > 0.0 { if lambda[i] > most[i] { most[i] } else { lambda[i] } } else { 0.0 };
+            }
+            return true;
+        }
+    }
+    false
 }
