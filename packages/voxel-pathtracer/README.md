@@ -1040,6 +1040,85 @@ engine.dispose();
   image on a synthetic field and a 4-sample trace of the Khronos Box sample; tracer output with signed colour and rough
   glass accepted). It is not claimed to beat other denoisers.
 
+## Film sequences (`@margoengine/voxel-pathtracer/sequence`)
+
+`margoengine/voxel-pathtracer/sequence` (or `@margoengine/voxel-pathtracer/sequence`) exports `traceFrames`, which
+traces a moving scene one frame at a time at a fixed frame rate, for film output. Each frame calls your `update` with
+its time, sets the scene it returns, sets the tracer's `shutter` and `previousCamera` from last frame's pose, and
+renders one `renderImage`. Motion blur comes from the tracer's own shutter (distributed ray tracing over the shutter
+interval, Cook, Porter and Carpenter 1984), so moves of the camera and of voxel instances blur with no motion vectors.
+Each frame gets its own seed, so noise does not slide under moving content. It works with `VoxelPathTracer` and
+`MeshPathTracer`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';
+import { traceFrames } from '@margoengine/voxel-pathtracer/sequence';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [8, 5, 8], target: [0, 1, 0] },
+});
+const block = { id: 'block', revision: 1, size: [4, 4, 4] as [number, number, number], voxels: new Uint8Array(64).fill(1) };
+const sceneAt = (time: number) => ({
+  revision: 1,
+  models: [block],
+  instances: [{ id: 'block-1', modelId: 'block', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2 + time * 4, 0, -2, 1] }],
+  materials: [{ id: 1, type: 'diffuse' as const, color: [0.8, 0.5, 0.3] as [number, number, number] }],
+  environment: { skyColor: [0.6, 0.75, 1] as [number, number, number], sunIntensity: 3, sunDirection: [0.4, 0.8, 0.3] as [number, number, number] },
+});
+const tracer = VoxelPathTracer.attach(engine, { scene: sceneAt(0) });
+await tracer.ready;
+const frames: Uint8ClampedArray[] = [];
+for await (const frame of traceFrames(tracer, {
+  frames: 4,
+  fps: 24,
+  width: 64,
+  height: 36,
+  samples: 16,
+  shutter: 0.5,
+  preRoll: 1,
+  camera: engine.camera,
+  update: ({ time }) => {
+    engine.camera.position = [8 * Math.cos(time), 5, 8 * Math.sin(time)];
+    return sceneAt(time);
+  },
+  signal: AbortSignal.timeout(60_000),
+})) {
+  frames.push(frame.pixels()); // RGBA8 with the tracer's exposure, tone mapping and gamma
+}
+console.log(frames.length, frames[0].length); // 4 9216
+tracer.dispose();
+engine.dispose();
+```
+
+- `traceFrames(tracer, options)` is an async generator of `TracedFrame`s: `index` (0 for the first traced frame),
+  `time` (`index / fps` seconds), `delta`, `progress`, `seed`, `image` (the `renderImage` result: linear colour and,
+  with `aovs`, the AOVs) and `pixels()` (8-bit RGBA, the same display mapping as `capture`: exposure, vignette, tone
+  mapping and gamma as the tracer had them when the frame was traced; transparent images unpremultiplied with alpha).
+- Options: `frames` (0 to 1,000,000), `fps` (default 30), `width`, `height`, `samples` (as `renderImage`), `shutter`
+  (0 to 1, default 0: the share of the frame interval the shutter is open, ending at this frame's pose, the tracer's
+  own rule), `camera` (the engine camera; its pose after each update becomes the next frame's `previousCamera`; default
+  none, so the camera does not blur), `update(timing)` (may move the camera and return the frame's scene or a promise
+  of it; returning nothing keeps the scene), `seed` (default 0), `noise` (`'per-frame'`, the default, seeds frame `i`
+  with `frameSeed(seed, i)`; `'fixed'` uses `seed` for every frame), `preRoll` (frames updated before frame 0 but not
+  traced, default 0), `denoise`, `aovs`, `transparent` and `signal`.
+- Instances without `previousMatrix` that were in the last frame's scene (matched by `id`) get last frame's `matrix` as
+  `previousMatrix` while `shutter` is above 0; one you set yourself wins. A frame whose `update` returns nothing after a
+  moving frame sets the scene again without that motion, so a stopped object is sharp.
+- The first update has no pose before it, so frame 0 is sharp unless `preRoll` is at least 1 (the pre-roll frame gives
+  frame 0 its opening pose).
+- The tracer's `shutter` and `previousCamera` are restored when the generator finishes, returns early or throws.
+  Invalid options throw `TypeError` or `RangeError` on the first `next()` before the tracer is touched; an aborted
+  `signal` rejects with its reason between frames and inside a render.
+- Not yet: triangle-mesh instances do not blur (they have no previous transform; FG-17 piece 4), and each frame is
+  traced at its own time only (the shutter integrates inside one render).
+- Evidence: `tests/sequence.test.js` (call order, timing, seeds, motion fill and restore against a recording tracer) and
+  `tests/sequence-browser.mjs` (`npm run test:gpu:sequence`, WebGPU and the WebGL2 layer, the same figures on both): a
+  still scene with `noise: 'fixed'` traces bit for bit the same each frame and per-frame noise differs; a bar panned 16
+  px a frame with shutter 0.5 widens by 7 px (8 expected, within 1 px), its energy within 1.0% of the mid-shutter still
+  and its centroid moved 3.98 px toward its previous place (4 expected); frame 0 is sharp; `pixels()` equals the
+  decoded `capture` PNG of the same render exactly, with exposure, AgX and vignette set.
+
 ## Heterogeneous coloured media
 
 `margoengine/voxel-pathtracer/media` (or `@margoengine/voxel-pathtracer/media`) exports

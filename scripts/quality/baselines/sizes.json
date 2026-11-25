@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18897477,
+  "total": 18900535,
   "history": [
     {
       "date": "2026-10-24",
@@ -12111,6 +12111,12 @@
       "commit": "63a127d99",
       "reason": "KHR_materials_diffuse_roughness (parser, EON lobe WGSL, ambient terms). Measured gzip after: gltf/extended-materials 10,265 B (ceiling before 9,959), spec-gloss 11,687, blender/pbr-ext 14,486, fbx worker 128,351, usdz worker 158,392: about 600 B, in optional entries only; core and stage unchanged. Crossing the 10,000 B leak line records the static imports of extended-materials that materials and its dependents already had. A split would need a second lazy shader entry and a loader hook for one lobe.",
       "grew": 33
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-17c",
+      "reason": "FG-17 piece 3 new entry voxel-pathtracer/sequence 3,058 B gzip: traceFrames (per-frame update, scene, shutter and previous camera, per-frame seeds, motion fill of instance previousMatrix, option restore) and the display mapping it shares with capture (display.ts, moved out of tracer.ts, root unchanged); optional, nothing else imports it",
+      "grew": 1
     }
   ],
   "items": {
@@ -13582,6 +13588,7 @@
     "@margoengine/voxel-pathtracer/mesh": 41562,
     "@margoengine/voxel-pathtracer/mesh-pbr": 50086,
     "@margoengine/voxel-pathtracer/resampled": 2190,
+    "@margoengine/voxel-pathtracer/sequence": 3058,
     "@margoengine/voxel-pathtracer/sky": 468,
     "@margoengine/voxel-pathtracer/spectral": 1471,
     "@margoengine/voxel-pathtracer/studio": 1303,

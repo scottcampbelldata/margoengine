@@ -1,0 +1,45 @@
+<!doctype html><html><meta charset="utf-8"><title>Tracer sequence mode</title><canvas width="96" height="48"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {traceFrames} from '/packages/voxel-pathtracer/dist/sequence.js';
+// A vertical emissive bar 4 x 40 voxels at distance 20 in the dark; the camera pans along x. Emission seen directly
+// has no path noise, so each pixel is the share of its jittered rays (over the shutter) that hit the bar.
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const W=96,H=48,fov=40,distance=20;
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,distance],target:[0,0,0],fov}});
+ const errors=[];const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const size=[4,40,1],voxels=new Uint8Array(size[0]*size[1]*size[2]).fill(1);
+ const scene={revision:1,models:[{id:'bar',revision:1,size,voxels}],instances:[{id:'bar',modelId:'bar',matrix:[1,0,0,0,0,1,0,0,0,0,1,0,-2,-20,-0.5,1]}],
+  materials:[{id:1,type:'emit',color:[1,1,1],emission:1}],environment:{ground:false,skyIntensity:0,sunIntensity:0}};
+ const tracer=VoxelPathTracer.attach(engine,{scene,denoise:false,toneMapping:'linear'});
+ const pxPerUnit=(H/2)/(distance*Math.tan(fov*Math.PI/360)),shiftPx=16,dx=shiftPx/pxPerUnit;
+ const pan=x=>{engine.camera.position=[x,0,distance];engine.camera.target=[x,0,0];};
+ const row=img=>{const r=new Float64Array(W);for(let y=8;y<H-8;y++)for(let x=0;x<W;x++)r[x]+=img.color[(y*W+x)*3]/(H-16);return r;};
+ const profile=r=>{const peak=Math.max(...r);let first=-1,last=-1,sum=0,moment=0;for(let x=0;x<W;x++){if(r[x]>0.01*peak){if(first<0)first=x;last=x;}sum+=r[x];moment+=r[x]*(x+0.5);}return {support:last-first+1,sum,centroid:moment/sum,peak};};
+ try{
+  await tracer.ready;
+  const options={frames:2,fps:24,width:W,height:H,samples:256,camera:engine.camera,signal:AbortSignal.timeout(120000)};
+  // Fixed noise on a still scene: every frame is the same image, bit for bit.
+  pan(0);const fixed=[];for await(const f of traceFrames(tracer,{...options,noise:'fixed',seed:11}))fixed.push(f);
+  const fixedEqual=fixed[0].image.color.every((v,i)=>v===fixed[1].image.color[i]);
+  const perFrame=[];pan(0);for await(const f of traceFrames(tracer,{...options,seed:11}))perFrame.push(f);
+  const perFrameDiffer=perFrame[0].image.color.some((v,i)=>v!==perFrame[1].image.color[i]);
+  // Pan: the camera moves dx per frame; frame 1 with shutter 0.5 integrates the last half of the move.
+  const still=[],blur=[];
+  for(const [shutter,out] of [[0,still],[0.5,blur]]){pan(0);for await(const f of traceFrames(tracer,{...options,shutter,update:({index})=>pan(index*dx)}))out.push(f);}
+  const s=profile(row(still[1].image)),b=profile(row(blur[1].image)),s0=profile(row(still[0].image)),b0=profile(row(blur[0].image));
+  // Display parity: pixels() equals the tracer's own capture PNG of the same samples and seed.
+  pan(0);const [shot]=await (async()=>{const out=[];for await(const f of traceFrames(tracer,{...options,frames:1,noise:'fixed',seed:5}))out.push(f);return out;})();
+  tracer.setOptions({exposure:1.5,toneMapping:'agx',vignette:0.3});
+  const [graded]=await (async()=>{const out=[];for await(const f of traceFrames(tracer,{...options,frames:1,noise:'fixed',seed:5}))out.push(f);return out;})();
+  const png=await tracer.capture({width:W,height:H,samples:256,seed:5,signal:AbortSignal.timeout(120000)});
+  const bitmap=await createImageBitmap(png,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
+  const c=new OffscreenCanvas(W,H).getContext('2d');c.drawImage(bitmap,0,0);const decoded=c.getImageData(0,0,W,H).data;
+  const px=graded.pixels();let parity=0;for(let i=0;i<W*H;i++)for(let k=0;k<3;k++)parity=Math.max(parity,Math.abs(px[i*4+k]-decoded[i*4+k]));
+  const restored={shutter:tracer.options.shutter,previousCamera:tracer.options.previousCamera??null};
+  return {errors,fixedEqual,perFrameDiffer,still:s,blur:b,still0:s0,blur0:b0,shiftPx,parity,linearMax:Math.max(...shot.pixels().filter((_,i)=>i%4===0)),restored};
+ }finally{tracer.dispose();engine.dispose();}
+};window.ready=true;
+</script></html>

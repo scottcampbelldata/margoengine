@@ -5827,6 +5827,10 @@
       "types": "./dist/voxel-pathtracer/denoise-ml.d.ts",
       "import": "./dist/voxel-pathtracer/denoise-ml.js"
     },
+    "./voxel-pathtracer/sequence": {
+      "types": "./dist/voxel-pathtracer/sequence.d.ts",
+      "import": "./dist/voxel-pathtracer/sequence.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

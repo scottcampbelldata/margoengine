@@ -14,10 +14,9 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
-import { agx } from '../../shared/agx.js';
 import { compatTier, loadCompatRoute } from '../../shared/compat.js';
 import type { RouteKernel, TraceInputs, TraceRoute } from './compat.js';
-import { acesNarkowicz } from '../../shared/aces.js';
+import { displayRows } from './display.js';
 import { unjitteredCamera } from '../../shared/temporal-camera.js';
 import {
   FLAG_CLAMP,
@@ -324,29 +323,10 @@ const watchLost = (device: GPUDevice, state: { lost: boolean }) => {
   else watch.states.add(state);
 };
 const unwatchLost = (device: GPUDevice, state: { lost: boolean }) => lostWatch.get(device)?.states.delete(state);
-// Khronos PBR Neutral tone mapper (Khronos specification, 2024), CPU twin of shared/display.js.
-const neutral = (c: number[]) => {
-  const x = Math.min(c[0], c[1], c[2]),
-    offset = x < 0.08 ? x - 6.25 * x * x : 0.04,
-    v = c.map((y) => y - offset),
-    peak = Math.max(v[0], v[1], v[2]);
-  if (peak < 0.76) return v;
-  const top = 1 - (0.24 * 0.24) / (peak + 0.24 - 0.76),
-    t = 1 - 1 / (0.15 * (peak - top) + 1);
-  return v.map((y) => (y * top) / peak + (top - (y * top) / peak) * t);
-};
-const toneCurve = (mode: Settings['toneMapping']) =>
-  mode === 'linear' ? (c: number[]) => c : mode === 'aces-narkowicz' ? acesNarkowicz : mode === 'agx' ? agx : neutral;
 /** Returns `s`, or throws its motion interval error when `o` opens the shutter. */
 const moving = (s: SceneSnapshot, o: Settings): SceneSnapshot => {
   if (o.shutter > 0 && s.motionError) throw s.motionError;
   return s;
-};
-/** 8-bit display value: sRGB, or the power 1 / gamma. */
-// sRGB encoding: IEC 61966-2-1.
-const encode = (v: number, gamma?: number) => {
-  const x = Math.min(1, Math.max(0, v));
-  return Math.round(255 * (gamma ? x ** (1 / gamma) : x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055));
 };
 /** FNV-1a over a matrix's float32 bits. */
 const cameraHash = (m: ArrayLike<number>) => {
@@ -746,32 +726,13 @@ export class VoxelPathTracer implements EnginePlugin {
   capture(options: VoxelTraceCaptureOptions): Promise<Blob> {
     return this.#enqueue(async () => {
       const o = this.#renderOptions(options, 1 << 26),
-        exposure = 2 ** this.#settings.exposure,
-        tone = toneCurve(this.#settings.toneMapping),
-        gamma = this.#settings.gamma,
-        vignette = this.#settings.vignette,
+        display = { ...this.#settings },
         writer = new PngWriter(o.width, o.height, o.transparent),
         channels = writer.channels;
       try {
         await this.#render(o, false, async (y0, rows, band) => {
-          const bytes = new Uint8Array(o.width * rows * channels),
-            c = [0, 0, 0];
-          for (let i = 0; i < o.width * rows; i++) {
-            // Transparent: the colour of what the pixel's rays hit (premultiplied by coverage in the render).
-            const alpha = band.alpha ? band.alpha[i] : 1;
-            let gain = alpha > 0 ? exposure / alpha : 0;
-            if (vignette > 0) {
-              const x = (i % o.width) + 0.5 - o.width / 2,
-                y = y0 + Math.floor(i / o.width) + 0.5 - o.height / 2,
-                // cos^4 natural vignetting, 1 / (1 + t^2)^2; the 0.2238 scale is fitted to observed MagicaVoxel output.
-                t = (vignette * Math.hypot(x, y)) / (0.2238 * o.height);
-              gain /= (1 + t * t) ** 2;
-            }
-            for (let k = 0; k < 3; k++) c[k] = Math.max(0, band.color[i * 3 + k] * gain);
-            const v = tone(c);
-            for (let k = 0; k < 3; k++) bytes[i * channels + k] = encode(v[k], gamma);
-            if (channels === 4) bytes[i * 4 + 3] = Math.round(255 * Math.min(1, Math.max(0, alpha)));
-          }
+          const bytes = new Uint8Array(o.width * rows * channels);
+          displayRows(display, o.width, o.height, y0, rows, band.color, band.alpha, channels, bytes);
           await writer.write(bytes, rows);
         });
         return await writer.finish();
