@@ -434,11 +434,18 @@ export class Crowd {
     if (agent.state !== 'moving' && agent.state !== 'offmesh') return;
     const path = agent.path,
       last = path.length - 1;
-    // Corners within reach this frame are passed (the final one only by arriving).
+    // A corner is passed once it is within reach this frame, or once the point after it can be walked to straight from
+    // here, so an agent that avoidance or a wall carried wide of a corner goes on instead of turning back to touch it
+    // (the final corner only by arriving; the start of an off-mesh link only by reaching it).
     while (agent.state === 'moving' && agent.corner < last) {
       const c = path[agent.corner],
-        reach = Math.max(agent.arrivalDistance, agent.maxSpeed * dt);
-      if (Math.hypot(c[0] - p[0], c[2] - p[2]) > reach) break;
+        reach = Math.max(agent.arrivalDistance, agent.maxSpeed * dt),
+        link = agent.links.includes(agent.corner);
+      if (
+        Math.hypot(c[0] - p[0], c[2] - p[2]) > reach &&
+        (link || !this.straight(agent, path[agent.corner + 1][0], path[agent.corner + 1][2]))
+      )
+        break;
       // Reaching an off-mesh link's start puts the agent on the link toward its landing point.
       agent.state = agent.links.includes(agent.corner) ? 'offmesh' : 'moving';
       agent.corner++;
@@ -501,6 +508,80 @@ export class Crowd {
       cos = Math.cos(angle * sign),
       sin = Math.sin(angle * sign);
     return [bx * cos - bz * sin, bx * sin + bz * cos];
+  }
+
+  /**
+   * Whether `agent` can walk straight from where it stands to (x, z) on ground it may use: the segment is followed
+   * through the polygons it crosses, leaving each through the edge it exits by, which must be a portal (an open part of
+   * one, at a tile seam) to allowed ground at the crossing. Touching a corner of the border counts as clear, as the
+   * border bounds the agent's centre. False on a surface without `polygonPoints` and `polygonLinks`.
+   */
+  private straight(agent: CrowdAgent, x: number, z: number): boolean {
+    const mesh = agent.surface,
+      filter = agent.filter;
+    if (!mesh.polygonPoints || !mesh.polygonLinks || agent.polygon < 0) return false;
+    const px = agent.position[0],
+      pz = agent.position[2],
+      dx = x - px,
+      dz = z - pz;
+    let polygon = agent.polygon;
+    // Each step leaves a polygon further along the segment; a mesh has fewer polygons than this many steps.
+    for (let step = 0; step < 4096; step++) {
+      const points = mesh.polygonPoints(polygon),
+        n = points.length,
+        a0 = points[0],
+        a1 = points[1],
+        a2 = points[2],
+        winding = (a1[0] - a0[0]) * (a2[2] - a0[2]) - (a1[2] - a0[2]) * (a2[0] - a0[0]) > 0 ? 1 : -1;
+      // Where the segment leaves this convex polygon: the first edge it crosses outward.
+      let exit = Infinity,
+        edge = -1;
+      for (let i = 0; i < n; i++) {
+        const a = points[i],
+          b = points[(i + 1) % n],
+          ex = b[0] - a[0],
+          ez = b[2] - a[2],
+          // Inside is where (ex * (z - az) - ez * (x - ax)) * winding >= 0; `toward` < 0 means the segment heads out.
+          toward = (ex * dz - ez * dx) * winding;
+        if (toward >= 0) continue;
+        const t = ((ex * (pz - a[2]) - ez * (px - a[0])) * winding) / -toward;
+        if (t < exit) {
+          exit = t;
+          edge = i;
+        }
+      }
+      if (edge < 0 || exit >= 1) return true;
+      const a = points[edge],
+        b = points[(edge + 1) % n],
+        cx = px + dx * exit,
+        cz = pz + dz * exit,
+        ex = b[0] - a[0],
+        ez = b[2] - a[2],
+        length2 = ex * ex + ez * ez,
+        at = ((cx - a[0]) * ex + (cz - a[2]) * ez) / length2,
+        slack = 1e-9 / Math.sqrt(length2);
+      let next = -1;
+      for (const link of mesh.polygonLinks(polygon)) {
+        if (link.offMesh !== undefined || link.to === polygon) continue;
+        if (filter && !((filter[mesh.polygonArea(link.to)] ?? 1) < Infinity)) continue;
+        const l = link.left,
+          r = link.right;
+        if (
+          Math.abs(ex * (l[2] - a[2]) - ez * (l[0] - a[0])) > 1e-6 * Math.sqrt(length2) ||
+          Math.abs(ex * (r[2] - a[2]) - ez * (r[0] - a[0])) > 1e-6 * Math.sqrt(length2)
+        )
+          continue;
+        const s = ((l[0] - a[0]) * ex + (l[2] - a[2]) * ez) / length2,
+          e = ((r[0] - a[0]) * ex + (r[2] - a[2]) * ez) / length2;
+        if (at >= Math.min(s, e) - slack && at <= Math.max(s, e) + slack) {
+          next = link.to;
+          break;
+        }
+      }
+      if (next < 0) return false;
+      polygon = next;
+    }
+    return false;
   }
 
   /** Puts every agent on the ground into square cells `size` wide, for {@link crowding}. */

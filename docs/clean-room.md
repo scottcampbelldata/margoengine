@@ -11391,3 +11391,18 @@ route corner lies on such a corner; the acceleration limit is applied by solving
 radius `maxAcceleration * dt` round the current velocity with the walls kept, and gives way to the walls when they need
 more. Proof: `packages/navmesh/test/crowd-walls.test.js` (a Z bend at full speed, a diagonal corridor head on and in a
 group: no frame stopped by a wall, no velocity reversals).
+
+### Crowd route corners passed by straight view (navmesh, 2026-11-25)
+
+The corner rule of `packages/navmesh/src/crowd.ts` (`straight`), from the paper alone:
+
+- I. Karamouzas, R. Geraerts and M. Overmars, "Indicative Routes for Path Planning and Crowd Simulation", Foundations of
+  Digital Games (FDG) 2009, pp. 113-120, https://webspace.science.uu.nl/~gerae101/pdf/fdg09.pdf (read: sections 4.2 and 4.3). Used:
+  the attraction point is the furthest point of the route the character can still reach through the free space round
+  it, always ahead of it, so it is never pulled back to a point of the route it has passed.
+
+Margo's own: the route stays the funnel's corners; a corner is passed once it is within reach this frame (as before) or
+once the corner after it can be walked to in a straight line on ground the agent may use, tested by following the
+segment through the polygons it crosses, each left through a portal; the start of an off-mesh link is still passed
+only by reaching it. Proof: `packages/navmesh/test/crowd-corners.test.js` (three agents following each other round the
+two corners of a diagonal corridor: no turning back on the spot, no loop).
