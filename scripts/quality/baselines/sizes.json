@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18997528,
+  "total": 19018864,
   "history": [
     {
       "date": "2026-10-24",
@@ -12270,6 +12270,18 @@
     },
     {
       "date": "2026-11-25",
+      "commit": "519453f01",
+      "reason": "reflection cone with contact hardening (519453f01): environment reflector/refractor, post ssr and water reflector carry the shared cone and capture-ray WGSL (+582 to +1,072 B gzip); a lazy split would add a chunk to every draw path that compiles the surface shader",
+      "grew": 4
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "6aa08e59b4",
+      "reason": "GAP-FILM-MSDF: GlyphFieldFont builds multi-channel fields (MTSDF by default: edge colouring, three pseudo-distance channels and the exact line error correction in outline-msdf.ts) and the shader reads them. text/outline measures 28,721 B (budget 25,953 B before), its base 21,551 B (budget 18,383 B). VectorFont extends GlyphFieldFont and draws with the SDF TextRenderer from the same fields, so text/vector carries the same builder: 41,820 B (budget 38,300 B), base 34,639 B (31,713 B). glyph() is synchronous, so splitting the builder behind import() would make every field build asynchronous. Only these four entries are recorded here; the other entries over budget on main are not this change. Core plus stage unchanged.",
+      "grew": 4
+    },
+    {
+      "date": "2026-11-25",
       "commit": "lane-B",
       "reason": "VFX.resetTime (GAP-FILM-RESET): the clock reset of every effect, +36 B measured on vfx and vfx/base",
       "grew": 2
@@ -12279,6 +12291,12 @@
       "commit": "lane-B",
       "reason": "Weather resetTime (GAP-FILM-RESET): WeatherMachine start snapshot and WeatherDrive reset, +39 B and +22 B measured",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "c162f3e1d1",
+      "reason": "c162f3e1d1 (KB-CROWD-WALLEND1): the navmesh root (Crowd) grows from 10,328 to 10,793 B gzip (+465 B, measured at c162f3e1d1~1 and c162f3e1d1 with only packages/navmesh changed) for the surface slide (Snook 2000) and the micrometre snap that let an agent pass a border corner. Crowd.move runs it every step synchronously, so it cannot sit behind import(); NavQuery.moveAlongSurface of navmesh/queries (5,268 B budget) is a disk search to the nearest reachable point, a different move, and importing it would add more bytes than the slide.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12617,9 +12635,9 @@
     "@margoengine/environment/main": 33519,
     "@margoengine/environment/prefiltered": 4263,
     "@margoengine/environment/probes": 19322,
-    "@margoengine/environment/reflector": 12251,
+    "@margoengine/environment/reflector": 13336,
     "@margoengine/environment/reflector-pbr": 5166,
-    "@margoengine/environment/refractor": 12206,
+    "@margoengine/environment/refractor": 13172,
     "@margoengine/environment/settings": 4074,
     "@margoengine/environment/studio": 1493,
     "@margoengine/environment/volumetric": 13323,
@@ -13018,7 +13036,7 @@
     "@margoengine/mixer/snapshots": 1956,
     "@margoengine/mixer/stereo": 1071,
     "@margoengine/mixer/worklet": 2825,
-    "@margoengine/navmesh": 10328,
+    "@margoengine/navmesh": 11117,
     "@margoengine/navmesh dist/workers/navmesh-build.js": 18911,
     "@margoengine/navmesh/agents": 17055,
     "@margoengine/navmesh/build": 13637,
@@ -13134,7 +13152,7 @@
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10584,
     "@margoengine/post/ssgi": 14202,
-    "@margoengine/post/ssr": 14471,
+    "@margoengine/post/ssr": 15453,
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
@@ -13576,13 +13594,13 @@
     "@margoengine/text/extrude": 12545,
     "@margoengine/text/fit": 11271,
     "@margoengine/text/msdf": 4494,
-    "@margoengine/text/outline": 25953,
-    "@margoengine/text/outline base (without CFF, CFF2 and variation readers)": 18383,
+    "@margoengine/text/outline": 29583,
+    "@margoengine/text/outline base (without CFF, CFF2 and variation readers)": 22198,
     "@margoengine/text/outline lazy CFF, CFF2 and variation readers": 8006,
     "@margoengine/text/rich": 12041,
     "@margoengine/text/selection": 958,
-    "@margoengine/text/vector": 38300,
-    "@margoengine/text/vector base (without CFF, CFF2 and variation readers)": 31713,
+    "@margoengine/text/vector": 43075,
+    "@margoengine/text/vector base (without CFF, CFF2 and variation readers)": 35679,
     "@margoengine/text/vector lazy CFF, CFF2 and variation readers": 8006,
     "@margoengine/tilemap": 7923,
     "@margoengine/tilemap/autotile": 2087,
@@ -13802,7 +13820,7 @@
     "@margoengine/water/liquid": 18041,
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
-    "@margoengine/water/reflector": 2660,
+    "@margoengine/water/reflector": 3988,
     "@margoengine/water/ripples": 3940,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
