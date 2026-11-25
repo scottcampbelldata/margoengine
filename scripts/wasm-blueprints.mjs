@@ -68,6 +68,14 @@ export const BLUEPRINTS = [
     crate: 'packages/physics2d/kernel',
     blueprint: 'packages/physics2d/src/physics2d-kernel.wasm',
     script: 'packages/physics2d/scripts/build-kernel.mjs',
+    args: ['simd'],
+  },
+  {
+    name: 'physics2d-kernel-scalar',
+    crate: 'packages/physics2d/kernel',
+    blueprint: 'packages/physics2d/src/physics2d-kernel-scalar.wasm',
+    script: 'packages/physics2d/scripts/build-kernel.mjs',
+    args: ['scalar'],
   },
   {
     name: 'erosion',

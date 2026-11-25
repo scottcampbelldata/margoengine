@@ -32307,19 +32307,11 @@ physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
 
 It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interactionGroups` and `tileMapColliders`, the collider list `addTileMap` builds. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
 
-**One load per app.** `await Physics2D.load()` compiles the kernel, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The loader is a dynamic import and the Wasm a separate file (`dist/physics2d.wasm`) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded.
+**One load per app.** `await Physics2D.load()` compiles the kernel, then `new Physics2D(engine)` stays synchronous. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait; when no other call waits on the load, it also cancels the download. The loader is a dynamic import and the Wasm a separate file (`dist/physics2d.wasm`) that bundlers emit as an asset and the browser compiles while it downloads when served as `application/wasm`. `{wasm}` points at another copy: a URL (your server or a CDN), a fetched `Response`, its bytes or a compiled `WebAssembly.Module`. It must be the bundled build; any other Wasm rejects with a `MargoError` of code `failed`, as does a missing file, and nothing is loaded. The package carries two builds of the kernel, each a file of its own: `dist/physics2d.wasm` with Wasm SIMD and `dist/physics2d-scalar.wasm` for engines that cannot compile it. `Physics2D.load()` probes the engine and fetches the one it can run (`load({simd: false})` forces the scalar one, to test it; `wasm` still names any file yourself, and a page then loads whichever you name). They are one kernel and step a world to the same bits, which a test holds on the hash of a 600-step world's snapshot; the scalar build takes its square roots from integer arithmetic that matches the hardware instruction bit for bit, and is larger and slower, never different.
 
 ```ts
 import {Physics2D} from '@margoengine/physics2d';
-
-// The package's own copy found through Node's resolver; in a page, pass the URL your server or CDN serves it from.
-const wasm = new URL('physics2d.wasm', import.meta.resolve('@margoengine/physics2d'));
-await Physics2D.load({wasm, signal: AbortSignal.timeout(30_000)});
-const physics = new Physics2D(null, {gravity: [0, 320]});
-physics.dispose();
 ```
-
-`raycastAll(origin, direction)` lists every collider a ray meets, nearest first, and a filter's `excludeCollider` leaves one collider out where `exclude` leaves a body. Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step, and a `teleport` or `moveTo` at once. `castShape` and `overlapShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points.
 
 [README continues: https://margoengine.com/llms/packages/physics2d.md]
 

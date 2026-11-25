@@ -30,6 +30,12 @@ export interface Physics2DLoadOptions {
    * be the build this package bundles. Calls made while a load runs share that load.
    */
   wasm?: KernelWasmSource;
+  /**
+   * Which build of the kernel to load: `true` the one with Wasm SIMD (`dist/physics2d.wasm`), `false` the scalar one
+   * (`dist/physics2d-scalar.wasm`), left out the SIMD one when this engine compiles it and the scalar one when it does not.
+   * Both step a world to the same bits. Ignored when `wasm` is given.
+   */
+  simd?: boolean;
 }
 
 export type { KernelWasmSource };
@@ -196,8 +202,8 @@ const NONE = 0xffffffff;
 
 // The kernel `Physics2D.load` loaded, shared by every world of the app. Calls during a load share it; the download is
 // cancelled when every call waiting on it has been aborted.
-const solver = new SharedLoad<Kernel, KernelWasmSource | undefined>((wasm, signal) =>
-  import('./kernel.js').then((chunk) => chunk.startKernel(wasm ?? chunk.defaultWasm(), signal)),
+const solver = new SharedLoad<Kernel, { wasm?: KernelWasmSource; simd?: boolean }>(({ wasm, simd }, signal) =>
+  import('./kernel.js').then((chunk) => chunk.startKernel(wasm ?? chunk.defaultWasm(!(simd ?? chunk.hasSimd())), signal)),
 );
 
 const BODY_KIND: Record<BodyType2D, number> = { dynamic: 0, fixed: 1, kinematicPosition: 2, kinematicVelocity: 2 };
@@ -246,8 +252,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
    * @throws AbortError (the signal's reason) when `signal` aborts first.
    * @throws MargoError (`failed`) when the Wasm cannot be fetched or is not this package's build.
    */
-  static async load({ signal, wasm }: Physics2DLoadOptions = {}): Promise<void> {
-    await solver.load(wasm, signal);
+  static async load({ signal, wasm, simd }: Physics2DLoadOptions = {}): Promise<void> {
+    await solver.load({ wasm, simd }, signal);
   }
   /** Creates the Physics2D on `engine` (preferred over the constructor). */
   static attach(engine: EngineKernel, options: Physics2DOptions = {}): Physics2D {

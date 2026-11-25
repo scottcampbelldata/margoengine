@@ -378,7 +378,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     stepCount: number;
     readonly kernel: Kernel;
     handle: number;
-    static load({ signal, wasm }?: Physics2DLoadOptions): Promise<void>;
+    static load({ signal, wasm, simd }?: Physics2DLoadOptions): Promise<void>;
     static attach(engine: EngineKernel, options?: Physics2DOptions): Physics2D;
     constructor(engine: EngineKernel | null, options?: Physics2DOptions);
     get isDisposed(): boolean;
@@ -450,6 +450,7 @@ export interface Physics2DHooks {
 export interface Physics2DLoadOptions {
     signal?: AbortSignal;
     wasm?: KernelWasmSource;
+    simd?: boolean;
 }
 
 export interface Physics2DOptions {

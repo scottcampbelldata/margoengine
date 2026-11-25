@@ -29,10 +29,14 @@ mod clamp_tests {
 /// Correctly rounded square root. Wasm: the `f32.sqrt` instruction through the SIMD form, as core has no float maths.
 #[inline(always)]
 pub fn sqrt(value: f32) -> f32 {
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
         use core::arch::wasm32::*;
         f32x4_extract_lane::<0>(f32x4_sqrt(f32x4_splat(value)))
+    }
+    #[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
+    {
+        soft_sqrt(value)
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -40,19 +44,139 @@ pub fn sqrt(value: f32) -> f32 {
     }
 }
 
+/// The square root of an f32 by integer arithmetic: the same correctly rounded result as the hardware instruction, for the Wasm
+/// build without SIMD, whose core has no float square root. The mantissa, with its exponent made even, is square-rooted as an
+/// integer with 28 more bits than the result needs, and the remainder says whether the root is exact or past a tie.
+pub fn soft_sqrt(value: f32) -> f32 {
+    let bits = value.to_bits();
+    let (negative, mut exponent, mut mantissa) = (bits >> 31 != 0, ((bits >> 23) & 0xff) as i32, (bits & 0x7f_ffff) as u64);
+    if exponent == 0xff {
+        // Infinity stays, a NaN comes back quiet as the instruction gives it, and minus infinity is not a number.
+        return if mantissa == 0 && negative { f32::from_bits(0x7fc0_0000) } else if mantissa != 0 { f32::from_bits(bits | 0x40_0000) } else { value };
+    }
+    if exponent == 0 && mantissa == 0 {
+        return value;
+    }
+    if negative {
+        return f32::from_bits(0x7fc0_0000);
+    }
+    if exponent == 0 {
+        // A subnormal: shift its leading bit to the hidden place.
+        exponent = 1;
+        while mantissa & 0x80_0000 == 0 {
+            mantissa <<= 1;
+            exponent -= 1;
+        }
+    } else {
+        mantissa |= 0x80_0000;
+    }
+    // value = mantissa * 2^t.
+    let mut t = exponent - 127 - 23;
+    if t & 1 != 0 {
+        mantissa <<= 1;
+        t -= 1;
+    }
+    let scaled = mantissa << 28;
+    // Digit by digit integer square root of `scaled` (below 2^54): the root has 27 bits at most.
+    let (mut root, mut remainder, mut bit) = (0u64, scaled, 1u64 << 54);
+    while bit > remainder {
+        bit >>= 2;
+    }
+    while bit != 0 {
+        if remainder >= root + bit {
+            remainder -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    // `root` squared plus `remainder` is `scaled`. Keep 24 bits of root, rounding to nearest, ties to even.
+    let shift = 64 - root.leading_zeros() as i32 - 24;
+    let (mut kept, low, half) = (root >> shift, root & ((1 << shift) - 1), 1u64 << (shift - 1));
+    if low > half || (low == half && (remainder != 0 || kept & 1 == 1)) {
+        kept += 1;
+    }
+    let mut place = shift - 14 + t / 2;
+    if kept == 1 << 24 {
+        kept >>= 1;
+        place += 1;
+    }
+    f32::from_bits((((place + 23 + 127) as u32) << 23) | (kept as u32 & 0x7f_ffff))
+}
+
 /// Correctly rounded square root of a double (the joint solver's Cholesky factor). Wasm: `f64.sqrt` through the SIMD
 /// form, as core has no float maths and a no_std Wasm build has no `f64::sqrt`.
 #[inline(always)]
 pub fn sqrt64(value: f64) -> f64 {
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
         use core::arch::wasm32::*;
         f64x2_extract_lane::<0>(f64x2_sqrt(f64x2_splat(value)))
+    }
+    #[cfg(all(target_arch = "wasm32", not(target_feature = "simd128")))]
+    {
+        soft_sqrt64(value)
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
         value.sqrt()
     }
+}
+
+/// The square root of an f64 by integer arithmetic, as `soft_sqrt` does for an f32 (a 128-bit root of the mantissa).
+pub fn soft_sqrt64(value: f64) -> f64 {
+    let bits = value.to_bits();
+    let (negative, mut exponent, mut mantissa) = (bits >> 63 != 0, ((bits >> 52) & 0x7ff) as i32, bits & 0xf_ffff_ffff_ffff);
+    if exponent == 0x7ff {
+        return if mantissa == 0 && negative { f64::from_bits(0x7ff8_0000_0000_0000) } else if mantissa != 0 { f64::from_bits(bits | (1 << 51)) } else { value };
+    }
+    if exponent == 0 && mantissa == 0 {
+        return value;
+    }
+    if negative {
+        return f64::from_bits(0x7ff8_0000_0000_0000);
+    }
+    if exponent == 0 {
+        exponent = 1;
+        while mantissa & (1 << 52) == 0 {
+            mantissa <<= 1;
+            exponent -= 1;
+        }
+    } else {
+        mantissa |= 1 << 52;
+    }
+    let mut t = exponent - 1023 - 52;
+    let mut m = mantissa as u128;
+    if t & 1 != 0 {
+        m <<= 1;
+        t -= 1;
+    }
+    let scaled = m << 56;
+    let (mut root, mut remainder, mut bit) = (0u128, scaled, 1u128 << 110);
+    while bit > remainder {
+        bit >>= 2;
+    }
+    while bit != 0 {
+        if remainder >= root + bit {
+            remainder -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    let shift = 128 - root.leading_zeros() as i32 - 53;
+    let (mut kept, low, half) = (root >> shift, root & ((1u128 << shift) - 1), 1u128 << (shift - 1));
+    if low > half || (low == half && (remainder != 0 || kept & 1 == 1)) {
+        kept += 1;
+    }
+    let mut place = shift - 28 + t / 2;
+    if kept == 1 << 53 {
+        kept >>= 1;
+        place += 1;
+    }
+    f64::from_bits((((place + 52 + 1023) as u64) << 52) | (kept as u64 & 0xf_ffff_ffff_ffff))
 }
 
 /// pi and half of it as the nearest f32.

@@ -648,6 +648,14 @@ export const LAZY_FILES = [
     when: '`await Physics2D.load()`, once per app, compiled while it downloads; its JavaScript is the lazy kernel chunk of the entry',
   },
   {
+    package: '@margoengine/physics2d',
+    file: 'packages/physics2d/dist/physics2d-scalar.wasm',
+    label: 'physics2d-scalar.wasm',
+    kind: '2D physics kernel Wasm without SIMD (Rust)',
+    measure: 'file',
+    when: '`await Physics2D.load()` on an engine that cannot compile Wasm SIMD (or `load({simd: false})`), instead of physics2d.wasm',
+  },
+  {
     package: '@margoengine/ifc',
     file: 'packages/ifc/dist/workers/ifc.js',
     label: 'workers/ifc.js',

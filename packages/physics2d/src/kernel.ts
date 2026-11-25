@@ -10,7 +10,16 @@ export type { KernelWasmSource };
  * The Wasm this package ships, beside this chunk in dist. The literal reaches the app's bundler unchanged, which emits
  * the file as an asset; `?no-inline` keeps Vite (in library mode too) from inlining it as base64.
  */
-export const defaultWasm = (): URL => new URL(/* @vite-ignore */ './physics2d.wasm?no-inline', import.meta.url);
+export const defaultWasm = (scalar = false): URL =>
+  scalar
+    ? new URL(/* @vite-ignore */ './physics2d-scalar.wasm?no-inline', import.meta.url)
+    : new URL(/* @vite-ignore */ './physics2d.wasm?no-inline', import.meta.url);
+
+/** Whether this engine compiles Wasm SIMD: a module with one 128-bit instruction (the probe of the wasm-feature-detect project). */
+export const hasSimd = (): boolean =>
+  WebAssembly.validate(
+    new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]),
+  );
 // The interface version the kernel reports and a hash of its Wasm's exports and imports, swapped in by the package build.
 declare const __KERNEL_VERSION__: string;
 declare const __KERNEL_INTERFACE__: number;
