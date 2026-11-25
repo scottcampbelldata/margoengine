@@ -13,10 +13,10 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { killChildTreeSync } from '../../../scripts/support/shutdown.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkg = path.resolve(here, '..');
-const root = path.resolve(pkg, '../..');
 export const LIMIT_MINUTES = 20;
 export const GLTFAST = '6.20.0';
 export const SOURCE = 'Assets/Margo/Ranger/model.glb';
@@ -221,9 +221,33 @@ function listProcesses() {
 /** Ends what the exited Editor left running, and returns once those processes are gone. */
 export function endOrphans(rootPid, since) {
   if (process.platform !== 'win32') return [];
-  const pids = orphansOf(listProcesses(), rootPid, since);
-  for (const pid of pids) spawnSync('taskkill', ['/pid', String(pid), '/F'], { stdio: 'ignore', windowsHide: true });
-  const alive = () => new Set(listProcesses().map((r) => r.pid));
+  const rows = listProcesses(),
+    pids = orphansOf(rows, rootPid, since),
+    created = new Map(rows.map((r) => [r.pid, r.created]));
+  // Orphans are not below this process, so each is ended through a handle opened by pid and only when its start time is
+  // still the one listed: a pid freed since the listing may be another process's by now (KB-TEST-FILEEXIT1).
+  if (pids.length)
+    spawnSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        pids
+          .map(
+            (pid) =>
+              `try { $p = [Diagnostics.Process]::GetProcessById(${pid}); if (([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() -eq ${created.get(pid)}) { $p.Kill() } } catch [ArgumentException] {} catch [InvalidOperationException] {} catch [ComponentModel.Win32Exception] {}`,
+          )
+          .join('\n'),
+      ],
+      { stdio: 'ignore', windowsHide: true },
+    );
+  const alive = () =>
+    new Set(
+      listProcesses()
+        .filter((r) => created.get(r.pid) === r.created)
+        .map((r) => r.pid),
+    );
   const deadline = Date.now() + 30_000;
   for (let now = alive(); pids.some((p) => now.has(p)); now = alive())
     if (Date.now() > deadline) throw new Error(`test:unity: could not end Unity child processes ${pids.join(', ')}`);
@@ -232,8 +256,7 @@ export function endOrphans(rootPid, since) {
 
 /** Kills the whole process tree of the child. */
 function killTree(child) {
-  if (process.platform === 'win32')
-    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+  if (process.platform === 'win32') killChildTreeSync(child);
   else
     try {
       process.kill(-child.pid, 'SIGKILL');

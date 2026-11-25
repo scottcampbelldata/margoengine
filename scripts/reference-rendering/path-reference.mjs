@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { displayImage } from './linear-image.mjs';
 import { saveReference } from './reference.mjs';
 import { encodePNG } from '../support/visual-image.js';
+import { killChildTreeSync } from '../support/shutdown.mjs';
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export const benchRoot =
@@ -20,11 +21,7 @@ export async function capturePathReference(script, folder) {
       { stdio: 'inherit', windowsHide: true },
     );
     const timer = setTimeout(() => {
-      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
-        windowsHide: true,
-        stdio: 'ignore',
-        timeout: 15000,
-      });
+      killChildTreeSync(child);
       reject(Error('Mitsuba exceeded its 20-minute process-tree deadline'));
     }, 20 * 60_000);
     child.once('error', (error) => {

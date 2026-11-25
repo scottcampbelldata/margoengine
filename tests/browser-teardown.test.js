@@ -20,9 +20,8 @@ import {
   closeAll,
   endTree,
   runSuite,
+  killOwnTree,
   SHUTDOWN_BUDGET_MS,
-  taskkillPids,
-  taskkillTree,
   waitSignaled,
 } from '../scripts/support/shutdown.mjs';
 
@@ -507,7 +506,7 @@ test('Windows endTree leaves a live replacement process alone after checking its
     assert.equal(replacement.exitCode, null, 'the unrelated replacement must still be running');
     process.kill(replacement.pid, 0);
   } finally {
-    if (replacement?.pid) await endTree(replacement.pid);
+    if (replacement?.pid) await endTree(replacement);
   }
 });
 
@@ -615,37 +614,23 @@ test('Windows waiter: a pid held by a process this user cannot query is not repo
   assert.deepEqual(await waitSignaled([4], 2000, 0), []);
 });
 
-test('the pids come from taskkill lines, never the parent it names', () => {
-  assert.deepEqual(
-    taskkillPids(
-      'SUCCESS: The process with PID 95380 (child process of PID 55468) has been terminated.\r\nSUCCESS: The process with PID 55468 (child process of PID 102216) has been terminated.\r\n',
-    ),
-    [95380, 55468],
-  );
-  assert.deepEqual(taskkillPids(''), []);
-});
-
-test('a taskkill that could not run has ended nothing known, so its root pid is still waited for', async () => {
+test('an own-tree kill that could not run has ended nothing known, so its root pid is still waited for', async () => {
   const run = (outcome) => (file, args, options, callback) => {
-    assert.equal(file, 'taskkill');
-    assert.deepEqual(args, ['/PID', '77', '/T', '/F']);
+    assert.equal(file, 'powershell.exe');
+    assert.ok(args[3].includes(`$owner = ${process.pid}; $root = 77`), 'the tree is walked from this process');
     callback(outcome.error ?? null, outcome.stdout ?? '');
   };
-  const success =
-    'SUCCESS: The process with PID 78 (child process of PID 77) has been terminated.\r\nSUCCESS: The process with PID 77 (child process of PID 5) has been terminated.\r\n';
-  assert.deepEqual(await taskkillTree(77, 1000, run({ stdout: success })), [78, 77]);
-  // Exit code 128: the process had already ended. Nothing to wait for.
-  assert.deepEqual(await taskkillTree(77, 1000, run({ error: { code: 128 } })), []);
-  // Did not start (a console that could not be created), ran out of time, or a WMI failure with no process ended.
+  assert.deepEqual(await killOwnTree(77, 1000, run({ stdout: '77\r\n78\r\n' })), [77, 78]);
+  // Not below this process (it exited, or its pid is another process's now): nothing ended, nothing to wait for.
+  assert.deepEqual(await killOwnTree(77, 1000, run({ stdout: '' })), []);
+  // Did not start (a console that could not be created), ran out of time, or a WMI failure.
   for (const error of [
     { code: 3221225794 },
     { code: null, killed: true, signal: 'SIGTERM' },
     { code: 1 },
     { code: 'ENOENT' },
   ])
-    assert.deepEqual(await taskkillTree(77, 1000, run({ error })), [77], JSON.stringify(error));
-  // Partly done: the lines still say what was ended.
-  assert.deepEqual(await taskkillTree(77, 1000, run({ error: { code: 1 }, stdout: success })), [78, 77]);
+    assert.deepEqual(await killOwnTree(77, 1000, run({ error })), [77], JSON.stringify(error));
 });
 
 test('a server with a connected client is dropped and closed (the case that hung check:depth and check:no-webgpu)', async () => {

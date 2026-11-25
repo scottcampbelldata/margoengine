@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
+import { killChildTreeSync } from '../../../scripts/support/shutdown.mjs';
 import { GameClient } from '../dist/index.js';
 import { openWebSocket } from '../dist/websocket.js';
 import { game } from '../examples/arena/game.js';
@@ -51,7 +52,7 @@ function start(t, command, pattern, env = {}) {
   const windows = process.platform === 'win32',
     child = spawn(command, { cwd: root, shell: true, detached: !windows, env: { ...process.env, ...env } });
   t.after(() => {
-    if (windows) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F']);
+    if (windows) killChildTreeSync(child);
     else if (child.exitCode === null) process.kill(-child.pid, 'SIGKILL');
   });
   return new Promise((done, fail) => {

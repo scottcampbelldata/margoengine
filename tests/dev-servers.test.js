@@ -400,7 +400,7 @@ test('a server tree the probe could not end is a problem', { timeout: 60_000 }, 
       settleMs: 200,
       listenLimitMs: 10_000,
       limitMs: 30_000,
-      end: async (server) => ((pid = server), [server]),
+      end: async (server) => ((pid = server.pid), [pid]),
     });
     assert.ok(
       problems.some((p) => p === `processes ${pid} still running after the kill`),

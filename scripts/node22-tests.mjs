@@ -6,11 +6,12 @@
 //   node scripts/node22-tests.mjs --repeat=5   five times in a row (the flake check), stopping at the first failure
 //   node scripts/node22-tests.mjs --list       print the test files and stop
 // Every run has a hard limit (MARGO_NODE22_TIMEOUT_MIN, default 30 minutes); on timeout the process tree is killed.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { killChildTreeSync } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -68,7 +69,7 @@ export function testFiles(base = root) {
 /** Ends a command and everything it started. */
 function kill(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') killChildTreeSync(child);
   else child.kill('SIGKILL');
 }
 

@@ -2,11 +2,11 @@
 // and reports every problem: a non-200 answer, a missing module, or a warning or error line in the server output. Used
 // by scripts/check-dev-servers.mjs (this checkout's servers) and scripts/template-install-check.mjs (scaffolded apps).
 // The server is killed with its whole process tree afterwards. Nothing here needs a GPU.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
-import { endTree } from './shutdown.mjs';
+import { endTree, killChildTreeSync } from './shutdown.mjs';
 
 /** A line that names a problem. The lines of a clean Vite, Next.js or Node server never match. */
 export const BAD_LINE =
@@ -14,7 +14,7 @@ export const BAD_LINE =
 
 export function killTree(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
-  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') killChildTreeSync(child);
   else child.kill('SIGKILL');
 }
 
@@ -85,7 +85,7 @@ function referencedUrls(text, base, html) {
 /**
  * @param {{command: string, args: string[], cwd: string, env?: object, page: string, tcpPort?: number, host?: string,
  *   insecure?: boolean, listenLimitMs?: number, limitMs?: number, settleMs?: number,
- *   end?: (pid: number) => Promise<number[]>}} options
+ *   end?: (child: import('node:child_process').ChildProcess) => Promise<number[]>}} options
  *   `page` is the full first URL (or '' for a server with no web page: it must then give `tcpPort`). `end` ends the
  *   server's tree and resolves to the pids still running (default: endTree, which waits until they are gone).
  */
@@ -171,7 +171,7 @@ export async function probe({
     // taskkill returns while the server is still dying and holds the folder it ran in: a caller that removed that
     // folder at once failed with EPERM under load (KB-FL3). Return only once the whole tree has gone.
     if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
-      const left = await end(child.pid);
+      const left = await end(child);
       if (left.length) problems.push(`processes ${left.join(', ')} still running after the kill`);
     }
   }

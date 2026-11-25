@@ -161,14 +161,48 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
   `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
 
-### Open 2026-11-25: a long test file ends with no result in its package run (KB-TEST-FILEEXIT1, humans, water, test runner)
+### Fixed 2026-11-25: a long test file ends with no result in its package run (KB-TEST-FILEEXIT1, humans, water, scripts, process kills)
 
 - **Repro:** `npm run test:changed` on the workstation (2026-11-25, lane A, a change to packages/shared, so every package
   runs): `packages/humans/test/fit.test.js` failed after 122 s and `packages/water/test/flood-bounds.test.js` after 257 s, each
   as 'test failed' at the file with no failing or cancelled subtest and nothing on stderr. Run alone
   (`node --test-reporter=tap --test test/<file>` in the package folder) both pass, 30 of 30 in 315 s and 18 of 18 in 345 s.
-- **Cause:** not found yet. The file process ends long before its tests could finish, which points at the process being
-  ended (memory or a kill) while the package runs its other test files beside it, not at a wrong value.
+- **Cause:** the file's process was ended from outside by a tree kill aimed at another process's old pid. On Node
+  26.13, `taskkill /F` on a running `node --test` file process gives exactly that report: 'test failed' at the file, the
+  test in flight neither failed nor cancelled, nothing on stderr. Running out of memory does not: V8 prints `FATAL ERROR
+  ... heap out of memory` and its stack to stderr, which the runner passes on. A pid names a process only while it runs;
+  once it has exited and its last handle is closed Windows gives the number to a new process (measured on the
+  workstation: after 295 process starts, 51 s), and a test file is the process the lanes start most often. Margo's
+  scripts ended trees by bare pid in about 30 places (`taskkill /T /F <pid>`, `endTree(pid)`, run-with-timeout's
+  `killTree(pid)`), several of them after the target could have exited: a limit timer cleared only on `close`, which
+  waits for every pipe and so fires after the exit when a grandchild holds one; a cleanup that kills a pid it kept
+  (template-browser-check's `finally`, jupyter-steps' second `killTree`); an asynchronous
+  taskkill during which Node sees the exit and closes its handle. `taskkill /T` also follows `ParentProcessId`, which
+  may name a parent that has exited or a newer process that took its pid (Microsoft, "Win32_Process class",
+  https://learn.microsoft.com/windows/win32/cimwin32prov/win32-process; "Process Handles and Identifiers",
+  https://learn.microsoft.com/windows/win32/procthread/process-handles-and-identifiers: the identifier is valid only
+  until the process ends, a handle until it is closed). Which lane's kill hit these two files was not caught live; the
+  minutes between the file's start and its end match a pid kept past its process's exit and reused.
+- **Fixed:** every tree kill on Windows goes through scripts/support/shutdown.mjs, by one of two routes. A child
+  process this one started is ended by `killChildTreeSync`: `taskkill /T /F` run synchronously and only before Node has
+  seen its exit, so Node still holds its handle and Windows cannot give its pid to anyone else during the kill (fast,
+  about 1 s); a child whose exit was seen is not ended by pid at all. A bare pid is ended by `killOwnTree` /
+  `killOwnTreeSync`: one PowerShell reads the process table, walks this process's own tree with each child created no
+  earlier than its parent, ends the pid and its tree only if it is in it, and ends each process through a handle
+  checked against its creation time, so a pid that has become another run's process is left alone (4 to 20 s on the
+  loaded workstation). `endTree` and both `killTree`s take either and pick the route; run-with-timeout, runWithTimeout's
+  CLI, the dev-server probe, the browser host's unlisted-tree end, verify, mutation, node22-tests, the reference
+  renderers, the shot queue, draco-resources, test-unity and the netcode and voxel-net checks pass the child.
+  test-watch's hung-run stop now uses the creation-checked walk (its own walk followed `ParentProcessId` unchecked);
+  test-unity's orphan kill checks each start time. Not covered: taskkill's own walk below a live child follows
+  `ParentProcessId`, and Microsoft does not say whether it checks creation times (docs/limits.md, "Process tree
+  kills"). Regression: tests/process-kill.test.js (a process not below this one survives `endTree`, `killTree` and
+  `killOwnTreeSync`, which the old taskkill route ended; a child whose exit was seen is not killed by pid; a child's
+  whole tree, a detached grandchild included, still ends by every route; and a scan that fails on a raw `taskkill` or
+  a `ParentProcessId` walk outside the helper, which verify and so check:merge run). A second report fits the same
+  class but was not traced: `npm run check:owners -- --packages=post` on the laptop (ea4937f59, 67 to 99% CPU, other
+  lanes' GPU suites running) failed `post/SSAO.attach` with `page.goto: net::ERR_ABORTED` for tests/modern-game.html,
+  as a page server or browser ended from outside would.
 
 ### Fixed 2026-11-25: the browser host sometimes exited mid-run in check:owners on the WebGL2 layer (KB-HOST-COMPATEXIT1, scripts, browser host)
 

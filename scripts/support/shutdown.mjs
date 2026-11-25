@@ -37,13 +37,158 @@ function httpServerOf(server) {
   return typeof server?.closeAllConnections === 'function' ? server : server?.httpServer;
 }
 
-/** Kills `child` and everything it started (`taskkill /T /F` on Windows, where `kill()` leaves the tree), then releases its pipes. */
+/**
+ * How Margo's scripts end a process tree by a bare pid on Windows (KB-TEST-FILEEXIT1); a child process whose handle this
+ * process holds goes the fast way, {@link killChildTreeSync}. A pid names a process only while
+ * it runs: once it has exited and the last handle to it is closed, Windows gives the number to a new process (about a
+ * minute later on the workstation, beside the lanes' test runs), and `ParentProcessId` keeps naming a parent that has
+ * exited, or the newer process that took its pid. `taskkill /T /F <pid>` trusts both, so a kill sent after the exit, or
+ * a tree walked through a reused parent, ended whatever held the number then: a `node --test` file of another run, which
+ * its runner reports as 'test failed' with nothing on stderr.
+ *
+ * This script ends `root` and its tree only if `root` is in the tree of `owner` (this process, which runs while the
+ * script runs), walked from the process table with each child created no earlier than its parent (Microsoft's rule for
+ * a reused `ParentProcessId`), and each process is ended through a handle opened by pid and checked against the creation
+ * time the table gave, so a pid reused between the listing and the kill is left alone. `root` equal to `owner` ends
+ * everything below this process but not this process. It prints the pids it ended, parents first. A root that is not
+ * ours (it exited, or its pid is another process's now) ends nothing. With `waitMs` it then waits on each handle for up
+ * to that long, so the folders and files they held are free, and exits 3 if one still runs.
+ */
+export const OWN_TREE_SCRIPT = (owner, root, waitMs = 0) =>
+  [
+    "$ErrorActionPreference = 'Stop'",
+    '$made = @{}; $below = @{}',
+    'foreach ($r in @(Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate)) {',
+    '  if ($null -eq $r.CreationDate) { continue }',
+    '  $made[[int]$r.ProcessId] = $r.CreationDate',
+    '  $below[[int]$r.ParentProcessId] += @([int]$r.ProcessId)',
+    '}',
+    'function Get-Below([int]$top) {',
+    '  $found = New-Object System.Collections.ArrayList; $next = New-Object System.Collections.Queue',
+    '  if (-not $made.ContainsKey($top)) { return ,$found }',
+    '  $next.Enqueue($top)',
+    '  while ($next.Count) {',
+    '    $parent = [int]$next.Dequeue()',
+    '    foreach ($id in $below[$parent]) {',
+    '      if ($id -eq $PID -or $id -eq $parent -or $found.Contains($id) -or $made[$id] -lt $made[$parent]) { continue }',
+    '      [void]$found.Add($id); $next.Enqueue($id)',
+    '    }',
+    '  }',
+    '  return ,$found',
+    '}',
+    `$owner = ${owner}; $root = ${root}`,
+    'if ($root -ne $owner -and -not (Get-Below $owner).Contains($root)) { exit 0 }',
+    '$ids = New-Object System.Collections.ArrayList; if ($root -ne $owner) { [void]$ids.Add($root) }',
+    '[void]$ids.AddRange((Get-Below $root))',
+    '$ended = New-Object System.Collections.ArrayList',
+    'foreach ($id in $ids) {',
+    // Gone since the listing: it ended with its parent (a node child's children are in a job that ends with it).
+    '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch [ArgumentException] { $id; continue }',
+    '  try { $start = $p.StartTime } catch [ComponentModel.Win32Exception] { continue } catch [InvalidOperationException] { continue }',
+    '  if ([Math]::Abs(($start - $made[$id]).TotalMilliseconds) -ge 1) { continue }',
+    // Kill throws only for a process that is already ending (access denied while it exits) or has exited: ended either way.
+    '  try { $p.Kill() } catch [ComponentModel.Win32Exception] {} catch [InvalidOperationException] {}',
+    '  [void]$ended.Add($p); $id',
+    '}',
+    `if (${Math.round(waitMs)} -gt 0) {`,
+    `  foreach ($p in $ended) { [void]$p.WaitForExit(${Math.round(waitMs)}) }`,
+    '  if (@($ended | Where-Object { -not $_.HasExited }).Count) { exit 3 }',
+    '}',
+    'exit 0',
+  ].join('\n');
+
+/** Where the script runs: never a folder of the caller's, which the caller may remove once the tree has ended. */
+export const OWN_TREE_CWD = process.env.SystemRoot;
+const ownTreeArgs = (pid) => ['-NoProfile', '-NonInteractive', '-Command', OWN_TREE_SCRIPT(process.pid, pid)];
+const endedPids = (stdout) => [...String(stdout ?? '').matchAll(/\d+/g)].map((match) => Number(match[0]));
+
+/**
+ * Pid `pid` may be a bare number from anywhere: it is ended, with its tree, only when it is this process or one of its
+ * descendants ({@link OWN_TREE_SCRIPT}). Returns the pids ended. A script that could not run (it did not start, ran out
+ * of time, or failed to read the process table, which a loaded PC can) has ended nothing known, so it answers `[pid]`:
+ * the caller then waits for that process and reports it if it still runs.
+ * @param {number} pid
+ * @returns {number[]}
+ */
+export function killOwnTreeSync(pid, timeout = SHUTDOWN_BUDGET_MS, report = console.error) {
+  if (!(Number.isInteger(pid) && pid > 0)) return [];
+  const { status, signal, stdout, stderr, error } = spawnSync('powershell.exe', ownTreeArgs(pid), {
+    cwd: OWN_TREE_CWD,
+    encoding: 'utf8',
+    timeout,
+    windowsHide: true,
+  });
+  if (status === 0) return endedPids(stdout);
+  report(ownTreeFailure(pid, error?.message ?? signal ?? `exit ${status}`, stderr));
+  return [pid];
+}
+
+const ownTreeFailure = (pid, why, stderr) =>
+  `the tree of ${pid} could not be ended (${why}): ${
+    String(stderr ?? '')
+      .trim()
+      .slice(-600) || 'no output'
+  }`;
+
+/** The processes `taskkill /T` says it ended, from its lines `SUCCESS: The process with PID 12 (child process of PID 3) ...`. */
+export function taskkillPids(output) {
+  return [...output.matchAll(/^\S.*?PID (\d+)/gm)].map((match) => Number(match[1]));
+}
+
+/**
+ * Ends `child`, a process this one started, and its tree, the fast way (`taskkill /T /F`, about 1 s where
+ * {@link killOwnTreeSync} reads the whole process table): only while its exit has not been seen, and synchronously,
+ * so Node cannot see the exit and close its handle while taskkill runs. Windows keeps a pid from any new process while
+ * a handle to its process is open, so the pid is the child's for the whole kill. A child whose exit was seen is not
+ * ended by pid: the number may be another run's process by now (KB-TEST-FILEEXIT1). Resolves to the pids ended, or
+ * `[child.pid]` when taskkill could not say (the caller then waits for it). Windows only; callers keep their own kill
+ * elsewhere (a process group, or the handle). taskkill finds the tree by `ParentProcessId`; Microsoft does not say
+ * whether it checks creation times, so a process orphaned by an earlier holder of the child's pid could still be taken
+ * in (docs/limits.md, "Process tree kills"). {@link killOwnTreeSync} checks them, at the cost of reading the table.
+ * @param {import('node:child_process').ChildProcess} child
+ * @returns {number[]}
+ */
+export function killChildTreeSync(child, timeout = SHUTDOWN_BUDGET_MS) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return [];
+  return taskkillHeld(child.pid, timeout);
+}
+
+/** `taskkill /T /F` on a pid this process holds a handle to (its child, or itself), run synchronously. */
+function taskkillHeld(pid, timeout) {
+  const { stdout, status } = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+    cwd: OWN_TREE_CWD,
+    encoding: 'utf8',
+    timeout,
+    windowsHide: true,
+  });
+  const ended = taskkillPids(String(stdout ?? ''));
+  // Exit code 128 only says the process had already ended; no lines and any other code: nothing ended is known.
+  return ended.length || status === 128 ? ended : [pid];
+}
+
+/** {@link killOwnTreeSync} without blocking this process. */
+export function killOwnTree(pid, timeout = SHUTDOWN_BUDGET_MS, run = execFile, report = console.error) {
+  if (!(Number.isInteger(pid) && pid > 0)) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    run(
+      'powershell.exe',
+      ownTreeArgs(pid),
+      { cwd: OWN_TREE_CWD, timeout, windowsHide: true },
+      (error, stdout, stderr) => {
+        if (!error) return resolve(endedPids(stdout));
+        report(ownTreeFailure(pid, error.message ?? error.code, stderr));
+        resolve([pid]);
+      },
+    );
+  });
+}
+
+/** Kills `child` and everything it started (on Windows through {@link killChildTreeSync}, where `kill()` leaves the tree), then releases its pipes. */
 export async function killTree(child) {
   if (!child) return;
   const running = child.exitCode === null && child.signalCode === null;
   if (running && child.pid) {
-    if (process.platform === 'win32')
-      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
+    if (process.platform === 'win32') killChildTreeSync(child);
     else child.kill('SIGKILL');
   }
   for (const stream of [child.stdin, child.stdout, child.stderr]) stream?.destroy();
@@ -63,11 +208,6 @@ function isAlive(pid) {
   } catch (error) {
     return error.code === 'EPERM';
   }
-}
-
-/** The processes `taskkill /T` says it ended, from its lines `SUCCESS: The process with PID 12 (child process of PID 3) ...`. */
-export function taskkillPids(output) {
-  return [...output.matchAll(/^\S.*?PID (\d+)/gm)].map((match) => Number(match[1]));
 }
 
 /**
@@ -128,35 +268,19 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile, { kill = fal
 }
 
 /**
- * Ends `pid` and its tree with `taskkill /T /F` and resolves to the pids it ended. Exit code 128 only says a process had
- * already ended, so the lines say what happened, not the code. A taskkill that could not run (it did not start, ran out
- * of time, or failed with no process ended: it reads the process table through WMI, which a loaded PC can fail) has
- * ended nothing known, so it resolves to `[pid]`: the caller then waits for that process and reports it if it still
- * runs, instead of taking "no lines" for "nothing left".
- * @param {number} pid
- * @param {number} timeout
- * @param {typeof execFile} [run]
- * @returns {Promise<number[]>}
- */
-export function taskkillTree(pid, timeout, run = execFile) {
-  return new Promise((resolve) => {
-    run('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout, windowsHide: true }, (error, stdout) => {
-      const ended = taskkillPids(String(stdout ?? ''));
-      resolve(error && error.code !== 128 && !ended.length ? [pid] : ended);
-    });
-  });
-}
-
-/**
- * Ends `pid` and everything it started, and resolves when none of them runs any more and, on Windows, each has closed
- * its handles (`settle`, default `waitSignaled`), so the folders and files they held can be removed. Never waits past
- * `waitMs` (plus PowerShell's start on Windows): it resolves to the pids still running then, normally none.
- * @param {number} pid
- * @param {{ waitMs?: number, kill?: (pid: number, timeout: number) => Promise<number[]>, alive?: (pid: number) => boolean, settle?: (pids: number[], waitMs: number, sinceMs: number) => Promise<number[]> }} [options]
+ * Ends `target` and everything it started, and resolves when none of them runs any more and, on Windows, each has
+ * closed its handles (`settle`, default `waitSignaled`), so the folders and files they held can be removed. `target` is
+ * a child process (on Windows ended with {@link killChildTreeSync}: fast, and not at all once its exit has been seen) or
+ * a pid (on Windows this process's own, ended the same way, or any other, ended only while it is below this process:
+ * {@link killOwnTree}, which reads the whole process table, 4 to 20 s on the loaded workstation). The kill may take up
+ * to the larger of `waitMs` and `SHUTDOWN_BUDGET_MS`; after it this never waits past `waitMs` (plus PowerShell's start
+ * on Windows) and resolves to the pids still running then, normally none.
+ * @param {number | import('node:child_process').ChildProcess} target
+ * @param {{ waitMs?: number, kill?: (target: number | import('node:child_process').ChildProcess, timeout: number) => Promise<number[]>, alive?: (pid: number) => boolean, settle?: (pids: number[], waitMs: number, sinceMs: number) => Promise<number[]> }} [options]
  * @returns {Promise<number[]>}
  */
 export async function endTree(
-  pid,
+  target,
   {
     waitMs = SHUTDOWN_BUDGET_MS,
     kill,
@@ -164,11 +288,20 @@ export async function endTree(
     settle = process.platform === 'win32' ? waitSignaled : null,
   } = {},
 ) {
+  const child = typeof target === 'object' && target !== null ? target : null,
+    pid = child ? child.pid : target;
   if (!pid) return [];
-  const begun = Date.now();
+  const begun = Date.now(),
+    killMs = Math.max(waitMs, SHUTDOWN_BUDGET_MS);
   let pids;
-  if (kill) pids = await kill(pid, waitMs);
-  else if (process.platform === 'win32') pids = await taskkillTree(pid, waitMs);
+  if (kill) pids = await kill(target, killMs);
+  else if (process.platform === 'win32')
+    pids = child
+      ? killChildTreeSync(child, killMs)
+      : pid === process.pid
+        ? taskkillHeld(pid, killMs)
+        : await killOwnTree(pid, killMs);
+  else if (child && (child.exitCode !== null || child.signalCode !== null)) pids = [];
   else {
     pids = [pid];
     try {
@@ -179,15 +312,16 @@ export async function endTree(
       } catch {}
     }
   }
-  const killed = pids;
-  // Windows PIDs can be reused before taskkill returns. kill(pid, 0) then sees the replacement,
+  const killed = pids,
+    killedAt = Date.now();
+  // Windows PIDs can be reused before the kill returns. kill(pid, 0) then sees the replacement,
   // so polling it before the identity-aware handle wait can spend the whole budget on an unrelated
   // process. The native waiter already waits for exit and checks StartTime: let it own that wait.
-  if (settle) return settle(killed, begun + waitMs - Date.now(), begun);
+  if (settle) return settle(killed, waitMs, begun);
   for (;;) {
     pids = pids.filter(alive);
     // wall-clock: a bound on the wait for processes already killed, far from normal.
-    if (pids.length && Date.now() - begun > waitMs) return pids;
+    if (pids.length && Date.now() - killedAt > waitMs) return pids;
     if (!pids.length) return [];
     // fixed-wait: polling the process table, which has no event to wait on.
     await new Promise((resolve) => setTimeout(resolve, 10));

@@ -188,7 +188,7 @@ test('endOwned ends the whole tree by helper program when Chromium listed nothin
   const { settled } = endOwned({ process: () => child, kill: async () => {} }, null, {
     reapMs: 50,
     settle: null,
-    end: async (pid, { waitMs }) => (ended.push([pid, waitMs]), [77]),
+    end: async (browser, { waitMs }) => (ended.push([browser.pid, waitMs]), [77]),
   });
   assert.deepEqual(await settled, [77, 77]);
   assert.deepEqual(ended, [[77, 50]]);
@@ -205,8 +205,8 @@ test('endOwned ends an unlisted tree by pid while the browser still runs, and th
   const { settled } = endOwned({ process: () => child, kill: async () => {} }, null, {
     reapMs: 50,
     settle: null,
-    end: (pid) => {
-      seen.push(['end', pid, child.signalCode]);
+    end: (browser) => {
+      seen.push(['end', browser.pid, child.signalCode]);
       return new Promise((resolve) => (finish = resolve));
     },
     log: () => {},
@@ -228,7 +228,7 @@ test('endOwned never ends a tree by the pid of a browser that has already exited
   const { settled } = endOwned({ process: () => child, kill: async () => {} }, null, {
     reapMs: 50,
     settle: null,
-    end: async (pid) => (ended.push(pid), []),
+    end: async (browser) => (ended.push(browser.pid), []),
     log: (line) => logs.push(line),
   });
   await settled;

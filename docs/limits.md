@@ -8217,15 +8217,28 @@ equality has been shown on Windows only; no Linux or macOS rebuild is on record 
 
 `glslFn(code, {name, defines, flipY, strict})` turns one GLSL ES 3.00 or 1.00 function, with the helpers, structs and constants it uses, into a node function; `glslToWGSL` returns its WGSL, entry name, parameters and result type; `toGLSL(target, translator, options)` returns the GLSL ES 3.00 program and binding tables the WebGL2 layer makes from a NodePass, a NodeMaterial that has drawn, or `{vertex, fragment}` WGSL, through the translator the caller passes (`await import('@margoengine/webgl2-compat/glsl')`). Defaults: the last function defined is called, no defines, `flipY` false, `strict` false (translated functions carry `@diagnostic(off, derivative_uniformity)`, so an implicit lookup in a per-pixel branch compiles as GLSL allows; `strict: true` keeps WGSL's rule). A source without `#version` reads as GLSL ES 3.00. Lookups read level 0 in vertex and compute nodes and use implicit derivatives in fragment and post nodes, as `texture()` does; each stage is translated once per source and options (cache of 256 translations). Refused, with MargoError `failed`, `line`, `column` and a help link: syntax errors, a uniform or a `gl_` built-in inside the source ("pass it as an argument"), an `out` or `inout` parameter on the called function, a parameter that is not a scalar, vector, square matrix or `sampler2D`/`samplerCube`/`sampler3D`/`sampler2DArray`, and a non-value return. Lines count from the source as written; a backslash line continuation joins two lines, so lines after it count one less, and columns after a macro expansion are those of the expanded line. Errors found while typing the translation (an unknown function, mismatched operands) carry no position. Limits are the shared front end's: 65,536 code units, 32,768 tokens, 128 nested statements and expressions, 64 macro rounds. Not in this entry: whole GLSL programs with `main`, uniforms and varyings (a raw GLSL material), and a Shadertoy `mainImage` wrapper; both are separate rows for Scott to decide. Sizes: shader/glsl 17,206 B min+gzip (new, ceiling 17,723 B); it bundles the GLSL front end that transitions/glsl also bundles, because two packages cannot share a chunk. Shader root unchanged at 18,664 B, transitions/glsl 19,656 B within 20,083 B, core + stage unchanged. Evidence: `packages/shader/test/glsl.test.js` (pinned WGSL for five fixtures, each checked by the layer's WGSL checker, toGLSL for a NodePass and a NodeMaterial, positions, options, hostile input) and `packages/shader/test/glsl-check.mjs` natively and with `--compat` on an RTX A6000 (Chrome, ANGLE Direct3D 11 for WebGL2): every pixel of five fixtures at two parameter values equals the browser's own WebGL2 compiler (maximum difference 0 levels on both legs, bound 1), NodeMaterials from GLSL equal their WGSL and `texture()` twins, and six toGLSL programs compile and link in raw WebGL2.
 
+## Process tree kills
+
+Scripts and tests end a process tree on Windows only through scripts/support/shutdown.mjs (KB-TEST-FILEEXIT1;
+tests/process-kill.test.js fails on a raw `taskkill` or a `ParentProcessId` walk anywhere else). A child process is
+ended by `killChildTreeSync` (`taskkill /T /F` while Node still holds its handle; 1.2 s measured on the loaded
+workstation); a bare pid by `killOwnTree`, which reads the whole process table first (4 to 20 s there, up to the 30,000
+ms shutdown budget) and ends the pid only if it is below the caller. Accepted difference: below a live child,
+taskkill finds the tree by `ParentProcessId`, which Microsoft documents may name a newer process that took a dead
+parent's pid, and does not say whether taskkill compares creation times; a process orphaned by an earlier holder of
+the child's pid could be taken in. Pass a pid instead of the child to get the checked walk, at its cost. A child whose
+exit was seen is never ended by pid; anything it left running is not ended either.
+
 ## Browser close limit
 
 A hosted browser close (`launchBrowser` in `scripts/lib/browser.mjs`, KB-P3h, 2026-11-15) has a hard limit,
 `CLOSE_LIMIT_MS` (20,000 ms). A close still open then (a host that never acknowledges the end, a client close that
-never returns) kills the host and the browser with their process trees (`taskkill /T /F` on Windows, the process
-groups elsewhere), waits up to `CLOSE_KILL_MS` (8,000 ms) for them to be gone, releases the host and fails with
-`SHUTDOWN_TIMEOUT`, listing the open steps (`open`), the killed pids (`killed`) and any still running (`survivors`).
-The limit and the kill end inside the 30,000 ms shutdown budget, so the suite reports this error, not the outer
-budget. Measured closes: 0.25 s alone, 0.28 to 2.03 s beside two GPU suites and ten CPU hogs; the close's own
+never returns) kills the host and the browser with their process trees (on Windows `killOwnTree` in
+`scripts/support/shutdown.mjs`, which ends a pid only while it is below the suite's own process, KB-TEST-FILEEXIT1; the
+process groups elsewhere), waits up to `CLOSE_KILL_MS` (8,000 ms) after the kill for them to be gone, releases the host
+and fails with `SHUTDOWN_TIMEOUT`, listing the open steps (`open`), the killed pids (`killed`) and any still running
+(`survivors`). On Windows the kill itself reads the whole process table: 4 to 20 s measured on the loaded
+workstation (it may take up to the 30,000 ms shutdown budget), against 1.2 s for the `taskkill /T` it replaced, which could end another run's process through a reused pid. Measured closes: 0.25 s alone, 0.28 to 2.03 s beside two GPU suites and ten CPU hogs; the close's own
 bounded waits add up to about 7 s. Before the limit a close past the budget threw but left the host and its
 browser running and the host referenced, so a suite that went on after the error never exited. Firefox and WebKit
 run without a host and close the ordinary way, inside the 30,000 ms budget, with no kill. `check:readme-run` closes each example's browser after the example's 20 s deadline,

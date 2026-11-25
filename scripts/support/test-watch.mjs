@@ -7,6 +7,7 @@
 import { spawnSync } from 'node:child_process';
 import { writeSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { OWN_TREE_CWD, OWN_TREE_SCRIPT } from './shutdown.mjs';
 
 /** Above verify's TEST_TIMEOUT_MS, so a test whose promise never settles gets `--test-timeout`'s error and its stack first. */
 export const SILENCE_SECONDS = 360;
@@ -61,28 +62,6 @@ export class HangWatch {
     return lines;
   }
 }
-
-/**
- * Stops every process below `root` and waits on each one's handle, so its files and working folder are free on return.
- * Prints how many it stopped; exits 3 if one outlives the wait. Skips its own process, which is below `root` too.
- */
-const stopScript = (root) => `
-$below = @{}
-foreach ($p in Get-CimInstance Win32_Process) { $below[[int]$p.ParentProcessId] += @([int]$p.ProcessId) }
-$ids = New-Object System.Collections.ArrayList
-$next = New-Object System.Collections.Queue
-$next.Enqueue(${root})
-while ($next.Count) {
-  foreach ($id in $below[[int]$next.Dequeue()]) {
-    if ($id -ne $PID -and -not $ids.Contains($id)) { [void]$ids.Add($id); $next.Enqueue($id) }
-  }
-}
-$found = @(foreach ($id in $ids) { Get-Process -Id $id -ErrorAction SilentlyContinue })
-foreach ($p in $found) { try { $p.Kill() } catch {} }
-foreach ($p in $found) { [void]$p.WaitForExit(20000) }
-$found.Count
-if (@($found | Where-Object { -not $_.HasExited }).Count) { exit 3 }
-`;
 
 /** Every process on the machine, pid to parent and whether it is a zombie, from one `ps` listing; skips `ps` itself. */
 function processTable() {
@@ -157,15 +136,17 @@ function endRun() {
     );
     process.exit(1); // process.exit: the watchdog ends a hung run, its children already stopped
   }
+  // Everything below this runner, walked by the shared rule (a reused parent pid would take in an unrelated tree),
+  // each process ended through a handle and waited on, from a folder that is not the run's.
   const { status, stdout, stderr, error } = spawnSync(
     'powershell',
-    ['-NoProfile', '-NonInteractive', '-Command', stopScript(process.pid)],
-    { cwd: process.env.SystemRoot, encoding: 'utf8', timeout: 60000, windowsHide: true },
+    ['-NoProfile', '-NonInteractive', '-Command', OWN_TREE_SCRIPT(process.pid, process.pid, 20000)],
+    { cwd: OWN_TREE_CWD, encoding: 'utf8', timeout: 60000, windowsHide: true },
   );
   writeSync(
     2,
     status === 0
-      ? `HUNG RUN ENDED: ${stdout.trim()} child processes stopped and gone\n`
+      ? `HUNG RUN ENDED: ${stdout.match(/\d+/g)?.length ?? 0} child processes stopped and gone\n`
       : `HUNG RUN: child processes may still be alive (status ${status}): ${error?.message ?? stderr}\n`,
   );
   process.exit(1); // process.exit: the watchdog ends a hung run, its children already stopped

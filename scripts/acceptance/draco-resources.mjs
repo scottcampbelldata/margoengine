@@ -19,11 +19,12 @@
 // the prebuilt's is a loss. A paired run cannot resume and is never repeated to obtain a pass. It narrows nothing:
 // every round's row is kept, and the one-shot record it follows stays as recorded.
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { killChildTreeSync } from '../support/shutdown.mjs';
 const [variant, manifest, outputPrefix, artifact] = process.argv.slice(2);
 assert.ok(
   ['draco', 'draco-full'].includes(variant) && manifest && outputPrefix && artifact,
@@ -50,12 +51,7 @@ if (!resume) {
 }
 let activeChild;
 const deadline = setTimeout(() => {
-  if (activeChild?.pid)
-    spawnSync('taskkill', ['/PID', String(activeChild.pid), '/T', '/F'], {
-      timeout: 15000,
-      windowsHide: true,
-      stdio: 'ignore',
-    });
+  if (activeChild?.pid && activeChild.exitCode === null) killChildTreeSync(activeChild);
   console.error('resource campaign hard limit: 40 minutes');
   process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 2400000);
@@ -73,7 +69,7 @@ async function child(side, path) {
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
-    spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { timeout: 15000, windowsHide: true, stdio: 'ignore' });
+    killChildTreeSync(p);
   }, 30000);
   try {
     const code = await new Promise((resolve, reject) => {

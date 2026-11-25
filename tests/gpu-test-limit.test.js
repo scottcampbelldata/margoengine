@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { DEFAULT_TEST_MINUTES, runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
 import { spawn } from 'node:child_process';
-import { endTree, taskkillPids, waitSignaled } from '../scripts/support/shutdown.mjs';
+import { endTree, waitSignaled } from '../scripts/support/shutdown.mjs';
 
 const node = JSON.stringify(process.execPath);
 const alive = (pid) => {
@@ -82,7 +82,7 @@ test('the limit really fires on the clock, with no help from a test', async () =
 });
 
 test('runLimited resolves after a killed tree is gone, not when the shell has exited', LIMIT, async () => {
-  // taskkill returns while the processes are dying and still hold the folder they ran in: removing it right after
+  // The kill returns while the processes are dying and still hold the folder they ran in: removing it right after
   // failed with EPERM under load. The end of the kill is held back here, so the order is the same every run.
   let finishKill;
   const killStarted = Promise.withResolvers();
@@ -112,7 +112,7 @@ test('runLimited resolves with the survivors when the kill cannot end the tree, 
   timeout: 60_000,
 }, async () => {
   // KB-VFX-SEEKHANG1: local CI's GPU step sat in vfx test:gpu for 120 minutes under a 10-minute suite limit. A kill
-  // that ended nothing (taskkillTree answers [pid] when taskkill cannot read the process table) left the shell
+  // that ended nothing (the own-tree kill answers [pid] when it cannot read the process table) left the shell
   // running, and runLimited waited for its close for good. Here the kill ends nothing on purpose.
   let pid;
   const result = await runLimited(`${node} -e "setInterval(() => {}, 1000)"`, {
@@ -126,13 +126,13 @@ test('runLimited resolves with the survivors when the kill cannot end the tree, 
     assert.equal(result.ok, false);
     assert.deepEqual(result.survivors, [pid]);
     assert.match(result.message, new RegExp(`unkillable hung: .*process tree not ended \\(pids ${pid} still run`));
-    assert.equal(alive(pid), true, 'the stand-in kill left the tree running, as a failed taskkill does');
+    assert.equal(alive(pid), true, 'the stand-in kill left the tree running, as a failed kill does');
   } finally {
     await endTree(pid);
   }
 });
 
-test('endTree waits for every process taskkill named, and returns the ones past the limit', async () => {
+test('endTree waits for every process the kill named, and returns the ones past the limit', async () => {
   const seen = [];
   let polls = 0;
   const gone = await endTree(1, {
@@ -171,7 +171,7 @@ test('endTree resolves only once the killed processes have closed their handles,
   // fixed-wait: a few turns of the loop; the assertion can only pass wrongly, never fail wrongly.
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.equal(resolved, false, 'resolved before the handles were closed');
-  assert.deepEqual(asked[0].pids, [21, 22], 'every process taskkill named is waited for');
+  assert.deepEqual(asked[0].pids, [21, 22], 'every process the kill named is waited for');
   assert.ok(asked[0].sinceMs >= since && asked[0].waitMs > 0 && asked[0].waitMs <= 30_000);
   finishSettle([22]);
   assert.deepEqual(await ending, [22], 'a process that never closed is reported');
@@ -192,16 +192,6 @@ test('waitSignaled waits for a running process to finish, and skips a pid that i
   } finally {
     hung.kill();
   }
-});
-
-test('the pids come from taskkill lines, never the parent it names', () => {
-  assert.deepEqual(
-    taskkillPids(
-      'SUCCESS: The process with PID 95380 (child process of PID 55468) has been terminated.\r\nSUCCESS: The process with PID 55468 (child process of PID 102216) has been terminated.\r\n',
-    ),
-    [95380, 55468],
-  );
-  assert.deepEqual(taskkillPids(''), []);
 });
 
 test('a passing test and a failing test finish normally, with no timeout message', async () => {

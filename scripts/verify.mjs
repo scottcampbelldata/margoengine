@@ -8,13 +8,14 @@
 // result cache would have served; MARGO_RESULT_CACHE=off stops the recording.
 // MARGOENGINE_PLANT_STALE=1 (set by check:merge) puts a stale file in two dist folders before the build; the tarball
 // test later asserts that no pack contains it, which proves the build cleans dist.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ResultStore, ShadowRun, servingRequested, shadowEnabled } from './support/result-cache.mjs';
 import { reportSpeedPhase } from './support/speed-phase.mjs';
+import { killChildTreeSync } from './support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -106,7 +107,7 @@ const rounded = (since) => Math.round((performance.now() - since) / 100) / 10;
 /** Ends a command and everything it started (a shell command is a tree of processes). */
 function kill(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') killChildTreeSync(child);
   else child.kill('SIGKILL');
 }
 

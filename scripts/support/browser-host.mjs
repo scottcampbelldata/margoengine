@@ -94,7 +94,7 @@ export function endOwned(
     }
     if (refused) log(`browser host: the browser process ${pid} refused to end: ${refused.message}`);
   };
-  // With no list from Chromium the tree is ended by pid (`end`, taskkill /T on Windows), so the browser must still run
+  // With no list from Chromium the tree is ended by pid (`end`, taskkill /T through killChildTreeSync on Windows), so the browser must still run
   // while that runs: Windows reuses a pid once no handle to its process is left, and Node closes the handle it holds
   // once the exit is seen. Killed first, the browser's pid was free while taskkill (which reads the process table
   // through WMI, seconds on a loaded PC) still ran, and the next suite's browser host, or any process that took the pid
@@ -118,7 +118,7 @@ export function endOwned(
     for (const pipe of child?.stdio ?? []) pipe?.destroy();
   };
   if (byTree)
-    fallback = Promise.resolve(end(pid, { waitMs: reapMs })).finally(() => {
+    fallback = Promise.resolve(end(child, { waitMs: reapMs })).finally(() => {
       killHandle();
       closePipes();
     });

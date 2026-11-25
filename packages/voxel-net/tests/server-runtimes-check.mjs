@@ -7,6 +7,7 @@ import { VoxelWorld } from '@margoengine/voxel';
 import { VoxelNetClient } from '../dist/index.js';
 import { connectWebSocket } from '../dist/server.js';
 import { testBlocks } from './blocks.js';
+import { killChildTreeSync } from '../../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(import.meta.dirname, 'native-server-fixture.js');
@@ -28,10 +29,7 @@ for (const [name, bin, args] of runtimes) {
   });
   // Register the rejection handler before awaiting startup, including a missing executable.
   exit.catch(() => {});
-  const kill = () =>
-    process.platform === 'win32'
-      ? spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true })
-      : child.kill('SIGKILL');
+  const kill = () => (process.platform === 'win32' ? killChildTreeSync(child) : child.kill('SIGKILL'));
   const timer = setTimeout(kill, 40000);
   const connections = [];
   const lines = createInterface({ input: child.stdout });

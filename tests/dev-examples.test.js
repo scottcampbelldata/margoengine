@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { serverUrl } from '../scripts/support/server-url.mjs';
+import { killChildTreeSync } from '../scripts/support/shutdown.mjs';
 
 const root = realpathSync.native(resolve(import.meta.dirname, '..'));
 const shortPath = () =>
@@ -33,7 +34,7 @@ test('serves a page from a short-path working directory and still refuses a file
     windowsHide: true,
   });
   t.after(() => {
-    if (windows) execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    if (windows) killChildTreeSync(child);
     else child.kill();
     rmSync(outside, { recursive: true, force: true });
   });

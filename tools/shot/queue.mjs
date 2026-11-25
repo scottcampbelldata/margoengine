@@ -32,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { SHOT_KINDS } from './shot-file.mjs';
+import { killChildTreeSync } from '../../scripts/support/shutdown.mjs';
 
 /** The format name of a job file. */
 export const JOB_FORMAT = 'margo-shot-job';
@@ -161,7 +162,7 @@ export const queuedJobs = (queue) =>
 
 /** Ends a process and everything it started (the browser, the dev server). */
 function killTree(child) {
-  if (process.platform === 'win32') spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore' });
+  if (process.platform === 'win32') killChildTreeSync(child);
   else
     try {
       process.kill(-child.pid, 'SIGKILL');

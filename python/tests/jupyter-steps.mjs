@@ -1,10 +1,13 @@
 // Helpers for python/tests/jupyter-browser.mjs: every step has a hard time limit that names the step, and a timeout
 // ends the whole process tree (Jupyter server, its kernels, the browser) instead of leaving them behind.
-import { spawnSync } from 'node:child_process';
+import { killOwnTreeSync } from '../../scripts/support/shutdown.mjs';
 
-/** Ends `pid` and every process it started: taskkill /T /F on Windows (a plain kill stops only the launcher). */
+/**
+ * Ends `pid` and every process it started (a plain kill stops only the launcher): on Windows only while it is this
+ * process or below it, since a pid that has exited may name another run's process (KB-TEST-FILEEXIT1).
+ */
 export function killTree(pid) {
-  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') killOwnTreeSync(pid);
   else {
     try {
       process.kill(-pid, 'SIGKILL');

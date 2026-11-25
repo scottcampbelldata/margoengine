@@ -1,6 +1,6 @@
 // Public bpy API only; CPU reference, no third-party renderer source. Images stay in engine-bench.
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import { displayImage } from './transport-image.mjs';
 import { pictureError, assertBudget } from './compare.mjs';
 import { saveReference } from './reference.mjs';
 import { encodePNG } from '../support/visual-image.js';
+import { killChildTreeSync } from '../support/shutdown.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 
 const family = process.argv.find((x) => x.startsWith('--case='))?.slice(7);
@@ -49,7 +50,7 @@ async function capture(candidate, direct) {
       stdio: 'inherit',
     });
     const timer = setTimeout(() => {
-      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+      killChildTreeSync(child);
       reject(new Error('Cycles reference exceeded its 20-minute process-tree deadline'));
     }, 20 * 60_000);
     child.once('error', (error) => {

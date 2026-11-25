@@ -1,21 +1,29 @@
 // Runs a command with a hard timeout. GPU work runs directly with a hard timeout; no GPU lock is used, ever (Scott,
 // 2026-11-16). Past `--max` minutes (default 10) the command's whole process tree is ended and this exits 124 with
 // "TIMEOUT after N min: <command>"; otherwise it exits with the command's own code.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { showHelp } from './support/help.mjs';
+import { killChildTreeSync, killOwnTreeSync } from './support/shutdown.mjs';
 
 /** The hard timeout of a command, in minutes, when none is given. */
 export const DEFAULT_MINUTES = 10;
 
 /**
- * Ends a process and everything it started. On Windows `taskkill /T /F` (a plain kill stops only the shell or launcher
- * and leaves browsers, servers and kernels running); elsewhere the process group, which {@link runWithTimeout} makes.
+ * Ends a process and everything it started: `target` is a child process or a pid. On Windows a child is ended only
+ * before its exit is seen ({@link killChildTreeSync}) and a pid only while it is this process or below it
+ * ({@link killOwnTreeSync}): a pid whose process has exited may name another run's process by then (KB-TEST-FILEEXIT1).
+ * A plain kill stops only the shell or launcher and leaves browsers, servers and kernels running. Elsewhere the process
+ * group, which {@link runWithTimeout} makes.
  */
-export function killTree(pid) {
+export function killTree(target) {
+  const child = typeof target === 'object' && target !== null ? target : null,
+    pid = child ? child.pid : target;
   if (!pid) return;
-  if (process.platform === 'win32')
-    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', timeout: 10_000, windowsHide: true });
+  if (process.platform === 'win32') {
+    if (child) killChildTreeSync(child);
+    else killOwnTreeSync(pid);
+  } else if (child && (child.exitCode !== null || child.signalCode !== null)) return;
   else
     try {
       process.kill(-pid, 'SIGKILL');
@@ -65,7 +73,7 @@ export function runWithTimeout(command, { timeoutMs = DEFAULT_MINUTES * 60_000, 
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
-    killTree(child.pid);
+    killTree(child);
   }, timeoutMs);
   const result = new Promise((done) => {
     const finish = (code) => {
@@ -107,7 +115,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         timeoutMs: minutes * 60_000,
       });
       const interrupted = () => {
-        killTree(running.child.pid);
+        killTree(running.child);
         process.exit(130); // process.exit: an interrupt ends the wrapper at once, its command tree already killed
       };
       const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];

@@ -224,7 +224,7 @@ export const TEARDOWN_GRACE_MS = 2_000;
 
 /**
  * The hard limit on closing a browser this module launched under a host (KB-P3h). Past it the close kills the host's
- * whole process tree (the host, the browser and everything under them: `taskkill /T /F` on Windows, the process groups
+ * whole process tree (the host, the browser and everything under them: the own-tree kill on Windows, the process groups
  * elsewhere), releases the host and fails with `SHUTDOWN_TIMEOUT` and `killed`, so a close that cannot finish never holds
  * its suite past the limit. Sized from measurement: a close took 0.25 s alone and
  * 0.28 to 2.03 s beside two GPU suites and ten CPU hogs (nodes-browser, 2026-11-15); its own bounded waits add up to

@@ -17,6 +17,7 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { killChildTreeSync } from './support/shutdown.mjs';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
 
@@ -621,12 +622,10 @@ export async function runTests(cwd, files, { timeoutMs = 240_000, parallel = fal
         clearTimeout(timer);
         // `node --test` runs each file in a child process of its own: end the whole tree, or a child keeps the folder busy.
         if (child.exitCode !== null) done(value);
-        else if (process.platform === 'win32')
-          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on(
-            'close',
-            () => done(value),
-          );
-        else {
+        else if (process.platform === 'win32') {
+          killChildTreeSync(child);
+          done(value);
+        } else {
           child.kill('SIGKILL');
           done(value);
         }

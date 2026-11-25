@@ -400,8 +400,7 @@ c.stdout.resume(); c.stderr.resume(); setInterval(() => {}, 1000);`,
     for (let i = 0; i < 3000 && !existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 10));
     runner = Number(readFileSync(pidFile, 'utf8'));
     assert.ok(runner > 0 && runner !== wrapper.pid);
-    if (process.platform === 'win32') spawnSync('taskkill', ['/F', '/PID', String(wrapper.pid)], { stdio: 'ignore' });
-    else wrapper.kill('SIGKILL');
+    wrapper.kill('SIGKILL');
     let gone = false;
     for (let i = 0; i < 2000 && !gone; i++) {
       await new Promise((r) => setTimeout(r, 10));
@@ -410,12 +409,7 @@ c.stdout.resume(); c.stderr.resume(); setInterval(() => {}, 1000);`,
     assert.ok(gone, `the runner ${runner} still runs after its wrapper ended`);
     assert.ok(!existsSync(pidFile), 'and it removed its pid file');
   } finally {
-    if (runner && parentRuns(runner))
-      spawnSync(
-        process.platform === 'win32' ? 'taskkill' : 'kill',
-        process.platform === 'win32' ? ['/F', '/PID', String(runner)] : ['-9', String(runner)],
-        { stdio: 'ignore' },
-      );
+    if (runner && parentRuns(runner)) process.kill(runner, 'SIGKILL');
     wrapper.kill();
     rmSync(queue, { recursive: true, force: true });
   }
