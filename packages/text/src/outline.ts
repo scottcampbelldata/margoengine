@@ -1,5 +1,6 @@
-// @margoengine/text/outline: SDF text from a font file with no browser API, so titles and captions render the same in a
-// page and in Node. Clean-room record: docs/clean-room.md, "Text outline SDF (GAP-FILM-TEXT)".
+// @margoengine/text/outline: distance-field text from a font file with no browser API, so titles and captions render
+// the same in a page and in Node. Clean-room record: docs/clean-room.md, "Text outline SDF (GAP-FILM-TEXT)" (FT-11 to
+// FT-15 for the multi-channel fields).
 import { MargoError } from '@margoengine/math/errors';
 import { Font, type GlyphBitmap } from './font.js';
 import { FONT_HELP } from './font-reader.js';
@@ -7,10 +8,13 @@ import { parseFontOutlines, type FontOutlines } from './font-outlines.js';
 import type { FontVariationOptions } from './font-variation.js';
 import { bidiClass, isIdeograph, isWhitespace, layoutText, type LayoutOptions } from './layout.js';
 import { OUTLINE_SDF_VERSION, outlineSdf } from './outline-sdf.js';
+import { outlineMsdf } from './outline-msdf.js';
 import { OutlineShaper, scriptTag } from './outline-shape.js';
 
 export { outlineSdf, flattenOutline, windingAt, OUTLINE_SDF_VERSION } from './outline-sdf.js';
 export type { OutlineSdf, OutlineSdfOptions } from './outline-sdf.js';
+export { outlineMsdf } from './outline-msdf.js';
+export type { OutlineMsdf, OutlineMsdfOptions } from './outline-msdf.js';
 export { OutlineShaper, scriptTag } from './outline-shape.js';
 export type { FontVariationOptions, FontVariationAxis } from './font-variation.js';
 
@@ -27,7 +31,18 @@ export interface GlyphFieldFontOptions extends FontVariationOptions {
   radius?: number;
   /** A name for the font in errors and logs; nothing is registered. Default a unique name. */
   family?: string;
+  /**
+   * Kind of glyph field. 'mtsdf' (default): three distance channels whose median keeps corners sharp at any size, plus
+   * the one-channel field in alpha for outlines and shadows; 4 bytes per texel. 'msdf': the same three channels, alpha
+   * 255; 4 bytes per texel. 'sdf': one channel, corners round once a glyph is drawn well above `size`; 1 byte per
+   * texel, for memory-tight pages.
+   */
+  field?: GlyphField;
 }
+
+/** Kinds of glyph field a {@link GlyphFieldFont} builds. */
+export type GlyphField = 'mtsdf' | 'msdf' | 'sdf';
+const FIELDS: readonly GlyphField[] = ['mtsdf', 'msdf', 'sdf'];
 
 /** Options for {@link GlyphFieldFont.load}. */
 export interface GlyphFieldFontLoadOptions extends GlyphFieldFontOptions {
@@ -48,6 +63,8 @@ export interface GlyphFieldFontStats {
   rasterized: number;
   /** Texel to outline distance evaluations those builds spent. */
   evaluations: number;
+  /** Texels the multi-channel error correction gave the true distance in every channel. */
+  corrected: number;
   /** Glyph fields taken from {@link GlyphFieldFont.importGlyphs}. */
   imported: number;
 }
@@ -81,8 +98,10 @@ export class GlyphFieldFont extends Font {
   override readonly radius: number;
   override readonly cutoff: number;
   override readonly buffer: number;
+  /** The kind of glyph field built: see {@link GlyphFieldFontOptions.field}. */
+  readonly field: GlyphField;
   /** Work counts since construction. */
-  readonly stats: GlyphFieldFontStats = { rasterized: 0, evaluations: 0, imported: 0 };
+  readonly stats: GlyphFieldFontStats = { rasterized: 0, evaluations: 0, corrected: 0, imported: 0 };
   private readonly bytes: Uint8Array;
   private readonly variations: Readonly<Record<string, number>>;
   private readonly shaper: OutlineShaper;
@@ -114,6 +133,7 @@ export class GlyphFieldFont extends Font {
   /**
    * @throws MargoError `failed` for bytes that are not a TrueType or CFF OpenType font.
    * @throws RangeError for a size that is not an integer from 8 to 512, or a radius outside (0, size / 2].
+   * @throws TypeError for a `field` other than 'mtsdf', 'msdf' or 'sdf'.
    */
   constructor(data: ArrayBuffer | ArrayBufferView, options: GlyphFieldFontOptions = {}) {
     const size = options.size ?? 64;
@@ -124,12 +144,16 @@ export class GlyphFieldFont extends Font {
     const radius = options.radius ?? size / 4;
     if (typeof radius !== 'number' || !(radius > 0 && radius <= size / 2))
       throw new RangeError('GlyphFieldFont radius must be above 0 and at most size / 2 pixels');
+    const field = options.field ?? 'mtsdf';
+    if (!FIELDS.includes(field))
+      throw new TypeError("GlyphFieldFont field must be 'mtsdf', 'msdf' or 'sdf'; leave it out for 'mtsdf'");
     const outlines = parseFontOutlines(data, options);
     super({ family: options.family ?? `margo-outline-${++names}` });
     this.outlines = outlines;
     this.size = size;
     this.radius = radius;
     this.cutoff = 0.25;
+    this.field = field;
     this.buffer = Math.ceil(radius * (1 - this.cutoff));
     this.bytes = ArrayBuffer.isView(data)
       ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -216,7 +240,7 @@ export class GlyphFieldFont extends Font {
     return { ascent: this.outlines.ascender / this.unitsPerEm, descent: -this.outlines.descender / this.unitsPerEm };
   }
 
-  /** The signed distance field of a cluster or shaped run, built once from the outlines. Null when it has no ink. */
+  /** The distance field of a cluster or shaped run, built once from the outlines. Null when it has no ink. */
   override glyph(cluster: string): GlyphBitmap | null {
     const cached = this.fields.get(cluster);
     if (cached) return cached.width ? cached : null;
@@ -229,19 +253,30 @@ export class GlyphFieldFont extends Font {
         for (const loop of this.outlines.getGlyphSegments(run.glyphs[i]))
           contours.push(loop.map((s) => s.map((v, k) => (k % 2 ? v : v + dx))));
       }
-      const field = outlineSdf(contours, this);
-      if (field) {
-        this.stats.rasterized++;
-        this.stats.evaluations += field.evaluations;
-        glyph = {
-          cluster,
-          width: field.width,
-          height: field.height,
-          left: field.left,
-          top: field.top,
-          color: false,
-          data: field.data,
-        };
+      if (this.field === 'sdf') {
+        const field = outlineSdf(contours, this);
+        if (field) {
+          this.stats.rasterized++;
+          this.stats.evaluations += field.evaluations;
+          const { width, height, left, top, data } = field;
+          glyph = { cluster, width, height, left, top, color: false, data };
+        }
+      } else {
+        const mtsdf = this.field === 'mtsdf',
+          field = outlineMsdf(contours, {
+            size: this.size,
+            radius: this.radius,
+            cutoff: this.cutoff,
+            buffer: this.buffer,
+            trueAlpha: mtsdf,
+          });
+        if (field) {
+          this.stats.rasterized++;
+          this.stats.evaluations += field.evaluations;
+          this.stats.corrected += field.corrected;
+          const { width, height, left, top, data, msdf } = field;
+          glyph = { cluster, width, height, left, top, color: false, data, msdf, mtsdf };
+        }
       }
     }
     this.fields.set(cluster, glyph);
@@ -259,8 +294,8 @@ export class GlyphFieldFont extends Font {
   }
 
   /**
-   * Identity of this font's glyph fields: a hash of the font bytes, size, radius, cutoff, buffer, variation values and
-   * the rasteriser version. {@link importGlyphs} accepts only bytes with the same key.
+   * Identity of this font's glyph fields: a hash of the font bytes, size, radius, cutoff, buffer, field kind, variation
+   * values and the rasteriser version. {@link importGlyphs} accepts only bytes with the same key.
    */
   get key(): string {
     return (this.cacheKey ??= hashBytes(
@@ -271,6 +306,7 @@ export class GlyphFieldFont extends Font {
         this.radius,
         this.cutoff,
         this.buffer,
+        this.field,
         Object.entries(this.variations).sort(),
       ]),
     ));
@@ -282,7 +318,7 @@ export class GlyphFieldFont extends Font {
       key = encoder.encode(this.key),
       entries = [...this.fields.values()].map((g) => [encoder.encode(g.cluster), g] as const);
     let length = 14 + key.length;
-    for (const [name, g] of entries) length += 14 + name.length + g.data.length;
+    for (const [name, g] of entries) length += 14 + name.length + g.data.length + (g.msdf?.length ?? 0);
     const out = new Uint8Array(length),
       view = new DataView(out.buffer);
     view.setUint32(0, CACHE_MAGIC, true);
@@ -302,13 +338,17 @@ export class GlyphFieldFont extends Font {
       view.setInt32(at + 8, g.top, true);
       out.set(g.data, at + 12);
       at += 12 + g.data.length;
+      if (g.msdf) {
+        out.set(g.msdf, at);
+        at += g.msdf.length;
+      }
     }
     return out;
   }
 
   /**
    * Takes glyph fields from {@link exportGlyphs}. Returns false, taking nothing, for bytes of another font, size,
-   * radius, variation or rasteriser version (a stale cache); true once every field is in.
+   * radius, field kind, variation or rasteriser version (a stale cache); true once every field is in.
    * @throws MargoError `failed` for bytes with this font's key that are cut short or malformed.
    */
   importGlyphs(bytes: Uint8Array): boolean {
@@ -327,7 +367,9 @@ export class GlyphFieldFont extends Font {
       );
     };
     let at = 10 + keyLength;
-    const count = view.getUint32(at, true),
+    const multi = this.field !== 'sdf',
+      mtsdf = this.field === 'mtsdf',
+      count = view.getUint32(at, true),
       glyphs: GlyphBitmap[] = [];
     at += 4;
     for (let n = 0; n < count; n++) {
@@ -341,9 +383,16 @@ export class GlyphFieldFont extends Font {
         left = view.getInt32(at + 4, true),
         top = view.getInt32(at + 8, true);
       at += 12;
-      if (at + width * height > bytes.length || (width === 0) !== (height === 0)) broken();
-      glyphs.push({ cluster, width, height, left, top, color: false, data: bytes.slice(at, at + width * height) });
-      at += width * height;
+      const texels = width * height,
+        end = at + (multi ? 5 : 1) * texels;
+      if (end > bytes.length || (width === 0) !== (height === 0)) broken();
+      const data = bytes.slice(at, at + texels);
+      glyphs.push(
+        multi && texels
+          ? { cluster, width, height, left, top, color: false, data, msdf: bytes.slice(at + texels, end), mtsdf }
+          : { cluster, width, height, left, top, color: false, data },
+      );
+      at = end;
     }
     if (at !== bytes.length) broken();
     for (const g of glyphs)

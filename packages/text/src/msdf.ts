@@ -44,6 +44,7 @@ export class BitmapFont extends Font {
   private readonly bitmaps = new Map<string, GlyphBitmap | null>();
   private readonly em: number;
   private readonly multi: boolean;
+  private readonly trueAlpha: boolean;
 
   constructor(
     readonly data: BitmapFontData,
@@ -59,6 +60,7 @@ export class BitmapFont extends Font {
       throw new TypeError(`BitmapFont needs ${data.pages.length} atlas pages; pass one for each name in data.pages`);
     this.em = Math.abs(data.info.size);
     this.multi = /^mt?sdf$/.test(field.fieldType ?? 'msdf');
+    this.trueAlpha = field.fieldType === 'mtsdf';
     const self = this as unknown as { size: number; radius: number; cutoff: number; buffer: number };
     self.size = this.em;
     self.radius = field.distanceRange;
@@ -137,6 +139,7 @@ export class BitmapFont extends Font {
         color: false,
         data: out,
         msdf: channels,
+        mtsdf: this.trueAlpha,
       };
     }
     this.bitmaps.set(cluster, glyph);

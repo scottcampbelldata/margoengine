@@ -54,7 +54,12 @@ test('single-channel fonts retain their old data path and multi-channel kinds in
   ]);
   assert.deepEqual(mtsdf.glyph('A').msdf, pixels);
   const shader = readFileSync(new URL('../src/shader.ts', import.meta.url), 'utf8');
-  assert.ok(shader.indexOf('textureSampleLevel(colorAtlas') < shader.indexOf('texel = max(min(tint.r'));
+  // The median of the three channels is taken after the colour atlas is sampled (filtered first, then the median).
+  const sampled = shader.indexOf('textureSampleLevel(colorAtlas'),
+    medianAt = shader.indexOf('max(min(tint.r, tint.g), min(max(tint.r, tint.g), tint.b))');
+  assert.ok(sampled >= 0 && medianAt > sampled, 'the median follows the sample');
+  // MTSDF (kind 3) outlines and shadows read the true distance in alpha; its fill keeps the median.
+  assert.ok(shader.includes('tint.a, glyphKind == 3u && kind != 2u'));
 });
 
 test('PNG loading preserves MTSDF RGB values even below transparent alpha and obeys cancellation', async () => {

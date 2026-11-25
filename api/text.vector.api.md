@@ -174,7 +174,10 @@ interface GlyphBitmap {
     readonly color: boolean;
     readonly data: Uint8Array;
     readonly msdf?: Uint8Array;
+    readonly mtsdf?: boolean;
 }
+
+type GlyphField = 'mtsdf' | 'msdf' | 'sdf';
 
 class GlyphFieldFont extends Font {
     readonly outlines: FontOutlines;
@@ -182,6 +185,7 @@ class GlyphFieldFont extends Font {
     readonly radius: number;
     readonly cutoff: number;
     readonly buffer: number;
+    readonly field: GlyphField;
     readonly stats: GlyphFieldFontStats;
     static load(url: string | URL, options?: GlyphFieldFontLoadOptions): Promise<GlyphFieldFont>;
     constructor(data: ArrayBuffer | ArrayBufferView, options?: GlyphFieldFontOptions);
@@ -211,11 +215,13 @@ interface GlyphFieldFontOptions extends FontVariationOptions {
     size?: number;
     radius?: number;
     family?: string;
+    field?: GlyphField;
 }
 
 interface GlyphFieldFontStats {
     rasterized: number;
     evaluations: number;
+    corrected: number;
     imported: number;
 }
 

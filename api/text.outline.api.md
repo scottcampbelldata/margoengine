@@ -12,12 +12,15 @@ export interface FontVariationOptions {
     openType?: OpenTypeReaders;
 }
 
+export type GlyphField = 'mtsdf' | 'msdf' | 'sdf';
+
 export class GlyphFieldFont extends Font {
     readonly outlines: FontOutlines;
     readonly size: number;
     readonly radius: number;
     readonly cutoff: number;
     readonly buffer: number;
+    readonly field: GlyphField;
     readonly stats: GlyphFieldFontStats;
     static load(url: string | URL, options?: GlyphFieldFontLoadOptions): Promise<GlyphFieldFont>;
     constructor(data: ArrayBuffer | ArrayBufferView, options?: GlyphFieldFontOptions);
@@ -47,17 +50,29 @@ export interface GlyphFieldFontOptions extends FontVariationOptions {
     size?: number;
     radius?: number;
     family?: string;
+    field?: GlyphField;
 }
 
 export interface GlyphFieldFontStats {
     rasterized: number;
     evaluations: number;
+    corrected: number;
     imported: number;
 }
 
 export const IGNORABLE: RegExp;
 
-export const OUTLINE_SDF_VERSION = 1;
+export const OUTLINE_SDF_VERSION = 2;
+
+export interface OutlineMsdf extends OutlineSdf {
+    msdf: Uint8Array;
+    corrected: number;
+}
+
+export interface OutlineMsdfOptions extends OutlineSdfOptions {
+    cornerAngle?: number;
+    trueAlpha?: boolean;
+}
 
 export interface OutlineRun {
     readonly glyphs: readonly number[];
@@ -89,6 +104,8 @@ export class OutlineShaper {
 }
 
 export function flattenOutline(contours: readonly (readonly (readonly number[])[])[], size: number, tolerance: number): Float64Array;
+
+export function outlineMsdf(contours: readonly (readonly (readonly number[])[])[], options: OutlineMsdfOptions): OutlineMsdf | null;
 
 export function outlineSdf(contours: readonly (readonly (readonly number[])[])[], options: OutlineSdfOptions): OutlineSdf | null;
 
@@ -158,6 +175,7 @@ interface GlyphBitmap {
     readonly color: boolean;
     readonly data: Uint8Array;
     readonly msdf?: Uint8Array;
+    readonly mtsdf?: boolean;
 }
 
 interface LayoutOptions {

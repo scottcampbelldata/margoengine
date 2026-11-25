@@ -4,12 +4,12 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-195 three.js features in 19 areas (recounted from the rows 2026-11-24; 52 of the COVERED rows are marked †):
+195 three.js features in 19 areas (recounted from the rows 2026-11-25; 52 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 186 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 6 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 187 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 0 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 3 | Out of scope by decision. The note says why and what to use instead. |
 
@@ -61,7 +61,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | SVGRenderer (vector output of a scene) | NOT PLANNED |  | | Margo draws with WebGPU. SVG is read, not written as a frame. |
 | Triangle-mesh path tracer | COVERED | voxel-pathtracer `@margoengine/voxel-pathtracer/mesh` (`MeshPathTracer`, `packages/voxel-pathtracer/src/mesh.ts`) and `/mesh-pbr` (glTF PBR through `traceSceneFromGLTF`, `packages/voxel-pathtracer/src/mesh-pbr.ts`); studio `ProgressiveStill` (`packages/studio/src/pathtrace.ts`) | | Indexed triangles traced with voxels, shadows and the root BSDFs. `/mesh-pbr` adds glTF PBR textures, UV sets, extension lobes, OPAQUE/MASK/BLEND alpha (BLEND as stochastic transparency, eb57207ea), affine instances over shared BLAS (`meshInstances`), emissive-triangle light sampling with MIS, and skinned or morphing glTF poses snapshotted per frame (8ce7e3e8d); README section 4f7780bf7. Limits: a deformed mesh's BLAS is rebuilt per pose (no refit), no motion blur across poses (docs/limits.md). |
 | Voxel cone-traced global illumination | NOT PLANNED | environment probes, post `SSGI` | | Probes and one-bounce SSGI are the indirect light. |
-| Real-time caustics | DONE | `@margoengine/post/caustics` `SurfaceCaustics` (any surface mesh onto every receiver, the shared beams water draws with); water `Caustics`; studio `ProductCaustics` (photon-traced closed glass); lightmap `@margoengine/lightmap/refracted` (baked); voxel-pathtracer caustic path guiding (`/guiding`) | | Live caustics from any refracting surface mesh onto every opaque receiver (one interface: receivers inside the medium); closed glass objects through the studio photon catcher. |
+| Real-time caustics | COVERED | `@margoengine/post/caustics` `SurfaceCaustics` (any surface mesh onto every receiver, the shared beams water draws with); water `Caustics`; studio `ProductCaustics` (photon-traced closed glass); lightmap `@margoengine/lightmap/refracted` (baked); voxel-pathtracer caustic path guiding (`/guiding`) | | Live caustics from any refracting surface mesh onto every opaque receiver (one interface: receivers inside the medium); closed glass objects through the studio photon catcher. |
 | Transpiling GLSL to node code | COVERED | shader `glslFn`, `toGLSL` (`@margoengine/shader/glsl`, `packages/shader/src/glsl/`) | | `glslFn` turns a GLSL ES 3.00 or 1.00 function (with its helpers, structs and constants) into a node, so existing GLSL joins a graph; `toGLSL` shows the GLSL a graph becomes. Whole GLSL programs are not translated: WGSL stays the shader language. |
 
 ### 3. Cameras
@@ -313,7 +313,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-24): 6 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-25): 5 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
@@ -321,7 +321,6 @@ Recounted from the rows (2026-11-24): 6 PARTIAL, 0 MISSING. Each fix goes in the
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel and mesh path tracers run on it (slow cold compiles on ANGLE Direct3D 11 are ANGLE's, KB-L5a-10), Safari, Firefox and phones are not yet measured, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Cloth simulation | PARTIAL. Soft bodies simulate cloth, but no render bridge draws them. | Add a render bridge to `@margoengine/physics/soft` that reads a body's particles as a mesh, with a test. |
 | Particle fluids and soft bodies | PARTIAL. `ParticleLiquid` draws fluid particles; there is no fluid solver. The soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1 are open. | Research a particle fluid solver first and build it as an optional package; fix the two soft defects in `@margoengine/physics` with regression tests. |
-| Real-time caustics | DONE. `SurfaceCaustics` of `@margoengine/post/caustics` casts caustics from any surface mesh onto every receiver, with the beams water uses; studio, lightmap and the path tracer cover closed glass, baking and references. | See [rival parity gaps](rival-parity-gaps.md). |
 
 ## Leave as the documented limit
 
@@ -336,7 +335,7 @@ These are not in three.js core or its official add-ons. Many have third-party th
 - **Voxels:** block worlds with meshing, light, streaming, queries and physics colliders (voxel); MagicaVoxel `.vox` read and write (voxel/vox); voxel editing (voxel-edit); a progressive voxel path tracer with a denoiser and MagicaVoxel's look (voxel-pathtracer).
 - **Content generation:** procedural cabins, trees, rocks, humanoids, marching cubes, noise and L-systems (procedural); 3D and 2D overlapping wave function collapse (wfc); spline roads (road); arc-length splines (splines).
 - **Engineering and BIM:** IFC through `web-ifc` (ifc).
-- **Tooling and integration:** React bindings (react; cf. react-three-fiber); triangle BVH with a worker build (bvh; cf. three-mesh-bvh); SDF text from any browser font (text; cf. troika-three-text); entity inspector (inspector); progressive glTF streaming with HTTP range requests (gltf/progressive; cf. needle-tools progressive loaders); Blender `.margo` offline asset pipeline (blender); Rust/Wasm transform and culling kernel (kernel); CAD camera controls and `fitToBoundingBox` in core.
+- **Tooling and integration:** React bindings (react; cf. react-three-fiber); triangle BVH with a worker build (bvh; cf. three-mesh-bvh); SDF text from any browser font, and multi-channel (MTSDF) fields with sharp corners built at runtime from a font file in a page or Node (text, text/outline; cf. troika-three-text, which builds one-channel fields, and prebuilt MSDF atlases); entity inspector (inspector); progressive glTF streaming with HTTP range requests (gltf/progressive; cf. needle-tools progressive loaders); Blender `.margo` offline asset pipeline (blender); Rust/Wasm transform and culling kernel (kernel); CAD camera controls and `fitToBoundingBox` in core.
 
 Positioning caveats for a public page:
 

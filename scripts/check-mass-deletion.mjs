@@ -8,12 +8,21 @@
 // path counts as a deletion) or more than 20,000 lines (generated files below do not count), and on SYNC-REVERT when a
 // `sync:` commit deletes or removes lines from more than 10 files. A commit body line
 // `Mass-deletion-approved-by: Scott Campbell <reason>` (reason on the line or the next one) lets it through.
+// It also fails on STALE-REVERT when a commit puts more than 2 files (generated ones not counted) back to the bytes
+// they had before an earlier commit of the last 500 changed them, so it silently undoes that commit: the 3bcef614ed
+// weather commit (2026-11-25) was a `git reset` onto a newer main with the working tree still on an older one, and it
+// undid seven landed commits in 40 files with only 1,528 lines gone. A body line `Reverts: <sha> <why>` names a commit
+// undone on purpose, as does the `This reverts commit <sha>` line git revert writes.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 export const MAX_FILES = 50;
 export const MAX_LINES = 20_000;
 export const MAX_SYNC_FILES = 10;
+export const MAX_STALE_FILES = 2;
+/** How far back an undone commit may be; older bytes coming back are a deliberate restore. */
+export const STALE_WINDOW = 500;
+const ABSENT = /^0+$/;
 const GENERATED = [
   /^api\/[^/]+\.api\.md$/,
   /^site\/llms[^/]*\.txt$/,
@@ -94,6 +103,74 @@ function measure(cwd, sha) {
   };
 }
 
+/** Commits a body names as undone on purpose: `Reverts: <sha>` lines and git revert's `This reverts commit <sha>`. */
+export function namedReverts(body) {
+  const shas = [];
+  for (const m of body.matchAll(/^(?:Reverts:\s*|This reverts commit\s+)([0-9a-f]{7,40})/gim))
+    shas.push(m[1].toLowerCase());
+  return shas;
+}
+
+/** Per-file entries of `git ... --raw -z`: { before, after, file } with full blob ids ("000..." for absent). */
+function rawEntries(text) {
+  const parts = text.split('\0');
+  const entries = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const m = /:\d+ \d+ ([0-9a-f]+) ([0-9a-f]+) [A-Z]\d*$/.exec(parts[i]);
+    if (m) entries.push({ before: m[1], after: m[2], file: parts[++i], at: i });
+  }
+  return entries;
+}
+
+/**
+ * Files `sha` puts back to the bytes they had before an earlier commit (within STALE_WINDOW of its parent) changed
+ * them, each as { file, undone } with the newest such commit. An added file counts when the earlier commit deleted it;
+ * a deleted one does not (removing what an earlier commit added is ordinary, and MASS-DELETION bounds deletions).
+ */
+export function undoneFiles(cwd, sha) {
+  let parent;
+  try {
+    parent = git(cwd, ['rev-parse', '--verify', '-q', `${sha}^`]).trim();
+  } catch {
+    return [];
+  }
+  const window = new Set(
+    git(cwd, ['rev-list', '-n', String(STALE_WINDOW), parent])
+      .split('\n')
+      .filter(Boolean),
+  );
+  const undone = [];
+  for (const { after, file } of rawEntries(
+    git(cwd, ['show', '--format=', '--raw', '-z', '--no-abbrev', '--no-renames', sha]),
+  )) {
+    if (generated(file) || ABSENT.test(after)) continue;
+    // Each earlier commit that changed the file, newest first: "\x01<sha>\0\n:modes before after status\0path\0".
+    const log = git(cwd, [
+      'log',
+      '-n',
+      '20',
+      '--format=%x01%H',
+      '--raw',
+      '-z',
+      '--no-abbrev',
+      '--no-renames',
+      parent,
+      '--',
+      file,
+    ]);
+    for (const block of log.split('\x01').slice(1)) {
+      const commit = block.slice(0, block.indexOf('\0')).trim();
+      if (!window.has(commit)) break;
+      const change = rawEntries(block).find((e) => e.file === file);
+      if (change && change.before === after) {
+        undone.push({ file, undone: commit });
+        break;
+      }
+    }
+  }
+  return undone;
+}
+
 /** The offences in a range, one { sha, subject, code, message } each. */
 export function scan(cwd, { range, last } = {}) {
   const args = ['log', '--no-merges', '--format=%H'];
@@ -115,6 +192,17 @@ export function scan(cwd, { range, last } = {}) {
         'SYNC-REVERT',
         `a sync: commit deletes or removes lines from ${lossy.length} files (limit ${MAX_SYNC_FILES})`,
       );
+    const named = namedReverts(body);
+    const stale = undoneFiles(cwd, sha).filter((u) => !named.some((n) => u.undone.startsWith(n)));
+    if (stale.length > MAX_STALE_FILES) {
+      const commits = [...new Set(stale.map((u) => u.undone.slice(0, 10)))];
+      const files = stale.slice(0, 8).map((u) => u.file);
+      found(
+        'STALE-REVERT',
+        `puts ${stale.length} files back to their bytes before earlier commits (limit ${MAX_STALE_FILES}), undoing ` +
+          `${commits.join(', ')} (${files.join(', ')}${stale.length > 8 ? ', ...' : ''})`,
+      );
+    }
   }
   return { checked: shas.length, bad };
 }
@@ -127,13 +215,18 @@ function main() {
   };
   const { checked, bad } = scan(process.cwd(), { range: value('--range'), last: value('--last') });
   if (!bad.length) {
-    console.log(`check:mass-deletion: ${checked} commit(s) checked, none deletes or reverts on a mass scale.`);
+    console.log(
+      `check:mass-deletion: ${checked} commit(s) checked, none deletes or reverts on a mass scale or undoes an earlier commit.`,
+    );
     return;
   }
   for (const b of bad)
     console.error(
       `check:mass-deletion ${b.code}: ${b.sha.slice(0, 9)} "${b.subject}" ${b.message}.\n` +
-        '  Add the body line `Mass-deletion-approved-by: Scott Campbell <reason>` only with his yes; otherwise undo the commit.',
+        (b.code === 'STALE-REVERT'
+          ? '  A reset onto a newer main with an older working tree does this: rebuild the commit from current main ' +
+            '(cherry-pick your own changes onto it), or name each commit undone on purpose in a `Reverts: <sha> <why>` body line.'
+          : '  Add the body line `Mass-deletion-approved-by: Scott Campbell <reason>` only with his yes; otherwise undo the commit.'),
     );
   process.exitCode = 1;
 }
