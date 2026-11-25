@@ -74,13 +74,16 @@ export function taskkillPids(output) {
  * Windows: waits until each of `pids` has finished exiting, its handles closed (its process object signalled), and
  * resolves to the ones still running when `waitMs` ran out. A pid that is gone, that a newer process took after
  * `sinceMs` (epoch ms), or whose start time cannot be read is not waited for. Node has no call that waits on a process
- * it did not start, so .NET's `Process.WaitForExit` does, from one Windows PowerShell for all the pids.
+ * it did not start, so .NET's `Process.WaitForExit` does, from one Windows PowerShell for all the pids. With `kill`,
+ * each pid that passed the start-time check is ended first, through that same process handle.
  * @param {number[]} pids
  * @param {number} waitMs
  * @param {number} sinceMs
+ * @param {typeof execFile} [run]
+ * @param {{ kill?: boolean }} [options]
  * @returns {Promise<number[]>}
  */
-export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
+export function waitSignaled(pids, waitMs, sinceMs, run = execFile, { kill = false } = {}) {
   const ids = pids.filter((pid) => Number.isInteger(pid) && pid > 0);
   if (!ids.length) return Promise.resolve([]);
   if (!(waitMs > 0)) return Promise.resolve(ids);
@@ -97,6 +100,15 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile) {
     // its teardown too. Reporting it failed a close with SHUTDOWN_TIMEOUT 677 ms after the end.
     '  $start = $p.StartTime',
     '  if ($null -eq $start -or $start.ToUniversalTime() -gt $since) { continue }',
+    // With `kill` the process is ended here, through the handle whose start time was just read, so a pid Windows has
+    // given to a newer process since the listing is never ended (the bare-pid window of KB-HOST-COMPATEXIT1). Kill
+    // throws InvalidOperationException when the process has already exited, and Win32Exception when it is still
+    // terminating (TerminateProcess answers access denied; the .NET Process.Kill reference lists "The process is
+    // terminating"): both are what was asked for. Uncaught, the second stopped the script, and the error path
+    // reported every listed child as a survivor (1 close in 5). WaitForExit below still reports one that stays.
+    ...(kill
+      ? ['  try { $p.Kill() } catch [InvalidOperationException] { } catch [ComponentModel.Win32Exception] { }']
+      : []),
     '  $left = [int][Math]::Max(0, ($end - [DateTime]::UtcNow).TotalMilliseconds)',
     '  if (-not $p.WaitForExit($left)) { $id }',
     '}',

@@ -13,7 +13,8 @@
 //
 // Protocol (one JSON object per line). Host to suite: `{"ready":true,"wsEndpoint":...,"pid":<browser pid>}` or
 // `{"error":<message>}` once; `{"terminated":{"browser":pid,"children":[...]}}` after an end request; then
-// `{"done":true,"survivors":[...],"elapsedMs":n}`. Suite to host: `{"end":true,"children":[pids]|null}`; the end of
+// `{"done":true,"survivors":[...],"elapsedMs":n}`. Suite to host: `{"end":true,"children":[pids]|null,"listedAt":ms}` (`listedAt`: the wall clock
+// when the children were listed); the end of
 // the host's stdin (the suite is gone) counts as an end request with no listed children.
 //
 // CLI: node scripts/support/browser-host.mjs <launch settings as JSON>
@@ -63,12 +64,18 @@ export function endOwned(
     reapMs = REAP_MS,
     end = endTree,
     settle = process.platform === 'win32' ? waitSignaled : pollGone,
+    endListed = process.platform === 'win32'
+      ? (pids, waitMs, sinceMs) => waitSignaled(pids, waitMs, sinceMs, undefined, { kill: true })
+      : null,
+    listedAt,
     log = console.error,
   } = {},
 ) {
   // The wall clock start goes to `settle`, which compares it with process start times; the bound itself is measured on
   // the monotonic clock (KB-BH-REAP1).
   const begun = Date.now();
+  // A listed child is ours only if it started no later than the listing (the suite's `listedAt`, else this request).
+  const since = Number.isFinite(listedAt) && listedAt <= begun ? listedAt : begun;
   const started = performance.now();
   const child = server.process?.();
   const pid = child?.pid;
@@ -95,7 +102,10 @@ export function endOwned(
   const byTree = children === null && pid && running;
   if (running && !byTree) killHandle();
   const listed = (children ?? []).filter((other) => Number.isInteger(other) && other > 0 && other !== pid);
-  for (const other of listed) {
+  // Windows reuses a pid once its process is gone: a child that exited after Chromium listed it may have left its pid
+  // to an unrelated process. `endListed` ends each listed pid only through a handle to a process that started no later
+  // than the listing, and waits for it. Without it (POSIX, where pids are not reused that soon) they are signalled here.
+  for (const other of endListed ? [] : listed) {
     try {
       process.kill(other, 'SIGKILL');
     } catch (error) {
@@ -134,7 +144,7 @@ export function endOwned(
     // One bound for all of them, waited for side by side: the browser's exit, the listed children's handles, the tree.
     const [browserGone, children, tree] = await Promise.all([
       Promise.race([exited.then(() => 'gone'), late]),
-      listed.length ? settle(listed, reapMs, begun) : [],
+      listed.length ? (endListed ?? settle)(listed, reapMs, since) : [],
       fallback ?? [],
     ]);
     const survivors = [...(browserGone === 'late' ? [pid] : []), ...children, ...tree];
@@ -161,6 +171,7 @@ export async function hostBrowser({
   logFile = HOST_LOG,
   end,
   settle,
+  endListed,
 } = {}) {
   // The suite may be gone by the time the result is ready: a closed pipe is not an error here.
   output.on?.('error', () => {});
@@ -191,7 +202,14 @@ export async function hostBrowser({
   // Nothing more is read: the input is let go, so it does not hold this process open (KB-OWN-EXIT2).
   lines.close();
   const begun = Date.now();
-  const { listed, settled } = endOwned(server, request.children, { reapMs, end, settle, log });
+  const { listed, settled } = endOwned(server, request.children, {
+    reapMs,
+    end,
+    settle,
+    log,
+    listedAt: request.listedAt,
+    ...(endListed === undefined ? {} : { endListed }),
+  });
   await say({ terminated: { browser: pid, children: listed } });
   const survivors = await settled;
   const elapsedMs = Date.now() - begun;

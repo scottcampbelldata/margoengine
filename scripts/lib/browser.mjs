@@ -324,7 +324,7 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
     pid: ready.pid,
     wsEndpoint: ready.wsEndpoint,
     process: child,
-    async end(children) {
+    async end(children, listedAt) {
       // A host that has already exited cannot be written to: say so, instead of a bare `write EPIPE` (KB-NA1b).
       if (
         gone ||
@@ -450,11 +450,13 @@ export function withBoundedClose(
       try {
         // Listing needs a connected client: read it before close() can disconnect its CDP session.
         const pids = await step('Chromium process listing', () => listOwnedPids(browser, listMs));
+        // Every listed process started before the listing returned; the host ends no pid whose process started later.
+        const listedAt = Date.now();
         const children = pids ? pids.filter((pid) => pid !== host.pid) : null;
         const results = await Promise.allSettled([
           step(
             `Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`,
-            () => host.end(children),
+            () => host.end(children, listedAt),
           ),
           step('Playwright client close', () => close(...args)),
         ]);

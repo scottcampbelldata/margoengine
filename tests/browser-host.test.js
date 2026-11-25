@@ -74,7 +74,7 @@ test('endOwned ends the browser through its handle and acknowledges before the e
   assert.equal(alive(child.pid), false);
 });
 
-test('endOwned ends each listed child by pid and waits for them through the native waiter', async () => {
+test('endOwned without endListed (POSIX) signals each listed child by pid and waits for them through settle', async () => {
   const child = await fakeBrowser();
   const other = await fakeBrowser();
   const waited = [];
@@ -87,6 +87,7 @@ test('endOwned ends each listed child by pid and waits for them through the nati
   const { listed, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid, child.pid, 0], {
     reapMs: 5000,
     settle,
+    endListed: null,
   });
   assert.deepEqual(listed, [other.pid], 'the browser itself and invalid pids are left out of the list');
   assert.deepEqual(await settled, []);
@@ -95,6 +96,53 @@ test('endOwned ends each listed child by pid and waits for them through the nati
     other.exitCode === null && other.signalCode === null ? other.once('exit', resolve) : resolve(),
   );
   assert.equal(alive(other.pid), false);
+});
+
+test('endOwned hands the listed children to endListed with the listing time, and signals none of them itself', async () => {
+  const child = await fakeBrowser();
+  const other = await fakeBrowser();
+  const calls = [];
+  const listedAt = Date.now() - 50;
+  const { listed, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid], {
+    reapMs: 5000,
+    settle: null,
+    listedAt,
+    endListed: async (pids, waitMs, since) => {
+      calls.push({ pids, waitMs, since });
+      return [];
+    },
+  });
+  assert.deepEqual(listed, [other.pid]);
+  assert.deepEqual(await settled, []);
+  assert.deepEqual(calls, [{ pids: [other.pid], waitMs: 5000, since: listedAt }]);
+  assert.equal(alive(other.pid), true, 'the bare pid was not signalled');
+  other.kill('SIGKILL');
+});
+
+// Regression (KB-HOST-COMPATEXIT1 follow-up, 2026-11-25): endOwned ended the listed children with process.kill(pid)
+// moments after Chromium listed them, so a child that had exited meanwhile could leave its pid to an unrelated process,
+// which was then killed. On Windows the default endListed ends a pid only through a handle to a process that started no
+// later than the listing.
+test('endOwned on Windows ends a listed child that started before the listing and spares a pid whose process started after it', {
+  skip: process.platform !== 'win32' && 'Windows pid reuse; POSIX signals listed pids directly',
+}, async () => {
+  const child = await fakeBrowser();
+  const before = await fakeBrowser();
+  await new Promise((resolve) => setTimeout(resolve, 50)); // timer: the listing must fall strictly between the starts
+  const listedAt = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, 50)); // timer: the same, after the listing
+  const after = await fakeBrowser(); // stands in for an unrelated process that took a listed pid after the listing
+  const { settled } = endOwned({ process: () => child, kill: async () => {} }, [before.pid, after.pid], {
+    reapMs: 10_000,
+    listedAt,
+  });
+  assert.deepEqual(await settled, []);
+  await new Promise((resolve) =>
+    before.exitCode === null && before.signalCode === null ? before.once('exit', resolve) : resolve(),
+  );
+  assert.equal(alive(before.pid), false, 'the listed child is ended');
+  assert.equal(alive(after.pid), true, 'a process that started after the listing is never ended');
+  after.kill('SIGKILL');
 });
 
 test('endOwned reports a browser the kernel has not finished with at the bound, and never asks the server to wait on it', async () => {

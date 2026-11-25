@@ -539,6 +539,37 @@ test('Windows waiter: an ended process gone before its start time was read is no
   }
 });
 
+test('Windows waiter with kill: a child already terminating (Kill throws access denied) is not a survivor', {
+  timeout: 15_000,
+}, async () => {
+  if (process.platform !== 'win32') return;
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  await new Promise((resolve, reject) => child.once('spawn', resolve).once('error', reject));
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  try {
+    // The 1-in-5 case made certain: Chromium has begun ending the child, so Kill fails as .NET's Process.Kill does
+    // for a process that is terminating (Win32Exception, access denied).
+    const survivors = await waitSignaled(
+      [child.pid],
+      5000,
+      Date.now() + 60_000,
+      (file, args, options, callback) => {
+        assert.ok(args[3].includes('$p.Kill()'), 'kill ends the process through its handle');
+        const terminating = args[3].replace(
+          '$p.Kill()',
+          'Stop-Process -Id $id -Force; throw (New-Object ComponentModel.Win32Exception 5)',
+        );
+        return execFile(file, [...args.slice(0, 3), terminating], options, callback);
+      },
+      { kill: true },
+    );
+    await exited;
+    assert.deepEqual(survivors, [], 'an ending child is waited for, not reported because Kill could not end it again');
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+});
+
 test('Windows waiter: a pid held by a process this user cannot query is not reported as ours', {
   timeout: 15_000,
 }, async () => {
