@@ -459,7 +459,7 @@ Each phase takes `'manual'` (`mesh.renderOrder` alone), `'front-to-back'` or `'b
 `'back-to-front'`. It is live, per engine and not per layer mask.
 
 ```ts
-import { Engine } from '@margoengine/core';
+import { Engine } from 'margoengine/core';
 import { setMaterialSortModes } from '@margoengine/materials';
 
 const engine = await Engine.create(document.querySelector('canvas')!);

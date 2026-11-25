@@ -4058,11 +4058,11 @@ function sortSettings(graph: Engine['frameGraph']): MaterialDraws['sortModes'] {
  * @example
  * setMaterialSortModes(engine, { opaque: 'front-to-back' }); // less overdraw on pixel-heavy scenes
  */
-export function setMaterialSortModes(engine: Engine, next: MaterialSortModes): void {
+export function setMaterialSortModes(engine: EngineKernel, next: MaterialSortModes): void {
   const ok = (v: unknown) => v === undefined || v === 'manual' || v === 'front-to-back' || v === 'back-to-front';
   if (!next || !ok(next.opaque) || !ok(next.transparent))
     throw new TypeError("Material sort modes take 'manual', 'front-to-back' or 'back-to-front'; pass one of those");
-  const m = sortSettings(engine.frameGraph);
+  const m = sortSettings(engineRuntime(engine).frameGraph);
   if (next.opaque) m.opaque = next.opaque;
   if (next.transparent) m.transparent = next.transparent;
 }

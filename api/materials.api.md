@@ -1030,7 +1030,7 @@ export function remapTileUVs(uvs: ArrayLike<number>, tiles: ArrayLike<number>, g
     spacing?: number;
 }): Float32Array;
 
-export function setMaterialSortModes(engine: Engine, next: MaterialSortModes): void;
+export function setMaterialSortModes(engine: EngineKernel, next: MaterialSortModes): void;
 
 export function sheen(options?: SheenOptions, base?: MaterialExtension): MaterialExtension;
 
