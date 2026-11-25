@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: fsm's equivalent mutants named lines that had moved (KB-MUTATION-PINS1, scripts, mutation)
+
+- **Repro:** `node --test tests/mutation.test.js` on main at caf466b4c: "every listed equivalent mutant exists" failed on
+  `fsm/final line 110 || -> &&`; after that pin, 13 more fsm pins (final, index, inspect, invoke, scxml) failed the same way.
+- **Cause:** scripts/mutation.mjs pins each equivalent mutant by line. Its fsm pins matched the sync's unformatted fsm
+  sources (ff88a70e7); main holds the formatted ones (c333e1023, put back by the restore caf466b4c), whose lines moved.
+  Each file still has the same mutants in the same order. Nothing in the fast gate ran tests/mutation.test.js when a
+  mutation target changed, so the stale pins reached main and showed only in local CI's full verify.
+- **Fixed:** each pin moved to the line of the mutant with the same id (d8cade908), every reason checked against its new
+  line. `npm run test:changed` now also runs tests/mutation.test.js when scripts/mutation.mjs or a mutation target's
+  source changes (`rootTests`, scripts/test-changed.mjs).
+  Regression: tests/mutation.test.js, and tests/check-merge-affected.test.js ("test:changed runs the mutation pins").
+
 ### Fixed 2026-11-25: `npm run build:packages` failed on Node 22.12.0 (KB-NODE22-BUILD1, scripts)
 
 - **Repro:** CI's Node 22.12.0 jobs (run 45703324344) stopped in `build:packages`: `SyntaxError: The requested module

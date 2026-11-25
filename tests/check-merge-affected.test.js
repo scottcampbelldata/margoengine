@@ -30,7 +30,7 @@ import {
   visualIds,
   wgslPackages,
 } from '../scripts/support/affected-gpu.mjs';
-import { testPackages } from '../scripts/test-changed.mjs';
+import { rootTests, testPackages } from '../scripts/test-changed.mjs';
 import { docReaderPackages } from '../scripts/support/file-classes.mjs';
 import { umbrellaChangeIsReexportOnly } from '../scripts/support/umbrella-change.mjs';
 import { demos } from '../scripts/support/visual-demos.js';
@@ -1012,6 +1012,13 @@ test('every document a package test reads from docs/ is declared in DOC_READERS'
     }
   }
   assert.ok(seen >= 10, 'the scan finds the known reads');
+});
+
+test('test:changed runs the mutation pins when a mutation target or the mutation script changes (KB-MUTATION-PINS1)', () => {
+  assert.deepEqual(rootTests(['packages/fsm/src/final.ts']), ['tests/mutation.test.js']);
+  assert.deepEqual(rootTests(['packages\\fsm\\src\\index.ts']), ['tests/mutation.test.js']);
+  assert.deepEqual(rootTests(['scripts/mutation.mjs']), ['tests/mutation.test.js']);
+  assert.deepEqual(rootTests(['packages/fsm/README.md', 'docs/limits.md']), []);
 });
 
 test('test:changed picks the changed packages, their dependents and the document readers from the check:merge decision', () => {

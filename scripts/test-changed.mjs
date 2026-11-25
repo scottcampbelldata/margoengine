@@ -10,10 +10,26 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { changedFiles, planContext, planFiles } from './check-merge.mjs';
+import { TARGETS } from './mutation.mjs';
 import { runWithTimeout } from './run-with-timeout.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 export const DEFAULT_PACKAGE_MINUTES = 15;
+
+/**
+ * Root tests a set of changed files needs beyond the package runs. tests/mutation.test.js pins equivalent mutants by
+ * line in the mutation targets' sources, so a change to one of those sources (a reformat moves every line) or to
+ * scripts/mutation.mjs runs it: a formatted fsm left 14 pins on stale lines until local CI (KB-MUTATION-PINS1).
+ */
+export function rootTests(files) {
+  const norm = (f) => f.replaceAll('\\', '/'),
+    sources = new Set(
+      Object.entries(TARGETS).flatMap(([name, targets]) =>
+        Object.values(targets).map((t) => `packages/${name}/${t.file}`),
+      ),
+    );
+  return files.map(norm).some((f) => f === 'scripts/mutation.mjs' || sources.has(f)) ? ['tests/mutation.test.js'] : [];
+}
 
 /**
  * The package directories (packages/<dir>) whose CPU tests a set of changed files selects, sorted, with the reason.
@@ -54,8 +70,16 @@ async function main() {
     { dirs, reason } = testPackages(await planContext(root), files, process.env);
   console.log(`test:changed: ${files.length} changed file${files.length === 1 ? '' : 's'}; ${reason}`);
   console.log(dirs.length ? `  packages: ${dirs.map((d) => d.slice(9)).join(', ')}` : '  no package tests to run');
+  const roots = rootTests(files);
+  if (roots.length) console.log(`  root tests: ${roots.join(', ')}`);
   if (args.includes('--plan')) return 0;
   const failed = [];
+  for (const file of roots) {
+    console.log(`
+=== node --test ${file} (at most ${minutes} min)`);
+    const { code, timedOut } = await runWithTimeout(`node --test ${file}`, { cwd: root, timeoutMs: minutes * 60_000 });
+    if (code !== 0) failed.push(`${file}${timedOut ? ' (timed out)' : ''}`);
+  }
   for (const dir of dirs) {
     console.log(`\n=== npm run test (${dir}, at most ${minutes} min)`);
     const { code, timedOut } = await runWithTimeout('npm run test', {
