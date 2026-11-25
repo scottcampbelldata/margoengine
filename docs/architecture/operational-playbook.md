@@ -1,3 +1,17 @@
+### Section 5 evidence: rough reflections with contact hardening (2026-11-25)
+
+Planar reflectors (environment's Reflector, Refractor and PBRReflector with `contactHardening`), water's planar
+reflection (`contactHardening`) and post's SSR now pick the blur mip from one reflection cone
+(packages/shared/reflection-cone.js): GGX alpha = roughness^2 as a Phong exponent, the cone holding 3/4 of the lobe,
+doubled for the reflected ray, its footprint at the world distance along the ray to what the pixel shows. Planar
+surfaces find that distance from the capture depth and the capture matrix alone (any projection, the oblique near plane
+included); SSR from the hit point, replacing its on-screen ray length, which left rays running away from the camera
+nearly sharp. Evidence: CPU checks against the closed form, and real frames on WebGPU and the WebGL2 compatibility layer
+(posts on a glossy floor, in calm water and under SSR: the foot's reflection keeps its contrast and the top's falls).
+Missing: no anisotropic stretch at grazing angles, the box mip chain caps the footprint (8 planar, 5 SSR levels), and
+no comparison against a path-traced reference. No benchmark claim is made. See the
+[clean-room record](../clean-room.md#reflection-cone-rough-planar-and-screen-space-reflections-with-contact-hardening-2026-11-25).
+
 ### Section 5 evidence: shadows from the environment map (shadows/ibl, 2026-11-25)
 
 `@margoengine/shadows/ibl` is a PostStack HDR stage: directions importance sampled from the equirect's luminance

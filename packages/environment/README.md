@@ -707,6 +707,51 @@ MeshReflector.attach(engine, { parent: floor, width: 10, height: 10, exclude: [f
 engine.start();
 ```
 
+**Rough reflections with contact hardening.** `contactHardening: true` on `Reflector`, `Refractor` or `PBRReflector`
+reads `roughness` as the surface's perceptual (GGX) roughness and blurs each pixel by the reflection cone it covers:
+sharp where a chair leg meets a polished floor, blurrier the farther the reflected point is from the surface, the far
+background blurriest. Without it (the default), `roughness` stays one blur for the whole surface (0 sharp, 1 the
+coarsest mip). `reflectionConeTangent(roughness)` and `reflectionConeLevel(roughness, distance, pixelsPerUnit,
+maxLevel)` (from `/reflector`) are the same maths on the CPU.
+
+```ts
+import { EngineKernel, PbrMaterial, box } from '@margoengine/core';
+import { Reflector, reflectionConeLevel } from '@margoengine/environment/reflector';
+import { PBRReflector } from '@margoengine/environment/reflector-pbr';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: { position: [0, 2.5, 9], target: [0, 0, 0] },
+});
+engine.createMesh().setGeometry(box(0.2, 2, 0.2)).setMaterial(new PbrMaterial({ color: '#ffffff' })).setPosition([0, 1, 0]);
+// A glossy dark floor: sharp at the post's foot, soft toward its top.
+const floor = PBRReflector.attach(engine, { width: 20, height: 20, roughness: 0.3, contactHardening: true, baseColor: '#202020' });
+floor.node.setRotation([-Math.PI / 2, 0, 0]);
+// A mirror on the wall with the same cone; roughness 0 stays a perfect mirror.
+const mirror = Reflector.attach(engine, { width: 3, height: 2, roughness: 0.15, contactHardening: true });
+mirror.node.setPosition([0, 1.5, -3]);
+console.log(reflectionConeLevel(0.3, 1, 100, 7)); // mip read 1 world unit from the floor at 100 texels per unit
+engine.start();
+```
+
+How it works. GGX alpha = roughness² (Karis 2013) used as a Beckmann width gives the Phong exponent
+n = 2 / alpha² - 2 (Walter et al. 2007); the cone around the half vector that holds 3/4 of the cosⁿ lobe has
+cos^(n+1) = 1/4, and the reflected cone is twice that angle (capped at 1.4 rad, reached near roughness 0.76). The cone
+idea for screen-space reflections is Uludag's (GPU Pro 5, 2014). Per pixel, the capture depth under the lookup (the
+nearest of its 2x2 texels) gives the distance s along the reflected ray to what the pixel shows; the cone covers a disc
+of diameter 2 s tan(angle) there, and the mip whose texel spans that disc in the capture is read (trilinear in the
+box-filtered chain). A contact (s = 0) reads mip 0. `PBRReflector`'s `blurDistance` ramp is replaced by the cone, and
+`Refractor` uses the distance behind the glass. `MeshReflector` keeps drei's own depth blur (`depthScale` and its
+thresholds) and rejects `contactHardening`. Water's planar reflection takes the same cone (`@margoengine/water/reflector`,
+`contactHardening`). Sources: Brian Karis, *Real Shading in Unreal Engine 4*, SIGGRAPH 2013 course notes,
+https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf ; Bruce Walter, Stephen R.
+Marschner, Hongsong Li and Kenneth E. Torrance, *Microfacet Models for Refraction through Rough Surfaces*, EGSR 2007,
+https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf ; Yasin Uludag, *Hi-Z Screen-Space Cone-Traced
+Reflections*, in W. Engel (ed.), GPU Pro 5, CRC Press, 2014, https://www.routledge.com/product/isbn/9781482208634 . Limits: the blur is
+the capture's 2x2 box mip chain (at most 8 levels, so a footprint over 128 capture texels stops growing), isotropic
+(no stretching along the view), and the level steps where depth changes sharply (an object's silhouette against the
+far background); a normal-map distortion moves the lookup but not the ray the distance is measured on.
+
 - **How a capture runs.** `engine.render({camera, delta: 0})` through the capture camera, with a filtered copy of the
   frame graph: only the scene passes run (`scenePasses`: order below -110, or from -25 up to 9: GPU culling, sky, shadow
   maps, clustered light lists, shader patches, core's main draw, glTF PBR, terrain, water, decals, transmission).

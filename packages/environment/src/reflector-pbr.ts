@@ -14,7 +14,7 @@ export interface PBRReflectorOptions extends ReflectorOptions {
   metalness?: number;
   /** Dielectric index of refraction, 1..4. Default 1.5 (F0 = 0.04). */
   ior?: number;
-  /** World distance from the plane at which roughness reaches its full blur. Positive normal float32, default 10. */
+  /** World distance from the plane at which roughness reaches its full blur (unused with `contactHardening`, whose cone sets the blur). Positive normal float32, default 10. */
   blurDistance?: number;
 }
 const checked = (value: number, name: string, min: number, max: number): number => {
@@ -48,7 +48,6 @@ export class PBRReflector extends Reflector {
   private eta = 1.5;
   private distanceValue = 10;
   private readonly inverse = new Float64Array(16);
-  private readonly depthViews = new WeakMap<GPUTexture, GPUTextureView>();
   /** Attach this floor to engine, with the same transform convention as Reflector. */
   static override attach(engine: EngineKernel, options: PBRReflectorOptions = {}): PBRReflector {
     const floor = new PBRReflector(options);
@@ -96,14 +95,7 @@ export class PBRReflector extends Reflector {
     return 96;
   }
   protected override get surfaceDepth(): GPUTextureView | undefined {
-    const texture = this.target.depth;
-    if (!texture) return undefined;
-    let view = this.depthViews.get(texture);
-    if (!view) {
-      view = texture.createView({ aspect: 'depth-only' });
-      this.depthViews.set(texture, view);
-    }
-    return view;
+    return this.captureDepthView();
   }
   protected override surfaceUniforms(c: Extract<PassContext, { backend: 'webgpu' }>, values: Float32Array): void {
     if (!invertMatrix(this.camera.matrix, this.inverse))
@@ -115,6 +107,19 @@ export class PBRReflector extends Reflector {
       o = this.origin;
     values.set([n[0], n[1], n[2], -(n[0] * o[0] + n[1] * o[1] + n[2] * o[2])], 76);
     values.set(this.inverse, 80);
+  }
+  // contactHardening: the cone's mip at the ray's distance to the captured point replaces the plane-distance ramp.
+  protected override coneShader(code: string): string {
+    const ramp = 'let lod=u.size.z*clamp(planeDistance/u.pbr.z,0.0,1.0);';
+    if (!code.includes(ramp))
+      throw new MargoError(
+        'state',
+        'PBRReflector found no blur line to replace; rebuild @margoengine/environment so reflector and reflector-pbr match',
+      );
+    return code.replace(
+      ramp,
+      'let ray=margoCaptureRay(u.capture,i.world,margoNearestDepth(captureDepth,uv),f32(dimensions.y));let lod=margoConeLevel(u.flags.w,ray.x,ray.y,u.size.z);',
+    );
   }
   protected override get surfaceShader(): string {
     return super.surfaceShader

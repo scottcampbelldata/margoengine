@@ -8,7 +8,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { linearColor, type ColorInput } from './color.js';
 
 /** Options of {@link MeshReflector}: {@link ReflectorOptions} (its `roughness` is unused) and the mix below. */
-export interface MeshReflectorOptions extends Omit<ReflectorOptions, 'roughness'> {
+export interface MeshReflectorOptions extends Omit<ReflectorOptions, 'roughness' | 'contactHardening'> {
   /** Reflection weight: multiplies the Fresnel reflectance; the weight is clamped to 1. At least 0. Default 1. */
   mixStrength?: number;
   /** How much of the blurred image replaces the sharp one, 0 to 1 (more is clamped to 1). Default 1. */
@@ -117,7 +117,6 @@ export class MeshReflector extends Reflector {
   private reflectance: [number, number, number] = [0.04, 0.04, 0.04];
   private constructed = false;
   private readonly inverse = new Float64Array(16);
-  private readonly depthViews = new WeakMap<GPUTexture, GPUTextureView>();
 
   /** Same as `engine.use(new MeshReflector(options))`; returns it. */
   static override attach(engine: EngineKernel, options: MeshReflectorOptions = {}): MeshReflector {
@@ -128,6 +127,10 @@ export class MeshReflector extends Reflector {
   constructor(options: MeshReflectorOptions = {}) {
     if ((options as ReflectorOptions).roughness !== undefined)
       throw new TypeError('MeshReflector takes blur and mixBlur, not roughness; remove roughness');
+    if ((options as ReflectorOptions).contactHardening !== undefined)
+      throw new TypeError(
+        'MeshReflector hardens contacts through depthScale and its thresholds, not contactHardening; remove contactHardening, or use PBRReflector with contactHardening',
+      );
     super(options);
     this.mixStrength = options.mixStrength ?? 1;
     this.mixBlur = options.mixBlur ?? 1;
@@ -234,6 +237,16 @@ export class MeshReflector extends Reflector {
       throw new TypeError('MeshReflector takes blur and mixBlur, not roughness; set blurSize and mixBlur instead');
     super.roughness = value;
   }
+  /** Always false: MeshReflector hardens contacts through `depthScale` and its thresholds. */
+  override get contactHardening(): boolean {
+    return false;
+  }
+  override set contactHardening(value: boolean) {
+    if (value !== false)
+      throw new TypeError(
+        'MeshReflector hardens contacts through depthScale and its thresholds, not contactHardening; use PBRReflector with contactHardening',
+      );
+  }
   protected override aim(main: Camera): boolean {
     if (this.minDepth >= this.maxDepth && this.depthScaleValue > 0)
       throw new RangeError(
@@ -254,14 +267,7 @@ export class MeshReflector extends Reflector {
     return 104;
   }
   protected override get surfaceDepth(): GPUTextureView | undefined {
-    const texture = this.target.depth;
-    if (!texture) return undefined;
-    let view = this.depthViews.get(texture);
-    if (!view) {
-      view = texture.createView({ aspect: 'depth-only' });
-      this.depthViews.set(texture, view);
-    }
-    return view;
+    return this.captureDepthView();
   }
   protected override surfaceUniforms(c: Extract<PassContext, { backend: 'webgpu' }>, values: Float32Array): void {
     if (!invertMatrix(this.camera.matrix, this.inverse))

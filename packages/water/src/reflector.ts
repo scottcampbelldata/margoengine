@@ -10,6 +10,7 @@ import {
 import { addSurfaceEffect, surfaceEffects } from './surface-effects.js';
 import type { Water } from './index.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import { reflectionConeShader } from '../../shared/reflection-cone.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
@@ -21,6 +22,10 @@ export interface WaterPlanarCapture {
   readonly texture: GPUTexture | undefined;
   /** World-to-WebGPU-clip projection belonging to texture, undefined until ready. */
   readonly textureMatrix: ArrayLike<number> | undefined;
+  /** The capture with its mip chain (environment Reflector with `roughness` above 0), read by `contactHardening`. */
+  readonly blurTexture?: GPUTexture | undefined;
+  /** The capture's depth through textureMatrix, read by `contactHardening`. */
+  readonly depthTexture?: GPUTexture | undefined;
   /** Optional scene-pass filter, temporarily wrapped to omit the consuming Water draw. Configure before attachment. */
   passes?: (pass: FramePass) => boolean;
 }
@@ -34,8 +39,15 @@ export interface WaterReflectionOptions {
   strength?: number;
   /** Strength of the water-normal distortion in the capture's projection, 0..0.1. Default 0. */
   distortion?: number;
-  /** Cross-filter blur, 0..1, modulated by the local surface roughness. Default 0. */
+  /** Cross-filter blur, 0..1, modulated by the local surface roughness; with `contactHardening`, the lowest roughness of the cone. Default 0. */
   roughness?: number;
+  /**
+   * Blur the reflection by a cone from the water's own roughness (its waves and ripples, at least `roughness`): sharp
+   * where a pier or hull meets the water, blurrier with distance from it. Reads the Reflector's `blurTexture` and
+   * `depthTexture`, so give the Reflector a `roughness` above 0 (1 builds the full mip chain). Fixed at construction.
+   * Default false.
+   */
+  contactHardening?: boolean;
   /** Nonnegative linear RGB multiplier, each 0..100. Default [1,1,1]. */
   color?: readonly [number, number, number];
 }
@@ -72,7 +84,17 @@ const scalar = (value: number, min: number, max: number, name: string) => {
     throw rangeError(`Invalid water reflection ${name}; pass ${min}..${max}`, 'material');
   return value;
 };
-const declarations = (binding: number) => `
+// Contact hardening: the capture depth under the lookup gives the reflected ray's distance to what it shows, and the
+// cone at that distance picks the mip (shared/reflection-cone.js); the edge and horizon fades then span that mip's
+// texel. The cone's roughness is the waves' slope variance inside the pixel (alpha^2 = 2 variance, after Toksvig 2005;
+// the waves the pixel resolves already bend the lookup), and at least the `roughness` option. Water's own `rough` is
+// not used: its floor is tuned for the sun's glitter and blurred even calm water's reflections away.
+const variance = 'let variance=(dot(normalDx,normalDx)+dot(normalDy,normalDy))/12.0;';
+const coneBlur = `let planarWaterRay=margoCaptureRay(planarWater.projection,planarWaterWorld,margoNearestDepth(planarWaterDepth,uv),f32(textureDimensions(planarWaterDepth).y));
+ let level=margoConeLevel(max(sqrt(sqrt(2.0*planarWaterVariance)),planarWater.settings.w),planarWaterRay.x,planarWaterRay.y,f32(textureNumLevels(planarWaterImage)-1));
+ let blur=exp2(level)-1.0;`;
+const declarations = (binding: number, cone: boolean) => {
+  const code = `
 struct PlanarWaterFrame { projection:mat4x4f, settings:vec4f, tint:vec4f }
 @group(0) @binding(${binding}) var<uniform> planarWater:PlanarWaterFrame;
 @group(0) @binding(${binding + 1}) var planarWaterImage:texture_2d<f32>;
@@ -108,6 +130,22 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
  return mix(fallback,color*planarWater.tint.rgb,planarWater.settings.y*fade.x*fade.y*horizon);
 }
 `;
+  if (!cone) return code;
+  const flat = ' let blur=planarWater.settings.w*(8.0+16.0*rough*rough);',
+    sample = 'var color=textureSampleLevel(planarWaterImage,planarWaterSampler,uv,0).rgb;\n if(blur>0.0){';
+  if (!code.includes(flat) || !code.includes(sample))
+    throw fault('failed', 'WaterReflection found no blur lines to replace; rebuild @margoengine/water');
+  return (
+    reflectionConeShader +
+    code
+      .replace(
+        'var planarWaterSampler:sampler;',
+        `var planarWaterSampler:sampler;\n@group(0) @binding(${binding + 3}) var planarWaterDepth:texture_depth_2d;\nvar<private> planarWaterVariance:f32;`,
+      )
+      .replace(flat, ' ' + coneBlur)
+      .replace(sample, 'var color=textureSampleLevel(planarWaterImage,planarWaterSampler,uv,level).rgb;\n if(false){')
+  );
+};
 
 /** Project environment's planar capture into Water's existing Fresnel term, including its SSR capture. */
 export class WaterReflection implements EnginePlugin {
@@ -115,6 +153,8 @@ export class WaterReflection implements EnginePlugin {
   private readonly surface: Water;
   private readonly source: WaterPlanarCapture;
   private readonly values = new Float32Array(24);
+  private readonly cone: boolean;
+  private fallbackDepth?: GPUTexture;
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private uniformResource?: GPUBufferBinding;
@@ -138,6 +178,9 @@ export class WaterReflection implements EnginePlugin {
     this.values[17] = scalar(options.strength ?? 1, 0, 1, 'strength');
     this.values[18] = scalar(options.distortion ?? 0, 0, 0.1, 'distortion');
     this.values[19] = scalar(options.roughness ?? 0, 0, 1, 'roughness');
+    if (options.contactHardening !== undefined && typeof options.contactHardening !== 'boolean')
+      throw rangeError('Invalid water reflection contactHardening; pass true or false', 'material');
+    this.cone = options.contactHardening ?? false;
     this.values.set(
       color.map((v) => scalar(v, 0, 100, 'color')),
       20,
@@ -156,7 +199,7 @@ export class WaterReflection implements EnginePlugin {
       throw fault('unsupported', 'Planar water needs WebGPU or the full WebGL2 compatibility layer', 'webgpu');
     if (!engine.hasPlugin(this.surface.name))
       throw fault('state', 'Attach the live Water to this engine before WaterReflection');
-    if (surfaceEffects.get(this.surface)?.some((e) => e.key === 'reflector'))
+    if (surfaceEffects.get(this.surface)?.some((e) => e.key.startsWith('reflector')))
       throw fault('attached', 'Water already has planar reflection; dispose it before replacing', 'state');
     this.removeFilter = excludeSurface(this.source, this.surface.name + ':draw');
     this.engine = engine;
@@ -168,26 +211,38 @@ export class WaterReflection implements EnginePlugin {
       format: 'rgba16float',
       usage: GPUTextureUsage.TEXTURE_BINDING,
     });
+    if (this.cone)
+      this.fallbackDepth = device.createTexture({
+        size: [1, 1],
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      });
     this.sampler = device.createSampler({
       minFilter: 'linear',
       magFilter: 'linear',
+      mipmapFilter: 'linear',
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     });
     this.remove = addSurfaceEffect(this.surface, {
-      key: 'reflector',
+      // The key is part of Water's pipeline key: the contact-hardening shader binds one more texture.
+      key: this.cone ? 'reflector-cone' : 'reflector',
       vertex: false,
-      count: 3,
-      shader: (code, binding) =>
-        code
+      count: this.cone ? 4 : 3,
+      shader: (code, binding) => {
+        if (this.cone && !code.includes(variance))
+          throw fault('failed', 'WaterReflection found no normal variance line; rebuild @margoengine/water');
+        return code
           .replace(
             'fn skyColor(direction:vec3f,rough:f32)->vec3f {return skyColorBase(direction,rough);}',
-            declarations(binding),
+            declarations(binding, this.cone),
           )
           .replace(
             '@fragment fn fragment(i:Output)->Result{',
             '@fragment fn fragment(i:Output)->Result{\nplanarWaterWorld=i.world;',
-          ),
+          )
+          .replace(variance, this.cone ? `${variance}planarWaterVariance=variance;` : variance);
+      },
       prepare: (c) => this.prepare(c),
     });
     this.removeDispose = this.surface.onDispose(() => this.dispose());
@@ -222,13 +277,18 @@ export class WaterReflection implements EnginePlugin {
     this.values[16] = +!!texture;
     if (texture) this.values.set(Array.from(matrix!), 0);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
-    const image = texture ?? this.fallback!;
-    let view = this.views.get(image);
+    const image = (texture && this.cone ? this.source.blurTexture : undefined) ?? texture ?? this.fallback!;
+    if (!this.cone) return [this.uniformResource!, this.view(image), this.sampler!];
+    const depth = (texture ? this.source.depthTexture : undefined) ?? this.fallbackDepth!;
+    return [this.uniformResource!, this.view(image), this.sampler!, this.view(depth, 'depth-only')];
+  }
+  private view(texture: GPUTexture, aspect?: GPUTextureAspect): GPUTextureView {
+    let view = this.views.get(texture);
     if (!view) {
-      view = image.createView();
-      this.views.set(image, view);
+      view = texture.createView(aspect ? { aspect } : undefined);
+      this.views.set(texture, view);
     }
-    return [this.uniformResource!, view, this.sampler!];
+    return view;
   }
   onDeviceRestored(engine: Engine): void {
     this.release();
@@ -246,8 +306,9 @@ export class WaterReflection implements EnginePlugin {
     this.remove = this.removeDispose = undefined;
     this.uniform?.destroy();
     this.fallback?.destroy();
+    this.fallbackDepth?.destroy();
     this.uniform = undefined;
-    this.fallback = undefined;
+    this.fallback = this.fallbackDepth = undefined;
   }
   dispose(): void {
     if (this.disposed) return;

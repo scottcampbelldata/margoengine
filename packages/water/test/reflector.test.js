@@ -21,3 +21,13 @@ test('planar water validates optics, requires a source and disposes idempotently
   assert.throws(() => effect.setup({}), { code: 'disposed' });
   surface.dispose();
 });
+
+test('contactHardening is a boolean fixed at construction', () => {
+  const surface = new Water(),
+    reflector = { texture: undefined, textureMatrix: undefined };
+  for (const contactHardening of [1, 'yes', null])
+    assert.throws(() => new WaterReflection({ surface, reflector, contactHardening }), /contactHardening/);
+  new WaterReflection({ surface, reflector, contactHardening: true }).dispose();
+  new WaterReflection({ surface, reflector, contactHardening: false }).dispose();
+  surface.dispose();
+});

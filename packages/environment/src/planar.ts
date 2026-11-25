@@ -14,6 +14,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { displayShader } from '../../shared/display.js';
+import { reflectionConeShader } from '../../shared/reflection-cone.js';
 import { linearColor, type ColorInput } from './color.js';
 import {
   CaptureTarget,
@@ -57,8 +58,14 @@ export interface PlanarOptions {
   resolution?: number;
   /** World distance the clip plane sits from the surface into the captured side; positive hides geometry that touches the surface, negative lets some through. Default 0. */
   clipBias?: number;
-  /** Blur of the captured image, 0 (sharp) to 1 (the coarsest mip). Default 0. */
+  /** Blur of the captured image, 0 (sharp) to 1 (the coarsest mip); with `contactHardening`, the surface's perceptual (GGX) roughness. Default 0. */
   roughness?: number;
+  /**
+   * Reads `roughness` as a physical reflection cone: each pixel takes the mip the cone covers where its ray meets the
+   * captured scene, so reflections stay sharp where an object touches the surface and blur with distance from it (and
+   * the far background blurs most). False keeps one blur for the whole surface. Default false.
+   */
+  contactHardening?: boolean;
   /**
    * Tangent-space normal map that distorts the image: `(device) => GPUTexture` (made again after a device restore), a
    * `GPUTexture` (2D, filterable; dropped and reported once after a restore) or RGBA8 pixels. Default none.
@@ -88,7 +95,7 @@ export interface PlanarOptions {
 
 // Projective texture lookup (Segal et al. 1992); distortion offset and mip blur are Margo design choices.
 const SURFACE = /* wgsl */ `
-${displayShader}
+${displayShader}${reflectionConeShader}
 struct Surface { viewProj:mat4x4f, capture:mat4x4f, model:mat4x4f, size:vec4f, tint:vec4f, normal:vec4f, flags:vec4f }
 @group(0) @binding(0) var<uniform> u:Surface;
 @group(0) @binding(1) var image:texture_2d<f32>;
@@ -110,6 +117,11 @@ struct Out { @builtin(position) position:vec4f, @location(0) world:vec3f, @locat
   if(u.flags.y>0.5){return vec4f(c,1.0);}
   return vec4f(toDisplay(c),1.0);
 }`;
+const SURFACE_COLOR = 'let c=textureSampleLevel(image,clampSampler,uv,u.size.z).rgb*u.tint.rgb;';
+// Contact hardening: the capture depth under the pixel gives the ray's distance to what it shows (margoCaptureRay).
+const CONE_COLOR = `let ray=margoCaptureRay(u.capture,i.world,margoNearestDepth(captureDepth,uv),f32(textureDimensions(captureDepth).y));
+  let c=textureSampleLevel(image,clampSampler,uv,margoConeLevel(u.flags.w,ray.x,ray.y,u.size.z)).rgb*u.tint.rgb;`;
+const DEPTH_BINDING = '@group(0) @binding(4) var repeatSampler:sampler;';
 // 2x2 box reduction of the previous mip, for the roughness blur. nearestHalf returns an exactly representable binary16
 // value before the render-target conversion: its allowed rounding direction must not accumulate a dark bias through
 // successive mip reductions.
@@ -151,6 +163,8 @@ interface DeviceState {
   repeatSampler: GPUSampler;
   placeholder: GPUTexture;
   pipelines: Map<string, GPURenderPipeline>;
+  /** Pipelines whose shader declares `captureDepth` without the class giving a `surfaceDepth`. */
+  depthPipelines: WeakSet<GPURenderPipeline>;
   reduce?: GPURenderPipeline;
   normal?: { source: GPUTexture | NormalMapImage; texture: GPUTexture; view: GPUTextureView; owned: boolean };
   group?: {
@@ -196,6 +210,7 @@ export abstract class PlanarSurface {
   private resolutionValue = 1;
   private clipBiasValue = 0;
   private roughnessValue = 0;
+  private hardening = false;
   private distortionValue = 0.03;
   private layersValue = 0xffffffff;
   private normalImage?: NormalMapImage;
@@ -233,6 +248,7 @@ export abstract class PlanarSurface {
     this.resolution = options.resolution ?? 1;
     this.clipBias = options.clipBias ?? 0;
     this.roughness = options.roughness ?? 0;
+    this.contactHardening = options.contactHardening ?? false;
     this.distortion = options.distortion ?? 0.03;
     this.layers = options.layers ?? 0xffffffff;
     this.exclude = options.exclude;
@@ -291,6 +307,14 @@ export abstract class PlanarSurface {
   set roughness(value: number) {
     this.roughnessValue = finite(value, 'Surface roughness', 0, 1);
   }
+  /** The `contactHardening` option. Live. */
+  get contactHardening(): boolean {
+    return this.hardening;
+  }
+  set contactHardening(value: boolean) {
+    if (typeof value !== 'boolean') throw new TypeError('Invalid contactHardening; pass true or false');
+    this.hardening = value;
+  }
   get distortion(): number {
     return this.distortionValue;
   }
@@ -335,6 +359,16 @@ export abstract class PlanarSurface {
   /** Borrowed world-to-clip matrix of texture, retained after a failed update; undefined before capture or after restore. */
   get textureMatrix(): Float32Array | undefined {
     return this.captured ? this.captureMatrix : undefined;
+  }
+
+  /** The latest capture with its box-filtered mip chain (level 0 equals `texture`) while `roughness` is above 0; otherwise undefined. */
+  get blurTexture(): GPUTexture | undefined {
+    return this.captured && this.roughnessValue > 0 ? this.blur?.texture : undefined;
+  }
+
+  /** The latest capture's depth (reversed-Z, through `textureMatrix`), or undefined before the first capture. */
+  get depthTexture(): GPUTexture | undefined {
+    return this.captured ? this.target.depth : undefined;
   }
 
   setup(engine: EngineKernel): void {
@@ -408,6 +442,17 @@ export abstract class PlanarSurface {
   /** Optional capture-depth binding for a material variant. Default none. */
   protected get surfaceDepth(): GPUTextureView | undefined {
     return undefined;
+  }
+  /**
+   * The contact-hardening variant of the surface shader `code` (`contactHardening` with a mip chain): reads the colour
+   * at the cone's mip, `margoConeLevel(u.flags.w, ...)` up to `u.size.z`. Returns `code` unchanged for a variant
+   * without that read. A shader that declares `captureDepth` gets the capture depth at binding 5.
+   */
+  protected coneShader(code: string): string {
+    if (!code.includes(SURFACE_COLOR)) return code;
+    return code
+      .replace(SURFACE_COLOR, CONE_COLOR)
+      .replace(DEPTH_BINDING, `${DEPTH_BINDING}\n@group(0) @binding(5) var captureDepth:texture_depth_2d;`);
   }
   /** Append live uniforms for an optional surface renderer before upload. */
   protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void {}
@@ -558,10 +603,13 @@ export abstract class PlanarSurface {
     const state = this.stateFor(c.device),
       samples = c.descriptor.multisample?.count ?? 1,
       depthFormat = c.descriptor.depthStencil?.format ?? 'depth32float',
-      key = `${c.format}:${samples}:${depthFormat}`;
+      blur = this.roughnessValue > 0 ? this.blur : undefined,
+      cone = this.hardening && blur !== undefined,
+      key = `${c.format}:${samples}:${depthFormat}:${cone}`;
     let pipeline = state.pipelines.get(key);
     if (!pipeline) {
-      const module = c.device.createShaderModule({ label: 'planar surface', code: this.surfaceShader });
+      const code = cone ? this.coneShader(this.surfaceShader) : this.surfaceShader;
+      const module = c.device.createShaderModule({ label: 'planar surface', code });
       pipeline = c.device.createRenderPipeline({
         label: 'planar surface',
         layout: 'auto',
@@ -577,11 +625,11 @@ export abstract class PlanarSurface {
         multisample: { count: samples },
       });
       state.pipelines.set(key, pipeline);
+      if (code.includes('var captureDepth:')) state.depthPipelines.add(pipeline);
     }
-    const blur = this.roughnessValue > 0 ? this.blur : undefined,
-      image = blur?.view ?? this.view(color),
+    const image = blur?.view ?? this.view(color),
       normal = this.normalView(state),
-      depth = this.surfaceDepth;
+      depth = this.surfaceDepth ?? (state.depthPipelines.has(pipeline) ? this.captureDepthView() : undefined);
     if (
       !state.group ||
       state.group.pipeline !== pipeline ||
@@ -613,7 +661,7 @@ export abstract class PlanarSurface {
     v.set(m, 32);
     v[48] = this.widthValue / 2;
     v[49] = this.heightValue / 2;
-    v[50] = blur ? this.roughnessValue * (blur.levels.length - 1) : 0;
+    v[50] = blur ? (cone ? 1 : this.roughnessValue) * (blur.levels.length - 1) : 0;
     v[51] = this.distortionValue;
     v.set(this.tint, 52);
     v[55] = 1;
@@ -623,7 +671,8 @@ export abstract class PlanarSurface {
     v[59] = (this.normalScroll[1] * this.elapsed) % 1;
     v[60] = normal === this.view(state.placeholder) ? 0 : 1;
     v[61] = linearHdr(c.format) ? 1 : 0;
-    v[62] = v[63] = 0;
+    v[62] = 0;
+    v[63] = cone ? this.roughnessValue : 0;
     this.surfaceUniforms(c, v);
     c.device.queue.writeBuffer(state.uniform, 0, v);
     const stencil = depthFormat.includes('stencil');
@@ -644,6 +693,15 @@ export abstract class PlanarSurface {
     pass.end();
   }
   private views = new WeakMap<GPUTexture, GPUTextureView>();
+  private depthViews = new WeakMap<GPUTexture, GPUTextureView>();
+  /** Depth-only view of the capture depth (sampleable for a depth-stencil capture too), undefined before a capture target exists. */
+  protected captureDepthView(): GPUTextureView | undefined {
+    const texture = this.target.depth;
+    if (!texture) return undefined;
+    let view = this.depthViews.get(texture);
+    if (!view) this.depthViews.set(texture, (view = texture.createView({ aspect: 'depth-only' })));
+    return view;
+  }
   private view(texture: GPUTexture): GPUTextureView {
     let view = this.views.get(texture);
     if (!view) this.views.set(texture, (view = texture.createView()));
@@ -705,6 +763,7 @@ export abstract class PlanarSurface {
       }),
       placeholder,
       pipelines: new Map(),
+      depthPipelines: new WeakSet(),
     };
     return this.state;
   }

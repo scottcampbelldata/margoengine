@@ -5,6 +5,7 @@ import { PlanarSurface, type PlanarOptions } from './planar.js';
 
 export type { PlanarSurface, PlanarOptions, NormalMapImage } from './planar.js';
 export { scenePasses, type CapturePassFilter } from './capture.js';
+export { reflectionConeTangent, reflectionConeLevel } from '../../shared/reflection-cone.js';
 
 /** Options of {@link Reflector}; see {@link PlanarOptions}. */
 export type ReflectorOptions = PlanarOptions;

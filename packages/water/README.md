@@ -109,6 +109,29 @@ WaterReflection.attach(engine, {surface, reflector});
 engine.start();
 ```
 
+`contactHardening: true` blurs the planar reflection by a roughness cone instead of the cross filter: a pier or hull
+reflects sharp where it meets the water and softer with height above it, and the far shore softest. The cone's
+roughness is the waves' slope variance inside each pixel (alpha² = 2 variance, after Toksvig 2005; the waves a pixel
+resolves already bend the lookup), and at least `roughness`. It reads the Reflector's `blurTexture` (its mip chain, so
+give the Reflector a `roughness` above 0) and `depthTexture`; it is fixed at construction. The cone and distance maths
+are environment's (`@margoengine/environment/reflector`, "Rough reflections with contact hardening": Karis 2013,
+Walter et al. 2007, Uludag 2014).
+
+```ts
+import {Engine, PbrMaterial, box} from '@margoengine/core';
+import {Reflector} from '@margoengine/environment/reflector';
+import {Water} from '@margoengine/water';
+import {WaterReflection} from '@margoengine/water/reflector';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const surface = Water.attach(engine, {size: [80, 80], height: 0});
+engine.createMesh().setGeometry(box(0.4, 3, 0.4)).setMaterial(new PbrMaterial({color: '#6b4a2b'})).setPosition([0, 1.5, 0]);
+const reflector = Reflector.attach(engine, {width: 80, height: 80, captureOnly: true, roughness: 1});
+reflector.node.setRotation([-Math.PI / 2, 0, 0]);
+WaterReflection.attach(engine, {surface, reflector, contactHardening: true, roughness: 0.1});
+engine.start();
+```
+
 `water.depthTexture` exposes borrowed viewport depth including opaque geometry and
 the water surface for subsequent effects, such as `Sky` distance fog. It is
 undefined before the first draw and after disposal/restoration until drawing

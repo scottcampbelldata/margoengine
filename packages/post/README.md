@@ -297,7 +297,13 @@ ssr.enabled = false; // pass-through, no recompiles
   `thickness` (scene units) a ray may pass behind a surface. Pixel x/y and NDC depth are linear along the projected
   ray for perspective and orthographic (`@margoengine/cameras`) projections alike.
 - **Roughness.** Surfaces rougher than `maxRoughness` are skipped; reflections fade out from half of it. The hit colour
-  comes from a half-resolution mip chain of the scene, at a level that grows with roughness² and hit distance.
+  comes from a half-resolution mip chain of the scene, at the level whose texel spans the reflection cone's footprint
+  at the hit: the cone of the surface's roughness (GGX alpha = roughness² as a Phong exponent, the cone holding 3/4 of
+  the lobe, doubled for the reflected ray; Karis 2013, Walter et al. 2007, Uludag 2014: the same maths as environment's
+  planar reflectors, `reflectionConeTangent`), times the world distance to the hit, projected at the hit's depth. So a
+  contact stays sharp and the blur grows with distance from the surface whichever way the ray runs (until 2026-11-25
+  the footprint came from the ray's on-screen length, which left rays running away from the camera nearly sharp;
+  `test/ssr-cone-browser.mjs`). The chain is five half-resolution levels, so footprints over 64 pixels stop growing.
 - **Rough reflections (`stochastic: true`).** Instead of skipping them, surfaces rougher than half of `maxRoughness`
   trace one ray per pixel per frame along a microfacet normal sampled from the GGX distribution of visible normals
   (Heitz 2018), and a resolve pass averages the rays over frames: last frame's result, reprojected through last frame's

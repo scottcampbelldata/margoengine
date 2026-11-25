@@ -9,6 +9,7 @@ import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
+import { reflectionConeShader } from '../../shared/reflection-cone.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -97,7 +98,10 @@ fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSRFresnel(
 const lit = (code: string) => code.includes('let margoAmbient=') && code.includes('fn iblBrdfTerms(');
 // One ray per pixel along the mirror direction, marched over the Hi-Z pyramid in screen space (pixel x, y and NDC depth
 // are linear along a projected segment for perspective and orthographic cameras alike). Roughness widens the cone:
-// the hit colour comes from a blurred mip of the scene. Deterministic, so frames are stable without TAA.
+// the hit colour comes from the blurred mip whose texel spans the cone's footprint at the hit, from the world distance
+// to the hit projected at the hit's depth (shared/reflection-cone.js), so contacts stay sharp and the blur grows with
+// distance whichever way the ray runs (until 2026-11-25 the footprint came from the ray's on-screen length, which
+// left rays running away from the camera nearly sharp). Deterministic, so frames are stable without TAA.
 const compositeShader =
   vertex +
   `
@@ -111,7 +115,7 @@ struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f}
 @group(0) @binding(6) var specular:texture_2d<f32>;
 @group(0) @binding(7) var weight:texture_2d<f32>;
 @group(0) @binding(8) var normals:texture_2d<f32>;
-${traceFunctions}${displayShader}
+${traceFunctions}${displayShader}${reflectionConeShader}
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let q=vec2i(frag.xy);let s=textureLoad(scene,q,0);var c=s.rgb;
 let m=textureLoad(weight,q,0);let e=textureLoad(specular,q,0);let rough=e.a;let d=textureLoad(depth,q,0);
@@ -124,7 +128,7 @@ let h=o+dir*t;let hq=vec2i(h.xy);let hp=world(vec2f(hq)+0.5,textureLoad(depth,hq
 // Fades: rays toward the camera, back faces, roughness, screen edges, distance.
 let f=(1.0-smoothstep(0.0,0.5,toward))*(1.0-smoothstep(0.0,0.3,dot(hn,r)))*(1.0-smoothstep(u.a.z*0.5,u.a.z,rough))
 *clamp(min(min(h.x,u.a.x-h.x),min(h.y,u.a.y-h.y))/(0.08*min(u.a.x,u.a.y)),0.0,1.0)*(1.0-smoothstep(0.8*u.b.x,u.b.x,distance(p,hp)));
-let lod=log2(max(t*len*rough*rough*2.0,1.0));var reflected=textureLoad(scene,hq,0).rgb;
+let hc=u.matrix*vec4f(hp,1.0);let lod=margoConeLevel(rough,distance(p,hp),length(vec3f(u.matrix[0].y,u.matrix[1].y,u.matrix[2].y))*0.5*u.a.y/max(abs(hc.w),1e-20),f32(textureNumLevels(blurred)));var reflected=textureLoad(scene,hq,0).rgb;
 if(lod>0.0){reflected=mix(reflected,textureSampleLevel(blurred,bilinear,h.xy/u.a.xy,min(lod-1.0,f32(textureNumLevels(blurred)-1))).rgb,min(lod,1.0));}
 c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));
 }}}}
