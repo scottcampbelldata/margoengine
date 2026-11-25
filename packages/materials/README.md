@@ -446,17 +446,21 @@ translucent flat colour without depth writes; `update(world, light?)` re-project
 `planarShadowMatrix` and `projectGeometry` are the maths on their own.
 
 ```ts
+import { Engine } from 'margoengine/core';
+import { boxGeometry } from 'margoengine/geometry';
 import { createBlobShadow, createPlanarShadow } from '@margoengine/materials/fake-shadows';
 
-declare const engine: import('@margoengine/core').EngineKernel;
-declare const geometry: import('@margoengine/materials').MeshGeometry;
-declare const world: Float32Array;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const blob = createBlobShadow(engine, { radius: 0.6, opacity: 0.45 });
 blob.root.setPosition([0, 0.01, 0]);
 
-const shadow = createPlanarShadow(engine, geometry, { plane: { normal: [0, 1, 0] }, light: { direction: [2, 5, 1] } });
-shadow.update(world); // each frame the caster moves
+const shadow = createPlanarShadow(engine, boxGeometry(1, 1, 1), {
+  plane: { normal: [0, 1, 0] },
+  light: { direction: [2, 5, 1] },
+});
+// The caster's world matrix (column major), here a box lifted 0.5 m; call update each frame the caster moves.
+shadow.update(new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.5, 0, 1]));
 ```
 
 ### Texture download caps
