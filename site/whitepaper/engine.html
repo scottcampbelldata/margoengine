@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,797 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,820 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,797 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,820 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,12 +30,12 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,797 bytes gzipped. The catalog lists 108 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,820 bytes gzipped. The catalog lists 108 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
   <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at 01836c27; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
-  <div role="listitem"><b>24,797 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; the build fails a change at 25,000</span><i>entry-sizes.json · 0e71a9024</i></div>
+  <div role="listitem"><b>24,820 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; the build fails a change at 25,000</span><i>entry-sizes.json · 0e71a9024</i></div>
   <div role="listitem"><b>108</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
   <div role="listitem"><b>6,498</b><span>Node tests in every <code>npm run verify</code>: 6,496 pass, 2 skipped, 0 fail</span><i>results/test-count.json · 01836c27</i></div>
   <div role="listitem"><b>153 of 161</b><span>feature rows with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
@@ -72,7 +72,7 @@
 </nav>
 
 <h2 id="abstract"><span class="n">0</span>Abstract</h2>
-<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 60,984 bytes minified and 24,797 bytes gzipped. The build fails at 25,000.</p>
+<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 61,038 bytes minified and 24,820 bytes gzipped. The build fails at 25,000.</p>
 <p>Everything else lives in optional, side-effect-free packages: glTF PBR, shadows, post-processing, physics, voxel worlds with multiplayer, a path tracer, exporters and React. A bundle contains only the packages it imports, and large runtimes load only when a file needs them.</p>
 <p>This paper covers the design, what we have measured, how the engine was built, and the limits we know about. Each figure names the file it came from. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>.</p>
 
@@ -194,7 +194,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <thead><tr><th>Entry</th><th class="num">Raw</th><th class="num">Gzip</th><th>Notes</th></tr></thead>
 <tbody>
 <tr><td><code>@margoengine/core</code></td><td class="num">53,196</td><td class="num">22,226</td><td>Wasm kernel, WebGPU renderer, views and scenes</td></tr>
-<tr><td>core + stage</td><td class="num">60,984</td><td class="num">24,797</td><td>the build-gated figure</td></tr>
+<tr><td>core + stage</td><td class="num">61,038</td><td class="num">24,820</td><td>the build-gated figure</td></tr>
 </tbody></table></div>
 <span class="src">examples/package-benchmarks/results/entry-sizes.json · record 0e71a9024 · dirty: false · <code>npm run measure:size</code> on main at 38ce7fbaa, 2026-11-12</span>
 <p>Every other entry and worker, and every lazily loaded file, is in the same record and on <a href="../sizes.html">margoengine.com/sizes</a>. A release test builds a page that calls <code>createStage</code> and loads a small glTF, records every request in headless Edge, and fails if the page fetches anything beyond the HTML, its chunks and the model (<code>examples/package-benchmarks/results/basic-scene-network.json</code>).</p>
