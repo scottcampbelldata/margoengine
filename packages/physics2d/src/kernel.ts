@@ -18,7 +18,9 @@ export const defaultWasm = (scalar = false): URL =>
 /** Whether this engine compiles Wasm SIMD: a module with one 128-bit instruction (the probe of the wasm-feature-detect project). */
 export const hasSimd = (): boolean =>
   WebAssembly.validate(
-    new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]),
+    new Uint8Array([
+      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+    ]),
   );
 // The interface version the kernel reports and a hash of its Wasm's exports and imports, swapped in by the package build.
 declare const __KERNEL_VERSION__: string;
