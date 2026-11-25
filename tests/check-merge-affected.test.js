@@ -583,7 +583,6 @@ test('verify keeps its checks and adds the preview contract after hygiene, asset
       'npm run check:parity',
       'npm run check:xr-runs',
       'npm run check:preview-contract',
-      'npm run check:coupling',
       'npm run check:pinned-math',
       'npm run build --workspace examples/gameplay-sandbox',
       'npm run test --workspace examples/gameplay-sandbox',
