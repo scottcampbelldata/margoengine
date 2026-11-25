@@ -160,6 +160,7 @@
     "api:check": "node scripts/api-report.js",
     "api:update": "node scripts/api-report.js --update",
     "check:banned-terms": "node scripts/check-banned-terms.mjs",
+    "rebase:main": "node scripts/rebase-main.mjs",
     "measure:size": "node scripts/measure-size.js",
     "proofs": "node examples/package-benchmarks/proofs/run.mjs",
     "record:wgsl-corpus": "node scripts/record-wgsl-corpus.mjs",
