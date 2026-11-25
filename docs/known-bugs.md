@@ -8778,6 +8778,10 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   deadline without output (KB1042e). Not reproduced on current main (2026-11-12): the full grid passes on
   the WebGL2 layer and on native WebGPU (256 captures, no failures; earlier 79 s compat and 62 s native).
   Pin: scripts/material-back-side-gpu-check.js, unchanged.
+  Closed 2026-11-25: the unchanged script ran the full grid in 12 s on the WebGL2 layer and 16 s natively
+  (RTX A6000, ANGLE D3D11, 256 captures, 840 checks, no failures). The same script took 62 s natively then, so the
+  79 s was that run's loaded machine, not the grid; the 60 s body deadline is gone (GPU tests have a 10 minute hard
+  limit, scripts/gpu-package-tests.mjs).
 - `materials/test:gpu:dispersion`: its circular-resource fixture failure is
   repaired by shallow field identity/value comparison. The complete native grid
   passes 278 checks/254 captures. The complete full-compat grid now reaches all
