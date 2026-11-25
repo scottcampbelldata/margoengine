@@ -11991,6 +11991,12 @@
       "commit": "FG-17a",
       "reason": "FG-17 piece 1 new entries post/accumulate 6,903 B gzip (Accumulate, an HDR PostStack stage: rgba32float ping-pong sum and rgba16float mean in one pass, presents alone through the display curve) and headless/accumulate 4,620 B (4,414 B in piece 1; piece 2 adds startFrame, the clock pair and subFrameSteps for seeks) (subFrames schedule, Owen-scrambled Sobol offsets through the filter inverse CDF, renderAccumulated driver); both optional, nothing else imports them",
       "grew": 1
+    },
+    {
+      "date": "2026-11-24",
+      "commit": "FG-17b",
+      "reason": "FG-17 piece 2: headless/accumulate 4,414 to 4,620 B gzip for startFrame, the clock pair that keeps one sample at exactly 1 / fps, and subFrameSteps for seeks of a sub-framed span",
+      "grew": 1
     }
   ],
   "items": {
