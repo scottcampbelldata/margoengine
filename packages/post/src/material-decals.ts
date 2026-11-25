@@ -14,7 +14,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { type BorrowSlot, type Borrowable, borrow, fix, lend, relend } from '../../shared/borrowed.js';
 import { finiteVector } from '@margoengine/math/validate';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -354,10 +354,12 @@ export class MaterialDecals implements EnginePlugin {
     v[32] = surface ? this.count : 0;
     v.set(this.data, 36);
     device.queue.writeBuffer(this.uniform!, 0, v, 0, 36 + this.data.length);
-    const key = `${output.format}:${output.multisample?.count ?? 1}:${+!output.hdr}`;
+    const key = `${output.format}:${output.multisample?.count ?? 1}:${+!output.hdr}:${premultipliedCanvas(this.engine)}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, shader(!output.hdr), output.format, { multisample: output.multisample });
+      pipeline = render(device, displayFor(this.engine, shader(!output.hdr)), output.format, {
+        multisample: output.multisample,
+      });
       this.pipelines.set(key, pipeline);
     }
     // Without a surface the stage only encodes the frame for display (count 0), so any bound texture will do.

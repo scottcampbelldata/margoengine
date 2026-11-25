@@ -2,7 +2,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader } from '../../shared/display.js';
 import { ScreenEffect, type ScreenContext } from './screen-effect.js';
 import { PostStack } from './stack.js';
 
@@ -102,7 +102,7 @@ export class EffectMask extends ScreenEffect {
       0,
     ]);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
-    this.draw(c, shader(output.hdr, this.kind !== 'ldr'), output, [
+    this.draw(c, displayFor(this.engine, shader(output.hdr, this.kind !== 'ldr')), output, [
       input,
       result,
       (mask ?? this.blank).createView(),

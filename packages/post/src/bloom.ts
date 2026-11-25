@@ -13,7 +13,13 @@ import {
   type PassContext,
   type DrawOptions,
 } from '@margoengine/core/extension';
-import { coreShaderRequired, displayShader, linearShader } from '../../shared/display.js';
+import {
+  coreShaderRequired,
+  displayFor,
+  displayShader,
+  linearShader,
+  premultipliedCanvas,
+} from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
@@ -213,6 +219,14 @@ const linear = composite.replace(
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linear.includes('toDisplay(hdr'))
   throw margoError('failed', 'Bloom: the HDR composite still encodes for display; update its linear-output patch');
+// On a premultiplied canvas the curve takes the straight colour of a partly covered pixel (packages/shared/display.js).
+const straight = composite.replace(
+  'let o=toDisplay(hdr*exp2(settings.y));',
+  'let o=toDisplayStraight(hdr*exp2(settings.y),s.a);',
+);
+if (straight === composite) throw margoError('failed', 'Bloom: the composite has no display output to make straight');
+const display = (engine: Parameters<typeof premultipliedCanvas>[0]) =>
+  premultipliedCanvas(engine) ? displayFor(engine, straight) : composite;
 /** One dispatch of the chain: pipeline, bind group, workgroups across and down. */
 type Step = [GPUComputePipeline, GPUBindGroup, number, number];
 /** Bind group whose entry i is resource i; holes are bindings the entry point does not use. */
@@ -277,6 +291,8 @@ export class Bloom implements EnginePlugin {
   private disposed = false;
   private host?: StackHost;
   private key = '';
+  /** The canvas was premultiplied when the solo composite was built. */
+  private straight = false;
   private imageDevice?: GPUDevice;
 
   constructor(readonly options: BloomOptions = {}) {
@@ -445,6 +461,7 @@ export class Bloom implements EnginePlugin {
       this.textures[0]?.width === c.width &&
       this.textures[0]?.height === c.height &&
       this.originalFormat === c.format &&
+      this.straight === premultipliedCanvas(this.engine) &&
       this.textures[1]?.format === c.descriptor.depthStencil!.format &&
       this.capture?.samples === (c.descriptor.multisample?.count ?? 4)
     )
@@ -477,7 +494,8 @@ export class Bloom implements EnginePlugin {
     this.allocate(device, Math.max(1, Math.ceil(c.width / 2)), Math.max(1, Math.ceil(c.height / 2)));
     this.scene = this.textures[0].createView();
     this.depth = this.textures[1].createView();
-    this.present = render(device, composite, c.format, { multisample: c.descriptor.multisample });
+    this.straight = premultipliedCanvas(this.engine);
+    this.present = render(device, display(this.engine), c.format, { multisample: c.descriptor.multisample });
     this.link(device, this.scene);
     // Last, so a frame that failed part-way rebuilds everything above on the next one.
     this.capture = new SceneTarget(device, this.textures[0], this.textures[1], c.descriptor.multisample?.count ?? 4);
@@ -583,7 +601,7 @@ export class Bloom implements EnginePlugin {
     const device = c.device,
       width = Math.max(1, Math.ceil(c.width / 2)),
       height = Math.max(1, Math.ceil(c.height / 2)),
-      key = output.format + output.multisample.count + output.hdr;
+      key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
     if (this.lists[0][0]?.width !== width || this.lists[0][0].height !== height) {
       for (const texture of this.textures) texture.destroy();
       this.textures = [];
@@ -593,7 +611,7 @@ export class Bloom implements EnginePlugin {
     if (this.key !== key) {
       this.key = key;
       this.source = undefined;
-      this.present = render(device, output.hdr ? linear : composite, output.format, {
+      this.present = render(device, output.hdr ? linear : display(this.engine), output.format, {
         multisample: output.multisample,
       });
     }

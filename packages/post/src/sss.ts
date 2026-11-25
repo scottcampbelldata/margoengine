@@ -12,7 +12,7 @@ import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extens
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -190,10 +190,10 @@ export class SSS implements EnginePlugin {
     encode: boolean,
     ms?: GPUMultisampleState,
   ) {
-    const key = `${+last}:${format}:${ms?.count ?? 1}:${+encode}`;
+    const key = `${+last}:${format}:${ms?.count ?? 1}:${+encode}:${premultipliedCanvas(this.engine)}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, shader(last, encode), format, ms ? { multisample: ms } : {});
+      pipeline = render(device, displayFor(this.engine, shader(last, encode)), format, ms ? { multisample: ms } : {});
       this.pipelines.set(key, pipeline);
     }
     return pipeline;

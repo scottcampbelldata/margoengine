@@ -7,7 +7,7 @@ import { render, compute, group as bind } from '../../shared/gpu.js';
 import { preset } from '../../shared/preset.js';
 import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
@@ -512,12 +512,17 @@ export class SSGI implements EnginePlugin {
   }
   private stage(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
     if (this.multi) return this.stageMulti(c, input, output);
-    const key = output.format + output.multisample.count + output.hdr;
+    const key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
     if (this.key !== key) {
       this.key = key;
-      this.composite = render(c.device, output.hdr ? linearComposite : compositeShader, output.format, {
-        multisample: output.multisample,
-      });
+      this.composite = render(
+        c.device,
+        output.hdr ? linearComposite : displayFor(this.engine, compositeShader),
+        output.format,
+        {
+          multisample: output.multisample,
+        },
+      );
       this.input = undefined;
     }
     if (this.input !== input) {
@@ -607,10 +612,12 @@ export class SSGI implements EnginePlugin {
     this.fullscreen(c, this.litPasses[next], this.litComposite!, composite, false);
     this.newest = next;
     if (output.hdr) return this.lit[next];
-    const key = output.format + output.multisample.count;
+    const key = output.format + output.multisample.count + premultipliedCanvas(this.engine);
     if (this.presentKey !== key) {
       this.presentKey = key;
-      this.present = render(device, presentShader, output.format, { multisample: output.multisample });
+      this.present = render(device, displayFor(this.engine, presentShader), output.format, {
+        multisample: output.multisample,
+      });
       this.presentGroups = [];
     }
     const present = (this.presentGroups[next] ??= bind(device, this.present!, [this.lit[next]]));

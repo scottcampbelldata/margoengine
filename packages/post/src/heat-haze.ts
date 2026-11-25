@@ -42,7 +42,7 @@ import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extens
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { valueNoiseWgsl } from '../../shared/noise-wgsl.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -372,10 +372,12 @@ export class HeatHaze implements EnginePlugin {
     v.set([plumes.length, o.steps ?? 24, 0, 0], 36);
     plumes.forEach((p, i) => writePlume(p, ambient, this.clock, v, HEAD + i * PLUME_FLOATS));
     device.queue.writeBuffer(this.uniform!, 0, v, 0, HEAD + plumes.length * PLUME_FLOATS);
-    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}`;
+    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, shader(!output.hdr), output.format, { multisample: output.multisample });
+      pipeline = render(device, displayFor(this.engine, shader(!output.hdr)), output.format, {
+        multisample: output.multisample,
+      });
       this.pipelines.set(key, pipeline);
     }
     const depth = this.host!.depthTexture!,

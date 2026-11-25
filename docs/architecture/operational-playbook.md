@@ -9731,3 +9731,13 @@ change untextured pixels and that disposing the effect removes the render attach
 ## Rough diffuse lobe (section 5 evidence, 2026-11-25)
 
 `KHR_materials_diffuse_roughness` compiles `eonWgsl` (`packages/gltf/src/shader.ts`) only into extended shaders of materials whose factor is above 0. It is the EON BRDF of Portsmouth, Kutz and Hill (JCGT 14(1), 2025, https://arxiv.org/abs/2410.18026): Fujii's Oren-Nayar single scatter plus a reciprocal multiple-scatter term, so the directional albedo of a white surface is 1. Evidence: `packages/gltf/test/diffuse-roughness.test.js` runs the shipped WGSL functions on the CPU against an oracle with the exact albedo (values, reciprocity, white furnace, albedo as the integral of the lobe); `packages/gltf/scripts/test-diffuse-roughness-browser.mjs` repeats the values on a GPU and compares pictures under sun, hemisphere and image-based light on WebGPU and the WebGL2 compatibility layer.
+
+## Display transform on a premultiplied canvas (section 5 supplement, 2026-11-25, KB-POST-ALPHARIM1)
+
+On a canvas `TransparentCanvas` marks premultiplied, a display transform must take straight colour: `toDisplay(c / a) * a`
+for 0 < a < 1 (Porter and Duff 1984), or silhouettes gain a light rim of about 36/255. Tonemap compiles its own variant
+(`premultipliedShader`); every post effect that writes the canvas from a linear capture builds its display pipeline
+through `displayFor(engine, code)` (`packages/shared/display.js`) and keys the pipeline on the mark, so an opaque canvas
+keeps its shaders byte for byte. Evidence: `packages/post/test/alpha-rim-browser.mjs` (12 effects, WebGPU and the WebGL2
+layer), `packages/headless/tests/transparent-gpu.mjs` (Tonemap chains, Node). Missing: DOF and water's screen composites
+still encode premultiplied colour (opaque-canvas only for now).

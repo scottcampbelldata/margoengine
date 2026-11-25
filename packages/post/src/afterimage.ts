@@ -7,7 +7,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -212,10 +212,12 @@ export class Afterimage implements EnginePlugin {
     this.pass(c, this.foldPipeline, fold, this.views[next]);
     this.last = next;
     if (output.hdr) return this.views[next];
-    const key = output.format + ':' + (output.multisample?.count ?? 1);
+    const key = output.format + ':' + (output.multisample?.count ?? 1) + premultipliedCanvas(this.engine);
     if (this.presentKey !== key) {
       this.presentKey = key;
-      this.presentPipeline = render(device, presentShader, output.format, { multisample: output.multisample });
+      this.presentPipeline = render(device, displayFor(this.engine, presentShader), output.format, {
+        multisample: output.multisample,
+      });
       this.presents = [];
     }
     const present = (this.presents[next] ??= group(device, this.presentPipeline!, [this.views[next]]));

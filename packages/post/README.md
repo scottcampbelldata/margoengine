@@ -1551,9 +1551,14 @@ and after the alpha changes (it writes frames only, no committed result yet).
 - **Tonemap** (`@margoengine/tonemap`) carries the scene alpha and applies its curve to the straight colour of
   partly covered pixels, so a silhouette keeps the face colour at its coverage
   (`packages/headless/tests/transparent-gpu.mjs`: within 1.1 of 255, alone and in a stack with FXAA or SMAA).
-- **SSAO** used without a display effect after it carries the scene alpha, but tone-maps the premultiplied colour
-  of partly covered silhouette pixels, so a 1 px rim can be up to ~45/255 brighter than its alpha allows (a faint
-  light edge on dark pages). In a `PostStack` with a Tonemap after it, Tonemap does the curve and there is no rim.
+- **Every effect that writes the canvas from a linear capture** (SSAO, GTAO, SSGI, SSR, Bloom, Afterimage, Accumulate,
+  LensFlare, Lens, Anamorphic, Blur and radial blur, HeatHaze, ContactShadows, SSS, MaterialDecals, MotionBlur,
+  SelectiveBloom, EffectMask) reads the mark TransparentCanvas sets and, on that canvas only, applies the display
+  transform to the straight colour of partly covered pixels: `toDisplay(c / a) * a` (T. Porter and T. Duff,
+  "Compositing Digital Images", SIGGRAPH 1984). Encoding the premultiplied colour made a 1 px rim about 36 of 255
+  brighter than its alpha allowed (KB-POST-ALPHARIM1). `packages/post/test/alpha-rim-browser.mjs` draws a box with
+  each of 12 effects alone, on WebGPU (within 0.7 of 255, Bloom 1.4) and the WebGL2 layer (within 2.3); an opaque
+  canvas keeps its shaders byte for byte (`packages/post/test/straight-display.test.js`).
 - **PostStack** adds no pass of its own; its last effect writes the canvas.
 - **SMAA** blends the stored premultiplied colour (alpha valid) and finds edges in alpha too; **Glitch** takes the
   largest alpha of its three reads; **Afterimage** applies its max to alpha too, so trails fade as a premultiplied

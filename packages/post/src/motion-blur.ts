@@ -5,7 +5,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { render, compute, group as bind } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex } from './hiz.js';
 import { applyView, fromTarget, viewLoadOp } from '../../shared/view-rect.js';
@@ -304,10 +304,15 @@ export class MotionBlur implements EnginePlugin {
     output: number,
     copy = false,
   ): void {
-    const key = (copy ? 'copy:' : '') + output + format + multisample.count;
+    const key = (copy ? 'copy:' : '') + output + format + multisample.count + premultipliedCanvas(this.engine);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(c.device, copy ? copyShader(output) : reconstructShader(output), format, { multisample });
+      pipeline = render(
+        c.device,
+        displayFor(this.engine, copy ? copyShader(output) : reconstructShader(output)),
+        format,
+        { multisample },
+      );
       this.pipelines.set(key, pipeline);
     }
     let byInput = this.groups.get(pipeline);

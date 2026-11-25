@@ -9,7 +9,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext, Vec3 } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -219,17 +219,19 @@ export class Anamorphic implements EnginePlugin {
       streaks = this.views[passes & 1];
     }
     const display = !output.hdr,
+      straight = display && premultipliedCanvas(this.engine),
       composite = pipeline(
-        `composite${output.format}${display}${output.multisample.count}`,
-        compositeShader(display),
+        `composite${output.format}${display}${output.multisample.count}${straight}`,
+        displayFor(this.engine, compositeShader(display)),
         display ? output.format : 'rgba16float',
         display ? output.multisample : undefined,
       );
-    const g = bind(`composite${output.format}${display}${output.multisample.count}${on}${passes & 1}`, composite, 7, [
-      input,
-      streaks,
-      this.sampler!,
-    ]);
+    const g = bind(
+      `composite${output.format}${display}${output.multisample.count}${straight}${on}${passes & 1}`,
+      composite,
+      7,
+      [input, streaks, this.sampler!],
+    );
     if (display) {
       this.pass(c, composite, g, output.view, true);
       return;

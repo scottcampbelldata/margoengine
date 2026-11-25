@@ -1,7 +1,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { StageOutput } from '../../shared/stack.js';
 import { fullscreen } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { Bloom, type BloomOptions } from './bloom.js';
 import { ScreenEffect, type ScreenContext } from './screen-effect.js';
 import { PostStack } from './stack.js';
@@ -91,7 +91,13 @@ export class SelectiveBloom extends ScreenEffect {
     ]);
     Object.assign(this.bloom.options, { strength: o.strength, threshold: o.threshold, radius: o.radius });
     this.bloom.encodeImage(c, selected, bloomed);
-    this.draw(c, composite(output.hdr), output, [input, selected, bloomed, uniform]);
+    // On a premultiplied canvas the curve takes the straight colour of a partly covered pixel (shared/display.js).
+    const code = composite(output.hdr),
+      shown =
+        !output.hdr && premultipliedCanvas(this.engine)
+          ? displayFor(this.engine, code.replace('let d=toDisplay(c);', 'let d=toDisplayStraight(c,s.a);'))
+          : code;
+    this.draw(c, shown, output, [input, selected, bloomed, uniform]);
   }
   protected override release(): void {
     super.release();

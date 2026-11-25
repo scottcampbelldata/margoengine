@@ -5,7 +5,7 @@ import { render, compute, group as bind } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
 import { type BorrowSlot, type Borrowable, borrow, lend } from '../../shared/borrowed.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex } from './hiz.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -317,10 +317,10 @@ export class LensFlare implements EnginePlugin {
       pass.dispatchWorkgroups(1);
       pass.end();
     }
-    const key = output.format + output.multisample.count + output.hdr + layout;
+    const key = output.format + output.multisample.count + output.hdr + layout + premultipliedCanvas(this.engine);
     if (this.key !== key) {
       this.key = key;
-      this.composite = render(c.device, flareShader(output.hdr, layout), output.format, {
+      this.composite = render(c.device, displayFor(this.engine, flareShader(output.hdr, layout)), output.format, {
         multisample: output.multisample,
       });
       this.input = undefined;

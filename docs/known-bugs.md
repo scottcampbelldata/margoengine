@@ -45,6 +45,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
   `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
 
+### Fixed 2026-11-25: post effects used alone on a transparent canvas drew a light rim on silhouettes (KB-POST-ALPHARIM1, post, display transform)
+
+- **Repro:** `packages/post/test/alpha-rim-browser.mjs` (WebGPU, and MARGO_COMPAT=1 for the WebGL2 layer): a box turned about the view axis on a `TransparentCanvas` with SSAO, GTAO, SSGI, SSR, Afterimage or LensFlare alone put silhouette pixels 36 to 37.5 of 255 above the face colour at their coverage, Bloom 37.5; Tonemap had the same fault until GAP-FILM-ALPHA (e323a96e86).
+- **Cause:** every post effect that writes the canvas from a linear capture ran `toDisplay` (PBR Neutral and the sRGB encoding) on the premultiplied colour. A partly covered pixel holds colour times coverage (Porter and Duff 1984), and the curve of that product is brighter than the product of the curve. FXAA, SMAA and Glitch were not affected: they filter core's display output, which core encodes per sample before the resolve.
+- **Fixed:** `straightDisplay` and `displayFor` in `packages/shared/display.js` rewrite each `vec4f(toDisplay(c),a)` as `toDisplay(c/a)*a` for 0 < a < 1, and every display pipeline in post (SSAO and GTAO, SSGI, SSR, Bloom, Afterimage, Accumulate, LensFlare, Lens, Anamorphic, Blur, HeatHaze, ContactShadows, SSS, MaterialDecals, MotionBlur, SelectiveBloom, EffectMask) builds from it and keys its pipeline on the canvas mark. An opaque canvas keeps its shaders byte for byte. Regression: the GPU test above (within 0.7 of 255 on WebGPU, Bloom 1.4; within 2.3 on the WebGL2 layer) and `packages/post/test/straight-display.test.js`.
+- **Same pattern outside post, not changed here:** DOF (`packages/dof/src/shaders.ts`, opaque-canvas only per the post README) and water's liquid, underwater and caustics composites encode `vec4f(toDisplay(rgb),now.a)` the same way; reported to the manager.
+
 ### Fixed 2026-11-25: a thin rod rolling on a default cloth is thrown through it (KB-SOFT-TUNNEL1, physics soft, soft-rigid contact)
 
 - **Repro:** `packages/physics/tests/soft.test.js`, "small and thin rigid bodies dropped on a default cloth rest on it for five seconds and never pass through it": with gravity 9.80665 m/s^2 the 5 mm rod rolls down the sagging sheet at up to 125 rad/s and leaves it at step 163, thrown at 65 m/s; at 9.81 it rolls a slightly different path and passed. It is not tunnelling through a gap: a single pass met one triangle 15 to 30 cm deep and pushed the rod through the sheet.

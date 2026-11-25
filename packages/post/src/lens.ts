@@ -9,7 +9,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { type BorrowSlot, type Borrowable, borrow, fix, lend, relend } from '../../shared/borrowed.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -264,10 +264,10 @@ export class Lens implements EnginePlugin {
       this.run(c, spread, groupFor('down', spread, 2, [this.glowViews[1]]), this.glowViews[0], false);
     }
     const display = !output.hdr,
-      key = `${output.format}${display}${output.multisample.count}`,
+      key = `${output.format}${display}${output.multisample.count}${display && premultipliedCanvas(this.engine)}`,
       composite = pipe(
         `composite${key}`,
-        compositeShader(display),
+        displayFor(this.engine, compositeShader(display)),
         display ? output.format : 'rgba16float',
         display ? output.multisample : undefined,
       ),

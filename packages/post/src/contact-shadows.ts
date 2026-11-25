@@ -13,7 +13,7 @@ import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extens
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -172,10 +172,12 @@ export class ContactShadows implements EnginePlugin {
     v.set([light[0] / length, light[1] / length, light[2] / length, o.thickness ?? 0.2], 32);
     v.set([o.distance ?? 0.4, 0, (o.enabled ?? true) ? (o.strength ?? 0.7) : 0, o.steps ?? 16], 36);
     device.queue.writeBuffer(this.uniform!, 0, v);
-    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}`;
+    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, shader(!output.hdr), output.format, { multisample: output.multisample });
+      pipeline = render(device, displayFor(this.engine, shader(!output.hdr)), output.format, {
+        multisample: output.multisample,
+      });
       this.pipelines.set(key, pipeline);
     }
     const depth = this.host!.depthTexture!,

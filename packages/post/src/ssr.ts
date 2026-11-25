@@ -8,7 +8,7 @@ import { preset } from '../../shared/preset.js';
 import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -519,12 +519,13 @@ export class SSR implements EnginePlugin {
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const models = this.models.size > 0,
       rough = this.stochastic,
-      key = output.format + output.multisample.count + output.hdr + models + rough,
+      key = output.format + output.multisample.count + output.hdr + models + rough + premultipliedCanvas(this.engine),
       code = output.hdr ? linearComposite : compositeShader,
       shader = models ? guarded(code) : code;
     if (this.key !== key) {
       this.key = key;
-      this.composite = render(c.device, rough ? roughComposite(shader, models) : shader, output.format, {
+      const full = rough ? roughComposite(shader, models) : shader;
+      this.composite = render(c.device, output.hdr ? full : displayFor(this.engine, full), output.format, {
         multisample: output.multisample,
       });
       this.input = undefined;

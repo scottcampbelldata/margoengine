@@ -19,7 +19,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { extractShader, ssaoShader, blurShader, compositeShader } from './shaders.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
-import { linearShader } from '../../shared/display.js';
+import { displayFor, linearShader, premultipliedCanvas } from '../../shared/display.js';
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linearComposite.includes('vec4f(toDisplay(c)'))
@@ -95,6 +95,8 @@ export class SSAO implements EnginePlugin {
   private occlusion?: GPUComputePipeline;
   private blur?: GPUComputePipeline;
   private composite?: GPURenderPipeline;
+  /** The canvas was premultiplied when the solo composite was built (it then encodes straight colour). */
+  private straight = false;
   private captureTarget?: SceneTarget;
   private textures: GPUTexture[] = [];
   private directions: GPUBuffer[] = [];
@@ -396,12 +398,17 @@ export class SSAO implements EnginePlugin {
   }
   /** Stacked: darken the ambient term of `input`; Khronos PBR Neutral encoded only as the display output. */
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
-    const key = output.format + output.multisample.count + output.hdr;
+    const key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
     if (this.key !== key) {
       this.key = key;
-      this.composite = render(c.device, output.hdr ? linearComposite : compositeShader, output.format, {
-        multisample: output.multisample,
-      });
+      this.composite = render(
+        c.device,
+        output.hdr ? linearComposite : displayFor(this.engine, compositeShader),
+        output.format,
+        {
+          multisample: output.multisample,
+        },
+      );
       this.groups.length = 4;
     }
     if (this.input !== input || !this.groups[4]) {
@@ -417,6 +424,7 @@ export class SSAO implements EnginePlugin {
     if (
       this.width === c.width &&
       this.height === c.height &&
+      (host || this.straight === premultipliedCanvas(this.engine)) &&
       (host
         ? this.captureTarget === host.target
         : this.originalFormat === c.format &&
@@ -493,7 +501,8 @@ export class SSAO implements EnginePlugin {
         entries: resources.map((resource, binding) => ({ binding, resource })),
       });
     if (!host) {
-      const module = c.device.createShaderModule({ code: compositeShader });
+      this.straight = premultipliedCanvas(this.engine);
+      const module = c.device.createShaderModule({ code: displayFor(this.engine, compositeShader) });
       this.composite = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

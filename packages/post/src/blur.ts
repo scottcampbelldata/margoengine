@@ -9,7 +9,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
-import { displayShader } from '../../shared/display.js';
+import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp, viewRect } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
@@ -323,9 +323,11 @@ export class Blur implements EnginePlugin {
     display: boolean,
     multisample?: GPUMultisampleState,
   ): GPURenderPipeline {
-    const key = `${shader === radialShader}:${format}:${display}:${multisample?.count ?? 1}`;
+    const straight = display && premultipliedCanvas(this.engine),
+      key = `${shader === radialShader}:${format}:${display}:${multisample?.count ?? 1}:${straight}`;
     let p = this.pipelines.get(key);
-    if (!p) this.pipelines.set(key, (p = render(device, shader(display), format, { multisample })));
+    if (!p)
+      this.pipelines.set(key, (p = render(device, displayFor(this.engine, shader(display)), format, { multisample })));
     return p;
   }
   private bind(device: GPUDevice, key: string, p: GPURenderPipeline, resources: GPUBindingResource[]): GPUBindGroup {
