@@ -1,6 +1,14 @@
 import { PbrMaterial as CoreMaterial } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
-import { Material, Texture, CubeTexture, loadTexture, loadCubeTexture, type TextureSource } from './built-material.js';
+import {
+  Material,
+  Texture,
+  CubeTexture,
+  loadTexture,
+  loadCubeTexture,
+  type TextureLimits,
+  type TextureSource,
+} from './built-material.js';
 import * as kinds from './material-classes.js';
 import { WgslMaterial } from './wgsl-material.js';
 import { alphaHash } from './alpha-hash.js';
@@ -45,7 +53,14 @@ export interface MaterialRestoreOptions {
   resolveExternal?(key: string, options: { signal?: AbortSignal }): object | Promise<object>;
   signal?: AbortSignal;
   fetch?: typeof fetch;
+  /** Download and decode caps for URL textures. They come from here only: a material file's own options never set them. */
+  limits?: TextureLimits;
 }
+/** A file's texture options without the download and decode caps, which only the caller of the restore may set. */
+const fileTextureOptions = (value: unknown): object => {
+  const { maxBytes: _bytes, maxPixels: _pixels, ...rest } = (value ?? {}) as Record<string, unknown>;
+  return rest;
+};
 const fail = (message: string): never => {
   throw new MargoError('state', message + '; use matching owner codecs and a version 1 material library');
 };
@@ -371,25 +386,27 @@ export async function restoreMaterialLibrary(
         if (source && (typeof source.url === 'string' || Array.isArray(source.url)))
           result = data.cube
             ? await loadCubeTexture(source.url, {
-                ...(data.options as object),
+                ...fileTextureOptions(data.options),
                 signal: options.signal,
                 fetch: options.fetch,
               })
             : await loadTexture(source.url, {
-                ...(data.options as object),
+                ...fileTextureOptions(data.options),
+                maxBytes: options.limits?.maxBytes,
+                maxPixels: options.limits?.maxPixels,
                 signal: options.signal,
                 fetch: options.fetch,
               });
         else if (data.cube) {
           const cube = data.source as { faces?: never; equirect?: Texture; size?: number };
           result = new CubeTexture(cube.faces ?? cube.equirect ?? (data.source as never), {
-            ...(data.options as object),
+            ...fileTextureOptions(data.options),
             ...(cube.size === undefined ? {} : { size: cube.size }),
           });
         } else
           result = new Texture(
             data.flipRows === true ? flipRows(data.source) : (data.source as TextureSource),
-            data.options as never,
+            fileTextureOptions(data.options) as never,
           );
         owned.push(result);
       } else {

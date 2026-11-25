@@ -32,6 +32,7 @@ export interface MaterialRestoreOptions {
     }): object | Promise<object>;
     signal?: AbortSignal;
     fetch?: typeof fetch;
+    limits?: TextureLimits;
 }
 
 export type MaterialValue = null | boolean | string | number | {
@@ -579,6 +580,11 @@ class Texture {
 }
 
 type TextureDimension = '2d' | '2d-array' | '3d' | 'cube';
+
+interface TextureLimits {
+    maxBytes?: number;
+    maxPixels?: number;
+}
 
 interface TextureOptions {
     colorSpace?: 'srgb' | 'linear' | 'display-p3';

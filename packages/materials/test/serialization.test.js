@@ -102,3 +102,40 @@ test('a captured drawable texture restores with its flipY orientation and natura
     delete globalThis.OffscreenCanvas;
   }
 });
+
+test('a material file cannot raise the texture download caps; only the caller of the restore sets them', async () => {
+  const map = new Texture({ data: new Uint8Array(16), width: 2, height: 2, format: 'rgba8unorm' });
+  const archive = JSON.parse(
+    JSON.stringify(
+      await captureMaterialLibrary(
+        { material: new Material({ map }) },
+        { textureURL: () => 'https://assets.test/a.png' },
+      ),
+    ),
+  );
+  const row = archive.objects.find((o) => o.type === 'texture');
+  assert.ok(row, 'the archive holds one URL texture');
+  row.data.options = { ...row.data.options, maxPixels: 1e12, maxBytes: 1e12 };
+  const fetchBefore = globalThis.fetch,
+    bitmapBefore = globalThis.createImageBitmap;
+  let size = [8192, 4096];
+  globalThis.fetch = async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } });
+  globalThis.createImageBitmap = async () => ({ width: size[0], height: size[1], close() {} });
+  try {
+    await assert.rejects(
+      restoreMaterialLibrary(archive),
+      /size limit/,
+      'the file asked for 1e12 pixels; the default holds',
+    );
+    await assert.rejects(restoreMaterialLibrary(archive, { limits: { maxBytes: 2 } }), /Texture download/);
+    size = [4, 4];
+    await assert.rejects(restoreMaterialLibrary(archive, { limits: { maxPixels: 8 } }), /size limit/);
+    assert.ok((await restoreMaterialLibrary(archive)).material, 'a small image still restores');
+    size = [8192, 4096];
+    const raised = await restoreMaterialLibrary(archive, { limits: { maxPixels: 8192 * 4096 } });
+    assert.ok(raised.material, 'the caller raises the cap');
+  } finally {
+    globalThis.fetch = fetchBefore;
+    globalThis.createImageBitmap = bitmapBefore;
+  }
+});
