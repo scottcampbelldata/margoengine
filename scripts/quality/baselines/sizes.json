@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18783130,
+  "total": 18807152,
   "history": [
     {
       "date": "2026-10-24",
@@ -11949,6 +11949,12 @@
       "commit": "FG-16",
       "reason": "FG-16 new entry scatter/velocity 3,319 B gzip: ScatterVelocity, a TAAVelocityPass drawing a scatter's wind motion (two poses a vertex) into TAA's object velocity pass, its coverage-depth stages included; optional, nothing else imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "db03e0da4",
+      "reason": "new @margoengine/splats/session entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -13140,6 +13146,7 @@
     "@margoengine/splats/modify": 20554,
     "@margoengine/splats/pick": 3573,
     "@margoengine/splats/progressive": 32898,
+    "@margoengine/splats/session": 24022,
     "@margoengine/splats/set": 30344,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 1734,
