@@ -110,43 +110,78 @@ export interface LoadGeoidOptions {
  */
 export async function loadEGM96(options: LoadGeoidOptions = {}): Promise<Geoid> {
   const url = new URL(options.url ?? /* @vite-ignore */ `./${EGM96_FILE}`, import.meta.url),
-    bytes = await read(url, options.signal),
-    size = EGM96_ROWS * EGM96_COLUMNS * 2;
-  if (!bytes || bytes.byteLength !== size)
-    throw fault(
-      'failed',
-      `The EGM96 grid ${url.href} is ${bytes ? `${bytes.byteLength} bytes, not ${size}` : 'missing'}; build it with node scripts/geoid/pack-egm96.mjs from NGA's WW15MGH.GRD`,
-      'controls-geoid',
-    );
-  const view = new DataView(bytes),
+    bytes = await read(url, EGM96_ROWS * EGM96_COLUMNS * 2, options.signal),
+    view = new DataView(bytes),
     data = new Int16Array(EGM96_ROWS * EGM96_COLUMNS);
   for (let i = 0; i < data.length; i++) data[i] = view.getInt16(i * 2, true);
   return new Geoid({ data, rows: EGM96_ROWS, columns: EGM96_COLUMNS });
 }
 
-/** The file's bytes, or null when it is not there (fetch in a page, the file system for a file: URL in Node). */
-async function read(url: URL, signal?: AbortSignal): Promise<ArrayBuffer | null> {
+/** The coded error for a grid file that is not there or not the packed EGM96 size. */
+const wrong = (url: URL, what: string) =>
+  fault(
+    'failed',
+    `The EGM96 grid ${url.href} is ${what}; build it with node scripts/geoid/pack-egm96.mjs from NGA's WW15MGH.GRD`,
+    'controls-geoid',
+  );
+
+/**
+ * Exactly `size` bytes of the file (fetch in a page, the file system for a file: URL in Node). The size is checked
+ * before anything is buffered (the file's size, the response's content-length) and the body is read into a buffer of
+ * that size, cancelled the moment more arrives, so a wrong or hostile response never grows memory past it.
+ */
+async function read(url: URL, size: number, signal?: AbortSignal): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (url.protocol === 'file:') {
     const fs = 'node:fs/promises',
-      { readFile } = (await import(/* @vite-ignore */ fs)) as {
+      { readFile, stat } = (await import(/* @vite-ignore */ fs)) as {
         readFile(path: URL, options: object): Promise<Uint8Array>;
+        stat(path: URL): Promise<{ size: number }>;
       };
+    let length: number;
     try {
-      const b = await readFile(url, signal ? { signal } : {});
-      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+      length = (await stat(url)).size;
     } catch (error) {
-      if ((error as { code?: string }).code === 'ENOENT') return null;
+      if ((error as { code?: string }).code === 'ENOENT') throw wrong(url, 'missing');
       throw error;
     }
+    if (length !== size) throw wrong(url, `${length} bytes, not ${size}`);
+    const b = await readFile(url, signal ? { signal } : {});
+    if (b.byteLength !== size) throw wrong(url, `${b.byteLength} bytes, not ${size}`);
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
   }
   const response = await fetch(url, signal ? { signal } : {});
-  if (response.status === 404) return null;
-  if (!response.ok)
+  if (response.status === 404) {
+    await response.body?.cancel();
+    throw wrong(url, 'missing');
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
     throw fault(
       'failed',
       `The EGM96 grid ${url.href} answered HTTP ${response.status}; serve the file beside the entry`,
       'controls-geoid',
     );
-  return response.arrayBuffer();
+  }
+  const declared = response.headers.get('content-length');
+  if (declared !== null && Number(declared) !== size) {
+    await response.body?.cancel();
+    throw wrong(url, `${declared} bytes, not ${size}`);
+  }
+  const out = new Uint8Array(size),
+    reader = response.body?.getReader();
+  if (!reader) throw wrong(url, 'an empty response');
+  let at = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (at + value.byteLength > size) {
+      await reader.cancel();
+      throw wrong(url, `more than ${size} bytes`);
+    }
+    out.set(value, at);
+    at += value.byteLength;
+  }
+  if (at !== size) throw wrong(url, `${at} bytes, not ${size}`);
+  return out.buffer;
 }

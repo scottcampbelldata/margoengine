@@ -95,3 +95,40 @@ test('GeospatialControls loads EGM96 on the first sea-level read: a geoid event,
   c.dispose();
   none.dispose();
 });
+
+test('a wrong-size response is refused before it is buffered: content-length first, then a capped read', async () => {
+  const size = EGM96_ROWS * EGM96_COLUMNS * 2,
+    original = globalThis.fetch;
+  let pulled = 0;
+  const endless = () =>
+    new ReadableStream({
+      pull(controller) {
+        pulled += 65536;
+        controller.enqueue(new Uint8Array(65536));
+      },
+    });
+  try {
+    // A declared size that is wrong: refused without reading the body.
+    globalThis.fetch = async () => new Response(endless(), { headers: { 'content-length': String(10 * size) } });
+    await assert.rejects(
+      loadEGM96({ url: 'https://example.test/egm96-15.bin' }),
+      (e) => e.code === 'failed' && /bytes, not/.test(e.message),
+    );
+    assert.ok(pulled <= 65536 * 2, `read ${pulled} bytes of a body it had refused`);
+    // No size declared and an endless body: the read stops at the cap.
+    pulled = 0;
+    globalThis.fetch = async () => new Response(endless());
+    await assert.rejects(
+      loadEGM96({ url: 'https://example.test/egm96-15.bin' }),
+      (e) => e.code === 'failed' && /more than/.test(e.message),
+    );
+    assert.ok(pulled <= size + 3 * 65536, `pulled ${pulled} bytes for a ${size} byte cap`);
+    // A short body and a 404 are refused too.
+    globalThis.fetch = async () => new Response(new Uint8Array(10));
+    await assert.rejects(loadEGM96({ url: 'https://example.test/egm96-15.bin' }), /10 bytes, not/);
+    globalThis.fetch = async () => new Response('no', { status: 404 });
+    await assert.rejects(loadEGM96({ url: 'https://example.test/egm96-15.bin' }), /missing/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
