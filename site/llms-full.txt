@@ -12252,13 +12252,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix plan:** substeps per island. A body in contact must turn at most 0.4 rad a substep (measured: 0.5 rad gains nothing at any spin to 700 rad/s, 0.6 gains 19 percent at 250 rad/s, the quarter pi at which Box2D v3 clamps the spin gains 1.5 percent at 400). Islands now solve one at a time, so an island takes `max(world substeps, ceil(spin * dt / 0.4))` substeps of its own, bounded, and the rest of the world steps as before. A world-wide count, tried first (kept on a local branch), fixes the bar but changes every island's substep length, and the joint-web stress tests (`kernel/tests/stability.rs`, seeds 23 and 35) leave their bounds; it also showed that the staged poses of kinematic bodies and the narrow phase's warm-start scaling must read the step's own substep count, not the world's setting.
 - **Fixed already in the same area:** the world inverse inertia and the point masses of a body that has turned were those of the step's first pose, and a spinner gained 3.2 times its energy at 400 rad/s and 3.4 times at 2,000 (`refresh_turned_contacts`, `spin_energy.rs`).
 
-### Open: the sheen albedo test reads a commit the public repository does not have (KB-SHEENPIN-HISTORY1, materials)
+### Fixed 2026-11-25: the sheen albedo test read a commit the public repository does not have (KB-SHEENPIN-HISTORY1, materials)
 
 - **Repro:** `node --test packages/materials/test/sheen-albedo-fit.test.js` in a clone of the public repository: "the GPU
   check reference is the pinned closed form the table replaced" fails with `fatal: invalid object name
   '5cef0a120b9fbbf336c56a476f56ccac2f107960^'`.
 - **Cause:** the test compares `closedFormAlbedoWGSL` (scripts/sheen-albedo-fit.mjs) with `git show` of that commit's
   parent, which is in the engine's earlier private history only. The shipped shader is not affected.
+- **Fix:** cd727fe31 and ddb0109a2 hold the closed-form reference in the test itself; the private sync ff88a70e7 undid
+  them and caf466b4c restored them. `packages/materials/test/sheen-albedo-fit.test.js` passes 5/5 and runs no git
+  command.
 
 ### Fixed 2026-11-21: a closed WebSocket or data-channel connection kept its listeners on the socket and channels (KB-NETCODE-LISTENERS1, netcode)
 
