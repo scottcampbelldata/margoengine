@@ -1100,6 +1100,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     readonly name: string;
     fixedTimestep: number;
     maxSubsteps: number;
+    film: boolean;
     interpolate: boolean;
     timeScale: number;
     paused: boolean;
@@ -1137,6 +1138,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     setup(engine: EngineKernel): void;
     onPreUpdate(delta: number): void;
     update(delta: number): number;
+    advance(frame: number, fps: number): number;
     step(): void;
     detectCollisions(): void;
     get quarantined(): readonly PhysicsBody[];
@@ -1569,6 +1571,7 @@ export interface PhysicsOptions {
     gravity?: Vec3;
     fixedTimestep?: number;
     maxSubsteps?: number;
+    film?: boolean;
     interpolate?: boolean;
     timeScale?: number;
     paused?: boolean;

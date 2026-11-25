@@ -76,8 +76,14 @@ export interface PhysicsOptions {
   gravity?: Vec3;
   /** Seconds per physics step (default 1/60). */
   fixedTimestep?: number;
-  /** Most steps per frame; extra time is dropped so a slow frame cannot snowball (default 4). */
+  /** Most steps per frame; extra time is dropped so a slow frame cannot snowball (default 4). Ignored in film mode. */
   maxSubsteps?: number;
+  /**
+   * Film mode (default false): `update` runs every step it owes, however long the frame was, and keeps the fraction of a step
+   * it cannot yet run, so no time is ever dropped and a shot never runs in silent slow motion. `maxSubsteps` is not used. Use
+   * {@link Physics.advance} to put the world at an exact frame of a shot, whatever the frame rate it is rendered at.
+   */
+  film?: boolean;
   /** Interpolate rendered transforms between the last two steps (default true). */
   interpolate?: boolean;
   /** Multiplies frame time, for slow motion (default 1). */
@@ -567,6 +573,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   readonly name: string;
   fixedTimestep: number;
   maxSubsteps: number;
+  /** Film mode: `update` drops no time (see {@link PhysicsOptions.film}). */
+  film: boolean;
   interpolate: boolean;
   timeScale: number;
   paused: boolean;
@@ -662,6 +670,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.maxSubsteps = options.maxSubsteps ?? 4;
+    this.film = options.film ?? false;
     this.interpolate = options.interpolate ?? true;
     this.timeScale = options.timeScale ?? 1;
     this.paused = options.paused ?? false;
@@ -870,7 +879,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (!this.paused) {
       const dt = this.fixedTimestep;
       this.accumulator += delta * this.timeScale;
-      while (this.accumulator + dt * 1e-6 >= dt && steps < this.maxSubsteps) {
+      while (this.accumulator + dt * 1e-6 >= dt && (this.film || steps < this.maxSubsteps)) {
         this.step();
         this.accumulator -= dt;
         steps++;
@@ -878,6 +887,42 @@ export class Physics implements EnginePlugin, BodyOwner {
       if (this.accumulator >= dt) this.accumulator %= dt;
       if (this.accumulator < 0) this.accumulator = 0;
       this.lastAlpha = this.interpolate ? this.accumulator / dt : 1;
+    }
+    this.sync();
+    return steps;
+  }
+
+  /**
+   * Puts the world at frame `frame` of a shot rendered at `fps` frames a second: it has then taken exactly
+   * `floor(frame / fps / fixedTimestep)` steps in all (a frame on a step boundary counts, to a part in 10^9), whatever calls
+   * brought it there, so a shot rendered at 24, 30 or 60 frames a second, or resumed from a restored snapshot, is the same
+   * simulation. The fraction of a step left over is the interpolation `alpha` the meshes are written at. Returns the steps
+   * taken. A world already past that frame cannot go back and throws; restore a snapshot instead.
+   * @throws MargoError code `state` when the world has taken more steps than that frame allows.
+   * @throws RangeError for a frame that is not a finite, non-negative whole number or an `fps` that is not above 0.
+   */
+  advance(frame: number, fps: number): number {
+    if (this.disposed) return 0;
+    if (!(Number.isFinite(frame) && frame >= 0 && Number.isInteger(frame)))
+      throw new RangeError(
+        `frame must be a finite, non-negative whole number; got ${frame}. Pass the frame's number in the shot.`,
+      );
+    if (!(Number.isFinite(fps) && fps > 0)) throw new RangeError(`fps must be a finite number above 0; got ${fps}.`);
+    const owed = (frame / fps / this.fixedTimestep) * (1 + 1e-9),
+      target = Math.floor(owed);
+    if (this.stepCount > target)
+      throw new MargoError(
+        'state',
+        `Physics has taken ${this.stepCount} steps and frame ${frame} at ${fps} fps is step ${target}; a world cannot go back. Restore a snapshot from before the frame.`,
+      );
+    let steps = 0;
+    if (!this.paused) {
+      while (this.stepCount < target) {
+        this.step();
+        steps++;
+      }
+      this.accumulator = Math.max(0, owed - target) * this.fixedTimestep;
+      this.lastAlpha = this.interpolate ? Math.min(1, this.accumulator / this.fixedTimestep) : 1;
     }
     this.sync();
     return steps;

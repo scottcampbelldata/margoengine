@@ -355,6 +355,18 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
   physics.dispose();
   ```
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
+- **Film mode and exact frames.** With `film: true`, `update` never drops time (a one-second hitch runs sixty steps), and `physics.advance(frame, fps)` puts the world at frame `frame` of a shot rendered at `fps`: exactly `floor(frame / fps / fixedTimestep)` steps in all, whatever frame rate or calls got it there, so a shot rendered at 24, 30 or 60 frames a second, or resumed after a restore, is the same simulation. A world already past the frame throws a `state` error: restore a snapshot instead.
+
+  ```ts
+  import {Physics} from 'margoengine/physics';
+
+  await Physics.load();
+  const physics = new Physics(null, {film: true});
+  physics.addBody(null, {position: [0, 5, 0], colliders: {shape: 'sphere', radius: 0.5}});
+  for (let frame = 1; frame <= 48; frame++) physics.advance(frame, 24);
+  console.log(physics.stepCount); // 120: two seconds of 1/60 s steps
+  physics.dispose();
+  ```
 - **Interpolation.** After each step the plugin stores the previous and current pose of every non-fixed body. Meshes get `lerp(previous, current, alpha)` for position and a shortest-arc slerp for rotation, where `alpha = accumulator / fixedTimestep`. Rendering therefore lags physics by less than one step and moves smoothly at any refresh rate. `interpolate: false` writes the latest step instead. Teleports (`body.setPosition`) reset both poses, so they do not streak.
 - **Mesh writes.** `sync()` reuses preallocated position and quaternion buffers. It writes them with core's `setPosition` and `setQuaternion`, which allocate nothing. Sleeping or motionless bodies are written once and then skipped. Fixed bodies are written only when moved through the body API. Scale is never touched. Stepping allocates nothing; events, scene queries and the vehicle and character helpers allocate their results.
 - **World space and parents.** Physics works in world space, so a body on a mesh below the root keeps its world pose: each frame it is written into the mesh's local transform through the parent's current world transform, with no frame of lag, parents before children when both have bodies. Nothing has to be flattened. A dynamic part falls off its model and stays where physics puts it, whatever its parent does. For a part that should move with its model and push things, use `{type: 'kinematicPosition', follow: true}`: before each step the body takes the mesh's world pose, and nothing is written back. `addModel(model, {perNode: true, type: 'kinematicPosition', follow: true})` does that for every part. Only a core `Mesh` can sit below a root; a mesh from another source must stay at the root.
@@ -405,6 +417,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | `gravity` | `[0, -9.81, 0]` | Also `physics.gravity = [...]` |
 | `fixedTimestep` | `1 / 60` | Seconds per step |
 | `maxSubsteps` | `4` | Steps per frame before the backlog is dropped |
+| `film` | `false` | Film mode: `update` runs every step it owes and keeps the fraction of a step, so no time is dropped; `maxSubsteps` is not used |
 | `interpolate` | `true` | Interpolate meshes between steps |
 | `timeScale` | `1` | Slow motion or fast forward |
 | `paused` | `false` | Paused worlds keep their meshes but do not step |
