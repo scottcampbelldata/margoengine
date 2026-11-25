@@ -6,7 +6,8 @@
 // the last frame (clock, step number, births budget: births per step equal exactly) and agree on the live count within
 // 5 % on a 2,000 particle fixture; C's step numbers restart (the restart a film cut showed before the seek). Births are
 // seeded by step and birth number, not slot (GAP-FILM-VFXSEED), so B holds exactly the particles A holds: every live
-// slot's 64 bytes, sorted, are equal (before the fix about none were shared).
+// slot's 64 bytes, sorted, are equal (before the fix about none were shared). Then A is reset and drawn beside a fresh
+// D: the same uniform and the same live particles, bit for bit (GAP-FILM-RESET).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 // A whole n = 1800 run takes about 10 s on the RTX A6000; each run gets 10 minutes, and every GPU wait inside the page
@@ -40,7 +41,7 @@ try {
       }),
     ]).finally(() => clearTimeout(timer));
     assert.deepEqual(r.errors, [], `GPU errors at n = ${n}`);
-    assert.deepEqual(r.zero, [0, 0, 0], 'warm-up frames move no clock');
+    assert.deepEqual(r.zero, [0, 0, 0, 0], 'warm-up frames move no clock');
     assert.equal(r.steps, n - 150);
     assert.ok(
       r.clocks.includes(r.name) && !r.unseekable.includes(r.name),
@@ -58,6 +59,16 @@ try {
     assert.ok(
       r.sameParticles,
       `${r.shared} of ${r.keptA} live particles equal after the seek and warm-up (GAP-FILM-VFXSEED)`,
+    );
+    // GAP-FILM-RESET: the effect reset after its run, drawn beside a fresh one, holds the same particles.
+    assert.equal(r.resetTime, 0, 'resetTime puts the clock at 0');
+    assert.ok(r.resetUniform, 'the reset effect uploads the uniform of a fresh one');
+    assert.equal(r.resetLive[0], r.resetLive[1], 'live counts after the reset');
+    assert.ok(r.resetLive[0] > 100, `the reset run keeps particles alive: ${r.resetLive[0]}`);
+    assert.deepEqual(r.resetKept[0], r.resetKept[1], 'live slots after the reset');
+    assert.ok(
+      r.resetSame,
+      `${r.resetShared} of ${r.resetKept[0]} live particles equal a fresh effect's after the reset`,
     );
     console.log(
       `ok vfx seek n = ${n} (${((Date.now() - started) / 1000).toFixed(1)} s): births ${r.birthsA} equal, live ${r.liveA} continuous, ${r.liveB} after seek and prewarm (${(off * 100).toFixed(2)} %), ${r.liveC} prewarm alone; ${r.shared} of ${r.keptA} particles equal bit for bit`,

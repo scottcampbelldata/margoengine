@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>VFX seek check</title><style>body{margin:0}canvas{display:inline-block;width:192px;height:128px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas>
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX seek check</title><style>body{margin:0}canvas{display:inline-block;width:192px;height:128px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas><canvas id="d"></canvas>
 <script type="module">
 // GAP-FILM-TIME bound for particles (class B, world history on the GPU). Three alike effects of capacity 2,000 with a
 // fractional rate and seeded bursts: A runs n + 1 live frames; B is fresh, seeks (n - P) / fps with
@@ -6,7 +6,9 @@
 // longest lifetime); C draws P + 1 frames with no seek. A and B must upload the same simulate uniform in the last frame
 // (clock, step number that seeds births, births budget) and their live counts must agree within 5 %. A birth's seed is
 // its step and its birth number in the step, not its slot (GAP-FILM-VFXSEED), so B's live particles are A's, bit for
-// bit, in other slots: every live slot's 64 bytes, sorted, must be equal. Driven by seek-check.mjs.
+// bit, in other slots: every live slot's 64 bytes, sorted, must be equal. GAP-FILM-RESET: A is then reset
+// (`resetTime`) and draws P + 1 frames beside D, fresh: the same uniform and the same live particles, bit for bit.
+// Driven by seek-check.mjs.
 import {Engine} from '/packages/core/dist/index.js';
 import {VFX} from '/packages/vfx/dist/base.js';
 import {schedule} from '/packages/vfx/dist/schedule.js';
@@ -30,14 +32,14 @@ async function live(w){
  encoder.copyBufferToBuffer(w.vfx.gpuState.indirect,0,staging,0,20);device.queue.submit([encoder.finish()]);
  await within(staging.mapAsync(GPUMapMode.READ),'the live count read');const n=new Uint32Array(staging.getMappedRange())[1];staging.unmap();staging.destroy();return n;
 }
-const a=await world('a'),b=await world('b'),c=await world('c');
+const a=await world('a'),b=await world('b'),c=await world('c'),d=await world('d');
 // Pipelines compile on warm-up frames of delta 0, which move no clock (a seek needs clocks at 0); every world gets the
 // same number of them.
 const counts=[];
 phase='warm-up';
-for(const w of [a,b,c]){let n=0;await waitForPipelines(async()=>{n++;await draw(w,0);});counts.push(n);}
+for(const w of [a,b,c,d]){let n=0;await waitForPipelines(async()=>{n++;await draw(w,0);});counts.push(n);}
 const most=Math.max(...counts);
-for(const [i,w] of [a,b,c].entries())for(let k=counts[i];k<most;k++)await draw(w,0);
+for(const [i,w] of [a,b,c,d].entries())for(let k=counts[i];k<most;k++)await draw(w,0);
 // Every live slot's 64 bytes (position and life, velocity and size, colour, rotation), as sorted keys: the particles
 // whatever slots they landed in.
 async function particles(w){
@@ -48,8 +50,18 @@ async function particles(w){
  for(let i=0;i<n;i++){if(!(f[i*8+3]>0))continue;const hot=u.subarray(i*8,i*8+8),cold=u.subarray(n*8+i*8,n*8+i*8+8);keys.push([...hot,...cold].join(","));}
  return keys.sort();
 }
+// A, reset, against D, fresh: P + 1 frames each, then the uniform and every live particle (sorted keys, as above: a
+// birth's slot depends on the order the GPU hands slots out, its 64 bytes do not).
+async function resetRun(uniform){
+ a.vfx.resetTime();const resetTime=a.vfx.time;
+ for(let step=0;step<=P;step++){phase=`reset frame ${step} of ${P}`;await draw(a);await draw(d);}
+ phase='reset read back';
+ const ka=await particles(a),kd=await particles(d),inD=new Set(kd);
+ return {resetTime,resetUniform:JSON.stringify(uniform(a))===JSON.stringify(uniform(d)),resetLive:[await live(a),await live(d)],
+  resetKept:[ka.length,kd.length],resetShared:ka.filter(k=>inD.has(k)).length,resetSame:ka.join(";")===kd.join(";")};
+}
 window.check={get phase(){return phase;},async run(n=600){
- const zero=[a,b,c].map(w=>w.vfx.time);
+ const zero=[a,b,c,d].map(w=>w.vfx.time);
  for(let step=0;step<=n;step++){phase=`A frame ${step} of ${n}`;await draw(a);}
  phase='seek B';const result=await within(seek(b.engine,(n-P)/FPS,{fps:FPS}),'the seek');
  for(let step=n-P;step<=n;step++){phase=`B frame ${step} of ${n}`;await draw(b);}
@@ -61,7 +73,8 @@ window.check={get phase(){return phase;},async run(n=600){
   timeA:a.vfx.time,timeB:b.vfx.time,uniformEqual:JSON.stringify(uniform(a))===JSON.stringify(uniform(b)),
   birthsA:a.vfx['ints'][53],birthsB:b.vfx['ints'][53],stepA:a.vfx['ints'][54],stepB:b.vfx['ints'][54],stepC:c.vfx['ints'][54],
   liveA:await live(a),liveB:await live(b),liveC:await live(c),
-  keptA:keysA.length,keptB:keysB.length,shared:keysA.filter(k=>inB.has(k)).length,sameParticles:keysA.join(";")===keysB.join(";")};
+  keptA:keysA.length,keptB:keysB.length,shared:keysA.filter(k=>inB.has(k)).length,sameParticles:keysA.join(";")===keysB.join(";"),
+  ...await resetRun(uniform)};
 }};
 window.ready=true;
 </script></body></html>

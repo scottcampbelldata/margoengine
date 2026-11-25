@@ -30,6 +30,7 @@ export class Flame implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onPreUpdate(delta: number): void;
     setLength(length: number): this;
     setWind(wind: VFXWind | undefined): this;

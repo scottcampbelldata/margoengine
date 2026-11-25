@@ -839,6 +839,13 @@ export class Flame implements EnginePlugin {
     if (this.disposed) return;
     this.clock += delta > 0 ? delta : 0;
   }
+  /**
+   * Back to time 0, as a fresh flame with the same options (GAP-FILM-RESET): the puffing, the light's flicker and the
+   * dither start again, so the same frames after it draw what a fresh flame draws.
+   */
+  resetTime(): void {
+    this.clock = this.current = 0;
+  }
   onPreUpdate(delta: number): void {
     if (this.disposed) return;
     this.advanceTime(delta);

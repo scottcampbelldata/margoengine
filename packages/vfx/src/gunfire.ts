@@ -946,6 +946,8 @@ const windAt = (wind: VFXWind | undefined, at: Vec3, t: number): [number, number
   return [wind[0], wind[1]];
 };
 
+/** A cloud's matrix before it is placed. */
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 /**
  * A battery of muzzle-loading guns: each shot flashes (fireball billboards whose brightness is the flash averaged over
  * the camera's shutter, and a point light of the same radiance), throws out a bank of white powder smoke that grows,
@@ -1144,6 +1146,45 @@ export class Battery implements EnginePlugin {
     if (o.smokeColor) {
       finiteVector(o.smokeColor, 3, 'Battery smokeColor');
       for (const c of o.smokeColor) check(c, 'smokeColor channel', 0, 1);
+    }
+  }
+  /**
+   * Back to time 0, as a fresh battery with the same options (GAP-FILM-RESET): the `shots` of the options queued again
+   * (ones added with `fire` or `broadside` are dropped), no shot fired, every bank, flash, spark, splinter and light
+   * idle, and the holes it drew into the targets' masks (their blue channel) cleared, so the same frames after it draw
+   * what a fresh battery draws.
+   */
+  resetTime(): void {
+    if (this.disposed) return;
+    this.clock = this.cursor = this.hitCursor = 0;
+    this.lastDelta = 1 / 30;
+    this.drift[0] = this.drift[1] = 0;
+    this.queue.length = 0;
+    this.queue.push(...(this.options.shots ?? []));
+    this.queue.sort((a, b) => a.time - b.time || a.gun - b.gun);
+    this.fired.length = 0;
+    this.pendingHits.length = 0;
+    this.puffs.clear();
+    this.point.along = this.point.rise = this.point.radius = this.point.speed = 0;
+    for (const bank of this.banks) {
+      bank.shot = bank.puff = null;
+      bank.cloud.options.opacity = 0;
+      bank.cloud.matrix.set(IDENTITY);
+    }
+    this.clouds.resetTime();
+    for (const effect of [...this.flashes, ...this.sparks, this.splinters]) effect.resetTime();
+    for (const light of this.lights) {
+      (light.position as unknown as number[]).splice(0, 3, 0, -1e6, 0);
+      light.intensity = 0;
+    }
+    this.target?.setLights(this.lights);
+    const cleared = new Set<HullMask>();
+    for (const t of this.options.targets ?? []) {
+      if (!t.mask || cleared.has(t.mask)) continue;
+      cleared.add(t.mask);
+      const data = maskImage(t.mask).data;
+      for (let i = 2; i < data.length; i += 4) data[i] = 0;
+      t.mask.update();
     }
   }
   /** Queues gun `gun` to fire at film time `time` (default now). */
@@ -2039,6 +2080,18 @@ export class HullFire implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
+  }
+  /**
+   * Back to time 0, as a fresh fire with the same options (GAP-FILM-RESET): its flames and smoke columns go back to their
+   * own start and are placed for time 0, and the mask's char and glow are painted for time 0 (none), so the same frames
+   * after it draw what a fresh fire draws.
+   */
+  resetTime(): void {
+    if (this.disposed) return;
+    this.clock = 0;
+    this.place();
+    for (const clock of [...this.flameVolumes, ...this.smokeColumns]) clock.resetTime();
+    this.paint();
   }
   /** Moves the fire's clock by `delta` seconds and sets its flames and smoke for that time and the ship's pose (CPU only). */
   advanceTime(delta: number): void {

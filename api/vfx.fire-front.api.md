@@ -96,6 +96,7 @@ export class FireFront implements EnginePlugin {
     get active(): boolean;
     ignite(x: number, z: number, radius?: number, time?: number): this;
     advanceTime(delta: number): void;
+    resetTime(): void;
     update(delta: number): void;
     settle(maxSeconds?: number, signal?: AbortSignal): Promise<number>;
     segments(): FireSegment[];
@@ -256,6 +257,7 @@ class Flame implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onPreUpdate(delta: number): void;
     setLength(length: number): this;
     setWind(wind: VFXWind | undefined): this;
@@ -345,6 +347,7 @@ class Smoke implements EnginePlugin {
     get time(): number;
     onPreUpdate(delta: number): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     refill(): this;
     setHeat(heat: number): this;
     setWind(wind: VFXWind | undefined): this;
@@ -406,6 +409,7 @@ class VFX implements EnginePlugin {
     setFog(fog: FogLike | null): this;
     burst(count: number, spawn?: BurstSpawn): this;
     reset(): this;
+    resetTime(): void;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

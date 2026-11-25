@@ -183,7 +183,10 @@ engine.render({ delta: 1 / 30 });
   holds one.
 - Clocks with `resetTime` today: `TAA`, `TAAUpscale`, `Tonemap`, `Shadows`, `VirtualShadows` (and their
   `lightPattern`), `HeatHaze`, `Stylize`, `Reflector`, `Refractor`, `VolumetricFog`, `Lines` and `Trail`, creative
-  `PostProcessing`, `LODSystem`, `XRaySelection` and `ShaderClock`. The rest are listed in
+  `PostProcessing`, `LODSystem`, `XRaySelection`, `ShaderClock`, `Scatter` and `ScatterInstances`, every sky clock
+  (`Sky`, `HillaireSky`, `AstroSky`, `Aurora`, `TornadoCloud`, `VolumetricClouds`, `Weather`), every water clock
+  (`Water`, `FFTOcean`, `WaterFlow`, `WaterRain`, `ShipWakes`, `ShotSplash`, `Floater`, `Iceberg`, `SeaIce`, `Flood`)
+  and every vfx clock (`VFX`, `BlownSand`, `Clouds`, `Flame`, `Smoke`, `FireFront`, `Battery`, `HullFire`). The rest are listed in
   `tests/film-reset-pending.json`, which only shrinks.
 
 ## Film captions and chapter cards

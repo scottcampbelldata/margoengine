@@ -805,7 +805,7 @@ export class FireFront implements EnginePlugin {
   private readonly step: number;
   private readonly seg: number;
   private acc = 0;
-  private readonly random: () => number;
+  private random: () => number;
   private readonly fuels: FuelModel[] = [];
   private readonly cellFuel: Uint8Array;
   private readonly stateOf: Uint8Array;
@@ -1143,6 +1143,41 @@ export class FireFront implements EnginePlugin {
       this.advance(this.step);
     }
     if (this.dirty) this.publish();
+    this.syncFlames();
+  }
+  /**
+   * Back to fire time 0, as a fresh fire with the same options (GAP-FILM-RESET): every cell unburnt again, the
+   * `ignitions` of the options queued again (ones added with `ignite` are dropped), the ember and spotting random
+   * stream restarted from `seed`, the counters cleared and the burn texture rewritten. Its smoke columns, flame volumes
+   * and ember effects go back to idle and to their own start, so the same frames after it draw the same fire.
+   */
+  resetTime(): void {
+    if (this.disposed) return;
+    this.time = this.acc = this.embers = this.spots = 0;
+    this.random = rng(finiteIn(this.options.seed ?? 1, 'seed', 0, 4294967295));
+    const states = this.stateOf;
+    for (let i = 0; i < states.length; i++) if (states[i] !== NO_FUEL) states[i] = UNBURNT;
+    this.arrival.fill(-1);
+    this.burnout.fill(-1);
+    for (const a of [this.intensity, this.exposure, this.crownOf, this.fed]) a.fill(0);
+    this.burning = [];
+    this.born = [];
+    this.pending = [];
+    for (const ig of this.options.ignitions ?? []) this.queue(ig);
+    this.travel.clear();
+    this.segs.clear();
+    this.flameAcc.clear();
+    // The fuel beds are a cache of the options; a fresh fire builds them on its first step.
+    this.bedKey = '';
+    this.beds = [];
+    this.fm10 = undefined;
+    this.frontKeys.fill(undefined);
+    this.houseKeys.fill(undefined);
+    for (const clock of [...this.columns, ...this.frontFlames, ...this.houseFlames, ...this.emberPool])
+      clock.resetTime();
+    // A fresh fire publishes once it has a texture: rewrite it (and idle the columns), as attaching does.
+    this.dirty = true;
+    if (this.texture) this.publish();
     this.syncFlames();
   }
   /** Same as {@link advanceTime}, so `seek` can replay a fire. */

@@ -508,6 +508,10 @@ export class Clouds implements EnginePlugin {
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
   }
+  /** Back to time 0, as a fresh one with the same options, for several cuts in one process (GAP-FILM-RESET): the clouds (they stay, with their options) at the start. */
+  resetTime(): void {
+    this.seconds = 0;
+  }
   /** The fog the puffs are drawn in (see `setFog`), or null. */
   get fog(): FogLike | null {
     return this.fogSource;

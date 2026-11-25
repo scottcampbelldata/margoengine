@@ -934,7 +934,9 @@ export class VFX implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to reset it');
     this.seconds = this.remainder = this.frames = this.burstCount = this.done = 0;
     this.spawnQueue.length = 0;
-    this.ticked = false;
+    // The last step's numbers and the frame-update flag go back too, so a reset effect is a fresh one (GAP-FILM-RESET).
+    for (const t of [this.tick, this.still]) t.delta = t.time = t.budget = t.frame = 0;
+    this.ticked = this.clocked = false;
     this.warm = [];
     this.held.length = 0;
     // Before attachment there is nothing to clear, and attaching adds initialCount itself.
@@ -946,6 +948,14 @@ export class VFX implements EnginePlugin {
       this.device.queue.writeBuffer(buffer, 0, new Uint32Array([3, 0, 0, 0, 0]));
     for (const r of this.runtimes) r.reset?.();
     return this;
+  }
+  /**
+   * The clock contract of `@margoengine/cutscene/seek` `resetClocks` (GAP-FILM-RESET): {@link reset}, as a clock. Time,
+   * counters, step seeds, queued bursts and particles go back to a fresh effect's, so the same frames after it draw
+   * what a fresh effect draws. Does nothing after `dispose()`.
+   */
+  resetTime(): void {
+    if (!this.disposed) this.reset();
   }
   /**
    * Sets the wind (see {@link VFXOptions.wind}); undefined or [0, 0] turns the wind force off. Takes effect on the next frame.

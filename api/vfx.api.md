@@ -416,6 +416,7 @@ class VFX implements EnginePlugin {
     setFog(fog: FogLike | null): this;
     burst(count: number, spawn?: BurstSpawn): this;
     reset(): this;
+    resetTime(): void;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

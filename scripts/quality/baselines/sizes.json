@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18995341,
+  "total": 18996955,
   "history": [
     {
       "date": "2026-10-24",
@@ -12267,6 +12267,12 @@
       "commit": "c162f3e1d",
       "reason": "physics base: WindForce holds its load as a force through the step and takes it implicitly in each body's motion (held.ts and the lattice's dense solve), so a body the wind holds up keeps its height and a light body in a strong wind stays stable; 87,407 budget to 88,148 measured. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-B",
+      "reason": "VFX.resetTime (GAP-FILM-RESET): the clock reset of every effect, +36 B measured on vfx and vfx/base",
+      "grew": 2
     }
   ],
   "items": {
@@ -13652,8 +13658,8 @@
     "@margoengine/usdz/skel": 8356,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13900,
-    "@margoengine/vfx": 37961,
-    "@margoengine/vfx/base": 13339,
+    "@margoengine/vfx": 39137,
+    "@margoengine/vfx/base": 13777,
     "@margoengine/vfx/blown-sand": 10823,
     "@margoengine/vfx/clouds": 8867,
     "@margoengine/vfx/curves": 1816,

@@ -866,6 +866,29 @@ continuous run draws there (`test/seek.test.js`, uniforms, lights and curves equ
 seed follows its place among the flames of its engine, so a scene drawn after another in the same process seeds its
 flames as a fresh process does.
 
+Several cuts in one process: `resetTime()` puts each vfx clock back as a fresh one with the same options has it
+(`resetClocks` from `@margoengine/cutscene/seek` calls it on every clock), so a later `seek` gives what a fresh world
+seeked there gives. `VFX.resetTime()` is `reset()` as a clock (particles, counters, step seeds, queued bursts and the
+frame-update flag; nothing after `dispose()`). `Smoke` resets its puffs with it; `FireFront` unburns every cell,
+queues the `ignitions` of its options again (ones added with `ignite` are dropped), restarts its random stream from
+`seed` and idles its columns, flames and embers; `Battery` queues its `shots` again (ones added with `fire` or
+`broadside` are dropped), idles its banks, flashes and lights and clears the holes it drew into its targets' masks;
+`HullFire` repaints its mask for time 0. Evidence: `test/reset-time.test.js` (state of a reset clock equals a fresh
+one's, before and after a seek) and `test/seek-check.mjs` (on the GPU, a reset effect drawn beside a fresh one holds the
+same live particles, bit for bit).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx';
+import {resetClocks, seek} from 'margoengine/cutscene/seek';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+VFX.attach(engine, {capacity: 2000, rate: 600, lifetime: [1, 2]});
+for (let frame = 0; frame < 60; frame++) engine.render({delta: 1 / 30});
+// The next scene of the film starts at 40 s: put every clock back to 0, then seek.
+resetClocks(engine);
+await seek(engine, 40, {fps: 30});
+```
+
 ### Wind
 
 `wind: [x, z]` (m/s) or `{sample(x, y, z, t)}` (a `WindField` or a `WeatherMachine`'s `wind`) makes every particle's horizontal

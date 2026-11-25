@@ -22,6 +22,7 @@ export class BlownSand implements EnginePlugin {
     set time(seconds: number);
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     grains(eye: Vec3): BlownSandGrain[];
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

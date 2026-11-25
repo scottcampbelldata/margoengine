@@ -74,6 +74,7 @@ export class Clouds implements EnginePlugin {
     remove(cloud: Cloud): boolean;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     puffs(): CloudPuff[];

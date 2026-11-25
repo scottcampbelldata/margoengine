@@ -656,6 +656,10 @@ export class BlownSand implements EnginePlugin {
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
   }
+  /** Back to time 0, as a fresh one with the same options, for several cuts in one process (GAP-FILM-RESET): the sand at the start. */
+  resetTime(): void {
+    this.seconds = 0;
+  }
   private validate() {
     const o = this.options;
     if (!o || typeof o !== 'object') throw new TypeError('BlownSand needs options {ground, wind}');

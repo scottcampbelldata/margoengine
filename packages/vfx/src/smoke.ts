@@ -512,6 +512,19 @@ export class Smoke implements EnginePlugin {
     eo.turbulence = o.turbulence ?? 0.4;
   }
   /**
+   * Back to time 0, as a fresh column with the same options (GAP-FILM-RESET): its clock and its puffs' effect (particles,
+   * counters, step seeds and prewarm) start again, so the same frames after it draw what a fresh column draws.
+   */
+  resetTime(): void {
+    if (this.disposed) return;
+    this.clock = 0;
+    // The column's curves, source and drag for time 0, as the constructor writes them.
+    this.check();
+    this.write();
+    this.calm(this.effect.options.wind);
+    this.effect.resetTime();
+  }
+  /**
    * Empties the column and fills it again on the next frame for the options as they are then (the prewarm of attach,
    * when `prewarm` is on): for a column moved to a new fire, so it does not grow up from the ground over its lifetime.
    */

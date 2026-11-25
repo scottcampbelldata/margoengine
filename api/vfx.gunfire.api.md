@@ -32,6 +32,7 @@ export class Battery implements EnginePlugin {
     readonly sparks: VFX[];
     readonly splinters: VFX;
     private constructor();
+    resetTime(): void;
     fire(gun: number, time?: number): this;
     broadside(time: number, interval?: number, guns?: readonly number[]): this;
     puffOf(gun: number): PowderPuff;
@@ -128,6 +129,7 @@ export class HullFire implements EnginePlugin {
     get time(): number;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     advanceTime(delta: number): void;
     static attach(engine: EngineKernel, options: HullFireOptions): HullFire;
     dispose(): void;
@@ -450,6 +452,7 @@ class Clouds implements EnginePlugin {
     remove(cloud: Cloud): boolean;
     advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
+    resetTime(): void;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     puffs(): CloudPuff[];
@@ -499,6 +502,7 @@ class Flame implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onPreUpdate(delta: number): void;
     setLength(length: number): this;
     setWind(wind: VFXWind | undefined): this;
@@ -588,6 +592,7 @@ class Smoke implements EnginePlugin {
     get time(): number;
     onPreUpdate(delta: number): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     refill(): this;
     setHeat(heat: number): this;
     setWind(wind: VFXWind | undefined): this;
@@ -651,6 +656,7 @@ class VFX implements EnginePlugin {
     setFog(fog: FogLike | null): this;
     burst(count: number, spawn?: BurstSpawn): this;
     reset(): this;
+    resetTime(): void;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
