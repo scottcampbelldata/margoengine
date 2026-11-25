@@ -5,8 +5,9 @@
 import { standardDensity } from '@margoengine/math/atmosphere';
 import { hypot } from '@margoengine/math/pinned';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
+import { colliderSurface, type Surface } from './aero.js';
 import type { PhysicsBody } from './body.js';
-import { checkVec, type Vec3 } from './math.js';
+import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment, QueryFilter } from './physics.js';
 
 /** Options of {@link explosion}. */
@@ -71,8 +72,13 @@ export interface WindOptions {
    * above sea level: 1.225 at 0, ISO 2533).
    */
   density?: number;
-  /** Drag coefficient (default 1). */
+  /**
+   * The normal-force coefficient of a surface square to the air, C_N90 (default 1.17, a square flat plate): each windward
+   * panel of a body's colliders takes C_N90 sin(a) times the dynamic pressure times its area, a the angle the air meets it.
+   */
   drag?: number;
+  /** Skin-friction coefficient along the surface (default 0.004, a turbulent plate). */
+  friction?: number;
   /** Only bodies whose centre is in the box from `min` to `max` feel it (default the whole world). */
   region?: { min: Vec3; max: Vec3 };
   /** Only the bodies these queries let through. */
@@ -93,11 +99,13 @@ export class WindForce implements PhysicsAttachment {
     private readonly physics: Physics,
     private readonly options: WindOptions,
   ) {
-    const { density, drag = 1, velocity } = options;
+    const { density, drag = 1.17, friction = 0.004, velocity } = options;
     if (density !== undefined && !(density > 0 && Number.isFinite(density)))
       throw new RangeError('Air density is a positive number of kg/m3; pass options.density above 0.');
     if (!(drag >= 0 && Number.isFinite(drag)))
       throw new RangeError('Drag coefficient is 0 or more; pass options.drag of 0 or above.');
+    if (!(friction >= 0 && Number.isFinite(friction)))
+      throw new RangeError('Friction coefficient is 0 or more; pass options.friction of 0 or above.');
     if (isFlow(velocity)) {
       const c = velocity.cell;
       if (!c || c[0] !== 0 || c[1] !== 0 || c[2] !== 0)
@@ -111,7 +119,13 @@ export class WindForce implements PhysicsAttachment {
   /** @internal */
   beforeStep(dt: number): void {
     if (this.released) return;
-    const { drag = 1, velocity, region, filter } = this.options,
+    const {
+        drag: normalCoefficient = 1.17,
+        friction: frictionCoefficient = 0.004,
+        velocity,
+        region,
+        filter,
+      } = this.options,
       min: Vec3 = region?.min ?? [-1e9, -1e9, -1e9],
       max: Vec3 = region?.max ?? [1e9, 1e9, 1e9],
       time = this.physics.stepCount * this.physics.fixedTimestep,
@@ -135,28 +149,120 @@ export class WindForce implements PhysicsAttachment {
             : (velocity as Vec3);
         density = this.options.density ?? standardDensity(p[1]);
       }
-      const v = body.linearVelocity,
-        u: Vec3 = [air[0] - v[0], air[1] - v[1], air[2] - v[2]],
-        speed = hypot(u[0], u[1], u[2]);
-      if (!(speed > 1e-6)) continue;
-      // The area the box of the body's colliders shows to the stream.
-      let lo = [Infinity, Infinity, Infinity],
-        hi = [-Infinity, -Infinity, -Infinity];
-      for (const collider of body.colliders) {
-        if (collider.isSensor()) continue;
-        const box = collider.aabb();
-        lo = lo.map((x, k) => (box.min[k]! < x ? box.min[k]! : x));
-        hi = hi.map((x, k) => (box.max[k]! > x ? box.max[k]! : x));
+      const surface = this.surfaceOf(body);
+      if (!surface) continue;
+      const { centres, normals, areas } = surface,
+        q = body.rotation,
+        pos = body.position,
+        com = body.worldCenterOfMass,
+        v = body.linearVelocity,
+        w = body.angularVelocity;
+      let fx = 0,
+        fy = 0,
+        fz = 0,
+        tx = 0,
+        ty = 0,
+        tz = 0;
+      for (let i = 0; i < areas.length; i++) {
+        const local = rotateVec(q, [centres[3 * i]!, centres[3 * i + 1]!, centres[3 * i + 2]!]),
+          n = rotateVec(q, [normals[3 * i]!, normals[3 * i + 1]!, normals[3 * i + 2]!]),
+          px = pos[0] + local[0],
+          py = pos[1] + local[1],
+          pz = pos[2] + local[2],
+          rx = px - com[0],
+          ry = py - com[1],
+          rz = pz - com[2];
+        // The air at the panel and its density: the body's own sample for a constant or functional wind.
+        let ax = air[0],
+          ay = air[1],
+          az = air[2],
+          rho = density;
+        if (flow && areas.length > 0) {
+          const s = flow.sample(px, py, pz, time, this.sample);
+          ax = s.velocity[0];
+          ay = s.velocity[1];
+          az = s.velocity[2];
+          rho = this.options.density ?? s.density;
+        } else if (typeof velocity === 'function') {
+          const at = (velocity as (point: Vec3, time: number) => Vec3)([px, py, pz], time);
+          ax = at[0];
+          ay = at[1];
+          az = at[2];
+        }
+        // The air relative to the panel, which moves with the body: v + omega x r.
+        const wx = ax - (v[0] + w[1] * rz - w[2] * ry),
+          wy = ay - (v[1] + w[2] * rx - w[0] * rz),
+          wz = az - (v[2] + w[0] * ry - w[1] * rx),
+          speed = hypot(wx, wy, wz);
+        if (!(speed > 1e-9)) continue;
+        const dn = n[0] * wx + n[1] * wy + n[2] * wz,
+          tanx = wx - dn * n[0],
+          tany = wy - dn * n[1],
+          tanz = wz - dn * n[2],
+          tangential = hypot(tanx, tany, tanz),
+          half = 0.5 * rho * areas[i]!,
+          // Windward: the flat-plate normal force C_N90 sin(a) q A along -n, sin(a) = -dn / |w|.
+          normal = dn < 0 ? half * normalCoefficient * speed * dn : 0,
+          friction = half * frictionCoefficient * tangential,
+          f0 = normal * n[0] + friction * tanx,
+          f1 = normal * n[1] + friction * tany,
+          f2 = normal * n[2] + friction * tanz;
+        fx += f0;
+        fy += f1;
+        fz += f2;
+        tx += ry * f2 - rz * f1;
+        ty += rz * f0 - rx * f2;
+        tz += rx * f1 - ry * f0;
       }
-      if (!Number.isFinite(lo[0]!)) continue;
-      const size = hi.map((x, k) => x - lo[k]!),
-        area =
-          (abs(u[0]) * size[1]! * size[2]! + abs(u[1]) * size[0]! * size[2]! + abs(u[2]) * size[0]! * size[1]!) / speed,
-        force = 0.5 * density * drag * area * speed;
       // A sleeping body is woken only by a wind that would push it a tenth of a metre a second squared.
-      if (body.sleeping && !(force * speed >= 0.1 * body.mass)) continue;
-      body.applyImpulse([u[0] * force * dt, u[1] * force * dt, u[2] * force * dt]);
+      if (body.sleeping && !(hypot(fx, fy, fz) >= 0.1 * body.mass)) continue;
+      body.applyImpulse([fx * dt, fy * dt, fz * dt]);
+      body.applyTorqueImpulse([tx * dt, ty * dt, tz * dt]);
     }
+  }
+
+  /** Each body's surface as panels in its frame, made again when its colliders change. */
+  private readonly surfaces = new Map<PhysicsBody, { key: string; surface: Surface }>();
+
+  private surfaceOf(body: PhysicsBody): Surface | undefined {
+    const colliders = body.colliders.filter((c) => !c.isSensor()),
+      key = colliders
+        .map((c) => {
+          const t = c.translationWrtParent(),
+            r = c.rotationWrtParent();
+          return `${c.handle}:${c.shape}:${c.shape === 'box' ? JSON.stringify(c.halfExtents()) : ''}:${c.shape === 'sphere' || c.shape === 'capsule' || c.shape === 'cylinder' || c.shape === 'cone' ? `${c.radius()},${c.halfHeight()}` : ''}:${t.x},${t.y},${t.z}:${r.x},${r.y},${r.z},${r.w}`;
+        })
+        .join('|');
+    if (!colliders.length) return undefined;
+    const cached = this.surfaces.get(body);
+    if (cached?.key === key) return cached.surface;
+    const parts = colliders.map((c) => {
+        const s = colliderSurface(c),
+          t = c.translationWrtParent(),
+          r = c.rotationWrtParent(),
+          q = [r.x, r.y, r.z, r.w],
+          centres = new Float64Array(s.centres.length),
+          normals = new Float64Array(s.normals.length);
+        for (let i = 0; i < s.areas.length; i++) {
+          const p = rotateVec(q, [s.centres[3 * i]!, s.centres[3 * i + 1]!, s.centres[3 * i + 2]!]),
+            n = rotateVec(q, [s.normals[3 * i]!, s.normals[3 * i + 1]!, s.normals[3 * i + 2]!]);
+          centres.set([p[0] + t.x, p[1] + t.y, p[2] + t.z], 3 * i);
+          normals.set(n, 3 * i);
+        }
+        return { centres, normals, areas: s.areas };
+      }),
+      join = (pick: (p: Surface) => Float64Array) => {
+        const out = new Float64Array(parts.reduce((n, p) => n + pick(p).length, 0));
+        let at = 0;
+        for (const p of parts) {
+          out.set(pick(p), at);
+          at += pick(p).length;
+        }
+        return out;
+      },
+      surface = { centres: join((p) => p.centres), normals: join((p) => p.normals), areas: join((p) => p.areas) };
+    this.surfaces.set(body, { key, surface });
+    return surface;
   }
 
   /** Stops the wind. */
@@ -184,8 +290,6 @@ export type WindField = WindForce;
 function isFlow(velocity: WindOptions['velocity']): velocity is FlowField {
   return typeof velocity === 'object' && velocity !== null && typeof (velocity as FlowField).sample === 'function';
 }
-
-const abs = (x: number): number => (x < 0 ? -x : x);
 
 /** The inverse-square falloff at a share `s` of the radius: 1 / (1 + 2 s)^2. */
 function inverseSquare(s: number): number {

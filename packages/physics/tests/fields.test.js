@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { explosion, Physics, WindField, WindForce } from '../dist/index.js';
+import { standardDensity } from '../../math/dist/atmosphere.js';
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not within ${tolerance} of ${expected}`);
@@ -125,6 +126,7 @@ test("a wind force without a density takes the standard atmosphere's at each bod
     return leaf.linearVelocity[0];
   };
   // ISO 2533: 1.225 kg/m3 at sea level, 0.73612 at 5 km.
-  near(push(0), push(0, { density: 1.225 }), 1e-12, 'sea level');
+  near(push(0), push(0, { density: standardDensity(0) }), 1e-15, 'sea level');
+  near(standardDensity(0), 1.225, 1e-6, "the standard atmosphere's sea-level density");
   near(push(5000) / push(0), 0.73612 / 1.225, 1e-4, 'thinner air pushes less');
 });

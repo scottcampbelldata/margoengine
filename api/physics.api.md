@@ -2053,6 +2053,7 @@ export interface WindOptions {
     velocity: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
     density?: number;
     drag?: number;
+    friction?: number;
     region?: {
         min: Vec3;
         max: Vec3;

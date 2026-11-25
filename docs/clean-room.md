@@ -11651,3 +11651,16 @@ The factor G = D G0, G0 = sqrt(E / (4 pi)) / k0^2 [k0]x, the Nyquist and mean bi
 standard deviation, Pfaff's transformation of the hypergeometric function to a series that converges for every argument,
 and an atan from + - * / only are this package's own arrangement. Proof: `packages/weather/tests/turbulence.test.js` (isotropy,
 the IEC ratios 0.68 and 0.51, u'w' < 0, divergence below 1e-12, determinism) and `tests/boundary-layer.test.js`.
+
+### Aerodynamic loads from shape (AERO-01, `WindForce` in `@margoengine/physics`, 2026-11-25)
+
+`packages/physics/src/aero.ts` cuts each collider's surface into panels and `fields.ts` loads them: on each windward panel the
+flat-plate normal force C_N90 sin(a) q A along its inward normal, and skin friction C_f q A along the tangential relative air,
+summed about the centre of mass. The laws are the textbook ones of S. F. Hoerner, "Fluid-Dynamic Drag", 1965 (chapters 2 and 3:
+skin friction and the flat plate's 1.17), and "Fluid-Dynamic Lift", 1975 (chapter 21, the plate's normal force after
+Flachsbart), as tabulated in J. Katz and A. Plotkin, "Low-Speed Aerodynamics", 2nd ed., Cambridge, 2001; none was read here.
+M. Padilla, A. Segall and O. Sorkine-Hornung, "Rigid Body Dynamics in Ambient Fluids", arXiv:2601.13971, 2026, was read in
+full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus lift but no force on a flat face square to the
+flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
+follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
+

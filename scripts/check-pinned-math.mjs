@@ -18,6 +18,7 @@ const root = resolve(fileURLToPath(import.meta.url), '../..');
 export const ALWAYS = [
   'packages/physics/src/world/*.ts',
   'packages/physics/src/fields.ts',
+  'packages/physics/src/aero.ts',
   'packages/math/src/atmosphere.ts',
 ];
 

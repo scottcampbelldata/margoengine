@@ -21,6 +21,8 @@ const stepFiles = [
   'multibody.ts',
   // The wind force and the explosion run inside a step (KB-PHYS-FIELDSMATH1): pinned maths only.
   'fields.ts',
+  // The panels of a body's surface, made inside a step when its colliders change (AERO-01).
+  'aero.ts',
 ];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 
