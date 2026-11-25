@@ -180,6 +180,7 @@ interface TileRenderable {
     readonly bytes: number;
     visible: boolean;
     dispose(): void;
+    readonly model?: object;
 }
 
 type TileState = 'unloaded' | 'loading' | 'ready' | 'failed';

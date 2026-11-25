@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18908554,
+  "total": 18910242,
   "history": [
     {
       "date": "2026-10-24",
@@ -12147,6 +12147,12 @@
       "commit": "FG-17d",
       "reason": "FG-17 piece 5a new entry voxel-pathtracer/from-engine 872 B gzip: traceSceneFromEngine, core meshes as a PBR mesh trace scene (geometry split cached per Geometry, one placement per visible mesh, PbrMaterial to metallic-roughness); optional, nothing else imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-d",
+      "reason": "geospatial frame and ground; new entry tiles/height (tilesHeightQuery)",
+      "grew": 3
     }
   ],
   "items": {
@@ -12363,7 +12369,7 @@
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/first-person": 3028,
     "@margoengine/controls/fly": 3047,
-    "@margoengine/controls/geospatial": 13652,
+    "@margoengine/controls/geospatial": 14533,
     "@margoengine/controls/globe": 3902,
     "@margoengine/controls/orbit": 6675,
     "@margoengine/controls/presentation": 7289,
@@ -13960,6 +13966,8 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/tiles/height": 806,
+    "leak @margoengine/tiles/height -> @margoengine/bvh": 1
   }
 }

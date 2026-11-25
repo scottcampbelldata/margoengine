@@ -116,6 +116,10 @@ export class GeospatialControls extends Controls {
     protected onDisconnect(): void;
 }
 
+export type GeospatialFrame = ArrayLike<number> | {
+    readonly frame: ArrayLike<number>;
+};
+
 export interface GeospatialHeights {
     ellipsoid: number;
     terrain: number;
@@ -140,6 +144,8 @@ export interface GeospatialOptions {
     maxRange?: number;
     clipPlanes?: boolean;
     zUp?: boolean;
+    frame?: GeospatialFrame;
+    ground?: WorldGround;
     scene?: boolean;
     colliders?: readonly (Mesh | ModelLike)[] | null;
     raycast?: SurfaceRaycast;
@@ -200,6 +206,12 @@ export interface PathOptions {
 }
 
 export type SurfaceRaycast = (origin: readonly [number, number, number], direction: readonly [number, number, number], far: number) => number | undefined;
+
+export type WorldGround = ((x: number, z: number) => number | undefined) | {
+    height(x: number, z: number): number | undefined;
+} | {
+    heightAt(x: number, z: number): number | undefined;
+};
 
 export interface ZoomPanPath {
     S: number;

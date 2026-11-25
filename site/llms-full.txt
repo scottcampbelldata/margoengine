@@ -11819,6 +11819,12 @@ A member is a root mesh, a loaded model (a plugin with `root`, `nodes` and `disp
   pan until it is lifted and pressed again. The gamepad is the first connected pad with four axes in the standard
   mapping (axes 0 to 3, triggers on buttons 6 and 7, boost on 10); it is read only when `gamepad` is true, and other
   pads are left to the page.
+- `frame` is any invertible affine ECEF-to-world matrix (rigid in practice: a scale changes metres per world unit, which
+  `clearance`, speeds and ranges do not follow). `ground` reads world Y at world (x, z) with Y up, so it fits a frame whose
+  Y is the local vertical (a tileset's ENU frame, a site frame); far from the frame origin (tens of km) the frame's
+  flat ground and the curved Earth part by d^2 / 2R (8 m at 10 km), which is the world's own flat-earth error.
+  `tilesHeightQuery` hits only the tiles drawn now: where a tile is not loaded yet it answers undefined and the
+  camera falls back to the ellipsoid floor; each call is one bvh ray over the drawn tile models.
 - Heights are above the WGS84 ellipsoid unless you pass `geoid`: Margo ships no geoid model, so `heights.seaLevel` is
   null without one (EGM96 departs from the ellipsoid by -107 to +85 m). `orientation` is in the eye's ENU frame, so an
   orbit camera that is level at its centre shows a roll of about range / Earth radius (5e-4 rad at 3 km). The `compass`
