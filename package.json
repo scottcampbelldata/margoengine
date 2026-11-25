@@ -297,7 +297,8 @@
     "test:integration:browser": "node scripts/integration-browser-tests.mjs",
     "test:pages:browser": "node scripts/test-pages-browser.mjs",
     "check:core-stress": "node scripts/core-stress.mjs",
-    "check:owners": "node scripts/check-owner-lifetime-gate.mjs"
+    "check:owners": "node scripts/check-owner-lifetime-gate.mjs",
+    "push:main": "node scripts/push-main.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
