@@ -30,6 +30,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the exact solve of rigid edges (`soft-kernel/src/rigid.rs`) holds only components without a loop (a rope, a tree). A cloth's edges are all loops, so they stay with the Gauss-Seidel sweep, whose stiffness depends on its iteration count and on the mass ratio (Macklin, Mueller and Chentanez 2016, "XPBD: position-based simulation of compliant constrained dynamics", section 3). At a ratio of a thousand the sweep leaves rigid edges far from their length. The remedy in the literature solves every inextensible edge together, loops included: fast projection (Goldenthal, Harmon, Fattal, Bercovier and Grinspun 2007, "Efficient simulation of inextensible cloth", SIGGRAPH), the conjugate-gradient solve rigid.rs already runs for trees, taken over the cloth's whole system.
 - **Owner:** the dynamics lane. Blocks moving the engine to standard gravity.
 
+### Fixed 2026-11-25: a tiny video's default bitrate was a few hundred bits a second (KB-HEADLESS-TINYRATE1, headless)
+
+- **Repro:** `packages/video/test/demux-check.mjs` on Edge 158.0.4370.33 (RTX A6000): a 16 x 16 solid colour encoded
+  as AV1 by `encodeVideo` read back 6 levels off (green drew as 6, 253, 5), past the check's 5.
+- **Cause:** the default bitrate was `width * height * fps / 10` with no floor, 256 bits a second for that clip.
+- **Fix:** the default is at least 100,000 bits a second; the same clip reads within 5 and VP9 within 2. A caller's
+  `bitrate` is used as given. Test: `packages/headless/tests/video.test.js` (the default bitrate).
+
 ### Fixed 2026-11-25: a thin rod rolling on a default cloth is thrown through it (KB-SOFT-TUNNEL1, physics soft, soft-rigid contact)
 
 - **Repro:** `packages/physics/tests/soft.test.js`, "small and thin rigid bodies dropped on a default cloth rest on it for five seconds and never pass through it": with gravity 9.80665 m/s^2 the 5 mm rod rolls down the sagging sheet at up to 125 rad/s and leaves it at step 163, thrown at 65 m/s; at 9.81 it rolls a slightly different path and passed. It is not tunnelling through a gap: a single pass met one triangle 15 to 30 cm deep and pushed the rod through the sheet.

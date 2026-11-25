@@ -281,12 +281,25 @@ test('imageSequence names frames in order and gives real PNG files', async () =>
   assert.equal(defaults.value.name, 'frame_0000.png');
 });
 
+test('the default bitrate follows the pixel count and never starves a tiny video', async () => {
+  // Regression (KB-HEADLESS-TINYRATE1): a 4 x 2 clip at 10 fps asked for 8 bits a second, and AV1 in Edge 158 drew a
+  // 16 x 16 solid colour 6 levels off.
+  const rate = async (width, height, options = {}) => {
+    const { webCodecs, log } = fakeCodecs({ colorSpace: { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709' } });
+    await encodeVideo([{ width, height, data: new Uint8Array(width * height * 4) }], { fps: 30, webCodecs, ...options });
+    return log.configs[0].bitrate;
+  };
+  assert.equal(await rate(16, 16), 100_000);
+  assert.equal(await rate(320, 240), 320 * 240 * 3);
+  assert.equal(await rate(16, 16, { bitrate: 5000 }), 5000, "the caller's rate is used as given");
+});
+
 test('encodeVideo writes a WebM a parser can walk: times, key frames, cues and seek head', async () => {
   const { webCodecs, log } = fakeCodecs({ colorSpace: { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709' } }),
     video = await encodeVideo(frames(5), { fps: 10, keyFrameInterval: 0.2, webCodecs }),
     { bytes } = video;
   assert.equal(log.configs[0].codec, 'vp09.00.51.08');
-  assert.equal(log.configs[0].bitrate, Math.round(4 * 2 * 10 * 0.1));
+  assert.equal(log.configs[0].bitrate, 100_000);
   assert.deepEqual(
     log.encoded.map((e) => e.keyFrame),
     [true, false, true, false, true],

@@ -240,7 +240,10 @@ export interface EncodeVideoOptions {
    * `vp09.*` and `av01.*`.
    * Default the first the runtime supports: VP9, VP8, AV1 for WebM; H.264, VP9, AV1 for MP4. */
   codec?: string;
-  /** Bits per second. Default `width * height * fps / 10`, about 6 Mbit/s at 1920 x 1080 and 30 fps. */
+  /**
+   * Bits per second. Default `width * height * fps / 10`, about 6 Mbit/s at 1920 x 1080 and 30 fps, and at least
+   * 100,000, so a thumbnail keeps its colours.
+   */
   bitrate?: number;
   /** Seconds between key frames, which is how finely a player can seek. Default 2. */
   keyFrameInterval?: number;
@@ -281,7 +284,10 @@ const CODECS = {
   ALLOWED = { webm: ['vp8', 'vp09', 'av01'], mp4: ['avc1', 'hvc1', 'hev1', 'vp09', 'av01'] },
   ALPHA = /^(vp8|vp09\.)/, // The codecs whose Matroska mappings carry alpha.
   QUEUE = 4, // Frames waiting in the encoder before the source is asked for more.
-  BITS_PER_PIXEL = 0.1;
+  BITS_PER_PIXEL = 0.1,
+  // The least default bitrate: by pixel count alone a thumbnail gets a few hundred bits a second, and AV1 then drew a
+  // 16 x 16 solid colour 6 levels off (KB-HEADLESS-TINYRATE1).
+  MIN_BITRATE = 100_000;
 
 async function supportedConfig(
   Encoder: typeof VideoEncoder,
@@ -698,7 +704,7 @@ async function* encodeSamples(
           width,
           height,
           framerate: fps,
-          bitrate: bitrate ?? Math.round(width * height * fps * BITS_PER_PIXEL),
+          bitrate: bitrate ?? Math.max(MIN_BITRATE, Math.round(width * height * fps * BITS_PER_PIXEL)),
           latencyMode: 'quality',
         });
         live();
