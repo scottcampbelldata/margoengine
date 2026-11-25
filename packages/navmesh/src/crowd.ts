@@ -461,7 +461,7 @@ export class Crowd {
       uz = dz / d;
     if (agent.state === 'offmesh') speed = Math.min(agent.maxSpeed, d / dt);
     else {
-      [ux, uz] = this.detour(agent, ux, uz, d);
+      [ux, uz] = this.detour(agent, ux, uz, d, agent.corner === last ? c : null);
       if (this.density) speed = Math.min(speed, agent.maxSpeed * this.crowding(agent, ux, uz));
     }
     disc.preferred[0] = ux * speed;
@@ -472,8 +472,10 @@ export class Crowd {
    * Steers the preferred direction past the nearest obstacle or standing agent that blocks the way to the next corner:
    * toward the tangent of its disc (grown by the agent's radius) on the side the way already leans to. ORCA alone
    * only slows an agent that heads straight at something that does not move aside, so it would stop in front of it.
+   * An agent standing on the target `end` of the last leg (covering it) is not passed but joined (see `joins`): going
+   * round it would only carry the agent past its target and back.
    */
-  private detour(agent: CrowdAgent, ux: number, uz: number, reach: number): [number, number] {
+  private detour(agent: CrowdAgent, ux: number, uz: number, reach: number, end: Vec3 | null): [number, number] {
     const px = agent.position[0],
       pz = agent.position[2];
     let best = Infinity,
@@ -495,7 +497,11 @@ export class Crowd {
     };
     for (const o of this.obstacleDiscs) consider(o.position[0], o.position[1], o.radius);
     for (const other of this.agents)
-      if (other !== agent && (other.state === 'idle' || other.state === 'arrived'))
+      if (
+        other !== agent &&
+        (other.state === 'idle' || other.state === 'arrived') &&
+        !(end && Math.hypot(other.position[0] - end[0], other.position[2] - end[2]) < other.radius + agent.radius)
+      )
         consider(other.position[0], other.position[2], other.radius);
     if (best === Infinity) return [ux, uz];
     const distance = Math.hypot(cx, cz);
@@ -508,6 +514,38 @@ export class Crowd {
       cos = Math.cos(angle * sign),
       sin = Math.sin(angle * sign);
     return [bx * cos - bz * sin, bx * sin + bz * cos];
+  }
+
+  /**
+   * Whether `agent`, on the last leg to `end` and moving at (vx, vz) this step, has joined the people already there:
+   * those that cover `end` (stand within the two radii of it, so `agent` cannot stand there) and stand still or walk
+   * nearer `end` (they get there first; the lower id on a tie), and those that arrived for the same place (their own
+   * target within the two radii of `end`). It has joined when it touches one of them (its disc within
+   * `arrivalDistance` of theirs), or when it is held back close behind one (within its own radius more) and this step
+   * took it no nearer `end`: the people between it and its target, and those pressing in beside it, leave it no way
+   * on. A target several agents share, or seats closer together than two people, would otherwise leave every agent but
+   * one pressing toward a point it cannot reach, circling it, turning back and forth on the spot or pushing into the
+   * others; now each stops where it meets the group, as people gathering do.
+   */
+  private joins(agent: CrowdAgent, end: Vec3, vx: number, vz: number): boolean {
+    const px = agent.position[0],
+      pz = agent.position[2],
+      own = Math.hypot(px - end[0], pz - end[2]),
+      held = vx * (end[0] - px) + vz * (end[2] - pz) <= 0,
+      slack = agent.arrivalDistance + (held ? agent.radius : 0);
+    for (const other of this.agents) {
+      if (other === agent || other.state === 'offmesh' || other.state === 'unreachable') continue;
+      const x = other.position[0],
+        z = other.position[2],
+        r = agent.radius + other.radius;
+      if (Math.hypot(x - px, z - pz) > r + slack) continue;
+      const theirs = Math.hypot(x - end[0], z - end[2]);
+      if (theirs < r && (other.state !== 'moving' || theirs < own || (theirs === own && other.id < agent.id)))
+        return true;
+      const target = other.state === 'arrived' && other.path.length ? other.path[other.path.length - 1] : null;
+      if (target && Math.hypot(target[0] - end[0], target[2] - end[2]) < r) return true;
+    }
+    return false;
   }
 
   /**
@@ -845,7 +883,7 @@ export class Crowd {
     agent.velocity[2] = vz;
     if (agent.state === 'moving' && agent.path.length && agent.corner === agent.path.length - 1) {
       const end = agent.path[agent.corner];
-      if (Math.hypot(end[0] - nx, end[2] - nz) <= agent.arrivalDistance) this.arrive(agent);
+      if (Math.hypot(end[0] - nx, end[2] - nz) <= agent.arrivalDistance || this.joins(agent, end, vx, vz)) this.arrive(agent);
     }
   }
 

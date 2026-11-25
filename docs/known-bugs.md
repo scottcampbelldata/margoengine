@@ -6,6 +6,38 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: crowd agents at a target others already covered never arrived, circling it or pressing into the people there (KB-CROWD-ARRIVE1, navmesh)
+
+- **Repro:** `packages/navmesh/test/crowd-arrival.test.js`: eight agents (radius 0.3) sent to seats 0.5 m apart, nine
+  agents from three sides sent to one point, or two agents sent to one point beside a diagonal wall. Before the fix
+  agents stayed `moving` for the whole 30 s, one turning about 88 times round its seat, the rest pushing into the
+  seated or pressing the wall, while their walk cycles played.
+- **Cause:** an agent arrived only within `arrivalDistance` (0.1 m) of its own target. When another agent stands on it
+  (or two neighbours cover it), no free position is that close, so ORCA held the agent off while its preferred velocity
+  kept pointing at the target; the detour round standing agents also steered it round the one on its target, past the
+  target and back.
+- **Fix:** fix(navmesh): crowd agents join the group at a target others cover. An agent on its last leg arrives where it
+  meets the agents covering its target or that arrived for the same place (touching one, or held back close behind
+  one); the detour leaves a standing agent on the target alone.
+
+### Fixed 2026-11-25: crowd agents carried wide of a route corner turned back to touch it (KB-CROWD-CORNER1, navmesh)
+
+- **Repro:** `packages/navmesh/test/crowd-corners.test.js`: three agents following each other round the two corners of a
+  diagonal corridor; one passes 0.15 m wide of a corner, turns round and walks back to it, turning on the spot.
+- **Cause:** a corner was passed only within `max(arrivalDistance, maxSpeed * dt)` of it.
+- **Fix:** fix(navmesh): crowd agents pass a route corner once the next is in straight view.
+
+### Fixed 2026-11-25: crowd agents jittered against walls that are not along X or Z (KB-CROWD-WALL1, navmesh)
+
+- **Repro:** `packages/navmesh/test/crowd-walls.test.js`: an agent through a tight Z bend at 3.5 m/s, two agents passing
+  head-on in a diagonal corridor, four walking it together: frames where a wall stopped the agent dead (a change of
+  velocity beyond `maxAcceleration`).
+- **Cause:** walls were not avoidance constraints. `move()` tried the full step, then X alone, then Z alone, else stood
+  still with its velocity zeroed; at a diagonal wall both axis moves leave the mesh, so the agent stopped, accelerated
+  into the wall the next frame and stopped again.
+- **Fix:** fix(navmesh): the mesh border is a hard ORCA constraint for crowd agents (van den Berg et al. 2011, section
+  5.4).
+
 ### Open 2026-11-24: a fast spinner against a wall with friction holds up to 3 percent more energy than it began with (KB-PHYS-SPINFRICTION1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/spin_energy.rs` (a 2 x 0.04 x 0.04 m bar, 3.2 kg, turning in place about z with its tips through a wall 0.02 m thick at x 0.9, no gravity, friction 0.5 on both colliders, 120 steps of 1/60 s): at 400 rad/s the bar's energy peaks at 1.031 times its start in the first step (88,016 J against 85,367 J). At 20, 100 and 2,000 rad/s, and with friction 0 at every spin, it never rises.

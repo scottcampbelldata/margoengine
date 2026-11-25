@@ -11406,3 +11406,31 @@ once the corner after it can be walked to in a straight line on ground the agent
 segment through the polygons it crosses, each left through a portal; the start of an off-mesh link is still passed
 only by reaching it. Proof: `packages/navmesh/test/crowd-corners.test.js` (three agents following each other round the
 two corners of a diagonal corridor: no turning back on the spot, no loop).
+
+### Crowd arrival at a target others cover (navmesh, 2026-11-25)
+
+The `joins` rule of `packages/navmesh/src/crowd.ts` and the detour that leaves a standing agent on the target alone.
+Sources compared, papers only:
+
+- C. W. Reynolds, "Steering Behaviors For Autonomous Characters", Game Developers Conference 1999,
+  https://www.red3d.com/cwr/steer/gdc99/ (read: arrival and path following). Used: the arrival ramp the crowd already
+  had (speed falling over `slowDownDistance`); it stops only at the target, so it cannot by itself end at a target
+  someone else stands on.
+- D. Helbing and P. Molnar, "Social force model for pedestrian dynamics", Physical Review E 51(5), 4282-4286, 1995,
+  https://doi.org/10.1103/PhysRevE.51.4282. Compared: a destination attracts and other people repel; at a destination
+  people already stand on, the two balance short of it and the pedestrian stays pressed against them, which is what an
+  arrival test that asks only for the target never ends.
+- I. Karamouzas, B. Skinner and S. J. Guy, "Universal Power Law Governing Pedestrian Interactions", Physical Review
+  Letters 113, 238701, 2014, https://doi.org/10.1103/PhysRevLett.113.238701. Compared: interaction by time to
+  collision, which spaces people out but likewise has no notion of a goal that is taken.
+- J. van den Berg, S. J. Guy, M. Lin and D. Manocha (2011, above). Compared: ORCA keeps agents apart but leaves an agent
+  whose preferred velocity points at a covered target pressing forever.
+
+Margo's own: an agent on its last leg arrives where it meets the group at its target: when it touches (within
+`arrivalDistance`) an agent that covers the target (within the two radii of it) and stands still or walks nearer it
+(the lower id on a tie), or one that arrived for the same place (its own target within the two radii); or when it is
+held back within its own radius more of one of them and its step took it no nearer the target. The detour, which steers
+round standing agents in the way, leaves alone a standing agent that covers the target: the agent joins it instead of
+going round it and back. Proof: `packages/navmesh/test/crowd-arrival.test.js` (eight agents to seats 0.5 m apart, nine
+agents from three sides to one point, two agents to one point beside a diagonal wall: all arrive, none turns on the
+spot or circles, and all end apart).
