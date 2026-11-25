@@ -11,8 +11,8 @@ import {
   regionWords,
   solverNumber,
   stateHash,
-  ticksAt,
 } from '../dist/world.js';
+import { FilmClock } from '../../math/dist/clock.js';
 
 const field = (name, quantity = 'position', unit = 'm') => ({
   name,
@@ -62,14 +62,28 @@ function spring(id, rate, { reads, log, stable = () => 0, x = 1 } = {}) {
   return s;
 }
 
-test('a frame maps to base ticks in exact integers at any rational rate', () => {
-  assert.equal(ticksAt(24, { num: 24, den: 1 }), BASE_HZ);
-  assert.equal(ticksAt(1, { num: 24000, den: 1001 }), Math.floor((7680 * 1001) / 24000));
-  for (const frame of [1, 7, 1001, 123457, 9e6])
-    assert.equal(ticksAt(frame, { num: 30000, den: 1001 }), Number((BigInt(frame) * 1001n * 7680n) / 30000n));
-  assert.equal(ticksAt(0, { num: 24, den: 1 }, [1, 2]), 160);
-  assert.throws(() => ticksAt(-1, { num: 24, den: 1 }), RangeError);
-  assert.throws(() => ticksAt(1, { num: 0, den: 1 }), RangeError);
+test("the world counts the film clock's base ticks, its own clock or one the scene shares", () => {
+  // Its own clock at an NTSC rate: frame 1001 of 30000/1001 fps is 256,256 base ticks, exactly.
+  const ntsc = new PhysicsWorld({ rate: { num: 30000, den: 1001 } });
+  ntsc.advance(1001);
+  assert.equal(ntsc.clock.ticks(BASE_HZ), Number((1001n * 1001n * 7680n) / 30000n));
+  assert.equal(ntsc.tick, ntsc.clock.ticks(BASE_HZ) - (ntsc.clock.ticks(BASE_HZ) % 128), 'stepped to the last 1/60 s');
+  // A shared clock: the scene seeks it and the world advances to wherever it stands.
+  const clock = new FilmClock({ fps: 24 }),
+    shared = new PhysicsWorld({ clock }).add(spring('a', 7), {});
+  clock.frame = 24;
+  shared.advance();
+  assert.equal(shared.tick, BASE_HZ);
+  shared.advance(30, { offset: { num: 1, den: 2 } });
+  assert.deepEqual(
+    [clock.frame, clock.offset],
+    [30, { num: 1, den: 2 }],
+    'advance with a frame seeks the shared clock',
+  );
+  assert.equal(shared.tick, (30.5 * BASE_HZ) / 24);
+  assert.throws(() => new PhysicsWorld({ clock, rate: { num: 30, den: 1 } }), /pass one of them/);
+  assert.throws(() => new PhysicsWorld({ clock: { fps: 24 } }), TypeError);
+  assert.throws(() => shared.advance(-1), RangeError);
 });
 
 test('the same shot at 24, 30 and 60 frames a second is the same physics', () => {
@@ -147,7 +161,10 @@ test('a snapshot replays bit for bit, the registry and levels with it', () => {
   world.restoreSnapshot(saved.bytes);
   assert.equal(world.hash(), saved.hash);
   assert.equal(world.levelOf('a'), levelThen);
-  assert.equal(world.tick, ticksAt(10, world.rate) - (ticksAt(10, world.rate) % 16));
+  // The world's counts come back; the clock is the scene's and stays where it was put (frame 40) until the next advance seeks it.
+  const at10 = new FilmClock({ fps: 24, frame: 10 }).ticks(BASE_HZ);
+  assert.equal(world.tick, at10 - (at10 % 16));
+  assert.equal(world.clock.frame, 40);
   world.advance(40);
   assert.equal(world.hash(), end);
 });
@@ -257,7 +274,7 @@ test('refusals: ids, a field nobody writes, a solver added mid-step', () => {
     (e) => e.name === 'MargoError' && e.code === 'state' && /"solver139599" and "solver322382"/.test(e.message),
   );
   world.remove('solver139599');
-  world.advance(1, { part: [1, 8] });
+  world.advance(1, { offset: { num: 1, den: 8 } });
   assert.equal(world.tick, 144);
   assert.throws(
     () => world.add(spring('slow', 0), {}),
@@ -269,7 +286,9 @@ test('refusals: ids, a field nobody writes, a solver added mid-step', () => {
 test('alpha is where a frame lies between steps of a level, exactly', () => {
   const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
   // Frame 1 at 24 fps is 320 base ticks: 2.5 steps of level 0 (128 ticks).
-  assert.equal(world.alpha(1, 0), 0.5);
-  assert.equal(world.alpha(1, 7), 0);
-  assert.equal(world.alpha(0, 0, [1, 4]), 80 / 128);
+  world.clock.frame = 1;
+  assert.equal(world.alpha(0), 0.5);
+  assert.equal(world.alpha(7), 0);
+  world.clock.at(0, { num: 1, den: 4 });
+  assert.equal(world.alpha(0), 80 / 128);
 });

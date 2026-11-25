@@ -3,9 +3,10 @@
 // time, and nothing is dropped.
 //
 // Time is counted in base ticks of 7,680 Hz, the rate of level 7, so a solver at level k steps every 2^(7 - k) base ticks and
-// two solvers at any levels meet on every step of the slower (Gear and Wells 1984; Neal and Belytschko 1989). A frame of a film
-// at a rational rate maps to base ticks in exact integer arithmetic, so no shot length or frame rate gains or loses time and
-// the same shot at 24, 30 or 60 frames a second runs the same physics.
+// two solvers at any levels meet on every step of the slower (Gear and Wells 1984; Neal and Belytschko 1989). The world reads
+// film time from a FilmClock (`@margoengine/math/clock`, the one implementation of frame-to-tick arithmetic, shared with
+// the rest of a scene), which counts the base ticks of a frame at a rational rate exactly, so no shot length or frame rate
+// gains or loses time and the same shot at 24, 30 or 60 frames a second runs the same physics.
 //
 // The world's own state lies in regions of the same memory as the solvers': the clock, each solver's rate level and origin
 // cell, and the field registry. The state hash and a snapshot take them with the solvers' state, under the id '' (no solver
@@ -19,6 +20,7 @@
 // Large worlds (floating origin, Thorne 2005): each solver steps in the frame of its origin cell, a cube of `cellSize` metres
 // (a power of two) indexed by three whole numbers. Moving an origin changes whole numbers only, never a float offset, so it
 // changes no bit of simulated state; a position goes from one cell's frame to another's through the integer cell difference.
+import { FilmClock, type FrameOffset, type FrameRate } from '@margoengine/math/clock';
 import { MargoError } from '@margoengine/math/errors';
 import { FieldRegistry, TransferRegistry } from './fields.js';
 import { type CouplingGraph, couplingGraph } from './graph.js';
@@ -35,6 +37,7 @@ import {
   type Cell,
   isRateLevel,
   type Port,
+  rateOf,
   type RateLevel,
   type Region,
   type Solver,
@@ -49,15 +52,14 @@ const TOP = 7;
 /** Base ticks in a step of level 0 (1/60 s): every level's steps meet on a multiple of it. */
 export const HYPER_PERIOD = 1 << TOP;
 
-/** A film's frame rate as a ratio of whole numbers: `num / den` frames a second (`{num: 24000, den: 1001}` for 23.976). */
-export interface FrameRate {
-  readonly num: number;
-  readonly den: number;
-}
-
 /** Settings of a {@link PhysicsWorld}; every one has a default. */
 export interface PhysicsWorldOptions {
-  /** The film's frame rate (default 24 frames a second). */
+  /**
+   * The film's clock (`@margoengine/math/clock`), shared with whatever else runs on film time: the world reads its frame and
+   * counts base ticks with it (default a new clock at `rate`).
+   */
+  clock?: FilmClock;
+  /** The film's frame rate, when the world makes its own clock (default 24 frames a second). */
   rate?: FrameRate;
   /** The seed solvers key their random numbers by, an unsigned 32-bit word (default 1). */
   seed?: number;
@@ -69,53 +71,10 @@ export interface PhysicsWorldOptions {
   memory?: WebAssembly.Memory;
 }
 
-const DEFAULT_RATE: FrameRate = { num: 24, den: 1 };
 const WORLD_ID = '';
 // Layout versions of the world's own regions.
 const CLOCK_LAYOUT = 1;
 const SOLVER_LAYOUT = 1;
-
-/**
- * The base ticks owed at frame `frame` of a film at `rate`, plus `part` (a ratio `p / q` of a frame, for motion-blur
- * sub-frames): floor((frame + part) * 7680 * den / num), in whole numbers, so it is a pure function of the frame and the rate.
- * @throws RangeError for a frame, part or rate that is not whole and in range, or a time past 2^53 ticks.
- */
-export function ticksAt(frame: number, rate: FrameRate, part: readonly [number, number] = [0, 1]): number {
-  const [numerator, denominator] = framePoint(frame, rate, part);
-  return divide(numerator, denominator);
-}
-
-/** Frame `frame` plus `part` as the exact ratio of base ticks numerator / denominator. */
-function framePoint(frame: number, rate: FrameRate, part: readonly [number, number]): [number, number] {
-  checkRate(rate);
-  const [p, q] = part;
-  if (!Number.isSafeInteger(frame) || frame < 0)
-    throw new RangeError(`A frame is a whole number of 0 or more (got ${frame}); pass the frame index.`);
-  if (!Number.isSafeInteger(p) || !Number.isSafeInteger(q) || q < 1 || p < 0 || p >= q)
-    throw new RangeError(`A sub-frame is a ratio p/q with 0 <= p < q (got ${p}/${q}); pass whole numbers.`);
-  const numerator = (frame * q + p) * rate.den * BASE_HZ,
-    denominator = q * rate.num;
-  if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator * HYPER_PERIOD))
-    throw new RangeError(
-      `Frame ${frame} at ${rate.num}/${rate.den} is past the ticks a world counts exactly (2^53); split the shot.`,
-    );
-  return [numerator, denominator];
-}
-
-/** floor(a / b) for whole numbers below 2^53, exactly: the float quotient corrected by one either way if it rounded across. */
-function divide(a: number, b: number): number {
-  let q = Math.floor(a / b);
-  if (q * b > a) q--;
-  else if ((q + 1) * b <= a) q++;
-  return q;
-}
-
-function checkRate(rate: FrameRate): void {
-  if (!rate || !Number.isSafeInteger(rate.num) || !Number.isSafeInteger(rate.den) || rate.num < 1 || rate.den < 1)
-    throw new RangeError(
-      'A frame rate is a ratio of whole numbers above 0, {num, den}; pass {num: 24, den: 1} or {num: 24000, den: 1001}.',
-    );
-}
 
 function checkCell(cell: Cell): void {
   if (!cell || cell.length !== 3 || !cell.every((k) => Number.isInteger(k) && Math.abs(k) < 2147483648))
@@ -157,7 +116,8 @@ type Unit =
  * call stops between steps; {@link PhysicsWorld.settle} or the next advance runs the rest.
  */
 export class PhysicsWorld {
-  readonly rate: FrameRate;
+  /** The film clock the world counts its ticks by. */
+  readonly clock: FilmClock;
   readonly seed: number;
   readonly gravity: readonly [number, number, number];
   readonly cellSize: number;
@@ -167,7 +127,8 @@ export class PhysicsWorld {
   readonly fields: FieldRegistry;
   /** The framework's transfers between representations. */
   readonly transfers = new TransferRegistry();
-  private readonly clock: Region;
+  /** The world's tick counts in its memory: [base ticks stepped, base ticks owed]. */
+  private readonly counts: Region;
   private entries: Entry[] = [];
   private order: Entry[] = [];
   private graph: CouplingGraph | undefined;
@@ -176,22 +137,29 @@ export class PhysicsWorld {
   private units: Unit[] = [];
 
   constructor(options: PhysicsWorldOptions = {}) {
-    const { rate = DEFAULT_RATE, seed = 1, gravity = [0, -9.80665, 0], cellSize = 4096, memory } = options;
-    checkRate(rate);
+    const { rate, clock, seed = 1, gravity = [0, -9.80665, 0], cellSize = 4096, memory } = options;
+    // Checked by its shape: physics bundles its own copy of @margoengine/math, so the app's FilmClock is another class object.
+    if (clock !== undefined && !(typeof clock?.ticks === 'function' && typeof clock.alpha === 'function' && clock.fps))
+      throw new TypeError(
+        'A world clock is a FilmClock of @margoengine/math/clock; pass one, or a rate for the world to make its own.',
+      );
+    if (clock && rate && clock.fps.num * rate.den !== rate.num * clock.fps.den)
+      throw new RangeError(
+        `The clock runs at ${clock.fps.num}/${clock.fps.den} frames a second and the rate given is ${rate.num}/${rate.den}; pass one of them.`,
+      );
     if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295)
       throw new RangeError(`A world seed is a whole number from 0 to 4294967295 (got ${seed}); pass one in range.`);
     if (!gravity || gravity.length !== 3 || !gravity.every(Number.isFinite))
       throw new RangeError('Gravity is three finite numbers in m/s^2; pass [0, -9.80665, 0] for Earth.');
     if (!(cellSize >= 1 && cellSize <= 1048576 && Number.isInteger(cellSize) && (cellSize & (cellSize - 1)) === 0))
       throw new RangeError(`A cell size is a power of two of metres from 1 to 2^20 (got ${cellSize}); pass 4096.`);
-    this.rate = { num: rate.num, den: rate.den };
+    this.clock = clock ?? new FilmClock({ fps: rate ?? 24 });
     this.seed = seed;
     this.gravity = [gravity[0], gravity[1], gravity[2]];
     this.cellSize = cellSize;
     this.arena = new Arena(memory);
     this.fields = new FieldRegistry(this.arena);
-    // [base ticks stepped, base ticks owed]
-    this.clock = this.arena.allocate('clock', 16, 'f64', CLOCK_LAYOUT);
+    this.counts = this.arena.allocate('clock', 16, 'f64', CLOCK_LAYOUT);
   }
 
   /** The world's memory. */
@@ -376,29 +344,36 @@ export class PhysicsWorld {
     return out;
   }
 
+  /** The film's frame rate, the clock's. */
+  get rate(): FrameRate {
+    return this.clock.fps;
+  }
+
   /**
-   * Runs every step owed up to frame `frame` (plus `part` of the next, for a motion-blur sub-frame). With `maxTicks` it runs
-   * no step that ends more than that many base ticks past the world's time, and {@link PhysicsWorld.settle} or the next
-   * advance runs the rest. Returns the base ticks stepped.
-   * @throws MargoError `state` for a frame before the world's time (restore a snapshot to go back), and for a field read
-   * or added to that no solver writes.
+   * Runs every step owed up to the clock's time: frame `frame` plus `offset` of the next (a motion-blur sub-frame) when
+   * given, which seeks the clock there first, else wherever the clock stands. The steps owed are the clock's whole base
+   * ticks, `clock.ticks(7680)`. With `maxTicks` it runs no step that ends more than that many base ticks past the world's
+   * time, and {@link PhysicsWorld.settle} or the next advance runs the rest. Returns the base ticks stepped.
+   * @throws MargoError `state` for a time before the world's (restore a snapshot to go back), and for a field read or added
+   * to that no solver writes; RangeError for a bad frame or offset (the clock's).
    */
-  advance(frame: number, options: { part?: readonly [number, number]; maxTicks?: number } = {}): number {
-    const target = ticksAt(frame, this.rate, options.part),
-      clock = this.time64(),
-      ran = clock[0]!;
+  advance(frame?: number, options: { offset?: FrameOffset; maxTicks?: number } = {}): number {
+    if (frame !== undefined) this.clock.at(frame, options.offset);
+    const target = this.clock.ticks(BASE_HZ),
+      counts = this.time64(),
+      ran = counts[0]!;
     if (target < ran)
       throw new MargoError(
         'state',
-        `Frame ${frame} is ${ran - target} base ticks before the world's time; restore a snapshot taken at or before it, then advance.`,
+        `Frame ${this.clock.frame} is ${ran - target} base ticks before the world's time; restore a snapshot taken at or before it, then advance.`,
       );
     const cap = options.maxTicks;
     if (cap !== undefined && !(Number.isSafeInteger(cap) && cap >= 1))
       throw new RangeError(
         `maxTicks is a whole number of 1 or more (got ${cap}); leave it out to run every step owed.`,
       );
-    clock[1] = Math.max(clock[1]!, target);
-    return this.run(cap === undefined ? clock[1]! : Math.min(clock[1]!, ran + cap));
+    counts[1] = Math.max(counts[1]!, target);
+    return this.run(cap === undefined ? counts[1]! : Math.min(counts[1]!, ran + cap));
   }
 
   /** Runs every step a capped advance left, so no time is dropped. Returns the base ticks stepped. */
@@ -407,16 +382,13 @@ export class PhysicsWorld {
   }
 
   /**
-   * How far frame `frame` (plus `part`) lies past the last step of a solver at `level` that ends at or before it, from 0 to
-   * below 1, in steps of that level: what drawing interpolates the last two published values by. Exact rational arithmetic
-   * and one division.
+   * How far the clock's time lies past the last step of a solver at `level` that ends at or before it, from 0 to below 1,
+   * in steps of that level: what drawing interpolates the last two published values by (`clock.alpha` at the level's
+   * rate, exact).
    */
-  alpha(frame: number, level: RateLevel, part: readonly [number, number] = [0, 1]): number {
+  alpha(level: RateLevel): number {
     if (!isRateLevel(level)) throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}).`);
-    const [numerator, denominator] = framePoint(frame, this.rate, part),
-      stride = 1 << (TOP - level),
-      before = divide(numerator, denominator * stride) * stride;
-    return (numerator - before * denominator) / (stride * denominator);
+    return this.clock.alpha(rateOf(level));
   }
 
   /** The state hash of the world: its clock, levels, cells and fields, and every solver's state (16 hex digits). */
@@ -431,7 +403,8 @@ export class PhysicsWorld {
 
   /**
    * Puts the world back as `bytes` (a snapshot's) found it; the run goes on bit for bit as it did. The world must hold the
-   * same solvers with the same fields as when it was taken.
+   * same solvers with the same fields as when it was taken. The film clock is the scene's and is left where it stands; the
+   * next `advance(frame)` seeks it.
    * @throws MargoError as the snapshot's `restoreSnapshot`, before anything is written.
    */
   restoreSnapshot(bytes: Uint8Array): this {
@@ -442,7 +415,7 @@ export class PhysicsWorld {
   private snapshotSolvers() {
     const world = {
       describe: () => ({ id: WORLD_ID, fields: [], rate: 0 as RateLevel, stableRate: () => 0 as RateLevel }),
-      stateRegions: () => [this.clock, ...this.entries.map((e) => e.record), ...this.fields.stateRegions()],
+      stateRegions: () => [this.counts, ...this.entries.map((e) => e.record), ...this.fields.stateRegions()],
       extraState: () => [],
     };
     return [world, ...this.entries.map((e) => e.solver)];
@@ -789,6 +762,6 @@ export class PhysicsWorld {
   }
 
   private time64(): Float64Array {
-    return regionWords(this.memory, this.clock) as Float64Array;
+    return regionWords(this.memory, this.counts) as Float64Array;
   }
 }

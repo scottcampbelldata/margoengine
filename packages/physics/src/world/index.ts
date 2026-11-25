@@ -46,14 +46,7 @@ export {
   couplingGraph,
   stronglyConnected,
 } from './graph.js';
-export {
-  BASE_HZ,
-  HYPER_PERIOD,
-  PhysicsWorld,
-  ticksAt,
-  type FrameRate,
-  type PhysicsWorldOptions,
-} from './world.js';
+export { BASE_HZ, HYPER_PERIOD, PhysicsWorld, type PhysicsWorldOptions } from './world.js';
 export {
   Aitken,
   Anderson,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 18846402,
+  "total": 18846825,
   "history": [
     {
       "date": "2026-10-24",
@@ -11961,6 +11961,12 @@
       "commit": "87f3b7bdd",
       "reason": "new materials/fake-shadows entry (blob and planar shadows)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "527a26ba7",
+      "reason": "@margoengine/physics/world: 12,132 to 12,542 B gzip: the world reads film time from a bundled FilmClock (@margoengine/math/clock, exact BigInt frame-to-tick arithmetic) in place of its own copy, so the engine has one implementation of it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12748,7 +12754,7 @@
     "@margoengine/physics/soft": 88860,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 27046,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 61340,
-    "@margoengine/physics/world": 12496,
+    "@margoengine/physics/world": 12919,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
