@@ -240,6 +240,15 @@ export class WeatherRegions implements Disposable {
   }
 
   /**
+   * Back to map time 0 (GAP-FILM-RESET): fronts and cells stand where they start; storms answer for the time asked, so
+   * they follow. The fronts, cells and storms added stay.
+   */
+  resetTime(): void {
+    this.alive();
+    this.clock = 0;
+  }
+
+  /**
    * Seconds until front `front` reaches world `(x, z)`, from time `t`; negative once it has passed. Use it for a
    * forecast ("rain in 4 minutes").
    */

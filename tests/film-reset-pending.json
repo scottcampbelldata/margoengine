@@ -25,17 +25,6 @@
     "tilemap/src/objects.ts:ObjectTileMap",
     "tilemap/src/renderer.ts:TileMap",
     "ui/src/renderer.ts:UiRenderer",
-    "voxel/src/render.ts:VoxelRenderer",
-    "weather/src/avalanche.ts:Avalanche",
-    "weather/src/drive.ts:WeatherDrive",
-    "weather/src/eruption.ts:Eruption",
-    "weather/src/gltf.ts:GLTFWeather",
-    "weather/src/hail.ts:Hail",
-    "weather/src/lava.ts:LavaFlow",
-    "weather/src/lens.ts:LensDrops",
-    "weather/src/machine.ts:WeatherMachine",
-    "weather/src/puddles.ts:Puddles",
-    "weather/src/regions.ts:WeatherRegions",
-    "weather/src/snow-drift.ts:SnowDrift"
+    "voxel/src/render.ts:VoxelRenderer"
   ]
 }

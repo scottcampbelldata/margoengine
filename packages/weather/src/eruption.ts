@@ -414,6 +414,13 @@ export class Eruption {
   advanceTime(delta: number): void {
     this.update(delta);
   }
+  /**
+   * Back to film second 0, as a fresh eruption with the same options (GAP-FILM-RESET): the vent, the column, the fall and
+   * the lightning start again (strikes are read again from the start); the plume's clouds follow on their next sync.
+   */
+  resetTime(): void {
+    this.film = this.fired = 0;
+  }
   /** Moves film time on by `delta` real seconds times `timeScale`. */
   update(delta: number): void {
     if (!(delta >= 0) || !Number.isFinite(delta))

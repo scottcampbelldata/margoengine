@@ -15,6 +15,7 @@ export class Avalanche implements SnowFieldSource {
     version: number;
     constructor(options: AvalancheOptions);
     reset(): void;
+    resetTime(): void;
     get time(): number;
     get isReleased(): boolean;
     get isStopped(): boolean;

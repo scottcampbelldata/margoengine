@@ -43,6 +43,7 @@ export class SnowDrift implements SnowFieldSource {
     budget: SnowBudget;
     constructor(options: SnowDriftOptions);
     reset(): void;
+    resetTime(): void;
     get time(): number;
     get simulated(): number;
     advanceTime(delta: number): void;

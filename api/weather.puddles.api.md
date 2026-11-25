@@ -40,6 +40,7 @@ export class Puddles extends SurfaceHook {
     patch(source: string): string;
     onPreUpdate(delta: number): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     protected validate(): void;
     protected variant(): string;
     protected write(): void;

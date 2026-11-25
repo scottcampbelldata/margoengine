@@ -407,6 +407,14 @@ export class Avalanche implements SnowFieldSource {
     this.version++;
   }
 
+  /**
+   * The clock contract of `@margoengine/cutscene/seek` `resetClocks` (GAP-FILM-RESET): {@link reset}, as a clock. The
+   * snow is read again from the options (a `snow` source as it stands then: reset it first), and `version` grows so the
+   * views upload it.
+   */
+  resetTime(): void {
+    this.reset();
+  }
   /** Film seconds reached. */
   get time(): number {
     return this.film;
@@ -523,8 +531,6 @@ export class Avalanche implements SnowFieldSource {
 
   private step(dt: number): void {
     const o = this.options,
-      W = this.width,
-      D = this.depth,
       n = this.n,
       dx = this.cellSize,
       k0 = o.pressure ?? 1,
@@ -581,7 +587,6 @@ export class Avalanche implements SnowFieldSource {
   ): void {
     const W = this.width,
       D = this.depth,
-      n = this.n,
       dx = this.cellSize,
       h = this.flow,
       qx = this.qx,

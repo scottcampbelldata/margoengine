@@ -43,6 +43,8 @@ export interface DriveSource {
   readonly wind?: WindField;
   /** Seconds of weather time, for the wind field. */
   readonly time?: number;
+  /** Puts the weather back to time 0 (GAP-FILM-RESET); a drive that steps it (`advance`) calls it from its own `resetTime`. */
+  resetTime?(): unknown;
 }
 
 /** The sky (`Sky` from `@margoengine/sky`): its cloud sheet and its fog. */
@@ -532,6 +534,17 @@ export class WeatherDrive {
    */
   advanceTime(delta: number): void {
     this.apply(delta, true);
+  }
+
+  /**
+   * Back to time 0, as a fresh drive with the same options (GAP-FILM-RESET): the weather it steps (with `advance`) is
+   * reset with it, the dead fuel moisture starts again from `fuelMoistureStart` on the next frame with a fire, and
+   * nothing counts as written yet. The targets keep what was last written until the next frame writes them again.
+   */
+  resetTime(): void {
+    if (this.disposed) throw new MargoError('disposed', 'WeatherDrive is disposed; attach a new WeatherDrive');
+    if (this.options.advance ?? true) this.options.weather.resetTime?.();
+    this.fuel = this.last = undefined;
   }
 
   private apply(delta: number, replay: boolean): DriveSettings {

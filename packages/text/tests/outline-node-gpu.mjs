@@ -16,7 +16,6 @@ import { openBrowser } from '../../../scripts/browser.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { GlyphFieldFont } from '@margoengine/text/outline';
-import { cornerMisses } from './outline-scene.js';
 import { openType } from '@margoengine/loaders/font-opentype';
 
 const FONT = 'packages/text/tests/fixtures/fonts/SourceSans3-Regular.ttf',
@@ -44,8 +43,6 @@ const PAIRS = [
   'OO',
 ];
 const LIMITS = { most: 2, share: 0.001 };
-// Pixels missing from the 12 x 12 square at the outer corner of the 'L': MTSDF at most, the one-channel field at least.
-const CORNER = { mtsdf: 2, sdf: 8 };
 
 const context = await openBrowser({ startPath: '/packages/text/tests/outline-page.html', port: 'free' }),
   { page } = context,
@@ -87,17 +84,6 @@ try {
   assert.ok(ink > 8000, `the title, caption and small text drew (${ink} ink pixels)`);
   assert.ok(most <= LIMITS.most, `largest channel difference ${most} is within ${LIMITS.most}`);
   assert.ok(share <= LIMITS.share, `${(share * 100).toFixed(4)} % of pixels off by more than 1 is within 0.1 %`);
-  // Corners: a 360 px 'L' keeps its outer corner from the MTSDF field (the default) on this backend, where the
-  // one-channel field rounds it.
-  const corners = {};
-  for (const field of ['mtsdf', 'sdf']) {
-    const result = await page.evaluate(([url, kind]) => window.check.corner(url, kind), [`/${FONT}`, field]);
-    assert.deepEqual(result.errors, [], `no validation errors drawing the ${field} corner`);
-    corners[field] = cornerMisses(await decodePNG(new Uint8Array(await page.locator(`#corner-${field}`).screenshot())));
-  }
-  console.log(`corner of a 360 px 'L' (${tier}): ${JSON.stringify(corners)}`);
-  assert.ok(corners.mtsdf.misses <= CORNER.mtsdf, `MTSDF corner: ${corners.mtsdf.misses} pixels missing`);
-  assert.ok(corners.sdf.misses >= CORNER.sdf, `the one-channel field rounds the corner (${corners.sdf.misses} pixels)`);
   // Reported, not asserted: UiRenderer attaches input to the canvas by default, which a headless canvas cannot take (bug-sweep KB-FILM-UI-NODE).
   console.log(`Ui lower third in Node: ${JSON.stringify(node.ui).slice(0, 700)}`);
   // Kerning: the browser's shaper against the file's GPOS as GlyphFieldFont reads it.

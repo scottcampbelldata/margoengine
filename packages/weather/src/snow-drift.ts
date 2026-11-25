@@ -442,6 +442,13 @@ export class SnowDrift implements SnowFieldSource {
     this.version++;
   }
 
+  /**
+   * The clock contract of `@margoengine/cutscene/seek` `resetClocks` (GAP-FILM-RESET): {@link reset}, as a clock; `version`
+   * grows so the views upload the snow.
+   */
+  resetTime(): void {
+    this.reset();
+  }
   /** Film seconds the snow has reached. */
   get time(): number {
     return this.film;

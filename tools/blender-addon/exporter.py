@@ -17,28 +17,24 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False, lightmap_size=0, live_nodes=False, bake_noise=False):
+def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False, object_animation=False, lightmap_size=0, live_nodes=False):
     if lightmap_size:
         from .lightmaps import lightmaps
         with lightmaps(context, lightmap_size) as records:
-            return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, records, live_nodes, bake_noise)
-    return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, live_nodes=live_nodes, bake_noise=bake_noise)
+            return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, records, live_nodes)
+    return _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, live_nodes=live_nodes)
 
 
-def _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, lightmap_records=None, live_nodes=False, bake_noise=False):
+def _export_scene(context, path, bake_size, lights_cameras, curves, object_animation, lightmap_records=None, live_nodes=False):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
     bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
     lights_cameras writes visible point, spot and sun lights and cameras as nodes with `margo:` light and camera tags,
     which @margoengine/blender/components builds; False leaves them out as before. curves writes visible curves
     objects as splines, point clouds as points and volumes as OpenVDB grids (header flag 2), which
-    @margoengine/blender/curves reads; False leaves them out as before. live_nodes keeps node graphs as animatable
-    shaders; with it, bake_noise bakes the materials that a Noise Texture feeds, as above, so their pattern is Cycles'
-    own, and the others stay live. A baked material is one frame, so an animated one fails by name."""
+    @margoengine/blender/curves reads; False leaves them out as before."""
     if bake_size and not 16 <= bake_size <= 4096:
         raise ValueError("bake_size must be 0 (off) or 16 to 4096 pixels")
-    if live_nodes and bake_noise and not bake_size:
-        raise ValueError("bake_noise bakes with Cycles; set bake_size to 16 to 4096 pixels")
     # Blender Z-up to Margo/glTF Y-up; a proper rotation preserves winding.
     basis = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
     nodes, geometry, materials, textures, images, samplers = [], [], [], [], [], []
@@ -279,16 +275,17 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
 
     def material_id(material, owner=None):
         """The material index of `material` on the object `owner`; a baked material is per mesh (its UV layout)."""
-        owned = (material_key(material), owner.original.data.name) if owner is not None and material else None
-        bake_key = owned if owned in baked else None
-        key = owned if live_nodes and material else material_key(material)
+        key = (material_key(material), owner.original.data.name) if live_nodes and material else material_key(material)
+        bake_key = (key, owner.original.data.name) if owner is not None and material else None
+        if bake_key not in baked:
+            bake_key = None
         id_key = ("baked",) + bake_key if bake_key else key
         if id_key in material_ids:
             return material_ids[id_key]
-        if bake_key:
-            result = baked_material(material, baked[bake_key])
+        if live_nodes and material:
+            result = live_materials[key]
         else:
-            result = live_materials[key] if live_nodes and material else direct(material)
+            result = baked_material(material, baked[bake_key]) if bake_key else direct(material)
         for value in result["pbrMetallicRoughness"]["baseColorFactor"] + [result["pbrMetallicRoughness"]["metallicFactor"], result["pbrMetallicRoughness"]["roughnessFactor"]]:
             if not math.isfinite(value) or not 0 <= value <= 1:
                 raise ValueError("PBR material factors must be finite and in [0,1]")
@@ -452,28 +449,21 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
         visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
         return obj.type == "MESH" and instance.show_self and visible.visible_get(view_layer=context.view_layer)
 
-    def bakes_noise(material):
-        """True when bake_noise takes this live-export material to the Cycles bake: a Noise Texture feeds it."""
-        trees = noise_trees(material.original) if bake_noise else None
-        if trees and any(a and (a.action or a.drivers or a.nla_tracks) for a in (t.animation_data for t in trees)):
-            failure(material, "bake_noise bakes one frame, but its node tree is animated; turn bake_noise off to keep it live")
-        return trees is not None
-
     if live_nodes:
         # Sampling sockets changes frames. Collect original owners first, outside any depsgraph iterator or mesh lease.
-        from .nodes import live_material, noise_trees
+        from .nodes import live_material
         pending = {}
         for instance in depsgraph.object_instances:
             if exported(instance):
                 obj = instance.object.original
                 for slot in obj.material_slots:
-                    if slot.material and not bakes_noise(slot.material):
+                    if slot.material:
                         pending[(material_key(slot.material), obj.data.name)] = (slot.material, obj)
         for key, (material, owner) in pending.items():
             live_materials[key] = live_material(context, material, owner)
         depsgraph = context.evaluated_depsgraph_get()
 
-    if bake_size and (bake_noise or not live_nodes):
+    if bake_size and not live_nodes:
         # Bake first: baking changes the scene, so it never runs while the depsgraph's instances are iterated.
         pending = {}
         for instance in depsgraph.object_instances:
@@ -484,7 +474,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             obj.data.polygons.foreach_get("material_index", used)
             for index in np.unique(used).tolist():
                 material = obj.material_slots[index].material if index < len(obj.material_slots) else None
-                if material and (bakes_noise(material) if live_nodes else needs_baking(material)):
+                if material and needs_baking(material):
                     # Bake the original material: the evaluated copy is rebuilt from it whenever the scene updates.
                     pending.setdefault((material_key(material), obj.original.data.name), (obj.original, material.original))
         for key, (owner, material) in pending.items():

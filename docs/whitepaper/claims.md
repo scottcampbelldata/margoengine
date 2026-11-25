@@ -5220,16 +5220,6 @@ CJK at 32, 64 and 128 px); pair kerning from the file equals Chromium's on 20 So
 `packages/text/tests/outline.test.js` and `npm run test:gpu:outline` in packages/text (native and `MARGO_COMPAT=1`).
 No speed claim; build times in the README are informal.
 
-Multi-channel fields (GAP-FILM-MSDF, 2026-11-25): the default `field: 'mtsdf'` keeps corners. Claim, measured on the
-CPU reconstruction the GPU performs (bilinear, then the median of three channels) on an 8 x 8 grid per texel: on Source
-Sans 3 at 32 px (glyphs ABEFHKLMNRTVWXYZ4791&kxzw) the samples on the wrong side further than 0.25 texel from the
-outline fall from 117 with the one-channel field to 4, none further than 0.5; on CFF, a variable instance, CJK and Arabic glyphs no glyph has more
-such samples than its one-channel field; alpha is the one-channel field byte for byte. Proof:
-`packages/text/tests/outline-msdf.test.js`; page against Node bytes in `npm run test:gpu:outline`, which also draws a
-360 px 'L' on the GPU (native WebGPU and the WebGL2 compatibility layer): 0 of the 144 pixels in the 12 x 12 square at
-its outer corner are missing with MTSDF, 13 with the one-channel field. Where contours overlap the gain is smaller
-(1,126 against 1,826 samples past 0.25 texel on Source Sans 3 VF, default instance, glyphs AKMW#&). No speed claim.
-
 ### Shorts P4: look checks (headless/look)
 `@margoengine/headless/look` checks rendered probe frames against bounds from a shot file's `lookBounds`: sky clipping,
 grain (Immerkaer 1996), speckle, banding (flat runs split by a skipped code), flat areas, block steps at the froxel

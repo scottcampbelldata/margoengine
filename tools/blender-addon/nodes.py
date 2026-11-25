@@ -131,24 +131,6 @@ def exact_curves(animation, path, width, start, fps, end=None, coarsen=0):
     return curves if any(c is not None for c in curves) else None
 
 
-def noise_trees(material):
-    """The node trees (node groups included) on the way from the active output when a Noise Texture feeds it; else None."""
-    seen, trees, found = set(), [], False
-    stack = [(material.node_tree, n) for n in material.node_tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output] if material.node_tree else []
-    while stack:
-        tree, node = stack.pop()
-        if node.as_pointer() in seen:
-            continue
-        seen.add(node.as_pointer())
-        if tree not in trees:
-            trees.append(tree)
-        found = found or node.type == "TEX_NOISE"
-        if node.type == "GROUP" and node.node_tree:
-            stack += [(node.node_tree, n) for n in node.node_tree.nodes if n.type == "GROUP_OUTPUT" and n.is_active_output]
-        stack += [(tree, link.from_node) for s in node.inputs for link in s.links]
-    return trees if found else None
-
-
 def graph(context, material, owner):
     tree = material.node_tree
     outputs = [n for n in tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]

@@ -163,6 +163,7 @@ export class WeatherMachine implements Disposable {
     stop(): this;
     update(delta: number): WeatherState;
     advanceTime(delta: number): void;
+    resetTime(): void;
     dispose(): void;
     [Symbol.dispose](): void;
 }

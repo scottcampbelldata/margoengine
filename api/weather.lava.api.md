@@ -38,6 +38,7 @@ export class LavaFlow {
     get time(): number;
     advanceTime(delta: number): void;
     update(delta: number): void;
+    resetTime(): void;
     seek(t: number): void;
     envelope(t?: number): number;
     supplied(t?: number): number;

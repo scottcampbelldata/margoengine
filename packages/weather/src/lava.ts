@@ -875,6 +875,14 @@ export class LavaFlow {
       throw new RangeError('LavaFlow update needs a finite delta, 0 or more');
     this.seek(this.film + delta * (this.options.timeScale ?? 1));
   }
+  /**
+   * Back to film second 0, as a fresh flow with the same options (GAP-FILM-RESET): the front, the glow lights (written
+   * for second 0) and the bombs' impacts start again (impacts are read again from the start).
+   */
+  resetTime(): void {
+    this.seek(0);
+    this.impactsFrom = 0;
+  }
   /** Goes to film second `t` (and writes the glow lights into `lights`). */
   seek(t: number): void {
     if (!(t >= 0) || !Number.isFinite(t)) throw new RangeError('LavaFlow seek needs a finite time, 0 or more');

@@ -910,6 +910,36 @@ seekSync(world, 40, { fps: 30, extra: [eruption, drift] });
 console.log(eruption.time, drift.simulated); // about 400 film seconds of eruption and 2,400 simulated seconds of snow
 ```
 
+Several cuts in one process: `resetTime()` puts each weather clock back as a fresh one with the same options has it
+(`resetClocks` from `@margoengine/cutscene/seek` calls it on the engine's clocks and on `extra`), so a later `seek`
+gives what a fresh world seeked there gives (`tests/reset-time.test.js`: each clock, and a whole weather world run,
+reset and seeked against a fresh one, field for field).
+
+- `Hail`, `LensDrops`, `Puddles`, `GLTFWeather` and `WeatherRegions` put their clocks (and the hail's faded-in amount)
+  back to 0; fronts, cells and storms stay.
+- `WeatherMachine` goes back to where it stood when time first moved: its state, its blend, its schedule or random
+  walk (the walk's seed at its start) and its wetness and snow cover. Calls made after time moved (`set`,
+  `transitionTo`, `schedule`, `randomWalk`, `stop`) are dropped, as a fresh machine set up the same way never saw them:
+  make them again from film code. No listener is called; listeners stay.
+- `WeatherDrive` resets the weather it steps (with `advance`, the default) and starts its fuel moisture again.
+- `Eruption` and `LavaFlow` go back to film second 0 and give their lightning and bomb impacts again from the start.
+  `Avalanche` and `SnowDrift` run their `reset()`, and their `version` grows so the views upload the snow; an
+  avalanche reads the snow of its `snow` source as it stands then, so reset that first (`resetClocks` takes `extra` in
+  the order given).
+
+```ts
+import { Eruption } from 'margoengine/weather/eruption';
+import { resetClocks, seekSync } from 'margoengine/cutscene/seek';
+
+const world = { scene: { plugins: new Map() } };
+const eruption = new Eruption({ rise: 1, wind: 8, timeScale: 10 });
+seekSync(world, 40, { fps: 30, extra: [eruption] });
+// The next cut starts 90 s into the film: back to 0, then seek.
+resetClocks(world, { extra: [eruption] });
+seekSync(world, 90, { fps: 30, extra: [eruption] });
+console.log(eruption.time); // about 900 film seconds
+```
+
 ## One panel for the whole weather: settings
 
 `@margoengine/weather/settings` lists the weather's master controls as one table for sliders and tools: wind speed

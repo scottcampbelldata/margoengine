@@ -186,7 +186,9 @@ engine.render({ delta: 1 / 30 });
   `PostProcessing`, `LODSystem`, `XRaySelection`, `ShaderClock`, `Scatter` and `ScatterInstances`, every sky clock
   (`Sky`, `HillaireSky`, `AstroSky`, `Aurora`, `TornadoCloud`, `VolumetricClouds`, `Weather`), every water clock
   (`Water`, `FFTOcean`, `WaterFlow`, `WaterRain`, `ShipWakes`, `ShotSplash`, `Floater`, `Iceberg`, `SeaIce`, `Flood`)
-  and every vfx clock (`VFX`, `BlownSand`, `Clouds`, `Flame`, `Smoke`, `FireFront`, `Battery`, `HullFire`). The rest are listed in
+  every vfx clock (`VFX`, `BlownSand`, `Clouds`, `Flame`, `Smoke`, `FireFront`, `Battery`, `HullFire`) and every
+  weather clock (`WeatherMachine`, `WeatherDrive`, `WeatherRegions`, `Hail`, `LensDrops`, `Puddles`, `GLTFWeather`,
+  `Eruption`, `LavaFlow`, `Avalanche`, `SnowDrift`). The rest are listed in
   `tests/film-reset-pending.json`, which only shrinks.
 
 ## Film captions and chapter cards

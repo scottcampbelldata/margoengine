@@ -256,6 +256,14 @@ export class Puddles extends SurfaceHook {
     this.clock = (this.clock + delta) % 3600;
   }
 
+  /**
+   * Back to time 0, as fresh puddles with the same options (GAP-FILM-RESET): the rings' clock starts again; the next
+   * frame update writes it to the GPU.
+   */
+  resetTime(): void {
+    this.clock = 0;
+  }
+
   protected validate(): void {
     validatePuddles(this.options);
   }

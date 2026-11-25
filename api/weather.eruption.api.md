@@ -97,6 +97,7 @@ export class Eruption {
     [Symbol.dispose](): void;
     get time(): number;
     advanceTime(delta: number): void;
+    resetTime(): void;
     update(delta: number): void;
     seek(t: number): void;
     peakRate(): number;

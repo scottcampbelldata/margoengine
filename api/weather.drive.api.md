@@ -85,6 +85,7 @@ export interface DriveSource {
     advanceTime?(delta: number): unknown;
     readonly wind?: WindField;
     readonly time?: number;
+    resetTime?(): unknown;
 }
 
 export interface EruptionTarget {
@@ -185,6 +186,7 @@ export class WeatherDrive {
     get time(): number;
     update(delta?: number): DriveSettings;
     advanceTime(delta: number): void;
+    resetTime(): void;
     setup(engine: {
         removePlugin(name: string): void;
     }): void;

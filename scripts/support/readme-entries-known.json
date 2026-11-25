@@ -4,7 +4,7 @@
   "audio": ["./pan","./binaural","./voices","./sprites"],
   "behavior": ["./subtrees","./inspect","./fuzzy","./text","./triggers"],
   "biomes": ["./region","./rivers","./cover","./far","./workers"],
-  "blender": ["./lightmap"],
+  "blender": ["./lightmap","./nodes"],
   "cache": ["./stream","./decoded"],
   "cinematic": ["./physical-lens","./ortho"],
   "clustered": ["./area-shapes","./cube-projector","./area-texture","./layers"],

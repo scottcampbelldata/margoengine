@@ -108,6 +108,15 @@ export class GLTFWeather implements EnginePlugin {
     this.puddles.advanceTime(delta);
   }
 
+  /**
+   * Back to time 0, as a fresh effect with the same options (GAP-FILM-RESET): the rain rings' clock starts again (snow
+   * has none); the next frame update writes it to the GPU.
+   */
+  resetTime(): void {
+    this.alive();
+    this.puddles.resetTime();
+  }
+
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
     this.snow.onPreUpdate(delta);

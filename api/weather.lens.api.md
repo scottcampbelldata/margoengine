@@ -15,6 +15,7 @@ export class LensDrops implements EnginePlugin {
     get time(): number;
     onPreUpdate(delta: number): void;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

@@ -16,6 +16,7 @@ export class GLTFWeather implements EnginePlugin {
     setup(engine: Engine): void;
     get time(): number;
     advanceTime(delta: number): void;
+    resetTime(): void;
     onPreUpdate(delta: number): void;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];

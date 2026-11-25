@@ -289,6 +289,11 @@ export class LensDrops implements EnginePlugin {
     this.clock += delta;
   }
 
+  /** Back to time 0, as fresh drops with the same options (GAP-FILM-RESET): the drops' clock starts again. */
+  resetTime(): void {
+    this.clock = 0;
+  }
+
   private draw(c: Context, input: GPUTextureView, output: StageOutput): void {
     const o = this.options;
     validate(o);

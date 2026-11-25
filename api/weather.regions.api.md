@@ -45,6 +45,7 @@ export class WeatherRegions implements Disposable {
     addStorm(storm: WeatherStorm): () => void;
     update(delta: number): this;
     advanceTime(delta: number): void;
+    resetTime(): void;
     arrival(front: WeatherFront, x: number, z: number, t?: number): number;
     stateAt(x: number, z: number, t?: number): WeatherState;
     apply(machine: {

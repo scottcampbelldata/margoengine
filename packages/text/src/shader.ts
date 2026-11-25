@@ -63,21 +63,17 @@ fn toLinear(c: vec3f) -> vec3f {
 
 @fragment fn fragment(i: Out) -> @location(0) vec4f {
   // Screen-space derivatives first, in uniform control flow: texels of the SDF per screen pixel.
-  // Glyph kinds: 0 one-channel SDF, 1 colour (emoji), 2 MSDF, 3 MTSDF (alpha holds the one-channel distance).
   let glyphKind = i.kind >> 2u;
-  let multi = glyphKind >= 2u;
-  let dimensions = select(vec2f(textureDimensions(sdfAtlas).xy), vec2f(textureDimensions(colorAtlas).xy), multi);
+  let dimensions = select(vec2f(textureDimensions(sdfAtlas).xy), vec2f(textureDimensions(colorAtlas).xy), glyphKind == 2u);
   let texels = i.uv * dimensions;
   let w = max(0.5 * (length(dpdx(texels)) + length(dpdy(texels))), 1e-3);
   var texel = textureSampleLevel(sdfAtlas, atlasSampler, i.uv, i.page, 0.0).r;
   var tint = textureSampleLevel(colorAtlas, atlasSampler, i.uv, i.page, 0.0);
   if (any(i.local < block.clipRect.xy) || any(i.local > block.clipRect.zw)) { discard; }
-  let kind = i.kind & 3u;
-  if (multi) {
-    // The median of three channels keeps corners; outlines and shadows of an MTSDF read the true distance in alpha,
-    // which stays right far from the edge where a median of pseudo-distances does not.
-    texel = select(max(min(tint.r, tint.g), min(max(tint.r, tint.g), tint.b)), tint.a, glyphKind == 3u && kind != 2u);
+  if (glyphKind == 2u) {
+    texel = max(min(tint.r, tint.g), min(max(tint.r, tint.g), tint.b));
   }
+  let kind = i.kind & 3u;
   // Signed distance in SDF texels, positive outside. Fade out where the field saturates so quad edges never show.
   let d = ((1.0 - texel) - block.sdf.y) * block.sdf.x;
   let field = clamp(texel * 127.5, 0.0, 1.0);

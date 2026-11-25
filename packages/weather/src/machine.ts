@@ -151,6 +151,8 @@ export class WeatherMachine implements Disposable {
   private disposed = false;
   // A replayed step (advanceTime) calls no listener: the film saw those transitions already.
   private silent = false;
+  /** The weather and its program (blend, schedule, walk) as they stood when time first moved: what `resetTime` restores. */
+  private start: Record<string, unknown> = {};
 
   /** The wind in this weather: a field kept in step with the state's `wind`, `gust` and `windDirection` on every update. */
   readonly wind: WindField;
@@ -424,7 +426,37 @@ export class WeatherMachine implements Disposable {
     }
   }
 
+  /** The fields `resetTime` puts back, as one copy (a schedule's current step stays one of its list's). */
+  private program(): Record<string, unknown> {
+    return structuredClone({
+      current: this.current,
+      transition: this.transition,
+      steps: this.steps,
+      walk: this.walk,
+      wet: this.wet,
+      snowLevel: this.snowLevel,
+    });
+  }
+
+  /**
+   * Back to weather time 0 (GAP-FILM-RESET): the state, the running blend, the schedule or random walk (its seed's
+   * place included) and the wetness and snow cover go back to where they stood when time first moved, so the same
+   * steps after it give the same weather. Calls made after time moved (`set`, `transitionTo`, `schedule`, ...) are
+   * dropped, as a fresh machine set up the same way never saw them; make them again from film code. No listener is
+   * called; listeners stay.
+   */
+  resetTime(): void {
+    this.alive();
+    this.idle();
+    // The start is taken again on the next step, from the state it restores, as a fresh machine takes it.
+    if (this.clock > 0) Object.assign(this, this.start);
+    this.start = {};
+    this.clock = 0;
+    this.syncWind();
+  }
+
   private step(dt: number): void {
+    if (this.clock === 0) this.start = this.program();
     this.clock += dt;
     let remaining = dt;
     // Several short blends or holds can end inside one step; process them all, in order, until the step's time is

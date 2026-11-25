@@ -337,6 +337,14 @@ export class Hail implements EnginePlugin {
           );
   }
 
+  /**
+   * Back to time 0, as a fresh hail with the same options (GAP-FILM-RESET): the stones' clock and the faded-in amount
+   * start again, so the same frames after it draw what a fresh hail draws. `lift` is the scene's and stays.
+   */
+  resetTime(): void {
+    this.clock = this.level = 0;
+  }
+
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
