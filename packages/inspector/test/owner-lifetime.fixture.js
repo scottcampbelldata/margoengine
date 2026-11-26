@@ -19,6 +19,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Inspector } = await load('../dist/index.js');
   const { FrameDebugger } = await load('../dist/frame.js');
   const { RemoteTarget, RemoteInspector, channelTransport } = await load('../dist/remote.js');
+  const { MeshDebugView } = await load('../dist/mesh-debug.js');
   const entries = [];
 
   entries.push({
@@ -78,6 +79,24 @@ export async function fixtures(load = (entry) => import(entry)) {
       };
     },
   });
+
+  // The view's uniform and storage copies go with it; the mesh it draws is the caller's.
+  for (const factory of [false, true])
+    entries.push({
+      name: 'MeshDebugView' + (factory ? '.attach' : ''),
+      create({ engine, scene, dependency }) {
+        const mesh = dependency(() =>
+          scene
+            .createMesh()
+            .setGeometry(box(1, 1, 1))
+            .setMaterial(new PbrMaterial()),
+        );
+        let plugin;
+        if (factory) plugin = MeshDebugView.attach(engine, { mode: 'material-ids' });
+        else scene.use((plugin = new MeshDebugView()));
+        return { plugin, dispose: () => plugin.dispose(), cleanup: () => mesh.dispose() };
+      },
+    });
 
   if (!page && typeof process !== 'undefined' && process.versions?.node) {
     const { createRemoteRelay } = await load('../dist/remote-relay.js');
