@@ -29,6 +29,7 @@
     "test:browser:lava": "cd ../.. && node packages/physics/tests/lava.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs",
     "test:browser:rail": "cd ../.. && node packages/physics/tests/rail.browser.mjs && node packages/physics/tests/rail.browser.mjs --compat",
+    "test:browser:thin-film": "cd ../.. && node packages/physics/tests/thin-film.browser.mjs && node packages/physics/tests/thin-film.browser.mjs --compat",
     "test:browser:strands": "cd ../.. && node packages/physics/tests/strands.browser.mjs",
     "test:browser:granular-mpm": "cd ../.. && node packages/physics/tests/granular-mpm.browser.mjs",
     "test:browser:synoptic": "cd ../.. && node packages/physics/tests/synoptic.browser.mjs",

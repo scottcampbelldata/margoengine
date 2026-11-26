@@ -6204,6 +6204,11 @@ its volume through expiry and restores the same replay hash. Four independently 
 drop sizes agree with the lab velocity bands at each of 1, 3 and 5 m in still air.
 [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+The rolling window fixture draws the live film surface and airborne sill drops on
+WebGPU and WebGL2. Hiding either surface at the same rigid pose changes its pixels.
+Restoring and replaying the coupled world recovers the same simulation hash and every
+rendered pixel on each backend. [Reproduce](reproduce.md#fluid-07-moving-window-render)
+
 One drop released by the sill arrives at a separate receiving film with the analytic
 contact location and speed. Its volume leaves flight once, enters the film once, and
 its normal impulse reaches a live wake. A turning drop also registers when both end
