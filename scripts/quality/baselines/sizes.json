@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19280607,
+  "total": 19283550,
   "history": [
     {
       "date": "2026-10-24",
@@ -12597,6 +12597,12 @@
       "commit": "a69348ec9",
       "reason": "@margoengine/physics lazy physics kernel 519848 to 519854 B: sat_coherent no longer holds an edge pair against a face it ties (KB-PHYS-EDGEHOLD1), so a box face resting on a block's edge keeps both ends; the kernel blueprint is one lazy chunk and the change is in it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6d77417bd",
+      "reason": "selection-actions-entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -13739,6 +13745,7 @@
     "@margoengine/sciviz/workers": 1840,
     "@margoengine/sciviz/xdmf": 19832,
     "@margoengine/selection": 23571,
+    "@margoengine/selection/actions": 2943,
     "@margoengine/selection/area": 16230,
     "@margoengine/selection/highlight": 14000,
     "@margoengine/selection/hit-details": 16055,
