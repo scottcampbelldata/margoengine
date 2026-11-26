@@ -341,7 +341,7 @@ fn coastBlend(xz:vec2f)->vec3f {
  var gradient=vec2f(0);if(distance==edges.x){gradient.x=slope;}else if(distance==edges.y){gradient.y=slope;}else if(distance==edges.z){gradient.x=-slope;}else{gradient.y=-slope;}
  return vec3f(gradient,t*t*(3.0-2.0*t));
 }
-struct CoastalSample {water:vec4f,normal:vec3f,surface:f32,blend:vec3f,ocean:f32,edge:f32}
+struct CoastalSample {water:vec4f,normal:vec3f,surface:f32,blend:vec3f,ocean:f32,edge:f32,wet:f32}
 fn coastal(xz:vec2f)->CoastalSample {
  let size=vec2i(textureDimensions(coast));let uv=(xz-frame.coast.xy)/frame.coast.zw;
  let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let lo=vec2i(floor(pixel));let hi=min(lo+1,size-1);let t=fract(pixel);
@@ -352,6 +352,11 @@ fn coastal(xz:vec2f)->CoastalSample {
  if(STILL){let fill=vec4f(a.w,b.w,c.w,d.w);levels=select(fill,levels,standing>vec4f(0.003));has=select(standing,vec4f(1),fill>vec4f(-1e29));signed=select(select(vec4f(-1),fill-vec4f(a.y,b.y,c.y,d.y),fill>vec4f(-1e29)),standing,standing>vec4f(0.003));}
  let weights=vec4f((1.0-t.x)*(1.0-t.y),t.x*(1.0-t.y),(1.0-t.x)*t.y,t.x*t.y)*step(vec4f(0.003),has);
  let total=dot(weights,vec4f(1));let surface=select(frame.settings.y,dot(weights,levels)/max(0.0001,total),total>0.0001);
+ // A flowing surface (KB-WATER-SHORESAW1): a dry texel's signed depth is the wet texels' level over its ground, so the
+ // waterline is where the water's level meets the bed between texels. Its depth clamped to 0 put the line on the dry
+ // texels' centres, a staircase of whole cells (0.78 by 3.9 m on the dune coast) where a front reaches further up the
+ // beach in one row than the next. All four texels dry draws no water.
+ if(!STILL){signed=select(select(vec4f(-1),vec4f(surface)-vec4f(a.y,b.y,c.y,d.y),total>0.0001),standing,standing>vec4f(0.003))-vec4f(0.003);}
  let h=select(vec4f(surface),levels,has>vec4f(0.003));
  let dx=mix(h.y-h.x,h.w-h.z,t.y)/max(0.0001,frame.flow.y);let dz=mix(h.z-h.x,h.w-h.y,t.x)/max(0.0001,frame.flow.z);
  let depths=max(vec4f(0),vec4f(frame.settings.y)-vec4f(a.y,b.y,c.y,d.y));
@@ -361,13 +366,37 @@ fn coastal(xz:vec2f)->CoastalSample {
  let sea=smoothstep(vec4f(band.x),vec4f(band.y),depths)*vec4f(select(0.0,1.0,connected[indices.x]==0u),select(0.0,1.0,connected[indices.y]==0u),select(0.0,1.0,connected[indices.z]==0u),select(0.0,1.0,connected[indices.w]==0u));
  let ocean=mix(mix(sea.x,sea.y,t.x),mix(sea.z,sea.w,t.x),t.y);let gradient=vec2f(mix(sea.y-sea.x,sea.w-sea.z,t.y)/frame.flow.y,mix(sea.z-sea.x,sea.w-sea.y,t.x)/frame.flow.z);let edge=coastBlend(xz);
  let blend=vec3f(edge.xy*(1.0-ocean)-edge.z*gradient,edge.z*(1.0-ocean));
- return CoastalSample(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),normalize(vec3f(-dx,1,-dz)),surface,blend,ocean,mix(mix(signed.x,signed.y,t.x),mix(signed.z,signed.w,t.x),t.y));
+ return CoastalSample(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),normalize(vec3f(-dx,1,-dz)),surface,blend,ocean,mix(mix(signed.x,signed.y,t.x),mix(signed.z,signed.w,t.x),t.y),total);
+}
+// The level of the wet cell of the coastal grid nearest xz within reach (x), and whether there is one (y), else the
+// sea's (KB-WATER-SHORESAW1). A mesh vertex whose four texels are all dry took the sea's level, so the triangle from
+// the last wet vertex up the beach dived under the sand within one mesh cell, and where it dived stepped with the mesh
+// (2.34 m on the dune coast): the waterline drew teeth. Holding the run-up's level out to the next vertex keeps the
+// surface flat across the front, so it meets the sand where the bed rises to the water's level, the waterline of a
+// moving shore (the free surface's intersection with the bed: S. C. Medeiros and S. C. Hagen, "Review of wetting and
+// drying algorithms for numerical tidal flow models", International Journal for Numerical Methods in Fluids 71(4),
+// 2013, https://doi.org/10.1002/fld.3668; P. D. Bates and J.-M. Hervouet, "A new method for moving-boundary
+// hydrodynamic problems in shallow water", Proceedings of the Royal Society A 455, 1999,
+// https://doi.org/10.1098/rspa.1999.0442). Fragments still end the water within a texel of the wet cells (edge).
+fn coastalReach(xz:vec2f,reach:f32)->vec2f {
+ let size=vec2i(textureDimensions(coast));let cell=frame.coast.zw/vec2f(size);
+ // reach plus a texel's diagonal: a vertex beside one standing in the water finds that water's texel.
+ let far=reach+length(cell);let centre=vec2i(floor((xz-frame.coast.xy)/cell));let r=min(vec2i(ceil(vec2f(far)/cell)),vec2i(8));
+ var best=1e30;var level=frame.settings.y;
+ for(var z=-r.y;z<=r.y;z++){
+  for(var x=-r.x;x<=r.x;x++){
+   let p=centre+vec2i(x,z);if(any(p<vec2i(0))||any(p>=size)){continue;}
+   let texel=textureLoad(coast,p,0);let away=length(frame.coast.xy+(vec2f(p)+0.5)*cell-xz);
+   if(texel.x>0.003&&away<=far&&away<best){best=away;level=texel.x+texel.y;}
+  }
+ }
+ return vec2f(level,select(0.0,1.0,best<1e29));
 }
 struct SurfHere {surf:Surf,weight:f32}
 // The surf at a point of the coastal grid and how much of it shows (0 off the field and toward the grid's edge).
 fn surfHere(xz:vec2f,sampleWidth:f32,foam:bool)->SurfHere {
  let size=vec2i(textureDimensions(coast));let field=surfField(xz,size);
- if(STILL||field.weight<=0.0){return SurfHere(Surf(vec3f(0),vec3f(0),vec3f(0),0.0,0.0,vec2f(0),0.0,vec2f(0)),0.0);}
+ if(STILL||field.weight<=0.0){return SurfHere(Surf(vec3f(0),vec3f(0),vec3f(0),0.0,0.0,vec2f(0),0.0,vec2f(0),0.0),0.0);}
  let uv=(xz-frame.coast.xy)/frame.coast.zw;let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let lo=vec2i(floor(pixel));let hi=min(lo+1,size-1);let t=fract(pixel);
  let ground=mix(mix(textureLoad(coast,lo,0).y,textureLoad(coast,vec2i(hi.x,lo.y),0).y,t.x),mix(textureLoad(coast,vec2i(lo.x,hi.y),0).y,textureLoad(coast,hi,0).y,t.x),t.y);
  return SurfHere(surfSample(xz,sampleWidth,frame.settings.y-ground,field,foam),field.weight*coastBlend(xz).z);
@@ -442,7 +471,8 @@ fn surface(xz:vec2f,sampleWidth:f32)->Surface {
    tangent=tangent*(1.0-w)+vec3f(w,0,0)+(base-p)*wx+ax;binormal=binormal*(1.0-w)+vec3f(0,0,w)+(base-p)*wz+az;
    p=mix(p,base+offset,w);crest=mix(crest,surfCrest,w);
   }
-  let v=coastal(xz);let blend=v.blend;let shore=vec3f(xz.x,v.surface,xz.y);let delta=shore-p;
+  let v=coastal(xz);let blend=v.blend;var level=v.surface;if(!STILL&&v.wet<=0.0001){level=coastalReach(xz,sampleWidth).x;}
+  let shore=vec3f(xz.x,level,xz.y);let delta=shore-p;
   tangent=mix(tangent,vec3f(1,-v.normal.x/max(0.0001,v.normal.y),0),blend.z)+delta*blend.x;
   binormal=mix(binormal,vec3f(0,-v.normal.z/max(0.0001,v.normal.y),1),blend.z)+delta*blend.y;
   p=mix(p,shore,blend.z);
@@ -645,7 +675,7 @@ ${displayShader}
   // shortcut: uncharted seabed deepens at 0.35 m/m; supply a larger heightmap for distant shoals.
   let outside=max(max(frame.coast.xy-i.xz,i.xz-frame.coast.xy-frame.coast.zw),vec2f(0));let bed=max(0.0,i.world.y-v.y)+length(outside)*0.35;
   gap=mix(gap,min(gap,bed),select(sample.ocean,1.0,isCoast));
-  if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;open=1.0-sample.blend.z;}
+  if(isCoast){dry=sample.edge<=0.0;gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;open=1.0-sample.blend.z;}
  }
  let pixelX=dpdx(i.world.xz);let pixelY=dpdy(i.world.xz);
  let footprint=max(length(pixelX),length(pixelY));
@@ -658,10 +688,13 @@ ${displayShader}
  if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
  // Breaking surf (surf.ts): rollers on the fronts and the lace they leave, a web of foam (ridges of drifting gradient
  // noise) torn into patches. The breaking churns sand into the water (murk), and the surf's foam replaces the depth-only
- // shoreline band, which on a gentle beach would whiten the whole surf zone.
- var surfing=0.0;var surfFoam=0.0;var murk=0.0;
+ // shoreline band, which on a gentle beach would whiten the whole surf zone. Whether a place is surf zone is the steady
+ // share of waves breaking there (surfZone), not the swell breaking this instant: a wave group's lull breaks nothing
+ // for a moment, and the shoreline band and foam lines filled it with a flat, hard-edged pale patch
+ // (KB-WATER-FOAMPATCH-KH1).
+ var surfing=0.0;var surfZone=0.0;var surfFoam=0.0;var murk=0.0;
  if(isCoast&&!river){
-  let here=surfHere(i.xz,footprint,true);surfing=here.weight*here.surf.breaking;
+  let here=surfHere(i.xz,footprint,true);surfing=here.weight*here.surf.breaking;surfZone=here.weight*here.surf.zone;
   if(surfing>0.0){
    let q=i.world.xz;let t=frame.settings.x;
    let patches=noise(q*0.21+vec2f(t*0.03,0.0)).x+noise(q*0.63+vec2f(3.1,-t*0.05)).x*0.5;
@@ -672,14 +705,14 @@ ${displayShader}
   }
   murk=here.weight*max(here.surf.breaking,here.surf.stir);
  }
- let shore=(1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08)))*(1.0-smoothstep(0.0,0.3,surfing));
+ let shore=(1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08)))*(1.0-smoothstep(0.0,0.3,surfZone));
  let pattern=mix(mix(0.45,1.0,frame.foam.z),1.0,grain);let caps=frame.grid.z;
  let fresh=clamp((select(shore,0.0,river)*SHORE_FOAM+movement*(0.9+0.9*caps))*pattern,0.0,1.0);
  var foam=max(fresh,surfFoam);if(frame.flow.w<0.5){foam=max(foam,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
  if(caps>0.0&&!river){
   var lines=0.0;
   // Foam lines ring land the surf does not reach; on a breaking beach the surf's own foam takes their place.
-  if(isCoast){let near=landNearby(i.world.xz);lines=smoothstep(0.04,0.3,near+(grain-0.5)*0.25+0.08*sin(frame.settings.x*1.3-near*9.0))*mix(0.55,1.0,grain)*(1.0-smoothstep(0.0,0.3,surfing));}
+  if(isCoast){let near=landNearby(i.world.xz);lines=smoothstep(0.04,0.3,near+(grain-0.5)*0.25+0.08*sin(frame.settings.x*1.3-near*9.0))*mix(0.55,1.0,grain)*(1.0-smoothstep(0.0,0.3,surfZone));}
   foam=max(foam,max(whitecap(i.world.xz,footprint)*open,lines*caps));
  }
  var shown=foam;if(frame.foam.z>0.0){shown=pow(foam,1.0-0.4*frame.foam.z);}

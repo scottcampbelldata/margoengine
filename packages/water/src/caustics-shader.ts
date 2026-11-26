@@ -26,7 +26,7 @@ export function waterSurface(state: QueryState): CausticSurfaceShader {
      : `let base=vec2f(grid)/f32(${state.segments})*frame.grid.xy-frame.grid.xy*0.5+frame.water.zw;
  let wave=oceanAt(base);return Sample(vec3f(base.x,frame.water.x,base.y)+wave.displacement,wave.normal,base);`
  }`,
-    dry: water ? 'if(inCoast(base)){let s=coastal(base);return select(s.water.x<0.003,s.edge<=0.0,STILL);}' : '',
+    dry: water ? 'if(inCoast(base)){let s=coastal(base);return s.edge<=0.0;}' : '',
     triangles: state.segments * state.segments * 2,
   };
 }

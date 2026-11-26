@@ -4692,6 +4692,19 @@ zone (0.9 to 0.35 m) drives the flow's height and flux toward it; the flow keeps
 packages/water/test/surf.browser.mjs on WebGPU and the WebGL2 layer (shoaling, breaking depth, no offshore breaking or
 foam, the run-up below) and dune-coast stills judged by eye. Missing: other GPUs, timing (build phase).
 
+KB-WATER-SHORESAW1 coastal waterline (2026-11-26): a flowing coast's water mesh holds the nearest wet texel's level on
+vertices whose texels are dry (`coastalReach`, within the vertex's sample width and a texel), instead of the sea's, so
+the triangles across the swash front no longer dive under the sand; fragments end the water where the wet level meets the
+bed between texels (signed depth for flowing water as for still water); caustics and the capture follow. Evidence:
+packages/water/test/shoreline.browser.mjs on WebGPU and the WebGL2 layer, and the Kitty Hawk kh-establish frame before
+and after. Missing: other GPUs.
+
+KB-WATER-FOAMPATCH-KH1 surf foam gate (2026-11-26): the shoreline foam band and foam lines close where the surf zone is,
+read as Battjes and Janssen's steady share of breaking waves Q_b (H_rms = 2 sqrt(sum (a Ks)^2) over gamma d, four Newton
+steps in `surfBreakingShare`), no longer the instant envelope's breaking, which reads 0 in a wave group's lull and drew a
+flat pale patch there. Evidence: packages/water/test/surf-lull.browser.mjs on WebGPU and the WebGL2 layer, and the
+Kitty Hawk s18 stills before and after. Missing: other GPUs.
+
 KB-WATER-SWASH1 coast flow (2026-11-18): Water's own coast flow (packages/water/src/coastal.ts) is no longer a virtual
 pipe (each outflow driven by its own cell's depth, no momentum carried, a 0.12 /s decay: the NOAA solitary wave ran up
 0.0129 of 0.0861, the surf test's swash 0.014 m). Maths: on the same staggered grid (depth at cells, discharge q at

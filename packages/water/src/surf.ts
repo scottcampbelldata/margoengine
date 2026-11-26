@@ -136,18 +136,35 @@ fn surfFoamAt(phase:f32,r:f32,phi:f32)->vec2f {
  let roller=smoothstep(-0.6,-0.1,behind)*(1.0-smoothstep(0.35*front,0.9*front,behind));
  return vec2f(roller,select(0.0,exp(behind*0.7),behind<0.0));
 }
+// The share of waves breaking where the sea's root-mean-square height over the depth-limited height is beta: Q_b of
+// J. A. Battjes and J. P. F. M. Janssen, "Energy loss and set-up due to breaking of random waves", Coastal Engineering
+// 1978, https://doi.org/10.1061/9780872621909.034, the root under 1 of (1 - Q_b) / ln Q_b = -beta^2 (as in The SWAN
+// team, "SWAN Scientific and Technical Documentation", Delft University of Technology, depth-induced wave breaking,
+// https://swanmodel.sourceforge.io/online_doc/swantech/node16.html). H_rms = sqrt(8 m0) = 2 sqrt(sum a^2) over the
+// components (m0 the surface variance) is steady in time, unlike the envelope that sets \`breaking\`: where the trains
+// cancel, a wave group's lull reads no breaking although the place is surf zone (KB-WATER-FOAMPATCH-KH1). Four Newton
+// steps on f(Q) = 1 - Q + beta^2 ln Q from below the root, at exp(-1 / beta^2) (f < 0 there) or SWAN's (2 beta - 1)^2;
+// f is concave and rises up to the root, so the steps climb to it without overshoot (within 1e-12 of a bracketing solve
+// for beta from 0.2 to 0.999). Under beta = 0.2 the share is under 2e-11 and reads 0.
+fn surfBreakingShare(beta:f32)->f32 {
+ if(beta>=1.0){return 1.0;}if(beta<0.2){return 0.0;}
+ let b2=beta*beta;var q=max(exp(-1.0/b2),select(0.0,(2.0*beta-1.0)*(2.0*beta-1.0),beta>0.5));
+ for(var i=0;i<4;i++){q=min(1.0,q-(1.0-q+b2*log(q))/(b2/q-1.0));}
+ return q;
+}
 struct SurfPart {gradient:vec2f,phase:f32,amplitude:f32,steepness:f32,swell:f32}
-struct Surf {offset:vec3f,dx:vec3f,dz:vec3f,crest:f32,breaking:f32,foam:vec2f,stir:f32,heading:vec2f}
+struct Surf {offset:vec3f,dx:vec3f,dz:vec3f,crest:f32,breaking:f32,foam:vec2f,stir:f32,heading:vec2f,zone:f32}
 // The surf at xz over still-water depth d with its field: displacement, its x and z derivatives, the crest share,
 // how hard the swell breaks there (0..1), with \`foam\` the roller and trail foam (0..1 each), and how much sand the
-// swell's orbital flow at the bed lifts (0..1). The swell components break as one sea: their phasor sum
+// swell's orbital flow at the bed lifts (0..1), and \`zone\` the share of waves breaking there over a wave group
+// (surfBreakingShare, steady in time). The swell components break as one sea: their phasor sum
 // E = sum a exp(i phase) gives the local height 2|E| and the phase of the combined crest, which carries the nonlinear
 // shape and the foam; each component keeps its own horizontal orbit.
 fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Surf {
  let kField=surfFieldK();let d=max(depth,0.02);
  var parts:array<SurfPart,24>;var count=0u;
  // E, and G = sum a grad(phase) exp(i phase) (its cosine and sine parts), so grad E = i G; k is the mean wavenumber.
- var envelope=vec2f(0);var gCos=vec2f(0);var gSin=vec2f(0);var weight=0.0;var k=0.0;var omega=0.0;
+ var envelope=vec2f(0);var gCos=vec2f(0);var gSin=vec2f(0);var weight=0.0;var k=0.0;var omega=0.0;var energy=0.0;
  for(var j=0u;j<u32(frame.settings.w);j++){
   let w=frame.waves[j];
   for(var c=0u;c<3u;c++){
@@ -160,14 +177,14 @@ fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Sur
     let along=deep.gradient-u*dot(deep.gradient,u);let g=along+u*sqrt(max(kl*kl-dot(along,along),0.0));
     parts[count]=SurfPart(g,s.phase,a*ks,w.shape.x,1.0);
     envelope+=a*ks*vec2f(cos(s.phase),sin(s.phase));gCos+=a*ks*g*cos(s.phase);gSin+=a*ks*g*sin(s.phase);
-    weight+=a*ks;k+=a*ks*kl;omega+=a*ks*sqrt(9.81*k0);
-   } else {parts[count]=SurfPart(deep.gradient,deep.phase,a*min(ks,1.0),w.shape.x,0.0);}
+    weight+=a*ks;k+=a*ks*kl;omega+=a*ks*sqrt(9.81*k0);energy+=a*ks*a*ks;
+   } else {parts[count]=SurfPart(deep.gradient,deep.phase,a*min(ks,1.0),w.shape.x,0.0);energy+=a*min(ks,1.0)*a*min(ks,1.0);}
    count++;
   }
  }
  let size=length(envelope);let high=2.0*size;let saturate=min(1.0,SURF_GAMMA*d/max(high,1e-4));
  let breaking=smoothstep(0.8,1.05,high/(SURF_GAMMA*d));
- var result=Surf(vec3f(0),vec3f(0),vec3f(0),0.0,breaking,vec2f(0),0.0,vec2f(0));
+ var result=Surf(vec3f(0),vec3f(0),vec3f(0),0.0,breaking,vec2f(0),0.0,vec2f(0),surfBreakingShare(2.0*sqrt(energy)/(SURF_GAMMA*d)));
  if(size>1e-5){
   // The combined swell: height S |E| F(phase of E), F the Abreu waveform at the Ursell number of the saturated sea.
   let phase=atan2(envelope.y,envelope.x);let turn=(gCos*envelope.x+gSin*envelope.y)/(size*size);

@@ -8648,6 +8648,12 @@ a beach"). Limits:
   of the beach, frictionless, the highest of six periods: 0.24, 0.31 and 0.37 m at 0.78, 0.39 and 0.2 m cells), the step is second order along a face
   and first order across it, and the surf's hand-over gives the flow no wave setup. Bed friction is Manning n = 0.02 on
   every cell (sand); there is no infiltration, so backwash on a coarse beach is too strong.
+- The waterline of the coastal flow lies where the wet cells' level meets the bed (KB-WATER-SHORESAW1), so it is as fine
+  as the flow's front: on the dune coast's 0.78 by 3.9 m cells the run-up still steps a few pixels far along the beach
+  where it reaches one cell further in one row than the next. A finer heightmap along the shore makes it finer.
+- The shoreline foam band and foam lines are held off by the steady share of breaking waves (Battjes and Janssen 1978,
+  KB-WATER-FOAMPATCH-KH1), not by each instant's breaking, so a wave group's lull keeps the surf zone's look; the surf
+  foam itself still follows the breaking crests, so a lull shows open water between them.
 - Spin-up: the flow runs the surf's last 40 s before its first frame, in 1/45 s steps, so it starts in the swash it would
   have reached. That covers beaches down to about 1:100 below the 0.35 m hand-over (a long wave crosses it in
   2 sqrt(0.35 / g) / slope s: 19 s on 1:50, 38 s on 1:100); a gentler beach still fills its swash during the first

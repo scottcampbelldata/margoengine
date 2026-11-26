@@ -11678,6 +11678,38 @@ Chosen here, not from the works: the line is where the root-mean-square envelope
 middle of the shader's breaking ramp), the deepest such depth found by stepping in from deep water and bisecting to a
 millimetre, and the field from the train with the most height.
 
+## The waterline of a moving shore: water coastal reach (KB-WATER-SHORESAW1, 2026-11-26)
+
+Written from the works below, read as text; no other engine's or project's code was read.
+
+- S. C. Medeiros and S. C. Hagen, "Review of wetting and drying algorithms for numerical tidal flow models",
+  International Journal for Numerical Methods in Fluids 71(4), 473-487, 2013, https://doi.org/10.1002/fld.3668. Used: the
+  shoreline of a wetting and drying model is where the free surface meets the bed, inside partly wet cells, not on the
+  cells' boundaries.
+- P. D. Bates and J.-M. Hervouet, "A new method for moving-boundary hydrodynamic problems in shallow water", Proceedings
+  of the Royal Society A 455, 3107-3128, 1999, https://doi.org/10.1098/rspa.1999.0442. Used: the free surface carried
+  over partly wet elements to find the waterline within them.
+
+Chosen here, not from the works: a dry mesh vertex takes the level of the nearest texel with more than 3 mm of water
+within its sample width plus one texel diagonal (at most 8 texels a side), else the sea's; a dry texel's signed depth is
+the wet texels' bilinear level over its ground, and a quad with no wet texel reads -1 m.
+
+## The steady surf zone: water surf foam gate (KB-WATER-FOAMPATCH-KH1, 2026-11-26)
+
+Written from the works below, read as text; no other engine's or project's code was read.
+
+- J. A. Battjes and J. P. F. M. Janssen, "Energy loss and set-up due to breaking of random waves", Proc. 16th ICCE,
+  1978, https://doi.org/10.1061/9780872621909.034. Used: the share of breaking waves Q_b at a point is the root under 1 of
+  (1 - Q_b) / ln Q_b = -(H_rms / H_max)^2, with H_max the depth-limited height.
+- The SWAN team, "SWAN Scientific and Technical Documentation", Delft University of Technology, depth-induced wave
+  breaking, https://swanmodel.sourceforge.io/online_doc/swantech/node16.html. Used: H_max = gamma d, Q_b = 1 at
+  H_rms / H_max of 1 and above, and (2 beta - 1)^2 as a value under the root for beta from 0.5 to 1.
+- M. S. Longuet-Higgins 1952 (above). Used: H_rms = 2 sqrt(sum a^2) over the components.
+
+Chosen here, not from the works: four Newton steps from max(exp(-1 / beta^2), (2 beta - 1)^2), which lies under the
+root, on the concave f(Q) = 1 - Q + beta^2 ln Q (checked within 1e-12 of a bracketing solve from beta 0.2 to 0.999);
+0 under beta = 0.2; gamma is the surf's 0.78; the shoreline foam and foam lines close over a Q_b of 0 to 0.3.
+
 ## Dead fuel moisture from the weather: weather/fuel-moisture (2026-11-17)
 
 Written from reports read as text, no code read: J. D. Cohen and J. E. Deeming, "The National Fire-Danger Rating System:

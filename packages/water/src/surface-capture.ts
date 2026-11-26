@@ -95,7 +95,7 @@ fn evaluate(id:u32)->CaptureVertex {
  }
  return CaptureVertex(vec4f(0),world,normal,base);
 }
-fn dry(base:vec2f)->bool {${water ? 'if(inCoast(base)){let s=coastal(base);return select(s.water.x<0.003,s.edge<=0.0,STILL);} ' : ''}return false;}
+fn dry(base:vec2f)->bool {${water ? 'if(inCoast(base)){let s=coastal(base);return s.edge<=0.0;} ' : ''}return false;}
 // FFT's draw samples the spectral normal at the interpolated base in the fragment stage.
 fn stableNormal(normal:vec3f)->vec3f {let scale=max(abs(normal.x),max(abs(normal.y),abs(normal.z)));let n=normal/scale;return n/sqrt(dot(n,n));}
 fn captureNormal(base:vec2f,normal:vec3f)->vec3f {return ${water ? 'stableNormal(normal)' : 'oceanAt(base).normal'};}

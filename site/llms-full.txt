@@ -13283,6 +13283,12 @@ a beach"). Limits:
   of the beach, frictionless, the highest of six periods: 0.24, 0.31 and 0.37 m at 0.78, 0.39 and 0.2 m cells), the step is second order along a face
   and first order across it, and the surf's hand-over gives the flow no wave setup. Bed friction is Manning n = 0.02 on
   every cell (sand); there is no infiltration, so backwash on a coarse beach is too strong.
+- The waterline of the coastal flow lies where the wet cells' level meets the bed (KB-WATER-SHORESAW1), so it is as fine
+  as the flow's front: on the dune coast's 0.78 by 3.9 m cells the run-up still steps a few pixels far along the beach
+  where it reaches one cell further in one row than the next. A finer heightmap along the shore makes it finer.
+- The shoreline foam band and foam lines are held off by the steady share of breaking waves (Battjes and Janssen 1978,
+  KB-WATER-FOAMPATCH-KH1), not by each instant's breaking, so a wave group's lull keeps the surf zone's look; the surf
+  foam itself still follows the breaking crests, so a lull shows open water between them.
 - Spin-up: the flow runs the surf's last 40 s before its first frame, in 1/45 s steps, so it starts in the swash it would
   have reached. That covers beaches down to about 1:100 below the 0.35 m hand-over (a long wave crosses it in
   2 sqrt(0.35 / g) / slope s: 19 s on 1:50, 38 s on 1:100); a gentler beach still fills its swash during the first
@@ -14987,6 +14993,43 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-26: the waterline of a flowing sea on a beach drew a sawtooth (KB-WATER-SHORESAW1, water)
+
+- **Repro:** the Kitty Hawk film's shot kh-establish (`examples/kitty-hawk`, the dune coast, looking south along the
+  beach): where the surf meets the flat sand the waterline was a row of teeth, the nearest several metres long.
+- **Cause:** two places took the sea's level where the coastal flow has no water.
+  - The water mesh: a vertex whose four coastal texels were all dry stood at the sea's level, so the triangle from the
+    last wet vertex up the beach dived under the sand within one mesh cell (2.34 m on the dune coast), and the sand
+    covered the water from where it dived. The waterline stepped with the mesh.
+  - The fragments: a dry texel's depth, clamped to 0, put the end of the water on the dry texels' centres, a staircase of
+    the coastal grid's cells (0.78 by 3.9 m on the dune coast), as a still surface's did before its signed depth.
+- **Fix:** a dry vertex takes the level of the nearest wet texel within its mesh cell and one texel (`coastalReach`), so
+  the surface stays flat across the swash front and meets the sand where the bed rises to it. A dry texel's signed depth
+  is the wet texels' level over its ground, so the water ends between texels where that level meets the bed, and a
+  quad with no wet texel draws none. Caustics and the surface capture read the same signed depth.
+- **Regression:** `packages/water/test/shoreline.browser.mjs` (WebGPU and the WebGL2 layer): a calm sea on a diagonal
+  1:50 beach ends on a straight line (1.04 px off it before, 0.00 after), and a pond held 3 m above the sea stands at its
+  level on the dry texels within a mesh cell of its waterline (0 m before).
+- **Left:** far along the dune coast's beach the run-up still steps by a few pixels where the swash reaches a cell
+  further in one 3.9 m row of the flow than the next; that is the flow grid's resolution (docs/limits.md).
+
+### Fixed 2026-11-26: a flat, hard-edged pale patch in the surf zone wherever the swell groups fell into a lull (KB-WATER-FOAMPATCH-KH1, water)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, the dune coast at its default 1.2 m surf, camera at
+  the waterline looking east): a lens-shaped pale patch with a sharp lower edge lay in the swash zone about 9 m out, with
+  no crest in it, and moved with the wave groups.
+- **Cause:** Water holds its shoreline foam band and its foam lines off where the surf breaks (on a breaking beach the
+  surf's own foam takes their place). It read how hard the swell broke at that instant, from the envelope of the swell
+  trains. Two trains of 72 m and 41 m cancel in each wave group's lull, the envelope falls to nothing and breaking reads
+  0, so inside the surf zone both foam terms came on at full strength (0.35 and up to 0.67 of white) over the whole lull,
+  with edges as sharp as the breaking ramp.
+- **Fix:** the gate reads the steady share of breaking waves (`Surf.zone` in `packages/water/src/surf.ts`): Battjes and
+  Janssen's Q_b from the sea's root-mean-square height over the depth-limited height, which does not beat with the
+  groups. The surf foam still follows the breaking crests.
+- **Regression:** `packages/water/test/surf-lull.browser.mjs` (WebGPU and the WebGL2 layer): the dune coast's two trains
+  on a 1:50 beach reach lulls at 23 of 29 surf-zone probes, the zone does not move with them and the shoreline gate stays
+  shut at every phase.
 
 ### Fixed 2026-11-26: a box held to the sea stirred a calm sea, drained the box and ran waves ahead of the sea (KB-FLIP-SEABAND1, physics, flip)
 
