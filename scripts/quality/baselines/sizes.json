@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20537496,
+  "total": 20538343,
   "history": [
     {
       "date": "2026-10-24",
@@ -13493,6 +13493,13 @@
       "commit": "b33cf08098",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 3378 to 4206 B gzip (ceiling 4462 B) for measured start-stop friction and a terrain-relative Froude number. Both closures share conservative transport and the live bed, which a split would duplicate. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "560ac1d07c84624d7b2c0ee7b208699a27fe9a98",
+      "grew": 1,
+      "added": 0,
+      "reason": "EARTH-01 increases the optional granular entry from 5114 to 5961 B gzip for the swim-wake receiver and its replayable impulse ledger. A split would duplicate the terrain and native registry bindings. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14329,7 +14336,7 @@
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-flow": 4462,
-    "@margoengine/physics/granular-mpm": 5370,
+    "@margoengine/physics/granular-mpm": 6217,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,

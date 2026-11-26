@@ -1308,7 +1308,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,315 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,316 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -14594,8 +14594,8 @@ changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
 WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
 grid visits only the occupied nodes, with storage sized for the maximum support
 of the input points. The kernel uses one deterministic scatter and gather order.
-The optional JavaScript entry is 5,114 B gzip against a 5,370 B budget. The
-plain and shared native assets are each 15,063 B raw and 5,930 B gzip.
+The optional JavaScript entry is 5,961 B gzip against a 6,217 B budget. The
+plain and shared native assets are each 16,082 B raw and 6,348 B gzip.
 Core and Stage gain zero bytes.
 
 The optional layer projection deposits each material point's current volume on
@@ -14606,9 +14606,13 @@ bedrock. The projection represents the volume in each ground column, including
 particles above its surface. Use it for a shallow layer. Separating suspended
 material and reconstructing overhangs need a different output.
 
-The first increment covers dry or cohesive granular material and snow. Explicit
-pore-water transport, reciprocal contact with dynamic bodies, the voxel material
-handoff, the measured inertial regime and the persistent ray-bed imprint remain open.
+The first increment covers dry or cohesive granular material and snow. The BB-7 reference fixture now drives the live bed with the actual pectoral wake.
+At 45 frames the fin-on case cuts about 49.6 μm and raises an adjacent region by
+about 73.0 μm relative to the still-fin case. This is a reduced one-way bed-shear
+model. It tracks the received horizontal impulse and preserves each grain's mass.
+The field does not return unresolved water momentum or pore pressure. Explicit
+pore-water transport, reciprocal dynamic contact, the voxel material handoff
+and measured inertial flow remain open.
 
 ### Physical strand guides (SOFT-03)
 
@@ -31883,10 +31887,9 @@ measurements require separate models and evidence.
 The optional continuum produces shear yield and persistent compaction on the live
 terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
 state to the vacated cell. The voxel-to-continuum material handoff for repose
-and pile evolution is still open. The continuum publishes real layer-volume
-changes to the live bed. BB-7 still needs to drive that layer with ray wake
-momentum and verify the resulting imprint against its control. The sand plume
-is already proven separately.
+and pile evolution is still open. The continuum publishes layer-volume changes to the live bed when it receives the
+ray wake; the fin-on and still-fin test measures erosion and deposition, and both
+memory modes replay identically. The original BB-7 shot still needs the scene binding.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 
