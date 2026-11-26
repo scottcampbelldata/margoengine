@@ -13972,8 +13972,8 @@
         "gzip": 10901
       },
       "./soft": {
-        "raw": 256319,
-        "gzip": 137034
+        "raw": 257339,
+        "gzip": 137827
       },
       "./meshfiles": {
         "raw": 6444,
@@ -18333,12 +18333,12 @@
       "entry": "./soft",
       "base": {
         "raw": 130856,
-        "gzip": 42494
+        "gzip": 42493
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 125462,
-        "gzip": 94249,
+        "raw": 126482,
+        "gzip": 95068,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

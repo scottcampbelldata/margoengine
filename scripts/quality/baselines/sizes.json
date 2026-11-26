@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20497561,
+  "total": 20505651,
   "history": [
     {
       "date": "2026-10-24",
@@ -13287,6 +13287,12 @@
       "commit": "2d4bcf225b",
       "grew": 1,
       "reason": "EARTH-05 signed wheel skid takes the optional entry from 12631 to 12899 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e91dfca2b6",
+      "grew": 2,
+      "reason": "SOFT-04 adds an exact translational minimization before reciprocal rigid contact in vertex blocks, moving the soft entry from 137034 to 137827 B gzip. @margoengine/physics/soft: 137210 to 141962 B ceiling (137827 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 94583 to 97921 B ceiling (95068 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14152,9 +14158,9 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 137210,
+    "@margoengine/physics/soft": 141962,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 43627,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 94583,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
     "@margoengine/physics/strands": 5569,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,

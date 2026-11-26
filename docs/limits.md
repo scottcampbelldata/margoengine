@@ -9618,7 +9618,8 @@ Free vertex-block bodies get one exact translational minimization per native sub
 their inertial linear impulse to working precision before contact. The pass visits live cell
 ranges and reads and translates unpinned body particles once each. It applies to the linear
 movement of the center of mass. Bodies with pins instead exchange reaction with their supports,
-and authored whole-body drag still changes momentum.
+and authored whole-body drag still changes momentum. The optional entry measures 137,827 B
+gzip with the translation correction, including 95,068 B for its lazy native kernel.
 
 The local/global `'projective'` mode uses the corotated material. A local rotation and unit-determinant
 projection per live tetrahedron precedes each global solve. Each matrix application visits its four
