@@ -1311,7 +1311,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,334 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,336 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -14288,12 +14288,18 @@ The distributed seam model opens authored coincident boundaries after both quadr
 points release. It uses the same separation law for tensile and tangential relative motion.
 An already released seam preserves its fracture work even if its physical opening closes.
 The aperture area is the two-triangle surface between the current edge pairs.
-Unilateral lip contact, automatic crack paths, mode-dependent cohesive properties,
-independent measured shell fracture, and SEA-10 flow through the live shell opening remain open.
+SEA-10 converts both live triangles to 16 hydraulic cells each. Their integration preserves
+triangular area and approximates the height density within each strip. The sea level is read
+at the area-weighted centroid. This supplies inflow and adds carried water to the hull.
+The geometry source is the shell's separate world trajectory, so align the panel with the
+compartment and use the same world scale. Closing the geometric gap stops flow while the
+seam remains fractured. Fluid pressure feedback to the shell, unilateral lip contact,
+automatic crack paths, mode-dependent cohesive properties and independent measured
+shell fracture remain open.
 The optional shell loader fetches the 10,030 B plain Wasm asset (4,951 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 48684 B minified and 18174 B gzip under its 18720 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 47654 B minified and 17539 B gzip under its 18720 B ceiling. The optional seakeeping entry measures 86363 B minified and 33399 B gzip under its 33698 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -15061,6 +15067,12 @@ The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core a
 A hidden model deforms only while a `DeformedPoints` reads it (a count per model in `packages/animation/src/deform-readers.ts`); with `visible` false the points still count as a reader until disposed.
 
 New entry @margoengine/animation/deformed-points: 4,286 B gzip, ceiling 4,542 B. The animation root gains the reader check and stays inside its recorded 26,165 B ceiling. Core and stage gain zero bytes (24,846 B).
+
+## Morph weights per crowd member (animation/instanced-morph, 2026-11-26)
+
+`MorphedCrowd` (`@margoengine/animation/instanced-morph`) gives each member of a bone-texture crowd its own morph weights, on WebGPU and on the WebGL2 compatibility layer. Limit: 64 live targets per bake (`MORPH_TARGET_LIMIT`); `bakeMorphBones` throws RangeError past it, and its `morphs` option names the targets that stay live (the rest are baked in at the model's current weights). A member row is 28 + 4 * ceil(targets / 4) floats (128 to 368 bytes), in the crowd's one instance buffer; a change to any member uploads all rows with the next frame (as every `VATCrowd` instance change does), so setting weights on 10,000 members with 8 targets writes 1.44 MB that frame. Weights are any finite float32; they are not clamped. Target offsets are position and normal only (no tangents), two rgba32float texels per vertex of each primitive that has the target, stored after the bone rows of the bake's 2,048-texel-wide texture: bone rows, one entry texel per (primitive, live target) block and the offsets together must fit 8,192 rows (16,777,216 texels), else RangeError. Texel indices are held as float32, exact over that whole range. The vertex stage reads one entry texel per block of the vertex's own primitive and two more per non-zero weight. New members start at the weights the model had when baked. Targets are joined by name across primitives; two different targets with one name share a weight. Everything else is `SkinnedCrowd`'s (opaque, no CPU culling, WebGPU device needed; the small WebGL2 preview tier throws `unsupported`).
+
+New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 B, of which the skinned crowd it extends is about 10 KB (an app that loads both entries loads that part once). `@margoengine/animation/instanced-skin` gains the layout parameter and stays inside its recorded 10,303 B ceiling. Core and stage gain zero bytes (24,892 B on this base).
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

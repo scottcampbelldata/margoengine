@@ -99,6 +99,10 @@
       "types": "./dist/animation/deformed-points.d.ts",
       "import": "./dist/animation/deformed-points.js"
     },
+    "./animation/instanced-morph": {
+      "types": "./dist/animation/instanced-morph.d.ts",
+      "import": "./dist/animation/instanced-morph.js"
+    },
     "./animator": {
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"
