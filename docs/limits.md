@@ -10517,3 +10517,7 @@ The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the fr
 ### Seakeeping encounter-scaled taper loads
 
 The incident-wave velocity and the longitudinal added-mass gradient use the same encounter scaling. The finite-memory continuation applies inside the first tabulated band. Tank qualification of the forward-motion amplitudes and near-stationary three-dimensional flow remain open. The seakeeping entry moved from 33,399 to 33,432 B gzip under its 33,698 B ceiling. Core and Stage gain zero bytes.
+
+## Physics worlds in netcode (`@margoengine/netcode/physics`)
+
+`physicsGame` keeps a world's whole snapshot as the rollback state, so each simulated frame copies the world's memory twice (a load and a save): 1,661,504 bytes for the test's world of nine bodies, most of it room the world keeps to grow. Its cost follows the world's memory, not what moves, and the session keeps `maxRollback + 2` of them. The world must hold the same bodies, colliders and joints for the whole session, and a world that grows its memory is refused with the sizes. `snapshotDiff` compares 32-bit words, so a change anywhere in a word sends the whole word; a step of one rolling ball in that world is 221 bytes. `BodyInterpolator` moves proxies through `setNextPosition` and `setNextRotation`, so they reach the sampled pose at the end of their next step.

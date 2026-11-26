@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20635832,
+  "total": 20639603,
   "history": [
     {
       "date": "2026-10-24",
@@ -14089,6 +14089,12 @@
       "commit": "J-24",
       "grew": 2,
       "reason": "Joint armature in the multibody projection (J-24): six armature and six rotor columns a joint, the rotor term in the backward and outward passes, and the spin read at the step's start, on top of the multibody springs landed the same day. Measured gzip: @margoengine/physics 890,040 B (budget 889,499), its lazy kernel blueprint 797,402 B (budget 795,608). The term lives in the kernel's one multibody solve; a separate kernel would duplicate the solver. Budgets (measured + max(3%, 256 B)): 916,741 and 821,324 B. Core plus stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "X-81-82",
+      "grew": 1,
+      "reason": "@margoengine/netcode/physics is a new optional entry (X-81, X-82): a physics world as a rollback game, snapshot diffs, and server bodies played back on clients; measured 3,515 B gzip, typed by shape so it imports no physics code. Its own entry, so netcode pages without physics pay nothing. Budget (measured + max(3%, 256 B)): 3,771 B. Core plus stage unchanged."
     }
   ],
   "items": {
@@ -14890,6 +14896,7 @@
     "@margoengine/netcode/media": 2941,
     "@margoengine/netcode/migrate": 8607,
     "@margoengine/netcode/node": 6457,
+    "@margoengine/netcode/physics": 3771,
     "@margoengine/netcode/presence": 6475,
     "@margoengine/netcode/relay": 3617,
     "@margoengine/netcode/rollback": 3437,

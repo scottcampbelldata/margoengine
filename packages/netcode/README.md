@@ -361,6 +361,60 @@ console.log(one.confirmed, one.stats.rollbacks, one.state.fighters.get(1), two.s
 The test `tests/rollback.test.js` runs four peers for 20 s under 50 ms latency, 20 ms jitter and 10% loss and checks
 that every confirmed frame of every peer has the same checksum as the game run once offline with every real input.
 
+### Physics worlds: rollback, snapshot diffs and server bodies
+
+`@margoengine/netcode/physics` puts a deterministic physics world (a `Physics` of `@margoengine/physics`, or anything with
+`takeSnapshot`, `restoreSnapshot`, `step` and `fixedTimestep`) in a session; it imports no physics code itself.
+`physicsGame({world, schema, input, apply})` is a rollback game whose state is the world's snapshot bytes: each tick
+loads them, calls `apply(inputs, tick)` to drive the world (impulses, forces, motor targets), steps once and keeps the
+snapshot it leaves, so rolling back is loading an older snapshot and every peer reaches the same bits. Every peer builds
+the same world in the same order and keeps every body, collider and joint for the whole session. The tick rate is the
+world's step rate.
+
+`snapshotDiff(base, next)` and `applySnapshotDiff(base, diff)` send a snapshot against one both ends have: the changed
+32-bit words XORed, the unchanged ones counted. `bodyStates([[id, body], ...])` reads a server's bodies into the
+`BODY_STATE_FIELDS` struct its state map sends, and a client's `BodyInterpolator` plays them back between the states it
+has (`push(time, states)`, `sample(time)`, `apply(time, proxies)` onto kinematic bodies' next poses).
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { physicsGame } from '@margoengine/netcode/physics';
+import { RollbackSession } from '@margoengine/netcode/rollback';
+
+await Physics.load();
+const schema = defineSchema({ types: { Input: { x: 'f32' } } } as const);
+function peer(local: number, link: import('@margoengine/netcode').Connection, push: number) {
+  const world = new Physics(null);
+  world.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [10, 0.5, 10] } });
+  const balls = [1, 2].map((p) => world.addBody(null, { position: [p * 2, 0.5, 0], colliders: { shape: 'sphere', radius: 0.5 } }));
+  const game = physicsGame<{ x: number }, ReturnType<Physics['takeSnapshot']>>({
+    world,
+    schema,
+    input: 'Input',
+    apply: (inputs) => {
+      for (const [p, input] of [...inputs].sort((a, b) => a[0] - b[0])) balls[p - 1]!.applyImpulse([input.x, 0, 0]);
+    },
+  });
+  return new RollbackSession(game, { players: [1, 2], local, peers: new Map([[3 - local, link]]), now: () => network.time, input: () => ({ x: push }) });
+}
+const network = new LoopbackNetwork({ latency: 40, seed: 1 });
+const [toTwo, toOne] = network.pair();
+const one = peer(1, toTwo, 0.1),
+  two = peer(2, toOne, -0.1);
+for (let frame = 0; frame < 300; frame++) {
+  network.advance(1000 / 60);
+  one.update();
+  two.update();
+}
+console.log(one.confirmed > 200, one.stats.desyncs + two.stats.desyncs); // true 0
+```
+
+`tests/physics.test.js` rolls a world of six boxes and two pushed balls back on two peers under 60 ms latency, 25 ms
+jitter and 10% loss: 353 frames confirmed, 48 rollbacks and 137 frames stepped again, and every confirmed frame of each
+peer has the checksum of the world stepped offline with every input on time; a diff of one step of a rolling ball is
+221 bytes of a 1,661,504 byte snapshot.
+
 ### Past a full mesh: the relay and spectators
 
 A full mesh needs a link from every peer to every other, which stops being practical at about 8. `@margoengine/netcode/relay` gives each peer one link, to a `RollbackRelay`, and shows it the other players through that link as ordinary connections, so `RollbackSession` does not change. The relay runs no game. It also learns each input on the way through, and streams every frame whose inputs are all known to `RollbackSpectator`s, who run the same game on them with no rollback.
@@ -1157,6 +1211,10 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
   rollback; the cost of a rollback is that many calls of your `step`. Measured in the 4-peer test (50 ms latency,
   20 ms jitter, 10% loss, 30 frames per second, input delay 2): 147 rollbacks in 581 frames, 185 frames resimulated,
   never more than 3 at once. All peers must use the same `inputDelay`; a mismatch shows up as a desync.
+- A physics world in rollback (`physicsGame`) saves its whole snapshot every frame and loads it every step: two copies of
+  the world's memory a simulated frame (1.66 MB for the test's small world, whose memory holds room to grow), so its cost
+  grows with the world's memory, not with what moves. The world must keep the same bodies, colliders and joints, and a
+  world that grows its memory mid-session is refused. Send `snapshotDiff`s, not snapshots, when a world goes over the wire.
 - Rollback sessions over direct links are a full mesh (each peer sends to every other), sensible up to about 8 players. Past that use `@margoengine/netcode/relay`, at the cost of a second hop.
 - The WebSocket server has no compression extension (snapshots are small and already delta coded) and no TLS of its
   own (use a reverse proxy). The WebRTC transport is tested here with stand-in channels; signalling is not included.
@@ -1235,13 +1293,14 @@ Options (defaults): `audio` microphone constraints (echo cancellation, noise sup
 
 ## Sources
 
-Clean room, from public descriptions only: Glenn Fiedler's articles "Fix Your Timestep!", "Snapshot Compression" and
-"State Synchronization"; Gabriel Gambetta's "Fast-Paced Multiplayer" series (prediction, reconciliation, entity
+Clean room, from public descriptions only: Glenn Fiedler's articles "Fix Your Timestep!", "Snapshot Compression",
+"Snapshot Interpolation", "Deterministic Lockstep" and "State Synchronization"; the GGPO documentation (Tony Cannon and
+others, ggpo.net) on rollback; Gabriel Gambetta's "Fast-Paced Multiplayer" series (prediction, reconciliation, entity
 interpolation); Yahn Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and
 Optimization" (GDC 2001); Timothy Ford, "Overwatch Gameplay Architecture and Netcode" (GDC 2017); F. Cristian,
 "Probabilistic clock synchronization" (1989); the LEB128 and zigzag encodings as specified for DWARF and Protocol
 Buffers; FNV-1a as published by Fowler, Noll and Vo; the W3C WebTransport Candidate Recommendation, in part; for media, W3C WebRTC 1.0 (addTrack, removeTrack, negotiationneeded and the perfect negotiation example), W3C Media Capture and Streams (getUserMedia, audio constraints, track `enabled` and `ended`), W3C Screen Capture (getDisplayMedia) and the W3C Web Audio API (MediaStreamAudioSourceNode, AnalyserNode, GainNode). No library's source was read.
 
-Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` only.
+Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` only (the physics entry is typed by shape and imports no physics code).
 
 Build and unit tests: npm test --workspace @margoengine/netcode
