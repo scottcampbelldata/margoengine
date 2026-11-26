@@ -322,7 +322,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
-| SEA-03 | Nonlinear waves, rogue waves | none | Claude | LANDED 47be5f699 |
+| SEA-03 | Nonlinear waves, rogue waves | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 1905b1c216 |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
@@ -395,7 +395,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
-| SEA-05 | Nearshore waves and surf zone | partial | Claude | LANDED 8c7453cd8 |
+| SEA-05 | Nearshore waves and surf zone | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
 | DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
@@ -406,20 +406,20 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | LANDED 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Claude | LANDED 2f1860412 |
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | LANDED f9161cc7e |
-| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | LANDED 62fa8c303 |
-| SEA-02 | Ocean surface synthesis and query | partial | Claude | LANDED 52b68ca65 |
-| SEA-04 | Local dispersive free surface | stand-in | Claude | LANDED 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Claude | LANDED d865c4c8f |
-| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | LANDED ebfc65dbb |
-| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | LANDED 533cc7249 |
-| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | LANDED d90933a42 (green water d865c4c8f) |
-| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | LANDED 5d2524732 |
-| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | LANDED e9007d3bb |
-| SEA-14 | Water entry and exit | stand-in | Claude | LANDED 12b84154b |
-| SEA-15 | Tracers and slicks in water | stand-in | Claude | LANDED ccbc86285 |
+| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
+| SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
+| SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
+| SEA-08 | Ship seakeeping | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d865c4c8f |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
+| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
+| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
+| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
+| SEA-14 | Water entry and exit | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
+| SEA-15 | Tracers and slicks in water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Claude | LANDED 9a189c4eb |
 | ATMO-01 | Boundary-layer wind field | stand-in | Claude | LANDED c38c25d3d |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | LANDED c38c25d3d |
 | ATMO-03 | Moist convection and cloud dynamics | none | Claude | LANDED 8833dbf0c |
-| ATMO-04 | Precipitation microphysics | stand-in | Claude | LANDED acbc53c7e |
+| ATMO-04 | Precipitation microphysics | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |

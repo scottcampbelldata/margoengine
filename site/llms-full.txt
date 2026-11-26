@@ -12760,6 +12760,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: defects found by the physics solver audit, Claude solvers (KB-PHYS-AUDIT2, physics, weather)
+
+Found by the audit in [physics-solver-audit.md](physics-solver-audit.md); each is fixed by the row's owner with a
+regression test.
+
+- **SEA-09 with SEA-08, sway and yaw damping counted twice.** **Cause:** with `ShipSolver` paired to `HullSolver`,
+  only added mass can be switched off in the manoeuvring model, so both solvers apply hull damping.
+- **SEA-14, entry uses sea-water density whatever the water.** **Cause:** `packages/physics/src/entry/solver.ts`
+  hard-codes 1025 kg/m³ in the cavity term instead of reading the water's density.
+- **SEA-01, a calibration case is used as the validation case.** **Cause:** the ST4 sheltering was calibrated at 10
+  and 20 m/s and `waves.test.js` validates at 20 m/s; the held-out 30 m/s result is only in `docs/limits.md`.
+- **SEA-10, the flooding solve can stop unconverged without a word.** **Cause:**
+  `packages/physics/src/seakeeping/flooding.ts` ends its 200-sweep loop silently. Also, the iron-ore cargo default
+  grain is 1e-4 m while the code's own comment gives about 0.012 m for taconite pellets.
+- **SEA-12, floating bodies have no righting moment, and the buoyancy is not exact.** **Repro:** float a heeled box
+  with `LoadSolver`; it does not right itself. **Cause:** `packages/physics/src/loads/solver.ts` applies buoyancy at
+  the shape's centre and takes the submerged volume from an equivalent ellipsoid (a box prism is exact only upright),
+  while the catalog row says exact submerged-volume buoyancy.
+- **FLUID-03, particles said to be jittered are seeded on a lattice, and a particle that would enter a solid stays
+  put.** **Cause:** `packages/physics/src/flip/transfer.ts` describes jittered seeding while `solver.ts` places
+  particles at exact octant centres, and `solver.ts` holds a particle in place instead of projecting it out of the
+  solid.
+
 ### Open 2026-11-26: defects found by the physics solver audit (KB-PHYS-AUDIT1, physics)
 
 The audit in [physics-solver-audit.md](physics-solver-audit.md) read every solver built by Codex. Missing pieces are
