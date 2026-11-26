@@ -390,6 +390,57 @@ enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand
 // ui.rays[i] tells where each ray points, for drawing a pointer; ui.dispose() lets go of everything.
 ```
 
+## Near interaction
+
+`@margoengine/xr/near` holds the hand-and-controller behaviours for UI you reach out to. Each one attaches to the `XR` (any `{controllers, onFrame}` host), moves objects you pass in (`{position, orientation}`, plus `scale` where it scales), has `dispose()` and `Symbol.dispose`, and checks its options with a `RangeError` that names the fix. Units are metres in the reference space.
+
+| Behaviour | What it does |
+| --- | --- |
+| `HandConstraint` | Carries a menu on the palm. It shows while a tracked hand's palm faces you (`showAngle` 45 degrees) and hides past `hideAngle` (60), so it does not flicker; `offset` is in the wrist joint's frame, default 10 cm off the palm. |
+| `FollowInView` | Tag-along: a panel stays put while it is inside a cone around your gaze (`maxViewDegrees` 25) and between `minDistance` 0.4 and `maxDistance` 1.2; outside, it eases to the cone's edge. `enabled = false` pins it, `snap()` puts it `distance` in front, `billboard` turns it to face you. |
+| `SurfaceMagnetism` | Sticks an object to the surface the gaze or a controller ray points at (planes, for example AR hit tests through `surfaceFromHit(hit)`), aligned to the normal: `normalAxis` 'y' stands it up, 'z' hangs a panel. `snapToSurface` snaps an object that something else moved. |
+| `Manipulator` | Six-DoF drag and multi-pointer scale: a pinch or squeeze on an object, or along the ray, picks it up; it keeps its pose in your hand's frame. A second pointer on the same object scales it by the distance between the pointers and turns it by the line between them; lifting one returns to the one-point drag with no jump. `rotate` ('follow', 'yaw', 'none'), `lock`, `translate` and `scaleLimits` constrain it. |
+| `AppBar` | A row of buttons under an object (default `remove` and `adjust`) that shows when a hand is within `showDistance` (0.6 m). |
+| `NearMenu` | A grid of buttons in front of you that tags along until its pin button pins it. |
+| `Slate` | A holographic 2D panel: drag its title bar to move it, its corner to resize it (within `minSize` and `maxSize`), its content to pan it (`contentOffset`, `zoomBy`); taps and the close button call back. |
+
+`AppBar`, `NearMenu` and `Slate` are `RayPanel`s: add them to `Interaction.panels` and rays and pinches press them. `AppBar` and `NearMenu` are also pressed by a fingertip: the index tip hovers a button within 6 cm of the panel, presses within 1.2 cm and clicks on release (`poke` sets the distances, `false` turns it off). They expose `layout()`, each button's centre, size and state in metres from the panel's centre, for drawing; Margo draws nothing here, so the look is yours.
+
+```ts
+import {Engine,PbrMaterial,box as boxGeometry} from 'margoengine/core';
+import {Quaternion} from 'margoengine/math/quaternion';
+import {Vector3} from 'margoengine/math/vector3';
+import {XR} from 'margoengine/xr';
+import {Interaction} from 'margoengine/xr/interaction';
+import {AppBar,FollowInView,HandConstraint,Manipulator,NearMenu,Slate,SurfaceMagnetism,nearTarget} from 'margoengine/xr/near';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const box=engine.createMesh().setGeometry(boxGeometry()).setMaterial(new PbrMaterial({color:'#e8a33d'})).setScale([0.2,0.2,0.2]).setPosition([0,1,-0.6]);
+const cube=nearTarget(box,{radius:0.15,scale:[0.2,0.2,0.2]});
+// Pinch or squeeze the cube to move it; two hands scale it (x scale between 0.05 and 0.6).
+const drag=Manipulator.attach(xr,{draggables:[cube],scaleLimits:[0.05,0.6]});
+// Its app bar appears when a hand comes near.
+const bar=AppBar.attach(xr,{target:cube,extent:[1,1],onSelect:(id)=>{if(id==='remove')cube.enabled=false;}});
+// A menu on the left palm, a tag-along menu and a slate.
+const wrist={position:new Vector3(),orientation:new Quaternion()};
+const palm=HandConstraint.attach(xr,{target:wrist,hand:'left'});
+const menu=NearMenu.attach(xr,{buttons:[{id:'a',label:'A'},{id:'b',label:'B'}],onSelect:(id)=>console.log('menu',id)});
+const slate=new Slate({title:'Notes',onClose:()=>{slate.enabled=false;},onContent:(e)=>console.log('tap',e.x,e.y)});
+const rays=Interaction.attach(xr,{panels:[bar,menu,slate]});
+// Hang a label on the wall the gaze meets (planes such as AR hit tests give; see surfaceFromHit), and keep it in view.
+const label={position:new Vector3(),orientation:new Quaternion()};
+const wall=SurfaceMagnetism.attach(xr,{target:label,surfaces:[{point:[0,0,-3],normal:[0,0,1]}],normalAxis:'z'});
+const tag=FollowInView.attach(xr,{target:label,billboard:'none',snapOnStart:false});
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']}).catch(engine.onError);
+// Draw bar.layout(), menu.layout() and the slate with your own meshes; menu.pinned = true stops it following you.
+void [drag,palm,rays,wall,tag];
+```
+
+Hands report no buttons, so `Manipulator` picks up with a pinch (thumb tip to index tip within `pinch`, default 2 cm) and controllers with the squeeze button. Joint frames follow WebXR Hand Input: -Z toward the fingertips and -Y out of the palm.
+
 ## Preview tier refusal
 
 `XR.create` and `XR.attach` reject the small WebGL2 preview with linked `MargoError` code `unsupported`, so an awaited call inside `autoEngine` setup can trigger `loadCompat`. After installing the full layer, WebXR also needs its `/xr` route and browser session support as documented above. An already attached or disposed engine remains a state error.
