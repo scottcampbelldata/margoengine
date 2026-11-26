@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19191641,
+  "total": 19192996,
   "history": [
     {
       "date": "2026-10-24",
@@ -12513,6 +12513,12 @@
       "commit": "85735e10c0",
       "reason": "ICE-05 adds its optional physics/ice entry at 3843 B gzip (budget 4099 B) for slab, frost and icicle phase change and layout-1 water, steam and heat exchange. Core and stage do not load it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4a5eb59338",
+      "reason": "3ddcd16437 added the optional entry @margoengine/ecs/coroutines (1,099 B gzip, generator scheduling) but its size row never reached main (fdafba53d5 holds only the entry list); the ecs root, core and stage are unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -12825,6 +12831,7 @@
     "@margoengine/ecs": 4815,
     "@margoengine/ecs dist/workers/parallel.js": 750,
     "@margoengine/ecs/changes": 882,
+    "@margoengine/ecs/coroutines": 1355,
     "@margoengine/ecs/engine": 2064,
     "@margoengine/ecs/growable": 2237,
     "@margoengine/ecs/objects": 1580,
