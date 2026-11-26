@@ -13056,7 +13056,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "e0aa251214",
+      "commit": "7d44694c88",
       "grew": 2,
       "reason": "SOFT-04 adds local/global rotation and volume projections with one shared native sparse operator, moving the soft entry from 113913 to 121474 B gzip. @margoengine/physics/soft: 117331 to 125119 B ceiling (121474 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 80702 to 88516 B ceiling (85937 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
