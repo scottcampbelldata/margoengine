@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20252311,
+  "total": 20282099,
   "history": [
     {
       "date": "2026-10-24",
@@ -12993,6 +12993,12 @@
       "commit": "3b81be0630",
       "reason": "SPACE-03 adds the optional 6095 B gzip accretion entry. Native disk transport and test geodesics share one optional import. Splitting would add two public entry points and separate the compact-object data readers. Core plus stage gains 0 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "a870d4b33",
+      "reason": "materials gains the portal entry (Portals): 29,788 B, most of it the Material and WgslMaterial code it reaches, as fake-shadows and batched",
+      "grew": 1
     }
   ],
   "items": {
@@ -13668,6 +13674,7 @@
     "@margoengine/materials/mips": 12364,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/plugins": 4715,
+    "@margoengine/materials/portal": 29788,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,
     "@margoengine/materials/retroreflection": 1855,
