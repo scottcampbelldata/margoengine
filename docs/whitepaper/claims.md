@@ -92,6 +92,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   adjacent face preserves enclosure and volume and releases only the selected cell's section.
   Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Tensile crack-front advance (SOFT-04, 2026-11-26). Under continued load, the crack enters
+  the adjacent tetrahedron on the same plane through its old front. The difference in open
+  surface area is positive, both sides remain closed, and total volume is preserved.
+  Restoring a snapshot at the old front reproduces the next state's hash. Run
+  `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

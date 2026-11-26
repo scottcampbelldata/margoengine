@@ -2,9 +2,9 @@
 // and each fragment's share of the original nodal mass and momentum.
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
-import type { SliceCell, SlicePlan, SlicePoint } from './soft-plane-cut.js';
+import { type SliceCell, type SlicePlan, type SlicePoint, TETRA_EDGES } from './soft-plane-cut.js';
 import { carryCutSurface, type SoftDestination, type SoftSplit } from './soft-split.js';
-import { NUCLEATED_CELL } from './soft-tensile-seam.js';
+import { CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NUCLEATED_CELL } from './soft-tensile-seam.js';
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 
 type NodeState = {
@@ -38,6 +38,29 @@ function childBasis(cell: SliceCell, state: Record<string, Float32Array>, row: n
       'The cut creates an unrepresentable rest basis. Move it away from a vertex or edge.',
     );
   return basis;
+}
+
+/** A front edge is material data: a cut can subdivide it without moving it off its original material endpoints. */
+function cutFrontFlags(plan: SlicePlan, cell: SliceCell, oldCells: Uint32Array, flags: number): number {
+  const { crackFront, points } = plan;
+  if (!crackFront?.size && (flags & CRACK_FRONT_MASK) === 0) return 0;
+  const previousEdges = TETRA_EDGES.filter((_, i) => (flags & (1 << (CRACK_FRONT_SHIFT + i))) !== 0);
+  const at = (corner: number): number => oldCells[4 * cell.parent + corner]!;
+  const belongs = (point: SlicePoint, a: number, b: number): boolean => {
+    const onEdge = (p: number): boolean => p === a || p === b;
+    return point.vertices
+      ? point.vertices.every(([p, weight]) => weight === 0 || onEdge(p))
+      : onEdge(point.first) && (point.weight === 0 || onEdge(point.second));
+  };
+  let transferred = 0;
+  TETRA_EDGES.forEach(([a, b], i) => {
+    const u = points[cell.nodes[a]]!;
+    const v = points[cell.nodes[b]]!;
+    const fresh = crackFront?.get(u)?.has(v) || crackFront?.get(v)?.has(u);
+    if (fresh || previousEdges.some(([a, b]) => belongs(u, at(a), at(b)) && belongs(v, at(a), at(b))))
+      transferred |= 1 << (CRACK_FRONT_SHIFT + i);
+  });
+  return transferred;
 }
 
 export function makeCutPieces(
@@ -118,6 +141,8 @@ export function makeCutPieces(
           if (point.weight > 0) contribute(point.second, point.weight);
         }
       }
+      const flags = fem.flags![row]!;
+      const fractured = cell.parent === crackedCell || (flags & NUCLEATED_CELL) !== 0;
       return {
         nodes: cell.nodes.map((node) => index.get(node)!),
         volume,
@@ -125,7 +150,7 @@ export function makeCutPieces(
         initialBasis: childBasis(cell, fem, row, 'o'),
         flowed: fem.flowed![row]!,
         load: fem.load![row]!,
-        fractured: cell.parent === crackedCell || (fem.flags![row]! & NUCLEATED_CELL) !== 0,
+        fractureFlags: fractured ? NUCLEATED_CELL : cutFrontFlags(plan, cell, oldCells, flags),
         parent: cell.parent,
       };
     });
@@ -223,7 +248,7 @@ export function makeCutPieces(
       f.vol0![row] = data.volume;
       f.flowed![row] = data.flowed;
       f.load![row] = data.load;
-      if (data.fractured) f.flags![row] = f.flags![row]! | NUCLEATED_CELL;
+      f.flags![row] = f.flags![row]! | data.fractureFlags;
       if (damage) soft.restoreOrthotropicFailure(row, damage, data.parent);
       if (band) soft.restoreCrackBand(row, band, data.parent);
     });

@@ -104,6 +104,13 @@ class IncisionGeometry {
     return point;
   }
 
+  /** Once a crack advances past its old front, each lip needs its own point along that old edge. */
+  splitCrackEdge(a: number, b: number): void {
+    const point = this.blend([a, b], [0.5, 0.5]);
+    this.zeros[0]!.add(point);
+    this.subdivisions.set(edgeKey(a, b), [point]);
+  }
+
   /** Both tetrahedra incident to an old facet insert the same blade-line intersections along it. */
   capEdge(a: number, b: number): void {
     const key = edgeKey(a, b);
@@ -239,28 +246,44 @@ export function planNucleatedCut(
   cells: Uint32Array,
   cell: number,
   normal: Vec3,
+  front?: readonly [number, number],
 ): SlicePlan | null {
+  const tetrahedron = (id: number): Tet => [cells[4 * id]!, cells[4 * id + 1]!, cells[4 * id + 2]!, cells[4 * id + 3]!];
+  const seed = tetrahedron(cell);
+  const through = front ?? [0, 1, 2, 3];
   const origin = vector((axis) => {
     let sum = 0;
-    for (let k = 0; k < 4; k++) sum += current[cells[cell * 4 + k]! * 3 + axis]!;
-    return sum * 0.25;
+    for (const k of through) sum += current[seed[k]! * 3 + axis]!;
+    return sum / through.length;
   });
   const geometry = new IncisionGeometry(current, [{ origin, normal }]);
   const distances = cutDistances(current, origin, normal);
-  const tetrahedron = (id: number): Tet => [cells[4 * id]!, cells[4 * id + 1]!, cells[4 * id + 2]!, cells[4 * id + 3]!];
-  const seed = tetrahedron(cell);
+  if (front) {
+    for (const k of front) distances[seed[k]!] = 0;
+    geometry.splitCrackEdge(seed[front[0]]!, seed[front[1]]!);
+  }
   const halves = SIGNS.map((side) =>
     FACES.map((face) => faceIntersection(seed, face, side, distances, (a, b) => geometry.sectionEdge(a, b))),
   );
-  const ring = sectionPolygon(halves[0]!, (p) => p >= distances.length || distances[p] === 0);
+  const onPlane = (p: number): boolean => p >= distances.length || distances[p] === 0;
+  const ring = sectionPolygon(halves[0]!, onPlane);
   if (!geometry.hasArea(ring)) return null;
-  const cap = geometry.triangles(ring, true);
+  const cap = geometry.triangles(geometry.refineEdges(ring), true);
   const severed = new Set(cap.map(faceKey));
-  const halvesTriangles = halves.map((faces) => faces.map((face) => geometry.triangles(face, false)));
+  const halvesTriangles = halves.map((faces) =>
+    faces.map((face) => {
+      if (face.length < 3) return [];
+      const refined = geometry.refineEdges(face);
+      return geometry.triangles(refined, refined.length !== face.length);
+    }),
+  );
   // A neighboring tetrahedron only needs the face split or individual edge nodes created by the seed.
   // Its other faces keep their old topology, so this repair does not propagate down the cutting plane.
   const shared = new Map(
-    FACES.map((face, i) => [faceKey(face.map((slot) => seed[slot])), halvesTriangles.flatMap((side) => side[i]!)]),
+    FACES.map((face, i) => [
+      faceKey(face.map((slot) => seed[slot])),
+      { triangles: halvesTriangles.flatMap((side) => side[i]!), face: i, joined: false },
+    ]),
   );
   const children: SliceCell[] = [];
   for (let parent = 0; parent < cells.length / 4; parent++) {
@@ -272,14 +295,28 @@ export function planNucleatedCut(
     const faces = FACES.map((face) => face.map((slot) => tet[slot]));
     const triangles = faces.flatMap((face) => {
       const existing = shared.get(faceKey(face));
-      if (existing) return existing;
+      if (existing) {
+        existing.joined = true;
+        return existing.triangles;
+      }
       const refined = geometry.refineEdges(face);
       return geometry.triangles(refined, refined.length !== 3);
     });
     if (triangles.length === 4) children.push({ parent, nodes: tet, inverse: null, fraction: 1 });
     else addCones(children, geometry, parent, tet, triangles);
   }
-  return { points: geometry.points, pieces: incisionPieces(children, geometry.points, severed) };
+  const crackFront = new Map<SlicePoint, Set<SlicePoint>>();
+  for (const { face, joined } of shared.values()) {
+    if (!joined || halves.some((half) => !geometry.hasArea(half[face]!))) continue;
+    const section = halves[0]![face]!.filter(onPlane);
+    if (section.length !== 2) continue;
+    const a = geometry.points[section[0]!]!;
+    const b = geometry.points[section[1]!]!;
+    const following = crackFront.get(a) ?? new Set<SlicePoint>();
+    following.add(b);
+    crackFront.set(a, following);
+  }
+  return { points: geometry.points, pieces: incisionPieces(children, geometry.points, severed), crackFront };
 }
 
 function addCones(

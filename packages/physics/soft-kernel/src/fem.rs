@@ -48,6 +48,9 @@ pub const VERTEX_BLOCK_TET: u32 = 8;
 pub const PROJECTIVE_TET: u32 = 16;
 /// This material region already nucleated a tensile crack. It still solves its elasticity.
 pub const NUCLEATED_TET: u32 = 32;
+/// The six edge slots that can carry a live crack front.
+pub const CRACK_FRONT_SHIFT: u32 = 6;
+pub const CRACK_FRONT_MASK: u32 = 63 << CRACK_FRONT_SHIFT;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 
@@ -59,6 +62,7 @@ pub struct Fem {
     pub count: usize,
     pub torn: u32,
     pub(crate) fracture_axis: [f64; 3],
+    pub(crate) fracture_edge: u32,
     /// Rayleigh-style damping of the elastic constraints, 1 / s: the share of the relative speed along a constraint that they remove.
     pub damping: f32,
     /// The four corners, B = Dm^-1 row by row, rest volume.
@@ -149,6 +153,7 @@ impl Fem {
             count: 0,
             torn: 0,
             fracture_axis: [0.0; 3],
+            fracture_edge: NONE,
             damping: 0.0,
             p: [U; 4],
             b: [F; 9],

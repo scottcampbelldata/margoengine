@@ -16966,8 +16966,8 @@ climber and complete tower still need the DYN-07 contact and animation bindings.
 now runs with a full orthotropic tensor in native vertex blocks. It can tear when independent
 tensile, compressive or shear stresses exceed authored strengths. A progressive option softens
 tension and shear before tearing. A prescribed tensile seam can open inside a tetrahedron.
-Unseeded tensile cracks can nucleate inside a cell from its principal strain. A moving
-crack front with mixed-mode propagation across arbitrary cells remains open.
+Unseeded tensile cracks can nucleate inside a cell from its principal strain and extend
+from a tracked front. Mixed-mode propagation with separate sliding and tearing toughness remains open.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors and
 their own deformable surface colliders. Geometric cutting of bodies with embedded skins, springs,

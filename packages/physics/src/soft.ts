@@ -10,7 +10,7 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { planPlaneCut, type SlicePlan } from './soft-plane-cut.js';
+import { planPlaneCut, type SlicePlan, TETRA_EDGES } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
@@ -23,6 +23,7 @@ export type { SoftTensileSeam } from './soft-tensile-seam.js';
 interface SoftExports extends WebAssembly.Exports {
   soft_fem_tensile_nucleation(first: number, count: number, threshold: number): number;
   soft_fem_fracture_axis(): number;
+  soft_fem_fracture_edge(): number;
   memory: WebAssembly.Memory;
   soft_reserve(particles: number, edges: number, bodies: number, colliders: number): void;
   soft_column(id: number): number;
@@ -1643,7 +1644,7 @@ export class SoftBodyDesc {
     return this;
   }
 
-  /** Lets an overstretched cell start a tensile crack inside its volume with no authored path. */
+  /** Lets an overstretched cell start or extend a tensile crack inside its volume with no authored path. */
   setTensileNucleation(openingStrain: number | null): this {
     this.tensileNucleation = openingStrain;
     return this;
@@ -5276,9 +5277,10 @@ export class SoftBodies implements PhysicsAttachment {
     const axis = new Float64Array(this.exports.memory.buffer, this.exports.soft_fem_fracture_axis(), 3);
     const direction: Vec3 = [axis[0]!, axis[1]!, axis[2]!];
     const cell = row - first;
+    const front = TETRA_EDGES[this.exports.soft_fem_fracture_edge() >>> 0];
     const split = this.splitGeometrically(
       body,
-      (current, cells) => planNucleatedCut(current, cells, cell, direction),
+      (current, cells) => planNucleatedCut(current, cells, cell, direction, front),
       cell,
     );
     if (split) this.announce(body, [], [cell], split);

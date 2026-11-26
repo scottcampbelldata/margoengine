@@ -6,6 +6,8 @@ type Edges = [Vec3, Vec3, Vec3];
 
 /** Native cell flag carried through a cut and snapshots. */
 export const NUCLEATED_CELL = 32;
+export const CRACK_FRONT_SHIFT = 6;
+export const CRACK_FRONT_MASK = 63 << CRACK_FRONT_SHIFT;
 
 /** A triangular weak patch in a single tetrahedron, opened by positive normal Green strain. */
 export interface SoftTensileSeam {

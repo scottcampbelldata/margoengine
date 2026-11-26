@@ -173,6 +173,16 @@ split faces once. A neighbor matches the registered facets and makes its interio
 from that boundary. The center nodes do not insert new points on any other old edges.
 [Graphical Modeling and Animation of Brittle Fracture](https://doi.org/10.1145/311535.311550).
 
+The tensile continuation follows the crack-front idea in O'Brien and Hodgins (1999), §5.
+For an existing material edge with unit tangent `e`, a candidate uses the projection
+`n − (n·e)e` of its current principal direction `n`. Its plane must cross the other two
+corners of the adjacent tetrahedron. The front is a set of edge slots in the native cell
+flags. A conforming midpoint on the previous edge gives the two advancing lips independent
+degrees of freedom. The published mixed-mode approach of Erdogan and Sih (1963) describes
+crack direction under stress-intensity loading. The implemented rule uses tensile Green strain.
+[Graphical Modeling and Animation of Brittle Fracture](https://arxiv.org/pdf/2303.02934)
+[On the Crack Extension in Plates Under Plane Loading and Transverse Shear](https://doi.org/10.1115/1.3656897).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

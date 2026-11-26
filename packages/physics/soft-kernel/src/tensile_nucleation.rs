@@ -2,9 +2,20 @@
 // Li and Barbič (2014), "Stable Orthotropic Materials," section 3, defines the
 // reference strain using F^T F. F F^T has the same spectrum and gives current axes.
 use crate::World;
-use crate::fem::{NONE, NUCLEATED_TET, TORN_TET};
+use crate::fem::{CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NONE, NUCLEATED_TET, TORN_TET};
 use crate::math::sqrt64;
 use crate::vertex_block::{Columns, Vec3, cross, dot};
+
+const EDGES: [(usize, usize, usize, usize); 6] = [
+    (0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1),
+];
+
+struct Candidate {
+    cell: usize,
+    stretch: f64,
+    axis: Vec3,
+    edge: u32,
+}
 
 /// Largest eigenvalue of F F^T and its world-space eigenvector, via symmetric Jacobi rotations.
 fn principal_stretch(f: Columns, minimum: f64) -> Option<(f64, Vec3)> {
@@ -55,13 +66,51 @@ fn principal_stretch(f: Columns, minimum: f64) -> Option<(f64, Vec3)> {
     Some((tensor[index][index], directions[index]))
 }
 
+/// A propagation plane must pass through its old front edge and cross the interior material.
+fn continuing_axis(points: [Vec3; 4], axis: Vec3, flags: u32) -> Option<(u32, Vec3)> {
+    let mut best = None;
+    let mut balance = 0.0;
+    for (edge, (a, b, c, d)) in EDGES.into_iter().enumerate() {
+        if flags & (1 << (CRACK_FRONT_SHIFT + edge as u32)) == 0 {
+            continue;
+        }
+        let direction = [0, 1, 2].map(|i| points[b][i] - points[a][i]);
+        let length = dot(direction, direction);
+        if length <= 0.0 {
+            continue;
+        }
+        let along = dot(axis, direction) / length;
+        let perpendicular = [0, 1, 2].map(|i| axis[i] - along * direction[i]);
+        let length_squared = dot(perpendicular, perpendicular);
+        if length_squared <= 128.0 * f64::EPSILON {
+            continue;
+        }
+        let scale = sqrt64(length_squared).recip();
+        let normal = perpendicular.map(|x| x * scale);
+        let distance = |p: usize| dot(normal, [0, 1, 2].map(|i| points[p][i] - points[a][i]));
+        let u = distance(c);
+        let v = distance(d);
+        if u * v >= 0.0 {
+            continue;
+        }
+        let ratio = u.abs().min(v.abs()) / (u.abs() + v.abs());
+        if ratio > balance {
+            balance = ratio;
+            best = Some((edge as u32, normal));
+        }
+    }
+    best
+}
+
 impl World {
-    /// The most stretched intact, previously uncracked cell in a body's contiguous range.
+    /// The most stretched admissible crack-tip cell, or an intact cell that can nucleate.
     pub fn tensile_nucleation(&mut self, first: usize, count: usize, threshold: f64) -> u32 {
-        let mut best = NONE;
-        let mut stretch_limit = 1.0 + 2.0 * threshold;
+        let minimum = 1.0 + 2.0 * threshold;
+        let (mut existing, mut fresh): (Option<Candidate>, Option<Candidate>) = (None, None);
         for t in first..first + count {
-            if self.fem.flags[t] & (TORN_TET | NUCLEATED_TET) != 0 {
+            let flags = self.fem.flags[t];
+            let at_front = flags & CRACK_FRONT_MASK != 0;
+            if flags & (TORN_TET | NUCLEATED_TET) != 0 || (!at_front && existing.is_some()) {
                 continue;
             }
             let corners = [0, 1, 2, 3].map(|i| self.fem.p[i][t] as usize);
@@ -70,22 +119,35 @@ impl World {
             if !(dot(f[0], cross(f[1], f[2])) > 0.0) {
                 continue;
             }
-            let Some((stretch, axis)) = principal_stretch(f, stretch_limit) else {
+            let selected = if at_front { &mut existing } else { &mut fresh };
+            let limit = selected.as_ref().map_or(minimum, |best| best.stretch);
+            let Some((stretch, axis)) = principal_stretch(f, limit) else {
                 continue;
             };
-            if stretch > stretch_limit {
-                stretch_limit = stretch;
-                best = t as u32;
-                self.fem.fracture_axis = axis;
+            if stretch <= limit {
+                continue;
             }
+            let (edge, axis) = if at_front {
+                let points = corners.map(|p| [self.x[p] as f64, self.y[p] as f64, self.z[p] as f64]);
+                let Some(front) = continuing_axis(points, axis, flags) else {
+                    continue;
+                };
+                front
+            } else {
+                (NONE, axis)
+            };
+            *selected = Some(Candidate { cell: t, stretch, axis, edge });
         }
-        best
+        let Some(candidate) = existing.or(fresh) else { return NONE };
+        self.fem.fracture_axis = candidate.axis;
+        self.fem.fracture_edge = candidate.edge;
+        candidate.cell as u32
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{dot, principal_stretch};
+    use super::{CRACK_FRONT_SHIFT, continuing_axis, dot, principal_stretch};
 
     #[test]
     fn rotated_and_compressed_principal_stretches_match_the_analytic_spectrum() {
@@ -97,5 +159,14 @@ mod tests {
         let (compression, _) = principal_stretch(compressed, 0.0).unwrap();
         assert!((compression - 0.81).abs() <= f64::EPSILON);
         assert!(principal_stretch(compressed, 1.0).is_none());
+    }
+
+    #[test]
+    fn projected_axis_advances_through_the_existing_edge_without_cutting_a_tangent() {
+        let tet = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, -1.0], [0.0, 1.0, 1.0]];
+        let front = 1 << CRACK_FRONT_SHIFT;
+        assert_eq!(continuing_axis(tet, [0.6, 0.0, 0.8], front), Some((0, [0.0, 0.0, 1.0])));
+        assert_eq!(continuing_axis(tet, [1.0, 0.0, 0.0], front), None);
+        assert_eq!(continuing_axis(tet, [0.0, 1.0, 0.0], front), None);
     }
 }

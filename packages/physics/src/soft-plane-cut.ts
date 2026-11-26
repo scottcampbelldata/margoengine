@@ -27,6 +27,7 @@ export interface SliceCell {
 export interface SlicePlan {
   readonly points: readonly SlicePoint[];
   readonly pieces: readonly SliceCell[][];
+  readonly crackFront?: ReadonlyMap<SlicePoint, ReadonlySet<SlicePoint>>;
 }
 
 export const FACES = [
@@ -34,6 +35,14 @@ export const FACES = [
   [0, 3, 2],
   [0, 1, 3],
   [0, 2, 1],
+] as const;
+export const TETRA_EDGES = [
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 2],
+  [1, 3],
+  [2, 3],
 ] as const;
 const SIDES: readonly Side[] = [-1, 1];
 const edgeKey = (a: number, b: number): string => (a < b ? `${a},${b}` : `${b},${a}`);

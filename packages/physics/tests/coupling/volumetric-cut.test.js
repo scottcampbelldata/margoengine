@@ -749,7 +749,7 @@ test('a local tensile crack leaves distant tetrahedra unrefined even on the same
   assert.deepEqual(unchanged.particlePositions(), Float32Array.from(distant.flat()));
 });
 
-test('local nucleation conforms to its face neighbor and releases only the selected cell', async () => {
+test('a tensile crack conforms to its neighbor and then advances along the existing front', async () => {
   const desc = new SoftBodyDesc([...position, [0, -2, 0]])
     .setCells([0, 1, 2, 3, 0, 4, 1, 3])
     .setSurface()
@@ -780,4 +780,34 @@ test('local nucleation conforms to its face neighbor and releases only the selec
     }
   }
   bound(lips, 2.25, 2.25);
+
+  const replay = await specimen(desc);
+  replay.body.setParticleKinematicTarget(3, [0, 0, 2 * stretch]);
+  replay.world.advance(1);
+  replay.world.restoreSnapshot(world.takeSnapshot().bytes);
+  replay.world.advance(2);
+  world.advance(2);
+  assert.equal(events.length, 2, 'the continuing load takes one local step into the adjoining material');
+  assert.equal(replay.world.hash(), world.hash());
+  const next = events[1].pieces;
+  for (const fragment of next) closed(fragment);
+  let advancedArea = 0;
+  for (const fragment of next) {
+    const triangles = fragment.triangles();
+    for (let i = 0; i < triangles.length; i += 3) {
+      const [p, q, r] = [...triangles.subarray(i, i + 3)].map((slot) => fragment.particlePosition(slot));
+      if (
+        [p, q, r].some((v) => v[1] < -4 * epsilon32) &&
+        [p, q, r].every((v) => Math.abs(v[2] - stretch / 2) < 4 * epsilon32)
+      ) {
+        advancedArea += Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
+      }
+    }
+  }
+  assert.ok(advancedArea > 0, 'the new lips continue the existing z plane into the neighboring tetrahedron');
+  bound(
+    next.reduce((sum, piece) => sum + piece.volume(), 0),
+    2 * stretch * unitVolume,
+    2 * unitVolume,
+  );
 });

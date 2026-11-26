@@ -820,6 +820,8 @@ physics.step();
 strain exceeds the threshold. The crack crosses the cell centroid perpendicular to the
 current principal stretch. The cell's material can continue deforming after it breaks.
 The remesher splits just that cell and the neighboring faces and edges it touches.
+Under continued tension, an adjacent eligible cell can extend the crack from its current
+front edge.
 Nucleation is off by default. Pass `null` to clear the option on the descriptor.
 
 ```ts

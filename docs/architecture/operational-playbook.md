@@ -10075,6 +10075,10 @@ exact centroid section of the most stretched cell. The inherited native flag sup
 repeat nucleation in that material region and leaves all uncracked neighbors eligible.
 The remesher shares the split faces and edges with incident neighbors. The matching facets
 keep the mesh closed, and remote tetrahedra stay at their original resolution.
+For propagation, a supercritical cell at the existing front projects its principal direction
+into the plane perpendicular to that edge. The new section starts at the old front. Its
+midpoint separates when the front advances, and the registered replacement facets keep the
+two lips continuous. The edge slots are included in native snapshot state.
 
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
