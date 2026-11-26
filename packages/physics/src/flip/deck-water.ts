@@ -5,8 +5,9 @@
 // frame (H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10). Fed back to the hull as
 // it is, that load diverges when the water outweighs the hull (the added-mass instability of P. Causin, J.-F. Gerbeau and
 // F. Nobile, Comput. Methods Appl. Mech. Eng. 194, 2005). So the water rides with the hull as added mass, in the hull
-// solver's solve: the load held is M (M + A)^-1 (F + A a_last + W) - W, A the water as a rigid body about the centre,
-// F its pressure on the deck and A a_last the rigid share of the last step's acceleration that F already holds. The sea comes in
+// solver's solve: the load held is M (M + A)^-1 (F + A a_last + W + O) - W - O, A the water as a rigid body about the
+// centre, F its pressure on the deck, A a_last the rigid share of the last step's acceleration that F already holds, and
+// O every other load on the hull (contacts, joints, locks), seen in what moved it at the last step. The sea comes in
 // where it overtops the bulwarks, from the hull solver's `deckInflow` port; water that crosses an open side goes back to
 // the sea (`seaSources()`); and the deck's load, the water's pressure on the box's walls and solids, holds the body
 // through `bodyForces`. It claims its hull in `deckClaims`, so the hull solver leaves its own deck load out: one owner
@@ -63,6 +64,7 @@ export class DeckWaterSolver extends FlipSolver {
   private uniform: V3 = [0, -9.81, 0];
   /** The hull's last acceleration, world axes: the centre's (3) and the spin's rate (3). */
   private lastAcceleration = [0, 0, 0, 0, 0, 0];
+  private hadLast = false;
   private frame: Region | null = null;
   /** The hull's mass and its world inertia this step (Infinity and zeros for a hull that does not move). */
   private hullMass = Infinity;
@@ -107,8 +109,9 @@ export class DeckWaterSolver extends FlipSolver {
     this.claimsRegion = host.allocate(`${this.id}:claims`, rows * 8, 'f64', DECK_LAYOUT);
     // The inflow's volume not yet made into particles, m^3, and the particles it has made (for their places).
     this.inflowCarry = host.allocate(`${this.id}:inflow`, 2 * 8, 'f64', DECK_LAYOUT);
-    // The hull's velocity and spin at the last step, for its acceleration: a flag, then six words.
-    this.frame = host.allocate(`${this.id}:frame`, 7 * 8, 'f64', DECK_LAYOUT);
+    // The hull's velocity and spin at the last step, for its acceleration: a flag, then six words; then the load held
+    // over that step (six words), for the loads the solve does not see.
+    this.frame = host.allocate(`${this.id}:frame`, 13 * 8, 'f64', DECK_LAYOUT);
     (regionWords(host.memory, this.claimsRegion) as Float64Array)[row] = 1;
   }
 
@@ -162,6 +165,7 @@ export class DeckWaterSolver extends FlipSolver {
     const had = frame[0] === 1,
       ac: V3 = had ? [(v[0] - frame[1]!) / dt, (v[1] - frame[2]!) / dt, (v[2] - frame[3]!) / dt] : [0, 0, 0],
       dw: V3 = had ? [(w[0] - frame[4]!) / dt, (w[1] - frame[5]!) / dt, (w[2] - frame[6]!) / dt] : [0, 0, 0];
+    this.hadLast = had;
     frame.set([1, v[0], v[1], v[2], w[0], w[1], w[2]]);
     this.lastAcceleration = [ac[0], ac[1], ac[2], dw[0], dw[1], dw[2]];
     this.spin = rotate(inverse, w);
@@ -341,21 +345,34 @@ export class DeckWaterSolver extends FlipSolver {
     for (let i = 0; i < 6; i++)
       for (let j = 0; j < 6; j++)
         if (!((i < 3 && j < 3 && i === j) || (i >= 3 && j >= 3))) system[i * 6 + j] = a[i * 6 + j]!;
+    // Every other load on the hull (contacts, joints, locks, other solvers' forces), from the last step: what moved it,
+    // M a_last, less the load this solver held and its weight; the hull solver takes them the same way. Without it the
+    // solve took the hull as free, so a hull held still let its water's weight go into a fall that never happened.
+    const frame = regionWords(this.host!.memory, this.frame!) as Float64Array,
+      seen = [0, 0, 0, 0, 0, 0];
+    if (this.hadLast)
+      for (let i = 0; i < 3; i++) {
+        seen[i] = M * this.lastAcceleration[i]! - frame[7 + i]! - weight[i]!;
+        let t = 0;
+        for (let j = 0; j < 3; j++) t += this.hullInertia[3 * i + j]! * this.lastAcceleration[3 + j]!;
+        seen[i + 3] = t - frame[10 + i]!;
+      }
     // The pressure F holds the water's reaction to the last step's acceleration; its rigid share A a_last goes back in, so
     // the solve carries it implicitly.
     for (let i = 0; i < 6; i++) {
       let back = 0;
       for (let j = 0; j < 6; j++) back += a[i * 6 + j]! * this.lastAcceleration[j]!;
-      rhs[i] = f[i]! + back + weight[i]!;
+      rhs[i] = f[i]! + back + weight[i]! + seen[i]!;
     }
     const acc = solve6(system, rhs),
       out = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < 3; i++) {
-      out[i] = M * acc[i]! - weight[i]!;
+      out[i] = M * acc[i]! - weight[i]! - seen[i]!;
       let t = 0;
       for (let j = 0; j < 3; j++) t += this.hullInertia[3 * i + j]! * acc[j + 3]!;
-      out[i + 3] = t;
+      out[i + 3] = t - seen[i + 3]!;
     }
+    for (let i = 0; i < 6; i++) frame[7 + i] = out[i]!;
     return out;
   }
 

@@ -330,3 +330,33 @@ test("deck water sloshes at the tank's natural period, sqrt(g k tanh(k d)) with 
   assert.ok(crests.length >= 3, `crests at ${crests.map((c) => c / 120)}`);
   assert.ok(Math.abs(measured - period) <= 0.05 * period, `period ${measured} s against ${period} s`);
 });
+
+test("a dynamic hull held by locks takes its deck water's weight as the deck load (KB-FLIP-DECKLOAD1)", () => {
+  // A 2,000 kg hull locked in place, 0.3 m of water on its 2 m by 1 m deck. The added-mass solve took the hull as free, so
+  // the water's weight went into a fall the locks never let happen: the load held came out at -237 N for 5,886 N of
+  // water. Carrying every other load on the hull (here the locks), seen in what moved it last step, it is the weight.
+  const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] }),
+    hull = physics.addBody(null, {
+      lockTranslations: true,
+      lockRotations: true,
+      colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 2000 },
+    }),
+    deck = new DeckWaterSolver('deckWater', { inflow: false }),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(deck, {
+        row: hull.row,
+        offset: [-1, -0.5, -0.5],
+        cells: [20, 10, 10],
+        cellSize: 0.1,
+        initial: (x, y) => y < 0.3,
+      })
+      .couple(['deckWater', 'rigid'], 'staggered');
+  world.advance(60);
+  const load = deck['words'](deck['forcesRegion'])[1],
+    weight = (RHO * G * deck.count * 0.1 ** 3) / 8;
+  assert.ok(
+    Math.abs(load + weight) <= RHO * G * 2 * 1 * 0.05,
+    `load ${load} N against the water's weight ${-weight} N`,
+  );
+});

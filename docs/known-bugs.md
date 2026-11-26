@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
+
+- **Repro:** a dynamic hull held by locks (or by contacts, joints, a mooring) with a `DeckWaterSolver` on it: 0.3 m of
+  water on a 2 m by 1 m deck (5,886 N) held the hull with -237 N; with the exceedance solver's inflow and the real hull
+  solver, +1,124 N against -4,297 N.
+- **Cause:** the deck volume carries its water as added mass in an implicit solve, M (M + A)^-1 (F + W) - W, which takes
+  the hull as free: the water's weight went into a fall the hull never made, so little of it reached a hull something
+  else held.
+- **Fix:** the solve carries every other load on the hull too, seen in what moved it at the last step (M a_last less the
+  load held and the weight), as the hull solver does: M (M + A)^-1 (F + A a_last + W + O) - W - O. A held hull takes the
+  water's weight; a free one still falls with its water at g.
+- **Regression:** `packages/physics/tests/deck-water.test.js`, "a dynamic hull held by locks takes its deck water's
+  weight as the deck load (KB-FLIP-DECKLOAD1)".
+
 ### Open 2026-11-26: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, tools/shot)
 
 - **Repro:** on an Apple M6 Mac (ANGLE on Metal), `npm run build:packages`, then `MARGO_COMPAT=1 npm run test:shot`. Two
