@@ -6,6 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix, invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { normalizeQuaternion } from '@margoengine/math/quat';
 import { deformationShader } from './shader.js';
+import { clearPoseSource, setPoseSource, type PrimitivePose } from '../../shared/pose-source.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 
 /** A bone's transform local to its parent bone; omitted parts keep their value (or the default, for a new bone). */
@@ -516,9 +517,30 @@ export class Skin implements EnginePlugin {
     this.uploaded = -1;
     this.dirtyFrom = 0;
     this.dirtyTo = this.count;
-    for (const p of mesh.primitives) p.deformed = output;
+    for (const p of mesh.primitives) {
+      p.deformed = output;
+      setPoseSource(p, this.scenePose);
+    }
     mesh.prepareDeformation = this.prepare;
   }
+  private scenePosed?: { vertices: Float32Array; revision: number; from?: Float32Array };
+  /**
+   * The CPU pose synchronous scene queries test while the GPU pass deforms the mesh (shared/pose-source.js): the
+   * vertices `picking` caches per pose, copied into one array so a tree over it is refitted, not rebuilt.
+   */
+  private readonly scenePose = (): PrimitivePose | undefined => {
+    const mesh = this.mesh;
+    if (!this.gpu || !mesh || mesh.primitives[0].deformed !== this.gpu.output) return undefined;
+    const from = this.picking.posePickingGeometry()[0].vertices,
+      posed = (this.scenePosed ??= { vertices: new Float32Array(from.length), revision: 0 });
+    if (posed.from !== from) {
+      if (posed.vertices.length !== from.length) posed.vertices = new Float32Array(from.length);
+      posed.vertices.set(from);
+      posed.from = from;
+      posed.revision++;
+    }
+    return posed;
+  };
   registerPasses(graph: FrameGraph): void {
     graph.add({ name: this.name, order: -10, execute: (c) => this.deform(c) });
   }
@@ -564,7 +586,10 @@ export class Skin implements EnginePlugin {
       gpu = this.gpu;
     if (!mesh || !gpu) return;
     if (mesh.prepareDeformation === this.prepare) mesh.prepareDeformation = undefined;
-    for (const p of mesh.primitives) if (p.deformed === gpu.output) p.deformed = undefined;
+    for (const p of mesh.primitives) {
+      if (p.deformed === gpu.output) p.deformed = undefined;
+      clearPoseSource(p, this.scenePose);
+    }
     for (const b of gpu.buffers) b.destroy();
     this.gpu = undefined;
   }

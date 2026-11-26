@@ -108,6 +108,82 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   light then dark under a rippled sea seen from 6 m; 61.1% of the water missed the bed before, 0.00% after, and none
   along the foot of the frame.
 
+### Fixed 2026-11-26: a synchronous raycast threw on every skinned or morphing model (KB-BVH-SYNCPOSE1, bvh, animation)
+
+- **Repro:** `const model = await loadGLTF(engine, 'Fox.glb'); Animation.attach(model);` then
+  `new Raycaster().intersectEngine(engine)` (or `intersectMeshes`, `intersectObjects`, `SceneBVH.intersect`,
+  `RaycastSnapshot.capture`): MargoError `unsupported`, "Deformed PBR mesh cannot be picked synchronously", as soon as
+  the model was visible. The same with a `Skin` on a `createMesh` mesh and with a `GeometryCachePlayer`. Only
+  `await raycaster.intersectModel(model)` and `intersectPosed(skin.picking)` answered.
+- **Cause:** a deformer writes the pose into a GPU buffer (`primitive.deformed`), and a GPU buffer cannot be read back
+  synchronously. The CPU held only the bind-pose vertices, so the synchronous paths of `@margoengine/bvh` had nothing
+  correct to test and refused. Nothing gave them the pose: the deformers kept their arithmetic in WGSL only, although
+  every input of it (node matrices, inverse binds, influences, morph deltas and weights, the cache frame) is on the CPU.
+- **Fix:** a deformer registers a CPU evaluation of its pose for each primitive it writes
+  (`packages/shared/pose-source.js`, a weak registry like the mesh sources). `Animation` evaluates the deformation
+  shader's arithmetic (`packages/animation/src/pose.ts`: morph targets, then the blend of four or eight joint
+  matrices, positions and normals) from the node matrices and morph weights as they are at the call; `Skin` gives the
+  vertices `picking` already posed; `GeometryCachePlayer` gives the floats it uploads. In bvh, `primitiveEntry`
+  (`packages/bvh/src/raycaster.ts`) is the one place every synchronous path reads a primitive through: while
+  `deformed` is set it returns the posed vertices, their bounding sphere and a tree over them, refitted bottom-up when
+  the pose's revision changes and never rebuilt. `Raycaster.intersect`, `castCandidates`, `getPrimitiveBVH`,
+  `computePrimitiveBVHAsync`, `SceneBVH` and the snapshot capture all go through it. A deformer with no CPU pose still
+  refuses with `unsupported`; the bind pose is never tested in its place.
+- **Cost:** per ray and deforming primitive that passes visibility, `layers` and `filter`, one palette evaluation
+  and comparison (two 4x4 products and 16 comparisons per joint), a second when the ray crosses its sphere; per new
+  pose one pass over the vertices to pose them, one for the sphere and one refit of the tree (each node once). An
+  unchanged pose costs no vertex work. Nothing is kept for a model that is never queried.
+- **Research:** Ingo Wald, Solomon Boulos and Peter Shirley,
+  [*Ray Tracing Deformable Scenes Using Dynamic Bounding Volume Hierarchies*, 2007](https://doi.org/10.1145/1186644.1186650)
+  (refit a tree whose topology was built once; quality holds while the deformation keeps the mesh coherent);
+  Christian Lauterbach, Sung-Eui Yoon, David Tuft and Dinesh Manocha,
+  [*RT-DEFORM: Interactive Ray Tracing of Dynamic Scenes using BVHs*, 2006](https://doi.org/10.1109/RT.2006.280213)
+  (refit, with a rebuild when a node's box grows against its children's); Daniel Kopta, Thiago Ize, Josef Spjut, Erik
+  Brunvand, Al Davis and Andrew Kensler,
+  [*Fast, Effective BVH Updates for Animated Scenes*, 2012](https://doi.org/10.1145/2159616.2159649) (tree rotations
+  during the refit). The fix takes the plain refit of the first: one character primitive, a few rays a frame, and a
+  skin keeps its parts together. The rebuild test and the rotations are not built (docs/limits.md). The pose arithmetic
+  is glTF 2.0 sections [3.7.2.2 and 3.7.3](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html), as the shader has it.
+- **Regression:** `packages/bvh/tests/deformed-sync.test.js` (900 rays against a brute-force scan of a bent sphere
+  outside its bind bounds, one evaluation and one refit per pose, `SceneBVH` and `RaycastSnapshot`; every test throws
+  `unsupported` on the code before) and `packages/animation/tests/sync-pick.test.js` (a skinned strip against its
+  closed form, a morph target, a moved joint, a `Skin`, a geometry cache). On a real GPU
+  (`packages/bvh/tests/gpu-build-browser.js`, RTX A6000, D3D12): at three times of the Fox's clip every CPU position
+  is within 1.00 float32 step of the largest coordinate of the GPU's read-back position, normals within 1e-4, and 102
+  synchronous first hits equal `intersectModel`'s.
+- **Left:** the three open entries below.
+
+### Open 2026-11-26: a synchronous raycast refuses a model skinned with a skinning mode (KB-BVH-SYNCPOSE-DQS1, animation)
+
+- **Repro:** `Animation.attach(model, {skinning: dualQuaternionSkinning})`, then `raycaster.intersectEngine(engine)`:
+  MargoError `unsupported` (`packages/animation/tests/sync-pick.test.js` pins the refusal).
+- **Cause:** a `SkinningMode` gives its blend as WGSL only (`shader`, and `encode` for the palette), so `Animation`
+  registers no CPU pose with one. `@margoengine/animation/dqs` already has the blend on the CPU (`skinDualQuaternion`,
+  `blendSkinning`).
+- **Owed:** an optional CPU blend on `SkinningMode` (an API addition), given by `dualQuaternionSkinning`, used by
+  `Animation`'s CPU pose, with the per-vertex `share`; a GPU check against the read-back pose.
+
+### Open 2026-11-26: a synchronous raycast refuses a model whose morph weights are sampled on the GPU (KB-BVH-SYNCPOSE-MORPHGPU1, animation)
+
+- **Repro:** `MorphWeightPlayer.attach(engine, 'Talk').add(animation)`, then `raycaster.intersectEngine(engine)`:
+  MargoError `unsupported`, also after `player.remove(animation)` (`packages/animation/tests/sync-pick.test.js`).
+- **Cause:** the player writes the weights straight into the deformation arena on the GPU, so `primitive.weights` is
+  not what is drawn, and after a `remove` the GPU keeps the last weights it wrote. `Animation` gives no CPU pose for a
+  morphed primitive from the first `add` on, rather than pose from stale weights.
+- **Owed:** the player's weights on the CPU on demand (its shader is `sampleTrackInto` term for term), handed to the
+  CPU pose, and the last sampled weights kept at `remove`.
+
+### Open 2026-11-26: a synchronous raycast refuses a BatchedMesh, and AssemblyBVH refuses every deformed mesh (KB-BVH-SYNCPOSE-BATCHED1, materials, machinery)
+
+- **Repro:** `BatchedMesh.attach(engine, material, {...})`, add an item, then `raycaster.intersectObjects(engine, [batch.mesh])`:
+  MargoError `unsupported`. And `AssemblyBVH` of `@margoengine/machinery` over any mesh under GPU deformation, an
+  `Animation`'s included: MargoError `unsupported` from its own check (`packages/machinery/src/spatial.ts`).
+- **Cause:** `BatchedMesh` places its items in a compute pass and registers no CPU pose
+  (`packages/shared/pose-source.js`), though its item matrices and source vertices are on the CPU. `AssemblyBVH` reads
+  `primitive.vertices` itself and refuses when `deformed` is set; it does not ask for the CPU pose.
+- **Owed:** a pose source in `BatchedMesh` (each item's vertices through its matrix, hidden items collapsed as the
+  pass does) and `AssemblyBVH` reading `posedVertices`, each with its test.
+
 ### Fixed 2026-11-26: the waterline of a flowing sea on a beach drew a sawtooth (KB-WATER-SHORESAW1, water)
 
 - **Repro:** the Kitty Hawk film's shot kh-establish (`examples/kitty-hawk`, the dune coast, looking south along the

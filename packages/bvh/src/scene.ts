@@ -9,12 +9,12 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { ownLayers as maskOf } from '../../shared/view-rect.js';
 import {
   deformedError,
-  deformedNode,
   engineModels,
   engineProxies,
   getMeshLayers,
   isModel,
   primitiveEntry,
+  unposed,
   worldSphere,
   type Candidate,
   type IntersectOptions,
@@ -266,7 +266,7 @@ export class SceneBVH {
       if (runtime.meshes.get(mesh.id) !== mesh) continue;
       const source = meshTriangles(mesh as unknown as Mesh);
       if (source?.kind === 'pbr') {
-        if (source.source.primitives.some((p) => p.deformed))
+        if (source.source.primitives.some((p) => unposed(p as unknown as ModelPrimitiveLike)))
           deformed.push({ node: mesh, mask: getMeshLayers(mesh as unknown as Mesh), model: null });
         else {
           const owner = source.source.model as unknown as ModelLike;
@@ -295,7 +295,9 @@ export class SceneBVH {
       model.primitives.forEach((primitive, index) => {
         const node = primitive.node as unknown as RuntimeMesh,
           instances = primitive.instances;
-        if (deformedNode(primitive.node)) {
+        // A deforming primitive sits in the tree at the pose its deformer evaluates on the CPU; one with no CPU pose
+        // refuses when a ray could reach it, as in the Raycaster.
+        if (unposed(primitive)) {
           deformed.push({ node, mask: maskOf(node) ?? rootMask ?? 1, model });
           return;
         }

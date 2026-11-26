@@ -1,6 +1,7 @@
 // Real GPU checks of @margoengine/bvh/gpu-build, run by bvh-browser.js: trees are read back and checked node by node, and
 // rays through them are compared with a float64 CPU tree of the same pose.
-import { MeshBVH } from '@margoengine/bvh';
+import { MeshBVH, Raycaster } from '@margoengine/bvh';
+import { posedVertices } from '../../shared/pose-source.js';
 import { GPUDynamicBVH } from '@margoengine/bvh/gpu-build';
 import { Animation } from '@margoengine/animation';
 import { Engine } from '@margoengine/core';
@@ -187,8 +188,12 @@ async function skinnedChecks() {
   const trees = await GPUDynamicBVH.fromModel(device, model);
   assert(trees.length > 0, 'the Fox has a deforming primitive');
   const clip = animation.clips[0],
-    poses = [];
-  let agreed = 0;
+    poses = [],
+    raycaster = new Raycaster();
+  let agreed = 0,
+    drift = 0,
+    synchronous = 0;
+  raycaster.firstHitOnly = true;
   for (const part of [0.1, 0.45, 0.8]) {
     animation.seek(clip.duration * part);
     engine.render({ culling: false });
@@ -218,6 +223,40 @@ async function skinnedChecks() {
         }),
         cpu = MeshBVH.build({ positions, indices: tree.primitive.indices });
       agreed += await compare(tree, cpu, rays, `Fox at ${part}`);
+      // The synchronous Raycaster tests the pose Animation evaluates on the CPU. It is the pose the GPU wrote: every
+      // position within float32 rounding of the read-back one (4 ulp of the largest coordinate; 1 measured on D3D12), every unit normal
+      // within 1e-4, and its hits are those of the asynchronous query that reads the GPU buffer back.
+      const cpuPose = posedVertices(tree.primitive).vertices,
+        largest = Math.max(...low.map(Math.abs), ...high.map(Math.abs)),
+        ulp = Math.fround(largest * (1 + 2 ** -23)) - Math.fround(largest);
+      for (let i = 0; i < count * 20; i += 20)
+        for (let k = 0; k < 3; k++) {
+          drift = Math.max(drift, Math.abs(cpuPose[i + k] - snapshot.vertices[i + k]) / ulp);
+          assert(
+            Math.abs(cpuPose[i + 4 + k] - snapshot.vertices[i + 4 + k]) <= 1e-4,
+            `Fox at ${part}: CPU normal ${i / 20} differs from the GPU's`,
+          );
+        }
+      assert(drift <= 4, `Fox at ${part}: CPU pose is ${drift} ulp from the GPU pose`);
+      const m = snapshot.matrix,
+        world = (p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+      for (const { origin, direction } of rays.slice(0, 60)) {
+        const from = world(origin),
+          to = world(origin.map((v, k) => v + direction[k]));
+        raycaster.set(
+          from,
+          to.map((v, k) => v - from[k]),
+        );
+        const [now] = raycaster.intersectObjects(engine, [model]),
+          [read] = await raycaster.intersectModel(model);
+        assert(!now === !read, `Fox at ${part}: the synchronous ray and the read-back ray disagree on a hit`);
+        if (!now) continue;
+        assert(
+          Math.abs(now.distance - read.distance) <= 1e-4 * Math.max(1, read.distance),
+          `Fox at ${part}: synchronous hit at ${now.distance}, read-back hit at ${read.distance}`,
+        );
+        synchronous++;
+      }
     }
   }
   assert(new Set(poses).size === poses.length, `the three poses differ: ${poses}`);
@@ -225,7 +264,8 @@ async function skinnedChecks() {
   animation.dispose?.();
   model.dispose();
   engine.dispose();
-  return { trees: trees.length, agreed };
+  assert(synchronous > 60, `only ${synchronous} synchronous rays hit the Fox`);
+  return { trees: trees.length, agreed, synchronous, drift };
 }
 
 export async function gpuBuildChecks(report) {
@@ -344,7 +384,7 @@ export async function gpuBuildChecks(report) {
   device.destroy();
   const skinned = await skinnedChecks();
   report.checks.push(
-    `gpu build: Fox.glb skinned by Animation, ${skinned.trees} tree, ${skinned.agreed} rays agree with the pose read back`,
+    `gpu build: Fox.glb skinned by Animation, ${skinned.trees} tree, ${skinned.agreed} rays agree with the pose read back; the synchronous Raycaster's CPU pose is within ${skinned.drift.toFixed(2)} ulp of the GPU's and ${skinned.synchronous} of its hits match intersectModel`,
   );
   return true;
 }

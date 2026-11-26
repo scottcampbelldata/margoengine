@@ -5,12 +5,11 @@ import type { BVHBuildOptions } from './build.js';
 import type { Side } from './math.js';
 import {
   boundingSphere,
-  deformedError,
-  deformedNode,
   getMeshLayers,
   isModel,
   modelMeshLayers,
   meshSide,
+  primitiveEntry,
   primitiveSide,
   worldSphere,
   type ModelLike,
@@ -179,8 +178,8 @@ export function captureEntries(
     mask: number,
   ) => {
     if (!live(node)) return;
-    if (deformedNode(node as unknown as Mesh)) throw deformedError();
-    const data = geometry(primitive.vertices, primitive.indices, 20);
+    // A primitive under GPU deformation is captured at its current CPU pose; one with no CPU pose throws here.
+    const data = geometry(primitiveEntry(primitive).vertices, primitive.indices, 20);
     if (!data) return;
     const side = primitiveSide(primitive.material);
     if (!SIDES.includes(side))

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20570094,
+  "total": 20576886,
   "history": [
     {
       "date": "2026-10-24",
@@ -13999,18 +13999,24 @@
       "commit": "da07f5d540",
       "reason": "BREAK-03 staged crush envelopes change @margoengine/physics/crush from 18559 to 19831 B gzip. Ceiling 19116 to 20426 B. One entry supports staged yielding, a falling load and recoil for both continuous and event contact. A split would repeat the contact and material paths.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "KB-BVH-SYNCPOSE1",
+      "reason": "KB-BVH-SYNCPOSE1 (bvh fix, synchronous raycasts on skinned and morphed models): animation 25,402 to 26,506 B gzip (+1,104 B), cap 26,165 to 27,302 B; animation/interactivity, which bundles the same Animation, 27,484 to 28,531 B (+1,047 B), cap 28,309 to 29,387 B; animation/geometry-cache 5,305 to 5,443 B (+138 B), cap 5,305 to 5,699 B. The bytes are the CPU twin of the deformation shader (pose.ts: morph targets, the four- or eight-joint blend, the cofactor normal), the palette comparison that redoes it only for a new pose, and the pose registration of Animation, Skin and GeometryCachePlayer: a GPU buffer cannot be read back synchronously, so without them a synchronous raycast on any animated model has no pose to test and threw. A split into an opt-in entry would leave that throw in place for every app that does not know to import it, and a lazy import() cannot serve a synchronous call.",
+      "grew": 3
     }
   ],
   "items": {
-    "@margoengine/animation": 25485,
+    "@margoengine/animation": 27302,
     "@margoengine/animation/clip-utils": 4836,
     "@margoengine/animation/deformed-points": 3330,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
-    "@margoengine/animation/geometry-cache": 5305,
+    "@margoengine/animation/geometry-cache": 5699,
     "@margoengine/animation/instanced-morph": 11318,
     "@margoengine/animation/instanced-skin": 9927,
-    "@margoengine/animation/interactivity": 24806,
+    "@margoengine/animation/interactivity": 29387,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
     "@margoengine/animation/morph-gpu": 3265,

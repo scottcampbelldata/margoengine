@@ -9,6 +9,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
 import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { posedVertices } from '../../shared/pose-source.js';
 import { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 import { isOrthographic, transformPointChecked } from '@margoengine/math/mat4';
 import { ownLayers as maskOf } from '../../shared/view-rect.js';
@@ -82,8 +83,8 @@ export function modelMeshLayers(mesh: Mesh, root: Mesh): number {
   return maskOf(mesh) ?? maskOf(root) ?? 1;
 }
 
-// gltf/pbr's structural model shapes (active GPU deformation requires async intersectModel); `intersectEngine` finds
-// attached models itself.
+// gltf/pbr's structural model shapes (a primitive under GPU deformation is tested at the pose its deformer evaluates
+// on the CPU, see primitiveEntry); `intersectEngine` finds attached models itself.
 export { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy };
 /** Live gltf/pbr models attached to an engine: its plugins that have `root` and `primitives`. */
 export function engineModels(engine: Engine): ModelLike[] {
@@ -100,19 +101,48 @@ export interface PrimitiveEntry {
   sphere: Float64Array;
   bvh: MeshBVH | null;
 }
+interface PosedEntry extends PrimitiveEntry {
+  indices: Uint32Array;
+  revision: number;
+}
 const primitiveCache = new WeakMap<Uint32Array, PrimitiveEntry>();
-const primitiveSource = (p: ModelPrimitiveLike) => ({
-  positions: p.vertices,
+const posedCache = new WeakMap<ModelPrimitiveLike, PosedEntry>();
+const primitiveSource = (vertices: Float32Array, indices: Uint32Array) => ({
+  positions: vertices,
   stride: 20,
-  normals: p.vertices.subarray(4),
-  indices: p.indices,
+  normals: vertices.subarray(4),
+  indices,
 });
-/** @internal */
-export function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
+function bindEntry(p: ModelPrimitiveLike): PrimitiveEntry {
   let entry = primitiveCache.get(p.indices);
   if (!entry || entry.vertices !== p.vertices) {
     entry = { vertices: p.vertices, sphere: boundingSphere(p.vertices, 20), bvh: null };
     primitiveCache.set(p.indices, entry);
+  }
+  return entry;
+}
+/**
+ * @internal What a synchronous query tests of a primitive: its own vertices, or while a GPU deformer writes it
+ * (`deformed`), the pose that deformer evaluates on the CPU (packages/shared/pose-source.js). A new pose costs one
+ * pass over the vertices for the sphere and one bottom-up refit of the tree, if a ray has reached it; the topology is
+ * the first pose's (Wald, Boulos and Shirley 2007).
+ * @throws MargoError `unsupported` when the deformer gives no CPU pose: the bind pose is never tested in its place.
+ */
+export function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
+  if (!p.deformed) return bindEntry(p);
+  const pose = posedVertices(p);
+  if (!pose) throw deformedError();
+  const { vertices, revision } = pose;
+  if (!(vertices instanceof Float32Array) || vertices.length !== p.vertices.length)
+    throw new TypeError('Posed vertices must match the primitive: a Float32Array of 20 floats per vertex');
+  let entry = posedCache.get(p);
+  if (!entry || entry.vertices !== vertices || entry.indices !== p.indices) {
+    entry = { vertices, indices: p.indices, revision, sphere: boundingSphere(vertices, 20), bvh: null };
+    posedCache.set(p, entry);
+  } else if (entry.revision !== revision) {
+    entry.revision = revision;
+    entry.sphere = boundingSphere(vertices, 20);
+    entry.bvh?.refit();
   }
   return entry;
 }
@@ -153,20 +183,27 @@ export const primitiveSide = (material: ModelPrimitiveLike['material']): Side =>
   material.side ?? (material.settings[2] === 2 ? 'back' : material.settings[2] >= 0.5 ? 'double' : 'front');
 /** @internal Material side of a core mesh: double-sided when material data[6] >= 0.5. */
 export const meshSide = (material: { data: Float32Array }): Side => (material.data[6] >= 0.5 ? 'double' : 'front');
-/** The cached BVH of a model primitive (primitives sharing vertex and index arrays share it), built on first use. */
+/**
+ * The cached BVH of a model primitive (primitives sharing vertex and index arrays share it), built on first use. A
+ * primitive under GPU deformation has its own tree over its current pose, refitted when the pose changes.
+ */
 export function getPrimitiveBVH(primitive: ModelPrimitiveLike, options?: BVHBuildOptions): MeshBVH {
   const entry = primitiveEntry(primitive);
-  return (entry.bvh ??= MeshBVH.build(primitiveSource(primitive), options));
+  return (entry.bvh ??= MeshBVH.build(primitiveSource(entry.vertices, primitive.indices), options));
 }
 /** Whether a model primitive already has a cached BVH. */
-export const hasPrimitiveBVH = (primitive: ModelPrimitiveLike): boolean => !!primitiveCache.get(primitive.indices)?.bvh;
+export const hasPrimitiveBVH = (primitive: ModelPrimitiveLike): boolean =>
+  !!(primitive.deformed ? posedCache.get(primitive) : primitiveCache.get(primitive.indices))?.bvh;
 /** Builds a primitive's BVH in the worker (vertices are copied, not moved) and caches it, for example right after `loadGLTF`. */
 export async function computePrimitiveBVHAsync(
   primitive: ModelPrimitiveLike,
   options: Omit<AsyncBuildOptions, 'transfer'> = {},
 ): Promise<MeshBVH> {
-  const bvh = await buildAsync(primitiveSource(primitive), options);
-  primitiveEntry(primitive).bvh = bvh;
+  const entry = primitiveEntry(primitive),
+    bvh = await buildAsync(primitiveSource(entry.vertices, primitive.indices), options);
+  // The worker built from a copy; the tree reads the live array, so a refit takes in a pose that moved meanwhile.
+  if (entry !== bindEntry(primitive)) bvh.refit();
+  entry.bvh = bvh;
   return bvh;
 }
 
@@ -614,7 +651,6 @@ export class Raycaster {
       const source = meshTriangles(mesh as unknown as Mesh);
       if (source?.kind === 'pbr') {
         if (!this.usable(runtime, mesh, getMeshLayers(mesh as unknown as Mesh), null)) continue;
-        if (source.source.primitives.some((p) => p.deformed)) throw deformedError();
         const owner = source.source.model as unknown as ModelLike;
         if (!models.includes(owner))
           for (const primitive of source.source.primitives) {
@@ -644,19 +680,18 @@ export class Raycaster {
       for (let index = 0; index < primitives.length; index++) {
         const primitive = primitives[index],
           node = primitive.node as unknown as RuntimeMesh,
-          instances = primitive.instances;
-        if (deformedNode(primitive.node)) {
-          if (this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)) throw deformedError();
-          continue;
-        }
-        // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
+          instances = primitive.instances,
+          // A deforming primitive is posed only once it is known to be tested: a hidden or filtered one costs nothing.
+          posed = !!primitive.deformed;
+        if (posed && !this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)) continue;
+        // Per ray, not per model: a rewritten primitive (new vertex or index array) or a new pose gets a fresh sphere.
         const sphere = primitiveEntry(primitive).sphere;
         if (instances) {
           // A linear scan over instances (one 4x4 product and sphere test each); `@margoengine/bvh/scene` holds them in its tree.
           if (
             !instances.count ||
             runtime.meshes.get(node.id) !== node ||
-            !this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)
+            !(posed || this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model))
           )
             continue;
           const world = store.matrices.subarray(node.id * 16, node.id * 16 + 16);
@@ -677,7 +712,7 @@ export class Raycaster {
           continue;
         }
         const entry = this.entry(store.matrices, node.id * 16, sphere);
-        if (entry >= 0 && this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model))
+        if (entry >= 0 && (posed || this.usable(runtime, node, maskOf(node) ?? rootMask ?? 1, model)))
           candidates.push({ node, entry, model, primitive, index });
       }
     }
@@ -967,16 +1002,13 @@ function packPose(source: Float32Array, target: Float32Array): void {
   }
 }
 
-/** @internal True when a registered PBR source on `node` has an active GPU deformation (skin or morph). */
-export function deformedNode(node: Mesh): boolean {
-  const source = meshTriangles(node);
-  return source?.kind === 'pbr' && source.source.primitives.some((p) => p.deformed);
-}
+/** @internal True when `primitive` is under GPU deformation and its deformer gives no CPU pose to test. */
+export const unposed = (primitive: ModelPrimitiveLike): boolean => !!primitive.deformed && !posedVertices(primitive);
 /** @internal Synchronous queries never test a deformed mesh's bind pose. */
 export const deformedError = (): MargoError =>
   new MargoError(
     'unsupported',
-    'Deformed PBR mesh cannot be picked synchronously; use Raycaster.intersectPosed(skin.picking) for a Skin, or await Raycaster.intersectModel(model) for its current pose.',
+    'This mesh is deformed on the GPU by a deformer that has no CPU pose, so it cannot be picked synchronously; await Raycaster.intersectModel(model) for its current pose.',
   );
 
 /**

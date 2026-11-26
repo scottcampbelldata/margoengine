@@ -57,8 +57,9 @@ const SIDES: readonly Raycaster['side'][] = ['material', 'front', 'back', 'doubl
  * visibility, object membership and the camera mapping are copied at capture, so later edits need a new capture.
  * Hits carry the captured numbers and the original mesh, model and primitive objects. Meshes removed (or whose id was
  * reused) and disposed models are skipped; queries after the engine or snapshot is disposed throw.
- * Core meshes, static PBR models, instances and pick proxies are tested in local space under a Float64 top-level
- * tree. A visible deformed (skinned or morphed) source makes capture throw rather than silently test its bind pose.
+ * Core meshes, PBR models, instances and pick proxies are tested in local space under a Float64 top-level tree. A
+ * skinned or morphed primitive is captured at the pose its deformer evaluates on the CPU at capture; a visible one
+ * whose deformer has no CPU pose makes capture throw rather than silently test its bind pose.
  */
 export class RaycastSnapshot {
   private runtime: SnapshotRuntime | null;
@@ -79,8 +80,8 @@ export class RaycastSnapshot {
    * Capture never changes source geometry and returns only when complete. Empty geometry is left out and draws with a
    * singular transform are skipped.
    * @throws TypeError for an invalid engine, object list or options; RangeError for malformed geometry, transforms or
-   * camera; MargoError `disposed` for a disposed engine, `unsupported` for a visible deformed source (use
-   * `await Raycaster.intersectModel(model)` for its current pose).
+   * camera; MargoError `disposed` for a disposed engine, `unsupported` for a visible source deformed on the GPU with
+   * no CPU pose (use `await Raycaster.intersectModel(model)` for its current pose).
    */
   static capture(
     engine: Engine,

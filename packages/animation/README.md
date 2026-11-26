@@ -70,6 +70,34 @@ do not advance playback time. The hook survives device restoration; disposal
 removes only the animation instance's own hook. No CPU skinning copy is added to
 the playback path.
 
+Synchronous CPU raycasts (`Raycaster.intersectEngine`, `intersectObjects`, `SceneBVH`
+and `RaycastSnapshot` of `@margoengine/bvh`) hit an animated model at its current
+pose with no readback: for the ray, `Animation` evaluates the deformation pass's
+arithmetic on the CPU (morph targets, then the linear blend of four or eight
+joints, positions and normals) from the node matrices and morph weights as they
+are at the call. It is redone only when a bone, a morph weight or the bind
+vertices changed, and nothing is kept for a model no ray ever asks about; the
+first query reads the influences and morph deltas from the asset once (32 or 64
+bytes per skinned vertex, 48 bytes per vertex and target). `Skin` and
+`GeometryCachePlayer` do the same from their own CPU data. An `Animation` with
+a `skinning` mode, or one whose weights a `MorphWeightPlayer` drives, has no CPU
+pose: those raycasts throw MargoError `unsupported`, and
+`await raycaster.intersectModel(model)` reads the pose back from the GPU.
+
+```ts
+import {Engine} from '@margoengine/core';
+import {loadGLTF} from '@margoengine/gltf/pbr';
+import {Animation} from '@margoengine/animation';
+import {Raycaster} from '@margoengine/bvh';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const hero = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(hero);
+animation.seek(0.4);
+const [hit] = new Raycaster().setFromEngine(engine, 320, 240).intersectObjects(engine, [hero]);
+console.log(hit ? hit.distance : 'the ray misses the pose');
+```
+
 Run the character demo at `/examples/robot-expressive.html` (also `character-animation.html`). RobotExpressive is by Tomás Laulhé with morphs by Don McCurdy (CC0). It is not a Khronos sample.
 
 The demo leaves facial weights under the sliders' control by removing weight tracks from its clips. Expressions persist while playing, pausing and switching clips. Presets include a neutral reset; playback speed and a reset-view button accompany touch-enabled orbit controls. The studio floor uses the optional shadows and tone-mapping packages.

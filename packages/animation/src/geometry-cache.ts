@@ -5,6 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, Scene } from '@margoengine/core/extension';
 import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf/pbr-model';
 import { MargoError } from '@margoengine/math/errors';
+import { setPoseSource } from '../../shared/pose-source.js';
 
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number };
 
@@ -821,8 +822,17 @@ export class GeometryCachePlayer implements EnginePlugin {
     this.chunks = this.chunks.filter((c) => this.pinned(c));
     void this.pump(this.open(), this.reader);
   }
+  private packs = 0;
+  /**
+   * The CPU pose synchronous scene queries test (shared/pose-source.js): `scratch`, the very floats the frame uploads.
+   */
+  private readonly pose = () =>
+    this.buffer && this.model.primitives[0].deformed === this.buffer
+      ? { vertices: this.scratch, revision: this.packs }
+      : undefined;
   /** Writes the frame's vertices into `scratch`. Position and normal only: the rest is the chunk's. */
   private pack(chunk: GeometryChunk, a = 0, next = chunk, b = 0, w = 0): void {
+    this.packs++;
     const out = this.scratch,
       n = chunk.vertexCount,
       from = a * n * 3,
@@ -903,6 +913,7 @@ export class GeometryCachePlayer implements EnginePlugin {
     }
     primitive.deformed = this.buffer;
     primitive.deformedOffset = 0;
+    setPoseSource(primitive, this.pose);
     device.queue.writeBuffer(this.buffer!, 0, this.scratch as Float32Array<ArrayBuffer>);
   }
 }

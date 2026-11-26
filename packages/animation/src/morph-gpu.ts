@@ -161,6 +161,9 @@ export class MorphWeightPlayer implements EnginePlugin {
     if (first && first !== animation && first.model.asset !== animation.model.asset)
       throw new TypeError('MorphWeightPlayer copies must share one asset; clone them with cloneModel');
     this.tracksOf(animation);
+    // The weights on the GPU are this player's from now on, and stay as it left them after `remove`: the copy's
+    // `primitive.weights` are not the pose, so a synchronous CPU query must not pose from them.
+    animation['gpuWeights'] = true;
     this.members.set(animation, { offset, speed });
     this.dirty = true;
     return this;
