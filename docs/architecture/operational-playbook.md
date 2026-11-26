@@ -10686,6 +10686,10 @@ on the world clock. Each SIMD lane integrates a separate submerged strip sample 
 published anisotropic stress law. The native reduction preserves sample order. Forces and
 centre-of-mass moments accumulate through the existing rigid field and survive snapshot restore.
 The calibration plate stresses and measured rotating-leg force traces come from separate experiments.
+The optional cyclic bearing model stores the highest pressure, corresponding compliance and previous
+elastic displacement per bed vertex. A compact active list unwinds only the prior reversible cut.
+The new contact subtracts its elastic height and accounts for permanent soil displacement separately
+in the shared bed and mineral flux. The active list and history are snapshot regions.
 
 ### Divergence-free particle pressure
 

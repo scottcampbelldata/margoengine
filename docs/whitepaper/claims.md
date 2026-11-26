@@ -5978,6 +5978,12 @@ linear plate experiments. A one-strip world additionally checks the exact force 
 centre-of-mass moment against the rigid body and replays the same state in both memories.
 [Measurement conditions and digitization](../clean-room.md#resistive-force-on-rotating-legs-earth-05).
 
+The optional cyclic bearing model recovers the previous elastic cut on the real bed and
+counts only the permanent part as displaced sediment. Load-controlled plate tests independently
+check the first indentation, partial and full rebound, reloading, a higher yield pressure, moving
+contacts and the shared bedrock floor. Snapshot and native memory parity also run in the browser.
+[Formula and test conditions](../clean-room.md#cyclic-soil-bearing-earth-05).
+
 ### Divergence-free particle pressure (FLUID-01)
 
 The scoped coupling tests verify a cubic self density, closed-form two-particle density and divergence

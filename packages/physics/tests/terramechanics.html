@@ -7,8 +7,8 @@
     import { Physics } from '/packages/physics/dist/index.js';
     import { AirborneParticles } from '/packages/physics/dist/airborne.js';
     import { TerrainBed } from '/packages/physics/dist/earth.js';
-    import { ResistiveSoil, Terramechanics } from '/packages/physics/dist/terramechanics.js';
-    import { PhysicsWorld, RigidSolver, worldMemory } from '/packages/physics/dist/world.js';
+    import { ResistiveSoil, soilPatchField, Terramechanics } from '/packages/physics/dist/terramechanics.js';
+    import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '/packages/physics/dist/world.js';
 
     const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] };
 
@@ -70,6 +70,45 @@
         } finally {
           physics.dispose();
         }
+      };
+      return [await simulate(false), await simulate(true)];
+    };
+
+    window.runCyclicSoil = async () => {
+      const simulate = async (shared) => {
+        const shape = { columns: 8, rows: 8, width: 0.8, depth: 0.8, centre: [0, 0] };
+        const input = soilPatchField();
+        const soil = await Terramechanics.load({ tier: 'resolved', input });
+        const bed = new TerrainBed();
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+        let state;
+        world.add({
+          describe: () => ({ id: 'plate', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] }),
+          init: host => { state = host.allocate('plate-load', 80, 'f64', 1); },
+          step: context => {
+            const load = [900, 450, 0, 1350, 0][context.tick];
+            regionWords(world.memory, state).set([0, 0, 0, 1, 0.3, 0.3, load, 0, 0, 0]);
+          },
+          exportPorts: tick => [{ field: input.name, region: state, tick, cell: [0, 0, 0] }],
+          importPorts: () => {},
+          stateRegions: () => [state],
+          extraState: () => [],
+        });
+        world.add(bed, { ...shape, elevations: () => 0 }).add(soil, {
+          terrain: shape, inputRows: 1,
+          material: { cohesiveModulus: 0, frictionalModulus: 100000, compaction: 1,
+            unloading: { stiffness: 400000, hardening: 2000000 } },
+        }).couple(['plate', soil.id, 'bed'], 'staggered');
+        world.advance(1);
+        const loaded = bed.elevations()[40];
+        const snapshot = world.takeSnapshot();
+        world.advance(3);
+        const recovered = bed.elevations()[40];
+        world.advance(5);
+        const hash = world.hash();
+        world.restoreSnapshot(snapshot.bytes);
+        world.advance(5);
+        return { hash, restored: world.hash(), loaded, recovered, residual: bed.elevations()[40], mass: soil.budget.compacted };
       };
       return [await simulate(false), await simulate(true)];
     };

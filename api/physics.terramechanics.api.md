@@ -152,6 +152,7 @@ export interface SoilMaterial {
     readonly dustFraction?: number;
     readonly density?: number;
     readonly reposeSlope?: number;
+    readonly unloading?: SoilUnloading;
 }
 
 export interface SoilPatch {
@@ -188,6 +189,11 @@ export interface SoilTreadMesh {
     readonly indices: ArrayLike<number>;
     readonly columns?: number;
     readonly rows?: number;
+}
+
+export interface SoilUnloading {
+    readonly stiffness: number;
+    readonly hardening?: number;
 }
 
 export class Terramechanics implements Solver<TerramechanicsParams> {

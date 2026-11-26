@@ -9922,7 +9922,14 @@ The resolved tier uses normalized pressure on the bed grid and accepts rectangul
 projected contours. Bearing and shear parameters come from the soil's material tests. Resolve the patch and its adjacent berm
 with several grid vertices. Surface repose uses one ordered face sweep over the newly displaced loose material.
 The candidate set follows newly moved soil and can spread far when the specified repose slope approaches zero.
-The ground is a height field with peak indentation per vertex. Optional hardpan adds one subsurface pressure
+The ground is a height field with peak indentation per vertex. Enable `material.unloading`
+to follow Wong's linear unloading and reloading branch. The largest stress already experienced at a
+vertex controls its elastic slope. A larger stress can add permanent settlement. Each vertex adds
+24 bytes of elastic state and four bytes of active-index capacity, plus fixed parameters and a count.
+The release step visits only previously compressed vertices. Overlapping footprints in the same
+step retain their greatest elastic displacement. The dry granular model treats identical repeated
+loads below the previous peak as elastic. Progressive fatigue and same-pressure ratcheting remain open.
+Optional hardpan adds one subsurface pressure
 transition sampled at the footprint centre. Resolve changes in layer depth at the scale of the footprint.
 Shear and displaced material use the topsoil fit. Shared layer exchange, overhangs and accumulated
 subgrade fatigue remain open. The rolling
@@ -9974,7 +9981,7 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 16,311 B gzip with a 16,801 B ceiling. Both Wasm assets are 39,311 B raw and 15,986 B gzip each.
+The optional entry is 16,514 B gzip with a 16,801 B ceiling. Both Wasm assets are 40,423 B raw and 16,491 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)

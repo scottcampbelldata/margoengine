@@ -42,6 +42,14 @@ export const SOIL_WHEEL_REACTION_WORDS = 3;
 const LEGGED_WORDS = 13;
 const CENTRE = [0, 0, 0] as const;
 
+/** Wong's unloading slope k₀ + Aᵤ zₘₐₓ for cyclic soil bearing. Measure both terms on prepared soil. */
+export interface SoilUnloading {
+  /** Unloading slope at zero depth k₀, Pa/m. */
+  readonly stiffness: number;
+  /** Increase in unloading slope per metre of peak sinkage Aᵤ, Pa/m². Default zero. */
+  readonly hardening?: number;
+}
+
 /** Uniform prepared soil properties. Calibrate pressure–sinkage with plates of two widths. */
 export interface SoilMaterial {
   /** Width-dependent addition to the pressure coefficient, Pa m^(1−n). Default 1,000. */
@@ -66,6 +74,8 @@ export interface SoilMaterial {
   readonly density?: number;
   /** Rise per metre at dry repose in the resolved tier. Defaults to the supplied internal friction tangent. */
   readonly reposeSlope?: number;
+  /** Recoverable deformation during repeated bearing loads. Omit for fully permanent indentation. */
+  readonly unloading?: SoilUnloading;
 }
 
 /** A measured wheel, belt, shoe or hoof load over a finite footprint. All values are SI. */
@@ -253,7 +263,7 @@ function positive(value: number, label: string): number {
   return finite(value, label, Number.MIN_VALUE);
 }
 
-function materialOf(input: SoilMaterial = {}): Required<SoilMaterial> {
+function materialOf(input: SoilMaterial = {}): Required<Omit<SoilMaterial, 'unloading'>> {
   const friction = finite(input.friction ?? 0.6, 'internal friction', 0);
   const material = {
     cohesiveModulus: finite(input.cohesiveModulus ?? 1000, 'cohesive modulus'),
@@ -391,7 +401,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private readonly sideForce?: FieldDescriptor;
   private readonly legged: boolean;
   private terrain!: BedShape;
-  private material!: Required<SoilMaterial>;
+  private material!: Required<Omit<SoilMaterial, 'unloading'>>;
   private hardpan?: Required<SoilHardpan>;
   private host!: SolverHost;
   private kernel!: NativeSoil;
@@ -411,6 +421,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private trackRelief?: Region;
   private reposePending?: Region;
   private diggingPhase?: Region;
+  private cycle?: { history: Region; active: Region };
   private sideWeight = 0;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -555,6 +566,19 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       );
     this.change = new BedChange(host, this.terrain, 'soil-bed-change');
     const allocate = (name: string, words: number) => host.allocate(name, words * 8, 'f64', SOIL_LAYOUT);
+    this.cycle = undefined;
+    const unloading = parameters.material?.unloading;
+    if (unloading) {
+      const stiffness = finite(unloading.stiffness, 'initial unloading stiffness', 0);
+      const hardening = finite(unloading.hardening ?? 0, 'unloading hardening', 0);
+      if (stiffness === 0 && hardening === 0)
+        throw new MargoError('state', 'The soil unloading slope is zero. Give a positive stiffness or hardening.');
+      this.cycle = {
+        history: allocate('soil-cycle-history', 2 + count * 3),
+        active: host.allocate('soil-cycle-active', (count + 1) * 4, 'u32', SOIL_LAYOUT),
+      };
+      this.words(this.cycle.history).set([stiffness, hardening]);
+    }
     if (parameters.hardpanDepths !== undefined && !hardpan)
       throw new MargoError('state', 'Local hardpan depths have no material. Provide the hardpan fit with them.');
     this.floorGrid =
@@ -886,6 +910,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       centre[0] - dx / 2,
       centre[1] - dz / 2,
       this.trackRelief?.byteOffset ?? 0,
+      this.cycle?.history.byteOffset ?? 0,
+      this.cycle?.active.byteOffset ?? 0,
     );
     if (rolling && !Number.isFinite(peak))
       throw new MargoError(
@@ -987,6 +1013,12 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       throw new MargoError(
         'state',
         'Soil and terrain geometry disagree. Add the live TerrainBed writer on the same grid and cell.',
+      );
+    if (this.cycle)
+      this.kernel.unload_soil(
+        this.cycle.history.byteOffset,
+        this.cycle.active.byteOffset,
+        this.change.state.byteOffset,
       );
     for (const [i, patch] of this.fixed.entries()) this.stamp(patch, i, bed.region, dt);
     const port = this.input && context.inputs.get(this.input.name);
@@ -1099,6 +1131,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       ...(this.trackRelief ? [this.trackRelief] : []),
       ...(this.reposePending && this.faces ? [this.faces] : []),
       ...(this.diggingPhase ? [this.diggingPhase] : []),
+      ...(this.cycle ? [this.cycle.history, this.cycle.active] : []),
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),

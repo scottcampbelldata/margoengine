@@ -5209,6 +5209,38 @@ and Goldman (2013), Table S2. The load acts on the next rigid step. The separate
 measured rotating-leg experiment checks both lift and thrust.
 [Rotating-leg validation](tests/coupling/resistive-soil.test.js).
 
+Set `material.unloading` to give the soil a recoverable part of its settlement.
+`unloading.stiffness` is the measured initial unloading slope in Pa/m, and
+`hardening` is its measured increase with peak depth in Pa/m², default zero.
+The surface rebounds when a load falls or leaves its footprint and follows the same
+elastic line when the load returns. Only the permanent part makes a rut, berm or dust.
+Omitting the option gives fully permanent indentation.
+
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { Terramechanics } from '@margoengine/physics/terramechanics';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const terrain = { columns: 8, rows: 8, width: 0.8, depth: 0.8, centre: [0, 0] as const };
+const soil = await Terramechanics.load({ tier: 'resolved' });
+const bed = new TerrainBed();
+const world = new PhysicsWorld();
+world.add(bed, { ...terrain, elevations: () => 0 });
+world.add(soil, {
+  terrain,
+  material: {
+    cohesiveModulus: 0, frictionalModulus: 100_000, compaction: 1,
+    unloading: { stiffness: 400_000, hardening: 2_000_000 },
+  },
+  patches: [{ x: 0, z: 0, length: 0.3, width: 0.3, load: 900 }],
+});
+world.couple([soil.id, 'bed'], 'staggered');
+world.advance(1);
+console.log(bed.bed.sample(0, 0).elevation, soil.budget.compacted);
+```
+
+[Live loading, unloading and plate travel examples](tests/coupling/soil-unloading.test.js).
+
 ## Granular material points
 
 Use the optional `@margoengine/physics/granular-mpm` entry for sand that yields under

@@ -37,7 +37,10 @@ export interface NativeSoil {
     originX: number,
     originZ: number,
     trackRelief: number,
+    cycle: number,
+    cycleActive: number,
   ): number;
+  unload_soil(cycle: number, cycleActive: number, change: number): void;
   repose(
     areas: number,
     change: number,
@@ -96,6 +99,7 @@ export function bindSoil(host: SolverHost, builds: Builds): NativeSoil {
     !(exports.__stack_pointer instanceof WebAssembly.Global) ||
     typeof exports.resistive !== 'function' ||
     typeof exports.stamp !== 'function' ||
+    typeof exports.unload_soil !== 'function' ||
     typeof exports.repose !== 'function'
   )
     throw new MargoError('failed', 'Unexpected terramechanics kernel ABI. Run the build for both native variants.');

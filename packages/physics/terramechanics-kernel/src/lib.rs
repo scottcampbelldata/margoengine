@@ -1,6 +1,7 @@
 #![no_std]
 #![allow(unsafe_op_in_unsafe_fn)]
 
+mod cyclic;
 mod resistive;
 
 use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_mul, f64x2_sqrt, unreachable};
@@ -1169,6 +1170,8 @@ pub unsafe extern "C" fn stamp(
     origin_x: f64,
     origin_z: f64,
     track_relief: *mut f64,
+    cycle_words: *mut f64,
+    cycle_active: *mut u32,
 ) -> f64 {
     let source = &mut *patch.cast::<Patch>();
     let mut local = *source;
@@ -1307,6 +1310,8 @@ pub unsafe extern "C" fn stamp(
     let mut removed = 0.0;
     let mut dug = 0.0;
     let mut rim_area = 0.0;
+    let mut cyclic_depth: f64 = 0.0;
+    let cycle = cyclic::Cycle::new(cycle_words, cycle_active);
     for x in x_start..x_end {
         let rx = origin_x + x as f64 * dx - p.x;
         for z in z_start..z_end {
@@ -1320,21 +1325,38 @@ pub unsafe extern "C" fn stamp(
             } else {
                 0.0
             };
+            let stress = if layered {
+                layered_pressure(p, settlement * profile).0 * coverage * pressure_scale
+            } else {
+                crest_pressure * coverage * pressure_shape
+            };
             if resolved {
-                *pressure.add(i) += if layered {
-                    layered_pressure(p, settlement * profile).0 * coverage * pressure_scale
-                } else {
-                    crest_pressure * coverage * pressure_shape
-                };
+                *pressure.add(i) += stress;
             }
             let room = cut_capacity(i, *heights.add(i), *deltas.add(i), floor, floor_grid);
-            let cut = (settlement * depth_shape * coverage - *peak.add(i))
-                .max(0.0)
-                .min(room);
+            let natural_depth = settlement * depth_shape * coverage;
+            let (cut, elastic_change) = if let Some(cycle) = &cycle {
+                if coverage > 0.0 && natural_depth > 0.0 {
+                    let stress = if resolved {
+                        stress
+                    } else if p.lower_stiffness > 0.0 {
+                        layered_pressure(p, settlement).0 * coverage
+                    } else {
+                        p.stiffness * pow(settlement, p.exponent) * coverage
+                    };
+                    let settled = cycle.indent(i, natural_depth, stress, *peak.add(i), room);
+                    cyclic_depth = cyclic_depth.max(*peak.add(i) + settled.cut + settled.elastic);
+                    (settled.cut, settled.change)
+                } else {
+                    (0.0, 0.0)
+                }
+            } else {
+                ((natural_depth - *peak.add(i)).max(0.0).min(room), 0.0)
+            };
             let extra = if swept_depth > 0.0 {
                 let axle_room = (p.wheel_radius - *peak.add(i) - cut).max(0.0);
                 let additional = (swept_depth * pressure_shape * coverage)
-                    .min(room - cut)
+                    .min((room - cut - elastic_change).max(0.0))
                     .min(axle_room);
                 dug += additional * area;
                 additional
@@ -1344,6 +1366,7 @@ pub unsafe extern "C" fn stamp(
             let cut = cut + extra;
             *peak.add(i) += cut;
             add_bed_change(deltas, track_relief, i, -cut);
+            *deltas.add(i) -= elastic_change;
             *dust.add(i) += cut * p.dust_flux;
             removed += cut * area;
             if p.berm_slope == 0.0 {
@@ -1419,7 +1442,11 @@ pub unsafe extern "C" fn stamp(
     if resolved {
         *work += visit;
     }
-    rolling_depth.map_or(settlement, |depth| depth.rim)
+    if cycle.is_some() {
+        cyclic_depth
+    } else {
+        rolling_depth.map_or(settlement, |depth| depth.rim)
+    }
 }
 
 /// Conservative gravity redistribution of freshly displaced material outside the current contact patches.

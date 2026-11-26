@@ -42,6 +42,16 @@ try {
   assert.ok(Math.abs(plainSoil.torque[2] - 0.06 * plainSoil.force[1]) < 1e-14);
   assert.ok(Math.abs(plainSoil.velocity[1] - (-0.06 + plainSoil.force[1] / 120)) < 2e-8);
   console.log(`Browser EARTH-05 resistive force and rigid replay ${plainSoil.hash}, force ${plainSoil.force[1]} N.`);
+  const [plainCycle, sharedCycle] = await page.evaluate(() => window.runCyclicSoil());
+  assert.deepEqual(plainCycle, sharedCycle);
+  assert.equal(plainCycle.hash, plainCycle.restored);
+  assert.ok(Math.abs(plainCycle.loaded + 0.1) < 2e-15);
+  assert.ok(Math.abs(plainCycle.recovered + 0.1 - 10_000 / 600_000) < 2e-15);
+  assert.ok(Math.abs(plainCycle.residual + 0.15 - 15_000 / 700_000) < 2e-15);
+  assert.ok(Math.abs(plainCycle.mass + 0.09 * plainCycle.residual) < 2e-15);
+  console.log(
+    `Browser EARTH-05 cyclic terrain replay ${plainCycle.hash}, recovered ${plainCycle.recovered - plainCycle.loaded} m.`,
+  );
   await page.evaluate(() => window.prepareTerramechanicsRender());
   const flat = await page.evaluate(() => window.terramechanicsFrame(0));
   const canvas = page.locator('#soil');

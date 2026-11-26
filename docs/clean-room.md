@@ -564,6 +564,37 @@ Physics. The analytic fixture independently integrates a translating strip's for
 moment, verifies the rigid body's resulting velocity and checks snapshot hash parity.
 The browser repeats that test with both native memory variants.
 
+### Cyclic soil bearing (EARTH-05)
+
+J. Y. Wong, M. Garber and J. Preston-Thomas, *Theoretical Prediction and Experimental
+Substantiation of the Ground Pressure Distribution and Tractive Performance of Tracked
+Vehicles* (1984), distinguish permanent settlement and elastic rebound for repetitive
+normal loading. J. Y. Wong, *Terramechanics and Off-Road Vehicle Engineering*, second
+edition (2009), gives the mineral-soil relation in Eqs. 4.23–4.24. The unloading and
+reloading line starts at the largest pressure and has slope `k₀ + Aᵤ zₘₐₓ`. Given
+pressure instead of prescribed depth, the recoverable part is pressure divided by that
+slope. The loading envelope resumes when a new pressure exceeds the stored maximum.
+[Wong, Garber and Preston-Thomas](https://doi.org/10.1243/PIME_PROC_1984_198_155_02).
+[Wong's book](https://www.sciencedirect.com/book/monograph/9780750685610/terramechanics-and-off-road-vehicle-engineering).
+
+S. J. Antony and Z. K. Jahanger, *Local Scale Displacement Fields in Grains–Structure
+Interactions Under Cyclic Loading* (2020), show reversible rebound in dense silica sand
+under multiple controlled cyclic programmes. Haibo Gao, Liang Ding and coauthors'
+separate Wh12 repetitive-pass tests (Ding et al., 2011, Figures 22–23) report further
+absolute sinkage when a wheel follows the same path. Those tests guide the next
+material validation, including its reference to the undisturbed surface.
+[Antony and Jahanger](https://doi.org/10.1007/s10706-019-01088-5).
+[Ding et al.](https://doi.org/10.1016/j.jterra.2010.08.001).
+
+The current fixture uses a square 300 mm plate covering nine equal-area vertices.
+It prescribes 10, 5, 0, 7.5, 10, 15 and 0 kPa in turn. The specified 100 kPa/m
+loading slope, 400 kPa/m unloading stiffness and 2,000 kPa/m² hardening give exact
+full-load peaks of 100 mm and 150 mm, with recoveries of 16⅔ mm and 21³⁄₇ mm.
+The tests compare the live bed, cumulative plastic cut and restored state to those
+closed forms. They also check release on travel and a bedrock-limited, dust-producing
+plate. This evidence is analytic.
+Run `node --test packages/physics/tests/coupling/soil-unloading.test.js` after building Physics.
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”
