@@ -22,6 +22,7 @@ import {
 } from '../../dist/seakeeping.js';
 import { SpectralSea, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, WakeSolver } from '../../dist/sea.js';
 import { SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
+import { kvlcc2Waterline } from './kvlcc2-waterline.js';
 import { freeSection, vHull } from './sections.js';
 import {
   BODY_FORCES_FIELD,
@@ -1149,6 +1150,77 @@ test('HullSolver short-wave reflection loads the wetted bow in the rigid force p
   const slenderFactor = 1 + (68 - 310 / 17) / Math.sqrt(GRAVITY * 2 * L);
   const slenderLoad = held([1, 0, 0], [head], { hullMesh: slender });
   compare(slenderLoad[0], (-scale * advancingReflection * slenderFactor) / 17);
+});
+
+test('HullSolver short-wave reflection agrees with held-out KVLCC2 short head-wave resistance', (proof) => {
+  // Park, Lee and Kim (2014), Tables 1–2 and 12. A, lambda, speed, dimensions and water properties are inputs.
+  const length = 3.2;
+  const beam = 0.58;
+  const draft = 0.208;
+  const freeboard = 0.3 - draft;
+  const gravity = 9.799;
+  const density = 997.8;
+  const speed = 0.142 * Math.sqrt(gravity * length);
+  const amplitude = 0.016;
+  const wavenumber = (2 * Math.PI) / (0.5 * length);
+  const frequency = Math.sqrt(gravity * wavenumber) / (2 * Math.PI);
+  const sea = new SpectralSea({
+    gravity,
+    waves: {
+      frequencies: Float64Array.of(frequency),
+      directions: Float64Array.of(Math.PI),
+      energy: Float64Array.of((amplitude * amplitude) / (4 * Math.PI * frequency)),
+      depth: Infinity,
+      density,
+    },
+  });
+  const held = (mesh, shortWaveResistance) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      linearVelocity: [speed, 0, 0],
+      colliders: {
+        shape: 'box',
+        halfExtents: [length / 2, (draft + freeboard) / 2, beam / 2],
+        mass: density * volumeBelow(mesh, [0, 1, 0], 0),
+      },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -gravity, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh, shortWaveResistance }],
+        sea,
+        gravity: [0, -gravity, 0],
+        addedMass: false,
+        radiation: false,
+        rollDamping: false,
+        diffraction: false,
+        drift: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const row = new Float64Array(world.memory.buffer, region.byteOffset + body.row * FORCE_WORDS * 8, FORCE_WORDS);
+    return row[0];
+  };
+
+  // Table 12: independent mean and expanded 95% uncertainty from 16 tank runs at lambda/L = 0.5.
+  const measured = 2.932;
+  const uncertainty = 0.4643;
+  const scale = (density * gravity * amplitude * amplitude * beam * beam) / length;
+  const predicted = [2, 1].map((stride) => {
+    const mesh = kvlcc2Waterline(length, draft, freeboard, stride);
+    return (held(mesh, false) - held(mesh, true)) / scale;
+  });
+  for (const load of predicted)
+    assert.ok(Math.abs(load - measured) <= uncertainty, JSON.stringify({ predicted, measured, uncertainty }));
+  assert.ok(Math.abs(predicted[0] - predicted[1]) < 0.01 * predicted[1], JSON.stringify(predicted));
+  proof.diagnostic(
+    `Normalized resistance ${predicted.map((value) => value.toFixed(4)).join(' and ')} vs ${measured} ± ${uncertainty}`,
+  );
 });
 
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T, advance = false, current = 0) {
