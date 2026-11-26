@@ -28,6 +28,7 @@ const modes = [
   ['--tidal-course', 'tide'],
   ['--short-wave-reflection', 'reflection'],
   ['--incident-spectrum', 'incident'],
+  ['--lateral-course', 'lateral'],
   ['--forward-course', 'course'],
   ['--hull-motion', 'hull'],
 ];
@@ -51,7 +52,8 @@ try {
     const reflection = motion === 'reflection';
     const incident = motion === 'incident' || surge || tide || reflection || panelHull;
     const bilge = motion === 'bilge';
-    const forwardCourse = (incident && !panelHull) || bilge || motion === 'course';
+    const lateral = motion === 'lateral';
+    const forwardCourse = (incident && !panelHull) || bilge || lateral || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
@@ -114,7 +116,7 @@ try {
       const body = physics.addBody(null, {
         position: [0, 0.25, 0],
         linearVelocity: [advance ? 1.5 : forwardCourse ? 1 : 0, advance ? 0 : -0.5, 0],
-        angularVelocity: advance ? [0, 0, 0] : [0.1, 0, 0.125],
+        angularVelocity: advance ? [0, 0, 0] : [0.1, lateral ? 0.08 : 0, 0.125],
         enabledTranslations: feedback ? [true, false, false] : undefined,
         enabledRotations: feedback ? [false, false, false] : undefined,
         colliders: { shape: 'box', halfExtents: [2, 0.75, 1], mass: 4100 },
@@ -141,7 +143,7 @@ try {
             {
               row: body.row,
               mesh,
-              course: tide ? {} : forwardCourse ? { speed: 1 } : undefined,
+              course: tide ? {} : forwardCourse ? { speed: 1, lateralHeading: lateral ? 0 : undefined } : undefined,
               surgeAddedMass: surge,
               panels,
               shortWaveResistance: reflection,

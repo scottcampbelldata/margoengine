@@ -27,6 +27,8 @@ import { SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { kvlcc2Waterline } from './kvlcc2-waterline.js';
 import { freeSection, vHull } from './sections.js';
 import {
+  BODIES_FIELD,
+  BODY_WORDS,
   BODY_FORCES_FIELD,
   DECK_CLAIMS_FIELD,
   DECK_INFLOW_FIELD,
@@ -544,6 +546,110 @@ test('HullSolver forward speed gives no radiation load from an unchanged fully t
   for (const load of loads.slice(1)) {
     for (const axis of [1, 5]) assert.ok(Math.abs(load[axis] - loads[0][axis]) < 1e-3, `${load} vs ${loads[0]}`);
   }
+});
+
+test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at advancing speed', (context) => {
+  const [length, depth, beam, draft] = [4, 0.5, 0.7, 0.25];
+  const mesh = boxMesh([length, depth, beam]);
+  const steps = 60;
+  const rate = Math.PI;
+  const amplitude = 0.001;
+  const speed = 1.2;
+  const section = lateralSection(lewisForm(beam, draft, beam * draft), rate, SEA_WATER, 0, GRAVITY);
+  const swayMass = section.sway.addedMass * length;
+  const swayDamping = section.sway.damping * length;
+  const rollMass = (section.rollOfSway.addedMass + section.swayOfRoll.addedMass) * length / 2;
+  const rollDamping = (section.rollOfSway.damping + section.swayOfRoll.damping) * length / 2;
+
+  function play(forward, driven) {
+    const world = new PhysicsWorld({ rate: { num: steps, den: 1 }, bodyRows: 1, memory: worldMemory(false) });
+    // A forced-oscillation rig prescribes the body state and leaves the solver's force response available to measure.
+    let region;
+    const words = () => new Float32Array(world.memory.buffer, region.byteOffset, BODY_WORDS);
+    const rig = {
+      describe: () => ({
+        id: 'rig',
+        fields: [{ field: BODIES_FIELD, access: 'write' }, { field: BODY_FORCES_FIELD, access: 'write' }],
+        rate: 0,
+        stableRate: () => 0,
+      }),
+      init(host) {
+        region = host.allocate('motion', BODY_WORDS * 4, 'f32', 2);
+        words()[6] = 1;
+        words()[16] = 1 / (SEA_WATER * length * beam * draft);
+        words()[23] = words()[24] = 1;
+      },
+      step({ tick }) {
+        const angle = rate * tick / steps;
+        const yaw = driven === 'yaw' ? amplitude * Math.sin(angle) : 0;
+        const roll = driven === 'roll' ? amplitude * Math.sin(angle) : 0;
+        const body = words();
+        body[3] = Math.sin(roll / 2);
+        body[4] = Math.sin(yaw / 2);
+        body[6] = Math.cos((yaw + roll) / 2);
+        body[10] = forward;
+        body[12] = driven === 'sway' ? amplitude * rate * Math.cos(angle) : 0;
+        body[13] = driven === 'roll' ? amplitude * rate * Math.cos(angle) : 0;
+        body[14] = driven === 'yaw' ? amplitude * rate * Math.cos(angle) : 0;
+      },
+      exportPorts: (tick) => [{ field: BODIES_FIELD.name, region, tick, cell: [0, 0, 0] }],
+      importPorts() {},
+      stateRegions: () => [region],
+      extraState: () => [],
+    };
+    const hull = new HullSolver();
+    world.add(rig, {}).add(hull, {
+      hulls: [{ row: 0, mesh, course: { speed: forward, lateralHeading: 0 } }],
+      sea: { elevation: () => 0, density: SEA_WATER },
+      drag: false, slamming: false, greenWater: false, rollDamping: false, diffraction: false,
+    }).couple(['rig', 'hull'], 'staggered');
+    const reported = hull.stateRegions().find((region) => region.name === 'radiated');
+    const real = [0, 0, 0];
+    const quadrature = [0, 0, 0];
+    const begin = 24 * steps;
+    const end = 36 * steps;
+    for (let frame = 1; frame <= end; frame++) {
+      world.advance(frame);
+      if (frame > begin) {
+        const words = new Float64Array(world.memory.buffer, reported.byteOffset, 7);
+        const phase = rate * (frame - 1) / steps;
+        for (let k = 0; k < 3; k++) {
+          real[k] += words[k + 3] * Math.cos(phase) * 2 / (end - begin);
+          quadrature[k] += words[k + 3] * Math.sin(phase) * 2 / (end - begin);
+        }
+      }
+    }
+    return [real, quadrature];
+  }
+  const yaw = play(speed, 'yaw');
+  const noYaw = play(0, 'yaw');
+  const sway = play(speed, 'sway');
+  const noSway = play(0, 'sway');
+  const roll = play(speed, 'roll');
+  const noRoll = play(0, 'roll');
+  const received = [
+    [yaw[0][0] - noYaw[0][0], yaw[1][0] - noYaw[1][0]],
+    [yaw[0][1] - noYaw[0][1], yaw[1][1] - noYaw[1][1]],
+    [sway[0][2] - noSway[0][2], sway[1][2] - noSway[1][2]],
+    [roll[0][2] - noRoll[0][2], roll[1][2] - noRoll[1][2]],
+    [yaw[0][2] - noYaw[0][2], yaw[1][2] - noYaw[1][2]],
+  ];
+  // STF Eqs. 43–54, with engine yaw opposite the sectional slope.
+  const expected = [
+    [-speed * swayMass * rate, -speed * swayDamping],
+    [-speed * rollMass * rate, -speed * rollDamping],
+    [speed * swayMass * rate, speed * swayDamping],
+    [speed * rollMass * rate, speed * rollDamping],
+    [-(speed ** 2) * swayDamping / rate, speed ** 2 * swayMass],
+  ].map((pair) => pair.map((value) => value * amplitude));
+  const errors = received.map((pair, i) => {
+    const target = expected[i];
+    return Math.hypot(pair[0] - target[0], pair[1] - target[1]) / Math.hypot(...target);
+  });
+  for (const [i, error] of errors.entries()) {
+    assert.ok(error < 0.01, JSON.stringify({ i, error, received, expected }));
+  }
+  context.diagnostic(JSON.stringify({ errors }));
 });
 
 test('HullSolver forward speed rejects a broad hull beyond its longitudinal restoring range', () => {

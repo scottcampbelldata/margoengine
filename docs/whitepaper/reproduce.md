@@ -5155,3 +5155,7 @@ Build packages, then `node --test packages/animation/tests/instanced-morph.test.
 ### SEA-08 three-dimensional radiation and diffraction
 
 Run `node --test packages/physics/tests/coupling/hull-panels.test.js` after building Physics. Run `cargo test --locked --release --manifest-path packages/physics/hull-panel-kernel/Cargo.toml` for refined coefficients, directional diffraction and the two finite-depth boundary conditions. For the coupled render, run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --panel-hull` for WebGPU, then with `MARGO_COMPAT=1` for WebGL2.
+
+### SEA-08 lateral course radiation
+
+Run `node --test --test-name-pattern="a fixed heading gives" packages/physics/tests/coupling/seakeeping.test.js`. Run the existing wake agreement fixture with `--lateral-course` on WebGPU and again with `MARGO_COMPAT=1` on WebGL2.

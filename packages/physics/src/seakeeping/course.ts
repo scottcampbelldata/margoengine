@@ -1,11 +1,74 @@
 import { type HullMemory, staticAddedMass } from './memory.js';
 
-/** A near-steady course for forward-speed heave, pitch and viscous roll loads. */
+/** A near-steady course for forward-speed strip loads and viscous roll. */
 export interface HullCourse {
   /** Constant longitudinal water-relative speed, m/s. Default the horizontal speed relative to the sampled mean current. */
   readonly speed?: number;
   /** Steady bow-up trim, radians. Default zero for a level mean waterline. */
   readonly trim?: number;
+  /** Fixed course direction in radians from +X towards +Z. Omit to disable the lateral speed terms. */
+  readonly lateralHeading?: number;
+}
+
+/**
+ * STF ordinary strip speed terms for pointed ends. The lateral slope is minus the engine yaw
+ * angle, so it plays the same role in sectional sway that pitch plays in heave. Sway and roll
+ * use the response to that slope. Yaw uses the response to sway displacement and roll angle.
+ */
+export function lateralCourseLoad(
+  ring: Float64Array,
+  lags: number,
+  slot: number,
+  count: number,
+  slope: number,
+  roll: number,
+  speed: number,
+  swayKernel: Float64Array,
+  crossKernel: Float64Array,
+  swayMass: number,
+  crossMass: number,
+  dt: number,
+): readonly [sway: number, rollMoment: number, yawMoment: number] {
+  const now = 6 * slot;
+  let yawRate = ring[now + 4]!;
+  let rollRate = ring[now + 3]!;
+  let relative = ring[now + 2]! - speed * slope;
+  const sway = swayMass * relative;
+  const rolling = crossMass * rollRate;
+  const slopeRate = -yawRate;
+  const presentSlope = slope;
+  const presentRoll = roll;
+  let displacement = 0;
+  let yawIntoSway = 0;
+  let yawIntoRoll = 0;
+  let swayIntoYaw = 0;
+  let rollIntoYaw = 0;
+  const n = Math.min(lags, count, swayKernel.length, crossKernel.length);
+  for (let lag = 1; lag < n; lag++) {
+    const at = 6 * ((slot - lag + lags) % lags);
+    const olderYaw = ring[at + 4]!;
+    const olderRoll = ring[at + 3]!;
+    slope += (yawRate + olderYaw) * 0.5 * dt;
+    roll -= (rollRate + olderRoll) * 0.5 * dt;
+    const olderRelative = ring[at + 2]! - speed * slope;
+    displacement -= (relative + olderRelative) * 0.5 * dt;
+    const lateral = swayKernel[lag]!;
+    const crossed = crossKernel[lag]!;
+    // The infinite radiation kernel integrates to zero. Refer held angles to the present
+    // so a truncated memory gives no DC load for a constant heading or heel.
+    yawIntoSway += lateral * (slope - presentSlope);
+    yawIntoRoll += crossed * (slope - presentSlope);
+    swayIntoYaw += lateral * displacement;
+    rollIntoYaw += crossed * (roll - presentRoll);
+    yawRate = olderYaw;
+    rollRate = olderRoll;
+    relative = olderRelative;
+  }
+  return [
+    speed * (swayMass * slopeRate + dt * yawIntoSway),
+    speed * (crossMass * slopeRate + dt * yawIntoRoll),
+    speed * (sway + rolling + dt * (swayIntoYaw + rollIntoYaw)),
+  ];
 }
 
 /** Per hull: a valid-sample count, then the relative heave velocity and pitch at every radiation lag. */

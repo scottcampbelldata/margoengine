@@ -60,7 +60,7 @@ import {
   rollKeelsOf,
   validateBilgeKeels,
 } from './bilge-keel.js';
-import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
+import { courseLoad, courseSpeedLimit, courseWords, lateralCourseLoad, type HullCourse } from './course.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
@@ -257,7 +257,12 @@ export class HullSolver implements Solver<HullParams> {
   private lags = 0;
   private history: Region | null = null;
   private courseHistory: Region | null = null;
-  private course: readonly ({ speed?: number; trimSine: number; historyIndex: number } | null)[] = [];
+  private course: readonly ({
+    speed?: number;
+    trimSine: number;
+    heading?: readonly [number, number];
+    historyIndex: number;
+  } | null)[] = [];
   private readonly courseLimits = new Map<Hull, number>();
   /** Per hull: 1 once it has radiated, then the radiation force of its last step (body frame, force then moment). */
   private radiated: Region | null = null;
@@ -533,7 +538,15 @@ export class HullSolver implements Solver<HullParams> {
         );
       if (course.speed !== undefined && !Number.isFinite(course.speed))
         throw new MargoError('state', 'The hull course speed is invalid. Use finite metres per second.');
-      return { speed: course.speed, trimSine: sin(trim), historyIndex: courseCount++ };
+      const heading = course.lateralHeading;
+      if (heading !== undefined && !Number.isFinite(heading))
+        throw new MargoError('state', 'Pass a finite course direction in radians for lateralHeading.');
+      return {
+        speed: course.speed,
+        trimSine: sin(trim),
+        heading: heading !== undefined ? [cos(heading), sin(heading)] as const : undefined,
+        historyIndex: courseCount++,
+      };
     });
     this.sea = sea;
     this.level = level;
@@ -1981,6 +1994,9 @@ export class HullSolver implements Solver<HullParams> {
     const force = [0, 0, 0, 0, 0, 0];
     const course = this.course[index];
     const diagonal = memory?.pairs[0];
+    let courseSamples = 0;
+    let lateralSlope = 0;
+    let courseRoll = 0;
     if (course && memory && diagonal) {
       const forward = rotate(q, [1, 0, 0]);
       const up = rotate(q, [0, 1, 0]);
@@ -2019,9 +2035,28 @@ export class HullSolver implements Solver<HullParams> {
         memory.heaveInfinite,
         dt,
       );
+      courseSamples = history[0]!;
       if (hull.panels) velocity[0] -= speed;
+      if (course.heading) {
+        const [refX, refZ] = course.heading;
+        const across = rotate(q, [0, 0, 1]);
+        // Remove the steady course component from the ordinary sway history, keeping the oscillatory sway.
+        velocity[2] -= speed * (refX * across[0] + refZ * across[2]);
+        lateralSlope = refX * z - refZ * x;
+        courseRoll = atan2(-across[1], up[1]);
+      }
     }
     ring.set([...velocity, ...spin], 6 * slot);
+    if (course?.heading && memory && speed !== 0) {
+      const sway = memory.pairs.find(({ i, j }) => i === 2 && j === 2);
+      const cross = memory.pairs.find(({ i, j }) => i === 2 && j === 3);
+      if (sway && cross) {
+        [force[2], force[3], force[4]] = lateralCourseLoad(
+          ring, lags, slot, courseSamples, lateralSlope, courseRoll, speed, sway.kernel, cross.kernel,
+          memory.lateralInfinite[14]!, memory.lateralInfinite[15]!, dt,
+        );
+      }
+    }
     let pairs = memory?.pairs ?? [];
     if (hull.panels) {
       let kernels = this.panelMemories.get(hull);
