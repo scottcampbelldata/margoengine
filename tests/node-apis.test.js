@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { API, check, scan } from '../scripts/check-node-apis.mjs';
+import { config, testFiles } from '../scripts/node22-tests.mjs';
 
 test('no shipped source uses an API newer than Node 22.12 without a feature test', async () => {
   assert.deepEqual(await check(), []);
@@ -26,6 +27,25 @@ test('every API in the table is really missing on Node 22.12 and present where t
     );
     t.diagnostic(`Node ${process.version}: ${present.length} of ${API.length} listed APIs present`);
   }
+});
+
+// KB-NODE22-HALF1: a TIFF test writer called DataView.setFloat16, which failed only on CI's Node 22 job.
+test('the Node 22 test files and their helpers use no built-in float16 API without a feature test', async () => {
+  const root = resolve(import.meta.dirname, '..'),
+    listed = [...config().sharedTests, ...testFiles().flatMap((group) => group.files)],
+    files = new Set(listed.map((file) => resolve(root, file))),
+    found = [];
+  // The set grows while it is walked: every helper a listed test imports from a test or support folder.
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const [, from] of source.matchAll(/\bfrom\s+'(\.{1,2}\/[^']+\.(?:m?js|ts))'/g)) {
+      const helper = resolve(dirname(file), from);
+      if (/[\\/](?:tests?|support)[\\/]/.test(helper) && existsSync(helper)) files.add(helper);
+    }
+    for (const { name, line } of await scan(source, file))
+      if (/float16|f16round/i.test(name)) found.push(`${relative(root, file)}:${line} ${name}`);
+  }
+  assert.deepEqual(found, []);
 });
 
 // KB-NODE22-BUILD1: CI builds the packages on Node 22.12, and a named import of an API it lacks fails before a line runs.
