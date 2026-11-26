@@ -12665,6 +12665,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: the flood bounds test process once ended without a report (water)
+
+- **Repro:** Not reproduced. In one `test:changed` run of 70 packages on the Windows workstation (CPU load about 88%),
+  `npm run test` in packages/water reported `test/flood-bounds.test.js` as failed after 270 s with only
+  `'test failed'`: no subtest, assertion, fatal error or Windows crash event. The file then passed alone (18 of 18,
+  508 s) and in a second run of the package's tests (261 of 261, exit 0, peak resident memory at exit 171 MiB).
+- **Cause:** Not found. A failed assertion would have named its subtest, so the process most likely ended from outside
+  or crashed without output; neither is shown. The next occurrence needs the child's exit code and signal: preload a
+  module through `NODE_OPTIONS=--require` that logs each test process's start and `exit` code.
+
 ### Fixed 2026-11-26: simulated earthquake loads lacked a propagating ground field (EARTH-08)
 
 - **Repro:** Trigger a moment below a layered site. Scene shake parameters could move a camera, but the ground
