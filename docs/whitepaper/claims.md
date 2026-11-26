@@ -5810,6 +5810,12 @@ and keeps a dry coastal vertex at the nearest wet texel's level (coastalReach). 
 argument is the same. packages/water/test/surf-lull.browser.mjs and packages/water/test/shoreline.browser.mjs hold the
 claims. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-26, KB-WATER-SEABEDMAZE1): the water-ssr --current proof advances to 0d06a4a3af, whose surface
+shader takes a bisected refraction crossing within a thickness of the ray as the hit and clamps a ray that leaves the
+frame to its edge. The call logs differ only in shader module text; every other call and argument is the same.
+packages/water/test/refraction-grazing.browser.mjs holds the claim. Reproduce with
+`node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.

@@ -14380,10 +14380,12 @@ water–glass optics and complete production-cut review remain open.
 
 One-row and one-column strips use a direct banded pressure solve with optional advancing and
 receding contact angles. The capillary regression covers a 128-cell strip at 20 μm spacing.
-Two-dimensional patches use the iterative pressure solve. The strip retention check uses a
-derived force bracket. A measured sliding threshold for this solver remains open.
+Two-dimensional patches use the iterative pressure solve. It preconditions each row and
+column as a block when the ratio of maximum to minimum positive face mobility exceeds
+four. The strip retention check uses a derived force bracket. A measured sliding
+threshold for this solver remains open.
 
-The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,711 B raw and each is 6,969 B gzip.
+The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 18,508 B raw and each is 7,591 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
