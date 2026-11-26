@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20577081,
+  "total": 20577174,
   "history": [
     {
       "date": "2026-10-24",
@@ -14011,6 +14011,12 @@
       "commit": "feat(physics2d) combine rules",
       "reason": "Collider2D.setShape (C2-09) and the friction and restitution combine rules with their setters, getters and CoefficientCombineRule2D (C2-12); 19,183 to 19,378 B gzip (this Mac). Collider methods on the one collider class; nothing to split.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) contact skin",
+      "reason": "Collider2D contactSkin option, setContactSkin and contactSkin() (C2-13); 19,378 to 19,471 B gzip (this Mac). Collider methods on the one collider class; nothing to split.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14903,7 +14909,7 @@
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 17331,
     "@margoengine/physics2d": 21245,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19378,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19471,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

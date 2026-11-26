@@ -245,6 +245,16 @@ export class Collider2D {
     return { collision: (this.settings[5] & 1) !== 0, contactForce: (this.settings[5] & 2) !== 0 };
   }
   /** The newtons a contact's force must pass to raise a `contactforce` event (Rapier's `setContactForceEventThreshold`); it also asks for the event. */
+  /** Rapier's `setContactSkin`: the gap, world units, the solver holds this collider off what it touches (0 for none). */
+  setContactSkin(distance: number): void {
+    if (!(distance >= 0) || !Number.isFinite(distance))
+      throw new RangeError(`A collider's contact skin is a finite distance of 0 or more (got ${distance}); pass one.`);
+    new Float32Array(this.settings.buffer)[7] = distance * this.owner.scale;
+    this.push();
+  }
+  contactSkin(): number {
+    return new Float32Array(this.settings.buffer)[7] / this.owner.scale;
+  }
   setContactForceEventThreshold(newtons: number): void {
     if (!(newtons >= 0) || !Number.isFinite(newtons))
       throw new RangeError(

@@ -13,8 +13,8 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances, a version below 13 no extra substeps, a version below 14 no combine rules (read as the average, the default).
-const VERSION: u32 = 14;
+/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances, a version below 13 no extra substeps, a version below 14 no combine rules (read as the average, the default), a version below 15 no contact skin.
+const VERSION: u32 = 15;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -225,6 +225,7 @@ impl World {
             w.u8(sh.hooks);
             w.u8(sh.friction_rule);
             w.u8(sh.restitution_rule);
+            w.f32(sh.skin);
             w.bool(sh.dead);
             // The fat box the broad phase keeps for it, which only changes when the shape leaves it.
             let fat = if sh.dead { None } else { self.broad_fat(index as u32) };
@@ -420,6 +421,10 @@ impl World {
             if friction_rule > crate::world::COMBINE_LAST || restitution_rule > crate::world::COMBINE_LAST {
                 return Err(PhysicsError::InvalidParameter);
             }
+            let skin = if r.version >= 15 { r.f32()? } else { 0.0 };
+            if !(skin.is_finite() && skin >= 0.0) {
+                return Err(PhysicsError::InvalidParameter);
+            }
             let dead = r.bool()?;
             let has_fat = r.bool()?;
             let f = [r.f32()?, r.f32()?, r.f32()?, r.f32()?];
@@ -438,7 +443,7 @@ impl World {
             if has_fat {
                 world.broad_place_exact(id as u32, &Bounds { min: [f[0], f[1]], max: [f[2], f[3]] });
             }
-            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, friction_rule, restitution_rule, grid, dead });
+            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, friction_rule, restitution_rule, skin, grid, dead });
         }
         let n = r.count(40)?;
         for _ in 0..n {

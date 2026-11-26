@@ -195,6 +195,9 @@ pub struct ShapeDef {
     pub friction_rule: u8,
     /// The same for restitution.
     pub restitution_rule: u8,
+    /// Rapier's contact skin, m: contacts start this much farther out and the solver holds the shape this far off what
+    /// it touches (two shapes rest the sum of their skins apart). Default 0.
+    pub skin: f32,
 }
 
 /// Combine rules of `ShapeDef::friction_rule` and `restitution_rule`, in the order a pair picks between two (the later
@@ -256,6 +259,7 @@ impl Default for ShapeDef {
             hooks: 0,
             friction_rule: COMBINE_AVERAGE,
             restitution_rule: COMBINE_AVERAGE,
+            skin: 0.0,
         }
     }
 }
@@ -316,6 +320,8 @@ pub struct Shape {
     /// Combine rules (`COMBINE_*`) of its friction and restitution.
     pub friction_rule: u8,
     pub restitution_rule: u8,
+    /// Its contact skin, m (`ShapeDef::skin`).
+    pub skin: f32,
     /// A grid of solid cells that scene queries meet in place of the core (the core is its bounding box); such a shape
     /// takes part in no contact.
     pub grid: Option<alloc::boxed::Box<crate::voxel::Grid>>,
@@ -796,7 +802,7 @@ impl World {
     /// Adds `core`, given in the body's frame, to `body`, and works out the body's mass again.
     pub fn create_shape(&mut self, body: u32, core: Core, def: &ShapeDef) -> Result<u32, PhysicsError> {
         let (id, bounds) = self.append_shape(body, core, def)?;
-        self.broad.place(id, &bounds, BOX_MARGIN);
+        self.broad.place(id, &bounds.grown(def.skin), BOX_MARGIN);
         Ok(id)
     }
 
@@ -808,7 +814,9 @@ impl World {
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > COMBINE_LAST || def.restitution_rule > COMBINE_LAST { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, grid: None, dead: false };
+        if !def.skin.is_finite() { return Err(PhysicsError::NotFinite); }
+        if def.skin < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, skin: def.skin, grid: None, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -890,7 +898,7 @@ impl World {
             Ok(staged) => {
                 let mut ids = Vec::with_capacity(staged.len());
                 for (id, bounds) in staged {
-                    self.broad.place(id, &bounds, BOX_MARGIN);
+                    self.broad.place(id, &bounds.grown(def.skin), BOX_MARGIN);
                     ids.push(id);
                 }
                 Ok(ids)
@@ -1037,7 +1045,7 @@ impl World {
             return Err(error);
         }
         self.broad.remove(id);
-        self.broad.place(id, &bounds, BOX_MARGIN);
+        self.broad.place(id, &bounds.grown(self.shapes[id as usize].skin), BOX_MARGIN);
         for contact in self.contacts.iter_mut().filter(|c| c.a == id || c.b == id) {
             contact.manifold.count = 0;
             contact.normal_impulse = [0.0; 2];
@@ -1150,7 +1158,7 @@ impl World {
             }
         }
         for (s, bounds) in staged {
-            self.broad.place(s, &bounds, BOX_MARGIN);
+            self.broad.place(s, &bounds.grown(self.shapes[s as usize].skin), BOX_MARGIN);
         }
         self.wake(body)
     }
@@ -1488,7 +1496,7 @@ impl World {
             let body = &self.bodies[self.shapes[s].body as usize];
             if !self.shapes[s].dead && body.kind != Kind::Static && body.awake {
                 let tight = bounds_from_validated(&self.shapes[s].core, body.xf)?;
-                self.broad.place(s as u32, &tight.grown(body.soft_ccd), BOX_MARGIN);
+                self.broad.place(s as u32, &tight.grown(body.soft_ccd + self.shapes[s].skin), BOX_MARGIN);
             }
         }
         // The body pairs joints keep apart, sorted once, so each pair's filter is a binary search, not a scan of every
@@ -1567,7 +1575,10 @@ impl World {
             let (oa, ob) = (ba.exact_origin(), bb.exact_origin());
             let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
             let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
-            let spec = SPECULATIVE.max(ba.soft_ccd).max(bb.soft_ccd);
+            // Contact skins: the pair's points start the skins farther out and read that much nearer, so the solver holds the
+            // shapes the sum of their skins apart (Rapier's contact skin).
+            let skin = sa.skin + sb.skin;
+            let spec = SPECULATIVE.max(ba.soft_ccd).max(bb.soft_ccd) + skin;
             if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 && spec == SPECULATIVE {
                 inputs[queued] = Some((&sa.core, xa, &sb.core, xb, reference_flip(&contact.manifold)));
                 pending[queued] = Some(contact);
@@ -1601,6 +1612,12 @@ impl World {
                 // Last step's reference face is kept within the hysteresis, so resting points keep their ids.
                 collide_coherent_trusted(&sa.core, xa, &sb.core, xb, spec, reference_flip(&contact.manifold))?
             };
+            let mut manifold = manifold;
+            if skin > 0.0 {
+                for point in &mut manifold.points[..manifold.count] {
+                    point.separation -= skin;
+                }
+            }
             cold += contact.refresh(manifold);
         }
         // Fewer than four remaining quads keep the scalar path, with the same per-contact frame and last face.

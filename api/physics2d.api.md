@@ -237,6 +237,8 @@ export class Collider2D {
         collision: boolean;
         contactForce: boolean;
     };
+    setContactSkin(distance: number): void;
+    contactSkin(): number;
     setContactForceEventThreshold(newtons: number): void;
     setCollisionGroups(groups: number): void;
     setSolverGroups(groups: number): void;
@@ -264,6 +266,7 @@ export interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
+    contactSkin?: number;
     hooks?: ActiveHooks2D;
 }
 

@@ -228,6 +228,21 @@ console.log(ball.colliders[0].restitutionCombineRule() === CoefficientCombineRul
 physics.dispose();
 ```
 
+`contactSkin` (or `setContactSkin`) is Rapier's contact skin: the collider's contacts start that much farther out and
+the solver holds it that far off what it touches, so two colliders rest the sum of their skins apart. It is in world
+units, and queries still meet the outline itself.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+const crate = physics.addBody(null, { colliders: { shape: 'box', width: 1, height: 1, contactSkin: 0.02 } });
+crate.colliders[0].setContactSkin(0.05); // rests 5 cm off what it lands on
+console.log(crate.colliders[0].contactSkin().toFixed(2)); // '0.05'
+physics.dispose();
+```
+
 ## Articulations
 
 `physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.

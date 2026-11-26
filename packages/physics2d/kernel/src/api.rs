@@ -403,6 +403,7 @@ fn shape_def() -> ShapeDef {
         hooks: ((flags >> 18) & 7) as u8,
         friction_rule: ((flags >> 21) & 7) as u8,
         restitution_rule: ((flags >> 24) & 7) as u8,
+        skin: f(7),
     }
 }
 
@@ -430,7 +431,7 @@ fn read_core(kind: u32, at: usize) -> Result<Core, PhysicsError> {
 
 /// io: the 8 settings words (density, friction, restitution, groups, solver groups, flags: events in bits 0..1, active
 /// types in 8..15, sensor in 16, one-sided in 17, hooks in 18..20, friction combine rule in 21..23, restitution combine rule
-/// in 24..26; force threshold; one spare), then the shape. Writes the new shape handles to io[0..]
+/// in 24..26; force threshold; contact skin, m), then the shape. Writes the new shape handles to io[0..]
 /// and returns how many: a chain and a concave polygon make several.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_create(handle: i32, body: u32, kind: u32) -> i32 {
@@ -509,15 +510,15 @@ pub extern "C" fn shape_set_core(handle: i32, shape: u32, kind: u32) -> i32 {
     })
 }
 
-/// The body of a shape, and in the buffer its settings words and whether it is a chain segment.
+/// The body of a shape, and in the buffer its settings words, whether it is a chain segment, and its contact skin.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_read(handle: i32, shape: u32) -> i32 {
     with_world!(handle, |w| {
         let s = w.shapes.get(shape as usize).filter(|s| !s.dead).ok_or(PhysicsError::InvalidHandle)?;
-        let words = [s.density.to_bits(), s.friction.to_bits(), s.restitution.to_bits(), s.groups, s.solver_groups, (s.events as u32) | ((s.active_types as u32) << 8) | ((s.sensor as u32) << 16) | ((s.one_sided as u32) << 17) | ((s.hooks as u32) << 18) | ((s.friction_rule as u32) << 21) | ((s.restitution_rule as u32) << 24), s.force_threshold.to_bits(), s.chain as u32];
+        let words = [s.density.to_bits(), s.friction.to_bits(), s.restitution.to_bits(), s.groups, s.solver_groups, (s.events as u32) | ((s.active_types as u32) << 8) | ((s.sensor as u32) << 16) | ((s.one_sided as u32) << 17) | ((s.hooks as u32) << 18) | ((s.friction_rule as u32) << 21) | ((s.restitution_rule as u32) << 24), s.force_threshold.to_bits(), s.chain as u32, s.skin.to_bits()];
         let body = s.body;
-        ensure(8);
-        io()[..8].copy_from_slice(&words);
+        ensure(9);
+        io()[..9].copy_from_slice(&words);
         Ok(body as i32)
     })
 }

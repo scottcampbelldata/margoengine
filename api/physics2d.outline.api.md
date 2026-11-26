@@ -65,6 +65,7 @@ interface ColliderSettings2D {
     solverGroups?: number;
     activeCollisionTypes?: number;
     contactForceThreshold?: number;
+    contactSkin?: number;
     hooks?: ActiveHooks2D;
 }
 

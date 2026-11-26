@@ -11,16 +11,17 @@ impl World {
         if shape.dead {
             return Err(PhysicsError::InvalidHandle);
         }
-        if [def.density, def.friction, def.restitution, def.force_threshold].into_iter().any(|v| !v.is_finite()) {
+        if [def.density, def.friction, def.restitution, def.force_threshold, def.skin].into_iter().any(|v| !v.is_finite()) {
             return Err(PhysicsError::NotFinite);
         }
-        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > crate::world::COMBINE_LAST || def.restitution_rule > crate::world::COMBINE_LAST {
+        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > crate::world::COMBINE_LAST || def.restitution_rule > crate::world::COMBINE_LAST || def.skin < 0.0 {
             return Err(PhysicsError::InvalidParameter);
         }
         let (before, body) = (shape.clone(), shape.body);
         let s = &mut self.shapes[id as usize];
         s.hooks = def.hooks;
         (s.friction_rule, s.restitution_rule) = (def.friction_rule, def.restitution_rule);
+        s.skin = def.skin;
         let density = if s.grid.is_some() { 0.0 } else { def.density };
         (s.density, s.friction, s.restitution, s.groups, s.solver_groups, s.sensor, s.events, s.active_types, s.force_threshold) =
             (density, def.friction, def.restitution, def.groups, def.solver_groups, def.sensor, def.events, def.active_types, def.force_threshold);

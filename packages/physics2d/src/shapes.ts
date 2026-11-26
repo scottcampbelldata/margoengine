@@ -140,6 +140,11 @@ export interface ColliderSettings2D {
   /** Report `contactforce` events when the contact's total force passes this many newtons. Default: no force events. */
   contactForceThreshold?: number;
   /**
+   * Rapier's contact skin, world units (default 0): contacts start this much farther out, and the solver holds the
+   * collider this far off what it touches, so two colliders rest the sum of their skins apart. Queries meet the outline.
+   */
+  contactSkin?: number;
+  /**
    * Which questions `Physics2D.hooks` is asked about this collider's pairs: `filterPair` (may a pair of solids meet at all),
    * `filterIntersection` (may a pair with a sensor in it intersect: Rapier's intersection pair filter) and `modifyContact` (change a
    * touching contact). Default: none; a hook is only called for colliders that ask.
@@ -373,6 +378,10 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
     (combineRule(options.frictionCombineRule, 'friction') << 21) |
     (combineRule(options.restitutionCombineRule, 'restitution') << 24);
   settings.f[6] = options.contactForceThreshold ?? 0;
+  const skin = options.contactSkin ?? 0;
+  if (!(skin >= 0 && Number.isFinite(skin)))
+    throw new RangeError(`A collider's contact skin is a finite distance of 0 or more (got ${skin}); pass one.`);
+  settings.f[7] = skin * scale;
   return { kind, settings: settings.u, geometry: geometry.u, area, convex };
 }
 
