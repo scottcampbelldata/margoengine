@@ -5590,6 +5590,7 @@ In `packages/biomes/tests/forest.test.js`, competition across the origin, recrui
 agree exactly with the existing offline stand in each memory mode. Individual IDs are retained across growth.
 The shared coupling fixtures in `packages/biomes/tests/coupling/forest.test.js` compare deterministic hashes across
 frame rates and after a partial-year restore. They route actual shallow-water inundation and LandscapeEvolution
-incision into annual mortality, and send the forest's root cohesion back to LandscapeEvolution. The TREE-3 fixture
+incision into annual mortality, and send the forest's root cohesion back to LandscapeEvolution. Snowpack uses that
+root term in measured slab stability and loses its support after a burn. The TREE-3 fixture
 compares the exposed fir's axis with a sheltered fir and measures the permanent horizontal crown-tip component
 after calm conditions return. It proves the orientation used by a renderer, prior to binding it into the filmed shot.

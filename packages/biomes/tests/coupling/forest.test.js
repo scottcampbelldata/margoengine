@@ -3,6 +3,7 @@ import test from 'node:test';
 import { bedSurface, TerrainBed } from '@margoengine/physics/earth';
 import { ShallowWaterSolver } from '@margoengine/physics/hydro';
 import { LandscapeEvolution } from '@margoengine/physics/landscape';
+import { Snowpack } from '@margoengine/physics/snowpack';
 import { PhysicsWorld, regionWords } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from '../../../physics/tests/coupling/harness.js';
 import { forestOrientation, ForestEcosystemSolver } from '../../dist/forest.js';
@@ -176,4 +177,35 @@ test('annual exposure and birth identities replay from a partial year at differe
     });
   frameRateIndependent(make, { seconds: 2 });
   seekEqualsContinuous(make, { frames: 48, at: 11 });
+});
+
+test('ICE-01 directly reads patch root cohesion and loses snow support after a burn', async () => {
+  const forest = await ForestEcosystemSolver.load({ exposure: true });
+  const snow = await Snowpack.load({ followTerrain: true, inputs: { support: { field: forest.rootCohesionField } } });
+  const ground = new TerrainBed();
+  const world = new PhysicsWorld({ rate })
+    .add(ground, { columns: 2, rows: 1, width: 2, depth: 1, centre: [1, 0.5], elevations: (x) => 2 - x })
+    .add(forest, {
+      ...stand,
+      bounds: [0, 0, 2, 1],
+      cells: [2, 1],
+      plants: [{ ...plant, x: 1.5, z: 0.5, radius: 0.4 }],
+    })
+    .add(snow, {
+      width: 2,
+      depth: 1,
+      origin: [0.5, 0.5],
+      layers: [{ mass: 100, density: 300, cohesion: 10 }],
+    })
+    .add(
+      publisher(forest.exposureField, 4, (out, tick) => out.set([0, 0, tick === 13 ? 1 : 0, 0])),
+      {},
+    );
+  world.advance(1);
+  assert.ok(snow.read(0, 0).stability < 1, 'bare patch is unstable');
+  assert.ok(snow.read(1, 0).stability > 1, 'rooted patch is stable');
+  world.advance(61);
+  assert.equal(forest.year.alive, 0);
+  close(snow.read(1, 0).stability, snow.read(0, 0).stability);
+  assert.ok(snow.read(1, 0).stability < 1, 'fire removes the root support term');
 });
