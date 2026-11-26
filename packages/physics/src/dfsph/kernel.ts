@@ -18,6 +18,7 @@ export function bindDfsphKernel(host: SolverHost, module: WebAssembly.Module, me
       pressurePairCapacity: number,
       bodyMobility: number,
       viscosityBodies: number,
+      impact: number,
     ]
   ) => number;
 }

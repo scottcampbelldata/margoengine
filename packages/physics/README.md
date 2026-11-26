@@ -4723,6 +4723,34 @@ the matching signed volume through its inflow and horizontal momentum through it
 same tick. Vertical momentum stays in the receipt ledger. Keep donor and receiver cells wet throughout
 that step. The shoreline case needs a receipt for what its wet/dry update accepts.
 
+#### Liquid impact energy
+
+Pass `impacts: true` to publish one layout-1 f64 row on `impactField`.
+Its words are `[offsetSeconds, x, y, z, normalImpulse, energy, count]`. Position is local to
+the field port's world cell. Its time is the port tick divided by the solver rate plus the offset.
+The solver sums hard-contact impulse and dissipated kinetic energy through the tick. The position
+and offset are their energy-weighted centres. A zero count identifies an empty tick.
+
+```ts
+import { DfsphSolver } from '@margoengine/physics/dfsph';
+import { PhysicsWorld, regionWords } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
+const liquid = await DfsphSolver.load(world.memory, { impacts: true });
+world.add(liquid, {
+  spacing: 0.5, wallPressure: false,
+  bounds: [[-2, 0, -2], [2, 2, 2]],
+  particles: [{ position: [0, 0.26, 0], velocity: [0, -1, 0] }],
+});
+world.advance(1);
+const field = liquid.impactField;
+const port = field && world.fields.port(field.name);
+if (!port) throw new Error('Impact field is unavailable. Enable impacts and advance through contact.');
+const [, , , , normalImpulse, energy] = regionWords(world.memory, port.region);
+if (normalImpulse !== 125 || energy !== 62.5) throw new Error('Expected the 125 kg sample to strike the floor.');
+console.log(energy);
+```
+
 ### Rail running gear and contact wire
 
 Import `@margoengine/physics/rail` for railway rolling stock with two sprung bogies, four wheelsets,

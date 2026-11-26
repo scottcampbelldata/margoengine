@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  DFSPH_IMPACT_LAYOUT,
+  DFSPH_IMPACT_WORDS,
   DFSPH_LAYOUT,
   DFSPH_PARTICLE_WORDS,
   DFSPH_PARCEL_WORDS,
@@ -298,7 +300,7 @@ test('a direct contact on a light plate conserves momentum and dissipates slidin
       colliders: { shape: 'box', halfExtents, mass: 0.125, sensor: true },
     });
     world.add(new RigidSolver(), { physics: rigid, capacity: rigid.kernel.capacity });
-    const liquid = await DfsphSolver.load(world.memory, { rigid: true });
+    const liquid = await DfsphSolver.load(world.memory, { rigid: true, impacts: true });
     const velocity = [-0.375, 0.375, 0];
     const friction = 0.4;
     world.add(liquid, {
@@ -356,6 +358,10 @@ test('a direct contact on a light plate conserves momentum and dissipates slidin
         dot(torque, response.angular)) /
       2;
     assert.ok(energyAfter < energyBefore);
+    const impact = regionWords(world.memory, world.fields.port(liquid.impactField.name).region);
+    near(impact[4], Math.abs(force[0]));
+    near(impact[5], energyBefore - energyAfter);
+    assert.equal(impact[6], 1);
   } finally {
     rigid.dispose();
   }
@@ -414,6 +420,46 @@ test('implicit viscosity includes a light rigid plate in the same dissipative so
       rigid.dispose();
     }
   }
+});
+
+test('the opt-in impact field publishes the energy centroid and clears after one tick', async () => {
+  const { world, liquid } = await solve(
+    {
+      spacing: 0.5,
+      bounds: [
+        [-8, 0, -8],
+        [8, 8, 8],
+      ],
+      wallPressure: false,
+      particles: [
+        { position: [-2, 0.26, -1], velocity: [0, -1, 0] },
+        { position: [2, 0.27, 1], velocity: [0, -2, 0] },
+      ],
+    },
+    {},
+    { impacts: true },
+  );
+  const lookup = () => world.fields.port(liquid.impactField.name);
+  assert.deepEqual([...regionWords(world.memory, lookup().region)], Array(DFSPH_IMPACT_WORDS).fill(0));
+  world.advance(1);
+  const { region, tick } = lookup();
+  assert.equal(tick, 0);
+  assert.equal(region.layout, DFSPH_IMPACT_LAYOUT);
+  const [time, x, y, z, impulse, energy, count] = regionWords(world.memory, region);
+  near(time, DT);
+  near(x, 1.2);
+  near(y, 0);
+  near(z, 0.6);
+  near(impulse, 375);
+  near(energy, 312.5);
+  assert.equal(count, 2);
+  const snapshot = world.takeSnapshot();
+  world.advance(2);
+  assert.deepEqual([...regionWords(world.memory, lookup().region)], Array(DFSPH_IMPACT_WORDS).fill(0));
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(2);
+  assert.equal(world.hash(), hash);
 });
 
 test('warm pressure and the dual-clock fluid replay bit-for-bit on both memory modes', async () => {

@@ -4396,6 +4396,7 @@ that rest volume and uses the two zero crossings of the signed quadrupole moment
 period. The current solver measures 0.885 s. Rayleigh's small-disturbance solution is
 ω² = 8 σ/(ρ R³), or 0.742 s at the fixture's parameters. The previous rest area produced 1.481 s.
 This comparison tracks the remaining error in the free-drop period. [On the Capillary Phenomena of Jets, Lord Rayleigh (1879)](https://www.jstor.org/stable/113738)
+Append `--refined` for 7,208 particles at the same nominal radius. The solver measures 0.787 s against the 0.735 s prediction.
 
 ### FLUID-01 rigid recoil
 
@@ -4422,3 +4423,13 @@ uses the rank-one viscosity form of Weiler et al. (2018), Equations 7–12, and 
 impulses divided by liquid particle mass. The inner product applies the corresponding rigid
 inverse mass and inertia, so the coupled operator is symmetric on the movable degrees of freedom.
 [Implicit Viscosity for SPH Fluids](https://doi.org/10.1145/3186264) and [Monolith](https://uwspace.uwaterloo.ca/items/8f3fdcaa-9371-41b5-832e-848727f4d824).
+
+### FLUID-01 impact energy
+
+Run `node --test --test-name-pattern="impact field|direct contact" packages/physics/tests/coupling/dfsph.test.js`.
+Each impulse J applied to the liquid has a measured relative arrival velocity u and local relative
+change Δu = KJ, where K includes the rigid mobility when present. The energy removed
+is −J·(u + Δu/2), summed separately from the normal impulse. The record keeps the energy-weighted
+position and substep arrival time. For the fixed-floor control the exact loss is ½ m(v₁² + v₂²).
+Moss et al. (2009), §3, model bubble resonance separately from the direct liquid–solid strike.
+[Sounding Liquids](https://gamma.cs.unc.edu/SoundingLiquids/soundingliquids.pdf)

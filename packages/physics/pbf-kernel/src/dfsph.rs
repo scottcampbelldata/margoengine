@@ -919,12 +919,44 @@ fn moving_contact(
     scale(impulse, -1.0)
 }
 
+#[repr(C)]
+#[derive(Default)]
+pub struct Impact {
+    time: f64,
+    position: Vec3,
+    normal_impulse: f64,
+    energy: f64,
+    count: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<Impact>() == 7 * 8);
+
+impl Impact {
+    fn add(&mut self, time: f64, position: Vec3, normal_impulse: f64, energy: f64) {
+        if normal_impulse <= 0.0 || energy <= 0.0 {
+            return;
+        }
+        let total = self.energy + energy;
+        let fraction = energy / total;
+        self.time = (1.0 - fraction) * self.time + fraction * time;
+        self.position = add(
+            scale(self.position, 1.0 - fraction),
+            scale(position, fraction),
+        );
+        self.normal_impulse += normal_impulse;
+        self.energy = total;
+        self.count += 1.0;
+    }
+}
+
 fn contacts(
     settings: &Settings,
     p: &mut Particle,
     shapes: &[Solid],
     out: &mut [Reaction],
     mobility: &[BodyMobility],
+    mut impact: Option<&mut Impact>,
+    clock: f64,
 ) -> f64 {
     let mut normal_impulse = 0.0;
     let walls = settings.walls as u32;
@@ -940,12 +972,21 @@ fn contacts(
             p.position[axis] = high;
             normal[axis] = -1.0;
         }
-        normal_impulse += dot(normal, remove_inward(p, normal, ZERO, settings.friction)).abs();
+        let before = p.velocity;
+        let reaction = remove_inward(p, normal, ZERO, settings.friction);
+        let normal_size = dot(normal, reaction).abs();
+        normal_impulse += normal_size;
+        if let Some(event) = impact.as_deref_mut().filter(|_| normal_size > 0.0) {
+            let at = sub(p.position, scale(normal, settings.radius));
+            let energy = dot(reaction, scale(add(before, p.velocity), 0.5));
+            event.add(clock, at, normal_size, energy);
+        }
     }
     for shape in shapes {
         if let Some((normal, depth)) = clip_solid(shape, p.position, settings.radius) {
             p.position = add(p.position, scale(normal, depth));
             let at = sub(p.position, scale(normal, settings.radius));
+            let before = p.velocity;
             let impulse = if shape.body < 0.0 {
                 remove_inward(p, normal, body_velocity(shape, at), settings.friction)
             } else {
@@ -960,7 +1001,28 @@ fn contacts(
                     item(out, row),
                 )
             };
-            normal_impulse += dot(normal, impulse).abs();
+            let normal_size = dot(normal, impulse).abs();
+            normal_impulse += normal_size;
+            if normal_size > 0.0 {
+                if let Some(event) = impact.as_deref_mut() {
+                    let arm = sub(at, shape.centre);
+                    let surface = body_velocity(shape, at);
+                    let (incoming, delta) = if shape.body < 0.0 {
+                        (sub(before, surface), sub(p.velocity, before))
+                    } else {
+                        let row = shape.body as usize;
+                        let body = item(mobility, row);
+                        let (linear, angular) = body.response(item(out, row));
+                        let incoming = sub(before, add(surface, add(linear, cross(angular, arm))));
+                        let delta = mobility_at(body, arm, scale(impulse, -1.0), 1.0 / p.mass);
+                        (incoming, delta)
+                    };
+                    // The relative work of the contact impulse is the
+                    // kinetic energy dissipated by its normal and tangent law.
+                    let energy = dot(impulse, add(incoming, scale(delta, 0.5)));
+                    event.add(clock, at, normal_size, energy);
+                }
+            }
             record_impulse(out, shape, at, impulse);
         }
     }
@@ -1359,6 +1421,7 @@ pub unsafe extern "C" fn solve_dfsph(
     pair_capacity: usize,
     body_mobility: *mut BodyMobility,
     viscosity_bodies: *mut ViscousBody,
+    impact: *mut Impact,
 ) -> u32 {
     let (points, work, boundary, shapes, reactions, trial, settings, stats) = unsafe {
         (
@@ -1372,6 +1435,10 @@ pub unsafe extern "C" fn solve_dfsph(
             &mut *stats,
         )
     };
+    let mut impact = unsafe { impact.as_mut() };
+    if let Some(event) = impact.as_deref_mut() {
+        *event = Impact::default();
+    }
     let cache = unsafe { core::slice::from_raw_parts_mut(pair_cache, pair_capacity) };
     let mobility = unsafe { core::slice::from_raw_parts_mut(body_mobility, body_count) };
     let body_work = unsafe {
@@ -1512,7 +1579,15 @@ pub unsafe extern "C" fn solve_dfsph(
         density_error = error * step;
         for p in points.iter_mut() {
             p.position = add(p.position, scale(p.velocity, step));
-            normal_impulse += contacts(settings, p, shapes, reactions, mobility);
+            normal_impulse += contacts(
+                settings,
+                p,
+                shapes,
+                reactions,
+                mobility,
+                impact.as_deref_mut(),
+                dt - following,
+            );
         }
         rebuild(&mut grid, points, boundary);
         cached += prepare(

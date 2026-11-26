@@ -5979,4 +5979,11 @@ The viscosity regression holds the sampled boundary geometry constant, then swit
 fixed to 0.125 kg. The 125 kg liquid sample and plate follow the closed-form implicit exchange in one
 iteration. Their kinetic energy falls from 8.789 to 8.780 J. The earlier fixed-velocity drag solve applied
 a 0.594 N·s impulse to the free plate and raised their energy to 9.980 J.
+
+### FLUID-01 mechanical impact events
+
+Two independent 125 kg samples striking the floor supply 375 N·s of total normal impulse, 312.5 J
+of dissipated kinetic energy and the analytical energy centroid. The live rigid impact also reports its
+actual energy loss. Empty ticks and snapshot playback preserve the event timing.
+[Reproduce](reproduce.md#fluid-01-impact-energy)
 [Reproduce](reproduce.md#fluid-01-rigid-recoil)

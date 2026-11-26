@@ -6,6 +6,10 @@
 import { Vec3 } from "@margoengine/core";
 import { Quat } from "@margoengine/math";
 
+export const DFSPH_IMPACT_LAYOUT = 1;
+
+export const DFSPH_IMPACT_WORDS = 7;
+
 export const DFSPH_LAYOUT = 1;
 
 export const DFSPH_PARCEL_LAYOUT = 1;
@@ -32,6 +36,7 @@ export interface DfsphOptions {
     readonly rigid?: boolean;
     readonly rate?: RateLevel;
     readonly modalContactField?: FieldDescriptor;
+    readonly impacts?: boolean;
     readonly parcelCapacity?: number;
     readonly signal?: AbortSignal;
 }
@@ -85,6 +90,7 @@ export interface DfsphReading {
 export class DfsphSolver implements Solver<DfsphParams> {
     readonly id: string;
     readonly particleField: FieldDescriptor;
+    readonly impactField?: FieldDescriptor;
     readonly parcelFields?: DfsphParcelFields;
     private constructor();
     static load(memory: WebAssembly.Memory, options?: DfsphOptions): Promise<DfsphSolver>;

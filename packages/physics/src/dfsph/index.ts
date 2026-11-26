@@ -49,6 +49,10 @@ const PRESSURE_PAIR_WORDS = 5;
 const BUCKET_WORDS = 4;
 const STATS_WORDS = 12;
 const MODAL_WORDS = 5;
+/** Layout for the optional hard-contact mechanical energy record. */
+export const DFSPH_IMPACT_LAYOUT = 1;
+/** Offset seconds, local XYZ, normal impulse in N·s, energy in J, and contact count. */
+export const DFSPH_IMPACT_WORDS = 7;
 const CUBIC = 8 / Math.PI;
 
 /** A material sample in the fluid cell. Particles share the configured rest volume. */
@@ -94,6 +98,8 @@ export interface DfsphOptions {
   readonly rate?: RateLevel;
   /** Optional one-track contactField of a ModalSoundSolver on the same world rate. */
   readonly modalContactField?: FieldDescriptor;
+  /** Publish one energy-weighted hard-contact record each tick. Default false. */
+  readonly impacts?: boolean;
   /** Whole-particle parcel requests this clock step. Default zero disables the exchange fields. */
   readonly parcelCapacity?: number;
   readonly signal?: AbortSignal;
@@ -167,6 +173,7 @@ type State = {
   readonly stats: Region;
   readonly settings: Region;
   readonly modal?: Region;
+  readonly impact?: Region;
   readonly parcels?: { readonly receipts: Region; readonly clock: Region };
   readonly buckets: Region;
   readonly next: Region;
@@ -217,6 +224,8 @@ const xyz = (values: Float64Array, at: number): Vec3 => [values[at]!, values[at 
 /** Clocked, native divergence-free SPH with independent density and velocity-divergence pressure. */
 export class DfsphSolver implements Solver<DfsphParams> {
   readonly particleField: FieldDescriptor;
+  /** Present with impacts enabled. A zero contact count denotes an empty tick. */
+  readonly impactField?: FieldDescriptor;
   /** Present when parcelCapacity is positive. Install the other endpoint at the same dyadic rate. */
   readonly parcelFields?: DfsphParcelFields;
   private state?: State;
@@ -229,9 +238,18 @@ export class DfsphSolver implements Solver<DfsphParams> {
     private readonly rigid: boolean,
     private readonly preferredRate: RateLevel,
     private readonly parcelCapacity: number,
+    impacts: boolean,
     private readonly modalContactField?: FieldDescriptor,
   ) {
     if (parcelCapacity) this.parcelFields = parcelFields(id);
+    if (impacts)
+      this.impactField = Object.freeze({
+        name: id + ':impact',
+        kind: 'scalarSeries',
+        quantity: 'liquidContactImpact',
+        unit: 's, m, N s, J, count',
+        centring: 'cell',
+      });
     this.particleField = {
       name: `${id}:particles`,
       kind: 'particleSet',
@@ -263,6 +281,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       options.rigid ?? false,
       rate as RateLevel,
       whole(options.parcelCapacity ?? 0, 0, 'DFSPH parcel capacity'),
+      options.impacts ?? false,
       modal ? Object.freeze({ ...modal }) : undefined,
     );
   }
@@ -272,6 +291,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
     if (this.rigid)
       fields.push({ field: BODIES_FIELD, access: 'read' }, { field: BODY_IMPULSES_FIELD, access: 'accumulate' });
     if (this.modalContactField) fields.push({ field: this.modalContactField, access: 'write' });
+    if (this.impactField) fields.push({ field: this.impactField, access: 'write' });
     if (this.parcelFields)
       fields.push(
         { field: this.parcelFields.requests, access: 'read' },
@@ -409,6 +429,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
       settings: f64('dfsph-settings', SETTINGS_WORDS),
       stats: f64('dfsph-statistics', STATS_WORDS),
       modal: this.modalContactField && f64('dfsph-modal-impact', MODAL_WORDS),
+      impact:
+        this.impactField && host.allocate('dfsph-impact-energy', DFSPH_IMPACT_WORDS * 8, 'f64', DFSPH_IMPACT_LAYOUT),
       parcels: this.parcelFields && {
         clock: f64('dfsph-parcel-request-clock', 2),
         receipts: f64('dfsph-parcel-receipts', this.parcelCapacity * DFSPH_PARCEL_WORDS),
@@ -516,12 +538,15 @@ export class DfsphSolver implements Solver<DfsphParams> {
       state.pressurePairCapacity,
       state.bodyMobility.byteOffset,
       state.viscosityBodies.byteOffset,
+      state.impact?.byteOffset ?? 0,
     );
     if (error)
       throw new MargoError(
         'failed',
         'DFSPH cannot resolve travel in one world step. Increase resolution in time or reduce velocity.',
       );
+    if (state.impact && !numbers(state, state.impact).every(Number.isFinite))
+      throw new MargoError('failed', 'DFSPH impact energy exceeds float64. Reduce particle mass or contact speed.');
   }
 
   private applyParcels(input: Port | undefined): void {
@@ -581,6 +606,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
     if (this.rigid) ports.push({ field: BODY_IMPULSES_FIELD.name, region: state.impulses, tick, cell: this.cell });
     if (state.modal && this.modalContactField)
       ports.push({ field: this.modalContactField.name, region: state.modal, tick, cell: this.cell });
+    if (this.impactField && state.impact)
+      ports.push({ field: this.impactField.name, region: state.impact, tick, cell: this.cell });
     if (this.parcelFields && state.parcels)
       ports.push({ field: this.parcelFields.receipts.name, region: state.parcels.receipts, tick, cell: this.cell });
     return ports;
@@ -590,6 +617,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
     const state = this.ready();
     const regions = [state.points, state.stats, state.impulses];
     if (state.modal) regions.push(state.modal);
+    if (state.impact) regions.push(state.impact);
     if (state.parcels) regions.push(state.parcels.clock, state.parcels.receipts);
     return regions;
   }

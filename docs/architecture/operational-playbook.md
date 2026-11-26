@@ -10638,6 +10638,8 @@ A separate off-centre direct-contact check uses the same mobility in a local nor
 It verifies reciprocal force and torque, zero inward speed, the selected tangent damping and kinetic energy loss.
 The implicit viscosity system includes reciprocal body impulse and world-axis motion. The isolated
 light-plate case now reduces joint kinetic energy from 8.789 to 8.780 J, matching its analytical exchange.
+The optional impact field records the work of real hard-contact impulses, their energy-weighted position
+and arrival time, and the number of contacts for one clock tick. Reads of the record survive replay.
 
 Section 5, Tonemap colour enhancement (2026-11-26): `@margoengine/tonemap/enhance` patches a scene-linear step in front
 of the display curve of both Tonemap shaders (the SDR one clamps its result at 0, the ColorOutput one keeps colours

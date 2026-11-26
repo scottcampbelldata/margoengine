@@ -16991,6 +16991,7 @@ Run `node packages/physics/tests/dfsph-capillary-lab.mjs` after building Physics
 against the 0.742 s Rayleigh prediction. Planar energy normalization corrected the earlier 1.481 s result. This fixture starts an equal-volume ellipsoid from rest without
 gravity or a container impact. The period provides a separate accuracy check for the planned unified
 pressure and surface-energy solve at several resolutions.
+The 7,208-particle refined case reads 0.787 s against 0.735 s. Intermediate meshes show non-monotonic period error.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.295 and 0.514 against the two original measurement

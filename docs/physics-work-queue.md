@@ -82,8 +82,9 @@ there, add a line below with the solver ID and what is needed, and build against
   the same tick through the signed inflow and added forcing. Vertical momentum stays in a separate ledger.
   General shoreline coupling needs HYDRO-01 to reserve donor volume and report what signed volume and
   momentum the wet/dry update actually accepts. SEA-04 needs a paired debit and horizontal momentum
-  receipt at the solver boundary. SOUND-05 needs a mapped liquid/bubble event record with position,
-  energy and a clock. SOUND-04's modal contact field has a real impact producer.
+  receipt at the solver boundary. DFSPH now publishes current hard-contact position, time, normal impulse
+  and dissipated energy through its optional impact field. SOUND-05 needs a consumer for that field and an
+  entrained-bubble event contract. SOUND-04's modal contact field has a real impact producer.
 
 - **SOFT-04** needs a same-tick handoff for GPU-resident positions and reciprocal rigid-contact impulses,
   with an ordered snapshot readback after the tick commits. The current SoftSolver contract steps CPU

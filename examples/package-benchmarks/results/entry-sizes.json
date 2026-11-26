@@ -15020,8 +15020,8 @@
         "gzip": 6304
       },
       "./dfsph": {
-        "raw": 20591,
-        "gzip": 8197
+        "raw": 21260,
+        "gzip": 8373
       },
       "./pbf": {
         "raw": 14384,
@@ -18495,14 +18495,14 @@
       "brotli": 6237
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
-      "raw": 36161,
-      "gzip": 14635,
-      "brotli": 12544
+      "raw": 36539,
+      "gzip": 14808,
+      "brotli": 12779
     },
     "packages/physics/dist/dfsph-kernel-shared.wasm": {
-      "raw": 36155,
-      "gzip": 14634,
-      "brotli": 12507
+      "raw": 36533,
+      "gzip": 14802,
+      "brotli": 12771
     },
     "packages/physics/dist/lightning-kernel.wasm": {
       "raw": 2357,
