@@ -28,7 +28,7 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
@@ -74,7 +74,10 @@ export interface HullParams {
   readonly sea: SeaSurface | SeaQuery;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
-  /** Body rows its `bodyForces` port covers (default one past the highest hull row). */
+  /**
+   * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
+   * given, it must be the same.
+   */
   readonly capacity?: number;
   /** The rigid world's gravity, m/s^2 (default [0, -9.81, 0]): the weight the added-mass solve takes with the load. */
   readonly gravity?: Vec3;
@@ -257,11 +260,12 @@ export class HullSolver implements Solver<HullParams> {
             `Hull triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}; keep each index under the vertex count.`,
           );
     }
-    const capacity = params.capacity ?? Math.max(...hulls.map((h) => h.row)) + 1;
-    if (!(Number.isInteger(capacity) && hulls.every((h) => h.row < capacity)))
-      throw new RangeError(
-        `A HullSolver's capacity of ${capacity} misses a hull's row; set it above every hull's row.`,
-      );
+    const capacity = bodyRowsOf(
+      host,
+      'A HullSolver',
+      hulls.map((h) => h.row),
+      params.capacity,
+    );
     this.capacity = capacity;
     this.hulls = hulls;
     this.sea = sea;

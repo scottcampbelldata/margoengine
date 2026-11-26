@@ -195,6 +195,16 @@ Inside a staggered coupling the members step in the order given to `couple()` (s
 the bodies where the tick began and its push lands in that tick's rigid step); solvers left uncoupled step in coupling
 order, ids within a group. The same calls give the same order whatever order the solvers were added in.
 
+**The world's body rows.** Every body-set field (`bodies`, `bodyImpulses`, `bodyForces`, `deckClaims`: a record a
+kernel body row) holds the same number of records, the world's body rows, fixed once: by the world's `bodyRows` option, or
+else by the rigid solver when it is added (its kernel's capacity, or the `capacity` given it). Every solver that writes or
+adds to a body-set field sizes it by them (`SolverHost.bodyRows()`; the rigid, soft and air solvers pass their kernel's
+capacity as the least they need, `bodyRows(atLeast)`), never by its own rows: solvers that each sized their own (one past
+their highest row, or the kernel's capacity) could not share a world, as its sum refuses contributions of different
+lengths. A solver that pushes on bodies before the rows are fixed (added before the rigid solver, in a world made without
+`bodyRows`) is refused with `MargoError` `state` naming the fix; so is a row past them, and a `capacity` given that is not
+them. A solver whose add fails leaves the rows as they were.
+
 **Rules for the coupling.**
 
 - **Impulses, not forces.** Solvers exchange impulses (force times dt) into mirrored accumulators, so the sender's

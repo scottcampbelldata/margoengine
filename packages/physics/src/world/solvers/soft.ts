@@ -80,9 +80,10 @@ export class SoftSolver implements Solver<SoftSolverParams> {
     const physics = soft.drive();
     this.level = rateLevelOf(physics.fixedTimestep);
     this.step0 = physics.fixedTimestep;
-    const capacity = params.capacity ?? physics.kernel.capacity;
-    if (!(Number.isInteger(capacity) && capacity > 0))
-      throw new RangeError(`A SoftSolver's capacity is a whole number of body rows above 0; got ${capacity}.`);
+    const wanted = params.capacity ?? physics.kernel.capacity;
+    if (!(Number.isInteger(wanted) && wanted > 0))
+      throw new RangeError(`A SoftSolver's capacity is a whole number of body rows above 0; got ${wanted}.`);
+    const capacity = host.bodyRows(wanted);
     this.capacity = capacity;
     this.impulses = host.allocate('impulses', capacity * IMPULSE_WORDS * 8, 'f64', SOFT_LAYOUT);
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', SOFT_LAYOUT);

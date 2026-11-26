@@ -15,7 +15,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { SolverDescription, SolverHost, StepContext } from '../world/solver.js';
 import { rateOf } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { regionWords } from '../world/memory.js';
 import type { Port, Region } from '../world/solver.js';
@@ -32,7 +32,10 @@ export interface DeckWaterParams extends Omit<FlipParams, 'origin'> {
   readonly row: number;
   /** The box's lowest corner in the body's frame, m (default [0, 0, 0]). */
   readonly offset?: readonly [number, number, number];
-  /** Body rows the `bodyForces` and `deckClaims` ports cover (default one past the row). */
+  /**
+   * Body rows the `bodyForces` and `deckClaims` ports cover: the world's (`PhysicsWorld.bodyRows`, the rigid world's
+   * capacity), which it reads; given, it must be the same.
+   */
   readonly capacity?: number;
   /** Particles it may hold (default eight a cell). */
   readonly particles?: number;
@@ -100,9 +103,7 @@ export class DeckWaterSolver extends FlipSolver {
       );
     if (!(offset.length === 3 && offset.every(Number.isFinite)))
       throw new RangeError("Deck water's offset is three finite numbers in the body's frame; pass [x, y, z].");
-    const rows = capacity ?? row + 1;
-    if (!(Number.isInteger(rows) && rows > row))
-      throw new RangeError(`Deck water's capacity of ${rows} body rows misses row ${row}; set it above the row.`);
+    const rows = bodyRowsOf(host, 'Deck water', [row], capacity);
     super.init(host, { ...liquid, ...(particles !== undefined ? { capacity: particles } : {}) });
     this.row = row;
     this.bodyCapacity = rows;

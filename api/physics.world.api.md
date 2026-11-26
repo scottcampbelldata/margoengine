@@ -175,6 +175,7 @@ export class PhysicsWorld {
     get ids(): string[];
     get coupling(): CouplingGraph;
     add<Params>(solver: Solver<Params>, params: Params, cell?: Cell): this;
+    get bodyRows(): number | undefined;
     remove(id: string): boolean;
     couple(ids: readonly string[], scheme: CouplingScheme, options?: CouplingOptions): this;
     schemeOf(id: string): CouplingScheme;
@@ -202,6 +203,7 @@ export interface PhysicsWorldOptions {
     gravity?: readonly [number, number, number];
     cellSize?: number;
     memory?: WebAssembly.Memory;
+    bodyRows?: number;
 }
 
 export interface Port {
@@ -315,6 +317,7 @@ export interface SolverHost {
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
     resize(region: Region, byteLength: number): Region;
     free(region: Region): void;
+    bodyRows(atLeast?: number): number;
     port(field: string): Port | undefined;
 }
 

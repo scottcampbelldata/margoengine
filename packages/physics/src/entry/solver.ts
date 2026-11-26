@@ -42,7 +42,7 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { type HullMesh, type SeaQuery, wettedLoads, type WettedLoads } from '../seakeeping/wetted.js';
 import { CAVITY_ALPHA, cavityThreshold, constantSpeedPinch, SECTION_WORDS, sectionRadius2 } from './cavity.js';
 import { slam, slamProfile, type Slam } from './slam.js';
@@ -79,7 +79,10 @@ export interface EntryParams {
   readonly sea: SeaSurface | SeaQuery;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
-  /** Body rows its `bodyForces` port covers (default one past the highest body row). */
+  /**
+   * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
+   * given, it must be the same.
+   */
   readonly capacity?: number;
   /** The water's surface tension, N/m (default 0.072), and dynamic viscosity, Pa s (default 1.0e-3). */
   readonly surfaceTension?: number;
@@ -242,11 +245,12 @@ export class EntrySolver implements Solver<EntryParams> {
       if (!(angle >= 0 && angle <= 180))
         throw new RangeError(`A contact angle is 0 to 180 degrees (got ${angle}); pass one.`);
     }
-    const capacity = params.capacity ?? Math.max(...bodies.map((b) => b.row)) + 1;
-    if (!(Number.isInteger(capacity) && bodies.every((b) => b.row < capacity)))
-      throw new RangeError(
-        `An EntrySolver's capacity of ${capacity} misses a body's row; set it above every body's row.`,
-      );
+    const capacity = bodyRowsOf(
+      host,
+      'An EntrySolver',
+      bodies.map((b) => b.row),
+      params.capacity,
+    );
     const gamma = params.surfaceTension ?? WATER_SURFACE_TENSION,
       mu = params.viscosity ?? WATER_VISCOSITY,
       events = params.events ?? 64;

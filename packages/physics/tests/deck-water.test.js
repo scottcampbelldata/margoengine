@@ -52,7 +52,8 @@ class Exceedance {
   init(host) {
     this.host = host;
     this.port = host.allocate('inflow', (1 + 8 * DECK_INFLOW_WORDS) * 8, 'f64', 1);
-    this.forces = host.allocate('forces', (this.row + 1) * FORCE_WORDS * 8, 'f64', 1);
+    // The world's body rows, as every solver that pushes on bodies covers.
+    this.forces = host.allocate('forces', host.bodyRows() * FORCE_WORDS * 8, 'f64', 1);
   }
   step(context) {
     const t = (context.tick + 0.5) / 60,

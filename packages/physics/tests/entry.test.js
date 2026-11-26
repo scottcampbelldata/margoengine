@@ -310,7 +310,7 @@ test("Lamb's spheroid: a sphere carries half its volume, a long body little alon
 });
 
 test('bad bodies and settings are refused, each naming its fix', () => {
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }),
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, bodyRows: 1 }),
     mesh = sphereMesh(1, 8, 4),
     sea = { elevation: () => 0 };
   assert.throws(() => world.add(new EntrySolver('a'), { bodies: [], sea }), /pass them/);
