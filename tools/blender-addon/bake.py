@@ -89,6 +89,10 @@ def bake_material(context, obj, material, size):
     emission = tree.nodes.new("ShaderNodeEmission")
     names["emission"] = emission.name
     emission.inputs["Strength"].default_value = 1
+    # Adds 0 to what feeds a float input, so Blender itself converts a colour or vector to the float the socket reads.
+    convert = tree.nodes.new("ShaderNodeMath")
+    names["convert"] = convert.name
+    convert.operation, convert.inputs[1].default_value = "ADD", 0
     coverage = []
 
     def node(key):
@@ -115,9 +119,14 @@ def bake_material(context, obj, material, size):
         return values
 
     def socket(name):
-        """Bakes what feeds a Principled input, through an Emission shader on the output."""
+        """Bakes what feeds a Principled input, through an Emission shader on the output. A float input takes a colour
+        as its luminance and a vector as its mean, as in the material."""
         links = material.node_tree.links
-        links.new(feed(node("shader").inputs[name])[1], node("emission").inputs["Color"])
+        source = feed(node("shader").inputs[name])[1]
+        if node("shader").inputs[name].type == "VALUE":
+            links.new(source, node("convert").inputs[0])
+            source = node("convert").outputs[0]
+        links.new(source, node("emission").inputs["Color"])
         links.new(node("emission").outputs["Emission"], node("output").inputs["Surface"])
         try:
             return run("EMIT")
@@ -196,7 +205,7 @@ def bake_material(context, obj, material, size):
             nodes.remove(nodes[held])
             nodes.active = nodes[active] if active else None
         nodes = material.node_tree.nodes
-        for key in ("target", "emission"):
+        for key in ("target", "emission", "convert"):
             nodes.remove(nodes[names[key]])
         nodes.active = nodes[previous_active] if previous_active else None
         for leftover in temporary_images:
