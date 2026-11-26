@@ -22,7 +22,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { endTree, waitSignaled } from './shutdown.mjs';
+import { endTree, startKiller, waitSignaled } from './shutdown.mjs';
 
 /** How long the host waits for the kernel to finish with an ended browser before it logs it as a survivor and ends. */
 export const REAP_MS = 120_000;
@@ -275,7 +275,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
     return server;
   };
-  process.exitCode = await hostBrowser({ settings, launchServer });
+  // Started with the host, so the listed children's kill at the end request does not wait for Windows PowerShell to
+  // start: past waitSignaled's 10 s bound under load, it was never made (KB-HOST-KILLLATE1).
+  const killer = process.platform === 'win32' ? startKiller() : null;
+  process.exitCode = await hostBrowser({
+    settings,
+    launchServer,
+    ...(killer ? { endListed: (pids, since) => killer.kill(pids, since) } : {}),
+  });
+  killer?.close();
   // Nothing of the browser's is waited for past the result: the process handle is unreferenced, so a browser the
   // kernel is still tearing down cannot hold this host open either.
   child.current?.unref();
