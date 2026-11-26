@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,306 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,308 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12410,6 +12410,20 @@ search reaches `maxPixels` (128 at most), so a radius wider on screen is cut. A 
 depth matches the resolved scene depth within 0.2% and one pixel's depth span; a pixel whose centre holds no
 matching core surface borrows a neighbour's tag within 1% and two spans, so a seam can shift by a pixel. At mesh
 corners the spiral sampling leaves a faint speckle at the edge of the radius. GPU cost not measured.
+
+### Spatial upscaler (`@margoengine/post/upscale`, 2026-11-26)
+
+Optional post/upscale is 5,068 B min+gzip (new entry, previously 0 B); core + stage unchanged. WebGPU and the WebGL2
+layer. `scale` 0.25 to 1 per axis (default 0.67), `sharpen` 0 to 1 (default 0.8). One frame only: no history, so it
+cannot add detail the render size lacks, and it does not anti-alias; feed it MSAA or TAA output. One full-canvas view
+is upscaled; a frame of several views, a partial rectangle or a view into a target is drawn at full size. Runs instead
+of TAAUpscale. Passes from order -75 to 45 run at render size; plugins after 45 draw over the full frame without the
+scene's depth. Values above 1 are upscaled (clamped to the four nearest render pixels' range) but not sharpened.
+A linear frame (float or -srgb format)
+is encoded to sRGB for the filters and decoded after. Costs a render-size colour and depth target (plus 4x MSAA
+attachments when the frame is multisampled) and one output-size colour texture. The shaders match the CPU twin
+(packages/post/test/upscale-math.js) within 2 of 255 codes on WebGPU and the WebGL2 layer (8-bit rounding of the
+intermediate). GPU cost not measured (build phase).
 
 ## Playground
 
