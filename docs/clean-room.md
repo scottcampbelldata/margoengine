@@ -11944,6 +11944,44 @@ coupling through an accumulated field are this package's own arrangement. Proof:
 `tests/coupling/surf.test.js`.
 
 
+### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
+
+`packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,
+`icorels`, `huuska`, `rudderLiftSlope`, `thrusterThrust`), with the `wash` of a `FoamSolver` ship in
+`packages/physics/src/foam/index.ts`. Written from papers and public documentation only (no code of any manoeuvring simulator,
+ship-design tool, CFD code or companion code was opened):
+
+- H. Yasukawa and Y. Yoshimura, "Introduction of MMG standard method for ship maneuvering predictions", J. Mar. Sci.
+  Technol. 20, 37-52, 2015, https://doi.org/10.1007/s00773-014-0293-y (open access, read with its tables 1 to 5): the
+  equations of motion about the midship (eq. 4), the hull's polynomials (eq. 7), the propeller's thrust and wake (eqs. 8 to
+  16), the rudder's normal force with Fujii's f_alpha and the inflow of eq. 25 (appendix A), and the KVLCC2 particulars,
+  derivatives, interaction constants and simulated turning and zig-zag results the tests hold. The propeller's place x'_P
+  = -0.48 is from the SIMMAN 2008 particulars as remembered (not in the paper's tables).
+- J. Holtrop and G. G. J. Mennen, "An approximate power prediction method", International Shipbuilding Progress 29, 1982, and
+  J. Holtrop, "A statistical re-analysis of resistance and propulsion data", ISP 31, 1984 (read): the resistance set, the
+  wake fraction, thrust deduction, eta_R and Keller's blade area, and the worked example the test reproduces (the wetted area
+  of the appendages counts in c8 and R_A, as the printed figures need).
+- ITTC Recommended Procedure 7.5-02-03-01.4, "1978 ITTC Performance Prediction Method" (read): the ITTC-1957 line.
+- A. Haeusler, A. Saccon, A. Pascoal, J. Hauser and A. Aguiar, four-quadrant propeller modelling, 2015 (read), after Healey et
+  al. 1995: c_L = c_Lmax sin 2 alpha, c_D = c_Dmax (1 - cos 2 alpha) / 2. Here its pitch angle and two constants are fitted to
+  the open-water quadratic (bollard thrust, its slope and its zero), the engine's own arrangement.
+- G. A. Hamill and C. Kee, "Predicting axial velocity profiles within a diffusing marine propeller jet", Ocean Engineering
+  124, 2016, and G. A. Hamill and J. A. McGarvey, 1996 (read): the efflux 1.59 n D sqrt(C_t) of Blaauw and van de Kaa (1978),
+  the zone of flow establishment to 3.25 D (Stewart 1992) with Berger et al.'s ring profile, eq. 7 and eq. 20 for the
+  maximum speeds and Fuehrer and Roemisch's exp(-22.2 (r / X)^2).
+- S. Serban and V. Panaitescu, 2016 review of squat formulas (read, with its worked canal case): ICORELS, Huuska and Guliev,
+  Hooft's form of Tuck's law (E. O. Tuck, J. Fluid Mech. 26, 1966, through it).
+- The tunnel thruster's momentum bound T = (4 rho A)^(1/3) P^(2/3) is derived from the momentum balance of a jet that does not
+  contract; its figure of merit 0.55 (installed thrusters give 0.45 to 0.65) and the speed-loss curve's shape (a minimum near
+  half the thrust at a speed of 0.4 of the jet's, Karlikov and Sholomovich as a TU Delft thesis restates them) are
+  calibrations, recorded in docs/limits.md.
+
+The rigid body held to the MMG equations (eq. 3's forces on its own mass, its yaw inertia from the bodies port), squat as a
+sea drawn down along the hull for the HullSolver to float on, the race's induced speed as its far wake less its inflow, the
+quay's pull from a one-dimensional continuity estimate of the gap flow, the hull's draught as wake sources and the race's
+boil where its jet's e-folding radius reaches the shaft's depth are this package's own arrangement. Proof:
+`packages/physics/tests/ship.test.js`, `tests/coupling/ship.test.js` and the race's boil in `tests/foam.test.js`.
+
 ### Nonlinear and rogue waves (SEA-03, `@margoengine/physics/rogue`, 2026-11-26)
 
 `packages/physics/src/rogue/index.ts` (`NonlinearSea`, `seaStatistics`, `pairKernels`, `heightChance`, `crestChance`,

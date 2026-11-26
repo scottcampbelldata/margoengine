@@ -2500,6 +2500,81 @@ console.log(surf.undertow(70, 4)[0] < 0); // true: the undertow runs seaward
 console.log(surf.runUp() > 0.05); // true: the water runs up the beach above its still level
 ```
 
+### Ships under way (`@margoengine/physics/ship`)
+
+Ships that steam, turn, stop and berth (SEA-09).
+
+`ShipSolver` holds each ship's rigid body through `bodyForces` with the MMG standard method (Yasukawa and Yoshimura 2015). That gives surge, sway and yaw: the hull's manoeuvring forces, the propeller's thrust in the wake it works in, and the rudder's normal force in the propeller's race, with the added masses and their coupling. The body then turns, drifts and stops as the method's ship does. Couple it before the rigid solver: `world.couple(['ship', 'rigid'], 'staggered')`. With a `HullSolver` floating the hull, use `['ship', 'hull', 'rigid']`.
+
+Each ship is `{row, model}` and takes these settings:
+- `model`: a `ManoeuvringModel` with the particulars, hydrodynamic derivatives and interaction constants. `KVLCC2_L7` is the 7 m KVLCC2 model of the paper, and `scaleModel(model, factor)` Froude-scales it (`scaleModel(KVLCC2_L7, 320 / 7)` is the tanker).
+- `midship`, `forward` and `up` in the body's frame (defaults the origin, +X and +Y).
+- `rudderRate`: default 2.32 degrees a second, the SOLAS 35-to-30 degrees in 28 s.
+- `thruster`: `{diameter, power, position}` for a bow thruster.
+- `block` and `addedMass`: pass `addedMass: false` when a HullSolver already carries the added masses.
+
+The solver also takes `depth` (a number or a function of (x, z), for squat), `walls` (quays and banks, `{from, to}`) and `density`.
+
+Steer with `control(i)`:
+- `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;
+- `rudder`, the order in radians, positive to starboard;
+- `thruster`, from -1 to 1.
+
+`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull.
+
+What it gives the rest of the engine:
+- `sea(base)`: the sea drawn down along each hull by its squat (ICORELS and Hooft's form of Tuck's law, Huuska's factor in a channel). Pass it to the `HullSolver` as its sea, so the hull sinks and trims by its own hydrostatics and the drawdown shows. `drawdown(x, z)` reads it.
+- `water`: a water `FlowField` of the propellers' races, the efflux by momentum theory and the jet's zones after Hamill and Kee (2016), for foam, bubbles, the bed and divers.
+- `sources(t)`: each hull's draught pressed on the surface, for a `WakeSolver` (`sources: (t) => ships.sources(t)`), so it makes a bow wave and a Kelvin wake.
+- `wash(t)`: where each race boils up to the surface, for a `FoamSolver` ship's `wash`, so the stern boils white even at the quay.
+- The bow thruster: its ideal thrust (4 rho A)^(1/3) P^(2/3) times 0.55, falling to half near a speed of 0.4 of the jet's and recovering beyond.
+- Suction toward a quay or bank alongside: the return flow squeezed through the gap.
+
+The parts work on their own too:
+- `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`.
+- `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.
+- `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
+- `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {KVLCC2_L7, Manoeuvring, ShipSolver, holtropMennen, squat} from 'margoengine/physics/ship';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+// The KVLCC2 model (7 m) at 1.18 m/s, 15.5 kn full scale, hard over to starboard: it turns in about 3.1 lengths.
+const tanker = new Manoeuvring(KVLCC2_L7, {u: 1.18}, {rudderRate: 0.21});
+tanker.revolutions = tanker.selfPropulsion(1.18);
+tanker.order = (35 * Math.PI) / 180;
+while (tanker.state.heading < Math.PI / 2) tanker.step(0.02);
+console.log((tanker.state.x / 7).toFixed(1)); // 3.1
+
+// Holtrop and Mennen's own example ship at 25 knots: 1,793 kN.
+const hull = {length: 205, beam: 32, draughtFore: 10, draughtAft: 10, volume: 37500, lcb: -0.75, midship: 0.98, waterplane: 0.75,
+  bulb: {area: 20, centre: 4}, transom: 16, appendages: [{area: 50, factor: 1.5}], stern: 10};
+console.log(Math.round(holtropMennen(hull, 25 * 0.514444).total / 1000)); // 1793
+
+// A 118 m cargo ship (C_B 0.667) at 8 knots over 10 m of water squats 0.24 m at the bow (ICORELS, C_S 1.7 below C_B 0.7).
+console.log(squat({length: 118, beam: 17.1, draught: 7.76, block: 0.667, speed: 4.12, depth: 10}).bow.toFixed(2)); // 0.24
+
+// The same model as a rigid body, turning under the ship solver.
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60, gravity: [0, 0, 0]});
+const body = physics.addBody(null, {
+  position: [0, 0, 0],
+  linearVelocity: [1.18, 0, 0],
+  colliders: {shape: 'box', halfExtents: [3.5, 0.46, 0.635], mass: 1025 * KVLCC2_L7.volume},
+});
+const ships = new ShipSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(ships, {ships: [{row: body.row, model: KVLCC2_L7, rudderRate: 0.21}]})
+  .couple(['ship', 'rigid'], 'staggered');
+ships.control(0).revolutions = ships.revolutionsFor(0, 1.18);
+ships.control(0).rudder = (35 * Math.PI) / 180;
+world.advance(60 * 20);
+console.log(body.position[2] > 3); // true: well round to starboard (+Z)
+```
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.

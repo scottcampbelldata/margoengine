@@ -117,7 +117,7 @@ export const SOLID = 2;
 
 export const THETA_FLOOR = 0.01;
 
-export function project(g: GridShape, kind: Uint8Array, phi: Float64Array, u: Float64Array, v: Float64Array, w: Float64Array, dt: number, rho: number, pressure: Float64Array, open?: readonly boolean[], tolerance?: number, maxIterations?: number): number;
+export function project(g: GridShape, kind: Uint8Array, phi: Float64Array, u: Float64Array, v: Float64Array, w: Float64Array, dt: number, rho: number, pressure: Float64Array, open?: readonly boolean[], tolerance?: number, maxIterations?: number, source?: Float64Array): number;
 
 export function sampleVelocity(g: GridShape, vel: Float64Array[], x: number, y: number, z: number, out: [number, number, number]): [number, number, number];
 

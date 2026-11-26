@@ -102,7 +102,21 @@ export interface FoamShip {
   readonly length: number;
   /** Beam, m. */
   readonly beam: number;
+  /**
+   * Where its propellers' races boil up to the surface (a `ShipSolver`'s `wash`): each from `position` [x, z] m along
+   * `direction` for `reach` m, `radius` m wide where it surfaces, its water moving at `speed` m/s there (default none).
+   */
+  readonly wash?: (time: number) => readonly {
+    readonly position: readonly [number, number];
+    readonly direction: readonly [number, number];
+    readonly reach: number;
+    readonly radius: number;
+    readonly speed: number;
+  }[];
 }
+
+/** The race speed at the surface that whitens it fully, m/s: the boil behind a working screw (a calibration: docs/limits.md). */
+export const WASH_SPEED = 1;
 
 /** What a {@link FoamSolver} is made from. */
 export interface FoamParams {
@@ -486,6 +500,24 @@ export class FoamSolver implements Solver<FoamParams> {
   /** The ships' wake foam this step. */
   private wakes(time: number, _dt: number, foam: Float64Array): void {
     for (const ship of this.ships) {
+      // The races' boil: white where a race breaks the surface, as fast as its water moves there, spreading and fading as
+      // the established jet does (2.6 D / X): its whiteness falls as start / (start + s) along it.
+      for (const patch of ship.wash?.(time) ?? []) {
+        const white = Math.min(1, patch.speed / WASH_SPEED),
+          { radius, reach } = patch;
+        if (!(white > 0 && radius > 0 && reach > 0)) continue;
+        this.paint(
+          foam,
+          patch.position[0],
+          patch.position[1],
+          patch.direction[0],
+          patch.direction[1],
+          reach,
+          // The established jet's e-folding half width X / sqrt(22.2) = 0.212 X from where it surfaces, 4.71 radii out.
+          (x) => [radius + 0.212 * x, (white * 4.71 * radius) / (4.71 * radius + x)],
+          this.wakeRate,
+        );
+      }
       let px: number, pz: number, vx: number, vz: number;
       if (ship.body) {
         if (!ship.body.valid) continue;

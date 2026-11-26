@@ -3295,6 +3295,10 @@
       "types": "./dist/physics/rogue.d.ts",
       "import": "./dist/physics/rogue.js"
     },
+    "./physics/ship": {
+      "types": "./dist/physics/ship.d.ts",
+      "import": "./dist/physics/ship.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"

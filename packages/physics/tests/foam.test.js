@@ -272,6 +272,42 @@ test("a ship leaves a trail of wake foam that widens aft, with its bow waves' ar
   assert.ok(width(40 - 15 - 4, 0.05) > width(40 - 15 - 4, 0.5), "the bow waves' arms outside it");
 });
 
+test('a ship at rest working its screw boils its race up white behind the stern, fading along it, and nothing ahead', () => {
+  // A ship held at a quay (no way on), its race surfacing 10 m behind the stern at 2 m/s, 1.5 m deep, along -x.
+  const calm = developed(2),
+    { solver, run } = foam({
+      waves: calm,
+      cells: [120, 20],
+      cellSize: 1,
+      windDrift: 0,
+      windrows: false,
+      ships: [
+        {
+          track: () => ({ position: [30, 0], velocity: [0, 0] }),
+          length: 40,
+          beam: 10,
+          wash: () => [{ position: [0, 0], direction: [-1, 0], reach: 30, radius: 1.5, speed: 2 }],
+        },
+      ],
+    });
+  run(10);
+  assert.ok(solver.coverage(-0.5, 0.5) > 0.9, 'white where the race surfaces');
+  assert.ok(solver.coverage(-25.5, 0.5) < solver.coverage(-5.5, 0.5), 'fading along it');
+  assert.ok(solver.coverage(-25.5, 0.5) > 0, 'still foam 25 m on');
+  assert.equal(solver.coverage(20.5, 0.5), 0, 'nothing ahead of it');
+  // No way on and no race: no wake at all.
+  const idle = foam({
+    waves: calm,
+    cells: [120, 20],
+    cellSize: 1,
+    windDrift: 0,
+    windrows: false,
+    ships: [{ track: () => ({ position: [30, 0], velocity: [0, 0] }), length: 40, beam: 10 }],
+  });
+  idle.run(10);
+  assert.equal(idle.solver.coverage(-0.5, 0.5), 0);
+});
+
 test("spray follows Gong's flux by the whitecap method; bag breakup takes over at strong winds", () => {
   // Gong (2003) at r80 = 2 um and U10 = 10 m/s, written out: 1.373 U^3.41 r^-A (1 + 0.057 r^3.45) 10^(1.607 exp(-B^2)).
   const r = 2,

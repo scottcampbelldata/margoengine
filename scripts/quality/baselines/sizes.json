@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20146852,
+  "total": 20158390,
   "history": [
     {
       "date": "2026-10-24",
@@ -12861,6 +12861,12 @@
       "commit": "fix(physics) deck volume keeps its water's volume",
       "reason": "physics/flip 9,249 to 10,188 B gzip (this Mac): Kugelstadt et al.'s implicit density projection after each advection (the particles' density on the grid, the walls sampled as water at rest, a second pressure solve moving clustered particles apart) and the inflow placing particles only in cells with room (KB-FLIP-DECKLOAD2). It is part of the liquid's step; a separate entry would carry the solver again.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "014c8749d",
+      "reason": "physics/ship is a new optional entry (SEA-09): ShipSolver (MMG manoeuvring on rigid bodies, squat as a drawn-down sea, bow thruster, quay suction, wake sources and the race's boil), Manoeuvring, Propeller with four quadrants and its race field, Holtrop and Mennen resistance and squat laws; 11,202 B gzip, its own entry so scenes without ships pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14755,6 +14761,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/ship": 11538
   }
 }
