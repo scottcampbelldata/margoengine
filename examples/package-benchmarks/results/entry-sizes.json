@@ -3,8 +3,8 @@
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 61081,
-    "gzip": 24846,
+    "raw": 61164,
+    "gzip": 24892,
     "limit": 25000
   },
   "packages": {
@@ -966,12 +966,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53218,
-        "gzip": 22225
+        "raw": 53301,
+        "gzip": 22262
       },
       "./extension": {
-        "raw": 53399,
-        "gzip": 22297
+        "raw": 53481,
+        "gzip": 22344
       }
     },
     "@margoengine/creative": {
@@ -15128,8 +15128,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 168977,
-        "gzip": 46664
+        "raw": 169079,
+        "gzip": 46735
       },
       "./bloom": {
         "raw": 24151,
@@ -15156,24 +15156,24 @@
         "gzip": 5698
       },
       "./ssr": {
-        "raw": 45222,
-        "gzip": 14934
+        "raw": 45325,
+        "gzip": 15001
       },
       "./gtao": {
         "raw": 44961,
         "gzip": 13826
       },
       "./rt-reflections": {
-        "raw": 50074,
-        "gzip": 16624
+        "raw": 50177,
+        "gzip": 16691
       },
       "./rt-gi": {
-        "raw": 48427,
-        "gzip": 15945
+        "raw": 48530,
+        "gzip": 16014
       },
       "./ssgi": {
-        "raw": 44533,
-        "gzip": 14458
+        "raw": 44636,
+        "gzip": 14530
       },
       "./motion-blur": {
         "raw": 26547,

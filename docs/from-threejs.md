@@ -1280,7 +1280,7 @@ What most often goes wrong in a port, with the fix.
 | A flag turns on shadows or environment light | Shadow casters, and non-core receivers, join each feature | `shadows.add(mesh)`, `lighting.add(model)`, `fog.add(model)`, `ssao.add(model)`. |
 | Everything attaches at once | `Environment.attach` is asynchronous | `await` it before `EnvironmentLighting.attach`. |
 | `render()` runs your frame code | `onFrame` callbacks run only from the started loop | Call `engine.start()`, or run your update before `render`. |
-| `scene.background` looks the same under post effects | With a post effect attached the colour comes out lighter: it is treated as linear light and encoded again ([known bugs](known-bugs.md), KB-CLEAR-CAPTURE1) | Use `ColorBackground` of `@margoengine/environment`, which stores linear light. |
+| `scene.background` shows as written under post effects | Under a post effect the colour is linear light in the scene, so the effect's tone map darkens it with the meshes (`#808080` shows as 116, not 128); on the bare canvas it shows as written | Pick the colour under the chain you ship. |
 | A raycast on an animated character | Synchronous BVH rays throw on a deforming model | `await raycaster.intersectModel(model)` or GPU picking. |
 | `mixer.update(delta)` in your loop | An attached mixer is already advanced by the engine; calling it too doubles the speed | Delete the call. |
 | A depth shader with `less` comparisons | WebGPU depth is reversed (near 1, far 0) | Use `greater`, or `DepthTexture`'s `distance`. |

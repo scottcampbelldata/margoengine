@@ -266,17 +266,78 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   round the crest (Ferstl et al. 2016), and a sharper free surface. These are FLUID-03 tiers not yet built. Until then
   `docs/limits.md` and the README give these figures, not a match.
 
-### Open 2026-11-26: a scene's background colour comes out lighter once a post effect captures the scene (KB-CLEAR-CAPTURE1, core)
+### Open 2026-11-26: a view drawn into an `-srgb` texture stores core's colours encoded twice (KB-VIEW-SRGB1, core)
+
+- **Repro:** one core mesh (`new PbrMaterial({ color: '#e0a050' })`) and `engine.scene.background = '#808080'`, no
+  plugin. `engine.render({ views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] })` with
+  `color` a 64 x 64 texture, read back with `copyTextureToBuffer`. In `rgba8unorm` the background holds 128,128,128
+  and the mesh's centre 182,125,43. In `rgba8unorm-srgb` the background holds 188,188,188 and the centre 220,186,114,
+  the sRGB encoding of those bytes (Intel Arc 140V, Edge 158, WebGPU).
+- **Cause:** core's fragment shader ends with its own tone map and sRGB encoding whatever the target's format
+  (`packages/core/src/shaders.ts`), and core writes a background's bytes as the clear value. An `-srgb` attachment
+  encodes what is written to it once more (WebGPU, GPURenderPassColorAttachment `clearValue` and the fragment output,
+  both converted to the attachment's format). Found while fixing KB-CLEAR-CAPTURE1, which leaves the frame's own
+  target as it was. A fix belongs in core: a view target in an `-srgb` format needs core's output and its clear colour
+  without the encoding. Needs a maintainer decision (frozen core). Use a `rgba8unorm` or `bgra8unorm` target meanwhile.
+
+### Open 2026-11-26: core's own clear colour comes out lighter and bluer once a post effect captures the scene (KB-CLEAR-DEFAULT1, core)
+
+- **Repro:** an empty scene with no `background` draws 5,6,9. With `Tonemap.attach(engine)` it draws 7,20,38 (Intel
+  Arc 140V, Edge 158, WebGPU and the WebGL2 layer; the two `info` lines of
+  `packages/post/test/scene-background-browser.mjs`).
+- **Cause:** core's clear colour is one set of numbers, 0.018, 0.023, 0.035 (`defaultClear`,
+  `packages/shared/clear-color.js`), written as the clear value of every target: display values on the canvas, linear
+  light in an HDR capture. KB-CLEAR-CAPTURE1 fixed this for a `background` colour and left core's own colour as it
+  was. The fix is the same decode for a capture, and it changes the backdrop of every frame under an HDR effect that
+  sets no background (to about 0,1,4 under the default tone map), so every pixel check and proof drawn over that
+  backdrop has to be run again with it. Needs a maintainer decision (frozen core, and it changes what checks accept).
+  Set `scene.background` meanwhile: a colour given there is the same colour in the scene on every target.
+
+### Fixed 2026-11-26: a scene's background colour came out lighter once a post effect captured the scene (KB-CLEAR-CAPTURE1, core)
 
 - **Repro:** `engine.scene.background = '#808080'` draws 128,128,128. With `Tonemap.attach(engine)`,
-  `Bloom.attach(engine)` or `PostStack.attach(engine, [new Tonemap()])` it draws 181,181,181; `'#07090f'` becomes
-  15,29,53 (Intel Arc 140V, Chromium WebGPU). `ColorBackground` of `@margoengine/environment` under the same `Tonemap`
-  draws 116,116,116, the tone-mapped linear colour.
-- **Cause:** core clears with the colour's sRGB bytes as given (`clearColorValue`, `packages/shared/clear-color.js`,
-  used by `packages/core/src/renderer.ts`), also when the colour target is a post effect's linear HDR capture, so the
-  display transform encodes them a second time. A fix that converts the clear colour for a linear target belongs where
-  the clear is written (core), or in every capture that redirects it. Needs a maintainer decision (frozen core). Use
-  `ColorBackground` meanwhile.
+  `Bloom.attach(engine)` or `PostStack.attach(engine, [new Tonemap()])` it drew 181,181,181 (182 under Bloom);
+  `'#07090f'` became 15,29,53 and `'#2a6cba'` 99,166,216 (Intel Arc 140V, Chromium, WebGPU and the WebGL2 layer).
+  `ColorBackground` of `@margoengine/environment` under the same `Tonemap` draws 116,116,116, the tone-mapped linear
+  colour.
+- **Cause:** core wrote the colour's sRGB bytes as the clear value of every colour target (`clearColorValue`,
+  `packages/shared/clear-color.js`, used by `packages/core/src/renderer.ts`), also when a pass had redirected the draw
+  into a linear HDR capture, so the display transform encoded them a second time.
+- **Fix (core):** core's draw gives `captureClearColor(color, capture)` the format of a capture's target: the pass
+  context's colour target when it is not the frame's own attachment. A capture that holds linear light takes the colour
+  decoded with the sRGB transfer function (IEC 61966-2-1): a float format (rgba16float, the WebGL2 layer's
+  rg11b10ufloat), which the display transform encodes later, or an `-srgb` format, whose clear value WebGPU encodes on
+  store. Both of core's clear paths use it (the attachment clear of a whole view, the drawn clear of a partial one), so
+  every capture that hands core its target is fixed at once: the `SceneTarget` users (PostStack, Bloom, Tonemap, DOF,
+  SSAO, creative PostProcessing, RenderGraph, and TAA, upscaling, transitions and materials' opaque colour inside one)
+  and environment captures (CubeCamera, reflectors), in XR eye views too. A display-encoded capture (FXAA, SMAA, TAA on
+  the canvas format) keeps the bytes. So does the frame's own target, the canvas or a view's `target` of any format,
+  where core's own shader writes display colour: a frame with no capture draws byte for byte as before, and an unset
+  background keeps core's clear colour on every target (KB-CLEAR-DEFAULT1). Captures that clear their own target
+  (reflection probes, clustered bounce, water, the renderer of `@margoengine/xr`) never drew the background and are
+  unchanged. Post's partial material clear (SSR, SSGI) passes the format too, so it writes what core's whole-view
+  clear writes. Core's material colours and the clear share one decode (`toLinear`). The bytes-only
+  `clearColorValue` stays for the targets that are always display-encoded (the WebGL2 preview renderer, sciviz media
+  tiles), so their bundles carry no decode.
+- **Why core:** the clear value is made inside core's draw from the view's `#rrggbb` string, the only form a view's
+  clear colour takes. A capture could hand core only another 8-bit hex string, too coarse for linear light (#07090f
+  would become #010101), or switch core's clear off and clear its target in a pass of its own: one more render pass
+  for every capture and view each frame, in every capturing package, with a capture written against the public pass
+  context left wrong.
+- **What changes on screen:** under an HDR effect a background is light in the scene, tone-mapped with it: #808080
+  shows as 116 (181 before), #07090f as 0,2,9 (15,29,53 before) and #2a6cba as 11,101,183 (99,166,216 before), each
+  as `ColorBackground` draws it. A reflector or cube capture sees the background at its linear value. With no effect
+  nothing changes.
+- **Regression:** `tests/clear-capture.test.js` (the value per format; core's attachment and drawn clears on a
+  capture, on the canvas and on a view's own float or `-srgb` target); real GPU:
+  `packages/post/test/scene-background-browser.mjs`, on WebGPU and with `--compat` (three colours under Tonemap, Bloom
+  and PostStack, in an empty scene, beside a mesh and in a half-canvas view, against the computed display value and
+  against `ColorBackground`; with no effect, the bytes as given). On the code before the fix the CPU test fails and
+  the GPU check reports all 54 effect cases wrong on both backends.
+- **Sources:** IEC 61966-2-1:1999, "Multimedia systems and equipment - Colour measurement and management - Part
+  2-1: Default RGB colour space - sRGB" (IEC, 1999), whose decode is v / 12.92 up to 0.04045 and ((v + 0.055) / 1.055)^2.4 above;
+  W3C, "WebGPU" (GPUWeb working group, 2024 Candidate Recommendation), GPURenderPassColorAttachment `clearValue`, converted
+  to the attachment's format like a shader output (https://www.w3.org/TR/webgpu/#dom-gpurenderpasscolorattachment-clearvalue).
 
 ### Fixed 2026-11-26: `@margoengine/animation/mixer` is not in the package README (KB-ANIM-MIXERDOC1, animation)
 

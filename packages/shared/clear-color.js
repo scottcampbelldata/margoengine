@@ -8,11 +8,38 @@ export const defaultClear = [0.018, 0.023, 0.035, 1];
 export const hexColor = (color) =>
   /^#([\da-f]{3}){1,2}$/i.test(color) ? parseInt((color[4] ? color : color.replace(/\w/g, '$&$&')).slice(1), 16) : -1;
 
+/**
+ * The clear value of a `#rgb` or `#rrggbb` colour for a display-encoded target (the canvas, a preview, a tile): its
+ * sRGB bytes as given, or core's clear colour for any other value.
+ */
 export function clearColorValue(color) {
   if (typeof color !== 'string') return defaultClear;
   const n = hexColor(color);
   if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
   return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+}
+
+/** An sRGB byte (0 to 255) as linear light, by the sRGB transfer function (IEC 61966-2-1). */
+export const toLinear = (v) => ((v /= 255) > 0.04045 ? ((v + 0.055) / 1.055) ** 2.4 : v / 12.92);
+const byte = (v) => v / 255,
+  linear = /float$|srgb$/;
+
+/**
+ * {@link clearColorValue} for a draw that may clear a capture's target. `capture` is the colour format of that target,
+ * one a pass drew the scene into instead of the frame's own. A capture that holds linear light takes the colour
+ * decoded with the sRGB transfer function (IEC 61966-2-1): a float format (a post effect's HDR capture), which the
+ * display transform encodes later, and an `-srgb` format, whose clear value the device encodes on store (WebGPU,
+ * GPURenderPassColorAttachment clearValue). Any other capture, and no capture (false or undefined: the frame's own
+ * target, the canvas or a view's target), takes the bytes as given, and core's clear colour is the same numbers on
+ * every target. Before KB-CLEAR-CAPTURE1 every target took the bytes, so a linear capture encoded them twice (#808080
+ * drew 181 under a tone map). A function of its own, so a bundle that never clears a capture carries no decode.
+ */
+export function captureClearColor(color, capture) {
+  if (typeof color !== 'string') return defaultClear;
+  const n = hexColor(color),
+    f = linear.test(capture) ? toLinear : byte;
+  if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
+  return [f(n >> 16), f((n >> 8) & 255), f(n & 255), 1];
 }
 
 /** Per device: the clear colour's bind group layout, its pipeline layout and a bind group per recent colour. */
