@@ -70,6 +70,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (and its bind groups per view) per key. Regression: `packages/terrain/test/capture.test.js` and
   `packages/water/test/capture.test.js` ("in two effects").
 
+### Open 2026-11-26: the instance attributes check on the WebGL2 layer differed once in its first case (KB-SCATTER-ATTRCOMPAT1, scatter, webgl2-compat)
+
+- **Repro:** `MARGO_COMPAT=1 node packages/scatter/test/attributes.browser.mjs` (workstation, RTX A6000): it failed once
+  in 6 runs at its first case (samples 1, custom false, edited false, restore false), `ScatterInstances` and
+  `AttributedScatter` drawing different pixels, run right after the 22 WebGPU scatter browser checks and while
+  `npm run quality` ran; the next 5 runs passed all 18 cases, as did one run on origin/main.
+- **Cause:** not found yet. Both sides are `ScatterInstances` code (the lane B Scatter capture change does not reach
+  it); the first case is the first frame pair after the page loads, so a compatibility-layer pipeline or texture that
+  is not ready when `waitForPipelines` returns is the first suspect.
+- **Owed:** a repro that fails on demand (the first case under load), the root cause in its owning package and a
+  regression test.
+
 ### Open 2026-11-26: water added to SceneTargets or MeshBlend builds an invalid capture stage (KB-WATER-TARGETS1, water)
 
 - **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.add(water)`:
