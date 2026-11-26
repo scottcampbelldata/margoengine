@@ -124,6 +124,8 @@ export interface Horse {
   seek(time: number): this;
   /** Called after every fixed step with the step length (a rider's seat follows here). Returns the remover. */
   onStep(step: (dt: number, horse: Horse) => void, reset?: () => void): () => void;
+  /** Adds a post-step pose solver before skinning. Returns the remover. */
+  onPose(modify: (pose: HorsePose, horse: Horse) => HorsePose): () => void;
   dispose(): void;
   [Symbol.dispose](): void;
 }
@@ -419,7 +421,9 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     outgoingCycles = 0;
   const commands: Command[] = [],
     tailActions: { at: number; value: TailAction }[] = [],
-    listeners = new Set<{ step: (dt: number, horse: Horse) => void; reset?: () => void }>();
+    listeners = new Set<{ step: (dt: number, horse: Horse) => void; reset?: () => void }>(),
+    poseSolvers = new Set<(base: HorsePose, horse: Horse) => HorsePose>(),
+    displacedJoints = new Set<number>();
   const shown = () => {
     const a = Math.min(1, Math.max(0, (time - ticks * STEP) / STEP)),
       dh = Math.atan2(Math.sin(motion.heading - prev.heading), Math.cos(motion.heading - prev.heading));
@@ -472,6 +476,12 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
   };
   const computePose = (frame: ReturnType<typeof shown>, height: number) => {
     pose = locomotionPose(frame.distance, time);
+    const tail = skeleton.strandChains?.[0];
+    if (tail) {
+      const rotations = [...pose.rotations];
+      for (const i of tail) rotations[i] = [0, 0, 0, 1];
+      pose = { ...pose, rotations };
+    }
     for (const action of tailActions)
       pose = horseTailFlick(skeleton, pose, time - action.at, action.value.strength, action.value.side);
     if (options.ground || frame.bank !== 0) pose = grounding.fit(frame, height, time, pose);
@@ -511,6 +521,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     const v = shown(),
       y = motion.supportHeight(v.x, v.z, v.heading);
     computePose(v, y);
+    for (const modify of poseSolvers) pose = modify(pose, horse);
     const nodes = model.nodes as unknown as {
       setQuaternion(q: readonly number[]): unknown;
       setPosition(p: readonly number[]): unknown;
@@ -519,6 +530,15 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     else {
       pose.rotations.forEach((q, i) => i > 0 && nodes[i]?.setQuaternion(q));
       for (const joint of movingJoints) nodes[joint]?.setPosition(horseJointTranslation(skeleton, pose, joint));
+      for (const joint of displacedJoints) {
+        if (!pose.jointTranslations?.has(joint))
+          nodes[joint]?.setPosition(horseJointTranslation(skeleton, pose, joint));
+      }
+      displacedJoints.clear();
+      for (const [joint, translation] of pose.jointTranslations ?? []) {
+        nodes[joint]?.setPosition(translation);
+        displacedJoints.add(joint);
+      }
     }
     model.root.setPosition([v.x, y, v.z]);
     model.root.setQuaternion([0, Math.sin(v.heading / 2), 0, Math.cos(v.heading / 2)]);
@@ -601,6 +621,8 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     if (disposed) return;
     disposed = true;
     listeners.clear();
+    poseSolvers.clear();
+    displacedJoints.clear();
     for (const step of cleanups.reverse()) step();
     if (!skin) (model as unknown as { dispose?(): void }).dispose?.();
   };
@@ -698,6 +720,10 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       const entry = { step, reset };
       listeners.add(entry);
       return () => void listeners.delete(entry);
+    },
+    onPose(modify) {
+      poseSolvers.add(modify);
+      return () => void poseSolvers.delete(modify);
     },
     dispose,
     [Symbol.dispose]: dispose,

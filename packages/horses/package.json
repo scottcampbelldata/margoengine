@@ -30,6 +30,7 @@
     "build": "node ../../scripts/build-optional.js horses",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:strands": "cd ../.. && node packages/horses/test/strand-horse.browser.mjs",
     "test:gpu": "cd ../.. && node packages/horses/test/horses-check.mjs"
   },
   "sideEffects": false,
@@ -61,6 +62,10 @@
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
+    },
+    "./strands": {
+      "types": "./dist/strands.d.ts",
+      "import": "./dist/strands.js"
     }
   },
   "files": [
@@ -75,6 +80,7 @@
   "dependencies": {
     "@margoengine/animation": "^1.0.0",
     "@margoengine/math": "^1.0.0",
-    "@margoengine/materials": "^1.0.0"
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/physics": "^1.0.0"
   }
 }

@@ -33,6 +33,8 @@ export interface HorseSkeleton {
   readonly ground: readonly (readonly [number, number, number])[];
   /** The saddle seat point (lowest point of the seat, behind the withers), model space at rest. */
   readonly saddle: readonly [number, number, number];
+  /** Tail, mane and forelock joint chains when built with the physical strand rig. The tail is first. */
+  readonly strandChains?: readonly (readonly number[])[];
   /** Index of a joint by name. */
   index(name: string): number;
 }
@@ -47,7 +49,7 @@ const LEG_NAMES: Record<string, string[]> = {
 const TAIL = ['tail1', 'tail2', 'tail3', 'tailHair1', 'tailHair2', 'tailHair3', 'tailHair4', 'tailHair5'] as const;
 
 /** The rig for a body: joint rest positions from its measurements. */
-export function horseSkeleton(body: HorseBody, tailLength?: number): HorseSkeleton {
+export function horseSkeleton(body: HorseBody, tailLength?: number, maneLength?: number): HorseSkeleton {
   if (!body || !(body.withers > 0)) throw new TypeError('horseSkeleton needs a horseBody()');
   const H = body.withers,
     L = body.bodyLength,
@@ -104,6 +106,24 @@ export function horseSkeleton(body: HorseBody, tailLength?: number): HorseSkelet
     const t = (i - 2) / (TAIL.length - 3);
     add(TAIL[i]!, TAIL[i - 1]!, [0, dock[1] - 0.92 * hairLength * t, dock[2] - hairLength * (0.18 * t + 0.08 * t * t)]);
   }
+  const strandChains: number[][] | undefined = maneLength === undefined ? undefined : [];
+  if (strandChains && maneLength !== undefined) {
+    if (!(maneLength > 0 && Number.isFinite(maneLength)))
+      throw new RangeError('Pass a finite positive mane length in metres.');
+    strandChains.push(TAIL.map((name) => joints.findIndex((joint) => joint.name === name)));
+    for (let guide = 0; guide < MANE_GUIDES + FORELOCK_GUIDES; guide++) {
+      const spec = maneGuide(body, maneLength, guide);
+      const chain: number[] = [];
+      let parent = spec.parent;
+      for (let point = 0; point <= MANE_SECTIONS; point++) {
+        const name = `maneGuide${guide}_${point}`;
+        chain.push(joints.length);
+        add(name, parent, hairPoint(spec.root, spec.direction, spec.bend, spec.length, point / MANE_SECTIONS));
+        parent = name;
+      }
+      strandChains.push(chain);
+    }
+  }
   const byName = new Map(joints.map((j, i) => [j.name, i]));
   return {
     body,
@@ -111,6 +131,7 @@ export function horseSkeleton(body: HorseBody, tailLength?: number): HorseSkelet
     legs,
     ground,
     saddle: [0, H - 0.01 * H, 0.1 * L],
+    ...(strandChains ? { strandChains } : {}),
     index(name: string) {
       const i = byName.get(name);
       if (i === undefined) throw new RangeError(`No horse joint "${name}"; use a name from the skeleton's joints`);
@@ -127,6 +148,41 @@ function neckPoll(body: HorseBody): V3 {
 }
 /** Unit direction of the head from the poll toward the muzzle, 50 degrees below horizontal. */
 const HEAD_DIR: V3 = [0, -Math.sin((50 * Math.PI) / 180), Math.cos((50 * Math.PI) / 180)];
+
+const MANE_GUIDES = 8;
+const FORELOCK_GUIDES = 2;
+const MANE_SECTIONS = 4;
+
+function maneGuide(body: HorseBody, length: number, index: number) {
+  const H = body.withers,
+    poll = neckPoll(body);
+  if (index >= MANE_GUIDES) {
+    return {
+      parent: 'head',
+      root: [(index - MANE_GUIDES - 0.5) * 0.025 * H, poll[1] + 0.07 * H, poll[2] + 0.01 * H] as V3,
+      direction: [0, HEAD_DIR[1] + 0.2 * HEAD_DIR[2], HEAD_DIR[2] - 0.2 * HEAD_DIR[1]] as V3,
+      bend: [0, -0.15, 0.05] as V3,
+      length: 1.1 * length,
+    };
+  }
+  const s = (index + 0.5) / MANE_GUIDES;
+  const crest = mix3([0, H, 0.3 * body.bodyLength], poll, s);
+  return {
+    parent: s < 0.42 ? 'neck1' : s < 0.82 ? 'neck2' : 'head',
+    root: [-0.01 * H, crest[1] + 0.06 * H * s - 0.01 * H, crest[2]] as V3,
+    direction: [-0.45, -0.89, 0] as V3,
+    bend: [-0.1, -0.05, -0.05] as V3,
+    length,
+  };
+}
+
+function hairPoint(root: V3, direction: V3, bend: V3, length: number, fraction: number): V3 {
+  return [
+    root[0] + direction[0] * length * fraction + bend[0] * fraction * fraction * length,
+    root[1] + direction[1] * length * fraction + bend[1] * fraction * fraction * length,
+    root[2] + direction[2] * length * fraction + bend[2] * fraction * fraction * length,
+  ];
+}
 
 // ----- small vector and quaternion helpers -----
 const qx = (a: number): Q => [Math.sin(a / 2), 0, 0, Math.cos(a / 2)];
@@ -155,12 +211,16 @@ export interface HorsePose {
   readonly rotations: readonly (readonly [number, number, number, number])[];
   /** Added to the body joint's rest translation. */
   readonly bodyOffset: readonly [number, number, number];
+  /** Per-joint local translations authored by a pose solver, in metres. */
+  readonly jointTranslations?: ReadonlyMap<number, readonly [number, number, number]>;
   /** Left and right scapula displacement on the thorax, in the body's local frame. */
   readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
 /** A joint's local translation in a pose, including the shoulder blades' slide on the thorax. */
 export function horseJointTranslation(skeleton: HorseSkeleton, pose: HorsePose, index: number): V3 {
+  const translated = pose.jointTranslations?.get(index);
+  if (translated) return [...translated];
   const joint = skeleton.joints[index]!,
     parent = skeleton.joints[joint.parent];
   if (!parent) return [...joint.rest];
@@ -700,6 +760,8 @@ export interface HorseModelOptions extends HorseBodyOptions {
   markings?: HorseMarkings;
   /** Mane hair length in metres. Default 0.11 times the withers height (a pulled mane). */
   maneLength?: number;
+  /** Add skinnable mane and forelock chains for the optional strand driver. Default false. */
+  strandRig?: boolean;
   /** Tail hair length in metres from the dock. Default 0.55 times the withers height (to the hocks). */
   tailLength?: number;
   /** Speeds in m/s at which each gait's clip is baked. Default each gait's preferred speed for this horse. */
@@ -893,7 +955,7 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   if (!(maneLength >= 0.02 && maneLength <= 0.8))
     throw new RangeError('horseDocument maneLength must be 0.02 to 0.8 m');
   if (!(tailLength >= 0.1 && tailLength <= 1.6)) throw new RangeError('horseDocument tailLength must be 0.1 to 1.6 m');
-  const skeleton = horseSkeleton(body, tailLength);
+  const skeleton = horseSkeleton(body, tailLength, options.strandRig ? maneLength : undefined);
   const socks = markings.socks ?? [0, 0, 0, 0];
   if (!Array.isArray(socks) || socks.length !== 4 || socks.some((h) => !(h >= 0 && h <= H)))
     throw new RangeError('horseDocument markings.socks must be four heights in metres, 0 to the withers height');
@@ -1129,7 +1191,7 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   for (const side of [1, -1]) {
     const base: V3 = [side * 0.035 * H, poll[1] + 0.05 * H, poll[2] - 0.01 * H],
       tip: V3 = [side * 0.05 * H, base[1] + 0.09 * H, base[2] + 0.025 * H],
-      m = Math.max(6, around / 3),
+      m = Math.max(6, Math.ceil(around / 3)),
       start = coatPart.count;
     for (let r = 0; r <= 3; r++) {
       const f = r / 3,
@@ -1181,11 +1243,7 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
     const start = part.count;
     for (let r = 0; r <= segsN; r++) {
       const f = r / segsN,
-        c: V3 = [
-          root[0] + dir[0] * length * f + bend[0] * f * f * length,
-          root[1] + dir[1] * length * f + bend[1] * f * f * length,
-          root[2] + dir[2] * length * f + bend[2] * f * f * length,
-        ],
+        c = hairPoint(root, dir, bend, length, f),
         w = width * (1 - 0.6 * f);
       for (const k of [0, 1]) {
         const o = (k - 0.5) * w;
@@ -1202,6 +1260,16 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
   const maneCards = [8, 20, 36][detail]!,
     n1 = jid('neck1'),
     n2 = jid('neck2');
+  const guideWeights = (index: number, fraction: number): [number, number][] => {
+    const chain = skeleton.strandChains![index + 1]!,
+      position = fraction * (chain.length - 1),
+      inner = Math.min(chain.length - 2, Math.floor(position)),
+      weight = position - inner;
+    return [
+      [chain[inner]!, 1 - weight],
+      [chain[inner + 1]!, weight],
+    ];
+  };
   for (let i = 0; i < maneCards; i++) {
     const s = (i + 0.5) / maneCards,
       c = mix3([0, at('body')[1] + body.chestDepth / 2, 0.3 * L], poll, s),
@@ -1217,16 +1285,18 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
       ln,
       ((L * 0.6) / maneCards) * 1.8,
       [-0.1, -0.05, -0.05],
-      () =>
-        s < 0.5
-          ? [
-              [n1, 1 - s],
-              [n2, s],
-            ]
-          : [
-              [n2, 1.5 - s],
-              [headJ, s - 0.5],
-            ],
+      (f) =>
+        skeleton.strandChains
+          ? guideWeights(Math.floor(s * MANE_GUIDES), f)
+          : s < 0.5
+            ? [
+                [n1, 1 - s],
+                [n2, s],
+              ]
+            : [
+                [n2, 1.5 - s],
+                [headJ, s - 0.5],
+              ],
       colors.mane as V3,
     );
   }
@@ -1240,7 +1310,7 @@ export function horseDocument(options: HorseModelOptions = {}): HorseDocument {
       maneLength * 1.1,
       0.03 * H,
       [0, -0.15, 0.05],
-      () => [[headJ, 1]],
+      (f) => (skeleton.strandChains ? guideWeights(MANE_GUIDES + Number(x > 0), f) : [[headJ, 1]]),
       colors.mane as V3,
     );
   }

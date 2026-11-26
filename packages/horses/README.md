@@ -313,3 +313,35 @@ console.log(motion.speed, motion.bank, motion.strideCyclesAt());
 own mass and `acceleration` to set available propulsive force. `bank` is the trunk angle about its forward axis,
 and `sidewaysSpeed` is lateral slip in metres per second. `addHorse` uses the live duty factor and stride length
 to hold the gait phase continuously when speed changes.
+
+## Physical mane and tail
+
+Use `addStrandHorse` for the same gait and skin with 11 simulated guides for the tail, mane
+and forelock. The tail and mane react to the body's acceleration, gravity and the supplied
+wind. The hair card transforms follow the native guide frames on the horse's 240 Hz clock.
+
+```ts
+import { Engine } from 'margoengine';
+import { addStrandHorse } from 'margoengine/horses/strands';
+import { BoundaryLayerWind } from 'margoengine/weather/boundary-layer';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const wind = new BoundaryLayerWind({ speed: 8, roughness: 0.03, turbulence: false });
+const horse = await addStrandHorse(engine, { coat: 'chestnut', strands: { wind } });
+horse.speed = 4;
+horse.advanceTime(1 / 30);
+engine.render({ delta: 1 / 30 });
+console.log(horse.strandSolver.sample(0, 7).position);
+```
+
+`seek(time)` replays the gait commands and native strand state together. `flickTail` drives the
+dock and the following joints respond through the solve. Supply `strands.bed` for ground contact
+and use the normal `ground` option to place the horse's hooves on that surface. The default
+strand tier is `'rod'` at 240 Hz with 5/s damping. `strands.fidelity: 'follow'` selects the
+inextensible model. Both use animated barrel and neck capsules.
+
+The default tail bundle uses 18 mm effective radius, 1150 kg/m³ effective density, 32 MPa Young
+modulus and 83 mm drag width. The mane and forelock defaults are 4.5 mm, 1100 kg/m³, 60 MPa
+and 27 mm respectively. Set `strands.tail` and `strands.mane` to fit the rig's bundle mass,
+stiffness and drag. These are coarse guide properties. An authored `skin` supplies
+`skeleton.strandChains` and uses `horseJointTranslation` when applying the pose.

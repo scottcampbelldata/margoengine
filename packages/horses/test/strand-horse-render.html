@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Horse mane and tail dynamics</title></head>
+<body>
+<script type="module">
+  import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, readPixels } from '/packages/headless/dist/index.js';
+  import { BoundaryLayerWind } from '/packages/weather/dist/boundary-layer.js';
+  import { addStrandHorse } from '../dist/strands.js';
+
+  const engine = await Engine.create(createHeadlessCanvas({ width: 640, height: 360 }), {
+    backend: 'webgpu', camera: { position: [-3.4, 1.85, -0.35], target: [0, 1.22, 1.02], near: 0.05, far: 30 },
+  });
+  engine.stop();
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', ({ error }) => errors.push(error.message));
+  engine.createMesh().setGeometry(box(14, 0.07, 14)).setPosition([0, -0.035, 0])
+    .setMaterial(new PbrMaterial({ color: '#9a917d', roughness: 0.88 }));
+  const wind = new BoundaryLayerWind({ speed: 24, direction: Math.PI, roughness: 0.03, turbulence: false });
+  const distance = (a, b) => Math.hypot(...a.map((x, k) => x - b[k]));
+  const capture = async () => {
+    engine.render({ delta: 1 / 60 });
+    return (await readPixels(engine)).data;
+  };
+  const pose = horse => [...horse.pose.jointTranslations].map(([node, xyz]) => [node, xyz, horse.pose.rotations[node]]);
+  async function ride(flow) {
+    const horse = await addStrandHorse(engine, { coat: 'chestnut', type: 'riding', detail: 1, strands: { wind: flow } });
+    try {
+      const chains = horse.skeleton.strandChains, t = chains[0].length - 1,
+        m = chains[4].length - 1, f = chains[9].length - 1;
+      const tip = (guide, index) => horse.strandSolver.sample(guide, index).position;
+      horse.speed = 4;
+      horse.gait = 'trot';
+      horse.heading = -0.29;
+      for (let i = 0; i < 45; i++) horse.advanceTime(1 / 30);
+      const first = horse.strandWorld.hash(), firstPose = pose(horse), pixels = await capture();
+      const tail = tip(0, t), mane = tip(4, m), forelock = tip(9, f);
+      const jointPoint = (guide, index) => Array.from(horse.model.nodes[chains[guide][index]].matrix.slice(12, 15));
+      const error = Math.max(distance(jointPoint(0, t), tail), distance(jointPoint(4, m), mane), distance(jointPoint(9, f), forelock));
+      horse.seek(1.5);
+      const replay = horse.strandWorld.hash(), replayPose = pose(horse);
+      const gait = horse.currentGait, speed = horse.currentSpeed;
+      return { first, replay, firstPose, replayPose, pixels, tail, mane, forelock, gait, speed, error, joints: chains.flat().length };
+    } finally {
+      horse.dispose();
+    }
+  }
+  window.runStrandHorse = async () => {
+    const still = await ride(undefined), gusted = await ride(wind);
+    let changed = 0;
+    for (let i = 0; i < still.pixels.length; i += 4) {
+      if ([0, 1, 2].reduce((sum, j) => sum + Math.abs(still.pixels[i + j] - gusted.pixels[i + j]), 0) > 20) changed++;
+    }
+    return {
+      first: gusted.first, replay: gusted.replay, poseEqual: JSON.stringify(gusted.firstPose) === JSON.stringify(gusted.replayPose),
+      changed, errors, gait: gusted.gait, speed: gusted.speed, joints: gusted.joints, error: gusted.error,
+      tail: distance(still.tail, gusted.tail), mane: distance(still.mane, gusted.mane),
+      forelock: distance(still.forelock, gusted.forelock),
+    };
+  };
+</script>
+</body>
+</html>

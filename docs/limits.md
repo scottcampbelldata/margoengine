@@ -9790,3 +9790,11 @@ changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared an
 native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,508 B gzip
 with a 4,764 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
 Stage gain zero bytes.
+
+The optional horse adapter drives eight tail joints and ten five-point mane and forelock
+guides on the existing gait clock. It represents the rest of the strands through hair cards
+weighted to those guides. The 1.5 s trotting fixture in a 24 m/s reference-height wind
+moved tail, mane and forelock tips by 0.2896, 0.0250 and 0.0579 m relative to the still-air
+run. Both backends produced 1,478 changed pixels and replay hash `f1550b4d0b329005`. The
+body capsules follow the skin pose on each tick. The parameters represent effective hair
+bundles, and bundle-scale stiffness and drag calibration remain open.

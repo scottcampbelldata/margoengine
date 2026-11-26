@@ -14685,3 +14685,17 @@ The curved no-load fixture independently checks invariance under a rigid transfo
 test measures every length during a wind reversal and contact with a live terrain bed. The
 browser fixture draws the solved centreline and frame in a fixed view and repeats the same
 gust against a still-air control.
+
+### Strand motion on the horse skin
+
+The optional horse driver uses the authored joint hierarchy and applies the solved guides as
+parent-relative transforms. The guide-to-bone calculation first maps the rest material frame
+to the rest bone. It then composes the live frame with that offset and converts the result
+through the live parent inverse. The weighted cards use the existing horse skinning path.
+
+Bazarsad Bolormaa, Jean Yves Drean and Dorj Enkhtuya, [*A Study of the Diameter Distribution and
+Tensile Property of Horse Tail Hair*](https://doi.org/10.1080/15440470801893281) (2008), measured
+variation across horse tail fibres and along their lengths. The rig uses larger effective
+bundles with independently controlled bending and drag settings. Those defaults are an
+authoring approximation pending bundle-scale measurements. The existing equine gait follows
+the references in the horses README.
