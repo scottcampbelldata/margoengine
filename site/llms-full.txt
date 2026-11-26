@@ -12876,12 +12876,14 @@ with several grid vertices. Surface repose uses one ordered face sweep over the 
 The candidate set follows newly moved soil and can spread far when the specified repose slope approaches zero.
 The ground is a height field with peak indentation per vertex. The optional hardpan adds one uniform
 subsurface pressure transition. Shear and displaced material still use the topsoil fit. Time-varying 3D tread
-contact, spatially varying shared layers, overhangs and accumulated subgrade fatigue remain open. The optional
-uniform excavation floor should match TerrainBed's bedrock. The volume ledger records material crossing the
-modeled bounds, compaction and lofted mineral dust.
+contact, spatially varying shared layers, overhangs and accumulated subgrade fatigue remain open. The rolling
+wheel option resolves the driven rim's average stress envelope below its axle. Lug phase, transient digging,
+braking-specific stress shapes and a direct tyre torque exchange remain open. The optional uniform excavation
+floor should match TerrainBed's bedrock. The volume ledger records material crossing the modeled bounds,
+compaction and lofted mineral dust.
 
-The optional entry is 10,366 B gzip with a 10,388 B ceiling. Both Wasm assets are 10,951 B raw and 4,823 B gzip each.
-The Physics root is 865,979 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The optional entry is 10,864 B gzip with a 11,190 B ceiling. Both Wasm assets are 14,955 B raw and 5,969 B gzip each.
+The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
@@ -12909,8 +12911,8 @@ rate. Use enough points to resolve thin obstacles.
 
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,515 B gzip
-with a 4,771 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,508 B gzip
+with a 4,764 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
 Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
@@ -29751,8 +29753,8 @@ pressures produce persistent relief and loft mineral dust. A configured uniform 
 response. Spatially varying bedrock and shared subsurface layers need a profile contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
-sampled projected shoe and tread contours. Live 3D tread intersection and validation against measured
-moving-footprint and berm profiles remain EARTH-05 work.
+sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
+Live 3D tread intersection, high-slip digging and measured berm profiles remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

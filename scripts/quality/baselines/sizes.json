@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20433613,
+  "total": 20434415,
   "history": [
     {
       "date": "2026-10-24",
@@ -13191,6 +13191,12 @@
       "commit": "1f99e19bf6403e4b66aba8c2e23c817bad80c59e",
       "grew": 1,
       "reason": "SOFT-03 adds the optional strands entry at 4508 B gzip (zero bytes before the entry existed). Its Cosserat and follow-the-leader tiers share one world layout, field sampler and loader. Splitting would duplicate that code and the state contract; core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c95f3be752",
+      "grew": 1,
+      "reason": "EARTH-05 measured rolling contact takes the optional entry from 10366 to 10864 B gzip. The native wheel arc feeds the same pressure and bed-transfer stamp, so splitting would duplicate patch coupling and the native loader. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14061,7 +14067,7 @@
     "@margoengine/physics/strands": 4764,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 10388,
+    "@margoengine/physics/terramechanics": 11190,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
