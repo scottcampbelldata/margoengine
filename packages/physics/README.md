@@ -4814,3 +4814,10 @@ dense guide sets when elastic frames and point self contact are unnecessary.
 - `field` publishes `STRAND_LAYOUT` in the world registry. Each `STRAND_WORDS`-word f64 record
   stores centreline position, linear velocity, XYZW material frame and angular velocity in that
   order. Give the same deterministic anchor, wind, and body functions to playback and snapshot replay.
+
+For a dynamic capsule or sphere, give `StrandSolver.load({ rigidCapsules })` its rigid body
+row, local endpoints and radius. Add the `RigidSolver` first so the strand solver can size its
+reaction field. Couple the two solvers at the same rate. With staggered rigid-then-strand
+stepping, the accumulated reaction enters the next rigid step. Contact reactions include
+linear impulse and the moment about the body's centre of mass. Reciprocal contact uses the
+rod tier.

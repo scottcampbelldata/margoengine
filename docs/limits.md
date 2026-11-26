@@ -9845,6 +9845,12 @@ effective moduli where those have been measured. Sampled bodies are kinematic ca
 spheres with point contact. Separation between contacts depends on guide spacing and substep
 rate. Use enough points to resolve thin obstacles.
 
+Optional dynamic capsule contacts publish an equal reaction to the real RigidSolver in SI.
+The isolated moving-capsule test closes initial linear momentum including the in-flight
+registry impulse and measures angular response off the body's centre. Use the same
+coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
+The native constraints sample discrete guide points and body poses at substep boundaries.
+
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
 native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,508 B gzip

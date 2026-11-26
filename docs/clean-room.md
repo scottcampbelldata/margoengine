@@ -14846,3 +14846,14 @@ After simulation it composes that offset with the current frame and converts bot
 position and rotation to the live parent frame. The avatar proof uses the authored ponytail
 and selected colliders from the [VRM SpringBone 1.0 extension specification](https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_springBone-1.0).
 The avatar asset and license are listed in `examples/assets/vrm/README.md`.
+
+### Reciprocal strand and rigid capsule contact
+
+For each dynamic capsule projection, the strand's position correction contributes the
+equivalent linear impulse from its lumped node mass and substep length. That impulse and
+the moving-surface velocity correction enter the rigid row with opposite sign. The surface
+point and rigid centre of mass give the angular impulse through their cross product. The
+contact point uses the closest point on the capsule axis. The linear and angular convention
+matches David Baraff, [*An Introduction to Physically Based Modeling: Rigid Body Simulation II*](https://www.cs.cmu.edu/~baraff/sigcourse/notesd2.pdf)
+(1997), equations 8–5 to 8–7 and C–11. The tests include the reaction still in the registry when closing
+the initial impulse budget. They also check both memory variants and an origin-cell offset.

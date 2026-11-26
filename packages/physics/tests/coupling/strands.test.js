@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { StrandSolver, STRAND_LAYOUT, STRAND_WORDS } from '../../dist/strands.js';
+import { Physics } from '../../dist/index.js';
 import { TerrainBed } from '../../dist/earth.js';
-import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
+import { BODY_IMPULSES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const zero = [0, 0, 0];
@@ -177,4 +178,68 @@ test('invalid fibre lengths, mass and collision profiles report direct fixes', a
   await assert.rejects(attach([{ points: [zero, zero] }]), /positive rest edge length/);
   await assert.rejects(attach([{ points, density: 0 }]), /positive fibre density/);
   await assert.rejects(attach([{ points }], { fidelity: 'follow', selfCollision: true }), /Use the rod tier/);
+});
+
+test('a real moving rigid capsule gets the opposite strand impulse and an off-centre moment', async () => {
+  for (const [shared, offset] of [
+    [false, 0],
+    [true, 16],
+  ]) {
+    await Physics.load({ threads: shared });
+    const world = new PhysicsWorld({ rate, gravity: zero, memory: worldMemory(shared), cellSize: 16 });
+    const rigid = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / 60 });
+    try {
+      const incoming = -3.6,
+        mass = 2;
+      const body = rigid.addBody(null, {
+        position: [offset + 0.14, 0, 0],
+        linearVelocity: [incoming, 0, 0],
+        colliders: { shape: 'sphere', radius: 0.1, mass, sensor: true },
+      });
+      world.add(new RigidSolver(), { physics: rigid }, offset ? zero : [1, 0, 0]);
+      const solver = await StrandSolver.load({
+        rigidCapsules: [{ body: body.row, start: [0, 0.04, 0], end: [0, 0.04, 0], radius: 0.1 }],
+      });
+      const radius = 0.01,
+        density = 850,
+        length = 0.3;
+      world.add(
+        solver,
+        {
+          strands: [{ points: [[0, length, 0], zero], radius, density, young: 0.25, drag: 0 }],
+          rate: 0,
+          damping: 0,
+          friction: 0,
+          iterations: 1,
+          selfCollision: false,
+          cellSize: 16,
+        },
+        [1, 0, 0],
+      );
+      world.couple(['rigid', solver.id], 'staggered');
+      world.advance(1);
+      const [port] = solver.exportPorts(0).filter(({ field }) => field === BODY_IMPULSES_FIELD.name);
+      const pending = regionWords(world.memory, port.region).slice(body.row * 6, body.row * 6 + 6);
+      const tip = solver.sample(0, 1),
+        tipMass = 0.5 * density * Math.PI * radius * radius * length;
+      assert.ok(tip.velocity[0] < 0 && pending[0] > 0 && pending[5] < 0, JSON.stringify({ tip, pending }));
+      // The root was unloaded at the first projection. The known initial rigid momentum remains in the two
+      // bodies and the in-flight f64 reaction. Its f32 velocity can round by less than one part in 2^22.
+      near(
+        pending[0] + tipMass * tip.velocity[0] + mass * body.linearVelocity[0],
+        mass * incoming,
+        mass * Math.abs(incoming) * 2 ** -22,
+      );
+      near(pending[1] + tipMass * tip.velocity[1] + mass * body.linearVelocity[1], 0, 64 * Number.EPSILON);
+      const snapshot = world.takeSnapshot();
+      world.advance(2);
+      assert.ok(body.linearVelocity[0] > incoming && body.angularVelocity[2] < 0);
+      const hash = world.hash();
+      world.restoreSnapshot(snapshot.bytes);
+      world.advance(2);
+      assert.equal(world.hash(), hash);
+    } finally {
+      rigid.dispose();
+    }
+  }
 });

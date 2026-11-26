@@ -243,6 +243,27 @@ struct Capsule {
 }
 
 #[repr(C)]
+struct RigidCapsule {
+    shape: Capsule,
+    centre: V,
+    velocity: V,
+    angular: V,
+    row: f64,
+}
+
+#[repr(C)]
+struct Reaction {
+    impulse: V,
+    angular: V,
+}
+
+#[repr(C)]
+struct Hit {
+    collider: usize,
+    point: V,
+}
+
+#[repr(C)]
 struct Advance {
     gravity: V,
     dt: f64,
@@ -470,6 +491,72 @@ fn ground_direction(
         .add(tangent.scale(sqrt(1.0 - minimum * minimum)))
 }
 
+#[inline(always)]
+fn capsule_contact(position: V, radius: f64, obstacle: &Capsule) -> Option<(V, V)> {
+    let axis = obstacle.end.subtract(obstacle.start);
+    let offset = position.subtract(obstacle.start);
+    let square = axis.dot(axis);
+    let along = if square > 0.0 {
+        (axis.dot(offset) / square).max(0.0).min(1.0)
+    } else {
+        0.0
+    };
+    let radial = offset.subtract(axis.scale(along));
+    let penetration = obstacle.radius + radius - radial.length();
+    if penetration <= 0.0 {
+        return None;
+    }
+    let normal = radial.direction(axis.cross(V::X).direction(V::Y));
+    let nearest = obstacle.start.add(axis.scale(along));
+    Some((
+        nearest.add(normal.scale(obstacle.radius)),
+        normal.scale(penetration),
+    ))
+}
+
+// The reaction is taken at the capsule surface and reported about the rigid centre of mass.
+fn transfer(reactions: &mut [Reaction], body: &RigidCapsule, point: V, impulse: V) {
+    let reaction = slot_mut(reactions, body.row as usize);
+    reaction.impulse = reaction.impulse.add(impulse);
+    reaction.angular = reaction
+        .angular
+        .add(point.subtract(body.centre).cross(impulse));
+}
+
+fn rigid_contact(
+    position: &mut V,
+    material: &Material,
+    bodies: &[RigidCapsule],
+    reactions: &mut [Reaction],
+    hit: &mut Hit,
+    dt: f64,
+) -> V {
+    if material.inverse_mass == 0.0 {
+        return V::ZERO;
+    }
+    let mut total = V::ZERO;
+    for (i, body) in bodies.iter().enumerate() {
+        if body.row < 0.0 {
+            continue;
+        }
+        if let Some((surface, correction)) =
+            capsule_contact(*position, material.radius, &body.shape)
+        {
+            *position = position.add(correction);
+            total = total.add(correction);
+            transfer(
+                reactions,
+                body,
+                surface,
+                correction.scale(-1.0 / (material.inverse_mass * dt)),
+            );
+            hit.collider = i + 1;
+            hit.point = surface;
+        }
+    }
+    total
+}
+
 fn contact(
     position: &mut V,
     material: &Material,
@@ -486,19 +573,7 @@ fn contact(
         normal = environment.ground.scale(penetration);
     }
     for obstacle in capsules {
-        let axis = obstacle.end.subtract(obstacle.start);
-        let offset = position.subtract(obstacle.start);
-        let square = axis.dot(axis);
-        let along = if square > 0.0 {
-            (axis.dot(offset) / square).max(0.0).min(1.0)
-        } else {
-            0.0
-        };
-        let radial = offset.subtract(axis.scale(along));
-        let penetration = obstacle.radius + material.radius - radial.length();
-        if penetration > 0.0 {
-            let fallback = axis.cross(V::X).direction(V::Y);
-            let correction = radial.direction(fallback).scale(penetration);
+        if let Some((_, correction)) = capsule_contact(*position, material.radius, obstacle) {
             *position = position.add(correction);
             normal = normal.add(correction);
         }
@@ -536,6 +611,11 @@ unsafe extern "C" fn advance_strands(
     chains: usize,
     colliders: usize,
     bucket_count: usize,
+    moving_capsules: *const RigidCapsule,
+    moving_count: usize,
+    hits: *mut Hit,
+    reactions: *mut Reaction,
+    reaction_count: usize,
 ) -> f64 {
     let cfg = unsafe { &*config };
     let nodes = unsafe { core::slice::from_raw_parts_mut(nodes, count) };
@@ -546,6 +626,13 @@ unsafe extern "C" fn advance_strands(
     let obstacles = unsafe { core::slice::from_raw_parts(obstacles, colliders) };
     let links = unsafe { core::slice::from_raw_parts_mut(links, count) };
     let buckets = unsafe { core::slice::from_raw_parts_mut(buckets, bucket_count) };
+    let bodies = unsafe { core::slice::from_raw_parts(moving_capsules, moving_count) };
+    let reactions = unsafe { core::slice::from_raw_parts_mut(reactions, reaction_count) };
+    let hits =
+        unsafe { core::slice::from_raw_parts_mut(hits, if bodies.is_empty() { 0 } else { count }) };
+    for hit in hits.iter_mut() {
+        hit.collider = 0;
+    }
     let dt = cfg.dt;
     for (i, node) in nodes.iter_mut().enumerate() {
         let rest = slot(material, i);
@@ -633,6 +720,16 @@ unsafe extern "C" fn advance_strands(
                     slot(env, i),
                     obstacles,
                 ));
+                if !bodies.is_empty() {
+                    state.contact = state.contact.add(rigid_contact(
+                        &mut node.position,
+                        slot(material, i),
+                        bodies,
+                        reactions,
+                        slot_mut(hits, i),
+                        dt,
+                    ));
+                }
             }
             if cfg.self_collision > 0.0 {
                 checked += self_contacts(nodes, material, scratch, links, buckets, cfg.grid_size);
@@ -658,11 +755,39 @@ unsafe extern "C" fn advance_strands(
             let correction = last.contact.length();
             if correction > 0.0 {
                 let normal = last.contact.scale(1.0 / correction);
-                let speed = node.velocity.dot(normal);
-                let tangent = node.velocity.subtract(normal.scale(speed));
+                let hit = if bodies.is_empty() {
+                    None
+                } else {
+                    hits.get(i).filter(|hit| hit.collider != 0)
+                };
+                let wall = hit
+                    .map(|hit| {
+                        let body = slot(bodies, hit.collider - 1);
+                        body.velocity
+                            .add(body.angular.cross(hit.point.subtract(body.centre)))
+                    })
+                    .unwrap_or(V::ZERO);
+                let prior = node.velocity;
+                let relative = if hit.is_some() {
+                    prior.subtract(wall)
+                } else {
+                    prior
+                };
+                let speed = relative.dot(normal);
+                let tangent = relative.subtract(normal.scale(speed));
                 let limit = cfg.friction * (correction / dt);
                 let retained = (1.0 - limit / tangent.length()).max(0.0);
                 node.velocity = tangent.scale(retained).add(normal.scale(speed.max(0.0)));
+                if let Some(hit) = hit {
+                    node.velocity = node.velocity.add(wall);
+                    let mass = 1.0 / slot(material, i).inverse_mass;
+                    transfer(
+                        reactions,
+                        slot(bodies, hit.collider - 1),
+                        hit.point,
+                        prior.subtract(node.velocity).scale(mass),
+                    );
+                }
             }
             let difference = node.frame.mul(last.old.frame.conjugate());
             let sign = if difference.w < 0.0 { -1.0 } else { 1.0 };
