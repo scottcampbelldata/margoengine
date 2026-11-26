@@ -1,8 +1,8 @@
-import {sheenBrdfWGSL,sheenAlbedoWGSL} from '../../shared/sheen.js';
-import {iridescenceWgsl} from '../../shared/iridescence.js';
+import { sheenBrdfWGSL, sheenAlbedoWGSL } from '../../shared/sheen.js';
+import { iridescenceWgsl } from '../../shared/iridescence.js';
 // Optional-only material state. Sampling and evaluation share complete mixture
 // densities; rejected geometric-hemisphere directions keep their null probability.
-export const PBR_LOBES=/* wgsl */ `
+export const PBR_LOBES = /* wgsl */ `
 ${sheenBrdfWGSL('pbrSheenBRDF')}
 ${sheenAlbedoWGSL('pbrSheenAlbedo')}
 ${iridescenceWgsl}
