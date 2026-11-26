@@ -510,6 +510,32 @@ pub extern "C" fn shape_set_core(handle: i32, shape: u32, kind: u32) -> i32 {
     })
 }
 
+/// How a shape's mass is found: `mode` 0 by its density, 1 the mass io[0] (kg), 2 the mass io[0], centre io[1..3] (m, the
+/// body's frame) and inertia io[3] (kg m^2) as given.
+#[unsafe(no_mangle)]
+pub extern "C" fn shape_set_mass(handle: i32, shape: u32, mode: u32) -> i32 {
+    with_world!(handle, |w| {
+        let m = match mode {
+            0 => crate::world::MassMode::Density,
+            1 => crate::world::MassMode::Mass(f(0)),
+            2 => crate::world::MassMode::Props { mass: f(0), center: point(1), inertia: f(3) },
+            _ => return Err(PhysicsError::InvalidParameter),
+        };
+        w.set_shape_mass(shape, m).map(|()| 0)
+    })
+}
+
+/// A shape's mass, centre of mass (body frame) and inertia as its mass mode gives them, then its outline's area: io[0..5].
+#[unsafe(no_mangle)]
+pub extern "C" fn shape_mass(handle: i32, shape: u32) -> i32 {
+    with_world!(handle, |w| {
+        let (data, area) = w.shape_mass(shape)?;
+        ensure(5);
+        io()[..5].copy_from_slice(&[data.mass.to_bits(), data.center.x.to_bits(), data.center.y.to_bits(), data.inertia.to_bits(), area.to_bits()]);
+        Ok(0)
+    })
+}
+
 /// io: the move, in the body's frame: x, y and the angle, so each point p goes to rotate(angle) p + (x, y).
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_move(handle: i32, shape: u32) -> i32 {

@@ -90,6 +90,8 @@ interface Exports {
   shape_set(world: number, shape: number): number;
   shape_set_core(world: number, shape: number, kind: number): number;
   shape_move(world: number, shape: number): number;
+  shape_set_mass(world: number, shape: number, mode: number): number;
+  shape_mass(world: number, shape: number): number;
   shape_read(world: number, shape: number): number;
   joint_create(world: number, a: number, b: number, collide: number): number;
   joint_remove(world: number, joint: number): number;

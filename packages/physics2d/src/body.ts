@@ -213,6 +213,83 @@ export class Collider2D {
   setDensity(value: number): void {
     new Float32Array(this.settings.buffer)[0] = encode(value, 'density');
     this.push();
+    // A density set takes the collider back from a set mass to its density, as Rapier's does.
+    this.massProps = null;
+    const { kernel, handle } = this.owner;
+    for (const shape of this.shapes) kernel.ok(kernel.exports.shape_set_mass(handle, shape, 0));
+  }
+  /**
+   * Gives the collider a mass of its own, kilograms, whatever its outline's area (Rapier's `setMass`): its centre of mass
+   * stays the outline's and its inertia is the outline's at that mass, and it holds through `setShape`. A collider of
+   * several kernel shapes shares it among them by area. `setDensity` takes it back to its density.
+   * @throws RangeError for a mass below 0 or not finite.
+   */
+  setMass(kilograms: number): void {
+    this.live();
+    if (!(kilograms >= 0) || !Number.isFinite(kilograms))
+      throw new RangeError(
+        `A collider's mass is a finite number of kilograms, 0 or more (got ${kilograms}); pass one.`,
+      );
+    const { kernel, handle } = this.owner,
+      areas = this.shapes.map((shape) => {
+        kernel.ok(kernel.exports.shape_mass(handle, shape));
+        return kernel.io(5).f[4];
+      }),
+      total = areas.reduce((a, b) => a + b, 0);
+    this.massProps = null;
+    this.shapes.forEach((shape, i) => {
+      const io = kernel.io(1);
+      io.f[0] = total > 0 ? (kilograms * areas[i]) / total : kilograms / this.shapes.length;
+      kernel.ok(kernel.exports.shape_set_mass(handle, shape, 1));
+    });
+  }
+  /**
+   * Gives the collider its mass, centre of mass and inertia outright (Rapier's `setMassProperties`): `mass` in kilograms,
+   * `centre` in the collider's own frame (world units) and `inertia` in kg m^2 in world units about that centre. They hold
+   * through `setShape` and a move on the body; `setDensity` or `setMass` replaces them.
+   * @throws RangeError for a number that is not finite, or a mass or inertia below 0.
+   */
+  setMassProperties(mass: number, centre: Vec2D = [0, 0], inertia = 0): void {
+    this.live();
+    for (const [v, what] of [
+      [mass, 'mass'],
+      [inertia, 'inertia'],
+      [centre?.[0], 'centre x'],
+      [centre?.[1], 'centre y'],
+    ] as const)
+      if (!Number.isFinite(v)) throw new RangeError(`A collider's ${what} is a finite number (got ${v}); pass one.`);
+    if (mass < 0 || inertia < 0)
+      throw new RangeError(`A collider's mass and inertia are 0 or more (got ${mass}, ${inertia}); pass them.`);
+    const { kernel, handle, scale } = this.owner,
+      c = Math.cos(this.turn),
+      s = Math.sin(this.turn);
+    this.massProps = { mass, centre: [centre[0], centre[1]], inertia };
+    this.shapes.forEach((shape, i) => {
+      const io = kernel.io(4);
+      io.f[0] = i === 0 ? mass : 0;
+      // Its centre in the body's frame: the collider's place on the body, turned.
+      io.f[1] = (this.offset[0] + c * centre[0] - s * centre[1]) * scale;
+      io.f[2] = (this.offset[1] + s * centre[0] + c * centre[1]) * scale;
+      io.f[3] = i === 0 ? inertia * scale * scale : 0;
+      kernel.ok(kernel.exports.shape_set_mass(handle, shape, 2));
+    });
+  }
+  /** The collider's mass, kilograms: from its density, or as set. */
+  mass(): number {
+    this.live();
+    const { kernel, handle } = this.owner;
+    let m = 0;
+    for (const shape of this.shapes) {
+      kernel.ok(kernel.exports.shape_mass(handle, shape));
+      m += kernel.io(5).f[0];
+    }
+    return m;
+  }
+  /** The mass properties given outright, kept so a move on the body takes their centre with it. */
+  private massProps: { mass: number; centre: Vec2D; inertia: number } | null = null;
+  private live(): void {
+    if (this.removed)
+      throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
   }
   /**
    * Which kinds of body pair this collider takes part in, as the bits of `activeCollisionTypes` (Rapier's
@@ -346,6 +423,8 @@ export class Collider2D {
     }
     this.offset = [offset[0], offset[1]];
     this.turn = turn;
+    // Mass properties given in the collider's frame go where it went.
+    if (this.massProps) this.setMassProperties(this.massProps.mass, this.massProps.centre, this.massProps.inertia);
     if (this.options) {
       this.options = { ...this.options, offset: this.offset, rotation: turn };
       this.described = { ...describeShapes(this.options, scale)[0], settings: this.settings };

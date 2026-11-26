@@ -13,7 +13,7 @@ use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 use crate::error::PhysicsError;
 use crate::joint::{Joint, JointDef, JointKind, Motor};
 use crate::manifold::{Manifold, collide_coherent_trusted, collide_four_trusted, reference_flip, validate_collision_core, validate_collision_pose};
-use crate::mass::checked_mass_of;
+use crate::mass::{MassData, checked_mass_of};
 use crate::math::{Rot, V2, Xf, sqrt, v2};
 use crate::shape::{Core, LINEAR_SLOP};
 use crate::smooth::{CHAIN_WELD, collide_smooth_trusted};
@@ -200,6 +200,16 @@ pub struct ShapeDef {
     pub skin: f32,
 }
 
+/// How a shape's mass is found (Rapier's collider mass properties): from its density and area, a mass of its own with the
+/// outline's centre and the inertia of the outline at that mass, or a mass, centre (in the body's frame) and inertia
+/// about it as given.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MassMode {
+    Density,
+    Mass(f32),
+    Props { mass: f32, center: V2, inertia: f32 },
+}
+
 /// Combine rules of `ShapeDef::friction_rule` and `restitution_rule`, in the order a pair picks between two (the later
 /// wins): the mean, the smaller, the product, the larger, the sum held to 0 to 1, the square root of the product.
 pub const COMBINE_AVERAGE: u8 = 0;
@@ -322,6 +332,8 @@ pub struct Shape {
     pub restitution_rule: u8,
     /// Its contact skin, m (`ShapeDef::skin`).
     pub skin: f32,
+    /// How its mass is found: from its density (the default), or set (`World::set_shape_mass`).
+    pub mass_mode: MassMode,
     /// A grid of solid cells that scene queries meet in place of the core (the core is its bounding box); such a shape
     /// takes part in no contact.
     pub grid: Option<alloc::boxed::Box<crate::voxel::Grid>>,
@@ -678,6 +690,25 @@ impl Default for World {
 }
 
 /// The box around `core` at `xf`.
+/// A shape's mass data by its mass mode: from its density, a set mass with the outline's centre and the outline's inertia
+/// at that mass (an outline of no area, a segment, has its mass at the middle of its points and no inertia), or as given.
+fn shape_mass_data(shape: &Shape) -> Result<MassData, PhysicsError> {
+    match shape.mass_mode {
+        MassMode::Density => checked_mass_of(&shape.core, shape.density),
+        MassMode::Mass(m) => {
+            let unit = checked_mass_of(&shape.core, 1.0)?;
+            if unit.mass > 0.0 {
+                Ok(MassData { mass: m, center: unit.center, inertia: unit.inertia * (m / unit.mass) })
+            } else {
+                let n = shape.core.count.max(1) as f32;
+                let middle = shape.core.vertices[..shape.core.count].iter().fold(V2::ZERO, |a, v| a.add(*v)).scale(1.0 / n);
+                Ok(MassData { mass: m, center: middle, inertia: 0.0 })
+            }
+        }
+        MassMode::Props { mass, center, inertia } => Ok(MassData { mass, center, inertia }),
+    }
+}
+
 pub fn bounds_of(core: &Core, xf: Xf) -> Result<Bounds<2>, PhysicsError> {
     validate_collision_core(core)?;
     validate_collision_pose(xf)?;
@@ -816,7 +847,7 @@ impl World {
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > COMBINE_LAST || def.restitution_rule > COMBINE_LAST { return Err(PhysicsError::InvalidParameter); }
         if !def.skin.is_finite() { return Err(PhysicsError::NotFinite); }
         if def.skin < 0.0 { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, skin: def.skin, grid: None, dead: false };
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, skin: def.skin, mass_mode: MassMode::Density, grid: None, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -923,7 +954,7 @@ impl World {
             let shape = self.shapes.get(s as usize).ok_or(PhysicsError::InvalidHandle)?;
             if shape.body != id { return Err(PhysicsError::InvalidHandle); }
             validate_shape(shape)?;
-            let data = checked_mass_of(&shape.core, shape.density)?;
+            let data = shape_mass_data(shape)?;
             mass += data.mass;
             first = first.add(data.center.scale(data.mass));
             list.push(data);
@@ -1094,6 +1125,45 @@ impl World {
             contact.primed = false;
         }
         self.wake(body)
+    }
+
+    /// Sets how a shape's mass is found (Rapier's collider `setMass` and `setMassProperties`; `MassMode::Density` goes back
+    /// to its density, as `setDensity` does), works the body's mass out again and wakes it. A mass or inertia below 0 or not
+    /// finite is refused and the shape left as it was.
+    pub fn set_shape_mass(&mut self, id: u32, mode: MassMode) -> Result<(), PhysicsError> {
+        let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if shape.dead {
+            return Err(PhysicsError::InvalidHandle);
+        }
+        let numbers: &[f32] = match &mode {
+            MassMode::Density => &[],
+            MassMode::Mass(m) => &[*m][..],
+            MassMode::Props { mass, center, inertia } => &[*mass, center.x, center.y, *inertia][..],
+        };
+        if numbers.iter().any(|v| !v.is_finite()) {
+            return Err(PhysicsError::NotFinite);
+        }
+        if match mode {
+            MassMode::Mass(m) => m < 0.0,
+            MassMode::Props { mass, inertia, .. } => mass < 0.0 || inertia < 0.0,
+            MassMode::Density => false,
+        } {
+            return Err(PhysicsError::InvalidParameter);
+        }
+        let body = shape.body;
+        let before = core::mem::replace(&mut self.shapes[id as usize].mass_mode, mode);
+        if let Err(error) = self.update_mass(body) {
+            self.shapes[id as usize].mass_mode = before;
+            return Err(error);
+        }
+        self.wake(body)
+    }
+
+    /// A shape's mass, centre of mass (in the body's frame) and inertia about it, as its mass mode gives them, and the area of
+    /// its outline (its mass at density 1).
+    pub fn shape_mass(&self, id: u32) -> Result<(MassData, f32), PhysicsError> {
+        let shape = self.shapes.get(id as usize).filter(|s| !s.dead).ok_or(PhysicsError::InvalidHandle)?;
+        Ok((shape_mass_data(shape)?, checked_mass_of(&shape.core, 1.0)?.mass))
     }
 
     pub fn remove_shape(&mut self, id: u32) -> Result<(), PhysicsError> {

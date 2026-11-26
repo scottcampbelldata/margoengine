@@ -258,6 +258,22 @@ console.log(door.colliders[0].rotationWrtParent().toFixed(3)); // '1.571'
 physics.dispose();
 ```
 
+A collider's mass can be its own rather than its density's: `setMass(kilograms)` (or the `mass` option) holds whatever
+the outline, its centre and inertia the outline's at that mass; `setMassProperties(mass, centre, inertia)` gives them
+outright, the centre in the collider's frame; `setDensity` goes back; `mass()` reads it. As Rapier's.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+const crate = physics.addBody(null, { colliders: { shape: 'box', width: 1, height: 1 } });
+crate.colliders[0].setMass(12);
+crate.colliders[0].setShape({ shape: 'circle', radius: 2 }); // still 12 kg
+console.log(crate.mass.toFixed(1)); // '12.0'
+physics.dispose();
+```
+
 ## Articulations
 
 `physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.

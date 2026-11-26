@@ -907,6 +907,8 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const collider = new Collider2D(this, body, ids, settings, options.offset ?? [0, 0], options.rotation ?? 0);
     collider.described = parts[0];
     collider.options = options;
+    // A mass given when the collider is made is its own, as a later setMass is: it holds through a new outline.
+    if (options.mass !== undefined) collider.setMass(options.mass);
     for (const id of ids) this.byShape.set(id, collider);
     body.colliders.push(collider);
     return collider;
