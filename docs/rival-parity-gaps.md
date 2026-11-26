@@ -60,7 +60,7 @@ From the three.js examples gallery, example by example (names only).
 | --- | --- | --- | --- | --- |
 | Per-instance morph target weights on instanced meshes: `SkinnedCrowd` holds every instance at the model's current weights and `VATCrowd` plays baked morph clips; no live weights per instance | three.js examples (`webgl_instancing_morph`, `webgpu_instancing_morph`) | PARTIAL | M |  |
 | Batched mesh per-item frustum culling and LOD levels: `BatchedMesh` items carry a matrix, a colour and a visible flag only (`CulledModels` and `LODSystem` cover instanced models) | three.js examples (`webgl_batch_lod_bvh`) | PARTIAL | M |  |
-| Draw a skinned or morphed mesh as points that follow the deformation (glTF POINTS primitives are skinned and `vfx` emits from a skinned surface; no option draws a triangle mesh as its vertices) | three.js examples (`webgpu_skinning_points`) | PARTIAL | S |  |
+| Draw a skinned or morphed mesh as points that follow the deformation (glTF POINTS primitives are skinned and `vfx` emits from a skinned surface; no option draws a triangle mesh as its vertices) | three.js examples (`webgpu_skinning_points`) | DONE | S | f8c292a91 |
 
 ## Lane B: particles, simulation and physics
 

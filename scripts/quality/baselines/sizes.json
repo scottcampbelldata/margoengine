@@ -13942,7 +13942,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "7db8e9d5b4",
+      "commit": "f8c292a91d",
       "reason": "New optional entry @margoengine/animation/deformed-points: 0 to 4286 B gzip, ceiling 4542 B. One instanced quad strip per vertex of a skinned or morphed mesh, drawn from the deformation pass's own output buffer; it adds no skinning code. The animation root stays inside its ceiling. Core plus stage unchanged at 24846 B.",
       "grew": 1
     }
