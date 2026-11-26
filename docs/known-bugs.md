@@ -6,6 +6,34 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: half floats needed DataView.setFloat16 on Node 22, and were rounded twice (KB-NODE22-HALF1, decoders/shared)
+
+- **Repro:** on Node 22.12, `node --test packages/decoders/tests/tiff.test.js`: "TIFF 16, 32 and 64-bit float with the
+  floating point predictor (Predictor 3)" fails with `view.setFloat16 is not a function`. Separately, on any Node,
+  `f16Bits(1 + 2 ** -11 + 2 ** -40)` (also behind `floatToHalf` and `toHalf`) gave 0x3c00 where `setFloat16` stores
+  0x3c01.
+- **Cause:** the test's TIFF writer called `DataView.setFloat16` and its expectation `Math.f16round`, neither of which
+  Node 22 has; no shipped source calls either (`npm run check:node-apis` reads shipped files only, so nothing checked
+  the tests CI runs on Node 22). The binary16 encoders narrowed a number to binary32 first, rounding it twice.
+- **Fix:** the writer stores `f16Bits` (`packages/shared/f16.js`), which now narrows with rounding to odd (Boldo and
+  Melquiond, IEEE Transactions on Computers 57(4), 2008, https://doi.org/10.1109/TC.2007.70819) so it rounds once;
+  `floatToHalf` (`@margoengine/environment`) and `toHalf` (`@margoengine/materials`) use it instead of their own copies.
+  Binary32 inputs encode as before. The TIFF reader already decoded half floats itself.
+- **Regression:** `packages/decoders/tests/tiff.test.js`, "TIFF half floats and the binary16 encoder need no built-in
+  float16, and match it where it exists", and `tests/node-apis.test.js`, "the Node 22 test files and their helpers use
+  no built-in float16 API without a feature test".
+
+### Open 2026-11-26: some tests CI runs on Node 22.12 import APIs it lacks (KB-NODE22-TESTS1, tests)
+
+- **Repro:** on Node 22.12, `npm run test:node22`: files that import `registerHooks` from `node:module` (in
+  `packages/biomes/tests`, `packages/mesh-edit/tests`, `packages/gltf/test/auto.test.js`,
+  `packages/blender/tests/pbr-ext-close.test.js`, `packages/webgl2-compat/test/routes.test.js`) or `zstdCompressSync` /
+  `zstdDecompressSync` from `node:zlib` (`packages/decoders/tests/streams.test.js` and `zstd-destination.test.js`,
+  `packages/exporters/tests/basis-native.test.js` and `basis-zstd.test.js`, `packages/splats/test/zstd.test.js`) can fail
+  with "does not provide an export named".
+- **Cause:** both arrived after Node 22.12 (22.22 has them), and `scripts/check-node-apis.mjs` reads shipped sources
+  only. `tests/node-apis.test.js` checks the Node 22 test files for the float16 APIs alone until these are guarded.
+
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in

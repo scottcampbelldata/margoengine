@@ -2,6 +2,7 @@
 // from the same four specifications the readers follow. Test-only: never shipped.
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
+import { f16Bits } from '../../../shared/f16.js';
 
 /** Messages name the fix after the problem (docs/conventions.md): a '; ' clause or a fix verb. */
 export const namesFix = (message) => /; \w|\b(must|needs?|pass|use|raise|request|resize|convert|save)\b/.test(message);
@@ -356,7 +357,7 @@ export function tiff({
               bits === 64
                 ? view.setFloat64(at + i * 8, v, little)
                 : bits === 16
-                  ? view.setFloat16(at + i * 2, v, little)
+                  ? view.setUint16(at + i * 2, f16Bits(v), little)
                   : view.setFloat32(at + i * 4, v, little);
             else if (bits === 16) view.setUint16(at + i * 2, v, little);
             else if (bits === 8) bytes[at + i] = v;
