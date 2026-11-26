@@ -1991,7 +1991,7 @@ and visibility. Items are copied into shared vertex and index ranges once; movin
 floats and reruns a compute pass over the used vertices on the next frame (an unchanged batch costs nothing). Removed
 items' space is reused by later items that fit. `batch.mesh` takes `shadows.add`, `clustered.add`, `ssao.add` and
 picking like any `createMesh` mesh; `batch.itemOf(vertex)` maps a hit vertex back to its item and `batch.bounds(id)`
-gives an item's world box. Every item is its own copy of its geometry: for many copies of one geometry use
+gives an item's world box (`batch.boundsInto(out, id)` writes it into your array). Every item is its own copy of its geometry: for many copies of one geometry use
 `createInstancedMesh`. On the RTX A6000, 10,000 distinct boxes cost 36.8 ms of CPU per frame as one mesh each and
 0.13 ms as one batch (`npm run bench -- scaling --cases=shapes`). WebGPU only.
 
@@ -2007,6 +2007,66 @@ const crate = batch.add(boxGeometry(1, 1, 1), { color: '#c08040' });
 const ball = batch.add(sphereGeometry(0.5), { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.5, 0, 1] });
 batch.setColor(ball, [0.2, 0.6, 1]).setVisible(crate, false);
 batch.remove(crate); // its space is reused by a later item that fits
+```
+
+## Batched item culling and levels of detail (`@margoengine/materials/batched-lod`)
+
+`BatchedLOD` gives the items of a `BatchedMesh` per-item frustum culling and levels of detail, still as one draw call
+per pass. `lod.add(geometry, {matrix})` adds an item that is culled; `lod.add([{geometry}, {geometry, distance}, ...])`
+adds one with up to 8 levels, finest first. Before each view is drawn, every item's world box is tested against that
+view's camera frustum and an item in view shows the level its distance picks; the batch's compute pass then collapses
+everything else, so shadows, picking and every other pass see only what is drawn. Items are added, moved, tinted,
+hidden and removed through the `BatchedLOD`, by the id its `add` returned; items added to the batch directly are left
+alone, and several `BatchedLOD`s can share a batch. `lod.dispose()` takes its items out of the batch; disposing the
+batch disposes it.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `culling` | `true` | Hide items whose world box is outside the drawing camera's frustum. Settable later. |
+| `margin` | `0` | World units added on every side of each box for the frustum test. A culled item casts no shadow, so set it to the longest shadow that should still reach into view. Fixed. |
+| `hysteresis` | `0.1` | Dead band of a level that gives none, 0 to below 1. Fixed. |
+| `bias` | `1` | Multiplies every camera distance before the level is picked: above 1 drops detail sooner. Settable later. |
+| `bvhItems` | `64` | Item count from which culling walks a bounding volume hierarchy of the items instead of testing each one. Fixed. |
+
+A level's `distance` is measured in world units from the camera to the centre of the item's box. The first level shows
+from 0; each later level shows from its `distance` on (the distance itself counts), and a coarser level is taken at
+once. Coming back to a finer level waits until the distance is below `distance * (1 - hysteresis)` of the level on show,
+so an item at a switch distance does not flicker; a level's own `hysteresis` overrides the default. It is the same rule
+as `LODSystem` in `@margoengine/lod`.
+
+Every level is a copy of its geometry and one item of the batch, so size `maxItems`, `maxVertices` and `maxIndices`
+for all levels together. The hierarchy is built when items are added or removed, refitted when they move, and rebuilt
+once movement has doubled its nodes' surface area; a node outside the frustum drops its items untested and a node
+wholly inside keeps them untested. A frame in which neither the camera nor an item changed does no work at all.
+`lod.stats` holds the last update's counts (`items`, `drawn`, `culled`, `triangles`, `tests`), `lod.levelOf(id)` the
+level an item draws (-1 when hidden or out of view) and `lod.itemOf(vertex)` the item of a picking hit. Works wherever
+`BatchedMesh` does.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material } from 'margoengine/materials';
+import { BatchedMesh } from 'margoengine/materials/batched';
+import { BatchedLOD } from 'margoengine/materials/batched-lod';
+import { boxGeometry, sphereGeometry } from 'margoengine/geometry';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const batch = BatchedMesh.attach(engine, new Material({ roughness: 0.5 }), {
+  maxItems: 1300,
+  maxVertices: 300_000,
+  maxIndices: 1_500_000,
+});
+const lod = BatchedLOD.attach(engine, batch, { margin: 2 });
+const levels = [
+  { geometry: sphereGeometry(0.5, 32, 16) },
+  { geometry: sphereGeometry(0.5, 12, 6), distance: 20 },
+  { geometry: sphereGeometry(0.5, 6, 3), distance: 60, hysteresis: 0.2 },
+];
+for (let i = 0; i < 400; i++)
+  lod.add(levels, { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 20) * 2 - 20, 0, -Math.floor(i / 20) * 2, 1] });
+const crate = lod.add(boxGeometry(1, 1, 1), { color: '#c08040' }); // one level: culled only
+lod.setMatrix(crate, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1]).setColor(crate, [0.2, 0.6, 1]);
+engine.render();
+console.log(lod.stats.drawn, 'of', lod.stats.items, 'items,', lod.stats.triangles, 'triangles');
 ```
 
 ## Clipping planes

@@ -61,6 +61,8 @@ const pipelines = new WeakMap<GPUDevice, GPUComputePipeline>();
 let serial = 0;
 type Range = { vertex: number; vertices: number; index: number; indices: number };
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+// Root times item matrix, for bounds().
+const product = new Float64Array(16);
 
 /**
  * Many different geometries drawn as one materials mesh: one draw call per pass however many items it holds, each
@@ -308,10 +310,14 @@ export class BatchedMesh implements EnginePlugin {
    * root), or of every visible item without `id`. Empty boxes are +Infinity/-Infinity.
    */
   bounds(id?: number): Float32Array {
-    const out = new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
+    return this.boundsInto(new Float32Array(6), id);
+  }
+  /** As `bounds(id)`, written into `out` (6 numbers) and returned, so a caller that asks every frame allocates nothing. */
+  boundsInto<T extends Float32Array | Float64Array | number[]>(out: T, id?: number): T {
+    for (let i = 0; i < 6; i++) out[i] = i < 3 ? Infinity : -Infinity;
     if (id !== undefined) this.range(id);
     const root = this.mesh.primitives[0].node.matrix,
-      m = new Float64Array(16);
+      m = product;
     for (let k = id ?? 0; k < (id === undefined ? this.ranges.length : id + 1); k++) {
       if (!this.ranges[k] || (id === undefined && this.items[k * ITEM + 19] < 0.5)) continue;
       for (let c = 0; c < 4; c++)

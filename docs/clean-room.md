@@ -16516,3 +16516,19 @@ Row "Draw a skinned or morphed mesh as points" and row "Per-instance morph targe
 - W3C, WebGPU and WGSL specifications (instance-step vertex buffers, `@builtin(vertex_index)` and `@builtin(instance_index)`, `discard`), https://www.w3.org/TR/webgpu/ and https://www.w3.org/TR/WGSL/ .
 
 Own derivations: the world-size extent from the view-projection matrix alone (the lengths of its x and y rows without their share along the w row, which is the projection's focal scale for a centred, off-axis or orthographic projection; `pointScale`, checked against direct projection in `packages/animation/tests/deformed-points.test.js`); the reader count that keeps a hidden model deforming.
+## Batched mesh item culling and levels of detail (`@margoengine/materials/batched-lod`, 2026-11-26)
+
+- J. H. Clark, [Hierarchical Geometric Models for Visible Surface Algorithms](https://doi.org/10.1145/360349.360354) (Communications of the ACM 19(10), 1976): a hierarchy of bounding volumes tested against the view, so a node outside drops everything under it and a node wholly inside keeps everything under it untested, and a level of detail chosen per object from how much of the screen it covers.
+- U. Assarsson and T. Möller, [Optimized View Frustum Culling Algorithms for Bounding Boxes](https://doi.org/10.1080/10867651.2000.10487517) (Journal of Graphics Tools 5(1), 2000): the box against plane test by the box's reach along the plane normal, with the three outcomes outside, crossing and inside that the walk uses.
+- G. Gribb and K. Hartmann, [Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix](https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf) (2001): the six planes core's camera already keeps, read as they are.
+- T. L. Kay and J. T. Kajiya, [Ray Tracing Complex Scenes](https://doi.org/10.1145/15922.15916) (SIGGRAPH 1986): the top-down build that splits each node's objects at the median along an axis.
+- I. Wald, S. Boulos and P. Shirley, [Ray Tracing Deformable Scenes Using Dynamic Bounding Volume Hierarchies](https://doi.org/10.1145/1189762.1189768) (ACM Transactions on Graphics 26(1), 2007): refitting the boxes of a tree as built when its objects move, and rebuilding once the refitted tree has degraded.
+- T. A. Funkhouser and C. H. Séquin, [Adaptive Display Algorithm for Interactive Frame Rates During Visualization of Complex Virtual Environments](https://doi.org/10.1145/166117.166149) (SIGGRAPH 1993): discrete levels of detail per object with hysteresis, so an object at a switch point does not flicker between two levels.
+- D. Luebke, M. Reddy, J. D. Cohen, A. Varshney, B. Watson and R. Huebner, [Level of Detail for 3D Graphics](https://www.sciencedirect.com/book/9781558608382/level-of-detail-for-3d-graphics) (Morgan Kaufmann, 2002), chapter 4: distance-based selection and the hysteresis band around each switch distance.
+
+Margo-own: each level is its own item of the batch with exactly one flag set, so the batch's compute pass, shadows and
+picking need no change; the padded outside test whose pad never grows from a box to one inside it, so the walk keeps
+exactly the items a test of every item keeps (packages/materials/tests/batched-lod.test.js); the rebuild rule (summed
+node surface area doubled since the build); and the level choice shared with `LODSystem` as `packages/shared/lod-pick.js`
+(coarser at once, finer only below `distance * (1 - hysteresis)` of the level on show). No other engine's source was
+read.
