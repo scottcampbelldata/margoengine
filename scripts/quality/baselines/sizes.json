@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20232268,
+  "total": 20238637,
   "history": [
     {
       "date": "2026-10-24",
@@ -12969,6 +12969,12 @@
       "commit": "a9fc0a883d",
       "reason": "fbx/export 8947 to 9965 B gzip (3077014d23): curves on camera clip planes, light range and spot cones, the default camera, and the checks that refuse values glTF does not allow. exportFBX is synchronous, so they cannot sit behind import(), and a second entry would repeat the FBX writer. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "80aa218baa",
+      "grew": 1,
+      "reason": "ATMO-05 adds @margoengine/physics/vortices 6113 B gzip from zero. The optional solver consumes the existing rigid and surface-water ports and shares pure vortex profiles with Sky."
     }
   ],
   "items": {
@@ -13832,6 +13838,7 @@
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/viscoplastic": 5187,
+    "@margoengine/physics/vortices": 6369,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 17737,
     "@margoengine/physics2d": 21360,
