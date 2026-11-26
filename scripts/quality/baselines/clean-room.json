@@ -1,7 +1,7 @@
 {
   "gate": "clean-room",
   "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
-  "total": 169,
+  "total": 171,
   "history": [
     {
       "date": "2026-10-24",
@@ -20,6 +20,12 @@
       "commit": "f617b4134",
       "reason": "The .babylon scene format loader and exporter (@margoengine/loaders/babylon, @margoengine/exporters/babylon) must name the format, its file extension and its customType values (BABYLON.StandardMaterial); no engine code is copied. Includes the generated umbrella and kit entries, and packages/selection/README.md (3 mentions, already on main before this commit)",
       "grew": 24
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "9bfd6d4e3",
+      "reason": "packages/loaders/tests/babylon.test.js tests the .babylon loader (parseBabylon, flattenBabylon), so it names its own file format; 6a89491d4 added a test with two more calls of those functions (34 to 36). The word is the format's name, not an engine dependency.",
+      "grew": 1
     }
   ],
   "items": {
@@ -35,7 +41,7 @@
     "mention packages/loaders/package.json": 3,
     "mention packages/loaders/src/babylon.ts": 72,
     "mention packages/loaders/src/index.ts": 18,
-    "mention packages/loaders/tests/babylon.test.js": 34,
+    "mention packages/loaders/tests/babylon.test.js": 36,
     "mention packages/margoengine/package.json": 3,
     "mention packages/margoengine/src/loaders/babylon.ts": 1
   }
