@@ -3339,6 +3339,10 @@
       "types": "./dist/physics/ship.d.ts",
       "import": "./dist/physics/ship.js"
     },
+    "./physics/loads": {
+      "types": "./dist/physics/loads.d.ts",
+      "import": "./dist/physics/loads.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"

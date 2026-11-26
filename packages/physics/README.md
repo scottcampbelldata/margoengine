@@ -2672,6 +2672,58 @@ world.advance(60 * 20);
 console.log(body.position[2] > 3); // true: well round to starboard (+Z)
 ```
 
+### Loads in the water (`@margoengine/physics/loads`)
+
+`LoadSolver` holds rigid bodies in the water through `bodyForces` with the water's loads (SEA-12): divers, debris, buoys, hoses, piles and dolphins. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
+
+- **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}` or `{mesh}`, a mesh taken as its equivalent ellipsoid. Each body takes:
+  - buoyancy of its submerged share and the Froude-Krylov force of the water's acceleration;
+  - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
+  - quadratic drag on its velocity through the water, a sphere's by Reynolds number (Morrison), else 1.0 or `drag`;
+  - a spinning body's drag;
+  - the wind's drag on its emerged part (`windage`, default 1), so floating debris drifts at a few percent of the wind.
+- **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the wetted length, its drag and added mass from DNV-RP-C205 by roughness (`roughness`, default 5e-5 m) and Keulegan-Carpenter number (`period`, default 8 s). A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
+- **The water** (`sea`): a `SeaSurface`, or any `{elevation, water, density}` such as a flood's (`{elevation: (x, z) => shallow.sample(x, z).surface, water: shallow.flow, density: 1000}`). Add `flows` for currents and races (`ShipSolver.water`) and `wind` for windage.
+
+The coefficients stand alone:
+- `cylinderCoefficients(KC, k/D)`, `steadyDrag`, `wakeAmplification` and `cylinderAddedMass`;
+- `morison`, `tangentialDrag`, `sphereDrag`, `sheddingFrequency` and `liftMagnification`;
+- `ellipsoidAddedMass`, `ellipsoidAlphas` and `equivalentEllipsoid(mesh)`.
+
+At a quay:
+- `standingWave`, `sainflou` and `goda` give the wall's pressures and run-up for a wave;
+- `thrusterEfflux` and `washOnBed` give a thruster's wash (PIANC);
+- `QuayWall({from, to, freeboard})` samples the water at its face from any incident surface (a sea, a `WakeSolver`): the standing wave doubles there, where it tops the edge it splashes over, and a flow (a ship's race) gives the wash against the face.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {LoadSolver, cylinderCoefficients, ellipsoidAddedMass} from 'margoengine/physics/loads';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+// A spheroid twice as long as it is wide carries 0.21 of its displaced mass moving along its axis and 0.70 across it.
+console.log(ellipsoidAddedMass([2, 1, 1]).map((c) => c.toFixed(2)).join(' ')); // 0.21 0.70 0.70
+// A smooth pile in waves at KC 10: C_D 0.71 and C_A 0.69 (DNV-RP-C205).
+const {drag, addedMass} = cylinderCoefficients(10, 0);
+console.log(drag.toFixed(2), addedMass.toFixed(2)); // 0.71 0.69
+
+// A crate of 600 kg/m^3 dropped into still water floats with 0.59 of its height under (it bobs: small bodies here make no
+// waves to damp them).
+const still = {
+  density: 1025,
+  elevation: () => 0,
+  water: {medium: 'water' as const, cell: [0, 0, 0] as const, sample: (_x: number, _y: number, _z: number, _t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 1025, temperature: 288}) => out},
+};
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+const crate = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1200}});
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: [1, 0.5, 0.5]}}]})
+  .couple(['loads', 'rigid'], 'staggered');
+world.advance(60 * 30);
+console.log(Math.abs(crate.position[1]) < 0.5); // true: afloat
+```
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.

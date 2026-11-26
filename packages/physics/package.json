@@ -186,6 +186,10 @@
       "types": "./dist/ship/index.d.ts",
       "import": "./dist/ship.js"
     },
+    "./loads": {
+      "types": "./dist/loads/index.d.ts",
+      "import": "./dist/loads.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"

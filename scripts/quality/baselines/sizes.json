@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20309374,
+  "total": 20317716,
   "history": [
     {
       "date": "2026-10-24",
@@ -13029,6 +13029,12 @@
       "commit": "eaedb9d6f6",
       "reason": "EARTH-10 adds physics/lava at 6304 B gzip (cap 6560 B). Depth-averaged lava, enthalpy transport, shoreline discharge and ice coupling are optional and load stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "959964ae8",
+      "reason": "physics/loads is a new optional entry (SEA-12): LoadSolver (buoyancy, Froude-Krylov, implicit added mass, Morison members with vortex shedding, drag and windage on compact bodies, current, race and flood loads), the DNV-RP-C205 coefficients, Lamb's ellipsoid added masses and the quay wall's pressures, run-up and wash; 8,086 B gzip, its own entry so scenes without bodies in the water pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14945,6 +14951,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/loads": 8342
   }
 }

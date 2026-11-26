@@ -12063,6 +12063,38 @@ coupling through an accumulated field are this package's own arrangement. Proof:
 `tests/coupling/surf.test.js`.
 
 
+### Loads in the water (SEA-12, `@margoengine/physics/loads`, 2026-11-26)
+
+`packages/physics/src/loads/` (`LoadSolver`, `QuayWall`, the Morison coefficients, the ellipsoid added masses and the quay
+formulas). Written from standards, papers and public reports only (no code of any offshore, riser or CFD program was opened):
+
+- DNV-RP-C205, "Environmental conditions and environmental loads", Det Norske Veritas, October 2010 (sections 3.3.3, 3.4.4,
+  6.1 to 6.13, 9.1 and 9.2, appendices D, E and F, read; the figures' formulas checked on page images): Morison's equation in
+  its relative-velocity form and for small 3D bodies, C_DS by roughness, the wake amplification psi(KC) below KC 12 (above it
+  only a figure: here psi falls from its value at 12 toward 1 as 12 / KC), C_A by KC, Eames's tangential drag (as 6.3.1.3
+  gives it), the 2D and 3D added-mass and drag tables, Lamb's ellipsoid integrals (table D-2), Strouhal's frequency and
+  lock-in, the standing wave at a wall and sea water's constants.
+- F. A. Morrison, "An Introduction to Fluid Mechanics", Cambridge University Press, 2013, the sphere's drag correlation (eq.
+  1, read).
+- M. L. Facchinetti, E. de Langre and F. Biolley, "Vortex-induced travelling waves along a cable", Eur. J. Mech. B/Fluids 23,
+  199-208, 2004 (sections 2 and eq. 5, read): the van der Pol wake, q = 2 C_L / C_L0, C_L0 0.3, A / eps 40 and the lift
+  magnification, written here as the root of K^3 - K = (A / eps) y0 / 2 (the two cube roots of eq. 5 multiply to 1/3 and their
+  cubes sum to that). eps 0.3 alone is from their companion paper as remembered (J. Fluids Struct. 19, 2004, not read).
+- USACE Coastal Engineering Manual, EM 1110-2-1100, tables VI-5-52 and VI-5-53 (read), and Y. Goda, "New wave pressure
+  formulae for composite breakwaters", Proc. 14th ICCE, 1974 (eqs. 1 to 8, read): Sainflou's and Goda's wall pressures.
+- F. Tukker, TU Delft MSc thesis, 2021 (sections 2.2 and 2.3, page images read), restating PIANC report 180 (2015): a bow
+  thruster's efflux 1.17 (P / (rho D^2))^0.33 and the Dutch method's bed velocity at a quay (Blokland 1996).
+- C. Caspersen et al., 2010 (abstract read), and Kjendlie et al., 2009 (through it): a swimmer's added mass about a quarter of
+  its mass.
+- O. Breivik, A. A. Allen, C. Maisondieu and J. C. Roth, "Wind-induced drift of objects at sea: the leeway field method",
+  Applied Ocean Research 33, 2011 (read): measured leeways the windage default is held to.
+
+The equivalent ellipsoid of a mesh (its second moments by signed tetrahedra, semi-axes sqrt(5 I / V)), the submerged share as
+a sphere's cap under the ellipsoid's vertical half-height (a prism's for a box), the strip-theory drag of a spinning body, the
+added mass held as M (M + A)^-1 (F + W) - W with members' added mass in the same tensor, the water's acceleration as a centred
+difference of the pure sample, and the quay wall's doubling by 1 + R at its face are this package's own arrangement. Proof:
+`packages/physics/tests/loads.test.js` and `tests/coupling/loads.test.js`.
+
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 
 `packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,
