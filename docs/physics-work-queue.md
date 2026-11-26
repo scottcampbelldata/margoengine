@@ -291,7 +291,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
-| SOUND-01 | Outdoor propagation | stand-in | Codex | BUILDING (codex/physics-sound-01) |
+| SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | LANDED 976796766b |
 | SOUND-02 | Enclosed and urban acoustics | partial | Codex | BUILDING (codex/physics-room-sound) |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |

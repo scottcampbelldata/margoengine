@@ -214,6 +214,10 @@
       "./stretch": {
         "raw": 1884,
         "gzip": 958
+      },
+      "./outdoor": {
+        "raw": 2663,
+        "gzip": 1191
       }
     },
     "@margoengine/behavior": {
@@ -14114,6 +14118,10 @@
       "./airborne": {
         "raw": 18860,
         "gzip": 8260
+      },
+      "./outdoor-sound": {
+        "raw": 10097,
+        "gzip": 4391
       }
     },
     "@margoengine/physics2d": {

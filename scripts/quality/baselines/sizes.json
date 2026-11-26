@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20195158,
+  "total": 20201252,
   "history": [
     {
       "date": "2026-10-24",
@@ -12915,6 +12915,12 @@
       "commit": "d5e70fde20",
       "reason": "BIO-02 adds 5474 B gzip for optional plant phenology, soil water, and branch geometry. Its SIMD penumbra is fetched lazily by memory mode. Core and Stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "976796766b",
+      "grew": 2,
+      "reason": "SOUND-01 optional entries: @margoengine/physics/outdoor-sound 4391 B gzip from zero, @margoengine/audio/outdoor 1191 B gzip from zero. Applications can use the path solver without Web Audio, or bind a path to playback without loading physics."
     }
   ],
   "items": {
@@ -12959,6 +12965,7 @@
     "@margoengine/audio/events": 5687,
     "@margoengine/audio/music": 2157,
     "@margoengine/audio/occlusion": 1772,
+    "@margoengine/audio/outdoor": 1447,
     "@margoengine/audio/pan": 933,
     "@margoengine/audio/resample": 1553,
     "@margoengine/audio/scan": 1330,
@@ -13752,6 +13759,7 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
+    "@margoengine/physics/outdoor-sound": 4647,
     "@margoengine/physics/pack-ice": 5368,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
