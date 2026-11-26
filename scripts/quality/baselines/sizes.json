@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20231177,
+  "total": 20237546,
   "history": [
     {
       "date": "2026-10-24",
@@ -12963,6 +12963,12 @@
       "commit": "35f1040045",
       "reason": "SEA-06 adds physics/tsunami at 6538 B gzip (cap 6794 B). Long-wave finite volumes, passive shoreline history and the two independent numerical queries are optional and load stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6456eb0da3",
+      "grew": 1,
+      "reason": "ATMO-05 adds @margoengine/physics/vortices 6113 B gzip from zero. The optional solver consumes the existing rigid and surface-water ports and shares pure vortex profiles with Sky."
     }
   ],
   "items": {
@@ -13826,6 +13832,7 @@
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/viscoplastic": 5187,
+    "@margoengine/physics/vortices": 6369,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 17737,
     "@margoengine/physics2d": 21360,

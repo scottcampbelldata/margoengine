@@ -281,7 +281,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | LANDED b6e01ceb4c |
-| ATMO-05 | Tropical cyclones and large vortices | partial | Codex | BUILDING (codex/physics-atmo-05) |
+| ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | LANDED 6456eb0da3 |
 | ATMO-06 | Airborne particle transport | stand-in | Codex | LANDED 965fab2df7 |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | LANDED 80679b25b4 |
