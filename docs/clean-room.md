@@ -13407,6 +13407,17 @@ recent flume and field experiments. [Winterwerp, “A simple model for turbulenc
 [Winterwerp, Manning, Martens, de Mulder and Vanlede, “A heuristic formula for turbulence-induced flocculation of cohesive sediment” (2006), equations 1 and 9](https://doi.org/10.1016/j.ecss.2006.02.003),
 [Nghiem et al., “Testing floc settling velocity models in rivers and freshwater wetlands” (2024)](https://doi.org/10.5194/esurf-12-1267-2024).
 
+The Wax Lake Delta check uses the four sites with camera tracks in Figure 6. The CaltechDATA release supplies
+`primaryparticle_sizedistn.csv` independently of the floc camera. We use `frac_num` as the number weight in
+the second moment of `diameter.center`, take its square root, then take the median across samples at each profile.
+This is Eq. 5 for a fractal dimension of two and zero weighting dimension. `floccam.csv` supplies a geometric
+mean optical diameter and a separate geometric mean displacement speed per profile. The 222 positive speeds
+are retained across the four profiles. Supplied optical diameter holds aggregate size fixed so the comparison
+isolates drag and buoyancy. The RMS log error of the four speed means goes from 4.681 for individual primary
+grains to 0.854 for the aggregates. In the fall profile, the settled aggregate moves at 0.166 mm/s in the model
+versus 0.830 mm/s tracked. The benchmark leaves growth, permeability and high-organic composition unconstrained.
+[Nghiem et al., source data](https://doi.org/10.22002/w4ave-nrg52).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

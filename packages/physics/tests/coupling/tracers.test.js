@@ -1253,3 +1253,58 @@ test('SEA-15 removing suspended concentration breaks mature flocs back toward pr
   world.advance(60 * 30);
   assert.equal(world.hash(), hash);
 });
+
+test('SEA-15 fixed measured aggregate sizes improve held-out Wax Lake Delta settling predictions', (t) => {
+  // Nghiem et al. (2024), Fig. 6. Site median of the sample-wise number-weighted RMS primary diameter,
+  // then geometric mean of optical diameters and displacement speeds. Units are µm and mm/s.
+  const profiles = [
+    { id: 'WDs21-DP18', primary: 3.75428, aggregate: 157.52492, observed: 0.455868 },
+    { id: 'WDs21-DP19', primary: 1.56645, aggregate: 131.43677, observed: 0.299166 },
+    { id: 'WDs21-DP22', primary: 3.25672, aggregate: 122.10597, observed: 0.452429 },
+    { id: 'Wf21B-DP08', primary: 1.52641, aggregate: 122.00899, observed: 0.830128 },
+  ];
+  const settling = (primary, aggregate) => {
+    const tracer = new TracerSolver();
+    const grain = { density: 2650, diameter: primary * 1e-6, colour: [0.45, 0.35, 0.2] };
+    const rate = { num: 60, den: 1 };
+    const world = new PhysicsWorld({ rate }).add(tracer, {
+      capacity: 1,
+      waterDensity: 1000,
+      viscosity: 1e-6,
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: [{ material: grain, position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+      flocculation:
+        aggregate === undefined
+          ? undefined
+          : {
+              material: grain,
+              initialDiameter: aggregate * 1e-6,
+              aggregation: 0,
+              breakup: 1,
+              environment: { concentration: 0, shearRate: 0 },
+            },
+    });
+    world.advance(60);
+    const [parcel] = [...tracer.particlesOf()];
+    assert.equal(parcel.mass, 1);
+    assert.equal(tracer.budget.water, 1);
+    return (-1 - parcel.position[1]) * 1000;
+  };
+  let baseline = 0;
+  let cohesive = 0;
+  let worst = 1;
+  const predictions = [];
+  for (const { id, primary, aggregate, observed } of profiles) {
+    const ordinary = settling(primary);
+    const floc = settling(primary, aggregate);
+    assert.ok(Math.abs(Math.log(floc / observed)) < Math.abs(Math.log(ordinary / observed)), id);
+    baseline += Math.log(ordinary / observed) ** 2;
+    cohesive += Math.log(floc / observed) ** 2;
+    worst = Math.max(worst, observed / floc, floc / observed);
+    predictions.push(floc.toFixed(3));
+  }
+  t.diagnostic(
+    `Predicted ${predictions.join(', ')} mm/s. RMS log speed error ${Math.sqrt(baseline / profiles.length).toFixed(3)} → ${Math.sqrt(cohesive / profiles.length).toFixed(3)}. Worst ratio ${worst.toFixed(2)}.`,
+  );
+});

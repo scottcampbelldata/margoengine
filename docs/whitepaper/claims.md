@@ -340,6 +340,9 @@ first: each names its scope, its evidence file and how to reproduce it.
   shear breaks aggregates back toward primary grains, and the simulation replays exactly. Reproduce with
   `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
   [Winterwerp et al. (2006), equations 1 and 9](https://doi.org/10.1016/j.ecss.2006.02.003).
+  With optical aggregate size supplied, the four Wax Lake Delta speed means give an RMS log error of 0.854,
+  down from 4.681 for primary grains. The fall site's predicted 0.166 mm/s is below the measured 0.830 mm/s.
+  [Nghiem et al. (2024), Figure 6 and source data](https://doi.org/10.22002/w4ave-nrg52).
 
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
