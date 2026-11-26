@@ -81,6 +81,23 @@ export type { DXFOptions, DXFResult, DXFLayer, DXFText, DXFSolid, DXFLines, DXFC
 export type { ThreeMFOptions, ThreeMFResult } from './threemf.js';
 export { parsePCD, parsePCDHeader } from './pcd.js';
 export type { PCDOptions, PCDHeader, PCDField } from './pcd.js';
+export { parsePMD, parsePMX, parseMMD, parseVMD, sampleVMDBone, vmdBezier } from './mmd.js';
+export type {
+  MMDOptions,
+  VMDOptions,
+  LoadedMMD,
+  MMDMaterial,
+  MMDBone,
+  MMDMorph,
+  MMDRigidBody,
+  MMDJoint,
+  LoadedVMD,
+  VMDBoneTrack,
+  VMDMorphTrack,
+  VMDCameraTrack,
+} from './mmd.js';
+export { parseX } from './xfile.js';
+export type { XOptions, LoadedX, XMesh, XFrame, XBone, XMaterial, XAnimation, XAnimationSet, XTrack } from './xfile.js';
 export { parseBabylon, flattenBabylon } from './babylon.js';
 export type {
   BabylonOptions,

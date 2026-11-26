@@ -1,5 +1,5 @@
 {
-  "commit": "b41f4709e4",
+  "commit": "2500b97885",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14054,6 +14054,22 @@
       "./groundwater": {
         "raw": 9420,
         "gzip": 3939
+      },
+      "./glacier": {
+        "raw": 7741,
+        "gzip": 3519
+      },
+      "./locomotion": {
+        "raw": 15630,
+        "gzip": 6419
+      },
+      "./aeolian": {
+        "raw": 13204,
+        "gzip": 5633
+      },
+      "./ageing": {
+        "raw": 10800,
+        "gzip": 4922
       }
     },
     "@margoengine/physics2d": {
@@ -16528,8 +16544,8 @@
         "gzip": 2904
       },
       "./blown-sand": {
-        "raw": 25118,
-        "gzip": 10561
+        "raw": 26368,
+        "gzip": 11061
       },
       "./flame": {
         "raw": 29296,
@@ -17726,6 +17742,16 @@
       "gzip": 3628,
       "brotli": 3284
     },
+    "packages/physics/dist/locomotion-kernel.wasm": {
+      "raw": 9037,
+      "gzip": 4134,
+      "brotli": 3750
+    },
+    "packages/physics/dist/locomotion-kernel-shared.wasm": {
+      "raw": 9125,
+      "gzip": 4196,
+      "brotli": 3803
+    },
     "packages/physics/dist/pedestrian-kernel.wasm": {
       "raw": 12041,
       "gzip": 5695,
@@ -17815,6 +17841,26 @@
       "raw": 11142,
       "gzip": 3356,
       "brotli": 3012
+    },
+    "packages/physics/dist/glacier-kernel.wasm": {
+      "raw": 15437,
+      "gzip": 6189,
+      "brotli": 5527
+    },
+    "packages/physics/dist/glacier-kernel-shared.wasm": {
+      "raw": 15525,
+      "gzip": 6250,
+      "brotli": 5583
+    },
+    "packages/physics/dist/aeolian-kernel.wasm": {
+      "raw": 8172,
+      "gzip": 3574,
+      "brotli": 3230
+    },
+    "packages/physics/dist/aeolian-kernel-shared.wasm": {
+      "raw": 8172,
+      "gzip": 3574,
+      "brotli": 3228
     }
   },
   "splits": {

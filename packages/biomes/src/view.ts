@@ -1400,7 +1400,7 @@ export class BiomeView implements Disposable {
                 ? import('@margoengine/biomes/hydrology').then(({ hydrologyOf }) => hydrologyOf(world))
                 : undefined,
             ]),
-            cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth),
+            cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth), // float division: metres to water cells
             rate = runoff
               ? (x: number, z: number) => runoff.dischargeAt(x, z)
               : (discharge ?? climateDischarge(world, drainage!)),

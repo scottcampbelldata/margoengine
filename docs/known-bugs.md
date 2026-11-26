@@ -20,6 +20,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
   both sides; a report both sides changed builds its own package only.
 
+### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
+
+- **Repro:** a dynamic hull held by locks (or by contacts, joints, a mooring) with a `DeckWaterSolver` on it: 0.3 m of
+  water on a 2 m by 1 m deck (5,886 N) held the hull with -237 N; with the exceedance solver's inflow and the real hull
+  solver, +1,124 N against -4,297 N.
+- **Cause:** the deck volume carries its water as added mass in an implicit solve, M (M + A)^-1 (F + W) - W, which takes
+  the hull as free: the water's weight went into a fall the hull never made, so little of it reached a hull something
+  else held.
+- **Fix:** the solve carries every other load on the hull too, seen in what moved it at the last step (M a_last less the
+  load held and the weight), as the hull solver does: M (M + A)^-1 (F + A a_last + W + O) - W - O. A held hull takes the
+  water's weight; a free one still falls with its water at g.
+- **Regression:** `packages/physics/tests/deck-water.test.js`, "a dynamic hull held by locks takes its deck water's
+  weight as the deck load (KB-FLIP-DECKLOAD1)".
+
 ### Open 2026-11-26: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, tools/shot)
 
 - **Repro:** on an Apple M6 Mac (ANGLE on Metal), `npm run build:packages`, then `MARGO_COMPAT=1 npm run test:shot`. Two
@@ -33,6 +47,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   unknown: it is the third page the same browser opens in that check, and the first without a sky.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
 
+### Fixed 2026-11-26: GitHub CI's lint failed every pull request, and quality checked less there (KB-CI-MERGEBASE1, .github/workflows/ci.yml)
+
+- **Repro:** any pull request (PR 68, job 139720307693): `npm run lint` stops with `fatal: Not a valid object name
+  origin/main`.
+- **Cause:** `actions/checkout@v4` checks out a pull request's merge commit at depth 1 with no origin/main, and
+  scripts/lint.mjs diffs against the merge base with origin/main. The test job's `npm run quality` has two readers of
+  the same merge base (scripts/quality/ratchet.js `droppedHistory`, scripts/support/unit-readers.mjs
+  `changedAgainstMain`) that treat a missing one as nothing to check, so a pull request's dropped baseline history and
+  changed documents' readers went unchecked.
+- **Fixed:** the lint and test jobs check out the whole history (`fetch-depth: 0`). Regression: tests/ci-checkout.test.js
+  follows each CI job's npm scripts through their imports and fails on a job that reaches `git merge-base` without a
+  full checkout (it named `lint` and `test` on the old ci.yml).
+
+### Fixed 2026-11-26: GitHub CI's bundler matrix and Node 22 tests failed on CI setup, not on code (KB-CI-PWVERSION1, KB-CI-ORACLE1, KB-CI-FIXTURES1, ci)
+
+- **Repro:** PR 68: "End-user proof on Node 22" (job 139720307968) stopped in `modern:test:bundlers` with
+  `Executable doesn't exist` for chromium-headless-shell 1255; "node22 unit tests" (job 139720354973) had 29
+  `ERR_MODULE_NOT_FOUND` for packages/physics/tests/oracle/dist/index.js, `Missing Required test fixture` in gltf,
+  environment and loaders, and `cannot start chromium` in ecs.
+- **Causes:** (1) scripts/bundler-matrix.mjs installed Playwright at npm's latest, and scripts/modern-package-tests.js at
+  the devDependency range, while CI's `npx playwright install chromium` fetched the browsers of the installed version.
+  (2) The physics comparison oracle was built only by the package's own `npm test`, and CI runs the test files after
+  `build:packages`. (3) The test and Node 22 jobs never fetched the Required external test assets or installed
+  Chromium.
+- **Fixed:** both fixtures pin the installed Playwright (scripts/support/playwright-version.mjs); `build:packages` builds
+  the oracle; both jobs fetch the assets (cached on the asset list) and install Chromium before the tests.
+  Regressions: tests/ci-playwright.test.js, tests/build-test-fixtures.test.js and tests/ci-test-jobs.test.js, each
+  failing on the old file.
+
 ### Fixed 2026-11-26: the branches of a multibody under a fixed root were islands that walked each other's links (KB-PHYS-MBISLAND1, physics kernel)
 
 - **Repro:** `packages/physics/tests/next-multibody.test.js`, "two branches under a fixed root are one island, and swing as
@@ -44,6 +87,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the moving links of a multibody whose root does not move are one island (`unite_multibodies`). Branches under a
   root that does not move do not move each other, so the physics is unchanged: the replay scenes' state hashes are the same.
 - **Regression:** the test above (two islands before).
+
+### Open 2026-11-26: check:rust-kernels builds the physics kernels with flags they no longer ship with (KB-RUST-KERNELFLAGS1, scripts)
+
+- **Repro:** `node --test tests/rust-kernel-tests.test.js`: "every kernel that ships as Wasm is built for wasm32 with the
+  shipped flags" fails, `WASM_RUSTFLAGS` (`-C target-feature=+simd128`) against the 3D kernel blueprint's `RUSTFLAGS`,
+  which since 8fbdc409d4 (K05) add the world-memory link flags (`--import-memory`, the slot's `--global-base` and the
+  exported stack and data symbols). The test runs in hygiene, so hygiene is red on main.
+- **Cause:** each physics kernel is now built with its own slot's link flags (packages/physics/scripts/build-*-kernel.mjs,
+  `rustFlags(slot, shared)`), while scripts/rust-kernel-tests.mjs builds every kernel that ships as Wasm with the one
+  `WASM_RUSTFLAGS` of scripts/support/wasm-kernel.mjs, so check:rust-kernels no longer checks the build that ships.
+- **Fix to make:** take each kernel's shipped flags from its build script (the blueprint's `RUSTFLAGS` for the 3D
+  kernel, the 2D kernel's own variant flags) in check:rust-kernels and in the test, owned by the physics kernel work.
+
 
 ### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
 
@@ -168,9 +224,11 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Regression:** `packages/webgl2-compat/test/glsl.test.js` (the struct form past the limit, per stage, and the plain
   form within it), `packages/webgl2-compat/test/lost-context-browser.mjs` and `scripts/compat-units-gpu-check.js
   --compat` (both in webgl2-compat's test:gpu; the check passes on native WebGPU, ANGLE Direct3D 11 and Vulkan).
-  Still open from the same row: the room the plan in the row asks for (shared glTF bindings, packing by the device
-  limit, a coded count before linking); a scene that needs more than 16 units still gets the layer's coded
-  `unsupported`.
+  The room the plan in the row asks for landed after it: glTF slots sharing a texture bind it once (2026-11-25), gltf
+  materials past the device limit pack their base maps, and the layer counts units per stage before linking and
+  refuses past a limit with code `unsupported` (errors#texture-units) (2026-11-26; `packages/gltf/test/materials-ext.test.js`,
+  `packages/webgl2-compat/test/device.test.js`). A scene that needs more than 16 units even packed still gets that
+  coded refusal.
 - **Sources:** Direct3D 11 has 128 shader resource slots, 16 sampler slots and 14 constant buffer slots per stage, so
   the 16 is ANGLE's own table, not the API's (Microsoft, "Direct3D 11.3 Functional Specification", 2015, section 21
   limits, https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm). A struct member of a
@@ -16238,9 +16296,39 @@ an impulse, rolling or scraping excitation, with sound and damping set by the co
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
 
+## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
+
+A static height seed and a separately prescribed plume could not move terrain or represent an exposed ridge losing
+snow. `AeolianTransport` sends resolved bed change to `TerrainBed`, and `BlownSand` can now draw its moving layer.
+Reproduce with `packages/physics/tests/coupling/aeolian.test.js` and `packages/vfx/test/blown-sand-check.mjs`.
+The [TREE-5 review](physics-demo-review.md) tracks integration into the filmed scene and the atmosphere-side fields.
+
 ## Fixed: soil drainage had no groundwater storage or spring receiver (HYDRO-06)
 
 Previously HYDRO-02 could export soil drainage, but no aquifer stored that water or passed it back to the surface
 through springs and seepage. Connect its recharge port to `GroundwaterSolver` and give the existing shallow-water
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
+
+### Glacier calving still needs the water impulse solver (PA-25)
+
+Advance `GlacierSolver` with a submerged grounded front and its adjacent open-water cell. The
+glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
+to convert the released ice volume and location into a water-source impulse, so the current
+registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.
+
+### Ground animal terrain and rig adapters (LIFE-02)
+
+The engine fixture covers the real TerrainBed-to-contact path. A ground animal placed on an overhang cannot
+reach the underside through a heightfield; its feet see the Bed surface. Supporting a climbing rig needs an
+arbitrary-surface collider field and articulated foot binding. The queue lists the shared contact and terrain
+geometry contract needed for independent impulse and animation consumers.
+
+## Open: weather and sea do not yet publish complete material-ageing exposure (BIO-04)
+
+A material-ageing world needs local deposition and annual climate values for atmospheric loss,
+and needs corrosion current and larval supply for site-specific wreck decay. Existing weather
+and sea fields leave out those quantities. A fixed `AgeingExposure` or a publisher writing
+`ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
+`packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
+See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.

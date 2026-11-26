@@ -173,6 +173,41 @@ pub extern "C" fn world_step(dt: f32) -> u32 {
     world().step(dt);
     world().header().failed
 }
+
+// A step shared by threads (KernelWorld.stepAsync): the main thread calls `world_step_begin`, each thread's instance solves a
+// run of islands with `world_solve_islands` on a view of the world of its own, and the main thread ends the step with
+// `world_step_end`. Islands share no row a solve writes, so the bits are those of `world_step` on any number of threads.
+static mut STEP_BEGUN: Option<crate::integrate::StepTimes> = None;
+
+/// Begins a step: the islands to solve (0 when the world solves phase by phase, which `world_step_end` does whole), or
+/// u32::MAX when the world was lost and does not step.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_step_begin(dt: f32) -> u32 {
+    let w = world();
+    match w.step_begin(dt) {
+        Some(times) => {
+            unsafe { *core::ptr::addr_of_mut!(STEP_BEGUN) = Some(times) };
+            if w.island_major { w.header().islands } else { 0 }
+        }
+        None => u32::MAX,
+    }
+}
+/// Solves islands `first` to `last - 1` of the step begun, on this instance's own view of the world.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_solve_islands(first: u32, last: u32, dt: f32) {
+    let mut view = world().thread_view();
+    for group in first..last {
+        view.solve_island(group as usize, dt);
+    }
+}
+/// Ends the step `world_step_begin` began; what `world_step` returns.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_step_end(dt: f32) -> u32 {
+    if let Some(times) = unsafe { (*core::ptr::addr_of_mut!(STEP_BEGUN)).take() } {
+        world().step_end(dt, times);
+    }
+    world().header().failed
+}
 /// Finds the contacts and events of the world as it stands, with no dynamics: no body moves.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_detect() -> u32 {

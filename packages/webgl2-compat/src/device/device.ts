@@ -14,6 +14,7 @@ import { clearsLost } from './fresh-clears.js';
 import { inverseTrigInaccurate } from './inverse-trig.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
 import { type Tape, TapePool } from './tape.js';
+import type { GLSLProgram } from '../glsl.js';
 import {
   CompatBindGroup,
   CompatBindGroupLayout,
@@ -38,6 +39,9 @@ import {
   Replayer,
   writeTexture,
   copyExternalImage,
+  programUnits,
+  translatePipeline,
+  type PipelineUnits,
 } from './render.js';
 
 /** The vendor string compatibility adapters report, so apps and stats can show "compatibility mode". */
@@ -344,6 +348,11 @@ export class CompatDevice extends EventTarget {
   readonly objects: GLObjects;
   /** @internal The GL programs of its render pipelines by GLSL and vertex layout, least recently used first. */
   readonly linked = new Map<string, LinkedProgram>();
+  /** @internal A descriptor `textureUnits` translated, kept for the pipeline made from it next (taken once). */
+  readonly translations = new WeakMap<
+    GPURenderPipelineDescriptor,
+    { vertex: unknown; fragment: unknown; entries: string; glsl: GLSLProgram }
+  >();
   /** Synchronous GPU-to-CPU reads the layer had to make (indirect arguments written by the GPU and the like). */
   stalls = 0;
   /** Compute dispatches run so far, per tier: fragment draws, point draws (scatter) and the CPU. */
@@ -490,8 +499,8 @@ export class CompatDevice extends EventTarget {
   }
 
   /** A coded refusal for something the layer cannot do (yet). */
-  unsupported(what: string): Error {
-    return fault('unsupported', `WebGL2 compatibility cannot do ${what}`, 'compatibility-layer');
+  unsupported(what: string, anchor = 'compatibility-layer'): Error {
+    return fault('unsupported', `WebGL2 compatibility cannot do ${what}`, anchor);
   }
 
   // ---------------------------------------------------------------- errors
@@ -772,6 +781,32 @@ export class CompatDevice extends EventTarget {
   }
   createRenderPipeline(descriptor: GPURenderPipelineDescriptor): CompatRenderPipeline {
     return new CompatRenderPipeline(this, descriptor);
+  }
+  /**
+   * The texture units a render pipeline made from `descriptor` would take on this WebGL2, per stage, counted from its
+   * translation before anything links: one per texture and sampler pair a stage reads, one per storage data texture.
+   * `over` names the first stage past its GL limit, which `createRenderPipeline` refuses with code `unsupported`
+   * (errors#texture-units). Undefined when the descriptor does not translate (the pipeline then reports why). The
+   * translation is kept for the next pipeline made from the same descriptor object, so asking first costs nothing.
+   */
+  textureUnits(descriptor: GPURenderPipelineDescriptor): PipelineUnits | undefined {
+    const vertex = descriptor.vertex.module as unknown as { ir?: unknown; error?: unknown },
+      fragment = descriptor.fragment?.module as unknown as { ir?: unknown; error?: unknown } | undefined;
+    if (vertex.error || fragment?.error) return undefined;
+    let glsl: GLSLProgram;
+    try {
+      glsl = translatePipeline(this, descriptor);
+    } catch {
+      // The pipeline made from it reports the same failure, in WebGPU's way (an error scope or a throw).
+      return undefined;
+    }
+    this.translations.set(descriptor, {
+      vertex: descriptor.vertex.module,
+      fragment: descriptor.fragment?.module,
+      entries: `${descriptor.vertex.entryPoint}|${descriptor.fragment?.entryPoint}`,
+      glsl,
+    });
+    return programUnits(glsl, this.adapter.capabilities.limits as unknown as Record<string, number>);
   }
   createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<CompatRenderPipeline> {
     let pipeline: CompatRenderPipeline;

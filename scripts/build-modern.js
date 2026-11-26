@@ -234,6 +234,10 @@ const missingTargets = packageOrder(manifests)
   .filter((name) => !only || only.includes(name))
   .flatMap((name) => missingPackageTargets(resolve(`packages/${name}`)));
 assert.deepEqual(missingTargets, [], 'build:packages finished without these declared export targets');
+// The physics comparison tests import the Rapier-backed oracle from packages/physics/tests/oracle/dist, test code that
+// nothing ships. Only the package's own `npm test` built it, so every run of the test files after build:packages (CI's
+// test and Node 22 jobs: 29 ERR_MODULE_NOT_FOUND, KB-CI-ORACLE1) found it missing.
+if (!only || only.includes('physics')) await runChild(process.execPath, ['packages/physics/scripts/build-oracle.js']);
 // A partial build (--only) ends here; a full one writes the size records (KB-OWN-EXIT2: by the event loop, not process.exit).
 if (!only) await sizeRecords();
 

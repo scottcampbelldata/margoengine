@@ -1644,6 +1644,31 @@ console.log(planSplashes(shot).map((e) => e.kind), splash.active().length, splas
   frame by frame. `look.waveLift` (1) scales both, 0 for the impact at rest; `surface(position)` gives them.
 - The foam is a ring per splash (up to 16), sized by the crown and spreading and fading over `foamLife` seconds.
   `sample(x, z)` is its CPU twin and `rings()` lists them. `active()` lists the splashes being drawn.
+- From the physics. For bodies the physics carries (a cannonball, a diver, a launched hull, a breaching whale), pass an
+  `EntrySolver` of `@margoengine/physics/entry` as `splashes`: ShotSplash draws its splashes as they fall due, each
+  worked out against the local surface and relative to the waves' motion, the cavity as the body actually ran it:
+  an `entry`'s crown, a `seal`'s Worthington jet and an `exit`'s lifted water as columns, a `skip`'s fan. The
+  splash clock then runs on the world's time (advance both on one film clock). `splashOf(e)` is the conversion.
+
+  ```ts
+  import {Engine} from 'margoengine/core';
+  import {VFX} from 'margoengine/vfx';
+  import {Water} from 'margoengine/water';
+  import {SPLASH_EMITTERS, ShotSplash} from 'margoengine/water/splash';
+
+  const engine = await Engine.create(document.querySelector('canvas')!);
+  const sea = Water.attach(engine, {size: [200, 200], segments: 256});
+  // An EntrySolver's splashes, as its splashes() lists them (here one entry at 0.5 s and its seal at 0.6 s).
+  const entry = {kind: 'entry' as const, row: 0, time: 0.5, position: [0, 0, 0] as [number, number, number], velocity: [0, -9, 0] as [number, number, number], speed: 9, sine: 1, radius: 0.0125, crownSpeed: 3.3, crownHeight: 0.4, columnSpeed: 0, columnHeight: 0};
+  const solver = {splashes: () => [entry, {...entry, kind: 'seal' as const, time: 0.6, crownSpeed: 0, crownHeight: 0, columnSpeed: 89, columnHeight: 21}]};
+  const splash = ShotSplash.attach(engine, {
+    surface: sea,
+    splashes: solver,
+    particles: (kind) => VFX.attach(engine, {...SPLASH_EMITTERS[kind]}),
+  });
+  for (let i = 0; i < 30; i++) engine.render({delta: 1 / 30});
+  console.log(splash.events.map((e) => e.columnSpeed > 0 ? 'column' : 'crown')); // ['crown', 'column']
+  ```
 - `advanceTime(delta)` moves its clock; each splash is a function of film time, so a cutscene `seek` (with it in
   `extra`) lands where playing lands.
 - Sliders: `SPLASH_SETTINGS` in `@margoengine/water/settings` holds the live rows on the shared shape: `crown`,

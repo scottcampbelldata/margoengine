@@ -8,6 +8,45 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'face-driver',
+    title: '@margoengine/input/face: webcam face to morph targets',
+    kind: 'family',
+    messages: [
+      'Face landmarks need the 468 or 478 points of the Face Landmarker topology; see https://margoengine.com/errors#face-driver',
+      'Face source unknown must be auto, blendshapes or landmarks; see https://margoengine.com/errors#face-driver',
+      'Face minScore must be in 0..1; see https://margoengine.com/errors#face-driver',
+      'Face hold must be seconds >= 0; see https://margoengine.com/errors#face-driver',
+      'Face aspect must be a finite width / height above 0; see https://margoengine.com/errors#face-driver',
+      'The face driver is disposed; create a new FaceDriver; see https://margoengine.com/errors#face-driver',
+      'Calibrate on a frame with a face in it; see https://margoengine.com/errors#face-driver',
+      'The face has no detector blendshape scores; enable them in the detector or use source landmarks; see https://margoengine.com/errors#face-driver',
+    ],
+    cause:
+      'The face driver was given a face mesh with fewer than the 468 Face Landmarker points, an unknown source, a minScore outside 0..1, a negative hold or an aspect that is not above 0, was asked for detector scores the face does not have, calibrated on a frame without a face, or used after dispose (a MargoError with code disposed).',
+    fix: "Pass the full face mesh (MediaPipe FaceLandmarker gives 478 points) or detector blendshape scores, turn on `outputFaceBlendshapes` in the detector or use `source: 'landmarks'`, keep minScore in 0..1, hold at 0 or more and aspect as the video width over height, calibrate on a frame that shows the face, and create a new FaceDriver after dispose.",
+  },
+  {
+    id: 'webcam-landmarks',
+    title: '@margoengine/input/landmarks: webcam and detector landmark frames',
+    kind: 'family',
+    messages: [
+      'A landmark frame needs a finite time in ms and faces, hands and poses arrays; see https://margoengine.com/errors#webcam-landmarks',
+      'A landmark frame needs a faces array; pass [] for none; see https://margoengine.com/errors#webcam-landmarks',
+      'landmarkStream buffer must be a whole number >= 1; see https://margoengine.com/errors#webcam-landmarks',
+      'The landmark stream has ended; create a new landmarkStream; see https://margoengine.com/errors#webcam-landmarks',
+      'A landmark stream has one reader; await each next() in turn; see https://margoengine.com/errors#webcam-landmarks',
+      'MediaPipe face result has no landmark arrays; see https://margoengine.com/errors#webcam-landmarks',
+      'This page has no camera access (getUserMedia); serve it over https; see https://margoengine.com/errors#webcam-landmarks',
+      'webcamLandmarks needs a detect(video, time) function; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter cutoffs must be finite and above 0 Hz; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter beta must be finite and >= 0; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter needs a finite value and time; see https://margoengine.com/errors#webcam-landmarks',
+    ],
+    cause:
+      'A landmark frame without a finite time or its faces, hands and poses arrays, a MediaPipe result without its landmark arrays, a stream pushed to after it ended or read by two readers at once, a page without camera access (no getUserMedia: not a secure context), a missing detect function, or a one-euro filter with a cutoff that is not above 0, a negative beta or a non-finite sample.',
+    fix: 'Build frames with `fromMediaPipe(result, time)` or as `{time, faces: [], hands: [], poses: []}`, create a new `landmarkStream` after `close` or `dispose` and read it with one `for await`, serve the page over https (or localhost) and handle a refused camera, pass `detect: (video, time) => frame`, and give `OneEuroFilter` cutoffs above 0 Hz, a beta of 0 or more and finite values with times in seconds.',
+  },
+  {
     id: 'mobile',
     title: 'margo-convert mobile: Capacitor project from a built app',
     kind: 'family',
@@ -2024,6 +2063,16 @@ export const entries = [
     fix: 'On a browser with WebGPU, do not install the layer (install() leaves WebGPU alone unless `force` is set). Without WebGPU, keep the feature off on compatibility devices (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), or use the `@margoengine/webgl2-compat/preview` preview below the full tier. For the work budget, make the dispatch smaller or raise `cpuWorkBudget` in `install()` or on the device. Report any other `failed` error with the shader that caused it.',
   },
   {
+    id: 'texture-units',
+    title:
+      'texture-units: a render pipeline takes more texture units than this WebGL2 has (@margoengine/webgl2-compat)',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A MargoError with code `unsupported` from `createRenderPipeline` on the WebGL2 compatibility layer. WebGL2 has no separate samplers: each texture and sampler pair a stage reads takes one texture unit, a texture read with two samplers (a compare sampler and a plain one) takes two, and storage buffers take data textures (one per bind group, one per binding with a dynamic offset). The layer counts the units of each stage from its translation before linking, against MAX_TEXTURE_IMAGE_UNITS (fragment), MAX_VERTEX_TEXTURE_IMAGE_UNITS (vertex) and MAX_COMBINED_TEXTURE_IMAGE_UNITS (both together, a pair both stages read counted once). The message names the stage, the count, the limit and every (group, binding) that takes a unit; `error.units` holds the same numbers. A shader within the 16 sampled textures and 16 samplers WebGPU allows per stage can still pass a WebGL2 limit of 16 units.',
+    fix: 'Ask first: on a layer device (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), `device.textureUnits(descriptor)` returns the units per stage and `over`, the first stage past its limit, without linking anything (the translation is kept for the pipeline made next from the same descriptor). Then bind fewer textures in that stage: pack textures into an array (as `@margoengine/gltf` does with its five base maps), share one texture between slots, read one sampler per texture, or move storage reads into fewer bind groups. `@margoengine/gltf` materials do this by themselves.',
+  },
+  {
     id: 'wgsl-syntax',
     title: 'wgsl-syntax: the text is not WGSL (@margoengine/webgl2-compat/wgsl)',
     kind: 'family',
@@ -2642,6 +2691,15 @@ export const entries = [
     cause:
       'A VFX preset cannot be turned into JSON or built from it: its version is not 1, a value cannot be embedded (a function, a class instance or an unsupported typed array), a resource reference has no binding, or the file request returned an error status.',
     fix: 'Save presets with version 1. Pass GPU resources and other live objects by reference: give `references` when saving and `bindings` when loading, so the file holds only the reference. Use numeric typed arrays. For a failed request, check the URL and the response status.',
+  },
+  {
+    id: 'vfx-node-system',
+    title: '@margoengine/vfx: node particle system graphs',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A node-system graph or its JSON was refused. The `code` of the VFXNodeSystemError says why: format or version (not a margo-vfx-node-system version 1 document), limit (over 512 blocks or 32 systems), duplicate-id, unknown-block or unknown-ref (a repeated id, an unknown type or a wire to a missing block), wrong-type (a wire feeds a block whose output does not fit), bad-param (a literal that is missing, not finite or out of order), cycle (value wires or start and end triggers loop), no-system (no system, or none that starts by itself), trigger (a trigger that does not join two systems, a second event trigger on one system, or a sub-emitter child with a shape, update blocks or triggers) or invalid-options (the compiled options were refused by VFX).',
+    fix: 'Read the code and the block id in the error. Give every block a unique id, wire only to blocks that output what the input needs, keep literals finite and in the range the option documents, break loops, and give sub-emitter children only creation blocks.',
   },
   {
     id: 'points',

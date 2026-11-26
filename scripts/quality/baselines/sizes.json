@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19458535,
+  "total": 20081843,
   "history": [
     {
       "date": "2026-10-24",
@@ -12705,6 +12705,102 @@
       "commit": "33a9d4228",
       "reason": "physics/surf ceiling 8,057 to 9,345 B (built 7,801 to 9,072 B): wave-current interaction (Doppler relation and action transport), the groups' bound long wave for the open sea, and Stockdon's incident swash for R2 and the wet sand. In the surf entry because every surf scene with currents, groups or run-up needs them; a split would load with each such scene.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-08 wave drift",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: the waves' drift: a section's two-dimensional scattering derived from the radiation solution (scatterSection, its reflected and transmitted waves and the held loads), the hull's beam-sea motions and far-field drift table, the Froude-Krylov mean taken off, and Newman's approximation over the sea's waves; measured gzip (Mac build) 13440 B, was 10910; without it a moored or drifting hull takes none of the waves' mean push (the wall's 1/2 rho g a^2 in short waves), and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 11237 to 13843 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "130a317319",
+      "reason": "ICE-02 adds optional grounded glacier flow and D8 drainage at 3519 B gzip (ceiling 3775 B). The plain and shared sparse SIMD kernels load on request. Core plus stage remains 24,820 B gzip.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(water) ShotSplash draws the physics splashes",
+      "reason": "water/splash 5,779 to 5,886 B gzip (this Mac): the splashes option, splashOf and the queue of physics splashes (SEA-14, PA-17), so ShotSplash draws what EntrySolver works out. The code reads the solver's events and turns each into a drawn splash; a separate entry would only add an import.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(water) crownless splash",
+      "reason": "water/splash 5,886 to 5,893 B gzip (this Mac): a splash with no crown (a column alone, or the look's height at 0) leaves its crown and mist emitters alone instead of giving a VFX an empty lifetime.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/landmarks, 0 to 2,078 B gzip measured (budget 2,334): landmark frames, the MediaPipe Tasks adapter, the webcam helper and the one-euro filter. Core plus stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) grid-particle liquids",
+      "reason": "New optional physics/flip entry (FLUID-03): FlipSolver (APIC on a MAC grid, the ghost-fluid free surface, MIC(0) conjugate gradients) and DeckWaterSolver (a box riding a hull, the deckInflow and deckClaims ports), 8,443 B gzip (this Mac). One solver and its subclass; a split would load the shared grid twice.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) deck water added mass",
+      "reason": "physics/flip 8,443 to 9,163 B gzip (this Mac): DeckWaterSolver carries its deck water as rigid added mass in an implicit 6 by 6 solve (the water's mass, first moment and inertia about the hull's centre), so water heavier than its hull no longer diverges. The solve and its two small helpers are the hull solver's scheme; importing seakeeping for them would load far more.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "52421d6d09",
+      "reason": "LIFE-02: 6419 B gzip for the optional limbless and legged locomotion entry and its terrain and contact ports. Core and stage add zero bytes.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/face, 0 to 3,481 B gzip measured (budget 3,737): the face-to-ARKit-blendshape driver with landmark measures, head rotation and smoothing. Core plus stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ea6114769",
+      "reason": "@margoengine/physics: the kernel's threaded build (Wasm SIMD and atomics for a shared memory), a third lazy blueprint chunk of about 247 KB deflated that only loadKernel({threads: true}) fetches, so the lazy kernel items and the package total grow by it (budgets 535450 to 795608 and 618161 to 889499 B) while a world that does not ask downloads nothing more; the base entry grows from 90777 to about 91255 B measured (budget 93993) for useThreads, stepAsync and the worker launch. The worker needs a module built with atomics, which the plain builds cannot be.",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "660579824",
+      "reason": "xr/near: new optional entry, near-interaction behaviours (hand constraint, follow in view, surface magnetism, six-DoF drag and two-pointer scale, app bar, near menu, slate): 6842 B gzip; one cohesive module sharing the pointer-frame, panel and poke code, a split would duplicate them",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d2fa3cb303",
+      "grew": 2,
+      "reason": "EARTH-07 entry sizes, previous record to current: @margoengine/physics/aeolian 0→5633 B (ceiling 0→5889 B); @margoengine/vfx/blown-sand 10561→11061 B (ceiling 10823→11393 B). The aeolian entry integrates the registry and lazily loads the arena solver. The renderer carries live grain mass and local velocity in its existing instance layout. A separate renderer entry would duplicate the terrain sampling and draw machinery."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "2500b97885",
+      "reason": "BIO-04 adds the optional 4922 B gzip ageing entry. The four material models share their patch state, exposure ports and optical outputs. Separate entries would duplicate those pieces. Core and stage gain 0 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "747d83b03",
+      "reason": "New entries @margoengine/loaders/mmd (PMD, PMX and VMD) and @margoengine/geometry/node-graph (the geometry graph runtime); the loaders root bundle grows by the same parsers",
+      "grew": 4
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) deck load on a held hull",
+      "reason": "physics/flip 9,163 to 9,249 B gzip (this Mac): the deck volume's added-mass solve carries every other load on the hull, seen in its last step, so a hull held by locks, contacts or joints takes its water's weight (KB-FLIP-DECKLOAD1).",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "046ee7e0d",
+      "reason": "physics/rogue is a new optional entry (SEA-03): NonlinearSea, the second-order random sea (Dalzell's sum and difference kernels over equal-variance components), the ECMWF freak-wave statistics, rogue waves as constrained NewWaves placed or drawn, and the SeaSurface contract; 7,674 B gzip, its own entry so scenes without nonlinear seas pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13137,6 +13233,7 @@
     "@margoengine/geometry/flow": 2728,
     "@margoengine/geometry/gpu": 5222,
     "@margoengine/geometry/hull": 2327,
+    "@margoengine/geometry/node-graph": 10479,
     "@margoengine/geometry/nurbs": 5262,
     "@margoengine/geometry/nurbs-edit": 11996,
     "@margoengine/geometry/optimize": 2409,
@@ -13220,8 +13317,10 @@
     "@margoengine/ifc/worker": 1828,
     "@margoengine/ifc/write": 10300,
     "@margoengine/input": 5722,
+    "@margoengine/input/face": 3737,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
+    "@margoengine/input/landmarks": 2334,
     "@margoengine/input/layout": 1954,
     "@margoengine/input/lock": 1616,
     "@margoengine/input/motion": 1806,
@@ -13294,7 +13393,7 @@
     "@margoengine/lines/trail": 6523,
     "@margoengine/lines/tree-helpers": 6296,
     "@margoengine/lines/tube-painter": 1507,
-    "@margoengine/loaders": 70635,
+    "@margoengine/loaders": 81070,
     "@margoengine/loaders dist/workers/usd.js": 9945,
     "@margoengine/loaders/3dm": 4094,
     "@margoengine/loaders/3ds": 3642,
@@ -13314,6 +13413,7 @@
     "@margoengine/loaders/materialx": 8687,
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mmcif": 3430,
+    "@margoengine/loaders/mmd": 7083,
     "@margoengine/loaders/mocap": 4445,
     "@margoengine/loaders/mtl": 10028,
     "@margoengine/loaders/nrrd": 7006,
@@ -13336,6 +13436,7 @@
     "@margoengine/loaders/vtk-legacy": 7127,
     "@margoengine/loaders/vtk-xml": 11711,
     "@margoengine/loaders/worker": 9943,
+    "@margoengine/loaders/xfile": 5444,
     "@margoengine/loaders/xml": 5755,
     "@margoengine/lod": 14236,
     "@margoengine/lod/auto": 9863,
@@ -13505,9 +13606,11 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 618161,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 90777,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 535450,
+    "@margoengine/physics": 889499,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
+    "@margoengine/physics/aeolian": 5889,
+    "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
@@ -13515,12 +13618,15 @@
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
+    "@margoengine/physics/flip": 9249,
     "@margoengine/physics/foam": 8022,
+    "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
+    "@margoengine/physics/locomotion": 6675,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
@@ -13529,7 +13635,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 7361,
-    "@margoengine/physics/seakeeping": 11237,
+    "@margoengine/physics/seakeeping": 13843,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
@@ -14141,7 +14247,7 @@
     "@margoengine/usdz/worker": 13900,
     "@margoengine/vfx": 39137,
     "@margoengine/vfx/base": 13777,
-    "@margoengine/vfx/blown-sand": 10823,
+    "@margoengine/vfx/blown-sand": 11393,
     "@margoengine/vfx/clouds": 8867,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/debris": 3160,
@@ -14284,7 +14390,7 @@
     "@margoengine/water/sea-state": 1380,
     "@margoengine/water/settings": 6675,
     "@margoengine/water/ships": 11259,
-    "@margoengine/water/splash": 5779,
+    "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9360,
     "@margoengine/water/wake": 1680,
     "@margoengine/weather": 8762,
@@ -14350,6 +14456,7 @@
     "@margoengine/xr/layers": 4612,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3600,
+    "@margoengine/xr/near": 7098,
     "@margoengine/xr/occlusion": 3198,
     "@margoengine/xr/performance": 1582,
     "@margoengine/xr/pointer": 2675,
@@ -14580,6 +14687,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/rogue": 7930
   }
 }

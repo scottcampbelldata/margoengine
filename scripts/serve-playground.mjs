@@ -27,6 +27,7 @@ const types = {
   '.hdr': 'image/vnd.radiance',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.ts': 'text/plain; charset=utf-8',
 };
 
 export const server = createServer(async (request, response) => {

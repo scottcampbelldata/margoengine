@@ -761,6 +761,42 @@ buffer core replaced, closed loops meeting, a drawn picture and a lost device.
 
 Apache-2.0 licensed.
 
+## Geometry graphs
+
+`@margoengine/geometry/node-graph` runs a serializable graph that builds a mesh: sources, setters, instancing on vertices and faces, conditionals, noise, merge and material ids. The graph is plain JSON (`{format: 'margo-geometry-graph', version: 1, nodes, output}`); there is no editor (a visual editor is on the do-later list), so graphs are written by code or by tools that emit the JSON.
+
+```ts
+import { GeometryGraph } from '@margoengine/geometry/node-graph';
+
+const g = new GeometryGraph();
+const ground = g.add('plane', { params: { width: 10, height: 10, widthSegments: 32, heightSegments: 32 } });
+const hills = g.add('setPositions', {
+  inputs: {
+    geometry: ground,
+    // Per vertex: lift y by noise of the vertex position.
+    positions: g.add('add', {
+      inputs: {
+        a: g.add('context', { params: { field: 'position' } }),
+        b: g.add('vec3', { inputs: { x: 0, y: g.add('noise', { inputs: { position: g.add('context'), scale: 0.4 } }), z: 0 } }),
+      },
+    }),
+  },
+});
+const rock = g.add('sphere', { params: { radius: 0.1, widthSegments: 8, heightSegments: 6 } });
+const scattered = g.add('instantiateOnFaces', { inputs: { target: hills, instance: rock }, params: { seed: 7 } });
+g.setOutput(g.add('merge', { inputs: { geometries: [hills, g.add('setMaterialId', { inputs: { geometry: scattered, id: 1 } })] } }));
+
+const mesh = g.build({ maxVertices: 500_000 });
+console.log(mesh.positions.length / 3, mesh.groups?.map((x) => x.materialIndex)); // vertices, [0, 1]
+const saved = g.stringify(); // JSON text; GeometryGraph.fromJSON(saved) reads it back
+```
+
+**Nodes.** Each node has an `id`, a `type`, constant `params` and `inputs`, an input being a number, a vector `[x, y, z]`, a boolean or `{node: id}` (`g.add` returns that reference). Types: sources `box`, `sphere`, `cylinder`, `cone`, `plane`, `circle`, `torus`, `capsule`, `empty` and `input` (geometry you pass in `options.inputs`); `context` (the vertex, face or instance being visited: `position`, `normal`, `uv`, `color`, `index`, `count`, `faceIndex`, `instanceIndex`); `vec3`, `swizzle`, `mix`, `clamp`, `negate`, `abs`, `floor`, `ceil`, `fract`, `sin`, `cos`, `sqrt`, `add`, `subtract`, `multiply`, `divide`, `min`, `max`, `pow` (numbers or vectors, componentwise), `length`, `normalize`, `dot`, `cross`, `distance`; `random` (seeded, by the context index unless you give `index`); `noise` (gradient noise of a position, `scale`, `octaves`, `lacunarity`, `gain`, `seed`; `output: 'vector'` gives three decorrelated samples); `compare`, `logic` and `conditional` (picks `then` or `otherwise` and never evaluates the other one, geometry or values); the setters `setPositions` (normals are recomputed unless `recomputeNormals: false`), `setNormals`, `setUVs`, `setColors` and `setMaterialId`; `transform` (translation, euler rotation in radians, scale; a mirror keeps faces facing out) and `merge`; and `instantiateOnVertices` and `instantiateOnFaces` (`scale` and `rotation` fields evaluated per instance, `alignToNormal`, `every` nth, `keepTarget`; vertices: `uniqueVertices`; faces: `perFace` random points, `seed`). Setter and instancer inputs that are not geometry are fields: they are evaluated once per vertex, face or instance, with `context` reading that element. A geometry input can never depend on the context.
+
+**Checks.** `parseGeometryGraph(json | text, {maxNodes, maxDepth})` returns a normalised copy or throws: `TypeError` for a wrong shape, `RangeError` for an unknown type, parameter or input, a value out of range, a reference to a missing node, a geometry wired where a value belongs, a cycle, a chain deeper than `maxDepth` (256), more than `maxNodes` nodes (4096) or an output that is not geometry. `g.build(options)` and `buildGeometryGraph(json, options)` also enforce `maxVertices` (4,000,000), `maxTriangles` (8,000,000) and `maxEvaluations` (100,000,000, one for each vertex, face or instance a field visits) before anything is allocated from a count, stop at `signal` (an `AbortSignal`) with its reason, and take `seed`, which is added to every seed. The result is `GeometryData` (`positions`, `normals`, `uvs`, `indices`, `groups` by material id) plus rgba `colors` when a setter or input made them.
+
+Gradient noise is Perlin's improved noise, with the permutation shuffled from the seed (Ken Perlin, "Improving Noise", SIGGRAPH 2002, https://doi.org/10.1145/566654.566636). Random points on faces use the square-root warp of Osada, Funkhouser, Chazelle and Dobkin, "Shape Distributions", ACM TOG 2002.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

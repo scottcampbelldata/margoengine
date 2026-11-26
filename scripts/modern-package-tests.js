@@ -26,6 +26,7 @@ import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
 import { waitForPageReady } from './support/page-ready.js';
 import { pages } from './support/doc-snippets.mjs';
+import { repoPlaywright } from './support/playwright-version.mjs';
 import {
   packageMarkdown,
   readmeExamples,
@@ -132,7 +133,8 @@ const dependencies = {
   '@types/react-dom': '^18.3.0',
   '@types/node': JSON.parse(await readFile('node_modules/@types/node/package.json', 'utf8')).version,
   '@testing-library/react': '16.3.3',
-  '@playwright/test': JSON.parse(await readFile('package.json', 'utf8')).devDependencies['@playwright/test'],
+  // The installed version, not the range: CI's browsers come from it (KB-CI-PWVERSION1).
+  '@playwright/test': repoPlaywright('.'),
   jsdom: '26.1.0',
   vite: JSON.parse(await readFile('package.json', 'utf8')).devDependencies.vite,
 };

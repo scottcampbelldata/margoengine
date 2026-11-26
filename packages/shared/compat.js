@@ -40,3 +40,12 @@ export function compatibilityLevel(device) {
 export function loadCompatRoute(device, load) {
   return compatTier(device) === 'webgl2' ? load() : undefined;
 }
+
+/**
+ * On the WebGL2 layer, the texture units a render pipeline made from `descriptor` would take per stage, counted before
+ * it links (the layer device's `textureUnits`; `over` is the first stage past its GL limit, which the layer refuses with
+ * code `unsupported`). Undefined on native WebGPU, where `maxSampledTexturesPerShaderStage` is the limit.
+ */
+export function compatTextureUnits(device, descriptor) {
+  return compatTier(device) === 'webgl2' ? device.textureUnits?.(descriptor) : undefined;
+}

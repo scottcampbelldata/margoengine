@@ -104,6 +104,62 @@ button:disabled {
   font-weight: 400;
   color: var(--muted);
 }
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tab {
+  display: inline-flex;
+}
+.tabs button,
+.add-file button,
+.add-file input {
+  font: inherit;
+  min-height: 44px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.tabs button {
+  cursor: pointer;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+.tabs button[aria-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -3px 0 var(--accent);
+  font-weight: 700;
+}
+.tab button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tab .remove {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-inline: 10px;
+}
+.add-file {
+  display: flex;
+  gap: 6px;
+}
+.add-file input {
+  width: 12ch;
+}
+.add-file button {
+  cursor: pointer;
+}
 .editor {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -145,6 +201,66 @@ button:disabled {
   white-space: pre;
   overflow: auto;
   height: 100%;
+}
+.api {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+}
+.api summary {
+  cursor: pointer;
+  min-height: 36px;
+  padding-block: 6px;
+}
+.api input {
+  font: inherit;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 10px;
+  margin-block: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+#api-list {
+  max-height: 40vh;
+  overflow: auto;
+}
+#api-list h3 {
+  font-size: 1rem;
+  margin: 10px 0 4px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+#api-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#api-list li {
+  padding-block: 4px;
+  border-top: 1px solid var(--line);
+}
+#api-list button {
+  font: inherit;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-weight: 700;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+#api-list code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+#api-list p {
+  margin: 2px 0 0;
 }
 .stage {
   position: relative;
@@ -207,4 +323,45 @@ button:disabled {
   .editor {
     height: 50vh;
   }
+}
+/* Embed mode (embed/index.html): a bar with Run and Open in Playground, then the canvas, or with ?code the code too. */
+.embed-only {
+  display: none;
+}
+[data-embed] .embed-only {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 6px;
+}
+[data-embed] .full-only,
+[data-embed] .skip {
+  display: none;
+}
+[data-embed] body {
+  background: var(--bg);
+}
+[data-embed] .playground {
+  max-width: none;
+  padding: 8px;
+}
+[data-embed] #status {
+  margin-block: 4px;
+}
+[data-embed] .stage {
+  height: calc(100vh - 120px);
+}
+[data-embed][data-view='canvas'] .panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-embed][data-view='canvas'] .code-pane,
+[data-embed][data-view='canvas'] .pane-title,
+[data-embed][data-view='canvas'] .console {
+  display: none;
+}
+[data-embed][data-view='code'] .stage {
+  height: calc(100vh - 360px);
+}
+[data-embed][data-view='code'] .editor {
+  height: calc(100vh - 170px);
 }

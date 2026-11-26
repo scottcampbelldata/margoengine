@@ -76,7 +76,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
 | Node Particle system: a whole particle system as a block graph (creation, emitter shape, update, random/gradient, triggers that start or chain systems) with JSON load (`vfx/src/nodes.ts` covers forces only) | Babylon Node Particle Editor | PARTIAL | M |  |
-| Near-interaction XR UI and behaviours: hand constraint, follow-in-view, surface magnetism, six-DoF drag, multi-pointer scale, app bar, holographic slate and near menu | Babylon | PARTIAL | M |  |
+| Near-interaction XR UI and behaviours: hand constraint, follow-in-view, surface magnetism, six-DoF drag, multi-pointer scale, app bar, holographic slate and near menu | Babylon | DONE | M | 660579824 |
 | WebXR body tracking | Babylon | DONE | S | 9464e1394 |
 
 ## Lane C: scene, assets, text and formats
@@ -98,18 +98,18 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| MMD loader: PMD/PMX models plus VMD motion and camera clips (no physics) | three.js | MISSING | M |  |
-| DirectX `.x` loader (text and binary, skin and animation sets) | three.js | MISSING | M |  |
+| MMD loader: PMD/PMX models plus VMD motion and camera clips (no physics) | three.js | DONE (`parsePMD`, `parsePMX`, `parseMMD`, `parseVMD`, `sampleVMDBone` of `@margoengine/loaders/mmd`; rigid bodies and joints are data only, never simulated) | M | 084f38ec9 |
+| DirectX `.x` loader (text and binary, skin and animation sets) | three.js | DONE (`parseX` of `@margoengine/loaders/xfile`; compressed `tzip` and `bzip` files are refused as unsupported) | M | a5f8c55ea |
 | Tilt Brush `.tilt` loader (brush strokes as ribbons) | three.js | DONE (`@margoengine/loaders/tilt`) | S | 004c621ab |
 | PRWM loader (packed binary mesh) | three.js | DONE (`@margoengine/loaders/prwm`) | S | 004c621ab |
 | RGBM, LogLuv and HDR-JPG texture loaders (Ultra HDR gain maps exist) | three.js | DONE (`@margoengine/environment/encoded-hdr`; HDR-JPG is the existing gain-map decoder, now also `decodeHDRJPG`) | S | d49bcdff4 |
 | G-code exporter (toolpath from a mesh or lines; the G-code loader exists) | three.js | DONE (`@margoengine/exporters/gcode`) | S | b3bf73bcb |
 | Depth-video point cloud (RGB plus depth video to points) | three.js | DONE (`@margoengine/points/depth-video`) | S | 146657294 |
 | Parametric surface presets (Klein bottle, Mobius strip, torus-knot variants) on the generic `geometry/src/parametric.ts` builder | three.js | DONE (`@margoengine/geometry/extras`: Klein bottle, Möbius strip, knots) | S | 65bd2d5d3 |
-| Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | MISSING | L |  |
+| Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | DONE (`GeometryGraph`, `buildGeometryGraph`, `parseGeometryGraph` of `@margoengine/geometry/node-graph`; no editor) | L | 0946c2a9d |
 | Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 0d5b43853 |
 | Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 861843398 |
-| `.babylon` scene import and scene-serializer export | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; `exportBabylon` of `@margoengine/exporters/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; static pose on export) | S to M | 03dda3de5 |
+| `.babylon` scene import and scene-serializer export | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; `exportBabylon` of `@margoengine/exporters/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; static pose on export) | S to M | 8df1341a1 |
 
 ## Lane D: tools, runtime and interaction
 
@@ -156,7 +156,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Octree helper for `points/src/octree.ts` | three.js | DONE (`@margoengine/lines/tree-helpers`: `OctreeHelper`) | S | 312af62b9 |
 | Cycle raycast: repeat a pick to step through overlapping hits | drei | DONE (`CycleRaycast`, `@margoengine/selection`) | S | 29bb42e10 |
 | Bounding-box anchor: HTML or a label pinned to a box corner or face | drei `BBAnchor` | DONE (`boxAnchorPoint`, `@margoengine/labels`) | S | 9cf6c56f0 |
-| Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | PARTIAL | L | piece 1 landed 3068bb7fa (site/playground: editor, sandboxed frame, console, share links, templates, versions, download); left: tabs, type hints, embed |
+| Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | PARTIAL | L | piece 1 3068bb7fa, ada2e5867, f050bd240; piece 2 d91d241d3 (files/tabs, link v2), 81398565e (API panel from .d.ts, Ctrl+Space), 1b744b945 (embed). Left: real type checking and member completion in the editor, which needs the TypeScript language service or Monaco (a new dependency, awaiting Scott's go) |
 | Declarative action manager: triggers on a node (pick, long pick, pointer over/out, intersect enter/exit, every frame, keys) with chained actions | Babylon ActionManager | DONE | S to M | fdc511bde |
 | Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | DONE (`OrbitBehaviors`, `@margoengine/controls/behaviors`) | S | 05ced2d88 |
 | Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | DONE (`Hotspot`, `@margoengine/labels`) | S | 9d2ff0cb9 |

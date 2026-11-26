@@ -96,6 +96,14 @@
       "types": "./dist/vrml.d.ts",
       "import": "./dist/vrml.js"
     },
+    "./mmd": {
+      "types": "./dist/mmd.d.ts",
+      "import": "./dist/mmd.js"
+    },
+    "./xfile": {
+      "types": "./dist/xfile.d.ts",
+      "import": "./dist/xfile.js"
+    },
     "./babylon": {
       "types": "./dist/babylon.d.ts",
       "import": "./dist/babylon.js"

@@ -1453,6 +1453,7 @@ backs them yet:
 | LIM-434 | Subsurface scattering blur: `SSS` in `@margoengine/post/sss` blurs masked pixels by a per-channel Gaussian profile in world units (two separable passes, after Jimenez et al. 2015 and d'Eon and Luebke 2007). On a real GPU (Apple silicon Mac, Metal, Chromium), a light and a dark box meeting in an edge, both masked, `radius` 0.12, 16 taps: the 10 to 90% edge is 15 px wide in red, 6 in green and 3 in blue (sharp without SSS); flat faces keep their colour to 0/255; the background is untouched; no mask equals no effect exactly (docs/limits.md, Rendering) | `packages/post/test/sss-browser.mjs`, `packages/post/test/sss.test.js` | `cd packages/post && npm test`; GPU: `node packages/post/test/sss-browser.mjs` | PROVEN | Stand-in scene (two boxes); GPU cost not measured. |
 | LIM-435 | Terrain height streaming: `TerrainStream.attach(engine, options)` in `@margoengine/terrain/stream` streams a terrain's heightmap and painted weights in tiles around the camera, in a window that moves by whole tiles (kept texels scrolled by GPU copies, exposed tiles loaded nearest first and uploaded in bands within a per-frame texel budget). On a Radeon 680M, on nine adjacent real Terrarium tiles around Mount Rainier (Terrain Tiles on AWS, 256 x 256 each) in a 2 x 2 window, through moves along +X, +Z, -X and -Z, a move inside the 0.75 tile margin and teleports off the data and back: the CPU copy, the GPU heightmap read back and the weights held exactly the mosaic's texels for the expected tiles (0 apart), the streamed terrain drew exactly the pixels of a plain Terrain given that window whole (0 of 255 apart), no frame uploaded more than its 16,384 texel budget, and a stream disposed mid-load aborted the load and rejected `ready` with 'disposed'. Cost not timed. | `packages/terrain/test/stream.browser.mjs`, `packages/terrain/test/stream.test.js` | `npm run test:gpu --workspace @margoengine/terrain`; `npm test --workspace @margoengine/terrain` | PROVEN | Cost not timed. |
 | LIM-436 | Interaction toolkit: `Interaction` in `@margoengine/xr/interaction` lets every controller and hand grab objects near the grip or along the ray (squeeze on an `xr-standard` gamepad, else a thumb and index pinch), keeps a held object's pose fixed in the grip's frame, snaps it into a fitting free socket on release and reports its throw velocity, and sends enter, move, down, up and leave with u and v to ray panels. Checked with stand-in controllers, not on a headset | `packages/xr/tests/interaction.test.js` | `npm test --workspace @margoengine/xr` | PROVEN (STAND-IN) | Checked with stand-in controllers, not on a headset |
+| LIM-669 | Near interaction: `@margoengine/xr/near` holds `HandConstraint` (palm menu with angle hysteresis), `FollowInView` (tag-along cone and distance limits), `SurfaceMagnetism` and `snapToSurface` (ray-plane placement and alignment), `Manipulator` (pinch or squeeze six-DoF drag with rotate and axis constraints, two-pointer scale and turn with limits), `AppBar`, `NearMenu` (fingertip poke and ray presses, pin) and `Slate` (move, resize, pan, tap, close). Checked with stand-in hands, controllers and surfaces, not on a headset | `packages/xr/tests/near.test.js` | `npm test --workspace @margoengine/xr` | PROVEN (STAND-IN) | Checked with stand-in controllers, not on a headset |
 | LIM-437 | Terrain sculpt and paint brushes: `await TerrainSculpt.attach(engine, terrain, options)` in `@margoengine/terrain/sculpt` raises, lowers, smooths and flattens a terrain's heightmap and paints its layer weights in one GPU compute pass per dab, with exact undo and redo of whole strokes and a CPU copy for `TerrainQuery`. On a Radeon 680M, on the real Mount Rainier Terrarium tile (256 x 256 texels 100 m apart) with painted weights: raise, lower, smooth and flatten dabs matched the brush formulas worked on the CPU to 0.14 mm inside the brush and left every texel outside it exactly as it was; a 30-dab smoothing stroke cut the squared Laplacian under it by 96%; full-strength paint set the layer exactly and soft paint stayed within one 8-bit step of the formula; after every stroke the CPU copy equalled the GPU read back and a TerrainQuery refreshed from `onChange` answered the raised ground (height and ray cast); undoing all 8 strokes gave back the original heightmap, weights and picture exactly (0 apart) and redoing them the edited ones. Cost not timed. | `packages/terrain/test/sculpt.browser.mjs`, `packages/terrain/test/sculpt.test.js` | `npm run test:gpu --workspace @margoengine/terrain`; `npm test --workspace @margoengine/terrain` | PROVEN | Cost not timed. |
 | LIM-438 | Own physics body kinds, mass and extra passes: a fixed body made dynamic rests on the fixed floor it touched, one made fixed stops and ends its touch, one made kinematicPosition holds its pose; `setType`'s `wakeUp` and a still kinematic body read asleep as on the root entry, step by step; `setAdditionalMass` adds a point at the centre, `setMassProperties` gives back exactly the figures given; an island with e extra passes is bit-equal to a world of iterations + e and leaves the others bit-equal to the plain world; a generic joint with all six locks is bit-equal to a fixed joint and with the linear three to a spherical one (docs/limits.md, Physics) | `packages/physics/tests/next-bodies.test.js` | `npm test --workspace @margoengine/physics` | PROVEN | Node; replay holds the kernel bit-equal across Node, Chromium and Firefox |
 | LIM-439 | Far voxel levels of detail: `VoxelLod` in `@margoengine/voxel/lod` puts exactly one node over every block in view (4,000 random blocks per setup), each level a ring of a bounded node count so a level doubles the view, never opens a hole while the eye moves (fixed points stay covered), and leaves the real world's loaded chunks empty; `noiseTerrainLod` columns are within half a cell of `noiseTerrain`'s ground. `VoxelRenderer` `scale: 2` from twice the eye draws the scale-1 image (0 of 29,823 pixels differ, Apple silicon Mac, Metal). | packages/voxel/tests/lod.test.js, packages/voxel/tests/lod-browser-check.mjs | npm test --workspace=@margoengine/voxel; node packages/voxel/tests/lod-browser-check.mjs | measured | Caves and trees are not in far levels; nodes generate on the main thread; frame cost at kilometre views is unmeasured; one GPU. |
@@ -5529,6 +5530,14 @@ agree between 24 and 60 frame-per-second views of one world, and snapshots repro
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
 
+### Resolved saltation and snow transport (EARTH-07)
+
+The surface model transfers mass conservatively between the loose bed, moving layer, dust and the open-boundary
+ledger. At a uniform interior vertex it reproduces the implicit saltation balance and Pomeroy–Gray's saturated
+snow flux, including exposure stress. A spaced slope settles toward repose while preserving its volume. Tests
+reproduce the quantities and exact clock and snapshot hashes in `packages/physics/tests/coupling/aeolian.test.js`.
+`packages/vfx/test/blown-sand-check.mjs` compares the simulated ridge plume and a mesh-only frame on both backends.
+
 ### Water-table and spring conservation (HYDRO-06)
 
 Fixed aquifer heads preserve the steady Dupuit profile and its discharge. Recharge entering from runoff adds the
@@ -5536,3 +5545,25 @@ same aquifer volume, and water leaving the aquifer as seepage adds the same shal
 memory modes preserve the same deterministic state across frame rates and snapshot restoration.
 Proof in [the groundwater coupling tests](../../packages/physics/tests/coupling/groundwater.test.js) and
 [the arena placement test](../../packages/physics/tests/groundwater.test.js).
+
+### Grounded glacier flow and meltwater routing (ICE-02)
+
+The optional glacier solver reproduces the exact two-column lagged Glen update and hydrostatic
+crevasse depth, preserves closed ice volume to floating-point roundoff, and transfers the independently
+computed liquid volume into the real shallow-water solver. Native plain and shared builds, different
+frame rates and snapshot replay agree by state hash. Build Physics and run
+`node --test packages/physics/tests/glacier.test.js packages/physics/tests/coupling/glacier.test.js`.
+
+### Small-animal ground locomotion
+
+LIFE-02 uses an inextensible lateral-undulation chain with anisotropic ground reactions and force-driven
+legged gaits with planted stance feet. The direct Physics fixtures substantiate friction, spring load, gait phase,
+forward and lateral motion, and equal state hashes in plain and shared memory. Coupling fixtures substantiate
+sampling from the real TerrainBed and hash-equivalent replay at multiple display rates. No speed claim is made.
+
+### Physics-driven material ageing (BIO-04)
+
+Outdoor and immersed material patches evolve with exposure on the world clock. The analytical tests
+check first-year and multi-year corrosion, immersion loss, rot activation, marine coverage, carbonate
+recession and layered reflectance. The same exposure sequence yields the same snapshot hash during
+normal advance, film-rate changes and seek. PBR data changes with the computed layers and coverage.

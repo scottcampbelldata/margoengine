@@ -15,6 +15,9 @@ unsafe extern "C" {
 pub struct Arena {
     pub base: *mut u8,
     size: usize,
+    /// False for a view (`Arena::view`), which frees nothing when dropped.
+    #[cfg(not(target_arch = "wasm32"))]
+    owned: bool,
 }
 
 /// Native worlds reserve this much address space; the system commits pages only when they are touched.
@@ -22,6 +25,16 @@ pub struct Arena {
 const NATIVE_BYTES: usize = 1 << 30;
 
 impl Arena {
+    /// The same block, for a solve on another thread (`World::thread_view`): it grows nothing and frees nothing.
+    pub fn view(&self) -> Self {
+        Self {
+            base: self.base,
+            size: self.size,
+            #[cfg(not(target_arch = "wasm32"))]
+            owned: false,
+        }
+    }
+
     #[cfg(target_arch = "wasm32")]
     pub fn new() -> Self {
         Self { base: core::ptr::null_mut(), size: 0 }
@@ -32,7 +45,7 @@ impl Arena {
         let layout = std::alloc::Layout::from_size_align(NATIVE_BYTES, 16).unwrap();
         let base = unsafe { std::alloc::alloc_zeroed(layout) };
         assert!(!base.is_null());
-        Self { base, size: NATIVE_BYTES }
+        Self { base, size: NATIVE_BYTES, owned: true }
     }
 
     /// Makes `bytes` from the base usable, moving the block when the host cannot grow it in place (the caller reads `base`
@@ -61,6 +74,9 @@ impl Arena {
 #[cfg(not(target_arch = "wasm32"))]
 impl Drop for Arena {
     fn drop(&mut self) {
+        if !self.owned {
+            return;
+        }
         let layout = std::alloc::Layout::from_size_align(self.size, 16).unwrap();
         unsafe { std::alloc::dealloc(self.base, layout) };
     }

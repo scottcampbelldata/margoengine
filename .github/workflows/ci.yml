@@ -15,7 +15,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: scripts/lint.mjs checks the files changed since the merge base with origin/main, which a
+      # depth-1 checkout (a pull request's merge commit) does not have (tests/ci-checkout.test.js).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -26,9 +30,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: npm run quality compares baselines and document readers with the merge base with origin/main,
+      # and without it they skipped those checks on every pull request (tests/ci-checkout.test.js).
       - uses: actions/checkout@v4
         with:
           lfs: true
+          fetch-depth: 0
       # The repository's minimum Node (root package.json engines; scripts/check-engines.mjs keeps the two equal).
       - uses: actions/setup-node@v4
         with:
@@ -46,6 +53,14 @@ jobs:
         run: npm run api:check
       - name: Quality checks
         run: npm run quality
+      # The test files need the Required external test assets (scripts/support/external-test-assets.mjs, kept outside
+      # the repository) and a Chromium for their browser cases (tests/ci-test-jobs.test.js, KB-CI-FIXTURES1).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../engine-bench/batch-160/gltf-gpu-samples
+          key: external-test-assets-${{ hashFiles('scripts/support/external-test-assets.mjs') }}
+      - run: node scripts/reference-rendering/fetch-skip-assets.mjs
+      - run: npx playwright install chromium
       - name: Tests
         run: node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js
 
@@ -108,6 +123,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:packages
+      # As in the test job: the Required external test assets and a Chromium (tests/ci-test-jobs.test.js).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/../engine-bench/batch-160/gltf-gpu-samples
+          key: external-test-assets-${{ hashFiles('scripts/support/external-test-assets.mjs') }}
+      - run: node scripts/reference-rendering/fetch-skip-assets.mjs
+      - run: npx playwright install chromium
       - run: node scripts/node22-tests.mjs
 
   kernel:

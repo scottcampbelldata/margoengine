@@ -1,3 +1,18 @@
+### Section 5 evidence: texture units counted before linking, glTF base maps packed by the limit (2026-11-26)
+
+The WebGL2 layer counts a render pipeline's texture units per stage from its GLSL before linking (render.ts
+`programUnits`: texture and sampler pairs a stage reads, a pair both stages read counted once in the combined count,
+plus storage data textures; a texture that is only size-queried takes none) against MAX_TEXTURE_IMAGE_UNITS,
+MAX_VERTEX_TEXTURE_IMAGE_UNITS and MAX_COMBINED_TEXTURE_IMAGE_UNITS, and `createRenderPipeline` refuses past a limit
+with code `unsupported` (errors#texture-units) instead of a link failure. `device.textureUnits(descriptor)` returns the
+same count and keeps the translation for the next pipeline from that descriptor. gltf marks a material on a device
+when its composed shader passes WebGPU's per-stage counts or the layer's count, and composes it with its five base
+maps in one array (four units fewer); materials that fit are unchanged. Evidence: CPU checks (glsl.test.js
+`stageUnits`; device.test.js refusal before link per stage; materials-ext.test.js no pack at 16, pack at a 12 limit)
+and scripts/compat-units-gpu-check.js on native WebGPU and ANGLE Direct3D 11 (all 13 maps, the peak and shared maps),
+RTX A6000. Missing: a GPU scene that needs packing on a real 16-unit device (the check's scenes fit after the shared
+bindings); other GPUs not run.
+
 ### Section 5 evidence: shadow map viewer, WebGPU and the WebGL2 layer (2026-11-25)
 
 `ShadowMapViewer` (`@margoengine/shadows/viewer`) is a debug overlay: it loads the chosen depth layer with `textureLoad`
@@ -7917,6 +7932,8 @@ The optional graph-gpu entry owns sorted Morton spatial trees, FR/FA2 compute pa
 
 83. Islands share no solve state (2026-11-26, `packages/physics/kernel/src/solver.rs` `normal_rows`/`solve_impacts`, `world.rs` `Window`, `claim_stamps`, `multibody.rs` `unite_multibodies`, test `tests/next-multibody.test.js`). Groundwork for solving islands on threads: the strikes a substep finds are listed in the window's own run of `IMPACTS` (from its first pair times the manifold size) with the count in the window, not the header; multibody walk stamps come from per-window ranges claimed when the window is set up; and the moving links of a multibody under a fixed or kinematic root are one island (KB-PHYS-MBISLAND1). Evidence: the replay scenes' state hashes are unchanged (only the arena lists moved, as the header's walk count moves), the physics (1,219) and kernel suites pass. Missing: the solve window itself still lives in the one `World` the kernel's static holds; a thread needs a view of its own.
 
+84. Islands solve on threads (2026-11-26, `packages/physics/kernel/src/integrate.rs` `step_begin`/`plan_islands`/`solve_island`/`step_end`, `world.rs` `thread_view`, `api.rs` `world_step_begin`/`world_solve_islands`/`world_step_end`, `packages/physics/src/kernel.ts` `useThreads`/`stepAsync`, `src/kernel-thread.ts`, tests `kernel/tests/threads.rs`, `tests/kernel-threads.test.js`). A step is begun on the main thread (broad and narrow phases, islands, rows) and every island's substep level and first multibody stamp are planned there in island order (ISLAND_LEVEL, ISLAND_STAMP, scratch); then any thread solves any island on a view of the world of its own (`thread_view`: the same block, a window, clock readings and counts of its own), and the main thread ends the step. Planning the levels before any island solves gives the same bits as before (an island's level reads only its own state). The kernel has a third build, threaded (Wasm SIMD and atomics, importing a shared memory, built as the cdylib alone so fat LTO compiles `core` with atomics), loaded only by `loadKernel({threads: true})`; each worker is its own instance of it over the world's memory with its own stack region. Evidence: the state hash after every step equals one thread's at 1, 2, 4 and 8 threads, with native threads (300 steps, up to 43 islands a step) and with Wasm workers in Node (240 steps); the replay state hashes are unchanged. Missing: the broad and narrow phases are serial; the engine plugin's `Physics.step` steps on one thread; no browser run of the workers yet (Node only).
+
 ## Batch 252 navmesh worker evidence (section 5 supplement)
 
 The optional navmesh/wasm entry loads one feature-local Rust SIMD raster asset and an owned CPU worker. Exact output evidence is in packages/navmesh/test/wasm.test.js and the crate's tests: byte-identical ordinary/tiled polygon files, equal reference clipping counts, cancellation/error/timeout teardown and source/artifact hash enforcement. The SIMD work proof keeps coverage, triangle order, span merging, classification and polygonization unchanged. Native rasterization uses fixed stack clip buffers, not allocations per cell. Evidence still owed: quiet-machine end-to-end speed measurements and browser/CSP hosting matrix. No core/stage or GPU backend change.
@@ -10094,6 +10111,16 @@ cover the analytic impulse and held-force convolution, resting contact, rolling 
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
 
+### Aeolian transport evidence (EARTH-07)
+
+`AeolianTransport` owns its arenas and writes conservative change through `TerrainBed`'s accumulation field.
+The native module imports the selected world memory and has an empty data section. The native-load regression
+checks every byte of a populated arena before and after each instance. `aeolian.test.js` checks the backward-Euler
+reaction, a Pomeroy–Gray snow equilibrium including cover, mass through open and closed edges, repose and world
+snapshot determinism with both memory variants. `blown-sand-check.mjs` renders an exposed ridge on native WebGPU
+and on the WebGL2 compatibility layer. ATMO-01 and ATMO-06 registry readers are covered by coupling fixtures until
+those solvers accept the physical fields. TREE-5 still needs a filmed-scene integration.
+
 ### Groundwater evidence (HYDRO-06)
 
 The optional Rust SIMD groundwater kernel imports world memory in both modes. It has an empty static data
@@ -10106,3 +10133,23 @@ the world clock and both native memory modes. HYDRO-02 supplies the exact water 
 receives the actual seepage volume. The aquifer and the surface solver keep independent volume ledgers.
 The production browser bundle fetches both kernels under cross-origin isolation and reproduces the same state
 hash in the two memory modes.
+
+### Grounded glacier flow and drainage (ICE-02)
+
+`@margoengine/physics/glacier` imports world memory and runs its own SIMD Wasm at level 0. Face-wise
+volume conservation, a positive donor limiter and the sparse implicit solve are checked on analytic
+and stiff non-flat grids. Layout-1 f64 fields expose thickness, crevasse depth, velocity, drainage
+and per-step releases. Real HYDRO-01 matches discharged melt volume. Identical full hashes cover
+plain/shared Wasm, frame-rate changes and snapshot replay. The wave-source fixture verifies only
+delivery of released volume to a registry reader. A SEA-06 impulse response needs its own solver.
+
+### Ground locomotion kernel (LIFE-02)
+
+The optional `@margoengine/physics/locomotion` Rust crate prepares gait geometry and applies grounded forces in
+two narrow exports per body. Both memory variants import the world's memory, use static slot 13 and lease an
+arena stack. Only profile construction and Bed sampling are in TypeScript. Linear contact work is measured by
+the configured number of links or feet plus torso, and each one gets its own sampled load.
+
+The Physics fixtures verify inextensible link closure, analytical slip force, a passive spring load, stance and
+swing wrenches, the live TerrainBed interface, deterministic replay after a snapshot, and the two memory variants
+after growth. The focused browser gate checks lazy loading, contact-driven motion and snapshot restoration.

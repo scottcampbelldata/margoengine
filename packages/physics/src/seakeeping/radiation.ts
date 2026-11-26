@@ -365,6 +365,269 @@ export function lateralSection(
   };
 }
 
+/** A section's far-field waves in a beam wave of unit amplitude, as complex amplitudes of waves going away from it. */
+export interface Scattering {
+  /** The wave reflected back the way the incident wave came. */
+  readonly reflected: readonly [number, number];
+  /** The wave going on past the section (the incident wave and the section's own together). */
+  readonly transmitted: readonly [number, number];
+  /**
+   * The wave's load on the section held still, per metre and metre of wave amplitude, as Re(F e^(-i w t)) against the
+   * elevation: heave (down, as the book takes it), sway, and roll about `pivot` (the Froude-Krylov and diffraction loads
+   * together, from the pressure of the incident and scattered flow over the contour).
+   */
+  readonly heaveForce: readonly [number, number];
+  readonly swayForce: readonly [number, number];
+  readonly rollMoment: readonly [number, number];
+}
+
+/**
+ * The waves a section of Lewis form `form` sends back and lets through in a beam wave of unit amplitude at `omega` rad/s
+ * (deep water), held still and, with `motions`, moving: each mode's complex velocity per unit wave amplitude (heave down
+ * positive as the book takes it, sway, and roll about `pivot`), as Re(v e^(-i w t)) with the incident wave
+ * Re(e^(i (k x - w t))) at the section's centre line.
+ *
+ * Derived here from the radiation solution of `heaveSection` and `lateralSection` (the same multipoles, the same least
+ * squares over the half contour): the scattered and radiated flow has the stream function on the contour that cancels the
+ * incident wave's and carries the section's motion, Psi = -Psi_I + (pi w / g) V S + C, split into the part even in x (the
+ * incident wave's cos k x half, heave) and the part odd in x (its sin k x half, sway and roll), each sent out as an
+ * outgoing wave whose two components are unknowns of the least squares. Far away the even part goes out alike on both
+ * sides and the odd part with opposite signs, so the reflected wave is their difference and the transmitted wave the
+ * incident wave plus their sum. A section that loses no energy has |R|^2 + |T|^2 = 1, which the tests hold.
+ */
+export function scatterSection(
+  form: LewisForm,
+  omega: number,
+  pivot: number,
+  motions: {
+    readonly heave?: readonly [number, number];
+    readonly sway?: readonly [number, number];
+    readonly roll?: readonly [number, number];
+  } = {},
+  gravity = 9.81,
+  terms = 16,
+  points = 64,
+  density = 1025,
+): Scattering {
+  const { scale: ms, a1, a3 } = form,
+    k = (omega * omega) / gravity,
+    xi = (omega * omega * ms) / gravity,
+    draft = ms * (1 - a1 + a3),
+    contour = (t: number): [number, number] => [
+      ms * ((1 + a1) * sin(t) - a3 * sin(3 * t)),
+      ms * ((1 - a1) * cos(t) + a3 * cos(3 * t)),
+    ],
+    coefficients = [1, a1, a3],
+    // The even multipoles (heave's, eq. 7.109) and the odd ones (sway's, eq. 7.106): their stream functions on the contour.
+    even = (m: number, t: number): number => {
+      let sum = 0;
+      for (let n = 0; n < 3; n++) {
+        const order = 2 * m + 2 * n - 1;
+        sum += (((n % 2 === 0 ? 1 : -1) * (2 * n - 1) * coefficients[n]!) / order) * sin(order * t);
+      }
+      return sin(2 * m * t) - xi * sum;
+    },
+    odd = (m: number, t: number): number => {
+      let sum = 0;
+      for (let n = 0; n < 3; n++) {
+        const order = 2 * m + 2 * n;
+        sum += (((n % 2 === 0 ? 1 : -1) * (2 * n - 1) * coefficients[n]!) / order) * cos(order * t);
+      }
+      return -cos((2 * m + 1) * t) + xi * sum;
+    },
+    // The outgoing wave's two stream functions, even and odd (the radiation solutions' psi_Bc and psi_Bs).
+    evenC = (x: number, y: number) => Math.PI * exp(-k * y) * sin(k * x),
+    evenS = (x: number, y: number) => -Math.PI * exp(-k * y) * cos(k * x) + waveIntegral(k, x, y)[0],
+    oddC = (x: number, y: number) => Math.PI * exp(-k * y) * cos(k * x),
+    oddS = (x: number, y: number) =>
+      Math.PI * exp(-k * y) * sin(k * x) + waveIntegral(k, x, y)[1] - y / (k * (x * x + y * y)),
+    scale = (Math.PI * omega) / gravity,
+    // The motions' shapes on the contour (radiation.ts): heave -x0, sway y0, roll about the pivot.
+    heaveShape = (t: number) => -contour(t)[0],
+    swayShape = (t: number) => contour(t)[1],
+    rollShape = (t: number) => {
+      const [x0, y0] = contour(t);
+      return -(x0 * x0 + (y0 - pivot) * (y0 - pivot)) / 2;
+    },
+    // The incident potential pi cos(k x - w t) raises the surface Re(e^(i (k x - w t))) a quarter period after it (the
+    // elevation is the potential's time rate over g), so a motion given against the elevation enters the stream function
+    // times i: its cos part is -Im v and its sin part Re v. (Checked: in long waves a section heaving with the surface
+    // sends out the wave that cancels its scattering.)
+    turn = (v: readonly [number, number] | undefined): [number, number] => (v ? [-v[1], v[0]] : [0, 0]),
+    [hr, hi] = turn(motions.heave),
+    [sr, si] = turn(motions.sway),
+    [rr, ri] = turn(motions.roll);
+  // One part, even or odd: least squares for [P_1..P_M (cos), Q_1..Q_M (sin), c1, c2] with the outgoing wave's cos part
+  // c1 C - c2 S and its sin part c2 C + c1 S; the constant taken off at the keel. Returns the outgoing wave c1 + i c2.
+  const part = (
+    multipole: (m: number, t: number) => number,
+    waveC: (x: number, y: number) => number,
+    waveS: (x: number, y: number) => number,
+    rhsCos: (t: number) => number,
+    rhsSin: (t: number) => number,
+  ): Float64Array => {
+    const size = 2 * terms + 2,
+      normal = new Float64Array(size * size),
+      rhs = new Float64Array(size),
+      row = new Float64Array(size),
+      keelC = waveC(0, draft),
+      keelS = waveS(0, draft),
+      keelA = Array.from({ length: terms }, (_, m) => multipole(m + 1, 0)),
+      add = (b: number) => {
+        for (let a = 0; a < size; a++) {
+          for (let c = 0; c < size; c++) normal[a * size + c]! += row[a]! * row[c]!;
+          rhs[a]! += row[a]! * b;
+        }
+      };
+    for (let j = 1; j <= points; j++) {
+      const t = (j * Math.PI) / (2 * points),
+        [x0, y0] = contour(t),
+        c = waveC(x0, y0) - keelC,
+        s = waveS(x0, y0) - keelS;
+      // The cos part of the time.
+      row.fill(0);
+      for (let m = 1; m <= terms; m++) row[m - 1] = multipole(m, t) - keelA[m - 1]!;
+      row[2 * terms] = c;
+      row[2 * terms + 1] = -s;
+      add(rhsCos(t));
+      // The sin part.
+      row.fill(0);
+      for (let m = 1; m <= terms; m++) row[terms + m - 1] = multipole(m, t) - keelA[m - 1]!;
+      row[2 * terms] = s;
+      row[2 * terms + 1] = c;
+      add(rhsSin(t));
+    }
+    const x = solve(normal, rhs, size);
+    return x;
+  };
+  // The incident wave pi cos(k x - w t): its even half pi e^(-k y) cos(k x) cos(w t) (stream pi e^(-k y) sin(k x), cos
+  // part), its odd half pi e^(-k y) sin(k x) sin(w t) (stream -pi e^(-k y) cos(k x), sin part). The scattered and radiated
+  // stream function on the contour is minus the incident one plus the motion's, each less its value at the keel.
+  const at = (f: (x: number, y: number) => number, t: number) => {
+      const [x0, y0] = contour(t);
+      return f(x0, y0) - f(0, draft);
+    },
+    incidentEven = (x: number, y: number) => Math.PI * exp(-k * y) * sin(k * x),
+    incidentOdd = (x: number, y: number) => -Math.PI * exp(-k * y) * cos(k * x),
+    moved = (shape: (t: number) => number, v: number, t: number) => scale * v * (shape(t) - shape(0)),
+    evenSolution = part(
+      even,
+      evenC,
+      evenS,
+      (t) => -at(incidentEven, t) + moved(heaveShape, hr, t),
+      (t) => moved(heaveShape, hi, t),
+    ),
+    oddSolution = part(
+      odd,
+      oddC,
+      oddS,
+      (t) => moved(swayShape, sr, t) + moved(rollShape, rr, t),
+      (t) => -at(incidentOdd, t) + moved(swayShape, si, t) + moved(rollShape, ri, t),
+    ),
+    er = evenSolution[2 * terms]!,
+    ei = evenSolution[2 * terms + 1]!,
+    or = oddSolution[2 * terms]!,
+    oi = oddSolution[2 * terms + 1]!;
+  // The loads on the section held still (no motions): the pressure p = -rho dPhi/dt of the incident and scattered flow,
+  // Phi = (g / (pi w)) (Phi_c cos w t + Phi_s sin w t), integrated against each mode's normal over both halves (K = 2 rho g /
+  // pi as in the radiation loads): F_j(t) = K (I_c sin w t - I_s cos w t), I the potentials' integrals against dS_j.
+  const held = motions.heave || motions.sway || motions.roll ? null : { evenSolution, oddSolution },
+    K = (2 * density * gravity) / Math.PI,
+    [nodes, weights] = QUADRATURE,
+    dx0 = (t: number) => ms * ((1 + a1) * cos(t) - 3 * a3 * cos(3 * t)),
+    dy0 = (t: number) => ms * (-(1 - a1) * sin(t) - 3 * a3 * sin(3 * t)),
+    evenPhi = (m: number, t: number): number => {
+      let sum = 0;
+      for (let n = 0; n < 3; n++) {
+        const order = 2 * m + 2 * n - 1;
+        sum += (((n % 2 === 0 ? 1 : -1) * (2 * n - 1) * coefficients[n]!) / order) * cos(order * t);
+      }
+      return cos(2 * m * t) - xi * sum;
+    },
+    oddPhi = (m: number, t: number): number => {
+      let sum = 0;
+      for (let n = 0; n < 3; n++) {
+        const order = 2 * m + 2 * n;
+        sum += (((n % 2 === 0 ? 1 : -1) * (2 * n - 1) * coefficients[n]!) / order) * sin(order * t);
+      }
+      return sin((2 * m + 1) * t) - xi * sum;
+    },
+    loadOf = (
+      solution: Float64Array,
+      phi: (m: number, t: number) => number,
+      waveC: (x: number, y: number) => number,
+      waveS: (x: number, y: number) => number,
+      incident: (x: number, y: number) => number,
+      incidentInSin: boolean,
+      slope: (t: number) => number,
+    ): [number, number] => {
+      const c1 = solution[2 * terms]!,
+        c2 = solution[2 * terms + 1]!;
+      let ic = 0,
+        is = 0;
+      for (let n = 0; n < nodes.length; n++) {
+        const t = (nodes[n]! * Math.PI) / 2,
+          w = (weights[n]! * Math.PI) / 2,
+          [x0, y0] = contour(t),
+          d = slope(t),
+          bc = waveC(x0, y0),
+          bs = waveS(x0, y0);
+        let c = c1 * bc - c2 * bs,
+          s = c2 * bc + c1 * bs;
+        for (let m = 1; m <= terms; m++) {
+          const f = phi(m, t);
+          c += solution[m - 1]! * f;
+          s += solution[terms + m - 1]! * f;
+        }
+        if (incidentInSin) s += incident(x0, y0);
+        else c += incident(x0, y0);
+        ic += w * c * d;
+        is += w * s * d;
+      }
+      // F(t) = K (I_c sin w t - I_s cos w t) = Re(F e^(-i w t)) with F = K (-I_s + i I_c) against the potential, and
+      // against the elevation (a quarter period before it) F times -i = K (I_c + i I_s); heave's normal points the other way
+      // (the book's heave is down). Checked: a free section moved by these loads loses no energy, |R|^2 + |T|^2 = 1 at every
+      // frequency, which no other sign or quarter period gives.
+      return [K * ic, K * is];
+    },
+    evenPhiC = (x: number, y: number) => Math.PI * exp(-k * y) * cos(k * x),
+    evenPhiS = (x: number, y: number) => Math.PI * exp(-k * y) * sin(k * x) + waveIntegral(k, x, y)[1],
+    oddPhiC = (x: number, y: number) => -Math.PI * exp(-k * y) * sin(k * x),
+    oddPhiS = (x: number, y: number) =>
+      Math.PI * exp(-k * y) * cos(k * x) - waveIntegral(k, x, y)[0] + x / (k * (x * x + y * y)),
+    none: [number, number] = [0, 0],
+    heaveUp = held
+      ? loadOf(held.evenSolution, evenPhi, evenPhiC, evenPhiS, (x, y) => Math.PI * exp(-k * y) * cos(k * x), false, dx0)
+      : none,
+    heaveForce: [number, number] = [-heaveUp[0], -heaveUp[1]],
+    swayForce = held
+      ? loadOf(held.oddSolution, oddPhi, oddPhiC, oddPhiS, (x, y) => Math.PI * exp(-k * y) * sin(k * x), true, dy0)
+      : none,
+    rollMoment = held
+      ? loadOf(
+          held.oddSolution,
+          oddPhi,
+          oddPhiC,
+          oddPhiS,
+          (x, y) => Math.PI * exp(-k * y) * sin(k * x),
+          true,
+          (t) => {
+            const [x0, y0] = contour(t);
+            return -(x0 * dx0(t) + (y0 - pivot) * dy0(t));
+          },
+        )
+      : none;
+  // Far away on the side the wave goes on to (x > 0) the even part goes out as E e^(i (k x - w t)) and the odd part as
+  // i O e^(i (k x - w t)); on the side it came from, the even part alike and the odd part with the opposite sign.
+  return {
+    reflected: [er + oi, ei - or],
+    transmitted: [1 + er - oi, ei + or],
+    heaveForce,
+    swayForce,
+    rollMoment,
+  };
+}
+
 /** Solves the symmetric system (row-major) by Gaussian elimination with partial pivoting, in a fixed order. */
 function solve(matrix: Float64Array, rhs: Float64Array, n: number): Float64Array {
   const a = matrix.slice(),

@@ -358,6 +358,10 @@ columns! {
     ISLAND_READY u32 BodyList,
     // The most extra passes any body of the island asks for.
     ISLAND_PASSES u32 BodyList,
+    // Each island's substep level and the first multibody stamp its walks take, planned before the islands solve
+    // (`plan_islands`), so islands can solve at once in any order.
+    ISLAND_LEVEL u32 BodyList,
+    ISLAND_STAMP u32 BodyList,
     // Where each island's run of the solved pairs starts and how long it is, and a cursor the list is filled with: the pairs of
     // an island are listed together, in the order they were listed.
     ISLAND_PAIR_START u32 BodyList,
@@ -969,7 +973,8 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
 /// their list. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 37] = [
+pub const SCRATCH: [usize; 39] = [
+    ISLAND_LEVEL, ISLAND_STAMP,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,

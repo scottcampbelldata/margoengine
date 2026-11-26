@@ -68,6 +68,10 @@
       "types": "./dist/clouds/index.d.ts",
       "import": "./dist/clouds.js"
     },
+    "./ageing": {
+      "types": "./dist/ageing.d.ts",
+      "import": "./dist/ageing.js"
+    },
     "./modal-sound": {
       "types": "./dist/modal-sound.d.ts",
       "import": "./dist/modal-sound.js"
@@ -88,6 +92,10 @@
       "types": "./dist/entry/index.d.ts",
       "import": "./dist/entry.js"
     },
+    "./flip": {
+      "types": "./dist/flip/index.d.ts",
+      "import": "./dist/flip.js"
+    },
     "./sea": {
       "types": "./dist/sea/index.d.ts",
       "import": "./dist/sea.js"
@@ -103,6 +111,10 @@
     "./life": {
       "types": "./dist/life/index.d.ts",
       "import": "./dist/life.js"
+    },
+    "./locomotion": {
+      "types": "./dist/locomotion/index.d.ts",
+      "import": "./dist/locomotion.js"
     },
     "./pedestrians": {
       "types": "./dist/pedestrians/index.d.ts",
@@ -132,13 +144,25 @@
       "types": "./dist/surf/index.d.ts",
       "import": "./dist/surf.js"
     },
+    "./rogue": {
+      "types": "./dist/rogue/index.d.ts",
+      "import": "./dist/rogue.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"
     },
+    "./glacier": {
+      "types": "./dist/glacier/index.d.ts",
+      "import": "./dist/glacier.js"
+    },
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
+    },
+    "./aeolian": {
+      "types": "./dist/aeolian/index.d.ts",
+      "import": "./dist/aeolian.js"
     },
     "./groundwater": {
       "types": "./dist/groundwater/index.d.ts",

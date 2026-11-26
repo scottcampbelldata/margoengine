@@ -22,5 +22,12 @@ export {
   type Section,
   swayAddedMassRigidLid,
 } from './strips.js';
-export { type HeaveSection, heaveSection, type LateralSection, lateralSection } from './radiation.js';
+export {
+  type HeaveSection,
+  heaveSection,
+  type LateralSection,
+  lateralSection,
+  type Scattering,
+  scatterSection,
+} from './radiation.js';
 export { type HullMemory, hullMemory, type RadiationPair, stillWaterline } from './memory.js';

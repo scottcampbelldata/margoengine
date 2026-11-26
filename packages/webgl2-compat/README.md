@@ -127,6 +127,43 @@ device.destroy();
 console.log(device.glObjects.created, device.glObjects.deleted); // the same counts
 ```
 
+A render pipeline's texture units are counted per stage before anything links. `device.textureUnits(descriptor)`
+returns them, with `over` naming the first stage past its limit, and `createRenderPipeline` refuses that pipeline with
+code `unsupported` ([errors#texture-units](https://margoengine.com/errors#texture-units)):
+
+```ts
+import { createCompatGPU } from '@margoengine/webgl2-compat/device';
+
+const adapter = await createCompatGPU().requestAdapter();
+if (!adapter) throw new Error('Full-tier WebGL2 is required');
+const device = await adapter.requestDevice();
+const count = 40; // more textures than any WebGL2 fragment stage has units for
+const declare = [], read = [];
+for (let i = 0; i < count; i++) {
+  declare.push(`@group(0) @binding(${i + 1}) var t${i}: texture_2d<f32>;`);
+  read.push(`c += textureSample(t${i}, s, vec2f(0.5));`);
+}
+const code = `@group(0) @binding(0) var s: sampler;
+${declare.join(' ')}
+@vertex fn vs() -> @builtin(position) vec4f { return vec4f(0.0, 0.0, 0.0, 1.0); }
+@fragment fn fs() -> @location(0) vec4f { var c = vec4f(0.0); ${read.join(' ')} return c; }`;
+const module = device.createShaderModule({ code });
+const descriptor: GPURenderPipelineDescriptor = {
+  layout: 'auto',
+  vertex: { module, entryPoint: 'vs' },
+  fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+};
+const over = device.textureUnits(descriptor)?.over;
+if (over) console.log(over.stage, over.units, over.limit); // 'fragment', 40, this GPU's MAX_TEXTURE_IMAGE_UNITS
+try {
+  device.createRenderPipeline(descriptor);
+} catch (error) {
+  const { code, units } = error as { code: string; units: { units: number } };
+  console.log(code, units.units); // 'unsupported', 40
+}
+device.destroy();
+```
+
 Depth bias uses `EXT_polygon_offset_clamp` when available: positive `depthBiasClamp`
 caps the offset with `min`, negative uses `max`, and zero (the default) leaves it
 unclamped. Clamp changes, including reset to zero, are replayed with pipeline
@@ -194,7 +231,14 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   50 or more rows into a shader resource after the textures, and past 16 the browser's GPU process crashes; so a
   stage whose texture units and uniform blocks together pass its limit (`textureUnits: { vertex, fragment }`, default
   16 each; the device passes MAX_VERTEX_TEXTURE_IMAGE_UNITS and MAX_TEXTURE_IMAGE_UNITS) declares each block's rows
-  inside a struct of the same std140 layout, which stays a constant buffer. `textureGather` and
+  inside a struct of the same std140 layout, which stays a constant buffer. The device counts a render pipeline's
+  texture units per stage from its translation before anything links (`device.textureUnits(descriptor)`: one per
+  texture and sampler pair a stage reads, one per storage data texture, against MAX_TEXTURE_IMAGE_UNITS,
+  MAX_VERTEX_TEXTURE_IMAGE_UNITS and MAX_COMBINED_TEXTURE_IMAGE_UNITS), and `createRenderPipeline` refuses a pipeline
+  past a limit with code `unsupported` and help link
+  [errors#texture-units](https://margoengine.com/errors#texture-units), naming the stage, the count, the limit and
+  each binding (`error.units`). Asking first costs nothing: the translation is kept for the pipeline made next from
+  the same descriptor (example below). `textureGather` and
   `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
   the four texels by hand with the sampler's address modes (2D and 2D-array textures; a cube gather is refused).
 - **Compute** (`margoengine/webgl2-compat/compute`, milestone M5): compute pipelines and passes, with

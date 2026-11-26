@@ -1339,6 +1339,10 @@
       "types": "./dist/geometry/utils.d.ts",
       "import": "./dist/geometry/utils.js"
     },
+    "./geometry/node-graph": {
+      "types": "./dist/geometry/node-graph.d.ts",
+      "import": "./dist/geometry/node-graph.js"
+    },
     "./geometry/extras": {
       "types": "./dist/geometry/extras.d.ts",
       "import": "./dist/geometry/extras.js"
@@ -1547,6 +1551,14 @@
       "types": "./dist/input/haptics.d.ts",
       "import": "./dist/input/haptics.js"
     },
+    "./input/landmarks": {
+      "types": "./dist/input/landmarks.d.ts",
+      "import": "./dist/input/landmarks.js"
+    },
+    "./input/face": {
+      "types": "./dist/input/face.d.ts",
+      "import": "./dist/input/face.js"
+    },
     "./lighting2d/sdf": {
       "types": "./dist/lighting2d/sdf.d.ts",
       "import": "./dist/lighting2d/sdf.js"
@@ -1670,6 +1682,14 @@
     "./loaders/vrml": {
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/mmd": {
+      "types": "./dist/loaders/mmd.d.ts",
+      "import": "./dist/loaders/mmd.js"
+    },
+    "./loaders/xfile": {
+      "types": "./dist/loaders/xfile.d.ts",
+      "import": "./dist/loaders/xfile.js"
     },
     "./loaders/babylon": {
       "types": "./dist/loaders/babylon.d.ts",
@@ -2167,6 +2187,10 @@
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
     },
+    "./physics/ageing": {
+      "types": "./dist/physics/ageing.d.ts",
+      "import": "./dist/physics/ageing.js"
+    },
     "./physics/modal-sound": {
       "types": "./dist/physics/modal-sound.d.ts",
       "import": "./dist/physics/modal-sound.js"
@@ -2187,6 +2211,10 @@
       "types": "./dist/physics/entry.d.ts",
       "import": "./dist/physics/entry.js"
     },
+    "./physics/flip": {
+      "types": "./dist/physics/flip.d.ts",
+      "import": "./dist/physics/flip.js"
+    },
     "./physics/sea": {
       "types": "./dist/physics/sea.d.ts",
       "import": "./dist/physics/sea.js"
@@ -2202,6 +2230,10 @@
     "./physics/life": {
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
+    },
+    "./physics/locomotion": {
+      "types": "./dist/physics/locomotion.d.ts",
+      "import": "./dist/physics/locomotion.js"
     },
     "./physics/pedestrians": {
       "types": "./dist/physics/pedestrians.d.ts",
@@ -2231,13 +2263,25 @@
       "types": "./dist/physics/surf.d.ts",
       "import": "./dist/physics/surf.js"
     },
+    "./physics/rogue": {
+      "types": "./dist/physics/rogue.d.ts",
+      "import": "./dist/physics/rogue.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
     },
+    "./physics/glacier": {
+      "types": "./dist/physics/glacier.d.ts",
+      "import": "./dist/physics/glacier.js"
+    },
     "./physics/runoff": {
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
+    },
+    "./physics/aeolian": {
+      "types": "./dist/physics/aeolian.d.ts",
+      "import": "./dist/physics/aeolian.js"
     },
     "./physics/groundwater": {
       "types": "./dist/physics/groundwater.d.ts",
@@ -3782,6 +3826,10 @@
     "./vfx/shapes": {
       "types": "./dist/vfx/shapes.d.ts",
       "import": "./dist/vfx/shapes.js"
+    },
+    "./vfx/node-system": {
+      "types": "./dist/vfx/node-system.d.ts",
+      "import": "./dist/vfx/node-system.js"
     },
     "./vfx/schedule": {
       "types": "./dist/vfx/schedule.d.ts",

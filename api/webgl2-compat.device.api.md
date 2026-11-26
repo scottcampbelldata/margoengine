@@ -218,6 +218,12 @@ export class CompatDevice extends EventTarget {
     readonly state: GLState;
     readonly objects: GLObjects;
     readonly linked: Map<string, LinkedProgram>;
+    readonly translations: WeakMap<GPURenderPipelineDescriptor, {
+        vertex: unknown;
+        fragment: unknown;
+        entries: string;
+        glsl: GLSLProgram;
+    }>;
     stalls: number;
     readonly dispatches: {
         fragment: number;
@@ -252,7 +258,7 @@ export class CompatDevice extends EventTarget {
     constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>, descriptor?: GPUDeviceDescriptor);
     enum(name: string): number;
     compare(f: GPUCompareFunction): number;
-    unsupported(what: string): Error;
+    unsupported(what: string, anchor?: string): Error;
     pushErrorScope(filter: ErrorFilter): void;
     popErrorScope(): Promise<CompatError | null>;
     validationError(message: string): void;
@@ -283,6 +289,7 @@ export class CompatDevice extends EventTarget {
     createBindGroup(descriptor: GPUBindGroupDescriptor): CompatBindGroup;
     createShaderModule(descriptor: GPUShaderModuleDescriptor): CompatShaderModule;
     createRenderPipeline(descriptor: GPURenderPipelineDescriptor): CompatRenderPipeline;
+    textureUnits(descriptor: GPURenderPipelineDescriptor): PipelineUnits | undefined;
     createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<CompatRenderPipeline>;
     loadReadback(): Promise<void>;
     loadCompute(): Promise<void>;
@@ -1338,6 +1345,7 @@ interface GLSLTexture {
     };
     readonly type: TextureType;
     readonly glslType: string;
+    readonly sampled?: boolean;
 }
 
 interface GLSLUniform {
@@ -1491,6 +1499,13 @@ class PassSnap {
     clear(): void;
 }
 
+interface PipelineUnits {
+    readonly vertex: StageUnits;
+    readonly fragment: StageUnits;
+    readonly combined: StageUnits;
+    readonly over?: StageUnits;
+}
+
 type Readback = {
     ready(): boolean;
     readonly forcible: boolean;
@@ -1544,6 +1559,15 @@ class Replayer {
         texture: CompatTexture;
     }, [w, h, depth]: [number, number, number]): void;
     copyTextures(a: CompatTexture, b: CompatTexture, fromLevel: number, sx: number, sy: number, sz: number, toLevel: number, dx: number, dy: number, dz: number, w: number, h: number, depth: number): void;
+}
+
+interface StageUnits {
+    readonly stage: 'vertex' | 'fragment' | 'combined';
+    readonly units: number;
+    readonly pairs: number;
+    readonly storage: number;
+    readonly limit: number;
+    readonly bindings: readonly (readonly [number, number])[];
 }
 
 interface StorageSlot {

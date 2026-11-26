@@ -779,6 +779,52 @@ VFX.attach(engine, {
 engine.start();
 ```
 
+### Node particle systems
+
+`@margoengine/vfx/node-system` describes a whole particle system, or several that chain, as a graph of blocks in versioned JSON. It compiles to ordinary `VFX` options (every range is checked by `VFX` itself) and runs the chaining on a clock you drive.
+
+Blocks, each with a unique `id`; a wire is a block id in place of a literal:
+
+- Values: `number`, `vector`, `color`, `random` (`min`, `max`, optional `seed`, `vector: true` for three draws), `math` (`add`, `sub`, `mul`, `min`, `max`, `mix`), `gradient` (2..8 stops) and `curve` (2..32 samples). A `random` block draws one value per compile, deterministically from its `seed` and the compile `seed` (default 0); fed to a lifetime it stays the range `[min, max]`, so the GPU draws per particle.
+- `shape`: `sphere`, `cone`, `hemisphere`, `cylinder`, `torus`, `rectangle-edge` or `grid`, with that shape's fields.
+- Creation: `create-capacity`, `create-rate`, `create-initial`, `create-lifetime`, `create-size`, `create-color`, `create-position`, `create-velocity` (with `spread`), `create-prewarm`, `create-burst`.
+- Update: `update-size`, `update-alpha`, `update-color` (a gradient), `update-spin`, `update-speed`, `update-velocity-limit`, `update-gravity`, `update-turbulence`, `update-ground`, `update-forces` (the `nodes` operator graph above).
+- `system`: `shape`, `create` and `update` list block ids; `duration` is seconds it runs (default 0: until stopped).
+- `trigger`: `on: 'start' | 'end'` starts `target` after `delay` seconds (default 0) of `source` starting or ending; `on: 'birth' | 'death' | 'collision'` makes `target` the sub-emitter of `source` (`count`, `inherit`, `speed`), built from the target's creation blocks, which then has no shape, update blocks or triggers. Systems no trigger targets start with `start()`.
+
+`compileNodeSystem(graph, {seed})` returns `{systems, roots}`; `serializeNodeSystem` and `parseNodeSystem` save and read the JSON; `createNodeSystem(graphOrText, {create})` makes a `NodeParticleSystem` (`start()`, `update(dt)`, `running`, `elapsed`, `dispose()` and `Symbol.dispose`); `loadNodeSystem(url, {create, signal})` fetches one. `create(options, id)` runs when a system starts and may return `{stop, dispose}`; `stop` is called at the end of `duration` (else `dispose`). A refused graph throws `VFXNodeSystemError` with a stable `code` (`format`, `version`, `limit`, `duplicate-id`, `unknown-block`, `unknown-ref`, `wrong-type`, `bad-param`, `cycle`, `no-system`, `trigger`, `invalid-options`) and a link to https://margoengine.com/errors#vfx-node-system. At most 512 blocks and 32 systems.
+
+```ts
+import {VFX} from 'margoengine/vfx';
+import {createNodeSystem, serializeNodeSystem, type NodeSystemGraph} from 'margoengine/vfx/node-system';
+// Fireworks: a rocket for two seconds, then a shower that starts half a second later; each rocket spark bursts when it dies.
+const graph: NodeSystemGraph = {
+  format: 'margo-vfx-node-system',
+  version: 1,
+  blocks: [
+    {id: 'rocket', type: 'system', duration: 2, create: ['r-rate', 'r-life', 'r-up'], update: ['r-grav']},
+    {id: 'r-rate', type: 'create-rate', value: 20},
+    {id: 'r-life', type: 'create-lifetime', value: 'life'},
+    {id: 'life', type: 'random', min: 1, max: 1.5},
+    {id: 'r-up', type: 'create-velocity', value: [0, 8, 0], spread: 1},
+    {id: 'r-grav', type: 'update-gravity', value: [0, -6, 0]},
+    {id: 'pop', type: 'system', create: ['p-life', 'p-size', 'p-color']},
+    {id: 'p-life', type: 'create-lifetime', value: [0.4, 0.8]},
+    {id: 'p-size', type: 'create-size', value: 0.04},
+    {id: 'p-color', type: 'create-color', value: [1, 0.6, 0.2, 1]},
+    {id: 'burst', type: 'trigger', on: 'death', source: 'rocket', target: 'pop', count: 16, inherit: 0.2},
+    {id: 'shower', type: 'system', create: ['s-rate', 'p-color'], update: ['s-fall']},
+    {id: 's-rate', type: 'create-rate', value: 60},
+    {id: 's-fall', type: 'update-size', curve: [1, 0]},
+    {id: 'after', type: 'trigger', on: 'end', source: 'rocket', target: 'shower', delay: 0.5},
+  ],
+};
+const text = serializeNodeSystem(graph); // JSON you can save and load again with createNodeSystem(text, ...)
+using show = createNodeSystem(text, {create: (options) => new VFX(options)});
+show.start().update(2.6); // a real app calls update(dt) every frame and attaches each effect to its engine
+console.log(show.running); // ['shower']
+```
+
 ### More emitter shapes
 
 `shapes` from `@margoengine/vfx/shapes` replaces the `emitter` feature with a superset: the original shapes plus
@@ -1419,7 +1465,7 @@ console.log(sand.time); // 0
 
 - Options, read every frame (a change of `ground`, `mask`, `amount`, `seed` or the wind direction lays the particles out
   again): `ground` (a height function `(x, z) => y` or a grid `{samples, width, depth, cellSize, origin}`; required),
-  `wind` (`{speed, direction, gust, gustPeriod}`, or a `WindField` from `@margoengine/weather`; required; `direction`
+  `wind` (`{speed, direction, gust, gustPeriod}`, or a `WindField` from `@margoengine/weather`; required for prescribed transport; `direction`
   is where it blows toward in radians, 0 toward +z and pi/2 toward +x), `mask` (0 to 1 at world x, z: 0 where the sand
   is wet, grassed or paved), `amount` (1), `threshold` (default `sandThreshold(grainSize)`), `grainSize` (0.00025 m),
   `windHeight` (10 m), `color` (the grain albedo, `[0.5, 0.42, 0.29]` linear), `streak` (0.6 m), `height` (0.3 m),
@@ -1442,6 +1488,36 @@ console.log(sand.time); // 0
   sphere, with a single-scattering albedo from the bed colour (Hapke 1981). Sources are in `docs/clean-room.md`.
 - Limits: the sand is drawn within `range` of the camera, `limit` particles at most; with no `sky` the grains are lit
   by the engine's ambient term only, so under a bright clear sky the plumes read as faint smudges (`docs/limits.md`).
+
+#### Blown snow from a live bed
+
+Pass an attached `AeolianTransport` as `transport` to use the bed's moving mass and velocity. Supply a live terrain
+sampler as `ground`. `referenceMass` sets the moving mass at half visual strength (0.02 kg/m² by default).
+`transport.sample(x, z)` gives the local moving mass and velocity. Advance the physics world and
+set the effect clock to the corresponding time when seeking a shot.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { AeolianTransport } from '@margoengine/physics/aeolian';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BlownSand } from '@margoengine/vfx/blown-sand';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: { position: [-4, 2, -5], target: [0, 0.4, 2] },
+});
+const grid = { columns: 16, rows: 16, width: 16, depth: 16, centre: [0, 0] as const };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const terrain = new TerrainBed();
+const transport = await AeolianTransport.load();
+world.add(terrain, { ...grid, elevations: (_x, z) => Math.max(0, 0.8 - Math.abs(z) * 0.16) });
+world.add(transport, { grid, material: 'snow', frictionVelocity: [0, 0.55], open: { maxZ: true } });
+world.advance(180);
+const bed = terrain.bed;
+const snow = BlownSand.attach(engine, { ground: (x, z) => bed.sample(x, z).elevation, transport, color: [0.87, 0.90, 0.94] });
+snow.time = 3;
+engine.render({ delta: 0 });
+```
 
 ### Cannon fire and burning hulls
 

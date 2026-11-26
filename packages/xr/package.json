@@ -103,6 +103,10 @@
     "./performance": {
       "types": "./dist/performance.d.ts",
       "import": "./dist/performance.js"
+    },
+    "./near": {
+      "types": "./dist/near.d.ts",
+      "import": "./dist/near.js"
     }
   },
   "files": [

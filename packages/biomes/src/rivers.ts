@@ -203,10 +203,10 @@ export function climateDischarge(
   const { nx, nz, step, flow } = drainage;
   const [originX, originZ] = world.bounds;
   const cell = step / 1000;
-  const secondsPerYear = 365.25 * 86400;
+  const SECONDS_PER_YEAR = 365.25 * 86400;
   return (x, z) => {
-    const i = Math.round((x - originX) / cell);
-    const j = Math.round((z - originZ) / cell);
+    const i = Math.round((x - originX) / cell); // float division: metres to cells
+    const j = Math.round((z - originZ) / cell); // float division: metres to cells
     if (!(i >= 0 && i < nx && j >= 0 && j < nz)) return 0;
     const { rainfall, alpha } = world.sampleRegion(x, z);
     if (rainfall === 0 || alpha === 0) return 0;
@@ -214,14 +214,14 @@ export function climateDischarge(
     // rainfall / alpha bounds PET. The adjacent integers are the resolution of the model's annual rates.
     const target = Math.round(alpha * ONE);
     let lo = 0;
-    let hi = Math.ceil(rainfall / alpha);
+    let hi = Math.ceil(rainfall / alpha); // float division: a bound for the search below
     while (hi - lo > 1) {
       const mid = Math.floor((lo + hi) / 2);
       if (moistureIndex(mid, rainfall) > target) lo = mid;
       else hi = mid;
     }
     const excess = Math.max(0, rainfall - alpha * lo);
-    return (flow[i + nx * j]! * cell * cell * excess) / (1000 * secondsPerYear);
+    return (flow[i + nx * j]! * cell * cell * excess) / (1000 * SECONDS_PER_YEAR);
   };
 }
 

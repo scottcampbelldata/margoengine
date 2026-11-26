@@ -37,13 +37,13 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
   const { step = 128, frameRate, forcing, ...params } = options;
   if (!Number.isFinite(step) || step <= 0)
     throw new RangeError('Invalid landscape grid spacing; supply positive finite metres.');
-  const mmPerMetre = 1000;
+  const MM_PER_METRE = 1000;
   const grid = {
-    columns: Math.ceil(width / (step * mmPerMetre)),
-    rows: Math.ceil(depth / (step * mmPerMetre)),
-    width: width / mmPerMetre,
-    depth: depth / mmPerMetre,
-    centre: [(ox + width * 0.5) / mmPerMetre, (oz + depth * 0.5) / mmPerMetre] as const,
+    columns: Math.ceil(width / (step * MM_PER_METRE)), // float division: millimetres to grid cells
+    rows: Math.ceil(depth / (step * MM_PER_METRE)), // float division: millimetres to grid cells
+    width: width / MM_PER_METRE,
+    depth: depth / MM_PER_METRE,
+    centre: [(ox + width * 0.5) / MM_PER_METRE, (oz + depth * 0.5) / MM_PER_METRE] as const,
   };
   const [{ PhysicsWorld }, { TerrainBed, bedSurface }, { LandscapeEvolution }] = await Promise.all([
     import('@margoengine/physics/world'),
@@ -56,7 +56,7 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
   const world = new PhysicsWorld({ rate: frameRate ?? { num: 60, den: 1 } })
     .add(terrain, {
       ...grid,
-      elevations: (x, z) => relief.height(Math.round(x * mmPerMetre), Math.round(z * mmPerMetre)) / mmPerMetre,
+      elevations: (x, z) => relief.height(Math.round(x * MM_PER_METRE), Math.round(z * MM_PER_METRE)) / MM_PER_METRE,
       bedrock: typeof floor === 'number' ? () => floor : floor,
     })
     .add(landscape, { ...params, grid });
@@ -71,7 +71,7 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
         height: (x: number, z: number) =>
           x < ox || x > ox + width || z < oz || z > oz + depth
             ? relief.height(x, z)
-            : Math.round(bed.sample(x / mmPerMetre, z / mmPerMetre).elevation * mmPerMetre),
+            : Math.round(bed.sample(x / MM_PER_METRE, z / MM_PER_METRE).elevation * MM_PER_METRE),
       });
     },
   };

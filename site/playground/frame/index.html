@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
+  <!-- A backup of the policy site/_headers gives /playground/frame/*, in case a host ignores _headers. A meta policy
+       cannot carry `sandbox` or `frame-ancestors`, so those two stay in _headers only (docs/playground.md). Download
+       HTML leaves this line out: a saved file is the visitor's own page. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: blob: data:; worker-src 'self' blob: https://cdn.jsdelivr.net; font-src 'self' https:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Margo Engine playground</title>
   <style>html,body{margin:0;height:100%;background:#111;color:#eee;font:16px system-ui,sans-serif}#scene{position:fixed;inset:0}</style>
 </head>
@@ -13,17 +17,26 @@
   <script>
 // The playground's run frame (docs/playground.md). The page loads it as <iframe sandbox="allow-scripts">, so it has an
 // opaque origin and its own loose policy (site/_headers): the page itself keeps a strict one. It waits for one run
-// message from its parent (checked by source and shape), loads margoengine's import map, adds it, then imports the code
-// as a blob module, so stack lines are lines of the code itself. Console output and errors go back to the parent.
-// A downloaded file sets window.MARGO_PLAYGROUND instead and runs at once.
+// message from its parent (checked by source and shape), loads margoengine's import map, adds an entry `#tab/<name>`
+// for each file, then imports main.js. Each file is a blob module; its `./name.js` imports are pointed at those entries
+// (a blob URL cannot be the base of a relative import), so files may import each other, cycles included, and stack
+// lines are lines of each file. Console output and errors go back to the parent. A downloaded file sets
+// window.MARGO_PLAYGROUND instead and runs at once.
+// Opened any other way it does nothing: not at the top level (site/_headers also sandboxes it there), not in a parent
+// from another origin, and it takes a run message only from its parent window, sent from the playground's own origin.
 (() => {
   'use strict';
   const CHANNEL = 'margo-playground';
-  const MAX_CODE = 256 * 1024;
+  const MAX_CODE = 256 * 1024, MAX_FILES = 12, FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}\.js$/;
   const CDN_MAP = 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/importmap.json';
   const CDN = /^https:\/\/cdn\.jsdelivr\.net\/npm\/((?:@[^/]+\/)?[^@/]+)@[^/]+\/(.+)$/;
-  const top = parent !== window ? parent : null;
-  let moduleUrl = '', started = false;
+  // The playground's origin: this document's URL origin (its own origin is opaque, 'null', in the sandbox).
+  const home = location.origin;
+  // Framed, and by a page of the playground's origin where the browser says so (Chromium and WebKit).
+  const framed = parent !== window && (!location.ancestorOrigins || location.ancestorOrigins[0] === home);
+  const top = framed ? parent : null;
+  const urls = new Map(); // blob URL -> file name
+  let started = false;
 
   const text = (v) => {
     if (v instanceof Error || (v && typeof v.message === 'string' && typeof v.name === 'string'))
@@ -32,26 +45,40 @@
     try { return JSON.stringify(v) ?? String(v); } catch { return String(v); }
   };
   const send = (message) => { if (top) top.postMessage({ channel: CHANNEL, ...message }, '*'); };
-  const lineOf = (error, fallback) => {
-    const at = moduleUrl && String((error && error.stack) || '').indexOf(moduleUrl + ':');
-    const m = at >= 0 ? /^:(\d+):\d+/.exec(String(error.stack).slice(at + moduleUrl.length)) : null;
-    const n = m ? Number(m[1]) : fallback;
-    return Number.isInteger(n) && n > 0 ? n : null;
+  /** The first stack frame in one of the files: [file, line], or [null, null]. */
+  const placeOf = (error, filename, lineno) => {
+    for (const [, url, line] of String((error && error.stack) || '').matchAll(/(blob:[^\s()]+?):(\d+):\d+/g))
+      if (urls.has(url)) return [urls.get(url), Number(line)];
+    return urls.has(filename) && lineno > 0 ? [urls.get(filename), lineno] : [null, null];
   };
-  const report = (error, line = null) =>
-    send({ kind: 'error', text: text(error), line: lineOf(error, line),
+  const report = (error, filename = '', lineno = 0) => {
+    const [file, line] = placeOf(error, filename, lineno);
+    send({ kind: 'error', text: text(error), file, line,
       code: error && typeof error.code === 'string' ? error.code : null });
+  };
 
   for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
     const original = console[level].bind(console);
     console[level] = (...args) => { original(...args); send({ kind: 'log', level, text: args.map(text).join(' ') }); };
   }
-  addEventListener('error', (e) => report(e.error ?? e.message, e.filename === moduleUrl ? e.lineno : null));
+  addEventListener('error', (e) => report(e.error ?? e.message, e.filename, e.lineno));
   addEventListener('unhandledrejection', (e) => report(e.reason));
 
-  const valid = (m) => m && typeof m === 'object' && m.channel === CHANNEL && m.kind === 'run' &&
-    typeof m.code === 'string' && m.code.length <= MAX_CODE &&
-    (m.packages === null || (typeof m.packages === 'string' && /^https?:\/\/[^\s]+\/$/.test(m.packages)));
+  const valid = (m) => {
+    if (!m || typeof m !== 'object' || m.channel !== CHANNEL || m.kind !== 'run') return false;
+    if (!(m.packages === null || (typeof m.packages === 'string' && /^https?:\/\/[^\s]+\/$/.test(m.packages))))
+      return false;
+    if (!Array.isArray(m.files) || !m.files.length || m.files.length > MAX_FILES) return false;
+    let size = 0;
+    const names = new Set();
+    for (const f of m.files) {
+      if (!f || typeof f.name !== 'string' || typeof f.code !== 'string' || !FILE_NAME.test(f.name)) return false;
+      if (names.has(f.name)) return false;
+      names.add(f.name);
+      size += f.code.length;
+    }
+    return m.files[0].name === 'main.js' && size <= MAX_CODE;
+  };
 
   async function importMap(packages) {
     const url = packages === null ? CDN_MAP : `${packages}margoengine/dist/importmap.json`;
@@ -67,16 +94,93 @@
     return { imports };
   }
 
+  /** `./name.js` in an import or export of a file of the project becomes its import map entry `#tab/name.js`. */
+  const linkTabs = (code, names) =>
+    code.replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])\.\/([A-Za-z0-9_-]+\.js)\2/g, (whole, head, q, name) =>
+      names.has(name) ? `${head}${q}#tab/${name}${q}` : whole);
+
+  // ---- The API of the imported entries, from their .d.ts files, for the page's API panel ----------------------------
+  // A small reader of declaration files, not a type checker: top-level `export` declarations with their first line and
+  // the first sentence of their doc comment, following `export * from` and `export {a as b} from` through the import
+  // map (bare) or the file's URL (relative). At most 120 declaration files per run.
+  const MAX_DTS = 120, MAX_EXPORTS = 400, MAX_ENTRIES = 20;
+  const KINDS = new Set(['function', 'class', 'interface', 'type', 'const', 'let', 'enum', 'namespace']);
+  const DECL =
+    /(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?export\s+(?:declare\s+)?(?:abstract\s+)?(function|class|interface|type|const|let|enum|namespace)\s+([A-Za-z_$][\w$]*)([^\n]*)/g;
+  const doc = (comment) =>
+    (comment || '').replace(/^\s*\*\s?/gm, '').split(/\n\s*@|(?<=\.)\s/)[0].replace(/\s+/g, ' ').trim().slice(0, 300);
+
+  function apiReader(map) {
+    const cache = new Map();
+    const typesOf = (js) => js.replace(/\.(m?js)$/, '.d.ts');
+    const resolve = (specifier, base) => {
+      if (/^\.\.?\//.test(specifier)) return typesOf(new URL(specifier, base).href);
+      const target = map.imports[specifier];
+      return target ? typesOf(new URL(target, location.href).href) : null;
+    };
+    const read = (url) => {
+      if (!url || cache.size >= MAX_DTS) return Promise.resolve(new Map());
+      if (!cache.has(url)) cache.set(url, parse(url));
+      return cache.get(url);
+    };
+    async function parse(url) {
+      const out = new Map();
+      let text = '';
+      try {
+        const response = await fetch(url);
+        if (response.ok) text = await response.text();
+      } catch {
+        return out; // A missing declaration file leaves its entry without names, never stops the run.
+      }
+      for (const [, comment, kind, name, rest] of text.matchAll(DECL))
+        out.set(name, { name, kind, signature: `${kind} ${name}${rest.replace(/\s*\{\s*$/, '')}`.trim().slice(0, 300), doc: doc(comment) });
+      for (const [, list, from] of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)) {
+        const target = await read(resolve(from, url));
+        for (const part of list.split(',')) {
+          const [name, alias = name] = part.replace(/^\s*type\s+/, '').split(/\s+as\s+/).map((x) => x.trim());
+          if (/^[A-Za-z_$][\w$]*$/.test(alias) && !out.has(alias))
+            out.set(alias, { ...(target.get(name) ?? { kind: 'const', signature: alias, doc: '' }), name: alias });
+        }
+      }
+      for (const [, from] of text.matchAll(/export\s+\*\s+from\s*['"]([^'"]+)['"]/g))
+        for (const [name, item] of await read(resolve(from, url))) if (!out.has(name)) out.set(name, item);
+      return out;
+    }
+    return async (files) => {
+      const specifiers = new Set();
+      for (const f of files)
+        for (const m of f.code.matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+          const specifier = m[1] ?? m[2];
+          if (map.imports[specifier] && !specifier.startsWith('#tab/')) specifiers.add(specifier);
+        }
+      const entries = [];
+      for (const specifier of [...specifiers].slice(0, MAX_ENTRIES)) {
+        const items = [...(await read(resolve(specifier, location.href))).values()].filter((x) => KINDS.has(x.kind));
+        entries.push({ specifier, exports: items.sort((a, b) => a.name.localeCompare(b.name)).slice(0, MAX_EXPORTS) });
+      }
+      return entries;
+    };
+  }
+
   async function run(message) {
     if (started || !valid(message)) return;
     started = true;
     try {
+      const map = await importMap(message.packages);
+      const names = new Set(message.files.map((f) => f.name));
+      for (const f of message.files) {
+        const url = URL.createObjectURL(new Blob([linkTabs(f.code, names)], { type: 'text/javascript' }));
+        urls.set(url, f.name);
+        map.imports[`#tab/${f.name}`] = url;
+      }
       const script = document.createElement('script');
       script.type = 'importmap';
-      script.textContent = JSON.stringify(await importMap(message.packages));
+      script.textContent = JSON.stringify(map);
       document.head.append(script);
-      moduleUrl = URL.createObjectURL(new Blob([message.code], { type: 'text/javascript' }));
-      await import(moduleUrl);
+      // The API panel's names load beside the run, never in its way.
+      if (top)
+        apiReader(map)(message.files).then((entries) => send({ kind: 'api', entries }), () => {});
+      await import('#tab/main.js');
       send({ kind: 'done' });
     } catch (error) {
       report(error);
@@ -85,7 +189,9 @@
 
   if (window.MARGO_PLAYGROUND) run(window.MARGO_PLAYGROUND);
   else if (top) {
-    addEventListener('message', (event) => { if (event.source === top) run(event.data); });
+    addEventListener('message', (event) => {
+      if (event.source === top && event.origin === home) run(event.data);
+    });
     send({ kind: 'ready' });
   }
 })();

@@ -4,7 +4,10 @@
 // along the wind, drawn with no sand, with sand under a 12 m/s wind at two times, and under a 3 m/s wind (below the
 // threshold). Each step sets the sand's clock and renders one frame; the driver screenshots the canvas.
 import {BlownSand} from '/packages/vfx/dist/blown-sand.js';
-import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {AeolianTransport} from '/packages/physics/dist/aeolian.js';
+import {TerrainBed} from '/packages/physics/dist/earth.js';
+import {PhysicsWorld} from '/packages/physics/dist/world.js';
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
 const errors=[],canvas=document.querySelector('canvas');
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-3,0.6,-2],target:[2,0.15,6],fov:50,near:0.05,far:500}});
 engine.stop();
@@ -21,6 +24,33 @@ window.step=async({wind,time})=>{
   sand.options.wind={speed:wind,direction:0,gust:0.3};sand.time=time;}
  engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();
  return {errors:errors.splice(0),drawCalls:engine.stats.drawCalls,particles:sand?.stats.particles??0,before};
+};
+
+const shape={columns:32,rows:32,width:32,depth:32,centre:[0,4]};
+const crest=(x,z)=>Math.max(0,1.6-0.32*Math.abs(z-4));
+const transport=await AeolianTransport.load();
+const terrain=new TerrainBed();
+const world=new PhysicsWorld({rate:{num:60,den:1}});
+world.add(terrain,{...shape,elevations:crest});
+world.add(transport,{grid:shape,material:'snow',frictionVelocity:[0,0.7],open:{maxZ:true}});
+const positions=[],normals=[],indices=[];
+for(const z of [-12,-1,4,9,20])for(const x of [-16,16]){
+ positions.push(x,crest(x,z),z);normals.push(0,1,0);
+}
+for(let a=0;a<8;a+=2)indices.push(a,a+2,a+1,a+1,a+2,a+3);
+const liveBed=terrain.bed;
+let snow;
+window.snowStep=async({frame,time,draw})=>{
+ if(!snow){
+  sand?.dispose();sand=null;
+  engine.createMesh().setGeometry(new Geometry(positions,normals,indices)).setMaterial(new PbrMaterial({color:[0.35,0.4,0.43],roughness:0.9}));
+  snow=BlownSand.attach(engine,{ground:(x,z)=>liveBed.sample(x,z).elevation,transport,color:[0.87,0.90,0.94],seed:7,range:32});
+ }
+ world.advance(frame);
+ snow.options.amount=draw?1:0;
+ snow.time=time;
+ engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();
+ return {errors:errors.splice(0),particles:snow.stats.particles,crest:transport.sample(0,4),exposedHeight:liveBed.sample(0,4).elevation};
 };
 window.ready=true;
 </script></body></html>

@@ -44,6 +44,21 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **LIFE-02:** Reserve static Wasm slot 13 and promote the versioned `groundAnimalPose` and
+  `groundAnimalContact` rows to shared fields when the rigid/animation readers adopt them. Add initial cell and
+  cell size to the solver host, portable bed geometry, and a contact-wrench accumulator for articulated bodies
+  and ground wear. The optional entry uses the live `bed` field with configured geometry, publishes both
+  versioned ports, and accepts an explicit initial cell meanwhile.
+
+- **EARTH-07:** Define the canonical boundary-layer momentum sink and dust inflow grid for ATMO-01 and ATMO-06.
+  The optional entry already emits vertex-centred layout-1 horizontal stress in Pa and dust in kg/(m² s).
+  It consumes the `Wind` contract or held friction fields. Registry fixtures exercise the outgoing ports
+  while the atmosphere solvers adopt those fields.
+
+- **BIO-04:** Provide a canonical per-patch material exposure layout for annual climate, deposition,
+  immersion, corrosion current and larval availability. The ageing entry consumes a versioned
+  exposure port with the same units and tests it with a replayable publisher.
+
 - **LIFE-05:** Register slot 10 for the pedestrian SIMD kernel. Provide canonical per-body force
   and stance/position fields and an identity layout for LIFE-06 formations, DYN-07 body and foot
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads
@@ -98,6 +113,10 @@ there, add a line below with the solver ID and what is needed, and build against
 - SPACE-01 reserves module window 8 for the plain and shared orbit kernels. Add the slot to the central table
   when production solver windows join it. The optional orbit entry publishes inertial positions and velocities
   as f64 xyz rows and elapsed time as a scalar in its layout-1 registry fields.
+
+- **ICE-02:** Reserve static module window 14. Add shared layout-1 f64 glacier outlet discharge (m³/s) and
+  per-tick marine and dry ice-release volumes (m³) for HYDRO-02 and SEA-06. ICE-02 publishes these descriptors
+  in the optional glacier entry, couples discharge to HYDRO-01 and exercises a wave-source reader.
 
 ## Research notes for open solvers
 
@@ -212,11 +231,11 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOFT-06 | Pressure bodies | none | Open | OPEN |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
-| LIFE-02 | Limbless, insect and small-animal locomotion | none | Codex | BUILDING (codex/physics-life02) |
+| LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | LANDED 6712e2b2a4 |
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | LANDED c82d68bf98 |
-| SEA-03 | Nonlinear waves, rogue waves | none | Claude | CLAIMED |
+| SEA-03 | Nonlinear waves, rogue waves | none | Claude | LANDED 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
@@ -234,13 +253,13 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
-| EARTH-07 | Aeolian transport | stand-in | Codex | BUILDING (codex/physics-earth-07) |
+| EARTH-07 | Aeolian transport | physics/aeolian | Codex | LANDED d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |
-| ICE-01 | Snowpack | partial | Open | OPEN |
-| ICE-02 | Glacier and ice-sheet flow | none | Codex | BUILDING (codex/physics-lane-2) |
-| ICE-03 | Iceberg rigid-body dynamics and calving | stand-in | Open | OPEN |
+| ICE-01 | Snowpack | partial | Codex | BUILDING (codex/physics-ice-01) |
+| ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
+| ICE-03 | Iceberg rigid-body dynamics and calving | stand-in | Codex | BUILDING (codex/physics-lane-2) |
 | ICE-04 | Pack ice and floes | stand-in | Open | OPEN |
 | ICE-05 | Ice thermodynamics | physics/ice | Codex | LANDED 7b64dddf4f |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
@@ -253,8 +272,8 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
-| BIO-03 | Forest ecosystem dynamics | sound | Open | OPEN |
-| BIO-04 | Material ageing | none | Codex | BUILDING (codex/physics-lane-3) |
+| BIO-03 | Forest ecosystem dynamics | sound | Codex | BUILDING (codex/physics-lane-3) |
+| BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
@@ -265,7 +284,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
-| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Open | OPEN |
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Codex | BUILDING (codex/physics-life01) |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 708e96a06b |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | LANDED 561885e7a1 |
@@ -309,7 +328,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | CLAIMED |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | CLAIMED |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | LANDED e9007d3bb |
-| SEA-14 | Water entry and exit | stand-in | Claude | CLAIMED |
+| SEA-14 | Water entry and exit | stand-in | Claude | LANDED 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | LANDED ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Claude | LANDED 9a189c4eb |

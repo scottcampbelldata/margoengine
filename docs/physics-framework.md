@@ -152,6 +152,7 @@ fields (MOOSE, Gaston et al. 2009; ESMF, Hill et al. 2004).
 | sea foam | foam | The foam on the sea (`seaFoam`, a `uniformGrid`: foam coverage and active whitecap coverage per cell, 0 to 1, f32), owned by `FoamSolver` of `@margoengine/physics/foam` (SEA-13), made by the breakers of the wave spectrum (SEA-01) and by ships' hulls; its spray flux is the source of airborne droplets (ATMO-06). |
 | tracers | tracers | Particles of dye, sediment, cargo and oil in the water (`tracers`, a `particleSet`: x, y, z, mass, material, state per particle), owned by `TracerSolver` of `@margoengine/physics/tracers` (SEA-15); the sea surface tints its water from their concentration. |
 | bodies | rigid | Pose, velocity, mass and inertia of every rigid body, the boundary signed-distance field of each, an accumulator for impulses at points (`bodyImpulses`, landing at the start of the rigid step) and one for forces held over the rigid step (`bodyForces`, force and torque about the centre of mass, taken off after it; the soft solver, the hulls and the air's loads (`AirSolver`) accumulate into it). |
+| deck water | exceedance (SEA-08) and liquid (FLUID-03) | Green water on a hull's deck, through two fields. `deckInflow` (a `surfaceSampleSet`, f64), written by the hull's exceedance solver: a count word, then 16 words a bulwark segment where the sea overtops: the hull's body row, the segment's ends a and b (body frame, m), its inward normal, the inflow's height h (m), its velocity u (body frame, m/s), its volume flux q (m^3/s), the tick. `deckClaims` (a `bodySet`, one f64 a body row), written by `DeckWaterSolver` of `@margoengine/physics/flip`: 1 where a grid-particle deck volume owns that hull's on-deck water and load. The exceedance solver leaves its own simplified deck load out where the claim is 1, so a hull carries one deck load. A field read needs its writer, so the exceedance solver reads `deckClaims` only when made to (a deck volume shares the world). The two read each other's fields, so they couple staggered: the deck takes the inflow a tick after it is written. |
 | follow targets | each moving solver | Pose, velocity and acceleration of anything a camera can follow (rigid bodies, vehicles, trains, ships, animals, birds, fish, flock and herd members), interpolated to the frame time on the world clock and expressed in large-world cells, so a following camera never jitters against the simulation. |
 
 **Transfers between representations** are registered operators owned by the framework, not code inside each solver:
@@ -280,6 +281,14 @@ them:
   chunks.
 - The reduction rules of section 7 keep the result independent of the thread count.
 - Without cross-origin isolation, a world runs single-threaded and reports the mode it chose.
+
+**Status (2026-11-26):** the rigid kernel's islands solve on threads. `KernelWorld.useThreads(count)` starts `count - 1`
+workers, each with its own instance of the kernel's threaded build over the world's shared memory and a stack region of its
+own; `stepAsync` begins the step on the main thread (broad and narrow phases, islands, rows, each island's planned level and
+multibody stamps), hands fixed runs of island numbers to the workers and solves the first itself, then ends the step on the
+main thread. Islands share no row a solve writes, so the bits are those of one thread at any count (section 7, rule 7):
+`kernel/tests/threads.rs` with native threads and `tests/kernel-threads.test.js` with Wasm workers check the state hash after
+every step at 1, 2, 4 and 8 threads. The broad and narrow phases are still serial.
 
 ## 10. The guard: coupling tests in the merge gate
 

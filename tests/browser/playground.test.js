@@ -5,14 +5,21 @@
 //   node scripts/run-with-timeout.mjs --max=5 -- npm run test:playground:browser
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { server } from '../../scripts/serve-playground.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
+import { runMessage, single } from '../../site/playground/share.js';
 import { templates } from '../../site/playground/templates.js';
 import { decodePNG } from '../support/png.js';
 
-const errorTemplate = templates.find((t) => t.id === 'error');
+const errorCode = templates.find((t) => t.id === 'error').files[0].code;
+// The page is ready when Run is enabled. A goto waits for DOMContentLoaded, not load: load also waits for the sandboxed
+// run frame, which Chromium starts in a renderer process of its own (an opaque origin), so a goto to load times a
+// process start under whatever else the machine runs. 45 cold loads in fresh contexts, three runs at once, measured
+// 0.2 to 0.9 s to load (2026-11-26); one goto in about 15 test runs passed 30 s, waiting for load alone.
+const ready = { waitUntil: 'domcontentloaded' };
 
 test('the playground runs templates, reports errors with lines and codes, and opens share links', {
   timeout: 240_000,
@@ -27,13 +34,16 @@ test('the playground runs templates, reports errors with lines and codes, and op
     context = await browser.newContext({
       viewport: { width: 1280, height: 900 },
     });
+    // The first context's first frame creates the browser's first GPU device and compiles the engine's pipelines,
+    // which is the slow step of the whole test (a cold shader cache); later steps reuse it. Other contexts keep the
+    // default 30 s.
     context.setDefaultTimeout(120_000);
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     // A policy that blocks something the page or the frame needs shows up as a console error.
     page.on('console', (message) => /Content Security Policy/i.test(message.text()) && errors.push(message.text()));
-    const response = await page.goto(page0);
+    const response = await page.goto(page0, ready);
     // The page's own policy is strict: its scripts only, nothing inline, no other host to talk to.
     const policy = response.headers()['content-security-policy'];
     assert.match(policy, /script-src 'self';/);
@@ -64,6 +74,31 @@ test('the playground runs templates, reports errors with lines and codes, and op
     for (let i = 0; i < shot.data.length; i += 4) if (shot.data[i] > 120 && shot.data[i] > shot.data[i + 2] + 40) lit++;
     assert.ok(lit > shot.width * shot.height * 0.005, `the cube is drawn (${lit} warm pixels)`);
 
+    // The API panel lists what the imports export, read from their .d.ts through re-exports
+    // (margoengine -> @margoengine/stage -> @margoengine/core), with signatures and doc lines.
+    await page.click('#api summary');
+    await page.locator('#api-list h3', { hasText: 'margoengine/webgl2-compat/preview' }).waitFor();
+    const margo = page.locator('#api-list section').filter({ has: page.locator('h3', { hasText: /^margoengine$/ }) });
+    await margo.getByRole('button', { name: 'Insert createStage' }).waitFor();
+    assert.match(
+      await margo.locator('li', { hasText: 'createStage' }).first().textContent(),
+      /function createStage\(target/,
+    );
+    assert.ok(
+      await margo.getByRole('button', { name: 'Insert Engine', exact: true }).count(),
+      'core re-exports are followed',
+    );
+    await page.fill('#api-filter', 'webglRend');
+    assert.deepEqual(await page.locator('#api-list h3').allTextContents(), ['margoengine/webgl2-compat/preview']);
+    // Ctrl+Space completes a name with one match.
+    const before = await page.inputValue('#editor');
+    await page.locator('#editor').focus();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\ncreateSta');
+    await page.keyboard.press('Control+Space');
+    assert.equal(await page.inputValue('#editor'), `${before}\ncreateStage`);
+    await page.fill('#editor', before);
+
     // A message that does not come from the frame is ignored.
     await page.evaluate((channel) => postMessage({ channel, kind: 'error', text: 'forged' }, '*'), 'margo-playground');
     await page.waitForTimeout(200);
@@ -82,14 +117,48 @@ test('the playground runs templates, reports errors with lines and codes, and op
         const e = document.getElementById('editor');
         return e.value.slice(e.selectionStart, e.selectionEnd);
       }),
-      errorTemplate.code.split('\n')[8],
+      errorCode.split('\n')[8],
     );
 
+    // Several files: main.js imports ring.js by './ring.js'.
+    await page.selectOption('#template', 'modules');
+    await page.locator('#console li', { hasText: 'Made 8 balls with ring.js' }).waitFor();
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js']);
+    // A new tab, imported by main.js, that throws: the error names its file and line, and opens that tab.
+    await page.fill('#new-file', 'boom');
+    await page.click('#add-file button');
+    assert.equal(await page.locator('#tabs [role=tab][aria-selected=true]').textContent(), 'boom.js');
+    await page.fill('#editor', "// boom.js\nexport const ok = 1;\nthrow new Error('from boom');\n");
+    await page.locator('#tab-0').click();
+    const main = await page.inputValue('#editor');
+    await page.fill('#editor', `import './boom.js';\n${main}`);
+    await page.click('#run');
+    const boom = page.locator('#console li.error', { hasText: 'from boom' });
+    await boom.waitFor();
+    await boom.getByRole('button', { name: 'boom.js line 3' }).click();
+    assert.equal(await page.locator('#tabs [role=tab][aria-selected=true]').textContent(), 'boom.js');
+    assert.equal(
+      await page.evaluate(() => {
+        const e = document.getElementById('editor');
+        return e.value.slice(e.selectionStart, e.selectionEnd);
+      }),
+      "throw new Error('from boom');",
+    );
+    // Removing the tab keeps the project before it as a version.
+    await page.getByRole('button', { name: 'Remove boom.js' }).click();
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js']);
+    await page.selectOption('#template', 'error');
+    await page.locator('#console li.error', { hasText: 'Mesh disposed' }).waitFor();
+
     // The version history holds both runs and restores the earlier one.
-    assert.ok((await page.locator('#versions option').count()) >= 2);
-    await page.selectOption('#versions', '1');
+    const versions = await page.locator('#versions option').allTextContents();
+    assert.ok(
+      versions.some((v) => /\(3 files\)$/.test(v)),
+      'the three-file project is a version',
+    );
+    await page.selectOption('#versions', String(versions.findIndex((v) => /\(3 files\)$/.test(v))));
     await page.click('#restore');
-    assert.equal(await page.inputValue('#editor'), templates[0].code);
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js', 'boom.js']);
     await page.selectOption('#template', 'error');
     await error.waitFor();
 
@@ -98,58 +167,171 @@ test('the playground runs templates, reports errors with lines and codes, and op
     await page.waitForFunction(() => location.hash.startsWith('#code='));
     const link = page.url();
     const other = await context.browser().newContext();
-    // The same step deadline as the first context: the test as a whole has the hard limit.
-    other.setDefaultTimeout(120_000);
     try {
       const shared = await other.newPage();
       const saved = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('margo-playground:v1') ?? 'null'));
       // Someone with code of their own...
-      await shared.goto(page0);
+      await shared.goto(page0, ready);
       await shared.waitForFunction(() => !document.getElementById('run').disabled);
       const own = '// My own scene\nconsole.log("mine");\n';
       await shared.fill('#editor', own);
       await shared.waitForFunction(
-        (own) => JSON.parse(localStorage.getItem('margo-playground:v1')).current === own,
+        (own) => JSON.parse(localStorage.getItem('margo-playground:v1')).current?.[0]?.code === own,
         own,
       );
       // ...opens the link: the shared code loads and runs, but their saved code stays as it was.
       const visit = async () => {
         await shared.goto('about:blank');
-        await shared.goto(link);
+        await shared.goto(link, ready);
         await shared.locator('#console li.error').waitFor();
       };
       await visit();
-      assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
+      assert.equal(await shared.inputValue('#editor'), errorCode);
       assert.equal(await shared.locator('#shared').isVisible(), true);
       assert.match(await shared.locator('#shared').textContent(), /Shared code loaded/);
-      assert.equal((await saved(shared)).current, own, 'opening a link does not replace the saved code');
+      assert.deepEqual((await saved(shared)).current, single(own), 'opening a link does not replace the saved code');
       // Back to my code: their code returns, nothing of the link is kept.
       await shared.click('#back');
       assert.equal(await shared.inputValue('#editor'), own);
       assert.equal(await shared.locator('#shared').isVisible(), false);
-      assert.equal((await saved(shared)).current, own);
+      assert.deepEqual((await saved(shared)).current, single(own));
       // Running the shared code makes it theirs; their own code is kept as a version.
       await visit();
-      assert.equal((await saved(shared)).current, own);
+      assert.deepEqual((await saved(shared)).current, single(own));
       await shared.click('#run');
       await shared.locator('#console li.error').waitFor();
       const after = await saved(shared);
-      assert.equal(after.current, errorTemplate.code);
+      assert.deepEqual(after.current, single(errorCode));
       assert.ok(
-        after.history.some((s) => s.code === own),
+        after.history.some((s) => s.files[0].code === own),
         'their own code is a version',
       );
       assert.equal(await shared.locator('#shared').isVisible(), false);
       // A damaged link says so and changes nothing.
       await shared.goto('about:blank');
-      await shared.goto(`${page0}#code=@@not-a-link`);
+      await shared.goto(`${page0}#code=@@not-a-link`, ready);
       await shared.waitForFunction(() => /damaged/.test(document.getElementById('status').textContent));
       assert.equal(await shared.locator('#status').getAttribute('role'), 'alert');
-      assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
-      assert.equal((await saved(shared)).current, errorTemplate.code);
+      assert.equal(await shared.inputValue('#editor'), errorCode);
+      assert.deepEqual((await saved(shared)).current, single(errorCode));
     } finally {
       await other.close();
     }
+    // The run frame on its own: opened at the top level it is still sandboxed (by its header), posts nothing and runs
+    // nothing, even when a run message comes from its own window (where parent === window).
+    const port = server.address().port;
+    const loner = await context.newPage();
+    await loner.goto(`http://127.0.0.1:${port}/site/playground/frame/`, ready);
+    assert.equal(await loner.evaluate(() => self.origin), 'null', 'sandboxed when opened directly');
+    const ranAlone = await loner.evaluate(
+      async (message) => {
+        postMessage(message, '*');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return { title: document.title, maps: document.querySelectorAll('script[type=importmap]').length };
+      },
+      runMessage(single("document.title = 'ran';"), `http://127.0.0.1:${port}/node_modules/`),
+    );
+    assert.deepEqual(ranAlone, { title: 'Margo Engine playground', maps: 0 });
+    await loner.close();
+
+    // Framed by a test page to try the frame's own checks, as on a host that ignores _headers: the page and a copy of
+    // the frame are written under test-results/, which the server sends with no site headers. A frame copy from the
+    // page's origin answers; one from another origin (localhost against 127.0.0.1) stays silent; and a message from a
+    // sibling frame instead of the parent runs nothing.
+    const probeDir = new URL('../../test-results/playground-probe/', import.meta.url);
+    await mkdir(new URL('frame/', probeDir), { recursive: true });
+    await copyFile(
+      new URL('../../site/playground/frame/index.html', import.meta.url),
+      new URL('frame/index.html', probeDir),
+    );
+    await writeFile(new URL('index.html', probeDir), '<!doctype html><title>probe</title><body></body>');
+    const probe = await context.newPage();
+    await probe.goto(`http://127.0.0.1:${port}/test-results/playground-probe/`);
+    const tryFrame = (host, from) =>
+      probe.evaluate(
+        async ({ src, message, from }) => {
+          const frame = Object.assign(document.createElement('iframe'), { src });
+          frame.setAttribute('sandbox', 'allow-scripts');
+          const heard = [];
+          addEventListener(
+            'message',
+            (e) =>
+              e.source === frame.contentWindow &&
+              e.data.kind !== 'api' && // the API list arrives beside the run, in no fixed order
+              heard.push(e.data.kind === 'error' ? `error: ${e.data.text}` : e.data.kind),
+          );
+          document.body.append(frame);
+          await new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (from === 'parent') frame.contentWindow.postMessage(message, '*');
+          else {
+            // A sibling frame posts the run message to the run frame.
+            const sibling = document.createElement('iframe');
+            sibling.setAttribute('sandbox', 'allow-scripts');
+            sibling.srcdoc = `<script>parent.frames[0].postMessage(${JSON.stringify(message)}, '*')</script>`;
+            document.body.append(sibling);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          frame.remove();
+          document.querySelectorAll('iframe').forEach((f) => f.remove());
+          return heard;
+        },
+        {
+          src: `http://${host}:${port}/test-results/playground-probe/frame/`,
+          message: runMessage(single("console.log('ran');"), `http://127.0.0.1:${port}/node_modules/`),
+          from,
+        },
+      );
+    assert.deepEqual(await tryFrame('127.0.0.1', 'parent'), ['ready', 'log', 'done'], 'the control runs');
+    assert.deepEqual(await tryFrame('localhost', 'parent'), [], 'a parent of another origin gets nothing');
+    assert.deepEqual(await tryFrame('127.0.0.1', 'sibling'), ['ready'], 'a message from a sibling runs nothing');
+    await probe.close();
+
+    // Embed: another site (localhost) frames the embed page with a share link. It runs the code, links to the full
+    // playground with the same files, and saves nothing in the playground's storage; the main page refuses that site.
+    const storeBefore = await page.evaluate(() => localStorage.getItem('margo-playground:v1'));
+    const host = await context.newPage();
+    await host.goto(`http://localhost:${port}/test-results/playground-probe/`);
+    const embedLink = new URL(link).hash;
+    const embedBase = `http://127.0.0.1:${port}/site/playground/embed/?packages=/node_modules/`;
+    await host.evaluate(
+      ([canvasOnly, withCode, full]) => {
+        for (const [id, src] of [
+          ['canvas-only', canvasOnly],
+          ['with-code', withCode],
+          ['full', full],
+        ]) {
+          const frame = Object.assign(document.createElement('iframe'), { id, src, width: 800, height: 600 });
+          document.body.append(frame);
+        }
+      },
+      [`${embedBase}${embedLink}`, `${embedBase}&code${embedLink}`, page0],
+    );
+    const frameOf = (id) => host.locator(`#${id}`).contentFrame();
+    for (const id of ['canvas-only', 'with-code']) {
+      const embedded = frameOf(id);
+      await embedded.locator('#run:not([disabled])').waitFor();
+      assert.equal(await embedded.locator('#share').isVisible(), false, `${id}: no full-playground tools`);
+      const open = await embedded.locator('#open-full').getAttribute('href');
+      assert.ok(open.startsWith(`http://127.0.0.1:${port}/site/playground/?packages=`), open);
+      assert.equal(new URL(open).hash, embedLink, `${id}: Open in Playground carries the same files`);
+      // The embed's run frame (embed/frame/) runs the shared code: the error template's error comes back.
+      await embedded.locator('#stage iframe').waitFor({ state: 'attached' });
+      assert.match(await embedded.locator('#stage iframe').getAttribute('src'), /\/site\/playground\/embed\/frame\/$/);
+    }
+    await frameOf('with-code').locator('#console li.error', { hasText: 'Mesh disposed' }).waitFor();
+    assert.equal(await frameOf('canvas-only').locator('#editor').isVisible(), false, 'canvas only');
+    assert.equal(await frameOf('with-code').locator('#editor').isVisible(), true, 'with ?code, the code too');
+    assert.equal(await frameOf('with-code').locator('#editor').inputValue(), errorCode);
+    // The main page sends frame-ancestors 'self': another site's frame of it stays empty.
+    assert.equal(await frameOf('full').locator('#editor').count(), 0, 'the main page is never framed elsewhere');
+    await host.close();
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem('margo-playground:v1')),
+      storeBefore,
+      'an embed saves nothing',
+    );
+
     // Page errors include the frame's: the only ones are the error template's own, on purpose.
     assert.deepEqual(
       errors.filter((message) => !/^Mesh disposed/.test(message)),

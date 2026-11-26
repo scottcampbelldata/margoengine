@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -42,6 +42,7 @@ await build({
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
+        'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         meshfiles: resolve(root, 'src/meshfiles.ts'),
@@ -50,27 +51,33 @@ await build({
         earth: resolve(root, 'src/earth/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
+        ageing: resolve(root, 'src/ageing.ts'),
         'modal-sound': resolve(root, 'src/modal-sound.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
         entry: resolve(root, 'src/entry/index.ts'),
+        flip: resolve(root, 'src/flip/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         celestial: resolve(root, 'src/space/index.ts'),
         schooling: resolve(root, 'src/schooling/index.ts'),
         life: resolve(root, 'src/life/index.ts'),
         pedestrians: resolve(root, 'src/pedestrians/index.ts'),
+        locomotion: resolve(root, 'src/locomotion/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
         foam: resolve(root, 'src/foam/index.ts'),
         surf: resolve(root, 'src/surf/index.ts'),
+        rogue: resolve(root, 'src/rogue/index.ts'),
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),
+        aeolian: resolve(root, 'src/aeolian/index.ts'),
         groundwater: resolve(root, 'src/groundwater/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
+        glacier: resolve(root, 'src/glacier/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
       },
@@ -84,6 +91,8 @@ for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/life', name), resolve(dist, name));
+for (const name of ['locomotion-kernel.wasm', 'locomotion-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/locomotion', name), resolve(dist, name));
 for (const name of ['pedestrian-kernel.wasm', 'pedestrian-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/pedestrians', name), resolve(dist, name));
 execFileSync(
@@ -102,6 +111,8 @@ await copyFile(resolve(root, 'src/sediment/sediment-kernel-shared.wasm'), resolv
 await copyFile(resolve(root, 'src/orbit/orbit-kernel.wasm'), resolve(dist, 'orbit-kernel.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel-shared.wasm'), resolve(dist, 'orbit-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/landscape/landscape-kernel.wasm'), resolve(dist, 'landscape-kernel.wasm'));
+await copyFile(resolve(root, 'src/aeolian/aeolian-kernel.wasm'), resolve(dist, 'aeolian-kernel.wasm'));
+await copyFile(resolve(root, 'src/aeolian/aeolian-kernel-shared.wasm'), resolve(dist, 'aeolian-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/groundwater/groundwater-kernel.wasm'), resolve(dist, 'groundwater-kernel.wasm'));
 await copyFile(
   resolve(root, 'src/groundwater/groundwater-kernel-shared.wasm'),
@@ -119,6 +130,9 @@ for (const name of ['falling-kernel.wasm', 'falling-kernel-shared.wasm'])
 
 for (const name of ['modal-sound-kernel.wasm', 'modal-sound-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/modal-sound', name), resolve(dist, name));
+
+for (const name of ['glacier-kernel.wasm', 'glacier-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/glacier', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

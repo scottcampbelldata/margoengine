@@ -18,6 +18,7 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { chromiumLaunchOptions } from './lib/browser.mjs';
+import { repoPlaywright } from './support/playwright-version.mjs';
 import { closeAll } from './support/shutdown.mjs';
 
 // The React cube page's gzip budgets (docs/limits.md, "React app budget"): what the browser loads before the page runs
@@ -91,17 +92,7 @@ const check = (bundler, modules) => {
 try {
   // One install: margoengine, its packages from the tarballs (overrides make its ^1.0.0 ranges resolve to them),
   // and the bundlers at their current versions.
-  const tools = [
-    'vite',
-    'webpack',
-    'esbuild',
-    'rollup',
-    '@rollup/plugin-node-resolve',
-    'next',
-    'react',
-    'react-dom',
-    'playwright',
-  ];
+  const tools = ['vite', 'webpack', 'esbuild', 'rollup', '@rollup/plugin-node-resolve', 'next', 'react', 'react-dom'];
   await writeFile(
     join(fixture, 'package.json'),
     JSON.stringify({
@@ -110,6 +101,8 @@ try {
       dependencies: {
         margoengine: packed.margoengine,
         ...Object.fromEntries(await Promise.all(tools.map(async (name) => [name, await version(name)]))),
+        // The repository's own Playwright, whose browsers CI installed; npm's latest wants a build CI never fetched.
+        playwright: repoPlaywright(root),
       },
       overrides: Object.fromEntries(Object.entries(packed).filter(([name]) => name !== 'margoengine')),
     }),

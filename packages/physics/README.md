@@ -757,7 +757,19 @@ for (let i = 0; i < 60; i++) world.step(1 / 60);
 console.log(world.columns.positionY[body], world.hash); // the hash is equal in every browser and in Node
 ```
 
-Read views from `world.columns` each time: `reserve`, `addBody` and anything else that grows the memory can replace them. Each world is its own Wasm instance, living in a world memory: `new KernelWorld(bodies, colliders, {arena})` takes the `Arena` of `margoengine/physics/world` to live in (default: one of its own over a plain memory), and `new Physics(null, {arena: world.arena})` puts a `Physics` in a physics world's memory, where its rigid solver's state lies with every other solver's. The world's block, a 1 MiB stack and the 720 KiB of records the batch queries use are regions of that arena; the block grows through it and moves with one copy when it cannot grow in place, which changes no result. One rigid kernel per memory, and a plain memory for now: a shared one is refused with `unsupported` until the kernel's threaded build exists. Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
+Read views from `world.columns` each time: `reserve`, `addBody` and anything else that grows the memory can replace them. Each world is its own Wasm instance, living in a world memory: `new KernelWorld(bodies, colliders, {arena})` takes the `Arena` of `margoengine/physics/world` to live in (default: one of its own over a plain memory), and `new Physics(null, {arena: world.arena})` puts a `Physics` in a physics world's memory, where its rigid solver's state lies with every other solver's. The world's block, a 1 MiB stack and the 720 KiB of records the batch queries use are regions of that arena; the block grows through it and moves with one copy when it cannot grow in place, which changes no result. One rigid kernel per memory. A world on a shared memory uses the kernel's threaded build (`loadKernel({threads: true})`, Wasm SIMD and atomics), and then its islands can solve on worker threads: `await world.useThreads(count)` starts `count - 1` workers (the main thread is the last), `await world.stepAsync(dt)` steps with the islands split over them in fixed runs, the main thread solving the first, and `world.endThreads()` stops them. Islands share nothing a solve writes, so a step gives the same bits on any number of threads (`threadCount` reads how many). A shared memory needs a cross-origin-isolated page (or Node); the broad and narrow phases still run on the main thread.
+
+```ts
+import {KernelWorld, loadKernel} from 'margoengine/physics';
+import {Arena, worldMemory} from 'margoengine/physics/world';
+
+await loadKernel({threads: true});
+const world = new KernelWorld(1024, 1024, {arena: new Arena(worldMemory(true))});
+await world.useThreads(4);
+await world.stepAsync(1 / 60);
+console.log(world.threadCount); // 4
+world.endThreads();
+``` Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
 
 Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed or sleeping body's pose by hand.
 
@@ -2144,7 +2156,8 @@ console.log(sea.elevation(-10, 0, 10) === wake.sample(-10, 0).height); // true: 
 - **Roll's viscous damping:** the eddies a rolling hull sheds at its bilges and the friction of its skin, which potential flow leaves out and which damp a real hull's roll most near its resonance (Ikeda's component method, ITTC 7.5-02-07-04.5). Each section's eddy coefficient (`eddyRollCoefficient`) and skin friction (`frictionGirth`, Kato's laminar law at the hull's natural roll frequency) are integrated along the hull about its centre of mass, and the moment -(eddy |p| + friction) p, p the roll rate, is taken implicitly in the damping, so a light hull stays stable. `rollDamping: false` leaves it out; `viscosity` is the water's kinematic viscosity (default `SEA_VISCOSITY`, 1.19e-6 m^2/s, sea water at 15 degrees C; fresh water 1.14e-6). Bilge keels, skegs and forward speed are not in yet.
 - **The load each step** is taken where a load held through the rigid step neither feeds the motion nor drains it: (s - 1) / (2 s) of the step on, s the substeps the `bodies` port gives (7/16 at 8), the pose carried there by the body's velocity and spin. Taken at the middle, a hull lost about pi w dt / (2 s) of its amplitude a cycle; taken where the step starts, it gained energy. The radiation force, convolved up to the step's start, is carried to the same point along its last two values.
 - **The waves a hull turns:** their diffraction, by strip theory's relative motion principle (Journee and Massie eqs. 8.19 and 8.45-8.47). Each section takes its added mass times the water's acceleration and its radiation memory convolved with the water's velocity, as it takes them for its own motion, at the depths that stand for its motion: its mean draft in heave and its centroid's depth in sway and roll. The Froude-Krylov part is the pressure over the wetted surface. It needs a sea that gives the water's motion (a `SeaSurface`'s `water`, as `SpectralSea`'s does); `diffraction: false` leaves it out. Measured: in head seas a box heaves within 1 percent of strip theory's frequency-domain answer (82 to 267 percent off without the diffraction); held in beam seas, its sway force and roll moment are within 1.5 percent.
-- **Not yet:** bilge keels and forward speed in the roll damping, surge added mass, wave drift and green water.
+- **The waves' drift:** the mean and slowly varying push of the waves a hull sends back. Each section's far-field drift in beam waves is the momentum the waves carry, 1/2 rho g a^2 |R|^2 per metre (Maruo; a wall sending everything back takes 1/2 rho g a^2), R the wave it sends back while it moves as the hull does (`scatterSection`, the two-dimensional scattering derived from the radiation solution). The solver applies it less the part its Froude-Krylov pressure over the moving wetted surface already gives, across the hull, over the sea's waves by Newman's approximation (the mean and the slow beat of wave groups). It needs a sea that gives its waves (`SpectralSea`'s `waveComponents`); `drift: false` leaves it out. Measured: moored in beam waves, a box's mean offset holds the far-field drift within 3 percent of the wall's force, and in short waves the wall's itself.
+- **Not yet:** bilge keels and forward speed in the roll damping, surge added mass, and green water.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -2273,6 +2286,41 @@ const world = new PhysicsWorld({rate: {num: 960, den: 1}})
   .couple(['entry', 'rigid'], 'staggered');
 world.advance(96); // a tenth of a second
 console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in with a cavity, which pinches
+```
+
+### Water that splashes and pours (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`)
+
+`FlipSolver` is FLUID-03: water in a box of cells that collapses, splashes, overturns and pours, as APIC particles
+(Jiang et al. 2015) on a grid that keeps it incompressible with a free surface (Gibou et al.'s ghost fluid). Give it
+the box (`cells`, `cellSize`, `origin`), where the water starts (`initial(x, y, z)`, eight particles a cell), solid
+boxes it flows round (`solids`) and the sides open to the air (`open`), where water leaves for the sea
+(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell.
+`positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
+break is its check: the front within 2 percent of their measurements.
+
+`DeckWaterSolver` is green water on a hull's deck: the same liquid in a box riding a rigid body (`row`, `offset` in
+the body's frame), feeling the frame's acceleration as the hull heaves and rolls. It takes the sea where it comes over
+the bulwarks from the `deckInflow` port, gives water over an open side back to the sea, and holds the hull with the
+deck's load through `bodyForces`. It claims its hull in `deckClaims`, so the hull's exceedance solver leaves its own
+deck load out.
+
+```ts
+import {FlipSolver} from 'margoengine/physics/flip';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A column of water 0.3 m wide and 0.6 m high let go in a tank 2 m long.
+const water = new FlipSolver();
+const world = new PhysicsWorld({rate: {num: 120, den: 1}}).add(water, {
+  cells: [80, 32, 1],
+  cellSize: 0.025,
+  initial: (x, y) => x < 0.3 && y < 0.6,
+  rate: 1,
+});
+world.advance(60); // half a second
+let front = 0;
+const p = water.positions();
+for (let i = 0; i < p.length; i += 3) front = Math.max(front, p[i]);
+console.log(front > 1); // true: the surge has run more than a metre
 ```
 
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
@@ -2449,6 +2497,47 @@ world.advance(30 * 120); // two minutes
 console.log(water.sample(60, 4).velocity[1] > 0.1); // true: a longshore current in the surf zone
 console.log(surf.undertow(70, 4)[0] < 0); // true: the undertow runs seaward
 console.log(surf.runUp() > 0.05); // true: the water runs up the beach above its still level
+```
+
+### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
+
+`NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
+
+Its statistics are the freak-wave parameters of the ECMWF wave model:
+- the steepness, the Benjamin-Feir index and the directionality R;
+- the kurtosis, from four-wave focusing (J(R) BFI^2) plus the bound waves;
+- the skewness, summed from the same kernels over the spectrum, so spreading lowers it;
+- the chance a wave passes 2 H_s, or its crest 1.25 H_s (Tayfun and Fedele's crest law).
+
+`heightChance`, `crestChance`, `expectedMaximum` (the expected largest of N waves) and `kurtosisFactor` (J(R)) are exported, with `seaStatistics(spectrum)` and `pairKernels` (the kernels of two waves).
+
+Rogue waves are real events, each a constrained NewWave: the most likely shape of an extreme crest in this sea, solved into the sea so a crest of the height asked for stands at its place and time with the sea around it still the sea. Each fades in and out within a window of 8 zero-crossing periods and 8 zero-crossing wavelengths, and outside every window the sea is untouched, bit for bit. Its settings:
+- `spectrum` or `waves` (with `at`, the place to sample it, default `[0, 0]`);
+- `components` (default 160; a point costs about their square over 2 multiplications);
+- `cutoff`, the highest frequency kept as a multiple of the peak (default 3);
+- `seed` (default 0), `gravity`, `current` (a water `FlowField` added to the waves' motion) and `temperature` (default 288.15 K);
+- `rogues`: `false`, a list of crests to place (`{position: [x, z], time, crest}`), or a region (`{min, max, from, to}`, default the 2 km square about `at` over the first hour) where the rogues focusing adds beyond the second order's own are drawn at the rate the statistics give. A long-crested narrow storm draws several an hour; a short-crested sea, whose R is above 1, draws none.
+
+Reading the sea:
+- `elevation(x, z, t)`, `linearElevation(x, z, t)`, `sample(x, z, t)` (height, normal, velocity, current, depth, density), `velocity(x, y, z, t)` (linear theory under Wheeler's stretching), `pressure(x, y, z, t)` and `water`;
+- `statistics`, `rogues` and `variance`.
+
+```ts
+import {NonlinearSea} from 'margoengine/physics/rogue';
+import {jonswap} from 'margoengine/physics/waves';
+
+// The North Sea on 1 January 1995: H_s 11.9 m, a peak period of 15 s in 70 m of water, and the Draupner wave's 18.5 m crest.
+const frequencies = Float64Array.from({length: 40}, (_, i) => 0.03 * 20 ** (i / 39));
+const directions = Float64Array.from({length: 36}, (_, j) => -Math.PI + ((j + 0.5) * Math.PI) / 18);
+const spectrum = jonswap(
+  {height: 11.9, period: 15, direction: 0},
+  {frequencies, directions, energy: new Float64Array(40 * 36), depth: 70, density: 1025},
+);
+const sea = new NonlinearSea({spectrum, rogues: [{position: [0, 0], time: 600, crest: 18.5}]});
+console.log(sea.elevation(0, 0, 600).toFixed(1)); // 18.5
+console.log(sea.elevation(0, 0, 600) - sea.linearElevation(0, 0, 600) > 1); // true: the bound waves lift the crest
+console.log(sea.statistics.rogueCrestChance > Math.exp(-12.5)); // true: crests pass 1.25 H_s more often than Rayleigh's
+console.log(sea.elevation(0, 0, 100) === new NonlinearSea({spectrum, rogues: false}).elevation(0, 0, 100)); // true
 ```
 
 ### Solver modules on one memory
@@ -3087,6 +3176,38 @@ scrape power times speed, rolling proxy power in W and rolling power times speed
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
 
+## Aeolian transport
+
+`AeolianTransport` lifts loose sand or snow, transports it across a `TerrainBed`, and deposits it when the wind
+falls below the impact threshold. Wind carries the grains downwind and steep faces relax toward repose. The
+solver publishes moving mass, dust emission and the opposing stress on the wind. Its optional Wasm assets load
+when `load()` is called. Length, velocity and mass use metres, m/s and kilograms.
+
+```ts
+import { AeolianTransport } from '@margoengine/physics/aeolian';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 16, rows: 8, width: 16, depth: 8, centre: [0, 0] as const };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const terrain = new TerrainBed();
+const transport = await AeolianTransport.load();
+world.add(terrain, { ...grid, elevations: (x) => Math.max(0, 0.3 - 0.1 * Math.abs(x)) });
+world.add(transport, { grid, material: 'snow', frictionVelocity: [0.55, 0], open: { maxX: true } });
+world.advance(180);
+console.log(transport.sample(0, 0)?.mass, terrain.bed.sample(0, 0).elevation, transport.budget.outflow);
+```
+
+Use `wind` for a replayable `Wind` provider or declare a `frictionField` when loading the solver. For the latter,
+each vertex stores `[uStarX, uStarZ, airDensity]` in f64 or f32. Pass `erodibility` or `erodibleField` to model soil
+cover or wet areas. Start with `mobileDepth` matching the loose layer above bedrock (default 0.1 m). Vertex arrays
+for this solver have X increasing fastest. `motionField` yields `[kg/m², m/s, m/s]`; `dustField` yields kg/(m² s)
+and `windDragField` yields `[Pa on X, Pa on Z]`, all f64 layout 1. The optional `vfx/blown-sand` entry can use the
+same solver as its `transport`, with a ground sampler from `terrain.bed`.
+On a fine sand grid, set `ripples: { meanHop }` to include short splash hops that amplify a bed perturbation into an
+impact ripple. `meanHop` is the mean hop length in metres. The other ripple coefficients default to an incident
+cotangent of 4 and an ejection rate of `grainSpeed / 0.3` per second.
+
 ## Groundwater and springs
 
 `@margoengine/physics/groundwater` evolves an unconfined water table with recharge, lateral Darcy flow, springs and
@@ -3128,3 +3249,146 @@ and an abort `signal`. The linear solve defaults to a relative residual of `1e-1
 `secondsPerSecond` defaults to 1. When accelerating underground time, outlet rates still describe volume per
 world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
 boundary inflow and outflow, spring discharge and seepage in cubic metres.
+
+## Glacier and ice-sheet flow
+
+`@margoengine/physics/glacier` advances grounded ice over a rectangular cell-centred bed. It solves
+Glen shallow-ice flow, opens surface crevasses under tension, releases marine calving and dry icefall
+volumes, and sends meltwater down a D8 surface drainage graph. Simulation runs on the world clock.
+
+```ts
+import { GlacierSolver } from '@margoengine/physics/glacier';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const glacier = await GlacierSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(glacier, {
+  nx: 3, nz: 2, dx: 100,
+  bed: [80, 45, 0, 75, 40, -5],
+  thickness: [90, 60, 20, 90, 60, 20],
+  melt: 1e-8, timeScale: 86400,
+});
+world.advance(60);
+console.log(glacier.sample(2, 1), glacier.budget);
+```
+
+Grid arrays are x-fast. Each cell is grounded (boundary 0), open water (1), or a dry cliff receiver
+(2). Water and cliff receivers have no grounded ice or snowfall. Outer edges are closed to ice
+transport. Unspecified thickness, accumulation, melt and crevasse water default to zero. The
+default Glen exponent is 3 and the temperate rate factor is 2.4e-24 Pa⁻³ s⁻¹. Ice and water
+densities default to 917 and 1000 kg/m³. Sea level defaults to 0 m, dz to dx, and timeScale to 1.
+`GlacierSolver.load({ id, signal })` accepts an optional field prefix (default glacier) and cancellation.
+
+All six published fields use layout-1 f64 cells. `thicknessField` and `crevasseField` are metres,
+`velocityField` stores x and z component planes in m/s of simulated time, and `meltwaterField`
+publishes m³ of liquid per world second at each outlet. Pass that descriptor and the appropriate
+outlet indices to `ShallowWaterSolver`. `calvingField` and `icefallField` publish the ice volume
+in m³ released during the current tick, at the source cell. They reset on the next step. Budget
+volumes use ice density. Use the same climate and suitable time scales for physically linked solvers.
+
+## Ground animal locomotion
+
+`@margoengine/physics/locomotion` loads the optional Rust SIMD solver for a slithering snake, a lizard, an insect,
+a spider or a sideways-moving crab. Choose one or mix the body types in a single `PhysicsWorld`. Give a legged body
+its own hip locations, foot locations and phases to replace the preset gait.
+
+```ts
+import { GroundLocomotion } from '@margoengine/physics/locomotion';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const gait = await GroundLocomotion.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(gait, {
+  bodies: [{ kind: 'snake' }, { kind: 'insect' }, { kind: 'crab' }],
+});
+world.advance(60);
+const snake = gait.read(0);
+const frontFoot = gait.readContact(1, 0);
+if (snake.position[2] <= 0 || !Number.isFinite(frontFoot.position[1])) {
+  throw new Error('Expected the ground animal poses after one second.');
+}
+```
+
+The plane starts at Y=0. To follow production terrain, pass the `TerrainBed` geometry as `bedShape` to
+`GroundLocomotion.load`, and register the bed before the animals. Use the same `cellSize` as the world and set
+`originCell` to the cell passed to `world.add` for an animal group that starts outside the origin cell. The `bed`
+parameter accepts a fixed `Bed` and supplies a surface until a declared live port is available. The remaining static
+fallback is `groundHeight`. The bed's border behavior follows `Bed`.
+
+A snake has 32 links over 1 m by default. Its 0.48 rad bend and two waves advance at 1 Hz, with a 0.025 m belly
+radius and forward, backward and sideways friction coefficients of 0.11, 0.14 and 0.19. The body receives no
+horizontal thrust from its internal wave. Legged bodies derive target speed from `frequency × stride` and drive
+through planted feet. Their default gait alternates diagonal pairs, tripods or tetrapods at a 0.58 duty factor.
+
+| Preset | Legs | Mass (kg) | Hip length × width (m) | Rest leg (m) | Gait (Hz) | Direction |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Lizard | 4 | 0.035 | 0.11 × 0.04 | 0.06 | 3 | +Z |
+| Insect | 6 | 0.003 | 0.037 × 0.015 | 0.023 | 6 | +Z |
+| Spider | 8 | 0.02 | 0.048 × 0.034 | 0.045 | 4 | +Z |
+| Crab | 8 | 0.06 | 0.052 × 0.08 | 0.048 | 4 | +X |
+
+Legged defaults use 0.35 leg lengths of desired travel per cycle, 0.28 leg lengths of swing clearance, 4% stance
+extension, 0.8 friction and a torso ground radius of 0.25 leg lengths. Zero `tractionResponse` and
+`postureResponse` give passive spring legs. Zero `frequency` holds the configured pose phase. The solver derives
+mass-based stiffness and damping from world gravity if omitted. Body and feet coordinates are in SI units,
+Y up and +Z forward before applying heading.
+
+`read` returns the current COM, velocity, quaternion and angular momentum. `readContact` returns the most recent
+reaction force, stance couple, and link midpoint or foot position. For legged animals, the torso contact is the last
+row after the configured feet. For a snake, each row's axis points from tail toward head. Its link endpoints are
+the midpoint plus and minus half a link length along that axis. Consumers can read the versioned
+`GROUND_POSE_FIELD` and `GROUND_CONTACT_FIELD` directly through the world registry. Contact rows are grouped by
+body order and report the samples that produced the last substep. The entry fetches Wasm on `load`, and accepts
+an abort signal.
+
+## Material ageing
+
+MaterialAgeingSolver advances rust, copper patina, wood rot, marine fouling and carbonate stone recession
+on the physics clock. A wreck can use metal patches with different immersion and surface exposure.
+Read a patch's remaining thickness for geometry or integrity logic and its appearance for an existing PBR material.
+
+```ts
+import { PbrMaterial } from '@margoengine/core';
+import { AGEING_YEAR, MaterialAgeingSolver } from '@margoengine/physics/ageing';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+const ageing = new MaterialAgeingSolver();
+world.add(ageing, {
+  timeScale: AGEING_YEAR,
+  exposure: { temperature: 293.15, relativeHumidity: 0.8, sulphurDioxide: 7, chloride: 25 },
+  patches: [
+    { material: 'copper' },
+    { material: 'steel', thickness: 0.003, exposure: { submerged: 1 } },
+  ],
+});
+const copper = new PbrMaterial(ageing.appearance(0));
+world.advance(30 * 24);
+copper.set(ageing.appearance(0));
+const wreck = ageing.read(1);
+if (wreck.fouledFraction <= 0 || wreck.consumedThickness <= 0 || copper.data[5]! >= 1) {
+  throw new Error('The material should show ageing. Advance the world and use the solver appearance.');
+}
+```
+
+The default time scale is one environmental second per world second. Use `AGEING_YEAR` to
+advance one model year per world second. Each patch can scale that duration with `exposureMultiplier`
+(default 1). Metal starts 0.01 m thick. Pine sapwood and limestone start 0.05 m thick.
+Use `initialLoss`, `initialRotActivity` and `initialCover` to start with an older patch. All default
+to zero. For metal, pre-existing loss seeds the atmospheric loss curve. Corrosion products are
+fully retained by default. Set `coatingRetention` to represent partial retention and
+`copperInnerScale` to change the copper substrate depth at which cuprite saturates (default 8 µm).
+
+Ambient defaults are 293.15 K, 70% relative humidity, 4 mg/(m² day) SO₂ and 3 mg/(m² day)
+chloride deposition. Rain defaults to 0.8 m/year at pH 5.6 and dry carbonate recession is zero.
+Submersion defaults to zero, and immersion current defaults to the carbon-steel equivalent
+of 60 µm/year. Specify current density in A/m² for the actual alloy and water chemistry.
+Default full-supply recruitment is 0.01 per day. Wet and dry removal default to 0.002 and 0.05 per day.
+Larval supply defaults to 1.
+
+For changing exposure, construct `new MaterialAgeingSolver({ readExposure: true })`
+and publish to its `exposureField`. Use `writeAgeingExposure` to fill one layout-1 f64 broadcast
+row or one row per patch. Row order is temperature in K, RH fraction, SO₂ and chloride in mg/(m² day),
+immersed fraction, incident rain in m/s, rain pH, corrosion current in A/m², dry carbonate recession in
+m/s and larval supply fraction. Fixed exposure defaults remain available before a producer's first tick.
+The solver's default ID and field prefix are `ageing`. Choose a separate `id` per group in one world.
+Its `stateField` has layout-1 f64 rows holding remaining and consumed metres, total and inner
+coating metres, rot activity, fouled fraction and environmental seconds.

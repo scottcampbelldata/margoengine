@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-embed>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Margo Engine playground (embedded)</title>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="stylesheet" href="../../site.css">
+  <link rel="stylesheet" href="../playground.css">
+  <script type="module" src="../playground.js"></script>
+</head>
+<!-- The embeddable playground (docs/playground.md, "Embed"): the same <main> as ../index.html (tests/playground.test.js
+     keeps them equal), shown as the canvas alone or, with ?code, code and canvas. Only this path, and its run frame at
+     ./frame/, may be framed by other sites (site/_headers). It saves nothing in the browser. -->
+<body>
+  <main id="main" class="playground">
+    <h1 class="visually-hidden">Playground</h1>
+    <div class="toolbar" role="toolbar" aria-label="Playground">
+      <button id="run" type="button" class="primary" aria-keyshortcuts="Control+Enter Meta+Enter" disabled>Run</button>
+      <a id="open-full" class="open-full embed-only" target="_blank" rel="noopener" href="../">Open in Playground</a>
+      <label class="full-only">Template
+        <select id="template"></select>
+      </label>
+      <button id="share" type="button" class="full-only">Share link</button>
+      <button id="save" type="button" class="full-only" aria-keyshortcuts="Control+S Meta+S">Save version</button>
+      <label class="full-only">Versions
+        <select id="versions"><option value="">No saved versions</option></select>
+      </label>
+      <button id="restore" type="button" class="full-only" disabled>Restore</button>
+      <button id="download" type="button" class="full-only" disabled>Download HTML</button>
+    </div>
+    <p id="status" role="status" aria-live="polite">Loading...</p>
+    <p id="shared" class="shared full-only" hidden>Shared code loaded. Your own code is still saved until you edit, run or save
+      this. <button id="back" type="button" class="small">Back to my code</button></p>
+    <div class="panes">
+      <section class="pane code-pane" aria-labelledby="editor-label">
+        <h2 id="editor-label" class="pane-title">Code <span class="hint">Ctrl+Enter runs. Esc, then Tab, leaves the editor.</span></h2>
+        <div class="files">
+          <div id="tabs" class="tabs" role="tablist" aria-label="Files"></div>
+          <form id="add-file" class="add-file">
+            <label for="new-file" class="visually-hidden">New file name</label>
+            <input id="new-file" placeholder="util.js" autocomplete="off" spellcheck="false" maxlength="35">
+            <button type="submit">Add file</button>
+          </form>
+        </div>
+        <div class="editor">
+          <pre id="gutter" class="gutter" aria-hidden="true">1</pre>
+          <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"
+            aria-labelledby="editor-label"></textarea>
+        </div>
+        <details id="api" class="api full-only">
+          <summary>API of the imported entries <span class="hint">Ctrl+Space completes a name</span></summary>
+          <input id="api-filter" type="search" placeholder="Filter names" aria-label="Filter the API" autocomplete="off">
+          <p id="api-empty" class="hint">Run the code to list what its imports export.</p>
+          <div id="api-list"></div>
+        </details>
+      </section>
+      <section class="pane" aria-labelledby="output-label">
+        <h2 id="output-label" class="pane-title">Result</h2>
+        <div id="stage" class="stage"></div>
+        <h2 class="pane-title">Console <button id="clear" type="button" class="small">Clear</button></h2>
+        <ol id="console" class="console" aria-live="polite"></ol>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

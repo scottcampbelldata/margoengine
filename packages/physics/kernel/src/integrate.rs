@@ -32,6 +32,13 @@ pub const PHASES: [&str; 15] = [
     "ccdToi", "ccdSolver",
 ];
 
+/// The clock readings a step carries from `step_begin` to `step_end`.
+#[derive(Clone, Copy)]
+pub struct StepTimes {
+    begun: f64,
+    stamp: f64,
+}
+
 /// Adds the time since `since` to a slot of the timings and starts the next stretch there: the finer timers of the solver and
 /// the sweep, which are sums over the substeps and the bodies.
 #[inline(always)]
@@ -155,16 +162,28 @@ impl World {
     }
 
     /// Advances the world by `dt` in `substeps` equal pieces. Pairs are found once a step, over the motion the whole step
-    /// is expected to make.
+    /// is expected to make. The same as `step_begin`, `solve_island` for every island and `step_end`, which is how threads
+    /// share a step: the islands solve on views of the world (`thread_view`), each on its own state alone.
     pub fn step(&mut self, dt: f32) {
+        let Some(times) = self.step_begin(dt) else { return };
+        if self.island_major {
+            for group in 0..self.header().islands as usize {
+                self.solve_island(group, dt);
+            }
+        }
+        self.step_end(dt, times);
+    }
+
+    /// The step up to its islands' solves: the broad and narrow phases, the islands, the rows, and each island's level of
+    /// substeps and multibody stamps (`plan_islands`). None when the world was lost and does not step.
+    pub fn step_begin(&mut self, dt: f32) -> Option<StepTimes> {
         if self.header().lost != NONE {
-            return;
+            return None;
         }
         let substeps = self.header().substeps;
-        let h = dt / substeps as f32;
         self.header_mut().step_dt = dt;
-        let mut stamp = now();
-        let begun = stamp;
+        let begun = now();
+        let mut stamp = begun;
         // Closes a phase: the time since the last stamp, in milliseconds, goes in its slot.
         let mut lap = |world: &mut World, phase: usize| {
             let at = now();
@@ -187,30 +206,62 @@ impl World {
         self.prepare_joints();
         self.order_couplings_by_island();
         tick(self, 8, &mut inner);
+        if self.island_major {
+            self.plan_islands(dt, substeps);
+        }
+        Some(StepTimes { begun, stamp })
+    }
+
+    /// Each island's level of substeps (`island_level`, from its own state alone) and the first multibody stamp of its walks,
+    /// in island order, into ISLAND_LEVEL and ISLAND_STAMP: what lets the islands solve at once, in any order, to the bits of
+    /// one after another.
+    fn plan_islands(&mut self, dt: f32, substeps: u32) {
+        let adaptive = self.header().adaptive_substeps != 0;
+        for group in 0..self.header().islands as usize {
+            self.window = self.group_window(group);
+            let level = if adaptive { self.island_level(dt, substeps) } else { 0 };
+            self.set_u(ISLAND_LEVEL, group, level);
+            self.claim_stamps(substeps << level);
+            self.set_u(ISLAND_STAMP, group, self.window.mb_call);
+        }
+    }
+
+    /// Island `group` of the step `step_begin` began, through all its substeps at its planned level. Islands share no body a
+    /// solve changes, so any number of them may solve at once, each on its own view of the world. The kinematic bodies'
+    /// columns keep the pose the step began at while the islands solve, and each substep reads them through the stage it is at.
+    pub fn solve_island(&mut self, group: usize, dt: f32) {
+        let mut inner = now();
+        self.window = self.group_window(group);
+        let level = self.uu(ISLAND_LEVEL, group);
+        let count = self.header().substeps << level;
+        let hi = dt / count as f32;
+        self.window.substeps = count;
+        self.window.mb_call = self.uu(ISLAND_STAMP, group);
+        self.rescale_warm(level);
+        let (raw, damping) = (self.header().contact_hertz, self.header().contact_damping);
+        let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
+        self.run_substeps(hi, count, stiffness, &mut inner, true);
+        self.keep_level(level);
+    }
+
+    /// The step after its islands: what no island holds, the kinematic bodies' moves, joint breaking, continuous collision
+    /// and the events.
+    pub fn step_end(&mut self, dt: f32, times: StepTimes) {
+        let substeps = self.header().substeps;
+        let h = dt / substeps as f32;
+        let mut inner = now();
         // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
         let stiffness = soft(hertz, damping, h);
         if self.island_major {
-            // Each island by itself, through all its substeps: islands share no body a solve changes. The kinematic bodies' columns
-            // keep the pose the step began at while the islands solve, and each substep reads them through the stage it is at.
-            // Each island at its own level (`island_level`): 2^k times the world's substeps, k from its own state alone, so an island
-            // that needs short substeps takes them and the rest of the world does not; all of them meet at the step's end.
-            let islands = self.header().islands as usize;
-            for group in 0..=islands {
-                self.window = self.group_window(group);
-                let adaptive = self.header().adaptive_substeps != 0;
-                let level = if group < islands && adaptive { self.island_level(dt, substeps) } else { 0 };
-                let count = substeps << level;
-                let hi = dt / count as f32;
-                self.window.substeps = count;
-                self.claim_stamps(count);
-                self.rescale_warm(level);
-                let raw = self.header().contact_hertz;
-                let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
-                self.run_substeps(hi, count, stiffness, &mut inner, true);
-                self.keep_level(level);
-            }
+            // What no island holds (a pair or a joint of bodies that cannot move), at the world's substeps.
+            self.window = self.group_window(self.header().islands as usize);
+            self.window.substeps = substeps;
+            self.claim_stamps(substeps);
+            self.rescale_warm(0);
+            self.run_substeps(h, substeps, stiffness, &mut inner, true);
+            self.keep_level(0);
             self.window = self.whole_window();
             self.integrate_kinematics(h, substeps);
         } else {
@@ -218,6 +269,12 @@ impl World {
             self.claim_stamps(substeps);
             self.run_substeps(h, substeps, stiffness, &mut inner, false);
         }
+        let mut stamp = times.stamp;
+        let mut lap = |world: &mut World, phase: usize| {
+            let at = now();
+            world.timing[phase] = (at - stamp) as f32;
+            stamp = at;
+        };
         self.break_joints(h);
         tick(self, 11, &mut inner);
         lap(self, 5);
@@ -228,7 +285,7 @@ impl World {
         self.gather_events();
         self.land_meshes();
         lap(self, 7);
-        self.timing[0] = (stamp - begun) as f32;
+        self.timing[0] = (stamp - times.begun) as f32;
         self.header_mut().steps += 1;
         self.check_range();
     }

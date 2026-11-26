@@ -2,6 +2,7 @@
 // draft (Archimedes, to f64 rounding), heeled it rights itself by the wall-sided righting arm, and in a small regular wave the
 // load is the linear Froude-Krylov force of a box, all against closed forms.
 import assert from 'node:assert/strict';
+import { freeSection } from './coupling/sections.js';
 import test from 'node:test';
 import {
   addedMassInfinite,
@@ -13,6 +14,7 @@ import {
   lateralSection,
   hullSections,
   lewisForm,
+  scatterSection,
   SEA_WATER,
   swayAddedMassRigidLid,
   wettedLoads,
@@ -318,4 +320,31 @@ test("a rolling section's viscous damping: a box sheds eddies at its corners, a 
   assert.ok(eddyRollCoefficient(box, 0.3, 0.05, 0.025) > eddyRollCoefficient(box, 0.3, 0.05, -0.0125));
   const girth = frictionGirth(circle, 0);
   assert.ok(Math.abs(girth - Math.PI) <= 2e-3 * Math.PI, `S r^2 ${girth} against pi`);
+});
+
+test('a section in a beam wave sends some back and lets the rest through, and a free one moved by it loses no energy', () => {
+  // The scattering derived from the radiation solution (scatterSection): held still, a section loses no energy, so
+  // |R|^2 + |T|^2 = 1; long waves pass (R -> 0) and short ones are sent back as from a wall (R -> 1). Free, moved by the
+  // wave's load on it held still and its own radiation, it loses none either: that holds only with the loads' and the
+  // motions' signs and phases all right (a heave or a quarter period turned round breaks it by up to a factor of 4).
+  for (const [B, T, D] of [
+    [2, 0.5, 1.5],
+    [4, 2, 3],
+  ]) {
+    const form = lewisForm(B, T, B * T);
+    for (const xi of [0.05, 0.3, 1, 2, 4]) {
+      const w = Math.sqrt((xi * GRAVITY) / form.scale),
+        held = scatterSection(form, w, T - D / 2),
+        r = Math.hypot(...held.reflected),
+        t = Math.hypot(...held.transmitted);
+      assert.ok(Math.abs(r * r + t * t - 1) <= 1e-4, `held, xi ${xi}: |R|^2 + |T|^2 = ${r * r + t * t}`);
+      if (xi === 0.05) assert.ok(r < 0.15, `a long wave passes: R ${r}`);
+      if (xi === 4) assert.ok(r > 0.999, `a short wave comes back: R ${r}`);
+    }
+    for (const w of [0.5, 1.5, 2.5, 3.2, 4.5, 6]) {
+      const { scattered } = freeSection([B, T, D], w),
+        energy = Math.hypot(...scattered.reflected) ** 2 + Math.hypot(...scattered.transmitted) ** 2;
+      assert.ok(Math.abs(energy - 1) <= 1e-3, `free, ${w} rad/s: |R|^2 + |T|^2 = ${energy}`);
+    }
+  }
 });

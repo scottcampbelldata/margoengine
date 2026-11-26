@@ -14,6 +14,7 @@ import {
   wettedLoads,
 } from '../../dist/seakeeping.js';
 import { SpectralSea } from '../../dist/sea.js';
+import { freeSection } from './sections.js';
 import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -721,5 +722,53 @@ test('HullSolver: held in beam seas a box takes the Froude-Krylov and diffractio
     assert.ok(off(G2, want2) <= 0.03, `at ${w} rad/s, sway force ${G2} against ${want2}`);
     assert.ok(off(G4, want4) <= 0.03, `at ${w} rad/s, roll moment ${G4} against ${want4}`);
     assert.ok(off(F2, want2) > 0.3 && off(M4, want4) > 0.3, 'without the diffraction the loads are far off');
+  }
+});
+
+test('HullSolver: moored in beam waves, a box drifts with the waves it sends back, as a wall does in short ones', () => {
+  // The mean drift of a section in beam waves is the momentum the waves carry, 1/2 rho g a^2 |R|^2 per metre (Maruo; a wall
+  // sending everything back takes 1/2 rho g a^2, Journee and Massie eq. 6.106), R the wave it sends back free. A deep box
+  // (4 m wide, 2 m draft, 3 m high: it stands upright), 4 m long, held on a soft damped mooring across the waves, in one
+  // wave of 0.05 m: its mean offset times the mooring's stiffness is the drift. R from the free section's two-dimensional
+  // scattering (the energy test's): the time domain's mean (the Froude-Krylov pressure over its moving surface and the
+  // solver's drift, which is the far field less the part that pressure gives) must be the far field. Measured, as parts
+  // of the wall's 1/2 rho g a^2 L: 0.855 against 0.873 at 3 rad/s, 0.998 against 1.000 at 8.7, and 0.043 against 0.002 in
+  // the long wave at 1.2 (the residual of the motions the time domain gives against the frequency domain's): bounds of 3
+  // percent of the wall's at 3 and 8.7, and the long wave under 6 percent.
+  const [L, D, B, T] = [4, 3, 4, 2],
+    a = 0.05,
+    m = SEA_WATER * L * B * T,
+    wall = 0.5 * SEA_WATER * GRAVITY * a * a * L;
+  for (const w of [1.2, 3, 8.7]) {
+    const sea = oneWave(a, w, 5, 6),
+      physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -GRAVITY, 0] }),
+      box = physics.addBody(null, {
+        position: [0, D / 2 - T, 0],
+        colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: m },
+      });
+    // Across the waves (z), heave and roll; a mooring of natural period 31 s, damped at 0.3 of critical.
+    box.enabledTranslations = [false, true, true];
+    box.enabledRotations = [true, false, false];
+    const k = 1.5 * m * 0.2 * 0.2,
+      c = 2 * 0.3 * 0.2 * 1.5 * m;
+    physics.on('beforestep', (dt) => box.applyImpulse([0, 0, (-k * box.position[2] - c * box.linearVelocity[2]) * dt]));
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(new HullSolver(), { hulls: [{ row: box.row, mesh: boxMesh([L, D, B]) }], sea, rollDamping: false })
+      .couple(['hull', 'rigid'], 'staggered');
+    let sum = 0,
+      n = 0;
+    for (let f = 1; f <= 200 * 60; f++) {
+      world.advance(f);
+      if (f > 80 * 60) {
+        sum += box.position[2];
+        n++;
+      }
+    }
+    const mean = (k * sum) / n,
+      r = Math.hypot(...freeSection([B, T, D], w).scattered.reflected),
+      far = wall * r * r;
+    if (w < 2) assert.ok(mean < 0.06 * wall, `at ${w} rad/s the long wave barely drifts it: ${mean} N`);
+    else assert.ok(Math.abs(mean - far) <= 0.03 * wall, `at ${w} rad/s: mean drift ${mean} N against ${far} N`);
   }
 });

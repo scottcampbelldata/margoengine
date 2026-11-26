@@ -29,6 +29,7 @@ export interface HullMemory {
     readonly dt: number;
     readonly rollEddy: number;
     readonly rollFriction: number;
+    readonly pivot: number;
     readonly strips: readonly DiffractionStrip[];
     readonly stripForms: readonly DiffractionForm[];
 }
@@ -49,6 +50,7 @@ export interface HullParams {
     readonly radiation?: boolean;
     readonly memory?: number;
     readonly diffraction?: boolean;
+    readonly drift?: boolean;
     readonly rollDamping?: boolean;
     readonly viscosity?: number;
 }
@@ -111,6 +113,14 @@ export const SEA_VISCOSITY = 0.00000119;
 
 export const SEA_WATER = 1025;
 
+export interface Scattering {
+    readonly reflected: readonly [number, number];
+    readonly transmitted: readonly [number, number];
+    readonly heaveForce: readonly [number, number];
+    readonly swayForce: readonly [number, number];
+    readonly rollMoment: readonly [number, number];
+}
+
 export interface SeaQuery {
     elevation(x: number, z: number, t: number): number;
     pressure?(x: number, y: number, z: number, t: number): number;
@@ -159,6 +169,12 @@ export function lateralSection(form: LewisForm, omega: number, density: number, 
 
 export function lewisForm(breadth: number, draft: number, area: number): LewisForm;
 
+export function scatterSection(form: LewisForm, omega: number, pivot: number, motions?: {
+    readonly heave?: readonly [number, number];
+    readonly sway?: readonly [number, number];
+    readonly roll?: readonly [number, number];
+}, gravity?: number, terms?: number, points?: number, density?: number): Scattering;
+
 export function stillWaterline(mesh: HullMesh, mass: number, density: number): number;
 
 export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: number): number;
@@ -172,6 +188,8 @@ type Cell = readonly [number, number, number];
 type Centring = 'cell' | 'face' | 'vertex' | 'particle';
 
 interface DiffractionForm {
+    readonly lewis: LewisForm;
+    readonly breadth: number;
     readonly a33: number;
     readonly a22: number;
     readonly a24: number;

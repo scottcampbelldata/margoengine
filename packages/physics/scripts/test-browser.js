@@ -11,6 +11,7 @@ import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compa
 const thermalOnly = process.argv.includes('--thermal-only');
 const swimOnly = process.argv.includes('--swim-only');
 const pedestrianOnly = process.argv.includes('--pedestrian-only');
+const locomotionOnly = process.argv.includes('--locomotion-only');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
@@ -33,11 +34,13 @@ try {
   const thermalRequests = [];
   const swimRequests = [];
   const pedestrianRequests = [];
+  const locomotionRequests = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
     if (/\/thermal-kernel(?:-shared)?\.wasm$/.test(url.pathname)) thermalRequests.push(url.pathname);
     if (/\/swim-kernel(?:-shared)?\.wasm$/.test(url.pathname)) swimRequests.push(url.pathname);
     if (/\/pedestrian-kernel(?:-shared)?\.wasm$/.test(url.pathname)) pedestrianRequests.push(url.pathname);
+    if (/\/locomotion-kernel(?:-shared)?\.wasm$/.test(url.pathname)) locomotionRequests.push(url.pathname);
   });
   // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
   if (compatRun()) await page.addInitScript(compatShim, compatUrl());
@@ -48,8 +51,10 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}tests/physics.html`);
   await page.waitForFunction(() => typeof window.runPhysicsTests === 'function', null, { timeout: 60000 });
   const report =
-    thermalOnly || swimOnly || pedestrianOnly ? { checks: [] } : await page.evaluate(() => window.runPhysicsTests());
-  if (!swimOnly && !pedestrianOnly) {
+    thermalOnly || swimOnly || pedestrianOnly || locomotionOnly
+      ? { checks: [] }
+      : await page.evaluate(() => window.runPhysicsTests());
+  if (!swimOnly && !pedestrianOnly && !locomotionOnly) {
     await page.evaluate(async () => {
       await import('/dist/thermal.js');
     });
@@ -76,7 +81,7 @@ try {
     assert.equal(temperature.value, 310);
     report.checks.push('Thermal Wasm loads on demand and advances the world in the browser');
   }
-  if (!thermalOnly && !pedestrianOnly) {
+  if (!thermalOnly && !pedestrianOnly && !locomotionOnly) {
     await page.evaluate(() => import('/dist/life.js'));
     assert.deepEqual(swimRequests, [], 'importing the swimming entry leaves both kernels unloaded');
     const reading = await page.evaluate(async () => {
@@ -115,7 +120,7 @@ try {
     assert.equal(reading.replayed, true);
     report.checks.push('Aquatic locomotion Wasm loads on demand, propels a swimmer and restores its snapshot');
   }
-  if (!thermalOnly && !swimOnly) {
+  if (!thermalOnly && !swimOnly && !locomotionOnly) {
     await page.evaluate(async () => {
       await import('/dist/pedestrians.js');
     });
@@ -145,6 +150,34 @@ try {
     assert.ok(reading.normalLoad > 0);
     assert.ok(Math.abs(reading.momentum) < 1e-12);
     report.checks.push('Pedestrian Wasm loads on demand and preserves unequal-mass contact momentum');
+  }
+
+  if (!thermalOnly && !swimOnly && !pedestrianOnly) {
+    await page.evaluate(() => import('/dist/locomotion.js'));
+    assert.deepEqual(locomotionRequests, [], 'importing the locomotion entry leaves the kernels unloaded');
+    const reading = await page.evaluate(async () => {
+      const { GroundLocomotion } = await import('/dist/locomotion.js');
+      const { PhysicsWorld } = await import('/dist/world.js');
+      const animals = await GroundLocomotion.load();
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(animals, {
+        bodies: [{ kind: 'snake' }, { kind: 'insect' }, { kind: 'crab' }],
+      });
+      world.advance(30);
+      const saved = world.takeSnapshot();
+      world.advance(60);
+      const hash = world.hash();
+      const distance = [animals.read(0).position[2], animals.read(1).position[2], animals.read(2).position[0]];
+      world.restoreSnapshot(saved.bytes);
+      world.advance(60);
+      return { distance, replayed: world.hash() === hash, shared: globalThis.crossOriginIsolated };
+    });
+    assert.deepEqual(
+      locomotionRequests.map((request) => request.split('/').at(-1)).sort(),
+      reading.shared ? ['locomotion-kernel-shared.wasm', 'locomotion-kernel.wasm'] : ['locomotion-kernel.wasm'],
+    );
+    assert.ok(reading.distance.every((distance) => distance > 0));
+    assert.equal(reading.replayed, true);
+    report.checks.push('Ground locomotion lazily loads Wasm, moves three gaits and restores contacts');
   }
   if (report.image) {
     await writeFile(resolve(results, 'physics-stack.png'), Buffer.from(report.image.split(',')[1], 'base64'));

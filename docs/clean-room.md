@@ -1,5 +1,13 @@
 # Clean room
 
+### Webcam face to morph targets in Input (2026-11-26)
+
+Apple's ARKit documentation, ARFaceAnchor.BlendShapeLocation (https://developer.apple.com/documentation/arkit/arfaceanchor/blendshapelocation), gives the 52 blendshape names `ARKIT_BLENDSHAPES` lists and their left/right meaning (the subject's side). Tereza Soukupova and Jan Cech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016, https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf), give the eye aspect ratio (|p2 - p6| + |p3 - p5|) / (2 |p1 - p4|) that `measureFace` uses for blinks and wide eyes; the jaw, mouth and brow measures are the same kind of scale-free distance ratio (over the face height or the outer-eye distance), measured against a calibrated neutral face. The point indices come from the published Face Landmarker landmark map (https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) and Kartynnik et al. 2019 (https://arxiv.org/abs/1907.06724). The head rotation is the orthonormal frame of the outer eye corners and the forehead-to-chin line, relative to the calibrated face; smoothing is the one-euro filter (Casiez, Roussel and Vogel 2012) per weight and per quaternion component on the hemisphere of the last value. No detector, model or weights are shipped or fetched; no rival source was read.
+
+### Webcam landmarks in Input (2026-11-26)
+
+Gery Casiez, Nicolas Roussel and Daniel Vogel, 1 Euro Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems (CHI 2012, https://doi.org/10.1145/2207676.2208639), for `OneEuroFilter`: a first-order low-pass with smoothing factor 1 / (1 + tau / dt), tau = 1 / (2 pi fc), whose cutoff fc = minCutoff + beta |dx| follows the low-passed speed. Google's public MediaPipe Tasks documentation (Face Landmarker https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker, Hand Landmarker https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker, Pose Landmarker https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) gives the result shapes `fromMediaPipe` reads, with Yury Kartynnik et al., Real-time Facial Surface Geometry from Monocular Video on Mobile GPUs (2019, https://arxiv.org/abs/1907.06724), Fan Zhang et al., MediaPipe Hands (2020, https://arxiv.org/abs/2006.10214) and Valentin Bazarevsky et al., BlazePose (2020, https://arxiv.org/abs/2006.10204) for the point orders. The W3C Media Capture and Streams specification (https://www.w3.org/TR/mediacapture-streams/) and the WICG video.requestVideoFrameCallback draft (https://wicg.github.io/video-rvfc/) give the webcam helper. No detector, model or weights are shipped or fetched; no rival source was read.
+
 ### Shadow map viewer in Shadows (2026-11-25)
 
 Lance Williams, Casting Curved Shadows on Curved Surfaces (SIGGRAPH 1978, https://dl.acm.org/doi/10.1145/965139.807402), for shadow depth maps; Rouslan Dimitrov, Cascaded Shadow Maps (NVIDIA, 2007, https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf) and Fan Zhang, Hanqiu Sun, Leilei Xu and Lee Kit Lun, Parallel-Split Shadow Maps for Large-scale Virtual Environments (VRCIA 2006, https://doi.org/10.1145/1128923.1128975), for cascades; Nathan Reed, Depth Precision Visualized (NVIDIA developer blog, 2015, https://developer.nvidia.com/content/depth-precision-visualized), for reversed depth. `ShadowMapViewer` (`@margoengine/shadows/viewer`) loads one texel per pixel of the chosen layer, mirrors reversed depth, turns a perspective value into distance with d = near * far / (far - z (far - near)) and shows (d - near) / (far - near) as grey. The engine's own light matrices (clustered `lightMatrix` and `orthographicShadow`, shadows `fitCascades`) fix which maps are reversed. The viewer's name comes from public documentation only; no rival source was read.
@@ -3117,6 +3125,7 @@ separation behaviour, and no wander. The library source was not opened.
 | Task network planner (`behavior/htn`) | T. Humphreys, "Exploring HTN Planners through Example", Game AI Pro, chapter 12, 2013 (read in full): world state, primitive and compound tasks, methods in priority order, the forward decomposition loop with its decomposition history, plan checking at run time, recursion, expected effects, the method traversal record, not planning on a task's own effects, partial plans written into the domain. The chapter accepts a new plan when all its method indexes are equal or higher; Margo compares records at the first index that differs, since those after it belong to different branches. Its second use of the record, culling during the search, and two planners for two body parts are left out. D. Nau et al. on SHOP (1999) and K. Erol, J. Hendler, D. Nau on HTN semantics were downloaded and not read, and nothing here comes from them. |
 | Context steering (`behavior/context`) | A. Fray, "Context Steering: Behavior-Driven Steering at the Macro Scale", Game AI Pro 2, chapter 18, 2015 (read in full): interest and danger maps as rings of slots, merging by the highest value, the mask from the lowest danger, the strongest interest left, subslot movement from the gradients, a spread that falls off, blur, and a share of the last map for stability. `slack` and `steer` are Margo's additions, not the chapter's, and its racing lane mode (18.5) is left out. |
 | XR interaction toolkit (`xr/interaction`) | WebXR Device API (targetRaySpace along -Z, gripSpace), WebXR Gamepads Module (xr-standard trigger and squeeze), WebXR Hand Input Module (thumb and index tip joints); ray against plane and sphere from textbook geometry; the held pose is the grip pose times the offset taken at the grab |
+| XR near interaction (`xr/near`) | WebXR Hand Input Module, W3C, https://www.w3.org/TR/webxr-hand-input-1/ (fetched 2026-11-26: the 25 joints and their order, thumb-tip 4 and index-finger-tip 9, joint space axes: -Z along the bone toward the fingertips and -Y perpendicular to the skin, outward from the palm); WebXR Device API, W3C, https://www.w3.org/TR/webxr/ (viewer pose, targetRaySpace along -Z); WebXR Hit Test Module, https://immersive-web.github.io/hit-test/ (hit pose +Y as the surface normal). The behaviours (palm-angle show and hide with hysteresis, the lazy follow cone, ray-plane surface placement, one-pointer drag with the pose kept in the pointer frame, two-pointer scale from the distance ratio and rotation from the shortest arc between the two lines, fingertip poke by distance in front of the panel) are Margo's own from the geometry; no Babylon.js, MRTK or other toolkit source, documentation or guidance page was read |
 | XR layers, haptics, video and locomotion (`xr/layers`) | WebXR Layers Module (composition layer types, layouts, isStatic and needsRedraw, the render state layers array, XRMediaBinding), except sections 6.1 to 6.3 and 6.9 (the WebGL binding); WebXR/WebGPU Binding draft (layer creation, getSubImage, array layers per eye, cube face order); WebXR Device API getOffsetReferenceSpace and XRRigidTransform; Gamepad (vibrationActuator, dual-rumble) and Gamepad Extensions (hapticActuators, pulse); the teleport arc is projectile motion under constant gravity |
 | XR planes, depth and light (`xr/ar`) | WebXR Plane Detection Module (XRPlane, XRPlaneSet, the update planes algorithm), WebXR Depth Sensing Module (feature, session configuration, XRSession attributes, XRDepthInformation, XRCPUDepthInformation and getDepthInformation; the GPU depth sections skimmed only) and WebXR Lighting Estimation API (XRLightProbe, XRLightEstimate, requestLightProbe, getLightEstimate; the reflection cube map sections skimmed only); WebXR Anchors Module read in full (anchors stay with `HitTest`); ear clipping after Meisters, "Polygons have ears" (1975), from its description, the paper itself not read |
 | XR occlusion by real depth (`xr/occlusion`) | WebXR Depth Sensing Module, W3C Editor's Draft 2026-08-25, https://immersive-web.github.io/depth-sensing/ (fetched: XRDepthInformation and XRViewGeometry, XRCPUDepthInformation data layout and formats, XRGPUDepthInformation and its formats, normDepthBufferFromNormView, normalized view coordinates from the top left, matchDepthView); WebXR/WebGPU Binding, Editor's Draft 2026-08-12, https://immersive-web.github.io/webxr-webgpu-binding/ (fetched: projection layer textures, clip depth in [0, 1]); R. Du, E. Turner, M. Dzitsiuk, L. Prasso, I. Duarte, J. Dourgarian, J. Afonso, J. Pascoal, J. Gladstone, N. Cruces, S. Izadi, A. Kowdle, K. Tsotsos and D. Kim, "DepthLab: Real-time 3D Interaction with Depth Maps for Mobile Augmented Reality", UIST 2020, pp. 829-843 (abstract read: dense depth for occlusion; its code not read). The per-sample reprojection into the sensor's view, the feather ramp and the neighbour fallback are Margo's own |
@@ -3539,6 +3548,7 @@ Unity VFX Graph and Shuriken, Godot particles, three.js and Babylon particle sys
 | Ribbons and trails (`vfx/ribbons`) | W. T. Reeves, "Particle Systems: A Technique for Modeling a Class of Fuzzy Objects", SIGGRAPH 1983 (particles drawn as streaks along their motion); T. Akenine-Moller, E. Haines, N. Hoffman et al., *Real-Time Rendering*, 4th ed., 2018, axial billboards (a strip turned about its own axis toward the eye by a cross product). The ring of records per slot, the birth-angle life stamp and the binary search for a life's records are Margo's own |
 | Mesh particles (`vfx/mesh`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles as rendered primitives with orientation); O. Rodrigues, "Des lois geometriques qui regissent les deplacements d'un systeme solide", J. Math. Pures Appl. 5, 1840 (rotation about an axis); G. Marsaglia, "Choosing a Point from the Surface of a Sphere", Ann. Math. Stat. 43, 1972, and Archimedes' hat-box result (uniform z and longitude give a uniform axis); J. H. Lambert, *Photometria*, 1760 (diffuse shading); W3C WebGPU specification, `drawIndirect` and instancing. Reusing the billboards' culled list and copying its count into the draw's arguments are Margo's own |
 | Sub-emitters and GPU events (`vfx/events`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles that spawn further particle systems, the fireworks of *Star Trek II*'s Genesis sequence); G. E. Blelloch, "Prefix Sums and Their Applications", CMU-CS-90-190, 1990, and M. Harris, S. Sengupta, J. D. Owens, "Parallel Prefix Sum (Scan) with CUDA", *GPU Gems 3*, ch. 39, 2007 (stream compaction of the event list by an exclusive scan). The frame-parity halves of the event data, the free-slot tickets past the emitter's budget and the generation flag are Margo's own |
+| Node particle systems (`vfx/node-system`) | W. T. Reeves, "Particle Systems: A Technique for Modeling a Class of Fuzzy Objects", ACM Transactions on Graphics 2(2), 1983, and Reeves and Blau, "Approximate and Probabilistic Algorithms for Shading and Rendering Structured Particle Systems", SIGGRAPH 1985 (a system described by distributions of its birth parameters, and particles that start further systems); A. B. Kahn, "Topological Sorting of Large Networks", Communications of the ACM 5(11), 1962 (ordering a block graph by its wires, and rejecting a cycle); C. Wellons, "Prospecting for Hash Functions", 2018 (the seeded draws of a random block); the public documentation of block-graph particle editors (what a creation, shape, update, random, gradient and trigger block does, read as user documentation only, no source). The compile to existing vfx options, the sub-emitter fold of a death trigger and the clock that chains systems are Margo's own |
 | Lit particles (`vfx/lit`) | S. Green, "Real-Time Approximations to Subsurface Scattering", *GPU Gems*, ch. 16, 2004 (wrap lighting, `max(0, (n.l + w) / (1 + w))`); J. H. Lambert, *Photometria*, 1760 (diffuse shading); the glTF 2.0 specification, Appendix B (the BRDF of the clustered light loop, reused from `@margoengine/clustered`); W3C WebGPU specification, bind groups and `maxBindGroups`. The ball normal from the billboard's disc and spin, and moving the lights to group 2 under an order-independent pass, are Margo's own |
 | Depth buffer collision (`vfx/depth-collide`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles bounced off surfaces); M. McGuire, M. Mara, "Efficient GPU Screen-Space Ray Tracing", JCGT 3(4), 2014 (testing points against the depth buffer with a thickness); surface reconstruction from depth by unprojecting a texel and its neighbours (Akenine-Moller et al., *Real-Time Rendering*, 4th ed., 2018, screen-space techniques). The reflection with restitution is standard rigid-body impulse. Choosing the neighbour nearer in depth on each axis, and pairing last frame's depth with last frame's camera, are Margo's own |
 | Velocity-stretched billboards (`vfx/stretch`) | W. T. Reeves, "Particle Systems", SIGGRAPH 1983 (particles drawn as streaks along their motion over the frame, the motion-blurred sparks of *Star Trek II*); W. T. Reeves, R. Blau, "Approximate and Probabilistic Algorithms for Shading and Rendering Structured Particle Systems", SIGGRAPH 1985; screen-space axis from the velocity's components along the camera's right and up vectors (Akenine-Moller et al., *Real-Time Rendering*, 4th ed., 2018, ch. 13 on billboards). Written from these descriptions; no other engine's code read. |
@@ -11929,6 +11939,56 @@ force by central differences with a dry neighbour holding the cell's own stress,
 coupling through an accumulated field are this package's own arrangement. Proof: `packages/physics/tests/surf.test.js` and
 `tests/coupling/surf.test.js`.
 
+
+### Nonlinear and rogue waves (SEA-03, `@margoengine/physics/rogue`, 2026-11-26)
+
+`packages/physics/src/rogue/index.ts` (`NonlinearSea`, `seaStatistics`, `pairKernels`, `heightChance`, `crestChance`,
+`expectedMaximum`, `kurtosisFactor`). Written from papers and public documentation only (no code of WAVEWATCH III, the ECMWF
+wave model, any HOS or NLS solver or any wave library was opened; no companion code of the papers below):
+
+- J. F. Dalzell, "A note on finite depth second-order wave-wave interactions", Applied Ocean Research 21(3), 105-111, 1999,
+  https://doi.org/10.1016/S0141-1187(99)00002-3 (not read), as T. A. A. Adcock and S. Draper restate it in "The second order
+  contribution to wave crest amplitude: random simulations and NewWave", Proc. 25th ISOPE, 2015, ISOPE-I-15-515 (appendix,
+  read): the sum and difference kernels B+ and B- with alpha, beta, gamma, delta, epsilon and zeta. The pair counting (each
+  unordered pair once, a component with itself at half weight, its own difference term 0) is set by the tests: Stokes's (1/2) k
+  a^2 cos 2 psi deep and its finite-depth form, Longuet-Higgins's (k1 + k2)/2 and -|k1 - k2|/2, and, for close frequencies in
+  finite water, Longuet-Higgins and Stewart's (1962) bound long wave -(2n - 1/2) g / (g h - c_g^2) (0.05 percent apart).
+- A. Alberello, A. Chabchoub, O. Gramstad, A. V. Babanin and A. Toffoli, "Non-Gaussian properties of second-order wave orbital
+  velocity", Coastal Engineering 110, 42-49, 2016, arXiv:1510.01535 (read): the second-order potential (its velocities are not
+  used here, see the limits) and the self-difference term set to 0.
+- ECMWF, IFS Documentation Cy50r1, Part VII: ECMWF Wave Model, chapter 8, "Extreme wave forecasting", 2025,
+  https://www.ecmwf.int/sites/default/files/elibrary/062026/81737-ifs-documentation-cy50r1-part-7-ecmwf-wave-model.pdf (read,
+  sections 8.1 to 8.3.7): C4 = <eta^4> / (3 <eta^2>^2) - 1; eps = k_bar sqrt(m0) with 0.89 omega_bar = omega(k_bar), omega_bar =
+  m0 / m_-1; delta_omega = 1 / (Q_p sqrt(pi)) with Goda's peakedness over E > 0.4 E_p; delta_theta = sqrt(2 (1 - R1)) over the
+  peak band; nu = sqrt(m0 m2 / m1^2 - 1); the deep-water BFI^2 = 2 eps^2 / delta_omega^2 and R = delta_theta^2 / (2 nu^2); the
+  dynamic kurtosis J(R) BFI^2 with J's fit (Gamma 0.9, alpha = 4 sqrt 3 / pi, beta = 1/3 + 2 sqrt 3 / pi, delta = 2 sqrt 3 / pi
+  - 4/3, J(R) = -J(1/R) / R above 1); the height exceedance e^(-2 H^2) (1 + C4 2 H^2 (H^2 - 1)) of N. Mori and P. A. E. M.
+  Janssen, "On kurtosis and occurrence probability of freak waves", J. Phys. Oceanogr. 36, 1471-1483, 2006 (as restated).
+- P. A. E. M. Janssen, "Nonlinear four-wave interactions and freak waves", J. Phys. Oceanogr. 33, 863-884, 2003 (as the IFS
+  documentation restates it): the Benjamin-Feir index and the bound kurtosis 6 eps^2 of a narrow deep sea.
+- M. A. Tayfun and F. Fedele, "Wave-height distributions and nonlinear effects", Ocean Engineering 34, 1631-1649, 2007 (read,
+  key equations), and F. Fedele, C. Lugni and A. Chawla, "The sinking of the El Faro: predicting real world rogue waves during
+  Hurricane Joaquin", Sci. Rep. 7, 2017, arXiv:1703.08161 (read, eqs. 13 to 19): the crest exceedance exp(-8 xi0^2) (1 + Lambda xi0^2
+  (4 xi0^2 - 1)), xi = xi0 + 2 mu xi0^2, mu = lambda_3 / 3, Lambda about 8 lambda_40 / 3 = 8 C4, and the narrowband bound
+  kurtosis lambda_40 = 2 lambda_3^2.
+- M. A. Tayfun, "Narrow-band nonlinear sea waves", J. Geophys. Res. 85, 1548-1552, 1980 (as restated): the narrow deep sea's
+  skewness 3 k sigma, which the tests hold the kernel sum to.
+- P. S. Tromans, A. R. Anaturk and P. Hagemeijer, "A new model for the kinematics of large ocean waves", Proc. 1st ISOPE,
+  1991 (as Adcock and Draper restate it, eq. 4): NewWave, the autocovariance shape of an extreme crest. Its constrained form in
+  a random sea, eta + (A - eta(0)) rho + (0 - eta'(0)) rho' / lambda_2, after P. H. Taylor, P. Jonathan and L. A. Harland, J.
+  Offshore Mech. Arct. Eng. 119, 1997 (not read; known only from memory), so it is derived here from the conditions it meets
+  (the crest's height and a still surface there) and the tests hold those conditions.
+- M. Christou and K. Ewans, "Field measurements of rogue water waves", J. Phys. Oceanogr. 44, 2317-2335, 2014 (as restated): a
+  rogue is a height above 2 H_s or a crest above 1.25 H_s.
+- J. D. Wheeler, "Method for calculating forces produced by irregular waves", J. Petroleum Technology 22, 359-367, 1970 (as
+  the offshore literature restates it): stretching linear kinematics to the instantaneous surface.
+
+The equal-variance draw (stratified quantiles of the frequency marginal, the direction from the bin's distribution), the
+joint solve of several events' crest and slope constraints, the secant correction of each linear crest for the second order's
+rise, the events' space-time window with amplitudes that vary over it, the rate of drawn rogues (one wave per zero-crossing
+wavelength squared per zero-crossing period times the crest chance with the full kurtosis less that with the bound kurtosis),
+the skewness as the kernels' sum over the spectrum's bins and the pressure's second-order rise taken as hydrostatic are this
+package's own arrangement. Proof: `packages/physics/tests/rogue.test.js`.
 ### Whitecaps, foam and spray (SEA-13, `@margoengine/physics/foam`, 2026-11-26)
 
 `packages/physics/src/foam/breaking.ts` (breaking statistics of a spectrum), `foam/spray.ts` (spray source functions) and
@@ -12512,6 +12572,40 @@ frequency-domain answer at 2.5, 3 and 3.5 rad/s (a box section's mean-pressure d
 82 to 267 percent off without the diffraction. Held in beam seas, its sway force and roll moment are within 1.5 percent of
 the Froude-Krylov load plus (i w a(w) + b(w)) U, 50 to 390 percent off without. No constant is calibrated.
 
+### A hull's wave drift: two-dimensional scattering and the far field (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-26)
+
+`scatterSection` in `packages/physics/src/seakeeping/radiation.ts` gives a section's reflected and transmitted waves and the
+wave's load on it, and `solver.ts` (`driftOf`, `driftLoad`) turns them into the hull's drift. Read for this job: J. M. J.
+Journee and W. W. Massie, *Offshore Hydromechanics*, TU Delft, 2001 (https://ocw.tudelft.nl/wp-content/uploads/Part_2.pdf
+and Part_3.pdf): the mean wave load on a wall (section 6.4.1, eqs. 6.86-6.106, 1/2 rho g a^2 for full reflection), the
+second-order wave forces by direct pressure integration (section 9.3.1, eq. 9.67, Pinkster), and the low-frequency drift
+by its spectrum (section 9.3.6). The far-field drift 1/2 rho g a^2 |R|^2 per metre is the momentum flux balance of the
+incident, reflected and transmitted waves (deep-water momentum flux 1/4 rho g a^2, with |R|^2 + |T|^2 = 1), as Maruo
+(1960) gives it; Newman's approximation of the slow drift (J. N. Newman, "Second-order, slowly-varying forces on vessels
+in irregular waves", 1974) is known through the book.
+
+These are this package's own, derived and checked:
+- **The scattering from the radiation solution.** The held section's scattered flow is the same multipoles and outgoing
+  wave as the radiation's, with the incident wave's stream function cancelled on the contour, split into its even part
+  (heave's basis) and its odd part (sway's), each wave's two components unknowns of the least squares. The series' wave
+  functions are the physical flow only on the side x > 0 (on the other they take the opposite parity, a branch of the
+  logarithm), so the far field is read there and continued even or odd by hand. Checked: |R|^2 + |T|^2 = 1 within 1e-4
+  for a box and a half circle from long waves (R -> 0) to short (R -> 1).
+- **The motions' phase.** The incident potential raises the surface a quarter period after it, so a motion given against
+  the elevation enters the stream function times i. Checked: in long waves a section heaving with the surface sends out
+  the wave that cancels its scattering (to 0.1 percent), and with the other phase does not.
+- **The held section's loads** from the pressure of the incident and scattered flow over the contour, their sign and
+  phase fixed by energy: a free section moved by them and its own radiation keeps |R|^2 + |T|^2 = 1 within 1e-3 at every
+  frequency, which none of the other fifteen combinations of sign and quarter period does.
+- **The drift the solver applies** is the far field (the hull's true motions, from those loads) less the mean its
+  Froude-Krylov pressure over the moving wetted surface gives in the motions the solver's own loads produce (their time
+  average by `wettedLoads`), so the time domain's mean is the far field. Checked
+  (`packages/physics/tests/coupling/seakeeping.test.js`): a moored box's mean drift within 3 percent of the wall's force
+  of the far field at 3 and 8.7 rad/s, and the wall's in short waves.
+- **Newman's approximation in O(N)**: Re[(sum a_i D_i e^(i theta_i))(sum a_j e^(-i theta_j))], the difference frequencies
+  with the mean of the two waves' coefficients, so a coefficient of either sign is taken.
+- **Oblique waves** by their share across the hull squared. That scaling is assumed, not derived.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
@@ -12726,6 +12820,30 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
   (FAA-H-8083-25B, Figure 5-34). In the level-turn controller fixture, the vertical component of lift balances
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
 
+
+### Grid-particle liquids (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`, 2026-11-26, FLUID-03)
+
+Written from papers and notes read as text (no code, no companion repositories):
+
+- C. Jiang, C. Schroeder, A. Selle, J. Teran and A. Stomakhin, "The affine particle-in-cell method", ACM Trans. Graph.
+  34(4), 51, 2015, and the J. Comput. Phys. version, arXiv 1603.06188: the MAC-grid transfers (a vector c_a a face axis,
+  trilinear weights, the gradient of the weight in place of D_p^-1) and their conservation of linear and angular
+  momentum.
+- Y. Zhu and R. Bridson, "Animating sand as a fluid", ACM Trans. Graph. 24(3), 2005: eight particles a cell, the
+  surface from the particles (k(s) = max(0, (1 - s^2)^3), R twice the spacing), velocity carried into the air.
+- R. Bridson and M. Muller-Fischer, "Fluid simulation", SIGGRAPH 2007 course notes, and R. Bridson, Fluid Simulation for
+  Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard.
+- F. Gibou, R. Fedkiw, L.-T. Cheng and M. Kang, J. Comput. Phys. 176, 205-227, 2002 (as the course notes give it): the
+  ghost-fluid free surface, theta = phi_i / (phi_i - phi_j), held at 0.01 or more.
+- H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10: the rotating frame's
+  d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
+- M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):
+  the inflow's particle places along a bulwark.
+- J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
+  Phil. Trans. R. Soc. A 244, 312-324, 1952, table 2 (the check).
+
+No constant is calibrated. The surface's particle radius (half a cell) and the extrapolation depth (two faces) are
+Zhu and Bridson's choices.
 
 ### Water entry and exit (`EntrySolver`, `@margoengine/physics/entry`, 2026-11-26, SEA-14)
 
@@ -13157,6 +13275,46 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Aeolian transport and blowing snow (EARTH-07)
+
+- G. Sauermann, K. Kroy and H. J. Herrmann (2001), [Continuum saltation model for sand dunes](https://doi.org/10.1103/PhysRevE.64.031305).
+  Equations 32–36 supply the partition of wind stress between air and grains and the saturated moving column.
+  Equations 46–47 give spatial saturation. With fixed mean grain speed `u`, the time-domain terms are
+  `mSat = 2 alpha (tau - tauImpact) / g` and `growth = u / lSat`, with
+  `lSat = 2 alpha u² tauImpact / (g gamma (tau - tauImpact))`. This implementation uses their simplified-model
+  `alpha = 0.35`, `gamma = 0.2` and `Cd = 3` to set the drag relaxation length `4 rhoGrain d / (3 Cd rhoAir)`.
+  It solves the resulting reaction by backward Euler, computes face transport from the updated areal mass,
+  and derives the advection substeps from the face-crossing speed. Equation 43 transports the equal and opposite
+  bed change. Direct fluid entrainment seeds one grain per square metre per `sqrt(d/g)` above the fluid threshold,
+  a mesh-area-independent seed for the simplified model's zero-mass equilibrium.
+- B. T. Werner (1995), [Eolian dunes: Computer simulations and attractor interpretation](https://doi.org/10.1130/0091-7613(1995)023%3C1107:EDCSAA%3E2.3.CO;2).
+  The model illustrates saltation plus downhill transfer at repose. Here an implicit pair transfer apportions
+  the slope correction using both vertices' bed areas and bounds it by the donor's mobile mass.
+- P. S. Jackson and J. C. R. Hunt (1975), [Turbulent wind flow over a low hill](https://doi.org/10.1002/qj.49710143015),
+  and K. Kroy, G. Sauermann and H. J. Herrmann (2002), [Minimal model for aeolian sand dunes](https://doi.org/10.1103/PhysRevE.66.031302).
+  Use the low-hill stress correction proportional to `H[dh/ds] + B dh/ds` along the wind. The discrete symmetric
+  sum uses the caller's integration reach and the active bed extent. Its coefficient defaults are exposed for input
+  conditions. A negative predicted surface stress is replaced by zero.
+- J. F. Kok, E. J. R. Parteli, T. I. Michaels and D. Bou Karam (2012), [The physics of wind-blown sand and dust](https://doi.org/10.1088/0034-4885/75/10/106901).
+  Section 2.2 and Table 2.3 distinguish the fluid and impact thresholds on Earth. The default impact velocity
+  is 0.8 times the Bagnold fluid velocity. Equation 4.14 gives vertical dust emission as efficiency per metre
+  times the horizontal saltation flux. The default 0.001/m lies within the reported range and scales with exposure.
+- J. W. Pomeroy and D. M. Gray (1990), [Saltation of snow](https://doi.org/10.1029/WR026i007p01583).
+  Equation 11 gives `Q = 0.68 rho uImpact (uStar² - uVegetation² - uImpact²) / (g uStar)` when positive.
+  The exposure controls the share of stress acting on snow, so `uStar² - uVegetation² = exposure uStar²`.
+  The paper's fixed grain-speed closure uses `2.8 uImpact`. Dividing the flux by that speed gives the equilibrium
+  moving column in the same conservative finite-volume solver. Snow's default threshold is 0.2 m/s.
+- R. S. Anderson (1987), [A theoretical model for aeolian impact ripples](https://doi.org/10.1111/j.1365-3091.1987.tb00814.x).
+  Equations 7–8 give the slope-dependent impact rate `max(0, 1 + cot(angle) dh/ds)` and Equation 14 distributes
+  the ejected grains over short downwind hops. The solver integrates exponential hop probability over each grid
+  interval and transfers mass in conservative pairs. The ejection coefficient uses one effective splash grain per
+  mean saltation hop, with the 0.3 m representative saltation length from Kok et al., Table 2.3. Supply the mean
+  short-hop length explicitly to resolve changes in the ripple regime.
+
+The Rust implementation and the renderer integration were written from these equations and descriptions. The
+renderer samples moving mass and grain velocity at the emitter and maps the mass to opacity as `m / (m + referenceMass)`.
+This opacity function is a visualization setting. Terrain and transported mass are advanced on the physics clock.
+
 ### Groundwater and springs (HYDRO-06)
 
 - Lorenzo A. Richards, [Capillary conduction of liquids through porous mediums](https://doi.org/10.1063/1.1745010),
@@ -13184,3 +13342,93 @@ The aquifer keeps water thickness relative to its bottom, so small inputs surviv
 Tests reconstruct the fixed-head solution, a two-cell material contact, a draining spring, and the water-volume
 exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
 field contracts.
+
+## Glacier and ice-sheet flow (ICE-02)
+
+- Ralf Greve and Heinz Blatter, [Dynamics of Ice Sheets and Glaciers](https://doi.org/10.1007/978-3-642-03415-2),
+  2009, chapters 4, 5 and 7. Grounded, no-slip shallow ice with Glen exponent 3 yields the depth-integrated
+  flux q = −(2/5) A (ρᵢg)³ H⁵ |∇s|² ∇s, with thickness H and surface s = bed + H.
+- Ed Bueler, Craig S. Lingle, Jed A. Kallen-Brown, Latrice N. Bowman and David N. Covey,
+  [Exact time-dependent similarity solutions for isothermal shallow ice sheets](https://www.cs.uaf.edu/~bueler/simice.pdf),
+  2005, section 7, compare arithmetic face-thickness (type I) with averaged cell diffusivities.
+  Ed Bueler, [Stable finite volume element schemes for the shallow-ice approximation](https://doi.org/10.1017/jog.2015.3),
+  2016, separates face fluxes and positive thickness on nonflat bed. The Margo implementation freezes the
+  symmetric face diffusivity for each backward-Euler step, solves its five-point linear system with
+  Jacobi-preconditioned CG, and limits summed outgoing face transfer to available donor ice.
+- C. J. van der Veen, [Fracture mechanics approach to penetration of surface crevasses on glaciers](https://doi.org/10.1016/S0165-232X(97)00022-0), 1998, compares ice overburden, tensile stress and
+  water pressure at the crack tip. The optional glacier uses the closely-spaced, zero-net-stress
+  approximation without crack-tip toughness, appropriate for a first-order grid-scale fracture front.
+- Douglas I. Benn, Charles R. Warren and Ruth H. Mottram, [Calving processes and the dynamics of calving glaciers](https://doi.org/10.1016/j.earscirev.2007.02.002), 2007, equations (10), (11) and section 4.6. The dry Nye depth
+  is 2 (ε̇/A)^(1/3)/(ρᵢg). An already opening crack gains the hydrostatic term (ρw/ρᵢ) times its water
+  column. The solver obtains tensile strain by projecting the discrete free-surface velocity gradient
+  along local flow. Freeboard is the marine break-off threshold, and the buoyancy ratio follows Archimedes.
+- Antoine Pralong and Martin Funk, [Dynamic damage model of crevasse opening and application to glacier calving](https://doi.org/10.1029/2004JB003104), 2005, studied failure of a hanging glacier. Here a dry receiver
+  needs an actual drop in bed elevation and a through-column fracture. Grid release evaluates the
+  failure threshold, while trajectories or damage below a released column belong to separate solvers.
+- John F. O’Callaghan and David M. Mark, [The extraction of drainage networks from digital elevation data](https://doi.org/10.1016/S0734-189X(84)80011-0), 1984. Connect each active surface cell to its steepest of
+  eight descending neighbours using metric distances. A topological sweep transmits each liquid volume once.
+
+The tests derive the exact two-column backward-Euler update, the linear-slope Glen velocity, the Nye
+depth and its hydrostatic increment, and the closed mass balance. The HYDRO-01 fixture measures the actual
+flood inlet volume. A registry-only observer uses the source layout SEA-06 will consume.
+
+### Ground animal locomotion (LIFE-02)
+
+- David L. Hu, Jasmine Nirody, Terri Scott and Michael J. Shelley, [The mechanics of slithering locomotion](https://doi.org/10.1073/pnas.0812533106), 2009, Eq. (2), Eq. (3) and Fig. 1. Use one normalized ground-tangent slip vector for the fore/aft and lateral coefficients. A travelling tangent angle integrates the paper's travelling curvature and supplies an inextensible chain. The discrete midpoint velocities are recentered, and the angular update subtracts the shape angular momentum before integrating yaw. Spring-damper contact load accounts for the bed normal, and `slipSpeed` regularizes tangential slip at zero. The default cloth coefficients come from that experiment. Shape and material settings remain configurable.
+- Philip Holmes, Robert J. Full, Daniel Koditschek and John Guckenheimer, [The Dynamics of Legged Locomotion: Models, Analyses, and Challenges](https://doi.org/10.1137/S0036144504445133), 2006, §3 and Fig. 13. A massless spring leg acts on a loaded body only while in compression. Margo adds axial damping, a prescribed stance rest-length extension and actual terrain normals. Swing feet show the kinematic path and carry zero force.
+- Marc H. Raibert, Michael Chepponis and H. Benjamin Brown Jr., [Running on four legs as though they were one](https://publications.ri.cmu.edu/storage/publications/pub_files/pub3/raibert_m_h_1986_1/raibert_m_h_1986_1.pdf), 1986, Eqs. (2)–(6). Touchdown places the foot at predicted half-stance travel plus the velocity error correction. A grounded PD attitude response uses quaternion error. An active foot may generate shear as well as axial load, with each force and moment sharing the Coulomb budget `|F_t| + |M| / (leg length / 2) ≤ μF_n`. The support lever represents the stance footprint in this reduced model. The world integrates the sum of applied reactions and moments without imposing speed or orientation. Zero gains give passive axial spring contacts.
+- Claire T. Farley and T. Christine Ko, [Mechanics of locomotion in lizards](https://doi.org/10.1242/jeb.200.16.2177), 1997, measured a bouncing trot in two lizard species. Robert J. Full and Michael S. Tu, [Mechanics of six-legged runners](https://polypedal.berkeley.edu/publications/020_Full_TheMechanicsofSixLeggedRunners_JExpBiol_1990.pdf), 1990, Fig. 4, measured alternating insect tripods.
+- Joseph C. Spagna, Edgar A. Valdivia and Vivin Mohan, [Gait characteristics of two fast-running spider species](https://www.americanarachnology.org/journal-joa/joa-all-articles/article/download/arac-39-01-84.pdf/), 2011, measured alternating tetrapods. Reinhard Blickhan and Robert J. Full, [Locomotion energetics of the ghost crab: II](https://doi.org/10.1242/jeb.130.1.155), 1987, measured lateral running and spring-like whole-body motion.
+
+The Wasm regions use double-precision state, pinned sine and cosine and explicit semi-implicit Euler stepping on the
+world's dyadic clock. The fixed-rate bound considers contact-mode stiffness and damping, friction regularization,
+stance/swing sampling and controller response. The engine tests verify Eq. (2), spring reaction, the friction-wrench
+bound, link closure, frictionless motion, swing loads, alternating footholds, lateral crab motion, and plain/shared
+and snapshot replay. The coupling tests compare the published reaction to the actual flat and sloped TerrainBed
+fields. The animal templates reproduce the documented coordination patterns and physical loads. The default masses,
+geometry and controller gains describe a generic starting point for each gait.
+
+## Material ageing and surface optics (BIO-04)
+
+- Julie Dorsey and Pat Hanrahan, [*Modeling and Rendering of Metallic Patinas*](https://graphics.stanford.edu/papers/patina/)
+  (1996), §§3–4. Coat and substrate layers are modeled separately. The diffuse finite-layer
+  Kubelka–Munk equation follows from the two-flux transport coefficients `K` and `S`, with mode
+  `m = sqrt(K(K + 2S))`. We evaluate its exponential form and apply their §4.2
+  combining rule `R = R₁ + T₁²R₂/(1 - R₁R₂)`. Zero absorption reduces to
+  `R = S d/(1 + S d)` and `T = 1/(1 + S d)`. The test uses the hyperbolic form as its independent reference.
+- Jinwei Gu, Chien-I Tu, Ravi Ramamoorthi, Peter Belhumeur, Wojciech Matusik and Shree
+  Nayar, [*Time-Varying Surface Appearance: Acquisition, Modeling and Rendering*](https://cave.cs.columbia.edu/old/publications/pdfs/Gu_TOG06.pdf)
+  (2006), Eq. 2. Spatial exposure rate alters local age; the special case `Aφ + D`
+  supplies the scalar-weathered fraction model for wood and stone. The reflectance palettes
+  are authored linear colors. Copper's inner oxide saturates with substrate loss; residual
+  consumed copper feeds the exterior carbonate layer. Oxide volume per unit metal volume
+  follows molecular mass, stoichiometry and density.
+- International Organization for Standardization, [*ISO 9223:2012*](https://www.iso.org/standard/53499.html)
+  (2012), §8.2 Eqs. 1 and 3, supplies first-year loss versus annualized RH, temperature, SO₂
+  and chloride deposition. [*ISO 9224:2012*](https://www.iso.org/standard/53500.html) (2012), Eqs. 1
+  and 3 and Table 2, give the long-term power law and linear continuation from 20 years.
+  For a changed annual climate, inverting the new loss curve at the accumulated depth
+  preserves the previous penetration. Immersion has a separate time and loss contribution.
+- ASTM International, [*G102-23: Standard Practice for Calculation of Corrosion Rates and
+  Related Information from Electrochemical Measurements*](https://store.astm.org/standards/g102)
+  (2023), uses Faraday's law. In SI the immersion depth rate is `j M/(n F ρ)`.
+  Robert E. Melchers, [*Predicting corrosion for life estimation of ocean and coastal steel
+  infrastructure*](https://doi.org/10.1002/maco.202314201) (2025), reports a representative
+  long-term rate of about 0.06 mm/year in the coastal case near 20 °C. The default current
+  is the carbon-steel current equivalent for that case.
+- Hannu Viitanen, Tomi Toratti, Lasse Makkonen, Ruut Peuhkuri, Tuomo Ojanen,
+  Leena Ruokolainen and Jarmo Räisänen, [*Towards modelling of decay risk of wooden
+  materials*](https://doi.org/10.1007/s00107-010-0450-x) (2010). The [2011 VTT
+  presentation](https://webpages.tuni.fi/nsb2011/sites/www.tut.fi.nsb2011/files/b11_4_viitanen_et_al_durability_of_wood_nsb_2011.pdf)
+  shows the exact critical time and mass-loss equations. The model accumulates activation,
+  subtracts dry deactivation and integrates irreversible mass loss from the instant activity reaches one.
+- S. Muko, K. Sakai and Y. Iwasa, [*Dynamics of marine sessile organisms with space-limited
+  growth and recruitment*](https://doi.org/10.1006/jtbi.2001.2298) (2001). Recruitment is proportional
+  to available surface and larval abundance. An aggregate group with first-order loss has
+  `C' = a(1-C)-bC`, whose fixed-input solution is exact. Recruitment and removal rates are adjustable.
+- Frederick W. Lipfert, [*Atmospheric damage to calcareous stones*](https://doi.org/10.1016/0004-6981(89)90587-8)
+  (1989), supplies the clean-rain equilibrium contribution of 18.8 µm recession per metre of rainfall.
+  Michael M. Reddy, [*Acid rain damage to carbonate stone*](https://www.usgs.gov/publications/acid-rain-damage-carbonate-stone-a-quantitative-assessment-based-aqueous-geochemistry)
+  (1988), and Paul A. Baedecker et al., [*Effects of acidic deposition on the erosion of carbonate stone*](https://doi.org/10.1016/0957-1272(92)90018-N)
+  (1992), distinguish clean-rain dissolution, acidity and dry deposition. In the solver's ideal acid
+  balance, two excess moles of protons dissolve one mole of CaCO₃, converted to depth by density.

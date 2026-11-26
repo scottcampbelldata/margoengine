@@ -93,6 +93,12 @@ export interface CouplingOptions {
 
 export type CouplingScheme = 'staggered' | 'strang' | 'predicted' | 'implicitPressure' | 'iterated';
 
+export const DECK_CLAIMS_FIELD: FieldDescriptor;
+
+export const DECK_INFLOW_FIELD: FieldDescriptor;
+
+export const DECK_INFLOW_WORDS = 16;
+
 export const DYNAMIC_BASE: number;
 
 export type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
@@ -1056,6 +1062,7 @@ interface KernelHeightfieldOptions {
 interface KernelLoadOptions {
     signal?: AbortSignal;
     simd?: boolean;
+    threads?: boolean;
 }
 
 interface KernelManifold {
@@ -1343,6 +1350,12 @@ class KernelWorld {
     }): this;
     touch(body: number): this;
     stepSeconds: number;
+    get threadCount(): number;
+    useThreads(count: number, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): void;
+    stepAsync(dt: number): Promise<this>;
     step(dt: number): this;
     detect(): this;
     handle(kind: KernelHandle['kind'], row: number): KernelHandle;
