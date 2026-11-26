@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19392223,
+  "total": 19394766,
   "history": [
     {
       "date": "2026-10-24",
@@ -12564,6 +12564,12 @@
     },
     {
       "date": "2026-11-26",
+      "commit": "lane-d-shadow-viewer",
+      "reason": "Optional shadows/viewer: ShadowMapViewer, a screen quad over one shadow map layer with reversed-depth linearisation; a new entry, absent before (ceiling 2540 B, measured min+gzip 2435 B). clustered/shadows 14791 to 14794 B gzip for LocalShadows.shadowMap, the per-layer record the viewer reads; a split would need a second entry reaching into LocalShadows' private layer layout.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-26",
       "commit": "c82d68bf98",
       "reason": "AERO-05, @margoengine/physics/falling 0 to 6259 B gzip, @margoengine/weather/hail 4901 to 5443 B gzip, @margoengine/weather/hail-physics 0 to 1056 B gzip. The falling solver shares one Wasm loader across plates, seeds and spheres. Hail shares one WebGPU overlay and compatible lighting for both trajectory sources. Splitting the source renderer would duplicate the draw and its ownership. Core and stage gain zero bytes.",
       "grew": 3
@@ -12837,7 +12843,7 @@
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadow-atlas": 17464,
-    "@margoengine/clustered/shadows": 14791,
+    "@margoengine/clustered/shadows": 14794,
     "@margoengine/clustered/shapes": 12255,
     "@margoengine/clustered/stochastic": 2513,
     "@margoengine/clustered/units": 1089,
@@ -13842,6 +13848,7 @@
     "@margoengine/shadows/rt-alpha": 8540,
     "@margoengine/shadows/style": 799,
     "@margoengine/shadows/transmission": 1026,
+    "@margoengine/shadows/viewer": 2540,
     "@margoengine/shadows/virtual": 18523,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 24501,
