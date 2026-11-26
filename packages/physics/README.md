@@ -5202,6 +5202,8 @@ The boundary is closed. The grid cells hold vertical depth in metres, X and Z di
 
 For rough dry granular beds, use `roughness: 'glass-beads'` in place of `friction`. The default roughness option is absent, which selects the constant-friction Voellmy tier. The named profile is measured for 0.5 mm glass beads and uses the 2002 rational stopping curve. Pass a `GranularRoughness` with the measured start and stop angles, characteristic thickness and `beta` for a different rough bed. Set `curve: 'exponential'` for the 1999 stopping fit. The low-speed exponent defaults to 0.001, and turbulent drag defaults to disabled for this tier. A static layer uses the starting curve, while faster layers use the stopping curve at a Froude-adjusted thickness.
 
+Use `depositToTerrain: true` at load time to also move arrested layers into the registered `TerrainBed`. The pressure gradient and bed slope must be under the material stopping threshold. Roughness materials also require a Froude number below their steady-flow threshold. The default `deposition.stopSpeed` of 0 transfers fully stopped material. A positive speed allows a small remaining motion to be absorbed by the fixed bed. `deposition.density` defaults to the moving density and can be higher for compaction. Couple `granularFlow` before `bed` to apply the deposit on the same tick. The next flow step reads the new bed. For this accumulating world, take a checkpoint after the first complete frame so the shared sum region is present.
+
 ```js
 import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
 import { PhysicsWorld } from '@margoengine/physics/world';
@@ -5218,4 +5220,20 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(flow, {
 });
 world.advance(6);
 console.log(flow.sample(32, 1).discharge);
+```
+
+```js
+import { TerrainBed } from '@margoengine/physics/earth';
+import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 3, rows: 2, width: 3, depth: 4, centre: [0, 0] };
+const bed = new TerrainBed();
+const flow = await GranularFlowSolver.load({ depositToTerrain: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(bed, { ...grid, elevations: new Float32Array(12) })
+  .add(flow, { grid, depth: 0.5, density: 300, deposition: { density: 400 } })
+  .couple(['granularFlow', 'bed'], 'staggered');
+world.advance(2);
+console.log(bed.volume(), flow.depositBudget.mass);
 ```

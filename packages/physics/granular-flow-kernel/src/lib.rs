@@ -386,3 +386,164 @@ pub extern "C" fn granular_step(
     }
     steps
 }
+
+#[repr(C)]
+struct Deposit {
+    density: f64,
+    moving_density: f64,
+    stop_speed: f64,
+}
+
+fn slope_axis(
+    cells: &[Column],
+    column: Column,
+    low: usize,
+    high: usize,
+    intervals: usize,
+    width: f64,
+) -> (f64, f64) {
+    if intervals == 0 {
+        return (0.0, 0.0);
+    }
+    let a = unsafe { cells.get_unchecked(low) };
+    let b = unsafe { cells.get_unchecked(high) };
+    let bed = (b.bed - a.bed) / (intervals as f64 * width);
+    // A centred surface derivative is zero at a symmetric peak. Both sides still
+    // drive outward motion there, so arrest checks the steepest downhill secant.
+    let to_low = (column.bed - a.bed) + (column.depth - a.depth);
+    let to_high = (column.bed - b.bed) + (column.depth - b.depth);
+    (bed, to_low.max(to_high).max(0.0) / width)
+}
+
+fn deposit_candidate(
+    cells: &[Column],
+    i: usize,
+    nx: usize,
+    nz: usize,
+    model: &Model,
+    speed_limit: f64,
+) -> bool {
+    let column = unsafe { *cells.get_unchecked(i) };
+    if column.depth == 0.0 {
+        return false;
+    }
+    let [ux, uz] = column.velocity();
+    if length(ux, uz) > speed_limit {
+        return false;
+    }
+    let x = i % nx;
+    let z = i / nx;
+    let west = usize::from(x > 0);
+    let east = usize::from(x + 1 < nx);
+    let near = usize::from(z > 0);
+    let far = usize::from(z + 1 < nz);
+    let (bx, sx) = slope_axis(cells, column, i - west, i + east, west + east, model.dx);
+    let (bz, sz) = slope_axis(
+        cells,
+        column,
+        i - near * nx,
+        i + far * nx,
+        near + far,
+        model.dz,
+    );
+    let speed = length(length(ux, uz), bx * ux + bz * uz);
+    let mut stop = model.friction;
+    if let Some(roughness) = model.roughness {
+        let normal = column.depth / sqrt(1.0 + bx * bx + bz * bz);
+        stop = roughness.stop(normal);
+        // The subcritical Froude condition is independent of the authored arrest tolerance.
+        if speed > roughness.beta * sqrt(model.gravity * normal) {
+            return false;
+        }
+    }
+    speed <= speed_limit && length(sx, sz) <= stop * model.grain_load
+}
+
+// Freeze a subcritical plug in one transfer after advection. The two triangles assigned to
+// each source cell give each vertex either one or two sixths of its projected footprint.
+#[unsafe(no_mangle)]
+pub extern "C" fn granular_deposit(
+    input: *const f64,
+    output: *mut f64,
+    changes: *mut f64,
+    vertex_area: *const f64,
+    budget: *mut f64,
+    params: *const f64,
+    nx: usize,
+    nz: usize,
+    dx: f64,
+    dz: f64,
+    gravity: f64,
+    friction: f64,
+    roughness: *const f64,
+    grain_load: f64,
+) -> i32 {
+    let count = nx * nz;
+    let vertices = (nx + 1) * (nz + 1);
+    let cells = unsafe { core::slice::from_raw_parts(input.cast::<Column>(), count) };
+    let next = unsafe { core::slice::from_raw_parts_mut(output.cast::<Column>(), count) };
+    let area = unsafe { core::slice::from_raw_parts(vertex_area, vertices) };
+    let change = unsafe { core::slice::from_raw_parts_mut(changes, vertices) };
+    let props = unsafe { &*params.cast::<Deposit>() };
+    let model = Model {
+        gravity,
+        dx,
+        dz,
+        friction,
+        turbulence: f64::INFINITY,
+        roughness: unsafe { roughness.cast::<Roughness>().as_ref() },
+        grain_load,
+    };
+    let mut mass = 0.0;
+    let mut impulse_x = 0.0;
+    let mut impulse_z = 0.0;
+    let mut kinetic = 0.0;
+    let cell_area = dx * dz;
+    let mass_per_depth = cell_area * props.moving_density;
+    let stride = nz + 1;
+    change.fill(0.0);
+    for (i, (column, result)) in cells.iter().zip(next.iter_mut()).enumerate() {
+        *result = *column;
+        if !deposit_candidate(cells, i, nx, nz, &model, props.stop_speed) {
+            continue;
+        }
+        let removed = column.depth * mass_per_depth;
+        let [vx, vz] = column.velocity();
+        let speed2 = vx * vx + vz * vz;
+        mass += removed;
+        impulse_x += removed * vx;
+        impulse_z += removed * vz;
+        kinetic += 0.5 * removed * speed2;
+        result.depth = 0.0;
+        result.discharge_x = 0.0;
+        result.discharge_z = 0.0;
+        let vertex = (i % nx) * stride + i / nx;
+        let sixth = removed / props.density / 6.0;
+        for (index, volume) in [
+            (vertex, sixth),
+            (vertex + 1, 2.0 * sixth),
+            (vertex + stride, 2.0 * sixth),
+            (vertex + stride + 1, sixth),
+        ] {
+            let a = unsafe { *area.get_unchecked(index) };
+            let delta = unsafe { change.get_unchecked_mut(index) };
+            *delta += volume / a;
+        }
+    }
+    if !mass.is_finite()
+        || !impulse_x.is_finite()
+        || !impulse_z.is_finite()
+        || !kinetic.is_finite()
+        || change.iter().any(|delta| !delta.is_finite())
+    {
+        return -1;
+    }
+    let terms = unsafe { core::slice::from_raw_parts_mut(budget, 4) };
+    for (out, piece) in terms.iter_mut().zip([mass, impulse_x, impulse_z, kinetic]) {
+        *out += piece;
+        if !out.is_finite() {
+            return -1;
+        }
+    }
+    0
+}

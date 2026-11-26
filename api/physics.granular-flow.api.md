@@ -9,9 +9,21 @@ export const GRANULAR_FLOW_LAYOUT = 1;
 
 export const GRANULAR_FLOW_WORDS = 4;
 
+export interface GranularDepositBudget {
+    readonly mass: number;
+    readonly impulse: readonly [number, number];
+    readonly horizontalKineticEnergy: number;
+}
+
+export interface GranularDeposition {
+    readonly density?: number;
+    readonly stopSpeed?: number;
+}
+
 export interface GranularFlowLoadOptions {
     readonly id?: string;
     readonly liveTerrain?: boolean;
+    readonly depositToTerrain?: boolean;
     readonly signal?: AbortSignal;
 }
 
@@ -25,6 +37,7 @@ export interface GranularFlowOptions {
     readonly poreSupport?: number;
     readonly turbulence?: number;
     readonly density?: number;
+    readonly deposition?: GranularDeposition;
 }
 
 export interface GranularFlowSample {
@@ -37,7 +50,7 @@ export interface GranularFlowSample {
 export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     readonly flowField: FieldDescriptor;
     private constructor();
-    static load({ id, liveTerrain, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
+    static load({ id, liveTerrain, depositToTerrain, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -52,6 +65,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     extraState(): readonly Region[];
     sample(x: number, z: number): GranularFlowSample;
     get mass(): number;
+    get depositBudget(): GranularDepositBudget;
     get lastSubsteps(): number;
 }
 

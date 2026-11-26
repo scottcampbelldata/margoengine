@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { cos, sin } from '@margoengine/math/pinned';
-import { BED_FIELD, BED_LAYOUT, bedVertexCount, type BedShape } from '../earth/bed.js';
+import { BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, BedChange, bedVertexCount, type BedShape } from '../earth/bed.js';
 import { regionWords } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 import {
@@ -20,6 +20,8 @@ export interface GranularFlowLoadOptions {
   readonly id?: string;
   /** Use a registered TerrainBed instead of the fixed bed option. Default false. */
   readonly liveTerrain?: boolean;
+  /** Read the live bed and transfer arrested material into it. Default false. */
+  readonly depositToTerrain?: boolean;
   /** Cancel loading of the optional native kernels. */
   readonly signal?: AbortSignal;
 }
@@ -45,6 +47,22 @@ export interface GranularRoughness {
   readonly slowExponent?: number;
 }
 
+export interface GranularDeposition {
+  /** Consolidated density in kilograms per cubic metre. Default the moving density. */
+  readonly density?: number;
+  /** Upper along-bed speed in metres per second for consolidation. Default 0. */
+  readonly stopSpeed?: number;
+}
+
+export interface GranularDepositBudget {
+  /** Total mass placed in TerrainBed, kilograms. */
+  readonly mass: number;
+  /** Horizontal momentum absorbed by the fixed bed, kilogram metres per second. */
+  readonly impulse: readonly [number, number];
+  /** Horizontal kinetic energy dissipated in consolidation, joules. */
+  readonly horizontalKineticEnergy: number;
+}
+
 export interface GranularFlowOptions {
   /** Rectangular grid. When coupled, use the shape and world cell of TerrainBed. */
   readonly grid: BedShape;
@@ -64,6 +82,8 @@ export interface GranularFlowOptions {
   readonly turbulence?: number;
   /** Constant bulk density in kilograms per cubic metre. Default 1600. */
   readonly density?: number;
+  /** Arrested-layer transfer parameters when depositToTerrain is enabled. */
+  readonly deposition?: GranularDeposition;
 }
 
 export interface GranularFlowSample {
@@ -71,6 +91,14 @@ export interface GranularFlowSample {
   readonly discharge: readonly [number, number];
   readonly bedElevation: number;
   readonly surfaceElevation: number;
+}
+
+interface DepositState {
+  readonly change: BedChange;
+  readonly areas: Region;
+  readonly deltas: Region;
+  readonly params: Region;
+  readonly trialBudget: Region;
 }
 
 interface State {
@@ -90,6 +118,7 @@ interface State {
   readonly working: Region;
   readonly trial: Region;
   readonly ledger: Region;
+  readonly deposit?: DepositState;
   readonly regions: readonly Region[];
 }
 
@@ -154,6 +183,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     private readonly builds: GranularFlowBuilds,
     private readonly id: string,
     private readonly liveTerrain: boolean,
+    private readonly depositToTerrain: boolean,
   ) {
     if (typeof id !== 'string' || !id.trim() || id !== id.trim())
       throw new RangeError('Invalid granular flow ID. Use a nonempty name without outer whitespace.');
@@ -167,6 +197,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     this.fields = [
       { field: this.flowField, access: 'write' },
       ...(liveTerrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
+      ...(depositToTerrain ? [{ field: BED_CHANGE_FIELD, access: 'accumulate' as const }] : []),
     ];
   }
 
@@ -174,9 +205,15 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
   static async load({
     id = 'granularFlow',
     liveTerrain = false,
+    depositToTerrain = false,
     signal,
   }: GranularFlowLoadOptions = {}): Promise<GranularFlowSolver> {
-    return new GranularFlowSolver(await loadGranularFlowBuilds(signal), id, liveTerrain);
+    return new GranularFlowSolver(
+      await loadGranularFlowBuilds(signal),
+      id,
+      liveTerrain || depositToTerrain,
+      depositToTerrain,
+    );
   }
 
   describe() {
@@ -207,6 +244,10 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const turbulence =
       requestedTurbulence === Infinity ? Infinity : finite(requestedTurbulence, 'turbulence', Number.MIN_VALUE);
     const density = finite(options.density ?? 1600, 'bulk density', Number.MIN_VALUE);
+    if (options.deposition && !this.depositToTerrain)
+      throw new RangeError('Granular deposition options require a bed connection. Load with depositToTerrain enabled.');
+    const depositDensity = finite(options.deposition?.density ?? density, 'deposit density', Number.MIN_VALUE);
+    const stopSpeed = finite(options.deposition?.stopSpeed ?? 0, 'deposit arrest speed', 0);
     const depth = options.depth ?? 0;
     const bed = options.bed ?? 0;
     const [velocityX, velocityZ] = options.velocity ?? [0, 0];
@@ -233,7 +274,14 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const state = allocate('granular-flow-state');
     const working = allocate('granular-flow-working');
     const trial = allocate('granular-flow-trial');
-    const ledger = host.allocate('granular-flow-ledger', Float64Array.BYTES_PER_ELEMENT, 'f64', GRANULAR_FLOW_LAYOUT);
+    const amount = Float64Array.BYTES_PER_ELEMENT;
+    const ledger = host.allocate(
+      'granular-flow-ledger',
+      amount * (this.depositToTerrain ? 5 : 1),
+      'f64',
+      GRANULAR_FLOW_LAYOUT,
+    );
+    const deposit = this.depositToTerrain ? this.allocateDeposit(host, grid) : undefined;
     const roughness = profile
       ? host.allocate(
           'granular-roughness',
@@ -242,6 +290,9 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
           GRANULAR_FLOW_LAYOUT,
         )
       : undefined;
+    const regions = [state, ledger];
+    if (roughness) regions.push(roughness);
+    if (deposit) regions.push(deposit.change.state);
     const s: State = {
       host,
       kernel,
@@ -259,11 +310,28 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       working,
       trial,
       ledger,
-      regions: roughness ? [state, ledger, roughness] : [state, ledger],
+      deposit,
+      regions,
     };
     words(s, state).set(initial);
     if (roughness && profile) words(s, roughness).set(profile);
+    if (deposit) {
+      words(s, deposit.areas).set(deposit.change.area);
+      words(s, deposit.params).set([depositDensity, density, stopSpeed]);
+    }
     this.runtime = s;
+  }
+
+  private allocateDeposit(host: SolverHost, grid: BedShape): DepositState {
+    const change = new BedChange(host, grid, 'granular-flow-bed-change');
+    const amount = Float64Array.BYTES_PER_ELEMENT;
+    return {
+      change,
+      areas: host.allocate('granular-flow-vertex-area', change.state.byteLength, 'f64', BED_LAYOUT),
+      deltas: host.allocate('granular-flow-delta-trial', change.state.byteLength, 'f64', BED_LAYOUT),
+      params: host.allocate('granular-flow-deposit-model', 3 * amount, 'f64', GRANULAR_FLOW_LAYOUT),
+      trialBudget: host.allocate('granular-flow-deposit-trial', 4 * amount, 'f64', GRANULAR_FLOW_LAYOUT),
+    };
   }
 
   private attached(): State {
@@ -320,15 +388,45 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       throw new RangeError(
         'Granular flow exceeded its finite-volume step range. Check layer depth, speed and spacing.',
       );
-    words(s, s.state).set(work);
+    if (s.deposit) this.deposit(s, s.deposit);
+    else words(s, s.state).set(work);
     words(s, s.ledger)[0] = substeps;
+  }
+
+  private deposit(s: State, deposit: DepositState): void {
+    const trialBudget = words(s, deposit.trialBudget);
+    trialBudget.set(words(s, s.ledger).subarray(1));
+    const result = s.kernel.granular_deposit(
+      s.working.byteOffset,
+      s.trial.byteOffset,
+      deposit.deltas.byteOffset,
+      deposit.areas.byteOffset,
+      deposit.trialBudget.byteOffset,
+      deposit.params.byteOffset,
+      s.grid.columns,
+      s.grid.rows,
+      s.dx,
+      s.dz,
+      s.gravity,
+      s.friction,
+      s.roughness?.byteOffset ?? 0,
+      s.grainLoad,
+    );
+    if (result !== 0)
+      throw new RangeError(
+        'Granular deposition exceeded its mass or field range. Use finite physical depths and densities.',
+      );
+    deposit.change.deltas.set(words(s, deposit.deltas));
+    words(s, s.ledger).set(trialBudget, 1);
+    words(s, s.state).set(words(s, s.trial));
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.attached();
-    return [{ field: this.flowField.name, region: s.state, tick, cell: [0, 0, 0] }];
+    const flow: Port = { field: this.flowField.name, region: s.state, tick, cell: [0, 0, 0] };
+    return s.deposit ? [flow, s.deposit.change.port(tick)] : [flow];
   }
 
   stateRegions(): readonly Region[] {
@@ -361,6 +459,13 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     let sum = 0;
     for (let i = 0; i < s.count; i++) sum += w[GRANULAR_FLOW_WORDS * i]!;
     return sum * s.dx * s.dz * s.density;
+  }
+
+  /** Cumulative mass, horizontal impulse and kinetic energy transferred to the fixed bed. */
+  get depositBudget(): GranularDepositBudget {
+    const s = this.attached();
+    const ledger = words(s, s.ledger);
+    return { mass: ledger[1] ?? 0, impulse: [ledger[2] ?? 0, ledger[3] ?? 0], horizontalKineticEnergy: ledger[4] ?? 0 };
   }
 
   /** Number of positivity-limited subdivisions in the last world step. */

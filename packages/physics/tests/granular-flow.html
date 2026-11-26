@@ -32,7 +32,20 @@
         world.advance(6);
         return { hash: world.hash(), velocity: solver.sample(32, 1).discharge[0] / depth };
       };
-      return { plain: await simulate(false), shared: await simulate(true), roughPlain: await rough(false), roughShared: await rough(true) };
+      const deposit = async (sharedMemory) => {
+        const solver = await GranularFlowSolver.load({ depositToTerrain: true });
+        const bed = new TerrainBed();
+        const grid = { columns: 3, rows: 2, width: 3, depth: 4, centre: [0, 0] };
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(sharedMemory) })
+          .add(bed, { ...grid, elevations: new Float32Array(12) })
+          .add(solver, { grid, depth: 0.5, density: 300, deposition: { density: 400 } })
+          .couple(['granularFlow', 'bed'], 'staggered');
+        world.advance(2);
+        return { hash: world.hash(), mass: solver.depositBudget.mass, volume: bed.volume(),
+          elevation: solver.sample(1, 1).bedElevation };
+      };
+      return { plain: await simulate(false), shared: await simulate(true), roughPlain: await rough(false), roughShared: await rough(true),
+        depositPlain: await deposit(false), depositShared: await deposit(true) };
     };
   </script>
 </body>

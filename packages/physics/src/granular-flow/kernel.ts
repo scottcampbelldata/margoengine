@@ -8,6 +8,22 @@ export interface GranularFlowBuilds {
 }
 
 export interface GranularFlowKernel {
+  granular_deposit(
+    input: number,
+    output: number,
+    changes: number,
+    vertexArea: number,
+    budget: number,
+    params: number,
+    nx: number,
+    nz: number,
+    dx: number,
+    dz: number,
+    gravity: number,
+    friction: number,
+    roughness: number,
+    grainLoad: number,
+  ): number;
   granular_step(
     work: number,
     trial: number,
