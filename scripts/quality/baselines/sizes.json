@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19259532,
+  "total": 19265005,
   "history": [
     {
       "date": "2026-10-24",
@@ -12585,6 +12585,12 @@
       "commit": "df1d94845f",
       "reason": "SPACE-01 adds optional orbital mechanics at 4017 B gzip (budget 4273 B) for the world solver and analytic Kepler samples. The plain and shared SIMD assets load separately. Shader/black-hole stays within its existing budget at 25814 B gzip, and core plus stage stays at 24,820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "6f4bbebc0e",
+      "reason": "HYDRO-04 entry sizes, previous record to current: @margoengine/physics/landscape 0→4347 B (ceiling 0→4603 B); @margoengine/biomes/landscape 0→614 B (ceiling 0→870 B). The optional Physics entry publishes SI-unit watershed and sediment fields and loads two native memory variants on demand. The separate Biomes entry adapts physical terrain snapshots without adding code to the Biomes root, core or stage. A further split would add requests without removing any code when evolving a relief.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12675,6 +12681,7 @@
     "@margoengine/biomes/hydrology": 5138,
     "@margoengine/biomes/io": 4543,
     "@margoengine/biomes/koppen": 1231,
+    "@margoengine/biomes/landscape": 870,
     "@margoengine/biomes/multinoise": 3748,
     "@margoengine/biomes/objects": 5494,
     "@margoengine/biomes/placement": 13635,
@@ -13388,6 +13395,7 @@
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/hydro": 6980,
     "@margoengine/physics/ice": 4099,
+    "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/orbit": 4273,

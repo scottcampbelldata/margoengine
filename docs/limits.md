@@ -9117,3 +9117,6 @@ Bed changes are accrued in f64 and become TerrainBed elevations on the following
 choose downhill directions comes from the shared f32 bed field. The biomes snapshot rounds the current terrain
 to millimetres and keeps the relief's authored river lines. Use fixed boundary elevations if a snapshot must join
 unchanged terrain outside the simulated rectangle.
+
+The optional Physics and Biomes landscape entries measure 4,347 B and 614 B min+gzip respectively. The
+plain and shared SIMD files are 12,166 B and 12,254 B before HTTP compression.

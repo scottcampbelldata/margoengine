@@ -2762,13 +2762,13 @@ stream-power step, moves size-classified sediment and redistributes downhill soi
 changes to the same TerrainBed used by water, landslides and rigid colliders. The native solver loads on
 demand and supports plain and shared world memory.
 
-```js
-import { TerrainBed } from '@margoengine/physics/earth';
+```ts
+import { type BedShape, TerrainBed } from '@margoengine/physics/earth';
 import { LandscapeEvolution } from '@margoengine/physics/landscape';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-const grid = { columns: 10, rows: 5, width: 100, depth: 50, centre: [0, 0] };
+const grid: BedShape = { columns: 10, rows: 5, width: 100, depth: 50, centre: [0, 0] };
 const bed = new TerrainBed();
 const landscape = await LandscapeEvolution.load();
 world.add(bed, { ...grid, elevations: (x, z) => 8 - 0.12 * x + 0.006 * z * z });

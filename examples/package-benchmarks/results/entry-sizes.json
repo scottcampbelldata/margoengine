@@ -438,6 +438,10 @@
       "dist/workers/biomes.js": {
         "raw": 110275,
         "gzip": 41304
+      },
+      "./landscape": {
+        "raw": 969,
+        "gzip": 614
       }
     },
     "@margoengine/blender": {
@@ -14038,6 +14042,10 @@
       "./orbit": {
         "raw": 9148,
         "gzip": 4017
+      },
+      "./landscape": {
+        "raw": 10290,
+        "gzip": 4347
       }
     },
     "@margoengine/physics2d": {
@@ -17769,6 +17777,16 @@
       "raw": 4532,
       "gzip": 2435,
       "brotli": 2248
+    },
+    "packages/physics/dist/landscape-kernel.wasm": {
+      "raw": 12166,
+      "gzip": 5235,
+      "brotli": 4687
+    },
+    "packages/physics/dist/landscape-kernel-shared.wasm": {
+      "raw": 12254,
+      "gzip": 5302,
+      "brotli": 4729
     }
   },
   "splits": {

@@ -327,6 +327,10 @@
       "types": "./dist/biomes/erosion.d.ts",
       "import": "./dist/biomes/erosion.js"
     },
+    "./biomes/landscape": {
+      "types": "./dist/biomes/landscape.d.ts",
+      "import": "./dist/biomes/landscape.js"
+    },
     "./biomes/valley": {
       "types": "./dist/biomes/valley.d.ts",
       "import": "./dist/biomes/valley.js"
@@ -3206,6 +3210,10 @@
     "./physics/runoff": {
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
+    },
+    "./physics/landscape": {
+      "types": "./dist/physics/landscape.d.ts",
+      "import": "./dist/physics/landscape.js"
     },
     "./physics/sediment": {
       "types": "./dist/physics/sediment.d.ts",
