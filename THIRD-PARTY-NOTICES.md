@@ -495,7 +495,15 @@ interpolation package (https://earth-info.nga.mil/, Office of Geomatics, EGM96),
 little-endian int16 centimetres (721 x 1441, 2,077,922 bytes) by `scripts/geoid/pack-egm96.mjs`. US Government work,
 public domain; credit NGA and NASA, no endorsement. Reference: Lemoine et al., "The Development of the Joint NASA GSFC
 and NIMA Geopotential Model EGM96", NASA/TP-1998-206861, 1998. Data only; no NGA interpolation code (INTPT.f) is read
-or used.
+or used. The committed file (2026-11-26, Scott approved the download) was packed from NGA's own `ww15mgh.grd.z`
+(Unix compress) as NGA served it at
+http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm96/ww15mgh.grd.z, fetched from the Internet Archive's
+2006-11-20 capture of that address
+(https://web.archive.org/web/20061120214936id_/http://earth-info.nga.mil:80/GandG/wgs84/gravitymod/egm96/ww15mgh.grd.z),
+because earth-info.nga.mil refused connections from the workstation. SHA-256: `ww15mgh.grd.z`
+5b789d8c2a3163cc48f7d8f194ebe6fcbfcde8417ed687b8f113fe76d29508e9, unpacked `WW15MGH.GRD` (9,618,935 bytes)
+c2537a9420a9398ee1e3d5e3506e14aafa47bed1cdc5c8f1a37cd18a209903a0, packed `egm96-15.bin`
+e8114a8ae5eedc1e69d89ed1c5ea8e617bc70657ad95bf0633616d7bd15d04f0 (heights -106.991 m to 85.391 m).
 
 ## 3MF Consortium sample and validation files
 packages/loaders/tests/fixtures/3mf-samples/ holds ten unchanged files from https://github.com/3MFConsortium/3mf-samples at commit 665e20dc4d7777fd4c9702bca86a2d4028440337: examples/material/multiprop-opaque.3mf and multiprop-metallic.3mf, and from validation tests/_archive/3mf-Verify six MUSTFAIL_3MF100_Extension_Chapter5b-5e multiproperties files and MUSTPASS_Chapter5.1a and 5.1b. BSD-2-Clause, Copyright (c) 2018, 3MF Consortium; the licence text is LICENSE.txt in that folder and each file SHA-256 is in packages/loaders/tests/fixtures/SOURCES.txt. Test inputs only, never shipped; no implementation code is included.
