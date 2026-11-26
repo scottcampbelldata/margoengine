@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import type { EngineKernel } from '@margoengine/core';
 import { parseColor, type ColorInput } from './color.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { alphaBlend, overlayPass } from '../../shared/pass.js';
@@ -137,7 +138,7 @@ export class InfiniteGrid implements EnginePlugin {
   }
 
   /** Makes a grid and adds it to `engine`. */
-  static attach(engine: Pick<Engine, 'use'>, options?: InfiniteGridOptions): InfiniteGrid {
+  static attach(engine: EngineKernel, options?: InfiniteGridOptions): InfiniteGrid {
     const grid = new InfiniteGrid(options);
     engine.use(grid);
     return grid;
