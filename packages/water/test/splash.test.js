@@ -53,7 +53,12 @@ test('a skip leaves slower than it came and keeps its heading', () => {
 });
 
 test('the drop-limited height, the deep seal and the cavity-running path', () => {
-  near(dragLimitedHeight(100, 6.5), (6.5 ** 2 / (2 * 9.81)) * Math.log(1 + (100 / 6.5) ** 2), 1e-12, 'quadratic drag rise');
+  near(
+    dragLimitedHeight(100, 6.5),
+    (6.5 ** 2 / (2 * 9.81)) * Math.log(1 + (100 / 6.5) ** 2),
+    1e-12,
+    'quadratic drag rise',
+  );
   near(dragLimitedHeight(0.5, 6.5), 0.5 ** 2 / (2 * 9.81), 1e-4, 'slow drops rise ballistically');
   near(cavitySeal(0.08), 2.3 * Math.sqrt(0.08 / 9.81), 1e-12, 'deep seal');
   const l = (8 * 0.08 * 7200) / (3 * 1025 * CAVITY_DRAG);
@@ -62,8 +67,14 @@ test('the drop-limited height, the deep seal and the cavity-running path', () =>
 });
 
 test('a grazing shot plans skips then an entry; a steep one goes straight in', () => {
-  const graze = planSplashes({ time: 2, position: [768, 0, 0], velocity: [288, -10.9, 0], radius: 0.0783, density: 7200 }, { maxSkips: 3 });
-  assert.deepEqual(graze.map((e) => e.kind), ['skip', 'skip', 'skip', 'entry']);
+  const graze = planSplashes(
+    { time: 2, position: [768, 0, 0], velocity: [288, -10.9, 0], radius: 0.0783, density: 7200 },
+    { maxSkips: 3 },
+  );
+  assert.deepEqual(
+    graze.map((e) => e.kind),
+    ['skip', 'skip', 'skip', 'entry'],
+  );
   for (let i = 1; i < graze.length; i++) {
     assert.ok(graze[i].time > graze[i - 1].time && graze[i].position[0] > graze[i - 1].position[0], 'onward');
     assert.ok(graze[i].speed < graze[i - 1].speed, 'slower each skip');
@@ -73,17 +84,41 @@ test('a grazing shot plans skips then an entry; a steep one goes straight in', (
   const e = steep[0];
   assert.equal(e.kind, 'entry');
   near(e.columnDelay, cavitySeal(0.0783), 1e-12, 'the column waits for the seal');
-  near(e.columnSpeed, Math.sqrt(2 * 9.81 * 0.5 * entryDepth(e.speed, 0.0783, 7200, e.columnDelay)), 1e-9, 'jet from the pinch depth');
-  near(e.crownSpeed, e.speed * Math.sqrt(CAVITY_DRAG / 2) * Math.sqrt(Math.sin(45 * deg)), 1e-9, 'Logvinovich sheet speed');
+  near(
+    e.columnSpeed,
+    Math.sqrt(2 * 9.81 * 0.5 * entryDepth(e.speed, 0.0783, 7200, e.columnDelay)),
+    1e-9,
+    'jet from the pinch depth',
+  );
+  near(
+    e.crownSpeed,
+    e.speed * Math.sqrt(CAVITY_DRAG / 2) * Math.sqrt(Math.sin(45 * deg)),
+    1e-9,
+    'Logvinovich sheet speed',
+  );
   near(e.crownHeight, dragLimitedHeight(e.crownSpeed, CROWN_DROP_FALL), 1e-12, 'crown height');
 });
 
-const emitter = () => ({ options: {}, bursts: [], burst(n) { this.bursts.push(n); } });
+const emitter = () => ({
+  options: {},
+  bursts: [],
+  burst(n) {
+    this.bursts.push(n);
+  },
+});
 
 test('ShotSplash drives each splash on the film clock and runs the column from the deep seal', () => {
   const impact = { time: 1, position: [10, 0.5, 20], velocity: [100, -150, 0], radius: 0.0783, density: 7200 };
   const made = [];
-  const splash = new ShotSplash({ source: [impact], particles: (kind, slot) => { const e = emitter(); made.push([kind, slot]); return e; }, slots: 2 });
+  const splash = new ShotSplash({
+    source: [impact],
+    particles: (kind, slot) => {
+      const e = emitter();
+      made.push([kind, slot]);
+      return e;
+    },
+    slots: 2,
+  });
   assert.equal(made.length, 6);
   for (let i = 0; i < 29; i++) splash.advanceTime(1 / 30);
   assert.equal(splash.active().length, 0);
@@ -104,7 +139,10 @@ test('ShotSplash drives each splash on the film clock and runs the column from t
 });
 
 test('foam rings spread and fade, and sample is the drawn foam', () => {
-  const splash = new ShotSplash({ source: [{ time: 0, position: [0, 0, 0], velocity: [0, -200, 0], radius: 0.08, density: 7200 }], particles: emitter });
+  const splash = new ShotSplash({
+    source: [{ time: 0, position: [0, 0, 0], velocity: [0, -200, 0], radius: 0.08, density: 7200 }],
+    particles: emitter,
+  });
   splash.advanceTime(0.5);
   const [r0] = splash.rings();
   assert.ok(splash.sample(0, 0) > 0.3 && splash.sample(r0[2] * 2, 0) < 1e-3);
@@ -120,7 +158,10 @@ test('foam rings spread and fade, and sample is the drawn foam', () => {
 
 test('the same frames give the same splashes, whatever the frame steps (a seek)', () => {
   const run = (dt, n) => {
-    const s = new ShotSplash({ source: [{ time: 0.3, position: [0, 0, 0], velocity: [250, -15, 0], radius: 0.0783, density: 7200 }], particles: emitter });
+    const s = new ShotSplash({
+      source: [{ time: 0.3, position: [0, 0, 0], velocity: [250, -15, 0], radius: 0.0783, density: 7200 }],
+      particles: emitter,
+    });
     for (let i = 0; i < n; i++) s.advanceTime(dt);
     return s.events.map((e) => [e.kind, e.time]).concat(s.rings().map((r) => r.map((x) => x.toFixed(9))));
   };
@@ -151,7 +192,12 @@ test('between skips the ball flies against air drag: the quadratic-drag range in
     mass = (density * 4 * Math.PI * radius ** 3) / 3,
     k = (0.5 * 1.225 * 0.47 * Math.PI * radius ** 2) / mass;
   const land = skipFlight([0, 0, 0], [100, 5, 0], radius, density, { drag: 0.47 });
-  near(land.position[0], Math.log(1 + k * 100 * land.time) / k, 2e-4 * land.position[0], 'range against Poncelet quadratic drag');
+  near(
+    land.position[0],
+    Math.log(1 + k * 100 * land.time) / k,
+    2e-4 * land.position[0],
+    'range against Poncelet quadratic drag',
+  );
   const vacuum = skipFlight([0, 0, 0], [100, 5, 0], radius, density, { drag: false });
   near(vacuum.time, (2 * 5) / 9.81, 2e-3, 'no drag: the vacuum flight time');
   near(vacuum.position[0], 100 * vacuum.time, 1e-6, 'and range');
@@ -178,7 +224,10 @@ test('a crosswind moves a skipping ball by the lag-time rule (McCoy 1999)', () =
   const splash = new ShotSplash({ source: [impact], particles: emitter, wind: [0, W] });
   splash.advanceTime(0.01);
   near(splash.events[1].position[2], windy[1].position[2], 1e-9, 'ShotSplash takes its wind');
-  const weather = new ShotSplash({ source: [impact], particles: () => Object.assign(emitter(), { options: { wind: [0, W] } }) });
+  const weather = new ShotSplash({
+    source: [impact],
+    particles: () => Object.assign(emitter(), { options: { wind: [0, W] } }),
+  });
   weather.advanceTime(0.01);
   near(weather.events[1].position[2], windy[1].position[2], 1e-9, 'and else the wind the weather wrote on its spray');
 });
@@ -215,4 +264,79 @@ test('bad options throw', () => {
   assert.throws(() => new ShotSplash({ particles: () => ({}) }), TypeError);
   assert.throws(() => birkhoffContact([1, 1, 0], 0.08, 7200), RangeError);
   assert.throws(() => planSplashes(null), TypeError);
+});
+
+test("ShotSplash draws the physics' splashes: an entry's crown, its seal's jet and an exit's lifted water, each once", () => {
+  // As EntrySolver.splashes() (@margoengine/physics/entry) lists them, growing as the world steps.
+  const list = [],
+    physics = { splashes: () => list },
+    splash = new ShotSplash({ splashes: physics, particles: emitter, slots: 4 }),
+    entry = {
+      kind: 'entry',
+      row: 0,
+      time: 0.1,
+      position: [2, 0.3, -1],
+      velocity: [3, -9, 0],
+      speed: 9.5,
+      sine: 0.95,
+      radius: 0.05,
+      crownSpeed: 3.3,
+      crownHeight: 0.5,
+      columnSpeed: 0,
+      columnHeight: 0,
+    },
+    seal = {
+      ...entry,
+      kind: 'seal',
+      time: 0.16,
+      velocity: [0, 88, 0],
+      speed: 88,
+      sine: 1,
+      crownSpeed: 0,
+      crownHeight: 0,
+      columnSpeed: 88,
+      columnHeight: 30,
+    },
+    exit = {
+      ...entry,
+      kind: 'exit',
+      time: 0.16,
+      velocity: [0, 4, 0],
+      speed: 4,
+      crownSpeed: 0,
+      crownHeight: 0,
+      columnSpeed: 4,
+      columnHeight: 0.8,
+    };
+  list.push(entry);
+  splash.advanceTime(0.05);
+  assert.equal(splash.events.length, 1);
+  assert.equal(splash.active().length, 0, 'not due yet');
+  splash.advanceTime(0.06);
+  splash.advanceTime(0);
+  assert.equal(splash.events.length, 1, 'taken once, however often it is read');
+  const [a] = splash.active(),
+    slot = splash.slots[a.slot];
+  assert.ok(slot.crown.bursts[0] > 0, 'the crown');
+  near(a.event.angle, Math.asin(0.95), 1e-12, 'its angle');
+  near(slot.crown.options.velocity[1], Math.sqrt(2 * 9.81 * 0.5), 1e-9, 'launched to the crown height');
+  assert.equal(slot.column.options.rate, 0, 'no column at the entry');
+  // Two at the same time: both taken, neither twice.
+  list.push(seal, exit);
+  splash.advanceTime(0.06);
+  splash.advanceTime(0.001);
+  assert.equal(splash.events.length, 3);
+  const jets = splash.active().filter((s) => s.event.columnSpeed > 0);
+  assert.equal(jets.length, 2);
+  for (const s of jets) {
+    const k = splash.slots[s.slot].column.options;
+    assert.ok(k.rate > 0, 'the column runs at once');
+    near(k.velocity[1], Math.sqrt(2 * 9.81 * s.event.columnHeight), 1e-9, 'launched to its height');
+    assert.equal(splash.slots[s.slot].crown.bursts.at(-1), 0, 'and throws no crown');
+  }
+  // A seek back: the splashes are taken again as the clock reaches them.
+  splash.resetTime();
+  splash.advanceTime(0.2);
+  assert.equal(splash.events.length, 3);
+  assert.throws(() => new ShotSplash({ splashes: {}, particles: emitter }), TypeError);
 });

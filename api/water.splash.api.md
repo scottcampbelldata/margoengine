@@ -21,6 +21,21 @@ export const CROWN_DROP_FALL = 6.5;
 
 export const MAX_SPLASH_RINGS = 16;
 
+export interface PhysicsSplash {
+    kind: 'entry' | 'seal' | 'exit' | 'skip';
+    row: number;
+    time: number;
+    position: readonly [number, number, number];
+    velocity: readonly [number, number, number];
+    speed: number;
+    sine: number;
+    radius: number;
+    crownSpeed: number;
+    crownHeight: number;
+    columnSpeed: number;
+    columnHeight: number;
+}
+
 export const SEAL_TIME = 2.3;
 
 export const SEA_WATER_DENSITY = 1025;
@@ -79,6 +94,9 @@ export interface ShotSplashLook {
 }
 
 export interface ShotSplashOptions {
+    splashes?: {
+        splashes(): readonly PhysicsSplash[];
+    };
     source?: {
         impacts(): readonly ShotImpact[];
     } | readonly ShotImpact[];
@@ -179,6 +197,8 @@ export function ricochetAngle(density: number, waterDensity?: number): number;
 export function skipFlight(position: Vec3, velocity: Vec3, radius: number, density: number, options?: SkipFlightOptions): SkipLanding;
 
 export function sphereDragCoefficient(mach: number): number;
+
+export function splashOf(e: PhysicsSplash): SplashEvent;
 
 // Not exported from this entry, but used by the exports above:
 

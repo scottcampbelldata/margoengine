@@ -88,7 +88,7 @@ export interface ShotImpact {
 export function ricochetAngle(density: number, waterDensity = SEA_WATER_DENSITY): number {
   finite(density, 1, 1e5, 'density');
   finite(waterDensity, 500, 2000, 'water density');
-  return ((18 * Math.PI) / 180) / Math.sqrt(density / waterDensity);
+  return (18 * Math.PI) / 180 / Math.sqrt(density / waterDensity);
 }
 
 /** The result of {@link birkhoffContact}. */
@@ -113,7 +113,12 @@ const GRID_T = 40,
  * grid in steps of a fiftieth of the time to cross its radius, until it leaves the water (a skip) or goes fully under
  * (an entry). The critical angle this gives is Johnson and Reid's 18 / sqrt(sigma) degrees within the trials' scatter.
  */
-export function birkhoffContact(velocity: Vec3, radius: number, density: number, waterDensity = SEA_WATER_DENSITY): SplashContact {
+export function birkhoffContact(
+  velocity: Vec3,
+  radius: number,
+  density: number,
+  waterDensity = SEA_WATER_DENSITY,
+): SplashContact {
   const v = vec3(velocity, 'velocity');
   const a = finite(radius, 1e-4, 10, 'radius'),
     rs = finite(density, 1, 1e5, 'density'),
@@ -163,7 +168,8 @@ export function birkhoffContact(velocity: Vec3, radius: number, density: number,
     }
     t += dt;
     depth = Math.max(depth, -c[1]!);
-    if (c[1]! >= a && u[1]! > 0) return { ricochet: true, velocity: [u[0]!, u[1]!, u[2]!], duration: t, travel: Math.hypot(c[0]!, c[2]!), depth };
+    if (c[1]! >= a && u[1]! > 0)
+      return { ricochet: true, velocity: [u[0]!, u[1]!, u[2]!], duration: t, travel: Math.hypot(c[0]!, c[2]!), depth };
     if (c[1]! <= -a || Math.hypot(u[0]!, u[1]!, u[2]!) < 1e-3 * speed0)
       return { ricochet: false, velocity: [u[0]!, u[1]!, u[2]!], duration: t, travel: Math.hypot(c[0]!, c[2]!), depth };
   }
@@ -184,8 +190,16 @@ export function cavitySeal(radius: number): number {
  * How far a cavity-running sphere goes in `seconds`, metres, slowed by its drag C_D (default {@link CAVITY_DRAG}):
  * U(t) = U0 / (1 + U0 t / l), l = 8 a rho_s / (3 rho_w C_D), so the path is l ln(1 + U0 t / l).
  */
-export function entryDepth(speed: number, radius: number, density: number, seconds: number, drag = CAVITY_DRAG): number {
-  const l = (8 * finite(radius, 1e-4, 10, 'radius') * finite(density, 1, 1e5, 'density')) / (3 * SEA_WATER_DENSITY * finite(drag, 0.01, 2, 'drag'));
+export function entryDepth(
+  speed: number,
+  radius: number,
+  density: number,
+  seconds: number,
+  drag = CAVITY_DRAG,
+): number {
+  const l =
+    (8 * finite(radius, 1e-4, 10, 'radius') * finite(density, 1, 1e5, 'density')) /
+    (3 * SEA_WATER_DENSITY * finite(drag, 0.01, 2, 'drag'));
   return l * Math.log(1 + (finite(speed, 0, 1e4, 'speed') * finite(seconds, 0, 1e4, 'seconds')) / l);
 }
 
@@ -212,7 +226,9 @@ export function sphereDragCoefficient(mach: number): number {
   return 0.92;
 }
 /** The air's motion a ball flies through: `[x, z]` m/s, or a field `{sample(x, y, z, t)}` (a VFX wind). */
-export type SplashWind = readonly [number, number] | { sample(x: number, y: number, z: number, t: number): ArrayLike<number> };
+export type SplashWind =
+  | readonly [number, number]
+  | { sample(x: number, y: number, z: number, t: number): ArrayLike<number> };
 /** Settings of {@link skipFlight}. */
 export interface SkipFlightOptions {
   /** The water between grazes. Default the plane through the start. */
@@ -236,7 +252,13 @@ export interface SkipLanding {
  * air (gravity, and the sphere drag of {@link sphereDragCoefficient} on its speed relative to the wind; fourth-order
  * Runge-Kutta in 2 ms steps) until it is back at the water, at most 60 s.
  */
-export function skipFlight(position: Vec3, velocity: Vec3, radius: number, density: number, options: SkipFlightOptions = {}): SkipLanding {
+export function skipFlight(
+  position: Vec3,
+  velocity: Vec3,
+  radius: number,
+  density: number,
+  options: SkipFlightOptions = {},
+): SkipLanding {
   const p = vec3(position, 'position'),
     v = vec3(velocity, 'velocity'),
     a = finite(radius, 1e-4, 10, 'radius'),
@@ -288,7 +310,11 @@ export function skipFlight(position: Vec3, velocity: Vec3, radius: number, densi
     if (t > 0 && above1 <= 0 && above0 > 0) {
       const f = above0 / (above0 - above1),
         at = s.map((x, i) => x + (next[i]! - x) * f);
-      return { time: t + f * dt, position: [at[0]!, level(at[0]!, at[2]!), at[2]!], velocity: [at[3]!, at[4]!, at[5]!] };
+      return {
+        time: t + f * dt,
+        position: [at[0]!, level(at[0]!, at[2]!), at[2]!],
+        velocity: [at[3]!, at[4]!, at[5]!],
+      };
     }
     for (let i = 0; i < 6; i++) s[i] = next[i]!;
     t += dt;
@@ -324,8 +350,12 @@ export interface SplashEvent {
  * through the air to the water again, {@link skipFlight}: drag, and the `wind`), then the entry; at most `maxSkips`
  * (default 8) skips. The water is the plane through the first impact, or `water` (a height source) between skips.
  */
-export function planSplashes(impact: ShotImpact, options: { maxSkips?: number; water?: WaterHeightSource; wind?: SplashWind; drag?: boolean | number } = {}): SplashEvent[] {
-  if (!impact || typeof impact !== 'object') throw typeError('planSplashes needs a ShotImpact {time, position, velocity, radius, density}', 'geometry');
+export function planSplashes(
+  impact: ShotImpact,
+  options: { maxSkips?: number; water?: WaterHeightSource; wind?: SplashWind; drag?: boolean | number } = {},
+): SplashEvent[] {
+  if (!impact || typeof impact !== 'object')
+    throw typeError('planSplashes needs a ShotImpact {time, position, velocity, radius, density}', 'geometry');
   const out: SplashEvent[] = [],
     maxSkips = finite(options.maxSkips ?? 8, 0, 64, 'maxSkips'),
     a = finite(impact.radius, 1e-4, 10, 'radius'),
@@ -344,7 +374,20 @@ export function planSplashes(impact: ShotImpact, options: { maxSkips?: number; w
       crownHeight = dragLimitedHeight(crownSpeed, CROWN_DROP_FALL);
     const contact = k < maxSkips ? birkhoffContact(v, a, rs) : undefined;
     if (contact?.ricochet) {
-      out.push({ kind: 'skip', time, position: p, speed: U, angle, heading, crownSpeed, crownHeight, columnDelay: 0, columnSpeed: 0, columnHeight: 0, radius: a });
+      out.push({
+        kind: 'skip',
+        time,
+        position: p,
+        speed: U,
+        angle,
+        heading,
+        crownSpeed,
+        crownHeight,
+        columnDelay: 0,
+        columnSpeed: 0,
+        columnHeight: 0,
+        radius: a,
+      });
       // It flies on through the air (gravity, drag, the wind) until it is back at the water.
       const w = contact.velocity,
         start: V3 = [p[0] + heading[0] * contact.travel, p[1], p[2] + heading[1] * contact.travel],
@@ -417,9 +460,36 @@ export interface SplashEmitterOptions {
  * its `WeatherDrive`).
  */
 export const SPLASH_EMITTERS: Readonly<Record<SplashKind, SplashEmitterOptions>> = Object.freeze({
-  crown: { capacity: 3000, rate: 0, gravity: [0, -G, 0], size: 0.35, color: [0.92, 0.95, 0.97, 0.75], lifetime: [1, 2], turbulence: 0.3, bounce: 0 },
-  column: { capacity: 3000, rate: 0, gravity: [0, -G, 0], size: 0.9, color: [0.9, 0.93, 0.95, 0.6], lifetime: [1, 2], turbulence: 0.5, bounce: 0 },
-  mist: { capacity: 1500, rate: 0, gravity: [0, -0.3, 0], size: 3, color: [0.88, 0.9, 0.92, 0.18], lifetime: [4, 7], turbulence: 0.6, bounce: 0 },
+  crown: {
+    capacity: 3000,
+    rate: 0,
+    gravity: [0, -G, 0],
+    size: 0.35,
+    color: [0.92, 0.95, 0.97, 0.75],
+    lifetime: [1, 2],
+    turbulence: 0.3,
+    bounce: 0,
+  },
+  column: {
+    capacity: 3000,
+    rate: 0,
+    gravity: [0, -G, 0],
+    size: 0.9,
+    color: [0.9, 0.93, 0.95, 0.6],
+    lifetime: [1, 2],
+    turbulence: 0.5,
+    bounce: 0,
+  },
+  mist: {
+    capacity: 1500,
+    rate: 0,
+    gravity: [0, -0.3, 0],
+    size: 3,
+    color: [0.88, 0.9, 0.92, 0.18],
+    lifetime: [4, 7],
+    turbulence: 0.6,
+    bounce: 0,
+  },
 });
 
 /** The look of a {@link ShotSplash}; every value is read each frame. */
@@ -437,7 +507,15 @@ export interface ShotSplashLook {
   waveLift: number;
 }
 /** The defaults of {@link ShotSplashLook}: every law at its own size, foam that fades over 25 s, spray that rides the waves. */
-export const SHOT_SPLASH_DEFAULTS: Readonly<ShotSplashLook> = Object.freeze({ crown: 1, column: 1, mist: 1, height: 1, foamWidth: 1, foamLife: 25, waveLift: 1 });
+export const SHOT_SPLASH_DEFAULTS: Readonly<ShotSplashLook> = Object.freeze({
+  crown: 1,
+  column: 1,
+  mist: 1,
+  height: 1,
+  foamWidth: 1,
+  foamLife: 25,
+  waveLift: 1,
+});
 const LOOK_RANGES: Record<keyof ShotSplashLook, [number, number]> = {
   crown: [0, 10],
   column: [0, 10],
@@ -448,8 +526,58 @@ const LOOK_RANGES: Record<keyof ShotSplashLook, [number, number]> = {
   waveLift: [0, 1],
 };
 
+/**
+ * A splash the physics worked out, as `EntrySolver.splashes()` of `@margoengine/physics/entry` lists them: a body
+ * striking the water against its local surface and relative to the waves' motion (`entry`), its cavity's deep seal
+ * throwing the jet (`seal`), its breaking out from under (`exit`), a glance off (`skip`).
+ */
+export interface PhysicsSplash {
+  kind: 'entry' | 'seal' | 'exit' | 'skip';
+  row: number;
+  time: number;
+  position: readonly [number, number, number];
+  velocity: readonly [number, number, number];
+  speed: number;
+  /** The sine of its angle to the surface. */
+  sine: number;
+  radius: number;
+  crownSpeed: number;
+  crownHeight: number;
+  columnSpeed: number;
+  columnHeight: number;
+}
+
+/** A {@link PhysicsSplash} as ShotSplash draws it: an entry or skip's crown, a seal's jet or an exit's lifted water as a column. */
+export function splashOf(e: PhysicsSplash): SplashEvent {
+  const h = Math.hypot(e.velocity[0], e.velocity[2]),
+    heading: [number, number] = h > 0 ? [e.velocity[0] / h, e.velocity[2] / h] : [1, 0],
+    column = e.kind === 'seal' || e.kind === 'exit';
+  return {
+    // A seal or an exit is drawn as an entry's column, at once.
+    kind: e.kind === 'skip' ? 'skip' : 'entry',
+    time: e.time,
+    position: [e.position[0], e.position[1], e.position[2]],
+    speed: e.speed,
+    angle: Math.asin(Math.min(1, Math.max(0, e.sine))),
+    heading,
+    crownSpeed: column ? 0 : e.crownSpeed,
+    crownHeight: column ? 0 : e.crownHeight,
+    columnDelay: 0,
+    columnSpeed: column ? e.columnSpeed : 0,
+    columnHeight: column ? e.columnHeight : 0,
+    radius: e.radius,
+  };
+}
+
 /** `ShotSplash` settings. */
 export interface ShotSplashOptions {
+  /**
+   * Splashes the physics works out (an `EntrySolver` of `@margoengine/physics/entry`, its `splashes()` read every frame),
+   * drawn as they fall due on the splash clock, which runs on the world's time: each entry against the local surface and
+   * relative to the waves, its cavity's seal and jet, exits and skips. Use it for bodies the physics carries; `source`
+   * plans a shot's fall on its own, on the plane of each impact.
+   */
+  splashes?: { splashes(): readonly PhysicsSplash[] };
   /** Where the impacts come from: a `Battery` (its `impacts()`, read every frame) or a list. */
   source?: { impacts(): readonly ShotImpact[] } | readonly ShotImpact[];
   /** Makes each slot's emitters: `(kind, slot) => VFX.attach(engine, SPLASH_EMITTERS[kind])`. Called at attach. */
@@ -494,7 +622,8 @@ fn shotFoam(p:vec2f)->f32 {
 `;
 const foamShader = (code: string, binding: number): string => {
   const foamLine = 'var foam=max(fresh,surfFoam);';
-  if (!code.includes(foamLine)) throw fault('state', 'ShotSplash found no place in the Water shader for its foam; update @margoengine/water');
+  if (!code.includes(foamLine))
+    throw fault('state', 'ShotSplash found no place in the Water shader for its foam; update @margoengine/water');
   return `
 @group(0) @binding(${binding}) var<uniform> shotFoamData:ShotFoam;
 ${FOAM_WGSL}${code.replace(foamLine, `${foamLine}foam=max(foam,shotFoam(i.world.xz)*pattern);`)}`;
@@ -513,7 +642,13 @@ const smoothstep = (a: number, b: number, x: number) => {
 export class ShotSplash implements EnginePlugin {
   readonly name = 'water:shot-splash-' + sequence++;
   readonly look: ShotSplashLook;
-  readonly slots: { crown: ShotSplashParticles; column: ShotSplashParticles; mist: ShotSplashParticles; event: SplashEvent | null; used: number }[] = [];
+  readonly slots: {
+    crown: ShotSplashParticles;
+    column: ShotSplashParticles;
+    mist: ShotSplashParticles;
+    event: SplashEvent | null;
+    used: number;
+  }[] = [];
   /** Every splash planned so far, in time order. */
   readonly events: SplashEvent[] = [];
   readonly options: ShotSplashOptions;
@@ -525,9 +660,15 @@ export class ShotSplash implements EnginePlugin {
   private clock = 0;
   private seen = 0;
   private fired = 0;
+  /** The last physics splash taken: its time and how many at that time. */
+  private physicsTime = -Infinity;
+  private physicsAtTime = 0;
   private readonly values = new Float32Array(4 + MAX_SPLASH_RINGS * RING_FLOATS);
   constructor(options: ShotSplashOptions) {
-    if (!options || typeof options.particles !== 'function') throw typeError('ShotSplash needs particles: (kind, slot) => emitter (a VFX)', 'geometry');
+    if (!options || typeof options.particles !== 'function')
+      throw typeError('ShotSplash needs particles: (kind, slot) => emitter (a VFX)', 'geometry');
+    if (options.splashes !== undefined && typeof options.splashes?.splashes !== 'function')
+      throw typeError('ShotSplash splashes come from an EntrySolver (its splashes()); pass one or none', 'geometry');
     this.options = options;
     this.look = { ...SHOT_SPLASH_DEFAULTS };
     this.setLook(options.look ?? {});
@@ -536,7 +677,11 @@ export class ShotSplash implements EnginePlugin {
     for (let i = 0; i < n; i++) {
       const make = (kind: SplashKind) => {
         const e = options.particles(kind, i);
-        if (!e || typeof e.burst !== 'function' || typeof e.options !== 'object') throw typeError('ShotSplash particles must return an emitter with options and burst(count), such as a VFX', 'geometry');
+        if (!e || typeof e.burst !== 'function' || typeof e.options !== 'object')
+          throw typeError(
+            'ShotSplash particles must return an emitter with options and burst(count), such as a VFX',
+            'geometry',
+          );
         e.options.rate = 0;
         return e;
       };
@@ -564,13 +709,34 @@ export class ShotSplash implements EnginePlugin {
   }
   private plan(impact: ShotImpact): void {
     const own = this.options.wind ?? this.slots[0]?.crown.options.wind,
-      wind = Array.isArray(own) || (own && typeof (own as { sample?: unknown }).sample === 'function') ? (own as SplashWind) : undefined,
+      wind =
+        Array.isArray(own) || (own && typeof (own as { sample?: unknown }).sample === 'function')
+          ? (own as SplashWind)
+          : undefined,
       list = planSplashes(impact, {
         maxSkips: this.options.maxSkips ?? 8,
         ...(this.options.water ? { water: this.options.water } : {}),
         ...(wind ? { wind } : {}),
       });
     for (const e of list) {
+      let i = this.events.length;
+      while (i > this.fired && this.events[i - 1]!.time > e.time) i--;
+      this.events.splice(i, 0, e);
+    }
+  }
+  /** Queues the physics splashes not taken yet (those after the last one taken, in their order). */
+  private takePhysics(list: readonly PhysicsSplash[]): void {
+    let atTime = 0;
+    for (const p of list) {
+      if (p.time < this.physicsTime) continue;
+      if (p.time === this.physicsTime) {
+        if (++atTime <= this.physicsAtTime) continue;
+        this.physicsAtTime = atTime;
+      } else {
+        this.physicsTime = p.time;
+        this.physicsAtTime = atTime = 1;
+      }
+      const e = splashOf(p);
       let i = this.events.length;
       while (i > this.fired && this.events[i - 1]!.time > e.time) i--;
       this.events.splice(i, 0, e);
@@ -598,6 +764,8 @@ export class ShotSplash implements EnginePlugin {
     this.seen = 0;
     this.fired = 0;
     this.events.length = 0;
+    this.physicsTime = -Infinity;
+    this.physicsAtTime = 0;
     for (const slot of this.slots) {
       slot.event = null;
       slot.used = -1;
@@ -612,8 +780,13 @@ export class ShotSplash implements EnginePlugin {
     if (this.disposed) return;
     this.clock += delta > 0 ? delta : 0;
     const src = this.options.source,
-      list = src ? ('impacts' in src && typeof src.impacts === 'function' ? src.impacts() : (src as readonly ShotImpact[])) : [];
+      list = src
+        ? 'impacts' in src && typeof src.impacts === 'function'
+          ? src.impacts()
+          : (src as readonly ShotImpact[])
+        : [];
     for (; this.seen < list.length; this.seen++) this.plan(list[this.seen]!);
+    if (this.options.splashes) this.takePhysics(this.options.splashes.splashes());
     const look = this.look;
     while (this.fired < this.events.length && this.events[this.fired]!.time <= this.clock) {
       const e = this.events[this.fired++]!;
@@ -659,7 +832,7 @@ export class ShotSplash implements EnginePlugin {
         k.rate = 0;
         continue;
       }
-      if (e.kind !== 'entry' || look.column <= 0) {
+      if (e.kind !== 'entry' || look.column <= 0 || !(e.columnSpeed > 0)) {
         k.rate = 0;
         continue;
       }
@@ -732,10 +905,16 @@ export class ShotSplash implements EnginePlugin {
     this.engine = engine;
     const surface = this.options.surface;
     if (!surface) return;
-    if (!engine.gpu) throw fault('unsupported', 'ShotSplash foam needs WebGPU or the full WebGL2 compatibility layer', 'webgpu');
-    if (!engine.hasPlugin(surface.name)) throw fault('state', 'Attach the Water surface to this engine before ShotSplash');
-    if (surfaceEffects.get(surface)?.some((e) => e.key === 'shot-splash')) throw fault('attached', 'This Water already has a ShotSplash; give it more slots', 'state');
-    this.uniform = engine.gpu.createBuffer({ size: this.values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    if (!engine.gpu)
+      throw fault('unsupported', 'ShotSplash foam needs WebGPU or the full WebGL2 compatibility layer', 'webgpu');
+    if (!engine.hasPlugin(surface.name))
+      throw fault('state', 'Attach the Water surface to this engine before ShotSplash');
+    if (surfaceEffects.get(surface)?.some((e) => e.key === 'shot-splash'))
+      throw fault('attached', 'This Water already has a ShotSplash; give it more slots', 'state');
+    this.uniform = engine.gpu.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     const resources = [{ buffer: this.uniform }];
     this.remove = addSurfaceEffect(surface, {
       key: 'shot-splash',
@@ -743,7 +922,8 @@ export class ShotSplash implements EnginePlugin {
       count: 1,
       shader: (code, binding) => foamShader(code, binding),
       prepare: (c: Context) => {
-        if (c.device !== this.engine?.gpu) throw fault('state', 'ShotSplash and Water must use the same engine; attach both to one engine');
+        if (c.device !== this.engine?.gpu)
+          throw fault('state', 'ShotSplash and Water must use the same engine; attach both to one engine');
         c.device.queue.writeBuffer(this.uniform!, 0, this.build());
         return resources;
       },
