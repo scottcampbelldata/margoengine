@@ -150,7 +150,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Webcam hand and pose landmarks from a camera stream outside WebXR, for AR and body overlays | drei, MediaPipe examples | MISSING | L |  |
 | Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | 3b1a571bb |
 | Infinite shader grid with cell and section sizes and distance fade (`GridHelper` is finite) | drei `Grid` | DONE (`@margoengine/lines/infinite-grid`) | S | f144ef66b |
-| Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | MISSING | S |  |
+| Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | DONE | S | 2992ec62e |
 | Light probe helper and positional-audio cone helper | three.js | DONE | S | d0dfc71e1 |
 | Raycaster helper (ray and hits) and BVH tree visualiser with a depth slider | three.js, three-mesh-bvh | DONE (`@margoengine/lines/tree-helpers`: `RaycasterHelper`, `BVHHelper`) | S | 312af62b9 |
 | Octree helper for `points/src/octree.ts` | three.js | DONE (`@margoengine/lines/tree-helpers`: `OctreeHelper`) | S | 312af62b9 |
