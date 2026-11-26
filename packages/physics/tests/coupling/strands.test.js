@@ -587,3 +587,63 @@ test('link friction exchanges equal momentum and removes tangential sliding ener
   const energy = (u, v) => u.reduce((sum, x, k) => sum + x * x + v[k] * v[k], 0);
   assert.ok(energy(c, d) < energy(a, b));
 });
+
+test('a sectioned rachis follows the bending integral for published cross-section moments', async () => {
+  const length = 0.128;
+  const n = 32;
+  const step = length / n;
+  const young = 4.5e9;
+  const density = 1300;
+  const g = 9.81;
+  const points = Array.from({ length: n + 1 }, (_, i) => [0, 0, i * step]);
+  // Bachmann et al. (2012), Table 1: 9.7% and 18.8% shaft stations of primary feathers.
+  for (const stationMoments of [
+    [2.292, 1.994],
+    [1.503, 1.686],
+  ]) {
+    const sections = Array.from({ length: n }, (_, i) => ({
+      radius: i < n / 2 ? 0.0018 : 0.0015,
+      area: i < n / 2 ? 2.2e-6 : 1.3e-6,
+      secondMoment: stationMoments[i < n / 2 ? 0 : 1] * 1e-12,
+    }));
+    const { solver, world } = await attach(
+      [{ points, density, young, drag: 0, sections }],
+      { damping: 27, selfCollision: false },
+      [0, -g, 0],
+    );
+    const nodalWeight = (i) => 0.5 * g * density * step * (sections[i - 1].area + (sections[i]?.area ?? 0));
+    let angle = 0;
+    let displacement = 0;
+    for (let j = 1; j < n; j++) {
+      let moment = 0;
+      for (let k = j + 1; k <= n; k++) moment += nodalWeight(k) * (k - j) * step;
+      const rotation =
+        (moment * step * (1 / sections[j - 1].secondMoment + 1 / sections[j].secondMoment)) / (2 * young);
+      angle += rotation;
+      displacement += rotation * (n - j) * step;
+    }
+    const maximumWeight = n * nodalWeight(1);
+    const shearBound = (maximumWeight * length) / ((young / 2.6) * sections[n - 1].area);
+    world.advance(120);
+    near(-solver.sample(0, n).position[1], displacement, displacement * angle * angle + shearBound);
+    const snapshot = world.takeSnapshot();
+    world.advance(140);
+    const expected = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(140);
+    assert.equal(world.hash(), expected);
+  }
+});
+
+test('strand section counts and effective section properties name their fixes', async () => {
+  const points = [zero, [0, 0, 0.2], [0, 0, 0.4]];
+  await assert.rejects(attach([{ points, sections: [{}] }]), /Supply one strand section for each link/);
+  await assert.rejects(
+    attach([{ points, sections: [{ secondMoment: 0 }, {}] }]),
+    /Pass a finite positive second moment/,
+  );
+  await assert.rejects(
+    attach([{ points, sections: [{}, { torsionConstant: Infinity }] }]),
+    /Pass a finite positive torsion constant/,
+  );
+});

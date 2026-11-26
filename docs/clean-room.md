@@ -14939,6 +14939,29 @@ test measures every length during a wind reversal and contact with a live terrai
 browser fixture draws the solved centreline and frame in a fixed view and repeats the same
 gust against a still-air control.
 
+### Feather and tapered strand sections
+
+- Thomas Bachmann, Jens Emmerlich, Werner Baumgartner, Jochen M. Schneider and Hermann Wagner,
+  [*Flexural stiffness of feather shafts: geometry rules over material properties*](https://doi.org/10.1242/jeb.059451)
+  (2012), equations 2–5 and table 1. The observed longitudinal change in stiffness follows
+  the spatial variation in cross-section moment. Use the measured moment and modulus
+  to set the curvature compliance rather than inferring both from the contact radius.
+- Richard Bonser and Peter Purslow, [*The Young's modulus of feather keratin*](https://pubmed.ncbi.nlm.nih.gov/9318836/)
+  (1995). Their comparative tension and dynamic bending tests distinguish material
+  modulus from shaft geometry. Bin Wang and Marc André Meyers, [*Seagull feather shaft:
+  Correlation between structure and mechanical response*](https://meyersgroup.ucsd.edu/papers/journals/Meyers%20428.pdf)
+  (2017), section 4.4, similarly separates the effective flexural rigidity of a hollow
+  shell and foam core.
+
+A section supplies its axial area, transverse moment and torsion constant independently.
+A frame joint spans half of each adjoining link, with total bending compliance
+`L₁ / (2 E₁ I₁) + L₂ / (2 E₂ I₂)` and an analogous torsion compliance using `GJ`.
+Weight distributes half of each link mass to each endpoint. The controlled beam tests
+use the 9.7% and 18.8% station moments in Bachmann's barn owl and pigeon data. These
+tests compare an independent sum of gravitational joint moments and report the
+small-angle and shear terms in the allowed error. The other section properties describe
+the test specimens. The GPU fixture uses tapered links against a still-air control.
+
 ### Swept strand and capsule contact
 
 - Minchen Li, Danny M. Kaufman and Chenfanfu Jiang,

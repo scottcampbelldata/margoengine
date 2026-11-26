@@ -29,7 +29,12 @@
     const x = ((group % 20) - 9.5) * 0.031, z = (Math.floor(group / 20) - 1) * 0.033;
     const length = 0.62 + 0.061 * Math.sin(group * 2.39);
     const points = Array.from({ length: 12 }, (_, i) => [x, 1.34 - length * i / 11, z + 0.01 * i / 11]);
-    return { points, radius: 0.0075, dragWidth: 0.031, young: 20e6, anchor: t => ({
+    const radius = 0.0075;
+    const sections = points.slice(1).map((_, i) => {
+      const taper = 1 - 0.74 * (i + 0.5) / (points.length - 1);
+      return { radius: radius * taper, dragWidth: 0.031 * taper };
+    });
+    return { points, radius, young: 20e6, sections, anchor: t => ({
       position: [x + 0.065 * Math.sin(6 * t), 1.34, z],
     }) };
   });

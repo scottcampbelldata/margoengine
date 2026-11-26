@@ -43,12 +43,16 @@ export interface StrandAnchor {
   readonly rotation?: Quat;
 }
 
-/** A cylindrical fibre guide, feather shaft, ponytail or spring-bone chain. */
-export interface StrandSpec {
-  /** Ordered rest points in metres, in the root's authored coordinates. At least two. */
-  readonly points: readonly Vec3[];
-  /** Cross-section radius in metres. Default 40 μm. */
+/** Section properties for a single link. Omitted values inherit the guide settings. */
+export interface StrandSection {
+  /** Outer contact radius in metres. Default 40 μm. */
   readonly radius?: number;
+  /** Load-bearing area in square metres. Defaults to the solid circular section. */
+  readonly area?: number;
+  /** Mean transverse area moment in metres to the fourth power. Defaults to the solid circular section. */
+  readonly secondMoment?: number;
+  /** Saint-Venant torsion constant in metres to the fourth power. Defaults to twice the second moment. */
+  readonly torsionConstant?: number;
   /** Material density in kg/m³. Default 1300. */
   readonly density?: number;
   /** Young's modulus in Pa. Default 3 GPa. */
@@ -57,6 +61,14 @@ export interface StrandSpec {
   readonly shear?: number;
   /** Width in metres for drag, allowing a vane or bundle wider than its shaft. Defaults to the fibre diameter. */
   readonly dragWidth?: number;
+}
+
+/** A fibre guide, feather shaft, ponytail or spring-bone chain. */
+export interface StrandSpec extends StrandSection {
+  /** Ordered rest points in metres, in the root's authored coordinates. At least two. */
+  readonly points: readonly Vec3[];
+  /** Optional section properties in root-to-tip link order. Supply one entry per link. */
+  readonly sections?: readonly StrandSection[];
   /** Dimensionless cross-flow drag coefficient. Default 1.2. */
   readonly drag?: number;
   /** Prescribed pose relative to `points[0]`. Defaults to a stationary root. */
@@ -158,6 +170,7 @@ type Guide = {
   readonly drag: number;
   readonly width: number;
   readonly radius: number;
+  readonly dragAreas?: Float64Array;
 };
 
 function invalid(fix: string): never {
@@ -172,6 +185,22 @@ function finite(value: number, label: string, min = -Infinity): number {
 function positive(value: number, label: string): number {
   if (!(value > 0 && Number.isFinite(value))) invalid(`Pass a finite positive ${label}.`);
   return value;
+}
+
+function readSection(guide: StrandSection, section?: StrandSection) {
+  const radius = positive(section?.radius ?? guide.radius ?? 40e-6, 'fibre radius');
+  const density = positive(section?.density ?? guide.density ?? 1300, 'fibre density');
+  const young = positive(section?.young ?? guide.young ?? 3e9, 'Young modulus');
+  const shear = positive(section?.shear ?? guide.shear ?? young / 2.6, 'shear modulus');
+  const frontal = Math.PI * radius * radius;
+  const area = positive(section?.area ?? guide.area ?? frontal, 'section area');
+  const inertia = positive(
+    section?.secondMoment ?? guide.secondMoment ?? (frontal * radius * radius) / 4,
+    'second moment',
+  );
+  const torsion = positive(section?.torsionConstant ?? guide.torsionConstant ?? 2 * inertia, 'torsion constant');
+  const width = positive(section?.dragWidth ?? guide.dragWidth ?? 2 * radius, 'projected drag width');
+  return { radius, density, young, shear, area, inertia, torsion, width, frontal, lineDensity: density * area };
 }
 
 function vector(value: Vec3): Vec3 {
@@ -415,12 +444,13 @@ export class StrandSolver implements Solver<StrandParams> {
   private initialize(spec: StrandSpec, first: number): Guide {
     const points = spec.points.map(vector);
     if (points.length < 2) invalid('Supply at least two distinct points per guide.');
-    const radius = positive(spec.radius ?? 40e-6, 'fibre radius'),
-      density = positive(spec.density ?? 1300, 'fibre density');
-    const young = positive(spec.young ?? 3e9, 'Young modulus'),
-      shear = positive(spec.shear ?? young / 2.6, 'shear modulus');
-    const area = Math.PI * radius * radius,
-      inertia = (area * radius * radius) / 4;
+    if (spec.sections && spec.sections.length !== points.length - 1)
+      invalid('Supply one strand section for each link between consecutive points.');
+    const base = readSection(spec);
+    const simpleCylinder = spec.sections === undefined && spec.area === undefined && spec.secondMoment === undefined;
+    const sections = spec.sections && Array.from(spec.sections, (section) => readSection(spec, section));
+    const dragAreas = sections ? new Float64Array(2 * points.length) : undefined;
+    let maxRadius = 0;
     const length: number[] = [],
       frames: Quat[] = [];
     let frame = IDENTITY;
@@ -445,12 +475,32 @@ export class StrandSolver implements Solver<StrandParams> {
       const l = length[i] ?? 0,
         previous = length[i - 1] ?? 0,
         span = 0.5 * (l + previous);
-      const mass = positive(density * area * span, 'point mass');
-      const edgeMass = density * area * l,
-        edgeBend = (edgeMass * (l * l + 3 * radius * radius)) / 12;
-      const edgeTwist = edgeMass * radius * radius * 0.5;
+      const section = sections?.[i] ?? sections?.[i - 1] ?? base;
+      const before = sections?.[i - 1] ?? section;
+      const nextSection = sections?.[i + 1];
+      const { area, density, radius, inertia, young, shear, torsion } = section;
+      const edgeMass = section.lineDensity * l;
+      const mass = positive(
+        sections ? 0.5 * (edgeMass + before.lineDensity * previous) : section.lineDensity * span,
+        'point mass',
+      );
+      const edgeBend = simpleCylinder
+        ? (edgeMass * (l * l + 3 * radius * radius)) / 12
+        : (edgeMass * l * l) / 12 + density * inertia * l;
+      const edgeTwist = simpleCylinder ? edgeMass * radius * radius * 0.5 : 2 * density * inertia * l;
       const restRotation = normalized(multiply([-q[0], -q[1], -q[2], q[3]], next));
       const joint = (l + (length[i + 1] ?? l)) * 0.5;
+      const bending = nextSection
+        ? (0.5 * l) / (young * inertia) + (0.5 * length[i + 1]!) / (nextSection.young * nextSection.inertia)
+        : joint / (young * inertia);
+      const twisting = nextSection
+        ? (0.5 * l) / (shear * torsion) + (0.5 * length[i + 1]!) / (nextSection.shear * nextSection.torsion)
+        : joint / (shear * torsion);
+      if (dragAreas) {
+        dragAreas[2 * i] = 0.5 * (section.width * l + before.width * previous);
+        dragAreas[2 * i + 1] = (section.frontal * l + before.frontal * previous) / (l + previous);
+      }
+      maxRadius = Math.max(maxRadius, radius);
       state.set(
         [
           ...sum(origin, rotate(orientation, difference(points[i]!, root))),
@@ -473,8 +523,8 @@ export class StrandSolver implements Solver<StrandParams> {
           l,
           l === 0 ? 0 : 1 / (shear * area * l),
           l === 0 ? 0 : 1 / (young * area * l),
-          joint / (young * inertia),
-          joint / (2 * shear * inertia),
+          bending,
+          twisting,
           ...restRotation,
         ],
         node * MATERIAL_WORDS,
@@ -486,9 +536,10 @@ export class StrandSolver implements Solver<StrandParams> {
       count: points.length,
       root,
       frame: frames[0]!,
-      radius,
-      width: positive(spec.dragWidth ?? 2 * radius, 'projected drag width'),
+      radius: maxRadius,
+      width: base.width,
       drag: finite(spec.drag ?? 1.2, 'drag coefficient', 0),
+      dragAreas,
     };
   }
 
@@ -541,11 +592,14 @@ export class StrandSolver implements Solver<StrandParams> {
         const crossFraction = magnitude > 0 ? Math.sqrt(Math.max(0, 1 - (along * along) / magnitude)) : 0;
         const span =
           0.5 * (material[MATERIAL_WORDS * i + 4]! + (i > guide.first ? material[MATERIAL_WORDS * (i - 1) + 4]! : 0));
+        const profileIndex = 2 * (i - guide.first);
+        const side = guide.dragAreas?.[profileIndex] ?? guide.width * span;
+        const frontal = guide.dragAreas?.[profileIndex + 1] ?? Math.PI * guide.radius * guide.radius;
         const factor =
           0.5 *
           finite(flow.density, 'air density', 0) *
           guide.drag *
-          (guide.width * span * crossFraction + Math.PI * guide.radius * guide.radius * (1 - crossFraction));
+          (side * crossFraction + frontal * (1 - crossFraction));
         env.set([...vector(flow.velocity), factor * material[MATERIAL_WORDS * i]!], at);
         if (bed) {
           const x = p[0] + v[0] * dt,

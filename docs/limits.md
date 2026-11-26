@@ -9902,7 +9902,11 @@ units are its own, so values from another engine's colour enhancement do not car
 The base native solver covers cylindrical elastic guides at 240 Hz by default. The follow tier
 keeps segment lengths and resolves a local bed plane. The rod tier resolves finite compliance
 and endpoint-sphere self contact using a sparse grid. Guide shear and twist use artist-supplied
-effective moduli where those have been measured. Sampled bodies are kinematic capsules and
+effective moduli where those have been measured. Optional per-link sections support different
+mass, axial and shear area, bending stiffness and torsion along the centreline. The two
+transverse components share a mean transverse second moment. Contact still uses round radii
+and there is no shell ovalization or explicit vane surface.
+Sampled bodies are kinematic capsules and
 spheres with point contact. Separation between contacts depends on guide spacing and substep
 rate. Use enough points to resolve thin obstacles.
 
@@ -9921,10 +9925,10 @@ passes. The work and memory grow linearly along each open guide. It reserves 1,1
 per authored point for solver scratch. The optional local profile uses less scratch, with
 reduced stiffness accuracy as its link count rises.
 
-The 720-point swept fixture moved its selected tip 0.4698 m relative to the still-air
-control and changed 3,040 pixels with the same camera on WebGPU and WebGL2. Plain, shared
-and restored native state all hash to `82f4cdeb4915b090` in the fixture. The optional entry
-is 5,806 B gzip with a 6,062 B ceiling. Both lazy Wasm variants are 43,921 B raw and
+The 720-point tapered and swept fixture moved its selected tip 0.7516 m relative to the
+still-air control and changed 2,907 pixels with the same camera on WebGPU and WebGL2.
+Plain, shared and restored native state all hash to `9245de2188de6730` in the fixture. The optional entry
+is 6,262 B gzip with a 6,518 B ceiling. Both lazy Wasm variants are 43,921 B raw and
 17,445 B gzip. Core and Stage gain zero bytes.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock

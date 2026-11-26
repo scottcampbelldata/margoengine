@@ -4871,7 +4871,10 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 
 const strand = await StrandSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(strand, {
-  strands: [{ points: [[0, 1.7, 0], [0, 1.6, 0.03], [0, 1.5, 0.06]] }],
+  strands: [{
+    points: [[0, 1.7, 0], [0, 1.6, 0.03], [0, 1.5, 0.06]],
+    sections: [{ radius: 90e-6 }, { radius: 55e-6 }],
+  }],
 });
 world.advance(30);
 console.log(strand.sample(0, 2).position);
@@ -4887,6 +4890,10 @@ dense guide sets when elastic frames and point self contact are unnecessary.
   modulus of E / 2.6. The default projected drag width is the diameter, with a coefficient of 1.2.
   Supply measured values for a shaft, bundle, or specific fibre. Wider vanes can use a separate
   `dragWidth`.
+  For a tapered or hollow shaft, give `sections` one object per centreline link.
+  A section inherits the guide defaults. It can specify contact radius and drag width
+  separately from load-bearing area, mean transverse second moment and torsion constant.
+  Use square metres for area and metres to the fourth power for both moments.
 - The default rate is level 2 (240 Hz), with six direct rod passes or twelve sequential
   passes, 2/s damping, 0.9 follower correction
   and a Coulomb contact coefficient of 0.25. The rod tier defaults to point self contact.
