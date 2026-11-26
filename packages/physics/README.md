@@ -4642,6 +4642,8 @@ The box's closed faces sample the pressure kernel beyond their planes on the res
 contacts alone, or per-face `walls` settings for open edges. The optional `surfaceTension` applies a
 separate liquid–air surface energy in N/m. Use `solidLiquidTension` and `solidVaporTension` in the same units
 to select wetting. A larger solid–air value favours wetting and a larger solid–liquid value repels.
+The integral of the smoothed cubic-kernel colour across a flat interface fixes its energy per unit area
+to the supplied tension. Resolved drop frequencies still carry a finite-resolution error.
 The implicit viscosity applies at closed planar walls as well as sampled solid shapes.
 By default pressure and viscosity reuse the exact sampled gradient records during a geometry step. Set
 `cacheNeighbors: false` if arena memory is tight. The fallback evaluates the same kernel and pair order.

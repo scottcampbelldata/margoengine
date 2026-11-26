@@ -4383,9 +4383,16 @@ particle volume. [Real-time Simulation of Large Bodies of Water with Small Scale
 
 ### FLUID-01 capillary shape oscillation
 
+The normalized cubic spline contributes a missing volume fraction
+C(u) = 2π ∫ᵤ¹ W(r) r(r−u) dr at dimensionless depth u. With particle volume d³ and support 3d,
+the free-surface energy per flat area is γ (A₀/d²) 3 ∫₀¹ (√(C² + 0.05²) − 0.05) du.
+Integrating that expression fixes A₀/d² to 3.79461105717. The scoped pair regression calculates
+this value independently of the native constant and checks the resulting force. The surface model
+follows Probst and Teschner, Equations 8–12 and §5.2. [Unified Pressure, Surface Tension and Friction for SPH Fluids](https://doi.org/10.1145/3708034)
+
 Build Physics and run `node packages/physics/tests/dfsph-capillary-lab.mjs`. The released ellipsoid
 preserves the volume of its 2,176-particle sphere. The benchmark derives its equivalent radius from
 that rest volume and uses the two zero crossings of the signed quadrupole moment to estimate one full
-period. The current solver measures 1.481 s. Rayleigh's small-disturbance solution is
-ω² = 8 σ/(ρ R³), or 0.742 s at the fixture's parameters. This comparison records a failure of the
-current split solve to match the continuum period. [On the Capillary Phenomena of Jets, Lord Rayleigh (1879)](https://www.jstor.org/stable/113738)
+period. The current solver measures 0.885 s. Rayleigh's small-disturbance solution is
+ω² = 8 σ/(ρ R³), or 0.742 s at the fixture's parameters. The previous rest area produced 1.481 s.
+This comparison tracks the remaining error in the free-drop period. [On the Capillary Phenomena of Jets, Lord Rayleigh (1879)](https://www.jstor.org/stable/113738)

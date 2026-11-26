@@ -298,7 +298,24 @@ test('the free surface follows the published energy gradient with matched pair m
   const contribution = 1 - (volume / h ** 3) * CUBIC * (2 - 6 * q ** 2 + 6 * q ** 3);
   const slope = contribution / Math.sqrt(contribution ** 2 + 0.05 ** 2);
   const gradient = (CUBIC * q * (12 - 18 * q)) / h ** 4;
-  const area = (Math.PI / 4) * spacing ** 2;
+  // Independently integrate the unit kernel over spherical rings beyond a
+  // plane. The smoothed interface energy per unit planar area must be gamma.
+  const integrate = (f, lo, hi, intervals) => {
+    const step = (hi - lo) / intervals;
+    let sum = f(lo) + f(hi);
+    for (let i = 1; i < intervals; i++) sum += (i % 2 ? 4 : 2) * f(lo + i * step);
+    return (step * sum) / 3;
+  };
+  const cap = (depth) => {
+    const ring = (radius) => {
+      const cubic = radius < 0.5 ? 1 - 6 * radius ** 2 * (1 - radius) : 2 * (1 - radius) ** 3;
+      return 2 * Math.PI * CUBIC * cubic * radius * (radius - depth);
+    };
+    const inner = depth < 0.5 ? integrate(ring, depth, 0.5, 128) : 0;
+    return inner + integrate(ring, Math.max(0.5, depth), 1, 128);
+  };
+  const plane = integrate((depth) => Math.hypot(cap(depth), 0.05) - 0.05, 0, 1, 2048);
+  const area = spacing ** 2 / (3 * plane);
   const impulse = 2 * DT * surface * slope * area * volume * gradient;
   const { world, liquid } = await solve({
     spacing,

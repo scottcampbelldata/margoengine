@@ -10604,6 +10604,8 @@ An isolated Water fixture draws the same simulated particle state on WebGPU and 
 fields have executable consumers. A real HYDRO-01 wet-cell test verifies same-tick mass and horizontal
 momentum, refusal and replay, with vertical momentum in a separate receipt ledger. The physics queue
 records the required owner's reservation and applied-flux receipt for wet/dry cells and breaking crests.
+The native capillary energy has a flat-interface normalization derived from its cubic kernel.
+A measured 34 g droplet oscillates in 0.885 s against the 0.742 s Rayleigh prediction.
 
 Section 5, Tonemap colour enhancement (2026-11-26): `@margoengine/tonemap/enhance` patches a scene-linear step in front
 of the display curve of both Tonemap shaders (the SDR one clamps its result at 0, the ColorOutput one keeps colours

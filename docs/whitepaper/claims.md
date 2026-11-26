@@ -5932,3 +5932,10 @@ A dense-ring regression exercises cached and fallback rows and compares every fl
 uncached run. At a 11,664-particle refinement step with 92,226,298 pair uses, the solver prepares 1,294,348
 reusable pressure records and performs 46,656 neighborhood queries. The refined accurate Martin–Moyce
 fixture passes both historical surge intervals under the original sampling allowance.
+
+### FLUID-01 capillary surface-energy normalization
+
+The independent spherical-cap integral over the cubic kernel establishes the rest area that gives the
+prescribed surface energy per flat area. The earlier rest area provided 20.7% of that energy. The
+2,176-particle drop's quadrupole period falls from 1.481 s to 0.885 s against Rayleigh's 0.742 s.
+The original refined Martin–Moyce bars still pass. [Reproduce](reproduce.md#fluid-01-capillary-shape-oscillation)

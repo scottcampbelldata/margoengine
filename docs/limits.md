@@ -9779,7 +9779,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 8,085 B gzip. Each lazy native asset measures 33,255 B raw and 12,667 B gzip.
+The DFSPH entry measures 8,085 B gzip. Each lazy native asset measures 33,255 B raw and 12,674 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -9814,7 +9814,8 @@ closed 1 m² periodic wet cell, with reciprocal volume and horizontal momentum a
 vertical ledger. Production wet/dry cells and the breaking crest need owner-side reservation and receipt
 of applied fluxes.
 
-The measured quadrupole period of a 20.10 mm free water drop is 1.481 s, compared with the
+The integrated cubic-kernel colour energy equals the prescribed surface tension per flat area.
+The measured quadrupole period of a 20.10 mm free water drop is 0.885 s, compared with the
 0.742 s Rayleigh limit for the same density, tension and rest volume. The separated surface
 energy and pressure updates need more validation for shape frequencies.
 

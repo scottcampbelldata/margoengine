@@ -1012,7 +1012,11 @@ fn capillary(
 ) {
     let support = 3.0 * settings.spacing;
     let neighbors = neighborhood(points, boundary, grid, settings, support);
-    let area = core::f64::consts::FRAC_PI_4 * settings.spacing * settings.spacing;
+    // The rest lattice has spacing d and volume d³. Normalize the energy
+    // integrated through a flat surface with the support of 3d:
+    // A0/d² = 1 / (3 ∫₀¹ [√(C(u)² + ε²) − ε] du).
+    // C is the fraction of the unit cubic kernel beyond a plane at u.
+    let area = 3.79461105717 * settings.spacing * settings.spacing;
 
     // Probst and Teschner, Eqs. (8), (10), and (12). Vertex energy uses the
     // positive free surface residue and the kernel fraction occupied by the solid.

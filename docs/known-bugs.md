@@ -16934,9 +16934,10 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 
 After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`.
 This coarse setup uses 12 rows across the water column. The interactive and accurate
-tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.399 and 0.508 against the
-original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
-measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
+tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.474 and 0.603 against the
+original 0.71–1.14 trial span and measurement allowance 0.149. The coarse accurate profile meets the
+first crossing and misses the second, 1.018 against 1.19–1.67 with the same allowance. The interactive
+profile remains early at both crossings. The discrete wall correction restores an exact motionless initial lattice.
 Both pressure and physical wall viscosity are included. The original release diaphragm still needs an
 explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
 The live HYDRO-01 test also settles whole-particle transfers against a wet periodic cell. Run
@@ -16947,13 +16948,13 @@ a paired volume and momentum receipt.
 
 The separated capillary and pressure updates also produce a slow shape oscillation in a free droplet.
 Run `node packages/physics/tests/dfsph-capillary-lab.mjs` after building Physics. With 2,176 particles,
-20.10 mm equivalent radius and the measured water tension 0.07274 N/m, the first quadrupole period is 1.481 s
-against the 0.742 s Rayleigh prediction. This fixture starts an equal-volume ellipsoid from rest without
+20.10 mm equivalent radius and the measured water tension 0.07274 N/m, the first quadrupole period is 0.885 s
+against the 0.742 s Rayleigh prediction. Planar energy normalization corrected the earlier 1.481 s result. This fixture starts an equal-volume ellipsoid from rest without
 gravity or a container impact. The period provides a separate accuracy check for the planned unified
 pressure and surface-energy solve at several resolutions.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
-using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement
+using the interactive iteration limits, which reads 0.295 and 0.514 against the two original measurement
 spans and their allowances.
 
 The deep-fill standing wave meets the analytic one-frame tolerance. Set the fixture's `ny` to 5 for a
