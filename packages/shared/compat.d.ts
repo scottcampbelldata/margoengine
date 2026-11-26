@@ -12,3 +12,25 @@ export function compatibilityLevel(
   device: { adapterInfo?: { vendor?: string }; features?: { has(name: string): boolean } } | undefined,
 ): boolean;
 export function loadCompatRoute<T>(device: GPUDevice | undefined, load: () => Promise<T>): Promise<T> | undefined;
+
+/** One stage's (or both stages' together) texture units on the WebGL2 layer, against its GL limit. */
+export interface CompatStageUnits {
+  readonly stage: 'vertex' | 'fragment' | 'combined';
+  readonly units: number;
+  readonly pairs: number;
+  readonly storage: number;
+  readonly limit: number;
+  readonly bindings: readonly (readonly [number, number])[];
+}
+/** On the WebGL2 layer, the texture units a render pipeline would take per stage; undefined on native WebGPU. */
+export function compatTextureUnits(
+  device: GPUDevice | undefined,
+  descriptor: GPURenderPipelineDescriptor,
+):
+  | {
+      readonly vertex: CompatStageUnits;
+      readonly fragment: CompatStageUnits;
+      readonly combined: CompatStageUnits;
+      readonly over?: CompatStageUnits;
+    }
+  | undefined;

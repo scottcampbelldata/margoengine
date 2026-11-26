@@ -113,6 +113,33 @@ export interface GLSLTexture {
   readonly type: TextureType;
   /** GLSL sampler type (`sampler2D`, `usampler2DArray`, `sampler2DShadow`...). */
   readonly glslType: string;
+  /**
+   * True when the stage reads texels through this sampler (sample, load, gather, compare). A texture the stage only
+   * asks for its size, layer or level count keeps its entry but takes no texture unit: the compiler drops the sampler.
+   */
+  readonly sampled?: boolean;
+}
+
+/**
+ * The texture units a translated stage takes, counted before linking: one per texture and sampler pair it reads
+ * (a map both compared and loaded is two), one per data texture its storage buffers read (a bind group's shared one
+ * once), none for a texture read only for its size. `bindings` lists each unit's (group, binding), storage as -1.
+ */
+export function stageUnits(stage: GLSLStage): {
+  units: number;
+  pairs: number;
+  storage: number;
+  bindings: [number, number][];
+} {
+  const pairs = stage.textures.filter((t) => t.sampled),
+    storage = new Map<string, [number, number]>();
+  for (const b of stage.storage) storage.set(b.texture, [b.group, b.shared ? -1 : b.binding]);
+  return {
+    units: pairs.length + storage.size,
+    pairs: pairs.length,
+    storage: storage.size,
+    bindings: [...pairs.map((t) => [t.group, t.binding] as [number, number]), ...storage.values()],
+  };
 }
 /** A vertex input or fragment output location. */
 export interface GLSLLocation {
@@ -2100,6 +2127,7 @@ export class StageEmitter {
     gatherArg?: IRExpr,
     size = false,
     mipFilter = false,
+    query = false,
   ): GLSLTexture {
     const tex = this.handleGlobal(textureArg),
       samp = samplerArg ? this.handleGlobal(samplerArg) : undefined,
@@ -2151,6 +2179,10 @@ export class StageEmitter {
       this.textures.set(key, entry);
       this.globals.push(`uniform highp vec3 ${entry.mipFilter};`);
     }
+    if (!query && !entry.sampled) {
+      entry = { ...entry, sampled: true };
+      this.textures.set(key, entry);
+    }
     return entry;
   }
 
@@ -2184,7 +2216,7 @@ export class StageEmitter {
     const coords1d = (c: string) => (tt.dimension === '1d' ? `vec2(${c}, 0.5)` : c);
     switch (name) {
       case 'textureDimensions': {
-        const t = this.combined(texArg, undefined, false, undefined, true);
+        const t = this.combined(texArg, undefined, false, undefined, true, false, true);
         const multi = tt.shape === 'multisampled' || tt.shape === 'depth_multisampled';
         const level = rest[0] && !multi ? `int(${v(rest[0])})` : '';
         const z = t.size as string;
@@ -2193,9 +2225,9 @@ export class StageEmitter {
         return tt.dimension === '1d' ? `uint(${xy}.x)` : `uvec2(${xy})`;
       }
       case 'textureNumLayers':
-        return `uint(${this.combined(texArg, undefined, false, undefined, true).size}.z)`;
+        return `uint(${this.combined(texArg, undefined, false, undefined, true, false, true).size}.z)`;
       case 'textureNumLevels':
-        return `uint(${this.combined(texArg, undefined, true).levels})`;
+        return `uint(${this.combined(texArg, undefined, true, undefined, false, false, true).levels})`;
       case 'textureNumSamples':
         this.notes.add('textureNumSamples reads 1: multisampled textures are resolved before sampling on WebGL2');
         return '1u';

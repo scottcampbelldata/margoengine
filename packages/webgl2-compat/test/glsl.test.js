@@ -3,7 +3,7 @@
 // compile, draw and compare the output on a real GPU; these pin the translation choices those checks rely on.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { glslFloat, glslName, translateStage, translateWGSL } from '../dist/glsl.js';
+import { glslFloat, glslName, stageUnits, translateStage, translateWGSL } from '../dist/glsl.js';
 
 const V =
   '@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i), 0.0, 0.0, 1.0); }';
@@ -711,4 +711,43 @@ test('the vertex stage counts against its own texture unit limit', () => {
   const over = translateWGSL({ vertex: { source }, fragment: { source }, textureUnits: { vertex: 16 } }).vertex;
   assert.match(over.source, /struct _Wv1_0 \{ highp uvec4 r\[64\]; \};/);
   assert.match(over.source, /#define _uv1_0 _wv1_0\.r/);
+});
+
+test('stageUnits counts the units a stage reads before linking: pairs, compare plus load as two, none for a size', () => {
+  const source = `${V}
+@group(0) @binding(0) var colour: texture_2d<f32>;
+@group(0) @binding(1) var sizeOnly: texture_2d<f32>;
+@group(0) @binding(2) var shadow: texture_depth_2d;
+@group(0) @binding(3) var linear: sampler;
+@group(0) @binding(4) var compare: sampler_comparison;
+@group(1) @binding(0) var<storage, read> a: array<vec4f>;
+@group(1) @binding(1) var<storage, read> b: array<vec4f>;
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  let size = vec2f(textureDimensions(sizeOnly));
+  let lit = textureSampleCompareLevel(shadow, compare, p.xy / size, 0.5) + textureLoad(shadow, vec2i(p.xy), 0);
+  return textureSampleLevel(colour, linear, p.xy, 0.0) * lit + a[0] + b[0];
+}`;
+  const shared = translateWGSL({ vertex: { source }, fragment: { source }, sharedStorage: () => true }).fragment;
+  const counted = stageUnits(shared);
+  assert.deepEqual(
+    [counted.units, counted.pairs, counted.storage],
+    [4, 3, 1],
+    'colour, shadow twice, one data texture',
+  );
+  assert.deepEqual(
+    counted.bindings,
+    [
+      [0, 2],
+      [0, 2],
+      [0, 0],
+      [1, -1],
+    ],
+    'in the order the stage reads them',
+  );
+  assert.ok(
+    shared.textures.some((t) => !t.sampled && t.binding === 1),
+    'the size-only texture keeps its entry',
+  );
+  const own = stageUnits(translateWGSL({ vertex: { source }, fragment: { source } }).fragment);
+  assert.equal(own.storage, 2, 'storage with its own data textures: one unit each');
 });

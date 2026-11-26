@@ -88,10 +88,10 @@ const programCache = () => ({
 });
 
 // Exercise the actual replay/cache with a recording GL context, without compiling or drawing on a GPU.
-async function offsetDevice(withClamp) {
+async function offsetDevice(withClamp, limits = {}) {
   const calls = [],
     requested = [];
-  const context = fakeContext();
+  const context = fakeContext({ limits });
   const get = context.getExtension.bind(context);
   context.getExtension = (name) => {
     requested.push(name);
@@ -1282,4 +1282,45 @@ test('allocations share one getError per task or out-of-memory scope, each error
     ['GPUOutOfMemoryError', 'GPUValidationError'],
   );
   device.destroy();
+});
+
+test('a pipeline past its texture units in a stage is refused with code unsupported before it links, and textureUnits says so first', async () => {
+  const { device } = await offsetDevice(true, { MAX_TEXTURE_IMAGE_UNITS: 4 });
+  try {
+    const reads = Array.from({ length: 5 }, (_, i) => `textureSampleLevel(t${i}, s, vec2f(0.5), 0.0)`).join(' + ');
+    const code = `@vertex fn v() -> @builtin(position) vec4f { return vec4f(0.0); }
+@group(0) @binding(9) var s: sampler;
+${Array.from({ length: 5 }, (_, i) => `@group(0) @binding(${i}) var t${i}: texture_2d<f32>;`).join('\n')}
+@group(1) @binding(0) var sized: texture_2d<f32>;
+@fragment fn f() -> @location(0) vec4f { return ${reads} + vec4f(f32(textureDimensions(sized).x)); }`;
+    const module = device.createShaderModule({ code });
+    const descriptor = {
+      layout: 'auto',
+      vertex: { module, entryPoint: 'v' },
+      fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+    };
+    const units = device.textureUnits(descriptor);
+    assert.deepEqual(
+      [units.fragment.units, units.fragment.limit, units.vertex.units, units.over?.stage],
+      [5, 4, 0, 'fragment'],
+      'five sampled pairs; the size-only texture takes none',
+    );
+    let thrown;
+    try {
+      device.createRenderPipeline(descriptor);
+    } catch (e) {
+      thrown = e;
+    }
+    assert.equal(thrown?.code, 'unsupported');
+    assert.match(
+      thrown.message,
+      /fragment stage takes 5 texture units \(5 texture and sampler pairs, 0 storage data textures; this WebGL2 has 4\)/,
+    );
+    assert.match(thrown.message, /group 0 binding 4.*errors#texture-units/);
+    assert.equal(thrown.units.units, 5);
+    assert.equal(device.programs.count, 0, 'nothing linked');
+    await assert.rejects(device.createRenderPipelineAsync(descriptor), (e) => e.code === 'unsupported');
+  } finally {
+    device.destroy();
+  }
 });
