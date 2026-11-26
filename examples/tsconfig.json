@@ -20,6 +20,7 @@
     "dune-coast/*.ts",
     "timber-valley/*.ts",
     "event-horizon/*.ts",
+    "from-playcanvas/*.ts",
     "gallery/*.ts",
     "kitty-hawk/*.ts",
     "molten-words/*.ts",
