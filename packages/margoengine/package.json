@@ -4167,6 +4167,10 @@
       "types": "./dist/rigging/hands.d.ts",
       "import": "./dist/rigging/hands.js"
     },
+    "./rigging/strand-springs": {
+      "types": "./dist/rigging/strand-springs.d.ts",
+      "import": "./dist/rigging/strand-springs.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

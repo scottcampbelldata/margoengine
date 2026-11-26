@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,304 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,306 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12958,6 +12958,13 @@ run. Both backends produced 1,478 changed pixels and replay hash `f1550b4d0b3290
 body capsules follow the skin pose on each tick. The parameters represent effective hair
 bundles, and bundle-scale stiffness and drag calibration remain open. The horses root and model
 entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 18,228 B gzip.
+
+The weighted avatar binding accepts positive uniform transforms. Its offline replay uses the
+same time-sampled anchor and wind functions. On the Seed-san reference avatar the fixed
+camera test measured 0.0946 m of ponytail-tip movement and 395 changed pixels on both
+backends. Its restored simulation hash is `7b5d4e76865419a4`. The manual rig uses a 240 Hz
+world clock. The automatic adapter advances that clock after the Animator pose. The optional
+rigging entry measures 1,991 B gzip with a 2,247 B ceiling.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -29913,7 +29920,7 @@ bed. Reciprocal rigid contact, segment-level continuous collision and inter-guid
 validation remain open. A point may pass a thin obstacle between substeps or slide past a
 capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
 solved guides. The optional horse driver applies the solved frames to the actual horse skin and replays the gait.
-The named production shots and legacy spring-bone skin path still need their own bindings.
+The optional physical rig also binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

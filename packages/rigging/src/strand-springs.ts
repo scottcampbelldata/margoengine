@@ -211,7 +211,7 @@ export async function addStrandSpringRig(
       const ancestor = model.nodes[chain.joints[i - 1]!]!.id;
       let parent = parents[node.id];
       while (parent !== -1 && parent !== ancestor) parent = parents[parent];
-      if (parent !== ancestor) throw new MargoError('state', 'Order each physical chain from parent to descendant.');
+      if (parent !== ancestor) throw new MargoError('state', 'Pass each physical chain in parent-to-descendant order.');
     }
   }
   for (const volume of options.colliders ?? []) {

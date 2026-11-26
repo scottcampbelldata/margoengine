@@ -9832,4 +9832,5 @@ The weighted avatar binding accepts positive uniform transforms. Its offline rep
 same time-sampled anchor and wind functions. On the Seed-san reference avatar the fixed
 camera test measured 0.0946 m of ponytail-tip movement and 395 changed pixels on both
 backends. Its restored simulation hash is `7b5d4e76865419a4`. The manual rig uses a 240 Hz
-world clock. The automatic adapter advances that clock after the Animator pose.
+world clock. The automatic adapter advances that clock after the Animator pose. The optional
+rigging entry measures 1,991 B gzip with a 2,247 B ceiling.

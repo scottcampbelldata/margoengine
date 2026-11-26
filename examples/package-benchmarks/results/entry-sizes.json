@@ -14868,6 +14868,10 @@
       "./hands": {
         "raw": 15198,
         "gzip": 5866
+      },
+      "./strand-springs": {
+        "raw": 4212,
+        "gzip": 1991
       }
     },
     "@margoengine/road": {
