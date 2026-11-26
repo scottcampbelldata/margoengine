@@ -205,6 +205,40 @@ test('XSPH blends equal and opposite velocities by the kernel weight and dissipa
   assert.ok(velocities[0] ** 2 + velocities[1] ** 2 < 2 * speed ** 2);
 });
 
+test('XSPH dissipates locally without borrowing a detached cloud’s kernel weights', async () => {
+  const pair = [
+    { position: [-0.2, 0, 0], velocity: [0.15, 0, 0] },
+    { position: [0.2, 0, 0], velocity: [-0.15, 0, 0] },
+  ];
+  const cloud = Array.from({ length: 12 }, (_, i) => ({
+    position: [4 + (i % 3) * 0.025, Math.floor(i / 3) * 0.025, 0],
+    velocity: [0, i % 2 === 0 ? 0.08 : -0.08, 0],
+  }));
+  const params = { ...relaxed, spacing: 0.5, support: 1, bounds: wide, viscosity: 1, relaxation: 1e30 };
+  const alone = await solve({ ...params, particles: pair });
+  const together = await solve({ ...params, particles: [...pair, ...cloud] });
+  alone.world.advance(1);
+  together.world.advance(1);
+  for (let i = 0; i < pair.length; i++) {
+    const withoutCloud = alone.pbf.sample(i);
+    const withCloud = together.pbf.sample(i);
+    withoutCloud.velocity.forEach((value, axis) => near(withCloud.velocity[axis], value));
+  }
+  const distance = 0.4 - 0.3 / 60;
+  const expected = 0.15 * (1 - 2 * params.spacing ** 3 * POLY6 * (1 - distance ** 2) ** 3);
+  near(together.pbf.sample(0).velocity[0], expected);
+  let momentum = 0;
+  let twiceEnergy = 0;
+  for (let i = 0; i < cloud.length; i++) {
+    const p = together.pbf.sample(i + pair.length);
+    momentum += p.mass * p.velocity[1];
+    twiceEnergy += p.mass * p.velocity.reduce((sum, component) => sum + component * component, 0);
+    assert.ok(Math.abs(p.velocity[1]) <= 0.08 + 1e-11);
+  }
+  near(momentum, 0);
+  assert.ok(twiceEnergy < cloud.length * together.pbf.sample(2).mass * 0.08 ** 2);
+});
+
 test('both profiles use sparse 27-cell candidates with linear work on separated particles', async () => {
   const particles = Array.from({ length: 256 }, (_, i) => ({ position: [3 * i, -73, 18] }));
   for (const [profile, iterations] of [

@@ -18501,14 +18501,14 @@
       "brotli": 3012
     },
     "packages/physics/dist/pbf-kernel.wasm": {
-      "raw": 17926,
-      "gzip": 7175,
-      "brotli": 6285
+      "raw": 18143,
+      "gzip": 7317,
+      "brotli": 6413
     },
     "packages/physics/dist/pbf-kernel-shared.wasm": {
-      "raw": 17926,
-      "gzip": 7175,
-      "brotli": 6289
+      "raw": 18143,
+      "gzip": 7317,
+      "brotli": 6413
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
       "raw": 36539,

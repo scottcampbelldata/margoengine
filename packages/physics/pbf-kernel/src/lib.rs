@@ -255,6 +255,7 @@ fn estimate_density(
     for i in 0..points.len() {
         let centre = item(points, i).position;
         let mut density = 0.0;
+        let mut fluid_weight = 0.0;
         let mut gradient_sum = ZERO;
         let mut neighbours = 0.0;
         grid.nearby(centre, |j| {
@@ -270,12 +271,14 @@ fn estimate_density(
             let offset = scale(sub(centre, p), 1.0 / settings.support);
             let d2 = norm2(offset);
             *evaluations += 1.0;
-            density += weight * kernel(d2);
+            let kernel_weight = weight * kernel(d2);
+            density += kernel_weight;
             if i != j && d2 < 1.0 {
                 let g = scale(gradient(offset, d2, i, j), weight);
                 gradient_sum = add(gradient_sum, g);
                 if j < points.len() {
                     neighbours += norm2(g);
+                    fluid_weight += kernel_weight;
                 }
             }
         });
@@ -284,8 +287,11 @@ fn estimate_density(
         // Kernel deficiency in an open interface is not negative pressure. The cohesive preview
         // option keeps the signed PBF constraint up to the deficit of a planar half-space.
         let limit = if settings.cohesive == 0.0 { 0.0 } else { -0.5 };
-        item_mut(work, i).lambda =
+        let state = item_mut(work, i);
+        state.lambda =
             -compression.max(limit) / (norm2(gradient_sum) + neighbours + settings.relaxation);
+        // The smoothing pass borrows this workspace entry for its fluid-only row sum.
+        state.smoothing[0] = fluid_weight;
         item_mut(points, i).density = density * settings.rest;
     }
     maximum
@@ -453,13 +459,11 @@ fn smooth(
     if settings.viscosity == 0.0 && settings.confinement == 0.0 {
         return;
     }
-    let mut maximum_weight: f64 = 1.0;
-    let mut energy_before = 0.0;
     for i in 0..points.len() {
         let p = item(points, i);
+        let local_weight = item(work, i).smoothing[0].max(1.0);
         let mut difference = ZERO;
         let mut omega = ZERO;
-        let mut total_weight = 0.0;
         grid.nearby(p.position, |j| {
             if i == j || j >= points.len() {
                 return;
@@ -469,10 +473,11 @@ fn smooth(
             let d2 = norm2(offset);
             let dv = sub(q.velocity, p.velocity);
             let volume = q.mass * volume_scale;
-            let weight = volume * kernel(d2);
             *evaluations += 1.0;
-            total_weight += weight;
-            difference = add(difference, scale(dv, weight));
+            // Symmetric row normalization keeps the mass-weighted edge impulses reciprocal.
+            // Each outgoing row sum is at most one, so smoothing is a convex velocity average.
+            let denominator = local_weight.max(item(work, j).smoothing[0]);
+            difference = add(difference, scale(dv, volume * kernel(d2) / denominator));
             if settings.confinement > 0.0 && d2 < 1.0 {
                 omega = add(
                     omega,
@@ -483,14 +488,20 @@ fn smooth(
                 );
             }
         });
-        maximum_weight = maximum_weight.max(total_weight);
-        item_mut(work, i).smoothing = difference;
-        item_mut(work, i).curl = omega;
-        energy_before += p.mass * norm2(p.velocity);
+        let row = item_mut(work, i);
+        row.correction = scale(difference, settings.viscosity);
+        row.curl = omega;
+    }
+    if settings.confinement == 0.0 {
+        for (p, w) in points.iter_mut().zip(work) {
+            p.velocity = add(p.velocity, w.correction);
+        }
+        return;
     }
 
     let mut mass = 0.0;
     let mut net = ZERO;
+    let mut energy_before = 0.0;
     let mut energy_smoothed = 0.0;
     for i in 0..points.len() {
         let p = item(points, i);
@@ -528,12 +539,10 @@ fn smooth(
         } else {
             ZERO
         };
-        let velocity = add(
-            p.velocity,
-            scale(item(work, i).smoothing, settings.viscosity / maximum_weight),
-        );
+        let velocity = add(p.velocity, item(work, i).correction);
         item_mut(work, i).smoothing = velocity;
         item_mut(work, i).correction = confinement;
+        energy_before += p.mass * norm2(p.velocity);
         energy_smoothed += p.mass * norm2(velocity);
         mass += p.mass;
         net = add(net, scale(confinement, p.mass));

@@ -9888,9 +9888,7 @@ dissipated mechanical energy. Bubble geometry, gas resonance and acoustic radiat
 
 ### Position-based particle water (FLUID-02)
 
-The dedicated PBF entry measures 6,244 B gzip. Each Wasm variant is 17,926 B raw and 7,175 B gzip.
-
-
+The dedicated PBF entry measures 6,244 B gzip. Each Wasm variant is 18,143 B raw and 7,317 B gzip.
 
 The fast and precise presets apply four and twelve projections per advective substep. A closed box can keep or
 release each face. An open face leaves the particles in the native set with their existing mass and momentum.
@@ -9904,6 +9902,13 @@ handoff, generic mesh contacts, and physical surface tension are tracked separat
 The `tensile` coefficient is referenced to 60 Hz. Its position increment scales with the squared substep,
 and free-water pairs outside the active density constraints receive zero artificial pressure.
 PBF input failures expose `PHYSICS_INPUT_TYPE` on `TypeError` and `PHYSICS_INPUT_RANGE` on `RangeError`.
+The XSPH velocity blend uses particle kernel weights from [Macklin and Müller, *Position Based Fluids*, 2013, eq. 17](https://mmacklin.com/pbf_sig_preprint.pdf).
+For each pair, the larger of its two fluid-neighbour weight sums and one is the shared denominator. This is a weighted
+variant of the symmetric local averaging in [Xiao, Boyd and Lall, *Distributed Average Consensus with Time-Varying Metropolis Weights*, 2005, eq. 4](https://web.stanford.edu/~boyd/papers/pdf/avg_metropolis.pdf).
+Reciprocal mass-weighted coefficients conserve linear momentum. Their row sums are at most the configured smoothing
+fraction, so a convex velocity average cannot increase total kinetic energy. Optional vorticity confinement still uses a
+separate energy budget. The tests cover the exact sparse-pair velocity, the effect of a detached dense cloud, and the
+cloud's momentum and energy at the maximum smoothing fraction.
 
 ### Rail wheelsets and catenary (DYN-05)
 

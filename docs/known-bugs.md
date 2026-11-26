@@ -29,7 +29,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   and shrinks every correction when any one is large, instead of substepping; the clamps hold the energy test while
   the column compresses. Found by the FLUID-02 verification in [physics-solver-audit.md](physics-solver-audit.md).
 - **Progress:** The artificial-pressure increment now scales with the substep squared and preserves rest for
-  an underfilled free-water pair. The global correction scales and the column compression remain open.
+  an underfilled free-water pair. XSPH viscous smoothing also uses local reciprocal weights, covered by the
+  detached-cloud regression in `packages/physics/tests/coupling/pbf.test.js`. The global pressure correction scales
+  and the column compression remain open.
 
 ### Fixed 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stopped every frame (KB-PICK-BUDGET1, selection)
 
