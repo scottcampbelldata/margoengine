@@ -17662,6 +17662,16 @@
       "gzip": 13044,
       "brotli": 11152
     },
+    "packages/biomes/dist/forest-kernel.wasm": {
+      "raw": 1276,
+      "gzip": 739,
+      "brotli": 679
+    },
+    "packages/biomes/dist/forest-kernel-shared.wasm": {
+      "raw": 1276,
+      "gzip": 739,
+      "brotli": 671
+    },
     "packages/biomes/dist/workers/biomes-splines.js": {
       "raw": 9911,
       "gzip": 4362,
