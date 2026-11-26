@@ -115,7 +115,6 @@ export class FlipSolver implements Solver<FlipParams> {
   private readonly flow = { velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0 };
   private lastSubsteps = 0;
   private lastIterations = 0;
-
   constructor(readonly id = 'liquid') {}
 
   describe(): SolverDescription {
@@ -330,8 +329,12 @@ export class FlipSolver implements Solver<FlipParams> {
       pressure = this.words(this.pressureRegion);
     this.correctDensity(dt);
     toGrid(g, p, count, this.vel, this.mass, this.wallMask);
-    this.accelerate(dt);
+    // The band takes the sea's velocity before gravity, as every face does, so the pressure solve that follows takes
+    // gravity out of the band and the interior alike. Held after gravity, the band lost part of its g dt, the solve made
+    // a pressure hydrostatic inside but not in the band, and its horizontal gradient stirred still water at the band's
+    // edge (0.15 m/s within half a second, in a calm sea).
     if (this.sea) this.holdToSea(dt);
+    this.accelerate(dt);
     for (let c = 0; c < this.kind.length; c++) this.kind[c] = this.solid[c] ? SOLID : 0;
     surface(g, p, count, h, 0.5 * h, this.kind, this.phi);
     this.lastIterations = project(
@@ -486,9 +489,20 @@ export class FlipSolver implements Solver<FlipParams> {
           source[c] = (r - 1) / dt;
         }
     for (const a of this.vel) a.fill(0);
+    // In a sea, the band's water is the sea's, its density held by the refill: the correction leaves it alone, the band a
+    // wall to it (no particle moved across its inner edge). Moving particles out of the band's full cells into the
+    // interior, which the refill then topped up again, pumped the sea into the box: 7 mm of water in 2 s under a 3 cm
+    // wave, and the waves inside ran a fifth of a radian ahead of the sea.
+    let kinds = this.kind;
+    if (this.sea) {
+      kinds = this.kind.slice();
+      for (let k = 0; k < nz; k++)
+        for (let i = 0; i < nx; i++)
+          if (this.sideDistance(i, k) < this.blend) for (let j = 0; j < ny; j++) kinds[cell(g, i, j, k)] = SOLID;
+    }
     project(
       g,
-      this.kind,
+      kinds,
       this.phi,
       this.vel[0]!,
       this.vel[1]!,
@@ -510,6 +524,7 @@ export class FlipSolver implements Solver<FlipParams> {
       top: V3 = [nx * h - lo, ny * h - lo, nz * h - lo];
     for (let q = 0; q < count; q++) {
       const o = q * PARTICLE_WORDS;
+      if (this.sea && this.sideDistance(Math.floor(p[o]! / h), Math.floor(p[o + 2]! / h)) < this.blend) continue;
       sampleVelocity(g, this.vel, p[o]!, p[o + 1]!, p[o + 2]!, d, this.wallMask);
       const to: V3 = [p[o]! + d[0] * dt, p[o + 1]! + d[1] * dt, p[o + 2]! + d[2] * dt];
       for (let a = 0; a < 3; a++) to[a] = Math.min(Math.max(to[a]!, lo), top[a]!);
@@ -688,42 +703,85 @@ export class FlipSolver implements Solver<FlipParams> {
   }
 
   /**
-   * The band at the step's start: its cells under the sea's surface that hold no particle take eight, moving as the sea
-   * does; its particles above the sea's surface go, so the band's water stands at the sea's level.
+   * The band at the step's start holds the sea's water: each cell keeps eight particles times its share under the sea's
+   * surface, giving up its highest when it holds more and taking new ones, moving as the sea does, at its free octants'
+   * centres (lowest first) when it holds fewer. Topping up only the cells that held no particle at all, as the band did
+   * first, let water drain out at the sides: a cell a wave or the density projection left two particles short kept the
+   * shortfall, and the box's sea level fell step after step.
    */
   private refill(t: number): void {
     const sea = this.sea!,
-      { nx, ny, nz, h } = this.grid,
+      g = this.grid,
+      { nx, ny, nz, h } = g,
       p = this.words(this.particleRegion),
       countWords = this.words(this.countRegion),
-      held = new Uint8Array(nx * ny * nz);
-    let count = countWords[0]!,
-      kept = 0;
+      // How many particles each band cell holds as the sea: eight times its share under the sea's surface (read at the
+      // column's centre); -1 off the band.
+      target = new Int8Array(nx * ny * nz).fill(-1),
+      held = new Map<number, number[]>();
+    for (let k = 0; k < nz; k++)
+      for (let i = 0; i < nx; i++) {
+        if (this.sideDistance(i, k) >= this.blend) continue;
+        const w = this.toWorld((i + 0.5) * h, 0, (k + 0.5) * h),
+          e = sea.elevation(w[0], w[2], t) - this.origin[1];
+        for (let j = 0; j < ny; j++) {
+          const c = cell(g, i, j, k);
+          if (!this.solid[c]) target[c] = Math.round(8 * Math.min(1, Math.max(0, e / h - j)));
+        }
+      }
+    let count = countWords[0]!;
     for (let q = 0; q < count; q++) {
       const o = q * PARTICLE_WORDS,
-        i = Math.floor(p[o]! / h),
-        j = Math.floor(p[o + 1]! / h),
-        k = Math.floor(p[o + 2]! / h),
-        w = this.toWorld(p[o]!, p[o + 1]!, p[o + 2]!);
-      if (this.sideDistance(i, k) < this.blend && w[1] > sea.elevation(w[0], w[2], t)) continue;
-      held[cell(this.grid, i, j, k)] = 1;
-      if (kept !== q) p.copyWithin(kept * PARTICLE_WORDS, o, o + PARTICLE_WORDS);
+        c = cell(g, Math.floor(p[o]! / h), Math.floor(p[o + 1]! / h), Math.floor(p[o + 2]! / h));
+      if (target[c]! < 0) continue;
+      const list = held.get(c);
+      if (list) list.push(q);
+      else held.set(c, [q]);
+    }
+    // A cell holding more than the sea's share gives up its highest particles.
+    const gone = new Uint8Array(count);
+    for (const [c, list] of held) {
+      const extra = list.length - target[c]!;
+      if (extra <= 0) continue;
+      list.sort((a, b) => p[b * PARTICLE_WORDS + 1]! - p[a * PARTICLE_WORDS + 1]! || a - b);
+      for (let n = 0; n < extra; n++) gone[list[n]!] = 1;
+      held.set(c, list.slice(extra));
+    }
+    let kept = 0;
+    const moved = new Int32Array(count);
+    for (let q = 0; q < count; q++) {
+      moved[q] = kept;
+      if (gone[q]) continue;
+      if (kept !== q) p.copyWithin(kept * PARTICLE_WORDS, q * PARTICLE_WORDS, (q + 1) * PARTICLE_WORDS);
       kept++;
     }
     p.fill(0, kept * PARTICLE_WORDS, count * PARTICLE_WORDS);
     count = kept;
+    // A cell holding fewer takes new ones moving as the sea's water, at its free octants' centres, lowest first.
     for (let k = 0; k < nz; k++)
       for (let j = 0; j < ny; j++)
         for (let i = 0; i < nx; i++) {
-          if (this.sideDistance(i, k) >= this.blend) continue;
-          const c = cell(this.grid, i, j, k);
-          if (held[c] || this.solid[c]) continue;
-          for (let o = 0; o < 8; o++) {
+          const c = cell(g, i, j, k),
+            want = target[c]!,
+            list = held.get(c) ?? [];
+          if (want <= list.length) continue;
+          let taken = 0;
+          for (const q of list) {
+            const o = moved[q]! * PARTICLE_WORDS,
+              octant =
+                (p[o]! / h - i >= 0.5 ? 1 : 0) |
+                (p[o + 1]! / h - j >= 0.5 ? 2 : 0) |
+                (p[o + 2]! / h - k >= 0.5 ? 4 : 0);
+            taken |= 1 << octant;
+          }
+          let have = list.length;
+          for (const o of [0, 1, 4, 5, 2, 3, 6, 7]) {
+            if (have >= want) break;
+            if (taken & (1 << o)) continue;
             const x = (i + 0.25 + 0.5 * (o & 1)) * h,
               y = (j + 0.25 + 0.5 * ((o >> 1) & 1)) * h,
               z = (k + 0.25 + 0.5 * ((o >> 2) & 1)) * h,
               w = this.toWorld(x, y, z);
-            if (!(w[1] < sea.elevation(w[0], w[2], t))) continue;
             if (count >= this.capacity)
               throw new MargoError(
                 'state',
@@ -734,6 +792,7 @@ export class FlipSolver implements Solver<FlipParams> {
             p.fill(0, at, at + PARTICLE_WORDS);
             p.set([x, y, z, v[0], v[1], v[2]], at);
             count++;
+            have++;
           }
         }
     countWords[0] = count;
@@ -748,7 +807,7 @@ export class FlipSolver implements Solver<FlipParams> {
     const sea = this.sea!,
       g = this.grid,
       { h } = g,
-      t = this.time + dt;
+      t = this.time;
     for (let a = 0; a < 3; a++) {
       const [mx, my, mz] = a === 0 ? [g.nx + 1, g.ny, g.nz] : a === 1 ? [g.nx, g.ny + 1, g.nz] : [g.nx, g.ny, g.nz + 1],
         va = this.vel[a]!;

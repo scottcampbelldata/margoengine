@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20592229,
+  "total": 20592560,
   "history": [
     {
       "date": "2026-10-24",
@@ -13687,6 +13687,12 @@
       "commit": "8300fcbe01",
       "reason": "BREAK-03 square tube folding and imposed-stroke work grows the optional crush entry from 3977 to 5098 B gzip. The ceiling rises from 4233 to 5354 B. The material constructor and stroke query share the existing hardening, compaction and elastic accounting. Splitting them would make the measured curve less direct to use from a patch and would duplicate normalization and constitutive constants.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) sea band",
+      "reason": "FlipSolver: the band held to the sea takes its velocity before gravity, keeps eight particles a cell times its share under the surface, and is a wall to the density projection (KB-FLIP-SEABAND1); 11,988 to 12,319 B gzip (this Mac). One solver; nothing to split.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14519,7 +14525,7 @@
     "@margoengine/physics/entry": 10205,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 11988,
+    "@margoengine/physics/flip": 12319,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-flow": 6221,

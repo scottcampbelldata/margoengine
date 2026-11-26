@@ -224,6 +224,40 @@ test("a box held to the sea passes the sea's waves through: a linear wave keeps 
   assert.ok(Math.abs(amplitude - a) <= 0.15 * a, `amplitude ${amplitude} m against ${a}`);
   assert.ok(Math.abs(phase) <= 0.15, `phase ${phase} rad`);
   assert.ok(Math.abs(mean / n) <= h / 2, `mean level ${mean / n} m`);
+  // KB-FLIP-SEABAND1: the band neither drains the box nor pumps the sea into it. The box holds the water it started
+  // with to 0.2 percent; the band that topped up only empty cells lost 1.45 percent in these 2.4 s.
+  const start = 8 * 160 * 48;
+  assert.ok(Math.abs(liquid.count / start - 1) <= 0.002, `${liquid.count} particles of ${start}`);
+});
+
+test('a box held to a calm sea stays still (KB-FLIP-SEABAND1)', () => {
+  // The band took the sea's velocity after gravity, so the pressure solve took gravity out of the interior and not the
+  // band, and still water at the band's edge ran at 0.15 m/s within half a second.
+  const still = {
+      elevation: () => 0,
+      water: {
+        sample(_x, _y, _z, _t, out = { velocity: [0, 0, 0], density: 1000, temperature: 288 }) {
+          out.velocity[0] = out.velocity[1] = out.velocity[2] = 0;
+          return out;
+        },
+      },
+    },
+    liquid = new FlipSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+      cells: [24, 8, 1],
+      cellSize: 0.1,
+      origin: [-1.2, -0.4, 0],
+      sea: still,
+      blend: 4,
+    });
+  world.advance(30);
+  const p = liquid.positions(),
+    words = liquid['words'](liquid['particleRegion']);
+  let fastest = 0;
+  for (let q = 0; q < p.length / 3; q++)
+    fastest = Math.max(fastest, Math.hypot(words[q * PARTICLE_WORDS + 3], words[q * PARTICLE_WORDS + 4]));
+  assert.ok(fastest < 1e-3, `moving at ${fastest} m/s`);
+  assert.equal(liquid.count, 8 * 24 * 4);
 });
 
 test('a snapshot restores the liquid bit for bit, and a second run gives the same bits', () => {

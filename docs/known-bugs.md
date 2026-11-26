@@ -6,6 +6,28 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: a box held to the sea stirred a calm sea, drained the box and ran waves ahead of the sea (KB-FLIP-SEABAND1, physics, flip)
+
+- **Repro:** a `FlipSolver` box held to a calm sea (`elevation` 0, `water` at rest; 24 x 8 x 1 cells of 10 cm, band 4)
+  moved at 0.15 m/s within half a second, circling in the band's lower corners. Under a 3 cm, 1 m wave
+  (`packages/physics/tests/flip.test.js`) the box lost 1.45 percent of its water in 2.4 s. With the band fixed, the waves
+  inside ran 0.18 to 0.25 rad ahead of the sea, the mean level stood 7 mm high, and neither converged with the cells.
+- **Cause:** three faults in how the band holds the sea.
+  - The band took the sea's velocity after gravity and before the pressure solve. Its faces lost part of their g dt, so
+    the solve made a pressure hydrostatic in the interior but not in the band, and its horizontal gradient drove the
+    circulation.
+  - The refill topped up only band cells holding no particle. A cell left a particle or two short by a wave kept the
+    shortfall, while particles above the sea's surface were always removed, so the box drained.
+  - The density projection moved particles out of the band's full cells into the interior, which the band then
+    topped up again, pumping water in. The pumping raised the level and the waves.
+- **Fix:** the band takes the sea's velocity before gravity, as every face does. Each band cell holds eight particles
+  times its share under the sea's surface, giving up its highest and taking new ones at its free octants. The density
+  projection treats the band as a wall and moves no band particle. A calm box now stays under 1 mm/s. A wave passes
+  with its phase within 0.012 rad and its mean within 1.5 mm (cells of 1.25 cm), converging with the cells, and the box
+  keeps its water to 0.06 percent.
+- **Regression:** "a box held to a calm sea stays still (KB-FLIP-SEABAND1)" and the water count added to "a box held
+  to the sea passes the sea's waves through" in `packages/physics/tests/flip.test.js`.
+
 ### Fixed 2026-11-26: one terrain or water in two capture effects draws the first effect's outputs (KB-CAPTURE-TWOEFFECTS1, terrain, water)
 
 - **Repro:** add one `Terrain` to SSR and to `SceneTargets` (`ssr.add(terrain); targets.add(terrain)`): the second
@@ -126,7 +148,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - **No surface tension.** At their scale a jet tip a few millimetres thick retracts at the Taylor-Culick speed
     (0.2 to 0.4 m/s), and Margo's liquid has no surface tension.
 - **Status:** `docs/limits.md` ("Grid-particle liquids") states the scatter, and the README says the comparison is not
-  yet like-for-like. This entry closes when the measure is like-for-like and the ratio converges, or when the
+  yet like-for-like. The study so far, with Erinin et al.'s own measures (the jet tip on the profile from cubic fits,
+  the crest's speed at jet formation, finite depth 0.91 m, a 5.6 m box), puts the ratio at 1.24 to 1.35. But the
+  breakers that plunge are higher than theirs (crest 147 to 158 mm against 108 to 112 mm), and crests of their height
+  spill at cells of 1.25 and 0.9 cm. The box's band also stirred the water (KB-FLIP-SEABAND1, fixed), so the study is
+  being run again. This entry closes when the measure is like-for-like and the ratio converges, or when the
   difference that remains is explained.
 
 ### Open 2026-11-26: a scene's background colour comes out lighter once a post effect captures the scene (KB-CLEAR-CAPTURE1, core)
