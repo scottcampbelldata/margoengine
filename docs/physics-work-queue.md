@@ -357,9 +357,11 @@ that it connects to." Each builder works on ONE row at a time:
 4. Set it LANDED with one line per audit item naming its commit and test. The verifier checks it straight away.
 5. Start the next row only when this one is VERIFIED. If the verifier sends it back, fix that before anything else.
 
-Order for Codex, film rows first: SEA-12, SEA-04, SEA-02, SEA-13, SEA-08, SEA-11, SEA-10, SEA-09, SEA-15, SEA-14,
-FLUID-07, BREAK-03, SEA-03, SEA-01, SEA-05, SEA-07, ATMO-04, ATMO-06, LIFE-03, LIFE-04, BIO-01, then every other
-REOPENED row, then the Open rows.
+Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "get the solvers done for the videos").
+- Claude: SEA-09, SEA-08, SEA-11, SEA-10, SEA-04, SEA-02, SEA-13, SEA-14, LIFE-03, LIFE-04 and BIO-01, plus its own
+  SOFT-01 and FLUID-03.
+- Codex, in this order: SEA-12, SEA-15, FLUID-07, BREAK-03, SEA-03, SEA-01, SEA-05, SEA-07, ATMO-04, ATMO-06, then
+  every other REOPENED row, then the Open rows.
 
 ## Who builds what (Scott, 2026-11-26)
 
@@ -446,8 +448,8 @@ REOPENED row, then the Open rows.
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 839a45208b |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |
-| LIFE-03 | Aquatic locomotion | physics/life | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
-| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368 |
+| LIFE-03 | Aquatic locomotion | physics/life | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
+| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368 |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 561885e7a1 |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
@@ -461,7 +463,7 @@ REOPENED row, then the Open rows.
 | FIRE-01 | Wildfire spread | partial | Open | OPEN |
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
 | FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
-| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
+| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
 | DYN-07 | Dynamic character, balance, push response | partial | Codex | OPEN |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
@@ -484,15 +486,15 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SOFT-01 | Cloth and thin shells | partial: water as a medium landed 1b7d95a48, curtains in a moving hull 3d1e785d7 | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | elastic rods (`@margoengine/physics/rod`: bend, twist and stretch in a multibody's direct solve, pins, cast-off) with water loads per segment (`segmentLoads` in `@margoengine/physics/loads`: buoyancy, Morison drag and inertia, vortex lift); validated against a cantilever in a current, a catenary, a taut cable's frequency and strumming lock-in (`packages/physics/tests/rod.test.js`, `loads-segments.test.js`) | Claude | LANDED d53e71328 |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
-| SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
-| SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
-| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
-| SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
-| SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
+| SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
+| SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
+| SEA-08 | Ship seakeeping | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
+| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
+| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | BUILDING (codex/physics-sea-12-upgrade) |
-| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
-| SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
+| SEA-14 | Water entry and exit | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
