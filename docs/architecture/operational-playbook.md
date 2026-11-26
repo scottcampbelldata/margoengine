@@ -10535,6 +10535,9 @@ the steady rim bearing envelope with the live projected lug tips before normaliz
 An indexed tread can extend beyond the rim. The native kernel intersects its rotated triangles with
 the local bearing plane and takes the lowest triangle at each occupied profile sample. Geometry lives
 in snapshot regions. The profile is temporary arena storage rebuilt each step.
+The opt-in wheel reaction port adds one snapshot record per external row. The native kernel
+integrates net drawbar and axle torque once after finding the loaded arc. The root finder still
+integrates only the vertical force required for its bracket. Unloaded rows are cleared before export.
 
 ### Divergence-free particle pressure
 

@@ -67,6 +67,7 @@ struct Patch {
     mesh_profile: f64,
     mesh_columns: f64,
     mesh_rows: f64,
+    reaction: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -254,13 +255,22 @@ fn rolling_angle(p: &Patch, entry: f64) -> (f64, f64) {
     )
 }
 
-fn rolling_load(p: &Patch, entry: f64) -> f64 {
+#[repr(C)]
+struct RollingReaction {
+    normal: f64,
+    drawbar: f64,
+    axle_torque: f64,
+}
+
+fn rolling_load<const REACTION: bool>(p: &Patch, entry: f64) -> RollingReaction {
     let (exit, peak) = rolling_angle(p, entry);
     let rim = p.wheel_radius;
     let lug_entry = 2.0 * arc_sin(root(0.5 * (1.0 - rim * cos(entry) / (rim + p.lug_height))));
     let lug_sine = sin(lug_entry);
     let shear_radius = rim + 0.5 * p.lug_height;
-    let mut force = 0.0;
+    let mut normal = 0.0;
+    let mut drawbar = 0.0;
+    let mut axle_torque = 0.0;
     for (first, last) in [(exit, peak), (peak, entry)] {
         let delta = (last - first) / 24.0;
         for i in 0..24 {
@@ -279,10 +289,23 @@ fn rolling_load(p: &Patch, entry: f64) -> f64 {
             let slide = rim * ((lug_entry - at) - (1.0 - p.drive_slip) * (lug_sine - sin(at)));
             let shear = (p.cohesion + pressure * p.friction)
                 * (1.0 - exp(-slide.max(0.0) / p.shear_length));
-            force += delta * (rim * pressure * cos(at) + shear_radius * shear * sin(at));
+            let radial = rim * pressure;
+            let tangential = shear_radius * shear;
+            let sine = sin(at);
+            let cosine = cos(at);
+            normal += delta * (radial * cosine + tangential * sine);
+            if REACTION {
+                drawbar += delta * (tangential * cosine - radial * sine);
+                axle_torque += delta * tangential * shear_radius;
+            }
         }
     }
-    2.0 * p.half_width * force
+    let width = 2.0 * p.half_width;
+    RollingReaction {
+        normal: width * normal,
+        drawbar: width * drawbar,
+        axle_torque: width * axle_torque,
+    }
 }
 
 const ROLLING_ROWS: usize = 65;
@@ -399,18 +422,28 @@ fn raster_tread(
 unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingCut> {
     let mut lo = 0.0;
     let mut hi = core::f64::consts::FRAC_PI_2;
-    if rolling_load(p, hi) < p.load {
+    if rolling_load::<false>(p, hi).normal < p.load {
         return None;
     }
     while hi - lo > 1e-9 {
         let middle = 0.5 * (lo + hi);
-        if rolling_load(p, middle) < p.load {
+        if rolling_load::<false>(p, middle).normal < p.load {
             lo = middle;
         } else {
             hi = middle;
         }
     }
     let entry = 0.5 * (lo + hi);
+    if p.reaction != 0.0 {
+        let reaction = rolling_load::<true>(p, entry);
+        if !(reaction.normal.is_finite()
+            && reaction.drawbar.is_finite()
+            && reaction.axle_torque.is_finite())
+        {
+            return None;
+        }
+        *((p.reaction as usize) as *mut RollingReaction) = reaction;
+    }
     let (exit, peak) = rolling_angle(p, entry);
     let rim = p.wheel_radius;
     let rim_rear = rim * sin(exit);

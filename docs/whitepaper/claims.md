@@ -5815,6 +5815,9 @@ The discrete two-lug test rotates a tread through 90°, preserves zero pressure 
 matches the independently integrated peak depth for both orientations.
 The indexed-wheel test advances a triangle tread through the physical phase field in both native
 memory modes. It checks the exact cut outside the rim, clearance 90° later and an integrated load of 80 N.
+Rolling reactions reproduce the closed-form drag of a symmetric, shear-free wheel. At powered slip 1,
+the fixture checks axle torque and drawbar force with the analytic cohesion integrals and a derived
+quadrature error bound. Seek reproduces both reactions and the coupled bed state.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

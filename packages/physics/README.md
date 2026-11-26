@@ -4778,6 +4778,12 @@ lowest rotating triangle at each sample and combines it with the rim profile. Se
 `rows` to resolve the narrowest groove. They default to 17 across and 65 along travel. The
 [indexed tread example](tests/coupling/terramechanics.test.js) has a two-triangle wheel segment and both phase positions.
 
+Pass `wheelReaction: soilWheelReactionField()` to `Terramechanics.load` to publish one resolved
+load record per external row. `SOIL_WHEEL_REACTION_WORDS` is the number of f64 values in each
+layout-1 record: vertical force in N, drawbar force in N along the wheel's forward direction and
+resisting axle torque in N·m. Rows without a loaded rolling wheel contain zeros. The reaction uses
+the published forward driven-wheel arc. This output does not replace the rigid tyre model.
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone

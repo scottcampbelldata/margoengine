@@ -16874,7 +16874,9 @@ The original city, deck, horse and courier shots still need the production bindi
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
 It stamps evenly spaced lugs and indexed triangle treads from live wheel spin. Full wheel tilt and
-terrain-relative torque, measured high-slip digging forces and measured berm profiles remain EARTH-05 work.
+measured high-slip digging forces and measured berm profiles remain EARTH-05 work. The resolved
+rolling arc supplies separate drawbar and axle reaction records. The rigid vehicle still needs
+reciprocal application of those independent loads.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

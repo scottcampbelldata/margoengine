@@ -8,6 +8,7 @@ import {
   SoilContactRigidSolver,
   soilPatchField,
   soilWheelPhaseField,
+  soilWheelReactionField,
   Terramechanics,
   wheelSoil,
 } from '@margoengine/physics/terramechanics';
@@ -349,6 +350,44 @@ test('two otherwise identical footprints distinguish a shallow and deep layer fr
   }
 });
 
+async function rollingBench(terrain, material, wheel, { width, length, load, speed, slip, wheelReaction, shared }) {
+  const input = soilPatchField('lab-wheel-assembly');
+  let memory, region;
+  const carriage = {
+    describe: () => ({ id: 'carriage', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] }),
+    init(host) {
+      memory = host.memory;
+      region = host.allocate('carriage-load', 80, 'f64', 1);
+    },
+    step(context) {
+      regionWords(memory, region).set([
+        0,
+        -0.16 + (speed * context.tick) / 60,
+        0,
+        1,
+        length,
+        width,
+        load,
+        0,
+        -slip * length,
+        0,
+      ]);
+    },
+    exportPorts: (tick) => [{ field: input.name, region, tick, cell: [0, 0, 0] }],
+    importPorts() {},
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
+  const bed = new TerrainBed();
+  const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
+    .add(bed, { ...terrain, elevations: () => 0 })
+    .add(carriage)
+    .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
+    .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
+  return { world, bed, soil };
+}
+
 test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and moderate powered slip', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const width = 0.165;
@@ -371,40 +410,7 @@ test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and mode
     [0, 0.00264, 0.00314],
     [0.2, 0.00796, 0.00934],
   ]) {
-    const input = soilPatchField('lab-wheel-assembly');
-    let memory, region;
-    const carriage = {
-      describe: () => ({ id: 'carriage', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] }),
-      init(host) {
-        memory = host.memory;
-        region = host.allocate('carriage-load', 80, 'f64', 1);
-      },
-      step(context) {
-        regionWords(memory, region).set([
-          0,
-          -0.16 + (speed * context.tick) / 60,
-          0,
-          1,
-          length,
-          width,
-          load,
-          0,
-          -slip * length,
-          0,
-        ]);
-      },
-      exportPorts: (tick) => [{ field: input.name, region, tick, cell: [0, 0, 0] }],
-      importPorts() {},
-      stateRegions: () => [region],
-      extraState: () => [],
-    };
-    const soil = await Terramechanics.load({ tier: 'resolved', input });
-    const bed = new TerrainBed();
-    const world = new PhysicsWorld({ rate })
-      .add(bed, { ...terrain, elevations: () => 0 })
-      .add(carriage)
-      .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
-      .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
+    const { world, bed, soil } = await rollingBench(terrain, material, wheel, { width, length, load, speed, slip });
     const areas = bedVertexAreas(terrain);
     world.advance(40);
     const result = soil.read(0);
@@ -423,6 +429,70 @@ test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and mode
     const hash = world.hash();
     world.restoreSnapshot(saved.bytes);
     world.advance(120);
+    assert.equal(world.hash(), hash);
+  }
+});
+
+test('native rolling reactions resolve asymmetric normal drag and full-slip axle torque', async () => {
+  const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const width = 0.165;
+  const length = 0.12;
+  const load = 80;
+  const radius = 0.15735;
+  const stiffness = 400_000;
+  const shearLength = 0.06;
+  const wheel = { radius, peakFraction: 0.5, peakSlip: 0 };
+  const wheelReaction = soilWheelReactionField('carriage-reaction');
+  for (const [slip, cohesion, shared] of [
+    [0, 0, false],
+    [1, 2500, true],
+  ]) {
+    const material = { cohesiveModulus: 0, frictionalModulus: stiffness, cohesion, shearLength, friction: 0 };
+    const { world, soil } = await rollingBench(terrain, material, wheel, {
+      width,
+      length,
+      load,
+      speed: 0,
+      slip,
+      wheelReaction,
+      shared,
+    });
+    world.advance(1);
+    const fields = world.fields.port(wheelReaction.name).region;
+    const [normal, drawbar, torque] = regionWords(world.memory, fields);
+    const entry = Math.acos(1 - soil.read(0).sinkage / radius);
+    const half = 0.5 * entry;
+    // The rim-pressure contribution grows by at most b C R² a for each radian of entry.
+    const angleError = 0.5e-9;
+    const normalError = width * (stiffness * radius * radius * entry + 2 * radius * cohesion) * angleError;
+    close(normal, load, normalError);
+    if (!cohesion) {
+      // The pressure is symmetric about a/2; the paired sine/cosine resultants point there exactly.
+      close(drawbar, -normal * Math.tan(half), 4096 * eps * normal);
+      assert.equal(torque, 0);
+    } else {
+      const k = radius / shearLength;
+      const coeff = width * radius * radius * cohesion;
+      const exact = coeff * (entry + Math.expm1(-k * entry) / k);
+      // Composite midpoint on 24 intervals on each half; |f''| <= k² for the dimensionless integrand.
+      const midpointError = (coeff * entry * (half / 24) ** 2 * k * k) / 24;
+      close(torque, exact, midpointError);
+      const falloff = Math.exp(-k * entry);
+      const sine = Math.sin(entry);
+      const cosine = Math.cos(entry);
+      const along = sine - (k * cosine + sine - k * falloff) / (1 + k * k);
+      const upward = 1 - cosine - (k * sine - cosine + falloff) / (1 + k * k);
+      const lever = Math.tan(half);
+      const traction = width * radius * cohesion;
+      const expected = traction * along - (normal - traction * upward) * lever;
+      const forceError = (traction * entry * (half / 24) ** 2 * (1 + k) ** 2 * (1 + lever)) / 24;
+      close(drawbar, expected, forceError);
+    }
+    const snapshot = world.takeSnapshot();
+    world.advance(4);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(4);
     assert.equal(world.hash(), hash);
   }
 });

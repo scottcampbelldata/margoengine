@@ -135,6 +135,17 @@ For an ellipse it is one minus the squared normalized radius. The per-vertex are
 area. The local repose pass conservatively transfers only the current step's new loose material.
 [Krenn and Hirzinger](https://elib.dlr.de/60535/1/elib_ISTVS2009_KrennHirzinger.pdf).
 
+Liang Ding, Haibo Gao, Zongquan Deng, Kazuya Yoshida and Keiji Nagatani, “Slip Ratio for Lugged Wheel
+of Planetary Rover in Deformable Soil: Definition and Estimation” (2009), Eq. 22, gives independent
+drawbar force and axle moment from the angular forces. After balancing the vertical load, the
+resolved rolling option projects the tangential stress forward and the normal stress rearward.
+The axle moment is the tangential force times its effective radius. The native integration uses
+24 midpoint samples on each side of the pressure peak. For a smooth wheel with symmetric pressure
+and no shear, drawbar equals the vertical load times the negative tangent of half the entry angle.
+At full slip with constant cohesion and zero internal friction, the shear exponential gives exact
+axle moment and sine/cosine force integrals, which the tests compare to the native midpoint error bound.
+[Ding et al. (2009)](https://vigir.missouri.edu/~gdesouza/Research/Conference_CDs/IEEE_IROS_2009/papers/0739.pdf).
+
 Krenn and Hirzinger's Fig. 9 gives a discontinuous projected footprint. The resolved tier accepts projected
 depth sampled from a shape. It rotates the sample grid with the contact and bilinearly interpolates local depth
 before applying the force integral. Supplied area and perimeter retain the geometry's effective width when
