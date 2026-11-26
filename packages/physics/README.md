@@ -736,7 +736,8 @@ console.log(body.isCellTorn(0)); // false: the rolling shear is beyond peak stre
 the same event as `soft.cut`, with the live fragments and a mapping from the original vertices.
 Each fragment retains the cell material and plastic rest shape. The fragments share the original
 mass, rest volume and linear momentum. The plane can pass through a mesh vertex or an edge.
-Use `soft.cut` when a finite blade should affect only the faces it crosses.
+Use `soft.cutTriangle` for a finite incision through cells. `soft.cut` still offers a blade
+that follows existing cell faces.
 
 ```ts
 import { Physics } from '@margoengine/physics';
@@ -755,6 +756,28 @@ Start with a tetrahedral solid without separate springs, clusters, an embedded s
 bindings. The fragments expose their closed boundary triangles when the original body has a mesh
 surface. For a cut that removes the original body, use the returned pieces to bind new rendering
 or constraints.
+
+#### Finite incisions in a solid
+
+`soft.cutTriangle` opens only the material inside a finite triangle in world space. An
+internal incision can return one new body with two independently moving lips joined around
+their perimeter. A complete cut can return several bodies. Each new body contains physical
+tetrahedra and exposes their new collision and render surfaces. The same data and mass transfer
+rules apply as for a full plane cut.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const desc = new SoftBodyDesc([[0, 0, 0], [2, 0, 0], [0, 2, 0], [0, 0, 2]])
+  .setCells([0, 1, 2, 3]).setSurface().setSolver('vertex-block');
+const original = soft.create(desc);
+const { pieces } = soft.cutTriangle(original, [[0.5, 0.2, 0.2], [0.5, 0.65, 0.2], [0.5, 0.2, 0.65]]);
+console.log(pieces[0]?.triangles().length); // one solid with the two new incision faces
+```
 
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 

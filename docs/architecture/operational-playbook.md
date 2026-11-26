@@ -10048,6 +10048,11 @@ closed tensile crack recovers compressive capacity. The irreversible damage and 
 are held fixed during each local solve. Public tests exercise partial damage, fracture and
 snapshot replay during a topology change, with a physical mesh resolution check at creation.
 
+Finite tetrahedral incisions keep shared cap edges conforming and duplicate particle slots
+only across blade-covered faces. A triangle completely inside one cell creates two independent
+surfaces and leaves the material connected at the crack front. Tests check area, volume,
+closed boundaries, real movement under a load on one lip, and replay through world snapshots.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is

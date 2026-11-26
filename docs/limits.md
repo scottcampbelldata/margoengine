@@ -9640,6 +9640,14 @@ live external bindings need a separate transfer when introducing new cutting ver
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
+`SoftBodies.cutTriangle` handles a finite planar incision, including one wholly inside an
+existing tetrahedron. Tetrahedra that meet the supporting plane may be subdivided so that
+neighboring faces remain conforming. Only the triangles covered by the blade are released.
+Cells outside the blade keep their material connections. Tiny subdivisions must fit the
+same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
+triangle per operation. Arbitrary embedded skins, springs, cluster constraints and live
+bindings still require their own state transfer.
+
 Optional orthotropic failure uses nine stress limits in the material frame. It compares the
 stress conjugate to Green strain with each positive tension, compression, or shear strength.
 Its failure data adds 18 f32 words per cell when a body authors strength limits. Nine store

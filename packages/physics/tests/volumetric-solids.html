@@ -43,9 +43,9 @@
     return new Geometry(positions, normals, indices);
   }
 
-  window.renderRung = async ({ loaded, showBoot = false, solver, fiber, orthotropy }) => {
+  window.renderRung = async ({ loaded, showBoot = false, solver, fiber, orthotropy, frame = 120 }) => {
     const scene = await ladder(undefined, { mass: loaded ? 35 : 0, solver, fiber, orthotropy });
-    scene.world.advance(120);
+    scene.world.advance(frame);
     cutMesh.setGeometry(null);
     rungMesh.setGeometry(surface(scene.rung));
     boot.setGeometry(showBoot ? box(0.106, 0.12, 0.12) : null);
@@ -55,18 +55,20 @@
     return { ...scene.reading(), hash: scene.world.hash(), visible: engine.stats.visible };
   };
 
-  window.renderLadderCut = async () => {
+  window.renderLadderCut = async (finite = false) => {
     const scene = await ladder(undefined, { mass: 35, solver: 'vertex-block' });
     scene.world.advance(120);
-    const { pieces } = scene.soft.cutPlane(scene.rung, [0.031, 0.91, 0], [1, 0.25, 0]);
+    const { pieces } = finite
+      ? scene.soft.cutTriangle(scene.rung, [[0.031, 0.92, -0.13], [0.031, 1.1, -0.13], [0.031, 0.92, 0.2]])
+      : scene.soft.cutPlane(scene.rung, [0.031, 0.91, 0], [1, 0.25, 0]);
     scene.world.advance(145);
     rungMesh.setGeometry(surface(pieces[0]));
-    cutMesh.setGeometry(surface(pieces[1]));
+    cutMesh.setGeometry(pieces[1] ? surface(pieces[1]) : null);
     boot.setGeometry(box(0.106, 0.12, 0.12));
     boot.setPosition(scene.boot.position);
     engine.render({ delta: 1 / 60 });
     await engine.gpu.queue.onSubmittedWorkDone();
-    return { hash: scene.world.hash(), visible: engine.stats.visible, boot: scene.boot.position };
+    return { hash: scene.world.hash(), visible: engine.stats.visible, boot: scene.boot.position, pieces: pieces.length };
   };
 </script>
 </body>

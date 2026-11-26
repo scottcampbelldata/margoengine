@@ -220,3 +220,150 @@ test('plane cuts and snapshot restore retain the smoothed strain that governs la
   b.world.advance(4);
   assert.equal(a.world.hash(), b.world.hash());
 });
+
+test('a finite interior incision creates two movable faces and keeps the rest of a tetrahedron connected', async () => {
+  const { soft, body, world } = await specimen(tetrahedron().setPinnedParticles([0, 1, 2]));
+  const originalMass = body.mass();
+  const blade = [
+    [0.5, 0.2, 0.2],
+    [0.5, 0.65, 0.2],
+    [0.5, 0.2, 0.65],
+  ];
+  const { pieces } = soft.cutTriangle(body, blade);
+  assert.equal(pieces.length, 1);
+  const [cut] = pieces;
+  bound(cut.mass(), originalMass, originalMass);
+  bound(cut.volume(), unitVolume, unitVolume);
+  closed(cut);
+  const points = cut.particlePositions();
+  const ids = cut.triangles();
+  const centre = [];
+  for (let i = 0; i < points.length; i += 3)
+    if (
+      Math.abs(points[i] - 0.5) <= epsilon32 &&
+      Math.abs(points[i + 1] - 0.35) <= epsilon32 &&
+      Math.abs(points[i + 2] - 0.35) <= epsilon32
+    )
+      centre.push(i / 3);
+  assert.equal(centre.length, 2);
+  let area = 0;
+  let net = 0;
+  for (let i = 0; i < ids.length; i += 3) {
+    const p = Array.from(ids.subarray(i, i + 3), (id) => cut.particlePosition(id));
+    if (p.some(([x]) => Math.abs(x - 0.5) > epsilon32)) continue;
+    for (const [_, y, z] of p) assert.ok(y >= 0.2 - epsilon32 && z >= 0.2 - epsilon32 && y + z <= 0.85 + 2 * epsilon32);
+    const [a, b, c] = p;
+    const oriented = ((b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1])) / 2;
+    area += Math.abs(oriented);
+    net += oriented;
+  }
+  const bladeAreaTwice = 0.45 * 0.45;
+  bound(area, bladeAreaTwice, bladeAreaTwice);
+  bound(net, 0, area);
+  cut.addParticleForce(centre[0], [-100, 0, 0]);
+  world.advance(1);
+  assert.notEqual(cut.particlePosition(centre[0])[0], cut.particlePosition(centre[1])[0]);
+});
+
+test('a finite triangle across a shared tetrahedral plane separates complete pieces', async () => {
+  const build = () => specimen(SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [2, 2, 2]));
+  const a = await build();
+  const b = await build();
+  const blade = [
+    [0.5, -1, -1],
+    [0.5, 3, -1],
+    [0.5, -1, 3],
+  ];
+  const cutA = a.soft.cutTriangle(a.body, blade);
+  const cutB = b.soft.cutTriangle(b.body, blade);
+  assert.equal(cutA.pieces.length, 2);
+  for (const piece of cutA.pieces) {
+    bound(piece.volume(), 0.5, 1);
+    closed(piece);
+  }
+  assert.deepEqual(
+    cutB.pieces.map((piece) => piece.cells()),
+    cutA.pieces.map((piece) => piece.cells()),
+  );
+  a.world.advance(3);
+  b.world.advance(1);
+  b.world.restoreSnapshot(a.world.takeSnapshot().bytes);
+  a.world.advance(6);
+  b.world.advance(6);
+  assert.equal(a.world.hash(), b.world.hash());
+});
+
+test('an oblique interior incision has conforming shared facets across a volume mesh', async () => {
+  const { soft, body } = await specimen(SoftBodyDesc.box([0, 0, 0], [1, 1, 1], [3, 3, 3]));
+  const surface = (y, z) => 0.47 - 0.13 * y + 0.21 * z;
+  const blade = [
+    [0.15, 0.2],
+    [0.8, 0.25],
+    [0.25, 0.78],
+  ].map(([y, z]) => [surface(y, z), y, z]);
+  const { pieces } = soft.cutTriangle(body, blade);
+  assert.equal(pieces.length, 1);
+  const [cut] = pieces;
+  bound(cut.volume(), 1, 1);
+  closed(cut);
+  const triangles = cut.triangles();
+  const twiceArea = ([a, b, c]) => {
+    const u = b.map((x, i) => x - a[i]);
+    const v = c.map((x, i) => x - a[i]);
+    return Math.sqrt(
+      (u[1] * v[2] - u[2] * v[1]) ** 2 + (u[2] * v[0] - u[0] * v[2]) ** 2 + (u[0] * v[1] - u[1] * v[0]) ** 2,
+    );
+  };
+  let stitchedAreaTwice = 0;
+  for (let i = 0; i < triangles.length; i += 3) {
+    const face = Array.from(triangles.subarray(i, i + 3), (id) => cut.particlePosition(id));
+    if (face.every(([x, y, z]) => Math.abs(x - surface(y, z)) < 4 * epsilon32)) stitchedAreaTwice += twiceArea(face);
+  }
+  bound(stitchedAreaTwice, 2 * twiceArea(blade), 1);
+});
+
+test('a finite blade that misses the solid leaves all state alone', async () => {
+  const { world, soft, body } = await specimen(tetrahedron());
+  const before = world.hash();
+  const blade = [
+    [0.5, 2, 2],
+    [0.5, 3, 2],
+    [0.5, 2, 3],
+  ];
+  assert.deepEqual(soft.cutTriangle(body, blade).pieces, []);
+  assert.throws(() => soft.cutTriangle(body, [blade[0], blade[0], blade[1]]), /noncollinear/);
+  assert.equal(world.hash(), before);
+});
+
+test('a second finite blade can cross an existing incision without losing volume or closing either lip', async () => {
+  const { soft, body } = await specimen(tetrahedron());
+  const first = [
+    [0.5, 0.2, 0.2],
+    [0.5, 0.65, 0.2],
+    [0.5, 0.2, 0.65],
+  ];
+  const second = [
+    [0.35, 0.23, 0.42],
+    [0.72, 0.22, 0.42],
+    [0.37, 0.55, 0.42],
+  ];
+  const initialMass = body.mass();
+  const [once] = soft.cutTriangle(body, first).pieces;
+  const { pieces } = soft.cutTriangle(once, second);
+  assert.equal(pieces.length, 1);
+  const [twice] = pieces;
+  bound(twice.volume(), unitVolume, unitVolume);
+  bound(twice.mass(), initialMass, initialMass);
+  closed(twice);
+  const ids = twice.triangles();
+  for (const [axis, plane] of [
+    [0, 0.5],
+    [2, 0.42],
+  ]) {
+    assert.ok(
+      Array.from({ length: ids.length / 3 }, (_, i) => ids.subarray(3 * i, 3 * i + 3)).some((face) =>
+        face.every((id) => Math.abs(twice.particlePosition(id)[axis] - plane) <= 2 * epsilon32),
+      ),
+    );
+  }
+});

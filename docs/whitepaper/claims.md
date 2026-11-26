@@ -53,6 +53,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   retains partial damage through cuts and snapshots. Run the crate's `crack_band` tests
   and `packages/physics/tests/coupling/volumetric-strength.test.js`.
 
+- Finite volumetric incisions (SOFT-04, 2026-11-26). The exact blade makes two moving
+  surfaces inside a single tetrahedron while conserving its mass and volume. A blade
+  across shared faces separates complete pieces. The oblique multi-cell fixture verifies
+  the expected total cut area and boundary connectivity. Run
+  `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

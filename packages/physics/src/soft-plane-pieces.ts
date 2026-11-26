@@ -2,7 +2,7 @@
 // and each fragment's share of the original nodal mass and momentum.
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
-import { planPlaneCut, type SliceCell, type SlicePoint } from './soft-plane-cut.js';
+import type { SliceCell, SlicePlan, SlicePoint } from './soft-plane-cut.js';
 import type { SoftDestination, SoftSplit } from './soft-split.js';
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 
@@ -39,16 +39,15 @@ function childBasis(cell: SliceCell, state: Record<string, Float32Array>, row: n
   return basis;
 }
 
-export function makePlanePieces(
+export function makeCutPieces(
   soft: SoftBodies,
   body: SoftBody,
   make: (positions: number[]) => SoftBodyDesc,
-  origin: Vec3,
-  normal: Vec3,
+  planCut: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
 ): SoftSplit | null {
   const current = body.particlePositions();
   const oldCells = body.cells();
-  const plan = planPlaneCut(current, oldCells, origin, normal);
+  const plan = planCut(current, oldCells);
   if (!plan) return null;
   const old = soft.columns();
   const fem = soft.cellColumns();
@@ -69,7 +68,9 @@ export function makePlanePieces(
     point: SlicePoint,
     cols: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>],
   ): Vec3 => {
-    const { first, second, weight } = point;
+    const { first, second, weight, vertices } = point;
+    if (vertices)
+      return vecOf((axis) => vertices.reduce((value, [p, fraction]) => value + fraction * cols[axis][at(p)]!, 0));
     return vecOf((axis) => blend(cols[axis][at(first)]!, cols[axis][at(second)]!, weight));
   };
   const volumeFactor = body.volumeOn ? old.vb_target![body.handle]! / body.surfaceRest : null;
@@ -108,8 +109,12 @@ export function makePlanePieces(
           if (forces && force)
             for (const axis of AXES) forces[3 * local + axis] = forces[3 * local + axis]! + share * force[axis];
         };
-        contribute(point.first, 1 - point.weight);
-        if (point.weight > 0) contribute(point.second, point.weight);
+        if (point.vertices) {
+          for (const [particle, weight] of point.vertices) contribute(particle, weight);
+        } else {
+          contribute(point.first, 1 - point.weight);
+          if (point.weight > 0) contribute(point.second, point.weight);
+        }
       }
       return {
         nodes: cell.nodes.map((node) => index.get(node)!),
@@ -162,21 +167,30 @@ export function makePlanePieces(
     desc.solver = body.solverKind;
     const state = nodes.map((node, i): NodeState => {
       const point = plan.points[node]!;
-      const { first, second, weight } = point;
-      const flags = old.pflags[at(first)]! & old.pflags[at(second)]!;
-      const pinned = (flags & PARTICLE_PINNED) !== 0;
+      const { first, second, weight, vertices } = point;
+      const flags = (p: number): number => old.pflags[at(p)]!;
+      const pinned = vertices
+        ? vertices.every(([p]) => (flags(p) & PARTICLE_PINNED) !== 0)
+        : (flags(first) & flags(second) & PARTICLE_PINNED) !== 0;
       if (pinned) desc.pinned.add(i);
       const goal = (p: number, axis: number): number => {
         const row = at(p);
         const native = (old.pflags[row]! & PARTICLE_TARGETED) !== 0 ? targets : positions;
         return native[axis]![row]!;
       };
+      const targeted = vertices
+        ? vertices.some(([p]) => (flags(p) & PARTICLE_TARGETED) !== 0)
+        : ((flags(first) | flags(second)) & PARTICLE_TARGETED) !== 0;
       const target =
-        pinned && ((old.pflags[at(first)]! | old.pflags[at(second)]!) & PARTICLE_TARGETED) !== 0
-          ? vecOf((axis) => blend(goal(first, axis), goal(second, axis), weight))
+        pinned && targeted
+          ? vecOf((axis) =>
+              vertices
+                ? vertices.reduce((value, [p, fraction]) => value + fraction * goal(p, axis), 0)
+                : blend(goal(first, axis), goal(second, axis), weight),
+            )
           : null;
       return {
-        oldParticle: first === second ? first : null,
+        oldParticle: !vertices && first === second ? first : null,
         position: interpolate(point, positions),
         previous: interpolate(point, [old.px, old.py, old.pz]),
         velocity: vecOf((axis) => momenta[3 * i + axis]! / masses[i]!),

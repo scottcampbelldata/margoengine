@@ -60,6 +60,19 @@ try {
   assert.equal(afterCut.hash, cut.hash);
   assert.deepEqual(await page.locator('canvas').screenshot(), cutImage);
   console.log(`LH-4 oblique cut, boot y=${cut.boot[1].toFixed(6)} m, ${cut.hash}`);
+  const uncut = await page.evaluate(() =>
+    window.renderRung({ loaded: true, showBoot: true, solver: 'vertex-block', frame: 145 }),
+  );
+  const uncutImage = await page.locator('canvas').screenshot();
+  const incision = await page.evaluate(() => window.renderLadderCut(true));
+  const incisionImage = await page.locator('canvas').screenshot();
+  assert.equal(incision.pieces, 1);
+  assert.ok(incision.boot[1] < uncut.bootHeight);
+  assert.notDeepEqual(incisionImage, uncutImage);
+  const replayIncision = await page.evaluate(() => window.renderLadderCut(true));
+  assert.equal(replayIncision.hash, incision.hash);
+  assert.deepEqual(await page.locator('canvas').screenshot(), incisionImage);
+  console.log(`LH-4 finite incision, boot y=${incision.boot[1].toFixed(6)} m, ${incision.hash}`);
   assert.deepEqual(errors, []);
 } finally {
   await close();

@@ -2,7 +2,7 @@
 // edge points. Globally ordered pulling triangulations agree on every common face.
 import type { Vec3 } from './math.js';
 
-type Tet = [number, number, number, number];
+export type Tet = [number, number, number, number];
 type Matrix = [Vec3, Vec3, Vec3];
 type Side = -1 | 1;
 
@@ -11,6 +11,8 @@ export interface SlicePoint {
   readonly second: number;
   /** Fraction measured from first to second. An old vertex has first === second. */
   readonly weight: number;
+  /** A point formed by clipping or triangulating a polygon can use all four parent vertices. */
+  readonly vertices?: readonly (readonly [particle: number, weight: number])[];
 }
 
 export interface SliceCell {
@@ -22,7 +24,12 @@ export interface SliceCell {
   readonly inverse: Matrix | null;
 }
 
-const FACES = [
+export interface SlicePlan {
+  readonly points: readonly SlicePoint[];
+  readonly pieces: readonly SliceCell[][];
+}
+
+export const FACES = [
   [1, 2, 3],
   [0, 3, 2],
   [0, 1, 3],
@@ -30,16 +37,16 @@ const FACES = [
 ] as const;
 const SIDES: readonly Side[] = [-1, 1];
 const edgeKey = (a: number, b: number): string => (a < b ? `${a},${b}` : `${b},${a}`);
-const faceKey = (a: readonly number[]): string => [...a].sort((x, y) => x - y).join(',');
-const subtract = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
+export const faceKey = (a: readonly number[]): string => [...a].sort((x, y) => x - y).join(',');
+export const subtract = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const cross = (a: Vec3, b: Vec3): Vec3 => [
   a[1] * b[2] - a[2] * b[1],
   a[2] * b[0] - a[0] * b[2],
   a[0] * b[1] - a[1] * b[0],
 ];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+export const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-function cutDistances(current: ArrayLike<number>, origin: Vec3, normal: Vec3): Float64Array {
+export function cutDistances(current: ArrayLike<number>, origin: Vec3, normal: Vec3): Float64Array {
   return Float64Array.from({ length: current.length / 3 }, (_, i) => {
     const terms = [0, 1, 2].map((axis) => (current[3 * i + axis]! - origin[axis]!) * normal[axis]!);
     const value = terms[0]! + terms[1]! + terms[2]!;
@@ -48,7 +55,7 @@ function cutDistances(current: ArrayLike<number>, origin: Vec3, normal: Vec3): F
   });
 }
 
-function faceIntersection(
+export function faceIntersection(
   tet: Tet,
   face: readonly number[],
   side: Side,
@@ -66,7 +73,7 @@ function faceIntersection(
 }
 
 /** The clipped original faces meet the section in a single cyclic sequence of edges. */
-function sectionPolygon(faces: readonly number[][], onPlane: (node: number) => boolean): number[] {
+export function sectionPolygon(faces: readonly number[][], onPlane: (node: number) => boolean): number[] {
   const adjacent = new Map<number, number[]>();
   for (const face of faces) {
     if (face.length < 3) continue;
@@ -85,11 +92,13 @@ function sectionPolygon(faces: readonly number[][], onPlane: (node: number) => b
   return ring;
 }
 
-function childCell(parent: number, tetra: Tet, node: Tet, points: readonly SlicePoint[]): SliceCell {
+export function childCell(parent: number, tetra: Tet, node: Tet, points: readonly SlicePoint[]): SliceCell {
   const affine = (i: number): Vec3 => {
-    const { first, second, weight } = points[i]!;
+    const { first, second, weight, vertices } = points[i]!;
     const coordinate = (corner: number): number =>
-      (corner === first ? 1 - weight : 0) + (corner === second ? weight : 0);
+      vertices
+        ? (vertices.find(([particle]) => particle === corner)?.[1] ?? 0)
+        : (corner === first ? 1 - weight : 0) + (corner === second ? weight : 0);
     return [coordinate(tetra[1]), coordinate(tetra[2]), coordinate(tetra[3])];
   };
   const a = affine(node[0]);
@@ -119,6 +128,16 @@ function clippedChildren(
 ): SliceCell[] {
   const faces = FACES.map((face) => faceIntersection(tet, face, side, d, add));
   faces.push(sectionPolygon(faces, (node) => node >= d.length || d[node] === 0));
+  return pullCells(parent, tet, faces, points);
+}
+
+/** Pulling triangulation for convex cells whose faces do not have inserted collinear vertices. */
+export function pullCells(
+  parent: number,
+  tet: Tet,
+  faces: readonly number[][],
+  points: readonly SlicePoint[],
+): SliceCell[] {
   const root = Math.min(...faces.flat());
   const children: SliceCell[] = [];
   for (const face of faces) {
@@ -168,15 +187,7 @@ function connectedPieces(cells: readonly SliceCell[]): SliceCell[][] {
 }
 
 /** Plans a complete plane section without modifying the body. */
-export function planPlaneCut(
-  current: Float32Array,
-  cells: Uint32Array,
-  origin: Vec3,
-  normal: Vec3,
-): {
-  points: SlicePoint[];
-  pieces: SliceCell[][];
-} | null {
+export function planPlaneCut(current: Float32Array, cells: Uint32Array, origin: Vec3, normal: Vec3): SlicePlan | null {
   const d = cutDistances(current, origin, normal);
   const points: SlicePoint[] = Array.from({ length: d.length }, (_, i) => ({ first: i, second: i, weight: 0 }));
   const intersections = new Map<string, number>();

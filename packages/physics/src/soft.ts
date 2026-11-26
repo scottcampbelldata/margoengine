@@ -10,9 +10,11 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { makePlanePieces } from './soft-plane-pieces.js';
+import { planPlaneCut } from './soft-plane-cut.js';
+import { makeCutPieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
+import { planTriangleCut } from './soft-triangle-cut.js';
 
 export type { SoftDestination, SoftSplit } from './soft-split.js';
 
@@ -1959,7 +1961,7 @@ export interface SoftTearEvent {
   edges: number[];
   /** Cell indices, as `body.cells()` numbers them: the tetrahedra that tore, empty when only edges did. */
   cells: number[];
-  /** The bodies the tear split `body` into (then removed), empty when it stayed whole. */
+  /** Replacements for the old body, empty if the operation kept it. An internal incision can return one body. */
   pieces: SoftBody[];
   /** Where a particle of `body` (numbered as it was) went: a place in each piece it is part of; none when the body stayed whole. */
   destination(particle: number): SoftDestination[];
@@ -5144,13 +5146,42 @@ export class SoftBodies implements PhysicsAttachment {
   /**
    * Slices a tetrahedral solid along a world-space plane, including through its cells.
    * Returns closed fragments with the original material, rest volume, mass and total linear momentum.
-   * Use a finite blade with {@link SoftBodies.cut} for a cut confined to part of the body.
+   * Use {@link SoftBodies.cutTriangle} for a finite incision.
    */
   cutPlane(body: SoftBody, origin: Vec3, normal: Vec3): SoftTearEvent {
-    if (body.removed || !this.bodies.includes(body))
-      throw new MargoError('state', 'The cut needs a live solid in this world. Use the SoftBodies that owns the body.');
+    this.checkSolidCut(body);
     checkVec(origin, 'Cut-plane origin');
     const direction = unitDirection(normal, 'Cut-plane normal');
+    const split = makeCutPieces(
+      this,
+      body,
+      (positions) => new SoftBodyDesc(positions),
+      (current, cells) => planPlaneCut(current, cells, origin, direction),
+    );
+    return this.announce(body, [], [], split);
+  }
+
+  /**
+   * Cuts a tetrahedral solid through the area of a finite world-space triangle.
+   * The lips of an internal incision can separate while the solid remains connected at the cut front.
+   */
+  cutTriangle(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent {
+    this.checkSolidCut(body);
+    if (!Array.isArray(blade) || blade.length !== 3)
+      throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
+    for (const point of blade) checkVec(point, 'Blade point');
+    const split = makeCutPieces(
+      this,
+      body,
+      (positions) => new SoftBodyDesc(positions),
+      (current, cells) => planTriangleCut(current, cells, blade),
+    );
+    return this.announce(body, [], [], split);
+  }
+
+  private checkSolidCut(body: SoftBody): void {
+    if (body.removed || !this.bodies.includes(body))
+      throw new MargoError('state', 'The cut needs a live solid in this world. Use the SoftBodies that owns the body.');
     if (
       body.numCells() === 0 ||
       body.edgeTotal > 0 ||
@@ -5162,15 +5193,13 @@ export class SoftBodies implements PhysicsAttachment {
     )
       throw new MargoError(
         'state',
-        'A plane cut needs a tetrahedral body without springs, clusters, skin or external bindings. Use SoftBodyDesc.box or a finite face cut.',
+        'A geometric cut needs a tetrahedral body without springs, clusters, skin or external bindings. Use SoftBodyDesc.box or a finite face cut.',
       );
     if (body.tornCells().length > 0)
       throw new MargoError(
         'state',
-        'The solid has pending torn cells. Split it at the tear before making a plane cut.',
+        'The solid has pending torn cells. Split it at the tear before making a geometric cut.',
       );
-    const split = makePlanePieces(this, body, (positions) => new SoftBodyDesc(positions), origin, direction);
-    return this.announce(body, [], [], split);
   }
 
   /** @internal Nothing to do after the sync: the particles are read on demand. */

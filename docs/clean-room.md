@@ -107,6 +107,20 @@ face topology.
 [Sandhaas and van de Kuilen](https://heronjournal.nl/58-23/5.pdf)
 [Bažant and Oh](https://doi.org/10.1007/BF02486267).
 
+For finite incisions, Sifakis, Der and Fedkiw (2007), §3.3, describes testing material
+contiguity across shared polygons. Yuting Wang, Chenfanfu Jiang, Craig Schroeder and
+Joseph Teran, “An Adaptive Virtual Node Algorithm with Robust Mesh Cutting” (2014),
+§5, organizes intersections in a shared registry and handles cuts through vertices,
+edges and faces. Margo partitions the planar section using the three blade edges,
+sharing all inserted nodes on intersected cell faces. The restricted polygon
+triangulation adds an interior node to the released lip and to a released seam whose
+endpoints both lie on the crack front. Cones from the interior repopulate each convex
+half with positive-volume tetrahedra. Shared face polygons outside the blade continue
+to join their cells and corresponding particle slots. The conservative affine state
+transfer is the same as for a complete plane cut.
+[Sifakis, Der and Fedkiw](https://physbam.stanford.edu/papers/stanford2007-04.pdf)
+[Wang, Jiang, Schroeder and Teran](https://www.math.ucdavis.edu/~jteran/papers/WJST14.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
