@@ -33,6 +33,7 @@ import { worldRadius } from '../../shared/sphere.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { pickLevel } from '../../shared/lod-pick.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -570,16 +571,9 @@ export class LODSystem implements EnginePlugin {
             : v / bias;
         v = (bias * w) / (yScale * this.radius[i] * Math.sqrt(Math.max(sx, sy, sz)));
       }
-      // Level choice, a dead band around each switch point (Schmitt trigger). The plain pick is the coarsest level
-      // whose threshold v has reached (equality counts). Going coarser is never delayed; going finer from the shown
-      // level s waits until v drops below s's threshold lowered by its own band, t_s * (1 - h_s). While v is inside
-      // that band, s holds even when the band reaches past finer thresholds.
-      const b = i * MAX_LEVELS,
-        n = counts[i],
-        shown = current[i];
-      let next = 0;
-      while (next + 1 < n && v >= thresholds[b + next + 1]) next++;
-      if (next < shown && v >= thresholds[b + shown] * (1 - bands[b + shown])) next = shown;
+      // Level choice with a dead band around each switch point (shared/lod-pick.js, also the batched items' pick).
+      const shown = current[i];
+      let next = pickLevel(thresholds, bands, i * MAX_LEVELS, counts[i], shown, v);
       if (next !== shown) next = this.reachable(i, next, shown);
       if (next !== shown) this.show(i, shown, next);
     }
