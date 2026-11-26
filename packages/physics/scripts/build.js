@@ -61,6 +61,7 @@ await build({
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
+        foam: resolve(root, 'src/foam/index.ts'),
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),

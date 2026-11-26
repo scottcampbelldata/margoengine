@@ -2211,6 +2211,10 @@
       "types": "./dist/physics/hydro.d.ts",
       "import": "./dist/physics/hydro.js"
     },
+    "./physics/foam": {
+      "types": "./dist/physics/foam.d.ts",
+      "import": "./dist/physics/foam.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19344036,
+  "total": 19352058,
   "history": [
     {
       "date": "2026-10-24",
@@ -12621,6 +12621,12 @@
       "commit": "3bd6e631e",
       "reason": "New optional entries loaders/prwm, loaders/tilt, environment/encoded-hdr, exporters/gcode, points/depth-video, scene/assets, save/delta and the geometry/extras surfaces (Lane C parity rows)",
       "grew": 11
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b2a7491a6",
+      "reason": "physics/foam is a new optional entry (SEA-13): FoamSolver, whitecaps from the ST4 spectrum's breaking statistics drawn as events, foam carried by the surface drift and windrows, ship wakes, and the spray source functions; its own entry so scenes without foam pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14482,6 +14488,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/foam": 8022
   }
 }

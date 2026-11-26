@@ -116,6 +116,10 @@
       "types": "./dist/hydro/index.d.ts",
       "import": "./dist/hydro.js"
     },
+    "./foam": {
+      "types": "./dist/foam/index.d.ts",
+      "import": "./dist/foam.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"

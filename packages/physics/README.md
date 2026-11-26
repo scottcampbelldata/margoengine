@@ -2253,6 +2253,60 @@ console.log(water.sample(300, 50).depth > 0); // true: the flood has reached 300
 console.log(Math.abs(water.volume() + water.budget.out - start) < 1e-6 * start); // true: every cubic metre accounted for
 ```
 
+### Whitecaps, foam and spray (`@margoengine/physics/foam`)
+
+`FoamSolver` is the sea's foam (SEA-13). The breakers come from the sea's own spectrum: the same saturation that drives ST4's breaking dissipation gives the length of breaking crests per area (Leckler et al. 2013), so the whitecaps match the waves the sea actually has. The solver draws breakers as events on the world's random numbers, at the rate each bin breaks:
+- each breaker is a crest 0.3 of a wavelength long, breaking for 0.8 of a period as it moves at the wave's speed;
+- it sweeps a strip of white water and leaves residual foam behind;
+- small breakers leave faint foam that fades in seconds; storm breakers leave dense foam that trails and lasts longer.
+
+On average the foam covers what Leckler et al.'s ST4 whitecap law gives. 16 percent of it is still breaking, Reul and Chapron's share. The foam is carried by the surface:
+- the water's current;
+- the waves' Stokes drift;
+- 0.6 percent of the wind.
+
+Above 3 m/s Langmuir windrows sweep long-lived foam into lines along the wind. The transport conserves foam and stretches it with the flow's shear instead of smearing it. Ships lay wakes: white water two beams long at the stern, a turbulent wake widening as x^(1/5) for a ship length, and the bow waves' arms at Kelvin's angle once the hull is fast enough. A wake's foam lasts minutes. The spray the whitecaps throw into the air follows Gong's (2003) flux by the whitecap method, with Troitskaya's bag breakup at strong winds.
+
+Its settings:
+- `waves`: the sea, a `WaveSolver` (its `field`, and its friction velocity for the spray) or any `WaveSpectrumField`;
+- the grid: `cells` (default 128 by 128) of `cellSize` metres (default 2), about `centre`; `statistics`, the spacing at which the spectrum is read for the breakers (default 64 m);
+- `wind`, a framework `Wind`, for the wind drift and the windrows; `current`, a water `FlowField` (a river's or a tide's);
+- `decay`, residual foam's e-folding time (default 3.8 s in sea water, 2.5 s in fresh, from the sea's density);
+- `windDrift` (default 0.006 of U10); `windrows` (`{spacing = 30, speed = 0.01, spinUp = 300}` or `false`);
+- `ships`: `{body, length, beam}` or `{track(t), length, beam}`; `wakePersistence` (default 150 s);
+- `capacity` (breakers alive at once, default 8192) and `rate` (its rate level).
+
+It publishes the field `seaFoam`: per cell, the foam coverage and the active whitecap coverage, 0 to 1, as f32.
+- `coverage(x, z)` and `activeCoverage(x, z)` read one cell; `meanCoverage()` the whole grid; `expectedCoverage(x, z)` is Leckler's law for the sea there.
+- `addFoam(min, max, whiteness, persistence)` lays foam from a splash or an impact.
+- `spray(x, z, r80)` is the film and jet drop flux in droplets per m^2 per s per micrometre of r80; `bagBreakups(x, z)` is the spume events per m^2 per s.
+- `breakingStatistics(spectrum, g)` gives any spectrum's whitecap coverage, breaking crest length, turnover and surface Stokes drift.
+
+```ts
+import {FoamSolver} from 'margoengine/physics/foam';
+import {WaveSolver} from 'margoengine/physics/waves';
+import {PhysicsWorld} from 'margoengine/physics/world';
+import {BoundaryLayerWind} from 'margoengine/weather/boundary-layer';
+
+// A 13 m/s wind on a sea that has blown for a day, and a coaster steaming through at 6 m/s.
+const wind = new BoundaryLayerWind({speed: 13, turbulence: false});
+const waves = new WaveSolver();
+const foam = new FoamSolver();
+const world = new PhysicsWorld({rate: {num: 30, den: 1}})
+  .add(waves, {cells: [1, 1], cellSize: 1e7, periodic: ['x', 'z'], wind, warmUp: 24 * 3600})
+  .add(foam, {
+    waves,
+    wind,
+    cells: [96, 96],
+    cellSize: 2,
+    ships: [{track: (t) => ({position: [-90 + 6 * t, 0], velocity: [6, 0]}), length: 40, beam: 9}],
+  });
+world.advance(30 * 20); // twenty seconds
+console.log(foam.expectedCoverage(0, 0) > 0.005); // true: whitecaps on about 1 percent of the sea
+console.log(foam.coverage(-12, 0) > 0.5); // true: the wake behind the coaster's stern
+console.log(foam.spray(0, 0, 1) >= 0); // true: droplets per m^2 s um where the foam is
+```
+
 ### Solver modules on one memory
 
 Every solver module of a world (a Rust crate built to WebAssembly) imports the world's one memory, so a solver reads

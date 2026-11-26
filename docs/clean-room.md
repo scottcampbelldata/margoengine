@@ -11866,6 +11866,68 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### Whitecaps, foam and spray (SEA-13, `@margoengine/physics/foam`, 2026-11-26)
+
+`packages/physics/src/foam/breaking.ts` (breaking statistics of a spectrum), `foam/spray.ts` (spray source functions) and
+`foam/index.ts` (`FoamSolver`, a framework solver). Written from papers only (no code of any model was opened):
+
+- F. Leckler, F. Ardhuin, J.-F. Filipot and A. Mironov, "Dissipation source terms and whitecap statistics", Ocean Modelling
+  70, 62-74, 2013, https://doi.org/10.1016/j.ocemod.2013.03.007, author draft read:
+  - the directional saturation with cos^2 over +-80 degrees (eq. 2; the C_g / 2 pi factor of Ardhuin et al. 2010 eq. 12 is a
+    misprint, their footnote 3);
+  - the breaking probability 28.4 (sqrt(B') - sqrt(B_r))^2 (eq. 4) and the crest length Lambda = P_b / (2 pi^2) (eq. 5);
+  - the whitecap coverage W = kappa integral of lambda Lambda, kappa = 0.30 for ST4, tuned to Monahan and Woolf (1989) and
+    WindSat (eqs. 14 and 15).
+- F. Ardhuin et al., J. Phys. Oceanogr. 40, 2010 (arXiv:0907.4240, read): eqs. 12 to 17, B_r = 0.0009 and its depth
+  correction (eq. 15).
+- N. Reul and B. Chapron, "A model of sea-foam thickness distribution for passive microwave remote sensing applications", J.
+  Geophys. Res. 108(C10), 3321, 2003, https://doi.org/10.1029/2003JC001887, read:
+  - a breaker's active stage of 0.8 T (Phillips et al. 2001) and foam persistence of about 5 T (eq. 21 with a = 0.8 and 5:
+    the active share 0.16);
+  - the bubbles' surface lifetime, 3.85 s in salt water and 2.54 s in fresh (Monahan and Zietlow 1969);
+  - Duncan's (1981) breaking crest of about 0.3 of a wavelength.
+- P. Callaghan, G. de Leeuw, L. Cohen and C. O'Dowd, Geophys. Res. Lett. 35, L23609, 2008, read: their whitecap fits; and
+  Callaghan, Deane, Stokes and Ward, J. Geophys. Res. 117, C09015, 2012 (abstract): foam decay times of 1.4 to 4.8 s, longer
+  for larger patches.
+- F. Ardhuin, L. Marie, N. Rascle, P. Forget and A. Roland, "Observation and estimation of Lagrangian, Stokes and Eulerian
+  currents induced by wind and waves at the sea surface", J. Phys. Oceanogr. 39, 2009, arXiv:0810.3537 (abstract): a
+  quasi-Eulerian wind drift of 0.4 to 0.8 percent of U10.
+- S. Leibovich, "The form and dynamics of Langmuir circulations", Annu. Rev. Fluid Mech. 15, 391-427, 1983, read: windrows
+  along the wind within minutes of a wind above 3 m/s, surface sweep speeds of about 1 percent of U10.
+- J. Reed and J. H. Milgram, "Ship wakes and their radar images", Annu. Rev. Fluid Mech. 34, 469-502, 2002, read:
+  - the stern's violent bubbly zone, about two beams long;
+  - the wake's width growing as x^(1/5);
+  - the turbulence 0.05 / (x / L + 0.07)^(4/5) (Hoekstra and Ligtelijn 1991, their eq. 26).
+- D. R. Trevorrow, S. Vagle and D. M. Farmer, J. Acoust. Soc. Am. 95, 1994 (abstract): bubble wakes acoustically strong for
+  about 7.5 minutes at 10 knots.
+- G. de Leeuw et al., "Production flux of sea spray aerosol", Rev. Geophys. 49, RG2001, 2011, read: the appendix's Gong (2003)
+  and Monahan, Spiel and Davidson (1986) functions, the whitecap method, r80 = r0 / 2.
+- Y. Troitskaya et al., "The 'bag breakup' spume droplet generation mechanism at high winds", Sci. Rep. 7, 1614, 2017, read:
+  the bag-breakup event rate (eq. 1).
+
+This package's own arrangement:
+- Breakers as Poisson events at the rate Lambda / (L_b tau*), with whiteness d and persistence tau_e chosen so the average
+  coverage is Leckler's W with Reul and Chapron's active share; for d up to 1, d tau_e = 0.2377 T, so storm breakers leave
+  dense foam that lasts longer.
+- The active patch's depth along the wave, 0.048 of a wavelength, the active share of W.
+- Breakers born beyond the grid by a sweep so the edges balance.
+- The flux-form, MC-limited transport of the foam's whiteness with its rate-weighted share.
+- Independent overlap 1 - (1 - a)(1 - b) for foam laid on foam.
+- The windrows as a sinusoidal surface convergence spun up exponentially.
+- The bow waves' foam arms at Kelvin's angle with a Froude-number ramp from 0.15 to 0.4.
+- Wake foam's 150 s persistence (the 7.5 minutes taken as three e-foldings).
+
+Validation:
+- On ST4's developed seas the coverage is 1.41, 0.98, 0.74 and 0.56 of Monahan and Woolf at 7, 10, 13 and 16 m/s (Leckler et
+  al. note the model follows Monahan and Woolf below 15 m/s and grows about linearly above, as satellites see).
+- The event model covers 1.03 of Leckler's W at 10 m/s, 0.167 of it active.
+- The surface Stokes drift of a narrow swell is sigma k a^2 to 1e-9.
+- Foam is conserved as it is carried, to 1e-6.
+- Known: ST4 counts too many short breakers against Melville and Matusov's (2002) Lambda(c) (Leckler et al.), which the
+  coverage, weighted by lambda, barely feels.
+
+Proof: `packages/physics/tests/foam.test.js` and `tests/coupling/foam.test.js`.
+
 ### Rivers, floods and dam breaks: conservative shallow water (HYDRO-01, `@margoengine/physics/hydro`, 2026-11-26)
 
 `packages/physics/src/hydro/shallow.ts` (the finite-volume kernel, K14) and `hydro/index.ts` (`ShallowWaterSolver`, a
