@@ -45,7 +45,7 @@ The public CAD-format scene is documented in [integration-engineering.md](integr
 
 ## User test pages
 
-The other pages in `examples/test-pages/` (city roads, character playground, product viewer and the rest) each use a
+The other pages in `examples/test-pages/` (city roads, character sandbox, product viewer and the rest) each use a
 few packages the way an application would, with buttons for edge cases and stress. `npm run test:pages:browser` opens
 every page, waits for its start, clicks every enabled button in order and waits for the work each click starts
 (`examples/test-pages/page-harness.ts` tracks it; there is no fixed sleep). A page fails on an uncaught error, a

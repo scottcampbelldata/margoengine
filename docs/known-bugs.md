@@ -11855,7 +11855,7 @@ Measured but not fixed. Their history, sources and rerun commands are in
   10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
   busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).
   The rival's shared-memory GPU sort drew no calls, so the number is its CPU sort. Repro:
-  `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
+  the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Cause not yet found. Publishing the number does not close it.
 - **Fixed (KB2604f, 2026-11-11): Truck 7k did not match the published photograph** (`@margoengine/splats`, perf
   history entries 103 and 115): it scored 12.226 dB. Cause: the projection linearised the EWA Jacobian at each
@@ -11872,7 +11872,7 @@ Measured but not fixed. Their history, sources and rerun commands are in
   busy machine, diagnostic. The rounds do not overlap (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600).
   Both sides draw every point. Margo waits with `onSubmittedWorkDone`. The rival waits with a one-pixel
   `readPixels`, because `fenceSync` returned `WAIT_FAILED`. Repro:
-  `node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
+  the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Cause not yet found. Publishing the number does not close it.
 - **Fixed (KB2604h, 2026-11-11): Cornell box irradiance did not match a Cycles bake** (`@margoengine/lightmap`,
   perf history entries 108 and 116): MAE 0.069543 (0.048730 after batch 187). Cause: the Cycles reference baked
@@ -12402,7 +12402,7 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   PSNR 35.388 dB and max byte miss 15, versus Babylon.js 8.33.0 dual depth peeling MAE 0.048151,
   PSNR 61.305 dB and max 1. Source: `packages/oit/src/index.ts` averages weighted colours with aggregate
   revealage; this does not retain the full ordered layer sequence. Rerun:
-  `node packages/oit/scripts/rival-bench.mjs`. Publishing the loss does not close it.
+  the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run). Publishing the loss does not close it.
   Closed 2026-11-11 (bug sweep L3b, KB3148a), accepted difference: weighted blended OIT (McGuire and Bavoil, JCGT
   2013) is by definition a depth-weighted average, not the over operator, so its error is the method, not a defect.
   The like-for-like route is Margo's depth peeling: `PeelOIT` on the same scene, reference and readback measures
@@ -12487,7 +12487,7 @@ The batch 168 OIT image loss above is also confirmed against an independent Cycl
 MAE 1.632960 (Margo) versus 0.132651 (Babylon), 1024 samples, seed 168, same emission/coverage panes.
 The reference has residual noise/silhouette sampling differences (exact oracle versus Cycles MAE
 0.094812); this does not close or excuse the weighted-order approximation defect. Repro:
-`node scripts/rival-oit-cycles.mjs`.
+the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 ### Audio event containers (batch 110)
 

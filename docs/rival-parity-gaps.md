@@ -109,7 +109,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | DONE (`GeometryGraph`, `buildGeometryGraph`, `parseGeometryGraph` of `@margoengine/geometry/node-graph`; no editor) | L | 688590050 |
 | Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 0d5b43853 |
 | Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 861843398 |
-| `.babylon` scene import and scene-serializer export | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; `exportBabylon` of `@margoengine/exporters/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; static pose on export) | S to M | 8df1341a1 |
+| `.babylon` scene import | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; the exporter was removed on 2026-11-26, Margo writes no rival format) | S to M | 8df1341a1 |
 
 ## Lane D: tools, runtime and interaction
 

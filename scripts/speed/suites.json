@@ -250,16 +250,6 @@
     "limitMinutes": 20
   },
   {
-    "id": "packages/oit/scripts/rival-bench.mjs",
-    "command": "node packages/oit/scripts/rival-bench.mjs",
-    "limitMinutes": 20
-  },
-  {
-    "id": "packages/points/scripts/rival-bench.mjs",
-    "command": "node packages/points/scripts/rival-bench.mjs",
-    "limitMinutes": 20
-  },
-  {
     "id": "packages/scene/scripts/bulk-bench.mjs",
     "command": "node packages/scene/scripts/bulk-bench.mjs",
     "limitMinutes": 20
@@ -275,18 +265,8 @@
     "limitMinutes": 20
   },
   {
-    "id": "packages/splats/scripts/rival-bench.mjs",
-    "command": "node packages/splats/scripts/rival-bench.mjs",
-    "limitMinutes": 20
-  },
-  {
     "id": "packages/studio/scripts/rival-bench.mjs",
     "command": "node packages/studio/scripts/rival-bench.mjs",
-    "limitMinutes": 20
-  },
-  {
-    "id": "packages/tiles/scripts/rival-bench.mjs",
-    "command": "node packages/tiles/scripts/rival-bench.mjs",
     "limitMinutes": 20
   },
   {

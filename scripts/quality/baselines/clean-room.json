@@ -1,7 +1,7 @@
 {
   "gate": "clean-room",
   "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
-  "total": 247,
+  "total": 169,
   "history": [
     {
       "date": "2026-10-24",
@@ -23,29 +23,20 @@
     }
   ],
   "items": {
-    "mention packages/exporters/README.md": 19,
-    "mention packages/exporters/package.json": 3,
-    "mention packages/exporters/src/babylon.ts": 21,
-    "mention packages/exporters/tests/babylon.test.js": 16,
     "mention packages/game/package.json": 3,
     "mention packages/game/src/loaders/babylon.ts": 1,
-    "mention packages/kit-react/package.json": 6,
-    "mention packages/kit-react/src/exporters/babylon.ts": 1,
+    "mention packages/kit-react/package.json": 3,
     "mention packages/kit-react/src/loaders/babylon.ts": 1,
-    "mention packages/kit-viz/package.json": 6,
-    "mention packages/kit-viz/src/exporters/babylon.ts": 1,
+    "mention packages/kit-viz/package.json": 3,
     "mention packages/kit-viz/src/loaders/babylon.ts": 1,
-    "mention packages/kit-web/package.json": 6,
-    "mention packages/kit-web/src/exporters/babylon.ts": 1,
+    "mention packages/kit-web/package.json": 3,
     "mention packages/kit-web/src/loaders/babylon.ts": 1,
-    "mention packages/loaders/README.md": 23,
+    "mention packages/loaders/README.md": 22,
     "mention packages/loaders/package.json": 3,
     "mention packages/loaders/src/babylon.ts": 72,
     "mention packages/loaders/src/index.ts": 18,
     "mention packages/loaders/tests/babylon.test.js": 34,
-    "mention packages/margoengine/package.json": 6,
-    "mention packages/margoengine/src/exporters/babylon.ts": 1,
-    "mention packages/margoengine/src/loaders/babylon.ts": 1,
-    "mention packages/selection/README.md": 2
+    "mention packages/margoengine/package.json": 3,
+    "mention packages/margoengine/src/loaders/babylon.ts": 1
   }
 }

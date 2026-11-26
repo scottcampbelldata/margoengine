@@ -623,10 +623,6 @@
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
     },
-    "./exporters/babylon": {
-      "types": "./dist/exporters/babylon.d.ts",
-      "import": "./dist/exporters/babylon.js"
-    },
     "./exporters/gcode": {
       "types": "./dist/exporters/gcode.d.ts",
       "import": "./dist/exporters/gcode.js"
