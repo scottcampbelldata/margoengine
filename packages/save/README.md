@@ -205,6 +205,34 @@ to the scene. `components(mesh)` adds your own data, and `onEntity(mesh, entity,
 
 Geometry is written into the save, so a large static mesh is better as a glTF model, which saves as a URL.
 
+## Change recorder (`@margoengine/save/delta`)
+
+`diffSave(base, edited)` is what a user changed in a loaded scene, as a small JSON delta; `applyDelta(base, delta)` puts it back on the base. Changed entities are JSON Merge Patches (RFC 7386, as prefab overrides already are), added entities are whole, removed ones are ids, and `meta` is patched too. Keep the delta instead of the whole document: it stays valid while the shipped base changes elsewhere, and it is a few lines of JSON.
+
+```ts
+import {diffSave, applyDelta, SaveRecorder} from 'margoengine/save/delta';
+
+const base = {
+  format: 'margo-save' as const, version: 1,
+  entities: [{id: 'door', transform: {position: [1, 0, 0]}, components: {hinge: {angle: 0}}}, {id: 'crate'}],
+};
+const edited = structuredClone(base);
+edited.entities[0].components.hinge.angle = 90; // the player opened the door
+edited.entities.pop();                          // and smashed the crate
+
+const delta = diffSave(base, edited);
+console.log(JSON.stringify(delta.changed), delta.removed); // {"door":{"components":{"hinge":{"angle":90}}}} ["crate"]
+console.log(applyDelta(base, JSON.parse(JSON.stringify(delta))).entities.length); // 1
+
+const recorder = new SaveRecorder(base); // measures from its base; commit(current) moves the base forward
+console.log(recorder.changes(edited).removed);
+```
+
+- `diffSave(base, edited)`: entities are matched by id; reordering the list is not recorded. A merge patch cannot store `null` (it means remove), so a changed value holding `null` throws a `TypeError` naming its path. Duplicate ids throw.
+- `applyDelta(base, delta, {validate = true, components, strictComponents})`: pure; throws a `TypeError` when the delta removes or changes an id the base lacks, adds one it has, was made for another `version`, or (with `validate`) leaves an invalid document, which `parseSave` names.
+- `SaveRecorder(base)`: `changes(current)`, `commit(current)`, `apply(delta)` and `base`. `isEmptyDelta(delta)` tells a no-op.
+- A delta is made from the document shape (`captureScene(engine)` of `@margoengine/save/engine` makes it), not by watching the running scene: take the current document with the engine's save functions, then diff it.
+
 ## Save slots
 
 `@margoengine/save/slots` puts a load screen over any storage. A slot holds a save, a small record of what it is and a
