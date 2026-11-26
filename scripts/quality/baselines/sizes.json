@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20632235,
+  "total": 20635602,
   "history": [
     {
       "date": "2026-10-24",
@@ -13831,6 +13831,12 @@
       "commit": "rod",
       "reason": "New optional entry @margoengine/physics/rod (3,934 B gzip): elastic rods on a multibody, their water loads taken from the loads entry. @margoengine/physics/loads grows 8,342 to 9,696 B for segmentLoads (the per-segment loads a rod solves implicitly), the shared water sampler and wake step, and Reynolds drag below the drag crisis: one copy of the member physics for LoadSolver and rods. A separate entry would duplicate the coefficients and the wake oscillator or make LoadSolver import from it for the same bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "035d96a473",
+      "reason": "KB-LOOK-MASKOCCLUDE1: lit Scatter material capture (setCapture, its own capture pipelines per effect, the shared lit stage) adds 1051 B gzip to the scatter root (26359 to 27410 measured); BiomeObjects and BiomeView forward one capture hook to their parts: biomes/objects 5494 to 5831 B, biomes/view 15565 to 15985 B. A lazy import would miss plants on the first frames (shots must be deterministic) and a wrapper entry needs the private lit stage. Core and stage add 0 B.",
+      "grew": 3
     }
   ],
   "items": {
@@ -13926,7 +13932,7 @@
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/landscape": 870,
     "@margoengine/biomes/multinoise": 3748,
-    "@margoengine/biomes/objects": 5494,
+    "@margoengine/biomes/objects": 6087,
     "@margoengine/biomes/placement": 13635,
     "@margoengine/biomes/presets": 3117,
     "@margoengine/biomes/region": 4672,
@@ -13940,7 +13946,7 @@
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/treeline": 4663,
     "@margoengine/biomes/valley": 5060,
-    "@margoengine/biomes/view": 15565,
+    "@margoengine/biomes/view": 16465,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4905,
@@ -14931,7 +14937,7 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 26359,
+    "@margoengine/scatter": 28233,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/grass": 2855,
     "@margoengine/scatter/imposter": 2968,

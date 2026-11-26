@@ -85,6 +85,9 @@ export class Scatter implements EnginePlugin {
         buffer: GPUBuffer;
     }[];
     protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void;
+    setCapture(hook: ScatterCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: ScatterPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     protected coverRing(_ring: number): 'opaque' | 'cover' | 'split';
     protected colourInstances(): GPUBuffer[];
     protected colourCommands(): GPUBuffer;
@@ -125,6 +128,12 @@ export interface ScatterBlades {
     rootShade?: number;
     widen?: number;
     translucency?: number;
+}
+
+export interface ScatterCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
 }
 
 export type ScatterImage = {

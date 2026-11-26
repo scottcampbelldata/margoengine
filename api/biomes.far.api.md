@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
+import { Scatter } from "@margoengine/scatter";
 import * as CoreModule from "@margoengine/core";
 import * as ScatterModule from "@margoengine/scatter";
 
@@ -21,6 +22,7 @@ export class FarForest implements Disposable {
         readonly count?: number;
         readonly graph?: PlacementGraph;
     }): Promise<FarForest>;
+    get scatters(): readonly Scatter[];
     get count(): number;
     dispose(): void;
     [Symbol.dispose](): void;

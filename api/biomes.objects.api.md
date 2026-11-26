@@ -4,7 +4,8 @@
 
 ```ts
 import { EngineKernel, PbrMaterial } from "@margoengine/core";
-import { ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
+import { PassContext } from "@margoengine/core/extension";
+import { ScatterCapture, ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
 import { ScatterTiles } from "@margoengine/scatter/tiles";
 
 export interface BiomeMeshData {
@@ -28,6 +29,9 @@ export class BiomeObjects implements Disposable {
     get farCount(): number;
     get count(): number;
     get seasonalMaterials(): readonly PbrMaterial[];
+    setCapture(hook: ScatterCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: ObjectsPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     get casters(): readonly ScatterTiles[];
     stream(rect: readonly [number, number, number, number], options?: {
         readonly signal?: AbortSignal;
@@ -483,6 +487,10 @@ interface MountainValleyOptions {
     } | false;
     readonly step?: number;
 }
+
+type ObjectsPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 interface PaintLayer {
     readonly biome: string;
