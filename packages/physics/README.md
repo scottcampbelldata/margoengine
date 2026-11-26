@@ -3202,10 +3202,14 @@ grain size, water density and viscosity. The default van Rijn pick-up
 rate increases with the three-halves power of relative excess stress. Give `criticalShields` to override onset,
 or set `erodibility` to use a linear rate in kg/m²/s at unit excess stress for a prescribed bed. `availableMass`
 defaults to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
-for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. The rest of the bed stays solid.
-The [rendered coupling fixture](../environment/tests/swim-sediment.html) shows the sand rise, drift, and settle.
+for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. `TracerSolver.withBedChange(id)` also deforms a live
+`TerrainBed`. Give `mobileLayer.thickness` in metres and `porosity` as a volume fraction in [0, 1). Place the layer
+above bedrock and use one sediment writer on it. The layer loses the mass carried in the puff and receives it when
+the grains settle. Both modes are off by default. The [rendered coupling fixture](../environment/tests/swim-sediment.html)
+uses the moving bed mesh as well as the rising, drifting and settling sand.
 
 ```ts
+import { TerrainBed } from 'margoengine/physics/earth';
 import { SwimSolver } from 'margoengine/physics/life';
 import { TracerSolver } from 'margoengine/physics/tracers';
 import { PhysicsWorld } from 'margoengine/physics/world';
@@ -3217,10 +3221,15 @@ world.add(rays, { bodies: [{
   tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
   fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
 }] });
-const sediment = new TracerSolver('sand', { bedJets: true });
-world.add(sediment, { bed: 0.5, bedJets: { availableMass: 0.023 } });
+const seabed = new TerrainBed();
+world.add(seabed, { columns: 40, rows: 40, width: 4, depth: 4,
+  elevations: () => -0.5, bedrock: () => -0.502 });
+const sediment = TracerSolver.withBedChange('sand');
+world.add(sediment, { bed: seabed.bed, bedJets: { availableMass: 0.023,
+  mobileLayer: { thickness: 0.002, porosity: 0.4 } } });
+world.couple([rays.id, 'sand', 'bed'], 'staggered');
 world.advance(1);
-console.log(sediment.jetErosion > 0, sediment.budget.water > 0); // true true
+console.log(sediment.jetErosion > 0, seabed.volume(-0.5) < 0); // true true
 ```
 
 Use `submergedJetWallShear` to sample the steady flat-bed stress from a known nozzle. Its arguments use SI units.

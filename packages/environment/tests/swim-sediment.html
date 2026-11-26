@@ -8,13 +8,16 @@
 <body>
   <canvas width="320" height="192"></canvas>
   <script type="module">
-    import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
+    import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
     import { FogVolumes } from '/packages/environment/dist/fog-volumes.js';
     import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
+    import { toGeometry } from '/packages/geometry/dist/utils.js';
+    import { TerrainBed } from '/packages/physics/dist/earth.js';
     import { SwimSolver } from '/packages/physics/dist/life.js';
     import { TracerSolver } from '/packages/physics/dist/tracers.js';
     import { PhysicsWorld } from '/packages/physics/dist/world.js';
     import { Bloom } from '/packages/post/dist/bloom.js';
+    import { heightfieldGeometry } from '/packages/terrain/dist/index.js';
 
     const engine = await Engine.create(document.querySelector('canvas'), {
       backend: 'webgpu', camera: { position: [0, -0.02, 1.38], target: [0.14, -0.32, 0], near: 0.015, far: 8 },
@@ -23,7 +26,7 @@
     Bloom.attach(engine, { strength: 0 });
     engine.scene.background = '#173c4b';
     const sand = new PbrMaterial({ color: '#626455', roughness: 0.96 });
-    engine.createMesh().setGeometry(box(8, 0.1, 8)).setPosition([0, -0.55, 0]).setMaterial(sand);
+    const sandMesh = engine.createMesh().setMaterial(sand);
     const silhouette = new PbrMaterial({ color: '#24383a', doubleSided: true, roughness: 0.58 });
     const wing = (side) => engine.createMesh().setMaterial(silhouette).setGeometry(new Geometry(
       [0, 0.015, -0.16, 0, 0.005, 0.18, side * 0.2, 0, 0.12, side * 0.38, -0.025, -0.03, side * 0.19, -0.005, -0.12],
@@ -37,7 +40,14 @@
 
     const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
     const swim = await SwimSolver.load();
-    const tracers = new TracerSolver('tracers', { bedJets: true });
+    const tracers = TracerSolver.withBedChange();
+    const terrain = new TerrainBed();
+    const bedHeight = -0.5;
+    const layer = { thickness: 0.002, porosity: 0.4 };
+    const groundGrid = { size: [8, 8], resolution: 80 };
+    world.add(terrain, { columns: 80, rows: 80, width: 8, depth: 8,
+      elevations: () => bedHeight, bedrock: () => bedHeight - layer.thickness });
+    const bed = terrain.bed;
     world.add(swim, { bodies: [{
       position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
       tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
@@ -54,17 +64,32 @@
       },
     };
     world.add(tracers, {
-      bed: 0.5, water, bedJets: { availableMass: 0.023 },
+      bed, water, bedJets: { availableMass: 0.023, mobileLayer: layer },
       horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
     });
+    world.couple([swim.id, 'tracers', 'bed'], 'staggered');
     const medium = new FogVolumes();
     const fog = VolumetricFog.attach(engine, {
       density: 0, temporal: 0, grid: [56, 34, 44], range: 3.5, ambient: [0.64, 0.72, 0.7],
     });
     const plumeRadius = 0.11;
     const volume = 4 * Math.PI * plumeRadius ** 3 / 3;
+    let bedRevision = -1;
+    let minHeight = bedHeight;
+    let maxHeight = bedHeight;
     window.step = async (frame, show) => {
       world.advance(frame);
+      if (terrain.revisions() !== bedRevision) {
+        bedRevision = terrain.revisions();
+        const mesh = toGeometry(heightfieldGeometry((x, z) => bed.sample(x, z).elevation, groundGrid));
+        sandMesh.setGeometry(mesh);
+        minHeight = Infinity;
+        maxHeight = -Infinity;
+        for (let i = 1; i < mesh.vertices.length; i += 6) {
+          minHeight = Math.min(minHeight, mesh.vertices[i]);
+          maxHeight = Math.max(maxHeight, mesh.vertices[i]);
+        }
+      }
       const ray = swim.read(0);
       for (const mesh of [left, right]) mesh.setPosition(ray.position);
       left.setRotation([0, 0, -ray.finDisplacement]);
@@ -79,7 +104,8 @@
       fog.options.volumes = show ? medium : undefined;
       engine.render({ delta: 0 });
       await engine.gpu.queue.onSubmittedWorkDone();
-      return { mass: tracers.budget.water, eroded: tracers.jetErosion, errors: errors.splice(0) };
+      return { mass: tracers.budget.water, eroded: tracers.jetErosion,
+        minHeight, maxHeight, bedVolume: terrain.volume(bedHeight), errors: errors.splice(0) };
     };
     window.ready = true;
   </script>

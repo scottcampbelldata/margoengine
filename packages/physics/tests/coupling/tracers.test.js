@@ -2,7 +2,7 @@
 // and a seek equal to a continuous run, with a breach leaking ore and a slick drifting in a current.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SpectralSea } from '../../dist/sea.js';
+import { SpectralSea, WakeSolver } from '../../dist/sea.js';
 import { TracerSolver } from '../../dist/tracers.js';
 import { PhysicsWorld } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -101,4 +101,51 @@ test('SEA-15 a slick rides live wave height while dye follows submerged orbital 
   const [parcel] = [...reflection.particlesOf()];
   assert.ok(Math.abs(parcel.position[1] - (crest - dt)) < 4 * Number.EPSILON);
   assert.equal(parcel.state, 'water');
+});
+
+test('SEA-15 dye follows the SEA-04 patch potential below a level surface', () => {
+  const cells = 64;
+  const spacing = 0.25;
+  const k = (2 * Math.PI * 2) / (cells * spacing);
+  const potential = 0.2;
+  const wake = new WakeSolver();
+  new PhysicsWorld().add(wake, {
+    cells: [cells, cells],
+    cellSize: spacing,
+    sponge: 0,
+    depth: Infinity,
+    waterBelow: true,
+    initial: (x) => [0, potential * Math.cos(k * x)],
+  });
+  const calm = {
+    frequencies: Float64Array.from([0.1, 0.2]),
+    directions: Float64Array.from([0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]),
+    energy: new Float64Array(8),
+    depth: Infinity,
+    density: 1025,
+  };
+  // Pick a published depth layer and exact cell centres, where no interpolation error enters the potential gradient.
+  const initial = [2.125, -0.5, -4.875];
+  const dt = 1 / 60;
+  const sample = (patches) => {
+    const sea = new SpectralSea({ waves: calm, patches });
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+      sea,
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: [{ material: 'dye', position: initial, rate: 60, stop: dt }],
+    });
+    world.advance(1);
+    assert.equal(tracer.budget.water, 1);
+    return [...tracer.particlesOf()][0].position;
+  };
+  const [x, y, z] = initial;
+  const flow = potential * k * Math.exp(k * y);
+  const moved = sample([wake]);
+  const expected = [x - dt * flow * Math.sin(k * x), y + dt * flow * Math.cos(k * x), z];
+  for (let axis = 0; axis < 3; axis++)
+    assert.ok(Math.abs(moved[axis] - expected[axis]) < 64 * Number.EPSILON, `${moved} vs ${expected}`);
+  assert.ok(moved[0] < x);
+  assert.deepEqual(sample([]), initial);
 });

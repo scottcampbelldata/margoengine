@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { TerrainBed } from '@margoengine/physics/earth';
 import {
   SWIM_CONTACT_FIELD,
   SWIM_CONTACT_LAYOUT,
@@ -405,6 +406,60 @@ test('the sediment bed rejects viscosity too small to compute a finite pickup ra
   const world = new PhysicsWorld({ rate });
   const tracer = new TracerSolver('tracers', { bedJets: true });
   assert.throws(() => world.add(tracer, { viscosity: Number.MIN_VALUE }), { name: 'MargoError', code: 'unsupported' });
+});
+
+test('BB-7 the same sand leaves the live bed, drifts, and builds a downstream deposit', async () => {
+  const swimmer = await SwimSolver.load();
+  const terrain = new TerrainBed();
+  const tracer = TracerSolver.withBedChange();
+  const ray = {
+    ...coast,
+    position: [0, -0.2, 0],
+    tail: noTail,
+    fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+    steering: [0, 1, 0],
+  };
+  const surface = -0.5;
+  const porosity = 0.4;
+  const thickness = 0.002;
+  const bulkDensity = 2650 * (1 - porosity);
+  const flow = { medium: 'water', cell: zero, sample: () => ({ velocity: [0.5, 0, 0], density, temperature: 280 }) };
+  const world = put(swimmer, [ray]);
+  world.add(terrain, {
+    columns: 48,
+    rows: 20,
+    width: 4,
+    depth: 2,
+    elevations: () => surface,
+    bedrock: () => surface - thickness,
+  });
+  world.add(tracer, {
+    bed: terrain.bed,
+    bedJets: { availableMass: 0.046, mobileLayer: { thickness, porosity } },
+    water: flow,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+  });
+  world.couple([swimmer.id, 'tracers', 'bed'], 'staggered');
+  const start = terrain.volume(surface);
+  world.advance(1);
+  const suspended = tracer.budget.water;
+  assert.ok(suspended > 0);
+  close(bulkDensity * (start - terrain.volume(surface)), suspended, 1e-9);
+  assert.equal(terrain.refusedVolume(), 0);
+
+  const snapshot = world.takeSnapshot();
+  world.advance(210);
+  close(tracer.budget.water, 0);
+  close(tracer.jetErosion, 0.046);
+  close(terrain.volume(surface), start);
+  const elevations = terrain.elevations();
+  assert.ok(elevations.some((height) => height < surface) && elevations.some((height) => height > surface));
+  assert.equal(terrain.refusedVolume(), 0);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(210);
+  assert.equal(world.hash(), hash);
 });
 
 test('BB-7 still fins and a bed below the jet footprint do not release sand', async () => {

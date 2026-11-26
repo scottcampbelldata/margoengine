@@ -13171,6 +13171,15 @@ surface. The coupling test advances a slick and submerged dye over a single trav
 origin cell, checks both paths at every step and replays the snapshot. This is an exact coupling check; the motion
 comes from the live SEA-02 solver.
 
+The sand plume and bed share an optional volume exchange (BB-7) using the sediment continuity relation in
+C. Paola and V. R. Voller, [“A Generalized Exner Equation for Sediment Mass Balance” (2005)](https://doi.org/10.1029/2004JF000274).
+Each lifted parcel debits the bed by its dry mass divided by grain density times solid fraction. On impact its mass
+adds the same packed volume at the landing position. The same three triangle weights route the mass and the f64 vertex
+heights, with each vertex's tributary area converting volume to height. The configured active-layer inventory bounds
+pickup at each vertex. `coupling/swim.test.js` verifies the transient loss, final balance and exact replay against
+the real `TerrainBed` ledgers. The rendered fixture draws the bed heights and verifies negative and positive relief.
+Independent lifted-mass measurements and playback of the original BB-7 shot remain open.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

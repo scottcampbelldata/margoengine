@@ -41,19 +41,26 @@ try {
   const settled = await footprint(180);
   assert.equal(inactive.count, 0);
   assert.equal(inactive.eroded, 0);
+  assert.equal(inactive.minHeight, -0.5);
+  assert.equal(inactive.maxHeight, -0.5);
   assert.ok(lifted.mass > 0 && lifted.count > 40);
+  assert.ok(lifted.minHeight < inactive.minHeight);
+  assert.ok(Math.abs(lifted.bedVolume * (2650 * 0.6) + lifted.mass) < 1e-9);
   assert.ok(downstream.mass > 0 && downstream.count > 40);
   assert.ok(downstream.center - lifted.center > 8, 'the visible sand moves with the bottom current');
   assert.ok(settled.mass < 1e-12);
   assert.ok(settled.eroded > 0);
   assert.equal(settled.count, 0);
+  assert.ok(settled.minHeight < inactive.minHeight && settled.maxHeight > inactive.maxHeight);
+  assert.ok(Math.abs(settled.bedVolume - inactive.bedVolume) < 1e-12);
   assert.deepEqual(uncaught, []);
   if (process.argv.includes('--preview') && !hardware?.compat) {
     await writeFile('test-results/ray-sand-puff.png', lifted.bytes);
   }
   console.log(
     `${hardware?.compat ? 'WebGL2 compatibility' : 'WebGPU'}: ${lifted.count} sand pixels at lift, ` +
-      `${(downstream.center - lifted.center).toFixed(1)} px downstream, clear after settling`,
+      `${(downstream.center - lifted.center).toFixed(1)} px downstream, clear after settling, ` +
+      `${((settled.maxHeight - settled.minHeight) * 1e6).toFixed(1)} µm bed relief`,
   );
 } finally {
   await close();

@@ -103,6 +103,10 @@ there, add a line below with the solver ID and what is needed, and build against
   properties in the same step. The optional entry accepts the same bedrock inputs as TerrainBed, samples hardpan
   thickness locally, uses `bedChange` and publishes versioned contact response and ATMO-06 dust.
 
+- **SEA-15:** Return accepted per-contributor vertex erosion from `bedChange` when several sediment writers share
+  a bedrock-limited grid. The tracer currently budgets a finite mobile layer for its single sediment
+  writer and returns suspended mass to the live `TerrainBed` on contact.
+
 - **ATMO-10:** Publish the SEA-07 adapter's regional pressure and wind input layout, including origin and
   spacing. The synoptic solver supplies pressure and horizontal wind on its local grid and already transfers
   their gradient and stress through the shallow-water forcing port.

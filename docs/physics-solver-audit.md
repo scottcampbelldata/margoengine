@@ -481,6 +481,13 @@ The tracer entry can now query a live `SeaSurface`: the slick follows wave heigh
 and submerged dye follows the sea's depth flow in a different origin cell. The test checks live SEA-02
 coupling and exact replay. Oil spreading, weathering and independent dispersion measurements remain open.
 
+BB-7's live terrain exchange now debits the parcels' packed volume from a finite mobile layer and deposits
+it under the settled grains. The CPU and render fixtures check cut, deposit, final volume and replay.
+The original shot binding, independent lifted mass and multi-writer bedrock acceptance remain open.
+
+The SEA-15 consumer is rebased on Lane D's `4ec0717e8a`. A calm-spectrum test with a real `WakeSolver`
+confirms submerged dye follows the analytical potential gradient through `SpectralSea.water`.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

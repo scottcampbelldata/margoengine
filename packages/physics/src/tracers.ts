@@ -26,6 +26,8 @@ import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
 import { MargoError } from '@margoengine/math/errors';
+import { BED_CHANGE_FIELD } from './earth/bed.js';
+import { TracerBedExchange } from './tracer-bed.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
@@ -113,6 +115,8 @@ export interface TracerBedJets {
   erodibility?: number;
   /** Total erodible bed mass in this simulation cell, kg. Default Infinity. */
   availableMass?: number;
+  /** Mobile layer for {@link TracerSolver.withBedChange}. Its thickness must fit above the terrain's bedrock. */
+  mobileLayer?: { thickness: number; porosity: number };
 }
 
 /** The grain-size or material mixture at an opening that publishes cargo outflow. */
@@ -235,6 +239,7 @@ export function settlingVelocity(
 export class TracerSolver implements Solver<TracerParams> {
   private readonly id: string;
   private readonly useBedJets: boolean;
+  private writeBedChange = false;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private params!: Required<
@@ -247,6 +252,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private settling: number[] = [];
   private sea?: SeaSurface;
   private readonly seaOffset: [number, number, number] = [0, 0, 0];
+  private readonly bedOffset: [number, number, number] = [0, 0, 0];
   private readonly seaSample: SeaSurfaceSample = {
     height: 0,
     normal: [0, 1, 0],
@@ -261,6 +267,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private particles!: Region;
   private ledger!: Region;
   private jetBed?: JetBed;
+  private bedExchange?: TracerBedExchange;
   /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
   private breachSlots = 0;
   private breachMaterials: number[] = [];
@@ -277,12 +284,20 @@ export class TracerSolver implements Solver<TracerParams> {
     this.useBedJets = options.bedJets ?? false;
   }
 
+  /** Receives fin impulses and exchanges their suspended sediment with a live TerrainBed. */
+  static withBedChange(id = 'tracers'): TracerSolver {
+    const solver = new TracerSolver(id, { bedJets: true });
+    solver.writeBedChange = true;
+    return solver;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
       fields: [
         { field: TRACER_FIELD, access: 'write' },
         ...(this.useBedJets ? [{ field: SWIM_WAKE_FIELD, access: 'read' as const }] : []),
+        ...(this.writeBedChange ? [{ field: BED_CHANGE_FIELD, access: 'accumulate' as const }] : []),
         // The cargo leaving damaged hulls, when a hull solver writes it.
         { field: HULL_BREACHES_FIELD, access: 'read', optional: true },
       ],
@@ -415,6 +430,19 @@ export class TracerSolver implements Solver<TracerParams> {
         limit: availableMass,
         rings: shear === 'wall-jet' ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS)) : undefined,
       };
+      if (this.writeBedChange) {
+        const layer = params.bedJets?.mobileLayer;
+        if (
+          typeof bed === 'number' ||
+          !layer ||
+          !(layer.thickness > 0 && Number.isFinite(layer.thickness) && layer.porosity >= 0 && layer.porosity < 1)
+        )
+          throw new MargoError(
+            'unsupported',
+            'Tracer bed change needs a live TerrainBed and a finite positive mobile layer with porosity in [0, 1); pass both.',
+          );
+        this.bedExchange = new TracerBedExchange(host, bed, grains.density * (1 - layer.porosity), layer.thickness);
+      }
     }
     // Each breach cargo's material, registered here so a particle's material index means the same after a restore.
     this.breachSlots = breaches;
@@ -529,7 +557,10 @@ export class TracerSolver implements Solver<TracerParams> {
   /** The bed's height under (x, z), y m. */
   private bedAt(x: number, z: number): number {
     const bed = this.params.bed;
-    return typeof bed === 'number' ? this.params.waterLevel - this.seaOffset[1] - bed : bed.sample(x, z).elevation;
+    const [dx, dy, dz] = this.bedOffset;
+    return typeof bed === 'number'
+      ? this.params.waterLevel - this.seaOffset[1] - bed
+      : bed.sample(x + dx, z + dz).elevation - dy;
   }
 
   private surfaceAt(x: number, z: number, time: number): number {
@@ -540,9 +571,12 @@ export class TracerSolver implements Solver<TracerParams> {
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
     const sea = this.sea;
+    const { bed, cellSize } = this.params;
     if (sea)
-      for (let axis = 0; axis < 3; axis++)
-        this.seaOffset[axis] = (context.cell[axis]! - sea.cell[axis]!) * this.params.cellSize;
+      for (let axis = 0; axis < 3; axis++) this.seaOffset[axis] = (context.cell[axis]! - sea.cell[axis]!) * cellSize;
+    if (typeof bed !== 'number')
+      for (let axis = 0; axis < 3; axis++) this.bedOffset[axis] = (context.cell[axis]! - bed.cell[axis]!) * cellSize;
+    this.bedExchange?.clear();
     if (this.random.seed !== context.seed) this.random = new RandomStream(context.seed, solverNumber(this.id));
     const time = (context.tick + 1) * dt,
       words = this.words(),
@@ -656,6 +690,8 @@ export class TracerSolver implements Solver<TracerParams> {
         words[p + 5] = BED;
         book[1]! -= words[p + 3]!;
         book[3]! += words[p + 3]!;
+        if (words[p + 4] === this.jetBed?.material)
+          this.bedExchange?.deposit(nx + this.bedOffset[0], nz + this.bedOffset[2], words[p + 3]!);
       }
       words[p] = nx;
       words[p + 1] = ny;
@@ -709,8 +745,10 @@ export class TracerSolver implements Solver<TracerParams> {
           floor = this.bedAt(px, pz),
           surface = this.surfaceAt(px, pz, time);
         if (!(floor < surface)) continue;
-        const at = free++ * STRIDE,
-          amount = mass / JET_PARCELS;
+        const share = mass / JET_PARCELS;
+        const amount = this.bedExchange?.erode(px + this.bedOffset[0], pz + this.bedOffset[2], share) ?? share;
+        if (!(amount > 0)) continue;
+        const at = free++ * STRIDE;
         words[at] = px;
         words[at + 1] = floor + Math.min(spread * 0.3, (surface - floor) * 0.5);
         words[at + 2] = pz;
@@ -765,13 +803,16 @@ export class TracerSolver implements Solver<TracerParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: TRACER_FIELD.name, region: this.particles, tick, cell: this.cell }];
+    const tracer = { field: TRACER_FIELD.name, region: this.particles, tick, cell: this.cell };
+    return this.bedExchange ? [tracer, this.bedExchange.port(tick)] : [tracer];
   }
 
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return [this.particles, this.ledger];
+    return this.bedExchange
+      ? [this.particles, this.ledger, ...this.bedExchange.regions()]
+      : [this.particles, this.ledger];
   }
 
   extraState(): readonly Region[] {
