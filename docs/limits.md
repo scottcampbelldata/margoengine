@@ -10455,6 +10455,10 @@ New entry @margoengine/animation/deformed-points: 4,286 B gzip, ceiling 4,542 B.
 
 New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 B, of which the skinned crowd it extends is about 10 KB (an app that loads both entries loads that part once). `@margoengine/animation/instanced-skin` gains the layout parameter and stays inside its recorded 10,303 B ceiling. Core and stage gain zero bytes (24,892 B on this base).
 
+### Seakeeping full KVLCC2 head-wave benchmark
+
+The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the freely pitching and heaving hull at fixed tow speed with `shortWaveResistance` enabled. At 2.0 the heave and pitch intervals also pass. At 1.1, the 0.7719 heave and 0.5949 pitch lie above the 95% upper limits of 0.7671 and 0.59368. The free-surge case and distributed measured pressure remain open. [Geometry and experiment](clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
+
 ### Seakeeping encounter-scaled taper loads
 
 The incident-wave velocity and the longitudinal added-mass gradient use the same encounter scaling. The finite-memory continuation applies inside the first tabulated band. Tank qualification of the forward-motion amplitudes and near-stationary three-dimensional flow remain open. The seakeeping entry moved from 33,399 to 33,432 B gzip under its 33,698 B ceiling. Core and Stage gain zero bytes.

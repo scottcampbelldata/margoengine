@@ -15070,6 +15070,10 @@ The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0
 
 The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core and Stage gain zero bytes.
 
+### Developing fin-jet wall layer (SEA-15)
+
+`turbulentTransition` defaults to false. When enabled, a round jet between two and four nozzle diameters from a flat bed develops a turbulent layer past the constant-pressure plateau if its predicted shear exceeds the laminar shear there. The stationary approximation omits adverse pressure gradients, turbulence history, jet travel time and sub-diameter clearances. The paired render carries suspended sediment 15.9 px downstream. The scoped tracer entry grows from 15,007 B to 15,323 B gzip within its 16,702 B ceiling.
+
 ### Bow tunnel discharge for bed wash (SEA-15)
 
 The optional `Ship.thrusterOutlet` samples a straight submerged round jet. It omits quay and bed reflection, crossflow bending, and travel time after a change in command. The configured diameter and outlet position determine a Gaussian profile whose centreline was 12.7% high against the independent laboratory fit at 20 diameters. Configuring any outlet adds 64 bytes of live state per ship slot. The scoped ship entry grows from 13,770 B to 14,217 B gzip within its 14,951 B ceiling.
@@ -15087,6 +15091,10 @@ New entry @margoengine/animation/deformed-points: 4,286 B gzip, ceiling 4,542 B.
 `MorphedCrowd` (`@margoengine/animation/instanced-morph`) gives each member of a bone-texture crowd its own morph weights, on WebGPU and on the WebGL2 compatibility layer. Limit: 64 live targets per bake (`MORPH_TARGET_LIMIT`); `bakeMorphBones` throws RangeError past it, and its `morphs` option names the targets that stay live (the rest are baked in at the model's current weights). A member row is 28 + 4 * ceil(targets / 4) floats (128 to 368 bytes), in the crowd's one instance buffer; a change to any member uploads all rows with the next frame (as every `VATCrowd` instance change does), so setting weights on 10,000 members with 8 targets writes 1.44 MB that frame. Weights are any finite float32; they are not clamped. Target offsets are position and normal only (no tangents), two rgba32float texels per vertex of each primitive that has the target, stored after the bone rows of the bake's 2,048-texel-wide texture: bone rows, one entry texel per (primitive, live target) block and the offsets together must fit 8,192 rows (16,777,216 texels), else RangeError. Texel indices are held as float32, exact over that whole range. The vertex stage reads one entry texel per block of the vertex's own primitive and two more per non-zero weight. New members start at the weights the model had when baked. Targets are joined by name across primitives; two different targets with one name share a weight. Everything else is `SkinnedCrowd`'s (opaque, no CPU culling, WebGPU device needed; the small WebGL2 preview tier throws `unsupported`).
 
 New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 B, of which the skinned crowd it extends is about 10 KB (an app that loads both entries loads that part once). `@margoengine/animation/instanced-skin` gains the layout parameter and stays inside its recorded 10,303 B ceiling. Core and stage gain zero bytes (24,892 B on this base).
+
+### Seakeeping full KVLCC2 head-wave benchmark
+
+The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the freely pitching and heaving hull at fixed tow speed with `shortWaveResistance` enabled. At 2.0 the heave and pitch intervals also pass. At 1.1, the 0.7719 heave and 0.5949 pitch lie above the 95% upper limits of 0.7671 and 0.59368. The free-surge case and distributed measured pressure remain open. [Geometry and experiment](clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
 
 ### Seakeeping encounter-scaled taper loads
 
