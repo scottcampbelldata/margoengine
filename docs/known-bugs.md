@@ -28,6 +28,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** "a box held to a calm sea stays still (KB-FLIP-SEABAND1)" and the water count added to "a box held
   to the sea passes the sea's waves through" in `packages/physics/tests/flip.test.js`.
 
+### Fixed 2026-11-26: a README that named a listed entry left the known-entries list stale, and test:changed never ran the test that checks it (KB-README-ENTRIES1, scripts)
+
+- **Repro:** document an `exports` subpath that `scripts/support/readme-entries-known.json` still lists, in the package
+  README only (react `./post` and `./tonemap` in e6b371f6f, animation `./mixer` in beaccae9f), then run the fast gate.
+- **Cause:** `tests/package-readmes.test.js` fails on a listed entry the README now names, but it is a root test and
+  `rootTests` in `scripts/test-changed.mjs` chose only the mutation pins, so no package's tests read the README and the
+  gate stayed green until the full verify.
+- **Fix:** the known list is shrunk, and `npm run test:changed` runs `tests/package-readmes.test.js` when a package
+  README or manifest, the known list or `scripts/readme-entries.mjs` changes.
+- **Regression:** "test:changed runs the README entry test when a package README, a manifest or the known list changes
+  (KB-README-ENTRIES1)" in `tests/check-merge-affected.test.js`.
+
 ### Fixed 2026-11-26: rebase:main wrote a size-history row twice when upstream already had it (KB-REBASE-HISTORYDUP1, scripts)
 
 - **Repro:** a branch commit whose `scripts/quality/baselines/sizes.json` carries a `history` row that `main` also has

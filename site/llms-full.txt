@@ -14170,7 +14170,7 @@ The fixture preserves one material impact through six seconds of applied load an
 The durable damage ledger records material work. Optional dry friction applies one isotropic coefficient
 for sticking and sliding, with a circular limit from the current normal impulse. The normal solve runs
 first, and the friction solve includes its change to the velocity at the same contact point. Coupled
-contact evolution is resolved on successive ticks. Distributed panel collapse and flooding remain open.
+contact evolution is resolved on successive ticks. Distributed panel collapse remains open.
 
 The short hollow square-tube curve predicts 940.1 J at 100 mm axial compression from geometry and
 independent AA6063-T5 tensile properties. The five measured Yob et al. specimens absorbed 897.4–1048.77 J.
@@ -14178,7 +14178,7 @@ This is mean progressive folding work for that tube and loading range. Initial p
 oscillations, global buckling and material rate dependence need higher-fidelity constitutive and geometry
 models. The same envelope transfers work to the tube in a separately tested rigid-sled simulation.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 11584 B minified and 5098 B gzip, with a 5354 B ceiling. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 11590 B minified and 5102 B gzip under its 5354 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14864,6 +14864,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   keeps its water to 0.06 percent.
 - **Regression:** "a box held to a calm sea stays still (KB-FLIP-SEABAND1)" and the water count added to "a box held
   to the sea passes the sea's waves through" in `packages/physics/tests/flip.test.js`.
+
+### Fixed 2026-11-26: a README that named a listed entry left the known-entries list stale, and test:changed never ran the test that checks it (KB-README-ENTRIES1, scripts)
+
+- **Repro:** document an `exports` subpath that `scripts/support/readme-entries-known.json` still lists, in the package
+  README only (react `./post` and `./tonemap` in e6b371f6f, animation `./mixer` in beaccae9f), then run the fast gate.
+- **Cause:** `tests/package-readmes.test.js` fails on a listed entry the README now names, but it is a root test and
+  `rootTests` in `scripts/test-changed.mjs` chose only the mutation pins, so no package's tests read the README and the
+  gate stayed green until the full verify.
+- **Fix:** the known list is shrunk, and `npm run test:changed` runs `tests/package-readmes.test.js` when a package
+  README or manifest, the known list or `scripts/readme-entries.mjs` changes.
+- **Regression:** "test:changed runs the README entry test when a package README, a manifest or the known list changes
+  (KB-README-ENTRIES1)" in `tests/check-merge-affected.test.js`.
 
 ### Fixed 2026-11-26: rebase:main wrote a size-history row twice when upstream already had it (KB-REBASE-HISTORYDUP1, scripts)
 
@@ -32067,7 +32079,12 @@ move those blocks independently.
 
 ### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
 
-A floating hull can give up normal kinetic energy, recoil from a contact, and publish lost seal integrity through `CrushSolver`. Run the floating service craft test in `packages/physics/tests/coupling/crush.test.js` to reproduce a fully failed seal. The below-deck water mass still needs a SEA-10 compartment and opening geometry to connect a damaged station to hydrostatic head, displaced water and the hull's centre of mass. EF-11 also needs its original scene and the later failure sequence. PA-52 remains open for its other paths.
+A crush station now opens an authored SEA-10 compartment aperture when its seal fails. It transfers
+the inflowing water and its mass to the hull. A flooding hull with exterior hydrodynamic added mass
+disabled used to dereference an absent carried-inertia region when the first water entered. The region is
+now allocated for compartments and the live crush-to-flood test exercises that setting.
+`packages/physics/tests/coupling/crush.test.js` reproduces the connection. Distributed rupture geometry
+and EF-11's production breakup sequence remain open. PA-52 remains open for its other paths.
 
 ### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
 

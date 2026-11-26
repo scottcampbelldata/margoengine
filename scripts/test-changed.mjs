@@ -22,6 +22,8 @@ export const DEFAULT_PACKAGE_MINUTES = 15;
  * Root tests a set of changed files needs beyond the package runs. tests/mutation.test.js pins equivalent mutants by
  * line in the mutation targets' sources, so a change to one of those sources (a reformat moves every line) or to
  * scripts/mutation.mjs runs it: a formatted fsm left 14 pins on stale lines until local CI (KB-MUTATION-PINS1).
+ * tests/package-readmes.test.js runs when a package README or manifest changes: a README that names a listed entry left
+ * the known list stale on main (KB-README-ENTRIES1).
  */
 export function rootTests(files) {
   const norm = (f) => f.replaceAll('\\', '/'),
@@ -30,7 +32,19 @@ export function rootTests(files) {
         Object.values(targets).map((t) => `packages/${name}/${t.file}`),
       ),
     );
-  return files.map(norm).some((f) => f === 'scripts/mutation.mjs' || sources.has(f)) ? ['tests/mutation.test.js'] : [];
+  const changed = files.map(norm),
+    // tests/package-readmes.test.js holds the README entry list: a package README or manifest, the known list or its
+    // checker can leave it out of date, and no package's own tests read them (KB-README-ENTRIES1).
+    readmes = changed.some(
+      (f) =>
+        /^packages\/[^/]+\/(README\.md|package\.json)$/.test(f) ||
+        f === 'scripts/readme-entries.mjs' ||
+        f === 'scripts/support/readme-entries-known.json',
+    );
+  return [
+    ...(changed.some((f) => f === 'scripts/mutation.mjs' || sources.has(f)) ? ['tests/mutation.test.js'] : []),
+    ...(readmes ? ['tests/package-readmes.test.js'] : []),
+  ];
 }
 
 /**

@@ -1018,7 +1018,19 @@ test('test:changed runs the mutation pins when a mutation target or the mutation
   assert.deepEqual(rootTests(['packages/fsm/src/final.ts']), ['tests/mutation.test.js']);
   assert.deepEqual(rootTests(['packages\\fsm\\src\\index.ts']), ['tests/mutation.test.js']);
   assert.deepEqual(rootTests(['scripts/mutation.mjs']), ['tests/mutation.test.js']);
-  assert.deepEqual(rootTests(['packages/fsm/README.md', 'docs/limits.md']), []);
+  assert.deepEqual(rootTests(['docs/limits.md', 'packages/fsm/src/other.ts']), []);
+});
+
+test('test:changed runs the README entry test when a package README, a manifest or the known list changes (KB-README-ENTRIES1)', () => {
+  assert.deepEqual(rootTests(['packages/react/README.md']), ['tests/package-readmes.test.js']);
+  assert.deepEqual(rootTests(['packages\\react\\package.json']), ['tests/package-readmes.test.js']);
+  assert.deepEqual(rootTests(['scripts/support/readme-entries-known.json']), ['tests/package-readmes.test.js']);
+  assert.deepEqual(rootTests(['scripts/readme-entries.mjs']), ['tests/package-readmes.test.js']);
+  assert.deepEqual(rootTests(['packages/fsm/src/final.ts', 'packages/fsm/README.md']), [
+    'tests/mutation.test.js',
+    'tests/package-readmes.test.js',
+  ]);
+  assert.deepEqual(rootTests(['docs/limits.md', 'packages/fsm/CHANGELOG.md']), []);
 });
 
 test('test:changed picks the changed packages, their dependents and the document readers from the check:merge decision', () => {
