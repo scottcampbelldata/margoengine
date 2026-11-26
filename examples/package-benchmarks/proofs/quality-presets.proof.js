@@ -7,7 +7,7 @@
 // Story per package: setup on a core Engine over the recording mock GPU, 8 frames at 1x and 4x MSAA with a resize and a
 // device restore, then dispose.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/quality-presets.proof.js [ref] [pin] [--current]
-// --current advanced to 5255f3c074 (Shadows' soft filter turns its noise a golden-ratio step each frame, KB-LOOK-TV-PENUMBRA1; 374aa47b9e before it; f7aa52189c (VFX particles take the wind: the simulation kernel's wind step; 2ebc51e744 before it,
+// --current advanced to 5feaab3d71 (Shadows' soft filter turns its noise a golden-ratio step each frame, KB-LOOK-TV-PENUMBRA1; 374aa47b9e before it; f7aa52189c (VFX particles take the wind: the simulation kernel's wind step; 2ebc51e744 before it,
 // VolumetricFog's far air and clear-air default; 4e89a51c0e before it: VFX births seeded by step and birth number, GAP-FILM-VFXSEED; 72df70379c before it,
 // directional hard shadows on the receiver plane, KB-SUNSHADOW-OFFSET1; 67e90fef9d before
 // it, 6007055dbf before Shadows' soft filter read its tap counts and focus from the frame uniform).
@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('96daac7', '01e5e35', '5255f3c074'),
+const { ref, pin } = refs('96daac7', '01e5e35', '5feaab3d71'),
   { Engine, TransformStore, wgsl } = await coreAt(pin);
 const [{ Clustered }, { Tonemap }, { QUALITY_PRESETS }] = await Promise.all(
     ['clustered', 'tonemap', 'quality'].map((name) => entryAt(name, 'src/index.ts', pin)),
