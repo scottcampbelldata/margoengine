@@ -1597,6 +1597,50 @@ console.log(await ascii.text()); // the same picture as lines of text
   option changes. Every frame reads each pixel twice (five times that for the character pass with `edges`); GPU cost not
   measured yet. A cell's alpha is its average coverage on a transparent canvas. WebGPU and the WebGL2 layer.
 
+## Pixel art: `Pixelate`
+
+`@margoengine/post/pixelate` (10,491 B min+gzip, its own entry; it carries the stack and the normal capture) draws the
+frame as square cells of whole pixels, each taking the colour at its middle, and adds two edge lines the cell grid
+would lose: a dark line along depth silhouettes and a light line along creases. An LDR `PostStack` effect: put it last.
+`Pixelate.attach(engine, options)` runs it alone in an owned stack.
+
+```ts
+import {createStage} from 'margoengine';
+import {Pixelate} from 'margoengine/post/pixelate';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const pixels = Pixelate.attach(stage.engine, {pixelSize: 8, normalEdgeStrength: 0.5});
+pixels.options.pixelSize = 4; // options are read every frame
+stage.engine.render();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `pixelSize` | `6` | Drawing-buffer pixels along one side of a cell, a whole number from 1 to 128. `1` keeps every pixel |
+| `depthEdgeStrength` | `0.4` | How far a silhouette darkens, 0 to 1. `0` draws none |
+| `normalEdgeStrength` | `0.3` | How far a crease lightens toward white, 0 to 1. `0` draws none |
+| `depthThreshold` | `0.02` | Relative step in linear depth, above 0, at which a silhouette starts. Smaller finds shallower steps |
+| `normalThreshold` | `0.1` | `1 - dot(n0, n1)` between neighbouring cells, above 0, at which a crease starts |
+| `normal` | owned capture | `() => GPUTexture \| undefined`: a texture of signed unit normals, any size, in place of the capture |
+| `enabled` | `true` | False draws every pixel with no edges |
+
+`add(model)` lets a model's own materials, alpha masks and deformed normals into the captured normals, as for `SSR`; it
+returns a function that takes it out again. A bad option throws a `RangeError` or `TypeError` naming it, at
+construction.
+
+- **Method.** One pass. Each cell reads the scene at its middle texel. The four neighbouring cells' depths, as linear
+  distance from the camera, give the silhouette: the relative step to each is smoothed from `depthThreshold` to twice
+  that and the largest one darkens the cell. Where the depth step stays under `depthThreshold` (the same surface, not
+  a silhouette), the largest `1 - dot` of the unit normals against the four neighbours, smoothed from `normalThreshold`
+  to twice that, lightens the cell. Silhouettes and creases are separate settings: strength 0 turns one off alone.
+- **Normals.** Without `normal` the effect plugs a scene-normal capture into the engine on setup and removes the need
+  for you to run one; a `normal` you supply is read instead, and the capture is not made. Sky and other pixels with no
+  depth get no edges.
+- **Limits.** Edges are found at cell spacing, so a feature narrower than a cell cannot draw a line. The scene is
+  sampled, not averaged, so a one pixel highlight can vanish or flicker as the camera moves. A supplied `normal`
+  texture is sampled at the same relative place as the frame, so a different size is allowed but is not filtered. WebGPU
+  and the WebGL2 layer.
+
 ## Overlays: `Ramp`, `Grid`, `DepthView`, `TextureOverlay`
 
 `@margoengine/post/overlays` (10,454 B min+gzip, its own entry; it carries the stack) draws a layer over the frame:
