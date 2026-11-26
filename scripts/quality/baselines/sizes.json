@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20506586,
+  "total": 20507831,
   "history": [
     {
       "date": "2026-10-24",
@@ -13311,6 +13311,12 @@
       "commit": "353704a4b2ffc8b52ac4e711838717dbf07de872",
       "grew": 1,
       "reason": "SOFT-03 moves the optional strands entry from 5557 to 5806 B gzip for swept link and capsule contact plus the retained rigid capsule poses. A split would duplicate the native loader and collide with the existing field ownership. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "cfd800032",
+      "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14427,6 +14433,7 @@
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
+    "@margoengine/scene/emitter": 1245,
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/helpers": 2426,
     "@margoengine/scene/mesh": 2123,

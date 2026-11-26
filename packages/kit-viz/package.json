@@ -1735,6 +1735,10 @@
       "types": "./dist/scene/tags.d.ts",
       "import": "./dist/scene/tags.js"
     },
+    "./scene/emitter": {
+      "types": "./dist/scene/emitter.d.ts",
+      "import": "./dist/scene/emitter.js"
+    },
     "./sciviz/bench": {
       "types": "./dist/sciviz/bench.d.ts",
       "import": "./dist/sciviz/bench.js"
