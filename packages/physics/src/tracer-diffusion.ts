@@ -1,4 +1,88 @@
 import { MargoError } from '@margoengine/math/errors';
+import { exp, ln, pow } from '@margoengine/math/pinned';
+
+/** An age-dependent, isotropic horizontal diffusion law for parcels released as one cloud. */
+export interface TracerHorizontalDispersion {
+  /** Scale in metres at which `horizontalDiffusivity` applies. Scale is three times the RMS radial displacement. */
+  referenceScale: number;
+  /** Diffusivity scale exponent from zero up to two, exclusive. Defaults to Richardson's four-thirds law. */
+  exponent?: number;
+  /** Initial unresolved scale, m (default 0 for a point release). */
+  initialScale?: number;
+}
+
+export interface HorizontalDispersionLaw {
+  referenceVariance: number;
+  initial: number;
+  rate: number;
+  power: number;
+}
+
+export function horizontalDispersionLaw(
+  { referenceScale, exponent = 4 / 3, initialScale = 0 }: TracerHorizontalDispersion,
+  diffusivity: number,
+): HorizontalDispersionLaw {
+  if (
+    !(
+      referenceScale > 0 &&
+      Number.isFinite(referenceScale) &&
+      initialScale >= 0 &&
+      Number.isFinite(initialScale) &&
+      exponent >= 0 &&
+      exponent < 2
+    )
+  )
+    throw new MargoError(
+      'unsupported',
+      'The horizontal dispersion law is outside range; supply finite scales with a positive reference and an exponent from zero to less than two.',
+    );
+  const referenceRms = referenceScale / 3;
+  const referenceVariance = referenceRms * referenceRms;
+  const ratio = initialScale / referenceScale;
+  const p = 1 - exponent / 2;
+  const initial = pow(ratio, 2 * p);
+  const rate = (4 * p * diffusivity) / referenceVariance;
+  if (
+    !(
+      referenceVariance > 0 &&
+      [referenceVariance, initial, rate].every(Number.isFinite) &&
+      (rate > 0 || diffusivity === 0)
+    )
+  )
+    throw new MargoError(
+      'unsupported',
+      'The horizontal diffusion scales exceed numeric range; use finite physical scales and diffusivity.',
+    );
+  return { referenceVariance, initial, rate, power: 1 / p };
+}
+
+/** Axis standard deviation over one step from d<R²>/dt = 4 K_ref (3 sqrt(<R²>)/L_ref)^exponent. */
+export function horizontalSpread(law: HorizontalDispersionLaw, age: number, dt: number): number {
+  const { referenceVariance, initial, rate, power } = law;
+  const start = initial + rate * age;
+  const increment = rate * dt;
+  if (increment === 0) return 0;
+  let growth: number;
+  if (start === 0) {
+    growth = pow(increment, power);
+  } else {
+    const ratio = increment / start;
+    const sum = 1 + ratio;
+    const change = power * (sum === 1 ? ratio : (ln(sum) / (sum - 1)) * ratio);
+    const before = pow(start, power);
+    // Subtract the variances directly for large changes. For small changes, use a relative increment.
+    if (change < 1e-3) growth = before * change * (1 + change * (0.5 + change * (1 / 6 + change / 24)));
+    else if (change < 0.5) growth = before * (exp(change) - 1);
+    else growth = pow(start + increment, power) - before;
+  }
+  const spread = Math.sqrt(0.5 * referenceVariance * growth);
+  if (!Number.isFinite(spread))
+    throw new MargoError(
+      'unsupported',
+      'Horizontal dispersion exceeded numeric range; use physical scales, age and diffusivity.',
+    );
+  return spread;
+}
 
 /** A vertical eddy diffusivity at a specified distance below the local water surface. */
 export interface TracerDiffusionKnot {

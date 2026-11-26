@@ -3308,6 +3308,25 @@ world.advance(60);
 console.log(dye.particlesOf().next().value!.position[0] > 0); // true
 ```
 
+Set `horizontalDispersion` to make the unresolved spreading of each release depend on its scale. The
+`referenceScale` is three times the RMS radial displacement in metres at which `horizontalDiffusivity`
+applies. The exponent defaults to Richardson's 4/3 and accepts values in [0, 2). `initialScale` defaults to
+zero for a point release. A nonzero value sets the initial mixing scale in metres and leaves emission positions
+under the source's control.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const dye = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(dye, {
+  horizontalDiffusivity: 0.75, horizontalDispersion: { referenceScale: 3 }, verticalDiffusivity: 0,
+  sources: [{ material: 'dye', position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+});
+world.advance(60);
+console.log(dye.budget.water); // 1
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

@@ -13274,6 +13274,18 @@ can still provide the instantaneous elevation. The test compares a crossed pair 
 profile at the surface and two depths, and checks exact replay in finite and deep water. Independent measurements
 of wave-induced mean flow remain open. [Breivik, Janssen and Bidlot, “Approximate Stokes Drift Profiles in Deep Water” (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
 
+The optional horizontal mixing law evolves the radial variance `q` of each release as `dq/dt = 4K_ref (3√q/L_ref)^b`.
+The solver integrates this ordinary differential equation exactly, then splits each variance increment equally
+between the two horizontal axes. This applies the Richardson scale dependence to an isotropic cloud moment. Each
+parcel's snapshot stores its age in steps. The Cape Kennedy check fits a four-thirds law to the 38 black squares in
+Poje et al. Figure 6. Their geometric mean coefficient gives apparent diffusivity 37.6 m²/s at scale 30 km. With cubic
+variance growth, the instantaneous diffusivity is three times the apparent value. All nine dye extents from releases
+3–6 in Okubo's Table 1 are reserved for comparison. The model improves the RMS log extent error from 1.996 to 0.537
+against constant diffusivity at the same reference value. The largest residual is a factor of 2.34 in extent. This is
+a cross-site comparison of horizontal extent. The model leaves coherent eddies and anisotropic shear to the flow field.
+[Poje et al., “Submesoscale dispersion in the vicinity of the Deepwater Horizon spill” (2014), Figure 6](https://doi.org/10.1073/pnas.1402452111),
+[Akira Okubo, “Oceanic diffusion diagrams” (1971), Table 1](https://doi.org/10.1016/0011-7471(71)90046-5).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

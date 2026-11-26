@@ -17,7 +17,7 @@
 //   2023, read in its abstract).
 //
 // Finite oil spills add Fay's axisymmetric spreading and optional Stiver–Mackay evaporation. Use a depth profile for
-// vertical turbulence where mixing varies with depth. Horizontal diffusivity is constant.
+// vertical turbulence where mixing varies with depth. Horizontal mixing can use a constant or a scale law.
 // Settled parcels remain in the bed ledger. Dispersion into oil droplets and flocculation are unresolved.
 
 import type {
@@ -36,7 +36,15 @@ import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.
 import { MargoError } from '@margoengine/math/errors';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
-import { depthDiffusivity, type TracerDiffusionKnot, turbulentVerticalStep } from './tracer-diffusion.js';
+import {
+  depthDiffusivity,
+  type HorizontalDispersionLaw,
+  horizontalDispersionLaw,
+  horizontalSpread,
+  type TracerDiffusionKnot,
+  type TracerHorizontalDispersion,
+  turbulentVerticalStep,
+} from './tracer-diffusion.js';
 import {
   type EvaporationRates,
   evaporatedFraction,
@@ -61,7 +69,7 @@ import type {
 } from './world/solver.js';
 
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
-export type { TracerDiffusionKnot } from './tracer-diffusion.js';
+export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
@@ -190,8 +198,10 @@ export interface TracerParams {
   waterDensity?: number;
   /** Kinematic viscosity of the water, m^2/s (default 1e-6). */
   viscosity?: number;
-  /** Horizontal eddy diffusivity, m^2/s (default 0.1). */
+  /** Horizontal eddy diffusivity, m^2/s (default 0.1). With `horizontalDispersion`, this is the reference value. */
   horizontalDiffusivity?: number;
+  /** Optional horizontal scale law for the unresolved spreading of each release. */
+  horizontalDispersion?: TracerHorizontalDispersion;
   /** Vertical eddy diffusivity, m^2/s (default 0.001). */
   verticalDiffusivity?: number;
   /** Optional depth-dependent vertical diffusivity. Linear between knots, constant outside, overriding the scalar. */
@@ -307,6 +317,7 @@ export class TracerSolver implements Solver<TracerParams> {
       | 'bed'
       | 'sources'
       | 'oilSpills'
+      | 'horizontalDispersion'
       | 'verticalDiffusivityProfile'
       | 'bedJets'
       | 'breaches'
@@ -320,6 +331,8 @@ export class TracerSolver implements Solver<TracerParams> {
   private spillRadii?: Region;
   private spillVapour?: Region;
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
+  private horizontalLaw?: HorizontalDispersionLaw;
+  private dispersionAges?: Region;
   private stokes?: StokesProfile;
   private readonly stokesVelocity: [number, number] = [0, 0];
   private emissionCapacity = 0;
@@ -429,6 +442,8 @@ export class TracerSolver implements Solver<TracerParams> {
       throw new RangeError(
         `A water depth is a finite number of metres above 0 (got ${bed}); pass one, or a terrain bed.`,
       );
+    const horizontalLaw =
+      params.horizontalDispersion && horizontalDispersionLaw(params.horizontalDispersion, horizontalDiffusivity);
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
@@ -531,6 +546,10 @@ export class TracerSolver implements Solver<TracerParams> {
     const ledgerWords = this.initBreachMixes(params.breachMixes ?? [], base);
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
+    if (horizontalLaw && horizontalLaw.rate > 0 && horizontalLaw.power > 1) {
+      this.horizontalLaw = horizontalLaw;
+      this.dispersionAges = host.allocate('horizontal-dispersion-ages', capacity * 8, 'f64', 1);
+    }
     // Released, in the water, on the surface, on the bed (kg), each source's mass not yet released as a particle, the
     // bed jets' and each breach's.
     this.ledger = host.allocate('ledger', ledgerWords * 8, 'f64', TRACER_LAYOUT);
@@ -859,8 +878,10 @@ export class TracerSolver implements Solver<TracerParams> {
       }
     }
     // Motion: the water's velocity (and a slick's windage), settling, and the random walk.
-    const sh = pow(2 * kh * dt, 0.5),
+    const baseSpread = pow(2 * kh * dt, 0.5),
       sv = pow(2 * kv * dt, 0.5);
+    const horizontalLaw = this.horizontalLaw;
+    const ages = this.dispersionAges && (regionWords(this.host.memory, this.dispersionAges) as Float64Array);
     for (let i = 0; i < capacity; i++) {
       const p = i * STRIDE,
         state = words[p + 5]!;
@@ -870,6 +891,11 @@ export class TracerSolver implements Solver<TracerParams> {
         z = words[p + 2]!,
         material = this.materials[words[p + 4]!]!,
         [n0, n1, n2] = this.normals(context.tick, i);
+      let sh = baseSpread;
+      if (horizontalLaw && ages) {
+        sh = horizontalSpread(horizontalLaw, ages[i]! * dt, dt);
+        ages[i]! += 1;
+      }
       let ux = 0,
         uy = 0,
         uz = 0;
@@ -1042,6 +1068,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.bedExchange) regions.push(...this.bedExchange.regions());
     if (this.spillRadii) regions.push(this.spillRadii);
     if (this.spillVapour) regions.push(this.spillVapour);
+    if (this.dispersionAges) regions.push(this.dispersionAges);
     return regions;
   }
 
