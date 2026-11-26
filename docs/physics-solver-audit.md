@@ -508,8 +508,9 @@ Finite instantaneous oil releases now use Fay's three radial laws, with mass con
 snapshot replay checked separately. Stiver–Mackay evaporation uses the integrated Fay area and preserves a separate
 vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
 A fixed-volume waxy film now reports its thickness and follows the Brönner Bingham yield force. Nine independent
-tank terminal radii lower the RMS log radius error from 1.127 to 0.749 compared with Fay's unyielded radius. The 30%
-blend that fractured under-spreads by a factor of 5.69 in the worst run. Continuous sources, fracture, unyielded oil
+tank terminal radii lower the RMS log radius error from 1.056 to 0.480 compared with Fay's unyielded radius at the
+reported 180 s measurement time. The simulated 30% blend under-spreads by a factor of 3.59 against the run that
+fractured. Continuous sources, fracture, unyielded oil
 extent and independent evaporation validation remain open.
 
 Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from

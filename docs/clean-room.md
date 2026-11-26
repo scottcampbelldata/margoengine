@@ -13304,9 +13304,10 @@ by the zero-yield Fay `R⁴` rate times `max(1−(R/R∞)²,0)^(2/3)`. Inverting
 initial radius. The early inertial envelope is Fay's. Antipodal parcels use the radial mass quantile of the profile.
 Independent terminal radius estimates from Brönner's tank use optical thickness contours and ultrasound. The solver
 inputs are the separate oscillatory rheometer stress, oil density, 4 L final volume and nominal seawater properties.
-Across all nine reported terminal radii, the RMS log error drops from 1.127 to 0.749. The worst error is a factor of 5.69
-for the 30% blend that fractured in one of the runs. The coherent-film law omits breakup and the comparison is at the
-end of the tank's continuous release, when the final volume is fixed.
+At the paper's 180 s sampling time, the nine reported terminal radii give an RMS log error of 1.056 for unyielded
+Fay spreading and 0.480 for the waxy film law. The worst error is a factor of 3.59 for the single 30% blend run,
+which fractured. The coherent-film law omits breakup. The radius comparison uses the fixed final volume after the
+tank's 120 s feed ends, with replicates grouped by their experiment IDs in the text above Table 2.
 
 Oil evaporation follows W. Stiver and D. Mackay, [“Evaporation rate of spills of hydrocarbons and petroleum mixtures” (1984)](https://doi.org/10.1021/es00129a006).
 The [Environment Canada catalogue (1990), §3.1](https://publications.gc.ca/collections/collection_2020/eccc/en84/En84-183-1990-eng.pdf)

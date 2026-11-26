@@ -98,13 +98,14 @@ test('SEA-15 a finite waxy film thins to the Bingham yield level and conserves i
 
 test('SEA-15 yield resistance improves held-out terminal slick radii in the wax tank', (t) => {
   // Brönner et al. Tables 1–2. Densities and oscillatory rheometer readings drive the model.
-  // The equivalent terminal radii are separately inferred from the film images and ultrasound.
+  // The film observations were taken at 180 s. Group repeats by their stated experiment IDs:
+  // WRD 11–13, 5% 14, 10% 8, 20% 15–17 and 30% 10.
   const observations = [
-    [894, 0.36, 1.28, 1.27],
-    [894.1, 1.25, 1.21, 0.77],
+    [894, 0.36, 1.22, 1.28, 1.27],
+    [894.1, 1.25, 1.21],
     [893.7, 0.46, 1.15],
-    [893.1, 1.65, 0.71, 0.79],
-    [892.4, 13.6, 0.77, 1.22],
+    [893.1, 1.65, 0.77, 0.71, 0.79],
+    [892.4, 13.6, 0.77],
   ];
   const volume = 0.004;
   const tracer = new TracerSolver();
@@ -119,7 +120,7 @@ test('SEA-15 yield resistance improves held-out terminal slick radii in the wax 
     })),
   );
   const world = new PhysicsWorld({ rate: { num: 2, den: 1 } }).add(tracer, { oilSpills, horizontalDiffusivity: 0 });
-  world.advance(480);
+  world.advance(360);
   let baseline = 0;
   let corrected = 0;
   let count = 0;
