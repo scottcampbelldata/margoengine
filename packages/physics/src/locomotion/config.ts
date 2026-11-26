@@ -93,6 +93,26 @@ export interface SmallLeggedBody extends BodyOptions {
 /** A separate body row of the small-animal world solver. */
 export type GroundAnimal = SlitheringBody | SmallLeggedBody;
 
+/** A live leg drive command. The caller supplies SI targets and a footfall clock. */
+export interface GroundLeggedDrive {
+  /** Desired travel speed in m/s. The contact solver limits the delivered acceleration. */
+  readonly speed: number;
+  /** Desired heading about +Y in radians. */
+  readonly heading: number;
+  /** Gait cycles per second. Zero leaves the phase fixed. */
+  readonly frequency: number;
+  /** Fraction of each cycle in stance, in (0, 1). */
+  readonly duty: number;
+  /** One offset in cycles per foot, in layout order. */
+  readonly phases: readonly number[];
+  /** Optional net external force through the COM, expressed in world coordinates, N. */
+  readonly force?: V;
+  /** Adapt the stance orientation to the combined ground slope and acceleration. Default false. */
+  readonly lean?: boolean;
+  /** Optional support velocity at the COM, world-axis m/s. Default stationary ground. */
+  readonly supportVelocity?: V;
+}
+
 /** Configuration for a group's initial state. */
 export interface GroundLocomotionParams {
   /** Independent body rows, in port order. */
@@ -113,6 +133,12 @@ export interface GroundLocomotionOptions {
   readonly cellSize?: number;
   /** Matching geometry of a TerrainBed. Configuring it declares the live bed input. */
   readonly bedShape?: BedShape;
+  /** Make leg drive commands part of the snapshot state, default false. */
+  readonly controlled?: boolean;
+  /** Override the pose field's registry name for an independent group. */
+  readonly poseField?: string;
+  /** Override the contact field's registry name for an independent group. */
+  readonly contactField?: string;
   /** Cancels kernel loading. */
   readonly signal?: AbortSignal;
 }
@@ -301,6 +327,14 @@ export function makeModel(animal: GroundAnimal, gravity: number): Model {
       posture,
       sin(yaw * 0.5),
       cos(yaw * 0.5),
+      (legs?.stride ?? 0) * frequency,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
     ],
     actuators: legs?.actuators ?? [],
     count,

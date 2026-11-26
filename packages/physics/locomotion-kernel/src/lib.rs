@@ -156,6 +156,10 @@ struct Profile {
     traction: f64,
     posture: f64,
     heading: [f64; 2],
+    target_speed: f64,
+    external_force: V,
+    lean: f64,
+    support_velocity: V,
 }
 
 #[repr(C)]
@@ -240,12 +244,20 @@ fn desired_velocity(profile: &Profile) -> V {
         1.0 - 2.0 * sin_half * sin_half,
     ];
     let side = [forward[2], 0.0, -forward[0]];
-    scale(
+    let local = scale(
         add(
             scale(side, profile.direction[0]),
             scale(forward, profile.direction[2]),
         ),
-        profile.stride * profile.frequency,
+        profile.target_speed,
+    );
+    add(
+        local,
+        [
+            profile.support_velocity[0],
+            0.0,
+            profile.support_velocity[2],
+        ],
     )
 }
 
@@ -262,7 +274,19 @@ fn feet(
     let forward = unit(tangent(torso.axis, UP), FORWARD);
     let side = [forward[2], 0.0, -forward[0]];
     let desired = desired_velocity(profile);
-    let actual = [body.velocity[0], 0.0, body.velocity[2]];
+    let actual = [
+        body.velocity[0] - profile.support_velocity[0],
+        0.0,
+        body.velocity[2] - profile.support_velocity[2],
+    ];
+    let relative_target = sub(
+        desired,
+        [
+            profile.support_velocity[0],
+            0.0,
+            profile.support_velocity[2],
+        ],
+    );
     let stance_seconds = if profile.frequency > 0.0 {
         profile.duty / profile.frequency
     } else {
@@ -270,7 +294,7 @@ fn feet(
     };
     // Raibert's touchdown captures both horizontal components. Reach comes
     // from the nominal shaft length and its supported vertical component.
-    let tracking = scale(sub(actual, desired), profile.placement);
+    let tracking = scale(sub(actual, relative_target), profile.placement);
     let reach = profile.size * sqrt(1.0 - 0.87 * 0.87);
     for ((leg, anchor), foot) in actuators.iter().zip(anchors).zip(feet) {
         let phase = wrap(body.phase + leg.phase);
@@ -394,7 +418,13 @@ fn leg_contact(
     let leg_vector = sub(add(body.position, arm), ground);
     let length = norm(leg_vector);
     let axis = unit(leg_vector, foot.normal);
-    let stretch_velocity = dot(add(body.velocity, cross(omega, arm)), axis);
+    let stretch_velocity = dot(
+        sub(
+            add(body.velocity, cross(omega, arm)),
+            profile.support_velocity,
+        ),
+        axis,
+    );
     let extension = profile.push * foot.phase * foot.phase;
     let rest_length = profile.size * (1.0 + extension);
     let length_rate =
@@ -414,13 +444,29 @@ fn leg_contact(
     add(scale(foot.normal, normal_load), limited)
 }
 
-fn posture_couple(body: &Body, profile: &Profile, omega: V) -> V {
+fn posture_couple(body: &Body, profile: &Profile, omega: V, support_up: V) -> V {
     if profile.posture == 0.0 {
         return ZERO;
     }
     let actual = [-body.rotation[0], -body.rotation[1], -body.rotation[2]];
-    let [y, w] = profile.heading;
-    let target = [0.0, y, 0.0];
+    let [y, yaw_w] = profile.heading;
+    let yaw = [0.0, y, 0.0];
+    let (target, w) = if profile.lean > 0.0 {
+        let axis = cross(UP, support_up);
+        let scalar = 1.0 + dot(UP, support_up);
+        let scale_by = 1.0 / sqrt(dot(axis, axis) + scalar * scalar);
+        let slope = scale(axis, scale_by);
+        let slope_w = scalar * scale_by;
+        (
+            add(
+                add(scale(yaw, slope_w), scale(slope, yaw_w)),
+                cross(slope, yaw),
+            ),
+            slope_w * yaw_w - dot(slope, yaw),
+        )
+    } else {
+        (yaw, yaw_w)
+    };
     let scalar = w * body.rotation[3] - dot(target, actual);
     let axis = add(
         add(scale(actual, w), scale(target, body.rotation[3])),
@@ -434,7 +480,14 @@ fn posture_couple(body: &Body, profile: &Profile, omega: V) -> V {
     )
 }
 
-fn drive(body: &Body, profile: &Profile, shape: &[Geometry], contacts: &mut [Contact], omega: V) {
+fn drive(
+    body: &Body,
+    profile: &Profile,
+    shape: &[Geometry],
+    contacts: &mut [Contact],
+    omega: V,
+    gravity: V,
+) {
     let feet = contacts.len() - 1;
     let support = contacts[..feet]
         .iter()
@@ -443,15 +496,48 @@ fn drive(body: &Body, profile: &Profile, shape: &[Geometry], contacts: &mut [Con
     if support <= 0.0 {
         return;
     }
+    let lever = 0.5 * profile.size;
     let mut traction = ZERO;
     if profile.traction > 0.0 {
         let actual = [body.velocity[0], 0.0, body.velocity[2]];
-        traction = scale(
+        let requested = scale(
             sub(desired_velocity(profile), actual),
             profile.mass / profile.traction,
         );
+        if profile.lean > 0.0 {
+            // Leave the torque budget needed to deliver shear below the COM.
+            // With COM height h the same shear consumes F + hF/lever.
+            let traction_limit = profile.friction * support / (1.0 + 0.87 * profile.size / lever);
+            traction = scale(unit(requested, ZERO), norm(requested).min(traction_limit));
+        } else {
+            traction = requested;
+        }
     }
-    let desired_couple = posture_couple(body, profile, omega);
+    let desired_couple = if profile.lean > 0.0 {
+        let mut stance_normal = ZERO;
+        let mut delivered_moment = ZERO;
+        for (foot, geo) in contacts[..feet].iter().zip(shape) {
+            let normal = dot(geo.normal, foot.force);
+            let weight = normal / support;
+            stance_normal = add(stance_normal, scale(geo.normal, weight));
+            let force = add(
+                scale(geo.normal, normal),
+                scale(tangent(traction, geo.normal), weight),
+            );
+            delivered_moment = add(
+                delivered_moment,
+                cross(sub(foot.point, body.position), force),
+            );
+        }
+        let leaning_acceleration = scale(traction, 1.0 / profile.mass);
+        let up = unit(
+            add(scale(stance_normal, norm(gravity)), leaning_acceleration),
+            UP,
+        );
+        sub(posture_couple(body, profile, omega, up), delivered_moment)
+    } else {
+        posture_couple(body, profile, omega, UP)
+    };
     for (foot, geo) in contacts[..feet].iter_mut().zip(shape) {
         let load = dot(foot.force, geo.normal).max(0.0);
         let weight = load / support;
@@ -463,7 +549,6 @@ fn drive(body: &Body, profile: &Profile, shape: &[Geometry], contacts: &mut [Con
         let moment = scale(desired_couple, weight);
         // A planted group has finite purchase: allow a support couple over its
         // representative stance lever, sharing the budget with tangential force.
-        let lever = 0.5 * profile.size;
         let demand = norm(shear) + norm(moment) / lever;
         let factor = if demand > 0.0 {
             (profile.friction * load / demand).min(1.0)
@@ -528,8 +613,9 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         } else {
             let force = leg_contact(body, profile, leg, g, omega, profile.stiffness);
             if g.stance != 0.0 || anchor.planted == 0.0 {
-                anchor.x = g.point[0];
-                anchor.z = g.point[2];
+                let carried_time = if g.stance != 0.0 { dt } else { 0.0 };
+                anchor.x = g.point[0] + profile.support_velocity[0] * carried_time;
+                anchor.z = g.point[2] + profile.support_velocity[2] * carried_time;
             }
             anchor.planted = if g.stance != 0.0 { 1.0 } else { -1.0 };
             (
@@ -541,18 +627,28 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         if point.iter().chain(&force).any(|value| !value.is_finite()) {
             return 1;
         }
+        let couple = if !snake && index == count - 1 && stance > 0.0 && dt > 0.0 {
+            let available = profile.friction * dot(force, g.normal) * profile.body_radius;
+            scale(
+                unit(body.momentum, ZERO),
+                -(norm(body.momentum) / dt).min(available),
+            )
+        } else {
+            ZERO
+        };
         *contact = Contact {
             point,
             axis: g.axis,
             force,
             stance,
-            couple: ZERO,
+            couple,
         };
     }
+    let gravity = [gravity_x, gravity_y, gravity_z];
     if !snake {
-        drive(body, profile, geometry, contacts, omega);
+        drive(body, profile, geometry, contacts, omega, gravity);
     }
-    let mut net_force = ZERO;
+    let mut net_force = profile.external_force;
     let mut torque = ZERO;
     for contact in contacts {
         net_force = add(net_force, contact.force);
@@ -562,7 +658,6 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         );
         torque = add(torque, if snake { [0.0, moment[1], 0.0] } else { moment });
     }
-    let gravity = [gravity_x, gravity_y, gravity_z];
     body.advance(
         add(gravity, scale(net_force, 1.0 / profile.mass)),
         torque,

@@ -153,15 +153,18 @@ try {
   }
 
   if (!thermalOnly && !swimOnly && !pedestrianOnly) {
-    await page.evaluate(() => import('/dist/locomotion.js'));
-    assert.deepEqual(locomotionRequests, [], 'importing the locomotion entry leaves the kernels unloaded');
+    await page.evaluate(() => Promise.all([import('/dist/locomotion.js'), import('/dist/legged.js')]));
+    assert.deepEqual(locomotionRequests, [], 'importing either locomotion entry leaves the kernels unloaded');
     const reading = await page.evaluate(async () => {
       const { GroundLocomotion } = await import('/dist/locomotion.js');
+      const { LeggedLocomotion } = await import('/dist/legged.js');
       const { PhysicsWorld } = await import('/dist/world.js');
       const animals = await GroundLocomotion.load();
       const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(animals, {
         bodies: [{ kind: 'snake' }, { kind: 'insect' }, { kind: 'crab' }],
       });
+      const legs = await LeggedLocomotion.load();
+      world.add(legs, { bodies: [{ kind: 'biped', target: { speed: 1.3, heading: 0 } }] });
       world.advance(30);
       const saved = world.takeSnapshot();
       world.advance(60);
@@ -169,15 +172,18 @@ try {
       const distance = [animals.read(0).position[2], animals.read(1).position[2], animals.read(2).position[0]];
       world.restoreSnapshot(saved.bytes);
       world.advance(60);
-      return { distance, replayed: world.hash() === hash, shared: globalThis.crossOriginIsolated };
+      return { distance, biped: legs.read(0), replayed: world.hash() === hash, shared: globalThis.crossOriginIsolated };
     });
     assert.deepEqual(
-      locomotionRequests.map((request) => request.split('/').at(-1)).sort(),
+      [...new Set(locomotionRequests.map((request) => request.split('/').at(-1)))].sort(),
       reading.shared ? ['locomotion-kernel-shared.wasm', 'locomotion-kernel.wasm'] : ['locomotion-kernel.wasm'],
     );
     assert.ok(reading.distance.every((distance) => distance > 0));
+    assert.equal(reading.biped.gait, 'walk');
+    assert.equal(reading.biped.fallen, false);
+    assert.ok(reading.biped.position[2] > 0);
     assert.equal(reading.replayed, true);
-    report.checks.push('Ground locomotion lazily loads Wasm, moves three gaits and restores contacts');
+    report.checks.push('Ground and legged locomotion share lazy Wasm, advance their own bodies and restore contacts');
   }
   if (report.image) {
     await writeFile(resolve(results, 'physics-stack.png'), Buffer.from(report.image.split(',')[1], 'base64'));

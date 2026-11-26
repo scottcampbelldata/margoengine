@@ -10180,3 +10180,12 @@ in two SIMD lanes for each remaining pair. Its Rust Wasm has no initial data and
 The build instantiates each variant over sentinel-filled memory and verifies every byte is intact. An independent
 offline integer reference checks annual births, mortality, snag cleanup and living crowns. World tests exercise
 the surface-water and landscape ports, exact exposure replay, and a retained growth axis after the wind drops.
+
+### Grounded biped and quadruped gait kernel (LIFE-01)
+
+The optional legged entry extends the slot-13 SIMD ground kernel with configurable phase and speed, body load and
+contact surface velocity. The stance controller allocates each active foot its share of a bounded force and couple.
+Controlled gait profiles live in extra state, preserving the existing uncontrolled ground-animal snapshot layout.
+The optional deck adapter reads the real rigid `bodies` port and returns the opposite integrated `bodyImpulses` per
+substep. The direct HorseMotion path shares the same support concepts and stays renderable without a PhysicsWorld.
+Verified with real terrain, a moving rigid support, plain/shared memory and browser replay.
