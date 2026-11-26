@@ -902,6 +902,182 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 6. Add whitewater particles for the FLIP tier (Ihmsen et al. 2012) and a Rust or Wasm kernel for large grids (about 5 ms a step for a 128 by 128 grid, in TypeScript).
 7. Replace the arbitrary 1.5 and 10 percent bounds with derived ones.
 
+### SEA-04 Local dispersive free surface (`physics/sea`, commits 33ab69766, 10d649b5c, 4ec0717e8), owner Codex: REOPENED
+
+**Checked.** Commits for the row: 33ab69766 (WakeSolver), 10d649b5c (Water draws the wake), 4ec0717e8 (liquid box takes the wake's waves). No SEA-04 commit since the audit touches `packages/physics/src/sea/wake.ts` or `tests/sea-wake.test.js` (the last change to either is 4ec0717e8, before the audit). Read `src/sea/wake.ts` (563 lines) and `tests/sea-wake.test.js` (277 lines). Ran under run-with-timeout: `node --test packages/physics/tests/sea-wake.test.js packages/physics/tests/coupling/wake.test.js`, 14 tests, 14 pass, 0 fail. Ran `packages/water/test/wake-agreement.browser.mjs` (WebGPU on Metal): passed, drawn wake within 0.042% of the solver; the `--compat` run was not done. `wake.ts` contains no wall, quay, obstacle, reflection, current or capillary code.
+
+**Validation.**
+- "a plane wave ... moves at sqrt(g k tanh(k D)) / k, exactly" (deep and 3 m): exact solution, the linear dispersion relation, bound 1e-9 of height. Sound.
+- "with no source and no sponge, the wave energy stays to round-off": conservation identity, 1e-10. Sound.
+- "a pressure patch moving at 4 m/s ... transverse waves 2 pi U^2 / g": exact Kelvin analytic wavelength, 5% bound (arbitrary, not derived from the grid). The 12 to 22 degree crest-angle band around 19.47 degrees is loose and arbitrary.
+- The `wake.test.js` coupling test and the water browser test are self-consistent (solver against its own drawing), not measurements.
+- Missing: no published measurement anywhere (Havelock 1908 wake amplitude, Cauchy-Poisson ring waves, Rabaud and Moisy 2013 angle against Froude number), and no test of a reflected wave or a standing wave at a wall. The limits.md Rabaud and Moisy claim still has no test.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (8 only partly met).
+
+**Audit list.**
+1. Reflection and clapotis off quays, hulls, breakwaters; wavelets with obstacles (Jeschke et al. 2018) — NOT DONE. No code in `wake.ts`; the grid is periodic with a sponge only (`limits.md:1720`).
+2. Hull displaced volume as a source — PARTIAL. `volume` is a source field in `wake.ts` (about line 387) and `HullSolver` publishes waterplane volume (`seakeeping/solver.ts:114`), but there is no test that the bow wave climbs the stem or the waterline moves.
+3. Wave-making resistance back to the hull — DONE in the seakeeping tests (`coupling/seakeeping.test.js:1424`, title read, not run by me).
+4. Capillary waves, viscous decay — NOT DONE (limits.md names none).
+5. Varying depth — NOT DONE (one flat-bottom depth).
+6. Currents — NOT DONE (limits.md: "no current").
+7. Rabaud and Moisy claim in limits.md has no test — NOT DONE.
+8. Havelock 1908 amplitude, Cauchy-Poisson ring waves — NOT DONE.
+9. `wakeHeight` README gap — PARTIAL. Documented in the water README (line 1475), still missing from the physics README.
+10. Breaking read for SEA-13 and spray, sources for rain rings — NOT DONE (no breaking output).
+11. Scale: Rust/Wasm SIMD, work counts — NOT DONE. About 20 ms a step on the CPU, "not timed in a gate".
+
+**To do before it can be VERIFIED:**
+1. Add true wall boundaries (Neumann, per Schreck, Hafner and Wojtan 2019, or Neumann penalisation per Kolomenskiy and Schneider 2009) with a standing-wave test (eta = 2A cos kx cos wt, doubled at the wall), the Penney and Price 1952 semi-infinite breakwater diffraction values, and MacCamy and Fuchs cylinder run-up.
+2. Make hulls obstacles that reflect and diffract; test the Kelvin wake reflecting off a quay.
+3. Test the displaced-volume source: bow wave height at the stem against Wigley or KVLCC2 data.
+4. Add a measured test with a derived bound: Havelock 1908, Cauchy-Poisson, Rabaud and Moisy 2013 against Froude number; test or remove the limits.md claim.
+5. Add currents, varying depth, capillary and viscous decay with a coded MargoError for out-of-range input (the wake throws plain RangeError and TypeError).
+6. Output a breaking read for SEA-13 and a rain-ring source; document `wakeHeight` in the physics README.
+7. Move FFTs to Wasm SIMD and record work counts.
+
+### SEA-02 Ocean surface synthesis and query (`@margoengine/physics/sea`, commits 52b68ca65, 4514375c8, 713c344ef, 3dbda315d; patches added by 33ab69766 and 4ec0717e8), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/sea/surface.ts` (415 lines), `tests/sea-surface.test.js`, the `sea-wake.test.js` patch tests, the audit row, the catalog row, `docs/limits.md` row "Sea surface" and the demo-review rows. `git log --since=2026-11-25` on the sea source shows no change to the wave synthesis since the audit: only error wording (713c344ef) and the wake `patches` and `waterBelow` hooks. Ran under run-with-timeout: `sea-surface.test.js` + `sea-wake.test.js`: 20 tests, 20 pass, 0 fail. `packages/water/test/sea-agreement.browser.mjs` (WebGPU, Apple Metal): passed (2043 vertices, 408 waves, worst 0.0% of its bound, largest difference 0.0020 mm). Not run: the WebGL2 `--compat` variant, and `coupling/seakeeping.test.js` (it tests the hull, not this surface).
+
+**Validation.** Every reference is the same linear formula the code implements, or an identity of it: `one wave in water {Infinity,12} m deep` checks height, normal, surface and below-surface velocity against closed-form Airy theory, bound 1e-9 a (rounding, derived; self-consistent, not measured). `a JONSWAP sea` checks variance equals the spectrum's m0 (1e-9, exact), kinematic condition w = dh/dt (1e-6, finite-difference error) and divergence-free flow (1e-5): exact identities, not measurements. Seed, order, refresh, bad-option, pressure (1e-9 rho g) and `waveComponents` tests are determinism or self-consistency. `sea-agreement` checks GPU against CPU with a derived f32 bound: a renderer-agreement test, not a physics validation. No published measurement is used anywhere (no buoy, wave-staff or tank record); no Longuet-Higgins (1952) Rayleigh crest or height distribution check on the synthesised sea; no steepness or choppiness test.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (point 8 is partly met: limits.md names the linear-theory differences).
+
+**Audit list.**
+1. FFT cascade with choppy horizontal displacement (Tessendorf 2001) — NOT DONE. `surface.ts` is a plain sum of linear waves, height a cos(theta) with no horizontal displacement; `grep` finds no choppy term (header, lines 1-35: "no Stokes asymmetry"). The drawn FFT code lives in `packages/water/src/fft.ts`, not in the physics sea that hulls read.
+2. Jacobian (fold) output for foam and sharp crests — NOT DONE; nothing in `sample` returns it.
+3. Spectrum varying across the scene — NOT DONE. Spectrum read once at `at` and applied everywhere (`surface.ts:30,253`, "taken for the whole sea until refresh()", limits.md row).
+4. Currents Doppler-shift waves — NOT DONE. `currentAt` only adds the current's velocity (`surface.ts:336-339`); no k.U term in omega.
+5. Horvath 2015 spectra — NOT DONE; only the wave solver's JONSWAP with cos^2 spread.
+6. Steep seas (Gerstner/second-order/Stokes) — NOT DONE; limits.md still says steep seas look rounder.
+7. Validate against Longuet-Higgins 1952 Rayleigh crest and height distributions, or any measured sea — NOT DONE (see Validation).
+8. Cost O(bins) per point (about 816 waves) — NOT DONE; sums are still in TypeScript, no Rust/Wasm or FFT grid for many points (K17 not used by this entry).
+9. Query-not-Solver, coupling — PARTIAL: wake patches (`sea-wake.test.js` "a sea adds its wake") and hull loads (`sea-surface.test.js` hull test, Archimedes to 1e-6) exist; no two-way return from bodies to the sea beyond SEA-04, no conserved-quantity account.
+10. PA-11 synchronous query — DONE (`sample`, `water.sample`; "same seed gives the same bits" test).
+11. Drawn water uses the same sea — DONE (4514375c8, `sea-agreement.browser.mjs` passes; limits.md "Drawn sea"), though limited to 896 waves and no sideways displacement drawn.
+12. Water velocity below the surface (BS-1, BB-2) — DONE (`one wave...` test below-surface u, v, w; `sea-wake` waterBelow tests).
+13. Demo rows EF-1, EF-5, BS-6, BS-3: sharp-crested swell and wave-following waterline — PARTIAL: hull rides the sea (EF-1 FIXED by the seakeeping coupling), but no sharp crests or foam Jacobian for EF-5, BS-6.
+
+**To do before it can be VERIFIED:**
+1. Add Tessendorf FFT synthesis with choppy displacement (horizontal lambda D) and the Jacobian, as a tier of `SpectralSea` using the existing K17 FFT, keeping `sample` and `water.sample` consistent with the displaced surface (invert the displacement when querying a point).
+2. Let the spectrum vary over space (interpolate the wave solver's per-cell spectrum, Horvath 2015 section on spatial variation), or sum cascades per patch.
+3. Doppler-shift waves by a current: omega' = omega + k.U (Longuet-Higgins and Stewart 1960 on wave-current interaction); test on a counter-current against the dispersion relation and wave blocking.
+4. Validate against measurement: Longuet-Higgins 1952 Rayleigh height and crest distributions on a long synthesised record, and a published wave-buoy or JONSWAP-campaign spectrum (Hasselmann et al. 1973) reproducing Hs, Tp and m2 with derived bounds; add a Stokes second-order (or Gerstner) check of crest-trough asymmetry against Tick 1959 or Longuet-Higgins and Stewart 1964.
+5. Add Horvath 2015 spectra (Pierson-Moskowitz, Donelan-Banner directional, Elfouhaily 1997) as a spectrum option.
+6. Move the hot sum into a Rust/Wasm SIMD or FFT-grid path, record work counts, and test far-from-origin queries.
+7. Refuse out-of-range inputs with a coded MargoError naming the fix, not bare `RangeError` and `TypeError` (`surface.ts` constructor).
+8. Add a coupling test with a floating-body return (SEA-04 or SEA-12) that accounts for energy or momentum exchange with the sea.
+9. Film controls: placed swell events, storm targets and a look parameter set (steepness, choppiness, whitecap seed) for EF-5, RITS-2, OO-2.
+
+### SEA-15 Tracers and slicks in water (`@margoengine/physics/tracers`, commits ccbc86285 to 03332d94c, 28 SEA-15 commits since 2026-11-25), owner Codex: not VERIFIED, status left BUILDING
+
+**Checked.** Read docs/physics-solvers.md row, the audit rows and "film upgrade progress" notes, docs/limits.md tracer sections, packages/physics/src/tracers.ts plus tracer-bed, tracer-bed-wash, tracer-wall-jet, tracer-fay, tracer-wax, tracer-evaporation, tracer-oil-dispersion, tracer-stokes, tracer-floc, tracer-diffusion, and the test files. Under run-with-timeout: `node --test` on tests/tracers.test.js, tests/coupling/tracers.test.js, coupling/breaches.test.js and coupling/swim.test.js: 66 tests, 66 pass, 0 fail. `packages/environment/tests/swim-sediment.browser.mjs` on WebGPU (1994 sand pixels at lift, 17.1 px downstream, clears after settling, 674.8 um bed relief) and on `--compat` (2023 px, same 17.1 px): both ran and passed.
+
+**Validation.**
+- Wall-jet stress vs downstream electrochemical points (tests/tracers.test.js:49, :77): published measurements, 14 points, RMS log error 0.127 to 0.097; the points are not used for fitting, but the bound is an improvement check, not derived.
+- Dense sand pickup (coupling :1168): four held-out BOKA flume retreat rates, RMS log error 1.734 to 0.734, worst factor 2.81. Measurement, held out.
+- Cohesive settling (:1337): Wax Lake Delta field profiles; RMS log error 4.681 to 0.854, worst factor 5.01 (fall profile). Measurement, but it is given measured aggregate size.
+- Wax tank radii (:99): nine tank radii, 1.056 to 0.480. MGO tank run (:156): 0.134 m RMS vs 1.081 m. Measurements. The 30% blend is under-spread by 3.59.
+- Shallow-wave Stokes drift (:666): Melito et al. tracking profiles, RMS 0.82 mm/s, envelope check. Measurement.
+- Okubo/Poje scale law (:764): calibrated on Poje drifters, compared with nine Okubo dye extents; worst factor 2.34. Held-out measurement.
+- CMO experiment 4 (:576): Rhodamine range check. Measurement.
+- Fay spreading, evaporation, Delvigne-Sweeney, Visser drift, floc growth (Winterwerp): exact or integrated-law checks (self-consistent), bounds are tolerances.
+- Free jet centreline 12.7% high vs Xia and Lam fit.
+Missing: measured ray or propeller lifted mass, field oil spreading, absolute entrainment, confined tunnel flow.
+
+**Fails points** 2, 3, 6, 7 (4 and 8 partial).
+
+**Audit list.**
+1. Van Rijn pick-up with Soulsby-Whitehouse Shields curve replacing constant 0.05 — DONE (tracer-bed.ts; coupling :1168, swim.test.js bed-stress test).
+2. Phares wall-jet law replacing the 0.1/5% factors — DONE (tracer-wall-jet.ts; tracers.test.js:49).
+3. Release height uncited — DONE (van Rijn reference level).
+4. Bed print through EARTH-01 / TerrainBed — DONE for one writer (coupling :946, :1088; browser test). Multi-writer bedrock acceptance NOT DONE (work-queue line 106).
+5. Taconite plume from a breached hold via field port — DONE (hullBreaches port; breaches.test.js; pellets vs fines).
+6. Fay spreading — DONE (:351), measured only for waxy/MGO tank oils.
+7. Mackay evaporation — DONE (Stiver-Mackay, :428), no independent evaporation measurement: PARTIAL.
+8. Delvigne-Sweeney dispersion — DONE (:811), no absolute entrainment measurement: PARTIAL.
+9. Breivik Stokes drift — DONE (:606, :666).
+10. Depth-varying and scale-dependent diffusivity — DONE (:529, :764); Okubo diagram checked.
+11. Flocculation — DONE (:1255, :1337), 5x error left.
+12. Propeller/thruster bed lifting — DONE (:946, :1088).
+13. Slicks ride the live sea — DONE (:232).
+14. The ray's sand puff measured against lifted mass, original shot binding — NOT DONE.
+15. Rival OpenDrift breadth (emulsification, dissolution, biodegradation, ensembles) — NOT DONE.
+16. Scaling: Rust/Wasm, threads — NOT DONE (none in src/tracers*; no particle-count work record).
+17. Wake and bubble sources from LIFE-03 tail — NOT DONE (known-bugs: tail wake lacks consumer).
+
+**To do before it can be VERIFIED:**
+1. Validate ray or propeller lifted sediment mass against a measured jet-scour or resuspension data set (e.g. Rajaratnam jet scour, propeller scour data) and close the short-clearance wake.
+2. Accept per-writer erosion on shared bedrock grids (work-queue line 106).
+3. Add emulsification, dissolution and biodegradation weathering, plus measured oil validation (Mackay evaporation, field spills), to meet OpenDrift breadth.
+4. Reduce the 5.01x floc and 3.59x wax errors or derive and state their bounds.
+5. Hot loops for many parcels in Rust/Wasm SIMD with recorded work counts.
+6. Bind the original BB-7 and EF-11 shots and render real frames.
+
+### SEA-14 Water entry and exit (`physics/entry`, commits 89bec7f16, b890b38ad, 12b84154b, c002e262b), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/entry/solver.ts` (1114 lines), `slam.ts`, `cavity.ts`, `packages/physics/tests/entry.test.js`, `tests/coupling/entry.test.js`, the Water entry row in `docs/limits.md:1719`, and the audit and known-bugs entries. Ran `node --test packages/physics/tests/entry.test.js packages/physics/tests/coupling/entry.test.js` under run-with-timeout: 15 tests, 15 pass, 0 fail. The browser scripts (`water/test/splash.browser.mjs`, `hull-entry-splash.browser.mjs`) were not run; this pass is CPU tests only. The only commit since the audit date is c002e262b (hull launch observed without duplicate loads), which adds no entry physics. Nothing was changed after the audit to answer its list.
+
+**Validation.** `entry.test.js:74` sphere slam peak: measured (Shiffman and Spencer; Antolik et al.), C in 0.9 to 1.1 at h/R 0.08 to 0.2, an uncalibrated band. `:109` ricochet: measured (Johnson and Reid), within 15% of the critical angle. `:87` cone Wagner radius: exact solution. `:139` cavity threshold (Duez, 7.2 m/s, exact to 1e-9) and pinch against Aristoff (10%): the pinch compares the code with the cavity model it implements, not a measured run. `:198`, `:206`, `:237`, `:274`, `:289`, `:306`: Archimedes draft, exit, breach, wake balance, snapshot, Lamb added mass; exact or self-consistent. The coupling file has frame-rate independence, seek and density checks (self-consistent). Speirs' measured slam impulse is in docs only (0.050 against 0.067, about 25% low), not a test. Missing: any test of exit force, crown sheet, Worthington jet speed or height, surface seal or asymmetric entry. The jet law is fitted to one golf ball (`solver.ts:131-134`).
+
+**Fails points** 1, 2, 3, 5, 6, 7 (point 4 is partly met: the SEA-08 launch link and wake and foam sources are tested; point 8 is honest).
+
+**Audit list.**
+1. Surface seal (Marston et al. 2016) — NOT DONE. Only the deep seal exists (`solver.ts:751`); `docs/limits.md:1719` says a dome-over is not modelled.
+2. Crown sheet dynamics — PARTIAL. The sheet speed is `sqrt(alpha) U sqrt(sine)` (`:572`); the sqrt(sine) factor is invented. No sheet evolution and no test.
+3. Worthington jet scaling (Gekle and Gordillo 2010) — PARTIAL. A constant 9.85 ratio (`:134`) calibrated on one sphere; no test.
+4. Bubble pinch-off — NOT DONE.
+5. Truly asymmetric entry — NOT DONE. An equivalent axisymmetric body is used.
+6. Exit-force validation against Truscott et al. — NOT DONE. No test.
+7. Speirs slam impulse as a test — NOT DONE. Docs only.
+8. Cavity gate `sine > 0.5` uncited — NOT DONE (`:567`).
+9. Invented sqrt(sine) grazing factor — NOT DONE (`:572`).
+10. Hard-coded 1025 kg/m3 — PARTIAL. Lines 313 and 384 read the sea's density, but `:573` and the default at `:204` still use 1025. KB-PHYS-AUDIT2 still lists it open with no regression test.
+11. Jet speed ratio calibrated on one case — NOT DONE (`:134`).
+12. SEA-08 link — DONE. Test at `tests/coupling/entry.test.js:62` ("EntrySolver observes a launching HullSolver hull without duplicating loads or wake displacement").
+13. FLIP or VOF splash sheets rival — NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Add a surface seal and crown sheet model (Marston et al. 2016, JFM; Aristoff and Bush 2009) and test it against their measured dome-over or seal times.
+2. Replace the 9.85 jet ratio with the Gekle and Gordillo (2010) scaling, and test it on at least two measured spheres or discs, one of them not used to fit.
+3. Add exit-force tests against Truscott et al. measurements, and the Speirs et al. slam impulse as a test.
+4. Read the water's density at `solver.ts:204` and `:573`, with a regression test (KB-PHYS-AUDIT2).
+5. Cite or derive the `sine > 0.5` gate and the sqrt(sine) factor (`:567`, `:572`), or replace them with a cited law.
+6. Add bubble pinch-off and an asymmetric entry (a body pitched or a diver), each with a measured case.
+7. Add a coded-error test for out-of-range inputs beyond the existing refusals; add a scaling record (work counts, Wasm for the slam profiles).
+8. Add a film-direction test: seeded or placed splash events and look parameters.
+
+### SEA-12 Hydrodynamic loads on arbitrary bodies (`@margoengine/physics/loads`, commits 5d2524732, 7bcfb11e3), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/loads/{solver,morison,segments,shapes,quay}.ts`, the four test files and the audit and known-bugs entries. Commits: 5d2524732 (the solver, 2026-11-26) and 7bcfb11e3 (rod segments loaded by the water, SOFT-02, 2026-11-26). Under run-with-timeout, `node --test` on `loads.test.js`, `loads-segments.test.js`, `load.test.js` and `coupling/loads.test.js`: 16 tests, 16 pass, 0 fail. No browser test exists (CPU-only solver).
+
+**Validation.** `loads.test.js` "Lamb's ellipsoid integrals": a published table (DNV-RP-C205 D-2), added-mass coefficients, bound 0.001. "Morison's coefficients follow DNV-RP-C205": published curves, reference is the standard's own fit, not measurement. "a pile's wave load, a sphere's drag...": worked numbers from the same formulas, self-consistent. "a light sphere ... (1 + C_A)/(m/(rho V)+C_A)": exact solution of its own equations. "a steel ball sinks at its terminal speed": analytic solution of its own drag law (2%); the sphere drag fit is the one it checks. "a crate floats ... leeway": a few percent of wind, qualitative against leeway literature. "a fixed pile sheds at St U/D": the code's own oscillator. Sainflou, Goda and PIANC tests are closed formulas re-evaluated. `loads-segments.test.js`: White's fit and DNV steady drag, closed forms. Coupling file: only frame-rate independence and seek. Still missing: any measured data (Sarpkaya 1976, Keulegan and Carpenter 1958, Haehnel and Daly 2004 debris impact, tank flotation or capsize), and any held-out case.
+
+**Fails points** 2, 3, 4, 5, 6, 7 (1 and 8 are partial).
+
+**Audit list.**
+1. Buoyancy righting moment so divers and debris settle their attitude: NOT DONE. `solver.ts:~333` applies buoyancy at the shape centre; the torque is only `(centre - cm) x force` (about `:378`). No centre of buoyancy; no heel test. The research recipe in `physics-solver-audit.md:266` is unbuilt.
+2. Exact submerged-volume buoyancy (catalog; known-bugs "floating bodies have no righting moment"): NOT DONE. Box prism is exact only upright, other shapes an equivalent ellipsoid (`:307-313`). The known-bugs entry is still open.
+3. Morison loads on soft-body rod segments (hoses, cables): DONE. `segments.ts` (`segmentLoads`) and 7bcfb11e3; tests "a submerged segment floats..." and "a segment through the surface..." in `loads-segments.test.js`, plus the rod tests. Closed forms only, no measured case.
+4. Mesh pressure integration (reuse SEA-08 wetted loads): NOT DONE.
+5. Cummins radiation damping and rotational added inertia: NOT DONE (catalog admits it).
+6. Haehnel and Daly debris impact, anchors: NOT DONE (no code).
+7. Validation against Sarpkaya 1976 and Keulegan and Carpenter 1958: NOT DONE.
+8. Two-way coupling tests with HYDRO-01, SEA-08, LIFE-03: NOT DONE. The only coupling tests are frame rate and seek; flood coupling is one-way.
+9. Red flags: wind at 1 m, ad hoc emerged area, default Cd 1.0, spin drag reusing Cd: not fixed (`solver.ts:63`, `:372`, defaults still 1).
+10. Coded errors: NOT DONE; plain `TypeError`/`RangeError` are thrown (`solver.ts:167-198`), no `MargoError`.
+11. Rust/Wasm or threads, work counts: NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Build a centre of buoyancy and righting moment (exact box and mesh via wetted pressure integration, cap centroid for ellipsoids) with a heel test against hydrostatic GM theory, and close the known-bugs entry.
+2. Validate against measurements: Sarpkaya 1976 or Keulegan and Carpenter 1958 force coefficients, a published flotation or roll decay test, Haehnel and Daly 2004 impacts, with derived bounds and a held-out case.
+3. Add radiation damping (Cummins 1962), rotational added inertia, debris impact and anchors.
+4. Two-way coupling tests with HYDRO-01 (bodies block flow), SEA-08 and LIFE-03, with momentum accounted.
+5. Replace the red-flag constants with cited values; throw `MargoError` with a help link.
+6. Add a Wasm hot loop for many bodies, work counts, and limits entries.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
