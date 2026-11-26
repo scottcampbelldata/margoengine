@@ -201,6 +201,20 @@ insert its midpoint. The native side test treats sums within their arithmetic ro
 as lying in the plane. No geometric offset is introduced to split a coincident face.
 [Graphical Modeling and Animation of Brittle Fracture](https://doi.org/10.1145/311535.311550).
 
+Avecillas-Leon, Singh and Duarte (2025), Eqs. 20–22, give the stress intensity factors
+from the displacement jumps on the paired lips behind a straight crack. Margo uses the
+leading term with the isotropic plane-strain modulus `E′ = E/(1−ν²)`. Substituting into
+Okada and Kamibeppu (2005), Eq. 5, gives `Gᵢ = π E′ δᵢ²/(32r)` for I/II and
+`Gᵢᵢᵢ = π μ δᵢᵢᵢ²/(16r)` for III. `r` measures undeformed distance behind the front.
+The opening term is zero under compression. The mode basis follows the current bonded
+facet, preserving its values under rigid rotation. Reeder (2006), Eqs. 6–7 with `η=1`,
+gives the critical energy as the arithmetic mean of the three authored toughnesses
+weighted by their fractions of total released energy. The native solver releases the
+bonded facet when the total exceeds that critical value.
+[Validation and Improvements of a Generalized/eXtended Finite Element Method for 3-D Fatigue Crack Propagation](https://link.springer.com/article/10.1007/s10704-025-00888-6)
+[A Virtual Crack Closure-Integral Method for Three-Dimensional Crack Problems Using Linear Tetrahedral Finite Elements](https://doi.org/10.3970/cmes.2005.010.229)
+[3-D Mixed Mode Delamination Fracture Criteria](https://ntrs.nasa.gov/citations/20060048260).
+
 Shewchuk's 1997 work on robust geometric predicates motivates checking the determinant
 in the coordinates that the native kernel will hold. An automatic crack is eligible only
 when the replacement has representable f32 vertex positions, affine rest bases and nodal masses.

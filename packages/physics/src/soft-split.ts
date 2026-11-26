@@ -288,6 +288,7 @@ function carry(
   desc.orthotropicStrength = body.orthotropicStrength;
   desc.crackBand = body.crackBand;
   desc.tensileNucleation = body.tensileNucleation;
+  desc.coplanarToughness = body.coplanarToughness;
   desc.inheritedBand = desc.crackBand !== null;
   desc.groups = body.collisionGroups;
   desc.shapeMatching = body.matched;

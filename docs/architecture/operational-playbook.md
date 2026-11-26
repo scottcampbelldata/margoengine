@@ -10094,6 +10094,10 @@ An explicit finite cut can seed that same progression. The material face before 
 identifies the two lips, and their common pair of particle IDs identifies the bonded edge.
 The native selector can also nominate a bonded face that lies in the propagation plane.
 The remesher opens the shared facet and only refines cells on its former front edge.
+An optional native mode instead compares each available coplanar facet to an authored
+mixed toughness. It obtains the opening and the two shears from the actual separated
+particles at a matching rest point. Per-body incident-corner scratch is reused between
+steps. No new permanent particle or cell columns enter the snapshot layout.
 The fracture step checks the rounded rest mesh before it replaces live topology. The LH-4
 overload fixture starts fracturing on step 4 under a 122.86 N rigid contact reaction and
 replays 15 cut events by step 18, while the same test threshold keeps the bare rung intact.
