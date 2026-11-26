@@ -6,6 +6,40 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: GPU picking of an instanced mesh tests the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
+
+- **Repro:** `createInstancedMesh` with a material whose `materialPlugin` vertex point (or a `displacementMap`) moves the
+  quad 1.5 units; `Picking.attach(engine)`, then `pick` where it draws answers null (the `picking` check of
+  `packages/materials/test/instance-attributes.html` logs `instancedThere: false` on WebGPU and the WebGL2 layer).
+- **Cause:** `packages/selection/src/picking.ts` draws instanced model primitives through its model pipeline from each
+  instance's world matrix and the geometry's bounding sphere; it never takes the primitive's `displacement` caster, which
+  plain primitives and every shadow pass draw through. A fix needs a caster variant of the picking pass drawn per
+  instance with ids per row.
+
+### Fixed 2026-11-26: GPU picking missed a mesh its shader moved past its geometry's bounds (KB-PICK-MOVED1, selection)
+
+- **Repro:** `createMesh` of a 0.8 wide quad whose material plugin moves it 1.5 units; `Picking` at the drawn place
+  answered null (the `picking` check of `packages/materials/test/instance-attributes-browser.mjs`).
+- **Cause:** the picking pass culled each primitive by its unmoved geometry's bounding sphere before drawing it through
+  its displacement caster.
+- **Fix:** a primitive whose material displaces is not culled by that sphere, as gltf/pbr's frustum test and the shadow
+  passes already do. Regression: the check above.
+
+### Fixed 2026-11-26: a material plugin's output point never ran on unlit, normal and matcap materials (KB-MAT-PLUGINUNLIT1)
+
+- **Repro:** `new UnlitMaterial({features: [materialPlugin({name: 'paint', output: 'color = vec3f(1.0, 0.0, 0.0);'})]})`
+  drew white.
+- **Cause:** those shadings return from the fragment entry before the lit code, where the point was inserted.
+- **Fix:** the point runs on the colour of the early return too. Regression: `packages/materials/test/plugins.test.js`.
+
+### Fixed 2026-11-26: a material plugin taken off and put back in one step left shadows bound to a destroyed buffer (KB-MAT-PLUGINCAST1)
+
+- **Repro:** `material.features = []; material.features = [plugin];` on a material whose plugin has uniforms and a vertex
+  point: the material kept the caster record bound to the buffers the first line destroyed.
+- **Cause:** the caster record was keyed by the plugins' ids, which a detach and re-attach kept.
+- **Fix:** a plugin takes a new id when its last detach frees its buffers. Regression:
+  `packages/materials/test/instance-attributes.test.js`.
+
 ### Fixed 2026-11-26: a CSP test's Wasm block also rejected Node's own parser module, after another test had ended (KB-CSP-STUB1, tests)
 
 - **Repro:** on Node 22.12, `node --test packages/decoders/tests/csp.test.js` (CI job "node22 unit tests"): every test

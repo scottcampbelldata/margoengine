@@ -16,6 +16,7 @@ export interface MaterialPlugin<U extends MaterialPluginValues = MaterialPluginV
         -readonly [K in keyof U]: MaterialPluginUniform<U[K]>;
     };
     readonly textures: Record<string, Texture>;
+    readonly instanceAttributes?: InstanceAttributes<InstanceAttributeSchema>;
 }
 
 export interface MaterialPluginOptions<U extends MaterialPluginValues = MaterialPluginValues> extends MaterialPluginPoints {
@@ -23,6 +24,7 @@ export interface MaterialPluginOptions<U extends MaterialPluginValues = Material
     uniforms?: Readonly<U>;
     textures?: Readonly<Record<string, Texture>>;
     declarations?: string;
+    instanceAttributes?: InstanceAttributes<InstanceAttributeSchema>;
 }
 
 export interface MaterialPluginPoints {
@@ -114,6 +116,41 @@ interface EnvironmentMap {
 type Filter = 'linear' | 'nearest';
 
 type ImageSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame;
+
+type InstanceAttribute = InstanceAttributeType | {
+    type: InstanceAttributeType;
+    default?: number | ArrayLike<number> | string;
+};
+
+type InstanceAttributeSchema = Record<string, InstanceAttribute>;
+
+type InstanceAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'color' | 'mat3x3f' | 'mat4x4f';
+
+type InstanceAttributeValue<A> = TypeOf<A> extends 'f32' ? number : TypeOf<A> extends 'color' ? ColorInput : ArrayLike<number>;
+
+class InstanceAttributes<S extends InstanceAttributeSchema = InstanceAttributeSchema> {
+    readonly capacity: number;
+    readonly types: Readonly<Record<keyof S & string, InstanceAttributeType>>;
+    constructor(capacity: number, attributes: S);
+    set<K extends keyof S & string>(name: K, index: number, value: InstanceAttributeValue<S[K]>): this;
+    get<K extends keyof S & string>(name: K, index: number, out?: Float32Array | number[]): TypeOf<S[K]> extends 'f32' ? number : Float32Array | number[];
+    setBuffer(name: keyof S & string, values: ArrayLike<number>, start?: number): this;
+    array(name: keyof S & string): Float32Array;
+    update(name?: keyof S & string, start?: number, count?: number): this;
+    reset(name?: keyof S & string, index?: number): this;
+    snapshot(): {
+        capacity: number;
+        attributes: InstanceAttributeSchema;
+        values: Record<string, Float32Array>;
+    };
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+    retain(): void;
+    release(): void;
+    entry(device: GPUDevice, binding: number): GPUBindGroupEntry;
+    declare(name: string, group: number, binding: number): string;
+    host(code: string, readers: readonly string[]): string;
+}
 
 type LiveColor = number[] & {
     set(value: ColorInput): number[];
@@ -392,6 +429,7 @@ interface MaterialFeature {
     caster?(device: GPUDevice, material: Material, map: CasterDisplacement | undefined): CasterDisplacement | undefined;
     attach?(material: Material): void;
     detach?(material: Material): void;
+    readonly instanceRows?: boolean;
 }
 
 interface MaterialOptions extends PhysicalOptions {
@@ -622,6 +660,10 @@ interface TranscodedTexture {
     dimension?: string;
     upload?(device: GPUDevice): GPUTexture;
 }
+
+type TypeOf<A> = A extends InstanceAttributeType ? A : A extends {
+    type: infer T;
+} ? T : never;
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';
 

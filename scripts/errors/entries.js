@@ -181,6 +181,22 @@ export const entries = [
     fix: 'Rename the plugin, uniform or texture (letters and digits, starting with a letter), fix the option name, pass WGSL strings, move bindings into uniforms and textures, merge plugins so a material has at most 8, and keep @margoengine/materials and @margoengine/gltf at matching versions. Errors inside your WGSL itself are WebGPU validation errors when the shader first draws.',
   },
   {
+    id: 'instance-attributes',
+    title: '@margoengine/materials/instance-attributes: per-instance values read by a material plugin',
+    kind: 'family',
+    messages: [
+      'Instance attribute capacity must be a whole number from 1 to 1,000,000; pass one; see https://margoengine.com/errors#instance-attributes',
+      'instanceAttributes takes 1 to 16 named attributes; pass them; see https://margoengine.com/errors#instance-attributes',
+      "No instance attribute 'x'; use glow, offset; see https://margoengine.com/errors#instance-attributes",
+      'Instance attribute rows run from 0 to 99; pass rows inside the capacity; see https://margoengine.com/errors#instance-attributes',
+      "Instance attribute 'x' is vec3f; pass 3 finite numbers; see https://margoengine.com/errors#instance-attributes",
+      'Instance attributes are disposed; create new ones with instanceAttributes; see https://margoengine.com/errors#instance-attributes',
+    ],
+    cause:
+      'instanceAttributes() checks the capacity, the names (letters and digits) and the types (f32, vec2f, vec3f, vec4f, color, mat3x3f, mat4x4f); every setter checks the attribute name, the row and that each value is finite as float32. A set used after dispose() throws a MargoError with code disposed. At the first draw, a buffer past the device storage limits throws RangeError, and a shader without the standard PBR points throws a MargoError with code unsupported.',
+    fix: 'Pass a capacity and attributes in range, set rows below the capacity with values of the declared type, lower the capacity or drop attributes for a small device, keep a set alive while a material reads it, and keep @margoengine/materials and @margoengine/gltf at matching versions.',
+  },
+  {
     id: 'mesh-debug-view',
     title: '@margoengine/inspector/mesh-debug: options, device and mesh size',
     kind: 'family',

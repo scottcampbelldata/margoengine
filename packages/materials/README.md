@@ -1494,6 +1494,7 @@ engine.onFrame((_, delta) => {
 | `uniforms` | Live values by name: a number is an `f32`, 2 to 4 numbers a `vec2f` to `vec4f` (default none). Assign `plugin.uniforms.k = v` (same size) or write an array uniform's elements in place. TypeScript keeps the declared kind: a number uniform reads as `number`, an array as `Float32Array`, and an undeclared name is an error |
 | `textures` | Up to 4 filterable Textures by name (default none); a Texture's own colour space wins, sRGB otherwise. Live: assign another Texture of the same dimension |
 | `declarations` | Module-scope WGSL helpers; prefix their names with the plugin's name (default none). They may not declare bindings |
+| `instanceAttributes` | Per-instance values from `instanceAttributes()` (default none), read at every point as `<name>_<attribute>`: see [Per-instance attributes](#per-instance-attributes-margoenginematerialsinstance-attributes) |
 | `vertex`, `surface`, `light`, `output` | The WGSL of each point, the body of a function (at least one) |
 
 The WGSL and names are fixed at creation and checked then: `TypeError` for an unknown option, an unusable name, a point
@@ -1507,7 +1508,92 @@ recompiles. Plugins also work on a loaded glTF model through `install(model, {fe
 (after its `shade`). Saving: pass `materialPluginCodec` in `codecs` to `captureMaterialLibrary` and
 `restoreMaterialLibrary`; it stores the WGSL, the current uniforms and the textures. Without it a capture refuses the
 plugin rather than drop it. A plugin's GPU buffers go when the last material using it drops it, and a restored device
-gets new ones with the current values.
+gets new ones with the current values. On `UnlitMaterial`, `NormalMaterial` and `MatcapMaterial` the `vertex`,
+`surface` and `output` points run; `light` has no light to edit.
+
+### Per-instance attributes (`@margoengine/materials/instance-attributes`)
+
+Besides its matrix, tint and UV transform, each instance can carry your own values. `instanceAttributes(capacity,
+attributes)` declares them, a material plugin reads them in its WGSL, and you set them per instance or as a whole
+buffer, in place, while the scene runs.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createInstancedMesh } from 'margoengine/materials';
+import { materialPlugin } from 'margoengine/materials/plugins';
+import { instanceAttributes } from 'margoengine/materials/instance-attributes';
+import { boxGeometry } from 'margoengine/geometry';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 30, 70], target: [0, 0, 0] } });
+const count = 400;
+const data = instanceAttributes(count, {
+  lift: 'f32',
+  glow: { type: 'color', default: '#000000' },
+});
+const swarm = materialPlugin({
+  name: 'swarm',
+  instanceAttributes: data,
+  vertex: 'position.y += swarm_lift;', // before the instance matrix, in the colour pass and every depth pass
+  surface: 's.emissive += swarm_glow;',
+});
+const boxes = createInstancedMesh(engine, boxGeometry(1, 1, 1), new PbrMaterial({ features: [swarm] }), count);
+const matrices = new Float32Array(count * 16);
+for (let i = 0; i < count; i++)
+  matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 20) * 2 - 19, 0, Math.floor(i / 20) * 2 - 19, 1], i * 16);
+boxes.instances.setMatrices(0, matrices);
+data.set('glow', 21, '#ff8030'); // one instance
+let time = 0;
+const lift = data.array('lift'); // the whole attribute, live: write it in place, then say what changed
+engine.onFrame((_, delta) => {
+  time += delta;
+  for (let i = 0; i < count; i++) lift[i] = Math.sin(time * 2 + i * 0.3);
+  data.update('lift');
+});
+engine.start();
+```
+
+| Type | WGSL | Floats | Default |
+| --- | --- | --- | --- |
+| `'f32'` | `f32` | 1 | 0 |
+| `'vec2f'`, `'vec3f'`, `'vec4f'` | the same | 2, 3, 4 | zeros |
+| `'color'` | `vec3f`, linear | 3 | white `[1, 1, 1]`; `set` takes any colour (sRGB hex, CSS, linear `[r, g, b]`) |
+| `'mat3x3f'`, `'mat4x4f'` | the same, column-major | 9, 16 | identity |
+
+An attribute is written as its type or as `{type, default}`. Whole numbers up to 2^24 are exact in an `f32`, so ids
+and flags fit.
+
+| Call | Does |
+| --- | --- |
+| `instanceAttributes(capacity, attributes)` | `capacity` rows (1 to 1,000,000) of 1 to 16 attributes named with letters and digits; both fixed |
+| `set(name, i, value)` / `get(name, i, out?)` | One instance. A refused value writes nothing |
+| `setBuffer(name, values, start = 0)` | Bulk: flat values for the rows from `start`, checked once and uploaded as one range (colours as linear RGB) |
+| `array(name)` then `update(name?, start = 0, count?)` | The live `Float32Array` of one attribute (`capacity` rows): write it directly (unchecked), then mark the rows; `update()` marks everything |
+| `reset(name?, i?)` | Back to the default, one attribute or all, one instance or all |
+| `capacity`, `types` | What was declared |
+| `dispose()` | Frees the GPU buffers; drop the plugins that read it first |
+
+Only the edited rows of each attribute are uploaded, at the next draw; an unchanged set uploads nothing. Row `i` is
+instance `i` (`mesh.instances`, `PBRInstances`, a glTF loaded with `EXT_mesh_gpu_instancing`): the data belongs to the
+material, so meshes that share the material share the values, and meshes that need their own take their own plugin and
+set. A mesh without instances reads row 0. An instance at or past `capacity` reads the defaults. Several plugins may
+read one set, and one material may take several sets (one storage buffer each, of WebGPU's 8 per shader stage).
+
+The values are read in the colour pass and, for a `vertex` point, in shadows (cascaded, virtual, local and
+clustered), contact shadows and GPU picking of plain meshes, so what they move casts and picks where it draws. A
+device restore uploads them again. `@margoengine/culling` `CulledModels` and `FrontToBack` leave such instances in
+their own rows (drawn unculled and unsorted), since reordered rows would swap their values. Not covered: TAA gives
+instances camera motion only, GPU picking of instanced meshes tests the unmoved instances, mesh `bounds`, CPU
+raycasts, occluder depth, path tracing and exporters do not see what a shader moves or the values, and core meshes
+(`createStage` boxes, core `PbrMaterial`) do not take material plugins. Errors are `TypeError`, `RangeError` or
+`MargoError` `'disposed'` / `'unsupported'` with https://margoengine.com/errors#instance-attributes. Saving: pass
+`instanceAttributesCodec` with `materialPluginCodec` in `codecs`.
+
+The vertex shader fetches the values by instance index (B. Dudash, [Animated Crowd
+Rendering](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-2-animated-crowd-rendering), GPU Gems
+3, 2007; F. Carucci, [Inside Geometry
+Instancing](https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-3-inside-geometry-instancing),
+GPU Gems 2, 2005).
 
 ### Soot and presets (`@margoengine/materials/soot`, `/presets`)
 

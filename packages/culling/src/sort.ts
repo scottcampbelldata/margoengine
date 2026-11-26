@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Batch, Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { readsRows } from '../../shared/instances.js';
 import { CulledInstances } from './index.js';
 import type { CullableModel, CullablePrimitive } from './models.js';
 import { localBox } from './software-depth.js';
@@ -375,6 +376,8 @@ export class FrontToBack implements EnginePlugin {
       for (const p of model.primitives) {
         const material = (p as CullablePrimitive & { material?: { alphaMode?: string } }).material;
         if (!p.instances?.count || p.deformed || transparent.has(p) || material?.alphaMode === 'BLEND') continue;
+        // Nor a material that reads its rows by index (materials `instanceAttributes`).
+        if (readsRows(p)) continue;
         const source = p.redirect?.instances ?? p.instances.upload(c.device);
         let center = this.centers.get(p.vertices);
         if (!center) {

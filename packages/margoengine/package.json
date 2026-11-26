@@ -2687,6 +2687,10 @@
       "types": "./dist/materials/plugins.d.ts",
       "import": "./dist/materials/plugins.js"
     },
+    "./materials/instance-attributes": {
+      "types": "./dist/materials/instance-attributes.d.ts",
+      "import": "./dist/materials/instance-attributes.js"
+    },
     "./materials/soot": {
       "types": "./dist/materials/soot.d.ts",
       "import": "./dist/materials/soot.js"

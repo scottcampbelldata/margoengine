@@ -2013,6 +2013,18 @@ examples successful). No shutdown deadline, rendering assertion or performance
 budget was relaxed. The full verify run found only an excluded-workspace link
 in a report removed on 2026-11-16 with the GPU scheduler (KB-GPULOCK-ALL); its existing regression guards that repair.
 
+## Per-instance attributes by row index (section 3 supplement, 2026-11-26)
+
+`@margoengine/materials/instance-attributes` reads a read-only storage buffer by `instance_index`: in the colour pass
+through a vertex input (shared with a node graph's `instanceIndex`) and a flat varying (location 6 or 8), in depth passes
+through a built-in added to the caster's vertex entry. Rules that follow: a pass that draws a materials caster must draw
+a primitive's instances in row order from instance 0; a culler or sorter that reorders rows must skip a material whose
+`shading.instanceRows` is true (`shared/instances.js` `readsRows`); the beauty shader names `f.model` so plain meshes are
+never merged into one instanced draw whose batch position would read as a row. Evidence:
+`packages/materials/test/instance-attributes-browser.mjs` (WebGPU and the WebGL2 layer). Missing: adapters without
+vertex-stage storage buffers (compatibility mode), instanced GPU picking (KB-PICK-INSTMOVE1), instance velocity for TAA,
+GPU runs of the shadow atlas and contact shadows.
+
 ## GPU work runs directly (Scott, 2026-11-16)
 
 GPU work runs at once, as many jobs as are started, and every command keeps a hard timeout. `scripts/run-with-timeout.mjs` starts a command and ends its whole process tree after `--max` minutes (default 10), exiting 124. Nothing queues, nothing is refused and nothing records usage, and a shot does not pause: it renders from its first frame to its last. The one pause that remains is the heat pause of `scripts/gpu-package-tests.mjs`, which waits for the machine to cool. Speed measurement stays deferred by `scripts/speed-phase.json` (`bench/cli.mjs` prints SPEED DEFERRED). Proof: `tests/run-with-timeout.test.js` (2, 5 and 20 runs start together; a hung command ends at its timeout).

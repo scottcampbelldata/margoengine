@@ -130,6 +130,10 @@
       "types": "./dist/plugins.d.ts",
       "import": "./dist/plugins.js"
     },
+    "./instance-attributes": {
+      "types": "./dist/instance-attributes.d.ts",
+      "import": "./dist/instance-attributes.js"
+    },
     "./soot": {
       "types": "./dist/soot.d.ts",
       "import": "./dist/soot.js"
