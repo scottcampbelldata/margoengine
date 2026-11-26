@@ -536,6 +536,41 @@ export class Vehicle implements PhysicsAttachment {
     };
   }
 
+  /** Number of f64 words needed to retain the attachment's controls, wheel spin and drivetrain. */
+  get motionStateWords(): number {
+    return 3 + 2 * this.wheels.length + (this.drivetrain ? 7 : 0);
+  }
+
+  /** Copies the physical running state into a caller-owned buffer for a world snapshot. */
+  writeMotionState(output: Float64Array): void {
+    if (output.length !== this.motionStateWords)
+      throw new MargoError('state', 'Use a vehicle motion buffer of motionStateWords f64 values.');
+    output[0] = this.engineForce;
+    output[1] = this.steering;
+    output[2] = this.brake;
+    let at = 3;
+    for (const wheel of this.wheels) {
+      output[at++] = wheel.omega;
+      output[at++] = wheel.rotation;
+    }
+    this.drivetrain?.writeMotionState(output.subarray(at));
+  }
+
+  /** Restores an attachment buffer written by writeMotionState for this vehicle configuration. */
+  readMotionState(source: Float64Array): void {
+    if (source.length !== this.motionStateWords || !source.every(Number.isFinite))
+      throw new MargoError('state', 'Use a finite motion state made by a vehicle with the same wheels and drivetrain.');
+    this.engineForce = source[0]!;
+    this.steering = source[1]!;
+    this.brake = source[2]!;
+    let at = 3;
+    for (const wheel of this.wheels) {
+      wheel.omega = source[at++]!;
+      wheel.rotation = source[at++]!;
+    }
+    this.drivetrain?.readMotionState(source.subarray(at));
+  }
+
   /** Current traction bound and sinkage from the last contact of the specified wheel. */
   wheelGround(index: number): WheelGroundState {
     this.checkWheel(index);

@@ -4319,3 +4319,7 @@ Build Physics with `node scripts/build-modern.js --precompiled --only=physics` a
 ### Developmental wood growth
 
 Build Biomes and the Physics and Procedural prerequisites, then run `node --test packages/biomes/tests/coupling/growth.test.js`. Launch the browser with `node packages/biomes/tests/growth-browser.mjs` and use `MARGO_COMPAT=1` for its compatibility mode. Compare the optional native files with `node scripts/wasm-blueprints.mjs --rebuild --compare --only=growth-kernel,growth-kernel-shared`.
+
+### Physical road driving
+
+Build `physics`, `road`, and the existing Weather and Procedural prerequisites. Run `node --test packages/road/test/driving.test.js packages/road/tests/coupling/road-driver.test.js`. Run `node packages/road/test/driving-browser.mjs` with and without `MARGO_COMPAT=1` for the opted-in road and vehicle pipeline in Chromium.

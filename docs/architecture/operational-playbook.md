@@ -10286,3 +10286,7 @@ The optional soft kernel adds an isothermal pressure constraint to its closed-su
 and its staggered rigid coupling use the same solver. Gas packing, external pressure and constraint mode are native
 snapshot columns. Closed-form affine-volume tests cover both signs of the pressure difference and vacuum. The
 world fixture shows actual rigid contact, matching hashes across frame rates and restoration of both gas controls.
+
+### Physical road driving (DYN-04)
+
+RoadDriver reads registered body poses and ATMO-09 relative wetness and writes its controls on the 60 Hz world clock. The binding carries tyre spin and transmission state in the solver's arena. The banked display mesh is reused for collision and wheel contact. Dimensional checks cover friction-limited curves, deck momentum, pressure-sinkage, a wheel crossing a lip, physical curved-route tracking and weather loads on a massive procedural vehicle. The film fixtures record the contact and motion evidence separately from the original shot reports.

@@ -4091,6 +4091,10 @@
       "types": "./dist/road/junctions.d.ts",
       "import": "./dist/road/junctions.js"
     },
+    "./road/driving": {
+      "types": "./dist/road/driving.d.ts",
+      "import": "./dist/road/driving.js"
+    },
     "./road/banking": {
       "types": "./dist/road/banking.d.ts",
       "import": "./dist/road/banking.js"

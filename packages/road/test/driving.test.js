@@ -131,3 +131,50 @@ test('invalid road weather gives a repairable error', () => {
   assert.throws(() => roadGrip(traction, -1), /Choose normalized road wetness/);
   assert.throws(() => roadGrip({ dry: 0.4, wet: 0.8 }), /Choose finite road grip coefficients/);
 });
+
+test('a real deck lip compresses the front axle and pitches the cart before the rear wheels arrive', () => {
+  const physics = new Physics(null, { gravity: [0, -9.81, 0] });
+  try {
+    const lip = 0.06;
+    const wheelbase = 2;
+    for (const elevation of [0, lip]) {
+      physics.addBody(null, {
+        type: 'fixed',
+        position: [0, elevation - 0.25, elevation === 0 ? -4 : 4],
+        colliders: { shape: 'box', halfExtents: [4, 0.25, 4] },
+      });
+    }
+    const car = physics.addBody(null, {
+      position: [0, 0.614, -1.8],
+      linearVelocity: [0, 0, 1],
+      colliders: { shape: 'box', halfExtents: [0.65, 0.18, 1.2], mass: 1200 },
+    });
+    const wheels = [-1, 1].flatMap((end) =>
+      [-1, 1].map((side) => ({
+        position: [0.65 * side, -0.15, (end * wheelbase) / 2],
+        radius: 0.3,
+        width: 0.2,
+        cast: 'shape',
+        suspensionStiffness: 18,
+        suspensionCompression: 2.5,
+        suspensionRelaxation: 2.5,
+        maxSuspensionForce: 8000,
+      })),
+    );
+    const vehicle = new Vehicle(physics, car, { wheels, groundReaction: true });
+    let compression = 0;
+    let pitch = 0;
+    for (let i = 0; i < 82; i++) {
+      physics.step();
+      if (vehicle.wheel(0).inContact && vehicle.wheel(2).inContact) {
+        compression = Math.max(compression, vehicle.wheel(0).suspensionLength - vehicle.wheel(2).suspensionLength);
+        pitch = Math.max(pitch, Math.abs(car.rotation[0]));
+      }
+    }
+    assert.ok(compression > lip / 3, `Front compression changed by ${compression} m`);
+    const fullAxlePitch = Math.atan(lip / wheelbase);
+    assert.ok(pitch > Math.sin(fullAxlePitch / 6), `Pitch quaternion x only reached ${pitch}`);
+  } finally {
+    physics.dispose();
+  }
+});

@@ -98,8 +98,9 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js road",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test test/*.test.js tests/coupling/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "node test/browser-check.mjs"
+    "test:gpu": "node test/browser-check.mjs",
+    "test:browser:driving": "node test/driving-browser.mjs"
   }
 }

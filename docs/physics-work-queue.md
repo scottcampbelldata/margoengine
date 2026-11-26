@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **DYN-04:** Define canonical wheel sinkage/soil displacement and road-control fields for EARTH-05 and procedural
+  traffic publishers. The road entry already reads real rigid body poses and ATMO-09 wetness, publishes versioned
+  drive commands, and applies paired contact impulses through the existing vehicle attachment.
+
 - **SOFT-06:** Add versioned per-chamber pressure and volume fields to the soft framework entry for atmospheric pressure
   input and gas feedback. The native soft constraint already uses the rigid contact fields and snapshots the fill.
 

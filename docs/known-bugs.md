@@ -16520,3 +16520,7 @@ A closed pressurized shell deforms and transfers impulses through the real rigid
 currently leaves the triangles connected, so the gas stays in its chamber. A pressure vessel that opens dynamically
 will need membrane topology changes and an opening/flow contract. Solver output exposes live recorded pressure and
 volume. A changing atmospheric field requires an application update until the shared pressure ports are available.
+
+### Loose road surface persistence (DYN-04 / EARTH-05)
+
+Vehicles now sink into a calibrated yielding surface and feel the resulting suspension load. `packages/road/test/driving.test.js` checks the pressure and spring balance and the effect on the wheel. Persistent ruts and displaced volume require a matching EARTH-05 shear and sediment producer feeding TerrainBed. The road driver operates on authored lanes. The original city and deck shots still need the production bindings.

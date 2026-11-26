@@ -182,6 +182,30 @@ export class Drivetrain {
     this.spin = (o.idleRpm * Math.PI) / 30;
   }
 
+  /** @internal Packs gear, spin, shift time, clutch lock, pedals, and delivered torque. */
+  writeMotionState(output: Float64Array): void {
+    output.set([
+      this.gear,
+      this.spin,
+      this.shifting,
+      this.locked ? 1 : 0,
+      this.throttle,
+      this.clutchPedal,
+      this.lastTorque,
+    ]);
+  }
+
+  /** @internal Restores the state packed by writeMotionState after its Vehicle verifies the source. */
+  readMotionState(source: Float64Array): void {
+    this.gear = source[0]!;
+    this.spin = source[1]!;
+    this.shifting = source[2]!;
+    this.locked = source[3] === 1;
+    this.throttle = source[4]!;
+    this.clutchPedal = source[5]!;
+    this.lastTorque = source[6]!;
+  }
+
   /** The engine's speed, rpm. */
   get rpm(): number {
     return this.spin * RPM;

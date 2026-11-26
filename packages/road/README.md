@@ -162,3 +162,45 @@ nonvertical ramps work. A sampled cusp/reversal rejects with linked code `failed
 refine the spline or increase segments. Core Geometry/PbrMaterial have no texture
 channel by design; use the separate `uvs` with an optional textured renderer or
 exporter, as documented above.
+
+## Wet roads and lane driving
+
+`@margoengine/road/driving` turns rendered `road` and `bankedRoad` triangles into fixed colliders with measured dry and wet tyre limits. `RoadSurfaces.register()` applies the same material model to an existing deck or soil collider. An optional pressure–sinkage curve makes suspension compress less as the tyres press into soft soil. Use `groundReaction: true` on a vehicle that exchanges wheel forces with a moving deck.
+
+`RoadDriver` follows a lane made from the road spline. It watches the rigid body's pose at 60 Hz, steers toward a geometric look-ahead point, and brakes before a curve or the end of an open path. Its speed bound depends on bank and available grip. Supply `SurfaceEnergySolver.wetnessField` to use the same ATMO-09 moisture in planning and in `RoadSurfaces` through its wetness callback. Bind the existing `Vehicle` once and unbind it at disposal. The world snapshot includes its drive controls, engine and wheel spin.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+import { road } from '@margoengine/road';
+import { addRoadVehicle, roadDrivePath, RoadDriver, RoadSurfaces } from '@margoengine/road/driving';
+import { Spline } from '@margoengine/splines';
+
+await Physics.load();
+const gravity = [0, -9.81, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const spline = new Spline([[0, 0, -8], [0, 0, 0], [0, 0, 16]]);
+const traction = { dry: 0.8, wet: 0.25 };
+const surfaces = new RoadSurfaces();
+surfaces.add(physics, road(spline), { traction, wetness: 0.5 });
+const wheels = [-1, 1].flatMap((end) => [-1, 1].map((side) => ({
+  position: [0.65 * side, -0.15, end] as const, radius: 0.3, steer: end > 0, suspensionStiffness: 18,
+})));
+const { body, vehicle } = await addRoadVehicle(physics, null, {
+  mass: 1200, size: [1.3, 0.36, 2.4], position: [0, 0.614, 0], groundMaterial: surfaces.sample, wheels,
+});
+const lane = await RoadDriver.create();
+world.add(new RigidSolver(), { physics });
+world.add(lane, { vehicles: [{ body: body.row, path: roadDrivePath(spline), traction, wheelbase: 2, maxSpeed: 4, attachment: vehicle }] });
+world.couple([lane.id, 'rigid'], 'staggered');
+const unbind = lane.bindVehicle(world, physics, 0);
+try {
+  world.advance(90);
+  if (body.position[2] < 1) throw new Error('Expected the lane-driven car to move at least 1 m');
+} finally {
+  unbind();
+}
+```
+
+`commandsField` uses layout 1 with f64 words for steer, throttle, brake, target speed, measured speed, route progress, relative wetness and segment index. The first three words are normalized `VehicleInput` values. `RoadDriver.read()` returns a copy. `addRoadVehicle()` uses the visual asset's actual dimensions and a supplied measured mass. Provide the asset's local forward direction when it differs from +Z. For wind, pass a `Wind` field such as Weather's `BoundaryLayerWind` and add the existing `AirSolver` to drive the optional attachment on the world clock.

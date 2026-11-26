@@ -5688,3 +5688,7 @@ A sealed soft chamber conserves `pV` between fills, and the signed pressure diff
 native pinned-tetrahedron fixture satisfies an independent backward-Euler balance for compression and expansion.
 The world fixture starts with a real gap, verifies that contact transfers momentum only once the membrane closes
 it, and restores the chamber and rigid-body state bit for bit.
+
+### Physical road driving
+
+In `packages/road/tests/coupling/road-driver.test.js`, four real wheels move a massive chassis through bank-aware curves, compare wet and dry speed limits against the force balance, and reproduce the engine, tyre and path state after snapshot restore. The road-contact tests separately check opposite deck impulse, pressure equilibrium, and front-axle compression at a 6 cm lip.

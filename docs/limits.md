@@ -9506,3 +9506,7 @@ triangles and allocates no new scratch while stepping. The same optional soft Wa
 The complete optional soft entry measures 110,995 B gzip, up from 108,726 B, within its 111,864 B ceiling.
 The separately loaded kernel chunk is 75,819 B gzip, up from 74,174 B, and the native kernel is 211,555 B raw.
 Core plus stage remains 24,820 B gzip.
+
+### Wheel contact and lane tracking (DYN-04)
+
+The clocked driver tracks authored open or closed lanes with measured traction. It uses one wetness word per vehicle with the documented bank convention. It brakes smoothly before an open lane ends. The current driver routes an individual car and uses the supplied route around obstacles. Road colliders reuse their rendered triangle tessellation. A calibrated soft patch uses a constant footprint and the measured pressure exponent. EARTH-05 owns wear and terrain-volume feedback. The paired road and dynamics fixtures cover the existing tyres, drivetrain, motorcycles and tracks alongside the new road controls and terrain interface. The optional road driving entry measures 12,445 B minified and 5,313 B gzip. The Physics root measures 1,339,661 B minified and 865,782 B gzip. Core and Stage gain zero bytes.

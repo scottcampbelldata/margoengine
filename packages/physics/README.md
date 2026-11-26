@@ -3951,3 +3951,9 @@ divided by rest density. The current volume also includes elastic compression.
 `pointField` publishes `VISCOPLASTIC_WORDS` layout-1 f64 values per allocated point, including
 position, velocity, current volume, pressure, shear stress, plastic shear and presence. Draw only
 the present points. `solventViscosity` adds implicit Newtonian diffusion to the material's plastic flow.
+
+### Measured wheel contact materials
+
+`VehicleOptions.groundMaterial` samples the collider, point, normal, radius and width from each actual wheel hit. Return `{ grip }` to limit the combined tyre force by the measured friction coefficient times normal load. Return `{ grip, soil: { stiffness, exponent, area } }` to let a loaded wheel sink into yielding ground. These values are pressure stiffness in Pa/m^exponent, the dimensionless exponent and measured footprint area in m². `vehicle.wheelGround(index)` reads the last applied grip and sinkage. `groundReaction: true` includes the moving support's point velocity and exchanges equal and opposite impulses with its dynamic body. The Road driving entry provides registered materials and banked road colliders.
+
+`Vehicle.writeMotionState()` and `readMotionState()` preserve attachment controls, wheel spin and transmission state in a buffer of `motionStateWords` f64 values. RoadDriver stores that buffer in the world arena when bound to a vehicle. Use the methods with a solver-owned arena region for custom vehicle attachments that need deterministic seek.
