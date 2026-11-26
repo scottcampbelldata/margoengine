@@ -4899,7 +4899,7 @@ For the independent Wigley tank comparison, run `node packages/physics/tests/cou
 
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 
-Build Physics and run `node --test packages/physics/tests/coupling/kvlcc2-long-wave.test.js`. This steps the full rigid carriage model at the published Froude number. It reports both six-encounter force means and the normalized first heave and pitch harmonics from the free body. The near-resonance comparison prints the pressure-only control and the separate motion residuals.
+Build Physics and run `node --test packages/physics/tests/coupling/kvlcc2-long-wave.test.js`. This steps the full rigid carriage model at the published Froude number. It reports both six-encounter force means and the normalized first heave and pitch harmonics from the free body. The near-resonance comparison prints the pressure-only control and checks heave and pitch against their own measured intervals. The refined geometry first matches the published equilibrium draft within its 1 mm uncertainty.
 
 ### SEA-08 axial resistance in short waves
 

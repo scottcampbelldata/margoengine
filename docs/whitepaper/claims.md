@@ -6461,7 +6461,7 @@ Pressure returned through the SEA-08 and SEA-04 coupling slows a 4 m prism from 
 
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 
-The existing solver with the reflection option meets the independent normalized mean resistance intervals for the full model at `λ/L = 2.0` and 1.1. The freely solved heave and pitch amplitudes also meet the experimental intervals at 2.0 over both tested mesh resolutions. The near-resonance motion amplitudes remain outside their experimental intervals. [Geometry, independent measured values and received loads](../clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
+The existing solver with the reflection option meets the independent normalized mean resistance intervals for the full model at `λ/L = 2.0` and 1.1. The freely solved heave and pitch amplitudes also meet the experimental intervals at both wavelengths on the draft-qualified hull. The 2.0 case also passes over the coarser geometry. [Geometry, independent measured values and received loads](../clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
 
 ### SEA-08 short-wave axial reflection
 

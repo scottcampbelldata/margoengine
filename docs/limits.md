@@ -10460,7 +10460,7 @@ New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 
 
 ### Seakeeping full KVLCC2 head-wave benchmark
 
-The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the freely pitching and heaving hull at fixed tow speed with `shortWaveResistance` enabled. At 2.0 the heave and pitch intervals also pass. At 1.1, the 0.7719 heave and 0.5949 pitch lie above the 95% upper limits of 0.7671 and 0.59368. The free-surge case and distributed measured pressure remain open. [Geometry and experiment](clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
+The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the freely pitching and heaving hull at fixed tow speed with `shortWaveResistance` enabled. The draft-qualified 41 by 13 hull meets the heave and pitch intervals at both wavelengths. At 1.1 it yields 0.75550 and 0.58761 within upper limits of 0.7671 and 0.59368. The volume-matched reference draft is 0.977 mm from nominal. The free-surge case and distributed measured pressure remain open. [Geometry and experiment](clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)
 
 ### Seakeeping encounter-scaled taper loads
 

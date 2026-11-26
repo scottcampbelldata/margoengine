@@ -9,6 +9,8 @@ import { kvlcc2Hull } from './kvlcc2-hull.js';
 const LENGTH = 3.2;
 const BEAM = 0.58;
 const DRAFT = 0.208;
+const VERTICAL_CENTRE_OF_MASS = 0.1856;
+const DRAFT_UNCERTAINTY = 0.001;
 const DEPTH = 3.5;
 const DENSITY = 997.8;
 const GRAVITY = 9.799;
@@ -58,10 +60,17 @@ function measuredWaves(wavelengthRatio, stride, shortWaveResistance = true) {
   const mesh = kvlcc2Hull({
     length: LENGTH,
     freeboard: 0.29 - DRAFT,
-    centre: [0.0348 * LENGTH, 0.1856 - DRAFT],
+    centre: [0.0348 * LENGTH, VERTICAL_CENTRE_OF_MASS - DRAFT],
     stride,
   });
   const referenceWaterline = stillWaterline(mesh, MASS, DENSITY);
+  if (stride === 1) {
+    const nominalWaterline = DRAFT - VERTICAL_CENTRE_OF_MASS;
+    assert.ok(
+      Math.abs(referenceWaterline - nominalWaterline) <= DRAFT_UNCERTAINTY,
+      `Reference waterline ${referenceWaterline} differs from ${nominalWaterline} beyond the measured draft uncertainty`,
+    );
+  }
   const { sea, waveNumber, encounter } = headSea(wavelengthRatio);
   const gravity = [0, -GRAVITY, 0];
   using physics = new Physics(null, { fixedTimestep: 1 / STEP_RATE, gravity, substeps: 1 });
@@ -143,7 +152,7 @@ test('HullSolver: freely moving KVLCC2 holds out measured long head-wave resista
   }
 });
 
-test('HullSolver: KVLCC2 meets the held-out near-resonant head-wave resistance with reflection', (context) => {
+test('HullSolver: KVLCC2 meets held-out near-resonant resistance, heave and pitch with reflection', (context) => {
   const withReflection = measuredWaves(1.1, 1);
   const withoutReflection = measuredWaves(1.1, 1, false);
   const measured = {
@@ -154,6 +163,6 @@ test('HullSolver: KVLCC2 meets the held-out near-resonant head-wave resistance w
   context.diagnostic(JSON.stringify({ wavelengthRatio: 1.1, measured, withoutReflection, withReflection }));
   assert.ok(Math.abs(withReflection.resistance - measured.resistance.mean) <= measured.resistance.expanded);
   assert.ok(Math.abs(withReflection.priorResistance - measured.resistance.mean) <= measured.resistance.expanded);
-  // Force and motion are separate observations. Report the two motion residuals for this case.
-  assert.ok(Number.isFinite(withReflection.heave) && Number.isFinite(withReflection.pitch));
+  assert.ok(Math.abs(withReflection.heave - measured.heave.mean) <= measured.heave.expanded);
+  assert.ok(Math.abs(withReflection.pitch - measured.pitch.mean) <= measured.pitch.expanded);
 });
