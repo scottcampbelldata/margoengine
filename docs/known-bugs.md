@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: the look masks see ground through plants and trees, so bounce reads over 100 percent (KB-LOOK-MASKOCCLUDE1, scatter, biomes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`
+  (blowup, 16:00): T6 bounce reads 193 percent early and 184 percent mid (bar 10 to 35): shadowed ground brighter than
+  lit ground, which no light can give. `probes/mid.shadow.png` marks shaded ground where the frame shows bright green
+  plants, and `mid.lit.png` marks the dark soil of the track.
+- **Cause:** the page's `SceneTargets` masks (`litGround`, `shadedGround`, `penumbra`) draw only what is added to the
+  targets, here the terrain; the forest, plants and snags are `ScatterTiles` (`@margoengine/scatter`, fed by
+  `@margoengine/biomes/objects`), which have no capture hook (`setCapture`, as Terrain, Water, gltf/pbr and voxel
+  have), so the mask pass draws the ground behind them unoccluded. The checks then average plants as "shadowed ground"
+  and soil as "lit ground". The same gap keeps scattered objects out of SSR, SSGI and every other capture pass.
+- **Owed:** `ScatterTiles.setCapture` (scatter: the instanced draw with its wind and LOD into a capture pass) and
+  `BiomeView.setCapture` forwarding to the terrain and its objects, so a page adds the whole view once; a regression
+  test of a plant in front of shaded ground; then KB-LOOK-TV-BOUNCE1 (sun to sky-ambient ratio) is measured again.
+  Until then the timber-valley bounce, shadowTint and penumbra numbers are not evidence.
+
+### Open 2026-11-26: the smoke haze over a burning valley takes no light from the fire (KB-WEATHER-FIREHAZE1, weather)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge --query=hour=22 --out=<folder>` after the
+  KB-WEATHER-NIGHTHAZE1 fix: the blowup's smoke haze is moonlit (about 0.1 percent of the noon haze after the smoke's
+  own dimming) and reads black (3, 1, 0), while a valley burning under a smoke pall at night glows orange from below.
+- **Cause:** the sky fog's colour (`WeatherDrive.tintFog`) is lit by the sun, the moon and the twilight sky only; the
+  fire fronts the drive already reads (`fires`, for `smokeEmission`) give the haze no light. A `FireFront`'s smoke
+  columns take the fire's glow (vfx); the sky fog does not.
+- **Owed in weather** (with what the front must report in vfx): the flames' radiant power under the layer lighting the
+  smoke from below, as the sun's share lights it from above, with a regression test and a night still.
+
 ### Fixed 2026-11-26: the moving look evidence read distances from an 8-bit depth mask (KB-SHOT-DEPTH8BIT1, tools/shot)
 
 - **Repro:** a shot with `shot.moving` at `depthScale` 2000 (the timber-valley shots) with ground within a few metres
@@ -17102,14 +17129,16 @@ sensitive to constraint count and is intended for shorter guides.
 
 ### The weather's smoke haze is lit as day at night (KB-WEATHER-NIGHTHAZE1)
 
-Open (found 2026-11-26 by gap lane B while fixing KB-SCENES-NIGHTSUN1). Repro: after building, run
-`node packages/scenes/test/timber-valley-still.mjs --views=ridge --query=hour=22 --out=<folder>`: the sky over the
-ridge is the night's dark blue with stars, but the valley under the blowup smoke is the afternoon's tan haze (the ridge
-view's mean 74.5 at 22:00 against 124.4 at 16:00, almost all of it the haze). Cause: `WeatherDrive.tintFog`
-(`packages/weather/src/drive.ts`) writes the sky fog's colour as `smokeColor()` times `smokeLight` (default 1) times
-`hazeLight(state, elevation)`, the share of light that crosses the layer; nothing in it falls as the sun sets, so the
-fixed linear colour is a sunlit haze at every hour (the option's own doc asks the caller to give "less at dusk and none
-at night"). `lightSky` already fades the light the layer scatters onto the dome with the sine of the sun's elevation.
-Fix owed in weather: light the haze colour by the light the air actually gets, the sun's handed over to the moon's and
-the night sky's as the sky does it (`Sky.nightFactor`, `lighting.moon`), with a regression test of a night fog colour
-and a GPU still at 22:00. Never in the scene file (no per-scene `smokeLight`).
+Fixed (2026-11-26, gap lane B). At 22:00 the timber-valley ridge view showed the night's dark blue starry sky over the
+afternoon's tan smoke haze (mean 74.5 against 124.4 at 16:00). Cause: `WeatherDrive.tintFog`
+(`packages/weather/src/drive.ts`) lit the sky fog's fixed colour by `hazeLight` of the sun alone, which does not fall
+as the sun sets. Fix in weather: the haze's light (`airLight` in drive.ts) hands the day share over to the night's by
+the sky's own blend (`Sky.nightFactor`, or the same smoothstep of its sun): (1 - n) times the day share plus n times
+the moon under the clouds and the twilight sky (`Sky.moonUnderClouds`, `Sky.twilightLight`, intensity times colour,
+each through the load at its own elevation) over the sky's `lighting.intensity`. The timber-valley night moon is 0.19
+against the noon sun's 5, so the night haze is about 4 percent of the day's, bluer, as the moonlit ground is. Regression:
+`packages/weather/tests/smoke.test.js` ("the smoke haze hands its sunlight over ..."), failing before the fix. Still:
+`node packages/scenes/test/timber-valley-still.mjs --views=ridge --query=hour=22 --out=<folder>` gives mean 25.1 (sky
+35, 48, 83 over a valley of 3, 1, 0), against 74.5 before. The valley under the blowup smoke now reads black at night:
+see KB-WEATHER-FIREHAZE1 for the fire's light the haze still lacks.
+

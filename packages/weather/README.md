@@ -1125,8 +1125,9 @@ A `WeatherDrive` also does three things for sand and dust, all of them package c
   up to 0.5), so a gale over a desert makes a sandstorm with no dust set by hand; `dustFromSand: false` turns it off, and
   a dust the state holds itself is never lowered.
 - **The fog turns dust coloured.** While dust is most of the air's extinction, the sky fog's colour is `dustColor()`
-  (a yellow-brown from the single-scattering albedo of desert dust, Dubovik et al. 2002) times `dustLight` (default 1;
-  the fog's colour is a fixed value, so give less at dusk). The colour the fog had comes back when the dust clears.
+  (a yellow-brown from the single-scattering albedo of desert dust, Dubovik et al. 2002) times `dustLight` (default 1),
+  lit by the night's light once the sun sets (see "The fog and the sun"). The colour the fog had comes back when the
+  dust clears.
 - **The sand follows the weather.** Each `BlownSand` takes the state's wind speed, direction and gustiness as its `wind`
   while its wind is unset or `{speed: 0}` (a speed above 0 on the layer overrides), and the air's extinction as its `fog`
   while that is unset.
@@ -1225,7 +1226,13 @@ where smoke's is 1.8). `airExtinction`, `visibility`, `fogForVisibility` and `fo
   `ashLight`, `sprayLight`); one alone gives its own colour exactly. Under smoke, ash or spray that colour is lit by
   `hazeLight(state, elevation)`, the light that still reaches the air: the direct sun through the layers plus the rest
   they scatter times what a two-stream slab passes down (Meador and Weaver 1980). So the haze, and the ground behind it,
-  darken as the load thickens: a black day or an ash darkness is dark at noon. A `VolumetricFog` the drive writes
+  darken as the load thickens: a black day or an ash darkness is dark at noon. As the sun sets the haze hands that
+  sunlight over to the night's by the sky's own blend (`sky.nightFactor`, 0 with the sun 4.6 degrees up, 1 at 6.9
+  degrees down): at night it is lit by the moon under the clouds and the twilight sky (`sky.moonUnderClouds`,
+  `sky.twilightLight`), each through the load at its own height, over the sky's `lighting.intensity`, so a moonlit
+  haze is as much dimmer than the noon haze as the moonlit ground is than the noon ground, and bluer
+  (KB-WEATHER-NIGHTHAZE1). A dust haze takes the same handover. A sky with no night lights gives a black haze at
+  night. A `VolumetricFog` the drive writes
   (`fogVolumes`, or found as `volumetric-fog`, with no `visibility` of its own) takes the load's colour too: each load's
   colour by its share of the volume's extinction, the rest of the air white, so ash greys it and smoke browns it; it is
   lit by the scene's lights, so no haze light is put on it. A colour held by the `air.color` row of
