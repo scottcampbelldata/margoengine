@@ -98,7 +98,13 @@ The worst cases, where the gap is closest to the row not being met:
   live plating and SEA-10 linkage. The current package supplies those on its reduced station path
   and provides a distributed triangular shell with bending, plane-stress yielding, reciprocal sphere contact
   and cohesive breakup along prescribed seams. SEA-10 consumes the actual live seam polygon for progressive
-  flooding. A pretest staged rail design also predicts the independent measured full-scale coach's longitudinal compression. Its rebound is low. The staged envelope also transfers a force curve calibrated only from NCAP sedan test 8035 to the independent coupe trial 8104 at 55.65 km/h. General shell contact, automatic tearing, full-scale vessel response and broader vehicle coverage remain open.
+  flooding. A pretest staged rail design predicts the independent measured full-scale coach's
+  longitudinal compression. Its rebound is low. The staged envelope transfers a force curve
+  calibrated only from NCAP sedan test 8035 to the independent coupe trial 8104 at 55.65 km/h.
+  A panel curve from Tabri model-ship trial 103 also predicts the compression work and stroke of
+  separate trials 104 and 105 using published wet inertia. Peak load runs up to 12.7% high.
+  General shell contact, automatic tearing, full-scale vessel response and broader vehicle
+  coverage remain open. [Model-ship evidence](whitepaper/reproduce.md#break-03-held-out-model-ship-contacts)
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the

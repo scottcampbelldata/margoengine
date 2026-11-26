@@ -5367,6 +5367,10 @@ if (Math.abs(crush.read(0).impulse - 3000) > 0.001) throw new Error('Expected el
 
 [Wet contact method and checks](../../docs/whitepaper/reproduce.md#break-03-wet-contact-inertia)
 
+The staged response predicts compression work and stroke in two independently
+measured foam-panel model-ship tests using the published wet inertia.
+[Held-out model-ship comparison](../../docs/whitepaper/reproduce.md#break-03-held-out-model-ship-contacts)
+
 Use `resolveGirder` to bend a cross section made of plate strips and stiffeners. Give each strip its
 area, offset and stress–strain curve, including the unloaded origin. The solver finds the axial
 strain that balances the prescribed force. Pass the prior `referenceStrain` as `previousStrain` to

@@ -15381,6 +15381,14 @@ centre, `M (M+A)^−1 J` produces the intended wet velocity jump through the dry
 An exact receipt removes that contribution from the following inferred external load.
 [Cummins](https://dome.mit.edu/handle/1721.3/49049) · [Journée and Massie](https://ocw.tudelft.nl/wp-content/uploads/OffshoreHydromechanics_Journee_Massie.pdf) · [Wet contact proofs](whitepaper/reproduce.md#break-03-wet-contact-inertia)
 
+Kristjan Tabri, Jukka Määttänen and Janne Ranta, *Model-scale experiments of
+symmetric ship collisions* (2008), supply an independent marine compression
+comparison using the staged station model. Only the loading curve and elastic
+recovery of trial 103 enter the force law. The material is frozen before applying
+the initial conditions and author-calculated instantaneous added inertia for
+trials 104 and 105. The test compares separately measured strokes and work.
+[Tabri, Määttänen and Ranta](https://aaltodoc.aalto.fi/server/api/core/bitstreams/a6449cf0-7cdb-4a06-8c7f-1363c7d54b26/content) · [Exact fixture and results](whitepaper/reproduce.md#break-03-held-out-model-ship-contacts)
+
 Native shell friction applies the same constrained dissipation objective to the live projected
 triangle point. It uses the contact inverse-mass construction of Tobias Preclik, Sebastian Eibl
 and Ulrich Rüde, *The Maximum Dissipation Principle in Rigid-Body Dynamics with Purely Inelastic

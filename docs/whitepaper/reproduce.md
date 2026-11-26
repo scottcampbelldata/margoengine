@@ -1,5 +1,33 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 held-out model-ship contacts
+
+Run `node --test packages/physics/tests/coupling/crush-ship-model.test.js` after
+building Physics. Tabri, Määttänen and Ranta, *Model-scale experiments of symmetric
+ship collisions* (2008), supplies specimen masses and author-calculated added
+inertia in Tables 1–2, panel height and longitudinal offset in Table 3, and the
+held-out outcomes in Table 5.
+[Tabri, Määttänen and Ranta](https://aaltodoc.aalto.fi/server/api/core/bitstreams/a6449cf0-7cdb-4a06-8c7f-1363c7d54b26/content)
+
+Read the force–stroke curve only from trial 103, Figure 13b. Use the peak load
+over its immediate recovery, 298 N over 3.1 mm, for the unloading stiffness.
+The two separate strikes share the bulb specimen design. Only their documented
+initial speeds and contact positions enter the setup. The wet mobility uses
+the source's added-inertia coefficients and gyration radii. The model uses
+the pitch gyration radius for yaw. The tests exercise two reciprocal rigid
+bodies, continuous crushing, fixed published inertia, and snapshot replay.
+
+| Trial | Work at 960/1920 Hz vs measured | Stroke at 960/1920 Hz vs measured | Peak at 960/1920 Hz vs measured |
+| --- | --- | --- | --- |
+| 104 | 1.682/1.712 J vs 1.7 J | 22.28/22.46 mm vs 21.3 mm | 164.2/165.7 N vs 147 N |
+| 105 | 3.366/3.427 J vs 3.6 J | 30.74/31.00 mm vs 33.2 mm | 232.9/234.6 N vs 221 N |
+
+The test checks work within 10% and peak stroke within half a 125 Hz motion
+sample at the measured initial speed. Peak force is reported separately and
+runs high by up to 12.7%. The scope is the first compression of these model
+ships with the same foam-panel design. Large-ship rupture, pressure feedback
+and hydrodynamic memory need separate evidence.
+
 ## BREAK-03 distributed shell friction
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.

@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Held-out wet model-ship compression (BREAK-03, 2026-11-26). One published panel
+  loading curve predicts compression in two independent measured tests within
+  6.5% for work and within half a measured position sample for stroke. Peak loads
+  run up to 12.7% high. [Reproduce](reproduce.md#break-03-held-out-model-ship-contacts)
 - Distributed shell friction (BREAK-03, 2026-11-26). Native contact transfers linear
   and angular impulses to the sphere and its live shell at the same point. The
   sliding check recovers the specified 0.020000 impulse ratio. A glancing sheet
