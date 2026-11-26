@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,228 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,230 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12440,7 +12440,7 @@ caves or overhanging holds needs a collider-based foot placement system. The pos
 kinematics and reaction wrenches for downstream animation or an erosion consumer. Inter-animal collision and
 feedback into the live terrain require downstream coupling.
 
-The optional entry measures 15,630 B raw and 6,419 B gzip. The plain Wasm is 9,037 B raw and 4,134 B gzip; the shared Wasm is 9,125 B raw and 4,196 B gzip.
+The optional entry measures 17,194 B raw and 6,926 B gzip. The plain Wasm is 10,782 B raw and 4,873 B gzip. The shared Wasm is 10,870 B raw and 4,937 B gzip.
 
 ## Material ageing (BIO-04)
 
@@ -12500,6 +12500,19 @@ updates the crown axis in proportion to new projected area. It represents long-t
 axis rather than tracking individual branches or modelling physiological dormancy, burial or ice damage. Flood
 tolerance represents measured depth and duration for one species and life stage. The burn and fuel-moisture input
 is an explicit versioned port. Cover, roots and canopy fuel update at annual boundaries.
+
+### Grounded biped and quadruped gait (LIFE-01)
+
+The optional `@margoengine/physics/legged` entry and the ground-animal entry share the same slot-13 SIMD module.
+Each moving body has 16 B of stored target, 40 B of gait state and two or four persistent foot contact points,
+plus the torso. A deck uses its declared planar rectangular support and the rigid body's pose. The projected COM
+sets the approximation for angularly varying contact-surface velocity. A highly articulated surface needs a
+contactable support-patch field. Planting and flight follow a reduced spring-mass model with a finite support
+couple. The renderer's baked export clips keep a single pace for each clip, while runtime horse posing uses the
+actual instantaneous stride.
+
+The legged entry measures 29,240 B raw and 11,101 B gzip and shares the ground kernel bytes listed above.
+Horses measures 40,737 B raw and 16,724 B gzip. Its gait utilities measure 2,738 B raw and 1,266 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -28854,6 +28867,14 @@ weather packages publishes the shared cell layout. The exposure fixture in `pack
 reproduces the effects on snags and live fuel. Forest growth provides the permanent axis required by TREE-3, and that
 fixture checks the crown-tip direction. Existing treeline footage and its distant impostors still need a growth-axis
 consumer in the shot. The remaining shared fields are listed in [Framework requests](physics-work-queue.md#framework-requests).
+
+### Legged rig, rider and flow hand-off (LIFE-01)
+
+The world solver can walk and run on live terrain and load a rigid platform. The recorded HORSE and COURIER
+footage predates these fixtures. To exercise the scene-level hand-off, connect the solved feet and COM to the
+rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
+handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
+LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
