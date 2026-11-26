@@ -2079,6 +2079,10 @@
       "types": "./dist/netcode/rollback.d.ts",
       "import": "./dist/netcode/rollback.js"
     },
+    "./netcode/physics": {
+      "types": "./dist/netcode/physics.d.ts",
+      "import": "./dist/netcode/physics.js"
+    },
     "./netcode/websocket": {
       "types": "./dist/netcode/websocket.d.ts",
       "import": "./dist/netcode/websocket.js"
