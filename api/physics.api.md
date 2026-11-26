@@ -1957,6 +1957,7 @@ export class Vehicle implements PhysicsAttachment {
     get valid(): boolean;
     setInput(input: VehicleInput): this;
     get speed(): number;
+    setWheelGroundTraction(index: number, traction: WheelGroundTraction): void;
     wheel(index: number): WheelState;
     get motionStateWords(): number;
     writeMotionState(output: Float64Array): void;
@@ -2021,6 +2022,13 @@ export interface WheelGroundMaterial {
 export interface WheelGroundState {
     readonly grip: number | null;
     readonly sinkage: number;
+}
+
+export interface WheelGroundTraction {
+    readonly collider: PhysicsCollider;
+    readonly load: number;
+    readonly drawbar: number;
+    readonly axleTorque: number;
 }
 
 export interface WheelJoint {

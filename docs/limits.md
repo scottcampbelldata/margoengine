@@ -9822,8 +9822,8 @@ and measured braking stress shapes remain open. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 12,367 B gzip with a 12,739 B ceiling. Both Wasm assets are 25,029 B raw and 9,768 B gzip each.
-The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The optional entry is 12,631 B gzip with a 12,739 B ceiling. Both Wasm assets are 25,029 B raw and 9,768 B gzip each.
+The Physics root is 866,709 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
