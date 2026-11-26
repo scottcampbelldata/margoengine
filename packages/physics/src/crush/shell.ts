@@ -14,6 +14,13 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_IMPULSES_FIELD } from '../world/s
 import { type CrushVector, triple, ZERO } from './rigid-contact.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
 import { type CrushShellContact, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
+import {
+  type CrushSheetSeam,
+  type CrushSheetSeamReading,
+  prepareSeams,
+  readSeamRow,
+  SEAM_STATE_WORDS,
+} from './shell-seam.js';
 import { makeShell, type Triangle } from './shell-topology.js';
 
 const MAX_SUBSTEPS = 8192;
@@ -46,6 +53,8 @@ export interface CrushShellParams {
   readonly spheres?: readonly CrushShellSphere[];
   /** Width of each position cell in metres when rigid spheres and the shell have different cells. */
   readonly cellSize?: number;
+  /** Optional initially bonded pairs of coincident boundary edges. */
+  readonly seams?: readonly CrushSheetSeam[];
 }
 
 export interface CrushShellFace {
@@ -82,6 +91,7 @@ interface ShellState {
   readonly resolution: number;
   readonly rigid?: ShellRigid;
   readonly maxNodeInverseMass: number;
+  readonly seams?: Region;
 }
 
 function finiteVector(v: CrushVector, label: string): CrushVector {
@@ -191,7 +201,14 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     });
     const steel = coefficients(material);
     const topology = makeShell(positions, triangles, material);
-    if (substeps(1 / rateOf(this.rate), topology.maxStep, resolution) > MAX_SUBSTEPS)
+    const seams = params.seams ?? [];
+    const cohesive = seams.length
+      ? prepareSeams(seams, positions, topology.boundaryEdges, topology.nodeMass, material.thickness)
+      : undefined;
+    const maxStep = cohesive
+      ? 0.5 / Math.sqrt((0.5 / topology.maxStep) ** 2 + cohesive.frequencySquared)
+      : topology.maxStep;
+    if (!(maxStep > 0) || substeps(1 / rateOf(this.rate), maxStep, resolution) > MAX_SUBSTEPS)
       throw new MargoError('state', 'Give the shell larger minimum elements or reduce its requested resolution.');
     const rigid = this.rigid ? new ShellRigid(host, spheres, material.thickness, params.cellSize) : undefined;
     const { kernel } = instanceFor(host, this.builds);
@@ -206,8 +223,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const faces = host.allocate('shell-faces', topology.faces.byteLength, 'u8', 1);
     // The runtime expects an aligned pointer even when the hinge count is zero.
     const hinges = host.allocate('shell-hinges', Math.max(8, topology.hinges.byteLength), 'u8', 1);
-    const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount);
-    const descriptor = host.allocate('shell-descriptor', 120, 'u8', 1);
+    const seamRecords = cohesive && host.allocate('shell-seams', cohesive.packed.byteLength, 'u8', 1);
+    const seamState = cohesive && f64('shell-seam-history', SEAM_STATE_WORDS * seams.length);
+    const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount + SEAM_STATE_WORDS * seams.length);
+    const descriptor = host.allocate('shell-descriptor', 136, 'u8', 1);
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -221,6 +240,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     }
     new Uint8Array(memory.buffer, faces.byteOffset, faces.byteLength).set(new Uint8Array(topology.faces));
     new Uint8Array(memory.buffer, hinges.byteOffset, hinges.byteLength).set(new Uint8Array(topology.hinges));
+    if (seamRecords && cohesive)
+      new Uint8Array(memory.buffer, seamRecords.byteOffset, seamRecords.byteLength).set(
+        new Uint8Array(cohesive.packed),
+      );
     new Uint32Array(memory.buffer, descriptor.byteOffset, 14).set([
       vertex.byteOffset,
       speed.byteOffset,
@@ -238,9 +261,12 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       0,
     ]);
     new Float64Array(memory.buffer, descriptor.byteOffset + 56, 7).set([...host.gravity, ...steel]);
-    new Uint32Array(memory.buffer, descriptor.byteOffset + 112, 2).set([
+    new Uint32Array(memory.buffer, descriptor.byteOffset + 112, 5).set([
       rigid?.work.byteOffset ?? 0,
       rigid?.spheres.length ?? 0,
+      seamRecords?.byteOffset ?? 0,
+      seamState?.byteOffset ?? 0,
+      seams.length,
     ]);
     if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
@@ -255,10 +281,11 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       faceState,
       energy,
       triangles: Uint32Array.from(triangles.flat()),
-      maxStep: topology.maxStep,
+      maxStep,
       resolution,
       rigid,
       maxNodeInverseMass,
+      seams: seamState,
     };
   }
 
@@ -291,8 +318,11 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   }
 
   stateRegions(): readonly Region[] {
-    const { positions, velocities, faceState, applied, reactions, energy, rigid } = this.requireState();
-    return [...[positions, velocities, faceState, applied, reactions, energy], ...(rigid ? [rigid.readings] : [])];
+    const { positions, velocities, faceState, applied, reactions, energy, rigid, seams } = this.requireState();
+    const regions = [positions, velocities, faceState, applied, reactions, energy];
+    if (rigid) regions.push(rigid.readings);
+    if (seams) regions.push(seams);
+    return regions;
   }
 
   extraState(): readonly Region[] {
@@ -329,6 +359,15 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const { rigid } = this.requireState();
     if (!rigid) throw new MargoError('state', 'Enable rigid-sphere coupling before reading contact.');
     return rigid.read(index);
+  }
+
+  /** Reads the cohesive state and live opening of a configured boundary pair. */
+  readSeam(index: number): CrushSheetSeamReading {
+    const { host, seams } = this.requireState();
+    if (!seams) throw new MargoError('state', 'Give the shell cohesive seams before reading fracture.');
+    const words = values(host, seams);
+    const at = SEAM_STATE_WORDS * indexIn(index, words.length / SEAM_STATE_WORDS, 'shell seam');
+    return readSeamRow(words, at);
   }
 
   readFace(face: number): CrushShellFace {

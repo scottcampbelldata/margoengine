@@ -103,6 +103,20 @@ try {
   console.log(
     `Distributed sheet: ${(1000 * liveShell.dent).toFixed(2)} mm live displacement, ${shellPixels} changed pixels.`,
   );
+  await page.waitForFunction(() => typeof window.drawCohesiveSeam === 'function', null, { timeout: 20_000 });
+  const intactSeam = await page.evaluate(() => window.drawCohesiveSeam(true));
+  const intactSeamImage = await decodePNG(await canvas.screenshot());
+  const tornSeam = await page.evaluate(() => window.drawCohesiveSeam(false));
+  const tornSeamImage = await canvas.screenshot();
+  const tearPixels = changedPixels(intactSeamImage, await decodePNG(tornSeamImage));
+  assert.equal(intactSeam.openingArea, 0);
+  assert.equal(tornSeam.broken, true);
+  assert.ok(tornSeam.openingArea > 0.1 && tearPixels > 32);
+  assert.deepEqual(await page.evaluate(() => window.drawCohesiveSeam(false)), tornSeam);
+  assert.deepEqual(await canvas.screenshot(), tornSeamImage);
+  assert.deepEqual(errors, []);
+  await writeFile(`test-results/break03-sheet-seam-${device}.png`, tornSeamImage);
+  console.log(`Cohesive seam: ${tornSeam.openingArea.toFixed(4)} m² opening, ${tearPixels} changed pixels.`);
 } finally {
   await close();
 }

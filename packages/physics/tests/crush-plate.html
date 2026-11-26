@@ -178,6 +178,26 @@
     }, mesh.triangles);
     return { dent: Math.max(0, -az, -bz, -cz), hash: shellWorld.hash(), visible: engine.stats.visible };
   };
+
+  const seamWorld = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+  const seamShell = await CrushShellSolver.load();
+  seamWorld.add(seamShell, {
+    positions: [[-1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 1, 0]],
+    triangles: [[0, 1, 2], [3, 4, 5]],
+    velocities: [[-0.8, 0, 0], [-0.8, 0, 0], [-0.8, 0, 0], [0.8, 0, 0], [0.8, 0, 0], [0.8, 0, 0]],
+    material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
+    seams: [{ sides: [[1, 2], [3, 5]], stiffness: 4e5, peakTraction: 12e3, toughness: 600 }],
+  });
+  const seamStart = seamWorld.takeSnapshot();
+  const seamNormals = Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  window.drawCohesiveSeam = async (flat) => {
+    seamWorld.restoreSnapshot(seamStart.bytes);
+    if (!flat) seamWorld.advance(18);
+    const mesh = seamShell.readMesh();
+    await drawSurface({ positions: Float32Array.from(mesh.positions), normals: seamNormals }, mesh.triangles);
+    const { broken, fractureWork, openingArea } = seamShell.readSeam(0);
+    return { broken, fractureWork, openingArea, hash: seamWorld.hash() };
+  };
 </script>
 </body>
 </html>

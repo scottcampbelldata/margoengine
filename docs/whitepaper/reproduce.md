@@ -45,6 +45,33 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 cohesive sheet seams
+
+Run `node --test packages/physics/tests/coupling/crush-shell.test.js` and
+`cargo test --manifest-path packages/physics/crush-shell-kernel/Cargo.toml`.
+The two live sheet pieces use a one-metre seam in a 15 mm sheet. At 600 J/m²
+of fracture toughness their interface absorbs 9 J. A lower-energy run softens the seam,
+unloads on its retained stiffness and keeps its aperture at zero. The released seam's
+area is checked against the polygon of the actual mesh edges. Additional native proofs
+check objectivity, momentum, energy under unloading and subdivision of a uniformly opening edge.
+Run `node packages/physics/tests/crush-plate.browser.mjs` and repeat with `--compat` to
+reproduce the live 0.4205 m² opening, 29,965 changed pixels and exact state and frame replay.
+
+The prescribed interface follows the bilinear peak-displacement damage law in
+[Camanho and Dávila, *Mixed-Mode Decohesion Finite Elements* (2002), sections 2.2.1–2.2.2](https://ntrs.nasa.gov/citations/20020053651)
+and [Turon, Dávila, Camanho and Costa, *An Engineering Solution for using Coarse Meshes in the Simulation of Delamination* (2005)](https://ntrs.nasa.gov/citations/20050160472).
+Initial cohesive stiffness K and peak traction T set the initial jump at T/K. For fracture
+energy G, the terminal jump is 2G/T. The secant stiffness is held on unloading, and the
+nonrecoverable work equals the area under the bilinear envelope minus stored interface
+energy. Two Gauss points share the undeformed length times thickness. The interpolated
+force at each point is central and therefore carries equal and opposite force and moment.
+
+The current interface uses the isotropic effective displacement magnitude along a prescribed
+split line. It exposes bulk plastic work separately from cohesive work. The separation in
+[Woelke, Shields and Hutchinson, *Cohesive zone modeling and calibration for mode I tearing of large ductile plates* (2015)](https://web-static-aws.seas.harvard.edu/hutchinson/papers/PlateTearing-2015.pdf)
+motivates that separation of the ledger. Their crack-tip localization and propagation data
+are outside this first bilinear law. The tests here use independent analytical balances.
+
 ## BREAK-03 distributed sphere contact
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.

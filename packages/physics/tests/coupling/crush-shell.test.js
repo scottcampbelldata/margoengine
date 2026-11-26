@@ -279,3 +279,126 @@ test('a one-substep moving rigid integrator cannot realize both contact moments'
     message: /Use at least two rigid substeps/,
   });
 });
+
+const joined = {
+  positions: [
+    [-1, 0, 0],
+    [0, 0, 0],
+    [0, 1, 0],
+    [0, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+  ],
+  triangles: [
+    [0, 1, 2],
+    [3, 4, 5],
+  ],
+  seams: [
+    {
+      sides: [
+        [1, 2],
+        [3, 5],
+      ],
+      stiffness: 4e5,
+      peakTraction: 12e3,
+      toughness: 600,
+    },
+  ],
+};
+
+function joinedModel(speed) {
+  const velocities = joined.positions.map((_, index) => [index < 3 ? -speed : speed, 0, 0]);
+  return model({ ...joined, velocities });
+}
+
+function openingInPlane(mesh) {
+  const lip = [1, 2, 5, 3].map((vertex) => [mesh.positions[3 * vertex], mesh.positions[3 * vertex + 1]]);
+  const twice = lip.reduce((sum, [x, y], i) => {
+    const [nextX, nextY] = lip[(i + 1) % lip.length];
+    return sum + x * nextY - y * nextX;
+  }, 0);
+  return Math.abs(twice) / 2;
+}
+
+function totalSeamEnergy(shell) {
+  const state = shell.readBudget();
+  const seam = shell.readSeam(0);
+  return (
+    state.kinetic +
+    state.membrane +
+    state.bending +
+    state.hardening +
+    state.plasticDissipation +
+    seam.elasticEnergy +
+    seam.fractureWork
+  );
+}
+
+test('distributed seam releases real sheet edges using the specified fracture energy and replays', async () => {
+  const { shell, world } = await joinedModel(0.8);
+  const start = world.takeSnapshot();
+  const initialEnergy = shell.readBudget().kinetic;
+  const measure = () => {
+    world.advance(18);
+    const tear = shell.readSeam(0);
+    const mesh = shell.readMesh();
+    assert.equal(tear.broken, true);
+    assert.equal(tear.elasticEnergy, 0);
+    near(tear.fractureWork, joined.seams[0].toughness * material.thickness, 1e-11);
+    near(tear.openingArea, openingInPlane(mesh), 1e-11);
+    assert.ok(tear.openingArea > 0.1);
+    near(totalSeamEnergy(shell), initialEnergy, 0.01);
+    const totalSpeed = mesh.velocities.filter((_, index) => index % 3 === 0).reduce((sum, value) => sum + value, 0);
+    near(totalSpeed, 0, 1e-10);
+    assert.deepEqual(mesh.triangles, new Uint32Array([0, 1, 2, 3, 4, 5]));
+    return { tear, mesh, hash: world.hash() };
+  };
+  const first = measure();
+  world.restoreSnapshot(start.bytes);
+  assert.deepEqual(measure(), first);
+});
+
+test('insufficient work softens the seam and unloads without unsealing the panel', async () => {
+  const { shell, world } = await joinedModel(0.29);
+  world.advance(7);
+  const loading = shell.readSeam(0);
+  assert.ok(loading.fractureWork > 0);
+  world.advance(15);
+  const unloading = shell.readSeam(0);
+  assert.equal(unloading.broken, false);
+  assert.equal(unloading.openingArea, 0);
+  assert.ok(unloading.fractureWork >= loading.fractureWork);
+  assert.ok(unloading.separation[0] < unloading.history[0]);
+  assert.ok(unloading.history[0] > 0.03);
+  const peak = unloading.history[0];
+  assert.ok(peak < 0.1);
+});
+
+test('invalid cohesive seam inputs identify boundary, endpoint order and fracture law', async () => {
+  const base = joined.seams[0];
+  for (const [seam, message] of [
+    [
+      {
+        ...base,
+        sides: [
+          [1, 2],
+          [0, 1],
+        ],
+      },
+      /Pair two distinct existing shell boundaries/,
+    ],
+    [
+      {
+        ...base,
+        sides: [
+          [1, 2],
+          [5, 3],
+        ],
+      },
+      /matching rest positions and endpoint order/,
+    ],
+    [{ ...base, toughness: 1 }, /choose a failure opening above initiation/],
+  ]) {
+    await assert.rejects(model({ ...joined, seams: [seam] }), { code: 'state', message });
+  }
+});

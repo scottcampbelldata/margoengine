@@ -1,6 +1,7 @@
 use core::ptr::copy_nonoverlapping;
 
 use crate::bending::{angle, bend};
+use crate::cohesive::{CohesiveEdge, History, seam};
 use crate::contact::{closest, contact};
 use crate::material::{Plastic, Steel};
 use crate::math::sqrt;
@@ -100,12 +101,16 @@ struct Shell {
     steel: Steel,
     spheres: *mut Sphere,
     sphere_count: u32,
+    seams: *const CohesiveEdge,
+    seam_history: *mut History,
+    seam_count: u32,
 }
 
 struct Workspace {
     positions: *mut Vector,
     velocities: *mut Vector,
     face_state: *mut FaceState,
+    seam_history: *mut History,
     forces: *mut Vector,
 }
 
@@ -134,13 +139,15 @@ impl Shell {
             (
                 velocities,
                 forces,
-                forces.add(self.node_count as usize).cast(),
+                forces.add(self.node_count as usize).cast::<FaceState>(),
             )
         };
+        let seam_history = unsafe { face_state.add(self.face_count as usize).cast() };
         Workspace {
             positions,
             velocities,
             face_state,
+            seam_history,
             forces,
         }
     }
@@ -255,6 +262,17 @@ impl Workspace {
             budget.bend += energy;
             unsafe { add_forces(self.forces, hinge.vertices, forces) };
         }
+        for i in 0..shell.seam_count as usize {
+            let edge = unsafe { *shell.seams.add(i) };
+            let history = unsafe { &mut *self.seam_history.add(i) };
+            let nodes = unsafe { load(self.positions, edge.vertices) };
+            let (force, updated) = seam(edge, nodes, *history);
+            if !(updated.elastic + updated.opening_area + updated.dissipation).is_finite() {
+                return false;
+            }
+            *history = updated;
+            unsafe { add_forces(self.forces, edge.vertices, force) };
+        }
         (budget.membrane + budget.bend + budget.hardening + budget.plastic).is_finite()
             && unsafe { self.contact_forces(shell) }
     }
@@ -313,6 +331,13 @@ unsafe extern "C" fn crush_shell_advance(
         copy_nonoverlapping(shell.positions, work.positions, nodes);
         copy_nonoverlapping(shell.velocities, work.velocities, nodes);
         copy_nonoverlapping(shell.face_state, work.face_state, faces);
+        if shell.seam_count > 0 {
+            copy_nonoverlapping(
+                shell.seam_history,
+                work.seam_history,
+                shell.seam_count as usize,
+            );
+        }
     }
     if !unsafe { work.forces(shell, &mut budget) } {
         return 0;
@@ -357,6 +382,13 @@ unsafe extern "C" fn crush_shell_advance(
         copy_nonoverlapping(work.positions, shell.positions, nodes);
         copy_nonoverlapping(work.velocities, shell.velocities, nodes);
         copy_nonoverlapping(work.face_state, shell.face_state, faces);
+        if shell.seam_count > 0 {
+            copy_nonoverlapping(
+                work.seam_history,
+                shell.seam_history,
+                shell.seam_count as usize,
+            );
+        }
         shell.ledger.write(budget);
     }
     1

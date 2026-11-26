@@ -5389,6 +5389,35 @@ Contact selects the closest live triangle within one sphere radius plus half the
 The sphere's surface normal is frictionless. Set `cellSize` if the rigid and shell solvers use
 different origin cells. [Contact method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact)
 
+Give `CrushShellSolver` cohesive `seams` where two pieces meet along a prescribed fracture
+line. Each side is a separate boundary edge with matching rest positions in the same
+endpoint order. The interface loses stiffness irreversibly as it takes work from relative
+motion. After both sampled points release, the edges move freely and `readSeam` reports the
+current area between them. The triangles already index separate pieces, so use the live
+mesh directly when drawing the opening.
+
+```ts
+import { CrushShellSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const shell = await CrushShellSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
+world.add(shell, {
+  positions: [[-1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 1, 0]],
+  triangles: [[0, 1, 2], [3, 4, 5]],
+  velocities: [[-0.8, 0, 0], [-0.8, 0, 0], [-0.8, 0, 0], [0.8, 0, 0], [0.8, 0, 0], [0.8, 0, 0]],
+  material: { thickness: 0.015, density: 7800, youngModulus: 200e9, poissonRatio: 0.3, yieldStress: 350e6 },
+  seams: [{ sides: [[1, 2], [3, 5]], stiffness: 4e5, peakTraction: 12e3, toughness: 600 }],
+});
+world.advance(18);
+if (!shell.readSeam(0).broken) throw new Error('Expected the loaded seam to release');
+```
+
+Stiffness is in Pa/m, peak traction in Pa, and toughness in J/m² of undeformed section.
+Set those from the bounded joint material response. The seam's recoverable and irreversible
+energies are in `readSeam`; `readBudget` continues to report the bulk sheet terms.
+[Seam method and checks](../../docs/whitepaper/reproduce.md#break-03-cohesive-sheet-seams)
+
 On moving bodies, add the circular plate to `CrushSolver.indentationPatches`. Choose the
 body-local plate anchor, normal and support point as with ordinary patches. The station
 absorbs the available normal energy up to localization. An intact dent stays plastically

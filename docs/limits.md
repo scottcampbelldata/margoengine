@@ -9634,10 +9634,16 @@ spheres, a matching shell and rigid tick rate, and at least two rigid substeps f
 body. Each sphere uses the closest live triangle in the current substep. The contact is
 frictionless, with an authored Hertz interface modulus and a compliant skin.
 This covers local sheet contact. Multi-point manifolds per sphere, sheet self-contact,
-swept time of impact, layered plastic bending, breakup and opening geometry remain open.
+swept time of impact and layered plastic bending remain open.
 Analytic tests cover world motion, reactions, elastic bending, plastic history and contact
 momentum. The measured rupture check above uses the separate circular station.
-The optional shell loader fetches the 8,446 B plain Wasm asset (4,305 B gzip). On hosts with
+The distributed seam model opens authored coincident boundaries after both quadrature
+points release. It uses the same separation law for tensile and tangential relative motion.
+An already released seam preserves its fracture work even if its physical opening closes.
+The aperture area is the two-triangle surface between the current edge pairs.
+Unilateral lip contact, automatic crack paths, mode-dependent cohesive properties,
+independent measured shell fracture, and SEA-10 flow through the live shell opening remain open.
+The optional shell loader fetches the 10,030 B plain Wasm asset (4,951 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 46480 B minified and 17377 B gzip under its 17899 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.

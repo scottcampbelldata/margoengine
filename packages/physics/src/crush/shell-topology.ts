@@ -17,9 +17,12 @@ export interface ShellTopology {
   readonly faces: ArrayBuffer;
   readonly hinges: ArrayBuffer;
   readonly maxStep: number;
+  readonly boundaryEdges: ReadonlySet<string>;
 }
 
 const length = (point: CrushVector): number => Math.sqrt(dot(point, point));
+
+export const shellEdgeKey = (a: number, b: number): string => (a < b ? `${a}/${b}` : `${b}/${a}`);
 
 export function makeShell(
   positions: readonly CrushVector[],
@@ -77,7 +80,7 @@ export function makeShell(
       [b, c, a],
       [c, a, b],
     ] as const) {
-      const edgeKey = start < end ? `${start}/${end}` : `${end}/${start}`;
+      const edgeKey = shellEdgeKey(start, end);
       const previous = edges.get(edgeKey);
       if (!previous) {
         edges.set(edgeKey, { start, end, opposite, area, paired: false });
@@ -124,5 +127,6 @@ export function makeShell(
       throw new MargoError('state', 'Give every shell vertex incident area and use finite SI sheet dimensions.');
     bound = Math.max(bound, omegaSquared);
   }
-  return { nodeMass: masses, faces: faceBytes, hinges: hingeBytes, maxStep: 0.5 / Math.sqrt(bound) };
+  const boundaryEdges = new Set([...edges].filter(([, edge]) => !edge.paired).map(([key]) => key));
+  return { nodeMass: masses, faces: faceBytes, hinges: hingeBytes, maxStep: 0.5 / Math.sqrt(bound), boundaryEdges };
 }

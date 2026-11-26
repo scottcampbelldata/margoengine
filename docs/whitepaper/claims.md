@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Cohesive sheet seams (BREAK-03, 2026-11-26). Two native shell pieces soften along a
+  prescribed interface and release the actual mesh edges. The fully released seam absorbs
+  9 J of fracture work. The lower-work control unloads and retains its damage with zero
+  opening area. The two graphics backends render the 0.4205 m² opening with 29,965 changed
+  pixels. Both the work and geometry replay exactly.
+  [Reproduce](reproduce.md#break-03-cohesive-sheet-seams)
 - Distributed sphere contact (BREAK-03, 2026-11-26). A fixed sphere loads all three supports
   with the independently derived Hertz force. A moving sphere transfers reciprocal momentum to
   the deforming mesh. Its 4.480000 J initial energy closes at 4.480031 J when recovered energy
