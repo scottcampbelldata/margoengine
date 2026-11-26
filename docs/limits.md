@@ -9649,7 +9649,7 @@ same f32 geometry and rest-basis requirements as a full plane cut. The API accep
 triangle per operation. Embedded skins, springs, cluster constraints and bound meshes still
 require their own state transfer.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
-600 tetrahedra. The complete optional entry measures 136,910 B gzip, with a 42,356 B base
+600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
 
 Optional orthotropic failure uses nine stress limits in the material frame. It compares the

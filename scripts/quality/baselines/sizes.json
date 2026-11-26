@@ -13269,6 +13269,12 @@
       "commit": "5421f02387",
       "grew": 1,
       "reason": "SOFT-04 adds finite through-element incision geometry, conforming shared faces, and conservative transfer to physically separate lips, moving the soft entry from 134833 to 136910 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 40143 to 43627 B ceiling (42356 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6034939ea2",
+      "grew": 0,
+      "reason": "SOFT-04 adds surviving authored rigid anchors through geometric cuts and existing face tears, moving the soft entry from 136910 to 137034 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
