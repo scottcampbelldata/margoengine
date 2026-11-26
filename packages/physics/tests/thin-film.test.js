@@ -237,17 +237,7 @@ test('ThinFilmSolver: planar pressure damps a product of orthogonal Neumann mode
   close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
 });
 
-test('ThinFilmSolver: a stiff low-viscosity planar cap advances conservatively on an incline', async () => {
-  const count = 32;
-  const radius = 0.0034;
-  const spacing = (3.2 * radius) / count;
-  const density = 726;
-  const viscosity = 0.000845;
-  const surfaceTension = 0.0234;
-  const precursorDepth = 20e-6;
-  const volume = 10e-9;
-  const gravity = 9.80665;
-  const tilt = (0.85 * Math.PI) / 180;
+function shallowCapDepth({ count, radius, spacing, density, gravity, surfaceTension, volume, precursorDepth }) {
   const x = (i) => (i + 0.5 - count / 2) * spacing;
   // The shallow gravity-capillary profile solves the radial linear Young–Laplace
   // equation. The modified Bessel I0 series supplies its shape before scaling to volume.
@@ -267,7 +257,22 @@ test('ThinFilmSolver: a stiff low-viscosity planar cap advances conservatively o
     return r < radius ? wetEdge - bessel0(inverseCapillaryLength * r) : 0;
   });
   const scale = volume / (spacing ** 2 * profile.reduce((sum, h) => sum + h, 0));
-  const depth = profile.map((h) => precursorDepth + scale * h);
+  return profile.map((h) => precursorDepth + scale * h);
+}
+
+test('ThinFilmSolver: a stiff low-viscosity planar cap advances conservatively on an incline', async () => {
+  const count = 32;
+  const radius = 0.0034;
+  const spacing = (3.2 * radius) / count;
+  const density = 726;
+  const viscosity = 0.000845;
+  const surfaceTension = 0.0234;
+  const precursorDepth = 20e-6;
+  const volume = 10e-9;
+  const gravity = 9.80665;
+  const tilt = (0.85 * Math.PI) / 180;
+  const x = (i) => (i + 0.5 - count / 2) * spacing;
+  const depth = shallowCapDepth({ count, radius, spacing, density, gravity, surfaceTension, volume, precursorDepth });
   const setup = async (normal, tangent, values, contactAngleHysteresis) => {
     const film = await ThinFilmSolver.load();
     const world = new PhysicsWorld({ rate, gravity: [tangent, -normal, 0] }).add(film, {
@@ -299,6 +304,47 @@ test('ThinFilmSolver: a stiff low-viscosity planar cap advances conservatively o
   world.restoreSnapshot(snapshot.bytes);
   world.advance(4);
   assert.equal(world.hash(), hash);
+});
+
+test('ThinFilmSolver: strongly coupled pressure converges on a water cap over a thin precursor', async () => {
+  const density = 998.2;
+  const gravity = 9.80665;
+  const surfaceTension = 0.072;
+  const volume = 20e-9;
+  const precursorDepth = 20e-6;
+  const radius = 0.0034827349076;
+  const angle = (37.5 * Math.PI) / 180;
+  for (const [count, tilt, contactAngleHysteresis] of [
+    [24, 0, undefined],
+    [16, (1.5 * Math.PI) / 180, [36, 39].map((degrees) => (degrees * Math.PI) / 180)],
+  ]) {
+    const spacing = (3.2 * radius) / count;
+    const depth = shallowCapDepth({ count, radius, spacing, density, gravity, surfaceTension, volume, precursorDepth });
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate, gravity: [gravity * Math.sin(tilt), -gravity * Math.cos(tilt), 0] }).add(
+      film,
+      {
+        cells: [count, count],
+        spacing,
+        depth,
+        density,
+        viscosity: 0.001002,
+        surfaceTension,
+        wetting: { precursorDepth, contactAngle: angle },
+        contactAngleHysteresis,
+      },
+    );
+    world.advance(2);
+    const evolved = film.depths();
+    assert.ok(evolved.every((h) => h > 0));
+    assert.ok(Math.max(...evolved) < Math.max(...depth));
+    close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
+    const center = (values) =>
+      values.reduce((sum, h, i) => sum + (h - precursorDepth) * ((i % count) + 0.5 - count / 2), 0) *
+      (spacing ** 3 / volume);
+    if (tilt) assert.ok(center(evolved) > 0);
+    else close(center(evolved), 0, 1e-13);
+  }
 });
 
 test('ThinFilmSolver: the precursor contact-angle pressure has its derived linear decay rate', async () => {

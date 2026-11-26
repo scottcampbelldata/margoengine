@@ -10657,8 +10657,9 @@ both Wasm memory modes.
 The planar conjugate-gradient solve takes the principal factor of each face line when mobility
 varies appreciably across the patch. The line factors borrow the consumed transport workspace
 for the duration of the pressure solve. Each matrix application keeps the cross-line gradient
-and curvature terms. A viscous-cap regression and a rectangular Neumann modal regression cover
-both choices of preconditioner.
+and curvature terms. At stronger stiffness it averages two symmetric cross-axis sweeps in
+opposite order. This keeps the preconditioner positive and gives the two grid directions equal
+treatment. Water-cap, viscous-cap and rectangular Neumann regressions cover the three choices.
 
 ### Environmental airborne batch (ATMO-06)
 

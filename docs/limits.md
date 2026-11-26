@@ -9745,10 +9745,11 @@ One-row and one-column strips use a direct banded pressure solve with optional a
 receding contact angles. The capillary regression covers a 128-cell strip at 20 μm spacing.
 Two-dimensional patches use the iterative pressure solve. It preconditions each row and
 column as a block when the ratio of maximum to minimum positive face mobility exceeds
-four. The strip retention check uses a derived force bracket. A measured sliding
-threshold for this solver remains open.
+four. If a face diagonal times floating-point epsilon exceeds the relative pressure tolerance,
+the preconditioner averages two symmetric sweeps across the face directions. The strip retention
+check uses a derived force bracket. A measured sliding threshold for this solver remains open.
 
-The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 18,508 B raw and each is 7,591 B gzip.
+The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 20,631 B raw and each is 8,460 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
