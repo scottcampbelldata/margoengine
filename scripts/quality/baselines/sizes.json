@@ -12411,6 +12411,12 @@
       "commit": "SEA-08 sway and roll",
       "grew": 2,
       "reason": "@margoengine/physics/seakeeping: the sway and roll radiation of each section (Ursell-Tasai antisymmetric multipoles on its Lewis form, lateralSection) and the sway, roll and yaw pairs of the radiation memory with their added mass at infinite frequency; measured gzip (Mac build) 8701 B, was under 7881; a hull without them sways and rolls undamped, and a split would put one hull solve into two entries every hull loads. Budget (measured + 3%): 7881 to 8962 B. @margoengine/physics/world: 15475 to 15518 B, the measured size after ba84133b2 made the framework errors name their fix (longer messages; its budget was not raised then)."
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "gap-lane-d",
+      "reason": "Lane D: new optional controls/behaviors 0 to 1156 B (elastic dolly bounce, idle auto-rotation, animated framing); core and stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12621,6 +12627,7 @@
     "@margoengine/compute/subgroups": 2537,
     "@margoengine/controls": 29556,
     "@margoengine/controls/arcball": 9248,
+    "@margoengine/controls/behaviors": 1156,
     "@margoengine/controls/box-gizmo": 6842,
     "@margoengine/controls/collide": 7341,
     "@margoengine/controls/device-orientation": 3770,
