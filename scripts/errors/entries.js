@@ -1835,6 +1835,8 @@ export const entries = [
       'width must be a finite number of CSS pixels, 0 or more',
       'dot must be a finite number of CSS pixels, 0 or more',
       'minLength must be a finite number of CSS pixels, 0 or more',
+      'Hotspot needs an integer face of 0 or more and three barycentric weights of 0 or more that sum to 1; fix the options',
+      'Hotspot primitive or face is not in the posed mesh; pass a primitiveIndex and face that exist',
       'boxAnchorPoint needs finite min <= max and an anchor of a face name, center, or three numbers from -1, 0 and 1; fix the arguments',
     ],
     cause:

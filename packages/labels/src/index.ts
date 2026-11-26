@@ -22,3 +22,5 @@ export {
   boxAnchorPoint,
 } from './projection.js';
 export type { Backend, Vec3, BoxAnchorSpec, BoxFace } from './projection.js';
+export { Hotspot } from './hotspot.js';
+export type { HotspotSource, HotspotSnapshot, HotspotOptions } from './hotspot.js';

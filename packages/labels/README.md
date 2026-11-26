@@ -102,6 +102,29 @@ engine.render();
 engine.dispose();
 ```
 
+## Pinning to a deformed mesh: Hotspot
+
+`Hotspot` is a fixed point inside one triangle of a skinned or morphed mesh, given as a triangle index and
+barycentric weights of its three corners. `worldPosition()` blends the triangle's posed corners at the current pose,
+so the point rides the surface as it bends; `project(camera.matrix, width, height)` gives CSS pixels, and `pin(label)`
+moves a label to it. Any source with `posePickingGeometry()` works, such as `skin.picking` from
+`@margoengine/animation` (the same source `Raycaster.intersectPosed` reads, so its posed vertices are cached per pose).
+`Hotspot.fromHit(source, hit)` takes `primitiveIndex`, `faceIndex` and `barycoord` from a pick hit. Weights must be 0 or
+more and sum to 1; a bad face, primitive or weight throws a RangeError that names the fix.
+
+```ts
+import { Hotspot } from '@margoengine/labels';
+
+const triangle = new Float32Array(60); // three stride-20 vertices, xyz first
+triangle.set([2, 0, 0], 20);
+triangle.set([0, 2, 0], 40);
+const snapshot = { vertices: triangle, indices: new Uint32Array([0, 1, 2]), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
+const hotspot = new Hotspot({ posePickingGeometry: () => [snapshot] }, { face: 0, barycentric: [0.5, 0.25, 0.25] });
+console.log(hotspot.worldPosition()); // [0.5, 0.5, 0]
+snapshot.vertices[42] = 4; // the pose bends the third corner up
+console.log(hotspot.worldPosition()); // [0.5, 0.5, 1]
+```
+
 ## Scaled pages
 
 A CSS scale on an element around the canvas (a zoomed preview, a slide, a fitted dashboard tile) scales what the browser draws but not the `left` and `top` the overlay is placed with. Each update the renderer reads the overlay's drawn width against the width it gave it, converts its correction by that scale, and lands on the canvas content box in the same update at any scale. An overlay in another `parent`, outside the scaled element, is scaled itself (`transform: scale(k)`, origin at its corner) so a CSS pixel of the labels is a CSS pixel of the canvas.

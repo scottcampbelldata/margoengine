@@ -45,6 +45,40 @@ export type DistanceScale = number | {
     max?: number;
 };
 
+export class Hotspot {
+    readonly primitiveIndex: number;
+    readonly face: number;
+    readonly barycentric: readonly [number, number, number];
+    constructor(source: HotspotSource, options: HotspotOptions);
+    static fromHit(source: HotspotSource, hit: {
+        primitiveIndex?: number;
+        faceIndex: number;
+        barycoord: ArrayLike<number>;
+    }): Hotspot;
+    worldPosition(out?: [number, number, number]): [number, number, number];
+    project(matrix: ArrayLike<number>, width: number, height: number, backend?: Backend): ScreenPoint;
+    pin(label: {
+        setPosition(position: [number, number, number]): unknown;
+    }): void;
+}
+
+export interface HotspotOptions {
+    primitiveIndex?: number;
+    face: number;
+    barycentric?: readonly [number, number, number];
+}
+
+export interface HotspotSnapshot {
+    vertices: ArrayLike<number>;
+    indices: ArrayLike<number>;
+    matrix: ArrayLike<number>;
+    primitiveIndex?: number;
+}
+
+export interface HotspotSource {
+    posePickingGeometry(): readonly HotspotSnapshot[];
+}
+
 export class Label extends Item {
     anchor: [number, number];
     screenOffset: [number, number];
