@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20558061,
+  "total": 20558458,
   "history": [
     {
       "date": "2026-10-24",
@@ -13585,6 +13585,12 @@
       "commit": "1d1d91857",
       "reason": "physics/ship ceiling 11538 to 14,951 B (built 11,202 to 14,516 B): any hull's manoeuvring from its dimensions (Kijima 1990, Yoshimura and Masumoto 2011, Clarke and Brix added masses) and the resolved race (swirl, tip and hub vortices, the rudder jet, vortex cavitation with hysteresis, aeration sources). In the ship entry because a ship's solver needs its hull model and its race; a split would load with every ship scene.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "297d67482",
+      "grew": 1,
+      "reason": "react/post measured 4,872 B, ceiling 4,621 to 5,018: Pixelate, DotScreen, Vignette, FilmGrain and ChromaticAberration join the composer effect components (the last three set options of its Tonemap). A separate entry would load the composer code twice."
     }
   ],
   "items": {
@@ -14616,7 +14622,7 @@
     "@margoengine/react/physics": 6721,
     "@margoengine/react/points": 1460,
     "@margoengine/react/portals": 3977,
-    "@margoengine/react/post": 4621,
+    "@margoengine/react/post": 5018,
     "@margoengine/react/sampler": 4377,
     "@margoengine/react/selection": 1412,
     "@margoengine/react/shadows": 4484,
