@@ -70,6 +70,10 @@
       "types": "./dist/earth/index.d.ts",
       "import": "./dist/earth.js"
     },
+    "./rail": {
+      "types": "./dist/rail/index.d.ts",
+      "import": "./dist/rail.js"
+    },
     "./seismic": {
       "types": "./dist/seismic/index.d.ts",
       "import": "./dist/seismic.js"

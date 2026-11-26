@@ -223,6 +223,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/rail-kernel.wasm',
+    label: 'rail-kernel.wasm',
+    kind: 'Rust SIMD tensioned contact-wire propagation',
+    measure: 'file',
+    when: 'RailSolver.load(world.memory) from the optional /rail entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/rail-kernel-shared.wasm',
+    label: 'rail-kernel-shared.wasm',
+    kind: 'Rust SIMD tensioned contact-wire propagation, shared world memory',
+    measure: 'file',
+    when: 'RailSolver.load(world.memory) from the optional /rail entry with shared memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/seismic-kernel.wasm',
     label: 'seismic-kernel.wasm',
     kind: 'Rust SIMD elastodynamic waves',
