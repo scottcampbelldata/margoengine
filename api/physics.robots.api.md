@@ -1253,6 +1253,7 @@ class PhysicsBody {
     setRotation(rotation: Quat, wakeUp?: boolean): this;
     setNextPosition(position: Vec3): this;
     setNextRotation(rotation: Quat): this;
+    setNextVelocity(linear: Vec3 | null, angular?: Vec3): this;
     get linearVelocity(): [number, number, number];
     setLinearVelocity(velocity: Vec3, wakeUp?: boolean): this;
     get angularVelocity(): [number, number, number];

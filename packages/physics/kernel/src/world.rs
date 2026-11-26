@@ -171,6 +171,8 @@ pub struct Window {
     /// The last stamp this window's multibody walks left (`mb_roots`). A window claims its stamps from the header's count when it
     /// is set up (`claim_stamps`), two a substep, so windows solved at once never share one.
     pub mb_call: u32,
+    /// The substep being solved, from 0: a kinematic body on a smooth path (SMOOTH_PATH) moves at its chord over it.
+    pub substep: u32,
 }
 
 pub struct World {
@@ -936,7 +938,7 @@ impl World {
 
     pub fn whole_window(&self) -> Window {
         let h = self.header();
-        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None, substeps: 0, impacts: 0, mb_call: 0 }
+        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None, substeps: 0, impacts: 0, mb_call: 0, substep: 0 }
     }
 
     /// FNV-1a over the world's state, the replay proof's fingerprint: the header's scalars and every column but those of `SCRATCH`, which

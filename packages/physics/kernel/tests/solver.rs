@@ -647,3 +647,111 @@ fn a_plate_rides_a_deck_turning_about_an_axis_far_away() {
     assert!(worst < 1e-3, "the plate slid {worst} m on the deck");
     println!("the plate stayed within {worst:e} m of its place, 60 m from the pitch axis");
 }
+
+#[test]
+fn a_plate_rides_a_deck_on_a_smooth_path_for_minutes_at_any_substeps() {
+    // The pitching deck of `a_plate_rides_a_deck_turning_about_an_axis_far_away`, given the spin it is to reach each target
+    // with (SMOOTH_PATH): it moves along the cubic of its poses and spins, so its speed changes through the step and not at
+    // its start. Driven to its pose at one speed a step, the plate slipped 3.6 mm in six minutes at 8 substeps
+    // (KB-PHYS-KINJUMP1); on the smooth path it holds at 8 and 16. (From 32 substeps it still slips: KB-PHYS-FINECONE1.)
+    for substeps in [8u32, 16] {
+        let mut w = world(4);
+        w.header_mut().substeps = substeps;
+        let deck = w.add_body(KINEMATIC_POSITION).unwrap();
+        w.add_collider(deck, SHAPE_BOX, [70.0, 0.5, 8.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+        w.set_v(POSITION_X, deck as usize, v3(60.0, -0.5, 0.0));
+        w.set_u(FLAGS, deck as usize, w.flags(deck as usize) | SMOOTH_PATH);
+        let plate = block(&mut w, [0.12, 0.01, 0.12], v3(0.0, 0.01, 0.0), 600.0, false);
+        let (amplitude, omega) = (4.0f64.to_radians(), 2.0 * std::f64::consts::PI / 9.0);
+        let spin = |t: f64| (amplitude * omega * (omega * t).cos()) as f32;
+        let pose = |t: f64| {
+            let theta = amplitude * (omega * t).sin();
+            Q { x: 0.0, y: 0.0, z: (theta / 2.0).sin() as f32, w: (theta / 2.0).cos() as f32 }
+        };
+        w.set_v(START_ANGULAR_X, deck as usize, v3(0.0, 0.0, spin(0.0)));
+        w.set_v(ANGULAR_X, plate as usize, v3(0.0, 0.0, spin(0.0)));
+        w.set_v(LINEAR_X, plate as usize, v3(0.0, -60.0 * spin(0.0), 0.0));
+        let local = |w: &World| {
+            let q = w.q(ROTATION_X, deck as usize);
+            q.conjugate().rotate(w.v(POSITION_X, plate as usize).sub(w.v(POSITION_X, deck as usize)))
+        };
+        let start = local(&w);
+        let mut worst = 0.0f32;
+        for i in 1..=(360 * 60) {
+            let t = i as f64 / 60.0;
+            w.set_q(TARGET_ROTATION_X, deck as usize, pose(t));
+            w.set_v(TARGET_X, deck as usize, v3(60.0, -0.5, 0.0));
+            w.set_v(TARGET_ANGULAR_X, deck as usize, v3(0.0, 0.0, spin(t)));
+            w.step(DT);
+            let d = local(&w).sub(start);
+            worst = worst.max((d.x * d.x + d.z * d.z).sqrt());
+        }
+        assert!(worst < 1e-3, "{substeps} substeps: the plate slid {worst} m on the deck in six minutes");
+        println!("{substeps} substeps: the plate stayed within {worst:e} m over six minutes");
+    }
+}
+
+#[test]
+fn a_kinematic_body_on_a_smooth_path_lands_on_its_targets_and_moves_through_the_step_at_its_chords() {
+    // Targets 1 m apart a step with speeds of 0 and 120 m/s at the ends (a start and a stop of a 60 m/s mean): its chords
+    // over the substeps sum to the move, the first slow and the last fast, and it lands on each target exactly.
+    let mut w = world(2);
+    w.header_mut().substeps = 8;
+    let body = w.add_body(KINEMATIC_POSITION).unwrap();
+    w.add_collider(body, SHAPE_BALL, [0.1, 0.0, 0.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    w.set_u(FLAGS, body as usize, w.flags(body as usize) | SMOOTH_PATH);
+    w.set_v(TARGET_X, body as usize, v3(1.0, 0.0, 0.0));
+    w.set_v(TARGET_LINEAR_X, body as usize, v3(120.0, 0.0, 0.0));
+    w.step(DT);
+    assert_eq!(w.v(POSITION_X, body as usize), v3(1.0, 0.0, 0.0));
+    assert_eq!(w.v(START_LINEAR_X, body as usize), v3(120.0, 0.0, 0.0), "the next step begins at the speed it arrived with");
+    // The chords of that step, read back with the step's pose as its start: a cubic from rest to 120 m/s over 1 m.
+    w.set_v(PREVIOUS_X, body as usize, v3(0.0, 0.0, 0.0));
+    w.set_v(START_LINEAR_X, body as usize, v3(0.0, 0.0, 0.0));
+    let h = DT / 8.0;
+    let (mut sum, mut speeds) = (0.0f32, [0.0f32; 8]);
+    for s in 0..8u32 {
+        let (v, _) = w.smooth_velocity(body as usize, s, 8);
+        speeds[s as usize] = v.x;
+        sum += v.x * h;
+    }
+    assert!((sum - 1.0).abs() < 1e-5, "the chords move it {sum} m");
+    assert!(speeds[0] < speeds[7] && speeds.windows(2).all(|p| p[0] <= p[1] + 1e-3), "{speeds:?}");
+}
+
+#[test]
+fn a_smooth_path_spins_each_substep_by_the_turn_its_poses_make_when_its_axis_swings() {
+    // Spun about z at the step's start and about x at its end, through a half radian about x: the path's rotation vector swings
+    // through the step, and the turn its poses make over a substep, exp(b) exp(a)^-1, is not b - a (rotations do not
+    // commute). The spin is the Baker-Campbell-Hausdorff series to third order, so what is left is fourth order,
+    // under |a|^2 |b - a| / 12, and the rounding of the poses' quaternions, a few ten millionths of a radian. The plain
+    // b - a misses by the cross term (a x b) / 2, ten to a hundred times that.
+    let mut w = world(2);
+    w.header_mut().substeps = 8;
+    w.header_mut().step_dt = DT;
+    let body = w.add_body(KINEMATIC_POSITION).unwrap() as usize;
+    w.add_collider(body as u32, SHAPE_BOX, [1.0, 1.0, 1.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    w.set_u(FLAGS, body, w.flags(body) | SMOOTH_PATH);
+    let (spin_start, spin_end, half) = (v3(0.0, 0.0, 30.0), v3(30.0, 0.0, 0.0), 0.25f32);
+    w.set_v(START_ANGULAR_X, body, spin_start);
+    w.set_v(TARGET_ANGULAR_X, body, spin_end);
+    w.set_q(TARGET_ROTATION_X, body, Q { x: half.sin(), y: 0.0, z: 0.0, w: half.cos() });
+    let turn = v3(2.0 * half, 0.0, 0.0);
+    // The path's rotation vector at a share t of the step, in doubles' worth of care: the Hermite cubic of the step's turn.
+    let path = |t: f32| turn.scale(t * t * (3.0 - 2.0 * t)).add(spin_start.scale(t * (t * t - 2.0 * t + 1.0) * DT)).add(spin_end.scale(t * t * (t - 1.0) * DT));
+    let h = DT / 8.0;
+    for s in 1..7u32 {
+        let (_, _, before) = w.kinematic_pose(body, s - 1, 8);
+        let (_, _, after) = w.kinematic_pose(body, s, 8);
+        let mut r = after.mul(before.conjugate());
+        if r.w < 0.0 {
+            r = Q { x: -r.x, y: -r.y, z: -r.z, w: -r.w };
+        }
+        let made = r.to_rotation_vector();
+        let (a, b) = (path(s as f32 / 8.0), path((s + 1) as f32 / 8.0));
+        let bound = a.dot(a) * size(b.sub(a)) / 12.0 + 1e-6;
+        let spun = w.smooth_velocity(body, s, 8).1.scale(h);
+        assert!(size(made.sub(spun)) < bound, "substep {s}: spun {spun:?}, the poses turned {made:?}, bound {bound}");
+        assert!(size(made.sub(b.sub(a))) > 10.0 * size(made.sub(spun)), "substep {s}: b - a would have done as well");
+    }
+}

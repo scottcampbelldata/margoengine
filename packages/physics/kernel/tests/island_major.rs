@@ -113,7 +113,7 @@ fn a_moving_kinematic_platform_is_followed_to_the_bit_across_the_substeps() {
             assert!(same(p, w.v(POSITION_X, at)) && same(c, w.v(CENTER_X, at)), "kind {kind}, stage {stage}");
             let r = w.q(ROTATION_X, at);
             assert_eq!([q.x.to_bits(), q.y.to_bits(), q.z.to_bits(), q.w.to_bits()], [r.x.to_bits(), r.y.to_bits(), r.z.to_bits(), r.w.to_bits()]);
-            w.integrate_pose(at, h, stage + 1 == substeps as usize);
+            w.integrate_pose(at, h, stage as u32, substeps);
         }
         let (p, c, q) = staged[substeps as usize];
         assert!(same(p, w.v(POSITION_X, at)) && same(c, w.v(CENTER_X, at)), "kind {kind}, last stage");
