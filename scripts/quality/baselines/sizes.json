@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20173829,
+  "total": 20173819,
   "history": [
     {
       "date": "2026-10-24",
@@ -12888,8 +12888,8 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "7b50b86947",
-      "reason": "BREAK-03 adds 3517 B gzip for an optional measured normal crush contact with rigid recoil and durable seal data. Core and Stage add zero bytes.",
+      "commit": "a3241a7cbc",
+      "reason": "BREAK-03 adds 3507 B gzip for an optional measured normal crush contact with rigid recoil and durable seal data. Core and Stage add zero bytes.",
       "grew": 1
     }
   ],
@@ -13705,7 +13705,7 @@
     "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 3773,
+    "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,

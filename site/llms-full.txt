@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,236 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,240 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12542,6 +12542,10 @@ the rigid world. The method resolves broken pack ice rather than applying a cont
 resistance regression. The Water adapter displays equivalent thickness and a water-surface tangent.
 
 The optional Physics entry measures 5,112 B gzip with a 5,368 B ceiling. Each lazy Wasm asset uses 5,716 B raw and 2,534 B gzip. Water/ice measures 13,297 B gzip with a 13,364 B ceiling. Core plus stage stays at 24,820 B gzip.
+
+### Crush response for civilian barriers (BREAK-03)
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and ignores shear and sustained contact. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8120 B minified and 3507 B gzip. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -28965,6 +28969,10 @@ repro, replace the two independent disks in the pack-ice contact case with one e
 disk. The fracture work reduces its footprint and thickens its subgrid pile while its row stays
 single. Explicit bonds, fracture-created rows and contact with grounded bathymetry are needed to
 move those blocks independently.
+
+### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
+
+A floating hull can give up normal kinetic energy, recoil from a contact, and publish lost seal integrity through `CrushSolver`. Run the floating service craft test in `packages/physics/tests/coupling/crush.test.js` to reproduce a fully failed seal. The below-deck water mass still needs a SEA-10 compartment and opening geometry to connect a damaged station to hydrostatic head, displaced water and the hull's centre of mass. EF-11 also needs its original scene and the later failure sequence. PA-52 remains open for its other paths.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

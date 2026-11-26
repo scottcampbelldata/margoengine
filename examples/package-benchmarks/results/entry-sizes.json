@@ -14100,8 +14100,8 @@
         "gzip": 4666
       },
       "./crush": {
-        "raw": 8123,
-        "gzip": 3517
+        "raw": 8120,
+        "gzip": 3507
       }
     },
     "@margoengine/physics2d": {
