@@ -72,6 +72,7 @@ import {
 } from './bounce-math.js';
 import { termEmission, termState } from './bounce-terms.js';
 import { capturePipeline, frameCapture } from '../../shared/frame-capture.js';
+import { captureModel, drawCapture } from '../../shared/capture.js';
 import { requireCompatTier } from '../../shared/compat.js';
 import { rectFrame } from '../../shared/rect-frame.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; MAP_READ: number; UNIFORM: number };
@@ -83,6 +84,45 @@ const CAPTURE_BINDING = 165;
 type GpuPass = Extract<PassContext, { backend: 'webgpu' }>;
 /** The capture's output: diffuse albedo (Snow and every surface hook included) and the distance to the source. */
 const CAPTURE_TAIL = 'return vec4f(i.color*(1.0-i.material.y),length(i.position-frame.eye.xyz));';
+/**
+ * The capture hook LightBounce gives models (gltf/pbr's `PBRCapture`, terrain's `TerrainCapture`, voxel's and water's;
+ * declared here so clustered imports none of them): one rgba16float target holding the diffuse albedo and the distance
+ * to the capture's eye, as the core capture writes it.
+ */
+export interface BounceModelCapture {
+  declarations(code: string): string;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
+}
+/** What `bounce.add` takes: a gltf/pbr `PBRModel`, a `Terrain`, a voxel renderer or anything with the same capture hook. */
+export interface BounceModel {
+  setCapture(hook: BounceModelCapture): () => void;
+  onDispose(callback: () => void): () => void;
+  draw(context: PassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+}
+// The model capture's WGSL: gltf/pbr's PBR Surface gets `margoCapture(s, v, k)` (the base layer's share `k` after
+// clearcoat and sheen weighs its albedo), other shaders (terrain, water) `margoSSR(n, v, base, metal, rough)`. The
+// distance is from the drawn position (`margoPosition`, which the capture entry points set when it is declared) to the
+// view's eye, the shader's own Frame (`f` in gltf/pbr, `frame` in terrain); a shader with neither writes nothing.
+const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
+function bounceModelTail(code: string): string {
+  const eye = /var<uniform>\s*f\s*:\s*Frame/.test(code)
+      ? 'f.eye.xyz'
+      : /var<uniform>\s*frame\s*:\s*Frame/.test(code)
+        ? 'frame.eye.xyz'
+        : '',
+    out = (albedo: string) => (eye ? `vec4f(${albedo},length(margoPosition-${eye}))` : 'vec4f(0)');
+  return `
+var<private> margoPosition:vec3f;
+${
+  pbrSurface.test(code)
+    ? `struct MargoCapture {@location(0) bounce:vec4f}
+fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {return MargoCapture(${out('s.base.rgb*(1.0-s.metal)*k')});}`
+    : `struct MargoSSR {@location(0) bounce:vec4f}
+fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {return MargoSSR(${out('base*(1.0-metal)')});}`
+}
+`;
+}
 /** A readback older than this many frames is captured again. */
 const STALE_FRAMES = 120;
 
@@ -301,6 +341,36 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
   private dirty = false;
   private scaled = false;
   private disposed = false;
+  private readonly models = new Map<BounceModel, () => void>();
+  private readonly modelCode = new Map<string, string>();
+  private modelPass?: GPURenderPassEncoder;
+  private modelTarget?: { color: GPUTextureView; depth: GPUTextureView; stencil: boolean };
+  // Added models draw into the capture's own target after the core meshes, depth tested against them.
+  private readonly hook: BounceModelCapture = {
+    targets: [{ format: 'rgba16float' }],
+    declarations: (code) => {
+      let out = this.modelCode.get(code);
+      if (out === undefined) {
+        if (this.modelCode.size >= 64) this.modelCode.clear();
+        this.modelCode.set(code, (out = bounceModelTail(code)));
+      }
+      return out;
+    },
+    begin: () => {
+      if (this.modelPass) return this.modelPass;
+      const t = this.modelTarget!;
+      return (this.modelPass = this.captureEncoder!.beginRenderPass({
+        colorAttachments: [{ view: t.color, loadOp: 'load', storeOp: 'store' }],
+        depthStencilAttachment: {
+          view: t.depth,
+          depthLoadOp: 'load',
+          depthStoreOp: 'store',
+          ...(t.stencil ? { stencilLoadOp: 'load', stencilStoreOp: 'store' } : {}),
+        },
+      }));
+    },
+  };
+  private captureEncoder?: GPUCommandEncoder;
 
   constructor(options: LightBounceOptions) {
     if (!options?.lights || typeof options.lights.setLights !== 'function')
@@ -340,6 +410,22 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     this.openingList = this.checkOpenings(openings);
     this.dirty = true;
     return this;
+  }
+  /**
+   * Makes a gltf/pbr model, terrain or voxel renderer reflect the bounce: its own materials (maps, alpha mask, instances,
+   * skinning) are drawn into every capture after the core meshes. Returns a remover; a model not added still receives
+   * the bounce but reflects none. Adding or removing captures every source again.
+   */
+  add(model: BounceModel): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'LightBounce is disposed; attach a new LightBounce');
+    if (typeof model?.setCapture !== 'function')
+      throw new TypeError('LightBounce add takes a model with a capture hook (gltf/pbr PBRModel, Terrain)');
+    const remove = captureModel(this.models, model, this.hook);
+    this.invalidate();
+    return () => {
+      remove();
+      this.invalidate();
+    };
   }
   /** Captures every source again (after the scene changed while `refresh` is 0). */
   invalidate(): void {
@@ -602,6 +688,7 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
         height: c.height,
         format: c.format,
         view: c.view,
+        descriptor: c.descriptor,
       },
       hadView = Object.hasOwn(c, 'view');
     encoder
@@ -632,7 +719,20 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
         clear: false,
         clearDepth: false,
       });
+      if (this.models.size) {
+        // The capture's target is single-sampled whatever the scene's.
+        c.descriptor = {
+          ...c.descriptor,
+          multisample: { count: 1 },
+          depthStencil: { ...c.descriptor.depthStencil!, format: depthFormat },
+        };
+        this.captureEncoder = encoder;
+        this.modelTarget = { color: layer, depth, stencil: depthFormat.includes('stencil') };
+        for (const model of this.models.keys()) drawCapture(model, this.hook, c);
+      }
     } finally {
+      this.modelPass?.end();
+      this.modelPass = this.captureEncoder = this.modelTarget = undefined;
       Object.assign(c, saved);
       if (!hadView) delete (c as { view?: unknown }).view;
     }
@@ -729,6 +829,7 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const remove of [...this.models.values()]) remove();
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;

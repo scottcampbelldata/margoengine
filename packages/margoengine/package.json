@@ -187,6 +187,10 @@
       "types": "./dist/audio/doppler.d.ts",
       "import": "./dist/audio/doppler.js"
     },
+    "./audio/outdoor": {
+      "types": "./dist/audio/outdoor.d.ts",
+      "import": "./dist/audio/outdoor.js"
+    },
     "./audio/events": {
       "types": "./dist/audio/events.d.ts",
       "import": "./dist/audio/events.js"
@@ -434,6 +438,10 @@
     "./biomes/erosion-wasm": {
       "types": "./dist/biomes/erosion-wasm.d.ts",
       "import": "./dist/biomes/erosion-wasm.js"
+    },
+    "./biomes/growth": {
+      "types": "./dist/biomes/growth.d.ts",
+      "import": "./dist/biomes/growth.js"
     },
     "./biomes/forest": {
       "types": "./dist/biomes/forest.d.ts",
@@ -3219,6 +3227,10 @@
       "types": "./dist/physics/modal-sound.d.ts",
       "import": "./dist/physics/modal-sound.js"
     },
+    "./physics/outdoor-sound": {
+      "types": "./dist/physics/outdoor-sound.d.ts",
+      "import": "./dist/physics/outdoor-sound.js"
+    },
     "./physics/falling": {
       "types": "./dist/physics/falling.d.ts",
       "import": "./dist/physics/falling.js"
@@ -3254,6 +3266,10 @@
     "./physics/life": {
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
+    },
+    "./physics/crush": {
+      "types": "./dist/physics/crush.d.ts",
+      "import": "./dist/physics/crush.js"
     },
     "./physics/legged": {
       "types": "./dist/physics/legged.d.ts",
@@ -3295,6 +3311,10 @@
       "types": "./dist/physics/rogue.d.ts",
       "import": "./dist/physics/rogue.js"
     },
+    "./physics/ship": {
+      "types": "./dist/physics/ship.d.ts",
+      "import": "./dist/physics/ship.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
@@ -3307,13 +3327,29 @@
       "types": "./dist/physics/iceberg.d.ts",
       "import": "./dist/physics/iceberg.js"
     },
+    "./physics/thin-film": {
+      "types": "./dist/physics/thin-film.d.ts",
+      "import": "./dist/physics/thin-film.js"
+    },
+    "./physics/pack-ice": {
+      "types": "./dist/physics/pack-ice.d.ts",
+      "import": "./dist/physics/pack-ice.js"
+    },
     "./physics/runoff": {
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/drainage-fog": {
+      "types": "./dist/physics/drainage-fog.d.ts",
+      "import": "./dist/physics/drainage-fog.js"
+    },
     "./physics/snowpack": {
       "types": "./dist/physics/snowpack.d.ts",
       "import": "./dist/physics/snowpack.js"
+    },
+    "./physics/airborne": {
+      "types": "./dist/physics/airborne.d.ts",
+      "import": "./dist/physics/airborne.js"
     },
     "./physics/aeolian": {
       "types": "./dist/physics/aeolian.d.ts",

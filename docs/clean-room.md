@@ -1,5 +1,34 @@
 # Clean room
 
+### Outdoor sound propagation (SOUND-01)
+
+The absolute air losses implement ISO 9613-1:1993 equations (3)–(5) and the Annex B humidity conversion.
+Table 1(e) provides an independent rounded check for 1 kHz at 0 °C and 50% relative humidity.
+ISO 9613-2:2024 defines the outdoor engineering terms for divergence, atmosphere, ground and screening.
+<https://www.iso.org/standard/17426.html> and <https://www.iso.org/standard/74047.html>.
+
+Erik Salomons, *Computational Atmospheric Acoustics* (2001), and Kenneth Gilbert and Michael White,
+“Application of the parabolic equation to sound propagation in a refracting atmosphere” (1989), cover
+the effects of the effective sound-speed gradient and reflecting ground. Plovsing and Kragh,
+*Nord2000 Comprehensive Outdoor Sound Propagation Model, Part 2* (2001), §§2–4, uses a linear effective
+sound-speed profile for curved rays. Margo keeps the first-order paraxial term with both endpoints fixed
+and integrates the resolved path length and effective sound speed by midpoint quadrature.
+<https://doi.org/10.1007/978-94-010-0660-6>.
+[Gilbert and White](https://doi.org/10.1121/1.397587).
+[Nord2000](https://forcetechnology.com/-/media/force-technology-media/pdf-files/projects/nord2000/nord2000-comprehensive-outdoor-sound-propagation-model---part-2-propagation-in-an-atmosphere-with-re.pdf).
+
+ITU-R P.526-16 (2025), §4.1 and equations (26)–(31), supplies scalar Fresnel knife-edge loss. The solver
+uses the dominant terrain edge, replacing wavelength with the acoustic wavelength. An unobstructed
+path adds a coherent image source from one local horizontal plane.
+<https://www.itu.int/rec/R-REC-P.526-16-202511-I/en>.
+
+NASA/TM-20250003228 (2025), §3 and Fig. 3-1, gives the front, expansion and rear of the far-field civil
+aviation N-wave. The helper samples a prescribed symmetric waveform with optional linear rise.
+Laakso, Välimäki, Karjalainen and Laine (1996) describe band-limited fractional-delay methods. Playback
+uses the Web Audio DelayNode and tests its sample arrival against the same undelayed chain.
+<https://ntrs.nasa.gov/citations/20250003228>, <https://doi.org/10.1109/79.482137>,
+and <https://www.w3.org/TR/webaudio/#DelayNode>.
+
 ### Webcam hands and body to a skeleton in Input (2026-11-26)
 
 Michael Gleicher, Retargetting Motion to New Characters (SIGGRAPH 1998, https://doi.org/10.1145/280814.280820), and Jean-Sebastien Monzani, Paolo Baerlocher, Ronan Boulic and Daniel Thalmann, Using an Intermediate Skeleton and Inverse Kinematics for Motion Retargeting (Computer Graphics Forum 19(3), 2000, https://doi.org/10.1111/1467-8659.00393), for retargeting through an intermediate humanoid: `BodyDriver` maps the landmarks onto VRM humanoid bones (VRM 1.0 humanoid specification, https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm-1.0/humanoid.md) and rotates each bone so its rest direction (toward its child, from the skeleton or a calibration T-pose or A-pose) lies along the landmark direction: the shortest-arc quaternion for one direction, the change of orthonormal frame for a direction plus a side direction (hips, chest, hands). Joint limits clamp the turn from the rest rotation relative to the parent (a cone about the rest pose, the joint constraint of Andreas Aristidou and Joan Lasenby, FABRIK: A fast, iterative solver for the Inverse Kinematics problem, Graphical Models 73(5), 2011, https://doi.org/10.1016/j.gmod.2011.05.003). Point orders are the Pose Landmarker (Bazarevsky et al., BlazePose, 2020, https://arxiv.org/abs/2006.10204) and Hand Landmarker (Zhang et al., MediaPipe Hands, 2020, https://arxiv.org/abs/2006.10214) maps. Smoothing is the one-euro filter on each landmark direction. No detector, model or weights are shipped or fetched; no rival source was read.
@@ -2354,6 +2383,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | EX16 | In-between weights and blended skin share | fbx/src/deformers.ts, fbx/src/skin.ts | FbxBlendShapeChannel, FbxSkin and FbxCluster class references; piecewise linear stops and the share measured against OBJ frames Maya wrote |
 | EX18 | Character Creator material json: layout, texture slots, eye occlusion and tear line shells | fbx/src/character-creator.ts | Read from the structure of a json Character Creator wrote (no published spec, no reader source read); glTF 2.0 section 3.9 channel layout; the lid shadow as ambient occlusion of the eyeball (Zhukov, Iones and Kronin, EGWR 1998; Jimenez, von der Pahlen et al., "Next-Generation Character Rendering", GDC 2013), its numbers read by their names; sRGB transfer of IEC 61966-2-1 |
 | EX17 | FBX camera and light properties on export, and the turn from -Z to +X and -Y | fbx/src/export.ts | FbxCamera and FbxLight class references; thin lens field of view; checked by reading the file in Blender as a user |
+| EX19 | FBX curves on camera clip planes and light range and cone, the animatable flag, the default camera setting and the order glTF puts on near and far and on the two cone angles | fbx/src/export.ts | Autodesk FBX SDK class reference, FbxCamera and FbxLight (https://help.autodesk.com/cloudhelp/2015/ENU/FBX-Developer-Help/cpp_ref/class_fbx_light.html) and FbxGlobalSettings::SetDefaultCamera (https://download.autodesk.com/us/fbx/20112/FBX_SDK_HELP/files/WS73099cc142f487551fea285e1221e4f9ff8-60f3.htm); the Khronos glTF 2.0 specification on cameras (https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#cameras) and KHR_lights_punctual (https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_lights_punctual); the `DefaultCamera` property as real files in `packages/fbx/test/fixtures/real` write it. Search results and those files only; no research paper covers this file field, and no exporter source was read. The check of both keys of a pair and the instant before them is Margo-own |
 | EX4 | Euler XYZ to and from quaternion, slerp, Hermite sampling of glTF cubic keys | fbx/src/export.ts | Textbook rotation algebra (Shoemake 1985 for slerp); glTF 2.0 specification, appendix C, for the cubic spline |
 
 ### gltf/pbr
@@ -11944,6 +11974,44 @@ coupling through an accumulated field are this package's own arrangement. Proof:
 `tests/coupling/surf.test.js`.
 
 
+### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
+
+`packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,
+`icorels`, `huuska`, `rudderLiftSlope`, `thrusterThrust`), with the `wash` of a `FoamSolver` ship in
+`packages/physics/src/foam/index.ts`. Written from papers and public documentation only (no code of any manoeuvring simulator,
+ship-design tool, CFD code or companion code was opened):
+
+- H. Yasukawa and Y. Yoshimura, "Introduction of MMG standard method for ship maneuvering predictions", J. Mar. Sci.
+  Technol. 20, 37-52, 2015, https://doi.org/10.1007/s00773-014-0293-y (open access, read with its tables 1 to 5): the
+  equations of motion about the midship (eq. 4), the hull's polynomials (eq. 7), the propeller's thrust and wake (eqs. 8 to
+  16), the rudder's normal force with Fujii's f_alpha and the inflow of eq. 25 (appendix A), and the KVLCC2 particulars,
+  derivatives, interaction constants and simulated turning and zig-zag results the tests hold. The propeller's place x'_P
+  = -0.48 is from the SIMMAN 2008 particulars as remembered (not in the paper's tables).
+- J. Holtrop and G. G. J. Mennen, "An approximate power prediction method", International Shipbuilding Progress 29, 1982, and
+  J. Holtrop, "A statistical re-analysis of resistance and propulsion data", ISP 31, 1984 (read): the resistance set, the
+  wake fraction, thrust deduction, eta_R and Keller's blade area, and the worked example the test reproduces (the wetted area
+  of the appendages counts in c8 and R_A, as the printed figures need).
+- ITTC Recommended Procedure 7.5-02-03-01.4, "1978 ITTC Performance Prediction Method" (read): the ITTC-1957 line.
+- A. Haeusler, A. Saccon, A. Pascoal, J. Hauser and A. Aguiar, four-quadrant propeller modelling, 2015 (read), after Healey et
+  al. 1995: c_L = c_Lmax sin 2 alpha, c_D = c_Dmax (1 - cos 2 alpha) / 2. Here its pitch angle and two constants are fitted to
+  the open-water quadratic (bollard thrust, its slope and its zero), the engine's own arrangement.
+- G. A. Hamill and C. Kee, "Predicting axial velocity profiles within a diffusing marine propeller jet", Ocean Engineering
+  124, 2016, and G. A. Hamill and J. A. McGarvey, 1996 (read): the efflux 1.59 n D sqrt(C_t) of Blaauw and van de Kaa (1978),
+  the zone of flow establishment to 3.25 D (Stewart 1992) with Berger et al.'s ring profile, eq. 7 and eq. 20 for the
+  maximum speeds and Fuehrer and Roemisch's exp(-22.2 (r / X)^2).
+- S. Serban and V. Panaitescu, 2016 review of squat formulas (read, with its worked canal case): ICORELS, Huuska and Guliev,
+  Hooft's form of Tuck's law (E. O. Tuck, J. Fluid Mech. 26, 1966, through it).
+- The tunnel thruster's momentum bound T = (4 rho A)^(1/3) P^(2/3) is derived from the momentum balance of a jet that does not
+  contract; its figure of merit 0.55 (installed thrusters give 0.45 to 0.65) and the speed-loss curve's shape (a minimum near
+  half the thrust at a speed of 0.4 of the jet's, Karlikov and Sholomovich as a TU Delft thesis restates them) are
+  calibrations, recorded in docs/limits.md.
+
+The rigid body held to the MMG equations (eq. 3's forces on its own mass, its yaw inertia from the bodies port), squat as a
+sea drawn down along the hull for the HullSolver to float on, the race's induced speed as its far wake less its inflow, the
+quay's pull from a one-dimensional continuity estimate of the gap flow, the hull's draught as wake sources and the race's
+boil where its jet's e-folding radius reaches the shaft's depth are this package's own arrangement. Proof:
+`packages/physics/tests/ship.test.js`, `tests/coupling/ship.test.js` and the race's boil in `tests/foam.test.js`.
+
 ### Nonlinear and rogue waves (SEA-03, `@margoengine/physics/rogue`, 2026-11-26)
 
 `packages/physics/src/rogue/index.ts` (`NonlinearSea`, `seaStatistics`, `pairKernels`, `heightChance`, `crestChance`,
@@ -12113,6 +12181,21 @@ Proof: `packages/physics/tests/hydro.test.js` and `tests/coupling/hydro.test.js`
 The particle columns in world memory, the source's carried remainder, the exact mass ledger, the reflecting surface and
 the absorbing bed, the floating state, and the concentration grid with mass-weighted colour are this package's own
 arrangement. Proof: `packages/physics/tests/tracers.test.js` and `tests/coupling/tracers.test.js`.
+
+For the ray's bed jet (BB-7), D. J. Phares, G. T. Smedley, and R. C. Flagan, “The wall shear stress
+produced by the normal impingement of a jet on a flat surface” (2000), describes the off-centre wall
+jet and wall-stress dependence on jet height. Read §§2–3 and the submerged-jet evidence in §5.
+<https://doi.org/10.1017/S002211200000121X>. L. C. van Rijn, “Sediment Transport, Part II:
+Suspended Load Transport” (1984), uses the excess bed shear term relative to the critical stress.
+<https://doi.org/10.1061/(ASCE)0733-9429(1984)110:11(1613)>.
+
+Margo's reduced model spreads the wake radius by 0.1 m per metre of travel and applies 5% of
+the incident normal momentum flux as a footprint-averaged shear. These constants and the linear
+excess-stress erosion are modelling choices. Four stratified parcels sample the wall-jet footprint.
+They settle by the SEA-15 grain law. In the render fixture, their optical cross section is twice the
+projected geometric area in the large-particle limit (van de Hulst, *Light Scattering by Small
+Particles*, 1957, extinction paradox). The mass, source placement, and replay assertions use the
+same packed wake from the live swimmer.
 
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
@@ -12885,6 +12968,11 @@ Written from papers and notes read as text (no code, no companion repositories):
   Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard.
 - F. Gibou, R. Fedkiw, L.-T. Cheng and M. Kang, J. Comput. Phys. 176, 205-227, 2002 (as the course notes give it): the
   ghost-fluid free surface, theta = phi_i / (phi_i - phi_j), held at 0.01 or more.
+- T. Kugelstadt, A. Longva, N. Thuerey and J. Bender, "Implicit density projection for volume conserving liquids", IEEE
+  TVCG 27(4), 2021, https://doi.org/10.1109/TVCG.2019.2947437 (Algorithm 1, eqs. 10 to 12, section 3.2): the particles'
+  density on the grid (trilinear, rest density at eight particles a cell), held at 1 or more beside the air and to 0.5
+  to 1.5, the solids sampled as water at rest; a second pressure solve with the density's deviation as its source,
+  whose gradient moves the particles, their velocities unchanged.
 - H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10: the rotating frame's
   d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
 - M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):
@@ -13325,6 +13413,31 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Drainage fog and its live medium (ATMO-08)
+
+- P. C. Manins and B. L. Sawford (1979), [A Model of Katabatic Winds](https://journals.ametsoc.org/view/journals/atsc/36/4/1520-0469_1979_036_0619_amokw_2_0_co_2.xml).
+  The shallow hydraulic layer has drag, entrainment and buoyant forcing from the cold layer's density excess.
+  The implementation carries depth, momentum, moist enthalpy and total water. It computes reduced gravity from
+  the ambient and layer virtual temperatures and applies it along the gradient of the layer top. The shear
+  entrainment flux is `E0 |u - uAmbient| / (1 + Ri)` with `Ri = gReduced depth / |u - uAmbient|²`. This is its
+  regularized neutral-to-stable closure. It carries ambient momentum, water and heat with entrained air.
+- P. G. Duynkerke (1991), [Radiation Fog: A Comparison of Model Simulation with Detailed Observations](https://journals.ametsoc.org/view/journals/mwre/119/2/1520-0493_1991_119_0324_rfacom_2_0_co_2.xml).
+  The observed processes used here are longwave cooling, turbulent transport, fog condensation and droplet
+  settling. A grey-layer boundary applies `emissivity * sigma * (skyT⁴ - airT⁴)`. Surface sensible and latent
+  exchanges are separate inputs. Stokes settling passes `2 rhoWater g r² / (9 muAir)` through an implicit depth
+  update and credits the settled mass to the ground.
+- D. Bolton (1980), [The Computation of Equivalent Potential Temperature](https://journals.ametsoc.org/view/journals/mwre/108/7/1520-0493_1980_108_1046_tcoept_2_0_co_2.xml).
+  Equation 10 is `eSat = 611.2 exp(17.67 T_C / (T_C + 243.5))` in Pa, and the vapour mixing ratio is
+  `0.622 e / (p - e)`. Solve equilibrium by keeping `qVapour + qLiquid` and
+  `1005 (T - 273.15) + 2500000 qVapour` fixed during phase change. The native solver calls the project's pinned
+  exponential for both modes. Its column light extinction follows geometric optics with efficiency 2, giving
+  `3 rhoDryAir qLiquid / (2 rhoWater radius)` for dispersed spherical droplets.
+- J. Stam (1999), [Stable Fluids](https://doi.org/10.1145/311535.311548), and Y. Dobashi, K. Kaneda,
+  H. Yamashita, T. Okita and T. Nishimoto (2000), [A Simple, Efficient Method for Realistic Animation of Clouds](https://doi.org/10.1145/344779.344795).
+  The PA-34 research calls for density to evolve in the flow in place of rigid procedural scrolling. This fog
+  solver uses a conservative donor-cell flux for depth and the transported fields, with a face sill at the higher
+  bed elevation. Environment interpolates the resulting extinction in X and Z before froxel accumulation.
+
 ### Layered snowpack and dense avalanche obstacles (ICE-01)
 
 - P. Bartelt and M. Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X%2802%2900074-5).
@@ -13574,3 +13687,101 @@ exact tests are in the package README and whitepaper claims.
 The engine verifies variable cadence, coupled normal and lateral traction, mean support height from independent hoof
 samples, an airborne trot phase, canting and slope work, world-space foot forces and opposing impulse on an actual
 rigid platform. Full limb mechanics, rig hand-off and water displacement remain separate couplings.
+
+## Discrete-element pack ice and vessel loads (ICE-04)
+
+- W. D. Hibler III, “A Dynamic Thermodynamic Sea Ice Model” (1979). Its area and thickness distribution
+  motivates separate bookkeeping for a remaining level-ice footprint and conserved ice volume. This
+  entry represents already fragmented ice at the scale of individual floes.
+  [Paper](https://doi.org/10.1175/1520-0485(1979)009%3C0815:ADTSIM%3E2.0.CO;2)
+- Agnieszka Herman, “Molecular-dynamics simulation of clustering processes in sea-ice floes”
+  (2011), equations 1–11. Circular area and submerged and exposed edge heights set the linear
+  ocean and quadratic air drag. The hard-disc normal impulse is the reduced mass times
+  `(1+e)` times closing speed. The air term here uses relative velocity. See also Herman,
+  “Discrete-Element bonded-particle Sea Ice model DESIgn, version 1.3a” (2016), section 4,
+  for disk contact and Coulomb slip. This solver uses an impulse law for the unbonded floes.
+  [Hard-disc paper](https://arxiv.org/abs/1110.0617) · [DESIgn paper](https://doi.org/10.5194/gmd-9-1219-2016)
+- D. Vella and J. S. Wettlaufer, “Explaining the patterns formed by ice floe interactions”
+  (2008), equation 12. The simple rafting threshold is `(8/3) exp(π/2)(1−ν²)σ²/(ρwgE)`.
+  Its table 1 sea-ice data and section 2.2 thickness range are checked separately.
+  [Paper](https://doi.org/10.1029/2008JC004781)
+- M. A. Hopkins, S. Frankenstein and A. S. Thorndike, “Formation of an aggregate scale in
+  Arctic sea ice” (2004). Ridging converts level ice into thick rubble during compression. The
+  local remap here takes an annulus with the same radial loss as the contact band and conserves
+  its mass on the parent row. Thick ice first pays a fracture-work estimate `σ × edge area × cut`.
+  Remaining dissipated work pays `ρi g h` per cubic metre for lifting a raft, or `ρw g h/2`
+  per cubic metre for lifting and submerging equal halves of a ridge.
+  [Paper](https://doi.org/10.1029/2003JC001855)
+- Gustav Lindqvist, “A straightforward method for calculation of ice resistance of ships”
+  (1989), distinguishes breaking and submerging ice from other hull losses. The local capsule
+  contact here transmits its impulse to the live rigid body. It uses the computed discrete contact
+  work for fracture and piles rather than adding Lindqvist's empirical continuous level-ice drag.
+  [Proceedings](https://iptek.its.ac.id/index.php/ijmeir/article/downloadSuppFile/4042/312)
+
+The one shared contact point defines torque and the Coulomb bound. The SIMD native step rebuilds
+a deterministic fixed-load spatial hash, reduces initial relative travel per substep, solves each
+local pair once per substep, and uses only world-owned scratch. The same compiled solver works
+with or without shared memory. No companion code or external assets were used.
+
+### Ductile crashworthiness (BREAK-03)
+
+- M. M. Kamal, [Analysis and Simulation of Vehicle to Barrier Impact](https://doi.org/10.4271/700414) (1970), uses measured component crush characteristics to drive a barrier test model. The engine takes the member's measured loading curve as input.
+- Matthew Huang, [Vehicle Crash Mechanics](https://www.routledge.com/Vehicle-Crash-Mechanics/Huang/p/book/9780429118371) (2002), §4.4.4 and §4.5.1, derives reduced mass and the spring-barrier turning point. Eqs. 4.25(6) and 4.26 yield effective mass `mA mB / (mA + mB)` for central contact and elastic peak stroke `v sqrt(m / k)`.
+- Preben Terndrup Pedersen and Shengming Zhang, [On impact mechanics in ship collisions](https://orbit.dtu.dk/en/publications/on-impact-mechanics-in-ship-collisions-2/) (1998), separate the external impulse from structural work. The engine uses that separation for the normal component at a configured berthing station. Zhang's [The Mechanics of Ship Collisions](https://backend.orbit.dtu.dk/ws/files/5436875/Zhang.pdf) (1999), §3.2 and Fig. 3.1, discusses the scope of V. U. Minorsky's [An Analysis of Ship Collisions with Reference to Protection of Nuclear Power Plants](https://doi.org/10.5957/jsr.1959.3.2.1) (1959). The volume correlation sets historical context. The engine uses measured force-displacement response at the station.
+
+For unit normal `n` and contact arm `r`, the point's inverse mass along `n` is `1/m + (r × n) · I⁻¹(r × n)`. Sum both sides and invert to obtain effective mass. The yield curve is `F = Fy + H p` for persistent stroke `p`. Solving `F = k(x − p)` concurrently gives the post-yield tangent `kH/(k+H)`. Integrate each linear branch with `ΔW = F0 Δx + 0.5 k Δx²` and invert at incident relative kinetic energy. The recoverable energy is triangular elastic work plus the loaded backing's elastic work when compacted. The rest is permanent work. Apply the equal and opposite impulse implied by incident and rebound speeds at a single contact point so the angular momenta balance as well. This reduced event model was written from the cited mechanics and equations.
+
+## Thin liquid films on moving surfaces (FLUID-07)
+
+- Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid
+  films” (1997), equations 2.25–2.30. Substrate-normal gravity and surface tension give the
+  reduced pressure. Through-depth integration yields pressure mobility
+  `(h³/3 + βh²)/μ` and shear mobility `(h²/2 + βh)/μ` for Navier slip length β.
+  [Journal](https://doi.org/10.1103/RevModPhys.69.931) · [Paper](https://www.tmfcr.cz/39/pdf/04-oron.pdf)
+- Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
+  Contact angle gives an independent line force, and curvature links the exposed surface to
+  pressure. The present thin-film depth equation uses a parameter for contact-line retention
+  per unit width, with a local deadband only between wet and dry cells. It resolves a drop's
+  deposited volume and subcell footprint through conservative finite volumes.
+  [Author PDF](https://wanghmin.github.io/publication/wang-2005-wds/Wang-2005-WDS.pdf)
+- L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
+  Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum
+  principle. Here each shared face uses one single flux limited by the donor's total outgoing
+  water. This is a conservative remap after the implicit pressure solve.
+  [Author PDF](https://www.math.ucla.edu/~bertozzi/papers/ZhornitskayaBertozzi.pdf)
+- Ross Gunn and Gilbert D. Kinzer, “The Terminal Velocity of Fall for Water Droplets in
+  Stagnant Air” (1949). The atmospheric contract supplies both the measured-fall-speed model
+  and water-equivalent precipitation. The surface converts the horizontal flux to its
+  own area by the ratio of inward relative normal speed to still-air fall speed.
+  [Journal](https://doi.org/10.1175/1520-0469(1949)006%3C0243:TTVOFF%3E2.0.CO;2)
+
+The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
+the symmetric cell pressure operator K. It solves
+`[I + Δt sqrt(M) G K Gᵀ sqrt(M)] y = −sqrt(M) G p` by Jacobi PCG before applying the positive
+mass remap. A patch mounted on a body uses the published pose, angular velocity and the previous
+centre velocity. The impact couples to the wave-pressure field through the incoming normal
+momentum divided by step duration and the analytical area of the raised-cosine footprint.
+
+## ATMO-06 environmental airborne particles
+
+- Roland Clift, John R. Grace and Martin E. Weber, *Bubbles, Drops, and Particles* (1978). Spherical drag starts from the Stokes force 3πμd |Δu|. Schiller–Naumann multiplies it by 1 + 0.15 Re^0.687 with Re = ρₐ d |Δu| / μ. The spherical approximation uses Cᴅ = 0.44 above Re = 1,000. Cross-section divided by particle mass is 3/(2ρₚd). [Original volume](https://books.google.com/books?id=n8gRAQAAIAAJ).
+- C. N. Davies, *Definitive Equations for the Fluid Resistance of Spheres* (1945). The slip factor 1 + (λ/r)[1.257 + 0.4 exp(−1.1r/λ)] divides the low-Re drag rate. Mean free path follows from gas viscosity, density and molecular mean speed. [Published paper](https://doi.org/10.1088/0959-5309/57/4/301).
+- William Sutherland, *The Viscosity of Gases and Molecular Force* (1893). The viscosity ratio is (T/T₀)^(3/2)(T₀ + S)/(T + S) with dry-air coefficients and temperature in kelvins. [Original paper](https://doi.org/10.1080/14786449308620508).
+- D. J. Thomson, *Criteria for the Selection of Stochastic Models of Particle Trajectories in Turbulent Flows* (1987). Use the homogeneous Gaussian case. Set a = exp(−Δt/Tᴸ). Each gust component keeps a times its prior value and takes an independent Gaussian increment with standard deviation σ√(1 − a²), sampled by the parcel and tick's Philox keys. [Original paper](https://doi.org/10.1017/S0022112087001940).
+- James Clerk Maxwell, steady diffusion to a sphere (1877), and V. A. Vlasov, *On a Theory of Mass Transfer During the Evaporation of a Spherical Droplet* (2021). The diffusive mass flux is 4πrDᵥ times the difference between the saturated and ambient vapour densities. Combining it with spherical volume gives d(d²)/dt = −8Dᵥ times that density difference divided by liquid density. The Buck CR-1A manual supplies the saturation equation. [Mass-transfer paper](https://doi.org/10.1016/j.ijheatmasstransfer.2021.121597) · [Buck Research manual](https://www.hygrometers.com/wp-content/uploads/CR-1A-users-manual-2009-12.pdf).
+- M. D. Petters and S. M. Kreidenweis, *A Single Parameter Representation of Hygroscopic Growth and Cloud Condensation Nucleus Activity* (2007). Equation 6 with a flat interface gives the wet-to-dry diameter-cubed ratio 1 + κ RH/(1 − RH). Table 1 gives κ = 1.12 for mean measured sodium chloride growth. Shrinkage stops at equilibrium or at the dry solute when ambient humidity is zero. [Original paper](https://doi.org/10.5194/acp-7-1961-2007).
+- S. L. Gong, *A Parameterization of Sea-Salt Aerosol Source Function for Sub- and Super-Micron Particles* (2003), and E. L. Andreas, *A New Sea Spray Generation Function* (1998). The existing SEA-13 Gong source is per area of active whitecap. Three midpoint bins integrate the source over 1–20 µm r₈₀. SEA-13's formation convention sets r₀ ≈ 2r₈₀. The number flux times formation volume, density and patch area gives each representative mass-rate band. [Gong](https://doi.org/10.1029/2003GB002079) · [Andreas](https://doi.org/10.1175/1520-0485%281998%29028%3C2175%3AANSSGF%3E2.0.CO%3B2).
+
+The equation for frozen local wind and drag over a step is dv/dt = −β(v − u) + g(1 − ρₐ/ρₚ).
+Its analytical velocity and displacement use the exponential decay, its time integral and the
+integral of that integral. The Rust kernel computes X and Y together and uses the same arithmetic
+order for Z. Field reads precede the native batch. The transported materials are environmental
+mineral dust and water droplets.
+
+### Developmental plant growth (BIO-02)
+
+- Przemyslaw Prusinkiewicz and Aristid Lindenmayer, [The Algorithmic Beauty of Plants](https://algorithmicbotany.org/papers/#abop) (1990), chapters 2 and 4. The tree example in Fig. 2.6 uses a parent apex that creates an internode, a continuing apex and a lateral apex on the same production. The module instantiates that production synchronously at season boundaries. Lateral azimuth follows a configurable fixed divergence angle with the golden-angle default.
+- Wojciech Pałubicki, Kipp Horel, Steven Longay, Adam Runions, Brendan Lane, Radomír Měch and Przemyslaw Prusinkiewicz, [Self-organizing tree models for image synthesis](https://algorithmicbotany.org/papers/selforg.sig2009.small.pdf) (2009), §§4.1–4.5 and Fig. 8. The source adds penumbra `a b^(-q)` per layer, restores the emitting bud's own shade and distributes vigor in proportion to `λQmain` and `(1−λ)Qlateral`. The engine implements the attenuation as repeated multiplication by a retained fraction. Available source extension is bounded by the plant's measured seasonal maximum and scaled by relative soil water. The new direction is the normalized weighted sum of the current bud heading, a light-seeking direction from the shadow gradient, and the vertical tropism. The area-specialized pipe model sums squared radii at forks and keeps existing wood when support demand falls.
+- Sören Pirk, Ondřej Šťava, Julian Kratt, Michel Abdul Massih Said, Boris Neubert, Radomír Měch, Bedřich Beneš and Oliver Deussen, [Plastic Trees](https://graphics.uni-konstanz.de/publikationen/Pirk2012PlasticTreesInteractive/Pirk2012PlasticTreesInteractive.pdf) (2012), §5.3. Tree and obstacle shadows change branch results. Our branch creation follows the prior developmental model and tests new segments against the occupied voxel interior. It avoids re-deforming the existing parent skeleton.
+
+Each solver gets a contiguous topology region whose size follows the productive lifetime, the minimum eligible extension and the maximum seasonal resource. The two layout-compatible native kernels accumulate voxel penumbrae in fixed order and vectorize consecutive x cells. No initial bytes are written into the arena, as verified by a full-memory sentinel in both builds.

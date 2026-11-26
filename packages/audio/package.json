@@ -45,6 +45,10 @@
       "types": "./dist/doppler.d.ts",
       "import": "./dist/doppler.js"
     },
+    "./outdoor": {
+      "types": "./dist/outdoor.d.ts",
+      "import": "./dist/outdoor.js"
+    },
     "./events": {
       "types": "./dist/events.d.ts",
       "import": "./dist/events.js"

@@ -1,5 +1,5 @@
 {
-  "commit": "5628424515",
+  "commit": "386297db1f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -214,6 +214,10 @@
       "./stretch": {
         "raw": 1884,
         "gzip": 958
+      },
+      "./outdoor": {
+        "raw": 2663,
+        "gzip": 1191
       }
     },
     "@margoengine/behavior": {
@@ -446,6 +450,10 @@
       "./forest": {
         "raw": 16512,
         "gzip": 7194
+      },
+      "./growth": {
+        "raw": 12386,
+        "gzip": 5474
       }
     },
     "@margoengine/blender": {
@@ -1388,8 +1396,8 @@
         "gzip": 18446
       },
       "./fog-volumes": {
-        "raw": 2704,
-        "gzip": 1382
+        "raw": 5283,
+        "gzip": 2243
       },
       "./density-volume": {
         "raw": 8980,
@@ -14000,8 +14008,8 @@
         "gzip": 8761
       },
       "./tracers": {
-        "raw": 10950,
-        "gzip": 4696
+        "raw": 13135,
+        "gzip": 5616
       },
       "./schooling": {
         "raw": 12628,
@@ -14029,7 +14037,7 @@
       },
       "./life": {
         "raw": 17208,
-        "gzip": 7286
+        "gzip": 7293
       },
       "./falling": {
         "raw": 14435,
@@ -14090,6 +14098,30 @@
       "./legged": {
         "raw": 29240,
         "gzip": 11101
+      },
+      "./pack-ice": {
+        "raw": 12205,
+        "gzip": 5112
+      },
+      "./drainage-fog": {
+        "raw": 10863,
+        "gzip": 4666
+      },
+      "./crush": {
+        "raw": 8120,
+        "gzip": 3507
+      },
+      "./thin-film": {
+        "raw": 14421,
+        "gzip": 5917
+      },
+      "./airborne": {
+        "raw": 18860,
+        "gzip": 8260
+      },
+      "./outdoor-sound": {
+        "raw": 10097,
+        "gzip": 4391
       }
     },
     "@margoengine/physics2d": {
@@ -17042,8 +17074,8 @@
         "gzip": 11041
       },
       "./ice": {
-        "raw": 33974,
-        "gzip": 13079
+        "raw": 34635,
+        "gzip": 13297
       },
       "./splash": {
         "raw": 12829,
@@ -17911,6 +17943,56 @@
       "raw": 6455,
       "gzip": 2811,
       "brotli": 2611
+    },
+    "packages/physics/dist/pack-ice-kernel.wasm": {
+      "raw": 5716,
+      "gzip": 2534,
+      "brotli": 2318
+    },
+    "packages/physics/dist/pack-ice-kernel-shared.wasm": {
+      "raw": 5716,
+      "gzip": 2534,
+      "brotli": 2332
+    },
+    "packages/physics/dist/drainage-fog-kernel.wasm": {
+      "raw": 8955,
+      "gzip": 3273,
+      "brotli": 2865
+    },
+    "packages/physics/dist/drainage-fog-kernel-shared.wasm": {
+      "raw": 8955,
+      "gzip": 3273,
+      "brotli": 2870
+    },
+    "packages/physics/dist/thin-film-kernel.wasm": {
+      "raw": 9209,
+      "gzip": 3995,
+      "brotli": 3531
+    },
+    "packages/physics/dist/thin-film-kernel-shared.wasm": {
+      "raw": 9209,
+      "gzip": 3995,
+      "brotli": 3521
+    },
+    "packages/physics/dist/airborne-kernel.wasm": {
+      "raw": 610,
+      "gzip": 439,
+      "brotli": 410
+    },
+    "packages/physics/dist/airborne-kernel-shared.wasm": {
+      "raw": 610,
+      "gzip": 439,
+      "brotli": 410
+    },
+    "packages/biomes/dist/growth-kernel.wasm": {
+      "raw": 601,
+      "gzip": 449,
+      "brotli": 408
+    },
+    "packages/biomes/dist/growth-kernel-shared.wasm": {
+      "raw": 601,
+      "gzip": 449,
+      "brotli": 415
     }
   },
   "splits": {

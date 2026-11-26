@@ -20,6 +20,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
   both sides; a report both sides changed builds its own package only.
 
+### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
+
+- **Repro:** Send a brief sound from 3 km away. Its old positional path pans and attenuates the sound as soon as it plays.
+- **Cause:** Panning and Doppler act on the source's current pose. The graph carried no travel time or air absorption.
+- **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
+- **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
+  `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
+
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in
@@ -35,16 +43,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   300, bit for bit). The joint web's seed 1 now takes another path, on which its drivers do 1.7e12 J of work and a body
   reaches 172 km/s with no energy gained; `a_web_of_joints_stays_in_the_numbers` bounded speeds at 1e5 m/s, a figure with
   no derivation, and now bounds them by the range a step refuses past (RANGE), the energy ledger holding the physics.
-### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
+
+### Fixed 2026-11-26: a held hull's deck volume fed by the sea's inflow took about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
   water, `HullSolver` writing `deckInflow` and `DeckWaterSolver` (inflow on, the deck box on the deck, cells [20, 6, 10] of
   0.1 m). The deck volume takes the inflow and settles at 0.438 m^3 (4,297 N), but its load on the hull (its forces region,
   y) settles at -2,198 N after 6 s. KB-FLIP-DECKLOAD1's fix brought the same case from +1,124 N; its regression (0.3 m of
   water placed at the start, no inflow) takes the full weight.
-- **Cause:** not yet found, in how the deck volume's load treats water made by the inflow on a held hull. The hull
-  solver's side is right: it sees the claim and leaves its own deck load out (`packages/physics/tests/deck-water.test.js`,
-  "the deck volume claims its hull").
+- **Cause:** the water was right to the load; the particles were not right to the water. Each particle stands for an
+  eighth of a cell of water, but the inflow put its particles along the bulwark whether a cell there was full or not,
+  and particles then clustered where the flow converged and against the walls that stop them (FLIP's known volume loss):
+  at 6 s the deck's particles stood 16.8 to a cell, so the liquid the grid kept, and its load, were half the water they
+  counted.
+- **Fix:** the inflow puts each particle in the first cell inward from the bulwark with room for it (fewer than eight),
+  and the liquid now runs the implicit density projection of Kugelstadt, Longva, Thuerey and Bender (IEEE TVCG 27(4),
+  2021) after each advection: the particles' density on the grid, held at 1 or more beside the air and to 0.5 to 1.5,
+  with the walls sampled as water at rest, drives a second pressure solve whose gradient moves the particles apart.
+  The same case now holds the hull with -4,578 N for 4,393 N of water (within the grid's bound), its particles at 7.2 a
+  cell.
+- **Regression:** `packages/physics/tests/deck-water.test.js`, "the deck volume claims its hull, so the hull carries one
+  deck load, not two": the deck volume's load equals its water's weight within rho g l b h / 2.
 
 ### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
 
@@ -16303,10 +16322,10 @@ hit and before either body changes its enabled flag. See BIO-01 in [Framework re
 ## Open: LIFE-03 swimmer wake and contact consumers in Barrier Bay
 
 The engine's swimmer produces the field data for a pectoral bed jet (BB-7) and the tail wake (BB-8/9).
-The existing scenes still need a sediment solver that accepts the pectoral impulse and a surface/vortex solver
-that consumes the tail impulse. Reproduce the available source with
-`node --test packages/physics/tests/coupling/swim.test.js` after building Physics. The bed fixture reads the
-actual impulse using an analytic disk stand-in. The anemone fixture uses a contact wrench stand-in for BB-3.
+The bed jet now lifts, carries, and deposits real SEA-15 tracer mass. It is checked from the actual swim port
+by `packages/physics/tests/coupling/swim.test.js` and on both graphics backends by
+`packages/environment/tests/swim-sediment.browser.mjs`. The tail wake still needs a surface/vortex consumer.
+The anemone fixture uses a contact wrench stand-in for BB-3.
 A rendered shot check remains open for each row in [physics-demo-review.md](physics-demo-review.md).
 
 ## Fixed: world-stepped hail uses particle size and scene geometry (PA-32)
@@ -16341,6 +16360,13 @@ the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoun
 an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
+
+## Fixed: valley fog lacked transported extinction (ATMO-08, PA-34 fog)
+
+A stationary fog box could vary noise without transporting moisture, so it did not resolve a plume carried
+against a slope or across a valley. Bind `FogGrid` to `DrainageFog` as the volumetric medium. Its physics and
+rendered movement are covered by `packages/physics/tests/coupling/drainage-fog.test.js` and
+`packages/environment/tests/drainage-fog.browser.mjs`. PA-34 retains the separate cloud path.
 
 ## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
 
@@ -16388,8 +16414,7 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)
 
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
-does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
-and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.
+does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. General run-up and terrain, avalanche and lava sources still need SEA-06.
 
 ## Open: canonical fire and alpine canopy links (BIO-03)
 
@@ -16406,3 +16431,37 @@ footage predates these fixtures. To exercise the scene-level hand-off, connect t
 rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
 handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
 LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.
+
+### Pack ice grounded and continuous-sheet contacts
+
+ICE-04 handles floating pack ice against other floes and waterline capsules. An unbroken sheet
+cannot fragment into individually transported blocks under a bow in the current model. For a
+repro, replace the two independent disks in the pack-ice contact case with one equivalent larger
+disk. The fracture work reduces its footprint and thickens its subgrid pile while its row stays
+single. Explicit bonds, fracture-created rows and contact with grounded bathymetry are needed to
+move those blocks independently.
+
+### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
+
+A floating hull can give up normal kinetic energy, recoil from a contact, and publish lost seal integrity through `CrushSolver`. Run the floating service craft test in `packages/physics/tests/coupling/crush.test.js` to reproduce a fully failed seal. The below-deck water mass still needs a SEA-10 compartment and opening geometry to connect a damaged station to hydrostatic head, displaced water and the hull's centre of mass. EF-11 also needs its original scene and the later failure sequence. PA-52 remains open for its other paths.
+
+### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
+
+A sloped film can flow off the grid and report its discharge. A nonzero discharge in the
+thin-film gravity-drain test leaves the patch without spawning airborne ligaments or
+atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
+general sea keeps its existing wind-wave damping because heterogeneous rain suppression
+and airborne secondary-drop transport are separate atmosphere and surface-wave work.
+
+## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
+
+The live path receives aeolian mineral dust and whitecaps through registry fields. Existing footage and the
+legacy water spray and debris renderers still use their earlier particles. Footstep dust can use the emission port;
+the coupling fixture supplies its measured rate without an EARTH-05 source writer. The mass ledger tracks vapour
+and deposited mass. Temperature, humidity and bed composition feedback need coastal or ground output layouts with
+positions. Embers, ash, high-speed debris and snow are outside the environmental water/mineral scope here. See
+[Framework requests](physics-work-queue.md#framework-requests).
+
+### Woody plant growth geometry and moving obstacles (BIO-02)
+
+`PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.

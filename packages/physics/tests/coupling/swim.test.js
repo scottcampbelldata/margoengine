@@ -10,6 +10,7 @@ import {
 } from '@margoengine/physics/life';
 import { SchoolSolver } from '@margoengine/physics/schooling';
 import { SpectralSea } from '@margoengine/physics/sea';
+import { TracerSolver } from '@margoengine/physics/tracers';
 import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -254,46 +255,13 @@ test('SwimSolver replays bit-identically across frame schedules, snapshots, and 
   assert.equal(plain.hash(), normal.hash());
 });
 
-// A receiving port owns the sediment threshold. It sees the downward fin impulse only when an actuator moves.
-function bedPressureProbe() {
-  let host, pressure;
-  const values = () => new Float64Array(host.memory.buffer, pressure.byteOffset, 1);
-  return {
-    describe: () => ({
-      id: 'swim-bed',
-      rate: 0,
-      stableRate: () => 0,
-      fields: [{ field: SWIM_WAKE_FIELD, access: 'read' }],
-    }),
-    init(owner) {
-      host = owner;
-      pressure = host.allocate('bed-pressure', 8, 'f64', 1);
-    },
-    step(context, dt) {
-      const port = context.inputs.get(SWIM_WAKE_FIELD.name);
-      assert.equal(port.region.layout, SWIM_WAKE_LAYOUT);
-      const wake = new Float64Array(
-        (port.region.memory ?? host.memory).buffer,
-        port.region.byteOffset,
-        port.region.byteLength / 8,
-      );
-      // Analytic disk used solely as the stand-in for a future SEA-15 sediment consumer.
-      values()[0] = Math.max(0, -wake[12]) / (dt * Math.PI * wake[14] * wake[14]);
-    },
-    exportPorts: () => [],
-    importPorts() {},
-    stateRegions: () => [pressure],
-    extraState: () => [],
-    pressure: () => values()[0],
-  };
-}
-
-test('BB-7 a ray pectoral beat transfers a downward impulse through the world to the bed stand-in', async () => {
+test('BB-7 a pectoral beat lifts sand above a near bed and the plume drifts and settles', async () => {
   const swimmer = await SwimSolver.load();
-  const probe = bedPressureProbe();
+  const tracer = new TracerSolver('tracers', { bedJets: true });
   const frequency = 1,
     amplitude = 0.2,
-    area = 0.05;
+    area = 0.05,
+    depth = 0.5;
   const ray = {
     ...coast,
     position: [0, -0.2, 0],
@@ -301,12 +269,58 @@ test('BB-7 a ray pectoral beat transfers a downward impulse through the world to
     fins: { area, strokeAmplitude: amplitude, strokeFrequency: frequency },
     steering: [0, 1, 0],
   };
-  const world = put(swimmer, [ray]).add(probe, {});
+  const water = { medium: 'water', cell: zero, sample: () => ({ velocity: [0.5, 0, 0], density, temperature: 280 }) };
+  const world = put(swimmer, [ray]).add(tracer, {
+    bed: depth,
+    bedJets: { availableMass: 0.023 },
+    water,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+  });
   world.advance(1);
   const speed = 2 * Math.PI * frequency * amplitude * Math.cos(Math.PI * frequency * sec);
-  close(probe.pressure(), 0.5 * density * speed * speed);
+  const footprint = Math.PI * (Math.sqrt(area / Math.PI) + 0.1 * (depth + ray.position[1])) ** 2;
+  const shear = (0.05 * 0.5 * density * speed * speed * area) / footprint;
+  const threshold = 0.05 * (2650 - density) * -gravity * 2.5e-4;
+  close(tracer.jetErosion, 0.02 * (shear / threshold - 1) * footprint * sec);
   assert.ok(swimmer.read(0).velocity[1] > 0);
-  assert.ok(swimmer.read(0).finDisplacement > 0);
+  const first = [...tracer.particlesOf()];
+  assert.equal(first.length, 4);
+  assert.ok(first.every(({ position, state }) => position[1] > -depth && position[1] < 0 && state === 'water'));
+  const save = world.takeSnapshot();
+  world.advance(11);
+  const after = [...tracer.particlesOf()];
+  close(after[0].position[0] - first[0].position[0], 0.5 * 10 * sec);
+  assert.ok(after[0].position[1] < first[0].position[1]);
+  world.advance(180);
+  close(tracer.jetErosion, 0.023);
+  close(tracer.budget.water + tracer.budget.bed, tracer.jetErosion);
+  close(tracer.budget.bed, tracer.jetErosion);
+  const hash = world.hash();
+  world.restoreSnapshot(save.bytes);
+  world.advance(180);
+  assert.equal(world.hash(), hash);
+});
+
+test('BB-7 still fins and a bed below the jet footprint do not release sand', async () => {
+  for (const [depth, strokeAmplitude] of [
+    [0.5, 0],
+    [100, 0.2],
+  ]) {
+    const swimmer = await SwimSolver.load();
+    const tracer = new TracerSolver('tracers', { bedJets: true });
+    const ray = {
+      ...coast,
+      position: [0, -0.2, 0],
+      tail: noTail,
+      fins: { area: 0.05, strokeAmplitude, strokeFrequency: 1 },
+      steering: [0, 1, 0],
+    };
+    const world = put(swimmer, [ray]).add(tracer, { bed: depth });
+    world.advance(1);
+    assert.equal(tracer.jetErosion, 0);
+    assert.deepEqual([...tracer.particlesOf()], []);
+  }
 });
 
 test('BB-3 pectoral sculling can maintain station against a uniform current', async () => {

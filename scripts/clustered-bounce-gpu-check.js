@@ -96,6 +96,47 @@ try {
     );
   });
 
+  // KB-BOUNCE-CAPTURE1: the patch as a gltf/pbr model added to the bounce (`bounce.add`) reflects as the core patch
+  // does: its capture draws the model's own material into the same target, so the wall's bounce matches the core
+  // patch's within 2%, and the JS twin over the data the GPU reads within 2%. Not added, the model reflects nothing.
+  results.model = { rows: [] };
+  await call('scene', { ...patchScene({}), meshes: ['patchWall'], patchModel: 'not added' });
+  const unadded = (await call('settle', 30)).stats,
+    unaddedOn = await call('probe', points, wall);
+  results.model.notAdded = { stats: unadded, bounce: heights.map((_, i) => unaddedOn[i][0] - off[i][0]) };
+  check(
+    'a gltf/pbr patch not added to the bounce reflects nothing',
+    results.model.notAdded.bounce.every((b, i) => Math.abs(b) < 0.01 * (on[i][0] - off[i][0])),
+    results.model.notAdded,
+  );
+  await call('scene', { ...patchScene({}), meshes: ['patchWall'], patchModel: true });
+  const modelSettled = await call('settle', 30),
+    modelOn = await call('probe', points, wall);
+  results.model.stats = modelSettled.stats;
+  check(
+    'an added gltf/pbr patch is captured and reduced to virtual point lights',
+    modelSettled.stats.sources === 1 && modelSettled.stats.vpls >= 24 && modelSettled.stats.vpls <= 32,
+    modelSettled.stats,
+  );
+  heights.forEach((c, i) => {
+    const gpu = modelOn[i][0] - off[i][0],
+      core = on[i][0] - off[i][0],
+      twin =
+        (0.5 / Math.PI) *
+        bounceIrradiance(new Float32Array(modelSettled.data), points[i].slice(0, 3), points[i].slice(3))[0];
+    results.model.rows.push({ c, gpu, core, twin, errorCore: gpu / core - 1, errorTwin: gpu / twin - 1 });
+    check(
+      `c ${c}: the gltf/pbr patch bounces ${gpu.toFixed(5)}, within 2% of the core patch's ${core.toFixed(5)}`,
+      Math.abs(gpu / core - 1) < 0.02,
+      { gpu, core },
+    );
+    check(
+      `c ${c}: the gltf/pbr patch bounce ${gpu.toFixed(5)} within 2% of the JS twin's ${twin.toFixed(5)}`,
+      Math.abs(gpu / twin - 1) < 0.02,
+      { gpu, twin },
+    );
+  });
+
   // KB-BOUNCE-TERMS1: the same spot projecting a red | blue image (linear) bounces the colours it casts. Its direct light
   // on the floor is red on +x and blue on -x (the image's u runs along the spot camera's x, here -x); the bounce at a
   // wall point on either side follows it, red and blue sum to the plain spot's bounce there (the halves are

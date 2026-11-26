@@ -44,6 +44,18 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **BIO-02:** Promote branch topology and geometry rows to a shared growth contract, and expose an obstacle field
+  and cell extent contract for moving scene geometry. The optional entry publishes a versioned geometry graph, reads
+  the live HYDRO-02 field, and runs its slot-free occupancy test in both memory modes.
+
+- **ATMO-06:** Promote the environmental source flux and deposited/vapour mass fields for EARTH-05 footstep dust
+  and air/soil feedback. Publish source-grid geometry where types currently describe only rows. The airborne
+  entry reads the existing EARTH-07 dust and SEA-13 whitecap fields on matching geometry and exposes the scoped ports.
+
+- **BREAK-03:** SEA-10 needs a versioned compartment opening and resulting carried water mass and inertia. The
+  current crush entry publishes calibrated seal loss and posts matched normal and angular impulses through the
+  rigid ports. A contact effective-inertia port would share resolved fluid added mass during shorter crush events.
+
 - **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,
   crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
   ships its versioned exposure and output fields and consumes HYDRO-01 and HYDRO-04 directly on matching grids.
@@ -252,51 +264,51 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
-| FLUID-06 | Viscoplastic fluids at small scale | partial | Open | OPEN |
-| FLUID-07 | Thin films and droplets on surfaces | stand-in | Open | OPEN |
+| FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | BUILDING (codex/physics-lane-2) |
+| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | LANDED (75f931cd2c) |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | LANDED b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
-| ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
+| ATMO-06 | Airborne particle transport | stand-in | Codex | LANDED 965fab2df7 |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
-| ATMO-08 | Fog and cold-air drainage | stand-in | Codex | BUILDING (codex/physics-atmo-08) |
+| ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | LANDED 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | LANDED 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | LANDED d2fa3cb303 |
-| EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
+| EARTH-08 | Seismic waves and ground shaking | none | Codex | BUILDING (codex/physics-earth-08) |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |
 | ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | LANDED 7f5ad4a8d2 |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | LANDED 7dbf9e06ee |
-| ICE-04 | Pack ice and floes | stand-in | Codex | BUILDING (codex/physics-lane-2) |
+| ICE-04 | Pack ice and floes | stand-in | Codex | LANDED (dbc7a0efd9) |
 | ICE-05 | Ice thermodynamics | physics/ice | Codex | LANDED 7b64dddf4f |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
-| SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
-| SOUND-02 | Enclosed and urban acoustics | partial | Codex | BUILDING (codex/physics-lane-3) |
+| SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | LANDED 976796766b |
+| SOUND-02 | Enclosed and urban acoustics | partial | Codex | BUILDING (codex/physics-room-sound) |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
-| BIO-02 | Plant growth and morphogenesis | none | Codex | BUILDING (codex/physics-bio02) |
+| BIO-02 | Plant growth and morphogenesis | biomes/growth with HYDRO-02 soil and live Procedural branch graphs | Codex | LANDED d5e70fde20 |
 | BIO-03 | Forest ecosystem dynamics | sound | Codex | LANDED 609d76e5ce |
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
-| DYN-04 | Wheeled vehicles on roads | partial | Open | OPEN |
+| DYN-04 | Wheeled vehicles on roads | partial | Codex | BUILDING (codex/physics-dyn04) |
 | DYN-05 | Rail vehicle dynamics | none | Open | OPEN |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
-| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
+| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | LANDED cf8fb29389 |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | LANDED 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 708e96a06b |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |

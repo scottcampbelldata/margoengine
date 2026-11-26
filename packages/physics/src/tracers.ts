@@ -18,12 +18,13 @@
 //
 // Accepted differences: no oil weathering (evaporation, emulsification, dispersion into droplets by breaking waves), slicks
 // spread by turbulence only (no Fay gravity-viscous spreading), constant diffusivities (no profile, so no drift correction
-// is needed), no flocculation of fine silt, and particles that reach the bed stay there (no resuspension).
+// is needed), no flocculation of fine silt, and settled tracer parcels remain in the bed ledger.
 
 import type { Bed, FlowField, FlowSample, Wind } from '@margoengine/math/fields';
 import { cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
+import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
 import { regionWords } from './world/memory.js';
 import type {
   Cell,
@@ -95,6 +96,18 @@ export interface TracerSource {
   stop?: number;
 }
 
+/** Erodible bed material for a tracer solver with bed-jet coupling enabled. */
+export interface TracerBedJets {
+  /** The mobile fraction of the bed. Default 'sand'. */
+  material?: 'sand' | 'silt';
+  /** Shields threshold for initiation of motion. Default 0.05. */
+  criticalShields?: number;
+  /** Erosion at unit excess shear, kg/m²/s. Default 0.02. */
+  erodibility?: number;
+  /** Total erodible bed mass in this simulation cell, kg. Default Infinity. */
+  availableMass?: number;
+}
+
 /** Settings of a {@link TracerSolver}; each has a default. */
 export interface TracerParams {
   /** The sources. */
@@ -119,6 +132,8 @@ export interface TracerParams {
   particleMass?: number;
   /** The most particles at once (default 20000); a source that would pass it releases heavier particles meanwhile. */
   capacity?: number;
+  /** Erodible layer struck by the swimming wake when bed-jet coupling is enabled. */
+  bedJets?: TracerBedJets;
 }
 
 /** Columns of a particle: x, y, z, mass, material, state (0 free, 1 in the water, 2 on the surface, 3 on the bed). */
@@ -128,6 +143,7 @@ const WATER = 1;
 const SURFACE = 2;
 const BED = 3;
 const ORIGIN: Cell = [0, 0, 0];
+const JET_PARCELS = 4;
 
 /** Ferguson and Church's settling speed, m/s, of a grain of `material` in water of `density` and viscosity `nu` (negative rises). */
 export function settlingVelocity(
@@ -151,9 +167,12 @@ export function settlingVelocity(
  */
 export class TracerSolver implements Solver<TracerParams> {
   private readonly id: string;
+  private readonly useBedJets: boolean;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
-  private params!: Required<Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources'>> & { bed: Bed | number };
+  private params!: Required<Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets'>> & {
+    bed: Bed | number;
+  };
   private sources: { material: number; source: TracerSource }[] = [];
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
@@ -162,18 +181,28 @@ export class TracerSolver implements Solver<TracerParams> {
   private random!: RandomStream;
   private particles!: Region;
   private ledger!: Region;
+  private jetBed?: { material: number; threshold: number; erodibility: number; limit: number };
   private g = gravityMagnitude(DEFAULT_GRAVITY);
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
-  /** @param id The solver's id (default `'tracers'`). */
-  constructor(id = 'tracers') {
+  /**
+   * @param id The solver's id (default `'tracers'`).
+   * @param options Enable `bedJets` to receive `SwimSolver` water impulses (default false).
+   */
+  constructor(id = 'tracers', options: { bedJets?: boolean } = {}) {
     this.id = id;
+    this.useBedJets = options.bedJets ?? false;
   }
 
   describe(): SolverDescription {
     return {
       id: this.id,
-      fields: [{ field: TRACER_FIELD, access: 'write' }],
+      fields: this.useBedJets
+        ? [
+            { field: TRACER_FIELD, access: 'write' },
+            { field: SWIM_WAKE_FIELD, access: 'read' },
+          ]
+        : [{ field: TRACER_FIELD, access: 'write' }],
       rate: 0 as RateLevel,
       stableRate: () => 0 as RateLevel,
     };
@@ -246,17 +275,54 @@ export class TracerSolver implements Solver<TracerParams> {
         throw new RangeError(
           `Source ${n}'s rate is a finite number of kg/s, 0 or more (got ${source.rate}); pass one.`,
         );
-      let index = this.materials.indexOf(material);
-      if (index < 0) {
-        index = this.materials.push(material) - 1;
-        this.settling.push(material.floats ? 0 : settlingVelocity(material, waterDensity, viscosity, this.g));
-      }
-      this.sources.push({ material: index, source });
+      this.sources.push({ material: this.materialIndex(material), source });
     });
+    if (this.useBedJets) {
+      const {
+        material = 'sand',
+        criticalShields = 0.05,
+        erodibility = 0.02,
+        availableMass = Infinity,
+      } = params.bedJets ?? {};
+      if (
+        (material !== 'sand' && material !== 'silt') ||
+        !(criticalShields > 0 && Number.isFinite(criticalShields)) ||
+        !(erodibility >= 0 && Number.isFinite(erodibility)) ||
+        !(availableMass >= 0)
+      )
+        throw new RangeError(
+          'Invalid erodible tracer bed; pass sand or silt with positive Shields and non-negative erosion and mass.',
+        );
+      const grains = TRACER_MATERIALS[material];
+      if (!(waterDensity < grains.density && this.g > 0))
+        throw new RangeError(
+          'The tracer bed requires sinking grains under gravity; use water less dense than the grains and nonzero gravity.',
+        );
+      this.jetBed = {
+        material: this.materialIndex(grains),
+        threshold: criticalShields * (grains.density - waterDensity) * this.g * grains.diameter,
+        erodibility,
+        limit: availableMass,
+      };
+    }
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
     // Released, in the water, on the surface, on the bed (kg), and each source's mass not yet released as a particle.
-    this.ledger = host.allocate('ledger', (4 + this.sources.length) * 8, 'f64', TRACER_LAYOUT);
+    this.ledger = host.allocate(
+      'ledger',
+      (4 + this.sources.length + Number(this.useBedJets)) * 8,
+      'f64',
+      TRACER_LAYOUT,
+    );
+  }
+
+  private materialIndex(material: TracerMaterial): number {
+    const index = this.materials.indexOf(material);
+    if (index !== -1) return index;
+    this.settling.push(
+      material.floats ? 0 : settlingVelocity(material, this.params.waterDensity, this.params.viscosity, this.g),
+    );
+    return this.materials.push(material) - 1;
   }
 
   private words(): Float64Array {
@@ -364,6 +430,61 @@ export class TracerSolver implements Solver<TracerParams> {
       words[p + 1] = ny;
       words[p + 2] = nz;
     }
+    if (this.jetBed) this.entrainBed(context, dt, free, this.jetBed);
+  }
+
+  private entrainBed(context: StepContext, dt: number, free: number, bed: NonNullable<TracerSolver['jetBed']>): void {
+    const port = context.inputs.get(SWIM_WAKE_FIELD.name);
+    if (!port) return;
+    const { region } = port;
+    if (region.layout !== SWIM_WAKE_LAYOUT || region.type !== 'f64' || region.byteLength % (SWIM_WAKE_WORDS * 8))
+      throw new RangeError(
+        'The swim wake port has an incompatible layout; connect the current SwimSolver wake output.',
+      );
+    const wake = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
+    const words = this.words(),
+      book = this.book(),
+      lifted = 4 + this.sources.length,
+      { capacity, waterLevel } = this.params;
+    for (let w = 0; w < wake.length; w += SWIM_WAKE_WORDS) {
+      const x = wake[w]!,
+        y = wake[w + 1]!,
+        z = wake[w + 2]!,
+        downward = -wake[w + 4]!,
+        radius = wake[w + 6]!,
+        height = y - this.bedAt(x, z);
+      if (!(wake[w + 7]! > 0 && downward > 0 && radius > 0 && height > 0 && y <= waterLevel)) continue;
+      const centreX = x + height * (wake[w + 3]! / downward),
+        centreZ = z + height * (wake[w + 5]! / downward);
+      // The jet expands on the way down. Take an effective shear over the wall-jet footprint.
+      const spread = radius + 0.1 * hypot(height, centreX - x, centreZ - z);
+      const area = Math.PI * spread * spread;
+      const shear = (0.05 * downward) / (dt * area);
+      const mass = Math.min(bed.erodibility * (shear / bed.threshold - 1) * area * dt, bed.limit - book[lifted]!);
+      if (!(mass > 0 && Number.isFinite(mass))) continue;
+      for (let parcel = 0; parcel < JET_PARCELS; parcel++) {
+        while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;
+        if (free === capacity) return;
+        const random = this.random.block(context.tick, w / SWIM_WAKE_WORDS, parcel + 1);
+        const angle = (2 * Math.PI * (parcel + (random[0]! + 0.5) / 4294967296)) / JET_PARCELS;
+        const distance = spread * pow(0.0625 + (0.7475 * (random[1]! + 0.5)) / 4294967296, 0.5);
+        const px = centreX + distance * cos(angle),
+          pz = centreZ + distance * sin(angle),
+          floor = this.bedAt(px, pz);
+        if (!(floor < waterLevel)) continue;
+        const at = free++ * STRIDE,
+          amount = mass / JET_PARCELS;
+        words[at] = px;
+        words[at + 1] = floor + Math.min(spread * 0.3, (waterLevel - floor) * 0.5);
+        words[at + 2] = pz;
+        words[at + 3] = amount;
+        words[at + 4] = bed.material;
+        words[at + 5] = WATER;
+        book[lifted]! += amount;
+        book[0]! += amount;
+        book[1]! += amount;
+      }
+    }
   }
 
   /** Three standard normal numbers for particle `i` at `tick`, by Box-Muller from the counter-based stream. */
@@ -397,6 +518,11 @@ export class TracerSolver implements Solver<TracerParams> {
     return { released: b[0]!, water: b[1]!, surface: b[2]!, bed: b[3]! };
   }
 
+  /** Cumulative kg lifted out of the erodible layer by water jets. Included in `budget.released`. */
+  get jetErosion(): number {
+    return this.jetBed ? this.book()[4 + this.sources.length]! : 0;
+  }
+
   /** Every live particle: position, mass, material index (into {@link TracerSolver.materialList}) and where it is. */
   *particlesOf(): Generator<{
     position: [number, number, number];
@@ -418,7 +544,7 @@ export class TracerSolver implements Solver<TracerParams> {
     }
   }
 
-  /** The materials of the sources, in the order particles name them. */
+  /** The materials of the releases, including the erodible bed layer, in the order particles name them. */
   get materialList(): readonly TracerMaterial[] {
     return this.materials;
   }

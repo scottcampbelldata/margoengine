@@ -4311,3 +4311,11 @@ and submerged steel example without external datasets.
 Build Physics and Horses, then run `node --test --test-timeout=20000 packages/physics/tests/legged.test.js packages/physics/tests/coupling/legged.test.js packages/horses/test/legged-drive.test.js`.
 The fixtures exercise measured cadence, a climb against gravity, the available traction budget, grounded torso
 response, real terrain, and a translating rigid support with an opposing impulse.
+
+### Civil barrier crush
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics` and run `node --test packages/physics/tests/crush.test.js packages/physics/tests/coupling/crush.test.js`. The tests cover analytical contact work, momentum, both arena memory modes, frame rates, capped seek, and a floating seakeeping hull. `node packages/physics/scripts/test-browser.js --crush-only` repeats the fixed-barrier impulse and replay in the browser.
+
+### Developmental wood growth
+
+Build Biomes and the Physics and Procedural prerequisites, then run `node --test packages/biomes/tests/coupling/growth.test.js`. Launch the browser with `node packages/biomes/tests/growth-browser.mjs` and use `MARGO_COMPAT=1` for its compatibility mode. Compare the optional native files with `node scripts/wasm-blueprints.mjs --rebuild --compare --only=growth-kernel,growth-kernel-shared`.

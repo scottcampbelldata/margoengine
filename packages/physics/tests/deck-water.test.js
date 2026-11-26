@@ -200,7 +200,10 @@ test('the deck volume claims its hull, so the hull carries one deck load, not tw
       const held = new Float64Array(world.memory.buffer, hull.exportPorts(0)[0].region.byteOffset, (body.row + 1) * 6)[
         body.row * 6 + 1
       ];
-      return { held, water: withDeck ? deck.count : 0 };
+      // The deck volume's own load on the hull (its bodyForces), and the weight of the water it holds.
+      const load = withDeck ? deck['words'](deck['forcesRegion'])[body.row * 6 + 1] : 0,
+        weight = withDeck ? (deck['density'] * G * deck.count * 0.1 ** 3) / 8 : 0;
+      return { held, water: withDeck ? deck.count : 0, load, weight };
     },
     shared = run(true),
     alone = run(false),
@@ -210,9 +213,13 @@ test('the deck volume claims its hull, so the hull carries one deck load, not tw
     Math.abs(shared.held - sides) <= 1e-4 * sides,
     `claimed: the hull solver holds ${shared.held} N, sides ${sides}`,
   );
-  // The deck volume took the sea's inflow (its own load on the hull is the still-water test's above; KB-FLIP-DECKLOAD2
-  // tracks its size on a held dynamic hull fed by the inflow).
+  // The deck volume took the sea's inflow, and its load on the held hull is that water's weight within the grid's bound,
+  // half a cell of water over the deck's area: rho g l b h / 2 (KB-FLIP-DECKLOAD2: about half of it before).
   assert.ok(shared.water > 0, 'the deck volume took the inflow');
+  assert.ok(
+    Math.abs(shared.load + shared.weight) <= (1000 * G * l * b * 0.1) / 2,
+    `the deck volume holds the hull with ${shared.load} N for ${shared.weight} N of water`,
+  );
   assert.ok(
     Math.abs(alone.held - whole) <= 1e-4 * whole,
     `alone: the hull solver holds ${alone.held} N, ${whole} with the deck`,

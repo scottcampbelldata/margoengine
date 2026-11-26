@@ -252,9 +252,11 @@ const {fbx} = await exportFBX({
 console.log(fbx.byteLength);
 ```
 
-A perspective camera is written as a 1 inch film and the lens that gives its `yfov`. `OrthoZoom` is the wider side of the view in metres, in a file of any unit. Light intensity is written as the percentage FBX has, times 100, so 3 is 300; point and spot lights are written with quadratic decay, glTF's fall-off, and `range` as far attenuation. Cone angles are doubled into the whole cone, in degrees. An open far plane has no FBX form: it is written a million near planes out. A camera or light that glTF would refuse is refused here with the same message. Curves on lens, colour and intensity are written from `propertyClips` (below); curves on the clip planes, range and cone are not, and a `defaultCamera` flag does not become the file's default camera.
+A perspective camera is written as a 1 inch film and the lens that gives its `yfov`. `OrthoZoom` is the wider side of the view in metres, in a file of any unit. Light intensity is written as the percentage FBX has, times 100, so 3 is 300; point and spot lights are written with quadratic decay, glTF's fall-off, and `range` as far attenuation. Cone angles are doubled into the whole cone, in degrees. An open far plane has no FBX form: it is written a million near planes out. A camera or light that glTF would refuse is refused here with the same message. Curves on cameras and lights are written from `propertyClips` (below). The camera whose `extras.defaultCamera` is true becomes the file's `DefaultCamera`, which `sceneExtras` flags again on reading; FBX names it by its model, so two cameras flagged under different names, or an unflagged camera sharing the name, throw a `TypeError`. Default none.
 
-A lens pull or a light fade is a `propertyClips` entry: curves on a perspective camera's `yfov` (written as both `FieldOfView` and the `FocalLength` it gives), a light's `intensity` or its `color` (three values per key), each on the node that carries the camera or light. A clip shares the stack of a node clip with the same `name`, or makes its own. A curve on a node that holds no matching camera or light, or a `yfov` on an orthographic camera, throws a `TypeError`. Keys are `STEP` or `LINEAR`.
+A lens pull or a light fade is a `propertyClips` entry, each curve on the node that carries the camera or light. Camera curves: `yfov` (perspective only, above 0 and below PI, written as both `FieldOfView` and the `FocalLength` it gives), `znear` and `zfar` in metres (`NearPlane`, `FarPlane`). Light curves: `intensity`, `color` (three values per key), `range` in metres (`FarAttenuationEnd`; a point or spot light that sets `range`), and a spot's `innerConeAngle` and `outerConeAngle` in radians from the axis (written as the whole cone in degrees). A property a curve drives is flagged animatable. A clip shares the stack of a node clip with the same `name`, or makes its own. Keys are `STEP` or `LINEAR`.
+
+A curve on a node that holds no matching camera or light, a `yfov` on an orthographic camera, a `range` or cone curve on a light that has none, or two curves on one property in a clip throw a `TypeError`. A key outside the values glTF allows the property, a `zfar` that does not stay above `znear`, or an outer cone that does not stay above the inner one (checked at every key and just before it, against the other value's curve or its resting value) throws a `RangeError`.
 
 ```ts
 import {exportFBX} from 'margoengine/fbx/export';
@@ -264,6 +266,7 @@ const {fbx} = await exportFBX({nodes: [shot, key]}, {
   propertyClips: [{name: 'Rack', channels: [
     {node: shot, property: 'yfov', times: [0, 2], values: [0.8, 0.4]},
     {node: key, property: 'intensity', times: [0, 2], values: [3, 0]},
+    {node: shot, property: 'znear', times: [0, 2], values: [0.1, 1]},
   ]}],
 });
 console.log(fbx.byteLength);

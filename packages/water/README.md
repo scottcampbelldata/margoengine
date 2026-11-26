@@ -1770,3 +1770,24 @@ console.log(water.time); // 3
 `cell`, `lifetime` and `strength` shape the rings, which fade out with distance. With `splashes: { field }` heavier
 drops also fall into a `Ripples` field around the camera, so the simulated surface moves too. It composes with
 `WaterFlow` in either attach order.
+
+### Display a simulated pack
+
+Pass a live `floeSource` to `SeaIce` to display the simulated floes. Call `update` after advancing or
+restoring the physics world. The surface still supplies heave and tilt, while each floe supplies its
+world XZ position, yaw, diameter and volume-equivalent thickness. Use the same origin cell for both.
+
+```ts
+import { PackIceSolver } from '@margoengine/physics/pack-ice';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { SeaIce } from '@margoengine/water/ice';
+
+const pack = await PackIceSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pack, {
+  floes: [{ position: [0, 0], velocity: [0.25, 0], radius: 1, thickness: 0.1 }],
+});
+const view = new SeaIce({ kind: 'floe', size: [40, 40], floeSource: pack });
+world.advance(1);
+view.update({ sample: () => ({ height: 0 }) }, 1 / 60);
+console.log(view.matrices[12]);
+```

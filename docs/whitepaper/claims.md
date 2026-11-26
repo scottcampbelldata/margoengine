@@ -9,6 +9,18 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Outdoor sound (SOUND-01, 2026-11-26). Terrain ridge diffraction, Weather wind, the round-trip ground image
+  and the ISO 9613-1 coefficient are checked against independent reference values. Web Audio delays a 3 km
+  pulse by 8.74044 s at 48 kHz relative to its otherwise identical undelayed filter chain. Reproduce with
+  `node --test packages/physics/tests/coupling/outdoor-sound.test.js` and
+  `node packages/audio/tests/outdoor-sound.browser.mjs` after building Physics and Audio.
+
+- Ray fin and seabed coupling (BB-7, 2026-11-26). The live swimming port entrains sand from the near bed
+  and leaves a distant bed or still fins clear. The mass ledger closes as the plume settles. The rendered
+  fixture moves 14.1 pixels downstream on WebGPU and the WebGL2 compatibility backend before clearing.
+  Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` and
+  `node packages/environment/tests/swim-sediment.browser.mjs` with and without `--compat` after building.
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes
@@ -5530,6 +5542,14 @@ agree between 24 and 60 frame-per-second views of one world, and snapshots repro
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
 
+### Radiation fog transport and rendering (ATMO-08)
+
+The layer conserves moist enthalpy and total water during condensation and warming. Its step ledger accounts for
+entrainment, drying or evaporation at the surface, boundary export and deposition. A live terrain slope accelerates
+dense air downhill. In the focused browser fixture, the visible extinction moves downstream through
+the existing volumetric pipeline on both backends. See `packages/physics/tests/coupling/drainage-fog.test.js` and
+`packages/environment/tests/drainage-fog.browser.mjs` after the scoped package builds.
+
 ### Layer heat, meltwater and snow obstacles (ICE-01)
 
 The two-layer conduction fixture matches the closed-form backward-Euler temperature difference and preserves
@@ -5601,3 +5621,39 @@ LIFE-01 produces quadruped and biped pose from normal support, compressive sprin
 and a gait chosen by measured speed. Tests reproduce variable equine cadence, slower uphill locomotion, bank and
 slip, diagonal trot flight, and transfer of the opposite contact impulse to a rigid platform. The scoped coupling
 harness verifies identical hashes through snapshot and replay.
+
+### Floating pack ice contact and material conservation (ICE-04)
+
+The optional pack-ice entry transfers equal and opposite linear momentum between its discrete
+floes and the existing rigid vessel. Local pile formation preserves ice volume. The coupling
+tests check unequal-mass restitution against its closed form, verify the published rafting
+threshold, account for level, rafted and ridged material, and step the same vessel with SEA-08
+buoyancy enabled. The Water bridge uses that world state to write the rendered instance matrices.
+[Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
+[Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
+
+### Civil barrier crush
+
+The reduced station model conserves rigid linear momentum and transfers the predicted normal work into permanent deformation. `packages/physics/tests/coupling/crush.test.js` compares the observed work to the kinetic-energy loss on two unequal masses and checks the angular response at an offset contact. The floating hull fixture verifies recoil and seal loss while actual seakeeping loads remain active. The bounded claim covers calibrated normal events on configured contact stations.
+
+### Conservative thin films and physical rain coupling (FLUID-07)
+
+The 2D Oron lubrication solve agrees with the linear discrete capillary decay and the analytical
+viscous gravity flux across a glass sill. Real rigid-body motion changes rain intercepted by
+the window and the wind-driven direction of runnels. An impact on a wet platform adds its
+water exactly once and applies pressure to a zero-net-volume dispersive ring.
+[Closed-form tests](../../packages/physics/tests/thin-film.test.js) ·
+[Coupling tests](../../packages/physics/tests/coupling/thin-film.test.js)
+
+### Resolved dust and water droplet trajectories (ATMO-06)
+
+`packages/physics/tests/airborne.test.js` compares both memory builds with the closed-form Stokes trajectory and
+a diffusion-limited wet diameter squared. A dry sea-spray parcel retains the configured salt mass fraction.
+The homogeneous turbulence fixture compares the sample mean and variance with the analytic OU distribution.
+`packages/physics/tests/coupling/airborne.test.js` drives dust from a real aeolian bed, passes active SEA-13
+whitecaps into three airborne bands and reproduces a wind-advected ground dust pulse. It checks mass closure,
+frame-rate invariance and exact replay. These are solver and source-link checks.
+
+### Developmental wood growth
+
+Plants sharing the Biomes growth field give different branch extension when their measured local soil water differs. The reported angle, branch area and depth attenuation agree with analytical cases in `packages/biomes/tests/coupling/growth.test.js`. The resulting three-internode fixture meshes to 36 triangles in Chromium and replays bit for bit after restore.

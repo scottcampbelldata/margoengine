@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "build:airborne": "node scripts/build-airborne-kernel.mjs",
     "build": "node scripts/build.js",
     "test": "npm run build && node scripts/build-oracle.js && node --test tests/*.test.js tests/coupling/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-preview.js && node scripts/test-replay.js --browsers=default",
@@ -76,6 +77,10 @@
       "types": "./dist/modal-sound.d.ts",
       "import": "./dist/modal-sound.js"
     },
+    "./outdoor-sound": {
+      "types": "./dist/outdoor-sound/index.d.ts",
+      "import": "./dist/outdoor-sound.js"
+    },
     "./falling": {
       "types": "./dist/falling.d.ts",
       "import": "./dist/falling.js"
@@ -111,6 +116,10 @@
     "./life": {
       "types": "./dist/life/index.d.ts",
       "import": "./dist/life.js"
+    },
+    "./crush": {
+      "types": "./dist/crush/index.d.ts",
+      "import": "./dist/crush.js"
     },
     "./legged": {
       "types": "./dist/legged/index.d.ts",
@@ -152,6 +161,10 @@
       "types": "./dist/rogue/index.d.ts",
       "import": "./dist/rogue.js"
     },
+    "./ship": {
+      "types": "./dist/ship/index.d.ts",
+      "import": "./dist/ship.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"
@@ -164,13 +177,29 @@
       "types": "./dist/iceberg/index.d.ts",
       "import": "./dist/iceberg.js"
     },
+    "./thin-film": {
+      "types": "./dist/thin-film/index.d.ts",
+      "import": "./dist/thin-film.js"
+    },
+    "./pack-ice": {
+      "types": "./dist/pack-ice/index.d.ts",
+      "import": "./dist/pack-ice.js"
+    },
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./drainage-fog": {
+      "types": "./dist/drainage-fog/index.d.ts",
+      "import": "./dist/drainage-fog.js"
+    },
     "./snowpack": {
       "types": "./dist/snowpack/index.d.ts",
       "import": "./dist/snowpack.js"
+    },
+    "./airborne": {
+      "types": "./dist/airborne/index.d.ts",
+      "import": "./dist/airborne.js"
     },
     "./aeolian": {
       "types": "./dist/aeolian/index.d.ts",

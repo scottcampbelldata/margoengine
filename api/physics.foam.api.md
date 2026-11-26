@@ -56,6 +56,13 @@ export interface FoamShip {
     };
     readonly length: number;
     readonly beam: number;
+    readonly wash?: (time: number) => readonly {
+        readonly position: readonly [number, number];
+        readonly direction: readonly [number, number];
+        readonly reach: number;
+        readonly radius: number;
+        readonly speed: number;
+    }[];
 }
 
 export class FoamSolver implements Solver<FoamParams> {
@@ -84,6 +91,8 @@ export const SATURATION_THRESHOLD = 0.0009;
 export const SEA_FOAM_FIELD: FieldDescriptor;
 
 export const SEA_FOAM_LAYOUT = 1;
+
+export const WASH_SPEED = 1;
 
 export const WHITECAP_COEFFICIENT = 0.3;
 

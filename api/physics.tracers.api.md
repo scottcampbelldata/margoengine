@@ -46,6 +46,13 @@ export const TRACER_MATERIALS: {
     };
 };
 
+export interface TracerBedJets {
+    material?: 'sand' | 'silt';
+    criticalShields?: number;
+    erodibility?: number;
+    availableMass?: number;
+}
+
 export interface TracerMaterial {
     density: number;
     diameter?: number;
@@ -67,10 +74,13 @@ export interface TracerParams {
     verticalDiffusivity?: number;
     particleMass?: number;
     capacity?: number;
+    bedJets?: TracerBedJets;
 }
 
 export class TracerSolver implements Solver<TracerParams> {
-    constructor(id?: string);
+    constructor(id?: string, options?: {
+        bedJets?: boolean;
+    });
     describe(): SolverDescription;
     init(host: SolverHost, params?: TracerParams): void;
     step(context: StepContext, dt: number): void;
@@ -84,6 +94,7 @@ export class TracerSolver implements Solver<TracerParams> {
         surface: number;
         bed: number;
     };
+    get jetErosion(): number;
     particlesOf(): Generator<{
         position: [number, number, number];
         mass: number;

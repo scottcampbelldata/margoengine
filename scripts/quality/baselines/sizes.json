@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20145913,
+  "total": 20201252,
   "history": [
     {
       "date": "2026-10-24",
@@ -12855,6 +12855,72 @@
       "commit": "7a5fc90bc0",
       "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) deck volume keeps its water's volume",
+      "reason": "physics/flip 9,249 to 10,188 B gzip (this Mac): Kugelstadt et al.'s implicit density projection after each advection (the particles' density on the grid, the walls sampled as water at rest, a second pressure solve moving clustered particles apart) and the inflow placing particles only in cells with room (KB-FLIP-DECKLOAD2). It is part of the liquid's step; a separate entry would carry the solver again.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "014c8749d",
+      "reason": "physics/ship is a new optional entry (SEA-09): ShipSolver (MMG manoeuvring on rigid bodies, squat as a drawn-down sea, bow thruster, quay suction, wake sources and the race's boil), Manoeuvring, Propeller with four quadrants and its race field, Holtrop and Mennen resistance and squat laws; 11,202 B gzip, its own entry so scenes without ships pay nothing. Core plus stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "eab592cfd1",
+      "reason": "ICE-04 adds physics/pack-ice at 5112 B gzip with lazy no-slot SIMD assets. Water/ice changes from 13079 to 13297 B for the structural SeaIce pose reader. A separate adapter would duplicate matrix code. Core plus stage is 24820 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "80679b25b4",
+      "grew": 2,
+      "reason": "ATMO-08 entry sizes, previous record to current: @margoengine/physics/drainage-fog 0→4666 B (ceiling 0→4922 B); @margoengine/environment/fog-volumes 1382→2243 B (ceiling 1638→2499 B). The drainage-fog entry integrates the registry and lazily loads the arena solver. The live renderer samples resolved optical columns using one storage binding and shares the existing volumetric pipeline. An additional entry would add a module for the same environment medium interface."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3ead56c312",
+      "reason": "KB-BOUNCE-CAPTURE1: clustered/bounce 14,967 to 15,419 B gzip: LightBounce.add draws gltf/pbr models and terrain into its captures through the shared capture hook (the hook, its WGSL tail and the 1x model pass); a separate entry would load the same LightBounce class twice. gltf/prepare 35,482 to 35,545 B: extendedPlan groups slots by colour space (shareOwner) and ownSlot picks the sRGB member, so packed specular colour decodes as sRGB; the rule is the plan itself, nothing to split",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "a3241a7cbc",
+      "reason": "BREAK-03 adds 3507 B gzip for an optional measured normal crush contact with rigid recoil and durable seal data. Core and Stage add zero bytes.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c1a005f944",
+      "grew": 1,
+      "reason": "BB-7 physics/tracers grows from 4696 to 5616 B gzip, raising its ceiling from 4952 to 5872 B. The optional swimming-wake mode entrains sediment directly into the existing tracer mass ledger. A separate entry would duplicate routing or expose the ledger for a second solver."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d8e800d08e",
+      "reason": "FLUID-07 adds physics/thin-film at 5917 B gzip (cap 6173 B). The moving-pane fields, pressure rings and drainage are optional and load independent stateless native assets. Core plus stage is 24820 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "386297db1f",
+      "reason": "ATMO-06 adds the optional 8260 B gzip environmental airborne solver. Wind sampling, source conservation and terrain deposition share parcel state. Splitting them would duplicate the field setup and accounting. Core plus stage gains 0 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d5e70fde20",
+      "reason": "BIO-02 adds 5474 B gzip for optional plant phenology, soil water, and branch geometry. Its SIMD penumbra is fetched lazily by memory mode. Core and Stage add zero bytes.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "976796766b",
+      "grew": 2,
+      "reason": "SOUND-01 optional entries: @margoengine/physics/outdoor-sound 4391 B gzip from zero, @margoengine/audio/outdoor 1191 B gzip from zero. Applications can use the path solver without Web Audio, or bind a path to playback without loading physics."
     }
   ],
   "items": {
@@ -12899,6 +12965,7 @@
     "@margoengine/audio/events": 5687,
     "@margoengine/audio/music": 2157,
     "@margoengine/audio/occlusion": 1772,
+    "@margoengine/audio/outdoor": 1447,
     "@margoengine/audio/pan": 933,
     "@margoengine/audio/resample": 1553,
     "@margoengine/audio/scan": 1330,
@@ -12943,6 +13010,7 @@
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
+    "@margoengine/biomes/growth": 5730,
     "@margoengine/biomes/hydrology": 5138,
     "@margoengine/biomes/io": 4543,
     "@margoengine/biomes/koppen": 1231,
@@ -13029,7 +13097,7 @@
     "@margoengine/clustered/area": 14883,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 14967,
+    "@margoengine/clustered/bounce": 15419,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6713,
     "@margoengine/clustered/cube-projector": 4716,
@@ -13190,7 +13258,7 @@
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 8421,
     "@margoengine/environment/exr-write": 2084,
-    "@margoengine/environment/fog-volumes": 1638,
+    "@margoengine/environment/fog-volumes": 2499,
     "@margoengine/environment/gi": 19000,
     "@margoengine/environment/ground": 5064,
     "@margoengine/environment/lightformer": 3402,
@@ -13319,7 +13387,7 @@
     "@margoengine/gltf/pbr-instancing": 3448,
     "@margoengine/gltf/pbr-model": 71859,
     "@margoengine/gltf/physics": 10323,
-    "@margoengine/gltf/prepare": 35482,
+    "@margoengine/gltf/prepare": 35545,
     "@margoengine/gltf/progressive": 101363,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/report": 11799,
@@ -13667,14 +13735,17 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
     "@margoengine/physics/aeolian": 5889,
     "@margoengine/physics/ageing": 5178,
+    "@margoengine/physics/airborne": 8516,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
+    "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 9249,
+    "@margoengine/physics/flip": 10188,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,
@@ -13688,6 +13759,8 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
+    "@margoengine/physics/outdoor-sound": 4647,
+    "@margoengine/physics/pack-ice": 5368,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/rogue": 7930,
@@ -13696,13 +13769,15 @@
     "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 16953,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/tracers": 4952,
+    "@margoengine/physics/thin-film": 6173,
+    "@margoengine/physics/tracers": 5872,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/waves": 8575,

@@ -73,9 +73,9 @@ const smoothstep = (a: number, b: number, x: number) => {
 
 /** Imaginary index of ice, 400 to 700 nm every 10 nm (Warren and Brandt 2008). */
 export const ICE_IMAGINARY_INDEX: readonly number[] = Object.freeze([
-  2.365e-11, 2.669e-11, 3.135e-11, 4.14e-11, 6.268e-11, 9.239e-11, 1.325e-10, 1.956e-10, 2.861e-10, 4.172e-10, 5.889e-10,
-  8.036e-10, 1.076e-9, 1.409e-9, 1.813e-9, 2.289e-9, 2.839e-9, 3.461e-9, 4.159e-9, 4.93e-9, 5.73e-9, 6.89e-9, 8.58e-9,
-  1.04e-8, 1.22e-8, 1.43e-8, 1.66e-8, 1.89e-8, 2.09e-8, 2.4e-8, 2.9e-8,
+  2.365e-11, 2.669e-11, 3.135e-11, 4.14e-11, 6.268e-11, 9.239e-11, 1.325e-10, 1.956e-10, 2.861e-10, 4.172e-10,
+  5.889e-10, 8.036e-10, 1.076e-9, 1.409e-9, 1.813e-9, 2.289e-9, 2.839e-9, 3.461e-9, 4.159e-9, 4.93e-9, 5.73e-9, 6.89e-9,
+  8.58e-9, 1.04e-8, 1.22e-8, 1.43e-8, 1.66e-8, 1.89e-8, 2.09e-8, 2.4e-8, 2.9e-8,
 ]);
 /** Absorption coefficient of pure ice, 1/m, at a wavelength of 400 to 700 nm (log-linear between the table's rows). */
 export function iceAbsorption(nanometres: number): number {
@@ -333,11 +333,26 @@ export class IceMaterial extends WgslMaterial {
       h = finite(plane.height, -1e5, 1e5, 'water height');
     const u = this.uniforms as Record<string, number | Float32Array | readonly number[]>;
     u.iceWater = [x, z, h, this.look.wetHeight];
-    u.iceSlope = [finite(plane.slopeX ?? 0, -10, 10, 'water slope'), finite(plane.slopeZ ?? 0, -10, 10, 'water slope'), this.look.wetDarkening, this.look.wetRoughness];
+    u.iceSlope = [
+      finite(plane.slopeX ?? 0, -10, 10, 'water slope'),
+      finite(plane.slopeZ ?? 0, -10, 10, 'water slope'),
+      this.look.wetDarkening,
+      this.look.wetRoughness,
+    ];
     this.notchMesh = finite(meshWaterline, -1e5, 1e5, 'mesh waterline');
-    u.iceNotch = [this.notchMesh, this.look.notchHeight, this.look.notchDepth, finite(worldWaterline, -1e5, 1e5, 'world waterline')];
+    u.iceNotch = [
+      this.notchMesh,
+      this.look.notchHeight,
+      this.look.notchDepth,
+      finite(worldWaterline, -1e5, 1e5, 'world waterline'),
+    ];
     if (meshUp !== undefined) {
-      if (!Array.isArray(meshUp) || meshUp.length !== 3 || !meshUp.every(Number.isFinite) || !(Math.hypot(meshUp[0], meshUp[1], meshUp[2]) > 0))
+      if (
+        !Array.isArray(meshUp) ||
+        meshUp.length !== 3 ||
+        !meshUp.every(Number.isFinite) ||
+        !(Math.hypot(meshUp[0], meshUp[1], meshUp[2]) > 0)
+      )
         throw rangeError('IceMaterial meshUp must be three finite numbers, not zero', 'geometry');
       const l = Math.hypot(meshUp[0], meshUp[1], meshUp[2]);
       u.iceNotchUp = [meshUp[0] / l, meshUp[1] / l, meshUp[2] / l, 0];
@@ -422,13 +437,18 @@ interface Moments {
 }
 function triangles(mesh: IceMesh): { p: ArrayLike<number>; index: (k: number) => number; count: number } {
   const p = mesh?.positions;
-  if (!p || typeof p.length !== 'number' || p.length < 12 || p.length % 3) throw typeError('Ice mesh needs positions (x, y, z triples)', 'geometry');
+  if (!p || typeof p.length !== 'number' || p.length < 12 || p.length % 3)
+    throw typeError('Ice mesh needs positions (x, y, z triples)', 'geometry');
   const idx = mesh.indices,
     count = idx ? idx.length : p.length / 3;
   if (count % 3 || count < 12) throw typeError('Ice mesh needs whole triangles, four or more', 'geometry');
   const vertices = p.length / 3;
-  if (idx) for (let k = 0; k < idx.length; k++) if (!Number.isInteger(idx[k]) || idx[k] < 0 || idx[k] >= vertices) throw rangeError('Ice mesh index out of range', 'geometry');
-  for (let k = 0; k < p.length; k++) if (!Number.isFinite(p[k])) throw rangeError('Ice mesh positions must be finite', 'geometry');
+  if (idx)
+    for (let k = 0; k < idx.length; k++)
+      if (!Number.isInteger(idx[k]) || idx[k] < 0 || idx[k] >= vertices)
+        throw rangeError('Ice mesh index out of range', 'geometry');
+  for (let k = 0; k < p.length; k++)
+    if (!Number.isFinite(p[k])) throw rangeError('Ice mesh positions must be finite', 'geometry');
   return { p, index: idx ? (k) => idx[k] : (k) => k, count };
 }
 type Mesh3 = ReturnType<typeof triangles>;
@@ -484,7 +504,13 @@ function below(mesh: Mesh3, c: number, rotate?: (v: number[]) => number[]): Mome
   }
   return { volume, first };
 }
-function solveWaterline(mesh: Mesh3, target: number, lo: number, hi: number, rotate?: (v: number[]) => number[]): number {
+function solveWaterline(
+  mesh: Mesh3,
+  target: number,
+  lo: number,
+  hi: number,
+  rotate?: (v: number[]) => number[],
+): number {
   for (let k = 0; k < 80; k++) {
     const mid = (lo + hi) / 2;
     if (below(mesh, mid, rotate).volume < target) lo = mid;
@@ -523,13 +549,18 @@ export function iceBuoyancy(mesh: IceMesh, options: BuoyancyOptions = {}): Buoya
     const A = [p[a], p[a + 1], p[a + 2]],
       B = [p[b], p[b + 1], p[b + 2]],
       C = [p[c], p[c + 1], p[c + 2]];
-    const det = A[0] * (B[1] * C[2] - B[2] * C[1]) - A[1] * (B[0] * C[2] - B[2] * C[0]) + A[2] * (B[0] * C[1] - B[1] * C[0]);
+    const det =
+      A[0] * (B[1] * C[2] - B[2] * C[1]) - A[1] * (B[0] * C[2] - B[2] * C[0]) + A[2] * (B[0] * C[1] - B[1] * C[0]);
     volume += det / 6;
     const s = [A[0] + B[0] + C[0], A[1] + B[1] + C[1], A[2] + B[2] + C[2]];
     for (let j = 0; j < 3; j++) first[j] += (det / 24) * s[j];
     for (let j = 0; j < 3; j++) second[j] += (det / 120) * (A[j] * A[j] + B[j] * B[j] + C[j] * C[j] + s[j] * s[j]);
   }
-  if (!(volume > 0)) throw rangeError('Ice mesh encloses no volume; pass a closed mesh wound outward (counter-clockwise from outside)', 'geometry');
+  if (!(volume > 0))
+    throw rangeError(
+      'Ice mesh encloses no volume; pass a closed mesh wound outward (counter-clockwise from outside)',
+      'geometry',
+    );
   const g = [first[0] / volume, first[1] / volume, first[2] / volume] as [number, number, number];
   const fraction = ice / water,
     target = volume * fraction;
@@ -599,7 +630,7 @@ export function iceBuoyancy(mesh: IceMesh, options: BuoyancyOptions = {}): Buoya
     for (let j = 0; j < 3; j++) {
       const a = v[j],
         c = v[(j + 1) % 3];
-      if ((a[1] <= waterline) !== (c[1] <= waterline)) {
+      if (a[1] <= waterline !== c[1] <= waterline) {
         const t = (waterline - a[1]) / (c[1] - a[1]);
         hits.push([a[0] + (c[0] - a[0]) * t, a[2] + (c[2] - a[2]) * t]);
       }
@@ -607,7 +638,10 @@ export function iceBuoyancy(mesh: IceMesh, options: BuoyancyOptions = {}): Buoya
     if (hits.length === 2) segments.push([...hits[0], ...hits[1]]);
   }
   // The waterplane's area centroid: the rate the displaced first moment grows, over the area.
-  const centre: [number, number] = area > 0 ? [(up.first[0] - down.first[0]) / (2 * e * area), (up.first[2] - down.first[2]) / (2 * e * area)] : [b[0], b[2]];
+  const centre: [number, number] =
+    area > 0
+      ? [(up.first[0] - down.first[0]) / (2 * e * area), (up.first[2] - down.first[2]) / (2 * e * area)]
+      : [b[0], b[2]];
   const footprint = new Float64Array(FOOTPRINT_SAMPLES);
   for (let k = 0; k < FOOTPRINT_SAMPLES; k++) {
     const t = (2 * Math.PI * k) / FOOTPRINT_SAMPLES,
@@ -673,7 +707,11 @@ export function iceBuoyancy(mesh: IceMesh, options: BuoyancyOptions = {}): Buoya
     stable: roll > 0 && pitch > 0,
     heel,
     trim,
-    up: [Math.sin(heel) * Math.cos(trim), Math.cos(heel) * Math.cos(trim), Math.sin(trim)] as unknown as [number, number, number],
+    up: [Math.sin(heel) * Math.cos(trim), Math.cos(heel) * Math.cos(trim), Math.sin(trim)] as unknown as [
+      number,
+      number,
+      number,
+    ],
     heavePeriod: area > 0 ? 2 * Math.PI * Math.sqrt(mass / (water * G * area)) : Infinity,
     rollPeriod: period(sxx + syy, roll),
     pitchPeriod: period(syy + szz, pitch),
@@ -724,7 +762,12 @@ export class Iceberg {
       damping: r?.damping ?? damping,
     });
     this.floater = new Floater({
-      hull: { length: Math.max(0.5, b.length), beam: Math.max(0.1, b.beam), draft: Math.max(0.05, b.draft), entrance: 60 },
+      hull: {
+        length: Math.max(0.5, b.length),
+        beam: Math.max(0.1, b.beam),
+        draft: Math.max(0.05, b.draft),
+        entrance: 60,
+      },
       metacentricHeight: Math.min(20, Math.max(0.01, b.rollMetacentricHeight)),
       heave: response(options.heave, b.heavePeriod, 0.2),
       roll: response(options.roll, b.rollPeriod, 0.05),
@@ -733,7 +776,8 @@ export class Iceberg {
       position: options.position ?? [0, 0, 0],
       heading: options.heading ?? 0,
     });
-    if (options.material !== undefined && !(options.material instanceof IceMaterial)) throw typeError('Iceberg material must be an IceMaterial', 'geometry');
+    if (options.material !== undefined && !(options.material instanceof IceMaterial))
+      throw typeError('Iceberg material must be an IceMaterial', 'geometry');
     this.material = options.material;
   }
   /**
@@ -766,7 +810,13 @@ export class Iceberg {
         across = Math.tan(fit.roll),
         f = [Math.sin(a), Math.cos(a)],
         port = [Math.cos(a), -Math.sin(a)];
-      this.plane = { x, z, height: fit.height, slopeX: along * f[0] + across * port[0], slopeZ: along * f[1] + across * port[1] };
+      this.plane = {
+        x,
+        z,
+        height: fit.height,
+        slopeX: along * f[0] + across * port[0],
+        slopeZ: along * f[1] + across * port[1],
+      };
     }
     if (this.material && this.plane) {
       const b = this.buoyancy,
@@ -844,8 +894,22 @@ export interface IceWind {
   speed: number;
   direction?: readonly [number, number];
 }
+/** Read-only pack ice poses, such as the state published by PackIceSolver. */
+export interface SeaIceFloeSource {
+  /** Fixed number of floe rows. */
+  readonly count: number;
+  /** A floe in the water surface's world cell. */
+  sample(index: number): {
+    readonly position: readonly [number, number];
+    readonly radius: number;
+    readonly heading: number;
+    readonly equivalentThickness: number;
+  };
+}
 /** Settings of a {@link SeaIce} field. */
 export interface SeaIceOptions {
+  /** Live poses to display. With this source, the physics world controls the rigid ice motion. */
+  floeSource?: SeaIceFloeSource;
   /** Default 'pancake'. */
   kind?: SeaIceKind;
   /** Centre and size of the field, world XZ metres. Size 1..1e5 each way. */
@@ -951,6 +1015,7 @@ export class SeaIce {
   private source?: WaterHeightSource;
   private offset: [number, number] = [0, 0];
   private readonly poses: Float32Array;
+  private readonly floeSource?: SeaIceFloeSource;
   constructor(options: SeaIceOptions) {
     if (!options || typeof options !== 'object') throw typeError('SeaIce needs options { size }', 'geometry');
     const kind = options.kind ?? 'pancake';
@@ -958,7 +1023,8 @@ export class SeaIce {
     this.kind = kind;
     const base = KINDS[kind];
     this.centre = options.centre ? vec2(options.centre, -1e7, 1e7, 'centre') : [0, 0];
-    if (!Array.isArray(options.size) || options.size.length !== 2) throw typeError('Sea ice size must be two numbers', 'geometry');
+    if (!Array.isArray(options.size) || options.size.length !== 2)
+      throw typeError('Sea ice size must be two numbers', 'geometry');
     this.size = [finite(options.size[0], 1, 1e5, 'size'), finite(options.size[1], 1, 1e5, 'size')];
     const concentration = finite(options.concentration ?? base.concentration, 0.01, 0.85, 'concentration');
     const diameter = pair(options.diameter ?? base.diameter, 0.05, 2000, 'diameter'),
@@ -974,8 +1040,18 @@ export class SeaIce {
     this.attenuation = 1;
     this.seaLevel = 0;
     this.setDrift(options);
+    if (options.floeSource) {
+      this.floeSource = options.floeSource;
+      const count = options.floeSource.count;
+      if (!Number.isSafeInteger(count) || count < 0 || typeof options.floeSource.sample !== 'function')
+        throw typeError('Invalid SeaIce floe source. Use a fixed row count and a sample method.', 'geometry');
+      this.pieces = Object.freeze(Array.from({ length: count }, (_, i) => Object.freeze(this.livePiece(i)!)));
+      this.poses = new Float32Array(count * 16);
+      return;
+    }
     const max = options.maxPieces ?? 20000;
-    if (!Number.isInteger(max) || max < 1 || max > 50000) throw rangeError('Sea ice maxPieces must be a whole number 1..50,000', 'geometry');
+    if (!Number.isInteger(max) || max < 1 || max > 50000)
+      throw rangeError('Sea ice maxPieces must be a whole number 1..50,000', 'geometry');
     // Dart throwing on a hash grid until the cover is reached or the darts stop landing: pieces never overlap.
     const rand = random(options.seed ?? 1),
       [w, d] = this.size,
@@ -1012,17 +1088,32 @@ export class SeaIce {
       misses = 0;
       const key = `${gx},${gz}`;
       grid.set(key, [...(grid.get(key) ?? []), pieces.length]);
-      pieces.push({ x, z, diameter: dia, aspect, thickness: thickness[0] + (thickness[1] - thickness[0]) * rand(), yaw: rand() * Math.PI * 2 });
+      pieces.push({
+        x,
+        z,
+        diameter: dia,
+        aspect,
+        thickness: thickness[0] + (thickness[1] - thickness[0]) * rand(),
+        yaw: rand() * Math.PI * 2,
+      });
       covered += Math.PI * r * r * aspect;
     }
     this.pieces = Object.freeze(pieces.map((p) => Object.freeze(p)));
     this.poses = new Float32Array(pieces.length * 16);
   }
   /** Changes the drift settings (wind, windFactor, turning, current, wavePeriod, waveDirection, attenuation, seaLevel). */
-  setDrift(d: Partial<Pick<SeaIceOptions, 'wind' | 'windFactor' | 'turning' | 'current' | 'wavePeriod' | 'waveDirection' | 'attenuation' | 'seaLevel'>>): this {
+  setDrift(
+    d: Partial<
+      Pick<
+        SeaIceOptions,
+        'wind' | 'windFactor' | 'turning' | 'current' | 'wavePeriod' | 'waveDirection' | 'attenuation' | 'seaLevel'
+      >
+    >,
+  ): this {
     if (d.wind !== undefined) {
       const dir = d.wind.direction ?? this.wind.direction ?? [1, 0];
-      if (!Array.isArray(dir) || dir.length !== 2 || !(Math.hypot(dir[0], dir[1]) > 0)) throw rangeError('Sea ice wind direction must be two numbers, not zero', 'geometry');
+      if (!Array.isArray(dir) || dir.length !== 2 || !(Math.hypot(dir[0], dir[1]) > 0))
+        throw rangeError('Sea ice wind direction must be two numbers, not zero', 'geometry');
       this.wind = { speed: finite(d.wind.speed, 0, 100, 'wind speed'), direction: [dir[0], dir[1]] };
     }
     if (d.windFactor !== undefined) this.windFactor = finite(d.windFactor, 0, 0.1, 'wind factor');
@@ -1031,7 +1122,8 @@ export class SeaIce {
     if (d.wavePeriod !== undefined) this.wavePeriod = finite(d.wavePeriod, 1, 30, 'wave period');
     if (d.waveDirection !== undefined) {
       const v = d.waveDirection;
-      if (!Array.isArray(v) || v.length !== 2 || !(Math.hypot(v[0], v[1]) > 0)) throw rangeError('Sea ice wave direction must be two numbers, not zero', 'geometry');
+      if (!Array.isArray(v) || v.length !== 2 || !(Math.hypot(v[0], v[1]) > 0))
+        throw rangeError('Sea ice wave direction must be two numbers, not zero', 'geometry');
       this.waveDirection = [v[0], v[1]];
     }
     if (d.attenuation !== undefined) this.attenuation = finite(d.attenuation, 0, 20, 'attenuation');
@@ -1058,8 +1150,10 @@ export class SeaIce {
   /** Seeks the clock: the field drifts to where the current drift puts it at that time. */
   setTime(seconds: number): this {
     this.seconds = finite(seconds, -1e9, 1e9, 'time');
-    const v = this.drift();
-    this.offset = [v[0] * this.seconds, v[1] * this.seconds];
+    if (!this.floeSource) {
+      const v = this.drift();
+      this.offset = [v[0] * this.seconds, v[1] * this.seconds];
+    }
     return this;
   }
   /** Freeboard of a piece `thickness` thick: thickness x (1 - ice / water density). */
@@ -1071,10 +1165,24 @@ export class SeaIce {
     const alpha = 0.2 * this.wavePeriod ** -2.13 * (this.kind === 'pancake' ? 0.7 : 1) * thickness;
     return Math.exp(-(alpha / 2) * this.attenuation * Math.max(0, metres));
   }
-  /** Where piece `i` is now, world XZ (wrapped into the field). */
+  private livePiece(i: number): SeaIcePiece | undefined {
+    const sample = this.floeSource?.sample(i);
+    if (!sample) return undefined;
+    return {
+      x: sample.position[0],
+      z: sample.position[1],
+      diameter: 2 * sample.radius,
+      aspect: 1,
+      thickness: sample.equivalentThickness,
+      yaw: sample.heading,
+    };
+  }
+  /** Where piece `i` is now, in world XZ. Procedural pieces wrap into the field. */
   at(i: number): [number, number] {
     const p = this.pieces[i];
     if (!p) throw rangeError('Sea ice piece index out of range', 'geometry');
+    const live = this.livePiece(i);
+    if (live) return [live.x, live.z];
     const [w, d] = this.size,
       wrap = (v: number, span: number) => v - span * Math.floor(v / span + 0.5);
     return [this.centre[0] + wrap(p.x + this.offset[0], w), this.centre[1] + wrap(p.z + this.offset[1], d)];
@@ -1104,13 +1212,16 @@ export class SeaIce {
    * through the water at the piece's centre and its rim, weakened by the swell's attenuation into the field.
    */
   update(source: WaterHeightSource, dt: number): this {
-    if (!source || typeof source.sample !== 'function') throw typeError('SeaIce needs a water source with sample(x, z)', 'geometry');
+    if (!source || typeof source.sample !== 'function')
+      throw typeError('SeaIce needs a water source with sample(x, z)', 'geometry');
     this.source = source;
     finite(dt, 0, 10, 'time step');
-    const v = this.drift();
     this.seconds += dt;
-    this.offset[0] += v[0] * dt;
-    this.offset[1] += v[1] * dt;
+    if (!this.floeSource) {
+      const v = this.drift();
+      this.offset[0] += v[0] * dt;
+      this.offset[1] += v[1] * dt;
+    }
     const [w, d] = this.size,
       wd = this.waveDirection,
       wl = Math.hypot(wd[0], wd[1]),
@@ -1119,8 +1230,10 @@ export class SeaIce {
     // Distance into the field from its upwave edge, along the swell.
     const edge = -(Math.abs(ux) * w + Math.abs(uz) * d) / 2;
     const out = this.poses;
-    this.pieces.forEach((p, i) => {
-      const [x, z] = this.at(i),
+    this.pieces.forEach((seed, i) => {
+      const live = this.livePiece(i),
+        p = live ?? seed,
+        [x, z] = live ? [live.x, live.z] : this.at(i),
         r = (p.diameter / 2) * 0.8;
       const h0 = source.sample(x, z)?.height ?? this.seaLevel,
         hx = source.sample(x + r, z)?.height ?? h0,
@@ -1144,7 +1257,27 @@ export class SeaIce {
       const sxw = p.diameter,
         szw = p.diameter * p.aspect,
         o = i * 16;
-      out.set([ax[0] * sxw, ax[1] * sxw, ax[2] * sxw, 0, up[0] * p.thickness, up[1] * p.thickness, up[2] * p.thickness, 0, az[0] * szw, az[1] * szw, az[2] * szw, 0, x, cy, z, 1], o);
+      out.set(
+        [
+          ax[0] * sxw,
+          ax[1] * sxw,
+          ax[2] * sxw,
+          0,
+          up[0] * p.thickness,
+          up[1] * p.thickness,
+          up[2] * p.thickness,
+          0,
+          az[0] * szw,
+          az[1] * szw,
+          az[2] * szw,
+          0,
+          x,
+          cy,
+          z,
+          1,
+        ],
+        o,
+      );
     });
     return this;
   }
@@ -1154,9 +1287,18 @@ export class SeaIce {
   }
   /** Writes the pieces' matrices into instances (`InstancedMesh.instances`) and sets their count; returns the count. */
   writeInstances(instances: IceInstances, first = 0, count = this.pieces.length - first): number {
-    if (!instances || typeof instances.setMatrixAt !== 'function') throw typeError('writeInstances needs instances with setMatrixAt', 'geometry');
-    if (!Number.isInteger(first) || !Number.isInteger(count) || first < 0 || count < 0 || first + count > this.pieces.length) throw rangeError('Sea ice instance range out of the field', 'geometry');
-    for (let i = 0; i < count; i++) instances.setMatrixAt(i, this.poses.subarray((first + i) * 16, (first + i) * 16 + 16));
+    if (!instances || typeof instances.setMatrixAt !== 'function')
+      throw typeError('writeInstances needs instances with setMatrixAt', 'geometry');
+    if (
+      !Number.isInteger(first) ||
+      !Number.isInteger(count) ||
+      first < 0 ||
+      count < 0 ||
+      first + count > this.pieces.length
+    )
+      throw rangeError('Sea ice instance range out of the field', 'geometry');
+    for (let i = 0; i < count; i++)
+      instances.setMatrixAt(i, this.poses.subarray((first + i) * 16, (first + i) * 16 + 16));
     instances.count = count;
     return count;
   }
@@ -1176,8 +1318,18 @@ export interface BergFoamLook {
   waveHeight: number | null;
 }
 /** The default BergFoam look. */
-export const BERG_FOAM_DEFAULTS: Readonly<BergFoamLook> = Object.freeze({ foamWidth: 3, breakFoam: 1, foamTrail: 60, waveHeight: null });
-const FOAM_RANGES: Record<keyof BergFoamLook, [number, number]> = { foamWidth: [0, 50], breakFoam: [0, 3], foamTrail: [0, 1000], waveHeight: [0, 20] };
+export const BERG_FOAM_DEFAULTS: Readonly<BergFoamLook> = Object.freeze({
+  foamWidth: 3,
+  breakFoam: 1,
+  foamTrail: 60,
+  waveHeight: null,
+});
+const FOAM_RANGES: Record<keyof BergFoamLook, [number, number]> = {
+  foamWidth: [0, 50],
+  breakFoam: [0, 3],
+  foamTrail: [0, 1000],
+  waveHeight: [0, 20],
+};
 /** Settings of BergFoam. */
 export interface BergFoamOptions {
   surface: Water;
@@ -1234,13 +1386,15 @@ export class BergFoam implements EnginePlugin {
   private disposed = false;
   private readonly values = new Float32Array(FOAM_FLOATS);
   constructor(options: BergFoamOptions) {
-    if (!options?.surface || typeof options.surface.onDispose !== 'function') throw fault('state', 'BergFoam needs a Water surface; pass options.surface');
+    if (!options?.surface || typeof options.surface.onDispose !== 'function')
+      throw fault('state', 'BergFoam needs a Water surface; pass options.surface');
     this.surface = options.surface;
     this.look = { ...BERG_FOAM_DEFAULTS };
     this.setLook(options.look ?? {});
     if (options.waveDirection) {
       const v = options.waveDirection;
-      if (!Array.isArray(v) || v.length !== 2 || !(Math.hypot(v[0], v[1]) > 0)) throw rangeError('BergFoam waveDirection must be two numbers, not zero', 'geometry');
+      if (!Array.isArray(v) || v.length !== 2 || !(Math.hypot(v[0], v[1]) > 0))
+        throw rangeError('BergFoam waveDirection must be two numbers, not zero', 'geometry');
       this.waveDirection = [v[0], v[1]];
     }
     for (const b of options.bergs ?? []) this.add(b);
@@ -1280,14 +1434,29 @@ export class BergFoam implements EnginePlugin {
       dir = this.waveDirection ?? (wind?.direction as [number, number] | undefined) ?? [1, 0.3],
       len = Math.hypot(dir[0], dir[1]);
     const speed = wind?.speed ?? 0;
-    return { direction: [dir[0] / len, dir[1] / len], waveHeight: this.look.waveHeight ?? Math.min(20, (0.21 * speed * speed) / G) };
+    return {
+      direction: [dir[0] / len, dir[1] / len],
+      waveHeight: this.look.waveHeight ?? Math.min(20, (0.21 * speed * speed) / G),
+    };
   }
   /** Fills the uniform from the bergs' poses now. */
   build(): Float32Array {
     const v = this.values,
       { direction, waveHeight } = this.sea();
     v.fill(0);
-    v.set([this.bergs.length, direction[0], direction[1], waveHeight, this.look.foamWidth, this.look.breakFoam, this.look.foamTrail, 0], 0);
+    v.set(
+      [
+        this.bergs.length,
+        direction[0],
+        direction[1],
+        waveHeight,
+        this.look.foamWidth,
+        this.look.breakFoam,
+        this.look.foamTrail,
+        0,
+      ],
+      0,
+    );
     this.bergs.forEach((berg, i) => {
       const f = berg.floater,
         b = berg.buoyancy,
@@ -1329,11 +1498,22 @@ export class BergFoam implements EnginePlugin {
         width = width0 * (1 + hs * 0.5);
       const toward = dist < 1e-4 ? [0, 0] : [rel[0] / dist, rel[1] / dist],
         weather = Math.max(0, -(toward[0] * dir[0] + toward[1] * dir[1]));
-      const ring = width > 0 && edge > -0.5 ? (1 - smoothstep(0, width * (0.6 + weather), edge)) * (0.45 + 0.55 * weather * Math.min(brk, 1) * smoothstep(0.1, 1.5, hs)) : 0;
-      const crash = edge > -0.5 ? brk * weather * smoothstep(0.2, 2, hs) * (1 - smoothstep(0, 0.6 * width + hs, edge)) : 0;
+      const ring =
+        width > 0 && edge > -0.5
+          ? (1 - smoothstep(0, width * (0.6 + weather), edge)) *
+            (0.45 + 0.55 * weather * Math.min(brk, 1) * smoothstep(0.1, 1.5, hs))
+          : 0;
+      const crash =
+        edge > -0.5 ? brk * weather * smoothstep(0.2, 2, hs) * (1 - smoothstep(0, 0.6 * width + hs, edge)) : 0;
       const along = rel[0] * dir[0] + rel[1] * dir[1],
         across = Math.abs(rel[0] * dir[1] - rel[1] * dir[0]);
-      const trail = trailLen > 0 && along > 0 ? 0.6 * Math.exp(-along / trailLen) * (1 - smoothstep(0.5 * mean, 1.1 * mean, across)) * smoothstep(-0.5, width, edge) : 0;
+      const trail =
+        trailLen > 0 && along > 0
+          ? 0.6 *
+            Math.exp(-along / trailLen) *
+            (1 - smoothstep(0.5 * mean, 1.1 * mean, across)) *
+            smoothstep(-0.5, width, edge)
+          : 0;
       foam = Math.max(foam, ring, crash, trail);
     }
     return Math.min(1, Math.max(0, foam));
@@ -1341,11 +1521,17 @@ export class BergFoam implements EnginePlugin {
   setup(engine: Engine): void {
     this.live();
     if (this.engine) throw fault('attached', 'BergFoam already attached; create another BergFoam', 'state');
-    if (!engine.gpu) throw fault('unsupported', 'BergFoam needs WebGPU or the full WebGL2 compatibility layer', 'webgpu');
-    if (!engine.hasPlugin(this.surface.name)) throw fault('state', 'Attach the Water surface to this engine before BergFoam');
-    if (surfaceEffects.get(this.surface)?.some((e) => e.key === 'berg-foam')) throw fault('attached', 'This Water already has berg foam; add bergs to the attached BergFoam', 'state');
+    if (!engine.gpu)
+      throw fault('unsupported', 'BergFoam needs WebGPU or the full WebGL2 compatibility layer', 'webgpu');
+    if (!engine.hasPlugin(this.surface.name))
+      throw fault('state', 'Attach the Water surface to this engine before BergFoam');
+    if (surfaceEffects.get(this.surface)?.some((e) => e.key === 'berg-foam'))
+      throw fault('attached', 'This Water already has berg foam; add bergs to the attached BergFoam', 'state');
     this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({ size: FOAM_FLOATS * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = engine.gpu.createBuffer({
+      size: FOAM_FLOATS * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     const resources = [{ buffer: this.uniform }];
     this.remove = addSurfaceEffect(this.surface, {
       key: 'berg-foam',
@@ -1353,7 +1539,8 @@ export class BergFoam implements EnginePlugin {
       count: 1,
       shader: (code, binding) => foamShader(code, binding),
       prepare: (c: Context) => {
-        if (c.device !== this.engine?.gpu) throw fault('state', 'BergFoam and Water must use the same engine; attach both to one engine');
+        if (c.device !== this.engine?.gpu)
+          throw fault('state', 'BergFoam and Water must use the same engine; attach both to one engine');
         c.device.queue.writeBuffer(this.uniform!, 0, this.build());
         return resources;
       },
@@ -1390,7 +1577,8 @@ export class BergFoam implements EnginePlugin {
 let sequence = 0;
 function foamShader(code: string, binding: number): string {
   const foamLine = 'var foam=max(fresh,surfFoam);';
-  if (!code.includes(foamLine)) throw fault('state', 'BergFoam found no place in the Water shader for its foam; update @margoengine/water');
+  if (!code.includes(foamLine))
+    throw fault('state', 'BergFoam found no place in the Water shader for its foam; update @margoengine/water');
   return `
 @group(0) @binding(${binding}) var<uniform> bergData:BergData;
 ${FOAM_WGSL}${code.replace(foamLine, `${foamLine}foam=max(foam,bergFoam(i.world.xz)*pattern);`)}`;
@@ -1431,12 +1619,17 @@ export class BergSpray {
   private rising = false;
   constructor(options: BergSprayOptions) {
     if (!(options?.berg instanceof Iceberg)) throw typeError('BergSpray needs an Iceberg', 'geometry');
-    if (!options.particles || typeof options.particles.burst !== 'function' || typeof options.particles.options !== 'object')
+    if (
+      !options.particles ||
+      typeof options.particles.burst !== 'function' ||
+      typeof options.particles.options !== 'object'
+    )
       throw typeError('BergSpray needs particles with options and burst(count), such as a VFX', 'geometry');
     this.berg = options.berg;
     this.particles = options.particles;
     const d = options.waveDirection ?? [1, 0];
-    if (!Array.isArray(d) || d.length !== 2 || !(Math.hypot(d[0], d[1]) > 0)) throw rangeError('BergSpray waveDirection must be two numbers, not zero', 'geometry');
+    if (!Array.isArray(d) || d.length !== 2 || !(Math.hypot(d[0], d[1]) > 0))
+      throw rangeError('BergSpray waveDirection must be two numbers, not zero', 'geometry');
     this.waveDirection = [d[0], d[1]];
     this.sprayRate = finite(options.sprayRate ?? 1500, 0, 1e6, 'spray rate');
     this.surgeBurst = finite(options.surgeBurst ?? 300, 0, 1e6, 'surge burst');
@@ -1473,7 +1666,11 @@ export class BergSpray {
       len = Math.hypot(this.waveDirection[0], this.waveDirection[1]);
     o.position = [x, hit.height, z];
     // Thrown up the face at the climb speed, and back against the swell.
-    o.velocity = [(-this.waveDirection[0] / len) * rise * 0.5, Math.max(0, rise) * 2, (-this.waveDirection[1] / len) * rise * 0.5];
+    o.velocity = [
+      (-this.waveDirection[0] / len) * rise * 0.5,
+      Math.max(0, rise) * 2,
+      (-this.waveDirection[1] / len) * rise * 0.5,
+    ];
     o.spread = Math.max(0.3, rise);
     o.emissionExtent = [2, 0.2, 2];
     const rate = this.sprayRate * smoothstep(th * 0.5, th * 1.5, rise);

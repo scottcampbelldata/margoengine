@@ -2295,7 +2295,7 @@ console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in 
 (Jiang et al. 2015) on a grid that keeps it incompressible with a free surface (Gibou et al.'s ghost fluid). Give it
 the box (`cells`, `cellSize`, `origin`), where the water starts (`initial(x, y, z)`, eight particles a cell), solid
 boxes it flows round (`solids`) and the sides open to the air (`open`), where water leaves for the sea
-(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell.
+(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell, and after each the particles that cluster are moved apart by Kugelstadt et al.'s implicit density projection, so the water keeps its volume.
 `positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
 break is its check: the front within 2 percent of their measurements.
 
@@ -2348,6 +2348,31 @@ console.log(released.toFixed(0), (suspended + bed).toFixed(0)); // 368 368: ever
 const plume = tracers.concentration([-10, -12, -10], [50, 0, 10], [12, 6, 4]);
 const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
+```
+
+For a ray, enable `bedJets` to couple swimming impulses to the erodible bed. A downward fin impulse spreads
+as it reaches the bed. It lifts `sand` (default) or `silt` where its estimated shear passes the critical Shields
+number (default 0.05). `erodibility` defaults to 0.02 kg/m²/s at unit excess shear, and `availableMass` defaults
+to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
+for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. The rest of the bed stays solid.
+The [rendered coupling fixture](../environment/tests/swim-sediment.html) shows the sand rise, drift, and settle.
+
+```ts
+import { SwimSolver } from 'margoengine/physics/life';
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const rays = await SwimSolver.load();
+world.add(rays, { bodies: [{
+  position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
+  tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
+  fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+}] });
+const sediment = new TracerSolver('sand', { bedJets: true });
+world.add(sediment, { bed: 0.5, bedJets: { availableMass: 0.023 } });
+world.advance(1);
+console.log(sediment.jetErosion > 0, sediment.budget.water > 0); // true true
 ```
 
 ### Rivers, floods and dam breaks (`@margoengine/physics/hydro`)
@@ -2498,6 +2523,81 @@ world.advance(30 * 120); // two minutes
 console.log(water.sample(60, 4).velocity[1] > 0.1); // true: a longshore current in the surf zone
 console.log(surf.undertow(70, 4)[0] < 0); // true: the undertow runs seaward
 console.log(surf.runUp() > 0.05); // true: the water runs up the beach above its still level
+```
+
+### Ships under way (`@margoengine/physics/ship`)
+
+Ships that steam, turn, stop and berth (SEA-09).
+
+`ShipSolver` holds each ship's rigid body through `bodyForces` with the MMG standard method (Yasukawa and Yoshimura 2015). That gives surge, sway and yaw: the hull's manoeuvring forces, the propeller's thrust in the wake it works in, and the rudder's normal force in the propeller's race, with the added masses and their coupling. The body then turns, drifts and stops as the method's ship does. Couple it before the rigid solver: `world.couple(['ship', 'rigid'], 'staggered')`. With a `HullSolver` floating the hull, use `['ship', 'hull', 'rigid']`.
+
+Each ship is `{row, model}` and takes these settings:
+- `model`: a `ManoeuvringModel` with the particulars, hydrodynamic derivatives and interaction constants. `KVLCC2_L7` is the 7 m KVLCC2 model of the paper, and `scaleModel(model, factor)` Froude-scales it (`scaleModel(KVLCC2_L7, 320 / 7)` is the tanker).
+- `midship`, `forward` and `up` in the body's frame (defaults the origin, +X and +Y).
+- `rudderRate`: default 2.32 degrees a second, the SOLAS 35-to-30 degrees in 28 s.
+- `thruster`: `{diameter, power, position}` for a bow thruster.
+- `block` and `addedMass`: pass `addedMass: false` when a HullSolver already carries the added masses.
+
+The solver also takes `depth` (a number or a function of (x, z), for squat), `walls` (quays and banks, `{from, to}`) and `density`.
+
+Steer with `control(i)`:
+- `revolutions`, rev/s, negative astern; `revolutionsFor(i, speed)` gives the self-propulsion revolutions;
+- `rudder`, the order in radians, positive to starboard;
+- `thruster`, from -1 to 1.
+
+`status(i)` reads speed, drift, yaw rate, rudder angle, the forces, the squat, the thruster's push and the quay's pull.
+
+What it gives the rest of the engine:
+- `sea(base)`: the sea drawn down along each hull by its squat (ICORELS and Hooft's form of Tuck's law, Huuska's factor in a channel). Pass it to the `HullSolver` as its sea, so the hull sinks and trims by its own hydrostatics and the drawdown shows. `drawdown(x, z)` reads it.
+- `water`: a water `FlowField` of the propellers' races, the efflux by momentum theory and the jet's zones after Hamill and Kee (2016), for foam, bubbles, the bed and divers.
+- `sources(t)`: each hull's draught pressed on the surface, for a `WakeSolver` (`sources: (t) => ships.sources(t)`), so it makes a bow wave and a Kelvin wake.
+- `wash(t)`: where each race boils up to the surface, for a `FoamSolver` ship's `wash`, so the stern boils white even at the quay.
+- The bow thruster: its ideal thrust (4 rho A)^(1/3) P^(2/3) times 0.55, falling to half near a speed of 0.4 of the jet's and recovering beyond.
+- Suction toward a quay or bank alongside: the return flow squeezed through the gap.
+
+The parts work on their own too:
+- `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`.
+- `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.
+- `holtropMennen(hull, speed)`: Holtrop and Mennen's resistance with the wake fraction, thrust deduction and eta_R; `ittc1957(Re)` is the friction line.
+- `squat`, `icorels` and `huuska`, `rudderLiftSlope` (Fujii) and `thrusterThrust`.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {KVLCC2_L7, Manoeuvring, ShipSolver, holtropMennen, squat} from 'margoengine/physics/ship';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+// The KVLCC2 model (7 m) at 1.18 m/s, 15.5 kn full scale, hard over to starboard: it turns in about 3.1 lengths.
+const tanker = new Manoeuvring(KVLCC2_L7, {u: 1.18}, {rudderRate: 0.21});
+tanker.revolutions = tanker.selfPropulsion(1.18);
+tanker.order = (35 * Math.PI) / 180;
+while (tanker.state.heading < Math.PI / 2) tanker.step(0.02);
+console.log((tanker.state.x / 7).toFixed(1)); // 3.1
+
+// Holtrop and Mennen's own example ship at 25 knots: 1,793 kN.
+const hull = {length: 205, beam: 32, draughtFore: 10, draughtAft: 10, volume: 37500, lcb: -0.75, midship: 0.98, waterplane: 0.75,
+  bulb: {area: 20, centre: 4}, transom: 16, appendages: [{area: 50, factor: 1.5}], stern: 10};
+console.log(Math.round(holtropMennen(hull, 25 * 0.514444).total / 1000)); // 1793
+
+// A 118 m cargo ship (C_B 0.667) at 8 knots over 10 m of water squats 0.24 m at the bow (ICORELS, C_S 1.7 below C_B 0.7).
+console.log(squat({length: 118, beam: 17.1, draught: 7.76, block: 0.667, speed: 4.12, depth: 10}).bow.toFixed(2)); // 0.24
+
+// The same model as a rigid body, turning under the ship solver.
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60, gravity: [0, 0, 0]});
+const body = physics.addBody(null, {
+  position: [0, 0, 0],
+  linearVelocity: [1.18, 0, 0],
+  colliders: {shape: 'box', halfExtents: [3.5, 0.46, 0.635], mass: 1025 * KVLCC2_L7.volume},
+});
+const ships = new ShipSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(ships, {ships: [{row: body.row, model: KVLCC2_L7, rudderRate: 0.21}]})
+  .couple(['ship', 'rigid'], 'staggered');
+ships.control(0).revolutions = ships.revolutionsFor(0, 1.18);
+ships.control(0).rudder = (35 * Math.PI) / 180;
+world.advance(60 * 20);
+console.log(body.position[2] > 3); // true: well round to starboard (+Z)
 ```
 
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
@@ -3099,6 +3199,32 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
 
+## Outdoor sound
+
+`@margoengine/physics/outdoor-sound` gives each source–listener link its travel time and eight octave gains.
+Set `air` to a Weather wind field for advection and vertical refraction, and `bed` to a TerrainBed for
+diffraction. An explicit `groundY` adds a plane reflection. The reflected pressure defaults to full strength
+and `groundReflection: 0` turns it off. With still air, temperature defaults to 293.15 K, pressure to
+101,325 Pa, and relative humidity to 0.5. Call `read` after advancing the world. Callbacks for moving links
+take world seconds and return metres relative to the solver cell. For a nonstandard world cell size, pass the
+same `cellSize` to the solver. The default is 4,096 m per cell.
+
+```ts
+import { OutdoorSound } from 'margoengine/physics/outdoor-sound';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const paths = new OutdoorSound();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(paths, {
+  links: [{ source: [0, 3, 0], listener: [3000, 3, 0] }],
+});
+world.advance(1);
+console.log(paths.read().delaySeconds.toFixed(2)); // 8.74
+```
+
+`read` also provides the band losses before summing spreading, air, terrain, and interference. Use
+`aviationNWave` for a prescribed far-field civil aviation signature. For a playback delay, pass the reading
+to the optional `OutdoorAudio` controller.
+
 ## Contact and modal sound
 
 Use @margoengine/physics/modal-sound with a PhysicsWorld to turn collision, scrape, roll and fracture
@@ -3176,6 +3302,36 @@ The layout-1 f64 contact field has five words per track: normal impact impulse i
 scrape power times speed, rolling proxy power in W and rolling power times speed. The layout-1 fracture field
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
+
+## Drainage fog
+
+`DrainageFog` is a shallow moist-air layer over a terrain grid. Clear-sky longwave loss and surface exchange cool the
+air, which releases latent heat as droplets condense. Dense air accelerates downhill, and the wind carries the
+vapour and fog across cell faces. Droplet settling, entrainment and open boundaries have a mass ledger.
+
+```ts
+import { DrainageFog } from '@margoengine/physics/drainage-fog';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const fog = await DrainageFog.load();
+world.add(fog, {
+  width: 4, depth: 2, spacing: [8, 8],
+  terrain: [3, 2, 1, 0, 3, 2, 1, 0], initialHumidity: 1, secondsPerSecond: 60,
+});
+world.advance(60);
+console.log(fog.read(2, 1).extinction, fog.budget.deposited);
+```
+
+Inputs use SI units. `heat` supplies sensible heat to the layer in W/m² and `moisture` supplies water to the air in
+kg/(m² s). Use the corresponding `SurfaceEnergySolver` words with `heat: { field, stride: 5, word: 1 }` and
+`moisture: { field, stride: 3, word: 0 }` at load time. Use `followTerrain` to read a matching `TerrainBed`, or
+provide the elevations directly. `wind` is a background `Wind` field sampled at each layer's centre.
+
+`read(x, z)` gives temperature, motion, vapour and liquid mixing ratios, extinction and deposition. The layout-1 f64
+`columnField` publishes the same cells in x-fast order. `opticalField` is `[ground, top, extinction, 0]` per cell as
+f32. Readers can use the field registry or call `writeColumnData` for direct view binding. Pass the solver as
+the source of Environment's optional `FogGrid`.
 
 ## Layered snowpack
 
@@ -3500,3 +3656,140 @@ impulse to that same body. A fixed `bed` or `groundHeight` supplies the fallback
 Enable `readIntent` to receive f64 pairs of desired speed and heading. Enable `readLoad` to receive f64 triples of
 external force in newtons at the COM. Both use the documented layout and body-row order. The built-in target lives
 in world snapshots. Use the public pose, gait and foot readings to place a rig.
+
+## Pack ice and floes
+
+Use `@margoengine/physics/pack-ice` for freely drifting sea-ice disks that collide, raft thin ice and turn
+thicker broken ice into pressure ridges. The state keeps the volume of level, rafted and ridged ice.
+The optional Water ice entry can display those poses on a sampled sea.
+
+```ts
+import { PackIceSolver } from '@margoengine/physics/pack-ice';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const pack = await PackIceSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pack, {
+  restitution: 0,
+  floes: [
+    { position: [-1.015, 0], velocity: [2, 0], radius: 1, thickness: 0.08 },
+    { position: [1.015, 0], velocity: [-2, 0], radius: 1, thickness: 0.08 },
+  ],
+});
+world.advance(1);
+console.log(pack.sample(0).raftedVolume);
+```
+
+Supply a pure shared `Wind` and water `FlowField` for weather and current. Registered producers can instead
+publish `windField` or `currentField` with one layout-1 f64 row of X velocity, Z velocity and density per
+floe. `floeField` publishes layout-1 records in `PACK_ICE_WORDS` order. Lengths, masses, angles and clock
+values are in SI units. Change the world cell and use the same `cellSize` for every participating field.
+
+For a live ship, load with `{ rigid: true }`, pass a waterline capsule for each vessel body row, and
+put `pack-ice` and `rigid` in a staggered group. Add `hull` to that group when SEA-08 provides buoyancy.
+Its body pose pushes the ice. The same contact sends the opposite linear and yaw impulse to the rigid
+body through `bodyImpulses`. `vesselImpulse(row)` reports the signed contact impulse of the current
+step. Use the same `rigidCapacity` as any other contributor to `bodyImpulses`.
+
+## Ductile crashworthiness (`@margoengine/physics/crush`)
+
+`resolveCrush` inverts a measured normal force-displacement curve to find the peak force, permanent stroke, and energy left for rebound. Use newtons, metres, kilograms, and metres per second. Positive hardening raises the yield force as the member permanently shortens. After the measured stroke is used, a stiffer elastic backing supports the load.
+
+```ts
+import { resolveCrush } from '@margoengine/physics/crush';
+
+const curve = { stiffness: 400, yieldForce: 40, stroke: 0.4 };
+const result = resolveCrush(curve, 4, 2);
+if (Math.abs(result.absorbedEnergy - 6) > 1e-12) throw new Error('Expected 6 J of permanent work');
+```
+
+`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const cart = physics.addBody(null, {
+  position: [-0.5, 0, 0], linearVelocity: [2, 0, 0],
+  colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 4 },
+});
+const crush = new CrushSolver();
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(crush, { bodyCapacity, patches: [{
+  body: cart.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12,
+  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 },
+}] });
+world.couple(['rigid', crush.id], 'staggered');
+world.advance(12);
+if (crush.read(0).impacts !== 1) throw new Error('Expected one barrier contact');
+```
+
+## Thin films on glass and ground
+
+Use `@margoengine/physics/thin-film` for a thin layer of water on a backing surface. The solver tracks
+rainfall, impacts, gravity, pressure, viscous shear, capillarity, drying and liquid leaving an open edge.
+The first two axes define the patch in metres. Set its origin and tangents in a rigid body's local frame
+and pass a body row to move it with a window or deck.
+
+```ts
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { ThinFilmSolver } from '@margoengine/physics/thin-film';
+
+const film = await ThinFilmSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
+  cells: [4, 6],
+  spacing: 0.04,
+  u: [1, 0, 0],
+  v: [0, -1, 0],
+  depth: 0.0002,
+  drains: [false, false, false, true],
+});
+world.advance(60);
+console.log(film.budget.dripped, film.sample(0, 5).depth);
+```
+
+Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
+A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input
+publishes layout-1 f64 rows of U, V, radius, deposited m³ and inward impact speed. A tick is consumed
+once, even when a slower writer's last value is held. Pass `waveSources: true` and give `film.waveField`
+to the local `WakeSolver` for pressure pulses on a wet platform in the same cell. The film retains
+the deposited water and the wake receives the normal impulse.
+
+Use `depths()` for a render texture, `filmField` to consume substrate, depth and drip records, and
+`dripsField` for cell discharge in m³/s. The options document the default water and wall properties.
+
+## Windborne dust, mist and sea spray
+
+`@margoengine/physics/airborne` moves individual environmental parcels using local wind, diameter-dependent
+drag, gravity and evaporation. Read the poses for scene particles and the ledger for mass accounting.
+
+```ts
+import { AirborneParticles } from '@margoengine/physics/airborne';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const particles = await AirborneParticles.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(particles, {
+  capacity: 128,
+  initial: [{ kind: 'freshwater-mist', diameter: 0.00008, mass: 0.00001, position: [0, 1, 0] }],
+  wind: {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [3, 0.3, 0], density: 1.225, temperature: 288.15 }),
+  },
+  humidity: 0.98,
+});
+world.advance(30);
+console.log(particles.readParticles(), particles.budget);
+```
+
+Enable `terrain` and match the actual `TerrainBed` grid for world-space deposition. Pass
+`dustField: aeolian.dustField` to receive mineral dust emitted by EARTH-07. Enable `whitecaps` with the
+matching SEA-13 grid in `spray` to turn active whitecaps into three measured-source diameter bands.
+Supply `sources` for existing waterfall mist or mineral footstep dust. If `emissions` is enabled, an
+optional source owns one layout-1 f64 kg/s value for each row. Closed mass accounting includes the
+discrete parcels, waiting source mass, vapour, settled mass and open outflow.

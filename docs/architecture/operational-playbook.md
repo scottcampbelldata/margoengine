@@ -4265,6 +4265,13 @@ reader receives the same pressure and travel time on the 60 Hz world clock as th
 Tests compare complete world hashes across frame rates and after seek. The scope is a depth-dependent
 column and high-frequency paraxial beams. See the [clean-room record](../clean-room.md#underwater-acoustics-sound-03).
 
+### Outdoor acoustics (SOUND-01)
+
+The world path region publishes delay, clearance and octave gains at 60 Hz. TerrainBed supplies the ridge geometry
+and Weather supplies the boundary layer through the shared Wind contract. Frame-rate and seek cases compare world
+hashes. Chromium's OfflineAudioContext measures the physical delay with the same panner and filters in a control
+render. For the 3 km still-air check, the delayed waveform starts 419,541 samples later at 48 kHz.
+
 ### Ice thermodynamics (ICE-05)
 
 The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,
@@ -10063,8 +10070,10 @@ solver instance its own stack. Unchanged slots and dynamic memory are checked at
 `packages/physics/tests/coupling/swim.test.js` verifies the exact thrust and drag reference models,
 a physical bank, a centreline with conserved transverse mass centroid, pectoral station-keeping, hydrostatic
 ballast and a breach. It exercises the actual SEA-02 surface, actual LIFE-04 intent and kinematics, and
-identical replay across frame rates, snapshots and plain/shared memory. Wake and contact consumers use
-documented stand-ins while production sediment, wake and articulated contacts are still being integrated.
+identical replay across frame rates, snapshots and plain/shared memory. The BB-7 regression feeds the live
+wake into `TracerSolver` and checks threshold, mass, current advection, settling and replay. The
+`packages/environment/tests/swim-sediment.browser.mjs` fixture uses the active tracer mass for local
+extinction on both graphics backends. The tail-wake render and articulated contacts still need integration.
 
 ### Section 5 evidence for light-bodies aerodynamics (AERO-05)
 
@@ -10126,6 +10135,14 @@ shared kernels import the same arena layout and keep no evolving state in static
 cover the analytic impulse and held-force convolution, resting contact, rolling versus sliding,
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
+
+### Drainage fog evidence (ATMO-08)
+
+`DrainageFog` uses the PhysicsWorld arena and pinned thermodynamics. Its coupled tests verify heat and water through
+phase change, Stokes deposition, downhill forcing from `TerrainBed`, real `SurfaceEnergySolver` exchange, open-edge
+export, conservative fog transfer and shared/plain replay. The environment medium exposes the same optical layer to
+the froxel pass. Its browser fixture moves the resolved patch on WebGPU and WebGL2 compatibility and verifies that
+removing the medium restores the clear frame. This covers the fog portion of PA-34.
 
 ### Snowpack evidence (ICE-01)
 
@@ -10205,3 +10222,36 @@ Controlled gait profiles live in extra state, preserving the existing uncontroll
 The optional deck adapter reads the real rigid `bodies` port and returns the opposite integrated `bodyImpulses` per
 substep. The direct HorseMotion path shares the same support concepts and stays renderable without a PhysicsWorld.
 Verified with real terrain, a moving rigid support, plain/shared memory and browser replay.
+
+### Pack ice as a separate world solver (ICE-04)
+
+The optional Rust SIMD module leaves the shared module address area untouched. Its floes and all
+work regions belong to their world. The field bridge uses the existing rigid body layout and
+impulse accumulator, including when SEA-08 applies buoyancy to the same body. The contact
+regression compares those opposite impulses and the Water regression checks the matrix boundary.
+The coupling harness establishes one hash across frame cadence, both memory modes and snapshot
+restore. Continuous-sheet blocks and grounding are outside the current planar pack model.
+
+### Civil impact work and rigid coupling (BREAK-03)
+
+`CrushSolver` reads the versioned `bodies` port and accumulates linear and angular impulses at the same point for both bodies. The published deformation and work ledger, contact latch, and pending impulse rows survive snapshot restore. Closed-form spring, perfectly plastic, hardening, and compacted backing references check energy and stroke. Two-body and fixed-barrier runs check momentum, offset torque, transverse misses, and persistent seal loss. A floating service craft uses the same rigid row for live seakeeping and a quay impact. Pending water ingress needs the SEA-10 compartment contract.
+
+### Thin films on rigid panes and open ground (FLUID-07)
+
+The thin-film module imports world memory and reserves no static data. Film and input buffers are
+transactional during a step. The solver consumes the live rigid body record and authored plane,
+turns physical precipitation into intercepted water, and sends independently held impact pressure to
+the optional WakeSolver. Depth, capillary redistribution, drying and edge drainage have independent
+closed-form or volume checks. Plain/shared builds, frame cadence and restore agree bit for bit.
+
+### Environmental airborne batch (ATMO-06)
+
+The optional native kernel integrates two Cartesian lanes at once, with a third scalar lane in the same operation
+order. Host-side queries supply each particle's local Wind conditions, then the solver runs the batch over its
+arena state. Both native module initializations leave sentinel-filled world memory untouched. Direct checks cover
+the closed-form Stokes trajectory, exact droplet mass changes, source buffering and two real producers through
+the field registry. A production Vite build preserves both lazy Wasm files.
+
+### Developmental plant growth (BIO-02)
+
+The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.

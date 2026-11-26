@@ -241,7 +241,8 @@ export class FlipSolver implements Solver<FlipParams> {
       if (s > fastest) fastest = s;
     }
     // Gravity adds up to g dt over the step; take it into the bound.
-    const g = Math.sqrt(this.gravity[0] ** 2 + this.gravity[1] ** 2 + this.gravity[2] ** 2),
+    const [gx, gy, gz] = this.gravity,
+      g = Math.sqrt(gx * gx + gy * gy + gz * gz),
       bound = Math.sqrt(fastest) + g * dt,
       substeps = Math.max(1, Math.ceil((bound * dt) / this.grid.h));
     if (substeps > this.maxSubsteps)
@@ -279,6 +280,7 @@ export class FlipSolver implements Solver<FlipParams> {
       p = this.words(this.particleRegion),
       count = this.words(this.countRegion)[0]!,
       pressure = this.words(this.pressureRegion);
+    this.correctDensity(dt);
     toGrid(g, p, count, this.vel, this.mass);
     this.accelerate(dt);
     for (let c = 0; c < this.kind.length; c++) this.kind[c] = this.solid[c] ? SOLID : 0;
@@ -342,6 +344,178 @@ export class FlipSolver implements Solver<FlipParams> {
       this.words(this.countRegion)[0] = kept;
     }
     void LIQUID;
+  }
+
+  /**
+   * The implicit density projection of T. Kugelstadt, A. Longva, N. Thuerey and J. Bender ("Implicit density projection
+   * for volume conserving liquids", IEEE TVCG 27(4), 2021, Algorithm 1 and eqs. 10 to 12), after the particles moved:
+   * the particles' density on the grid (trilinear, eight particles a cell at rest), held at 1 or more beside the air
+   * (the surface's particle deficiency) and to 0.5 to 1.5 (one cell's correction a step at most); a second solve of the
+   * pressure equation with that deviation as its source; and the particles moved by its gradient, their velocities
+   * left alone. Without it particles cluster where the flow converges and at the walls they are held against, and the
+   * liquid they stand for loses volume (water on a deck lost two fifths of its cells in six seconds).
+   */
+  private correctDensity(dt: number): void {
+    const g = this.grid,
+      { nx, ny, nz, h } = g,
+      p = this.words(this.particleRegion),
+      count = this.words(this.countRegion)[0]!;
+    if (count === 0) return;
+    for (let c = 0; c < this.kind.length; c++) this.kind[c] = this.solid[c] ? SOLID : 0;
+    surface(g, p, count, h, 0.5 * h, this.kind, this.phi);
+    // Particles per cell at rest: eight. The density over the rest density, trilinear at the cell centres, starting from
+    // the walls' share (the solids and the closed sides sampled as water at rest, the paper's cure for the particle
+    // deficiency at walls).
+    const ratio = this.wallDensity().slice();
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        gx = p[o]! / h - 0.5,
+        gy = p[o + 1]! / h - 0.5,
+        // One cell deep, every particle is wholly in that layer.
+        gz = nz > 1 ? p[o + 2]! / h - 0.5 : 0,
+        i0 = Math.floor(gx),
+        j0 = Math.floor(gy),
+        k0 = Math.floor(gz),
+        fx = gx - i0,
+        fy = gy - j0,
+        fz = gz - k0;
+      for (let dk = 0; dk < 2; dk++) {
+        const k = k0 + dk;
+        if (k < 0 || k >= nz) continue;
+        const wz = nz > 1 ? (dk ? fz : 1 - fz) : dk ? 0 : 1;
+        for (let dj = 0; dj < 2; dj++) {
+          const j = j0 + dj;
+          if (j < 0 || j >= ny) continue;
+          const wy = dj ? fy : 1 - fy;
+          for (let di = 0; di < 2; di++) {
+            const i = i0 + di;
+            if (i < 0 || i >= nx) continue;
+            ratio[cell(g, i, j, k)]! += ((di ? fx : 1 - fx) * wy * wz) / 8;
+          }
+        }
+      }
+    }
+    // Next to air the kernels reach cells no particle fills: no less than the rest density there.
+    const source = new Float64Array(nx * ny * nz);
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const c = cell(g, i, j, k);
+          if (this.kind[c] !== LIQUID) continue;
+          let r = ratio[c]!;
+          const air = (ii: number, jj: number, kk: number) =>
+            ii >= 0 &&
+            jj >= 0 &&
+            kk >= 0 &&
+            ii < nx &&
+            jj < ny &&
+            kk < nz &&
+            this.kind[cell(g, ii, jj, kk)] !== LIQUID &&
+            !this.solid[cell(g, ii, jj, kk)];
+          if (
+            air(i - 1, j, k) ||
+            air(i + 1, j, k) ||
+            air(i, j - 1, k) ||
+            air(i, j + 1, k) ||
+            (nz > 1 && (air(i, j, k - 1) || air(i, j, k + 1)))
+          )
+            r = Math.max(r, 1);
+          r = Math.min(1.5, Math.max(0.5, r));
+          // The displacement's divergence is the density's excess: dense water spreads, thin water draws in.
+          source[c] = (r - 1) / dt;
+        }
+    for (const a of this.vel) a.fill(0);
+    project(
+      g,
+      this.kind,
+      this.phi,
+      this.vel[0]!,
+      this.vel[1]!,
+      this.vel[2]!,
+      dt,
+      this.density,
+      new Float64Array(nx * ny * nz),
+      this.open,
+      1e-6,
+      400,
+      source,
+    );
+    const d: V3 = [0, 0, 0],
+      lo = 1e-6 * h,
+      top: V3 = [nx * h - lo, ny * h - lo, nz * h - lo];
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS;
+      sampleVelocity(g, this.vel, p[o]!, p[o + 1]!, p[o + 2]!, d);
+      const to: V3 = [p[o]! + d[0] * dt, p[o + 1]! + d[1] * dt, p[o + 2]! + d[2] * dt];
+      for (let a = 0; a < 3; a++) to[a] = Math.min(Math.max(to[a]!, lo), top[a]!);
+      if (this.solid[cell(g, Math.floor(to[0] / h), Math.floor(to[1] / h), Math.floor(to[2] / h))]) continue;
+      p[o] = to[0];
+      p[o + 1] = to[1];
+      p[o + 2] = to[2];
+    }
+  }
+
+  private walls: Float64Array | null = null;
+  /**
+   * The share of each cell centre's density that the walls give, as if every solid cell and a layer of cells beyond each
+   * closed side held eight particles at their octants' centres, at rest. Made once (the walls do not move in the box).
+   */
+  private wallDensity(): Float64Array {
+    if (this.walls) return this.walls;
+    const g = this.grid,
+      { nx, ny, nz } = g,
+      out = new Float64Array(nx * ny * nz),
+      flat = nz === 1;
+    // Every cell of the grid grown by one on each side: a wall if solid, or beyond a closed side.
+    for (let k = flat ? 0 : -1; k <= (flat ? 0 : nz); k++)
+      for (let j = -1; j <= ny; j++)
+        for (let i = -1; i <= nx; i++) {
+          const inside = i >= 0 && j >= 0 && k >= 0 && i < nx && j < ny && k < nz;
+          if (inside ? !this.solid[cell(g, i, j, k)] : this.isOpen(i, j, k)) continue;
+          for (let o = 0; o < 8; o++) {
+            // The virtual particle's place in cells, less a half: the trilinear weights onto the cell centres.
+            const gx = i + 0.25 + 0.5 * (o & 1) - 0.5,
+              gy = j + 0.25 + 0.5 * ((o >> 1) & 1) - 0.5,
+              gz = flat ? 0 : k + 0.25 + 0.5 * ((o >> 2) & 1) - 0.5,
+              i0 = Math.floor(gx),
+              j0 = Math.floor(gy),
+              k0 = Math.floor(gz),
+              fx = gx - i0,
+              fy = gy - j0,
+              fz = gz - k0;
+            for (let dk = 0; dk < 2; dk++) {
+              const kk = k0 + dk;
+              if (kk < 0 || kk >= nz) continue;
+              const wz = flat ? (dk ? 0 : 1) : dk ? fz : 1 - fz;
+              for (let dj = 0; dj < 2; dj++) {
+                const jj = j0 + dj;
+                if (jj < 0 || jj >= ny) continue;
+                const wy = dj ? fy : 1 - fy;
+                for (let di = 0; di < 2; di++) {
+                  const ii = i0 + di;
+                  if (ii < 0 || ii >= nx) continue;
+                  const c = cell(g, ii, jj, kk);
+                  if (!this.solid[c]) out[c]! += ((di ? fx : 1 - fx) * wy * wz) / 8;
+                }
+              }
+            }
+          }
+        }
+    this.walls = out;
+    return out;
+  }
+
+  /** Whether the cell (i, j, k), outside the grid, is beyond an open side (air) rather than a wall. */
+  private isOpen(i: number, j: number, k: number): boolean {
+    const { nx, ny, nz } = this.grid;
+    return (
+      (i < 0 && this.open[0]!) ||
+      (i >= nx && this.open[1]!) ||
+      (j < 0 && this.open[2]!) ||
+      (j >= ny && this.open[3]!) ||
+      (k < 0 && this.open[4]!) ||
+      (k >= nz && this.open[5]!)
+    );
   }
 
   /** Adds the acceleration the liquid feels to every face it reaches, over `dt`. */

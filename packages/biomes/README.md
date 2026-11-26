@@ -370,3 +370,28 @@ forest's `rootCohesionField` for feedback. These grids must share dimensions, ex
 `exposure` and publish one `[burn severity, fuel moisture]` pair per cell when you have a weather/fire producer.
 The forest publishes cell-centred crown cover, root cohesion in Pa, live canopy fuel in kg/m², and moisture in
 kg/kg dry fuel. Fuel and root strength require site/species measurements and default to zero.
+
+## Live plant growth and morphogenesis
+
+`@margoengine/biomes/growth` grows woody plants as a sequence of bud productions on the physics clock. Each developmental season distributes available resources among terminal and lateral buds, changes shoot direction toward light and away from shadow, and updates branch radius from the distal stem area. Nearby plants share a shadow grid. Solid voxels block new shoots, and an optional HYDRO-02 soil port averages usable root-zone water over the season.
+
+```ts
+import { PlantGrowth } from '@margoengine/biomes/growth';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { tubes } from '@margoengine/procedural/lsystem';
+
+const growth = await PlantGrowth.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(growth, {
+  ticksPerSeason: 60,
+  plants: [{ position: [0.25, 0.25, 0.25], species: {
+    productiveSeasons: 3, seasonalExtension: 2, minimumExtension: 0.05,
+    internodeLength: 0.4, tipRadius: 0.02,
+  } }],
+  voxels: { origin: [0, 0, 0], dimensions: [4, 4, 4], size: 1 },
+});
+world.advance(120);
+const branchMesh = tubes(growth.toBranches());
+if (!branchMesh.indices.length) throw new Error('Expected the two seasons to produce branches');
+```
+
+Use `growth.toBranches()` once shoots exist for a copy of the current Procedural graph, or `growth.internodes()` for stable parent IDs and the original f64 coordinates. The `branchesField` publishes layout-1 f64 data with header `[rowCount, season]`. Each row holds end xyz, unit growth direction xyz, radius in metres, parent and successor indices, plant index, branch order, and birth season. The first rows are the seed positions. A successor index of `-1` is dormant and `-2` is absent. The first `rowCount` rows are in use. Bind `RainfallRunoff.soilWaterField` through `PlantGrowth.load({ soil })` with the same x-fast geometry as its HYDRO-02 source and wilting and full-growth thresholds in water-equivalent metres. The option descriptions give all defaults and units.

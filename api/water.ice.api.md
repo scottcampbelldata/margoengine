@@ -228,9 +228,20 @@ export class SeaIce {
     writeInstances(instances: IceInstances, first?: number, count?: number): number;
 }
 
+export interface SeaIceFloeSource {
+    readonly count: number;
+    sample(index: number): {
+        readonly position: readonly [number, number];
+        readonly radius: number;
+        readonly heading: number;
+        readonly equivalentThickness: number;
+    };
+}
+
 export type SeaIceKind = 'pancake' | 'brash' | 'floe';
 
 export interface SeaIceOptions {
+    floeSource?: SeaIceFloeSource;
     kind?: SeaIceKind;
     centre?: readonly [number, number];
     size: readonly [number, number];

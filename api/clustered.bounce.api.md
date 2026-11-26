@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { RectAreaLight } from "@margoengine/math";
 
 export const BOUNCE_BINDING = 164;
@@ -19,6 +19,18 @@ export interface BounceMesh {
     readonly vertices: Float32Array;
     readonly indices: ArrayLike<number>;
     readonly matrix: ArrayLike<number>;
+}
+
+export interface BounceModel {
+    setCapture(hook: BounceModelCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(context: PassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+}
+
+export interface BounceModelCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
 }
 
 export interface BounceOpening {
@@ -110,6 +122,7 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     };
     get openings(): readonly BounceOpeningLight[];
     setOpenings(openings: readonly BounceOpeningLight[]): this;
+    add(model: BounceModel): () => void;
     invalidate(): void;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
