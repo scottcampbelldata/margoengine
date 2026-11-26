@@ -15415,6 +15415,17 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   `−ρ V U n`. Deposit the droplet in the film and apply this impulse and its moment about
   the body centre through the registered body force port. The wake option owns the other
   route for that pulse. [Journal](https://doi.org/10.1063/5.0083437)
+- IAPWS, *Release on the Refractive Index of Ordinary Water Substance* (1997), Eq. 1.
+  The moving-window browser regression uses water IOR 1.333, the rounded visible index at
+  room temperature. The render reads meters of solver depth into the surface mesh and its
+  linear thickness map. Centre-difference gradients give the free-surface normals. The
+  existing material transmission uses the green channel for thickness, following Khronos,
+  *KHR_materials_volume*, and the microfacet refraction model of Bruce Walter, Stephen
+  R. Marschner, Hongsong Li and Kenneth E. Torrance (2007). An airborne drop is drawn as
+  a sphere at the integrated position and with the volume-equivalent diameter.
+  [IAPWS R9-97](https://iapws.org/technical-guidance/release/Rindex) ·
+  [Khronos volume](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_volume/README.md) ·
+  [Walter et al.](https://doi.org/10.2312/EGWR/EGSR07/195-206)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves
