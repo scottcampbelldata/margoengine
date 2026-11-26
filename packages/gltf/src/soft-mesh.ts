@@ -278,6 +278,12 @@ export interface SoftBodyMeshOptions extends SoftSurfaceOptions {
  */
 export class SoftBodyMesh implements EnginePlugin {
   readonly name = 'soft-mesh:' + serial++;
+  /**
+   * Copies the particles after physics has stepped them this frame (physics is a `late` plugin, KB-PHYS-FRAMEORDER1):
+   * a late plugin added after the physics world runs after it, so the mesh drawn is the step just taken, not the one
+   * before (KB-SOFTMESH-LAG1).
+   */
+  readonly late = true;
   /** The model it draws with: `model.setVisible`, picking and the PBR model API work on it. */
   readonly model: PBRModel;
   /** The CPU surface it uploads. */
