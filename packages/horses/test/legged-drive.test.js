@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HorseMotion } from '../dist/index.js';
 import { horseBody } from '../dist/anatomy.js';
-import { GRAVITY, strideLength } from '../dist/gaits.js';
+import { GRAVITY, stride, strideLength, trunkMotion } from '../dist/gaits.js';
 
 const dt = 1 / 240;
 const ride = (speed, heading = 0) => ({ speed, heading, gait: 'auto' });
@@ -80,4 +80,15 @@ test('PA-70 and HORSE-4: live stride cycles follow actual speed without a jump a
     close(motion.strideCyclesAt() - phase, speed / strideLength(body, speed));
   }
   assert.notEqual(strideLength(body, low), strideLength(body, high));
+});
+
+test('PA-70: a shorter trotting duty increases the live trunk excursion at fixed mass', () => {
+  const body = horseBody();
+  const a = stride(body, 2.75, 'trot');
+  const b = stride(body, 4.25, 'trot');
+  const low = -trunkMotion(body, a, a.strike[0] + a.duty / 2).rise;
+  const high = -trunkMotion(body, b, b.strike[0] + b.duty / 2).rise;
+  assert.ok(b.duty < a.duty);
+  assert.ok(low < high);
+  close(low * a.duty, high * b.duty);
 });

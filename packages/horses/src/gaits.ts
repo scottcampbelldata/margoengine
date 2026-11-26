@@ -174,6 +174,12 @@ export interface Stride {
   readonly pattern: GaitPattern;
 }
 
+function stanceDuty(pattern: GaitPattern, froude: number): number {
+  const [low, high] = pattern.froude;
+  const progress = Math.min(1, Math.max(0, (froude - low) / (high - low)));
+  return pattern.duty[0] + (pattern.duty[1] - pattern.duty[0]) * progress;
+}
+
 /**
  * The stride at this speed. `gait` forces a gait (a slow canter, a fast walk); left out it follows the speed.
  * @throws RangeError for a speed that is not finite and positive.
@@ -182,11 +188,8 @@ export function stride(body: HorseBody, speed: number, gait: Gait = gaitFor(body
   if (!(speed > 0)) throw new RangeError('stride needs a speed above 0 m/s; a standing horse has no stride');
   const pattern = GAIT_PATTERNS[gait];
   if (!pattern) throw new TypeError(`Unknown gait; use one of ${GAITS.join(', ')}`);
-  const fr = froude(body, speed),
-    [a, b] = pattern.froude,
-    t = Math.min(1, Math.max(0, (fr - a) / (b - a))),
-    duty = pattern.duty[0] + (pattern.duty[1] - pattern.duty[0]) * t,
-    length = strideLength(body, speed);
+  const duty = stanceDuty(pattern, froude(body, speed));
+  const length = strideLength(body, speed);
   return { gait, speed, length, duration: length / speed, duty, strike: pattern.strike, pattern };
 }
 
@@ -235,13 +238,17 @@ export interface TrunkMotion {
 
 /**
  * The trunk's rise and pitch at stride phase `phase`: lowest at mid-support, `bounces` cycles a stride, peak to peak
- * `pattern.rise` times the withers height. The canter and gallop rock: the forehand rises as the hind legs push.
+ * rise reference times the withers height. A shorter duty concentrates support in less time and increases
+ * the spring excursion. The canter and gallop rock as the hind legs push.
  */
 export function trunkMotion(body: HorseBody, s: Stride, phase: number): TrunkMotion {
   const low = lowPhase(s),
     k = s.pattern.bounces,
     a = 2 * Math.PI * k * (phase - low),
-    amp = (s.pattern.rise * body.withers) / 2;
+    nominalDuty = stanceDuty(s.pattern, s.pattern.preferred),
+    // Over a stride the support impulse balances the same weight. At fixed
+    // spring stiffness its excursion scales with the mean force while loaded.
+    amp = (s.pattern.rise * body.withers * nominalDuty) / (2 * s.duty);
   return {
     rise: -amp * Math.cos(a),
     pitch: (s.pattern.pitch / 2) * Math.sin(2 * Math.PI * (phase - low)),
