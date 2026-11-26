@@ -227,6 +227,162 @@ measured, not landed (the upgrade moved to Codex). What it did, in body axes (x 
   needs the drift angle). Radiated waves to SEA-04 were not started: `WakeSolver` reads layout-1 `seaSource` rows (x, z,
   radius, pressure, volume pushed over the step), so the hull would write one row a station.
 
+### Notes on the open Claude rows (2026-11-26)
+
+Progress and research for the reopened rows above, for whoever builds the upgrade next.
+
+**SEA-09 manoeuvring.** Done in 3c2f57931:
+
+- `empiricalModel(hull)` builds a full MMG model for any hull from its dimensions: Kijima 1990 linear and |v|v terms
+  for full hulls, Yoshimura and Masumoto 2011 cubics for fine hulls, their surge and rudder sets, Clarke and Brix added
+  masses, and Holtrop's thrust deduction and form factor. It reports when a hull is outside the regression's range.
+  It reproduces Yasukawa and Yoshimura's KVLCC2 values, and its turning circle is within 30 percent of MARIN's
+  free-running data.
+- The race field: each propeller's race is resolved with its swirl from the shaft torque, its contraction, the tip
+  vortices with Lamb-Oseen cores (holding to 0.8 D, gone by 1.5 D) and the jet the rudder turns. Pennings' measured
+  circulation is matched within 6 percent.
+- Cavitation in the tip vortex has inception and desinence hysteresis and a Rayleigh collapse time. It reaches the
+  bubbles (SEA-15) and the foam (SEA-13) through `aeration(t)`, and appears as `status.cavity`.
+
+Still open on this row:
+
+- the 4-DOF MMG with heel (Yasukawa et al. 2019), plus the sailing hull, leeway, keel lift and oars;
+- shallow-water derivatives (Kijima and Nakiri 2003) and bank effect against Lataire's data;
+- manoeuvring in waves (Skejic and Faltinsen 2008);
+- Savitsky 1964 planing;
+- a sailing VPP and coupling to the AERO-02 sail;
+- the Wageningen B-series open-water curves (Bernitsas et al. 1981);
+- `holtropMennen` wired into the solver;
+- autopilot and track targets;
+- ICE-04 coupling;
+- validation against SIMMAN 2008 free-running data;
+- a Rust and Wasm kernel;
+- the red flags in the row: sway and yaw damping counted twice when paired with `HullSolver`, the thruster
+  calibrations, the silent squat speed cap, the shaft depth and the quay pull constants.
+
+**SEA-12 hydrodynamic loads.** Research for the buoyancy righting moment, a design not yet built:
+
+- Box or mesh: integrate the still water's pressure ρ g (η − y) over the wetted surface with seakeeping's
+  `wettedLoads`. Pass a pressure built from the host's gravity, because `wettedLoads` otherwise falls back to its own
+  9.81. That gives the force and its moment about the centre of mass, exact at any attitude.
+- Ellipsoid: the submerged part's centroid is a unit sphere's cap mapped through the axes.
+  - Let s be the centre's depth over the half-height along the vertical. The cap has height h = 1 + s.
+  - Its centroid lies 3 (2 − h)² / (4 (3 − h)) from the centre, toward the cap.
+  - Map it back by x = Σ aᵢ xᵢ eᵢ. The moment is (centroid − G) × ρ g V_sub.
+- Then take the buoyancy out of the force applied at the shape's centre (`loads/solver.ts`), and size `bodyForces`
+  with `bodyRowsOf`, as the other body-pushing solvers do.
+- Sources:
+  - DNV-RP-C205 (2010) section 6.13, for small bodies;
+  - the spherical cap's centroid, a textbook result.
+
+**SEA-03 rogue waves.** Research for the high-order spectral (HOS) focusing tier.
+
+Model:
+
+- Dommermuth and Yue (1987) and West et al. (1987), carrying the surface potential and elevation to order M 3 to 4.
+- Dealiasing: enlarge the grid by (M + 1) / 2.
+- Time step: the linear part exactly, then adaptive Cash-Karp RK4(5) on the rest.
+- Finite-depth operators carry tanh(kh), as in Wang and Pan, Dommermuth 2014 and Toffoli et al. 2010. Dommermuth
+  2014's eq. 17 ramp is misprinted: as printed, it switches the nonlinear terms off after T_a.
+
+Breaking:
+
+- Onset at Bx = u / c > 0.855 (Barthelemy et al. 2018; Derakhti et al. 2020 for shallow water).
+- A slope check at |η_x| = 0.5774 (McAllister 2023), which also guards against blow-up.
+- Dissipation by Tian's eddy viscosity, or by Derakhti's breaking strength b = 0.034 (Γ − 0.30)^2.5.
+
+Tests:
+
+- Chabchoub et al.'s (2012) Peregrine tank case (f0 1.7 Hz, a0 0.01 m, ε 0.116), which amplifies by about 3.
+- Benjamin-Feir growth: fastest at K = 2 ε k0, at rate ε² ω0 / 2, and unstable below 2.83 ε k0.
+- Onorato et al. (2005, Marintek): second order underestimates crests after 17 wavelengths.
+
+Cost and use:
+
+- A Fitzgerald patch of 2.5 by 1.25 km on a 256 by 128 grid (512 by 256 padded) costs 80 to 120 FFTs a step. That
+  is 2 to 4 Gflop per simulated second, so it needs a Rust and Wasm kernel.
+- Blend the patch into the second-order sea over a ring two wavelengths wide.
+- To place a rogue, run the NewWave group backward linearly and iterate on the focus point, or seed a Peregrine
+  breather.
+
+**SEA-05 nearshore waves.** Research for the reef orbital flow:
+
+- Near-bed orbital velocity:
+  - Soulsby (2006), with skewness and asymmetry from Ruessink, Ramaekers and van Rijn (2012) and the waveform of
+    Abreu et al. (2010);
+  - van der Lugt et al. (2024) refit it for sheltered, fetch-limited sites.
+- Flow inside canopies: Lowe, Koseff and Monismith's (2005) two-layer equation, in Neshamar et al.'s (2023) closed
+  form (their eq. 23).
+- Flexible blades: Luhar and Nepf (2016) and Lei and Nepf (2019), with le/l = 0.94 (Ca L)^−0.25.
+- Reef friction: fe of about 0.1 on the reef flat and 0.4 on the forereef (Davis et al. 2021).
+- Reef-flat currents: a wave-enhanced bed stress with C_D 0.01 (Lentz).
+- Test numbers:
+  - Soulsby's worked case gives 0.568 m/s (H 1 m, T 6 s, h 5 m).
+  - Ruessink et al. at Ur 1 give B 0.711 and Ψ −29.5°.
+  - Neshamar's limits are 1 / I as D → 0, and 0.009 at D 100 (λ 0.05).
+  - A reef flat with a 0.05 m setup over 500 m, h 1 m and C_D 0.01 flows at 0.31 m/s.
+
+Phase-resolved tier: non-hydrostatic shallow water (Zijlema, Stelling and Smit 2011; Smit's 2008 MSc and 2014 PhD
+theses).
+
+- Dispersion:
+  - one layer, ω² = g k² h / (1 + (kh)² / 4), within 1 percent up to kh 0.5;
+  - two layers, ω² = g k² h (1 + (kh)² / 16) / (1 + 3 (kh)² / 8 + (kh)⁴ / 256), within 1 percent up to kh of
+    about 7.8.
+- Breaking by the hydrostatic front approximation (Smit et al. 2013): hydrostatic where the surface rises faster
+  than 0.6 c, held at 0.3 c beside a breaking point.
+- Bed friction by Manning: c_f = n² g / h^(1/3).
+- Validation:
+  - Demirbilek et al.'s (2007) reef flume: 15 conditions, with wave heights scattered by 2.4 to 9.8 percent and the
+    reef-flat setup by 0.17 and 0.19;
+  - Buckley et al.'s reef flume (16 runs);
+  - Beji and Battjes's (1993) bar.
+
+**SEA-01 wave spectrum.** Research for the young lake sea and swell decay.
+
+The Fitzgerald's sea was limited by duration, not fetch:
+
+- At 25 m/s over 200 to 300 km a sea needs 12 to 16 h to develop; with 9 to 12 h, the growth laws give 5 to 7 m.
+- Hultquist, Dutter and Schwab (2006, BAMS) hindcast Hs 7.8 m, at the top of that band. This is consistent with
+  unstable cold air over warm water.
+
+Test numbers:
+
+- JONSWAP's laws at 25 m/s over 200 km give Hs 5.71 m and Tp 10.38 s.
+- The USACE Coastal Engineering Manual (CEM) gives 6.55 m and 8.60 s. Its 9 h duration limit gives an equivalent
+  fetch of 101 km and Hs 4.65 m.
+- From the CEM hindcast tables, a lake sea's steepness is about 0.036, against the Pacific's 0.017.
+
+Spreading and depth:
+
+- The current `jonswap` seeding spreads cos² (32.5° rms). A young wind sea is about 22.8° at the peak and 41.5° in
+  the tail, following Donelan, Hamilton and Hui's (1985) sech².
+- TMA's depth factor is tanh²(kh) / (1 + 2kh / sinh 2kh).
+
+Swell decay: Ardhuin, Chapron and Collard 2009 (GRL 36, L06607; not JPO, as the row says).
+
+- Observed energy e-folding lengths run from over 20,000 km down to 2,800 km for the steepest swells, with decay
+  rates of −0.6e-7 to 3.7e-7 per m.
+- Laminar decay is 2.2e-8 per m at 13 s and 5.8e-9 per m at 19 s.
+- Ardhuin et al. 2010 (JPO 40) give s1 0.8, s2 −0.018, s3 0.015, a laminar coefficient of 1.2 and a critical
+  Reynolds number of 2e5 m / Hs. The prefactor of the 2009 paper's eq. 6 is unreadable in both copies.
+
+Held-out gale: 30 m/s over 100 km by the combined Kahma-Calkoen law (Karimpour and Chen 2016) gives Hs 6.16 m and
+Tp 9.3 s. Stable air gives 5.23 m and unstable air 7.22 m; the split is in Kahma and Calkoen's 1994 chapter.
+
+**ATMO-04 precipitation.** Research for rain carried by the gusts, splashes and snow:
+
+- Each drop relaxes to the wind over v_t / g. Big drops hit the sea at 0.85 U10, and small drops lag:
+  u = 0.85 U10 (1 − e^(−5000 r)). Source: Veron and Mieussens 2016, with Marshall-Palmer and Best's fall speed in
+  radius form.
+- Splash regimes follow the Weber and Froude numbers (Murphy et al. 2015 and later papers). Secondary droplets
+  follow r^(−5/2).
+- A drop's ring leaves a calm disk that grows at 0.178 m/s (Laxague and Zappa 2020).
+- Rain damps waves at k R ρ_drop / ρ_water with no wind (Kuo and Hao 2026). A 5 m wave keeps 0.94 of its amplitude
+  after 1 h at 50 mm/h.
+- Snow: Locatelli and Hobbs (1974, JGR) give fall-speed and mass laws for aggregates of unrimed dendrites, for
+  densely rimed dendrites and for the graupel types, but not for single dendrites. Their table belongs in the test.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point
