@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20173819,
+  "total": 20174739,
   "history": [
     {
       "date": "2026-10-24",
@@ -12891,6 +12891,12 @@
       "commit": "a3241a7cbc",
       "reason": "BREAK-03 adds 3507 B gzip for an optional measured normal crush contact with rigid recoil and durable seal data. Core and Stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c1a005f944",
+      "grew": 1,
+      "reason": "BB-7 physics/tracers grows from 4696 to 5616 B gzip, raising its ceiling from 4952 to 5872 B. The optional swimming-wake mode entrains sediment directly into the existing tracer mass ledger. A separate entry would duplicate routing or expose the ledger for a second solver."
     }
   ],
   "items": {
@@ -13742,7 +13748,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/tracers": 4952,
+    "@margoengine/physics/tracers": 5872,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/waves": 8575,
