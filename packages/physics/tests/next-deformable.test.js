@@ -250,7 +250,10 @@ test('a surface that stops moving stops pulling: the speed lasts one step', () =
 
 test('the same 5 m rise as a teleport (now: true) has no velocity or sweep, so it passes the ball: the swept path is the one that catches it', () => {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
-  const sheet = physics.addBody(null, { type: 'fixed', colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true } });
+  const sheet = physics.addBody(null, {
+    type: 'fixed',
+    colliders: { shape: 'trimesh', vertices: flat, indices, deformable: true },
+  });
   const ball = physics.addBody(null, { position: [0.05, 2, 0.05], colliders: { shape: 'sphere', radius: 0.3 } });
   physics.step();
   sheet.colliders[0].setVertices(shifted(0, 5), { now: true });

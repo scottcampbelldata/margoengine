@@ -349,7 +349,9 @@ export class Vehicle implements PhysicsAttachment {
       if (made.cast !== 'ray' && made.cast !== 'shape')
         throw new RangeError(`Wheel cast must be 'ray' or 'shape'; got ${String(made.cast)}.`);
       if (made.tyre && typeof made.tyre.forces !== 'function')
-        throw new TypeError('A tyre model is an object with a forces(sample) method; pass pacejkaTyre() or brushTyre().');
+        throw new TypeError(
+          'A tyre model is an object with a forces(sample) method; pass pacejkaTyre() or brushTyre().',
+        );
     }
     const mass = chassis.mass;
     this.maxEngineForce = options.maxEngineForce ?? mass;
@@ -368,7 +370,9 @@ export class Vehicle implements PhysicsAttachment {
     if (this.drivetrain) {
       for (const index of this.drivenIndexes()) {
         if (!Number.isInteger(index) || index >= this.wheels.length)
-          throw new RangeError(`The drivetrain names wheel ${index}, but the vehicle has ${this.wheels.length}; use wheel indexes from 0 to ${this.wheels.length - 1}.`);
+          throw new RangeError(
+            `The drivetrain names wheel ${index}, but the vehicle has ${this.wheels.length}; use wheel indexes from 0 to ${this.wheels.length - 1}.`,
+          );
         if (!this.wheels[index]!.tyre)
           throw new MargoError(
             'state',

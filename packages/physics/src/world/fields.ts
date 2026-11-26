@@ -76,6 +76,8 @@ export interface RegisteredField {
   readonly owner: string | undefined;
   /** Solvers that read it, in id order. */
   readonly readers: readonly string[];
+  /** Those of them that do without it when no solver writes it (an optional read), in id order. */
+  readonly optionalReaders: readonly string[];
   /** Solvers that add to it, in id order. */
   readonly contributors: readonly string[];
   /** The value at the last coupling tick it was published at, and the one before (for interpolation). */
@@ -94,6 +96,7 @@ interface Entry {
   readonly descriptor: FieldDescriptor;
   owner: string | undefined;
   readonly readers: Set<string>;
+  readonly optionalReaders: Set<string>;
   readonly contributors: Set<string>;
   readonly meta: Region;
   mirrors: readonly [Region, Region] | undefined;
@@ -154,6 +157,7 @@ export class FieldRegistry {
           descriptor: { name, kind, quantity, unit, centring },
           owner: undefined,
           readers: new Set(),
+          optionalReaders: new Set(),
           contributors: new Set(),
           meta: this.arena.allocate(`${name}/meta`, META * 8, 'f64', META_LAYOUT),
           mirrors: undefined,
@@ -163,8 +167,11 @@ export class FieldRegistry {
         this.fields.set(name, entry);
       }
       if (use.access === 'write') entry.owner = solver;
-      else if (use.access === 'read') entry.readers.add(solver);
-      else entry.contributors.add(solver);
+      else if (use.access === 'read') {
+        entry.readers.add(solver);
+        if (use.optional === true) entry.optionalReaders.add(solver);
+        else entry.optionalReaders.delete(solver);
+      } else entry.contributors.add(solver);
     }
   }
 
@@ -179,6 +186,7 @@ export class FieldRegistry {
         this.words(entry.meta).fill(0);
       }
       entry.readers.delete(solver);
+      entry.optionalReaders.delete(solver);
       entry.contributors.delete(solver);
       entry.from.delete(solver);
       if (entry.owner === undefined && entry.readers.size === 0 && entry.contributors.size === 0)
@@ -337,6 +345,7 @@ export class FieldRegistry {
       descriptor: e.descriptor,
       owner: e.owner,
       readers: [...e.readers].sort(byText),
+      optionalReaders: [...e.optionalReaders].sort(byText),
       contributors: [...e.contributors].sort(byText),
       current: at(0, current),
       previous: at(6, 1 - current),

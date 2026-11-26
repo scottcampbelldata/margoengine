@@ -8,7 +8,10 @@ const swingOf = ([x, , z]) => Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (x * x 
 function pressed(hertz) {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
   const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    rod = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
+    rod = physics.addBody(null, {
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+    }),
     joint = physics.addJoint(top, rod, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.4 });
   if (hertz !== undefined) joint.setLimitSoftness(hertz, 1);
   // A steady torque into the limit, about the axis the cone's swing turns about.
@@ -41,7 +44,10 @@ test('limit softness checks its input, reads back, and 0 returns to a contact st
     b = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1 } }),
     joint = physics.addJoint(a, b, { type: 'cone', swing: 0.5 });
   joint.setLimitSoftness(4, 0.7);
-  assert.deepEqual(joint.limitSoftness.map((x) => Math.round(x * 10) / 10), [4, 0.7]);
+  assert.deepEqual(
+    joint.limitSoftness.map((x) => Math.round(x * 10) / 10),
+    [4, 0.7],
+  );
   joint.setLimitSoftness(0);
   assert.equal(joint.limitSoftness[0], 0);
   assert.throws(() => joint.setLimitSoftness(-1), RangeError);

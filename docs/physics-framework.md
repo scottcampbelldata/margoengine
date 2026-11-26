@@ -132,6 +132,8 @@ Every quantity that crosses a solver boundary is a field in the registry:
 - One writer per field.
 - Accumulation is order-independent by construction: contributions are summed by solver id, then by element index.
 - Readers see the value at the coupling tick.
+- A field nobody writes is refused, unless every reader marks its read `optional`: such a reader steps with no port for
+  the field until a writer comes (the hull solver reads `deckClaims` so, before a liquid solver on the deck exists).
 
 This is the "privileges" idea of Legion and of render graphs (Bauer et al. 2012; O'Donnell 2017), applied to physics
 fields (MOOSE, Gaston et al. 2009; ESMF, Hill et al. 2004).

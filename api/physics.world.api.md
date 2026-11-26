@@ -78,6 +78,7 @@ export interface CouplingNode {
     readonly id: string;
     readonly writes: readonly string[];
     readonly reads: readonly string[];
+    readonly optionalReads?: readonly string[];
     readonly accumulates: readonly string[];
 }
 
@@ -133,6 +134,7 @@ export class FieldRegistry {
 export interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
+    readonly optional?: boolean;
 }
 
 export const HYPER_PERIOD: number;
@@ -237,6 +239,7 @@ export interface RegisteredField {
     readonly descriptor: FieldDescriptor;
     readonly owner: string | undefined;
     readonly readers: readonly string[];
+    readonly optionalReaders: readonly string[];
     readonly contributors: readonly string[];
     readonly current: PublishedPort | undefined;
     readonly previous: PublishedPort | undefined;
