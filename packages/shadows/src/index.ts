@@ -396,13 +396,8 @@ interface Motion {
 }
 /** Instance rows a primitive draws (gltf/pbr `PBRInstances`): `count` rows of 24 floats, a node-space matrix first. */
 type InstanceRows = { readonly count: number; readonly data: Float32Array; readonly version?: number };
-const rowsOf = (p: object): InstanceRows | undefined => (p as { instances?: InstanceRows | null }).instances ?? undefined;
-/** Primitive `i`'s rows unless an earlier primitive of the list draws the same rows. */
-const firstRows = (primitives: readonly object[], i: number): InstanceRows | undefined => {
-  const rows = rowsOf(primitives[i]);
-  for (let j = 0; rows && j < i; j++) if (rowsOf(primitives[j]) === rows) return undefined;
-  return rows;
-};
+const rowsOf = (p: object): InstanceRows | undefined =>
+  (p as { instances?: InstanceRows | null }).instances ?? undefined;
 /**
  * A primitive whose bounds are known on the CPU: range() made once, not a closure per caster per frame. A material's
  * `shading` (materials' createMesh gives every mesh one) changes colour only: the depth pass draws the vertices as they
@@ -442,32 +437,29 @@ const localBounds = (source: MeshSource | undefined): Float32Array | undefined =
  * stay, so still instances are read once; rows without a `version` are read every call. A matrix moves the box by its
  * centre and absolute-valued extents (Arvo, "Transforming Axis-Aligned Bounding Boxes", Graphics Gems, 1990).
  */
-const instancedCache = new WeakMap<MeshSource, { local: Float32Array; keys: unknown[]; box: Float64Array }>();
+// keys: the local box, then the rows, version (NaN without one, so never kept) and count of each distinct row set in
+// primitive order, then whether a primitive draws without instances. One array reused: compared each call.
+const instancedCache = new WeakMap<MeshSource, { keys: unknown[]; box: Float64Array }>(),
+  nodeKeys: unknown[] = [];
 const nodeBounds = (source: MeshSource | undefined): ArrayLike<number> | undefined => {
-  const local = localBounds(source);
+  const local = localBounds(source),
+    keys = nodeKeys;
   if (!local) return local;
-  const primitives = source!.primitives;
-  let plain = false,
-    instanced = false;
-  for (let i = 0; i < primitives.length; i++) {
-    if (rowsOf(primitives[i])) instanced = true;
-    else plain = true;
+  let plain = false;
+  keys.length = 1;
+  keys[0] = local;
+  for (const p of source!.primitives) {
+    const rows = rowsOf(p);
+    if (!rows) plain = true;
+    else if (!keys.includes(rows)) keys.push(rows, rows.version ?? NaN, rows.count);
   }
-  if (!instanced) return local;
-  // keys: plain, then the rows, version and count of each distinct row set in primitive order.
+  if (keys.length < 2) return local;
+  keys.push(plain);
   const cached = instancedCache.get(source!);
-  let same = !!cached && cached.local === local && cached.keys[0] === plain,
-    at = 1;
-  for (let i = 0; same && i < primitives.length; i++) {
-    const rows = firstRows(primitives, i);
-    if (!rows) continue;
-    const k = cached!.keys;
-    same = k[at] === rows && rows.version !== undefined && k[at + 1] === rows.version && k[at + 2] === rows.count;
-    at += 3;
-  }
-  if (same && at === cached!.keys.length) return cached!.box;
-  const keys: unknown[] = [plain],
-    box = cached?.box ?? new Float64Array(6),
+  let same = cached?.keys.length === keys.length;
+  for (let i = 0; same && i < keys.length; i++) same = keys[i] === cached!.keys[i];
+  if (same) return cached!.box;
+  const box = cached?.box ?? new Float64Array(6),
     cx = (local[0] + local[3]) / 2,
     cy = (local[1] + local[4]) / 2,
     cz = (local[2] + local[5]) / 2,
@@ -476,12 +468,9 @@ const nodeBounds = (source: MeshSource | undefined): ArrayLike<number> | undefin
     ez = (local[5] - local[2]) / 2;
   box.fill(Infinity, 0, 3).fill(-Infinity, 3);
   if (plain) box.set(local);
-  for (let i = 0; i < primitives.length; i++) {
-    const rows = firstRows(primitives, i);
-    if (!rows) continue;
-    keys.push(rows, rows.version, rows.count);
-    const d = rows.data;
-    for (let k = 0, o = 0; k < rows.count; k++, o += 24)
+  for (let s = 1; s < keys.length - 1; s += 3) {
+    const { count, data: d } = keys[s] as InstanceRows;
+    for (let o = 0; o < count * 24; o += 24)
       for (let a = 0; a < 3; a++) {
         const c = d[o + a] * cx + d[o + 4 + a] * cy + d[o + 8 + a] * cz + d[o + 12 + a],
           e = Math.abs(d[o + a]) * ex + Math.abs(d[o + 4 + a]) * ey + Math.abs(d[o + 8 + a]) * ez;
@@ -489,7 +478,7 @@ const nodeBounds = (source: MeshSource | undefined): ArrayLike<number> | undefin
         if (c + e > box[a + 3]) box[a + 3] = c + e;
       }
   }
-  instancedCache.set(source!, { local, keys, box });
+  instancedCache.set(source!, { keys: keys.slice(), box });
   return box;
 };
 /** True when caster `p` draws no instances or rows of its node's gltf/pbr primitives, which `nodeBounds` reads. */
