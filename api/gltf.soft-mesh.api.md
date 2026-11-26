@@ -11,6 +11,7 @@ import { Splats } from "@margoengine/splats";
 
 export class SoftBodyMesh implements EnginePlugin {
     readonly name: string;
+    readonly late = true;
     readonly model: PBRModel;
     readonly surface: SoftSurface;
     constructor(engine: EngineKernel, body: SoftBody, _arg1?: SoftBodyMeshOptions);
