@@ -1005,6 +1005,7 @@ class PBRModel implements EnginePlugin {
         vertexAlpha?: boolean | undefined;
         displacement?: import("./shared/caster.js").CasterDisplacement | undefined;
         clip?: GPUBufferBinding | undefined;
+        instances?: PBRInstances | undefined;
     }[];
     setup(engine: Engine, device?: GPUDevice | null): void;
     shareBuffers(target: PBRPrimitive, source: PBRPrimitive): boolean;
@@ -1064,6 +1065,7 @@ class PBRModel implements EnginePlugin {
         vertexAlpha?: boolean | undefined;
         displacement?: import("./shared/caster.js").CasterDisplacement | undefined;
         clip?: GPUBufferBinding | undefined;
+        instances?: PBRInstances | undefined;
     }[];
     readPickingGeometry(): Promise<readonly PBRPickingGeometry[]>;
     draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: ExternalPass, carry?: PBRDrawRun): void;
