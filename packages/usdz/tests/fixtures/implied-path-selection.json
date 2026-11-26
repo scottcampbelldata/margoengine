@@ -1,0 +1,422 @@
+{
+ "stage139": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n        variants = { string vs = \"y\" }\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    over \"a\" (\n    )\n    {\n        over \"b\" (\n            prepend references = @./l0.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        append references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    variantSet \"vs\" = {\n        \"y\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"y\" {\n                        def \"b\" (\n                        )\n                        {\n                        }\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"Q\"\n{\n    def \"c\" (\n        prepend inherits = </C>\n    )\n    {\n        over \"a\" (\n            inherits = </C>\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    3,
+    2,
+    8,
+    0
+   ],
+   "/Q": [
+    13
+   ],
+   "/Q/c": [
+    14,
+    8,
+    0
+   ],
+   "/Q/c/a": [
+    15,
+    8,
+    0,
+    9,
+    1,
+    7,
+    3
+   ],
+   "/Q/c/a/a": [
+    1,
+    10,
+    11,
+    4
+   ],
+   "/Q/c/a/a/b": [
+    12,
+    5,
+    1,
+    10,
+    11
+   ],
+   "/Q/c/a/a/b/b": [
+    12
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage139-weaker-reference": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n        variants = { string vs = \"y\" }\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"Shared\"\n{\n    over \"a\" (\n        variants = { string vs = \"x\" }\n    )\n    {\n    }\n}\ndef \"M\"\n{\n    over \"a\" (\n    )\n    {\n        over \"b\" (\n            prepend references = @./l0.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        append references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    variantSet \"vs\" = {\n        \"y\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"y\" {\n                        def \"b\" (\n                        )\n                        {\n                        }\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"Q\"\n{\n    def \"c\" (\n        prepend inherits = </C>\n        references = </Shared>\n    )\n    {\n        over \"a\" (\n            inherits = </C>\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    2,
+    10,
+    0
+   ],
+   "/Shared": [
+    3
+   ],
+   "/Q": [
+    15
+   ],
+   "/Q/c": [
+    16,
+    10,
+    0,
+    3
+   ],
+   "/Q/c/a": [
+    17,
+    10,
+    0,
+    11,
+    1,
+    9,
+    5,
+    4
+   ],
+   "/Q/c/a/a": [
+    1,
+    12,
+    13,
+    6
+   ],
+   "/Q/c/a/a/b": [
+    14,
+    7,
+    1,
+    12,
+    13
+   ],
+   "/Q/c/a/a/b/b": [
+    14
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/Shared": {
+    "type": "",
+    "props": {}
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "own-selection-first": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n        variants = { string vs = \"y\" }\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    def \"a\" (\n    )\n    {\n        def \"b\" (\n            prepend references = @./l0.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        append references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"x\" {\n                    }\n                }\n            }\n        }\n        \"y\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"y\" {\n                        def \"b\" (\n                        )\n                        {\n                        }\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"Q\"\n{\n    def \"c\" (\n        prepend inherits = </C>\n        variants = { string vs = \"x\" }\n    )\n    {\n        over \"a\" (\n            variants = { string vs = \"y\" }\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    3,
+    2,
+    8,
+    0
+   ],
+   "/M/a": [
+    4,
+    1
+   ],
+   "/M/a/b": [
+    5,
+    1
+   ],
+   "/Q": [
+    16
+   ],
+   "/Q/c": [
+    17,
+    8,
+    0,
+    9
+   ],
+   "/Q/c/a": [
+    18,
+    1,
+    10,
+    7,
+    3
+   ],
+   "/Q/c/a/a": [
+    4
+   ],
+   "/Q/c/a/a/b": [
+    5,
+    1,
+    13,
+    14
+   ],
+   "/Q/c/a/a/b/b": [
+    15
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "parent-index-not-read": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n        variants = { string vs = \"y\" }\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    over \"a\" (\n    )\n    {\n        def \"b\" (\n            prepend references = @./l0.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        append references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"x\" {\n                    }\n                }\n            }\n        }\n        \"y\" {\n            def \"a\" (\n                variantSets = \"vs\"\n            )\n            {\n                variantSet \"vs\" = {\n                    \"y\" {\n                        def \"b\" (\n                        )\n                        {\n                        }\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"Q\"\n{\n    def \"c\" (\n        prepend inherits = </C>\n    )\n    {\n        over \"a\" (\n            inherits = </C>\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\nover \"M\" (\n    variants = { string vs = \"x\" }\n)\n{\n}\n"
+  },
+  "prims": {
+   "/M": [
+    19,
+    3,
+    2,
+    8,
+    0,
+    9
+   ],
+   "/M/a": [
+    4,
+    1,
+    10
+   ],
+   "/M/a/b": [
+    5,
+    1,
+    10
+   ],
+   "/Q": [
+    16
+   ],
+   "/Q/c": [
+    17,
+    8,
+    0
+   ],
+   "/Q/c/a": [
+    18,
+    8,
+    0,
+    12,
+    1,
+    7,
+    3
+   ],
+   "/Q/c/a/a": [
+    1,
+    13,
+    14,
+    4
+   ],
+   "/Q/c/a/a/b": [
+    15,
+    5,
+    1,
+    13,
+    14
+   ],
+   "/Q/c/a/a/b/b": [
+    15
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/a/a/b/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage9-authored-arc": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C>\n    variantSets = \"vs\"\n    variants = { string vs = \"y\" }\n)\n{\n    variantSet \"vs\" = {\n        \"y\" {\n            def \"a\" (\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n    variantSets = \"vs\"\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\" (\n            )\n            {\n            }\n        }\n    }\n}\ndef \"Shared\"\n{\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        over \"a\" (\n            inherits = </C>\n        )\n        {\n        }\n    }\n    over \"b\" (\n        references = </Shared>\n    )\n    {\n        over \"b\" (\n            prepend references = @./l1.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"Q\" (\n)\n{\n    over \"a\" (\n        append references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        variantSets = \"vs\"\n        variants = { string vs = \"y\" }\n    )\n    {\n        def \"a\" (\n            references = @./l2.usda@</M> (offset = 10)\n        )\n        {\n        }\n        variantSet \"vs\" = {\n            \"y\" {\n                def \"a\" (\n                    variants = { string vs = \"x\" }\n                )\n                {\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    12
+   ],
+   "/Q/a": [
+    13,
+    15,
+    8
+   ],
+   "/Q/a/a": [
+    14,
+    16,
+    7,
+    9,
+    3,
+    4
+   ],
+   "/Q/a/a/a": [
+    8,
+    5
+   ],
+   "/Q/a/a/b": [
+    10,
+    6
+   ],
+   "/Q/a/a/b/b": [
+    11,
+    2
+   ]
+  },
+  "reading": {
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a/a/a": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a/a/b": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/a/a/b/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ }
+}
