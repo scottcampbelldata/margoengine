@@ -12980,6 +12980,39 @@ The peak comparison also includes the original Morison residual from Eq. (16). M
 runs are 0.092 for `C_M` and 0.063 for `C_D`, with a maximum peak `C_F` error of 0.374. DNV gives
 0.039 and 0.214 mean coefficient errors, respectively, on the same runs. DNV remains the default.
 
+Optional rotational inertia uses the velocity potential for a rotating ellipsoid. Integrate the outer potential
+in Lamb's Art. 112 Eq. (6) against the normal velocity to get the fluid kinetic energy. The denominator has
+`2(b²−c²)+(b²+c²)(β₀−γ₀)`, also printed in Bateman's report. The two axisymmetric cases in the NACA
+Report 323 Table VI agree to half its last printed digit. The held torque uses the inverse-inertia tensor
+published by the rigid body. Solving in wrench space keeps the system defined for constrained rigid axes.
+[H. Lamb, *Hydrodynamics*, Art. 112](https://scispace.com/pdf/hydrodynamics-by-horace-lamb-14s3kx3ak5.pdf) ·
+[H. Bateman, NACA Report 164, p. 163](https://web.stanford.edu/~cantwell/AA200_Course_Material/AA200_References/Jones_Classical_Aerodynamic_Theory.pdf)
+
+The supplied passive radiation modes approximate the zero-forward-speed Cummins kernel in principal motions.
+Each exponential stores the history of its velocity. Over one step, an exponential with decay time `τ`
+contributes its old memory times `exp(−dt/τ)` and its end-of-step velocity times `τ (1−exp(−dt/τ))`.
+Eliminating the new velocity from the wrench transfers a nonnegative term to the effective mass or inertia.
+The kit stores the preceding wet amplitude and recomputes history from the actual rigid velocity on the next step.
+The exact two-state implicit system tests the velocity history and hash after restore. The reference coefficients
+are caller-provided for the body and draft. [W. E. Cummins, *The Impulse Response Function and Ship Motions* (1962), Eq. 61](https://dome.mit.edu/handle/1721.3/49049)
+
+The civil woody-debris first-contact model combines wood and support normal compliance in series. A compressing
+elastic contact reaches its peak at a quarter of the reduced-mass oscillator period. The rigid-port adapter uses
+the point mobility of both bodies, then applies a single normal impulse with opposite linear and angular reactions.
+Haehnel and Daly's 2.4 MN/m estimate is the envelope of their Series 1, 3 and 4. At the measured momentum and
+speed of the held-out concrete-facing Series 6, the model predicts 30.42 kN. The upper measured replicate is
+30.31 kN and the reading uncertainty is 0.37 kN. The test also compares Series 8 near-central impacts. The
+force prediction covers the upper-envelope contact, with individual Series 6 replicates from 28.74 to 30.31 kN.
+[R. B. Haehnel and S. F. Daly, *Maximum Impact Force of Woody Debris on Floodplain Structures*, ERDC/CRREL TR-02-2, Figs. 13–14](https://archive.org/details/DTIC_ADA398916)
+
+The taut line is the massless, near-neutral limit of the elastic mooring element. The axial force is
+`EA max(L-L₀, 0) / L₀`. Solve it against both attachments' rigid point mobilities, and stage equal and
+opposite impulses at the two points. A fixed pile retains its reaction as a reported force. The test checks
+slack engagement, the peak of the exact axial oscillator within its discrete damping bound at 60 and 240 Hz,
+and linear and angular momentum through replay. The straight line covers short taut tethers.
+[Hall (2024), *Generalized Quasi-Static Mooring System Modeling*, §2.1](https://doi.org/10.3390/en17133155) ·
+[Hall and Goupee (2015), *Validation of a lumped-mass mooring line model*](https://doi.org/10.1016/j.oceaneng.2015.05.035)
+
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 
 `packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,

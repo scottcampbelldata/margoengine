@@ -22,6 +22,8 @@ export interface LoadBody {
     readonly centre?: readonly [number, number, number];
     readonly drag?: number | readonly [number, number, number];
     readonly addedMass?: readonly [number, number, number];
+    readonly addedInertia?: 'ellipsoid' | readonly [number, number, number];
+    readonly radiation?: readonly LoadRadiationMode[];
     readonly pressureModel?: 'compact' | 'surface';
     readonly windage?: number;
 }
@@ -49,6 +51,12 @@ export interface LoadParams {
     readonly viscosity?: number;
     readonly capacity?: number;
     readonly level?: RateLevel;
+}
+
+export interface LoadRadiationMode {
+    readonly axis: 0 | 1 | 2 | 3 | 4 | 5;
+    readonly strength: number;
+    readonly decayTime: number;
 }
 
 export type LoadShape = {
@@ -166,12 +174,74 @@ export interface SegmentState {
     readonly length: number;
 }
 
+export interface TautMooringEnd {
+    readonly row: number;
+    readonly point?: Vector;
+}
+
+export interface TautMooringLine {
+    readonly anchor: TautMooringEnd;
+    readonly fairlead: TautMooringEnd;
+    readonly length: number;
+    readonly axialRigidity: number;
+}
+
+export interface TautMooringLoad {
+    readonly tension: number;
+    readonly anchorForce: Vector;
+}
+
+export interface TautMooringParams {
+    readonly lines: readonly TautMooringLine[];
+    readonly rate?: RateLevel;
+}
+
+export class TautMooringSolver implements Solver<TautMooringParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: TautMooringParams): void;
+    step({ inputs }: StepContext, dt: number): void;
+    readLine(line: number): TautMooringLoad;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface WoodyDebrisContact extends Omit<WoodyDebrisImpactInput, 'closingSpeed' | 'inverseEffectiveMass'> {
+    readonly debrisRow: number;
+    readonly supportRow: number;
+    readonly point: Vector;
+    readonly normal: Vector;
+}
+
+export interface WoodyDebrisImpact {
+    readonly peakForce: number;
+    readonly timeToPeak: number;
+    readonly duration: number;
+    readonly normalImpulse: number;
+    readonly dissipatedEnergy: number;
+}
+
+export interface WoodyDebrisImpactInput {
+    readonly closingSpeed: number;
+    readonly inverseEffectiveMass: number;
+    readonly woodStiffness?: number;
+    readonly structureStiffness?: number;
+    readonly restitution?: number;
+}
+
+export function accumulateFilteredWoodyContact(bodies: Float32Array, impulses: Float64Array, contact: WoodyDebrisContact): WoodyDebrisImpact | undefined;
+
 export function cylinderAddedMass(kc: number, steady?: number): number;
 
 export function cylinderCoefficients(kc: number, roughness?: number, current?: number, orbital?: number, re?: number): {
     drag: number;
     addedMass: number;
 };
+
+export function ellipsoidAddedInertia(axes: readonly [number, number, number]): [number, number, number];
 
 export function ellipsoidAddedMass(axes: readonly [number, number, number]): [number, number, number];
 
@@ -212,6 +282,11 @@ export function sainflou(height: number, period: number, depth: number, options?
     crest: number;
 };
 
+export function sampleWoodyDebrisImpact(impact: WoodyDebrisImpact, elapsed: number): {
+    readonly force: number;
+    readonly impulse: number;
+};
+
 export function segmentLoads(sea: LoadWater, options?: SegmentLoadOptions): SegmentLoads;
 
 export function sheddingFrequency(speed: number, diameter: number, strouhal?: number): number;
@@ -243,6 +318,8 @@ export function washOnBed(efflux: number, diameter: number, distance: number, he
 export function waterAcceleration(sea: LoadWater, flows: readonly FlowField[], x: number, y: number, z: number, t: number, sample: FlowSample, out: Vec3): Vec3;
 
 export function waterVelocity(sea: LoadWater, flows: readonly FlowField[], x: number, y: number, z: number, t: number, sample: FlowSample, out: Vec3): Vec3;
+
+export function woodyDebrisImpact(input: WoodyDebrisImpactInput): WoodyDebrisImpact | undefined;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -329,4 +406,8 @@ interface StepContext {
 type Vec3 = [number, number, number];
 
 type Vec3 = [number, number, number];
+
+type Vector = readonly [number, number, number];
+
+type Vector = readonly [number, number, number];
 ```

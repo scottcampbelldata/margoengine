@@ -40,6 +40,30 @@ export function ellipsoidAddedMass(axes: readonly [number, number, number]): [nu
   return alphas.map((alpha) => alpha / (2 - alpha)) as [number, number, number];
 }
 
+/**
+ * Lamb's rotational added inertia divided by displaced fluid mass, in m², about the three ellipsoid axes.
+ * From Lamb's rotating-ellipsoid potential, Art. 112 Eq. (6), and Bateman (1924), NACA Report 164, p. 163.
+ */
+export function ellipsoidAddedInertia(axes: readonly [number, number, number]): [number, number, number] {
+  const alphas = ellipsoidAlphas(axes);
+  const squares = axes.map((a) => a * a);
+  const out: [number, number, number] = [0, 0, 0];
+  for (let axis = 0; axis < 3; axis++) {
+    const j = (axis + 1) % 3;
+    const k = (axis + 2) % 3;
+    const difference = squares[j]! - squares[k]!;
+    if (difference === 0) continue;
+    const alphaDifference = alphas[k]! - alphas[j]!;
+    const normalized = alphaDifference / difference;
+    const denominator = 5 * (2 - (squares[j]! + squares[k]!) * normalized);
+    const inertia = (difference * difference * normalized) / denominator;
+    if (!(inertia >= 0 && Number.isFinite(inertia)))
+      throw invalidLoad('Cannot resolve fluid rotational inertia at this aspect ratio; supply measured addedInertia.');
+    out[axis] = inertia;
+  }
+  return out;
+}
+
 /** A closed mesh's ellipsoid of equal second moments: its centre, its semi-axes and their directions (rows), its volume. */
 export interface EquivalentEllipsoid {
   centre: [number, number, number];

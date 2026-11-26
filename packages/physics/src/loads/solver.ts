@@ -34,7 +34,8 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } 
 import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
 import { cylinderCoefficients, sphereDrag, tangentialDrag, wakeStep } from './morison.js';
 import { memberOrbit } from './oscillatory.js';
-import { ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
+import { type LoadRadiationMode, prepareRadiation, type RadiationMode } from './radiation.js';
+import { ellipsoidAddedInertia, ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
 import { smoothOscillatoryCylinder } from './smooth-cylinder.js';
 import { flowAcceleration, waterAcceleration, waterVelocity } from './water.js';
 
@@ -64,6 +65,10 @@ export interface LoadBody {
   readonly drag?: number | readonly [number, number, number];
   /** Added mass coefficients along its three axes (default Lamb's for the ellipsoid; 0.25 of the body's mass across for a diver, `0.68` for a cube). */
   readonly addedMass?: readonly [number, number, number];
+  /** Rotational added inertia in m² per displaced kilogram, or 'ellipsoid' for Lamb's value. Default zero. */
+  readonly addedInertia?: 'ellipsoid' | readonly [number, number, number];
+  /** Passive exponential radiation kernels in the principal motions at the rigid centre of mass. Default empty. */
+  readonly radiation?: readonly LoadRadiationMode[];
   /** 'surface' integrates incident pressure on a box or closed mesh. Default 'compact' uses a local plane and point acceleration. */
   readonly pressureModel?: 'compact' | 'surface';
   /** The wind's drag coefficient on its emerged part (default 1.0). */
@@ -115,11 +120,21 @@ interface BodyRuntime {
   readonly centre: Vec3;
   readonly volume: number;
   readonly addedMass: Vec3;
+  readonly addedInertia: Vec3;
+  readonly radiation: readonly RadiationMode[];
   readonly sphere: boolean;
   /** A box's exact half extents, also used for its vertical support. */
   readonly box: Vec3 | undefined;
   /** Body-local pressure integration surface relative to the geometric centre. */
   readonly mesh: HullMesh | undefined;
+}
+
+interface BodyLoads {
+  mass: number;
+  force: Vec3;
+  torque: Vec3;
+  added: Float64Array;
+  rotational?: Float64Array;
 }
 
 /** A member's load from the last step, world axes: force, N, at its middle, and its wake's lift coefficient. */
@@ -143,6 +158,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private memberLoads: MemberLoad[] = [];
   private forces!: Region;
   private wakes!: Region;
+  private history: Region | undefined;
   private cell: [number, number, number] = [0, 0, 0];
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly hydrostatic: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
@@ -192,11 +208,19 @@ export class LoadSolver implements Solver<LoadParams> {
     this.nu = viscosity;
     this.level = level as RateLevel;
     const rows: number[] = [];
+    let radiationWords = 1;
     this.bodies = bodies.map((spec) => {
       if (!(Number.isInteger(spec?.row) && spec.row >= 0))
         throw invalidLoad(`A body's row is a whole number, 0 or more (got ${spec?.row}); pass the body's row.`);
       rows.push(spec.row);
-      return this.prepare(spec);
+      if (spec.radiation !== undefined && !Array.isArray(spec.radiation))
+        throw invalidLoad('Invalid radiation modes; supply an array of axis, strength and decayTime records.');
+      const modes = (spec.radiation ?? []).map((mode) => {
+        const prepared = prepareRadiation(mode, 1 / rateOf(this.level), radiationWords);
+        radiationWords += 2;
+        return prepared;
+      });
+      return this.prepare(spec, modes);
     });
     for (const m of members) {
       if (
@@ -240,13 +264,14 @@ export class LoadSolver implements Solver<LoadParams> {
       throw invalidLoad('Invalid hydrodynamic force capacity; omit capacity to use the world body rows.');
     this.forces = host.allocate('forces', Math.max(1, capacity) * FORCE_WORDS * 8, 'f64', LOADS_LAYOUT);
     this.wakes = host.allocate('wakes', Math.max(1, members.length) * 2 * 8, 'f64', LOADS_LAYOUT);
+    if (radiationWords > 1) this.history = host.allocate('radiation', radiationWords * 8, 'f64', LOADS_LAYOUT);
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2.
     const wakes = regionWords(host.memory, this.wakes) as Float64Array;
     for (let i = 0; i < members.length; i++) wakes[2 * i] = 2;
   }
 
   /** A body's equivalent ellipsoid, frame and added mass. */
-  private prepare(spec: LoadBody): BodyRuntime {
+  private prepare(spec: LoadBody, radiation: readonly RadiationMode[]): BodyRuntime {
     const shape = spec.shape;
     if (!shape || typeof shape !== 'object')
       throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
@@ -301,7 +326,16 @@ export class LoadSolver implements Solver<LoadParams> {
       addedMass = (spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)) as Vec3;
     if (addedMass.length !== 3 || !addedMass.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient)))
       throw invalidLoad('Invalid hydrodynamic added mass; supply three finite nonnegative coefficients.');
-    return { spec, axes, frame, centre, volume, addedMass, sphere, box, mesh };
+    if (spec.addedInertia !== undefined && spec.addedInertia !== 'ellipsoid' && !Array.isArray(spec.addedInertia))
+      throw invalidLoad('Invalid rotational added inertia; give three finite nonnegative m² values or use ellipsoid.');
+    const addedInertia =
+      spec.addedInertia === 'ellipsoid' ? ellipsoidAddedInertia(axes) : ([...(spec.addedInertia ?? [0, 0, 0])] as Vec3);
+    if (
+      addedInertia.length !== 3 ||
+      !addedInertia.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient))
+    )
+      throw invalidLoad('Invalid rotational added inertia; give three finite nonnegative m² values or use ellipsoid.');
+    return { spec, axes, frame, centre, volume, addedMass, addedInertia, radiation, sphere, box, mesh };
   }
 
   /** The water's velocity at a point and time: the sea's water plus every flow (water.ts). */
@@ -320,7 +354,8 @@ export class LoadSolver implements Solver<LoadParams> {
       wakes = regionWords(this.host.memory, this.wakes) as Float64Array,
       dt = 1 / rateOf(context.level),
       t = (context.tick + 0.5) / rateOf(context.level),
-      rho = this.sea.density;
+      rho = this.sea.density,
+      history = this.history ? (regionWords(this.host.memory, this.history) as Float64Array) : undefined;
     out.fill(0);
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name),
       bodies = port
@@ -334,14 +369,23 @@ export class LoadSolver implements Solver<LoadParams> {
       if (!bodies) break;
       const at = b.spec.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
-      this.loadBody(b, bodies, at, t, rho, out);
+      this.loadBody(b, bodies, at, t, dt, rho, history);
     }
     this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes));
-    this.hold(out);
+    this.hold(out, bodies);
+    if (history) history[0] = 1;
   }
 
   /** A compact body's load, held with its added mass. */
-  private loadBody(b: BodyRuntime, bodies: Float32Array, at: number, t: number, rho: number, out: Float64Array): void {
+  private loadBody(
+    b: BodyRuntime,
+    bodies: Float32Array,
+    at: number,
+    t: number,
+    dt: number,
+    rho: number,
+    history: Float64Array | undefined,
+  ): void {
     const q: [number, number, number, number] = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!],
       origin: Vec3 = [bodies[at]!, bodies[at + 1]!, bodies[at + 2]!],
       cm: Vec3 = [bodies[at + 7]!, bodies[at + 8]!, bodies[at + 9]!],
@@ -486,14 +530,38 @@ export class LoadSolver implements Solver<LoadParams> {
     if (surfacePressure) {
       for (let k = 0; k < 3; k++) acc.force[k]! += this.pressure.force[k]!;
     } else acc.force[1] += buoyancy;
-    for (let i = 0; i < 3; i++)
-      for (let r = 0; r < 3; r++)
-        for (let c = 0; c < 3; c++) acc.added[3 * r + c]! += added[i]! * axesWorld[i]![r]! * axesWorld[i]![c]!;
+    for (let axis = 0; axis < 3; axis++) {
+      addInertiaAxis(acc.added, axesWorld[axis]!, added[axis]!);
+      const inertia = b.addedInertia[axis]! * rho * submerged;
+      if (inertia > 0) addInertiaAxis((acc.rotational ??= new Float64Array(9)), axesWorld[axis]!, inertia);
+    }
+    if (history && b.radiation.length > 0) {
+      const exposed = Math.sqrt(wet);
+      for (const mode of b.radiation) {
+        const angular = mode.axis >= 3;
+        const direction = axesWorld[mode.axis % 3]!;
+        const velocity = dot(angular ? w : v, direction);
+        const previous = mode.index;
+        if (history[0] === 1)
+          history[previous] = mode.decay * history[previous]! + mode.integral * history[previous + 1]! * velocity;
+        history[previous + 1] = exposed;
+        // Eliminate the end-of-step velocity from the implicit exponential update.
+        // Its incremental acceleration contributes a positive term on the inertial side.
+        const load = -mode.strength * exposed * (mode.decay * history[previous]! + mode.integral * exposed * velocity);
+        const inertia = mode.strength * mode.integral * wet * dt;
+        const wrench = angular ? acc.torque : acc.force;
+        for (let k = 0; k < 3; k++) wrench[k]! += load * direction[k]!;
+        if (inertia > 0) {
+          const addedMatrix = angular ? (acc.rotational ??= new Float64Array(9)) : acc.added;
+          addInertiaAxis(addedMatrix, direction, inertia);
+        }
+      }
+    }
   }
 
   /** The loads gathered for a body row this step. */
-  private rows = new Map<number, { mass: number; force: Vec3; torque: Vec3; added: Float64Array }>();
-  private rowOf(row: number, mass: number): { mass: number; force: Vec3; torque: Vec3; added: Float64Array } {
+  private rows = new Map<number, BodyLoads>();
+  private rowOf(row: number, mass: number): BodyLoads {
     let r = this.rows.get(row);
     if (!r) {
       r = { mass, force: [0, 0, 0], torque: [0, 0, 0], added: new Float64Array(9) };
@@ -502,8 +570,8 @@ export class LoadSolver implements Solver<LoadParams> {
     return r;
   }
 
-  /** Writes each row's loads, held with its added mass: F_held = M (M I + A)^-1 (F + W) - W, its translational part. */
-  private hold(out: Float64Array): void {
+  /** Writes each dry-body wrench that produces the acceleration of the body and its carried water. */
+  private hold(out: Float64Array, bodies: Float32Array | undefined): void {
     for (const [row, r] of this.rows) {
       const m = r.mass,
         W: Vec3 = [0, -m * this.g, 0],
@@ -515,9 +583,11 @@ export class LoadSolver implements Solver<LoadParams> {
       for (let k = 0; k < 3; k++)
         held[k] = m * (inverse[3 * k]! * F[0] + inverse[3 * k + 1]! * F[1] + inverse[3 * k + 2]! * F[2]);
       const at = row * FORCE_WORDS;
+      const torque =
+        r.rotational && bodies ? holdTorque(r.torque, r.rotational, bodies, row * BODY_WORDS + 17) : r.torque;
       for (let k = 0; k < 3; k++) {
         out[at + k]! += held[k]! - W[k]!;
-        out[at + 3 + k]! += r.torque[k]!;
+        out[at + 3 + k]! += torque[k]!;
       }
     }
     this.rows.clear();
@@ -664,12 +734,41 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   stateRegions(): readonly Region[] {
-    return [this.wakes];
+    return this.history ? [this.wakes, this.history] : [this.wakes];
   }
 
   extraState(): readonly Region[] {
     return [this.forces];
   }
+}
+
+function addInertiaAxis(matrix: Float64Array, direction: Vec3, coefficient: number): void {
+  for (let row = 0; row < 3; row++)
+    for (let column = 0; column < 3; column++)
+      matrix[row * 3 + column]! += coefficient * direction[row]! * direction[column]!;
+}
+
+function holdTorque(torque: Vec3, added: Float64Array, bodies: Float32Array, at: number): Vec3 {
+  // Solve (identity + A * dry mobility) * held = torque. Inverse inertia comes
+  // from BODIES, including singular mobility when the rigid body is axis-locked.
+  const xx = bodies[at]!;
+  const xy = bodies[at + 1]!;
+  const xz = bodies[at + 2]!;
+  const yy = bodies[at + 3]!;
+  const yz = bodies[at + 4]!;
+  const zz = bodies[at + 5]!;
+  const mobility = [xx, xy, xz, xy, yy, yz, xz, yz, zz];
+  const system = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  for (let row = 0; row < 3; row++)
+    for (let column = 0; column < 3; column++)
+      for (let k = 0; k < 3; k++) system[row * 3 + column]! += added[row * 3 + k]! * mobility[k * 3 + column]!;
+  const inverse = invert3(system);
+  const held: Vec3 = [0, 0, 0];
+  for (let i = 0; i < 3; i++)
+    held[i] = inverse[i * 3]! * torque[0] + inverse[i * 3 + 1]! * torque[1] + inverse[i * 3 + 2]! * torque[2];
+  if (!held.every(Number.isFinite))
+    throw invalidLoad('Rotational water inertia exceeds numeric range; supply physical SI inertia and torque.');
+  return held;
 }
 
 function rotate(q: readonly [number, number, number, number], v: readonly number[]): Vec3 {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20651534,
+  "total": 20655202,
   "history": [
     {
       "date": "2026-10-24",
@@ -14161,6 +14161,12 @@
       "commit": "feat(physics2d) vehicle",
       "reason": "body.inertia",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "06915b7d54",
+      "grew": 1,
+      "reason": "SEA-12 implicit angular inertia, radiation and debris contact grow physics/loads from 12619 to 16180 B gzip. The optional ceiling moves from 12998 to 16666 B. Rotation and radiation share the body wrench and snapshot state; a split still needs the loads runtime for the body coupling."
     }
   ],
   "items": {
@@ -15012,7 +15018,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 12998,
+    "@margoengine/physics/loads": 16666,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,

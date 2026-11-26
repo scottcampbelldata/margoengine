@@ -1145,6 +1145,17 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   peak of ten β = 4480 runs against calibration from β = 3123 and 5260. Mass and drag mean absolute errors are
   0.092 and 0.063, compared with 0.039 and 0.214 for DNV. The maximum normalized peak-load error is 0.374.
 
+  The next checkpoint adds implicit rotational water inertia, passive modal Cummins radiation and measured
+  woody-debris impact. `loads.test.js` checks rotational coefficients against the NACA Report 323 table, the
+  rigid torque against its exact mass-inertia equation, and radiation against a two-state implicit reference plus
+  snapshot replay. `coupling/loads-debris.test.js` checks the held-out concrete support and off-centre impact
+  load-cell groups, the exact elastic pulse, and single reciprocal normal impulses on a mutually filtered pair.
+  `coupling/loads-reciprocal.test.js` checks SEA-08 hull and LIFE-03 active tail exchange with immersed SEA-12
+  bodies through actual shallow water. Its held-forcing receiver is a test fixture. Native surface-water
+  momentum receipts and passive swim-water reactions remain open.
+  `coupling/loads-mooring.test.js` checks the taut tether's fixed-pile reaction, slack engagement, the axial
+  oscillator at two world rates, off-centre dynamic attachment impulses, and bit-exact replay.
+
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/rogue/index.ts` (1068 lines) and `groups.ts` (278 lines), plus the row in `docs/physics-solvers.md`, `docs/limits.md`, and the audit rows. Commits since the audit (2026-11-25) are only 47be5f699 and 116edc307 (three sisters); nothing touches a dynamic or high-order spectral tier. Tests run under run-with-timeout: `packages/physics/tests/rogue.test.js` 9 pass / 0 fail; `packages/physics/tests/sisters.test.js` 3 pass / 0 fail. There is no `tests/coupling` file for it, and no GPU or browser test.

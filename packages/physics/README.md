@@ -4117,6 +4117,7 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
   - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. The Froude–Krylov force uses the water's acceleration;
   - `pressureModel: 'surface'` reads incident gauge pressure from `sea.pressure` for a box or closed mesh and integrates its wrench over the actual clipped waterline. The default `'compact'` uses the local plane and point acceleration. Additional `flows` still contribute their own acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
+  - rotational added inertia with `addedInertia: 'ellipsoid'` or three measured m² per displaced kg values along the shape axes. The default is zero. `radiation` supplies passive Cummins modes as `{axis, strength, decayTime}` with axis 0–2 for translation and 3–5 for rotation. A mode contributes `strength * exp(-t / decayTime)` to the radiation kernel. The default is an empty array. Supply coefficients for the body and draft;
   - quadratic drag on its velocity through the water, a sphere's by Reynolds number (Morrison), else 1.0 or `drag`;
   - a spinning body's drag;
   - the wind's drag on its emerged part (`windage`, default 1), so floating debris drifts at a few percent of the wind.
@@ -4129,9 +4130,33 @@ code `unsupported` and a repair instruction. [Hydrodynamic input help](https://m
 The coefficients stand alone:
 - `cylinderCoefficients(KC, k/D)`, `steadyDrag`, `wakeAmplification` and `cylinderAddedMass`;
 - `morison`, `tangentialDrag`, `sphereDrag`, `sheddingFrequency` and `liftMagnification`;
-- `ellipsoidAddedMass`, `ellipsoidAlphas` and `equivalentEllipsoid(mesh)`.
+- `ellipsoidAddedMass`, `ellipsoidAddedInertia`, `ellipsoidAlphas` and `equivalentEllipsoid(mesh)`.
 - `reynoldsDrag(Re, k/D)`: a cylinder's steady drag below the drag crisis (White's fit) and DNV's above it; with a Reynolds
   number, `cylinderCoefficients` takes it.
+
+`woodyDebrisImpact({closingSpeed, inverseEffectiveMass})` gives the normal pulse from a log's first
+impact on a support. The default wood stiffness is 2.4 MN/m, the support is rigid and restitution is 1.
+Use `sampleWoodyDebrisImpact(impact, elapsed)` for load vs time. For a mutually filtered rigid pair, call
+`accumulateFilteredWoodyContact` once from a staggered `bodyImpulses` contributor when the pair first crosses.
+Supply the candidate's contact point, contact normal and both body rows. The routine uses the rows'
+translational and rotational mobility and writes both reactions. Keep that pair filtered for the entire
+analytic pulse. Ordinary native contacts can use the pulse as a separate load estimate.
+
+```ts
+import {sampleWoodyDebrisImpact, woodyDebrisImpact} from 'margoengine/physics/loads';
+
+const impact = woodyDebrisImpact({closingSpeed: 1.2, inverseEffectiveMass: 1 / 270, structureStiffness: 120e6});
+if (impact) {
+  const peak = sampleWoodyDebrisImpact(impact, impact.timeToPeak);
+  console.log(Math.round(peak.force / 1000)); // 30 kN
+}
+```
+
+`TautMooringSolver` holds a short, near-neutrally buoyant line between a fairlead and a fixed pile
+or moving rigid anchor. Specify the two rigid rows, optional body-local pins, unstretched length and
+axial rigidity `EA` in newtons. `lineLoad(index)` reports the average tension and anchor reaction for
+the step. Put it in the same-rate staggered group before the rigid solver. For a heavy line with sag
+or seabed contact, use `Rod` with `segmentLoads`.
 
 A moving slender structure (a `Rod`'s links, a hose, a mooring line) takes its loads from `segmentLoads(sea, options)`
 before each step. It uses the members' physics: DNV's coefficients by roughness and KC, Reynolds drag below the crisis,
@@ -4196,7 +4221,9 @@ const crate = physics.addBody(null, {
 });
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: halfExtents}, pressureModel: 'surface'}]})
+  .add(new LoadSolver(), {sea: still, bodies: [{
+    row: crate.row, shape: {box: halfExtents}, pressureModel: 'surface', addedInertia: 'ellipsoid',
+  }]})
   .couple(['loads', 'rigid'], 'staggered');
 world.advance(60 * 30);
 console.log(Math.abs(crate.position[1]) < 0.35, Math.abs(crate.rotation[0]) < 0.01); // true true

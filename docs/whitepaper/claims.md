@@ -373,6 +373,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node --test --test-name-pattern='surface pressure|sloping waterline|held-out Sarpkaya' packages/physics/tests/loads.test.js`.
   [Sarpkaya, 1976, Appendix A, printed p. 160](https://upload.wikimedia.org/wikipedia/commons/3/3c/Vortex_shedding_and_resistance_in_harmonic_flow_about_smooth_and_rough_circular_cylinders_at_high_Reynolds_numbers_%28IA_vortexsheddingre00sarp%29.pdf).
 
+- Woody debris against a stiff concrete-faced support (SEA-12). The civil load model predicts an
+  upper-envelope peak of 30.42 kN for the independent Series 6 group. The upper measured replicate is
+  30.31 kN and the digitization bound is 0.37 kN. Series 1, 3 and 4 provide the spring-rate calibration.
+  The rigid contact test conserves momentum through paired linear and angular impulses.
+  Reproduce with `node --test packages/physics/tests/coupling/loads-debris.test.js`.
+  [Haehnel and Daly, TR-02-2, Figs. 13–14](https://archive.org/details/DTIC_ADA398916).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

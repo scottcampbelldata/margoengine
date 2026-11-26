@@ -11,6 +11,7 @@ import {
   QuayWall,
   cylinderAddedMass,
   cylinderCoefficients,
+  ellipsoidAddedInertia,
   ellipsoidAddedMass,
   ellipsoidAlphas,
   equivalentEllipsoid,
@@ -351,6 +352,93 @@ test('SEA-12 a sloping waterline applies mesh pressure when the body centre is d
   assert.ok(near(row[at + 1], load, 1e-12));
   const centre = [0.75, -0.25];
   assert.ok(near(row[at + 5], (centre[0] + centre[1]) * load, 1e-12));
+});
+
+test('SEA-12 Lamb rotational inertia agrees with the independently tabulated ellipsoid tensor', () => {
+  assert.deepEqual(ellipsoidAddedInertia([1, 1, 1]), [0, 0, 0]);
+  assert.equal(ellipsoidAddedInertia([3, 1, 1])[0], 0);
+  // NACA Report 323, Table VI, its analytic oblate entries a/c = b/c.
+  // Normalize by I of the displaced ellipsoid and use half the last printed decimal.
+  for (const [a, reference] of [
+    [2, 0.3386],
+    [3, 0.8359],
+  ]) {
+    const calculated = ellipsoidAddedInertia([a, a, 1]);
+    assert.ok(Math.abs(calculated[0] / ((a * a + 1) / 5) - reference) < 0.00005);
+  }
+  const calculated = ellipsoidAddedInertia([3, 2, 1]);
+  assert.ok(near(calculated[0] * 4, ellipsoidAddedInertia([6, 4, 2])[0], 1e-12));
+});
+
+test('SEA-12 rotational added inertia reduces the wetted angular acceleration', () => {
+  const mass = 2000;
+  const halfExtents = [1, 0.5, 0.25];
+  const volume = 8 * halfExtents[0] * halfExtents[1] * halfExtents[2];
+  const rho = 1025.9;
+  const addedInertia = [0.2, 0, 0];
+  const axisInertia = (mass * (halfExtents[1] ** 2 + halfExtents[2] ** 2)) / 3;
+  const pressureGradient = 900;
+  const sea = still();
+  sea.pressure = (_x, y, z) => -rho * 9.81 * y - pressureGradient * (y + 4) * z;
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(sea, [
+    {
+      position: [0, -4, 0],
+      collider: { shape: 'box', halfExtents, mass },
+      load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0], addedInertia, pressureModel: 'surface' },
+    },
+  ]);
+  simulation.advance(1);
+  const forces = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  const at = bodies[0].row * FORCE_WORDS;
+  const torque = (pressureGradient * volume * (halfExtents[1] ** 2 - halfExtents[2] ** 2)) / 3;
+  const expected = (torque * axisInertia) / (axisInertia + addedInertia[0] * rho * volume);
+  assert.ok(near(forces[at + 3], expected, 2 ** -22), `${forces[at + 3]} N·m vs ${expected} N·m`);
+});
+
+test('SEA-12 Cummins radiation matches the implicit memory update and restores the same motion', () => {
+  const mass = 10;
+  const strength = 125;
+  const decayTime = 0.5;
+  const initial = 0.8;
+  const dt = 1 / 60;
+  const decay = Math.exp(-dt / decayTime);
+  const integral = decayTime * (1 - decay);
+  const { bodies, world: simulation } = world(
+    still(),
+    [
+      {
+        position: [0, -8, 0],
+        velocity: [initial, 0, 0],
+        collider: { shape: 'sphere', radius: 0.3, mass },
+        load: { shape: { sphere: 0.3 }, drag: 0, addedMass: [0, 0, 0], radiation: [{ axis: 0, strength, decayTime }] },
+      },
+    ],
+    [],
+    {},
+    [0, 0, 0],
+  );
+  const coupling = (dt * strength) / mass;
+  const determinant = 1 + coupling * integral;
+  let u = initial;
+  let memory = 0;
+  let saved;
+  for (let tick = 1; tick <= 60; tick++) {
+    // Solve [1, coupling; -integral, 1] · [u', memory'] = [u, decay*memory].
+    [u, memory] = [(u - coupling * decay * memory) / determinant, (integral * u + decay * memory) / determinant];
+    simulation.advance(tick);
+    const actual = bodies[0].linearVelocity[0];
+    assert.ok(Math.abs(actual - u) < 60 * 2 ** -23 * initial, `tick ${tick}: ${actual} vs ${u}`);
+    if (tick === 24) saved = simulation.takeSnapshot();
+  }
+  const final = simulation.hash();
+  simulation.restoreSnapshot(saved.bytes);
+  assert.equal(simulation.hash(), saved.hash);
+  simulation.advance(60);
+  assert.equal(simulation.hash(), final);
 });
 
 test('SEA-12 an inclined ellipsoid takes buoyancy through the transformed half-cap centroid', () => {
