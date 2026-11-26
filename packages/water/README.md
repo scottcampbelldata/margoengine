@@ -1220,12 +1220,12 @@ world.add(terrain, { ...grid, elevations: () => 0 });
 world.add(new ShallowWaterSolver(), { bed: terrain.bed, depth: 1 });
 world.add(sediment, { grid, suspendedMass: 20, settlingVelocity: 0 });
 world.advance(1);
-const map = engine.gpu.createTexture({
+const map = engine.gpu!.createTexture({
   size: [16, 16],
   format: 'r32float',
   usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
 });
-engine.gpu.queue.writeTexture({ texture: map }, new Float32Array(256), { bytesPerRow: 64 }, [16, 16]);
+engine.gpu!.queue.writeTexture({ texture: map }, new Float32Array(256), { bytesPerRow: 64 }, [16, 16]);
 const water = Water.attach(engine, {
   height: -50,
   size: [60, 60],
@@ -1752,9 +1752,9 @@ import {Engine} from 'margoengine/core';
 import {Water} from 'margoengine/water';
 import {FilmClock} from 'margoengine/math/clock';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
-const heightmap = engine.gpu.createTexture({size: [64, 64], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+const heightmap = engine.gpu!.createTexture({size: [64, 64], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
 const heights = new Float32Array(64 * 64).map((_, i) => -3 + ((i % 64) / 63) * 4.5); // a beach rising to +x
-engine.gpu.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: 256}, [64, 64]);
+engine.gpu!.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: 256}, [64, 64]);
 const clock = new FilmClock({fps: 24});
 const water = Water.attach(engine, {size: [64, 64], segments: 64, spray: true, terrain: {heightmap: () => heightmap, origin: [-32, -32], size: [64, 64]}, clock});
 clock.frame = 72; // the shot's first frame is 3 s in
