@@ -16878,8 +16878,8 @@ open. The resolved rolling arc exchanges drawbar and axle reactions with the liv
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
-brake cases pass. Reverse travel, measured braking across multiple slip angles and sidewall
-bulldozing remain open.
+brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
+opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

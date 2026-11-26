@@ -211,6 +211,16 @@ and exact seek. It uses the signed speed ratio even below 1 m/s.
 [Pavlov and Johnson (2024)](https://doi.org/10.1016/j.jterra.2023.08.004),
 [Pavlov (2023), Chapter 5](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf).
 
+Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
+magnitudes in the shear law and projects the force in the direction of the local slip velocity
+(dissertation Eqs. 5.10–5.14 and 5.20–5.21). The sidewall depth is measured from the chord between
+entry and exit, and the depth-integrated passive wedge pressure follows Eqs. 5.22–5.27. Specific
+weight is material density times the configured gravity. At 45° with zero cohesion and friction,
+the symmetric arc's sidewall integral reduces to a polynomial in sine and cosine. The tests bound
+the native midpoint error from its second derivative and check exact mirror symmetry. The live
+oblique rig verifies that the previous side reaction gives the chassis an impulse opposing slip
+at the actual contact and reproduces the coupled state after seek.
+
 Blake Hannaford and Jee-Hwan Ryu, “Time-Domain Passivity Control of Haptic Interfaces” (2002),
 Eq. 12, motivates accounting for work across all ports in a sampled coupling. For longitudinal
 contact impulse `J`, signed axle impulse `L`, tangential relative speed `v`, angular speed `w`,

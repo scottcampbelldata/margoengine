@@ -4832,6 +4832,12 @@ binding's `shearRadii` in metres to obtain the signed slip from actual surface a
 including at crawl speed. Negative resisting torque spins up a skidding wheel while the terrain
 reaction slows the chassis.
 
+To couple sideways soil loading, pass the same descriptor from `soilWheelSideForceField()` as
+`wheelSideForce` to both solvers, alongside `wheelReaction`. Each external row publishes one f64
+force in N along the wheel's right axis. The resolved model combines sideways rim shear and
+sidewall earth pressure. It uses the prepared soil's density and `sidewallGravity`, which defaults
+to 9.81 m/s². The rigid wheel applies the force at the contact and limits it to oppose side slip.
+
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
 

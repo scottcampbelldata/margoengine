@@ -10588,6 +10588,9 @@ Tyre state, reaction samples and the paired terrain state all participate in see
 Opt-in skid holds free-rolling exit and peak angles while the native bracket balances the
 two signed shear regions. An optional shear radius derives the slip from relative wheel and bed
 speeds down to zero travel. The same rigid impulse bound handles the reversed axle moment.
+The optional right-axis force field pairs the combined rim shear with the sidewall pressure
+integral. The rigid adapter applies it after longitudinal traction, then recomputes the current
+contact velocity. The lateral impulse respects the available grip and stops at zero side slip.
 
 ### Divergence-free particle pressure
 

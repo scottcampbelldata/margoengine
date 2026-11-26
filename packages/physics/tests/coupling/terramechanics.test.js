@@ -9,6 +9,7 @@ import {
   soilPatchField,
   soilWheelPhaseField,
   soilWheelReactionField,
+  soilWheelSideForceField,
   Terramechanics,
   wheelSoil,
 } from '@margoengine/physics/terramechanics';
@@ -350,7 +351,12 @@ test('two otherwise identical footprints distinguish a shallow and deep layer fr
   }
 });
 
-async function rollingBench(terrain, material, wheel, { width, length, load, speed, slip, wheelReaction, shared }) {
+async function rollingBench(
+  terrain,
+  material,
+  wheel,
+  { width, length, load, speed, slip, wheelReaction, wheelSideForce, lateral = 0, sidewallGravity, shared },
+) {
   const input = soilPatchField('lab-wheel-assembly');
   let memory, region;
   const carriage = {
@@ -368,7 +374,7 @@ async function rollingBench(terrain, material, wheel, { width, length, load, spe
         length,
         width,
         load,
-        0,
+        lateral * length,
         -slip * length,
         0,
       ]);
@@ -378,12 +384,12 @@ async function rollingBench(terrain, material, wheel, { width, length, load, spe
     stateRegions: () => [region],
     extraState: () => [],
   };
-  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce });
   const bed = new TerrainBed();
   const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
     .add(bed, { ...terrain, elevations: () => 0 })
     .add(carriage)
-    .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
+    .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel], sidewallGravity })
     .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
   return { world, bed, soil };
 }
@@ -494,6 +500,42 @@ test('native rolling reactions resolve asymmetric normal drag and full-slip axle
     world.restoreSnapshot(snapshot.bytes);
     world.advance(4);
     assert.equal(world.hash(), hash);
+  }
+});
+
+test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {
+  const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const radius = 0.14;
+  const gravity = 9.81;
+  const density = 1300;
+  const wheelSideForce = soilWheelSideForceField('smooth-sidewall');
+  const material = { cohesiveModulus: 0, frictionalModulus: 250_000, cohesion: 0, friction: 0, density };
+  const wheel = { radius, peakFraction: 0.5, peakSlip: 0, exitFraction: -1 };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03, slip: 0, sidewallGravity: gravity, wheelSideForce };
+  let previous;
+  for (const [lateral, shared] of [
+    [1, false],
+    [-1, true],
+    [0, true],
+  ]) {
+    const { world, soil } = await rollingBench(terrain, material, wheel, { ...rig, lateral, shared });
+    world.advance(1);
+    const side = regionWords(world.memory, world.fields.port(wheelSideForce.name).region)[0];
+    if (!lateral) {
+      assert.equal(side, 0);
+      continue;
+    }
+    const a = Math.acos(1 - soil.read(0).sinkage / radius);
+    const s = Math.sin(a);
+    const c = Math.cos(a);
+    const integral = 2 * (s - s ** 3 / 3 - c * (a + 0.5 * Math.sin(2 * a)) + c * c * s);
+    const pressure = (density * gravity * radius ** 3) / 4;
+    const largestInterval = (1.5 * a) / 24;
+    const curvatureBound = 2 + 6 * (1 - c) + (1 - c) ** 2;
+    const midpointError = (pressure * 2 * a * largestInterval ** 2 * curvatureBound) / 24;
+    close(side, lateral * pressure * integral, midpointError);
+    if (previous === undefined) previous = side;
+    else assert.equal(side, -previous);
   }
 });
 
@@ -792,13 +834,14 @@ for (const tier of ['mean', 'resolved']) {
     coupledVehicles(tier));
 }
 
-async function withWheelReaction(initialSpin, initialSpeed, check) {
+async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0) {
   await Physics.load({ threads: true });
   const terrain = { columns: 72, rows: 96, width: 1.8, depth: 2.4, centre: [0, 0] };
   const input = soilPatchField();
   const wheelReaction = soilWheelReactionField();
-  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
-  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction });
+  const wheelSideForce = sideSpeed ? soilWheelSideForceField() : undefined;
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce });
+  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction, wheelSideForce });
   const world = new PhysicsWorld({ rate, memory: worldMemory(true) });
   const bed = new TerrainBed();
   world.add(bed, { ...terrain, elevations: () => 0 });
@@ -811,10 +854,10 @@ async function withWheelReaction(initialSpin, initialSpeed, check) {
     type: 'dynamic',
     position: [0, 0.28, 0],
     lockRotations: true,
-    enabledTranslations: [false, false, true],
+    enabledTranslations: [sideSpeed !== 0, false, true],
     colliders: { shape: 'box', halfExtents: [0.1, 0.05, 0.1], mass },
   });
-  chassis.setLinearVelocity([0, 0, initialSpeed]);
+  chassis.setLinearVelocity([sideSpeed, 0, initialSpeed]);
   using vehicle = new Vehicle(physics, chassis, {
     wheels: [{ position: [0, 0, 0], radius, inertia, suspensionRestLength: 0.3, suspensionStiffness: 8 }],
     tyre: { forces: () => ({ longitudinal: 0, lateral: 0 }) },
@@ -846,7 +889,7 @@ async function withWheelReaction(initialSpin, initialSpeed, check) {
     rollingWheels: [{ radius, skidExponent: 0.55 }],
   });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
-  check({ physics, world, ground, chassis, vehicle, mass, radius, inertia, wheelReaction, seed });
+  check({ physics, world, ground, chassis, vehicle, mass, radius, inertia, wheelReaction, wheelSideForce, seed });
 }
 
 test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {
@@ -915,4 +958,32 @@ test('a live locked wheel uses the reverse axle moment and brakes at crawl speed
     world.advance(10);
     assert.equal(world.hash(), hash);
   });
+});
+
+test('live yawed soil contact damps side slip with the exported right-axis force', async () => {
+  await withWheelReaction(
+    10,
+    0.24,
+    ({ world, chassis, vehicle, mass, wheelSideForce }) => {
+      world.advance(1);
+      const movement = chassis.linearVelocity[0];
+      const [side] = regionWords(world.memory, world.fields.port(wheelSideForce.name).region);
+      assert.ok(side < 0);
+      world.advance(2);
+      const wheel = vehicle.wheel(0);
+      assert.ok(wheel.sideImpulse > 0);
+      const [nx, ny, nz] = wheel.contactNormal;
+      const rightX = Math.hypot(ny, nz);
+      const suspended = movement + (nx * wheel.load) / (60 * mass);
+      assert.ok(chassis.linearVelocity[0] < suspended);
+      close(chassis.linearVelocity[0] - suspended, (-rightX * wheel.sideImpulse) / mass, 2 ** -22 * suspended);
+      const snapshot = world.takeSnapshot();
+      world.advance(12);
+      const hash = world.hash();
+      world.restoreSnapshot(snapshot.bytes);
+      world.advance(12);
+      assert.equal(world.hash(), hash);
+    },
+    0.16,
+  );
 });

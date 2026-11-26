@@ -5850,6 +5850,9 @@ uses the edges of the observed PDF graph markers as its force and torque bounds.
 The lockup test reproduces the saturated two-region shear moment exactly for a smooth wheel at
 constant cohesion. A second fixture at 0.09 m/s checks a moving chassis, brake, TerrainBed,
 negative drawbar impulse, positive spin impulse and precise restored state.
+At 45° of oblique travel, the native sidewall force matches an exact symmetric-wheel integral
+within its derived quadrature error. Reversing obliquity reverses the force exactly across shared
+and plain Wasm. An actual wheel consumes the separate side force and slows its lateral slip.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

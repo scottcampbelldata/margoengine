@@ -45,6 +45,8 @@ export interface SoilContactRigidOptions {
   readonly wheelPhase?: FieldDescriptor;
   /** Apply solved drawbar and axle reactions to wheels on the registered terrain collider. */
   readonly wheelReaction?: FieldDescriptor;
+  /** Optional lateral soil force to consume along with wheelReaction. Use soilWheelSideForceField. */
+  readonly wheelSideForce?: FieldDescriptor;
   /** Read the live bed and update the supplied collider before sampling wheel and belt loads. */
   readonly terrain?: BedShape;
 }
@@ -62,25 +64,34 @@ function heading(vehicle: Vehicle | TrackedVehicle, forward: Point = [0, 0, 1]):
   return scale > 0 ? [x / scale, z / scale] : [0, 1];
 }
 
-function rollingSlip(
+function rollingSlips(
   binding: WheelSoilBinding,
   wheel: ReturnType<Vehicle['wheel']>,
   fx: number,
   fz: number,
   radius: number,
-) {
+  lateral: number,
+): Pair {
   const point = wheel.contactPoint;
   const normal = wheel.contactNormal;
-  if (!point || !normal || !wheel.ground || !(normal[1] > 0)) return wheel.slipRatio;
+  if (!point || !normal || !wheel.ground || !(normal[1] > 0)) return [wheel.slipRatio, lateral];
   const fy = -(normal[0] * fx + normal[2] * fz) / normal[1];
-  const upside = hypot(1, fy);
+  const forwardLength = hypot(1, fy);
   const speed = binding.vehicle.chassis.velocityAtPoint(point);
   const bedSpeed = wheel.ground.body.velocityAtPoint(point);
-  const travel =
-    ((speed[0] - bedSpeed[0]) * fx + (speed[1] - bedSpeed[1]) * fy + (speed[2] - bedSpeed[2]) * fz) / upside;
+  const vx = speed[0] - bedSpeed[0];
+  const vy = speed[1] - bedSpeed[1];
+  const vz = speed[2] - bedSpeed[2];
+  const travel = (vx * fx + vy * fy + vz * fz) / forwardLength;
+  const [nx, ny, nz] = normal;
+  const x = ny * fz - nz * fy;
+  const y = nz * fx - nx * fz;
+  const z = nx * fy - ny * fx;
+  const crossing = (vx * x + vy * y + vz * z) / hypot(hypot(x, y), z);
   const rim = radius * wheel.spin;
   const scale = Math.max(Math.abs(travel), Math.abs(rim));
-  return scale > 0 ? (rim - travel) / scale : 0;
+  const along = Math.max(Math.abs(travel), Number.EPSILON * Math.abs(crossing));
+  return [scale > 0 ? (rim - travel) / scale : 0, along > 0 ? -crossing / along : 0];
 }
 
 function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, phases?: Float64Array): number {
@@ -95,7 +106,11 @@ function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, ph
       const fx = x * cos(azimuth) + z * sin(azimuth);
       const fz = z * cos(azimuth) - x * sin(azimuth);
       const radius = binding.shearRadii?.[index];
-      const longitudinal = -(radius ? rollingSlip(binding, wheel, fx, fz, radius) : wheel.slipRatio) * patch.length;
+      const [axial, across] = radius
+        ? rollingSlips(binding, wheel, fx, fz, radius, lateral / patch.length)
+        : [wheel.slipRatio, 0];
+      const longitudinal = -axial * patch.length;
+      const transverse = radius ? across * patch.length : lateral;
       out.set(
         [
           wheel.contactPoint[0],
@@ -105,8 +120,8 @@ function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, ph
           patch.length,
           patch.width,
           wheel.load,
-          longitudinal * fx + lateral * fz,
-          longitudinal * fz - lateral * fx,
+          longitudinal * fx + transverse * fz,
+          longitudinal * fz - transverse * fx,
           3,
         ],
         at,
@@ -164,6 +179,7 @@ export class SoilContactRigidSolver extends RigidSolver {
   private readonly terrain?: BedShape;
   private readonly phase?: FieldDescriptor;
   private readonly reaction?: FieldDescriptor;
+  private readonly sideForce?: FieldDescriptor;
   private ground?: PhysicsCollider;
   private heights?: Region;
   private phases?: Region;
@@ -176,6 +192,9 @@ export class SoilContactRigidSolver extends RigidSolver {
     this.terrain = options.terrain && { ...options.terrain, centre: [...options.terrain.centre] };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
     this.reaction = options.wheelReaction && { ...options.wheelReaction };
+    this.sideForce = options.wheelSideForce && { ...options.wheelSideForce };
+    if (this.sideForce && !this.reaction)
+      throw new MargoError('state', 'Lateral soil feedback needs the wheel reaction field. Provide wheelReaction too.');
   }
 
   override describe() {
@@ -187,6 +206,7 @@ export class SoilContactRigidSolver extends RigidSolver {
         { field: this.soilField, access: 'write' as const },
         ...(this.phase ? [{ field: this.phase, access: 'write' as const }] : []),
         ...(this.reaction ? [{ field: this.reaction, access: 'read' as const }] : []),
+        ...(this.sideForce ? [{ field: this.sideForce, access: 'read' as const }] : []),
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
     };
@@ -295,6 +315,20 @@ export class SoilContactRigidSolver extends RigidSolver {
         'Wheel reactions do not match the soil bindings. Use the same layout, rows and cell.',
       );
     const words = regionWords(this.memory, port.region) as Float64Array;
+    const sides = this.sideForce && context.inputs.get(this.sideForce.name);
+    if (
+      sides &&
+      (sides.region.type !== 'f64' ||
+        sides.region.layout !== SOIL_LAYOUT ||
+        sides.region.byteLength * SOIL_PATCH_WORDS !== this.patches.byteLength ||
+        (sides.region.memory ?? this.memory) !== this.memory ||
+        sides.cell.some((coordinate, axis) => coordinate !== context.cell[axis]))
+    )
+      throw new MargoError(
+        'state',
+        'Wheel side forces do not match the soil bindings. Use the same layout, rows and cell.',
+      );
+    const lateral = sides ? (regionWords(this.memory, sides.region) as Float64Array) : undefined;
     let row = 0;
     for (const binding of this.wheels) {
       for (let i = 0; i < binding.patches.length; i++, row++) {
@@ -305,6 +339,7 @@ export class SoilContactRigidSolver extends RigidSolver {
             load: words[at]!,
             drawbar: words[at + 1]!,
             axleTorque: words[at + 2]!,
+            sideForce: lateral && -lateral[row]!,
           });
       }
     }

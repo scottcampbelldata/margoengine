@@ -102,6 +102,8 @@ export interface WheelGroundTraction {
   readonly drawbar: number;
   /** Moment resisting forward spin in N·m. Negative torque spins up a skidding wheel. */
   readonly axleTorque: number;
+  /** Optional force along the tyre's lateral axis in N, limited to oppose side slip. */
+  readonly sideForce?: number;
 }
 
 /** The surface effect used by one wheel in its last step. */
@@ -584,7 +586,8 @@ export class Vehicle implements PhysicsAttachment {
         Number.isFinite(Math.fround(traction.load)) &&
         traction.load > 0 &&
         Number.isFinite(Math.fround(traction.drawbar)) &&
-        Number.isFinite(Math.fround(traction.axleTorque))
+        Number.isFinite(Math.fround(traction.axleTorque)) &&
+        (traction.sideForce === undefined || Number.isFinite(Math.fround(traction.sideForce)))
       )
     )
       throw new MargoError(
@@ -950,6 +953,7 @@ export class Vehicle implements PhysicsAttachment {
         // brings the slip to rest, where a force found at the slip the step began with would ring.
         this.driveBrake(wheel, dt);
         let soilImpulse: number | undefined;
+        let soilSide: number | undefined;
         let contactSpeed = pv;
         if (traction?.collider === wheel.ground && wheel.force > 0) {
           const support = this.groundReaction ? traction.collider.body : undefined;
@@ -973,6 +977,20 @@ export class Vehicle implements PhysicsAttachment {
               wheel.point,
             );
             contactSpeed = contactVelocity(chassis, support, wheel.point);
+            if (traction.sideForce !== undefined) {
+              const crossing = dot(side, contactSpeed);
+              const inverseSide =
+                tractionInverse(chassis, wheel.point, side) +
+                (support ? tractionInverse(support, wheel.point, side) : 0);
+              const gripImpulse = (wheel.groundGrip ?? Infinity) * wheel.force * dt;
+              const longitudinal = Math.abs(soilImpulse);
+              const available = Math.sqrt(Math.max(0, (gripImpulse - longitudinal) * (gripImpulse + longitudinal)));
+              const lateral = traction.sideForce * Math.min(1, wheel.force / traction.load) * dt;
+              const stop = inverseSide > 0 ? Math.abs(crossing) / inverseSide : Infinity;
+              soilSide = crossing * lateral < 0 ? Math.sign(lateral) * Math.min(Math.abs(lateral), stop, available) : 0;
+              pushWheel(wheel, [side[0] * soilSide, side[1] * soilSide, side[2] * soilSide], wheel.point);
+              contactSpeed = contactVelocity(chassis, support, wheel.point);
+            }
           }
         }
         const radius = wheel.radius,
@@ -996,6 +1014,7 @@ export class Vehicle implements PhysicsAttachment {
         for (let sweep = 0; sweep < 3; sweep++) {
           for (const which of [0, 1] as const) {
             if (which === 0 && soilImpulse !== undefined) continue;
+            if (which === 1 && soilSide !== undefined) continue;
             let low = 0,
               high = which === 0 ? Math.abs(surface) / gainForward : Math.abs(sideSpeed) / gainSide;
             if (!(high > 0)) continue;
@@ -1034,18 +1053,19 @@ export class Vehicle implements PhysicsAttachment {
         wheel.omega -= (longitudinal * radius * dt) / wheel.inertia;
         wheel.rotation += wheel.omega * dt;
         wheel.forwardImpulse = soilImpulse ?? longitudinal * dt;
-        wheel.sideImpulse = -lateral * dt;
+        wheel.sideImpulse = soilSide ?? -lateral * dt;
         if (soilImpulse === undefined)
           pushWheel(
             wheel,
             [forward[0] * wheel.forwardImpulse, forward[1] * wheel.forwardImpulse, forward[2] * wheel.forwardImpulse],
             wheel.point,
           );
-        pushWheel(
-          wheel,
-          [side[0] * wheel.sideImpulse, side[1] * wheel.sideImpulse, side[2] * wheel.sideImpulse],
-          elevated,
-        );
+        if (soilSide === undefined)
+          pushWheel(
+            wheel,
+            [side[0] * wheel.sideImpulse, side[1] * wheel.sideImpulse, side[2] * wheel.sideImpulse],
+            elevated,
+          );
         continue;
       }
       // The friction circle: drive and grip together stay inside what the load can hold.

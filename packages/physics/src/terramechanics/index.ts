@@ -155,6 +155,8 @@ export interface TerramechanicsOptions {
   readonly wheelPhase?: FieldDescriptor;
   /** Optional resolved rolling forces and axle moments, in external load order. Use soilWheelReactionField. */
   readonly wheelReaction?: FieldDescriptor;
+  /** Optional solved force along the wheel's right axis, N. Use soilWheelSideForceField. */
+  readonly wheelSideForce?: FieldDescriptor;
   /** Read the real LIFE-01 contact field. Provide `feet` at initialization. Default false. */
   readonly legged?: boolean;
   /** Resolved contacts expose a vertex pressure field and conservative berm relaxation. Default 'mean'. */
@@ -179,6 +181,8 @@ export interface TerramechanicsParams {
   readonly profiles?: readonly (SoilContactProfile | null)[];
   /** Per external load row. Use null to keep its existing shape. Requires the resolved tier. */
   readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
+  /** Acceleration used by wheel sidewall earth pressure, m/s². Default 9.81. */
+  readonly sidewallGravity?: number;
   /** Minimum elevation to excavate, m in the bed cell. Default no floor. Set the same uniform floor as TerrainBed. */
   readonly floor?: number;
   /** Per-vertex excavation floor. Share the same data as TerrainBed.bedrock. */
@@ -208,6 +212,11 @@ export function soilWheelPhaseField(name = 'soilWheelPhase'): FieldDescriptor {
 /** Forces and resisting torque integrated over the resolved rolling contact arc. */
 export function soilWheelReactionField(name = 'soilWheelReaction'): FieldDescriptor {
   return { name, kind: 'surfaceSampleSet', quantity: 'soilWheelReaction', unit: 'record', centring: 'particle' };
+}
+
+/** Signed force along the wheel's right axis, one N value per external load row. */
+export function soilWheelSideForceField(name = 'soilWheelSideForce'): FieldDescriptor {
+  return { name, kind: 'surfaceSampleSet', quantity: 'soilWheelSideForce', unit: 'N', centring: 'particle' };
 }
 
 function finite(value: number, label: string, lower = -Infinity, upper = Infinity): number {
@@ -342,6 +351,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private readonly input?: FieldDescriptor;
   private readonly phase?: FieldDescriptor;
   private readonly reaction?: FieldDescriptor;
+  private readonly sideForce?: FieldDescriptor;
   private readonly legged: boolean;
   private terrain!: BedShape;
   private material!: Required<SoilMaterial>;
@@ -360,6 +370,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private faces?: Region;
   private response!: Region;
   private reactions?: Region;
+  private sides?: Region;
+  private sideWeight = 0;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
   private profiles: (ProfileSlot | null)[] = [];
@@ -383,9 +395,10 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.input = options.input && { ...options.input };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
     this.reaction = options.wheelReaction && { ...options.wheelReaction };
+    this.sideForce = options.wheelSideForce && { ...options.wheelSideForce };
     if (this.phase && !this.input)
       throw new MargoError('state', 'Wheel phase needs external wheel loads. Provide the matching soil patch field.');
-    if (this.reaction && (tier !== 'resolved' || !this.input))
+    if ((this.reaction || this.sideForce) && (tier !== 'resolved' || !this.input))
       throw new MargoError(
         'state',
         'Wheel reactions need resolved external loads. Use the resolved tier and a soil patch field.',
@@ -430,6 +443,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         { field: this.dustField, access: 'write' as const },
         { field: this.responseField, access: 'write' as const },
         ...(this.reaction ? [{ field: this.reaction, access: 'write' as const }] : []),
+        ...(this.sideForce ? [{ field: this.sideForce, access: 'write' as const }] : []),
         ...(this.pressureField ? [{ field: this.pressureField, access: 'write' as const }] : []),
         ...(this.input ? [{ field: this.input, access: 'read' as const }] : []),
         ...(this.phase ? [{ field: this.phase, access: 'read' as const }] : []),
@@ -455,6 +469,12 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.inputRows = parameters.inputRows ?? 0;
     this.floor = parameters.floor === undefined ? -Infinity : finite(parameters.floor, 'excavation floor');
     this.cellSize = positive(parameters.cellSize ?? 4096, 'cell size');
+    if (this.sideForce)
+      this.sideWeight = finite(
+        this.material.density * (parameters.sidewallGravity ?? 9.81),
+        'sidewall specific weight',
+        0,
+      );
     if (!Number.isSafeInteger(this.inputRows) || this.inputRows < 0 || Boolean(this.input) !== this.inputRows > 0)
       throw new MargoError(
         'state',
@@ -501,11 +521,12 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 48);
+    this.nativePatch = allocate('soil-patch-scratch', 51);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
     if (this.reaction) this.reactions = allocate('soil-wheel-reactions', this.inputRows * SOIL_WHEEL_REACTION_WORDS);
+    if (this.sideForce) this.sides = allocate('soil-wheel-side-forces', this.inputRows);
     if (this.pressureField) {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
@@ -750,6 +771,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         : 0,
       skid,
       rolling?.skidExponent ?? 0,
+      rolling && this.sides ? this.sides.byteOffset + (row - this.fixed.length) * 8 : 0,
+      rolling && this.sides ? finite((shearX * forward[1] - shearZ * forward[0]) / length, 'lateral wheel slip') : 0,
+      this.sideWeight,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -830,6 +854,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.words(this.dust).fill(0);
     this.words(this.response).fill(0);
     if (this.reactions) this.words(this.reactions).fill(0);
+    if (this.sides) this.words(this.sides).fill(0);
     if (this.pressure && this.workRegion && this.faces) {
       this.words(this.pressure).fill(0);
       this.words(this.workRegion).fill(0);
@@ -927,6 +952,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       ...(this.reaction && this.reactions
         ? [{ field: this.reaction.name, region: this.reactions, tick, cell: this.cell }]
         : []),
+      ...(this.sideForce && this.sides
+        ? [{ field: this.sideForce.name, region: this.sides, tick, cell: this.cell }]
+        : []),
       ...(this.pressureField && this.pressure
         ? [{ field: this.pressureField.name, region: this.pressure, tick, cell: this.cell }]
         : []),
@@ -943,6 +971,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.budgetRegion,
       this.response,
       ...(this.reactions ? [this.reactions] : []),
+      ...(this.sides ? [this.sides] : []),
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),

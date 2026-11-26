@@ -70,6 +70,9 @@ struct Patch {
     reaction: f64,
     skid: f64,
     skid_exponent: f64,
+    side_reaction: f64,
+    lateral_slip: f64,
+    side_weight: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -257,22 +260,21 @@ fn rolling_angle(p: &Patch, entry: f64) -> (f64, f64) {
     )
 }
 
-#[repr(C)]
 struct RollingReaction {
     normal: f64,
     drawbar: f64,
     axle_torque: f64,
+    lateral: f64,
 }
 
-fn skid_shear(
+fn skid_motion(
     entry: f64,
     transition: f64,
     front_cosine: f64,
     ratio: f64,
     radius: f64,
-    k: f64,
     at: f64,
-) -> f64 {
+) -> (f64, f64) {
     let (start, bias) = if at < transition {
         (transition, ratio)
     } else {
@@ -280,17 +282,42 @@ fn skid_shear(
     };
     let sine_difference = 2.0 * cos(0.5 * (start + at)) * sin(0.5 * (start - at));
     let distance = radius * (bias * (start - at) - sine_difference).abs();
-    let velocity = bias - cos(at);
-    let fraction = if ratio > 0.0 {
-        1.0 - exp(-distance / (k * ratio))
-    } else {
-        f64::from(distance > 0.0)
-    };
-    if velocity == 0.0 {
+    (distance, bias - cos(at))
+}
+
+fn slip_magnitude(x: f64, y: f64) -> f64 {
+    let scale = x.abs().max(y.abs());
+    if scale == 0.0 {
         0.0
     } else {
-        fraction.copysign(velocity)
+        scale * length(x / scale, y / scale)
     }
+}
+
+fn mobilized_motion(jx: f64, jy: f64, vx: f64, vy: f64, k: f64) -> (f64, f64) {
+    let speed = slip_magnitude(vx, vy);
+    if speed == 0.0 {
+        return (0.0, 0.0);
+    }
+    let displacement = slip_magnitude(jx, jy);
+    let fraction = if k > 0.0 {
+        1.0 - exp(-displacement / k)
+    } else {
+        f64::from(displacement > 0.0)
+    };
+    (fraction * (vx / speed), fraction * (vy / speed))
+}
+
+fn sidewall(p: &Patch, radius: f64, sine: f64, cosine: f64, chord: (f64, f64, f64)) -> f64 {
+    let (sin_exit, cos_exit, slope) = chord;
+    let depth = (radius * ((sine - sin_exit) * slope + cosine - cos_exit)).max(0.0);
+    let wedge = slip_magnitude(1.0, p.friction) + p.friction;
+    let angle = p.lateral_slip / slip_magnitude(1.0, p.lateral_slip);
+    let pressure = depth
+        * wedge
+        * (2.0 * p.cohesion
+            + 0.5 * p.side_weight * depth * wedge * (1.0 + 0.5 * wedge * p.friction));
+    radius * cosine * pressure * angle * angle.abs()
 }
 
 fn rolling_load<const REACTION: bool>(
@@ -305,6 +332,7 @@ fn rolling_load<const REACTION: bool>(
     let mut normal = 0.0;
     let mut drawbar = 0.0;
     let mut axle_torque = 0.0;
+    let mut lateral = 0.0;
     let skidding = p.skid < 0.0;
     let (transition, front_cosine, a, b, c) = if skidding {
         let transition = entry * (1.0 + 0.5 * p.skid);
@@ -328,6 +356,18 @@ fn rolling_load<const REACTION: bool>(
     } else {
         (0.0, 0.0, peak, entry, entry)
     };
+    let lateral_active = p.lateral_slip != 0.0;
+    let sin_exit = if lateral_active { sin(exit) } else { 0.0 };
+    let cos_exit = if lateral_active { cos(exit) } else { 0.0 };
+    let chord = if lateral_active {
+        (
+            sin_exit,
+            cos_exit,
+            (cos_exit - cos(entry)) / (sin(entry) - sin_exit),
+        )
+    } else {
+        (0.0, 0.0, 0.0)
+    };
     for (first, last) in [(exit, a), (a, b), (b, c), (c, entry)] {
         if first == last {
             continue;
@@ -346,29 +386,52 @@ fn rolling_load<const REACTION: bool>(
             } else {
                 p.stiffness * pow(depth, p.exponent)
             };
-            let mobility = if skidding {
-                skid_shear(
+            let sine = sin(at);
+            let cosine = cos(at);
+            let (tangent, across) = if skidding {
+                let (distance, velocity) = skid_motion(
                     entry,
                     transition,
                     front_cosine,
                     1.0 + p.skid,
                     shear_radius,
-                    p.shear_length,
                     at,
+                );
+                mobilized_motion(
+                    distance,
+                    shear_radius * (entry - at) * p.lateral_slip,
+                    velocity,
+                    p.lateral_slip,
+                    p.shear_length * (1.0 + p.skid),
                 )
             } else {
-                let slide = rim * ((lug_entry - at) - (1.0 - p.drive_slip) * (lug_sine - sin(at)));
-                1.0 - exp(-slide.max(0.0) / p.shear_length)
+                let travel = 1.0 - p.drive_slip;
+                let slide = rim * ((lug_entry - at) - travel * (lug_sine - sine));
+                if lateral_active {
+                    let velocity = travel * p.lateral_slip;
+                    mobilized_motion(
+                        slide.max(0.0),
+                        shear_radius * (lug_entry - at) * velocity,
+                        1.0 - travel * cosine,
+                        velocity,
+                        p.shear_length,
+                    )
+                } else {
+                    (1.0 - exp(-slide.max(0.0) / p.shear_length), 0.0)
+                }
             };
-            let shear = (p.cohesion + pressure * p.friction) * mobility;
+            let yield_stress = p.cohesion + pressure * p.friction;
             let radial = rim * pressure;
-            let tangential = shear_radius * shear;
-            let sine = sin(at);
-            let cosine = cos(at);
+            let tangential = shear_radius * (yield_stress * tangent);
             normal += delta * (radial * cosine + tangential * sine);
             if REACTION {
                 drawbar += delta * (tangential * cosine - radial * sine);
                 axle_torque += delta * tangential * shear_radius;
+                if lateral_active {
+                    lateral += delta
+                        * (2.0 * p.half_width * shear_radius * yield_stress * across
+                            + sidewall(p, shear_radius, sine, cosine, chord));
+                }
             }
         }
     }
@@ -377,6 +440,7 @@ fn rolling_load<const REACTION: bool>(
         normal: width * normal,
         drawbar: width * drawbar,
         axle_torque: width * axle_torque,
+        lateral,
     }
 }
 
@@ -524,15 +588,22 @@ unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingC
         None
     };
     let (entry, (exit, peak)) = loaded_arc(p, zero_angles)?;
-    if p.reaction != 0.0 {
+    if p.reaction != 0.0 || p.side_reaction != 0.0 {
         let reaction = rolling_load::<true>(p, entry, (exit, peak));
         if !(reaction.normal.is_finite()
             && reaction.drawbar.is_finite()
             && reaction.axle_torque.is_finite())
+            || !reaction.lateral.is_finite()
         {
             return None;
         }
-        *((p.reaction as usize) as *mut RollingReaction) = reaction;
+        if p.reaction != 0.0 {
+            *((p.reaction as usize) as *mut [f64; 3]) =
+                [reaction.normal, reaction.drawbar, reaction.axle_torque];
+        }
+        if p.side_reaction != 0.0 {
+            *((p.side_reaction as usize) as *mut f64) = reaction.lateral;
+        }
     }
     let rim = p.wheel_radius;
     let rim_rear = rim * sin(exit);
