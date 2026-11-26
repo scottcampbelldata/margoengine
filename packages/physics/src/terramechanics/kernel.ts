@@ -28,6 +28,7 @@ export interface NativeSoil {
     dz: number,
     originX: number,
     originZ: number,
+    trackRelief: number,
   ): number;
   repose(
     areas: number,
@@ -40,6 +41,7 @@ export interface NativeSoil {
     nz: number,
     dx: number,
     dz: number,
+    trackRelief: number,
   ): number;
 }
 

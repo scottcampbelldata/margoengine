@@ -9878,8 +9878,9 @@ gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular e
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
-[0, 1], rotating lugs return up to the current rear cut capacity or transfer loose soil between
-banks at large obliquity. Previously filled and compacted tracks use the cumulative bed state.
+[0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
+banks at large obliquity. The optional history costs eight bytes per grid vertex and visits
+only the affected vertices. The separate excavation maximum prevents counting a cut twice.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor

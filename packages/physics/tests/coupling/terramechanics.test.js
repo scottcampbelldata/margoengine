@@ -602,6 +602,42 @@ test('turning grousers return a bounded share of the cut while locked grousers c
   close(oblique.bed.volume(), 0, 2048 * eps * oblique.soil.budget.removed);
 });
 
+test('rolling grousers reuse older trailing cut capacity without excavating it twice', async () => {
+  const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03, slip: 1 };
+  for (const shared of [false, true]) {
+    const fresh = await rollingBench(terrain, material, wheel, { ...rig, shared });
+    const carrying = await rollingBench(terrain, material, { ...wheel, grouserFill: 1 }, { ...rig, shared });
+    fresh.world.advance(240);
+    carrying.world.advance(120);
+    const snapshot = carrying.world.takeSnapshot();
+    carrying.world.advance(240);
+    // At four seconds these two stations trail the axle by four and seven centimetres.
+    const axle = -0.16 + rig.speed * 4;
+    for (const behind of [0.04, 0.07]) {
+      assert.ok(fresh.bed.bed.sample(0, axle - behind).elevation < 0);
+      assert.equal(carrying.bed.bed.sample(0, axle - behind).elevation, 0);
+    }
+    const budget = carrying.soil.budget;
+    assert.equal(budget.removed, fresh.soil.budget.removed);
+    assert.equal(budget.deposited, budget.removed);
+    assert.equal(budget.exported, 0);
+    close(carrying.bed.volume(), 0, 2048 * eps * budget.removed);
+    const hash = carrying.world.hash();
+    carrying.world.restoreSnapshot(snapshot.bytes);
+    carrying.world.advance(240);
+    assert.equal(carrying.world.hash(), hash);
+  }
+});
+
 test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.14;

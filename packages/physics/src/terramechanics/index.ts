@@ -388,6 +388,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private response!: Region;
   private reactions?: Region;
   private sides?: Region;
+  private trackRelief?: Region;
   private sideWeight = 0;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -548,6 +549,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
     if (this.reaction) this.reactions = allocate('soil-wheel-reactions', this.inputRows * SOIL_WHEEL_REACTION_WORDS);
     if (this.sideForce) this.sides = allocate('soil-wheel-side-forces', this.inputRows);
+    if (
+      this.material.reposeSlope > 0 &&
+      rolling.some((wheel) => wheel?.bermProfile === 'cross-track' && (wheel.grouserFill ?? 0) > 0)
+    )
+      this.trackRelief = allocate('soil-track-relief', count);
     if (this.pressureField) {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
@@ -822,6 +828,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       dz / rows,
       centre[0] - dx / 2,
       centre[1] - dz / 2,
+      this.trackRelief?.byteOffset ?? 0,
     );
     if (rolling && !Number.isFinite(peak))
       throw new MargoError(
@@ -979,6 +986,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         rows + 1,
         (slope * width) / columns,
         (slope * depth) / rows,
+        this.trackRelief?.byteOffset ?? 0,
       );
       this.words(this.workRegion)[2] = moved;
     }
@@ -1012,6 +1020,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.response,
       ...(this.reactions ? [this.reactions] : []),
       ...(this.sides ? [this.sides] : []),
+      ...(this.trackRelief ? [this.trackRelief] : []),
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),

@@ -251,10 +251,12 @@ Equation 4.3 gives transport area per metre of advance as
 radius as the rolling model. The transported fraction is bounded by the actual loose cut,
 and oblique travel draws it only from the source-side bank.
 When the front and rear corners align, the article's high-obliquity rule moves the transported
-portion to the opposite bank. Otherwise the solver returns it into the available newly cut
-rear contact area. The cases check locked zero transport, full-spin bounded backfill, highly
-oblique transfer and exact total volume. The publication's steady backfill shape and full
-scanned profile remain separate comparisons.
+portion to the opposite bank. Otherwise it returns soil into the rear contact area, limited by
+the present net depression accumulated by this solver, including its earlier cuts and repose
+redistribution. The excavation maximum is a separate history. Returning earlier material
+therefore preserves the original cut ledger. A moving-carriage case checks two filled trailing
+stations against the same wheel without transport, net volume, zero export and snapshot replay
+in plain and shared memory. The measured scan profiles remain a separate comparison.
 [Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
 
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement

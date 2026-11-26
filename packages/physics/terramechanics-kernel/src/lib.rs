@@ -532,6 +532,13 @@ fn grouser_share(p: &Patch, area: f64) -> f64 {
     }
 }
 
+unsafe fn add_bed_change(deltas: *mut f64, track_relief: *mut f64, vertex: usize, amount: f64) {
+    *deltas.add(vertex) += amount;
+    if !track_relief.is_null() {
+        *track_relief.add(vertex) += amount;
+    }
+}
+
 unsafe fn deposit_backfill(
     p: &Patch,
     lattice: &BermLattice,
@@ -539,11 +546,11 @@ unsafe fn deposit_backfill(
     (travel_x, travel_z): (f64, f64),
     volume: f64,
     areas: *const f64,
-    cuts: *const f64,
+    track_relief: *mut f64,
     deltas: *mut f64,
     work: *mut f64,
 ) -> f64 {
-    if volume <= 0.0 {
+    if volume <= 0.0 || track_relief.is_null() {
         return 0.0;
     }
     let mut rear_volume = 0.0;
@@ -553,7 +560,7 @@ unsafe fn deposit_backfill(
             let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
             let i = x * lattice.nz + z;
             if along < 0.0 {
-                rear_volume += *cuts.add(i) * *areas.add(i);
+                rear_volume += (-*track_relief.add(i)).max(0.0) * *areas.add(i);
             }
         }
     }
@@ -566,7 +573,8 @@ unsafe fn deposit_backfill(
                 let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
                 let i = x * lattice.nz + z;
                 if along < 0.0 {
-                    *deltas.add(i) += *cuts.add(i) * scale;
+                    let thickness = (-*track_relief.add(i)).max(0.0) * scale;
+                    add_bed_change(deltas, track_relief, i, thickness);
                 }
             }
         }
@@ -595,6 +603,7 @@ unsafe fn deposit_cross_track(
     cut_bounds: (usize, usize, usize, usize),
     areas: *const f64,
     deltas: *mut f64,
+    track_relief: *mut f64,
     rim: *mut f64,
     faces: *mut u32,
     work: *mut f64,
@@ -636,7 +645,7 @@ unsafe fn deposit_cross_track(
             (travel_x, travel_z),
             requested,
             areas,
-            rim,
+            track_relief,
             deltas,
             work,
         )
@@ -722,14 +731,15 @@ unsafe fn deposit_cross_track(
             } else {
                 -weight * left_scale
             };
-            *deltas.add(i) += deposit;
+            add_bed_change(deltas, track_relief, i, deposit);
             if deposit > 0.0 && *deltas.add(i) > 0.0 {
                 queue.around(i, nx, nz, 0);
             }
         }
     }
     *work += 2.0 * ((x_end - x_start) * (z_end - z_start)) as f64;
-    backfill + f64::from(left_area > 0.0) * left + f64::from(right_area > 0.0) * right
+    let exported = f64::from(left_area == 0.0) * left + f64::from(right_area == 0.0) * right;
+    loose - exported
 }
 
 fn phase_offset(angle: f64, pitch: f64) -> f64 {
@@ -1028,6 +1038,7 @@ pub unsafe extern "C" fn stamp(
     dz: f64,
     origin_x: f64,
     origin_z: f64,
+    track_relief: *mut f64,
 ) -> f64 {
     let source = &mut *patch.cast::<Patch>();
     let mut local = *source;
@@ -1189,7 +1200,7 @@ pub unsafe extern "C" fn stamp(
                 .max(0.0)
                 .min(room);
             *peak.add(i) += cut;
-            *deltas.add(i) -= cut;
+            add_bed_change(deltas, track_relief, i, -cut);
             *dust.add(i) += cut * p.dust_flux;
             removed += cut * area;
             if p.berm_slope == 0.0 {
@@ -1206,8 +1217,6 @@ pub unsafe extern "C" fn stamp(
                 };
                 *rim.add(i) = weight;
                 rim_area += weight * area;
-            } else if p.grouser_fill > 0.0 {
-                *rim.add(i) = cut;
             }
         }
     }
@@ -1232,6 +1241,7 @@ pub unsafe extern "C" fn stamp(
             (x_start, x_end, z_start, z_end),
             areas,
             deltas,
+            track_relief,
             rim,
             faces,
             work,
@@ -1243,7 +1253,7 @@ pub unsafe extern "C" fn stamp(
             for z in z_start..z_end {
                 let i = x * nz + z;
                 let deposit = *rim.add(i) * fill;
-                *deltas.add(i) += deposit;
+                add_bed_change(deltas, track_relief, i, deposit);
                 if resolved && deposit > 0.0 && *deltas.add(i) > 0.0 {
                     queue.around(i, nx, nz, 0);
                 }
@@ -1280,6 +1290,7 @@ pub unsafe extern "C" fn repose(
     nz: usize,
     limit_x: f64,
     limit_z: f64,
+    track_relief: *mut f64,
 ) -> f64 {
     let mut moved = 0.0;
     let queue = FaceQueue::new(faces, nx * nz);
@@ -1306,8 +1317,8 @@ pub unsafe extern "C" fn repose(
         let target_area = *areas.add(target);
         let volume = (gradient / (1.0 / source_area + 1.0 / target_area))
             .min(*deltas.add(source) * source_area);
-        *deltas.add(source) -= volume / source_area;
-        *deltas.add(target) += volume / target_area;
+        add_bed_change(deltas, track_relief, source, -volume / source_area);
+        add_bed_change(deltas, track_relief, target, volume / target_area);
         moved += volume;
         if *deltas.add(target) > 0.0 {
             queue.around(target, nx, nz, face + 1);
