@@ -23,15 +23,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/physics/tests/coupling/vortices.test.js` covers the >60 m/s case, real rigid debris,
   a moving shallow-water reach and the CY-14 gale. The Sky hurricane and tornado suites check shared balances.
 
-### Open 2026-11-26: the flood bounds test process once ended without a report (water)
+### Fixed 2026-11-26: the flood bounds test process once ended without a report (water, same cause as KB-TEST-FILEEXIT1)
 
 - **Repro:** Not reproduced. In one `test:changed` run of 70 packages on the Windows workstation (CPU load about 88%),
   `npm run test` in packages/water reported `test/flood-bounds.test.js` as failed after 270 s with only
   `'test failed'`: no subtest, assertion, fatal error or Windows crash event. The file then passed alone (18 of 18,
   508 s) and in a second run of the package's tests (261 of 261, exit 0, peak resident memory at exit 171 MiB).
-- **Cause:** Not found. A failed assertion would have named its subtest, so the process most likely ended from outside
-  or crashed without output; neither is shown. The next occurrence needs the child's exit code and signal: preload a
-  module through `NODE_OPTIONS=--require` that logs each test process's start and `exit` code.
+- **Cause:** The same class as KB-TEST-FILEEXIT1 above, which named this file (257 s) before: a file process ended from
+  outside by a tree kill aimed at a reused pid, which Node 26.13 reports exactly as 'test failed' at the file. It is not
+  a timeout kill: `test:changed` and `run-with-timeout` report one as `timed out` / exit 124 with `TIMEOUT after N min`,
+  and the water package sets no per-file limit. The report came after commit 3c08d37a1 landed (2026-11-25) but from a
+  run whose scripts were not shown to be at it; other lanes' worktrees run the scripts of their own checkout, and one
+  not yet rebased still ends trees by bare pid. Which kill hit it was not caught live, so this is attributed by
+  signature, not proven.
+- **Fixed:** By 3c08d37a1 (every Windows tree kill by a checked handle, in scripts/support/shutdown.mjs) and 32d3bc44c
+  (KB-HOST-KILLLATE1). No raw `taskkill` or `ParentProcessId` walk remains outside the helper (`rg taskkill` finds
+  only comments). Checked 2026-11-26 on the fixed tree: three copies of `flood-bounds.test.js` at once beside four CPU
+  hogs, each under `run-with-timeout --max=18`, all passed (18 of 18, exit 0, about 16 min each).
+- **Regression:** tests/process-kill.test.js (5 of 5 pass), whose scan fails on any raw `taskkill` outside the helper.
 
 ### Fixed 2026-11-26: simulated earthquake loads lacked a propagating ground field (EARTH-08)
 
