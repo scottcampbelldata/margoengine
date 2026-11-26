@@ -10572,6 +10572,9 @@ In a staggered rigid–soil–bed group, the rigid wheel consumes the previous r
 collider. The chassis receives a tangential impulse and the wheel's separate spin state receives
 the axle impulse. A coupled work bound uses the current point velocity, enabled axes and inertia.
 Tyre state, reaction samples and the paired terrain state all participate in seek.
+Opt-in skid holds free-rolling exit and peak angles while the native bracket balances the
+two signed shear regions. An optional shear radius derives the slip from relative wheel and bed
+speeds down to zero travel. The same rigid impulse bound handles the reversed axle moment.
 
 ### Divergence-free particle pressure
 

@@ -28,7 +28,7 @@ export const SOIL_LAYOUT = 1;
 export const SOIL_PATCH_WORDS = 10;
 /** Per patch: pressure Pa, settlement m, mobilized shear stress Pa and normal load N. */
 export const SOIL_RESPONSE_WORDS = 4;
-/** Per rolling wheel: integrated normal load N, drawbar force N and resisting axle torque N·m. */
+/** Per rolling wheel: normal load N, drawbar N and signed resisting axle torque N·m. */
 export const SOIL_WHEEL_REACTION_WORDS = 3;
 const LEGGED_WORDS = 13;
 const CENTRE = [0, 0, 0] as const;
@@ -121,6 +121,8 @@ export interface SoilRollingWheel {
   readonly lugSupport?: number;
   /** Increase in bearing exponent per unit of powered slip. Default zero. */
   readonly slipExponent?: number;
+  /** Increase in bearing exponent per unit of skid. Set a measured value, including zero, to enable skid. */
+  readonly skidExponent?: number;
   /** Fraction of entry angle at the pressure peak with zero slip. Default 0.4. */
   readonly peakFraction?: number;
   /** Increase in pressure peak fraction per unit of powered slip. Default 0.3. */
@@ -271,7 +273,8 @@ export function wheelSoil(
 
 type Patch = readonly [number, number, number, number, number, number, number, number, number, number];
 type ProfileSlot = Pick<SoilContactProfile, 'columns' | 'rows' | 'area' | 'perimeter'> & { region: Region };
-type RollingParameters = Required<Omit<SoilRollingWheel, 'treadMesh'>>;
+type RollingParameters = Required<Omit<SoilRollingWheel, 'treadMesh' | 'skidExponent'>> &
+  Pick<SoilRollingWheel, 'skidExponent'>;
 type MeshSlot = { geometry: Region; profile: Region; columns: number; rows: number };
 
 function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
@@ -305,6 +308,8 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
     lugHeight,
     lugSupport: finite(wheel.lugSupport ?? 0, 'wheel lug support', 0, lugHeight),
     slipExponent: finite(wheel.slipExponent ?? 0, 'wheel slip exponent increment', 0),
+    skidExponent:
+      wheel.skidExponent === undefined ? undefined : finite(wheel.skidExponent, 'wheel skid exponent increment', 0),
     peakFraction,
     peakSlip: finite(wheel.peakSlip ?? 0.3, 'wheel pressure peak slip increment', 0, 1 - Number.EPSILON - peakFraction),
     exitFraction: finite(wheel.exitFraction ?? 0, 'wheel exit fraction', -1, 0),
@@ -496,7 +501,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 46);
+    this.nativePatch = allocate('soil-patch-scratch', 48);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -638,8 +643,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const rolling = this.rolling[row - this.fixed.length];
     const mesh = this.meshes[row - this.fixed.length];
     const forward = [forwardX / direction, forwardZ / direction] as const;
-    const drivingSlip = rolling ? Math.min(1, Math.max(0, -(shearX * forward[0] + shearZ * forward[1]) / length)) : 0;
-    const exponent = positive(material.exponent + (rolling?.slipExponent ?? 0) * drivingSlip, 'effective exponent');
+    const longitudinalSlip = -(shearX * forward[0] + shearZ * forward[1]) / length;
+    const drivingSlip = rolling ? Math.min(1, Math.max(0, longitudinalSlip)) : 0;
+    const skid = rolling?.skidExponent === undefined ? 0 : Math.max(-1, Math.min(0, longitudinalSlip));
+    const exponent = positive(
+      material.exponent + (rolling?.slipExponent ?? 0) * drivingSlip - (rolling?.skidExponent ?? 0) * skid,
+      'effective exponent',
+    );
     const resolved = Boolean(this.pressure);
     const ellipse = Boolean(flags & 1);
     const profile = this.profiles[row];
@@ -738,6 +748,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       rolling && this.reactions
         ? this.reactions.byteOffset + (row - this.fixed.length) * SOIL_WHEEL_REACTION_WORDS * 8
         : 0,
+      skid,
+      rolling?.skidExponent ?? 0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,

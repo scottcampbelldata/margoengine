@@ -17,6 +17,8 @@ export interface WheelSoilBinding {
   readonly vehicle: Vehicle;
   /** Projected footprint length and width per wheel, m. */
   readonly patches: readonly { readonly length: number; readonly width: number }[];
+  /** Effective shear radius, m, per wheel. Null keeps the tyre slip. For lugs use rim radius plus half lug height. */
+  readonly shearRadii?: readonly (number | null)[];
   /** Only publish contact against this collider when supplied. */
   readonly ground?: PhysicsCollider;
   /** Forward vector in the chassis frame. Default +Z. */
@@ -60,6 +62,27 @@ function heading(vehicle: Vehicle | TrackedVehicle, forward: Point = [0, 0, 1]):
   return scale > 0 ? [x / scale, z / scale] : [0, 1];
 }
 
+function rollingSlip(
+  binding: WheelSoilBinding,
+  wheel: ReturnType<Vehicle['wheel']>,
+  fx: number,
+  fz: number,
+  radius: number,
+) {
+  const point = wheel.contactPoint;
+  const normal = wheel.contactNormal;
+  if (!point || !normal || !wheel.ground || !(normal[1] > 0)) return wheel.slipRatio;
+  const fy = -(normal[0] * fx + normal[2] * fz) / normal[1];
+  const upside = hypot(1, fy);
+  const speed = binding.vehicle.chassis.velocityAtPoint(point);
+  const bedSpeed = wheel.ground.body.velocityAtPoint(point);
+  const travel =
+    ((speed[0] - bedSpeed[0]) * fx + (speed[1] - bedSpeed[1]) * fy + (speed[2] - bedSpeed[2]) * fz) / upside;
+  const rim = radius * wheel.spin;
+  const scale = Math.max(Math.abs(travel), Math.abs(rim));
+  return scale > 0 ? (rim - travel) / scale : 0;
+}
+
 function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, phases?: Float64Array): number {
   const { vehicle, patches, ground } = binding;
   const [x, z] = heading(vehicle, binding.forward);
@@ -68,10 +91,11 @@ function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, ph
     if (phases) phases[at / SOIL_PATCH_WORDS] = wheel.rotation;
     if (wheel.contactPoint && wheel.load > 0 && (!ground || ground === wheel.ground)) {
       const azimuth = wheel.steering;
-      const longitudinal = -wheel.slipRatio * patch.length;
       const lateral = (patch.length * sin(wheel.slipAngle)) / Math.max(cos(wheel.slipAngle), Number.EPSILON);
       const fx = x * cos(azimuth) + z * sin(azimuth);
       const fz = z * cos(azimuth) - x * sin(azimuth);
+      const radius = binding.shearRadii?.[index];
+      const longitudinal = -(radius ? rollingSlip(binding, wheel, fx, fz, radius) : wheel.slipRatio) * patch.length;
       out.set(
         [
           wheel.contactPoint[0],
@@ -174,6 +198,7 @@ export class SoilContactRigidSolver extends RigidSolver {
       ...entry,
       ground: entry.ground ?? soilCollider,
       patches: entry.patches.map((p) => ({ ...p })),
+      shearRadii: entry.shearRadii && [...entry.shearRadii],
     }));
     this.tracks = (params.tracks ?? []).map((entry) => ({ ...entry, patches: entry.patches.map((p) => ({ ...p })) }));
     this.vehicles = [...this.wheels, ...this.tracks].map(({ vehicle }) => vehicle);
@@ -189,13 +214,19 @@ export class SoilContactRigidSolver extends RigidSolver {
       this.vehicles.some((v) => !params.physics.owns(v.chassis)) ||
       this.wheels.some((b) => b.patches.length !== b.vehicle.wheelCount) ||
       this.tracks.some((b) => b.patches.length !== b.vehicle.trackCount) ||
+      this.wheels.some(
+        (b) =>
+          b.shearRadii &&
+          (b.shearRadii.length !== b.vehicle.wheelCount ||
+            b.shearRadii.some((radius) => radius !== null && !(Number.isFinite(radius) && radius > 0))),
+      ) ||
       [...this.wheels, ...this.tracks].some((b) =>
         b.patches.some((p) => ![p.length, p.width].every((s) => Number.isFinite(s) && s > 0)),
       )
     )
       throw new MargoError(
         'state',
-        'Soil contact bindings disagree with the rigid world. Provide distinct live vehicles and positive footprints for each wheel or belt.',
+        'Soil contact bindings disagree with the rigid world. Provide distinct live vehicles and positive footprint dimensions and shear radii.',
       );
     super.init(host, params);
     this.memory = host.memory;

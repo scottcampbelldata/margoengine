@@ -9848,8 +9848,10 @@ triangle. Wheel camber is outside that phase-only footprint model. The optional 
 reports vertical and longitudinal force and resisting axle torque for the forward driven arc.
 Its reciprocal rigid binding applies the previous contact result on the same collider. A tyre provides
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound
-limit the paired impulse, while reverse and braking use the tyre response. Transient digging forces
-and measured braking stress shapes remain open. The measured rover comparison covers steady
+limit the paired impulse. A configured skid exponent adds signed two-region shear under forward
+braking, including lockup. A configured shear radius uses actual wheel and ground speed.
+Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
+slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.

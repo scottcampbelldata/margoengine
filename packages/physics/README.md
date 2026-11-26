@@ -4817,12 +4817,18 @@ Pass `wheelReaction: soilWheelReactionField()` to `Terramechanics.load` to publi
 load record per external row. `SOIL_WHEEL_REACTION_WORDS` is the number of f64 values in each
 layout-1 record: vertical force in N, drawbar force in N along the wheel's forward direction and
 resisting axle torque in N·m. Rows without a loaded rolling wheel contain zeros. The reaction uses
-the published forward driven-wheel arc. Pass the same field as `wheelReaction` to
+the published rolling-wheel arc. Pass the same field as `wheelReaction` to
 `SoilContactRigidSolver` to apply both components on its registered `BedCollider`. Configure a tyre
 model on those wheels to give them independent spin. On powered forward contact, the drawbar impulse
 acts on the chassis and the axle moment slows the wheel. The tyre supplies lateral grip and contacts
 outside this model's range. A lower current load scales the previous reaction before application.
 The [reciprocal wheel example](tests/coupling/terramechanics.test.js) constructs the matching fields and wheel.
+
+Set a measured `skidExponent` on the rolling wheel to enable forward skidding, including a locked
+wheel. Zero enables its shear model with a constant bearing exponent. Set the corresponding rigid
+binding's `shearRadii` in metres to obtain the signed slip from actual surface and ground speed,
+including at crawl speed. Negative resisting torque spins up a skidding wheel while the terrain
+reaction slows the chassis.
 
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';

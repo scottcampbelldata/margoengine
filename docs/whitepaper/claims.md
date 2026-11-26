@@ -5836,6 +5836,9 @@ work and reproduces the complete coupled hash after restoration.
 The Wh2 carriage reproduces the held-out 60% tip-slip drawbar and axle torque in
 Ding et al. (2009), Fig. 6. The test converts the slip between lug-tip and shear radii and
 uses the edges of the observed PDF graph markers as its force and torque bounds.
+The lockup test reproduces the saturated two-region shear moment exactly for a smooth wheel at
+constant cohesion. A second fixture at 0.09 m/s checks a moving chassis, brake, TerrainBed,
+negative drawbar impulse, positive spin impulse and precise restored state.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

@@ -497,6 +497,31 @@ test('native rolling reactions resolve asymmetric normal drag and full-slip axle
   }
 });
 
+test('a locked smooth wheel has the exact saturated two-region axle moment', async () => {
+  const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const radius = 0.125;
+  const width = 0.14;
+  const cohesion = 1200;
+  const exitFraction = -0.48;
+  const wheelReaction = soilWheelReactionField('skid-reaction');
+  const wheel = { radius, peakFraction: 0.2, exitFraction, skidExponent: 0.55 };
+  const material = { cohesiveModulus: 0, frictionalModulus: 800_000, friction: 0, cohesion, shearLength: 0.021 };
+  const rig = { width, length: 0.16, load: 70, speed: 0.05, wheelReaction };
+  const free = await rollingBench(terrain, material, wheel, { ...rig, slip: 0 });
+  const locked = await rollingBench(terrain, material, wheel, { ...rig, slip: -1, shared: true });
+  free.world.advance(1);
+  locked.world.advance(1);
+  const angle = (model) => Math.acos(1 - model.soil.read(0).sinkage / radius);
+  const entry = angle(locked);
+  const rear = exitFraction * angle(free);
+  const transition = 0.5 * entry;
+  const reversal = Math.acos((Math.sin(entry) - Math.sin(transition)) / (entry - transition));
+  const [, drawbar, torque] = regionWords(locked.world.memory, locked.world.fields.port(wheelReaction.name).region);
+  close(torque, width * radius * radius * cohesion * (entry + rear - 2 * reversal), 8192 * eps * Math.abs(torque));
+  assert.ok(drawbar < 0 && torque < 0 && entry > angle(free));
+  assert.ok(locked.bed.bed.sample(0, -0.16).elevation < 0);
+});
+
 test('held-out Ding et al. Wh2 drawbar and torque at 60% tip slip', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.15735;
@@ -767,7 +792,7 @@ for (const tier of ['mean', 'resolved']) {
     coupledVehicles(tier));
 }
 
-test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {
+async function withWheelReaction(initialSpin, initialSpeed, check) {
   await Physics.load({ threads: true });
   const terrain = { columns: 72, rows: 96, width: 1.8, depth: 2.4, centre: [0, 0] };
   const input = soilPatchField();
@@ -789,55 +814,105 @@ test('a powered wheel consumes the native drawbar force and axle moment without 
     enabledTranslations: [false, false, true],
     colliders: { shape: 'box', halfExtents: [0.1, 0.05, 0.1], mass },
   });
-  chassis.setLinearVelocity([0, 0, 0.2]);
+  chassis.setLinearVelocity([0, 0, initialSpeed]);
   using vehicle = new Vehicle(physics, chassis, {
     wheels: [{ position: [0, 0, 0], radius, inertia, suspensionRestLength: 0.3, suspensionStiffness: 8 }],
     tyre: { forces: () => ({ longitudinal: 0, lateral: 0 }) },
   });
   const seed = new Float64Array(vehicle.motionStateWords);
   vehicle.writeMotionState(seed);
-  seed[3] = 10; // First wheel's spin after the three recorded driver controls.
+  seed[3] = initialSpin; // First wheel's spin after the three recorded driver controls.
   vehicle.readMotionState(seed);
-  world.add(rigid, { physics, ground, wheels: [{ vehicle, patches: [{ width: 0.165, length: 0.16 }] }] });
+  if (initialSpin === 0) vehicle.setInput({ brake: 1 });
+  world.add(rigid, {
+    physics,
+    ground,
+    wheels: [{ vehicle, patches: [{ width: 0.165, length: 0.16 }], shearRadii: [radius] }],
+  });
   world.add(soil, {
     terrain,
     inputRows: 1,
-    material: { cohesion: 6000, friction: 0.7, compaction: 1 },
-    rollingWheels: [{ radius }],
+    material: initialSpin
+      ? { cohesion: 6000, friction: 0.7, compaction: 1 }
+      : {
+          cohesiveModulus: 0,
+          frictionalModulus: 8_000_000,
+          exponent: 1.46,
+          cohesion: 1000,
+          friction: Math.tan((29 * Math.PI) / 180),
+          shearLength: 0.021,
+          compaction: 1,
+        },
+    rollingWheels: [{ radius, skidExponent: 0.55 }],
   });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
-  world.advance(1);
-  const energy = () => 0.5 * (mass * vehicle.speed ** 2 + inertia * vehicle.wheel(0).spin ** 2);
-  const before = energy();
-  const spin = vehicle.wheel(0).spin;
-  const speed = vehicle.speed;
-  const [normal, drawbar, torque] = regionWords(world.memory, world.fields.port(wheelReaction.name).region);
-  assert.ok(normal > 0 && drawbar > 0 && torque > 0);
-  assert.ok(Math.abs(vehicle.wheel(0).forwardImpulse) <= (mass * Math.abs(10 * radius - 0.2)) / 2 ** 15);
-  world.advance(2);
-  const wheel = vehicle.wheel(0);
-  assert.ok(
-    wheel.forwardImpulse > 0 && wheel.spin < spin,
-    `traction: ${wheel.forwardImpulse} N·s, spin ${spin} → ${wheel.spin} rad/s, load ${wheel.load} N`,
+  check({ physics, world, ground, chassis, vehicle, mass, radius, inertia, wheelReaction, seed });
+}
+
+test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {
+  await withWheelReaction(
+    10,
+    0.2,
+    ({ physics, world, ground, chassis, vehicle, mass, radius, inertia, wheelReaction, seed }) => {
+      world.advance(1);
+      const energy = () => 0.5 * (mass * vehicle.speed ** 2 + inertia * vehicle.wheel(0).spin ** 2);
+      const before = energy();
+      const spin = vehicle.wheel(0).spin;
+      const speed = vehicle.speed;
+      const [normal, drawbar, torque] = regionWords(world.memory, world.fields.port(wheelReaction.name).region);
+      assert.ok(normal > 0 && drawbar > 0 && torque > 0);
+      assert.ok(Math.abs(vehicle.wheel(0).forwardImpulse) <= (mass * Math.abs(10 * radius - 0.2)) / 2 ** 15);
+      world.advance(2);
+      const wheel = vehicle.wheel(0);
+      assert.ok(
+        wheel.forwardImpulse > 0 && wheel.spin < spin,
+        `traction: ${wheel.forwardImpulse} N·s, spin ${spin} → ${wheel.spin} rad/s, load ${wheel.load} N`,
+      );
+      const scale = (60 * wheel.forwardImpulse) / drawbar;
+      close(wheel.spin - spin, -(torque * scale) / (60 * inertia), 2048 * eps * spin);
+      const [nx, ny, nz] = wheel.contactNormal;
+      const tangent = Math.hypot(ny, nz);
+      const normalImpulse = (wheel.load * nz) / 60;
+      const tyreImpulse = (wheel.forwardImpulse * ny + wheel.sideImpulse * nx * nz) / tangent;
+      close(vehicle.speed - speed, (normalImpulse + tyreImpulse) / mass, 2 ** -23 * vehicle.speed);
+      assert.ok(energy() < before);
+      const mark = world.takeSnapshot();
+      world.advance(14);
+      const hash = world.hash();
+      world.restoreSnapshot(mark.bytes);
+      world.advance(14);
+      assert.equal(world.hash(), hash);
+      vehicle.readMotionState(seed);
+      chassis.setLinearVelocity([0, 0, 0.2]);
+      vehicle.setWheelGroundTraction(0, { collider: ground.collider, load: 100, drawbar: 250, axleTorque: 0 });
+      physics.step();
+      assert.equal(vehicle.wheel(0).forwardImpulse, 0, 'force with no driving work is rejected by the discrete bound');
+      assert.equal(vehicle.wheel(0).spin, 10);
+    },
   );
-  const scale = (60 * wheel.forwardImpulse) / drawbar;
-  close(wheel.spin - spin, -(torque * scale) / (60 * inertia), 2048 * eps * spin);
-  const [nx, ny, nz] = wheel.contactNormal;
-  const tangent = Math.hypot(ny, nz);
-  const normalImpulse = (wheel.load * nz) / 60;
-  const tyreImpulse = (wheel.forwardImpulse * ny + wheel.sideImpulse * nx * nz) / tangent;
-  close(vehicle.speed - speed, (normalImpulse + tyreImpulse) / mass, 2 ** -23 * vehicle.speed);
-  assert.ok(energy() < before);
-  const mark = world.takeSnapshot();
-  world.advance(14);
-  const hash = world.hash();
-  world.restoreSnapshot(mark.bytes);
-  world.advance(14);
-  assert.equal(world.hash(), hash);
-  vehicle.readMotionState(seed);
-  chassis.setLinearVelocity([0, 0, 0.2]);
-  vehicle.setWheelGroundTraction(0, { collider: ground.collider, load: 100, drawbar: 250, axleTorque: 0 });
-  physics.step();
-  assert.equal(vehicle.wheel(0).forwardImpulse, 0, 'force with no driving work is rejected by the discrete bound');
-  assert.equal(vehicle.wheel(0).spin, 10);
+});
+
+test('a live locked wheel uses the reverse axle moment and brakes at crawl speed', async () => {
+  await withWheelReaction(0, 0.09, ({ world, vehicle, mass, inertia, wheelReaction }) => {
+    world.advance(1);
+    const [normal, drawbar, torque] = regionWords(world.memory, world.fields.port(wheelReaction.name).region);
+    assert.ok(normal > 0 && drawbar < 0 && torque < 0);
+    const speed = vehicle.speed;
+    world.advance(2);
+    const wheel = vehicle.wheel(0);
+    assert.ok(wheel.forwardImpulse < 0 && wheel.spin > 0);
+    const accepted = (60 * wheel.forwardImpulse) / drawbar;
+    close(wheel.spin, (-torque * accepted) / (60 * inertia), 2048 * eps * wheel.spin);
+    // Isolate the tangential coupling. The sloped live bed also gives the suspension impulse a z component.
+    const afterSuspension = speed + (wheel.contactNormal[2] * wheel.load) / (60 * mass);
+    const before = 0.5 * mass * afterSuspension ** 2;
+    const after = 0.5 * (mass * vehicle.speed ** 2 + inertia * wheel.spin ** 2);
+    assert.ok(vehicle.speed < afterSuspension && after - before <= 2 ** -22 * before);
+    const snapshot = world.takeSnapshot();
+    world.advance(10);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(10);
+    assert.equal(world.hash(), hash);
+  });
 });

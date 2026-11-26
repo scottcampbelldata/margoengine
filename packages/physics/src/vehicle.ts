@@ -100,7 +100,7 @@ export interface WheelGroundTraction {
   readonly load: number;
   /** Signed chassis force along the rolling direction, N. */
   readonly drawbar: number;
-  /** Nonnegative moment resisting forward spin, N·m. */
+  /** Moment resisting forward spin in N·m. Negative torque spins up a skidding wheel. */
   readonly axleTorque: number;
 }
 
@@ -584,13 +584,12 @@ export class Vehicle implements PhysicsAttachment {
         Number.isFinite(Math.fround(traction.load)) &&
         traction.load > 0 &&
         Number.isFinite(Math.fround(traction.drawbar)) &&
-        Number.isFinite(Math.fround(traction.axleTorque)) &&
-        traction.axleTorque >= 0
+        Number.isFinite(Math.fround(traction.axleTorque))
       )
     )
       throw new MargoError(
         'state',
-        'The wheel ground traction is invalid. Provide positive load, finite force and nonnegative torque.',
+        'The wheel ground traction is invalid. Provide positive load and finite force and torque.',
       );
     wheel.traction = { ...traction };
   }
@@ -952,11 +951,16 @@ export class Vehicle implements PhysicsAttachment {
         this.driveBrake(wheel, dt);
         let soilImpulse: number | undefined;
         let contactSpeed = pv;
-        if (traction?.collider === wheel.ground && wheel.force > 0 && !(wheel.brake && this.brake > 0)) {
+        if (traction?.collider === wheel.ground && wheel.force > 0) {
           const support = this.groundReaction ? traction.collider.body : undefined;
           const current = contactVelocity(chassis, support, wheel.point);
           const travel = dot(forward, current);
-          if (travel >= 0 && wheel.omega * wheel.radius >= travel) {
+          const rimSpeed = wheel.omega * wheel.radius;
+          const matches =
+            traction.axleTorque < 0
+              ? rimSpeed >= 0 && rimSpeed <= travel
+              : rimSpeed >= travel && !(wheel.brake && this.brake > 0);
+          if (travel >= 0 && matches) {
             const inverse =
               tractionInverse(chassis, wheel.point, forward) +
               (support ? tractionInverse(support, wheel.point, forward) : 0);

@@ -68,6 +68,8 @@ struct Patch {
     mesh_columns: f64,
     mesh_rows: f64,
     reaction: f64,
+    skid: f64,
+    skid_exponent: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -262,8 +264,40 @@ struct RollingReaction {
     axle_torque: f64,
 }
 
-fn rolling_load<const REACTION: bool>(p: &Patch, entry: f64) -> RollingReaction {
-    let (exit, peak) = rolling_angle(p, entry);
+fn skid_shear(
+    entry: f64,
+    transition: f64,
+    front_cosine: f64,
+    ratio: f64,
+    radius: f64,
+    k: f64,
+    at: f64,
+) -> f64 {
+    let (start, bias) = if at < transition {
+        (transition, ratio)
+    } else {
+        (entry, front_cosine)
+    };
+    let sine_difference = 2.0 * cos(0.5 * (start + at)) * sin(0.5 * (start - at));
+    let distance = radius * (bias * (start - at) - sine_difference).abs();
+    let velocity = bias - cos(at);
+    let fraction = if ratio > 0.0 {
+        1.0 - exp(-distance / (k * ratio))
+    } else {
+        f64::from(distance > 0.0)
+    };
+    if velocity == 0.0 {
+        0.0
+    } else {
+        fraction.copysign(velocity)
+    }
+}
+
+fn rolling_load<const REACTION: bool>(
+    p: &Patch,
+    entry: f64,
+    (exit, peak): (f64, f64),
+) -> RollingReaction {
     let rim = p.wheel_radius;
     let lug_entry = 2.0 * arc_sin(root(0.5 * (1.0 - rim * cos(entry) / (rim + p.lug_height))));
     let lug_sine = sin(lug_entry);
@@ -271,7 +305,33 @@ fn rolling_load<const REACTION: bool>(p: &Patch, entry: f64) -> RollingReaction 
     let mut normal = 0.0;
     let mut drawbar = 0.0;
     let mut axle_torque = 0.0;
-    for (first, last) in [(exit, peak), (peak, entry)] {
+    let skidding = p.skid < 0.0;
+    let (transition, front_cosine, a, b, c) = if skidding {
+        let transition = entry * (1.0 + 0.5 * p.skid);
+        let half_front = 0.5 * (entry - transition);
+        let front_cosine = cos(0.5 * (entry + transition))
+            * if half_front > 0.0 {
+                sin(half_front) / half_front
+            } else {
+                1.0
+            };
+        let reversal = (2.0 * arc_sin(root(0.5 * (1.0 - front_cosine))))
+            .max(transition)
+            .min(entry);
+        (
+            transition,
+            front_cosine,
+            transition.min(peak),
+            transition.max(peak).min(reversal),
+            reversal.max(peak),
+        )
+    } else {
+        (0.0, 0.0, peak, entry, entry)
+    };
+    for (first, last) in [(exit, a), (a, b), (b, c), (c, entry)] {
+        if first == last {
+            continue;
+        }
         let delta = (last - first) / 24.0;
         for i in 0..24 {
             let at = first + (i as f64 + 0.5) * delta;
@@ -286,9 +346,21 @@ fn rolling_load<const REACTION: bool>(p: &Patch, entry: f64) -> RollingReaction 
             } else {
                 p.stiffness * pow(depth, p.exponent)
             };
-            let slide = rim * ((lug_entry - at) - (1.0 - p.drive_slip) * (lug_sine - sin(at)));
-            let shear = (p.cohesion + pressure * p.friction)
-                * (1.0 - exp(-slide.max(0.0) / p.shear_length));
+            let mobility = if skidding {
+                skid_shear(
+                    entry,
+                    transition,
+                    front_cosine,
+                    1.0 + p.skid,
+                    shear_radius,
+                    p.shear_length,
+                    at,
+                )
+            } else {
+                let slide = rim * ((lug_entry - at) - (1.0 - p.drive_slip) * (lug_sine - sin(at)));
+                1.0 - exp(-slide.max(0.0) / p.shear_length)
+            };
+            let shear = (p.cohesion + pressure * p.friction) * mobility;
             let radial = rim * pressure;
             let tangential = shear_radius * shear;
             let sine = sin(at);
@@ -306,6 +378,25 @@ fn rolling_load<const REACTION: bool>(p: &Patch, entry: f64) -> RollingReaction 
         drawbar: width * drawbar,
         axle_torque: width * axle_torque,
     }
+}
+
+fn loaded_arc(p: &Patch, fixed: Option<(f64, f64)>) -> Option<(f64, (f64, f64))> {
+    let mut lo = fixed.map_or(0.0, |(_, peak)| peak);
+    let mut hi = core::f64::consts::FRAC_PI_2;
+    let angles = |entry| fixed.unwrap_or_else(|| rolling_angle(p, entry));
+    if rolling_load::<false>(p, hi, angles(hi)).normal < p.load {
+        return None;
+    }
+    while hi - lo > 1e-9 {
+        let middle = 0.5 * (lo + hi);
+        if rolling_load::<false>(p, middle, angles(middle)).normal < p.load {
+            lo = middle;
+        } else {
+            hi = middle;
+        }
+    }
+    let entry = 0.5 * (lo + hi);
+    Some((entry, angles(entry)))
 }
 
 const ROLLING_ROWS: usize = 65;
@@ -420,22 +511,21 @@ fn raster_tread(
 }
 
 unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingCut> {
-    let mut lo = 0.0;
-    let mut hi = core::f64::consts::FRAC_PI_2;
-    if rolling_load::<false>(p, hi).normal < p.load {
-        return None;
-    }
-    while hi - lo > 1e-9 {
-        let middle = 0.5 * (lo + hi);
-        if rolling_load::<false>(p, middle).normal < p.load {
-            lo = middle;
-        } else {
-            hi = middle;
+    let zero_angles = if p.skid < 0.0 {
+        let mut reference = *p;
+        reference.skid = 0.0;
+        reference.exponent += p.skid * p.skid_exponent;
+        if reference.lower_stiffness > 0.0 {
+            reference.transition_pressure =
+                reference.stiffness * pow(reference.transition, reference.exponent);
         }
-    }
-    let entry = 0.5 * (lo + hi);
+        Some(loaded_arc(&reference, None)?.1)
+    } else {
+        None
+    };
+    let (entry, (exit, peak)) = loaded_arc(p, zero_angles)?;
     if p.reaction != 0.0 {
-        let reaction = rolling_load::<true>(p, entry);
+        let reaction = rolling_load::<true>(p, entry, (exit, peak));
         if !(reaction.normal.is_finite()
             && reaction.drawbar.is_finite()
             && reaction.axle_torque.is_finite())
@@ -444,7 +534,6 @@ unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingC
         }
         *((p.reaction as usize) as *mut RollingReaction) = reaction;
     }
-    let (exit, peak) = rolling_angle(p, entry);
     let rim = p.wheel_radius;
     let rim_rear = rim * sin(exit);
     let rim_fore = rim * sin(entry);

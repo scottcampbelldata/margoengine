@@ -178,6 +178,21 @@ the 2010 slip-sinkage fit and use the same soil family and wheel dimensions. The
 also checks a permanent rut. The source's high-slip sinkage and transient digging force
 remain separate comparisons.
 
+Catherine Pavlov and Aaron M. Johnson, “A terramechanics model for high slip angle and skid with
+prediction of wheel-soil interaction geometry” (2024), and Pavlov’s 2023 CMU dissertation, Eqs.
+5.3–5.6, 5.11 and 5.15–5.20, distinguish driving slip from braking skid. The optional skid arc holds
+the pressure peak and exit angle at the load-matched free-rolling geometry. It increments the
+bearing exponent by the magnitude of skid times the measured coefficient. The rear and front
+shear distances integrate distinct velocities. The front bias is the mean cosine between the
+first contact and the transition. The code splits integration where the local shear changes sign.
+At zero spin, all nonzero shear distances reach their signed saturation. The exact test integrates
+the locked smooth wheel’s constant-cohesion moment over both signed regions. The live fixture
+uses the sand fit from dissertation Table 5.3 with its own wheel geometry and verifies a negative
+drawbar impulse, a positive wheel spin impulse, no energy gain in the paired tangential impulse
+and exact seek. It uses the signed speed ratio even below 1 m/s.
+[Pavlov and Johnson (2024)](https://doi.org/10.1016/j.jterra.2023.08.004),
+[Pavlov (2023), Chapter 5](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf).
+
 Blake Hannaford and Jee-Hwan Ryu, “Time-Domain Passivity Control of Haptic Interfaces” (2002),
 Eq. 12, motivates accounting for work across all ports in a sampled coupling. For longitudinal
 contact impulse `J`, signed axle impulse `L`, tangential relative speed `v`, angular speed `w`,
