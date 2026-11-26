@@ -14,7 +14,8 @@ import {
   rotationToQuaternion,
 } from '@margoengine/math/quat';
 import type { Animator } from '@margoengine/animator';
-import type { Mesh } from '@margoengine/core/extension';
+import type { Mesh as MeshHandle } from '@margoengine/core';
+import { type Mesh, meshRuntime } from '@margoengine/core/extension';
 
 /** How one bone of a chain moves; the numbers mean what VRMC_springBone's joint fields mean. */
 export interface SpringSettings {
@@ -712,8 +713,8 @@ export class SpringBones {
 
 /** What {@link springAccess} reads of a model: `animation.model` fits. */
 export interface SpringModel {
-  readonly nodes: readonly Mesh[];
-  readonly root: Mesh;
+  readonly nodes: readonly MeshHandle[];
+  readonly root: MeshHandle;
 }
 
 /**
@@ -724,8 +725,8 @@ export function springAccess(
   model: SpringModel,
   writeRotation?: (bone: number, rotation: readonly number[]) => void,
 ): SpringAccess {
-  const { nodes } = model,
-    engine = model.root.engine,
+  const nodes: readonly Mesh[] = model.nodes.map(meshRuntime),
+    engine = meshRuntime(model.root).engine,
     store = engine.store,
     t = store.transforms;
   return {

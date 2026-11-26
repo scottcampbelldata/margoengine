@@ -4,8 +4,7 @@
 
 ```ts
 import { Animator } from "@margoengine/animator";
-import { Vec3 } from "@margoengine/core";
-import { Mesh } from "@margoengine/core/extension";
+import { Mesh, Vec3 } from "@margoengine/core";
 
 export interface Jiggle {
     joint: number;
@@ -65,8 +64,8 @@ export interface SpringCollider {
 }
 
 export interface SpringModel {
-    readonly nodes: readonly Mesh[];
-    readonly root: Mesh;
+    readonly nodes: readonly MeshHandle[];
+    readonly root: MeshHandle;
 }
 
 export interface SpringPose {
