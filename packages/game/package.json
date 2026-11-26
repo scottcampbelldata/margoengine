@@ -2359,6 +2359,10 @@
       "types": "./dist/physics/loads.d.ts",
       "import": "./dist/physics/loads.js"
     },
+    "./physics/surge": {
+      "types": "./dist/physics/surge.d.ts",
+      "import": "./dist/physics/surge.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"

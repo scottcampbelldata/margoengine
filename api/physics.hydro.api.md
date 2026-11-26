@@ -9,6 +9,8 @@ export const DEFAULT_ROUGHNESS = 0.03;
 
 export const DRY = 0.000001;
 
+export const EARTH_ROTATION = 0.00007292115;
+
 export const FORCING_WORDS = 5;
 
 export const SURFACE_WATER_FIELD: FieldDescriptor;
@@ -16,6 +18,8 @@ export const SURFACE_WATER_FIELD: FieldDescriptor;
 export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor;
 
 export const SURFACE_WATER_LAYOUT = 1;
+
+export const SURFACE_WATER_POTENTIAL_FIELD: FieldDescriptor;
 
 export interface ShallowBuilding {
     readonly min: readonly [number, number];
@@ -72,8 +76,13 @@ export interface ShallowWaterParams {
     readonly rain?: Precipitation;
     readonly wind?: Wind;
     readonly windDragLimit?: number;
+    readonly coriolis?: number | {
+        readonly latitude: number;
+        readonly north?: number;
+    };
     readonly density?: number;
     readonly courant?: number;
+    readonly timeScale?: number;
     readonly rate?: RateLevel;
 }
 
@@ -81,6 +90,8 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     constructor(id?: string, runoff?: ShallowRunoffInput);
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
+    get timeScale(): number;
+    get waterDensity(): number;
     step(context: StepContext, dt: number): void;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
@@ -89,12 +100,18 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     sample(x: number, z: number, out?: WaterSample): WaterSample;
     get shape(): BedShape;
     volume(): number;
+    get work(): {
+        steps: number;
+        substeps: number;
+    };
     get budget(): {
         inflow: number;
         rain: number;
         out: number;
     };
-    get flow(): FlowField;
+    get flow(): FlowField & {
+        readonly timeScale: number;
+    };
 }
 
 export const WATER_DENSITY = 1000;
@@ -176,6 +193,7 @@ interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 interface SolverHost {

@@ -12935,6 +12935,61 @@ quay's pull from a one-dimensional continuity estimate of the gap flow, the hull
 boil where its jet's e-folding radius reaches the shaft's depth are this package's own arrangement. Proof:
 `packages/physics/tests/ship.test.js`, `tests/coupling/ship.test.js` and the race's boil in `tests/foam.test.js`.
 
+### Tides, storm surge and currents (SEA-07, `@margoengine/physics/surge`, 2026-11-26)
+
+`packages/physics/src/surge/index.ts` (`SurgeSolver`, `tidalLevel`, `TIDAL_CONSTITUENTS`, `inverseBarometer`), with the
+`surfaceWaterPotential` field, the Coriolis rotation and the time scale it adds to `packages/physics/src/hydro`. Written
+from papers, reports and public documentation only (no code of ADCIRC, SLOSH, Delft3D, FVCOM, ROMS, TPXO or any tide model
+was opened):
+
+- R. A. Luettich and J. J. Westerink, "Formulation and numerical implementation of the 2D/3D ADCIRC finite element model
+  version 44.XX", 2004, https://adcirc.org/wp-content/uploads/sites/2255/2018/11/adcirc_theory_2004_12_08.pdf (eqs. 2.2 to 2.6,
+  read): the depth-integrated momentum with -g H d/dx (zeta + P_s / (g rho_0) - alpha eta), the tide, the air's pressure and
+  the free surface as one gradient. Here the gradient enters as a potential added to the bed of the hydrostatic
+  reconstruction (E. Audusse, F. Bouchut, M.-O. Bristeau, R. Klein and B. Perthame, SIAM J. Sci. Comput. 25, 2050-2065, 2004,
+  known through the shallow water's own record), so water at rest under it is balanced as over a bed.
+- C. P. Jelesnianski, J. Chen and W. A. Shaffer, "SLOSH: Sea, Lake, and Overland Surges from Hurricanes", NOAA Technical
+  Report NWS 48, 1992, https://www.weather.gov/media/mdl/SLOSH_TR48.pdf (sections 1 to 4, read): the hydrostatic
+  (inverse-barometer) height, prescribed at an open deep sea; its surface stress coefficient C_D rho_a / rho_w = 3e-6.
+- M. A. Donelan, B. K. Haus, N. Reul, W. J. Plant, M. Stiassnie, H. C. Graber, O. B. Brown and E. S. Saltzman, "On the
+  limiting aerodynamic roughness of the ocean in very strong winds", Geophys. Res. Lett. 31, L18306, 2004,
+  https://doi.org/10.1029/2004GL019460 (read): the drag coefficient saturating at 2.5e-3 above 33 m/s; M. D. Powell, P. J.
+  Vickery and T. A. Reinhold, Nature 422, 2003 (as Donelan et al. state it): about 2.6e-3 near 35 m/s. J. R. Garratt, Mon. Wea.
+  Rev. 105, 1977 (the shallow water's existing law, as restated).
+- R. H. Stewart, "Introduction to Physical Oceanography", chapter 17.4 (read): the degree-2 tide-generating potential, its
+  species, the equilibrium tide and Apel's (1987) constituent periods. The potential itself comes from the celestial solver
+  (SPACE-02, `tidalDrive`).
+- IERS Conventions 2010, G. Petit and B. Luzum (eds.), IERS Technical Note 36 (as secondary sources quote it): k_2 = 0.30102
+  and h_2 = 0.6078, so the Love numbers' reduction 1 + k_2 - h_2 = 0.693.
+- D. J. Schwab, "Hydrodynamic modeling in the Great Lakes from 1950 to 1990 and prospects for the 1990s", 1992,
+  https://www.glerl.noaa.gov/pubs/fulltext/1992/19920019.pdf (read): wind set-up proportional to fetch, U^2 and 1/depth; lake
+  tides of a few centimetres.
+- D. B. Rao and D. J. Schwab, Phil. Trans. R. Soc. A 281, 1976 (as its abstract states): Lake Superior's fundamental seiche
+  of 7.86 h. Merian's period 2L / sqrt(g h) (via the USACE Coastal Engineering Manual's restatement).
+- D. A. Williams, K. J. Horsburgh, D. M. Schultz and C. W. Hughes, "Proudman resonance with tides, bathymetry and variable
+  atmospheric forcings", Natural Hazards 102, 1239-1263, 2020, https://doi.org/10.1007/s11069-020-03896-y (pp. 1 to 4, read):
+  the forced wave 1 / (1 - Fr^2) times the inverse barometer and its linear growth at Fr = 1 (eqs. 2 and 3). The test holds
+  the growth to the exact linear solution from rest, derived here: for eta_tt - c^2 eta_xx = c^2 P_xx with P = -B f(x - c t),
+  eta = (c t / 2) B f'(xi) + (B / 4) f(xi) - (B / 4) f(x + c t), xi = x - c t (a particular solution t G(xi) with
+  G = -(c / 2) P', and the free waves that start it from rest).
+- T. R. Hultquist, M. R. Dutter and D. J. Schwab, "Reexamination of the 9-10 November 1975 'Edmund Fitzgerald' storm using
+  today's technology", BAMS 87, 607-622, 2006 (through NWS Marquette's and secondary accounts): the 982 hPa low over the lake and
+  winds of 50 to 60 knots.
+- The Kelvin wave, the inertial circle, Merian's seiche and the quarter-wave co-oscillating tide are textbook results (A. E.
+  Gill, "Atmosphere-Ocean Dynamics", 1982, known from memory, and G. I. Taylor 1922 as restated), held by the tests.
+
+The Coriolis force as an exact rotation of the momentum by f dt after each substep, the potential's mean over the wet water
+taken off (so a closed lake keeps its mean level and only differences move water), the cells' Earth-fixed positions on the
+tangent plane brought back to the sphere, the tanh ramp and the water's time scale (its own inputs on its time, other solvers' fields on the world's, as the spectral
+sea's `timeScale` already does) are this package's own arrangement. The quarter-wave tide is measured by harmonic analysis
+of the M2 constituent (least squares at the tide's frequency over whole periods, as tide gauges are reduced), since a
+frictionless channel keeps the seiche its start rang. The water's time scale is checked by a derived bound: two-stage
+Runge-Kutta turns a mode of frequency w by w dt + (w dt)^3 / 6 a step (the argument of 1 + i w dt - (w dt)^2 / 2), and a
+simple long wave travelling at sqrt(g h) (1 + 3 eta / (2 h)) grows a second harmonic of 3 a^2 k c t / (4 h), the
+Riemann simple wave expanded to first order (A. E. Gill, "Atmosphere-Ocean Dynamics", known from memory). The world's
+refusal of a field read at another time scale than its writer's is this package's own arrangement. Proof:
+`packages/physics/tests/surge.test.js` and `tests/coupling/surge.test.js`.
+
 ### Nonlinear and rogue waves (SEA-03, `@margoengine/physics/rogue`, 2026-11-26)
 
 `packages/physics/src/rogue/index.ts` (`NonlinearSea`, `seaStatistics`, `pairKernels`, `heightChance`, `crestChance`,

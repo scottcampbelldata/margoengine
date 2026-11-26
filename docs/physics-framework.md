@@ -196,6 +196,8 @@ Inside a staggered coupling the members step in the order given to `couple()` (s
 the bodies where the tick began and its push lands in that tick's rigid step); solvers left uncoupled step in coupling
 order, ids within a group. The same calls give the same order whatever order the solvers were added in.
 
+**Time scales.** A solver that runs its own time faster than the world's, for a timelapse, declares it in its description (`timeScale()`, its seconds per world second, asked after `init`). The world refuses, with a `state` error naming the fix, a solver at another scale (its own declared, or 1) that reads what such a solver publishes or publishes what it reads, and a flow field among a solver's parameters (to three levels: `params.sea.water`) whose `timeScale` differs from the solver's. A field is only right at its writer's time: a surge's water sped up 600 times, read by a ship at the world's time, would carry it with velocities from minutes ahead. The shallow water (HYDRO-01), its surge (SEA-07) and the synoptic weather (ATMO-10) declare theirs; solvers that do not declare are not checked as writers.
+
 **The world's body rows.** Every body-set field (`bodies`, `bodyImpulses`, `bodyForces`, `deckClaims`, `manoeuvringClaims`: a record a
 kernel body row) holds the same number of records, the world's body rows, fixed once: by the world's `bodyRows` option, or
 else by the rigid solver when it is added (its kernel's capacity, or the `capacity` given it). Every solver that writes or

@@ -3383,6 +3383,10 @@
       "types": "./dist/physics/loads.d.ts",
       "import": "./dist/physics/loads.js"
     },
+    "./physics/surge": {
+      "types": "./dist/physics/surge.d.ts",
+      "import": "./dist/physics/surge.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
@@ -4102,6 +4106,10 @@
     "./react/clouds": {
       "types": "./dist/react/clouds.d.ts",
       "import": "./dist/react/clouds.js"
+    },
+    "./react/clustered": {
+      "types": "./dist/react/clustered.d.ts",
+      "import": "./dist/react/clustered.js"
     },
     "./rigging": {
       "types": "./dist/rigging.d.ts",

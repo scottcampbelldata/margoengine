@@ -229,6 +229,10 @@
       "types": "./dist/loads/index.d.ts",
       "import": "./dist/loads.js"
     },
+    "./surge": {
+      "types": "./dist/surge/index.d.ts",
+      "import": "./dist/surge.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"

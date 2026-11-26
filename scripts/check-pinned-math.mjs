@@ -35,6 +35,7 @@ export const ALWAYS = [
   'packages/physics/src/loads/*.ts',
   'packages/physics/src/pbf/*.ts',
   'packages/physics/src/dfsph/*.ts',
+  'packages/physics/src/surge/index.ts',
   'packages/physics/src/vegetation/*.ts',
   'packages/math/src/atmosphere.ts',
   'packages/weather/src/boundary-layer.ts',

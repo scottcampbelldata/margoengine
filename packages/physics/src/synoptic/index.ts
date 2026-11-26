@@ -285,6 +285,8 @@ export class SynopticWeather implements Solver<SynopticParams> {
       id: this.id,
       rate: 0 as const,
       stableRate: () => 0 as const,
+      // Its own seconds per world second: the shallow water it reads and forces must run at the same.
+      timeScale: () => this.speed,
       fields: this.connectWater
         ? [
             ...fields,

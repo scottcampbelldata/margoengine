@@ -93,6 +93,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
         id: string;
         rate: 0;
         stableRate: () => 0;
+        timeScale: () => number;
         fields: ({
             field: FieldDescriptor;
             access: 'write';
@@ -190,6 +191,7 @@ interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 interface SolverHost {

@@ -18,6 +18,7 @@
 // State: h, hu and hv per cell in f64, and the ledger of water that came in and went out (inflow, rain, the sides).
 import type { Bed, FlowField, FlowSample, Precipitation, Wind } from '@margoengine/math/fields';
 import { gravityMagnitude } from '@margoengine/math/gravity';
+import { cos, sin } from '@margoengine/math/pinned';
 import { type BedShape, bedVertexCount } from '../earth/bed.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -60,6 +61,24 @@ export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor = {
   unit: 'm^2/s^2, m/s',
   centring: 'cell',
 };
+/**
+ * The registry field of the forces on the water that are the gradient of a height (SEA-07): per cell a forcing potential
+ * psi, m (f64), owned by {@link ShallowWaterSolver}. The water adds it to its bed in its hydrostatic reconstruction, so the
+ * force is -g h grad(psi) and water at rest stands at -psi to rounding: the inverse barometer (p - p_ref) / (rho g) and minus
+ * the equilibrium tide. Contributors (`SurgeSolver` of `@margoengine/physics/surge`) add; the registry sums them by
+ * contributor, then cell.
+ */
+export const SURFACE_WATER_POTENTIAL_FIELD: FieldDescriptor = {
+  name: 'surfaceWaterPotential',
+  kind: 'uniformGrid',
+  quantity: 'forcingPotential',
+  unit: 'm',
+  centring: 'cell',
+};
+/** The Earth's rotation rate, rad/s (IERS Conventions 2010). */
+export const EARTH_ROTATION = 7.292115e-5;
+/** The Earth's mean radius, m (for the beta plane). */
+const EARTH_RADIUS = 6.371e6;
 /** f64 words of a cell's record in `surfaceWaterForcing`: force x, z over density, Stokes drift x, z, rms orbital velocity. */
 export const FORCING_WORDS = 5;
 /** Fresh water's density, kg/m^3. */
@@ -134,10 +153,24 @@ export interface ShallowWaterParams {
    * winds, Donelan et al. 2004; Garratt's law reaches it at 26 m/s).
    */
   readonly windDragLimit?: number;
+  /**
+   * The Earth's rotation: the Coriolis parameter f, 1/s (an f-plane), or `{latitude, north}` (radians; north on the ground
+   * plane from -Z toward +X, default 0) for the beta plane f = 2 Omega sin(latitude) + (2 Omega cos(latitude) / R) y about the
+   * grid's centre, y northward (default none). It turns the water's momentum by f dt each substep, exactly, so an inertial
+   * oscillation keeps its energy.
+   */
+  readonly coriolis?: number | { readonly latitude: number; readonly north?: number };
   /** The water's density, kg/m^3 (default 1000). */
   readonly density?: number;
   /** The largest Courant number of a substep (default 0.4; at most 0.5, where the scheme keeps depths positive). */
   readonly courant?: number;
+  /**
+   * Seconds of the water's time per second of world time (default 1): 600 runs ten minutes of a surge or a flood each second,
+   * for a timelapse or a long test. The water's own inputs (its inflows' discharges and its sides' levels, and a surge's
+   * pressure) are functions of the water's time; fields other solvers publish (the rain, the wind, the tide) are read at the
+   * world's time, so give those solvers the same scale.
+   */
+  readonly timeScale?: number;
   /** Its rate level (default 0, the world's base rate). */
   readonly rate?: RateLevel;
 }
@@ -146,8 +179,11 @@ const ORIGIN: Cell = [0, 0, 0];
 const AIR_DENSITY = 1.225;
 /** The wind's drag coefficient in very strong winds, where the sea's roughness saturates (Donelan et al. 2004). */
 export const WIND_DRAG_LIMIT = 2.5e-3;
-/** The ledger's words: water that came in by the inflows, by rain, and that left over the sides (negative: came in). */
-const LEDGER = 3;
+/**
+ * The ledger's words: water that came in by the inflows, by rain, and that left over the sides (negative: came in); then
+ * the work done, the steps and the Courant substeps taken since the start.
+ */
+const LEDGER = 5;
 
 /** A sample of the water: its depth, surface and depth-averaged velocity. */
 export interface WaterSample {
@@ -179,8 +215,15 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private wind: Wind | undefined;
   private windDragLimit = WIND_DRAG_LIMIT;
   private density = WATER_DENSITY;
+  /** Each cell's Coriolis parameter, 1/s, or none. */
+  private coriolis: Float64Array | undefined;
+  /** The forcing potential the contributors summed this tick, m per cell, or none. */
+  private potential: Float64Array | undefined;
+  /** The grid with the bed raised by the potential, for the reconstruction. */
+  private forced: (ShallowGrid & { bed: Float64Array }) | undefined;
   private courant = 0.4;
   private level: RateLevel = 0;
+  private scale = 1;
   private state!: Region;
   private ledger!: Region;
   private published!: Region;
@@ -211,10 +254,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       fields: [
         { field: SURFACE_WATER_FIELD, access: 'write' },
         { field: SURFACE_WATER_FORCING_FIELD, access: 'write' },
+        { field: SURFACE_WATER_POTENTIAL_FIELD, access: 'write' },
         ...(this.runoff ? [{ field: this.runoff.field, access: 'read' as const }] : []),
       ],
       rate: this.level,
       stableRate: () => this.level,
+      timeScale: () => this.scale,
     };
   }
 
@@ -275,7 +320,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       x0: this.x0,
       z0: this.z0,
     };
-    const { courant = 0.4, density = WATER_DENSITY, rate = 0 } = params;
+    const { courant = 0.4, density = WATER_DENSITY, rate = 0, timeScale = 1 } = params;
+    if (!(timeScale > 0 && Number.isFinite(timeScale)))
+      throw new RangeError(
+        `A time scale is a finite number of the water's seconds per world second above 0 (got ${timeScale}); pass one, or leave it unset for 1.`,
+      );
+    this.scale = timeScale;
     if (!(courant > 0 && courant <= 0.5))
       throw new RangeError(
         `A Courant number lies in (0, 0.5], where the scheme keeps depths positive (got ${courant}); pass one.`,
@@ -297,6 +347,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
         `The wind's drag coefficient limit lies in (0, 0.01] (got ${windDragLimit}); pass one, or leave it for 2.5e-3.`,
       );
     this.windDragLimit = windDragLimit;
+    this.coriolis = this.rotation(params.coriolis, shape);
     this.blocks = new Float64Array(count);
     for (const building of params.buildings ?? []) {
       const { min, max, height } = building ?? ({} as ShallowBuilding);
@@ -351,6 +402,46 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     // The start: a level or a depth, and a velocity, at each cell centre.
     this.fill(params);
     this.publish();
+  }
+
+  /** Each cell's Coriolis parameter from `coriolis`, or none. */
+  private rotation(coriolis: ShallowWaterParams['coriolis'], shape: BedShape): Float64Array | undefined {
+    if (coriolis === undefined) return undefined;
+    const { nx, nz } = this,
+      f = new Float64Array(nx * nz);
+    if (typeof coriolis === 'number') {
+      if (!(Number.isFinite(coriolis) && Math.abs(coriolis) <= 2 * EARTH_ROTATION * 10))
+        throw new RangeError(
+          `A Coriolis parameter is finite 1/s, at most 20 Omega (got ${coriolis}); pass one such as 1.07e-4 at 47 degrees, or {latitude}.`,
+        );
+      return f.fill(coriolis);
+    }
+    const { latitude, north = 0 } = coriolis ?? ({} as { latitude: number; north?: number });
+    if (!(Math.abs(latitude) <= Math.PI / 2 && Number.isFinite(north)))
+      throw new RangeError(
+        `A latitude lies in [-pi/2, pi/2] radians and north is finite radians (got ${latitude}, ${north}); pass them.`,
+      );
+    const f0 = 2 * EARTH_ROTATION * sin(latitude),
+      beta = (2 * EARTH_ROTATION * cos(latitude)) / EARTH_RADIUS,
+      sn = sin(north),
+      cn = cos(north);
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) {
+        const [x, z] = this.centreOf(i, j),
+          y = (x - shape.centre[0]) * sn - (z - shape.centre[1]) * cn;
+        f[i + nx * j] = f0 + beta * y;
+      }
+    return f;
+  }
+
+  /** Seconds of the water's time per second of world time. */
+  get timeScale(): number {
+    return this.scale;
+  }
+
+  /** The water's density, kg/m^3. */
+  get waterDensity(): number {
+    return this.density;
   }
 
   private inflowCell(position: readonly [number, number]): number {
@@ -430,13 +521,21 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }
     this.cell = context.cell;
     this.cellBeds(this.ground.elevations);
-    const t0 = context.tick / rateOf(context.level);
+    // t0 the world's time; the water runs `scale` of its seconds each world second.
+    const t0 = context.tick / rateOf(context.level),
+      scale = this.scale,
+      span = dt * scale;
+    // As many substeps as the Courant bound asks, each the longest it allows (or what is left of the step): at a large
+    // time scale one world step is many of the water's seconds, never one long step.
+    const ledger = this.ledgerWords();
     let t = 0;
-    while (t < dt) {
-      const sub = Math.min(dt - t, this.substep());
-      this.advance(t0 + t, sub, runoff);
+    while (t < span) {
+      const sub = Math.min(span - t, this.substep());
+      this.advance(t0 + t / scale, sub, runoff);
       t += sub;
+      ledger[4]! += 1;
     }
+    ledger[3]! += 1;
     this.publish();
   }
 
@@ -458,7 +557,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     return fastest > 0 ? this.courant / fastest : Number.POSITIVE_INFINITY;
   }
 
-  /** One substep of `dt` from time `t`: SSP Runge-Kutta 2, friction and the sources. */
+  /** One substep of `dt` of the water's time from world time `t`: SSP Runge-Kutta 2, friction and the sources. */
   private advance(t: number, dt: number, runoff?: Float64Array): void {
     const s = this.words(),
       n = this.nx * this.nz,
@@ -480,7 +579,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       hv1[k] = hv[k]! + dt * r0.hv[k]!;
     }
     this.settle(h1, hu1, hv1, dt);
-    const r1 = this.rates(h1, hu1, hv1, t + dt, runoff),
+    const r1 = this.rates(h1, hu1, hv1, t + dt / this.scale, runoff),
       ledger = this.ledgerWords();
     for (let k = 0; k < n; k++) {
       h[k] = 0.5 * (h[k]! + h1[k]! + dt * r1.h[k]!);
@@ -488,6 +587,19 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       hv[k] = 0.5 * (hv[k]! + hv1[k]! + dt * r1.hv[k]!);
     }
     this.settle(h, hu, hv, dt / 2);
+    // The Earth's rotation turns the momentum by f dt: d(u, w)/dt = f (-w, u) with x east and z south, exactly.
+    const f = this.coriolis;
+    if (f)
+      for (let k = 0; k < n; k++) {
+        if (!(h[k]! > DRY)) continue;
+        const angle = f[k]! * dt,
+          c = cos(angle),
+          sn = sin(angle),
+          a = hu[k]!,
+          b = hv[k]!;
+        hu[k] = a * c - b * sn;
+        hv[k] = a * sn + b * c;
+      }
     // The ledger: the step's in and out, as the two stages weigh them.
     ledger[0]! += 0.5 * dt * (r0.inflow + r1.inflow);
     ledger[1]! += 0.5 * dt * (r0.rain + r1.rain);
@@ -499,7 +611,21 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     }
   }
 
-  /** dU/dt and the volumes per second the inflows and rain add and the sides take, at time `t`. */
+  /** The grid the reconstruction sees: the bed raised by the forcing potential, or the bed itself. */
+  private forcedGrid(): ShallowGrid {
+    const potential = this.potential;
+    if (!potential) return this.grid;
+    if (!this.forced) this.forced = { ...this.grid, bed: new Float64Array(this.grid.bed.length) };
+    const bed = this.forced.bed,
+      base = this.grid.bed;
+    for (let k = 0; k < bed.length; k++) bed[k] = base[k]! + potential[k]!;
+    return this.forced;
+  }
+
+  /**
+   * dU/dt and the volumes per second the inflows and rain add and the sides take, at world time `t`: the sides and inflows at
+   * the water's time, `t` times the time scale, the rain and the wind at `t`.
+   */
   private rates(
     h: Float64Array,
     hu: Float64Array,
@@ -511,13 +637,14 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       rh = new Float64Array(n),
       rhu = new Float64Array(n),
       rhv = new Float64Array(n),
-      out = shallowRates(this.grid, h, hu, hv, t, rh, rhu, rhv),
+      own = t * this.scale,
+      out = shallowRates(this.forcedGrid(), h, hu, hv, own, rh, rhu, rhv),
       area = this.grid.dx * this.grid.dz;
     let inflow = 0,
       rain = 0;
     for (const { cell, discharge } of this.inflows) {
-      const q = typeof discharge === 'function' ? discharge(t) : discharge;
-      if (!Number.isFinite(q)) throw new RangeError(`An inflow's discharge at ${t} s is ${q}; return m^3/s.`);
+      const q = typeof discharge === 'function' ? discharge(own) : discharge;
+      if (!Number.isFinite(q)) throw new RangeError(`An inflow's discharge at ${own} s is ${q}; return m^3/s.`);
       rh[cell]! += q / area;
       inflow += q;
     }
@@ -600,6 +727,18 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private forcing: Float64Array | undefined;
 
   importPorts(_tick: number): void {
+    const cells = this.nx * this.nz,
+      potential = this.host.port(SURFACE_WATER_POTENTIAL_FIELD.name);
+    if (!potential) this.potential = undefined;
+    else {
+      const words = regionWords(this.host.memory, potential.region) as Float64Array;
+      if (words.length !== cells)
+        throw new RangeError(
+          `Contributions to "surfaceWaterPotential" have ${words.length} values; this water has ${cells} cells, so make each on the water's own grid.`,
+        );
+      if (!this.potential) this.potential = new Float64Array(cells);
+      this.potential.set(words);
+    }
     const sum = this.host.port(SURFACE_WATER_FORCING_FIELD.name);
     if (!sum) {
       this.forcing = undefined;
@@ -657,17 +796,27 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     return v * this.grid.dx * this.grid.dz;
   }
 
+  /** The work done since the start: the steps taken and the Courant substeps within them (a deterministic count). */
+  get work(): { steps: number; substeps: number } {
+    const l = this.ledgerWords();
+    return { steps: l[3]!, substeps: l[4]! };
+  }
+
   /** The water that came in by the inflows and by rain and that left over the sides since the start, m^3. */
   get budget(): { inflow: number; rain: number; out: number } {
     const l = this.ledgerWords();
     return { inflow: l[0]!, rain: l[1]!, out: l[2]! };
   }
 
-  /** The water as a flow field: depth-averaged velocity below its surface, still air above (for tracers and bodies). */
-  get flow(): FlowField {
+  /**
+   * The water as a flow field: depth-averaged velocity below its surface, still air above (for tracers and bodies). It
+   * carries the water's `timeScale`, and a solver at another scale is refused it.
+   */
+  get flow(): FlowField & { readonly timeScale: number } {
     return {
       medium: 'water',
       cell: this.cell,
+      timeScale: this.scale,
       sample: (x, y, z, _t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
         const w = this.sample(x, z);
         const under = w.depth > DRY && y <= w.surface;

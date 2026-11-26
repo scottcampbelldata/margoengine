@@ -1827,6 +1827,10 @@
       "types": "./dist/react/clouds.d.ts",
       "import": "./dist/react/clouds.js"
     },
+    "./react/clustered": {
+      "types": "./dist/react/clustered.d.ts",
+      "import": "./dist/react/clustered.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

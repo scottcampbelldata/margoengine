@@ -1860,6 +1860,7 @@ interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 interface SolverHost {

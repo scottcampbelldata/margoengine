@@ -88,6 +88,7 @@ await build({
         rogue: resolve(root, 'src/rogue/index.ts'),
         ship: resolve(root, 'src/ship/index.ts'),
         loads: resolve(root, 'src/loads/index.ts'),
+        surge: resolve(root, 'src/surge/index.ts'),
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),

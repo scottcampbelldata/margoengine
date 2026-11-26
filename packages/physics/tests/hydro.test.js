@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bedSurface, TerrainBed } from '../dist/earth.js';
-import { ShallowWaterSolver } from '../dist/hydro.js';
+import { SURFACE_WATER_FIELD, ShallowWaterSolver } from '../dist/hydro.js';
+import { HullSolver } from '../dist/seakeeping.js';
+import { TracerSolver } from '../dist/tracers.js';
 import { PhysicsWorld } from '../dist/world.js';
 
 const g = -new PhysicsWorld().gravity[1];
@@ -22,7 +24,7 @@ function ground(columns, rows, width, depth, f) {
 function flood(params, rate = 60) {
   const water = new ShallowWaterSolver(),
     world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(water, params);
-  return { water, world, run: (seconds) => world.advance(world.tick / 128 + seconds * rate) };
+  return { water, world, run: (seconds) => world.advance(Math.round((world.time + seconds) * rate)) };
 }
 
 /** Each cell's depth along x (row 0) and its discharge. */
@@ -356,6 +358,163 @@ test("a storm wind's drag levels off at Donelan's 2.5e-3: 40 m/s drives the wate
   // Powell et al.'s 2.6e-3, asked for.
   assert.ok(Math.abs(run(40, { windDragLimit: 2.6e-3 }) / ((1.2 * 2.6e-3 * 1600) / 1000) - 1) < 1e-9);
   assert.throws(() => run(40, { windDragLimit: 0 }), /drag coefficient limit/);
+});
+
+test("a time scale runs the water's own time in Courant substeps: 600 of its seconds a world second match 1 within the time step's error", () => {
+  // A 1 km channel 2 m deep, a seiche of 2 cm ringing in it (linear: at a / h = 0.01 it would steepen
+  // into a bore only after about 2 h / (3 a k sqrt(g h)) = 4,800 s). At 600, a world step (1/60 s) is 10 s of
+  // the water's, which it takes in as many substeps as the Courant bound allows: dt <= 0.4 / (2 sqrt(g h) / 20 m), so at
+  // least ceil(10 / dt) of them, never one long step.
+  const h = 2,
+    amplitude = 0.02,
+    L = 1000,
+    { bed } = ground(50, 1, L, 20, () => -h),
+    run = (scale) => {
+      const { water, world } = flood({
+        bed,
+        level: (x) => amplitude * Math.cos((Math.PI * x) / L),
+        roughness: 0,
+        timeScale: scale,
+      });
+      world.advance((600 / scale) * 60);
+      return { water };
+    },
+    real = run(1),
+    fast = run(600),
+    longest = 0.4 / ((2 * Math.sqrt(g * (h + amplitude))) / 20);
+  assert.equal(fast.water.timeScale, 600);
+  // The work: one substep a step at 1 (1/60 s is under the bound); at 600, 10 s in Courant substeps.
+  assert.deepEqual(real.water.work, { steps: 36000, substeps: 36000 });
+  const { steps, substeps } = fast.water.work;
+  assert.equal(steps, 60);
+  assert.ok(
+    substeps >= steps * Math.ceil(10 / longest) &&
+      substeps <= steps * (Math.ceil(10 / (0.4 / ((2 * Math.sqrt(g * h)) / 20))) + 1),
+    `${substeps} substeps`,
+  );
+  // The same water but for the time step. Two-stage Runge-Kutta turns a mode of frequency w by w dt + (w dt)^3 / 6 a step
+  // (the argument of 1 + i w dt - (w dt)^2 / 2), so it is w^3 dt^2 / 6 a second off in phase: the fundamental, w =
+  // pi sqrt(g h) / L, and its overtide at 2 w, which the waves' own steepening grows in time. A simple wave travelling at
+  // sqrt(g h) (1 + 3 eta / 2 h) gains a second harmonic of 3 a^2 k c t / (4 h); a standing wave's two halves of a / 2
+  // give (3 / 8) (a / h) k c t of a, at the run's end.
+  const omega = (Math.PI * Math.sqrt(g * h)) / L,
+    step = 10 / (substeps / steps),
+    phase = (w) => (600 * w ** 3 * step ** 2) / 6,
+    overtide = (3 / 8) * (amplitude / h) * (Math.PI / L) * Math.sqrt(g * h) * 600,
+    bound = amplitude * (phase(omega) + overtide * phase(2 * omega));
+  let worst = 0;
+  for (let i = 0; i < 50; i++) {
+    const x = (i + 0.5) * 20;
+    worst = Math.max(worst, Math.abs(real.water.sample(x, 10).surface - fast.water.sample(x, 10).surface));
+  }
+  assert.ok(worst < bound, `${worst} m apart, bound ${bound}`);
+});
+
+test("the water's own inputs run on its time and other solvers' fields on the world's: a river's 400 s hydrograph, the wind read at world time", () => {
+  const { bed } = ground(50, 1, 1000, 20, () => -2),
+    river = (t) => (t < 400 ? 2 * Math.sin((Math.PI * t) / 400) ** 2 : 0);
+  for (const scale of [1, 600]) {
+    let latest = 0;
+    const wind = {
+        medium: 'air',
+        cell: [0, 0, 0],
+        sample: (_x, _y, _z, t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
+          latest = Math.max(latest, t);
+          out.velocity[0] = 5;
+          out.velocity[1] = out.velocity[2] = 0;
+          out.density = 1.2;
+          return out;
+        },
+      },
+      { water, world } = flood({
+        bed,
+        level: 0,
+        roughness: 0.03,
+        inflows: [{ position: [10, 10], discharge: river }],
+        wind,
+        timeScale: scale,
+      }),
+      start = water.volume();
+    world.advance((600 / scale) * 60);
+    // All 400 m^3 come in, at either scale, and the ledger holds them.
+    const added = water.volume() - start;
+    assert.ok(Math.abs(added / 400 - 1) < 1e-6, `${added} m^3 came in at ${scale}`);
+    assert.ok(Math.abs(water.budget.inflow - added) < 1e-9 * added);
+    // The wind is read at the world's time: 600 s at 1, 1 s at 600.
+    assert.ok(Math.abs(latest - 600 / scale) < 0.1, `${latest} at ${scale}`);
+  }
+});
+
+test('a solver at another time scale is refused the water: a flow field it is given, or a field it reads', () => {
+  const { bed } = ground(4, 1, 400, 100, () => -5),
+    reader = (id, scale) => ({
+      describe: () => ({
+        id,
+        fields: [{ field: SURFACE_WATER_FIELD, access: 'read' }],
+        rate: 0,
+        stableRate: () => 0,
+        ...(scale === undefined ? {} : { timeScale: () => scale }),
+      }),
+      init() {},
+      step() {},
+      exportPorts: () => [],
+      importPorts() {},
+      stateRegions: () => [],
+    });
+  // A flow field: the tracers run on the world's time.
+  const fast = flood({ bed, level: 0, timeScale: 600 }),
+    error = (() => {
+      try {
+        fast.world.add(new TracerSolver(), { water: fast.water.flow, sources: [] });
+      } catch (e) {
+        return e;
+      }
+    })();
+  assert.equal(error?.code, 'state');
+  assert.match(
+    error.message,
+    /params\.water, a water field at a time scale of 600, and runs at 1; give the solver that makes it the same timeScale/,
+  );
+  const same = flood({ bed, level: 0 });
+  same.world.add(new TracerSolver(), { water: same.water.flow, sources: [] });
+  // A hull riding the sped-up water, given it through its sea.
+  const harbour = new PhysicsWorld({ rate: { num: 60, den: 1 }, bodyRows: 4 }),
+    quick = new ShallowWaterSolver();
+  harbour.add(quick, { bed, level: 0, timeScale: 600 });
+  assert.throws(
+    () =>
+      harbour.add(new HullSolver(), {
+        hulls: [
+          {
+            row: 0,
+            // A 4 by 1 by 2 m box, outward faces.
+            mesh: {
+              vertices: Float32Array.from([
+                -2, -0.5, -1, 2, -0.5, -1, 2, 0.5, -1, -2, 0.5, -1, -2, -0.5, 1, 2, -0.5, 1, 2, 0.5, 1, -2, 0.5, 1,
+              ]),
+              indices: Uint32Array.from([
+                0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6,
+                5,
+              ]),
+            },
+          },
+        ],
+        sea: { elevation: () => 0, water: quick.flow },
+      }),
+    (e) => e.code === 'state' && /params\.sea\.water, a water field at a time scale of 600/.test(e.message),
+  );
+  // A field it reads, whichever is added first.
+  assert.throws(
+    () => fast.world.add(reader('gauge'), {}),
+    /"gauge" reads "surfaceWater" from "[^"]+" at a time scale of 1.*give "[^"]+" timeScale 1/,
+  );
+  assert.throws(() => fast.world.add(reader('gauge', 60), {}), /at a time scale of 60.*give both the same timeScale/);
+  fast.world.add(reader('gauge', 600), {});
+  const first = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(reader('gauge'), {});
+  assert.throws(
+    () => first.add(new ShallowWaterSolver(), { bed, level: 0, timeScale: 600 }),
+    /"gauge" reads "surfaceWater"/,
+  );
 });
 
 test('settings out of range are refused with what to pass', () => {

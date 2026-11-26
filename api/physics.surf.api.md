@@ -158,8 +158,13 @@ interface ShallowWaterParams {
     readonly rain?: Precipitation;
     readonly wind?: Wind;
     readonly windDragLimit?: number;
+    readonly coriolis?: number | {
+        readonly latitude: number;
+        readonly north?: number;
+    };
     readonly density?: number;
     readonly courant?: number;
+    readonly timeScale?: number;
     readonly rate?: RateLevel;
 }
 
@@ -167,6 +172,8 @@ class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     constructor(id?: string, runoff?: ShallowRunoffInput);
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
+    get timeScale(): number;
+    get waterDensity(): number;
     step(context: StepContext, dt: number): void;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
@@ -175,12 +182,18 @@ class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     sample(x: number, z: number, out?: WaterSample): WaterSample;
     get shape(): BedShape;
     volume(): number;
+    get work(): {
+        steps: number;
+        substeps: number;
+    };
     get budget(): {
         inflow: number;
         rain: number;
         out: number;
     };
-    get flow(): FlowField;
+    get flow(): FlowField & {
+        readonly timeScale: number;
+    };
 }
 
 interface Solver<Params = unknown> {
@@ -200,6 +213,7 @@ interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 interface SolverHost {

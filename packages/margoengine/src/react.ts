@@ -37,3 +37,4 @@ export * from '@margoengine/react/accumulative-shadows';
 export * from '@margoengine/react/sampler';
 export * from '@margoengine/react/outlines';
 export * from '@margoengine/react/clouds';
+export * from '@margoengine/react/clustered';

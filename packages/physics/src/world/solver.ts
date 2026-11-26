@@ -141,6 +141,13 @@ export interface SolverDescription {
    * part of state.
    */
   stableRate(): RateLevel;
+  /**
+   * Seconds of its own time per second of world time, asked after init (default 1, the world's time). A solver that runs
+   * its own time faster for a timelapse declares it, and the world refuses a solver at another scale that reads what it
+   * publishes, or that it reads a flow field from (one whose `timeScale` differs), naming the fix: a field is only right at
+   * its writer's time.
+   */
+  timeScale?(): number;
 }
 
 /** What the world gives a solver when it is made: where its memory is and what it may allocate. */

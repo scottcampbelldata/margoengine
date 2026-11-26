@@ -246,6 +246,7 @@ export class PhysicsWorld {
     };
     try {
       solver.init(this.host(entry), params);
+      this.checkTimeScales(entry, params);
       const level = this.chooseLevel(entry),
         ran = this.tick;
       if (ran % (1 << (TOP - level)) !== 0)
@@ -265,6 +266,65 @@ export class PhysicsWorld {
       throw error;
     }
     return this;
+  }
+
+  /**
+   * Refuses a solver whose fields would be read at another time than they were made at: a solver that declares a time
+   * scale (`timeScale()` in its description, its own seconds per world second) and a solver at another scale that reads
+   * what it publishes or publishes what it reads; and a flow field among `params`, to three levels, whose `timeScale`
+   * differs from the solver's (a sped-up surge's water given to a ship at the world's time).
+   */
+  private checkTimeScales(entry: Entry, params: unknown): void {
+    const declares = (e: Entry) => typeof e.description.timeScale === 'function',
+      scaleOf = (e: Entry) => (declares(e) ? e.description.timeScale!() : 1),
+      own = scaleOf(entry),
+      fix = (writer: string, scale: number, reader: Entry) =>
+        declares(reader)
+          ? `give both the same timeScale`
+          : `"${reader.id}" runs on the world's time, so give "${writer}" timeScale 1 (or ${scale === 1 ? 'leave it' : 'run them apart'})`;
+    for (const other of this.entries) {
+      if (other === entry) continue;
+      for (const [writer, reader] of [
+        [entry, other],
+        [other, entry],
+      ] as const) {
+        if (!declares(writer)) continue;
+        for (const made of writer.description.fields) {
+          if (made.access === 'read') continue;
+          const used = reader.description.fields.find((u) => u.field.name === made.field.name);
+          if (!used || !(used.access === 'read' || (made.access === 'accumulate' && used.access === 'write'))) continue;
+          const a = scaleOf(writer),
+            b = scaleOf(reader);
+          if (a !== b)
+            throw new MargoError(
+              'state',
+              `Solver "${reader.id}" reads "${made.field.name}" from "${writer.id}" at a time scale of ${b}, and "${writer.id}" makes it at ${a} of its seconds a world second; ${fix(writer.id, a, reader)}.`,
+            );
+        }
+      }
+    }
+    const seen = new Set<object>(),
+      visit = (value: unknown, path: string, depth: number): void => {
+        if (!value || typeof value !== 'object' || seen.has(value) || ArrayBuffer.isView(value)) return;
+        seen.add(value);
+        const field = value as { timeScale?: unknown; medium?: unknown; sample?: unknown };
+        if (
+          typeof field.medium === 'string' &&
+          typeof field.sample === 'function' &&
+          typeof field.timeScale === 'number' &&
+          field.timeScale !== own
+        )
+          throw new MargoError(
+            'state',
+            `Solver "${entry.id}" is given ${path}, a ${field.medium} field at a time scale of ${field.timeScale}, and runs at ${own}; give the solver that makes it the same timeScale as this one${declares(entry) ? '' : " (this one runs on the world's time)"}.`,
+          );
+        if (depth >= 3) return;
+        if (Array.isArray(value)) value.forEach((v, i) => visit(v, `${path}[${i}]`, depth + 1));
+        else
+          for (const key of Object.keys(value))
+            visit((value as Record<string, unknown>)[key], `${path}.${key}`, depth + 1);
+      };
+    visit(params, 'params', 0);
   }
 
   /**

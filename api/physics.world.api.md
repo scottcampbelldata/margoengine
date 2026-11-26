@@ -315,6 +315,7 @@ export interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 export interface SolverHost {

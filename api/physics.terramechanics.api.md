@@ -123,6 +123,7 @@ export class SoilContactRigidSolver extends RigidSolver {
         id: string;
         rate: import("../world/solver.js").RateLevel;
         stableRate(): import("../world/solver.js").RateLevel;
+        timeScale?(): number;
         fields: import("../world/solver.js").FieldUse[];
     };
     init(host: SolverHost, params: SoilContactRigidParams): void;
@@ -2180,6 +2181,7 @@ interface SolverDescription {
     readonly fields: readonly FieldUse[];
     readonly rate: RateLevel;
     stableRate(): RateLevel;
+    timeScale?(): number;
 }
 
 interface SolverHost {

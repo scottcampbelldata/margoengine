@@ -3372,9 +3372,14 @@ console.log(submergedJetWallShear(jet, 0), submergedJetWallShear(jet, 0.4) > 0);
 - `buildings`: `{min: [x, z], max: [x, z], height}` boxes that raise the bed under them (Schubert and Sanders' building blocks), so a flood goes round a town's blocks and over them only when deeper than they are tall;
 - `inflows`: rivers and pipes, `{position: [x, z], discharge}` in m^3/s or a function of time (a flood hydrograph);
 - `rain`, a `Precipitation` field (`@margoengine/weather`'s `PrecipitationField`), falling on water and ground alike; `wind`, a framework `Wind`, whose stress rho_a C_D |U| U drags the water (Garratt's C_D = (0.75 + 0.067 U) 1e-3, up to `windDragLimit`, default 2.5e-3, where the sea's roughness saturates in storm winds, Donelan et al. 2004);
+- `coriolis`, the Earth's rotation: a Coriolis parameter f in 1/s, or `{latitude, north}` (radians; `north` from -Z toward +X, default 0) for the beta plane about the grid's centre. Each substep turns the momentum by f dt exactly, so currents swing right in the north and a Kelvin wave keeps to its coast (default none);
+- `timeScale`: seconds of the water's time per second of world time (default 1). 3600 runs an hour of surge or flood each world second, for a timelapse or a long test. Each world step is then many of the water's seconds, taken in as many substeps as the Courant bound asks, each the longest it allows, never one long step. `water.work` counts the steps and substeps.
+  - On the water's time: its own inputs (the inflows' discharges, the sides' levels, and a surge's pressure and ramp).
+  - On the world's time: fields other solvers publish (the rain, the wind, the tide), so give those solvers the same scale.
+  - What the water publishes carries its scale: the `surfaceWater` field, the surge's potential and `water.flow`. The world refuses, with a `state` error naming the fix, a solver at another scale that reads them or is given `water.flow`. Ships, hulls, loads, tracers and anything riding the water run on the world's time, so a sped-up surge is for scenes of the water alone, or of solvers that take the same `timeScale` (the surge, the synoptic weather);
 - `courant` (default 0.4, at most 0.5), `density` (default 1000), `rate` (its rate level, default the world's base rate).
 
-It publishes the field `surfaceWater`: per cell, the depth h in m and the discharges hu and hv in m^2/s, as f32, x fastest. It takes waves' forcing from the field `surfaceWaterForcing`, which a `SurfSolver` adds to: per cell, the force of the radiation stress over the density, the Stokes drift (the water's momentum is then Lagrangian, and its bed friction acts on what is left of it) and the orbital velocity that stirs the bed. `water.sample(x, z)` gives the depth, the surface height and the depth-averaged velocity there; `water.flow` is the water as a framework `FlowField` (for tracers, debris and bodies); `water.volume()` the volume, and `water.budget` what came in by the inflows and by rain and what left over the sides since the start, in m^3.
+It publishes the field `surfaceWater`: per cell, the depth h in m and the discharges hu and hv in m^2/s, as f32, x fastest. It takes waves' forcing from the field `surfaceWaterForcing`, which a `SurfSolver` adds to: per cell, the force of the radiation stress over the density, the Stokes drift (the water's momentum is then Lagrangian, and its bed friction acts on what is left of it) and the orbital velocity that stirs the bed. It also takes the field `surfaceWaterPotential`, which a `SurgeSolver` adds to: per cell, a height psi whose gradient pushes the water, -g h grad(psi). The water adds it to its bed in its hydrostatic reconstruction, so water at rest under it stands at -psi to rounding. `water.sample(x, z)` gives the depth, the surface height and the depth-averaged velocity there; `water.flow` is the water as a framework `FlowField` (for tracers, debris and bodies); `water.volume()` the volume, and `water.budget` what came in by the inflows and by rain and what left over the sides since the start, in m^3.
 
 ```ts
 import {bedSurface} from 'margoengine/physics/earth';
@@ -3400,6 +3405,69 @@ const start = water.volume();
 world.advance(30 * 60); // one minute
 console.log(water.sample(300, 50).depth > 0); // true: the flood has reached 300 m
 console.log(Math.abs(water.volume() + water.budget.out - start) < 1e-6 * start); // true: every cubic metre accounted for
+```
+
+### Tides, storm surge and currents (`@margoengine/physics/surge`)
+
+`SurgeSolver` forces a `ShallowWaterSolver` with the air's pressure and the Sun's and Moon's pull (SEA-07). Both act on the water as the gradient of a height:
+- the inverse barometer (p - p_ref) / (rho g), a centimetre a hectopascal;
+- the equilibrium tide gamma_2 U / g of the tide-generating potential U, from the world's `CelestialSolver` (`@margoengine/physics/space`), with the Love numbers' reduction gamma_2 = 0.693.
+
+It sums them into one forcing potential per cell, the field `surfaceWaterPotential`. The water adds it to its bed in its hydrostatic reconstruction, so the force is -g h grad(psi), and water at rest stands at -psi to rounding: a lake under a still low stands at the inverse barometer and does not creep. Couple it before the water: `world.couple(['surge', 'water'], 'staggered')`. Construct it with `new SurgeSolver('surge', {tide: true})` to read the world's tide (add a `CelestialSolver` first). Its settings:
+- `water`: the `ShallowWaterSolver`, added to the world first;
+- `pressure`: the air's pressure at the water, a function of `(x, z, time)` giving Pa, `time` the water's (default none);
+- `reference`: the pressure the water is level under, Pa (default the mean over the wet water each step, so a closed lake keeps its mean level; pass 101325 for a sea whose open side is held);
+- `site`: where the world's origin lies on the Earth, `{latitude, longitude}` in radians and `north` (radians from -Z toward +X, default 0), for the tide;
+- `love` (default 0.693), `ramp` (seconds of the water's time over which the forcing grows from nothing, tanh-shaped, default 0) and `rate`.
+
+The pressure is a function of the water's time, so with the water's `timeScale` it is written in storm time. The tide comes from the `CelestialSolver` at the world's time: give it the water's `timeScale` too.
+
+`potentialAt(x, z)` reads the potential. The rest of a storm surge is the shallow water's own:
+- `wind`, a `Wind` field 10 m above the water: its stress rho_a C_D |U| U, with Garratt's C_D = (0.75 + 0.067 U) 1e-3 up to `windDragLimit` (default 2.5e-3, where the sea's roughness saturates in strong winds, Donelan et al. 2004);
+- `coriolis`, the Earth's rotation: a Coriolis parameter f in 1/s, or `{latitude, north}` for the beta plane about the grid's centre. It turns the momentum by f dt each substep, exactly, so currents swing to the right in the north and a Kelvin wave keeps its coast;
+- `roughness`, Manning's n of the bed.
+
+At an open sea, `tidalLevel(constituents, {mean, ramp})` gives the tide coming in from its harmonic constituents (`{amplitude, speed, phase}`, `speed` in rad/s or a name in `TIDAL_CONSTITUENTS`: M2, S2, N2, K2, K1, O1, P1, Q1, Mf, Mm), for a `{sea}` or `{level}` side. `inverseBarometer(drop, density)` gives the rise under a drop in pressure.
+
+```ts
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {SurgeSolver} from 'margoengine/physics/surge';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// Lake Superior on 10 November 1975, as a flat box 563 km by 160 km and 147 m deep at 47.5 N: a 50-knot westerly for ten
+// hours and the 982 hPa low crossing it, an hour of the lake each second of the world's.
+const columns = 56, rows = 16, width = 563000, depth = 160000, hour = 3600;
+const elevations = new Float64Array((columns + 1) * (rows + 1)).fill(-147);
+const wind = {
+  medium: 'air' as const,
+  cell: [0, 0, 0] as const,
+  // A field is read at the world's time: one world second is an hour of the storm.
+  sample: (_x: number, _y: number, _z: number, t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0}) => {
+    out.velocity[0] = 25.7 * Math.tanh((t * hour) / 7200);
+    out.velocity[1] = out.velocity[2] = 0;
+    out.density = 1.2;
+    out.temperature = 280;
+    return out;
+  },
+};
+const water = new ShallowWaterSolver();
+const surge = new SurgeSolver();
+const world = new PhysicsWorld()
+  .add(water, {
+    bed: bedSurface({columns, rows, width, depth, centre: [width / 2, depth / 2]}, elevations),
+    level: 0,
+    roughness: 0.025,
+    wind,
+    coriolis: {latitude: (47.5 * Math.PI) / 180},
+    timeScale: hour,
+  })
+  // The pressure is on the water's time: the low moves east at 25 m/s.
+  .add(surge, {water, pressure: (x, z, t) => 101325 - 3125 * Math.exp(-(((x + 100000 - 25 * t) ** 2 + (z - depth / 2) ** 2) / 9e10))})
+  .couple(['surge', 'water'], 'staggered');
+world.advance(10 * world.rate.num / world.rate.den); // ten world seconds: ten hours of the lake
+const east = water.sample(width - 5000, depth / 2).surface, west = water.sample(5000, depth / 2).surface;
+console.log((east - west).toFixed(1)); // about 0.8: the lake piled up at its eastern end
 ```
 
 ### Whitecaps, foam and spray (`@margoengine/physics/foam`)
@@ -5359,7 +5427,8 @@ by default. The weather and water readers use the winds from the same physical f
 `wind` is the existing `Wind` contract for a cloud box or other atmospheric reader. `rainSource()` supplies surface
 mm/h to `PrecipitationField`. Set its `base` just above the ground when the upstream physics has already accounted for
 fallout. Load with `{water: true}` and pass the grid of a `ShallowWaterSolver` to accumulate pressure gradients and wind
-stress on it. Arrange the pair in a staggered coupling. `@margoengine/weather/synoptic` adapts the same solve for Sky.
+stress on it. Arrange the pair in a staggered coupling, and give the water the weather's `timeScale` (the world refuses
+the pair at two scales). `@margoengine/weather/synoptic` adapts the same solve for Sky.
 
 ## Natural lightning and thunder
 
