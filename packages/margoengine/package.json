@@ -6431,6 +6431,10 @@
       "types": "./dist/xr/performance.d.ts",
       "import": "./dist/xr/performance.js"
     },
+    "./xr/near": {
+      "types": "./dist/xr/near.d.ts",
+      "import": "./dist/xr/near.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
