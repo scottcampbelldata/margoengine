@@ -192,7 +192,7 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 | Progressive loading | `loadGLTFProgressive` (`margoengine/gltf/progressive`) | |
 | Draco, KTX2, Meshopt | `@margoengine/decoders` | Passed in only when a file needs them |
 | `.obj`, `.stl`, `.ply`, `.fbx`, `.usdz` | `@margoengine/loaders`, `@margoengine/fbx`, `@margoengine/usdz` | |
-| `.babylon` | `parseBabylon`, `flattenBabylon` (`@margoengine/loaders/babylon`); `exportBabylon` (`@margoengine/exporters/babylon`) writes one | [Below](#loading-a-babylon-file) |
+| `.babylon` | `parseBabylon`, `flattenBabylon` (`@margoengine/loaders/babylon`); import only, Margo does not write `.babylon` (export glTF instead) | [Below](#loading-a-babylon-file) |
 | Cloth and soft bodies, drawn | `drawSoftBody(engine, body, {material})` (`margoengine/gltf/soft-mesh`) on a `@margoengine/physics/soft` body | |
 | `AnimationGroup`, `scene.animationGroups` | `Animation.attach(model)`, `animation.clips`, `animation.play(name)` | `playing`, `seek`, `loop`, `speed` |
 | Animation blending, weights | `Animator.attach(animation, {...})` (`margoengine/animator`) | State machines, blend trees, additive layers, foot IK |
