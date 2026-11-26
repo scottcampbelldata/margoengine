@@ -221,7 +221,8 @@ export class RangeCache {
       this.stats[missing.length === last - first + 1 ? 'misses' : 'partial']++;
     } else {
       let reason: 'revalidated' | 'offline' | undefined;
-      if (revalidate || (!this.checked.has(url) && file.fresh <= Date.now())) {
+      const trusted = request.cache === 'force-cache' || this.checked.has(url) || file.fresh > Date.now();
+      if (revalidate || !trusted) {
         // Once per RangeCache, as AssetCache: a failed check is not retried on every range of a streaming file.
         this.checked.add(url);
         reason = globalThis.navigator?.onLine === false ? 'offline' : await this.revalidate(request, file);

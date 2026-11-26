@@ -230,12 +230,15 @@ const versioned = (url: string, hash: string) => {
 /**
  * Per-file versioning for an {@link AssetCache}. A manifest maps each URL to the SHA-256 of its bytes, so a release drops
  * only the files that changed, where the cache's own `version` drops all of them. A listed file is requested as
- * `url?v=<hash>`, kept under that name, and its bytes are checked once per session. Files not listed pass straight
- * through. Pass `assets.fetch` as a loader's `fetch` option.
+ * `url?v=<hash>`, kept under that name, and its bytes are checked once per session. A stored copy is read without asking
+ * the server (`cache: 'force-cache'`, unless the request names another mode), as the bytes of a hash cannot change.
+ * Files not listed pass straight through. Pass `assets.fetch` as a loader's `fetch` option.
  */
 export class HashedAssets {
   private manifest: Readonly<Record<string, string>>;
   private readonly checked = new Set<string>();
+  /** Names whose bytes were wrong: the next request goes past every HTTP cache. */
+  private readonly rejected = new Set<string>();
 
   constructor(
     private readonly cache: Pick<AssetCache, 'fetch' | 'delete'>,
@@ -252,11 +255,14 @@ export class HashedAssets {
       hash = this.manifest[url];
     if (!hash) return this.cache.fetch(input, init);
     const name = versioned(url, hash),
+      given = init?.cache ?? (input instanceof Request ? input.cache : 'default'),
+      cache = given !== 'default' ? given : this.rejected.has(name) ? 'reload' : 'force-cache',
       // A Request keeps its signal, headers and credentials on the versioned URL.
-      response = await this.cache.fetch(input instanceof Request ? new Request(name, input) : name, init);
+      response = await this.cache.fetch(input instanceof Request ? new Request(name, input) : name, { ...init, cache });
     if (!response.ok || this.checked.has(name)) return response;
     const actual = await hashBytes(await response.clone().arrayBuffer());
     if (actual !== hash) {
+      this.rejected.add(name);
       await this.cache.delete(name);
       throw fault(
         'failed',
@@ -264,6 +270,7 @@ export class HashedAssets {
         'cache',
       );
     }
+    this.rejected.delete(name);
     this.checked.add(name);
     return response;
   };
