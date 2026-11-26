@@ -14308,13 +14308,21 @@ An authored finite blade seeds eligible tensile fronts where its paired lips sha
 particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
 principal plane that crosses adjacent cell material or coincides with a bonded face. A plane
 that only touches an exposed face cannot advance.
+Coplanar fracture toughness uses a small-strain isotropic displacement correlation.
+It needs two actual boundary lips with a shared front edge and matching detached
+material positions, ahead of which there is a coplanar bonded facet. An unmatched
+or inverted candidate is ineligible. The option fits the leading linear-elastic
+plane-strain term at one matched radius. It leaves crack kinking, large-strain and
+orthotropic toughness outside this mode. Snapshot replay needs the same authored
+material and toughness. If tensile nucleation is enabled, it starts a new crack when
+there is no recorded front and the strain threshold is exceeded.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-With coincident-face release, the optional entry measures 142,266 B gzip.
-The base is 45,555 B and the lazy native kernel is 96,878 B.
+With coplanar mixed-mode toughness, the optional entry measures 145,660 B gzip.
+The base is 45,885 B and the lazy native kernel is 100,020 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -31716,7 +31724,9 @@ tensile, compressive or shear stresses exceed authored strengths. A progressive 
 tension and shear before tearing. A prescribed tensile seam can open inside a tetrahedron.
 Unseeded tensile cracks can nucleate inside a cell from its principal strain and extend
 from a tracked front. Authored seams support separate sliding and tearing strains.
-Mixed-mode propagation with separate toughness along an unseeded front remains open.
+Coplanar propagation can use separate opening, sliding and tearing toughness at matched
+isotropic lips in small strain. General mixed-mode kinking and orthotropic toughness
+remain open.
 Automatic fracture evaluates whether each proposed edit fits the native rest mesh before
 committing the geometry. Regions below its resolution stay intact for that step.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.

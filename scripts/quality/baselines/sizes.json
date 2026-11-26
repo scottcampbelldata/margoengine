@@ -13459,7 +13459,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "03b4480686",
+      "commit": "84a2a19855",
       "grew": 1,
       "reason": "SOFT-04 adds native paired-lip displacement correlation and independently authored mixed-mode toughness, moving the soft entry from 142266 to 145660 B gzip. @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 97921 to 103021 B ceiling (100020 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
