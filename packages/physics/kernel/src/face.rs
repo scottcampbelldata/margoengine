@@ -481,18 +481,15 @@ fn first_within(gap: &dyn Fn(f32) -> f32, speed: f32, reach: f32) -> Option<f32>
 mod batch {
     use super::*;
 
-    static mut FACE_IN: [f32; FACE_IN_WORDS * FACE_MAX] = [0.0; FACE_IN_WORDS * FACE_MAX];
-    static mut FACE_OUT: [u32; FACE_OUT_WORDS * FACE_K * FACE_MAX] = [0; FACE_OUT_WORDS * FACE_K * FACE_MAX];
-
-    /// Where the input records go.
+    /// Where the input records go: the start of the host's input and output region (`io_bind`).
     #[unsafe(no_mangle)]
     pub extern "C" fn face_input() -> u32 {
-        core::ptr::addr_of!(FACE_IN) as u32
+        crate::api::io_at(crate::api::FACE_IN_AT)
     }
     /// Where the output records are: K a triangle, in the order of the input.
     #[unsafe(no_mangle)]
     pub extern "C" fn face_output() -> u32 {
-        core::ptr::addr_of!(FACE_OUT) as u32
+        crate::api::io_at(crate::api::FACE_OUT_AT)
     }
     /// Triangles one call takes.
     #[unsafe(no_mangle)]
@@ -509,8 +506,8 @@ mod batch {
             return -1;
         }
         let world = crate::api::world();
-        let input = core::ptr::addr_of!(FACE_IN) as *const f32;
-        let output = core::ptr::addr_of_mut!(FACE_OUT) as *mut u32;
+        let input = face_input() as *const f32;
+        let output = face_output() as *mut u32;
         let mut found = 0;
         for i in 0..count as usize {
             // SAFETY: one thread, and i < FACE_MAX keeps both records inside their buffers.

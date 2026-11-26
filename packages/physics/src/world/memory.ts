@@ -11,7 +11,8 @@
 // is never used, then each module has a static window of one page at its slot, where its linker placed its read-only data
 // (`--global-base`). Regions start above the last window, at DYNAMIC_BASE, so no region overlaps a module's data. A module
 // keeps no state of its own and has no allocator; it works in the regions the world gives it, and each instance of it (one
-// per thread) runs on a stack region of its own.
+// per thread) runs on a stack region of its own. The rigid kernel (slot 15) keeps one thing in its window, the handle of
+// its world, whose block is a region it grows through the host's `region_resize`.
 import { MargoError } from '@margoengine/math/errors';
 import type { ElementType, Region } from './solver.js';
 

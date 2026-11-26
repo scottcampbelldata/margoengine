@@ -355,18 +355,15 @@ fn closest_distance_squared(p: V3, a: V3, b: V3, c: V3) -> f32 {
 mod batch {
     use super::*;
 
-    static mut PROBE_IN: [f32; PROBE_IN_WORDS * PROBE_MAX] = [0.0; PROBE_IN_WORDS * PROBE_MAX];
-    static mut PROBE_OUT: [u32; PROBE_OUT_WORDS * PROBE_K * PROBE_MAX] = [0; PROBE_OUT_WORDS * PROBE_K * PROBE_MAX];
-
-    /// Where the input records go.
+    /// Where the input records go, in the host's input and output region (`io_bind`).
     #[unsafe(no_mangle)]
     pub extern "C" fn probe_input() -> u32 {
-        core::ptr::addr_of!(PROBE_IN) as u32
+        crate::api::io_at(crate::api::PROBE_IN_AT)
     }
     /// Where the output records are: K a particle, in the order of the input.
     #[unsafe(no_mangle)]
     pub extern "C" fn probe_output() -> u32 {
-        core::ptr::addr_of!(PROBE_OUT) as u32
+        crate::api::io_at(crate::api::PROBE_OUT_AT)
     }
     /// Particles one call takes.
     #[unsafe(no_mangle)]
@@ -389,8 +386,8 @@ mod batch {
             return -1;
         }
         let world = crate::api::world();
-        let input = core::ptr::addr_of!(PROBE_IN) as *const f32;
-        let output = core::ptr::addr_of_mut!(PROBE_OUT) as *mut u32;
+        let input = probe_input() as *const f32;
+        let output = probe_output() as *mut u32;
         let mut found = 0;
         for i in 0..count as usize {
             // SAFETY: one thread, and i < PROBE_MAX keeps both records inside their buffers.

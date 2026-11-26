@@ -12,13 +12,14 @@ import {
   PhysicsWorld,
   RigidSolver,
   rateLevelOf,
+  worldMemory,
 } from '../dist/world.js';
 
 await Physics.load();
 
 /** A floor, a falling box and a tumbling capsule, at a 1/60 s step unless `step` is given. */
-function scene({ step = 1 / 60, bodies = 0 } = {}) {
-  const physics = new Physics(null, { fixedTimestep: step });
+function scene({ step = 1 / 60, bodies = 0, arena } = {}) {
+  const physics = new Physics(null, { fixedTimestep: step, ...(arena ? { arena } : {}) });
   if (bodies) physics.kernel.reserve(bodies, bodies);
   physics.addBody(null, {
     type: 'fixed',
@@ -273,4 +274,30 @@ test("a seek by restore rewinds the Physics's step count, so a load clocked by i
   assert.equal(seek.world.hash(), straight.world.hash());
   straight.physics.dispose();
   seek.physics.dispose();
+});
+
+test("a Physics made on the world's arena keeps its state in the world's memory, and steps and restores to the same bits", () => {
+  const alone = scene(),
+    // The kernel has a plain-memory build so far: the world is made on a plain memory.
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) }),
+    inWorld = scene({ arena: world.arena });
+  const solver = new RigidSolver();
+  world.add(solver, { physics: inWorld.physics });
+  assert.equal(inWorld.physics.kernel.memory, world.memory);
+  assert.ok(
+    solver.stateRegions().every((region) => region.memory === undefined),
+    'no memory of its own to name',
+  );
+  world.advance(20);
+  const saved = world.takeSnapshot();
+  world.advance(70); // frame 70
+  for (let i = 0; i < 70; i++) alone.physics.step();
+  assert.equal(inWorld.physics.kernel.hash, alone.physics.kernel.hash);
+  const ran = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  assert.equal(world.hash(), saved.hash);
+  world.advance(70);
+  assert.equal(world.hash(), ran);
+  alone.physics.dispose();
+  inWorld.physics.dispose();
 });

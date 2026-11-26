@@ -61,6 +61,13 @@ export const MODULES = [
   },
 ];
 
+/**
+ * Kernels that keep their own build script and committed blueprint but live in the world's memory all the same: each takes a
+ * slot of the table, so no module's window lands on its data. The rigid kernel is built by
+ * packages/physics/scripts/build-kernel.mjs with `rustFlags` of its entry, plain memory (one thread) for now.
+ */
+export const KERNEL_SLOTS = [{ name: 'rigid', slot: 15, crate: 'packages/physics/kernel' }];
+
 /** A module's global base: the start of its slot's window. */
 export const globalBase = (entry) => MODULE_BASE + entry.slot * MODULE_WINDOW;
 

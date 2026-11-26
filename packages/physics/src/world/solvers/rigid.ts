@@ -19,7 +19,8 @@
 //   box, a hull's load) is a force through the step rather than an impulse at its start.
 //
 // State. The kernel's state is the words its own hash covers (`KernelWorld.stateRanges`), named by column and row capacity
-// (`positionX[64]`), in the kernel's own memory until the framework's solvers share one (`Region.memory`, transitional). A
+// (`positionX[64]`), in the world's memory when the Physics was made on the world's arena (`new Physics(null, {arena:
+// world.arena})`), else in the kernel's own memory, which the regions then name (`Region.memory`, transitional). A
 // snapshot restored into a world built with other capacities or another column table is refused before anything is
 // written: the regions' names carry the capacities, and their layout version is a fingerprint of the column table.
 import { MargoError } from '@margoengine/math/errors';
@@ -317,11 +318,17 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     }
   }
 
-  /** The kernel's state words, named by column and row capacity, in the kernel's own memory (transitional). */
+  /** The memory a region of the kernel's names: none when the kernel lives in the world's, else its own (transitional). */
+  private kernelMemory(): { memory?: WebAssembly.Memory } {
+    const { memory } = this.live().kernel;
+    return memory === this.host?.memory ? {} : { memory };
+  }
+
+  /** The kernel's state words, named by column and row capacity. */
   stateRegions(): readonly Region[] {
     const kernel = this.live().kernel,
       byOffset = new Map<number, string>(),
-      memory = kernel.memory;
+      memory = this.kernelMemory();
     this.layout = columnTableVersion(kernel.columns);
     for (const [name, view] of Object.entries(kernel.columns)) byOffset.set(view.byteOffset, name);
     let header = 0;
@@ -332,7 +339,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       .map(({ byteOffset, byteLength }) => {
         const column = byOffset.get(byteOffset),
           name = column === undefined ? `header${header++}` : `${column}[${byteLength / 4}]`;
-        return { name, byteOffset, byteLength, type: 'u32' as const, layout: this.layout, memory };
+        return { name, byteOffset, byteLength, type: 'u32' as const, layout: this.layout, ...memory };
       });
   }
 
@@ -343,7 +350,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
    */
   extraState(): readonly Region[] {
     const kernel = this.live().kernel,
-      memory = kernel.memory,
+      memory = this.kernelMemory(),
       ranges = kernel.stateRanges(),
       covered = new Set(ranges.map((range) => range.byteOffset)),
       out: Region[] = this.clock ? [this.clock] : [];
@@ -356,7 +363,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         byteLength: 4,
         type: 'u32',
         layout: this.layout,
-        memory,
+        ...memory,
       });
     for (const [name, view] of Object.entries(kernel.columns))
       if (view.byteLength > 0 && !covered.has(view.byteOffset))
@@ -366,7 +373,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
           byteLength: view.byteLength,
           type: 'u32',
           layout: this.layout,
-          memory,
+          ...memory,
         });
     return out;
   }

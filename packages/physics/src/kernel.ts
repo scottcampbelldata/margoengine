@@ -4,9 +4,13 @@ import { clock } from './clock.js';
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
 import type { Quat, Vec3 } from './math.js';
+import { Arena, isShared, stackRegion, worldMemory } from './world/memory.js';
+import type { Region } from './world/solver.js';
 
 interface KernelExports extends WebAssembly.Exports {
-  memory: WebAssembly.Memory;
+  __stack_pointer: WebAssembly.Global;
+  io_bytes(): number;
+  io_bind(at: number): void;
   world_new(bodies: number, colliders: number): number;
   world_base(): number;
   world_bytes(): number;
@@ -982,15 +986,33 @@ export interface KernelSolverOptions {
   adaptiveSubsteps?: boolean;
 }
 
+/** What a {@link KernelWorld} is made with besides its rows. */
+export interface KernelWorldOptions {
+  /**
+   * The world memory's region allocator to live in (default: a new one over a plain {@link worldMemory}). The world's block,
+   * its stack and its query records are regions of it, so a physics world's solvers can read the bodies where they lie. One
+   * rigid kernel per memory: its statics sit in its slot of the module table.
+   */
+  arena?: Arena;
+}
+
+/** Bytes of the kernel instance's stack region: what rustc gives a Wasm module by default. */
+const KERNEL_STACK = 1 << 20;
+/** The memories a rigid kernel already lives in: a second would share the first's statics. */
+const hosting = new WeakSet<WebAssembly.Memory>();
+
 /**
- * One simulated world in its own Wasm instance. Column views alias the kernel's memory: reading a pose is a typed-array
- * read, with no call and no copy. Growth, which a step can cause, replaces every view, so read them from `columns` each
- * time and never keep one.
+ * One simulated world in its own Wasm instance, in a region of a world memory (by default one of its own). Column views
+ * alias that memory: reading a pose is a typed-array read, with no call and no copy. Growth, which a step can cause, and any
+ * other region growing the memory replace every view, so read them from `columns` each time and never keep one.
  * Everything a step can change lives in one block, so {@link KernelWorld.snapshot} is one copy.
  */
 export class KernelWorld {
-  /** Every column by name, for example `columns.positionX[body]`. */
-  readonly columns: Record<string, KernelColumn> = {};
+  /** The region allocator the world lives in. */
+  readonly arena: Arena;
+  private views: Record<string, KernelColumn> = {};
+  private bound: ArrayBuffer | SharedArrayBuffer | null = null;
+  private block: Region | null = null;
   private readonly api: KernelExports;
   private layout = -1;
   private recycleDistance = 0.05;
@@ -1008,22 +1030,66 @@ export class KernelWorld {
    * @throws MargoError (`state`) before {@link loadKernel} has finished.
    * @throws RangeError for a capacity the kernel refuses.
    */
-  constructor(bodies = 1024, colliders = bodies) {
+  constructor(bodies = 1024, colliders = bodies, options: KernelWorldOptions = {}) {
     const module = chosen ? builds[chosen].value : undefined;
     if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
+    const arena = options.arena ?? new Arena(worldMemory(false)),
+      { memory } = arena;
+    if (isShared(memory))
+      throw new MargoError(
+        'unsupported',
+        'The rigid kernel has a build for a plain memory only so far; pass an Arena over worldMemory(false), or a PhysicsWorld made with {memory: worldMemory(false)}.',
+      );
+    if (hosting.has(memory))
+      throw new MargoError(
+        'state',
+        'This memory already holds a rigid kernel, whose statics a second would share; pass another Arena, one per KernelWorld.',
+      );
+    this.arena = arena;
     this.api = new WebAssembly.Instance(module, {
       env: {
+        memory,
+        // The world's block: allocated at the first ask, then resized, moving with one copy when it cannot grow in place.
+        region_resize: (base: number, bytes: number) => this.resizeBlock(base, bytes),
         contact_filter: (a: number, b: number) => this.ask(a, b),
         contact_modify: (row: number) => this.modifyRow(row),
         // Times the phases of a step. Nothing in the world reads it back, so it is not part of a snapshot or the hash.
         clock,
       },
     }).exports as KernelExports;
+    hosting.add(memory);
+    const stack = stackRegion(arena, 'rigid', KERNEL_STACK);
+    const top = stack.byteOffset + stack.byteLength;
+    this.api.__stack_pointer.value = top - (top % 16);
+    this.api.io_bind(arena.allocate('rigid:io', this.api.io_bytes(), 'u8', 1).byteOffset);
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_new(bodies, colliders))
       throw new RangeError(
         `Bodies and colliders must be integers from 1 to 4194304; use a smaller world (got ${bodies}, ${colliders}).`,
       );
     this.bind();
+  }
+
+  /** The kernel's ask for its world's block: 0 when the memory cannot hold it, which the kernel reports as a refusal. */
+  private resizeBlock(base: number, bytes: number): number {
+    const length = bytes + ((8 - (bytes % 8)) % 8);
+    if (this.block !== null && base !== this.block.byteOffset) return 0;
+    try {
+      this.block =
+        this.block === null
+          ? this.arena.allocate('rigid:world', length, 'u8', 1)
+          : this.arena.resize(this.block, length > this.block.byteLength ? length : this.block.byteLength);
+    } catch (error) {
+      // The memory cannot grow that far: the kernel's own path for that case is a refusal, which its callers name.
+      if (error instanceof RangeError) return 0;
+      throw error;
+    }
+    return this.block.byteOffset;
+  }
+
+  /** Every column by name, for example `columns.positionX[body]`; fresh views whenever the memory or the layout changed. */
+  get columns(): Record<string, KernelColumn> {
+    if (this.arena.memory.buffer !== this.bound) this.bind();
+    return this.views;
   }
 
   private modifier: ((row: number) => void) | null = null;
@@ -1044,13 +1110,14 @@ export class KernelWorld {
 
   private bind(): void {
     const { api } = this,
-      { buffer } = api.memory,
+      { buffer } = this.arena.memory,
       base = api.world_base();
     this.layout = api.world_layout();
+    this.bound = buffer;
     kernelColumns.forEach(([name, kind, rows], column) => {
       const at = base + (api.world_offset(column) >>> 0),
         length = api.world_capacity(rows);
-      this.columns[name] = kind === 'f' ? new Float32Array(buffer, at, length) : new Uint32Array(buffer, at, length);
+      this.views[name] = kind === 'f' ? new Float32Array(buffer, at, length) : new Uint32Array(buffer, at, length);
     });
   }
 
@@ -2361,7 +2428,7 @@ export class KernelWorld {
       )
     )
       return null;
-    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);
+    const f = new Float32Array(this.arena.memory.buffer, this.api.query_buffer(), 6);
     return [
       [f[0]!, f[1]!, f[2]!],
       [f[3]!, f[4]!, f[5]!],
@@ -2369,7 +2436,7 @@ export class KernelWorld {
   }
   colliderAabb(collider: number): [[number, number, number], [number, number, number]] | null {
     if (!this.api.collider_aabb(collider)) return null;
-    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 6);
+    const f = new Float32Array(this.arena.memory.buffer, this.api.query_buffer(), 6);
     return [
       [f[0]!, f[1]!, f[2]!],
       [f[3]!, f[4]!, f[5]!],
@@ -2548,7 +2615,7 @@ export class KernelWorld {
   }
   private readManifolds(total: number): KernelManifold[] {
     const kept = total < 53 ? total : 53,
-      words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), 38 * kept),
+      words = new Uint32Array(this.arena.memory.buffer, this.api.query_buffer(), 38 * kept),
       f = new Float32Array(words.buffer, words.byteOffset, 38 * kept),
       manifolds: KernelManifold[] = [];
     for (let m = 0; m < kept; m++) {
@@ -2661,7 +2728,7 @@ export class KernelWorld {
     const found = this.api.pair_distance(a, b);
     if (found < 0) throw new RangeError(PAIR_REFUSED);
     if (!found) return null;
-    const f = new Float32Array(this.api.memory.buffer, this.api.query_buffer(), 7);
+    const f = new Float32Array(this.arena.memory.buffer, this.api.query_buffer(), 7);
     return { distance: f[0]!, pointA: [f[1]!, f[2]!, f[3]!], pointB: [f[4]!, f[5]!, f[6]!] };
   }
   private rows(call: (skip: number) => number, refused: string): number[] {
@@ -2670,7 +2737,7 @@ export class KernelWorld {
       total = call(skip);
       if (total < 0) throw new RangeError(refused);
       const page = total - skip < 8 * QUERY_HITS ? total - skip : 8 * QUERY_HITS,
-        words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), page);
+        words = new Uint32Array(this.arena.memory.buffer, this.api.query_buffer(), page);
       for (let i = 0; i < page; i++) rows.push(words[i]!);
       skip += page;
     }
@@ -2717,7 +2784,7 @@ export class KernelWorld {
     ];
   }
   private readCast(i: number): KernelShapeCastHit {
-    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 64 * i, 16),
+    const words = new Uint32Array(this.arena.memory.buffer, this.api.query_buffer() + 64 * i, 16),
       f = new Float32Array(words.buffer, words.byteOffset, 16);
     return {
       collider: words[0]!,
@@ -2730,7 +2797,7 @@ export class KernelWorld {
     };
   }
   private readProjection(i: number): KernelProjection {
-    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),
+    const words = new Uint32Array(this.arena.memory.buffer, this.api.query_buffer() + 32 * i, 8),
       f = new Float32Array(words.buffer, words.byteOffset, 8);
     return { collider: words[0]!, inside: words[1] === 1, point: [f[2]!, f[3]!, f[4]!], distance: f[5]! };
   }
@@ -2786,7 +2853,7 @@ export class KernelWorld {
     const all = shared === undefined ? 0xffffffff : shared >>> 0;
     for (let start = 0; start < count; start += capacity) {
       const n = capacity < count - start ? capacity : count - start,
-        input = new Float32Array(this.api.memory.buffer, this.api.probe_input(), 12 * n),
+        input = new Float32Array(this.arena.memory.buffer, this.api.probe_input(), 12 * n),
         words = new Uint32Array(input.buffer, input.byteOffset, 12 * n);
       for (let i = 0; i < n; i++) {
         const p = start + i,
@@ -2805,7 +2872,7 @@ export class KernelWorld {
             throw new RangeError('softContacts needs finite positions, radii and margins.');
       }
       this.api.soft_probe(n, k, flags, excludeBody);
-      const answer = new Uint32Array(this.api.memory.buffer, this.api.probe_output(), 16 * k * n),
+      const answer = new Uint32Array(this.arena.memory.buffer, this.api.probe_output(), 16 * k * n),
         floats = new Float32Array(answer.buffer, answer.byteOffset, answer.length);
       for (let i = 0; i < n; i++)
         for (let slot = 0; slot < k; slot++) {
@@ -2878,7 +2945,7 @@ export class KernelWorld {
       all = shared === undefined ? 0xffffffff : shared >>> 0;
     for (let start = 0; start < count; start += capacity) {
       const n = capacity < count - start ? capacity : count - start,
-        input = new Float32Array(this.api.memory.buffer, this.api.face_input(), 24 * n),
+        input = new Float32Array(this.arena.memory.buffer, this.api.face_input(), 24 * n),
         words = new Uint32Array(input.buffer, input.byteOffset, 24 * n);
       for (let i = 0; i < n; i++) {
         const p = start + i,
@@ -2898,7 +2965,7 @@ export class KernelWorld {
         if (!(input[at + 18]! >= 0)) throw new RangeError('softFaceContacts needs a thickness of 0 or more metres.');
       }
       this.api.soft_probe_faces(n, k, flags, excludeBody);
-      const answer = new Uint32Array(this.api.memory.buffer, this.api.face_output(), 20 * k * n),
+      const answer = new Uint32Array(this.arena.memory.buffer, this.api.face_output(), 20 * k * n),
         floats = new Float32Array(answer.buffer, answer.byteOffset, answer.length);
       for (let i = 0; i < n; i++)
         for (let slot = 0; slot < k; slot++) {
@@ -2959,7 +3026,7 @@ export class KernelWorld {
     return this.api.probe_capacity();
   }
   private readHit(i: number): KernelRayHit {
-    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),
+    const words = new Uint32Array(this.arena.memory.buffer, this.api.query_buffer() + 32 * i, 8),
       floats = new Float32Array(words.buffer, words.byteOffset, 8);
     return {
       collider: words[0]!,
@@ -3251,12 +3318,9 @@ export class KernelWorld {
   get hash(): number {
     return this.api.world_hash() >>> 0;
   }
-  /**
-   * The memory the world lives in: its own, as each world is its own Wasm instance until the physics framework's solvers share
-   * one memory (docs/physics-framework.md, section 3). Transitional: it goes when they do.
-   */
+  /** The memory the world lives in: its arena's, which other solvers of a physics world may share. */
   get memory(): WebAssembly.Memory {
-    return this.api.memory;
+    return this.arena.memory;
   }
   /**
    * The byte ranges of {@link KernelWorld.memory} that are the world's state, in a fixed order: exactly the words {@link hash}
@@ -3273,7 +3337,7 @@ export class KernelWorld {
   /** The whole world as one copy of its bytes, for {@link KernelWorld.restore}. Only this kernel build can read them. */
   snapshot(): Uint8Array {
     const { api } = this;
-    return new Uint8Array(api.memory.buffer, api.world_base(), this.bytes).slice();
+    return new Uint8Array(this.arena.memory.buffer, api.world_base(), this.bytes).slice();
   }
   /**
    * Puts the world back as a {@link KernelWorld.snapshot} found it, in one copy, at the snapshot's size. Rows, pairs, sleep
@@ -3282,12 +3346,11 @@ export class KernelWorld {
    */
   restore(snapshot: Uint8Array): this {
     const { api } = this,
-      base = api.world_base(),
       bytes = snapshot.byteLength,
       words = new DataView(snapshot.buffer, snapshot.byteOffset, bytes);
     if (
       bytes < 8 ||
-      words.getUint32(0, true) !== new DataView(api.memory.buffer).getUint32(base, true) ||
+      words.getUint32(0, true) !== new DataView(this.arena.memory.buffer).getUint32(api.world_base(), true) ||
       words.getUint32(4, true) !== bytes
     )
       throw new RangeError('These bytes are not a snapshot of this kernel; use what snapshot() returned.');
@@ -3295,7 +3358,8 @@ export class KernelWorld {
       throw new RangeError(
         `Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`,
       );
-    new Uint8Array(api.memory.buffer, base, bytes).set(snapshot);
+    // Making room may have moved the world's block: its start is read after.
+    new Uint8Array(this.arena.memory.buffer, api.world_base(), bytes).set(snapshot);
     this.bind();
     // Rows handed out, not rows of room: a collider must not name a row no hull or mesh was written to.
     this.hullRows = api.hull_count();

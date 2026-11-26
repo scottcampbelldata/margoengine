@@ -99,8 +99,8 @@ export interface Region {
   readonly layout: number;
   /**
    * The memory the region lies in when it is not the world's: transitional, for a solver whose module still owns its memory (the
-   * rigid and soft kernels, until the framework's solvers share one memory, docs/physics-framework.md, section 3), and removed
-   * then. A snapshot and the state hash read it and record nothing of it, so they do not change when the memory does.
+   * soft kernel, and a rigid kernel whose Physics was not made on the world's arena; docs/physics-framework.md, section 3), and
+   * removed once none does. A snapshot and the state hash read it and record nothing of it, so they do not change when the memory does.
    */
   readonly memory?: WebAssembly.Memory;
 }

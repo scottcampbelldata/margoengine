@@ -781,8 +781,9 @@ export interface KernelTrimeshOptions {
 }
 
 export class KernelWorld {
-    readonly columns: Record<string, KernelColumn>;
-    constructor(bodies?: number, colliders?: number);
+    readonly arena: Arena;
+    constructor(bodies?: number, colliders?: number, options?: KernelWorldOptions);
+    get columns(): Record<string, KernelColumn>;
     setContactModifier(modifier: ((row: number) => void) | null): void;
     get capacity(): number;
     get colliderCapacity(): number;
@@ -1591,6 +1592,7 @@ export interface PhysicsOptions {
     iterations?: number;
     solverIterations?: number;
     name?: string;
+    arena?: Arena;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean | 'noForces';
     intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
@@ -2137,6 +2139,17 @@ interface AirLoad {
     load(dt: number): void;
 }
 
+class Arena {
+    readonly memory: WebAssembly.Memory;
+    constructor(memory?: WebAssembly.Memory);
+    get used(): number;
+    get freeBytes(): number;
+    allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    free(region: Region): void;
+    resize(region: Region, byteLength: number): Region;
+    words(region: Region): RegionWords;
+}
+
 interface BodyOwner {
     readonly kernel: KernelWorld;
     addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
@@ -2156,6 +2169,8 @@ class DofCoupling extends Mechanism {
 interface DofCouplingOptions extends MechanismOptions {
     ratio?: number;
 }
+
+type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
 
@@ -2236,6 +2251,10 @@ interface KernelShapeCastHit {
     started: boolean;
 }
 
+interface KernelWorldOptions {
+    arena?: Arena;
+}
+
 type Link = Multibody['links'][number];
 
 abstract class Mechanism implements PhysicsAttachment {
@@ -2288,4 +2307,15 @@ interface QuarantineEvent {
     type: 'quarantine';
     body: PhysicsBody;
 }
+
+interface Region {
+    readonly name: string;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+    readonly type: ElementType;
+    readonly layout: number;
+    readonly memory?: WebAssembly.Memory;
+}
+
+type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint8Array;
 ```

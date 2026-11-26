@@ -9,16 +9,26 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { committedBlueprint } from '../../../scripts/committed-blueprint.mjs';
+import { KERNEL_SLOTS, rustFlags } from '../../../scripts/physics-modules.mjs';
 import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const kernel = resolve(root, 'kernel');
 const repository = resolve(root, '../..');
 
+/**
+ * How the kernel is linked into the world's memory: it imports the memory, places its statics in its slot's window of the
+ * module table (scripts/physics-modules.mjs, KERNEL_SLOTS) and links no stack; KernelWorld gives it a stack region and the
+ * regions its world lives in.
+ */
+export const LINK_RUSTFLAGS = rustFlags(
+  KERNEL_SLOTS.find((entry) => entry.name === 'rigid'),
+  false,
+);
 /** The flags the blueprint is built with; a change to them is a change to the blueprint. */
-export const RUSTFLAGS = '-C target-feature=+simd128';
-/** The scalar variant's flags: none, so no instruction of Wasm SIMD is made and a browser without it can compile the module. */
-export const SCALAR_RUSTFLAGS = '';
+export const RUSTFLAGS = `-C target-feature=+simd128 ${LINK_RUSTFLAGS}`;
+/** The scalar variant's flags: no instruction of Wasm SIMD is made, so a browser without it can compile the module. */
+export const SCALAR_RUSTFLAGS = LINK_RUSTFLAGS;
 /** The variants of the kernel: the default with SIMD, and the scalar one for browsers without Wasm SIMD. */
 export const VARIANTS = {
   simd: { flags: RUSTFLAGS, file: 'src/wasm.ts', optimizer: ['--enable-simd'] },

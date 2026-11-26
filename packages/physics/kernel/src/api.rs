@@ -10,6 +10,36 @@ use crate::world::World;
 
 static mut WORLD: Option<World> = None;
 
+// The batch queries' records (face.rs, probe.rs) lie in a region the host gives the kernel (`io_bind`), not in statics: a
+// module's statics must fit its 64 KiB window of the world's memory (scripts/physics-modules.mjs), and these take 720 KiB.
+/// Where the face queries' input records start in the input and output region, in bytes.
+pub(crate) const FACE_IN_AT: usize = 0;
+/// Where their output records start.
+pub(crate) const FACE_OUT_AT: usize = FACE_IN_AT + 4 * crate::face::FACE_IN_WORDS * crate::face::FACE_MAX;
+/// Where the particle probes' input records start.
+pub(crate) const PROBE_IN_AT: usize = FACE_OUT_AT + 4 * crate::face::FACE_OUT_WORDS * crate::face::FACE_K * crate::face::FACE_MAX;
+/// Where their output records start.
+pub(crate) const PROBE_OUT_AT: usize = PROBE_IN_AT + 4 * crate::probe::PROBE_IN_WORDS * crate::probe::PROBE_MAX;
+/// Bytes of the whole region.
+const IO_BYTES: usize = PROBE_OUT_AT + 4 * crate::probe::PROBE_OUT_WORDS * crate::probe::PROBE_K * crate::probe::PROBE_MAX;
+static mut IO: u32 = 0;
+
+/// Bytes the input and output region of the batch queries takes, for the host to allocate before `io_bind`.
+#[unsafe(no_mangle)]
+pub extern "C" fn io_bytes() -> u32 {
+    IO_BYTES as u32
+}
+/// Takes the input and output region at `at` (8-byte aligned, `io_bytes` long).
+#[unsafe(no_mangle)]
+pub extern "C" fn io_bind(at: u32) {
+    unsafe { IO = at };
+}
+/// The address `offset` bytes into the input and output region.
+#[inline(always)]
+pub(crate) fn io_at(offset: usize) -> u32 {
+    unsafe { IO + offset as u32 }
+}
+
 #[inline(always)]
 pub(crate) fn world() -> &'static mut World {
     // SAFETY: an instance runs on one thread, and KernelWorld calls world_new before anything else.

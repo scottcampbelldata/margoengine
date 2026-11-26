@@ -75,6 +75,17 @@ export function bedVolume(shape: BedShape, elevations: ArrayLike<number>, datum?
 
 // Not exported from this entry, but used by the exports above:
 
+class Arena {
+    readonly memory: WebAssembly.Memory;
+    constructor(memory?: WebAssembly.Memory);
+    get used(): number;
+    get freeBytes(): number;
+    allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    free(region: Region): void;
+    resize(region: Region, byteLength: number): Region;
+    words(region: Region): RegionWords;
+}
+
 interface BodyOptions {
     type?: BodyType;
     position?: Vec3;
@@ -841,8 +852,9 @@ interface KernelTrimeshOptions {
 }
 
 class KernelWorld {
-    readonly columns: Record<string, KernelColumn>;
-    constructor(bodies?: number, colliders?: number);
+    readonly arena: Arena;
+    constructor(bodies?: number, colliders?: number, options?: KernelWorldOptions);
+    get columns(): Record<string, KernelColumn>;
     setContactModifier(modifier: ((row: number) => void) | null): void;
     get capacity(): number;
     get colliderCapacity(): number;
@@ -1006,6 +1018,10 @@ class KernelWorld {
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;
+}
+
+interface KernelWorldOptions {
+    arena?: Arena;
 }
 
 interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
@@ -1596,6 +1612,7 @@ interface PhysicsOptions {
     iterations?: number;
     solverIterations?: number;
     name?: string;
+    arena?: Arena;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean | 'noForces';
     intersectionFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
     contactModifier?: (contact: ContactModification) => void;
@@ -1683,6 +1700,8 @@ interface Region {
     readonly layout: number;
     readonly memory?: WebAssembly.Memory;
 }
+
+type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint8Array;
 
 type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
     targetVelocity?: Vec3;

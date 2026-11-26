@@ -92,7 +92,12 @@ The framework removes the copying:
 - **Bridges.** TypeScript calls each module's `step` in schedule order. Calls stay on the JS side (one call per solver
   per tick), and data stays in shared memory.
 - **The rigid kernel's arena** stays as it is: one region, its column table, growth and snapshot by copy. It becomes
-  the rigid solver module and its region.
+  the rigid solver module and its region. **Status (2026-11-26):** the kernel imports the world's memory and its statics
+  sit in slot 15 of the module table (`KERNEL_SLOTS` in `scripts/physics-modules.mjs`, 14.9 KB of its 64 KiB window). Its
+  world's block, stack and batch-query records are regions of an `Arena`; the block grows through the host's
+  `region_resize` and moves with one copy when it cannot grow in place. `new Physics(null, {arena: world.arena})` puts its
+  state in a physics world's memory, where the rigid solver's regions name no memory of their own. Plain memory only for
+  now: the shared build comes with threads.
 
 The first task of the framework work is a prototype that proves this layout (two modules, one memory, a port read in
 place, a snapshot of both, thread-count independence). If the linker cannot give fixed non-overlapping bases for some
@@ -224,7 +229,7 @@ and every solver uses it:
 | linear solvers | preconditioned conjugate gradient, multigrid-preconditioned CG, banded Cholesky, fixed-order dot products |
 | FFT | for the spectral ocean and spectral turbulence |
 | transfers | APIC, conservative remap, mesh load transfer |
-| allocator | one region allocator over the shared memory: the world's `Arena` allocates, frees and resizes regions (address-ordered first fit, freed blocks merged; 2026-11-26). The rigid, soft and 2D kernels still keep memories and heaps of their own until they move into world regions |
+| allocator | one region allocator over the shared memory: the world's `Arena` allocates, frees and resizes regions (address-ordered first fit, freed blocks merged; 2026-11-26), and the rigid kernel's world lives in its regions. The soft and 2D kernels still keep memories and heaps of their own until they move into world regions |
 
 ## 7. Determinism
 

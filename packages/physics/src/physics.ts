@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // The own solver behind the names `Physics` has today. On the step path: no `Math`, tests/step-path.test.js holds that.
+import type { Arena } from './world/memory.js';
 import { DEFAULT_GRAVITY } from '@margoengine/math/gravity';
 import { MargoError } from '@margoengine/math/errors';
 import { filmSteps } from './film.js';
@@ -100,6 +101,11 @@ export interface PhysicsOptions {
   solverIterations?: number;
   /** Plugin name (default 'physics'). */
   name?: string;
+  /**
+   * The world memory's region allocator the rigid world lives in (default: a memory of its own). Pass a physics world's
+   * (`world.arena`) and its rigid solver's state lies in that world's memory with every other solver's. One Physics per arena.
+   */
+  arena?: Arena;
   /**
    * Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet,
    * true solves them, and `'noForces'` (Rapier's hook answering with no solver flags) finds their contacts and fires their
@@ -684,7 +690,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new RangeError('maxSubsteps must be a positive integer');
     const gravity = options.gravity ?? DEFAULT_GRAVITY;
     checkVec(gravity, 'Gravity');
-    this.world = new KernelWorld();
+    this.world = new KernelWorld(1024, 1024, options.arena ? { arena: options.arena } : {});
     this.world.setGravity(...gravity);
     const filter = options.contactFilter,
       sensorFilter = options.intersectionFilter;
