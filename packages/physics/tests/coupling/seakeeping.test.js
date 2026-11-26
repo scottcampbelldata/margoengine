@@ -1065,6 +1065,92 @@ test('HullSolver infers its forward course through the mean current while retain
   assert.deepEqual(held(1, undefined), held(1, 0), 'a hull that drifts with the tide has zero advective course');
 });
 
+test('HullSolver short-wave reflection loads the wetted bow in the rigid force port', () => {
+  const density = 1024;
+  const amplitude = 0.125;
+  const mass = density * L * B * T;
+  const mesh = boxMesh([L, D, B]);
+  const held = (
+    velocity,
+    waveRows,
+    { enabled = true, y = D / 2 - T, current = [0, 0, 0], rotation = [0, 0, 0, 1], hullMesh = mesh } = {},
+  ) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, y, 0],
+      linearVelocity: velocity,
+      rotation,
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass },
+    });
+    const sea = {
+      density,
+      elevation: () => 0,
+      sample: () => ({ current }),
+      waveCount: waveRows.length,
+      waveComponents(_t, out) {
+        waveRows.forEach((wave, i) => out.set(wave, 4 * i));
+        return waveRows.length;
+      },
+    };
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh: hullMesh, shortWaveResistance: enabled }],
+        sea,
+        addedMass: false,
+        radiation: false,
+        rollDamping: false,
+        diffraction: false,
+        drift: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    return Array.from(
+      new Float64Array(world.memory.buffer, region.byteOffset + body.row * FORCE_WORDS * 8, FORCE_WORDS),
+    );
+  };
+  const compare = (actual, expected) => {
+    assert.ok(Math.abs(actual - expected) < 1e-9, JSON.stringify({ actual, expected }));
+  };
+  const scale = 0.5 * density * GRAVITY * B * amplitude ** 2;
+  const speedFactor = 1 + 10 / Math.sqrt(GRAVITY * L);
+  const head = [-2, 0, amplitude, 0];
+  const oblique = [-1.5, 2, amplitude / 2, 0.7];
+  // Independently evaluated modified Bessel values at k_e d, using SciPy.
+  const staticReflection = 0.896920592356178;
+  const advancingReflection = 0.9995143633665055;
+  const obliqueReflection = 0.9995456009710303;
+  const stationary = held([0, 0, 0], [head]);
+  const advancing = held([1, 0, 0], [head, oblique]);
+  compare(stationary[0], -scale * staticReflection);
+  compare(advancing[0], -scale * speedFactor * (advancingReflection + (0.6 ** 2 * obliqueReflection) / 4));
+  compare(advancing[2], 0);
+  compare(held([0, 0, 0], [[2, 0, amplitude, 0]])[0], -stationary[0]);
+  compare(held([0, 0, 0], [[-0.125, 0, amplitude, 0]])[0], -scale * 3.818900788618694e-5);
+  compare(held([0, 0, 0], [[0, 2, amplitude, 0]])[0], 0);
+  compare(held([1, 0, 0], [head, oblique], { enabled: false })[0], 0);
+  for (const y of [3, -3]) compare(held([1, 0, 0], [head], { y })[0], 0);
+  assert.deepEqual(held([0, 0, 0], [[-2, 0, amplitude, 2.2]]), stationary);
+  assert.deepEqual(held([1.25, 0, 0], [head, oblique], { current: [0.25, 0, 0] }), advancing);
+  const halfTurn = Math.SQRT1_2;
+  const rotated = held([0, 0, 0], [[0, -2, amplitude, 1.1]], { rotation: [0, -halfTurn, 0, halfTurn] });
+  assert.ok(Math.abs(rotated[0]) < 1e-5);
+  assert.ok(Math.abs(rotated[2] - stationary[0]) < 1e-5, 'the pressure follows the turned waterline');
+  const slender = boxMesh([2 * L, D, B]);
+  for (let i = 0; i < slender.vertices.length; i += 3) {
+    slender.vertices[i + 2] *= 1 - Math.abs(slender.vertices[i] / L);
+  }
+  // A diamond waterline's forward normals have n_x² = 1/17. Its open forward projection is B.
+  const slenderFactor = 1 + (68 - 310 / 17) / Math.sqrt(GRAVITY * 2 * L);
+  const slenderLoad = held([1, 0, 0], [head], { hullMesh: slender });
+  compare(slenderLoad[0], (-scale * advancingReflection * slenderFactor) / 17);
+});
+
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T, advance = false, current = 0) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });

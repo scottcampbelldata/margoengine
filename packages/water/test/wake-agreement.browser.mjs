@@ -24,6 +24,7 @@ const modes = [
   ['--bilge-keels', 'bilge'],
   ['--surge-panels', 'surge'],
   ['--tidal-course', 'tide'],
+  ['--short-wave-reflection', 'reflection'],
   ['--incident-spectrum', 'incident'],
   ['--forward-course', 'course'],
   ['--hull-motion', 'hull'],
@@ -43,7 +44,8 @@ try {
     const advance = motion === 'advance';
     const surge = motion === 'surge';
     const tide = motion === 'tide';
-    const incident = motion === 'incident' || surge || tide;
+    const reflection = motion === 'reflection';
+    const incident = motion === 'incident' || surge || tide || reflection;
     const bilge = motion === 'bilge';
     const forwardCourse = incident || bilge || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
@@ -65,13 +67,16 @@ try {
     const nf = 12,
       nd = 12,
       spectrum = {
-        frequencies: Float64Array.from({ length: nf }, (_, i) => 0.06 * 12 ** (i / (nf - 1))),
+        frequencies: Float64Array.from({ length: nf }, (_, i) => (reflection ? 0.12 : 0.06) * 12 ** (i / (nf - 1))),
         directions: Float64Array.from({ length: nd }, (_, j) => (2 * Math.PI * j) / nd),
         energy: new Float64Array(nf * nd),
         depth: 25,
         density: 1025,
       };
-    jonswap({ height: 1, period: 7, direction: 0.4 }, spectrum);
+    jonswap(
+      reflection ? { height: 0.45, period: 1.1, direction: Math.PI } : { height: 1, period: 7, direction: 0.4 },
+      spectrum,
+    );
     const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] });
     let wake;
     let hash;
@@ -122,6 +127,7 @@ try {
               mesh,
               course: tide ? {} : forwardCourse ? { speed: 1 } : undefined,
               surgeAddedMass: surge,
+              shortWaveResistance: reflection,
               bilgeKeels: bilge
                 ? [
                     { root: [0, -0.45, -1], span: [-0.06, -0.08], length: 3 },

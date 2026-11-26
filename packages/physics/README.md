@@ -2945,6 +2945,8 @@ console.log(highest > 0.8); // true: it rides the swell's crests
 
 Set a tow speed relative to the water and keep the body on that course with the rigid solver or the ship controller. With `course: {}` or an omitted `course.speed`, the hull projects its velocity relative to the sea surface sample’s mean current along the course. The hull still responds to heave and pitch loads. Enable `surgeAddedMass` to carry three-dimensional water inertia along the hull axis in the high-encounter-frequency limit. It defaults to false. Use a closed solver mesh with at most 512 wetted triangles after clipping. `SpectralSea` supplies the reference bed depth. The option uses the same rigid force port as the other added masses. Add optional `bilgeKeels` for viscous roll damping. Each plate specifies a root midpoint in hull coordinates, a `[dy, dz]` offset from root to tip and a fore–aft length, all in metres. The hull’s natural small-amplitude roll frequency is used unless a prescribed `rollFrequency` is given in rad/s. Omit the list for a bare hull. The wet part of each plate contributes normal drag and forward lift. Seat the root midpoint on the hull mesh to include the separate hull-pressure moment. It follows the wet girth on that side of the hull. The wet plate also adds inertia along its normal when `addedMass` is enabled, its default. The drag coefficient uses the low-excursion extension of the ITTC model so that a light roll in calm water does not acquire the extrapolated large drag of the original fit.
 
+Set `shortWaveResistance: true` to carry the mean axial load from reflected short waves on a surface-piercing hull. It uses `SpectralSea.waveComponents`, the reference waterline from the hull mesh, draft, and the water-relative course. The option defaults to false and can be enabled alongside the separate beam-wave drift model.
+
 ```ts
 import {Physics} from 'margoengine/physics';
 import {HullSolver, SEA_WATER} from 'margoengine/physics/seakeeping';
@@ -2968,16 +2970,16 @@ const mesh = {
   ]),
 };
 const sea = new SpectralSea({waves: {
-  frequencies: Float64Array.from([0.4, 0.5]),
+  frequencies: Float64Array.from([0.8, 1]),
   directions: Float64Array.from([0, Math.PI]),
-  energy: Float64Array.from([0.005, 0, 0, 0]),
+  energy: Float64Array.from([0, 0.005, 0, 0]),
   depth: 8, density: SEA_WATER,
 }});
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
   .add(new HullSolver(), {
     hulls: [{
-      row: body.row, mesh, course: {speed: 1}, surgeAddedMass: true,
+      row: body.row, mesh, course: {speed: 1}, surgeAddedMass: true, shortWaveResistance: true,
       bilgeKeels: [
         {root: [0, -0.18, -0.35], span: [-0.04, -0.06], length: 2.4},
         {root: [0, -0.18, 0.35], span: [-0.04, 0.06], length: 2.4},

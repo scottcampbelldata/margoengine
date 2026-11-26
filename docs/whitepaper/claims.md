@@ -6366,3 +6366,7 @@ With 1 m/s world velocity and 0.25 m/s longitudinal current, the inferred course
 ### SEA-08 bow and stern displacement
 
 A 4 m prismatic hull moving at 0.75 m/s through the water transfers 12.5 L from its trailing end to its leading end in one 60 Hz tick. Its net grid volume stays zero, and the source’s longitudinal first moment equals swept volume times hull length. Astern travel reverses the sign, and an equal drift current yields zero displacement. The replay is exact in plain and shared memory. Both renderers sample the outgoing wake at 1,362 vertices and agree with the physics surface. Tank amplitudes and production film bindings remain open. [Derivation and held-out experiment](../clean-room.md#sea-08-displacement-from-a-translating-hull)
+
+### SEA-08 short-wave axial reflection
+
+A wall-sided hull receives the analytic head- and quartering-wave mean loads through the rigid force port. A slender diamond checks the small-bluntness advance term from its exact waterline projection. A rotated hull turns the applied force with the waterline, and a steady drift gives the same load as its corresponding through-water course. The analytical force cases leave tank performance open. [Source equations and experimental hold-out](../clean-room.md#sea-08-mean-axial-load-from-short-wave-reflection)

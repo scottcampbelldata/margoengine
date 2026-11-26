@@ -65,6 +65,12 @@ import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import {
+  interceptedBreadth,
+  type ReflectingWaterline,
+  reflectingWaterline,
+  wallReflectance,
+} from './wave-reflection.js';
+import {
   GRAVITY,
   type HullMesh,
   SEA_WATER,
@@ -86,6 +92,8 @@ export interface Hull {
   readonly bilgeKeels?: readonly HullBilgeKeel[];
   /** Carry the 3D high-frequency water inertia along the hull's x axis. Default false. */
   readonly surgeAddedMass?: boolean;
+  /** Add mean axial wave-reflection loads on the hull's waterline. Default false. */
+  readonly shortWaveResistance?: boolean;
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
    * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
@@ -256,6 +264,7 @@ export class HullSolver implements Solver<HullParams> {
   private drift = true;
   /** Per hull: its drift coefficient (N per m of hull and square metre of wave amplitude, summed along it) by frequency. */
   private readonly drifts = new Map<Hull, { frequencies: Float64Array; coefficient: Float64Array }>();
+  private readonly reflectingWaterlines = new Map<Hull, ReflectingWaterline>();
   private waves32 = new Float32Array(0);
   private courseWaveScratch = new Float64Array(0);
   private greenWater = true;
@@ -306,7 +315,6 @@ export class HullSolver implements Solver<HullParams> {
       throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
     if (girderSeams && (girderSeams.kind !== 'surfaceSampleSet' || girderSeams.quantity !== GIRDER_SEAM_QUANTITY))
       throw new MargoError('state', 'Pass GirderJointSolver.seamField to link a failed girder to a hull opening.');
-    if (wake) this.loads.surfacePiercing = false;
     this.wakeSourceField = Object.freeze({
       name: id + '.wakeSources',
       kind: 'surfaceSampleSet',
@@ -418,6 +426,9 @@ export class HullSolver implements Solver<HullParams> {
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.wakeSources = null;
     this.wakePlanes.clear();
+    this.reflectingWaterlines.clear();
+    if (this.wakeRadius !== null || hulls.some((hull) => hull.shortWaveResistance)) this.loads.surfacePiercing = false;
+    else delete this.loads.surfacePiercing;
     if (this.wakeRadius !== null) {
       if (level !== 0)
         throw new MargoError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
@@ -693,13 +704,16 @@ export class HullSolver implements Solver<HullParams> {
         );
       const course = this.course[index];
       const wetWake = wake && this.loads.surfacePiercing && bodies[at + 16]! > 0;
+      const reflecting = hull.shortWaveResistance && this.loads.surfacePiercing && bodies[at + 16]! > 0;
       const throughWater =
-        (wetWake && this.wakeAdvance) || (course && course.speed === undefined)
+        (wetWake && this.wakeAdvance) || ((course || reflecting) && course?.speed === undefined)
           ? this.throughWaterSpeed(v, turned, centre, t)
           : 0;
       const speed = course ? (course.speed ?? throughWater) : 0;
       if (wetWake)
         this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, throughWater, dt, wake);
+      if (reflecting)
+        this.reflectShortWaves(hull, 1 / bodies[at + 16]!, turned, t, course?.speed ?? throughWater, loads);
       if (this.radiation)
         this.radiate(
           hull,
@@ -738,6 +752,62 @@ export class HullSolver implements Solver<HullParams> {
             : [...loads.force, ...loads.torque];
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
     }
+  }
+
+  /** Add the mean longitudinal pressure of reflected short waves using the reference waterline. */
+  private reflectShortWaves(
+    hull: Hull,
+    mass: number,
+    rotation: readonly [number, number, number, number],
+    t: number,
+    speed: number,
+    loads: WettedLoads,
+  ): void {
+    const sea = this.wavesOf();
+    if (!sea) return;
+    const gravity = -this.gravity[1];
+    if (gravity <= 0) return;
+    const axis = rotate(rotation, [1, 0, 0]);
+    const heading = hypot(axis[0], axis[2]);
+    if (heading === 0) return;
+    let waterline = this.reflectingWaterlines.get(hull);
+    const density = this.sea!.density ?? SEA_WATER;
+    if (!waterline) {
+      const height = stillWaterline(hull.mesh, mass, density);
+      waterline = reflectingWaterline(hull.mesh, height);
+      this.reflectingWaterlines.set(hull, waterline);
+    }
+    const { beam, length, draft } = waterline;
+    if (!(beam > 0 && length > 0 && draft > 0)) return;
+    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
+    const count = sea.waveComponents(t, this.waves32);
+    const depth = sea.stillDepth ?? Infinity;
+    const forwardX = axis[0] / heading;
+    const forwardZ = axis[2] / heading;
+    const froude = Math.abs(speed) / Math.sqrt(gravity * length);
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+      const kx = this.waves32[4 * i]!;
+      const kz = this.waves32[4 * i + 1]!;
+      const amplitude = this.waves32[4 * i + 2]!;
+      const k = hypot(kx, kz);
+      if (!(k > 0 && amplitude > 0)) continue;
+      const along = kx * forwardX + kz * forwardZ;
+      const across = -kx * forwardZ + kz * forwardX;
+      const width = interceptedBreadth(waterline, along / k, across / k);
+      if (width === 0) continue;
+      const decay = depth < Infinity ? exp(-2 * k * depth) : 0;
+      const omega = Math.sqrt((gravity * k * (1 - decay)) / (1 + decay));
+      const encounter = omega - along * speed;
+      const reflection = wallReflectance((encounter * encounter * draft) / gravity);
+      const bluntness = Math.abs(width) / beam;
+      // Tsujimoto et al. (2008), Figure 7, conventional hulls without a measured speed coefficient.
+      const coefficient = Math.max(10, 68 - 310 * bluntness);
+      total += amplitude * amplitude * width * reflection * (1 + coefficient * froude);
+    }
+    const force = -0.5 * density * gravity * total;
+    loads.force[0] += force * forwardX;
+    loads.force[2] += force * forwardZ;
   }
 
   /** Project the wet boundary's vertical and longitudinal fluxes onto its still-water waterplane. */

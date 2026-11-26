@@ -92,6 +92,7 @@ export interface Hull {
     readonly course?: HullCourse;
     readonly bilgeKeels?: readonly HullBilgeKeel[];
     readonly surgeAddedMass?: boolean;
+    readonly shortWaveResistance?: boolean;
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
 }

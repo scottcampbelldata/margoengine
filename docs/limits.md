@@ -10379,3 +10379,9 @@ The optional `HullWake.advance` flag starts off. It adds one source row per stat
 The advancing-hull seakeeping entry is 31,849 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
 
 The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0 mm near the bow, versus 63.8 and 77.9 mm measured at the two fixed-sinkage towing speeds. The crest arrives farther aft in the numerical case. [Measured conditions and reproduction](./clean-room.md#sea-08-independently-measured-wigley-waterline)
+
+### Seakeeping short-wave resistance
+
+`Hull.shortWaveResistance` defaults to false. It uses the mean reference waterline, a projected bow or stern incidence, the absolute forward Froude number and a linear spectral energy sum. It supplies a horizontal axial force through the body centre. Its wall-sided reflection approximation leaves motion-induced head-wave drag, nonlinear breaking and pressure distribution along the hull outside its scope. The conventional speed curve was measured at `λ/L = 0.3`, and finite-depth, large-Froude and strongly following sea extensions are unqualified. The hull must be surface-piercing and the supplied sea must expose spectral wave components.
+
+The short-wave seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
