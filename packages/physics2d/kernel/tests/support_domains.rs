@@ -383,6 +383,8 @@ fn impact_restitution_keeps_the_existing_rebound_bar_in_both_lane_modes() {
             Core::circle(V2::ZERO, 0.25).unwrap(),
             &ShapeDef {
                 restitution: 0.8,
+                // The pair's restitution is the ball's, the larger of the two (by default a pair takes their average).
+                restitution_rule: margoengine_physics2d_kernel::world::COMBINE_MAX,
                 ..Default::default()
             },
         )

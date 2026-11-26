@@ -1,6 +1,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Kernel, Words } from './kernel.js';
 import {
+  combineRule,
+  type CoefficientCombineRule2D,
   describeShape,
   describeShapes,
   type ActiveHooks2D,
@@ -188,6 +190,22 @@ export class Collider2D {
   setRestitution(value: number): void {
     new Float32Array(this.settings.buffer)[2] = encode(value, 'restitution');
     this.push();
+  }
+  /** How a contact combines this collider's friction with the other's (Rapier's `setFrictionCombineRule`). */
+  setFrictionCombineRule(rule: CoefficientCombineRule2D): void {
+    this.settings[5] = (this.settings[5] & ~(7 << 21)) | (combineRule(rule, 'friction') << 21);
+    this.push();
+  }
+  frictionCombineRule(): CoefficientCombineRule2D {
+    return ((this.settings[5] >>> 21) & 7) as CoefficientCombineRule2D;
+  }
+  /** How a contact combines this collider's restitution with the other's (Rapier's `setRestitutionCombineRule`). */
+  setRestitutionCombineRule(rule: CoefficientCombineRule2D): void {
+    this.settings[5] = (this.settings[5] & ~(7 << 24)) | (combineRule(rule, 'restitution') << 24);
+    this.push();
+  }
+  restitutionCombineRule(): CoefficientCombineRule2D {
+    return ((this.settings[5] >>> 24) & 7) as CoefficientCombineRule2D;
   }
   setDensity(value: number): void {
     new Float32Array(this.settings.buffer)[0] = encode(value, 'density');

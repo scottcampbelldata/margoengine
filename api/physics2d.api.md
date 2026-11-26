@@ -196,6 +196,16 @@ export interface CharacterOptions2D {
     filter?: QueryFilter2D;
 }
 
+export const CoefficientCombineRule2D: {
+    readonly Average: 0;
+    readonly Min: 1;
+    readonly Multiply: 2;
+    readonly Max: 3;
+    readonly ClampedSum: 4;
+    readonly GeometricMean: 5;
+};
+export type CoefficientCombineRule2D = (typeof CoefficientCombineRule2D)[keyof typeof CoefficientCombineRule2D];
+
 export class Collider2D {
     readonly body: Body2D;
     readonly shapes: number[];
@@ -212,6 +222,10 @@ export class Collider2D {
     get activeHooks(): Required<ActiveHooks2D>;
     setFriction(value: number): void;
     setRestitution(value: number): void;
+    setFrictionCombineRule(rule: CoefficientCombineRule2D): void;
+    frictionCombineRule(): CoefficientCombineRule2D;
+    setRestitutionCombineRule(rule: CoefficientCombineRule2D): void;
+    restitutionCombineRule(): CoefficientCombineRule2D;
     setDensity(value: number): void;
     setActiveCollisionTypes(types: number): void;
     activeCollisionTypes(): number;
@@ -240,6 +254,8 @@ export interface ColliderSettings2D {
     rotation?: number;
     friction?: number;
     restitution?: number;
+    frictionCombineRule?: CoefficientCombineRule2D;
+    restitutionCombineRule?: CoefficientCombineRule2D;
     density?: number;
     mass?: number;
     sensor?: boolean;

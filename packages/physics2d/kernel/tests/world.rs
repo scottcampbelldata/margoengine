@@ -8,7 +8,7 @@
 // and the pile sleeps at 1.02 s; Rapier 2D 0.21.0's drops 29.56 mm and sleeps at 0.92 s.
 use margoengine_physics2d_kernel::math::{Rot, V2, v2};
 use margoengine_physics2d_kernel::shape::Core;
-use margoengine_physics2d_kernel::world::{BodyDef, Kind, Settings, ShapeDef, World};
+use margoengine_physics2d_kernel::world::{BodyDef, COMBINE_MAX, Kind, Settings, ShapeDef, World};
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -299,7 +299,8 @@ fn restitution_bounces_and_zero_restitution_does_not() {
         let mut world = World::default();
         ground(&mut world, V2::ZERO, 10.0);
         let ball = world.create_body(&BodyDef { position: v2(0.0, 2.25), ..Default::default() }).unwrap();
-        world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: e, ..Default::default() }).unwrap();
+        // The ball's restitution is the pair's: the larger of its and the ground's 0 (by default a pair takes their average).
+        world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: e, restitution_rule: COMBINE_MAX, ..Default::default() }).unwrap();
         // Falls 2 m; e^2 of the drop comes back as height.
         let (mut hit, mut peak) = (false, 0.0f32);
         for _ in 0..240 {

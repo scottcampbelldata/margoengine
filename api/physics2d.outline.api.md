@@ -38,6 +38,16 @@ interface ActiveHooks2D {
     modifyContact?: boolean;
 }
 
+const CoefficientCombineRule2D: {
+    readonly Average: 0;
+    readonly Min: 1;
+    readonly Multiply: 2;
+    readonly Max: 3;
+    readonly ClampedSum: 4;
+    readonly GeometricMean: 5;
+};
+type CoefficientCombineRule2D = (typeof CoefficientCombineRule2D)[keyof typeof CoefficientCombineRule2D];
+
 type ColliderOptions2D = ShapeOptions2D & ColliderSettings2D;
 
 interface ColliderSettings2D {
@@ -45,6 +55,8 @@ interface ColliderSettings2D {
     rotation?: number;
     friction?: number;
     restitution?: number;
+    frictionCombineRule?: CoefficientCombineRule2D;
+    restitutionCombineRule?: CoefficientCombineRule2D;
     density?: number;
     mass?: number;
     sensor?: boolean;

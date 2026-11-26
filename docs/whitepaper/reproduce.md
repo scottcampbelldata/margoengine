@@ -1151,7 +1151,7 @@ The deliberately accepted scene pins are:
 ~~~text
 pyramid:   9ffefc83c3a99be4
 joint grid: 95a47530df180011
-mixed:     92db6847c4e919d4   (previous: 9acb68471fbe6ba0)
+mixed:     749b88a3c4d673fc   (previous: 92db6847c4e919d4, before Rapier's average combine rule became the default)
 ~~~
 
 This is a result-changing correctness baseline. The commit names the mixed re-pin and its reason, and runs

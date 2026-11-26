@@ -6804,6 +6804,11 @@ A body with `ccd` set (`BodyDef::ccd`, `set_body_params`) that travels more than
 
 `@margoengine/physics2d` no longer uses Rapier 2D: `Physics2D.load()` compiles `dist/physics2d.wasm` (the committed blueprint `packages/physics2d/src/physics2d-kernel.wasm`, 407 kB raw), and the Rapier objects (`Body2D.raw`, `Joint2D.raw`, `Physics2D.world`, `Physics2DOptions.rapier`, `RapierModule2D`) are gone; the breaks are recorded in `api/breaks.json`. Accepted differences from the Rapier build, each with its cause: friction defaults to 0.5 and restitution to 0 as before, but the contact solver is the kernel's soft step, so resting poses differ from Rapier's by a fraction of the linear slop (5 mm); a collider's `mass` option sets its density from the shape's area (the kernel has no mass override), which is the same mass for a solid shape and none for an edge; `setEnabled(false)` makes a collider meet nothing and drops it from queries but its mass still counts (Rapier removes it from the body's mass too); `overlapShape` and `castShape` take a box, circle, capsule, segment or a convex polygon of at most 8 points (Rapier also took concave polygons as compounds); a polyline whose last point repeats its first is a closed chain; the character controller is TypeScript over the kernel's shape cast, so its exact corner cases (slope entry, stepping onto a ledge a hair wider than `minWidth`) follow the algorithm in `packages/physics2d/src/character.ts` and not Rapier's; `pushDynamic` applies the character's mass times the speed into the body as an impulse. Tests: `packages/physics2d/tests/physics2d.test.js` and `kernel-features.test.js`.
 
+
+Since 2026-11-26 a pair's friction and restitution combine by Rapier's rules (C2-12), the average by default: before,
+the kernel took the square root of the product of the frictions and the larger restitution. A scene whose bodies bounce
+off a floor of restitution 0 now bounces at half its restitution unless it sets `Max` (as in Rapier); frictions that
+differ meet at their mean. Snapshots written before (version 13 and earlier) read with the average.
 ## Own 2D shapes beyond the first six (2026-11-24)
 
 `triangle`, `trimesh`, `heightfield`, `halfspace`, `compound`, `voxels`, `borderRadius` and one-sided polylines are options of `Physics2D` colliders (`packages/physics2d/src/shapes.ts`). Accepted differences from Rapier: `borderRadius` grows the shape outward as Rapier's round shapes do, so a box of `width` 20 with radius 6 is 32 wide; a `trimesh` is one convex piece per triangle, not a mesh with edge ghosts, so a body sliding over its seams can catch where a `heightfield` or `polyline` (chains with ghost vertices) does not; a `halfspace` is a polygon 200,000 world units across and deep, not infinite; `voxels` collide as merged outlines with no thickness, as tile maps do, so a very fast body needs `ccd: true`, and answer every scene query (point, ray, overlap, cast, projection) from the filled cells themselves (`kernel/src/voxel.rs`, a lookup and a grid walk; a voxels collider cannot be rotated, and its query-only shape adds no mass and touches nothing); a `heightfield` is a chain with smooth joins, solid on the up side. A one-sided polyline is solid on the side its right-hand normals point to (left to right is up on screen) and a body that is already behind it stays behind; ray queries still meet it from both sides. A `mass` on a compound or mesh is spread over its pieces by area. Tests: `packages/physics2d/tests/shapes-more.test.js` and `kernel/tests/chain.rs`.
@@ -6852,7 +6857,9 @@ All 29 native physical bars pass, including the unchanged 1:100 and required 1:1
 100-row pile sag, slope creep, bounce, friction, joints and sleep. The 1:1000 result is 0.518550681 m sag versus
 0.518550736 m closed form, zero final displacement from the one-second sample, asleep at 0.8833334 s. The
 unchanged regression fails on verified main 47f81f909: 1.186208290 m sag and 92.105 mm creep. The mixed-scene pin changes
-intentionally from `9acb68471fbe6ba0` to `92db6847c4e919d4`; pyramid/joint-grid pins are unchanged.
+intentionally from `9acb68471fbe6ba0` to `92db6847c4e919d4`; pyramid/joint-grid pins are unchanged. It changes again,
+to `749b88a3c4d673fc`, when a pair's friction and restitution combine by Rapier's rules with the average by default
+(2026-11-26, C2-12); its mixed shapes differ in friction and restitution, the pyramid's and joint grid's do not.
 The same two stack predicates run inside Wasm `check(0)`; native scalar/SIMD and shipped Wasm SIMD agree on
 the stack metrics. Wasm always selects SIMD even when its stored `contact_lanes` setting is false.
 
@@ -14314,10 +14321,11 @@ Staged contact can use a positive piecewise-linear virgin loading envelope with 
 and recoverable-adjusted permanent stroke. The only supported unloading law is one linear
 stiffness followed by elastic backing at compaction. Continuous contact requires a rigid
 rate fast enough to keep the implicit response monotone across each traversed falling branch.
+Use the same rate and place crush before rigid in their staggered group.
 The held-out single-coach test qualifies compression from a pretest design curve at 960 and 1920 Hz.
 It predicts rebound speeds of 1.49–1.61 mph versus about 3.3 mph measured. An independently tested Accord coupe qualifies the full-width 56 km/h road-car pulse for one vehicle family. Rebound speed is 0.42–0.44 m/s high. Occupant motion, other road-car families, oblique impacts and inter-car joints remain open.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A paired optional hull contact channel includes instantaneous exterior added mass and carried water at a station. It requires the same-rate order hull, crush, rigid. The calculation freezes the six-axis mobility over each 60 Hz contact interval. Unpaired bodies, rigid bodies with locked angular axes, and distributed shell contacts use the dry rigid response. Hydroelastic impact, radiation forces generated by the contact itself, and fully coupled pressure on a deforming shell remain open. A linked authored compartment aperture opens at full seal loss from the stroke threshold and supplies inflow and carried mass through SEA-10. A shell seam can link its live opening geometry instead. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 54616 B minified and 19831 B gzip under its 20426 B ceiling. The optional seakeeping entry measures 87966 B minified and 33986 B gzip under its 35006 B ceiling. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A paired optional hull contact channel includes instantaneous exterior added mass and carried water at a station. It requires the same-rate order hull, crush, rigid. The calculation freezes the six-axis mobility over each 60 Hz contact interval. Unpaired bodies, rigid bodies with locked angular axes, and distributed shell contacts use the dry rigid response. Hydroelastic impact, radiation forces generated by the contact itself, and fully coupled pressure on a deforming shell remain open. A linked authored compartment aperture opens at full seal loss from the stroke threshold and supplies inflow and carried mass through SEA-10. A shell seam can link its live opening geometry instead. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 54789 B minified and 19879 B gzip under its 20426 B ceiling. The optional seakeeping entry measures 87966 B minified and 33986 B gzip under its 35006 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -32742,14 +32750,23 @@ disk. The fracture work reduces its footprint and thickens its subgrid pile whil
 single. Explicit bonds, fracture-created rows and contact with grounded bathymetry are needed to
 move those blocks independently.
 
+### Fixed 2026-11-26: staged crush accepted stale rigid contact rows (BREAK-03)
+
+A staged station could evaluate a contact using a different rigid tick or solve after the
+rigid accumulator had already been consumed. The station now verifies the rigids are from
+the preceding tick and names the required same-rate staggered order. The staged crush coupling
+test covers both incompatible schedules.
+
 ### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
 
 A crush station now opens an authored SEA-10 compartment aperture when its seal fails. It transfers
 the inflowing water and its mass to the hull. A flooding hull with exterior hydrodynamic added mass
 disabled used to dereference an absent carried-inertia region when the first water entered. The region is
 now allocated for compartments and the live crush-to-flood test exercises that setting.
-`packages/physics/tests/coupling/crush.test.js` reproduces the connection. Distributed rupture geometry
-and EF-11's production breakup sequence remain open. PA-52 remains open for its other paths.
+`packages/physics/tests/coupling/crush.test.js` reproduces the connection. A cohesive shell seam can
+also open SEA-10 through its live polygon, covered by `packages/physics/tests/coupling/crush-shell-flood.test.js`.
+Automatic tearing, direct water pressure on the deforming shell, and EF-11's production breakup
+sequence remain open. PA-52 remains open for its other paths.
 
 ### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
 

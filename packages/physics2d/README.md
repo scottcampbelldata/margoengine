@@ -210,6 +210,24 @@ console.log(body.mass.toFixed(3)); // '2.262': 2 kg/m^2 over a disc of 0.6 m
 physics.dispose();
 ```
 
+A contact combines two colliders' friction and restitution by their combine rules, as Rapier's do:
+`CoefficientCombineRule2D.Average` by default, or `Min`, `Multiply`, `Max`, `ClampedSum` (the sum held to 0 to 1) or
+`GeometricMean`; of two colliders' rules the later in that list wins. Set them with the `frictionCombineRule` and
+`restitutionCombineRule` options or `setFrictionCombineRule` and `setRestitutionCombineRule`. A ball of restitution
+0.8 on a floor of 0 bounces at 0.4 by the average; give the ball `Max` to bounce at 0.8.
+
+```ts
+import { CoefficientCombineRule2D, Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+const ball = physics.addBody(null, {
+  colliders: { shape: 'circle', radius: 0.25, restitution: 0.8, restitutionCombineRule: CoefficientCombineRule2D.Max },
+});
+console.log(ball.colliders[0].restitutionCombineRule() === CoefficientCombineRule2D.Max); // true
+physics.dispose();
+```
+
 ## Articulations
 
 `physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.

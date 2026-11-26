@@ -190,6 +190,35 @@ pub struct ShapeDef {
     pub one_sided: bool,
     /// `HOOK_FILTER`, `HOOK_CONTACT` and `HOOK_INTERSECTION`: ask the world's hook about the pairs this shape is in.
     pub hooks: u8,
+    /// How a contact combines this shape's friction with the other's (`COMBINE_*`); of two shapes' rules the later in that
+    /// list wins, as Rapier's `CoefficientCombineRule` does. Default `COMBINE_AVERAGE`.
+    pub friction_rule: u8,
+    /// The same for restitution.
+    pub restitution_rule: u8,
+}
+
+/// Combine rules of `ShapeDef::friction_rule` and `restitution_rule`, in the order a pair picks between two (the later
+/// wins): the mean, the smaller, the product, the larger, the sum held to 0 to 1, the square root of the product.
+pub const COMBINE_AVERAGE: u8 = 0;
+pub const COMBINE_MIN: u8 = 1;
+pub const COMBINE_MULTIPLY: u8 = 2;
+pub const COMBINE_MAX: u8 = 3;
+pub const COMBINE_CLAMPED_SUM: u8 = 4;
+pub const COMBINE_GEOMETRIC_MEAN: u8 = 5;
+/// The last combine rule.
+pub const COMBINE_LAST: u8 = COMBINE_GEOMETRIC_MEAN;
+
+/// Two shapes' coefficients combined by the later of their two rules.
+pub fn combine(a: f32, rule_a: u8, b: f32, rule_b: u8) -> f32 {
+    match rule_a.max(rule_b) {
+        COMBINE_MIN => a.min(b),
+        COMBINE_MULTIPLY => a * b,
+        COMBINE_MAX => a.max(b),
+        COMBINE_CLAMPED_SUM => (a + b).clamp(0.0, 1.0),
+        COMBINE_GEOMETRIC_MEAN => crate::solver::sqrt_product(a, b),
+        // Halves first: two coefficients near f32::MAX average to a finite number.
+        _ => 0.5 * a + 0.5 * b,
+    }
 }
 
 /// `ShapeDef::hooks` bits: the hook may veto a pair of solids, may change a pair's contact, and may veto a pair with a sensor in it.
@@ -225,6 +254,8 @@ impl Default for ShapeDef {
             force_threshold: 0.0,
             one_sided: false,
             hooks: 0,
+            friction_rule: COMBINE_AVERAGE,
+            restitution_rule: COMBINE_AVERAGE,
         }
     }
 }
@@ -282,6 +313,9 @@ pub struct Shape {
     pub force_threshold: f32,
     pub one_sided: bool,
     pub hooks: u8,
+    /// Combine rules (`COMBINE_*`) of its friction and restitution.
+    pub friction_rule: u8,
+    pub restitution_rule: u8,
     /// A grid of solid cells that scene queries meet in place of the core (the core is its bounding box); such a shape
     /// takes part in no contact.
     pub grid: Option<alloc::boxed::Box<crate::voxel::Grid>>,
@@ -773,8 +807,8 @@ impl World {
         if target.dead { return Err(PhysicsError::InvalidHandle); }
         let bounds = bounds_of(&core, target.xf)?;
         if [def.density, def.friction, def.restitution].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
-        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, grid: None, dead: false };
+        if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > COMBINE_LAST || def.restitution_rule > COMBINE_LAST { return Err(PhysicsError::InvalidParameter); }
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, grid: None, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {

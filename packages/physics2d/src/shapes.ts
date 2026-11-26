@@ -110,6 +110,13 @@ export interface ColliderSettings2D {
   rotation?: number;
   friction?: number;
   restitution?: number;
+  /**
+   * How a contact combines this collider's friction with the other's (default `CoefficientCombineRule2D.Average`): of two
+   * colliders' rules the later of Average, Min, Multiply, Max, ClampedSum, GeometricMean wins, as in Rapier.
+   */
+  frictionCombineRule?: CoefficientCombineRule2D;
+  /** The same for restitution (default `CoefficientCombineRule2D.Average`). */
+  restitutionCombineRule?: CoefficientCombineRule2D;
   /** Mass per square metre (Rapier units). Default 1. */
   density?: number;
   /** Overrides density with a total mass in Rapier units. */
@@ -184,6 +191,31 @@ const radiusOf = (value: number | undefined): number => {
 };
 
 const KIND = { circle: 0, capsule: 1, segment: 2, rect: 3, polygon: 4, chain: 5, decomposed: 6, voxels: 7 } as const;
+
+/**
+ * How a contact combines two colliders' friction or restitution, as Rapier's `CoefficientCombineRule`: the mean, the smaller,
+ * the product, the larger, the sum held to 0 to 1, or the square root of the product. Of two colliders' rules the later in
+ * that order wins.
+ */
+export const CoefficientCombineRule2D = {
+  Average: 0,
+  Min: 1,
+  Multiply: 2,
+  Max: 3,
+  ClampedSum: 4,
+  GeometricMean: 5,
+} as const;
+export type CoefficientCombineRule2D = (typeof CoefficientCombineRule2D)[keyof typeof CoefficientCombineRule2D];
+
+/** A combine rule checked, as its kernel number (0 to 5); the average when none is given. @internal */
+export function combineRule(rule: number | undefined, what: string): number {
+  if (rule === undefined) return 0;
+  if (!(Number.isInteger(rule) && rule >= 0 && rule <= 5))
+    throw new RangeError(
+      `A collider's ${what} combine rule is a CoefficientCombineRule2D (Average, Min, Multiply, Max, ClampedSum or GeometricMean; got ${rule}); pass one.`,
+    );
+  return rule;
+}
 
 /** A collider ready for the kernel: its shape kind, the eight settings words and the geometry words, in metres. */
 export interface Described {
@@ -337,7 +369,9 @@ export function describeShape(options: ColliderOptions2D, scale: number): Descri
     (oneSided ? 1 << 17 : 0) |
     (options.hooks?.filterPair ? 1 << 18 : 0) |
     (options.hooks?.modifyContact ? 1 << 19 : 0) |
-    (options.hooks?.filterIntersection ? 1 << 20 : 0);
+    (options.hooks?.filterIntersection ? 1 << 20 : 0) |
+    (combineRule(options.frictionCombineRule, 'friction') << 21) |
+    (combineRule(options.restitutionCombineRule, 'restitution') << 24);
   settings.f[6] = options.contactForceThreshold ?? 0;
   return { kind, settings: settings.u, geometry: geometry.u, area, convex };
 }

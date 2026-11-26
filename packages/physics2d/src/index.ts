@@ -31,7 +31,7 @@ export type { ArticulationLink2D, LinkPose2D, IKOptions2D } from './articulation
 export { PidController2D } from './pid.js';
 export { CharacterController2D } from './character.js';
 export type { CharacterOptions2D, CharacterMoveResult2D } from './character.js';
-export { interactionGroups } from './shapes.js';
+export { CoefficientCombineRule2D, interactionGroups } from './shapes.js';
 export type { ActiveHooks2D, ColliderOptions2D, ColliderSettings2D, ShapeOptions2D, Vec2D } from './shapes.js';
 export { tileMapColliders } from './tilemap.js';
 export type { TileMapSource, TileMapBodyOptions, TileShape } from './tilemap.js';

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20576886,
+  "total": 20577081,
   "history": [
     {
       "date": "2026-10-24",
@@ -14005,6 +14005,12 @@
       "commit": "KB-BVH-SYNCPOSE1",
       "reason": "KB-BVH-SYNCPOSE1 (bvh fix, synchronous raycasts on skinned and morphed models): animation 25,402 to 26,506 B gzip (+1,104 B), cap 26,165 to 27,302 B; animation/interactivity, which bundles the same Animation, 27,484 to 28,531 B (+1,047 B), cap 28,309 to 29,387 B; animation/geometry-cache 5,305 to 5,443 B (+138 B), cap 5,305 to 5,699 B. The bytes are the CPU twin of the deformation shader (pose.ts: morph targets, the four- or eight-joint blend, the cofactor normal), the palette comparison that redoes it only for a new pose, and the pose registration of Animation, Skin and GeometryCachePlayer: a GPU buffer cannot be read back synchronously, so without them a synchronous raycast on any animated model has no pose to test and threw. A split into an opt-in entry would leave that throw in place for every app that does not know to import it, and a lazy import() cannot serve a synchronous call.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) combine rules",
+      "reason": "Collider2D.setShape (C2-09) and the friction and restitution combine rules with their setters, getters and CoefficientCombineRule2D (C2-12); 19,183 to 19,378 B gzip (this Mac). Collider methods on the one collider class; nothing to split.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14897,7 +14903,7 @@
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 17331,
     "@margoengine/physics2d": 21245,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19378,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

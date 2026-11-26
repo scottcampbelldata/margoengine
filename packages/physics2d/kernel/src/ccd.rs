@@ -289,7 +289,11 @@ impl World {
             return Ok(None);
         }
         let (one_sided, side, asks) = (sb.one_sided, sb.core.normals[0], (sa.hooks | sb.hooks) & HOOK_CONTACT != 0);
-        let mut law = Law { restitution: sa.restitution.max(sb.restitution), friction: crate::solver::sqrt_product(sa.friction, sb.friction), tangent_speed: 0.0 };
+        let mut law = Law {
+            restitution: crate::world::combine(sa.restitution, sa.restitution_rule, sb.restitution, sb.restitution_rule),
+            friction: crate::world::combine(sa.friction, sa.friction_rule, sb.friction, sb.friction_rule),
+            tangent_speed: 0.0,
+        };
         let other = impact.path.at(tau);
         let m = touch(&impact.core, mine, &sb.core, other)?;
         if m.count == 0 {
