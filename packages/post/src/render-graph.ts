@@ -101,6 +101,7 @@ export type RenderGraphErrorCode =
   | 'type-mismatch'
   | 'size-mismatch'
   | 'cycle';
+/** A refused graph description: a TypeError whose `code` is a {@link RenderGraphErrorCode}. */
 export type RenderGraphError = TypeError & { code: RenderGraphErrorCode };
 
 const ANCHOR = 'render-graph';

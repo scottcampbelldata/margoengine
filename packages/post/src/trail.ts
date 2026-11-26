@@ -54,7 +54,6 @@ export const TRAIL_MAX_STAMPS = 4096;
 const BLENDS = ['screen', 'add', 'max'] as const;
 // Below this a texel is set to 0: float16 multiplication alone stalls at its smallest values and never reaches black.
 const CUTOFF = 1 / 1024;
-const ANCHOR = 'trail-texture';
 
 const fadeShader = `${fullscreen}
 struct U { fade:vec4f, brush:vec4f }
@@ -142,9 +141,9 @@ export class TrailTexture implements EnginePlugin {
     const size = options.size ?? 256,
       [w, h] = typeof size === 'number' ? [size, size] : Array.isArray(size) && size.length === 2 ? size : [NaN, NaN];
     if (![w, h].every((v) => Number.isInteger(v) && v >= 1))
-      throw rangeError('TrailTexture size must be a whole number of texels >= 1, or [width, height]', ANCHOR);
+      throw rangeError('TrailTexture size must be a whole number of texels >= 1, or [width, height]', 'trail-texture');
     if (options.order !== undefined && !Number.isFinite(options.order))
-      throw rangeError('TrailTexture order must be a finite number', ANCHOR);
+      throw rangeError('TrailTexture order must be a finite number', 'trail-texture');
     this.width = w;
     this.height = h;
     this.check();
@@ -170,7 +169,7 @@ export class TrailTexture implements EnginePlugin {
    * sample of the same stroke, along the way. Samples outside 0..1 are kept, so a stroke can leave and re-enter. */
   move(x: number, y: number): void {
     if (!Number.isFinite(x) || !Number.isFinite(y))
-      throw rangeError('TrailTexture move needs finite x and y in texture coordinates', ANCHOR);
+      throw rangeError('TrailTexture move needs finite x and y in texture coordinates', 'trail-texture');
     const o = this.check(),
       last = this.last;
     if (!last) {
@@ -201,7 +200,7 @@ export class TrailTexture implements EnginePlugin {
    * stroke. */
   stamp(x: number, y: number, strength = 1): void {
     if (!Number.isFinite(x) || !Number.isFinite(y) || !(Number.isFinite(strength) && strength >= 0))
-      throw rangeError('TrailTexture stamp needs finite x and y and a strength >= 0', ANCHOR);
+      throw rangeError('TrailTexture stamp needs finite x and y and a strength >= 0', 'trail-texture');
     this.check();
     this.push(x, y, 0, strength);
   }
@@ -294,18 +293,21 @@ export class TrailTexture implements EnginePlugin {
         enabled: o.enabled ?? true,
       };
     for (const key of ['decay', 'radius', 'intensity', 'smoothing', 'interpolate', 'speed'] as const)
-      if (typeof v[key] !== 'number') throw typeError(`TrailTexture ${key} must be a number`, ANCHOR);
-    if (typeof v.enabled !== 'boolean') throw typeError('TrailTexture enabled must be a boolean', ANCHOR);
-    if (!BLENDS.includes(v.blend)) throw typeError("TrailTexture blend must be 'screen', 'add' or 'max'", ANCHOR);
-    if (!(v.decay > 0 && v.decay <= 1)) throw rangeError('TrailTexture decay must be in (0, 1]', ANCHOR);
-    if (!(v.radius > 0 && v.radius <= 1)) throw rangeError('TrailTexture radius must be above 0 and at most 1', ANCHOR);
+      if (typeof v[key] !== 'number') throw typeError(`TrailTexture ${key} must be a number`, 'trail-texture');
+    if (typeof v.enabled !== 'boolean') throw typeError('TrailTexture enabled must be a boolean', 'trail-texture');
+    if (!BLENDS.includes(v.blend))
+      throw typeError("TrailTexture blend must be 'screen', 'add' or 'max'", 'trail-texture');
+    if (!(v.decay > 0 && v.decay <= 1)) throw rangeError('TrailTexture decay must be in (0, 1]', 'trail-texture');
+    if (!(v.radius > 0 && v.radius <= 1))
+      throw rangeError('TrailTexture radius must be above 0 and at most 1', 'trail-texture');
     if (!(Number.isFinite(v.intensity) && v.intensity >= 0))
-      throw rangeError('TrailTexture intensity must be finite and >= 0', ANCHOR);
-    if (!(v.smoothing >= 0 && v.smoothing < 1)) throw rangeError('TrailTexture smoothing must be in [0, 1)', ANCHOR);
+      throw rangeError('TrailTexture intensity must be finite and >= 0', 'trail-texture');
+    if (!(v.smoothing >= 0 && v.smoothing < 1))
+      throw rangeError('TrailTexture smoothing must be in [0, 1)', 'trail-texture');
     if (!(Number.isInteger(v.interpolate) && v.interpolate >= 0 && v.interpolate <= 256))
-      throw rangeError('TrailTexture interpolate must be a whole number 0 to 256', ANCHOR);
+      throw rangeError('TrailTexture interpolate must be a whole number 0 to 256', 'trail-texture');
     if (!(Number.isFinite(v.speed) && v.speed >= 0))
-      throw rangeError('TrailTexture speed must be finite and >= 0', ANCHOR);
+      throw rangeError('TrailTexture speed must be finite and >= 0', 'trail-texture');
     return v;
   }
 
@@ -326,7 +328,7 @@ export class TrailTexture implements EnginePlugin {
     if (this.textures[0]) return this.textures[0];
     const limit = device.limits?.maxTextureDimension2D ?? 8192;
     if (this.width > limit || this.height > limit)
-      throw rangeError(`TrailTexture size is above this device's maxTextureDimension2D (${limit})`, ANCHOR);
+      throw rangeError(`TrailTexture size is above this device's maxTextureDimension2D (${limit})`, 'trail-texture');
     this.device = device;
     const made = [0, 1].map(() =>
       device.createTexture({
