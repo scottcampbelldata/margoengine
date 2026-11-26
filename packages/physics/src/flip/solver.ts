@@ -704,7 +704,8 @@ export class FlipSolver implements Solver<FlipParams> {
             fz = k + (a === 2 ? 0 : 0.5),
             d = Math.min(fx, g.nx - fx, g.nz > 1 ? Math.min(fz, g.nz - fz) : Infinity);
           if (d >= this.blend) continue;
-          const b = (1 - d / this.blend) ** 2;
+          const e = 1 - d / this.blend,
+            b = e * e;
           for (let j = 0; j < my; j++) {
             const x = fx * h,
               y = (j + (a === 1 ? 0 : 0.5)) * h,
