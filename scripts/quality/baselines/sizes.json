@@ -13242,13 +13242,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "c32e306e062638b14e2a13934cea5417ef9e75fe",
-      "grew": 1,
-      "reason": "SOFT-03 and PA-75 add the optional strand-springs entry at 1991 B gzip with the existing SpringAccess. It contains rigid transform validation, guide-to-skin mapping and hook lifecycle. A separate third package would duplicate the SpringAccess and Animator bridge. The native physics and World modules load on demand and core and Stage gain zero bytes."
-    },
-    {
-      "date": "2026-11-26",
-      "commit": "78f35c541b",
+      "commit": "58ab0ecb56",
       "grew": 0,
       "reason": "SOFT-04 adds native crack-band softening, irreversible mode state, and a damaged compliance solve with a finite limit at complete separation, moving the soft entry from 133213 to 134833 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
