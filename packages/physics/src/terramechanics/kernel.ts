@@ -15,16 +15,28 @@ export interface NativeSoil {
     change: number,
     dust: number,
     rim: number,
+    pressure: number,
     heights: number,
     floor: number,
     budget: number,
+    work: number,
     nx: number,
     nz: number,
     dx: number,
     dz: number,
     originX: number,
     originZ: number,
-  ): void;
+  ): number;
+  repose(
+    areas: number,
+    change: number,
+    pressure: number,
+    heights: number,
+    nx: number,
+    nz: number,
+    dx: number,
+    dz: number,
+  ): number;
 }
 
 async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
@@ -62,7 +74,11 @@ export function bindSoil(host: SolverHost, builds: Builds): NativeSoil {
     throw new MargoError('unsupported', 'The shared soil kernel is unavailable. Create a plain-memory world.');
   const stack = host.allocate('soil-stack', STACK_BYTES, 'u8', 1);
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
-  if (!(exports.__stack_pointer instanceof WebAssembly.Global) || typeof exports.stamp !== 'function')
+  if (
+    !(exports.__stack_pointer instanceof WebAssembly.Global) ||
+    typeof exports.stamp !== 'function' ||
+    typeof exports.repose !== 'function'
+  )
     throw new MargoError('failed', 'Unexpected terramechanics kernel ABI. Run the build for both native variants.');
   exports.__stack_pointer.value = stack.byteOffset + stack.byteLength;
   return exports as unknown as NativeSoil;

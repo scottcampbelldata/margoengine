@@ -44,7 +44,7 @@ solve. Both routes use the same rest-volume and stiffness-damping scaling as the
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
 `p = (kc/b + kphi) z^n`, verified against J. Y. Wong, *Theory of Ground Vehicles*, 3rd ed. (2001), Eq. 2.47.
 J. Y. Wong and A. R. Reece, “Prediction of rigid wheel performance based on the analysis of soil-wheel stresses”
-(1967), integrates normal and tangential stresses around a wheel. Margo applies the uniform-pressure version to a
+(1967), integrates normal and tangential stresses around a wheel. The mean tier applies uniform pressure to a
 measured contact patch and uses DYN-04's suspension. Z. Janosi and B. Hanamoto, “The Analytical Determination of
 Drawbar Pull as a Function of Slip for Tracked Vehicles in Deformable Soils” (1961), gives
 `τ = (c + p tan φ)(1 − exp(−j/K))`, verified against Wong Eq. 2.56.
@@ -58,6 +58,21 @@ redistribution into the first unoccupied ring. Margo integrates volume with the 
 height-field triangles and weights the berm in the direction of mobilized shear. The ledger separates compacted
 volume, dry mineral fines and loose soil that leaves the modeled patch. Native state retains the peak indentation.
 [Sumner et al.](https://www.ri.cmu.edu/pub_files/pub4/sumner_robert_1999_1/sumner_robert_1999_1.pdf).
+
+R. Krenn and G. Hirzinger, “SCM – A Soil Contact Model for Multi-Body System Simulations” (2009), Eqs. 2–4,
+defines equivalent width as twice a footprint's area divided by its perimeter. The resolved tier uses that width
+and solves one peak depth from the force integral `F = Σ (kc / b + kphi) (z_peak q_i)^n A_i`.
+For a rectangular rounded footprint the profile `q_i` is one minus the squared maximum normalized coordinate.
+For an ellipse it is one minus the squared normalized radius. The per-vertex area is the TerrainBed nodal
+area. The local repose pass conservatively transfers only the current step's new loose material.
+[Krenn and Hirzinger](https://elib.dlr.de/60535/1/elib_ISTVS2009_KrennHirzinger.pdf).
+
+M. Apfelbeck, S. Kuß, B. Rebele and B. Schäfer, “A systematic approach to reliably characterize soils based on
+bevameter testing” (2011), gives fits for circular plates in Table 5 and observed square profiles in Fig. 8.
+Both tiers reproduce the held-out square-plate sinkage for the dry quartz sand at 41.21 kPa (18.6–21.2 mm)
+and fire clay at 2 kPa (24.3–30.7 mm). The test bands use the plotted error bars with one pixel of graph read-off
+allowance. The circular-plate fits used for the check are the slow quartz and fast clay measurements in Table 5.
+[Apfelbeck et al.](https://elib.dlr.de/69724/1/Apfelbeck_BevameterTest_JTerra2011.pdf).
 
 ### Synoptic weather and moisture (ATMO-10)
 

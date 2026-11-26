@@ -10421,3 +10421,8 @@ ledger splits cut material among the berm, compaction, dry fines and outflow. Th
 existing wheel and belt loads and refits the registered height field. The adapter snapshots the belt shear history and
 the collider-height mirror. LIFE-01 foot rows are another input. ATMO-06 consumes the same mineral dust grid used for
 aeolian sources. Tests include both clocks at their shared times and audit the held source mass at an intermediate tick.
+
+Both tiers use the same coupling contracts. The resolved tier balances integrated vertex pressure with the input
+force and exposes a layout-1 pressure grid. The native repose sweep transfers unconstrained, newly deposited loose
+soil across each grid face at most once per step. Reported work gives raster-vertex visits and grid faces examined,
+and the volume moved is auditable without a timer.

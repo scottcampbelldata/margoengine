@@ -89,6 +89,43 @@ test('native soil state matches across frame cadence, in-flight restore and memo
   assert.equal(plain.hash(), shared.hash());
 });
 
+test('resolved rounded footprints integrate the independent square-profile solution and spread a conservative berm', async () => {
+  const soil = await Terramechanics.load({ tier: 'resolved' });
+  const spacing = 0.025;
+  const terrain = { columns: 64, rows: 64, width: 64 * spacing, depth: 64 * spacing, centre: [0, 0] };
+  const halfCells = 8;
+  const side = 2 * halfCells * spacing;
+  const load = 1600;
+  const { world, bed } = planted(
+    soil,
+    terrain,
+    { cohesiveModulus: 0, frictionalModulus: coefficient, compaction: 0, dustFraction: 0, reposeSlope: 0.2 },
+    { patches: [{ x: 0, z: 0, length: side, width: side, load, rounded: true }] },
+  );
+  world.advance(1);
+  const port = world.fields.port(soil.pressureField.name);
+  const pressure = regionWords(world.memory, port.region);
+  const area = bedVertexAreas(terrain);
+  const normal = pressure.reduce((sum, pressure, vertex) => sum + pressure * area[vertex], 0);
+  // Independently count the 8k vertices in each Chebyshev ring of a square contact. Interior
+  // nodal areas are dx², and the parabolic profile gives zero pressure on the outer ring.
+  let nodalArea = spacing * spacing;
+  for (let k = 1; k < halfCells; k++) nodalArea += 8 * k * (1 - (k * k) / (halfCells * halfCells)) * spacing * spacing;
+  const crest = load / nodalArea;
+  close(pressure[32 * 65 + 32], crest, 512 * eps * crest);
+  close(normal, load, 1024 * eps * load);
+  close(bed.elevations()[32 * 65 + 32], -crest / coefficient, (1024 * eps * crest) / coefficient);
+  close(bed.volume(), 0, 2048 * eps * soil.budget.removed);
+  assert.ok(soil.work.relaxedVolume > 0 && soil.work.rasterVisits > 0);
+  assert.equal(soil.work.reposeFaces, 2 * 64 * 65);
+  const mark = world.takeSnapshot();
+  world.advance(15);
+  const hash = world.hash();
+  world.restoreSnapshot(mark.bytes);
+  world.advance(15);
+  assert.equal(world.hash(), hash);
+});
+
 async function steps(kind, speed) {
   const terrain = { columns: 48, rows: 120, width: 3.6, depth: 9, centre: [0, 2] };
   const legged = await LeggedLocomotion.load({ bedShape: terrain });
@@ -144,11 +181,11 @@ test('COURIER-3: real biped stance produces a persistent change and launches min
   assert.ok(foot.removed > 0 && foot.dust > 0);
 });
 
-test('real wheel and belt loads erode the registered bed and the resulting collider survives seek', async () => {
+async function coupledVehicles(tier) {
   await Physics.load();
   const terrain = { columns: 28, rows: 40, width: 4.2, depth: 6, centre: [0, 1] };
   const contact = soilPatchField();
-  const soil = await Terramechanics.load({ input: contact });
+  const soil = await Terramechanics.load({ input: contact, tier });
   const rigid = new SoilContactRigidSolver(contact, { terrain });
   const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
   const bed = new TerrainBed();
@@ -173,7 +210,16 @@ test('real wheel and belt loads erode the registered bed and the resulting colli
   );
   using vehicle = new Vehicle(physics, chassisAt(-0.95), {
     wheels,
-    groundMaterial: () => ({ grip: 0.8, soil: wheelSoil(wheelShape.width, wheelShape.length) }),
+    groundMaterial: () => ({
+      grip: 0.8,
+      soil: wheelSoil(
+        wheelShape.width,
+        wheelShape.length,
+        undefined,
+        true,
+        tier === 'resolved' ? { rounded: true } : undefined,
+      ),
+    }),
   });
   const beltPatches = [-0.27, 0.27].map((x) => ({ length: 0.84, width: 0.25, centre: [x, 0, 0] }));
   using tracked = new TrackedVehicle(physics, chassisAt(0.95), {
@@ -207,4 +253,9 @@ test('real wheel and belt loads erode the registered bed and the resulting colli
   world.restoreSnapshot(mark.bytes);
   world.advance(24);
   assert.equal(world.hash(), hash);
-});
+}
+
+for (const tier of ['mean', 'resolved']) {
+  test(`${tier}: real wheel and belt loads change the registered collider and survive seek`, () =>
+    coupledVehicles(tier));
+}

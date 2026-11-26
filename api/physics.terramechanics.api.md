@@ -12,6 +12,7 @@ export interface LeggedSoilPatch {
     readonly length: number;
     readonly width: number;
     readonly elliptical?: boolean;
+    readonly rounded?: boolean;
 }
 
 export const SOIL_LAYOUT = 1;
@@ -54,6 +55,8 @@ export class SoilContactRigidSolver extends RigidSolver {
     stateRegions(): readonly Region[];
 }
 
+export type SoilContactTier = 'mean' | 'resolved';
+
 export interface SoilMaterial {
     readonly cohesiveModulus?: number;
     readonly frictionalModulus?: number;
@@ -64,6 +67,7 @@ export interface SoilMaterial {
     readonly compaction?: number;
     readonly dustFraction?: number;
     readonly density?: number;
+    readonly reposeSlope?: number;
 }
 
 export interface SoilPatch {
@@ -75,12 +79,14 @@ export interface SoilPatch {
     readonly load: number;
     readonly displacement?: readonly [number, number];
     readonly elliptical?: boolean;
+    readonly rounded?: boolean;
 }
 
 export class Terramechanics implements Solver<TerramechanicsParams> {
     readonly id: string;
     readonly dustField: FieldDescriptor;
     readonly responseField: FieldDescriptor;
+    readonly pressureField?: FieldDescriptor;
     private constructor();
     static load(options?: TerramechanicsOptions): Promise<Terramechanics>;
     describe(): {
@@ -105,6 +111,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     get budget(): SoilBudget;
+    get work(): {
+        readonly rasterVisits: number;
+        readonly reposeFaces: number;
+        readonly relaxedVolume: number;
+    } | undefined;
     read(row: number): {
         pressure: number;
         sinkage: number;
@@ -117,6 +128,7 @@ export interface TerramechanicsOptions {
     readonly id?: string;
     readonly input?: FieldDescriptor;
     readonly legged?: boolean;
+    readonly tier?: SoilContactTier;
     readonly signal?: AbortSignal;
 }
 
@@ -152,7 +164,9 @@ export interface WheelSoilBinding {
 
 export function soilPatchField(name?: string): FieldDescriptor;
 
-export function wheelSoil(width: number, length: number, material?: SoilMaterial, elliptical?: boolean): {
+export function wheelSoil(width: number, length: number, material?: SoilMaterial, elliptical?: boolean, resolvedContact?: {
+    readonly rounded?: boolean;
+}): {
     stiffness: number;
     exponent: number;
     area: number;

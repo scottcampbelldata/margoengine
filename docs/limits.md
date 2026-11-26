@@ -9661,12 +9661,13 @@ per configured car. The powered separation event is for animation. The optional 
 
 ### Tracks and footprints on a physical bed (EARTH-05)
 
-Terramechanics treats one prepared material as a projected footprint of uniform mean pressure. Bearing and shear
-parameters come from the soil's material tests. Resolve the patch and its adjacent berm with several grid vertices.
-The ground is a height field, so it represents indentation and surface displacement without overhangs or buried layers.
-The stored indentation is the peak depth at each vertex. More passes at the same peak load can reach fresh ground but
-do not model subgrade fatigue. The optional uniform excavation floor should match TerrainBed's bedrock. Material
-pushed past the patch's modeled bounds is accounted for separately from compaction and lofted mineral dust.
+Terramechanics treats one prepared material per prescribed rectangular or elliptical footprint. The mean tier
+uses uniform pressure. The resolved tier uses normalized pressure on the bed grid and an optional parabolic
+profile. Bearing and shear parameters come from the soil's material tests. Resolve the patch and its adjacent berm
+with several grid vertices. Surface repose uses one ordered face sweep over the newly displaced loose material.
+The ground is a height field with peak indentation per vertex. Buried layers, overhangs, arbitrary tread meshes
+and accumulated subgrade fatigue remain open. The optional uniform excavation floor should match TerrainBed's
+bedrock. The volume ledger records material crossing the modeled bounds, compaction and lofted mineral dust.
 
-The optional entry is 9,206 B gzip with a 9,483 B ceiling. Both Wasm assets are 2,042 B raw and 1,194 B gzip each.
+The optional entry is 9,683 B gzip with a 9,974 B ceiling. Both Wasm assets are 5,820 B raw and 2,684 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.

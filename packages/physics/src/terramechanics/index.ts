@@ -16,7 +16,7 @@ export {
 
 /** Version of the optional soil contact, response and dust fields. */
 export const SOIL_LAYOUT = 1;
-/** Per patch: XZ, forward XZ, length, width, normal N, shear-displacement XZ, ellipse flag. A zero load is inactive. */
+/** Per patch: XZ, forward XZ, length, width, normal N, shear-displacement XZ and shape bits (1 ellipse, 2 rounded). */
 export const SOIL_PATCH_WORDS = 10;
 /** Per patch: pressure Pa, settlement m, mobilized shear stress Pa and normal load N. */
 export const SOIL_RESPONSE_WORDS = 4;
@@ -43,6 +43,8 @@ export interface SoilMaterial {
   readonly dustFraction?: number;
   /** Dry bulk density converting displaced volume to mass, kg/m³. Default 1,600. */
   readonly density?: number;
+  /** Rise per metre at dry repose in the resolved tier. Defaults to the supplied internal friction tangent. */
+  readonly reposeSlope?: number;
 }
 
 /** A measured wheel, belt, shoe or hoof load over a finite footprint. All values are SI. */
@@ -58,6 +60,8 @@ export interface SoilPatch {
   readonly displacement?: readonly [number, number];
   /** Elliptical tyre or hoof patch. Default rectangular shoe or belt. */
   readonly elliptical?: boolean;
+  /** Give the resolved tier a parabolic contact section, e.g. a rounded tyre tread. Default false. */
+  readonly rounded?: boolean;
 }
 
 /** Override the footprint size of a foot row in the live LIFE-01 contact field. */
@@ -66,7 +70,11 @@ export interface LeggedSoilPatch {
   readonly length: number;
   readonly width: number;
   readonly elliptical?: boolean;
+  readonly rounded?: boolean;
 }
+
+/** Mean pressure or force-normalized nodal stress and berm redistribution. */
+export type SoilContactTier = 'mean' | 'resolved';
 
 export interface TerramechanicsOptions {
   readonly id?: string;
@@ -74,6 +82,8 @@ export interface TerramechanicsOptions {
   readonly input?: FieldDescriptor;
   /** Read the real LIFE-01 contact field. Provide `feet` at initialization. Default false. */
   readonly legged?: boolean;
+  /** Resolved contacts expose a vertex pressure field and conservative berm relaxation. Default 'mean'. */
+  readonly tier?: SoilContactTier;
   readonly signal?: AbortSignal;
 }
 
@@ -116,31 +126,53 @@ function positive(value: number, label: string): number {
 }
 
 function materialOf(input: SoilMaterial = {}): Required<SoilMaterial> {
+  const friction = finite(input.friction ?? 0.6, 'internal friction', 0);
   const material = {
-    cohesiveModulus: finite(input.cohesiveModulus ?? 1000, 'cohesive modulus', 0),
-    frictionalModulus: finite(input.frictionalModulus ?? 400_000, 'frictional modulus', 0),
+    cohesiveModulus: finite(input.cohesiveModulus ?? 1000, 'cohesive modulus'),
+    frictionalModulus: finite(input.frictionalModulus ?? 400_000, 'frictional modulus'),
     exponent: positive(input.exponent ?? 1, 'pressure exponent'),
     cohesion: finite(input.cohesion ?? 500, 'cohesion', 0),
-    friction: finite(input.friction ?? 0.6, 'internal friction', 0),
+    friction,
     shearLength: positive(input.shearLength ?? 0.025, 'shear length'),
     compaction: finite(input.compaction ?? 0.2, 'compaction', 0, 1),
     dustFraction: finite(input.dustFraction ?? 0.0005, 'dust fraction', 0, 1),
     density: positive(input.density ?? 1600, 'bulk density'),
+    reposeSlope: finite(input.reposeSlope ?? friction, 'repose slope', 0),
   };
-  if (!(material.frictionalModulus + material.cohesiveModulus > 0))
-    throw new MargoError('state', 'Soil stiffness is zero. Provide a nonzero pressure–sinkage coefficient.');
   return material;
 }
 
+function bearingWidth(length: number, width: number, ellipse: boolean, resolved: boolean): number {
+  if (!resolved) return width;
+  if (!ellipse) return (length * width) / (length + width);
+  // Ramanujan's ellipse circumference. For a circle, 2A/P is the measured test-plate radius.
+  const ratio = (length - width) / (length + width);
+  const h = ratio * ratio;
+  const perimeter = (Math.PI * (length + width) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)))) / 2;
+  return (Math.PI * length * width) / (2 * perimeter);
+}
+
 /** Bekker stiffness and area in the existing `VehicleOptions.groundMaterial` soil layout. */
-export function wheelSoil(width: number, length: number, material: SoilMaterial = {}, elliptical = true) {
+export function wheelSoil(
+  width: number,
+  length: number,
+  material: SoilMaterial = {},
+  elliptical = true,
+  resolvedContact?: { readonly rounded?: boolean },
+) {
   const data = materialOf(material);
   const b = positive(width, 'width');
   const l = positive(length, 'length');
   return {
-    stiffness: data.cohesiveModulus / b + data.frictionalModulus,
+    stiffness: positive(
+      data.cohesiveModulus / bearingWidth(l, b, elliptical, Boolean(resolvedContact)) + data.frictionalModulus,
+      'effective stiffness',
+    ),
     exponent: data.exponent,
-    area: b * l * (elliptical ? Math.PI / 4 : 1),
+    area: positive(
+      (b * l * (elliptical ? Math.PI / 4 : 1)) / (resolvedContact?.rounded ? data.exponent + 1 : 1),
+      'contact area',
+    ),
   };
 }
 
@@ -157,7 +189,7 @@ function packed(p: SoilPatch): Patch {
     p.load,
     p.displacement?.[0] ?? 0,
     p.displacement?.[1] ?? 0,
-    p.elliptical ? 1 : 0,
+    (p.elliptical ? 1 : 0) + (p.rounded ? 2 : 0),
   ];
 }
 
@@ -166,6 +198,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   readonly id: string;
   readonly dustField: FieldDescriptor;
   readonly responseField: FieldDescriptor;
+  readonly pressureField?: FieldDescriptor;
   private readonly input?: FieldDescriptor;
   private readonly legged: boolean;
   private terrain!: BedShape;
@@ -179,6 +212,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private nativePatch!: Region;
   private dust!: Region;
   private budgetRegion!: Region;
+  private pressure?: Region;
+  private workRegion?: Region;
   private response!: Region;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -192,6 +227,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     options: TerramechanicsOptions,
   ) {
     this.id = options.id ?? 'terramechanics';
+    const tier = options.tier ?? 'mean';
+    if (tier !== 'mean' && tier !== 'resolved')
+      throw new MargoError('state', 'Unknown soil contact tier. Choose mean or resolved.');
     this.input = options.input && { ...options.input };
     this.legged = options.legged ?? false;
     this.dustField = {
@@ -208,6 +246,14 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       unit: 'record',
       centring: 'particle',
     };
+    if (tier === 'resolved')
+      this.pressureField = {
+        name: `${this.id}:pressure`,
+        kind: 'uniformGrid',
+        quantity: 'normalPressure',
+        unit: 'Pa',
+        centring: 'vertex',
+      };
   }
 
   static async load(options: TerramechanicsOptions = {}): Promise<Terramechanics> {
@@ -224,6 +270,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         { field: BED_CHANGE_FIELD, access: 'accumulate' as const },
         { field: this.dustField, access: 'write' as const },
         { field: this.responseField, access: 'write' as const },
+        ...(this.pressureField ? [{ field: this.pressureField, access: 'write' as const }] : []),
         ...(this.input ? [{ field: this.input, access: 'read' as const }] : []),
         ...(this.legged ? [{ field: LEGGED_CONTACT_FIELD, access: 'read' as const }] : []),
       ],
@@ -256,10 +303,14 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 14);
+    this.nativePatch = allocate('soil-patch-scratch', 18);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
+    if (this.pressureField) {
+      this.pressure = allocate('soil-pressure', count);
+      this.workRegion = allocate('soil-work', 3);
+    }
     this.kernel = bindSoil(host, this.builds);
     this.words(this.areas).set(this.change.area);
   }
@@ -273,28 +324,37 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   }
 
   private stamp(patch: Patch, row: number, bed: Region, dt: number): void {
-    const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, ellipse] = patch;
+    const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, flags] = patch;
     if (finite(load, 'normal load', 0) === 0) return;
-    if (![x, z, forwardX, forwardZ, shearX, shearZ, ellipse].every(Number.isFinite) || (ellipse !== 0 && ellipse !== 1))
+    if (
+      ![x, z, forwardX, forwardZ, shearX, shearZ].every(Number.isFinite) ||
+      !Number.isInteger(flags) ||
+      flags < 0 ||
+      flags > 3
+    )
       throw new MargoError(
         'state',
-        'A soil contact row has invalid geometry. Use finite positions, directions and displacement with a 0 or 1 ellipse flag.',
+        'A soil contact row has invalid geometry. Use finite coordinates and shape bits for rectangle, ellipse and rounded section.',
       );
     const direction = hypot(forwardX, forwardZ);
     if (!direction) throw new MargoError('state', 'Soil contact forward is zero. Provide a nonzero XZ vector.');
     positive(length, 'contact length');
     positive(width, 'contact width');
     const material = this.material;
+    const resolved = Boolean(this.pressure);
+    const ellipse = Boolean(flags & 1);
     const area = positive(width * length * (ellipse ? Math.PI / 4 : 1), 'contact area');
     const pressure = positive(load / area, 'contact pressure');
-    const stiffness = positive(material.cohesiveModulus / width + material.frictionalModulus, 'effective stiffness');
+    const stiffness = positive(
+      material.cohesiveModulus / bearingWidth(length, width, ellipse, resolved) + material.frictionalModulus,
+      'effective stiffness at this footprint width',
+    );
     const depth = finite(pow(pressure / stiffness, 1 / material.exponent), 'settlement', 0);
     const slip = hypot(shearX, shearZ);
     const share = 1 - exp(-slip / material.shearLength);
     const shear = finite((material.cohesion + pressure * material.friction) * share, 'shear stress', 0);
     const dust = (1 - material.compaction) * material.dustFraction;
     const { columns, rows, width: dx, depth: dz, centre } = this.terrain;
-    this.words(this.response).set([pressure, depth, shear, load], row * SOIL_RESPONSE_WORDS);
     this.words(this.nativePatch).set([
       x,
       z,
@@ -309,24 +369,34 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       share,
       slip > 0 ? shearX / slip : 0,
       slip > 0 ? shearZ / slip : 0,
-      ellipse,
+      flags,
+      Number(resolved),
+      load,
+      stiffness,
+      material.exponent,
     ]);
-    this.kernel.stamp(
+    const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
       this.areas.byteOffset,
       this.peaks.byteOffset,
       this.change.state.byteOffset,
       this.dust.byteOffset,
       this.rim.byteOffset,
+      this.pressure?.byteOffset ?? 0,
       bed.byteOffset,
       this.floor,
       this.budgetRegion.byteOffset,
+      this.workRegion?.byteOffset ?? 0,
       columns + 1,
       rows + 1,
       dx / columns,
       dz / rows,
       centre[0] - dx / 2,
       centre[1] - dz / 2,
+    );
+    this.words(this.response).set(
+      [pressure, finite(peak, 'resolved soil settlement', 0), shear, load],
+      row * SOIL_RESPONSE_WORDS,
     );
   }
 
@@ -360,7 +430,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           load,
           fx * displacement,
           fz * displacement,
-          ellipse,
+          ellipse + (foot.rounded ? 2 : 0),
         ],
         start + i,
         bed,
@@ -374,6 +444,10 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.change.clear();
     this.words(this.dust).fill(0);
     this.words(this.response).fill(0);
+    if (this.pressure && this.workRegion) {
+      this.words(this.pressure).fill(0);
+      this.words(this.workRegion).fill(0);
+    }
     const bed = context.inputs.get(BED_FIELD.name);
     if (
       !bed ||
@@ -424,6 +498,23 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     }
     const feet = this.legged && context.inputs.get(LEGGED_CONTACT_FIELD.name);
     if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bed.region, dt);
+    if (this.pressure && this.workRegion && this.words(this.workRegion)[0]! > 0) {
+      const { columns, rows, width, depth } = this.terrain;
+      const slope = this.material.reposeSlope;
+      const moved = this.kernel.repose(
+        this.areas.byteOffset,
+        this.change.state.byteOffset,
+        this.pressure.byteOffset,
+        bed.region.byteOffset,
+        columns + 1,
+        rows + 1,
+        (slope * width) / columns,
+        (slope * depth) / rows,
+      );
+      const work = this.words(this.workRegion);
+      work[1] = columns * (rows + 1) + rows * (columns + 1);
+      work[2] = moved;
+    }
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -431,13 +522,23 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.change.port(tick, this.cell),
       { field: this.dustField.name, region: this.dust, tick, cell: this.cell },
       { field: this.responseField.name, region: this.response, tick, cell: this.cell },
+      ...(this.pressureField && this.pressure
+        ? [{ field: this.pressureField.name, region: this.pressure, tick, cell: this.cell }]
+        : []),
     ];
   }
 
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return [this.change.state, this.peaks, this.dust, this.budgetRegion, this.response];
+    return [
+      this.change.state,
+      this.peaks,
+      this.dust,
+      this.budgetRegion,
+      this.response,
+      ...(this.pressure && this.workRegion ? [this.pressure, this.workRegion] : []),
+    ];
   }
 
   extraState(): readonly Region[] {
@@ -448,6 +549,15 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   get budget(): SoilBudget {
     const data = this.words(this.budgetRegion);
     return { removed: data[0]!, compacted: data[1]!, suspended: data[2]!, deposited: data[3]!, exported: data[4]! };
+  }
+
+  /** Deterministic work and moved loose volume for the last resolved-tier step. */
+  get work():
+    | { readonly rasterVisits: number; readonly reposeFaces: number; readonly relaxedVolume: number }
+    | undefined {
+    if (!this.workRegion) return;
+    const work = this.words(this.workRegion);
+    return { rasterVisits: work[0]!, reposeFaces: work[1]!, relaxedVolume: work[2]! };
   }
 
   /** Response of the latest tick, fixed patches first, then external patches and LIFE-01 feet. */

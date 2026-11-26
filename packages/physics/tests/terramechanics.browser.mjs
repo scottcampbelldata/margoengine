@@ -24,12 +24,15 @@ page.on('response', (response) => {
 try {
   await page.waitForFunction(() => typeof window.runTerramechanics === 'function', null, { timeout: 20_000 });
   assert.deepEqual([...assets], []);
-  const { plain, shared } = await page.evaluate(() => window.runTerramechanics());
-  assert.ok(plain.min < 0 && plain.max > 0 && plain.mass > 0);
-  assert.deepEqual(plain, shared);
+  const results = await page.evaluate(() => window.runTerramechanics());
+  for (const [tier, [plain, shared]] of Object.entries(results)) {
+    assert.ok(plain.min < 0 && plain.max > 0 && plain.mass > 0);
+    assert.deepEqual(plain, shared);
+    console.log(`Browser EARTH-05 ${tier} replay ${plain.hash}, rut ${plain.min} m, lofted ${plain.mass} kg.`);
+  }
+  assert.notEqual(results.mean[0].min, results.resolved[0].min);
   assert.deepEqual([...assets].sort(), ['terramechanics-kernel-shared.wasm', 'terramechanics-kernel.wasm']);
   assert.deepEqual(errors, []);
-  console.log(`Browser EARTH-05 native replay ${plain.hash}, rut ${plain.min} m, lofted ${plain.mass} kg.`);
 } finally {
   await close();
 }

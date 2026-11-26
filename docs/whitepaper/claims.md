@@ -5771,7 +5771,11 @@ the actual procedural wagon and more than 36,000 changed frame pixels.
 
 The soil contact cases verify the independent Bekker and Janosi–Hanamoto laws, the bedrock bound and the
 triangulated volume ledger. Existing wheel and belt attachments produce measured inputs to the changing rigid
-collider. Real LIFE-01 walk, trot and biped stance supply mineral fines to ATMO-06. The isolated browser loads
-both native variants lazily and replays the same coupled bed and dust state. After building Physics, run
-`node --test packages/physics/tests/coupling/terramechanics.test.js` and
+collider. Real LIFE-01 walk, trot and biped stance supply mineral fines to ATMO-06. The mean and resolved tiers
+both reproduce held-out square-plate sinkage from Apfelbeck et al. (2011) for quartz sand and fire clay. The
+resolved pressure integral matches the independent prescribed force and the repose step conserves the loose-soil
+ledger. The isolated browser loads both native variants lazily and replays each tier's coupled bed and dust state
+exactly. After building Physics, run `node --test packages/physics/tests/terramechanics.test.js
+packages/physics/tests/coupling/terramechanics.test.js` and
 `node packages/physics/tests/terramechanics.browser.mjs`.
+[Measurement and test conditions](../clean-room.md#soil-pressure-shear-and-permanent-footprints-earth-05).

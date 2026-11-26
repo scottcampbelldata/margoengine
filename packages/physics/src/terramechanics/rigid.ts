@@ -78,7 +78,7 @@ function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding): n
           wheel.load,
           longitudinal * fx + lateral * fz,
           longitudinal * fz - lateral * fx,
-          1,
+          3,
         ],
         at,
       );

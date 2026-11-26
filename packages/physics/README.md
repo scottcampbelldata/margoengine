@@ -4491,4 +4491,13 @@ For legged bodies, load with `{ legged: true }`, configure the foot rows and pla
 The default dry material has `kc = 1,000`, `kphi = 400,000` and `n = 1` in the SI Bekker fit. It uses 500 Pa
 cohesion, 0.6 internal friction, 25 mm shear length, 20% compaction, 0.05% fines from uncompacted volume and
 1,600 kg/m³ dry bulk density. Replace these coefficients with a measured material for the footprint and moisture.
+Each empirical coefficient may be signed. The combined pressure coefficient for the chosen footprint must be positive.
 The optional `floor` is the same uniform bedrock elevation used on TerrainBed. Both solvers must share their cell.
+
+`Terramechanics.load({ tier: 'resolved' })` distributes bearing stress within each patch and normalizes the
+integrated pressure to the measured load. It uses the effective width `2 × area / perimeter`. Set
+`rounded: true` for a parabolic depth profile inside rectangular or elliptical footprints. For wheel suspension,
+pass `{ rounded: true }` as the fifth argument to `wheelSoil` to opt in to the same fit. The resolved tier publishes
+`pressureField` in pascals on the bed vertices and reports raster visits, repose faces and moved volume through
+`soil.work`. `reposeSlope` controls how far newly displaced loose soil can transfer across adjacent faces. It
+defaults to the internal-friction tangent. The default `'mean'` tier uses uniform pressure and one berm ring.
