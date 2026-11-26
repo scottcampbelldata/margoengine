@@ -14,6 +14,7 @@ import type {
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { type CompressionStep, stepCompression } from './continuous.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
+import { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse } from './plate.js';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
@@ -68,6 +69,8 @@ export interface CrushPatch {
   readonly material: CrushMaterial;
   /** Default 'impact'. Use 'continuous' to advance yielding under the actual end stroke each tick. */
   readonly response?: 'impact' | 'continuous';
+  /** Optional sampled plate shape for a continuous contact, driven by its live and residual stroke. */
+  readonly plate?: CrushPlate;
   /** Dry sliding and sticking coefficient for the contact pair. Default 0. */
   readonly friction?: number;
   /** Permanent stroke at which the barrier can no longer maintain its seal. Default the material's stroke. */
@@ -102,6 +105,16 @@ export interface CrushPatchState {
   readonly impacts: number;
 }
 
+/** Current shape of a plate linked to a crush patch. */
+export interface CrushPlateState {
+  /** Current total contact stroke including permanent shortening, m. */
+  readonly stroke: number;
+  /** Lost seal fraction of the patch, from zero to one. */
+  readonly sealLoss: number;
+  /** Plate state while the imposed stroke leaves a positive span. */
+  readonly buckling?: CrushPlateResponse;
+}
+
 interface Patch extends CrushPatch {
   readonly material: Required<CrushMaterial>;
   readonly response: 'impact' | 'continuous';
@@ -117,6 +130,7 @@ interface State {
   readonly damage: Region;
   readonly contacts: Region;
   readonly reactions: Region;
+  readonly plateStrokes?: Region;
 }
 
 function vector(v: CrushVector, label: string): CrushVector {
@@ -313,6 +327,7 @@ function impact(
   out: Float64Array,
   damage: Float64Array,
   latched: Uint8Array,
+  plateStrokes: Float64Array | undefined,
   dt: number,
 ): void {
   const { body, support } = patch;
@@ -327,6 +342,7 @@ function impact(
   const gap = dot(separation, normal);
   const at = CRUSH_WORDS * index;
   const permanent = damage[at]!;
+  if (patch.plate && plateStrokes) plateStrokes[index] = permanent;
   const clearance = gap + permanent;
   const continuous = patch.response === 'continuous';
   if (!continuous && clearance > 0) latched[index] = 0;
@@ -378,6 +394,7 @@ function impact(
   }
   if (step) {
     recordCompression(damage, at, step, patch.sealStroke, latched[index] !== 0);
+    if (patch.plate && plateStrokes) plateStrokes[index] = step.totalStroke;
     latched[index] = 1;
   }
   if (!result) return;
@@ -439,6 +456,12 @@ export class CrushSolver implements Solver<CrushParams> {
       const response = patch.response ?? 'impact';
       if (response !== 'impact' && response !== 'continuous')
         throw new MargoError('state', 'Choose impact or continuous for the crush patch response.');
+      const plate = patch.plate && { ...patch.plate };
+      if (plate) {
+        if (response !== 'continuous')
+          throw new MargoError('state', 'Use a continuous crush patch response to sample the live plate shape.');
+        resolvePlateBuckling(plate, 0);
+      }
       const body = rowIndex(patch.body, capacity);
       const normal = vector(patch.normal, 'normal');
       const length = positive(hypot(...normal), 'normal length');
@@ -451,6 +474,7 @@ export class CrushSolver implements Solver<CrushParams> {
         body,
         material,
         response,
+        plate,
         friction: positive(patch.friction ?? 0, 'friction coefficient', 0),
         normal: scale(normal, 1 / length),
         anchor: vector(patch.anchor, 'anchor'), // float division: unit normal
@@ -467,6 +491,9 @@ export class CrushSolver implements Solver<CrushParams> {
       damage: host.allocate('crush-damage', patches.length * CRUSH_WORDS * F64, 'f64', CRUSH_LAYOUT),
       contacts: host.allocate('crush-contacts', patches.length, 'u8', CRUSH_LAYOUT),
       reactions: host.allocate('crush-reactions', capacity * IMPULSE_WORDS * F64, 'f64', IMPULSES_LAYOUT),
+      plateStrokes: patches.some((patch) => patch.plate)
+        ? host.allocate('crush-plate-strokes', patches.length * F64, 'f64', CRUSH_LAYOUT)
+        : undefined,
     };
   }
 
@@ -485,8 +512,9 @@ export class CrushSolver implements Solver<CrushParams> {
     const bodies = regionWords(state.host.memory, port.region) as Float32Array;
     const damage = regionWords(state.host.memory, state.damage) as Float64Array;
     const contacts = regionWords(state.host.memory, state.contacts) as Uint8Array;
+    const plateStrokes = state.plateStrokes && (regionWords(state.host.memory, state.plateStrokes) as Float64Array);
     for (let i = 0; i < state.patches.length; i++)
-      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, dt);
+      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt);
   }
 
   importPorts(_tick: number): void {}
@@ -500,8 +528,8 @@ export class CrushSolver implements Solver<CrushParams> {
   }
 
   stateRegions(): readonly Region[] {
-    const { damage, contacts } = this.requireState();
-    return [damage, contacts];
+    const { damage, contacts, plateStrokes } = this.requireState();
+    return plateStrokes ? [damage, contacts, plateStrokes] : [damage, contacts];
   }
 
   extraState(): readonly Region[] {
@@ -524,6 +552,21 @@ export class CrushSolver implements Solver<CrushParams> {
       elasticEnergy: values[at + 5]!,
       sealLoss: values[at + CRUSH_SEAL_LOSS_WORD]!,
       impacts: values[at + 7]!,
+    };
+  }
+
+  /** Samples the current or unloaded residual shape in the linked plate's local coordinates. */
+  readPlate(index: number, rest?: ArrayLike<number>): CrushPlateState {
+    const { host, patches, plateStrokes, damage } = this.requireState();
+    const plate = Number.isSafeInteger(index) ? patches[index]?.plate : undefined;
+    if (!plate || !plateStrokes)
+      throw new MargoError('state', 'Choose a configured continuous crush patch with a plate to sample its shape.');
+    const stroke = (regionWords(host.memory, plateStrokes) as Float64Array)[index]!;
+    const sealLoss = (regionWords(host.memory, damage) as Float64Array)[index * CRUSH_WORDS + CRUSH_SEAL_LOSS_WORD]!;
+    return {
+      stroke,
+      sealLoss,
+      buckling: stroke < plate.length ? resolvePlateBuckling(plate, stroke, rest) : undefined,
     };
   }
 

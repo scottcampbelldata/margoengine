@@ -19,6 +19,10 @@ draw paths using `node packages/physics/tests/crush-plate.browser.mjs` and the s
 The flat control keeps the same in-plane vertex locations. Only the crest and normals affect the changed
 pixels. The buckled frame repeats byte for byte. [Stein (1959)](https://ntrs.nasa.gov/citations/19980235521)
 
+The same browser test also loads and retracts a native rigid carriage. It evaluates the live
+`CrushSolver.readPlate` surface at both strokes and draws them with the same camera. The loaded and
+released frames differ, and rerunning the loaded state gives the same world hash and image.
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard

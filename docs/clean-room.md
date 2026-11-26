@@ -15162,6 +15162,12 @@ The test uses the held-out measured line and derives the model from the elastic 
 dimensionless load band covers line thickness and rounding when reading the printed axes. The measured trace extends into plasticity
 and changes to six, seven and eight half-waves. Those regimes are outside this first-mode model.
 
+The linked plate samples the first mode at the continuous contact's current total stroke. The
+unilateral release samples the material return map's permanent stroke. The saved region records
+one total stroke per configured plate, so the field is independent of the sample mesh resolution.
+This uses the existing station's material curve for reaction and the first-mode geometry for
+rendering local shortening. The live fixture pushes and retracts a real RigidSolver carriage.
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

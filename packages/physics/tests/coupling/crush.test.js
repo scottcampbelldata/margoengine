@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { ATMOSPHERE, HULL_BREACHES_FIELD, HULL_BREACH_WORDS, HullSolver } from '../../dist/seakeeping.js';
-import { CRUSH_LAYOUT, CRUSH_WORDS, CrushSolver, resolveCrush, squareTubeCrushMaterial } from '../../dist/crush.js';
+import {
+  CRUSH_LAYOUT,
+  CRUSH_WORDS,
+  CrushSolver,
+  resolveCrush,
+  resolvePlateBuckling,
+  squareTubeCrushMaterial,
+} from '../../dist/crush.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -35,6 +42,7 @@ function withBodies({
   halfB = halfA,
   curve = material,
   response,
+  plate,
   movingMass = 4,
 } = {}) {
   const world = new PhysicsWorld({ rate: frameRate, gravity: zero, memory: worldMemory(shared) });
@@ -60,6 +68,7 @@ function withBodies({
         radius: 0.12,
         material: curve,
         response,
+        plate,
         friction,
         support: { body: other?.row, point: other ? [-0.2, offset, 0] : [-0.2, y + offset, 0] },
       },
@@ -347,6 +356,59 @@ test('continuous elastic, yielding and compacted branches return reciprocal nati
     } finally {
       physics.dispose();
     }
+  }
+});
+
+test('a live crush-linked plate follows its current stroke and keeps only its plastic shape after release', async () => {
+  const plate = { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 };
+  const curve = { stiffness: 300e6, yieldForce: 80e3, stroke: 0.025 };
+  const rest = [0.15, 0.15, 0.45, 0.15];
+  const { world, physics, crush, vehicle } = await assemble({
+    initial: 0,
+    two: false,
+    response: 'continuous',
+    movingMass: 5e6,
+    curve,
+    plate,
+  });
+  try {
+    const initial = crush.readPlate(0, rest);
+    assert.equal(initial.stroke, 0);
+    assert.equal(initial.buckling.crest, 0);
+    vehicle.setPosition([-0.3986, 0, 0]);
+    world.advance(1);
+    const loaded = crush.readPlate(0, rest);
+    const damage = crush.read(0);
+    assert.equal(loaded.stroke, damage.peakStroke);
+    assert.equal(loaded.sealLoss, damage.sealLoss);
+    assert.deepEqual(loaded.buckling, resolvePlateBuckling(plate, loaded.stroke, rest));
+    assert.ok(loaded.buckling.crest > 0 && damage.permanentStroke > 0);
+    const snapshot = world.takeSnapshot();
+    const retract = () => {
+      vehicle.setPosition([-0.5, 0, 0]);
+      vehicle.setLinearVelocity(zero);
+      world.advance(2);
+      return crush.readPlate(0, rest);
+    };
+    const unloaded = retract();
+    const hash = world.hash();
+    assert.equal(unloaded.stroke, damage.permanentStroke);
+    assert.ok(unloaded.buckling.crest > 0 && unloaded.buckling.crest < loaded.buckling.crest);
+    assert.deepEqual(crush.read(0), damage);
+    world.restoreSnapshot(snapshot.bytes);
+    assert.deepEqual(crush.readPlate(0, rest), loaded);
+    assert.deepEqual(retract(), unloaded);
+    assert.equal(world.hash(), hash);
+    assert.throws(() => crush.readPlate(9), { code: 'state', message: /configured continuous crush patch/ });
+
+    vehicle.setPosition([0.4, 0, 0]);
+    world.advance(3);
+    const collapsed = crush.readPlate(0, rest);
+    assert.ok(collapsed.stroke >= plate.length);
+    assert.equal(collapsed.sealLoss, 1);
+    assert.equal(collapsed.buckling, undefined);
+  } finally {
+    physics.dispose();
   }
 });
 

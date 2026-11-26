@@ -9557,6 +9557,10 @@ surface. Three early measured loads for Stein’s five-half-wave bay agree withi
 straight in-plane and free of in-plane shear. High deflection, mode switching, post-yield rupture and
 full hull shell coupling remain open. The fixture renders an 8.48 mm crest with the sampled normals on
 native WebGPU and the WebGL2 compatibility layer.
+An optional continuous patch can also drive that mesh from its own contact stroke. The current and
+residual shapes use the station's authored force curve and the first-mode shape model. The live steel
+fixture renders an 8.46 mm crest under load and 7.45 mm after release on both backends. Fully exhausted
+span exposes the stroke and seal state. Topology-changing breakup remains open.
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 18335 B minified and 7606 B gzip under its 7862 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
 

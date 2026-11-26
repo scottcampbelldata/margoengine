@@ -36,6 +36,24 @@ try {
   await mkdir('test-results', { recursive: true });
   await writeFile(`test-results/break03-buckled-plate-${buckled.compat ? 'webgl2' : 'webgpu'}.png`, image);
   console.log(`Crush plate ${buckled.compat ? 'WebGL2 layer' : 'WebGPU'}: ${changed} pixels, ${buckled.crest} m crest`);
+
+  await page.waitForFunction(() => typeof window.drawLiveCrushPlate === 'function', null, { timeout: 20_000 });
+  const loaded = await page.evaluate(() => window.drawLiveCrushPlate(false));
+  const loadedImage = await canvas.screenshot();
+  const released = await page.evaluate(() => window.drawLiveCrushPlate(true));
+  const releasedImage = await canvas.screenshot();
+  assert.equal(loaded.visible, 1);
+  assert.equal(released.visible, 1);
+  assert.ok(released.stroke > 0 && released.stroke < loaded.stroke);
+  assert.ok(released.crest > 0 && released.crest < loaded.crest);
+  assert.notDeepEqual(releasedImage, loadedImage);
+  assert.deepEqual(await page.evaluate(() => window.drawLiveCrushPlate(false)), loaded);
+  assert.deepEqual(await canvas.screenshot(), loadedImage);
+  assert.deepEqual(errors, []);
+  const device = buckled.compat ? 'webgl2' : 'webgpu';
+  await writeFile(`test-results/break03-live-plate-loaded-${device}.png`, loadedImage);
+  await writeFile(`test-results/break03-live-plate-released-${device}.png`, releasedImage);
+  console.log(`Live plate crest ${loaded.crest} m loaded, ${released.crest} m after release.`);
 } finally {
   await close();
 }

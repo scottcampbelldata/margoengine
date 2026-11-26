@@ -4888,6 +4888,38 @@ if (crush.read(0).impacts !== 1) throw new Error('Expected one barrier contact')
 if (cart.linearVelocity[2] >= 0.5) throw new Error('Expected friction to slow the slide');
 ```
 
+Attach a `plate` to a continuous patch to sample its live geometry. `readPlate` uses the current
+stroke under pressure and the retained stroke after release. Pass the rest XY pairs in the plate's
+local frame and give the sampled positions and normals to the renderer. If the span is exhausted,
+the reading still provides `stroke` and `sealLoss` and no longer includes a buckling surface.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const platen = physics.addBody(null, {
+  position: [-0.3986, 0, 0],
+  colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 5e6, sensor: true },
+});
+const crush = new CrushSolver();
+const capacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity });
+world.add(crush, { bodyCapacity: capacity, patches: [{
+  body: platen.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12, response: 'continuous',
+  support: { point: [-0.2, 0, 0] }, material: { stiffness: 300e6, yieldForce: 80e3, stroke: 0.025 },
+  plate: { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 },
+}] });
+world.couple(['rigid', crush.id], 'staggered');
+world.advance(1);
+const { buckling } = crush.readPlate(0, [0.15, 0.15, 0.45, 0.15]);
+if (!buckling?.surface || buckling.surface.positions[2] <= 0) throw new Error('Expected the loaded plate crest');
+```
+
 ## Thin films on glass and ground
 
 Use `@margoengine/physics/thin-film` for a thin layer of water on a backing surface. The solver tracks

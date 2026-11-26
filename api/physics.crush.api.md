@@ -33,6 +33,7 @@ export interface CrushPatch {
     readonly radius: number;
     readonly material: CrushMaterial;
     readonly response?: 'impact' | 'continuous';
+    readonly plate?: CrushPlate;
     readonly friction?: number;
     readonly sealStroke?: number;
 }
@@ -65,6 +66,12 @@ export interface CrushPlateResponse {
     readonly surface?: CrushPlateSurface;
 }
 
+export interface CrushPlateState {
+    readonly stroke: number;
+    readonly sealLoss: number;
+    readonly buckling?: CrushPlateResponse;
+}
+
 export interface CrushPlateSurface {
     readonly positions: Float64Array;
     readonly normals: Float64Array;
@@ -93,6 +100,7 @@ export class CrushSolver implements Solver<CrushParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     read(index: number): CrushPatchState;
+    readPlate(index: number, rest?: ArrayLike<number>): CrushPlateState;
 }
 
 export interface CrushStrokeResult {

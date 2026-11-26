@@ -4,7 +4,9 @@
 <body style="margin:0"><canvas width="480" height="320"></canvas>
 <script type="module">
   import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
-  import { resolvePlateBuckling } from '../dist/crush.js';
+  import { CrushSolver, resolvePlateBuckling } from '../dist/crush.js';
+  import { Physics } from '../dist/index.js';
+  import { PhysicsWorld, RigidSolver } from '../dist/world.js';
 
   const plate = { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 };
   const engine = await Engine.create(document.querySelector('canvas'), {
@@ -26,6 +28,12 @@
     }
   }
 
+  async function drawSurface(surface) {
+    panel.setGeometry(new Geometry(surface.positions, surface.normals, triangles));
+    await engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  }
+
   window.drawCrushPlate = async (flat) => {
     const { crest, surface } = resolvePlateBuckling(plate, 0.0014, points);
     if (flat) {
@@ -35,10 +43,41 @@
         surface.normals.set([0, 0, 1], i);
       }
     }
-    panel.setGeometry(new Geometry(surface.positions, surface.normals, triangles));
-    await engine.render({ delta: 0 });
-    await engine.gpu.queue.onSubmittedWorkDone();
+    await drawSurface(surface);
     return { crest, visible: engine.stats.visible, compat: Boolean(globalThis.__margoCompat) };
+  };
+
+  await Physics.load();
+  const gravity = [0, 0, 0];
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity });
+  const physics = new Physics(null, { arena: world.arena, gravity });
+  const carriage = physics.addBody(null, {
+    position: [-0.5, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 5e6, sensor: true },
+  });
+  const crush = new CrushSolver();
+  const capacity = physics.kernel.capacity;
+  world.add(new RigidSolver(), { physics, capacity });
+  world.add(crush, { bodyCapacity: capacity, patches: [{
+    body: carriage.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12,
+    support: { point: [-0.2, 0, 0] }, response: 'continuous', plate,
+    material: { stiffness: 300e6, yieldForce: 80e3, stroke: 0.025 },
+  }] });
+  world.couple(['rigid', crush.id], 'staggered');
+  world.advance(1);
+  const initial = world.takeSnapshot();
+  window.drawLiveCrushPlate = async (released) => {
+    world.restoreSnapshot(initial.bytes);
+    carriage.setPosition([-0.3986, 0, 0]);
+    world.advance(2);
+    if (released) {
+      carriage.setPosition([-0.5, 0, 0]);
+      carriage.setLinearVelocity([0, 0, 0]);
+      world.advance(3);
+    }
+    const { stroke, buckling } = crush.readPlate(0, points);
+    await drawSurface(buckling.surface);
+    return { stroke, crest: buckling.crest, hash: world.hash(), visible: engine.stats.visible };
   };
 </script>
 </body>
