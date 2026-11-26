@@ -14169,7 +14169,13 @@ the film keeps their deposited water. Normal pressure acts along the supported s
 surface. Detaching films, contact-angle dynamics on a steep drop, thin-film interference and
 general rain damping of ocean waves are outside this equation.
 
-The optional thin-film entry is 5,917 B gzip with a 6,173 B ceiling. Both Wasm assets are 9,209 B raw and each is 3,995 B gzip. Core plus stage remains 24,820 B gzip.
+The optional `wetting` model gives the film a finite equilibrium contact angle by adding
+Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
+free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
+thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
+water balance. Measured spreading, contact-angle hysteresis and airborne drops remain open.
+
+The optional thin-film entry is 6,512 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,624 B raw and each is 4,197 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -14246,6 +14252,16 @@ When a soft surface is torn or cut, its new query colliders retain the live cont
 settings. The rigid shape's density is carried when the original collider supplied volume mass and the
 new, outward-wound collision mesh still encloses positive volume. Open cloth pieces keep their
 triangle colliders without volumetric mass. Soft-particle masses transfer separately.
+
+**Large-strain rubber.** `CellMaterial.rubber` adds the finite-chain series and a second-invariant term to
+the native vertex-block solver. It preserves the specified Lamé coefficients at rest. It recovers an inverted
+tetrahedron and reproduces the restored continuation bit for bit. The Treloar test takes traction from actual
+vertex-block acceleration and removes the hydrostatic contribution to compare with the measured nominal tensile
+stress. A two-resolution extrapolation bounds the finite-step error. At 20% extension or greater, the 23
+withheld readings stay within the calibration-derived prediction envelope. The largest observed relative
+errors in that set are 10.9% uniaxial and 12.5% equibiaxial. The reported specimen at 2% biaxial extension
+has about 55% relative underprediction. Small biaxial extension, hysteresis and independent large-strain
+gelatin and ice tests are still open. This material curve is available for reversible isotropic vertex blocks.
 
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean
 tetrahedra. Each sweep solves the local elastic and inertial energy exactly to working precision.
@@ -14765,6 +14781,30 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-26: one terrain or water in two capture effects draws the first effect's outputs (KB-CAPTURE-TWOEFFECTS1, terrain, water)
+
+- **Repro:** add one `Terrain` to SSR and to `SceneTargets` (`ssr.add(terrain); targets.add(terrain)`): the second
+  effect's capture stage carries SSR's three-output `MargoSSR` under its own two to seven targets, a pipeline error
+  on the GPU. Water with two effects of the same target formats drew the first effect's stage for both, and with
+  different formats rebuilt its capture pipeline and bind groups on every draw.
+- **Cause:** a model takes one hook, shared by every effect through `shareCapture` (`packages/shared/capture.js`),
+  which forwards `declarations()` to the effect drawing now. Terrain cached its capture stage by the lit shader alone
+  (`captureCode`), and water kept one capture pipeline keyed without the declarations.
+- **Fix:** both key the stage and pipeline by the declarations this draw's effect returns; water keeps one pipeline
+  (and its bind groups per view) per key. Regression: `packages/terrain/test/capture.test.js` and
+  `packages/water/test/capture.test.js` ("in two effects").
+
+### Open 2026-11-26: water added to SceneTargets or MeshBlend builds an invalid capture stage (KB-WATER-TARGETS1, water)
+
+- **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.add(water)`:
+  the water capture fragment returns `MargoSSR(specular, weight, normal)` while that effect's `MargoSSR` has one field
+  per output, so the shader does not compile.
+- **Cause:** water's capture (`captureShader` in `packages/water/src/index.ts`) writes SSR's three fields itself (the
+  sky reflection SSR replaces) instead of calling the hook's `margoSSR(n, v, base, metal, rough)`, and
+  `SceneTargets.add`/`MeshBlend.add` accept any model with `setCapture`.
+- **Owed:** water calls `margoSSR` for an effect that is not SSR (its normal, body colour and roughness), with a
+  test that adds one water to SSR and to SceneTargets.
 
 ### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
 
@@ -31893,6 +31933,8 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
+The thin-film precursor model now supplies an equilibrium contact angle. Dynamic hysteresis
+and comparison against independent measured drop spreading remain open.
 
 ## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
 
@@ -31964,6 +32006,11 @@ uses illustrative coefficients. Active muscle fibers, independent measurements f
 along a curved body interface are pending.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
+
+The finite-chain rubber model underpredicts Treloar's smallest equibiaxial readings, by about 55% at 2%
+extension. The gated held-out traction data in `packages/physics/tests/coupling/volumetric-rubber.test.js`
+start at 20% extension and the low-strain miss is recorded in the limits. This remains a constitutive
+calibration gap. The large-deformation gelatin and ice measurements also await a hold-out comparison.
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
