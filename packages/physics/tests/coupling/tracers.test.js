@@ -320,3 +320,87 @@ test('SEA-15 a completely evaporated release clears its parcels and leaves the o
   assert.ok(Math.abs(tracer.budget.surface - 0.03) < 1e-16);
   assert.equal(tracer.budget.released, 0.05);
 });
+
+function verticalMoments(tracer, initialHeight) {
+  const heights = [...tracer.particlesOf()].map((parcel) => parcel.position[1] - initialHeight);
+  const mean = heights.reduce((total, height) => total + height, 0) / heights.length;
+  const variance = heights.reduce((total, height) => total + (height - mean) ** 2, 0) / (heights.length - 1);
+  return { mean, variance };
+}
+
+test('SEA-15 a vertical diffusivity gradient gives the drift and midpoint variance in a linear mixing layer', () => {
+  const surface = 5;
+  const depth = 14;
+  const n = 8192;
+  const worldRate = { num: 60, den: 1 };
+  const dt = 1 / worldRate.num;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: worldRate }).add(tracer, {
+    waterLevel: surface,
+    sources: [{ material: 'dye', position: [0, surface - depth, 0], rate: n / dt, stop: dt }],
+    capacity: n,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    verticalDiffusivityProfile: [
+      { depth: 10, diffusivity: 0.2 / dt },
+      { depth: 20, diffusivity: 1.4 / dt },
+    ],
+  });
+  world.advance(1);
+  const { mean, variance } = verticalMoments(tracer, surface - depth);
+  // Fick's law in a locally linear layer gives a drift -K′t of -0.12 m and variance 2 K₀t + (K′t)².
+  const want = 2 * 0.68 + 0.12 ** 2;
+  const meanSE = Math.sqrt(want / n);
+  const varianceSE = want * Math.sqrt(2 / (n - 1));
+  assert.ok(Math.abs(mean + 0.12) < 4 * meanSE, `${mean} vs -0.12 m`);
+  assert.ok(Math.abs(variance - want) < 4 * varianceSE, `${variance} vs ${want} m²`);
+  assert.equal(tracer.budget.water, n);
+  // A uniform control sees the same normal for parcel zero. Only the drift differs at the sampled midpoint K.
+  const control = new TracerSolver();
+  const controlWorld = new PhysicsWorld({ rate: worldRate }).add(control, {
+    waterLevel: surface,
+    capacity: 1,
+    sources: [{ material: 'dye', position: [0, surface - depth, 0], rate: 1 / dt, stop: dt }],
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: (0.68 + 0.12 ** 2 / 2) / dt,
+  });
+  controlWorld.advance(1);
+  const drift = tracer.particlesOf().next().value.position[1] - control.particlesOf().next().value.position[1];
+  assert.ok(Math.abs(drift + 0.12) < 8 * Number.EPSILON, `${drift} vs -0.12 m after equal noise`);
+  const save = world.takeSnapshot();
+  world.advance(3);
+  const hash = world.hash();
+  world.restoreSnapshot(save.bytes);
+  world.advance(3);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 CMO experiment 4 compares a profile from microstructure with separate Rhodamine dispersion', () => {
+  // Oakey & Greenan (2004), Table 2. The midpoint of the independent EPSONDE range (1.0–2.0) drives local diffusion.
+  const microstructure = 1.5e-6;
+  const depth = 17;
+  const n = 4096;
+  const hours = 97;
+  const hour = 3600;
+  const rate = { num: 60, den: 1 };
+  const dt = 1 / rate.num;
+  // In still water, replacing each physical hour by one world step leaves the diffusion product K·t unchanged.
+  const accelerated = (microstructure * hour) / dt;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate }).add(tracer, {
+    capacity: n,
+    bed: 70,
+    horizontalDiffusivity: 0,
+    verticalDiffusivityProfile: [
+      { depth: 14, diffusivity: accelerated },
+      { depth: 20, diffusivity: accelerated },
+    ],
+    sources: [{ material: 'dye', position: [0, -depth, 0], rate: n / dt, stop: dt }],
+  });
+  world.advance(hours);
+  const { variance } = verticalMoments(tracer, -depth);
+  const inferred = variance / (2 * hours * hour);
+  // Held-out response: dye-based 1.8 ± 0.4 from Ledwell et al. (2004), Fig. 14, inferred from fluorescence surveys.
+  assert.ok(inferred >= 1.4e-6 && inferred <= 2.2e-6, `${inferred} m²/s from parcel dispersion`);
+  assert.equal(tracer.budget.water, n);
+});

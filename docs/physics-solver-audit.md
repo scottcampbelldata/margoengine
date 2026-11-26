@@ -494,6 +494,11 @@ vapour ledger. The integrated exposure matches an independent quadrature of the 
 The remaining oil work includes film thickness, dispersion into droplets, and independent measured slick-extent and
 evaporation validation. Scale-dependent dye diffusion remains open.
 
+Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from
+Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSONDE microstructure samples drive
+the profile. The local simulated broadening falls in the range inferred from separate Rhodamine fluorescence surveys.
+This case does not assess migration caused by solar heating or dispersion across the whole shelf.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

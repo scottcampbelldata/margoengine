@@ -13201,6 +13201,16 @@ find that many crude oils are weakly sensitive to wind. The transfer coefficient
 validation of the expanding-slick evaporation model remains open. The early, intermediate and late analytical cases
 compare against independent quadrature at 30 and 60 world steps per second.
 
+Depth-dependent vertical diffusion uses André W. Visser, [“Using random walk models to simulate the vertical distribution of particles in a turbulent water column” (1997)](https://doi.org/10.3354/meps158275), equation 6.
+The random step includes the diffusivity-gradient drift and evaluates its variance at half that drift. A manufactured
+linear profile verifies the first two moments and the midpoint using a uniform control with the same random input.
+For CMO Experiment 4, the midpoint of the independent microstructure uncertainty interval supplies the local
+diffusivity near 17 m. The simulated variance implies 1.61 × 10⁻⁶ m²/s, within the 1.4–2.2 × 10⁻⁶ m²/s interval
+inferred from Rhodamine fluorescence. The still-water test preserves `K·t` while accelerating the 97-hour interval.
+This comparison covers local broadening. The measured layer migration also depended on solar heating.
+[Oakey and Greenan (2004), Table 2](https://doi.org/10.1029/2003JC002193),
+[Ledwell, Duda, Sundermeyer and Seim (2004), Figure 14](https://doi.org/10.1029/2003JC002194).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

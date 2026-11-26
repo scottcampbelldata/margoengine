@@ -250,6 +250,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   three radius regimes. The liquid and vapour ledger balance within 10⁻¹⁵ kg, with exact snapshot replay.
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
+- Vertical dye diffusion (SEA-15, 2026-11-26). The solver recovers the drift and midpoint variance in a linear
+  diffusivity layer and replays exactly. For CMO Experiment 4, the independent microstructure input yields an
+  effective 1.61 × 10⁻⁶ m²/s from the parcel variance. The range inferred from Rhodamine measurements was 1.4–2.2 × 10⁻⁶ m²/s.
+  Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
+  [Oakey and Greenan (2004), Table 2](https://doi.org/10.1029/2003JC002193),
+  [Ledwell et al. (2004), Figure 14](https://doi.org/10.1029/2003JC002194).
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

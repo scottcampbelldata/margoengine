@@ -3251,6 +3251,26 @@ world.advance(600);
 console.log(oil.evaporatedMass > 0); // true
 ```
 
+Set `verticalDiffusivityProfile` to use different mixing rates at different depths. Supply at least two depths in
+ascending order, in metres below the local free surface, with diffusivity in m²/s. The solver interpolates between
+knots, extends the endpoints as constants and includes the drift associated with the diffusivity gradient. Omitting
+the profile uses the scalar `verticalDiffusivity`.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const dye = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(dye, {
+  verticalDiffusivityProfile: [
+    { depth: 0, diffusivity: 0.01 }, { depth: 4, diffusivity: 0.001 }, { depth: 10, diffusivity: 0.002 },
+  ],
+  sources: [{ material: 'dye', position: [0, -4, 0], rate: 60, stop: 1 / 60 }],
+});
+world.advance(1);
+console.log(dye.budget.water); // 1
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

@@ -16,7 +16,8 @@
 //   it, the wind drift factor (3 percent by default, the traditional constant; Liu, Li and Mu, Frontiers in Marine Science
 //   2023, read in its abstract).
 //
-// Finite oil spills add Fay's axisymmetric spreading and optional Stiver–Mackay evaporation. Diffusivities are constant.
+// Finite oil spills add Fay's axisymmetric spreading and optional Stiver–Mackay evaporation. Use a depth profile for
+// vertical turbulence where mixing varies with depth. Horizontal diffusivity is constant.
 // Settled parcels remain in the bed ledger. Dispersion into oil droplets and flocculation are unresolved.
 
 import type { Bed, FlowField, FlowSample, SeaSurface, SeaSurfaceSample, Wind } from '@margoengine/math/fields';
@@ -27,6 +28,7 @@ import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.
 import { MargoError } from '@margoengine/math/errors';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
+import { depthDiffusivity, type TracerDiffusionKnot, turbulentVerticalStep } from './tracer-diffusion.js';
 import {
   type EvaporationRates,
   evaporatedFraction,
@@ -50,6 +52,7 @@ import type {
 } from './world/solver.js';
 
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
+export type { TracerDiffusionKnot } from './tracer-diffusion.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
@@ -180,6 +183,8 @@ export interface TracerParams {
   horizontalDiffusivity?: number;
   /** Vertical eddy diffusivity, m^2/s (default 0.001). */
   verticalDiffusivity?: number;
+  /** Optional depth-dependent vertical diffusivity. Linear between knots, constant outside, overriding the scalar. */
+  verticalDiffusivityProfile?: readonly TracerDiffusionKnot[];
   /** The mass each particle carries, kg (default 1). */
   particleMass?: number;
   /** The most particles at once (default 20000); a source that would pass it releases heavier particles meanwhile. */
@@ -284,7 +289,16 @@ export class TracerSolver implements Solver<TracerParams> {
   private params!: Required<
     Omit<
       TracerParams,
-      'sea' | 'water' | 'wind' | 'bed' | 'sources' | 'oilSpills' | 'bedJets' | 'breaches' | 'breachMixes'
+      | 'sea'
+      | 'water'
+      | 'wind'
+      | 'bed'
+      | 'sources'
+      | 'oilSpills'
+      | 'verticalDiffusivityProfile'
+      | 'bedJets'
+      | 'breaches'
+      | 'breachMixes'
     >
   > & {
     bed: Bed | number;
@@ -293,6 +307,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private readonly oilSpills: OilSpillState[] = [];
   private spillRadii?: Region;
   private spillVapour?: Region;
+  private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
   private emissionCapacity = 0;
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
@@ -353,6 +368,7 @@ export class TracerSolver implements Solver<TracerParams> {
   }
 
   init(host: SolverHost, params: TracerParams = {}): void {
+    this.depthDiffusivity = params.verticalDiffusivityProfile && depthDiffusivity(params.verticalDiffusivityProfile);
     const {
       sources = [],
       sea,
@@ -759,6 +775,7 @@ export class TracerSolver implements Solver<TracerParams> {
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
     const sea = this.sea;
+    const column = this.depthDiffusivity;
     const { bed, cellSize } = this.params;
     if (sea)
       for (let axis = 0; axis < 3; axis++) this.seaOffset[axis] = (context.cell[axis]! - sea.cell[axis]!) * cellSize;
@@ -868,7 +885,8 @@ export class TracerSolver implements Solver<TracerParams> {
         continue;
       }
       const nx = x + ux * dt + sh * n0;
-      let ny = y + (uy - this.settling[words[p + 4]!]!) * dt + sv * n1;
+      const vertical = column ? turbulentVerticalStep(column, this.surfaceAt(x, z, time) - y, dt, n1) : sv * n1;
+      let ny = y + (uy - this.settling[words[p + 4]!]!) * dt + vertical;
       const nz = z + uz * dt + sh * n2;
       // The surface reflects what is in the water; the bed keeps what reaches it.
       const surface = this.surfaceAt(nx, nz, time);
