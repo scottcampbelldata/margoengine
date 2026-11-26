@@ -85,6 +85,10 @@
       "status": "ruled",
       "source": "packages/clustered/src/contact.ts"
     },
+    "clustered:LocalShadowMap.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out: LocalShadows.shadowMap(kind, index, face) returns the package's own shadow atlas and layer for one light, never a caller input"
+    },
     "clustered:LocalShadowPrimitive.alphaSampler": {
       "status": "exempt",
       "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
@@ -629,6 +633,10 @@
       "status": "ruled",
       "source": "packages/post/src/decals.ts"
     },
+    "post:LUT1DOptions.lut": {
+      "status": "ruled",
+      "source": "packages/post/src/lut1d.ts"
+    },
     "post:LensFlareElement.texture": {
       "status": "ruled",
       "source": "packages/post/src/lens-flare.ts"
@@ -920,6 +928,10 @@
     "shadows:ShadowEffectFrame.map": {
       "status": "exempt",
       "reason": "a draw, caster or pick record one package hands another each frame (rule 6): the shadow depth map Shadows gives its effects"
+    },
+    "shadows:ShadowMapLayer.texture": {
+      "status": "exempt",
+      "reason": "a per-frame record (rule 6): ShadowMapViewer reads its source, a layer or a function returning one, every frame, keeps no texture and makes its view each frame, so a restore leaves nothing to carry"
     },
     "shadows:ShadowPrimitive.alphaSampler": {
       "status": "exempt",

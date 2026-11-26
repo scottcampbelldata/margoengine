@@ -1,5 +1,5 @@
 {
-  "commit": "2500b97885",
+  "commit": "5628424515",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -404,8 +404,8 @@
         "gzip": 4407
       },
       "./ecosystem": {
-        "raw": 6926,
-        "gzip": 3210
+        "raw": 8057,
+        "gzip": 3652
       },
       "./erosion-wasm": {
         "raw": 4954,
@@ -442,6 +442,10 @@
       "./landscape": {
         "raw": 969,
         "gzip": 614
+      },
+      "./forest": {
+        "raw": 16512,
+        "gzip": 7194
       }
     },
     "@margoengine/blender": {
@@ -5868,16 +5872,16 @@
     },
     "@margoengine/horses": {
       ".": {
-        "raw": 37842,
-        "gzip": 15641
+        "raw": 40737,
+        "gzip": 16724
       },
       "./anatomy": {
         "raw": 1784,
         "gzip": 841
       },
       "./gaits": {
-        "raw": 2607,
-        "gzip": 1211
+        "raw": 2738,
+        "gzip": 1266
       },
       "./model": {
         "raw": 27548,
@@ -14060,8 +14064,8 @@
         "gzip": 3519
       },
       "./locomotion": {
-        "raw": 15630,
-        "gzip": 6419
+        "raw": 17194,
+        "gzip": 6926
       },
       "./aeolian": {
         "raw": 13204,
@@ -14082,6 +14086,10 @@
       "./snowpack": {
         "raw": 13595,
         "gzip": 5737
+      },
+      "./legged": {
+        "raw": 29240,
+        "gzip": 11101
       }
     },
     "@margoengine/physics2d": {
@@ -17654,6 +17662,16 @@
       "gzip": 13044,
       "brotli": 11152
     },
+    "packages/biomes/dist/forest-kernel.wasm": {
+      "raw": 1276,
+      "gzip": 739,
+      "brotli": 679
+    },
+    "packages/biomes/dist/forest-kernel-shared.wasm": {
+      "raw": 1276,
+      "gzip": 739,
+      "brotli": 671
+    },
     "packages/biomes/dist/workers/biomes-splines.js": {
       "raw": 9911,
       "gzip": 4362,
@@ -17755,14 +17773,14 @@
       "brotli": 3284
     },
     "packages/physics/dist/locomotion-kernel.wasm": {
-      "raw": 9037,
-      "gzip": 4134,
-      "brotli": 3750
+      "raw": 10782,
+      "gzip": 4873,
+      "brotli": 4415
     },
     "packages/physics/dist/locomotion-kernel-shared.wasm": {
-      "raw": 9125,
-      "gzip": 4196,
-      "brotli": 3803
+      "raw": 10870,
+      "gzip": 4937,
+      "brotli": 4474
     },
     "packages/physics/dist/pedestrian-kernel.wasm": {
       "raw": 12041,

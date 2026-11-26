@@ -9,6 +9,9 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 export class SSGI implements EnginePlugin {
     readonly options: SSGIOptions;
     readonly name = "ssgi";
+    protected engine?: Engine;
+    protected stack?: PostStack;
+    protected traced?: SSGITrace;
     constructor(options?: SSGIOptions);
     static attach(engine: EngineKernel, options?: SSGIOptions): SSGI;
     add(model: SSRModel): () => void;
@@ -31,11 +34,40 @@ export interface SSGIOptions {
     multiBounce?: boolean;
 }
 
+export interface SSGITrace {
+    active(device: GPUDevice): boolean;
+    prepare(context: Context): void;
+    trace(code: string): string;
+    group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
+
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+class PostStack implements EnginePlugin {
+    readonly name = "post:stack";
+    constructor(effects?: readonly EnginePlugin[]);
+    static attach(engine: EngineKernel, effects?: readonly EnginePlugin[]): PostStack;
+    static join(engine: EngineKernel, effect: EnginePlugin, index?: number): PostStack;
+    get effects(): readonly EnginePlugin[];
+    get depthTexture(): GPUTexture | undefined;
+    get sceneTexture(): GPUTexture | undefined;
+    addEffect(effect: EnginePlugin, index?: number): this;
+    removeEffect(effect: EnginePlugin): boolean;
+    moveEffect(effect: EnginePlugin, index: number): this;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
 
 interface SSRCapture {
     declarations(code: string): string;

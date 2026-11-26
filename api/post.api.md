@@ -283,6 +283,9 @@ export interface SSAOSource {
 export class SSGI implements EnginePlugin {
     readonly options: SSGIOptions;
     readonly name = "ssgi";
+    protected engine?: Engine;
+    protected stack?: PostStack;
+    protected traced?: SSGITrace;
     constructor(options?: SSGIOptions);
     static attach(engine: EngineKernel, options?: SSGIOptions): SSGI;
     add(model: SSRModel): () => void;
@@ -370,6 +373,10 @@ type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 
 
 type Borrowable<T> = T | ((device: GPUDevice) => T);
 
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 interface LensFlareElement {
     texture?: Borrowable<GPUTexture>;
     size: number;
@@ -388,6 +395,13 @@ type PostPassContext = Extract<PassContext, {
 type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface SSGITrace {
+    active(device: GPUDevice): boolean;
+    prepare(context: Context): void;
+    trace(code: string): string;
+    group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
 
 interface SSRTrace {
     active(device: GPUDevice): boolean;

@@ -6,3 +6,6 @@ import { distDir } from '../../../scripts/support/dist-dir.mjs';
 // build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
 const dist = distDir(fileURLToPath(new URL('..', import.meta.url)));
 copyFileSync(new URL('../src/erosion.wasm', import.meta.url), join(dist, 'erosion.wasm'));
+
+for (const file of ['forest-kernel.wasm', 'forest-kernel-shared.wasm'])
+  copyFileSync(new URL(`../src/${file}`, import.meta.url), join(dist, file));

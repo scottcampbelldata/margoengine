@@ -35,12 +35,24 @@ export interface GroundGaitFoot {
     readonly phase: number;
 }
 
+export interface GroundLeggedDrive {
+    readonly speed: number;
+    readonly heading: number;
+    readonly frequency: number;
+    readonly duty: number;
+    readonly phases: readonly number[];
+    readonly force?: V;
+    readonly lean?: boolean;
+    readonly supportVelocity?: V;
+}
+
 export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     private constructor();
     static load(options?: GroundLocomotionOptions): Promise<GroundLocomotion>;
     describe(): SolverDescription;
     init(host: SolverHost, params: GroundLocomotionParams): void;
     step(context: StepContext, dt: number): void;
+    setLeggedDrive(body: number, drive: GroundLeggedDrive): void;
     contactCount(body: number): number;
     read(body: number, out?: GroundAnimalPose): GroundAnimalPose;
     readContact(body: number, element: number, out?: GroundAnimalContact): GroundAnimalContact;
@@ -54,6 +66,9 @@ export interface GroundLocomotionOptions {
     readonly id?: string;
     readonly cellSize?: number;
     readonly bedShape?: BedShape;
+    readonly controlled?: boolean;
+    readonly poseField?: string;
+    readonly contactField?: string;
     readonly signal?: AbortSignal;
 }
 

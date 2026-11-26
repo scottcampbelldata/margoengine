@@ -1,6 +1,7 @@
 export type {
   GroundAnimal,
   GroundGaitFoot,
+  GroundLeggedDrive,
   GroundLocomotionOptions,
   GroundLocomotionParams,
   SlitheringBody,

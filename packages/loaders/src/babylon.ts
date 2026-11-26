@@ -113,6 +113,7 @@ export interface BabylonMesh extends BabylonNode {
 /** A TransformNode: a pure parent. */
 export interface BabylonTransformNode extends BabylonNode {}
 
+/** A camera of a .babylon scene, with its look-at point and lens. */
 export interface BabylonCamera {
   id: string;
   name: string;
@@ -130,6 +131,7 @@ export interface BabylonCamera {
   orthographic?: { left: number; right: number; top: number; bottom: number };
 }
 
+/** A light of a .babylon scene: point, directional, spot or hemispheric, in linear rgb. */
 export interface BabylonLight {
   id: string;
   name: string;
@@ -149,6 +151,7 @@ export interface BabylonLight {
   groundColor?: [number, number, number];
 }
 
+/** One bone of a {@link BabylonSkeleton}. */
 export interface BabylonBone {
   name: string;
   index: number;
@@ -157,6 +160,7 @@ export interface BabylonBone {
   matrix: number[];
 }
 
+/** A skeleton of a .babylon scene: its bones in file order. */
 export interface BabylonSkeleton {
   id: string;
   name: string;
@@ -192,9 +196,11 @@ const list = (v: unknown, what: string): Json[] => {
   for (const item of v) if (!isObject(item)) syntax(`${what} holds a value that is not an object`);
   return v as Json[];
 };
-const str = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : fallback);
+const str = (v: unknown, fallback: string): string =>
+  typeof v === 'string' ? v : typeof v === 'number' ? String(v) : fallback;
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
-const flag = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : typeof v === 'number' ? v !== 0 : fallback);
+const flag = (v: unknown, fallback: boolean): boolean =>
+  typeof v === 'boolean' ? v : typeof v === 'number' ? v !== 0 : fallback;
 function vec<N extends number>(v: unknown, n: N, fallback: number[], what: string): number[] {
   if (v === undefined || v === null) return fallback;
   if (!Array.isArray(v) || v.length < n || v.slice(0, n).some((x) => typeof x !== 'number' || !Number.isFinite(x)))
@@ -206,7 +212,8 @@ function numbers(v: unknown, what: string, multiple: number, max: number): numbe
   if (!Array.isArray(v)) return syntax(`${what} is not an array`);
   if (v.length > max) throw new LoaderError(F, 'limit', `${what} has ${v.length} values, past the limit of ${max}`);
   if (v.length % multiple) syntax(`${what} length ${v.length} is not a multiple of ${multiple}`);
-  for (let i = 0; i < v.length; i++) if (typeof v[i] !== 'number' || !Number.isFinite(v[i])) syntax(`${what}[${i}] is not a number`);
+  for (let i = 0; i < v.length; i++)
+    if (typeof v[i] !== 'number' || !Number.isFinite(v[i])) syntax(`${what}[${i}] is not a number`);
   return v as number[];
 }
 
@@ -214,7 +221,14 @@ const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.
 
 function eulerToQuaternion(x: number, y: number, z: number): [number, number, number, number] {
   // Babylon's YXZ order: roll about Z first, then pitch about X, then yaw about Y; q = qy * qx * qz.
-  const [sx, cx, sy, cy, sz, cz] = [Math.sin(x / 2), Math.cos(x / 2), Math.sin(y / 2), Math.cos(y / 2), Math.sin(z / 2), Math.cos(z / 2)];
+  const [sx, cx, sy, cy, sz, cz] = [
+    Math.sin(x / 2),
+    Math.cos(x / 2),
+    Math.sin(y / 2),
+    Math.cos(y / 2),
+    Math.sin(z / 2),
+    Math.cos(z / 2),
+  ];
   // qy * qx
   const ax = cy * sx,
     ay = sy * cx,
@@ -270,7 +284,14 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
   } else if (isObject(input)) doc = input;
   else throw new LoaderError(F, 'range', 'expected bytes, JSON text or a parsed object');
   if (!isObject(doc)) return syntax('the file is not a JSON object');
-  if (doc.meshes === undefined && doc.cameras === undefined && doc.lights === undefined && doc.materials === undefined && doc.geometries === undefined && doc.transformNodes === undefined)
+  if (
+    doc.meshes === undefined &&
+    doc.cameras === undefined &&
+    doc.lights === undefined &&
+    doc.materials === undefined &&
+    doc.geometries === undefined &&
+    doc.transformNodes === undefined
+  )
     throw new LoaderError(F, 'header', 'no meshes, cameras, lights, materials or geometries: not a .babylon scene');
 
   const warnings: string[] = [];
@@ -283,7 +304,8 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
   };
   // Mirror helpers.
   const P = (v: number[]): [number, number, number] => [v[0], v[1], rh ? 0 - v[2] : v[2]];
-  const Q = (q: number[]): [number, number, number, number] => (rh ? [0 - q[0], 0 - q[1], q[2], q[3]] : [q[0], q[1], q[2], q[3]]);
+  const Q = (q: number[]): [number, number, number, number] =>
+    rh ? [0 - q[0], 0 - q[1], q[2], q[3]] : [q[0], q[1], q[2], q[3]];
 
   // ---- textures and materials
   let textureBytes = 0;
@@ -386,10 +408,12 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
     if (!pos || pos.length === 0) return null;
     const count = pos.length / 3;
     vertexTotal += count;
-    if (vertexTotal > maxVertices) throw new LoaderError(F, 'limit', `vertex count ${vertexTotal} exceeds the limit of ${maxVertices}`);
+    if (vertexTotal > maxVertices)
+      throw new LoaderError(F, 'limit', `vertex count ${vertexTotal} exceeds the limit of ${maxVertices}`);
     const per = (key: string, width: number, label: string): number[] | undefined => {
       const a = numbers(src[key], `${what} ${label}`, width, count * width);
-      if (a && a.length !== count * width) syntax(`${what} ${label} has ${a.length / width} entries for ${count} vertices`);
+      if (a && a.length !== count * width)
+        syntax(`${what} ${label} has ${a.length / width} entries for ${count} vertices`);
       return a;
     };
     const normals = per('normals', 3, 'normals'),
@@ -402,14 +426,16 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
       indexList = Array.from({ length: count }, (_, i) => i);
     }
     triangleTotal += indexList.length / 3;
-    if (triangleTotal > maxTriangles) throw new LoaderError(F, 'limit', `triangle count ${triangleTotal} exceeds the limit of ${maxTriangles}`);
+    if (triangleTotal > maxTriangles)
+      throw new LoaderError(F, 'limit', `triangle count ${triangleTotal} exceeds the limit of ${maxTriangles}`);
     const indices = new Uint32Array(indexList.length);
     for (let i = 0; i < indexList.length; i += 3) {
       const a = indexList[i],
         b = indexList[i + 1],
         c = indexList[i + 2];
       for (const v of [a, b, c])
-        if (!Number.isInteger(v) || v < 0 || v >= count) throw new LoaderError(F, 'range', `${what}: index ${v} is outside the ${count} vertices`);
+        if (!Number.isInteger(v) || v < 0 || v >= count)
+          throw new LoaderError(F, 'range', `${what}: index ${v} is outside the ${count} vertices`);
       indices[i] = a;
       indices[i + 1] = rh ? c : b;
       indices[i + 2] = rh ? b : c;
@@ -435,8 +461,20 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
       for (const s of subs) {
         const start = num(s.indexStart, 0),
           n = num(s.indexCount, 0);
-        if (!Number.isInteger(start) || !Number.isInteger(n) || start < 0 || n < 0 || start + n > indices.length || start % 3 || n % 3)
-          throw new LoaderError(F, 'range', `${what}: a subMesh covers indices ${start} to ${start + n} of ${indices.length}`);
+        if (
+          !Number.isInteger(start) ||
+          !Number.isInteger(n) ||
+          start < 0 ||
+          n < 0 ||
+          start + n > indices.length ||
+          start % 3 ||
+          n % 3
+        )
+          throw new LoaderError(
+            F,
+            'range',
+            `${what}: a subMesh covers indices ${start} to ${start + n} of ${indices.length}`,
+          );
         groups.push({ start, count: n, properties: { materialIndex: num(s.materialIndex, 0) } });
       }
       geometry.groups = groups;
@@ -490,7 +528,11 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
 
   // ---- nodes
   const nodeFields = (n: Json, what: string): BabylonNode => {
-    if (n.pivotMatrix !== undefined && Array.isArray(n.pivotMatrix) && n.pivotMatrix.some((x, i) => x !== (i % 5 === 0 ? 1 : 0)))
+    if (
+      n.pivotMatrix !== undefined &&
+      Array.isArray(n.pivotMatrix) &&
+      n.pivotMatrix.some((x, i) => x !== (i % 5 === 0 ? 1 : 0))
+    )
       warn(`${what}: pivotMatrix is not applied`);
     const t = vec(n.position, 3, [0, 0, 0], `${what} position`);
     const q = Array.isArray(n.rotationQuaternion)
@@ -530,7 +572,8 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
     let built: ReturnType<typeof buildGeometry>;
     if (geometryId !== undefined) {
       const src = geometries.get(geometryId);
-      if (!src) throw new LoaderError(F, 'range', `${what} names geometry "${geometryId}" which the file does not hold`);
+      if (!src)
+        throw new LoaderError(F, 'range', `${what} names geometry "${geometryId}" which the file does not hold`);
       if (!cache.has(geometryId)) cache.set(geometryId, buildGeometry(src, `geometry ${geometryId}`));
       built = cache.get(geometryId)!;
       // Submeshes belong to the mesh, not the shared vertex data.
@@ -555,7 +598,8 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
     }
     const mesh: BabylonMesh = { ...node, geometry: built.geometry };
     if (typeof m.materialId === 'string') mesh.materialId = m.materialId;
-    if (m.skeletonId !== undefined && m.skeletonId !== null && m.skeletonId !== -1) mesh.skeletonId = str(m.skeletonId, '');
+    if (m.skeletonId !== undefined && m.skeletonId !== null && m.skeletonId !== -1)
+      mesh.skeletonId = str(m.skeletonId, '');
     if (built.joints) {
       mesh.joints = built.joints;
       mesh.weights = built.weights;
@@ -597,7 +641,11 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
         : eulerToQuaternion(...(vec(c.rotation, 3, [0, 0, 0], `${what} rotation`) as [number, number, number]));
       // Rotate +Z (Babylon looks along +Z) by q.
       const [x, y, z, w] = q;
-      target = [position[0] + 2 * (x * z + w * y), position[1] + 2 * (y * z - w * x), position[2] + 1 - 2 * (x * x + y * y)];
+      target = [
+        position[0] + 2 * (x * z + w * y),
+        position[1] + 2 * (y * z - w * x),
+        position[2] + 1 - 2 * (x * x + y * y),
+      ];
     }
     const cam: BabylonCamera = {
       id: str(c.id, str(c.name, `camera_${cameras.length}`)),
@@ -611,7 +659,12 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
     };
     if (c.parentId !== undefined && c.parentId !== null) cam.parentId = str(c.parentId, '');
     if (num(c.mode, 0) === 1)
-      cam.orthographic = { left: num(c.orthoLeft, -1), right: num(c.orthoRight, 1), top: num(c.orthoTop, 1), bottom: num(c.orthoBottom, -1) };
+      cam.orthographic = {
+        left: num(c.orthoLeft, -1),
+        right: num(c.orthoRight, 1),
+        top: num(c.orthoTop, 1),
+        bottom: num(c.orthoBottom, -1),
+      };
     cameras.push(cam);
   }
   const lights: BabylonLight[] = [];
@@ -633,13 +686,15 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
     };
     if (l.parentId !== undefined && l.parentId !== null) light.parentId = str(l.parentId, '');
     if (type !== 3 && l.position !== undefined) light.position = P(vec(l.position, 3, [0, 0, 0], `${what} position`));
-    if (type !== 0 && l.direction !== undefined) light.direction = P(vec(l.direction, 3, [0, -1, 0], `${what} direction`));
+    if (type !== 0 && l.direction !== undefined)
+      light.direction = P(vec(l.direction, 3, [0, -1, 0], `${what} direction`));
     if (l.range !== undefined && num(l.range, Infinity) < 1e30) light.range = num(l.range, Infinity);
     if (type === 2) {
       light.angle = num(l.angle, Math.PI / 2);
       if (l.innerAngle !== undefined) light.innerAngle = num(l.innerAngle, 0);
     }
-    if (type === 3 && l.groundColor !== undefined) light.groundColor = rgb(l.groundColor, [0, 0, 0], `${what} groundColor`, false);
+    if (type === 3 && l.groundColor !== undefined)
+      light.groundColor = rgb(l.groundColor, [0, 0, 0], `${what} groundColor`, false);
     lights.push(light);
   }
 
@@ -678,11 +733,23 @@ export function parseBabylon(input: BinaryInput | string | object, options: Baby
       if (d > parents.size) throw new LoaderError(F, 'syntax', `node "${start}" is its own ancestor`);
   }
 
-  const out: LoadedBabylon = { meshes, transformNodes, materials, multiMaterials, cameras, lights, skeletons, warnings };
-  if (Array.isArray(doc.clearColor)) out.clearColor = vec(doc.clearColor, 3, [0, 0, 0], 'clearColor') as [number, number, number];
-  if (Array.isArray(doc.ambientColor)) out.ambientColor = vec(doc.ambientColor, 3, [0, 0, 0], 'ambientColor') as [number, number, number];
+  const out: LoadedBabylon = {
+    meshes,
+    transformNodes,
+    materials,
+    multiMaterials,
+    cameras,
+    lights,
+    skeletons,
+    warnings,
+  };
+  if (Array.isArray(doc.clearColor))
+    out.clearColor = vec(doc.clearColor, 3, [0, 0, 0], 'clearColor') as [number, number, number];
+  if (Array.isArray(doc.ambientColor))
+    out.ambientColor = vec(doc.ambientColor, 3, [0, 0, 0], 'ambientColor') as [number, number, number];
   if (typeof doc.activeCameraID === 'string') out.activeCameraId = doc.activeCameraID;
-  if (isObject(doc.producer)) out.producer = { name: str(doc.producer.name, ''), version: str(doc.producer.version, '') };
+  if (isObject(doc.producer))
+    out.producer = { name: str(doc.producer.name, ''), version: str(doc.producer.version, '') };
   return out;
 }
 
@@ -712,7 +779,8 @@ function composeTRS(t: number[], q: number[], s: number[]): Float64Array {
 }
 function mul(a: Float64Array, b: Float64Array): Float64Array {
   const o = new Float64Array(16);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return o;
 }
 
@@ -757,12 +825,17 @@ export function flattenBabylon(scene: LoadedBabylon, options: FlattenBabylonOpti
   for (const { mesh, m } of placed) {
     const g = mesh.geometry,
       base = positions.length / 3;
-    const det = m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+    const det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
     for (let i = 0; i < g.positions.length; i += 3) {
       const x = g.positions[i],
         y = g.positions[i + 1],
         z = g.positions[i + 2];
-      positions.push(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]);
+      positions.push(
+        m[0] * x + m[4] * y + m[8] * z + m[12],
+        m[1] * x + m[5] * y + m[9] * z + m[13],
+        m[2] * x + m[6] * y + m[10] * z + m[14],
+      );
       if (withNormals) {
         // Normals follow the inverse transpose; for TRS that is the rotation with the scale divided out twice.
         const nx = g.normals![i],
@@ -788,9 +861,19 @@ export function flattenBabylon(scene: LoadedBabylon, options: FlattenBabylonOpti
       else indices.push(a, b, c);
     }
     const material = mesh.materialId ? materials.get(mesh.materialId) : undefined;
-    groups.push({ start, count: indices.length - start, name: mesh.name, ...(material ? { color: [...material.color] as [number, number, number, number] } : {}) });
+    groups.push({
+      start,
+      count: indices.length - start,
+      name: mesh.name,
+      ...(material ? { color: [...material.color] as [number, number, number, number] } : {}),
+    });
   }
-  const out: LoadedGeometry = { kind: 'mesh', positions: new Float32Array(positions), indices: new Uint32Array(indices), groups };
+  const out: LoadedGeometry = {
+    kind: 'mesh',
+    positions: new Float32Array(positions),
+    indices: new Uint32Array(indices),
+    groups,
+  };
   if (withNormals && normals.length) out.normals = new Float32Array(normals);
   if (withUvs && uvs.length) out.uvs = new Float32Array(uvs);
   return out;

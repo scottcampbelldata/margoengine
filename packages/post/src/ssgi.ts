@@ -39,6 +39,19 @@ export interface SSGIOptions {
   multiBounce?: boolean;
 }
 
+/** What a ray-traced subclass of SSGI (`RTGI`, @margoengine/post/rt-gi) gives it: while `active` is true the trace
+ * (one bounce and multi-bounce alike) is patched to trace a scene in bind group 1 for rays the screen does not answer. */
+export interface SSGITrace {
+  /** True when this frame traces; false runs plain SSGI. Validates the subclass's options. */
+  active(device: GPUDevice): boolean;
+  /** Writes this view's tracing uniforms, after SSGI's own (render pass `ssgi:gbuffer`). */
+  prepare(context: Context): void;
+  /** The trace shader with tracing added. */
+  trace(code: string): string;
+  /** Bind group 1 of a patched pipeline for the view `prepare` last wrote. */
+  group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
+
 // Material replay outputs: the ambient light the scene added (rgb, as SSAO replays it: `margoAmbient` when a plugin names
 // it, else core's ambient term), the diffuse albedo base*(1-metal) with coverage, and the shading normal.
 const giStruct = '\nstruct MargoGI {@location(0) ambient:vec4f,@location(1) albedo:vec4f,@location(2) normal:vec4f}\n';
@@ -214,11 +227,15 @@ function directions(count: number): Float32Array {
  */
 export class SSGI implements EnginePlugin {
   readonly name = 'ssgi';
-  private engine?: Engine;
+  protected engine?: Engine;
   /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
   private device?: GPUDevice;
   private host?: StackHost;
-  private stack?: PostStack;
+  protected stack?: PostStack;
+  /** Set by ray-traced subclasses. */
+  protected traced?: SSGITrace;
+  /** Whether the trace pipelines were built with tracing. */
+  private tracing = false;
   private disposed = false;
   private uniform?: GPUBuffer;
   private rays?: GPUBuffer;
@@ -434,6 +451,7 @@ export class SSGI implements EnginePlugin {
       c.device.queue.writeBuffer(this.rays!, 0, directions(rays) as Float32Array<ArrayBuffer>);
     }
     if (!this.enabled) return;
+    if (this.traced?.active(c.device)) this.traced.prepare(c);
     if (this.base !== c.descriptor) {
       this.base = c.descriptor;
       this.single = {
@@ -502,16 +520,27 @@ export class SSGI implements EnginePlugin {
     pipeline: GPURenderPipeline,
     g: GPUBindGroup,
     scoped = true,
+    scene?: GPUBindGroup,
   ) {
     const pass = c.encoder.beginRenderPass(descriptor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, g);
+    if (scene) pass.setBindGroup(1, scene);
     if (scoped) applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
+  /** The trace pipelines with or without tracing, as `traced` says this frame. */
+  private retrace(device: GPUDevice, traced: SSGITrace | undefined): void {
+    if (!!traced === this.tracing) return;
+    this.tracing = !!traced;
+    this.tracer = this.feedback = undefined;
+    this.input = undefined;
+  }
   private stage(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
-    if (this.multi) return this.stageMulti(c, input, output);
+    const traced = this.traced?.active(c.device) ? this.traced : undefined;
+    this.retrace(c.device, traced);
+    if (this.multi) return this.stageMulti(c, input, output, traced);
     const key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
     if (this.key !== key) {
       this.key = key;
@@ -525,6 +554,7 @@ export class SSGI implements EnginePlugin {
       );
       this.input = undefined;
     }
+    this.tracer ??= render(c.device, traced ? traced.trace(traceShader) : traceShader, 'rgba16float');
     if (this.input !== input) {
       this.input = input;
       this.chainGroups[0] = bind(c.device, this.downsample!, [input, this.sampler!]);
@@ -549,7 +579,7 @@ export class SSGI implements EnginePlugin {
       for (let i = 0; i < blurLevels; i++)
         this.fullscreen(c, this.chainPasses[i], this.downsample!, this.chainGroups[i], false);
       const blur = this.blurViewGroups!.get(this.slice);
-      this.fullscreen(c, this.giPasses[0], this.tracer!, trace);
+      this.fullscreen(c, this.giPasses[0], this.tracer!, trace, true, traced?.group(c.device, this.tracer!));
       this.fullscreen(c, this.giPasses[1], this.blur!, blur[0]);
       this.fullscreen(c, this.giPasses[0], this.blur!, blur[1]);
     }
@@ -559,12 +589,17 @@ export class SSGI implements EnginePlugin {
   }
   /** Multi-bounce frame: blur chain from last frame's result, the feedback trace, the same bilateral blur, a linear
    * composite into the newer result, then the display pass when SSGI ends the stack. */
-  private stageMulti(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
+  private stageMulti(
+    c: Context,
+    input: GPUTextureView,
+    output: StageOutput,
+    traced: SSGITrace | undefined,
+  ): GPUTextureView | void {
     const device = c.device,
       last = this.newest,
       next = last ^ 1;
     this.litComposite ??= render(device, linearComposite, 'rgba16float');
-    this.feedback ??= render(device, feedbackTrace, 'rgba16float');
+    this.feedback ??= render(device, traced ? traced.trace(feedbackTrace) : feedbackTrace, 'rgba16float');
     if (this.input !== input) {
       this.input = input;
       // Sources 0 and 1: last frame's results; 2: this frame's input, for a frame without history.
@@ -605,7 +640,7 @@ export class SSGI implements EnginePlugin {
       for (let i = 0; i < blurLevels; i++)
         this.fullscreen(c, this.chainPasses[i], this.downsample!, this.chainGroups[i], false);
       const blur = this.blurViewGroups!.get(this.slice);
-      this.fullscreen(c, this.giPasses[0], this.feedback!, trace);
+      this.fullscreen(c, this.giPasses[0], this.feedback!, trace, true, traced?.group(c.device, this.feedback!));
       this.fullscreen(c, this.giPasses[1], this.blur!, blur[0]);
       this.fullscreen(c, this.giPasses[0], this.blur!, blur[1]);
     }
@@ -734,6 +769,7 @@ export class SSGI implements EnginePlugin {
     this.litComposite = this.feedback = this.present = undefined;
     this.presentKey = '';
     this.multi = false;
+    this.tracing = false;
     this.axes = [];
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;

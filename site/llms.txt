@@ -224,13 +224,13 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 17 entry points
 - [@margoengine/headless API](https://margoengine.com/llms/api/headless.md): 13 entry points
 - [@margoengine/studio API](https://margoengine.com/llms/api/studio.md): 8 entry points
-- [@margoengine/post API](https://margoengine.com/llms/api/post.md): 42 entry points
+- [@margoengine/post API](https://margoengine.com/llms/api/post.md): 43 entry points
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 8 entry points
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 3 entry points
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 4 entry points
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 6 entry points
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 24 entry points
-- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 35 entry points
+- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 36 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 25 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 13 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 21 entry points
@@ -263,7 +263,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 7 entry points
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 16 entry points
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 12 entry points
-- [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 40 entry points
+- [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 41 entry points
 - [@margoengine/physics2d API](https://margoengine.com/llms/api/physics2d.md): 2 entry points
 - [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 6 entry points
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 15 entry points

@@ -163,7 +163,7 @@ export const entries = [
       'ShadowMapViewer needs a source: a shadow map layer or a function returning one; see https://margoengine.com/errors#shadow-map-viewer',
       'ShadowMapViewer needs a non-empty name and a finite order; see https://margoengine.com/errors#shadow-map-viewer',
       'ShadowMapViewer x and y must be 0 or more and size above 0; see https://margoengine.com/errors#shadow-map-viewer',
-      "ShadowMapViewer layer 4 is outside the texture's 4 layers; see https://margoengine.com/errors#shadow-map-viewer",
+      "ShadowMapViewer layer 4 is outside the texture's 4 layers; pass a layer inside them; see https://margoengine.com/errors#shadow-map-viewer",
       'ShadowMapViewer perspective maps need near above 0 and a finite far above near; see https://margoengine.com/errors#shadow-map-viewer',
     ],
     cause:
@@ -2503,6 +2503,8 @@ export const entries = [
       'quantizeHeights needs a Float32Array or Float64Array of heights',
       'quantizeHeights unit must be a positive number',
       'riverSources needs the river lines (world.rivers) and a heightAt(x, z) function',
+      'Invalid landscape grid spacing; supply positive finite metres.',
+      'Use at most 65536 ecosystem species',
       'riverSources needs discharge 0..100000 m^3/s and a finite radius >= 0 metres',
       'riverSources needs a finite discharge 0..100000 m^3/s at each river head; return one',
       'BiomeView water flow must be true, false or { discharge, runoff, substeps }',

@@ -165,7 +165,7 @@ export class ShadowMapViewer implements EnginePlugin {
       perspective = map.projection === 'perspective';
     if (!Number.isInteger(layer) || layer < 0 || layer >= texture.depthOrArrayLayers)
       throw new RangeError(
-        `ShadowMapViewer layer ${layer} is outside the texture's ${texture.depthOrArrayLayers} layers${LINK}`,
+        `ShadowMapViewer layer ${layer} is outside the texture's ${texture.depthOrArrayLayers} layers; pass a layer inside them${LINK}`,
       );
     if (perspective && !(map.near! > 0 && map.far! > map.near! && Number.isFinite(map.far)))
       throw new RangeError(`ShadowMapViewer perspective maps need near above 0 and a finite far above near${LINK}`);

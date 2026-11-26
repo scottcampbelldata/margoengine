@@ -3464,3 +3464,39 @@ and current geometry for rendering. `meltwaterField` carries freshwater in m³/s
 The wake field contains paired layout-1 f64 SeaSource rows [x, z, radius, pressure, volume]. Bind it
 in the second argument of `WakeSolver`, with both solvers at 60 Hz in the same world cell. It works
 alongside `WakeParams.sources`. Read the result in `SpectralSea` or render it with `WaterWake`.
+
+## Grounded biped and quadruped gait
+
+`@margoengine/physics/legged` drives a biped or quadruped from planted feet, spring support and limited ground
+traction. It chooses footfall cadence and duty from the speed that was actually reached. Fast quadruped gaits use
+diagonal or asymmetric contacts, and an unloaded foot applies no force.
+
+```ts
+import { LeggedLocomotion } from '@margoengine/physics/legged';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const legs = await LeggedLocomotion.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(legs, {
+  bodies: [{ kind: 'biped' }, { kind: 'quadruped' }],
+});
+legs.setTarget(0, { speed: 1.3, heading: 0 });
+legs.setTarget(1, { speed: 3.5, heading: 0 });
+world.advance(240);
+console.log(legs.read(0).gait, legs.readContact(1, 0).force);
+```
+
+The optional entry shares the ground animal kernel, which loads on demand. Masses default to 75 kg and 500 kg.
+Rest legs default to 0.9 m and 1.08 m. The default friction coefficient is 0.6. Each body's configured carried
+mass is included in its inertia. Contact points, force, supported couple and stance are returned per foot, followed
+by the torso. The pose and gait are also published in the world registry. Use `bedShape` and a registered
+`TerrainBed` for live terrain.
+
+For a rigid platform, give `load` a `deck` with the rigid body row, its full local X/Z dimensions and the local Y
+level of its top. Add the `RigidSolver` first, then add the legged solver and call
+`world.couple(['rigid', 'legged-locomotion'], 'staggered')`. Rigid motion is sampled through the body's canonical
+port. Planted feet follow the support velocity and the legged solver returns the opposite force and moment as an
+impulse to that same body. A fixed `bed` or `groundHeight` supplies the fallback outside the deck.
+
+Enable `readIntent` to receive f64 pairs of desired speed and heading. Enable `readLoad` to receive f64 triples of
+external force in newtons at the COM. Both use the documented layout and body-row order. The built-in target lives
+in world snapshots. Use the public pose, gait and foot readings to place a rig.

@@ -205,6 +205,67 @@ test('native physical slots sharing a glTF texture bind it once, in the owner co
   }
 });
 
+test('extended slots sharing a glTF texture bind it once per colour space, through the sRGB view when one reads colour', async () => {
+  const map = (index) => ({ index }),
+    formats = new Map(),
+    groups = [];
+  const { gpu, engine, model, view } = await scene(
+    [
+      {
+        extensions: {
+          KHR_materials_diffuse_roughness: { diffuseRoughnessFactor: 0.5 },
+          KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatTexture: map(0) },
+          KHR_materials_sheen: { sheenColorFactor: [1, 1, 1], sheenColorTexture: map(0) },
+          KHR_materials_specular: { specularTexture: map(1), specularColorTexture: map(1) },
+        },
+      },
+    ],
+    {
+      doc: {
+        textures: Array.from({ length: 2 }, (_, source) => ({ source })),
+        images: Array.from({ length: 2 }, () => ({})),
+      },
+      images: Array.from({ length: 2 }, () => ({ width: 1, height: 1, close() {} })),
+      configureGPU(gpu) {
+        const texture = gpu.device.createTexture,
+          group = gpu.device.createBindGroup;
+        gpu.device.createTexture = (descriptor) => {
+          const made = texture(descriptor),
+            view = made.createView;
+          made.createView = (d) => {
+            const v = view(d);
+            formats.set(v, descriptor.format);
+            return v;
+          };
+          return made;
+        };
+        gpu.device.createBindGroup = (descriptor) => {
+          groups.push(descriptor);
+          return group(descriptor);
+        };
+      },
+    },
+  );
+  try {
+    gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+    const bound = groups.find((g) => g.entries.some((e) => e.binding === 10)),
+      format = (binding) => formats.get(bound.entries.find((e) => e.binding === binding)?.resource);
+    // Clearcoat (5, R linear) binds 0, sheen colour (9, sRGB) binds 1 on the same texture; specular (11, A) and
+    // specular colour (12, RGB) share binding 2, the sRGB view, whose alpha stays linear.
+    assert.deepEqual(
+      bound.entries.map((e) => e.binding).filter((b) => b >= 10),
+      [10, 11, 12, 13, 14, 15],
+    );
+    assert.deepEqual([format(10), format(12), format(14)], ['rgba8unorm', 'rgba8unorm-srgb', 'rgba8unorm-srgb']);
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
+});
+
 async function scene(materials, extra = {}) {
   const gpu = mockGPU(),
     store = await TransformStore.create(64),
@@ -390,10 +451,17 @@ test('CPU reference: thin-film sensitivity and Fresnel limits from the iridescen
   assert.ok(Math.max(...F) - Math.min(...F) > 0.01 && F.every((v) => v >= 0 && v <= 1), String(F));
 });
 
-test('binding plan: shared glTF textures bind once, at most 8 extension textures, unused maps fall back to defaults', () => {
+test('binding plan: shared glTF textures bind once per colour space, at most 8 extension textures, unused maps fall back to defaults', () => {
   const maps = Array.from({ length: 18 }, (_, k) => (k < 5 ? { index: k } : { index: 100 + (k % 4) }));
   const plan = extendedPlan(maps, features);
-  assert.deepEqual(plan.slots, [-1, -1, -1, -1, -1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, -1, -1, -1]);
+  // Texture 101 holds clearcoat (5) and iridescence (13), linear, and sheen colour (9) and diffuse transmission colour
+  // (17), sRGB: two bindings. Texture 100 holds anisotropy (8), linear RGB, and specular colour (12), sRGB, which
+  // diffuse transmission (16, alpha) joins. Bindings follow each group's first slot.
+  assert.deepEqual(plan.slots, [-1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 1, 2, 5, 0, 1, 2, 5, 4, -1, -1, -1]);
+  // Specular (A) and specular colour (RGB) in one texture, the layout KHR_materials_specular suggests: one binding.
+  const specular = Array(21);
+  specular[11] = specular[12] = { index: 7 };
+  assert.deepEqual(extendedPlan(specular, features).slots.slice(11, 13), [0, 0]);
   const distinct = extendedPlan(
     Array.from({ length: 18 }, (_, k) => ({ index: k })),
     features,

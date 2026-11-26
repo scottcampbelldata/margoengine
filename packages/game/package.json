@@ -407,6 +407,10 @@
       "types": "./dist/biomes/erosion-wasm.d.ts",
       "import": "./dist/biomes/erosion-wasm.js"
     },
+    "./biomes/forest": {
+      "types": "./dist/biomes/forest.d.ts",
+      "import": "./dist/biomes/forest.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
@@ -2235,6 +2239,10 @@
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
     },
+    "./physics/legged": {
+      "types": "./dist/physics/legged.d.ts",
+      "import": "./dist/physics/legged.js"
+    },
     "./physics/locomotion": {
       "types": "./dist/physics/locomotion.d.ts",
       "import": "./dist/physics/locomotion.js"
@@ -2378,6 +2386,10 @@
     "./post/rt-reflections": {
       "types": "./dist/post/rt-reflections.d.ts",
       "import": "./dist/post/rt-reflections.js"
+    },
+    "./post/rt-gi": {
+      "types": "./dist/post/rt-gi.d.ts",
+      "import": "./dist/post/rt-gi.js"
     },
     "./post/ssgi": {
       "types": "./dist/post/ssgi.d.ts",

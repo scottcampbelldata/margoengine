@@ -165,6 +165,10 @@
     "./erosion-wasm": {
       "types": "./dist/erosion-wasm.d.ts",
       "import": "./dist/erosion-wasm.js"
+    },
+    "./forest": {
+      "types": "./dist/forest.d.ts",
+      "import": "./dist/forest.js"
     }
   },
   "files": [
@@ -228,6 +232,7 @@
     "test:gpu:prefetch": "cd ../.. && node packages/biomes/tests/prefetch-check.mjs",
     "test:gpu:flythrough:speed": "cd ../.. && node packages/biomes/tests/flythrough-speed.mjs",
     "test:gpu:objects-frame:speed": "cd ../.. && node packages/biomes/tests/objects-frame-speed.mjs",
+    "build:forest": "node scripts/build-forest.mjs",
     "build:erosion": "node scripts/build-erosion.mjs",
     "test:browser:erosion": "cd ../.. && node packages/biomes/tests/erosion-browser.mjs"
   }

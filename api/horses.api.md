@@ -94,6 +94,9 @@ export class HorseMotion {
     distance: number;
     gait: Gait | 'stand';
     previous: Gait | 'stand';
+    sidewaysSpeed: number;
+    slipping: boolean;
+    bank: number;
     fade: number;
     constructor(body: HorseBody, options?: {
         position?: readonly [number, number];
@@ -102,6 +105,8 @@ export class HorseMotion {
         turnRate?: number;
         fade?: number;
     });
+    setSupport(options: HorseSupportOptions): this;
+    supportHeight(x?: number, z?: number, heading?: number): number;
     pick(speed: number, forced: Gait | 'auto'): Gait | 'stand';
     speedAfter(dt: number, target: number): number;
     step(dt: number, target: {
@@ -109,6 +114,7 @@ export class HorseMotion {
         heading: number;
         gait: Gait | 'auto';
     }): void;
+    strideCyclesAt(distance?: number): number;
     phase(gait: Gait, strideLength: number): number;
     phaseAt(gait: Gait, strideLength: number, distance: number): number;
 }
@@ -120,6 +126,8 @@ export interface HorseOptions extends HorseModelOptions {
     ground?: (x: number, z: number) => number;
     acceleration?: number;
     turnRate?: number;
+    grip?: number;
+    loadMass?: number;
     fade?: number;
     coatHair?: HairOptions | false;
     maneHair?: HairOptions | false;
@@ -151,6 +159,8 @@ export interface HorseSkin {
     readonly skeleton: HorseSkeleton;
     applyPose(pose: HorsePose): void;
 }
+
+export type HorseSupportOptions = Pick<HorseOptions, 'ground' | 'grip' | 'loadMass'>;
 
 export type HorseType = 'draft' | 'cavalry' | 'riding';
 

@@ -30,6 +30,7 @@ import { clearVisualOutput } from './support/visual-output.js';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
 import { demos } from './support/visual-demos.js';
+import { shownErrorMessage, shownErrors, shownErrorsGuard } from './support/shown-errors.js';
 import { margoError } from '../packages/shared/errors.js';
 import {
   selectBaselineProfile,
@@ -227,6 +228,8 @@ async function run() {
           // A GPU reset that takes the view's device fails it at once, saying so, instead of at the 120 s ready timeout.
           await page.addInitScript(deviceLossGuard);
           watchDeviceLoss(page);
+          // A view that showed an error fails, even if the page wrote other text over it (KB-DEPTHTEX-BLACK1).
+          await page.addInitScript(shownErrorsGuard);
           const capture = async () => {
             // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
             await page.waitForTimeout(1000);
@@ -262,6 +265,8 @@ async function run() {
               await page.waitForTimeout(500);
               [last, next] = [next, await shot()];
             }
+            const shown = shownErrorMessage(await shownErrors(page));
+            if (shown) throw new Error(shown);
             return downsample(await decodePNG(next), factor);
           };
           page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));

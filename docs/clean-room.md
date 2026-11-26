@@ -12412,6 +12412,22 @@ Benyoub, "Sampling Visible GGX Normals with Spherical Caps", CGF 2023, https://d
 distribution, kept for a later speed pass. Hit shading is core's own glTF 2.0 Appendix B BRDF text; traversal is
 `sceneBvhWGSL` of piece 6a. Written from these papers; no engine's code was read.
 
+### Ray-traced bounce light behind screen-space GI (FG-17 piece 6c, 2026-11-25)
+
+`packages/post/src/rt-gi.ts`, `src/rt-shade.ts` and the `traced` hook in `src/ssgi.ts`. The same hybrid order as piece
+6b, screen first and the scene where the screen has no hit (Barre-Brisebois et al., "Hybrid Rendering for Real-Time Ray
+Tracing", Ray Tracing Gems ch. 25, 2019, https://doi.org/10.1007/978-1-4842-4427-2_25), applied to SSGI's
+cosine-weighted rays (Matt Pharr, Wenzel Jakob and Greg Humphreys, "Physically Based Rendering", 3rd ed., 13.6.3,
+2016). Compared and not used yet: reservoir reuse of bounce paths (Yaobin Ouyang, Shiqiu Liu, Markus Kettunen, Matt
+Pharr and Jacopo Pantaleoni, "ReSTIR GI: Path Resampling for Real-Time Path Tracing", CGF 40(8), HPG 2021,
+https://doi.org/10.1111/cgf.14378), and a variance-guided denoise (Christoph Schied, Anton Kaplanyan, Chris Wyman et
+al., "Spatiotemporal Variance-Guided Filtering", HPG 2017, https://doi.org/10.1145/3105762.3105770), both left for a
+later piece as SSGI's blur already filters the sum; probe volumes (Zander Majercik, Jean-Philippe Guertin, Derek
+Nowrouzezahrai and Morgan McGuire, "Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields", JCGT 8(2),
+2019, https://jcgt.org/published/0008/02/01/) answer a different question (world-space caches) and are not part of
+this piece. Hit shading is core's own BRDF text, shared with piece 6b. Written from these papers; no engine's code was
+read.
+
 ### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
 
 `packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and
@@ -13533,3 +13549,28 @@ body mass ρᵢ A H. It distinguishes the continuous oscillator from the discret
 The capsize fixture contrasts a restoring wide box and an unstable narrow box under the same heel.
 The real registry chain transfers a calved glacier column to a free-floating iceberg and the signed
 wetted-volume change to a WakeSolver, where crest and trough travel away from the source.
+
+## BIO-03 live forest competition and succession
+
+- Daniel B. Botkin, James F. Janak and James R. Wallis, [*Some Ecological Consequences of a Computer Model of Forest Growth*](https://www.jstor.org/stable/2258570), 1972. The individual annual growth and death events motivate the ecosystem clock.
+- Stephen W. Pacala et al., [*Forest Models Defined by Field Measurements: Estimation, Error Analysis, and Dynamics*](https://www.sortie-nd.org/research/pubs/Pacala_et_al_1996_Ecol_Monogr_66_1-43.pdf), 1996. Growth, recruitment and mortality use individual, species-dependent light responses. Margo's Q16 crown overlap, logistic crown-radius increment and suppression probability are its previously shipped reduced forms.
+- James S. Clark, Miles Silman, Ruth Kern, Eric Macklin and Janneke HilleRisLambers, [*Seed Dispersal Near and Far: Patterns Across Temperate and Tropical Forests*](https://research.fs.usda.gov/treesearch/2094), 1999. Integrating the two-dimensional t kernel over a disk at shape 1 gives radial CDF `1 - 1/(1 + (r/a)²)` with `a = sqrt(u)`. With a uniform upper-tail variate `v`, the inverse is `a sqrt(1/v - 1)`. The offline and live models share the fixed-point inverse sampling and its existing tail bound.
+- Guillaume Cordonnier, Éric Galin, James Gain, Bedřich Beneš, Éric Guérin, Adrien Peytavie and Marie-Paule Cani, [*Authoring Landscapes by Combining Ecosystem and Terrain Erosion Simulation*](https://www.cs.purdue.edu/homes/bbenes/papers/Cordonnier17ToG.pdf), 2017. Section 4.6 and Figure 13 provide the reference for the bidirectional plant/erosion feedback and disturbance-driven regrowth. Gross resolved incision integrated over a model year is compared with each species' measured scour tolerance.
+- L. J. Waldron, [*The Shear Resistance of Root-Permeated Homogeneous and Stratified Soil*](https://doi.org/10.2136/sssaj1977.03615995004100050005x), 1977. The effective additional cohesion in Pa is tensile stress times root area fraction and a geometric/friction factor. The forest takes their measured product beneath a full crown. The patch model weights by projected crown area and bounds representative cover at unity.
+- Don Minore, [*Effects of Artificial Flooding on Seedling Survival and Growth of Six Northwestern Tree Species*](https://andrewsforest.oregonstate.edu/pubs/pdf/pub752.pdf), 1968, and John M. Kabrick et al., [*Quantifying Flooding Effects on Hardwood Seedling Survival and Growth for Bottomland Restoration*](https://www.nrs.fs.usda.gov/pubs/jrnl/2012/nrs_2012_kabrick_001.pdf), 2012. The controlled exposure experiments motivate species-specific depth and duration thresholds, which callers set for their site and life stage. The solver counts ticks at or above the chosen depth.
+- John E. Wade and E. Wendell Hewson, [*Trees as a Local Climatic Wind Indicator*](https://journals.ametsoc.org/view/journals/apme/18/9/1520-0450_1979_018_1182_taalcw_2_0_co_2.xml), 1979, and G. L. Wooldridge, R. C. Musselman, R. A. Sommerfeld, D. G. Fox and B. H. Connell, [*Mean Wind Patterns and Snow Depths in an Alpine–Subalpine Ecosystem as Measured by Damage to Coniferous Trees*](https://research.fs.usda.gov/download/treesearch/48421.pdf), 1996. Leeward form follows chronic exposed wind. The solver's reduced growth rule averages `U |U|` and sets the direction of new crown area to `leanMax * meanLoad / (referenceSpeed² + |meanLoad|)`. Its existing and new axes are averaged by projected crown areas before and after growth. The saturation and area moment are Margo assumptions, with site calibration separate from the observed wind-deformation relation.
+
+The transition reuses Margo's integer ecosystem. The annual crown search has an original Rust neighbourhood table in
+arena memory and gives identical succession with plain and shared Wasm. Measurements for the matching examples and
+exact tests are in the package README and whitepaper claims.
+
+### Grounded biped and quadruped gait (LIFE-01)
+
+- R. McNeill Alexander and A. S. Jayes, [A dynamic similarity hypothesis for the gaits of quadrupedal mammals](https://doi.org/10.1111/j.1469-7998.1983.tb04266.x), 1983, supplies relative stride and Froude scaling. Alexander's [author review](https://www.cs.cmu.edu/~cga/legs/alexander.pdf), 1984, compares dimensionless duty and stride in quadrupeds and bipeds. With `Fr = v² / (g h)`, use the published `L/h = 2.3 Fr^0.3` curve and integrate cadence `v/L` through speed changes. The simulated support stride also observes `2 × accessible foot travel / duty`, with the single-stance moment bound `r ≤ μ × support lever`.
+- Reinhard Blickhan, [The spring-mass model for running and hopping](https://doi.org/10.1016/0021-9290(89)90224-8), 1989, motivates compressive stance springs and ballistic unloaded phases. Thomas Geijtenbeek, Michiel van de Panne and A. Frank van der Stappen, [Flexible Muscle-Based Locomotion for Bipedal Creatures](https://courses.washington.edu/bioen520/notes/Geijtenbeek_%28Trans_on_Graphics_2013%29.pdf), 2013, Fig. 5 and §4.4, motivate separate stance/swing phases and trunk feedback during stance. The reduced world solver reuses the grounded spring and contact kernel. It applies a finite support couple, with a shear allowance reduced by the moment budget of an offset centre of mass. Torso collision absorbs angular motion through rolling friction.
+- Huiling Tan and Alan Wilson, [Grip and limb force limits to turning performance in competition horses](https://pmc.ncbi.nlm.nih.gov/articles/PMC3107634/), 2011, derives the small-radius traction limit. Use `a_lat = speed × turn rate`, and enforce `a_tan² + a_lat² ≤ (μ g_n)²`. Bank follows the ratio of lateral acceleration to normal gravity. The measured fit `μ = 0.6` is a surface default and can be changed.
+- Alberto E. Minetti, Luca P. Ardigò, E. Reinach and F. Saibene, [The relationship between mechanical work and energy expenditure of locomotion in horses](https://www.bio.utexas.edu/faculty/pianka/Horse_Energetics.pdf), 1999, Table 1 and Fig. 8, measured pace-dependent frequency and body motion. Alberto E. Minetti et al., [Energy cost of walking and running at extreme uphill and downhill slopes](https://iris.unibs.it/bitstream/11379/540545/1/Minetti%20JAP%202002.pdf), 2002, supplies measured human evidence for climbing cost. The equine drive uses gravitational work `m g Δh` against a fixed work-per-metre command, without applying human metabolic fit coefficients to a horse.
+
+The engine verifies variable cadence, coupled normal and lateral traction, mean support height from independent hoof
+samples, an airborne trot phase, canting and slope work, world-space foot forces and opposing impulse on an actual
+rigid platform. Full limb mechanics, rig hand-off and water displacement remain separate couplings.

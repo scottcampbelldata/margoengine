@@ -20,6 +20,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
   both sides; a report both sides changed builds its own package only.
 
+### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
+
+- **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in
+  a shuffled order (as if its bodies had woken in that order); their bodies differed after 45 steps.
+- **Cause:** a step works through its lists in the order they were filled: the awake list in wake order (which numbered the
+  islands and ordered each island's bodies), the active pairs in the order they were found and swapped out. Gauss-Seidel
+  passes give different bits in a different order, so history the world does not hold as state decided its path, against
+  rule 4 of docs/physics-framework.md section 7 (iteration order never depends on allocation order).
+- **Fix:** at the start of every step and again after the island build's wake-ups, the awake list is put in body order and
+  the active pairs in the order of their colliders and parts (`canonical_lists`, a stable bottom-up merge sort through
+  scratch columns). Islands are numbered by their lowest body, and bodies, pairs and events come in row and collider order.
+- **Regression:** the test above (600 steps, three wake orders shuffled again every 50 steps, and a snapshot restored at step
+  300, bit for bit). The joint web's seed 1 now takes another path, on which its drivers do 1.7e12 J of work and a body
+  reaches 172 km/s with no energy gained; `a_web_of_joints_stays_in_the_numbers` bounded speeds at 1e5 m/s, a figure with
+  no derivation, and now bounds them by the range a step refuses past (RANGE), the energy ledger holding the physics.
 ### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
@@ -185,6 +200,26 @@ power. EARTH-10 can connect using the layouts requested in the [work queue](phys
 ### Fixed 2026-11-25: missing time-varying celestial forcing and tracker backtracking (SPACE-02)
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
+
+### Fixed 2026-11-26: a WgslMaterial could not read a borrowed 32-bit float texture, so the depth-texture demo drew black (KB-DEPTHTEX-BLACK1, materials)
+
+- **Repro:** `npm run visual:update` on a186f625f0 (RTX A6000, Edge 158.0.4370.33): `depth-texture-high` and `-phone`
+  captured an all-black canvas in 4 of 4 runs with no page or WGSL error. The page's status, watched as it changed,
+  briefly read `MargoError: Texture samples 32-bit float texels, which needs the device feature float32-filterable`.
+  Chrome 158 gave the same; not a browser change.
+- **Cause:** f6f22a4977 (2026-11-20, borrowed-object rule) added a `float32-filterable` refusal to the shared bind of
+  every Texture made from a GPUTexture. A WgslMaterial reads such a texture with `textureLoad`, which needs no
+  filtering (as its docs say), so DepthTexture's r32float `distance` threw on the first frame, core stopped the loop
+  and the demo then wrote its ready text over the error and reported ready. The visual check took the black canvas.
+- **Fix:** the refusal stays only where texels are filtered: material map slots (`sampled`) and envMap, each now
+  checked after the bind so a function source, whose format is known only then, is refused too. The demo keeps an
+  error on screen and never reports ready after one. Class guard: `scripts/visual-regression.js` fails a view that
+  showed an error text at any moment, even one other text replaced (`scripts/support/shown-errors.js`); on the bug
+  build it fails both depth-texture views with the MargoError above. A guard on GPU work was tried first and dropped:
+  gameplay-sandbox and windy-meadow stop their loop on purpose under reduced motion, so they submit no work either.
+  Regressions: "a borrowed 32-bit float GPUTexture binds to a WgslMaterial without float32-filterable" in
+  packages/materials/test/texture-formats.test.js (fails on the old code) and tests/visual-shown-errors.test.js.
+  Other demos still write their ready text over an onError message; the guard catches them in the visual check.
 
 ### Fixed 2026-11-26: `GPUSceneBVH`'s buffers were missing from the borrowed GPU object registry, so hygiene failed (bvh)
 
@@ -16355,3 +16390,19 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
 does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
 and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.
+
+## Open: canonical fire and alpine canopy links (BIO-03)
+
+BIO-03 reads a replayable exposure port for burn severity and fuel moisture until a producer in FIRE-01 and the
+weather packages publishes the shared cell layout. The exposure fixture in `packages/biomes/tests/coupling/forest.test.js`
+reproduces the effects on snags and live fuel. Forest growth provides the permanent axis required by TREE-3, and that
+fixture checks the crown-tip direction. Existing treeline footage and its distant impostors still need a growth-axis
+consumer in the shot. The remaining shared fields are listed in [Framework requests](physics-work-queue.md#framework-requests).
+
+### Legged rig, rider and flow hand-off (LIFE-01)
+
+The world solver can walk and run on live terrain and load a rigid platform. The recorded HORSE and COURIER
+footage predates these fixtures. To exercise the scene-level hand-off, connect the solved feet and COM to the
+rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
+handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
+LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20106219,
+  "total": 20145913,
   "history": [
     {
       "date": "2026-10-24",
@@ -12831,6 +12831,30 @@
       "commit": "7f5ad4a8d2",
       "grew": 2,
       "reason": "ICE-01 entry sizes, previous record to current: @margoengine/physics/snowpack 0→5737 B (ceiling 0→5993 B); @margoengine/weather/avalanche 6738→7195 B (ceiling 6984→7451 B). The snowpack entry integrates the registry and lazily loads the arena solver. Weather adds solid reflection and distributed obstacle drag to the same avalanche flux. A separate wrapper would need to duplicate the main flow step to change its conservative boundary flux."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5628424515",
+      "reason": "BIO-03 shares the annual transition, taking offline ecosystem from 3,210 to 3,652 B gzip. The live forest entry is 7,194 B gzip plus lazily loaded 1,276 B raw kernels. Duplicating the annual model would let offline and live dynamics diverge. Core and stage gain 0 B.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e6403e5f16",
+      "reason": "LIFE-01: 11101 B gzip for the optional biped and quadruped entry with rigid deck impulses, variable stance, and the reused ground kernel. Horses now use loaded slope, traction and live phase. Core and stage add zero bytes.",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3609b9e1c9",
+      "reason": "FG-17 piece 6c new entry post/rt-gi 15,595 B gzip: RTGI extends SSGI (the entry carries SSGI's own chunk, shared with post/ssgi) plus the trace patch and the shared traced-hit shading of rt-shade; post/ssgi grows 77 B for its traced hook (SSGITrace), which with no subclass builds and binds what it did",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7a5fc90bc0",
+      "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12909,12 +12933,13 @@
     "@margoengine/biomes/cover": 3795,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 6548,
-    "@margoengine/biomes/ecosystem": 3466,
+    "@margoengine/biomes/ecosystem": 3908,
     "@margoengine/biomes/editor": 4433,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/erosion-wasm": 2649,
     "@margoengine/biomes/far": 4587,
     "@margoengine/biomes/farmland": 5853,
+    "@margoengine/biomes/forest": 7450,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
@@ -13230,7 +13255,7 @@
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
     "@margoengine/exporters/usdz": 22472,
-    "@margoengine/exporters/usdz-anim": 26542,
+    "@margoengine/exporters/usdz-anim": 28718,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24529,
     "@margoengine/fbx dist/workers/fbx.js": 132202,
@@ -13319,7 +13344,7 @@
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,
     "@margoengine/headless/video": 13452,
-    "@margoengine/horses": 16111,
+    "@margoengine/horses": 17226,
     "@margoengine/horses/anatomy": 1097,
     "@margoengine/horses/crowd": 12397,
     "@margoengine/horses/gaits": 1467,
@@ -13657,8 +13682,9 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/iceberg": 5418,
     "@margoengine/physics/landscape": 4603,
+    "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
-    "@margoengine/physics/locomotion": 6675,
+    "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
@@ -13736,13 +13762,14 @@
     "@margoengine/post/outline": 7282,
     "@margoengine/post/overlays": 11210,
     "@margoengine/post/pixelate": 10491,
+    "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16677,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10584,
-    "@margoengine/post/ssgi": 14202,
+    "@margoengine/post/ssgi": 14708,
     "@margoengine/post/ssr": 15069,
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,

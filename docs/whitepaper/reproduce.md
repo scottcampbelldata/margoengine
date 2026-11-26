@@ -4305,3 +4305,9 @@ Build Physics with `node packages/physics/scripts/build.js`, then run
 The checks include independent closed forms, evolving field producers, real PBR material data and
 plain/shared-memory replay. The Physics README's material ageing block builds a 30-year copper
 and submerged steel example without external datasets.
+
+### Physical legged gaits
+
+Build Physics and Horses, then run `node --test --test-timeout=20000 packages/physics/tests/legged.test.js packages/physics/tests/coupling/legged.test.js packages/horses/test/legged-drive.test.js`.
+The fixtures exercise measured cadence, a climb against gravity, the available traction budget, grounded torso
+response, real terrain, and a translating rigid support with an opposing impulse.

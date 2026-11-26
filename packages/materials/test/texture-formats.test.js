@@ -312,6 +312,25 @@ test('material map slots take 2D textures only, and 32-bit floats only with floa
   assert.equal(new Material({ map: flat }).bindings(device(['float32-filterable']).device).length, 10);
 });
 
+test('a borrowed 32-bit float GPUTexture binds to a WgslMaterial without float32-filterable (KB-DEPTHTEX-BLACK1)', () => {
+  // The depth-texture demo hands DepthTexture's r32float distance to a WgslMaterial that reads it with textureLoad;
+  // the borrowed path refused it on every device without float32-filterable and the frame stayed black.
+  const gpu = device(),
+    distance = gpu.device.createTexture({ size: [4, 4], format: 'r32float' }),
+    water = new WgslMaterial({
+      wgsl: 'fn shade(i: Out, s: Surface) -> Surface {return s;}',
+      textures: { sceneDistance: new Texture(distance) },
+    });
+  assert.ok(water.bindings(gpu.device).length > 0);
+  // Filtered slots still refuse it, a function source included (its format is known only after its first bind).
+  assert.throws(() => new Material({ map: new Texture(distance) }).bindings(device().device), /float32-filterable/);
+  assert.throws(
+    () => new Material({ map: new Texture(() => distance) }).bindings(device().device),
+    /Material map samples 32-bit float.*float32-filterable/,
+  );
+  assert.ok(new Material({ map: new Texture(distance) }).bindings(device(['float32-filterable']).device).length);
+});
+
 test('WgslMaterial declares each texture by its dimension and keeps it on swaps', () => {
   const volume = new Texture(
       { data: new Float32Array(8), width: 2, height: 2, depth: 2, format: 'r32float' },

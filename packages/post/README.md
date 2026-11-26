@@ -561,6 +561,48 @@ gi.options.multiBounce = false;                                // back to one bo
   `engine.use`). Memory: three material targets, two `rgba16float` GI targets, a half-resolution Hi-Z and blur chain,
   and its own 1x depth at 4x. GPU cost not measured yet. WebGPU only.
 
+## Ray-traced bounce light: `RTGI`
+
+`@margoengine/post/rt-gi` is SSGI with a ray tracer behind it. SSGI's material replay, cosine-weighted Hi-Z rays, tile
+spread, bilateral blur and composite stay as above; a ray the screen does not answer (it leaves the screen, runs behind
+the camera or under nearer geometry) is traced through a `GPUSceneBVH` from `@margoengine/bvh/gpu-scene` (an optional
+peer) from the same start along the same direction. Every SSGI option, `multiBounce` included, works the same.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {MeshBVH} from 'margoengine/bvh';
+import {GPUSceneBVH} from 'margoengine/bvh/gpu-scene';
+import {RTGI} from 'margoengine/post/rt-gi';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const lamp = box(4, 0.1, 4);
+engine.createMesh().setGeometry(lamp).setPosition([0, 3, -4]).setMaterial(new PbrMaterial({color: '#ffffff'}));
+const scene = GPUSceneBVH.forShader(engine.gpu!, [
+  {bvh: MeshBVH.fromGeometry(lamp), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3, -4, 1], material: {emissive: [1, 1, 1]}},
+]);
+const gi = RTGI.attach(engine, {scene, rays: 4}); // or put it in your PostStack like SSGI
+gi.options.multiBounce = true; // traced hits add into the history like screen hits
+gi.options.shadows = false;    // skip the sun's shadow ray at traced hits (default true)
+```
+
+- **Hybrid order** (Barre-Brisebois et al. 2019). Each ray marches the Hi-Z first; only a ray with no screen hit
+  traces, from SSGI's own start (two pixel footprints off the surface) up to `maxDistance`, faded over its last 20%
+  like SSGI's screen hits. Traced and screen hits add into the same sum over rays, so the share of rays that hit and
+  the bounce light stay one average.
+- **Shading of traced hits.** The same as `RTReflections`: core's BRDF text with the instance's `material`, the engine
+  sun with a shadow ray through the scene (`shadows`; `bias` default 0.01), core's flat ambient and the emissive. The
+  view vector is the ray's reverse.
+- **Fallback.** A disposed scene, or one made on a device that was lost, runs as plain SSGI until `gi.options.scene`
+  is given a new one.
+- **Checked on a real GPU** (`test/rt-gi-browser.mjs`, WebGPU and the WebGL2 layer, identical figures on an RTX
+  A6000): a white matte floor under a wide emissive ceiling that is never on screen, sun and ambient off, which SSGI
+  alone leaves black, reads 181 against the closed form 180.54 (display of emissive x the mean distance fade, 0.99888)
+  with one bounce and with `multiBounce`; the floor turned away from the ceiling stays 0, and a disposed scene gives
+  SSGI's 0 back.
+- **Limits.** Everything `RTReflections` lists for traced hits (scene instances only, one material record per
+  instance, core's sun and flat ambient only, flat normals), plus: no ReSTIR GI reuse and no SVGF denoise, so the
+  noise is SSGI's `rays` per pixel and its blur; traced hits are lit directly, so with `multiBounce` a traced hit does
+  not carry the bounces already built up on screen. GPU cost not measured yet (build phase).
+
 ## Motion blur: `MotionBlur`
 
 `@margoengine/post/motion-blur` (6,861 B min+gzip, its own entry; it carries the stack) blurs along per-pixel motion

@@ -1366,8 +1366,11 @@ Extension maps that point at one glTF texture (the same image and sampler) bind 
 set and transform. Slots share only within one colour space, except that a slot reading only alpha (sheen roughness,
 specular) also reads an sRGB view, where alpha stays linear. So clearcoat R + roughness G, sheen colour RGB + roughness
 A and specular A + colour RGB, packed as the extensions suggest, bind 5 extension textures in place of 8. Clearcoat
-(linear) and sheen colour (sRGB) in one texture keep two views. Nothing to set: the same glTF file draws with fewer
-texture units.
+(linear) and sheen colour (sRGB) in one texture keep two views. Extended materials (`extendedMaterials`) follow the
+same rule over all their slots, so their eight extension textures count one binding per texture and colour space, and
+specular colour packed with specular decodes as sRGB there too. Nothing to set: the same glTF file draws with fewer
+texture units. `node packages/gltf/scripts/test-extended-colour-space-browser.mjs` checks it on WebGPU, and with
+`--compat` on the WebGL2 compatibility layer.
 
 If a physical or extended material still composes a shader past the device's limit (WebGPU's sampled textures or
 samplers per stage, or the texture units the WebGL2 compatibility layer counts before linking), its five base maps

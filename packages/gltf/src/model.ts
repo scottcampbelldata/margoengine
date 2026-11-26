@@ -294,12 +294,16 @@ const packedMaterials = new WeakMap<GPUDevice, WeakSet<PBRMaterial>>(),
     return packed;
   };
 // Map slot i of resource material m gets its own texture and sampler: base slots always; extension slots of extended
-// materials only when bound, once per shared glTF texture.
+// materials only when bound, once per binding: its first sRGB slot (an alpha-only slot reads alpha linear in an sRGB
+// view), else its first slot, so the view decodes every slot sampling it in its own colour space.
 const ownSlot = (m: PBRMaterial, i: number, x?: GLTFExtendedMaterials) => {
   if (!m.extended || i < 5) return true;
   const slots = planOf(m, x!).slots,
     j = slots[i];
-  return j >= 0 && slots.indexOf(j) === i;
+  if (j < 0) return false;
+  const first = slots.indexOf(j),
+    srgb = slots.findIndex((b, k) => b === j && srgbSlots.includes(k));
+  return (srgb >= 0 ? srgb : first) === i;
 };
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
 const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.renderState,

@@ -44,6 +44,15 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,
+  crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
+  ships its versioned exposure and output fields and consumes HYDRO-01 and HYDRO-04 directly on matching grids.
+
+- **LIFE-01:** Publish common legged intent/load/pose/stance descriptors and moving support geometry with a
+  per-contact surface velocity. The optional module reads `bodies` and posts `bodyImpulses` for an explicit rigid
+  rectangular deck. DYN-07 articulation, LIFE-06 rider forces and SEA-12 immersion can consume the versioned
+  legged fields until their shared contracts are available. Reuses slot 13.
+
 - **LIFE-02:** Reserve static Wasm slot 13 and promote the versioned `groundAnimalPose` and
   `groundAnimalContact` rows to shared fields when the rigid/animation readers adopt them. Add initial cell and
   cell size to the solver host, portable bed geometry, and a contact-wrench accumulator for articulated bodies
@@ -271,12 +280,12 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
-| SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |
+| SOUND-02 | Enclosed and urban acoustics | partial | Codex | BUILDING (codex/physics-lane-3) |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
-| BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
-| BIO-03 | Forest ecosystem dynamics | sound | Codex | BUILDING (codex/physics-lane-3) |
+| BIO-02 | Plant growth and morphogenesis | none | Codex | BUILDING (codex/physics-bio02) |
+| BIO-03 | Forest ecosystem dynamics | sound | Codex | LANDED 609d76e5ce |
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
@@ -288,7 +297,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
-| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Codex | BUILDING (codex/physics-life01) |
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | LANDED 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 708e96a06b |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | LANDED 561885e7a1 |

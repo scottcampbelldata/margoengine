@@ -77,7 +77,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 
 | ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
 |---|---|---|---|---|---|---|
-| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | Point mass with leg spring, grip-limited turning, lean, slopes, slips, falls | horses/src/index.ts, gaits.ts, model.ts, seat.ts; humans; animator | stand-in: PA-68, 69, 70 (fixed stride, one ground sample) | Alexander and Jayes, "A dynamic similarity hypothesis for the gaits of quadrupedal mammals" (1983). Blickhan, "The spring-mass model for running and hopping" (1989). Geijtenbeek, van de Panne and van der Stappen, "Flexible muscle-based locomotion for bipedal creatures" (2013). | K09 K10 K18 K29 |
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | Point mass with leg spring, grip-limited turning, lean, slopes, slips, falls | @margoengine/physics/legged and @margoengine/horses | grip, multi-hoof grade, dynamic cadence and live rigid deck coupling | Alexander and Jayes, "A dynamic similarity hypothesis for the gaits of quadrupedal mammals" (1983). Blickhan, "The spring-mass model for running and hopping" (1989). Geijtenbeek, van de Panne and van der Stappen, "Flexible muscle-based locomotion for bipedal creatures" (2013). | K09 K10 K18 K29 |
 | LIFE-02 | Limbless, insect and small-animal locomotion | Snakes, lizards, crabs, spiders, insects, kinematic templates plus ground contact | @margoengine/physics/locomotion | GroundLocomotion, with TerrainBed, pose and contact wrench ports | Hu, Nirody, Scott and Shelley, "The mechanics of slithering locomotion" (2009). Holmes et al., "The dynamics of legged locomotion" (2006). | K09 K10 K29 |
 | LIFE-03 | Aquatic locomotion | Fish, whales, dolphins, seals, undulatory swimming, breaching, diving | physics/src/life | six-DOF SIMD swimmer with hull-strip and fin loads, live SEA-02 and LIFE-04 coupling, contact and wake fields | Lighthill, "Note on the swimming of slender fish" (1960). Triantafyllou, Triantafyllou and Yue, "Hydrodynamics of fishlike swimming" (2000). Tu and Terzopoulos, "Artificial fishes" (1994). | K09 K10 K22 K29 |
 | LIFE-04 | Collective animal motion | Flocks, schools, herds, swarms | `@margoengine/physics/schooling`, `behavior/src/steering.ts` | sound: three-zone metric rules, nearest-visible neighbour count, predator prediction and point-mass mass, drag and turn limits. Intent is tested with a body-controller stand-in. | Reynolds, "Flocks, herds and schools" (1987). Couzin et al. (2002). Ballerini et al., topological interaction in starlings (2008). | K06 K18 |
@@ -206,7 +206,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 |---|---|---|---|---|---|---|
 | BIO-01 | Plant mechanics under wind and water | Trees, shrubs, grass, crops, reeds, kelp: modal response, breakage, windthrow, felled trees; kelp, sea grass and soft corals sway in the water velocity below the surface | `@margoengine/physics/vegetation` and `@margoengine/scatter/plant-motion` | modal motion, windthrow, rigid impacts and scatter posing; reads the supplied subsurface flow contract (PA-30) | de Langre, "Effects of wind on plants" (2008). Stam, "Stochastic dynamics" (1997). Habel, Kusternig and Wimmer, "Physically guided animation of trees" (2009). Gardiner et al., ForestGALES (2000). | K17 K18 K22 |
 | BIO-02 | Plant growth and morphogenesis | L-system growth, tropisms, competition | procedural/src/lsystem.ts, plants.ts (static) | none (dynamic) | Prusinkiewicz and Lindenmayer (1990). Palubicki et al. (2009). Pirk et al. (2012). | K06 |
-| BIO-03 | Forest ecosystem dynamics | Competition, seeding, mortality, succession | biomes/src/ecosystem.ts | sound (JABOWA and SORTIE style, integer-deterministic) | Botkin, Janak and Wallis (1972). Pacala et al. (1996). Cordonnier et al. (2017). | none beyond K01 to K05 |
+| BIO-03 | Forest ecosystem dynamics | Competition, seeding, mortality, succession, chronic wind-shaped growth and tree–soil feedback | `@margoengine/biomes/forest`, offline `@margoengine/biomes/ecosystem` | framework solver; water, soil and burn disturbance; published canopy, roots, fuel and fuel moisture | Botkin, Janak and Wallis (1972). Pacala et al. (1996). Cordonnier et al. (2017). | none beyond K01 to K05 |
 | BIO-04 | Material ageing | Rust, patina, rot, fouling, stone weathering, wreck decay | `@margoengine/physics/ageing` | atmospheric and immersion corrosion, rot, fouling, limestone recession and PBR appearance | Dorsey and Hanrahan (1996). Gu et al., time-varying surface appearance (2006). | none beyond K01 to K05 |
 
 ### Family SPACE: orbital and celestial (3)
@@ -424,7 +424,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 ## 4. State, order and owners
 
 **State across the 103.**
-- Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core), BIO-03 and the SGP4 part of SPACE-01.
+- Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core) and the SGP4 part of SPACE-01.
 - Partial: about 25. The deterministic analytic models in weather, vfx and sky count here: avalanche, eruption,
   lava, thermal, fire front, hurricane and tornado, snow drift and fuel moisture.
 - Stand-in: about 40. These are the kinematic or scripted pieces the audit lists.

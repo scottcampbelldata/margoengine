@@ -64,6 +64,7 @@ await build({
         life: resolve(root, 'src/life/index.ts'),
         pedestrians: resolve(root, 'src/pedestrians/index.ts'),
         locomotion: resolve(root, 'src/locomotion/index.ts'),
+        legged: resolve(root, 'src/legged/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
