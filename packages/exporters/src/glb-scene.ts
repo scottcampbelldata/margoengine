@@ -43,8 +43,12 @@ function floats(accessor: AccessorValues): Float32Array {
  * influences; RangeError for data past its buffer.
  */
 export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GLBSceneSkip[] } {
-  const parts: GLBParts = splitGLB(bytes),
-    json = parts.json as JSONObject,
+  return sceneOfParts(splitGLB(bytes));
+}
+
+/** {@link sceneOfGLB} of a file already split. */
+export function sceneOfParts(parts: GLBParts): { scene: ExportScene; skipped: GLBSceneSkip[] } {
+  const json = parts.json as JSONObject,
     compressed = (json.extensionsRequired ?? []).find((name: string) => /draco|meshopt/i.test(name));
   if (compressed)
     throw new TypeError(`This GLB needs ${compressed} decoded; export from the uncompressed file, before compressing`);

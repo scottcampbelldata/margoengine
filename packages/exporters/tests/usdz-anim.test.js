@@ -724,7 +724,8 @@ test('what it cannot take is refused with what to do', async () => {
   await assert.rejects(exportAnimatedUSDZ(source, { clip: 'Run' }), /no clip "Run"/);
   await assert.rejects(exportAnimatedUSDZ(source, { fps: 0 }), RangeError);
   await assert.rejects(exportAnimatedUSDZ(source, { fps: Infinity }), RangeError);
-  await assert.rejects(exportAnimatedUSDZ(packed), /decoded/);
+  // A Draco file is decoded (usdz-anim-compressed.test.js), then refused for what it holds, here no clip.
+  await assert.rejects(exportAnimatedUSDZ(packed), /exportUSDZ/);
   await assert.rejects(exportAnimatedUSDZ(new Uint8Array(4)), TypeError);
   const long = {
     nodes: [node],
