@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20648058,
+  "total": 20649327,
   "history": [
     {
       "date": "2026-10-24",
@@ -14137,6 +14137,12 @@
       "commit": "863848faa5",
       "grew": 1,
       "reason": "SEA-12 hydrostatic righting and input diagnostics change physics/loads from 9019 to 11387 B gzip and its optional ceiling from 9290 to 11729 B. The body loads always need exact displacement and pressure moments. A second entry would still be imported for each box or closed mesh, and would duplicate the existing hull pressure contract. Core and stage stay unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6e77101bc2",
+      "grew": 1,
+      "reason": "SEA-12 incident mesh pressure and held-out oscillatory member loads grow physics/loads from 11387 to 12619 B gzip. The optional ceiling moves from 11729 to 12998 B. The two in-line models share the member force integration and shipping them as separate entries would duplicate that integration."
     }
   ],
   "items": {
@@ -14988,7 +14994,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 11729,
+    "@margoengine/physics/loads": 12998,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 8785,

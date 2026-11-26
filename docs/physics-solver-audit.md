@@ -1107,6 +1107,13 @@ for the independently photographed 27.5° float. The derived image-resolution ba
 argument errors in the loads entry now use `MargoError` with a specific repair and help anchor. Dynamic pressure
 validation, roll decay, hydrodynamic radiation, reciprocal water coupling and native scaling remain open.
 
+  The surface-pressure mode integrates live incident pressure for boxes or closed meshes. The pressure and
+  sloping-waterline tests in `packages/physics/tests/loads.test.js` check its force and moment and show that
+  incident acceleration contributes once. Two member tests reproduce the missed short wetted interval and
+  the phase-dependent KC error. The held-out Sarpkaya 1976 test compares force coefficients and the measured
+  peak of ten β = 4480 runs against calibration from β = 3123 and 5260. Mass and drag mean absolute errors are
+  0.092 and 0.063, compared with 0.039 and 0.214 for DNV. The maximum normalized peak-load error is 0.374.
+
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/rogue/index.ts` (1068 lines) and `groups.ts` (278 lines), plus the row in `docs/physics-solvers.md`, `docs/limits.md`, and the audit rows. Commits since the audit (2026-11-25) are only 47be5f699 and 116edc307 (three sisters); nothing touches a dynamic or high-order spectral tier. Tests run under run-with-timeout: `packages/physics/tests/rogue.test.js` 9 pass / 0 fail; `packages/physics/tests/sisters.test.js` 3 pass / 0 fail. There is no `tests/coupling` file for it, and no GPU or browser test.

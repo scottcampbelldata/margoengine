@@ -4115,11 +4115,12 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 - **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}` or `{mesh}`. A mesh needs a closed surface with outward-wound triangles and may split vertices at coincident seams. Each body takes:
   - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. The Froude–Krylov force uses the water's acceleration;
+  - `pressureModel: 'surface'` reads incident gauge pressure from `sea.pressure` for a box or closed mesh and integrates its wrench over the actual clipped waterline. The default `'compact'` uses the local plane and point acceleration. Additional `flows` still contribute their own acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
   - quadratic drag on its velocity through the water, a sphere's by Reynolds number (Morrison), else 1.0 or `drag`;
   - a spinning body's drag;
   - the wind's drag on its emerged part (`windage`, default 1), so floating debris drifts at a few percent of the wind.
-- **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the wetted length, its drag and added mass from DNV-RP-C205 by roughness (`roughness`, default 5e-5 m) and Keulegan-Carpenter number (`period`, default 8 s). A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
+- **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the clipped wetted length. Set `period` to the dominant harmonic in seconds (default 8) or `Infinity` for steady water. The default `coefficients: 'dnv'` uses the peak orbital speed with DNV and White for roughness (`roughness`, default 5e-5 m) and Reynolds effects. `coefficients: 'sarpkaya-1976'` uses a smooth cylinder (roughness 0) and measured in-line coefficients over the laboratory range. A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
 - **The water** (`sea`): a `SeaSurface`, or any `{elevation, water, density}` such as a flood's (`{elevation: (x, z) => shallow.sample(x, z).surface, water: shallow.flow, density: 1000}`). Add `flows` for currents and races (`ShipSolver.water`) and `wind` for windage.
 
 Omit `capacity` to use the world's rigid body rows. Unsupported load inputs raise `MargoError` with
@@ -4182,6 +4183,7 @@ console.log(drag.toFixed(2), addedMass.toFixed(2)); // 0.71 0.69
 const still = {
   density: 1025,
   elevation: () => 0,
+  pressure: (_x: number, y: number) => 1025 * 9.81 * Math.max(0, -y),
   water: {medium: 'water' as const, cell: [0, 0, 0] as const, sample: (_x: number, _y: number, _z: number, _t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 1025, temperature: 288}) => out},
 };
 await Physics.load();
@@ -4194,7 +4196,7 @@ const crate = physics.addBody(null, {
 });
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: halfExtents}}]})
+  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: halfExtents}, pressureModel: 'surface'}]})
   .couple(['loads', 'rigid'], 'staggered');
 world.advance(60 * 30);
 console.log(Math.abs(crate.position[1]) < 0.35, Math.abs(crate.rotation[0]) < 0.01); // true true

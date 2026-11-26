@@ -22,6 +22,7 @@ export interface LoadBody {
     readonly centre?: readonly [number, number, number];
     readonly drag?: number | readonly [number, number, number];
     readonly addedMass?: readonly [number, number, number];
+    readonly pressureModel?: 'compact' | 'surface';
     readonly windage?: number;
 }
 
@@ -32,6 +33,7 @@ export interface LoadMember {
     readonly diameter: number;
     readonly roughness?: number;
     readonly period?: number;
+    readonly coefficients?: 'dnv' | 'sarpkaya-1976';
     readonly vortex?: {
         readonly strouhal?: number;
         readonly lift?: number;

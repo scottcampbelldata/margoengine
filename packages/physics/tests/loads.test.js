@@ -17,7 +17,9 @@ import {
   goda,
   liftMagnification,
   morison,
+  reynoldsDrag,
   sainflou,
+  SEA_WATER_VISCOSITY,
   sheddingFrequency,
   sphereDrag,
   standingWave,
@@ -280,6 +282,77 @@ test('SEA-12 a heeled box and triangle mesh return the exact displaced volume an
   }
 });
 
+test('SEA-12 surface pressure integrates horizontal force and moment across a submerged box', () => {
+  const rho = 1025.9;
+  const g = 9.81;
+  const acceleration = 2;
+  const shear = 900;
+  const halfExtents = [2, 1, 0.5];
+  const volume = 8 * halfExtents[0] * halfExtents[1] * halfExtents[2];
+  const sea = still();
+  sea.pressure = (x, y, z) => -rho * g * y - rho * acceleration * x - shear * (y + 4) * z;
+  sea.water.sample = (_x, _y, _z, t) => ({ velocity: [acceleration * t, 0, 0], density: rho, temperature: 288 });
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(sea, [
+    {
+      position: [0, -4, 0],
+      collider: { shape: 'box', halfExtents, mass: 4000 },
+      load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0], pressureModel: 'surface' },
+    },
+  ]);
+  simulation.advance(1);
+  const forces = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  const at = bodies[0].row * FORCE_WORDS;
+  // With -grad(p) over the volume, the incident acceleration is counted once.
+  // Integral of (dy² - z²) over the box gives the roll moment of the cross term.
+  const exact = [
+    rho * acceleration * volume,
+    rho * g * volume,
+    0,
+    (shear * volume * (halfExtents[1] ** 2 - halfExtents[2] ** 2)) / 3,
+    0,
+    0,
+  ];
+  const tolerance = 256 * Number.EPSILON * exact[1];
+  for (const [index, expected] of exact.entries())
+    assert.ok(
+      Math.abs(forces[at + index] - expected) < tolerance,
+      `row ${index}: ${forces[at + index]} vs ${expected}`,
+    );
+});
+
+test('SEA-12 a sloping waterline applies mesh pressure when the body centre is dry', () => {
+  const rho = 1025.9;
+  const gravity = 9.81;
+  const elevation = (x) => x;
+  const sea = still([0, 0, 0], elevation);
+  sea.pressure = (x, y) => rho * gravity * Math.max(0, x - y);
+  const halfExtents = [1, 0.5, 0.5];
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(sea, [
+    {
+      position: [0, 0.75, 0],
+      collider: { shape: 'box', halfExtents, mass: 100 },
+      load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0], pressureModel: 'surface' },
+    },
+  ]);
+  simulation.advance(1);
+  const at = bodies[0].row * FORCE_WORDS;
+  const row = regionWords(simulation.arena.memory, loads.exportPorts(0)[0].region);
+  // The wet section is a triangle of leg 0.75, extruded through a 1 m span.
+  const load = (rho * gravity * 0.75 ** 2) / 2;
+  assert.ok(near(row[at], -load, 1e-12));
+  assert.ok(near(row[at + 1], load, 1e-12));
+  const centre = [0.75, -0.25];
+  assert.ok(near(row[at + 5], (centre[0] + centre[1]) * load, 1e-12));
+});
+
 test('SEA-12 an inclined ellipsoid takes buoyancy through the transformed half-cap centroid', () => {
   const axes = [1.1, 0.3, 0.8];
   const heel = 0.37;
@@ -461,6 +534,147 @@ test('a steel ball sinks at its terminal speed; a crate floats at its displaceme
   const drift = crate.bodies[0].linearVelocity[2];
   assert.ok(drift > 0.05 && drift < 0.4, `drift ${drift} m/s in a 10 m/s wind`);
   assert.ok(Math.abs(crate.bodies[0].position[1]) < 0.5, 'afloat');
+});
+
+test('SEA-12 member force integrates a 7.5 cm wetted length in either endpoint order', () => {
+  const sea = still([0.4, 0, 0]);
+  const from = [0, -0.075, 0];
+  const to = [0, 1.925, 0];
+  const diameter = 0.08;
+  const member = { from, to, diameter, period: Infinity, roughness: 0 };
+  const { loads, world: simulation } = world(sea, [], [member, { ...member, from: to, to: from }]);
+  simulation.advance(1);
+  const drag = reynoldsDrag((0.4 * diameter) / SEA_WATER_VISCOSITY, 0);
+  const exact = 0.5 * sea.density * drag * diameter * 0.4 ** 2 * 0.075;
+  for (const index of [0, 1]) assert.ok(near(loads.memberLoad(index).force[0], exact, 128 * Number.EPSILON));
+});
+
+test('SEA-12 a harmonically loaded member keeps one peak Keulegan–Carpenter number across phases', () => {
+  let time = 0;
+  const sea = still([0, 0, 0], (_x, _z, t) => {
+    time = t;
+    return 0;
+  });
+  const peak = 0.36;
+  const period = 2;
+  const diameter = 0.08;
+  const omega = (2 * Math.PI) / period;
+  sea.water.sample = (_x, _y, _z, t) => ({ velocity: [peak * Math.cos(omega * t), 0, 0], density: sea.density });
+  const { loads, world: simulation } = world(
+    sea,
+    [],
+    [{ from: [0, -3, 0], to: [0, -1, 0], diameter, period, roughness: 0 }],
+  );
+  const coefficients = cylinderCoefficients(
+    (peak * period) / diameter,
+    0,
+    0,
+    peak,
+    (peak * diameter) / SEA_WATER_VISCOSITY,
+  );
+  const inertiaMax = sea.density * ((Math.PI * diameter ** 2) / 4) * (1 + coefficients.addedMass) * peak * omega;
+  // The central derivative's relative truncation error is at most (omega * h)^2/6.
+  const tolerance = 2 * inertiaMax * ((omega * 0.001) ** 2 / 6 + 128 * Number.EPSILON);
+  for (const tick of [1, 15, 30, 45, 60, 80, 105, 120]) {
+    simulation.advance(tick);
+    const velocity = peak * Math.cos(omega * time);
+    const acceleration = -omega * peak * Math.sin(omega * time);
+    const exact = 2 * morison(sea.density, diameter, coefficients.drag, coefficients.addedMass, velocity, acceleration);
+    const force = loads.memberLoad(0).force[0];
+    assert.ok(Math.abs(force - exact) <= tolerance, `tick ${tick}: ${force} N vs ${exact} N`);
+  }
+});
+
+test('SEA-12 smooth cylinders predict the held-out Sarpkaya 1976 force coefficients and measured peak', (t) => {
+  // Appendix A, printed p.160, all runs inside the untapered KC overlap. Neither
+  // this diameter nor any of these responses was used to construct the interpolation.
+  // Rows: KC, measured CM, CD, peak CF and lambda* (%) from the load cell.
+  const measured = [
+    [7.18, 1.86, 1.03, 2.75, 9],
+    [7.66, 1.78, 1.14, 2.59, 10],
+    [8.33, 1.82, 1.04, 2.38, 10],
+    [8.77, 1.74, 1.11, 2.26, 13],
+    [9.36, 1.75, 1.05, 2.13, 12],
+    [9.88, 1.7, 1.07, 1.99, 11],
+    [10.66, 1.62, 1.04, 1.9, 9],
+    [11.34, 1.66, 1.05, 1.73, 7],
+    [12.06, 1.71, 0.98, 1.66, 10],
+    [12.94, 1.66, 0.99, 1.5, 6],
+  ];
+  // Maximum calibration-cylinder span over the overlap is 0.6125 in CM and
+  // 0.4465 in CD, at KC=11.95. Interpolate between the two measured beta values.
+  // At KC=13.6 two calibration sweeps at beta=5260 differ by 0.07 and 0.08.
+  // Add half of the table's last printed decimal place.
+  const fraction = (4480 - 3123) / (5260 - 3123);
+  const massBound = 0.6125 * fraction + 0.07 + 0.005;
+  const dragBound = 0.4465 * fraction + 0.08 + 0.005;
+  const period = 5;
+  const steps = 60 * period;
+  const diameter = 5.975 * 0.0254;
+  const viscosity = (diameter * diameter) / (4480 * period);
+  const omega = (2 * Math.PI) / period;
+  let massError = 0;
+  let dragError = 0;
+  let dnvMassError = 0;
+  let dnvDragError = 0;
+  let peakError = 0;
+  for (const [kc, measuredMass, measuredDrag, measuredPeak, peakResidual] of measured) {
+    let time = 0;
+    const sea = still([0, 0, 0], (_x, _z, t) => {
+      time = t;
+      return 0;
+    });
+    const speed = (kc * diameter) / period;
+    sea.water.sample = (_x, _y, _z, t) => ({ velocity: [speed * Math.cos(omega * t), 0, 0], density: sea.density });
+    const { loads, world: simulation } = world(
+      sea,
+      [],
+      [{ from: [0, -2, 0], to: [0, -1, 0], diameter, coefficients: 'sarpkaya-1976', period }],
+      { viscosity },
+    );
+    const forceScale = (sea.density * diameter * speed * speed) / 2;
+    const inertiaScale = (Math.PI * Math.PI) / kc;
+    let cmProjection = 0;
+    let cmNorm = 0;
+    let cdProjection = 0;
+    let cdNorm = 0;
+    let peak = 0;
+    for (let tick = 1; tick <= steps; tick++) {
+      simulation.advance(tick);
+      const phase = omega * time;
+      const inertiaBasis = -inertiaScale * Math.sin(phase);
+      const dragBasis = Math.cos(phase) * Math.abs(Math.cos(phase));
+      const force = loads.memberLoad(0).force[0] / forceScale;
+      cmProjection += force * inertiaBasis;
+      cmNorm += inertiaBasis * inertiaBasis;
+      cdProjection += force * dragBasis;
+      cdNorm += dragBasis * dragBasis;
+      peak = Math.max(peak, Math.abs(force));
+    }
+    const cm = cmProjection / cmNorm;
+    const cd = cdProjection / cdNorm;
+    const dm = Math.abs(cm - measuredMass);
+    const dd = Math.abs(cd - measuredDrag);
+    assert.ok(dm <= massBound && dd <= dragBound, `KC ${kc}: C_M ${cm} and C_D ${cd}`);
+    // Add the published Eq. (16) peak residual of the measured Morison fit,
+    // the rounding of CF and lambda*, and the finite phase sampling error.
+    const phaseBound = ((cm * inertiaScale + 2 * cd) * Math.PI) / steps;
+    const peakBound =
+      inertiaScale * massBound + dragBound + (measuredPeak * (peakResidual + 0.5)) / 100 + 0.005 + phaseBound;
+    assert.ok(Math.abs(peak - measuredPeak) <= peakBound, `KC ${kc}: peak ${peak} vs ${measuredPeak}`);
+    peakError = Math.max(peakError, Math.abs(peak - measuredPeak));
+    const dnv = cylinderCoefficients(kc, 0, 0, speed, 4480 * kc);
+    massError += dm;
+    dragError += dd;
+    dnvMassError += Math.abs(1 + dnv.addedMass - measuredMass);
+    dnvDragError += Math.abs(dnv.drag - measuredDrag);
+  }
+  t.diagnostic(
+    `Mean absolute coefficient errors (${measured.length} runs): C_M ${(massError / measured.length).toFixed(3)} vs ${(dnvMassError / measured.length).toFixed(3)} DNV, C_D ${(dragError / measured.length).toFixed(3)} vs ${(dnvDragError / measured.length).toFixed(3)} DNV. Maximum peak C_F error ${peakError.toFixed(3)}.`,
+  );
+  // This separately selectable calibration improves inline drag. The diagnostic also
+  // reports the higher inertia error against DNV for the same held-out cylinder.
+  assert.ok(dragError < dnvDragError);
 });
 
 test('a fixed pile in a 1 m/s current sheds vortices at St U / D: its lift swings at 2 Hz with C_L0 0.3', () => {

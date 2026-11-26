@@ -12954,6 +12954,30 @@ held-out angle. The upper edge spans about 187 pixels in a 2× page raster. One 
 uncertainty at each end and the printed rounding give a 0.92° comparison band. These are static heel
 results. The added body damping is used to reach equilibrium and does not validate measured roll decay.
 
+The surface-pressure option uses the same wet shell quadrature for the incident Froude–Krylov wrench and
+separately integrates unit depth for displaced volume. The centre velocity derivative accounts for added
+mass and any independently supplied flow. The exact tests use a submerged
+box under a quadratic pressure and a dry-centred box cut by a plane. See J. M. J. Journée and W. W. Massie,
+[*Offshore Hydromechanics* (2001), §6.3](https://ocw.tudelft.nl/wp-content/uploads/OffshoreHydromechanics_Journee_Massie.pdf),
+and [Dunavant (1985)](https://doi.org/10.1002/nme.1620210612).
+
+For a harmonic member load, the flow now samples one quarter and one half period from the current phase.
+The half-cycle average is the mean. The largest eigenvalue of the Gram matrix of the two normal harmonic
+vectors gives the squared peak in their ellipse. This keeps (KC=U_mT/D) consistent through the cycle,
+as defined in [G. H. Keulegan and L. H. Carpenter (1958), *Forces on cylinders and plates in an oscillating fluid*](https://doi.org/10.6028/jres.060.043).
+Two Gauss points integrate the linearly clipped wet interval.
+
+The optional smooth-cylinder model uses Turgut Sarpkaya,
+[*Vortex shedding and resistance in harmonic flow about smooth and rough circular cylinders at high Reynolds numbers* (1976), report NPS-59SL76021](https://upload.wikimedia.org/wikipedia/commons/3/3c/Vortex_shedding_and_resistance_in_harmonic_flow_about_smooth_and_rough_circular_cylinders_at_high_Reynolds_numbers_%28IA_vortexsheddingre00sarp%29.pdf).
+Appendix A, pp. 158 and 163 supply the two calibration cylinders (β = 3123 and 5260). The
+member integration applies the interpolated `C_M` and `C_D` at the requested dimensionless flow conditions.
+The full β = 4480 diameter series is withheld from the fit. Its ten
+runs inside the untapered KC range on p. 160 serve as comparisons for the solver's projected force coefficients
+and its peak versus the load cell. The coefficient bands follow the calibration span and run-to-run repeatability.
+The peak comparison also includes the original Morison residual from Eq. (16). Mean absolute errors in the ten
+runs are 0.092 for `C_M` and 0.063 for `C_D`, with a maximum peak `C_F` error of 0.374. DNV gives
+0.039 and 0.214 mean coefficient errors, respectively, on the same runs. DNV remains the default.
+
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 
 `packages/physics/src/ship/` (`ShipSolver`, `Manoeuvring`, `Propeller`, `raceVelocity`, `holtropMennen`, `ittc1957`, `squat`,

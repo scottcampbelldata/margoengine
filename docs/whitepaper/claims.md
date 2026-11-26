@@ -364,6 +364,15 @@ first: each names its scope, its evidence file and how to reproduce it.
   heel. Reproduce with `node --test --test-name-pattern='heeled box|inclined ellipsoid|free rectangular float' packages/physics/tests/loads.test.js`.
   [Hori and Hori, Fig. 4.6](https://vixra.org/pdf/2307.0154v2.pdf).
 
+- Incident pressure and oscillatory member loads (SEA-12). A closed box under a polynomial gauge pressure
+  matches the exact integrated horizontal force, uplift and roll moment. A sloping waterline loads the wet
+  part of a box with a dry centre. The separately selectable smooth-cylinder interpolation predicts ten
+  held-out load-cell cases at β = 4480, with mean absolute errors of 0.092 in inertia coefficient and 0.063
+  in drag coefficient. On the same cases the default DNV coefficients give 0.039 and 0.214, respectively.
+  The largest error in normalized measured peak load is 0.374. Reproduce with
+  `node --test --test-name-pattern='surface pressure|sloping waterline|held-out Sarpkaya' packages/physics/tests/loads.test.js`.
+  [Sarpkaya, 1976, Appendix A, printed p. 160](https://upload.wikimedia.org/wikipedia/commons/3/3c/Vortex_shedding_and_resistance_in_harmonic_flow_about_smooth_and_rough_circular_cylinders_at_high_Reynolds_numbers_%28IA_vortexsheddingre00sarp%29.pdf).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

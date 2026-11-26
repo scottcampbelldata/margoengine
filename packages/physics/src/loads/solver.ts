@@ -18,7 +18,7 @@ import { invalidLoad } from './errors.js';
 import type { FlowField, FlowSample, SeaSurface, Wind } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { pow } from '@margoengine/math/pinned';
-import type { HullMesh, WettedLoads } from '../seakeeping/wetted.js';
+import { type HullMesh, type WettedLoads, wettedLoads } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
   type Port,
@@ -33,8 +33,10 @@ import {
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
 import { cylinderCoefficients, sphereDrag, tangentialDrag, wakeStep } from './morison.js';
+import { memberOrbit } from './oscillatory.js';
 import { ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
-import { waterAcceleration, waterVelocity } from './water.js';
+import { smoothOscillatoryCylinder } from './smooth-cylinder.js';
+import { flowAcceleration, waterAcceleration, waterVelocity } from './water.js';
 
 type Vec3 = [number, number, number];
 const LOADS_LAYOUT = 1;
@@ -43,6 +45,7 @@ export const SEA_WATER_VISCOSITY = 1.19e-6;
 
 /** The water a {@link LoadSolver} loads bodies in: its surface's height, its flow and its density. */
 export type LoadWater = Pick<SeaSurface, 'elevation' | 'water' | 'density'>;
+type PressureWater = LoadWater & Partial<Pick<SeaSurface, 'pressure'>>;
 
 /** A compact body's shape in its frame: an ellipsoid (semi-axes, m), a sphere (radius), a box (half extents) or a mesh. */
 export type LoadShape =
@@ -61,6 +64,8 @@ export interface LoadBody {
   readonly drag?: number | readonly [number, number, number];
   /** Added mass coefficients along its three axes (default Lamb's for the ellipsoid; 0.25 of the body's mass across for a diver, `0.68` for a cube). */
   readonly addedMass?: readonly [number, number, number];
+  /** 'surface' integrates incident pressure on a box or closed mesh. Default 'compact' uses a local plane and point acceleration. */
+  readonly pressureModel?: 'compact' | 'surface';
   /** The wind's drag coefficient on its emerged part (default 1.0). */
   readonly windage?: number;
 }
@@ -74,8 +79,10 @@ export interface LoadMember {
   readonly diameter: number;
   /** Surface roughness k, m (default 5e-5, new steel; marine growth 5e-3 to 5e-2). */
   readonly roughness?: number;
-  /** The period of the waves for its Keulegan-Carpenter number, s (default 8). */
+  /** The dominant wave period in seconds (default 8), or Infinity for steady flow. */
   readonly period?: number;
+  /** Use the measured smooth-cylinder interpolation for oscillatory flow. Default 'dnv' uses DNV/White. */
+  readonly coefficients?: 'dnv' | 'sarpkaya-1976';
   /** Vortex shedding: Strouhal number and fixed-cylinder lift amplitude (default none; {strouhal: 0.2, lift: 0.3}). */
   readonly vortex?: { readonly strouhal?: number; readonly lift?: number };
 }
@@ -128,7 +135,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private level: RateLevel = 0;
   private g = 9.81;
   private nu = SEA_WATER_VISCOSITY;
-  private sea!: LoadWater;
+  private sea!: PressureWater;
   private flows: readonly FlowField[] = [];
   private wind: Wind | undefined;
   private bodies: BodyRuntime[] = [];
@@ -139,6 +146,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private cell: [number, number, number] = [0, 0, 0];
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly hydrostatic: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
+  private readonly pressure: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
 
   constructor(id = 'loads') {
     this.id = id;
@@ -210,6 +218,16 @@ export class LoadSolver implements Solver<LoadParams> {
           );
         rows.push(m.row);
       }
+      if (m.period !== undefined && !(m.period > 0))
+        throw invalidLoad('Invalid member wave period; pass positive seconds, or Infinity for steady flow.');
+      if (m.roughness !== undefined && !(m.roughness >= 0 && Number.isFinite(m.roughness)))
+        throw invalidLoad('Invalid member roughness; pass a finite nonnegative roughness in metres.');
+      if (m.coefficients !== undefined && m.coefficients !== 'dnv' && m.coefficients !== 'sarpkaya-1976')
+        throw invalidLoad("Invalid member coefficient model; choose 'dnv' or 'sarpkaya-1976'.");
+      if (m.coefficients === 'sarpkaya-1976' && m.roughness !== undefined && m.roughness !== 0)
+        throw invalidLoad(
+          "The 'sarpkaya-1976' member model needs a smooth cylinder; set roughness to 0 or select 'dnv'.",
+        );
     }
     this.members = members;
     this.memberLoads = members.map(() => ({ force: [0, 0, 0], lift: 0 }));
@@ -273,6 +291,12 @@ export class LoadSolver implements Solver<LoadParams> {
     volume ??= (4 / 3) * Math.PI * axes[0] * axes[1] * axes[2];
     if (!(volume > 0 && Number.isFinite(volume)))
       throw invalidLoad('Hydrodynamic shape volume is outside numeric range; pass physical dimensions in metres.');
+    if (spec.pressureModel !== undefined && spec.pressureModel !== 'compact' && spec.pressureModel !== 'surface')
+      throw invalidLoad("Invalid pressure model; choose 'compact' or 'surface'.");
+    if (spec.pressureModel === 'surface' && (!mesh || typeof this.sea.pressure !== 'function'))
+      throw invalidLoad(
+        "Surface pressure needs a box or closed mesh and sea.pressure; supply both or choose 'compact'.",
+      );
     const sphere = Math.max(...axes) < 1.05 * Math.min(...axes),
       addedMass = (spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)) as Vec3;
     if (addedMass.length !== 3 || !addedMass.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient)))
@@ -334,7 +358,7 @@ export class LoadSolver implements Solver<LoadParams> {
       h1 = ay * axesWorld[1][1],
       h2 = az * axesWorld[2][1],
       surface = this.sea.elevation(centre[0], centre[2], t),
-      // The submerged share: a box's as a prism of its vertical extent (exact upright), an ellipsoid's as a sphere's cap.
+      // Vertical support bounds for the compact and ellipsoid calculations.
       half = b.box
         ? Math.abs(b.box[0] * axesWorld[0][1]) +
           Math.abs(b.box[1] * axesWorld[1][1]) +
@@ -344,9 +368,31 @@ export class LoadSolver implements Solver<LoadParams> {
       throw invalidLoad('Non-finite hydrodynamic surface height; return a finite elevation in metres.');
     const depth = surface - centre[1];
     const densityGravity = rho * this.g;
+    const surfacePressure = b.spec.pressureModel === 'surface';
+    const force: Vec3 = [0, 0, 0];
     let submerged: number;
     let torque: Vec3;
-    if (b.mesh) {
+    if (surfacePressure) {
+      const pose = { position: centre, rotation: q };
+      wettedLoads(
+        b.mesh!,
+        pose,
+        {
+          elevation: (x, z, time) => this.sea.elevation(x, z, time),
+          pressure: (x, y, z, time) => Math.max(0, this.sea.elevation(x, z, time) - y),
+        },
+        t,
+        cm,
+        this.hydrostatic,
+      );
+      submerged = Math.max(0, Math.min(b.volume, this.hydrostatic.force[1]));
+      wettedLoads(b.mesh!, pose, this.sea, t, cm, this.pressure);
+      torque = [...this.pressure.torque];
+      if (!this.pressure.force.every(Number.isFinite) || !torque.every(Number.isFinite))
+        throw invalidLoad(
+          'Non-finite mesh pressure load; return finite water elevations and gauge pressure in pascals.',
+        );
+    } else if (b.mesh) {
       meshHydrostatics(b.mesh, q, depth, sub(cm, centre), this.hydrostatic);
       submerged = Math.max(0, Math.min(b.volume, this.hydrostatic.force[1]));
       torque = [densityGravity * this.hydrostatic.torque[0], 0, densityGravity * this.hydrostatic.torque[2]];
@@ -357,8 +403,7 @@ export class LoadSolver implements Solver<LoadParams> {
       torque = cross(buoyancyArm, [0, densityGravity * submerged, 0]);
     }
     const wet = submerged / b.volume;
-    const force: Vec3 = [0, 0, 0],
-      buoyancy = densityGravity * submerged;
+    const buoyancy = densityGravity * submerged;
     let added: Vec3 = [0, 0, 0];
     if (wet > 0) {
       const u = this.water(centre[0], Math.min(centre[1], surface), centre[2], t, [0, 0, 0]),
@@ -366,8 +411,23 @@ export class LoadSolver implements Solver<LoadParams> {
         vc = add(v, cross(w, sub(centre, cm))),
         vr = sub(u, vc),
         speed = Math.sqrt(dot(vr, vr));
-      // The velocity-derived Froude-Krylov force is distinct from the hydrostatic wrench above.
-      for (let k = 0; k < 3; k++) force[k]! += rho * submerged * a[k]!;
+      // Surface pressure already contains the sea's incident acceleration. Only the additional flows
+      // still need the velocity-derived displaced-water force.
+      const incident = surfacePressure
+        ? this.flows.length === 0
+          ? [0, 0, 0]
+          : flowAcceleration(
+              undefined,
+              this.flows,
+              centre[0],
+              Math.min(centre[1], surface),
+              centre[2],
+              t,
+              this.sample,
+              [0, 0, 0],
+            )
+        : a;
+      for (let k = 0; k < 3; k++) force[k]! += rho * submerged * incident[k]!;
       // Added mass per axis: its part pushed by the water's acceleration, rho C_A V a; the part the body's own acceleration
       // takes is held implicitly below.
       added = b.addedMass.map((c) => c * rho * submerged) as Vec3;
@@ -423,7 +483,9 @@ export class LoadSolver implements Solver<LoadParams> {
       acc.force[k]! += force[k]!;
       acc.torque[k]! += torque[k]! + arm[k]!;
     }
-    acc.force[1] += buoyancy;
+    if (surfacePressure) {
+      for (let k = 0; k < 3; k++) acc.force[k]! += this.pressure.force[k]!;
+    } else acc.force[1] += buoyancy;
     for (let i = 0; i < 3; i++)
       for (let r = 0; r < 3; r++)
         for (let c = 0; c < 3; c++) acc.added[3 * r + c]! += added[i]! * axesWorld[i]![r]! * axesWorld[i]![c]!;
@@ -496,10 +558,17 @@ export class LoadSolver implements Solver<LoadParams> {
     const axis = sub(to, from),
       length = Math.sqrt(dot(axis, axis));
     if (!(length > 0)) return;
+    const d0 = this.sea.elevation(from[0], from[2], t) - from[1];
+    const d1 = this.sea.elevation(to[0], to[2], t) - to[1];
+    if (!(Number.isFinite(d0) && Number.isFinite(d1)))
+      throw invalidLoad('Non-finite member submergence; return a finite water elevation at both member ends.');
+    const wetFrom = d0 < 0 && d1 > 0 ? -d0 / (d1 - d0) : 0;
+    const wetTo = d1 < 0 && d0 > 0 ? d0 / (d0 - d1) : 1;
+    const wet = d0 <= 0 && d1 <= 0 ? 0 : wetTo - wetFrom;
     const e = scale(axis, 1 / length),
       D = m.diameter,
       area = (Math.PI * D * D) / 4,
-      roughness = (m.roughness ?? 5e-5) / D,
+      roughness = (m.roughness ?? (m.coefficients === 'sarpkaya-1976' ? 0 : 5e-5)) / D,
       period = m.period ?? 8,
       total: Vec3 = [0, 0, 0],
       moment: Vec3 = [0, 0, 0],
@@ -507,10 +576,10 @@ export class LoadSolver implements Solver<LoadParams> {
     let liftSum = 0,
       wetSpeed = 0,
       across: Vec3 = [0, 0, 0];
-    // Two-point Gauss over the member.
+    // Clip the segment against its linear waterline before the two-point Gauss integration.
     for (const g of [0.5 - 0.5 / Math.sqrt(3), 0.5 + 0.5 / Math.sqrt(3)]) {
-      const p = add(from, scale(axis, g));
-      if (p[1] > this.sea.elevation(p[0], p[2], t)) continue;
+      if (!(wet > 0)) break;
+      const p = add(from, scale(axis, wetFrom + g * wet));
       const u = this.water(p[0], p[1], p[2], t, [0, 0, 0]),
         a = this.acceleration(p[0], p[1], p[2], t, [0, 0, 0]),
         vp = onBody ? add(v, cross(w, sub(p, cm))) : ([0, 0, 0] as Vec3),
@@ -519,9 +588,23 @@ export class LoadSolver implements Solver<LoadParams> {
         aN = sub(a, scale(e, dot(a, e))),
         speedN = Math.sqrt(dot(vrN, vrN)),
         speed = Math.sqrt(dot(vr, vr)),
-        kc = (speedN * period) / D,
-        { drag, addedMass } = cylinderCoefficients(kc, roughness),
-        half = length / 2,
+        orbital = Number.isFinite(period)
+          ? memberOrbit(
+              u,
+              this.water(p[0], p[1], p[2], t + period / 4, [0, 0, 0]),
+              this.water(p[0], p[1], p[2], t + period / 2, [0, 0, 0]),
+              vp,
+              e,
+            )
+          : { peak: 0, mean: speedN },
+        kc = Number.isFinite(period) ? (orbital.peak * period) / D : 0,
+        re = ((orbital.peak + orbital.mean) * D) / this.nu,
+        dnv = cylinderCoefficients(kc, roughness, orbital.mean, orbital.peak, re),
+        { drag, addedMass } =
+          m.coefficients === 'sarpkaya-1976' && orbital.peak > 0 && Number.isFinite(period)
+            ? smoothOscillatoryCylinder(kc, (D * D) / (this.nu * period), orbital.mean / orbital.peak, dnv)
+            : dnv,
+        half = (length * wet) / 2,
         // Normal: rho A a + rho C_A A a, the water's acceleration, and the drag; the member's own acceleration's added mass
         // rho C_A A (I - e e^T) per length is held implicitly with its body.
         fN = add(scale(aN, rho * area * (1 + addedMass) * half), scale(vrN, 0.5 * rho * drag * D * speedN * half)),
