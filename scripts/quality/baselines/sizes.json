@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20511412,
+  "total": 20511851,
   "history": [
     {
       "date": "2026-10-24",
@@ -13389,6 +13389,12 @@
       "commit": "a9827b3f4b",
       "grew": 1,
       "reason": "KB-SCENES-NIGHTSUN1: timber-valley picks its sky by sunScene (a moonlit night below the horizon) and places the real moon from a new longitude setting; the ephemeris loads by import() only at night, so the entry grows 5829 to 5843 B gzip (+14 B)."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "32665059ae",
+      "grew": 1,
+      "reason": "EARTH-05 persistent simultaneous cross-track settling takes the optional entry from 13706 to 13754 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
     }
   ],
   "items": {
@@ -14260,7 +14266,7 @@
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 13728,
+    "@margoengine/physics/terramechanics": 14167,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
