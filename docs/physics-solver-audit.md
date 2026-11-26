@@ -507,6 +507,10 @@ Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSON
 the profile. The local simulated broadening falls in the range inferred from separate Rhodamine fluorescence surveys.
 This case does not assess migration caused by solar heating or dispersion across the whole shelf.
 
+Tracers can use wave-averaged Stokes transport from a fixed directional spectrum and a separate mean current.
+The crossed-wave test checks the directional sum and depth decay in finite and deep water. The normal live-velocity
+mode still follows the SEA-04 wake potential. Independent wave-induced drift measurements remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

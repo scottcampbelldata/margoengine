@@ -20,7 +20,15 @@
 // vertical turbulence where mixing varies with depth. Horizontal diffusivity is constant.
 // Settled parcels remain in the bed ledger. Dispersion into oil droplets and flocculation are unresolved.
 
-import type { Bed, FlowField, FlowSample, SeaSurface, SeaSurfaceSample, Wind } from '@margoengine/math/fields';
+import type {
+  Bed,
+  FlowField,
+  FlowSample,
+  SeaSurface,
+  SeaSurfaceSample,
+  WaveSpectrumSample,
+  Wind,
+} from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
@@ -36,6 +44,7 @@ import {
   type TracerOilEvaporation,
 } from './tracer-evaporation.js';
 import { type FayCoefficients, fayCoefficients, fayRadius } from './tracer-fay.js';
+import { stokesAt, type StokesProfile, stokesProfile } from './tracer-stokes.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
@@ -167,6 +176,8 @@ export interface TracerParams {
   sea?: SeaSurface;
   /** Override the water's velocity at any depth (default: sea.water when supplied). */
   water?: FlowField;
+  /** Wave-averaged Stokes drift from a fixed directional spectrum. Use `water` for the mean current in this mode. */
+  stokesSpectrum?: WaveSpectrumSample;
   /** Size of an origin cell, m. Match the PhysicsWorld setting (default 4096). */
   cellSize?: number;
   /** The wind over the water, for floating slicks (default none). */
@@ -291,6 +302,7 @@ export class TracerSolver implements Solver<TracerParams> {
       TracerParams,
       | 'sea'
       | 'water'
+      | 'stokesSpectrum'
       | 'wind'
       | 'bed'
       | 'sources'
@@ -308,6 +320,8 @@ export class TracerSolver implements Solver<TracerParams> {
   private spillRadii?: Region;
   private spillVapour?: Region;
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
+  private stokes?: StokesProfile;
+  private readonly stokesVelocity: [number, number] = [0, 0];
   private emissionCapacity = 0;
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
@@ -418,6 +432,7 @@ export class TracerSolver implements Solver<TracerParams> {
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
+    this.stokes = params.stokesSpectrum && stokesProfile(params.stokesSpectrum, this.g);
     this.params = {
       cellSize,
       waterLevel,
@@ -776,6 +791,7 @@ export class TracerSolver implements Solver<TracerParams> {
     this.cell = context.cell;
     const sea = this.sea;
     const column = this.depthDiffusivity;
+    const stokes = this.stokes;
     const { bed, cellSize } = this.params;
     if (sea)
       for (let axis = 0; axis < 3; axis++) this.seaOffset[axis] = (context.cell[axis]! - sea.cell[axis]!) * cellSize;
@@ -863,7 +879,7 @@ export class TracerSolver implements Solver<TracerParams> {
         ux = v[0];
         uy = v[1];
         uz = v[2];
-      } else if (sea) {
+      } else if (sea && !stokes) {
         const v =
           state === SURFACE
             ? sea.sample(x + seaX, z + seaZ, time, this.seaSample).velocity
@@ -871,6 +887,11 @@ export class TracerSolver implements Solver<TracerParams> {
         ux = v[0];
         uy = v[1];
         uz = v[2];
+      }
+      if (stokes) {
+        stokesAt(stokes, state === SURFACE ? 0 : waterLevel - seaY - y, this.stokesVelocity);
+        ux += this.stokesVelocity[0];
+        uz += this.stokesVelocity[1];
       }
       if (state === SURFACE) {
         if (this.wind) {

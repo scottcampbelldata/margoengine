@@ -404,3 +404,63 @@ test('SEA-15 CMO experiment 4 compares a profile from microstructure with separa
   assert.ok(inferred >= 1.4e-6 && inferred <= 2.2e-6, `${inferred} m²/s from parcel dispersion`);
   assert.equal(tracer.budget.water, n);
 });
+
+test('SEA-15 wave-averaged tracers follow the directional Stokes transport in deep and finite water', () => {
+  const gravity = 9.80665;
+  const waveNumbers = [0.18, 0.46];
+  const amplitudes = [0.3, 0.15];
+  const headings = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+  const level = 1.25;
+  const releaseDepths = [0, 0.75, 4];
+  const rate = { num: 60, den: 1 };
+  for (const depth of [Infinity, 7]) {
+    // Pick two exact roots of linear dispersion, then obtain their corresponding frequency bins.
+    const omega = waveNumbers.map((k) => Math.sqrt(gravity * k * Math.tanh(k * depth)));
+    const frequencies = Float64Array.from(omega, (speed) => speed / (2 * Math.PI));
+    const width = frequencies[1] - frequencies[0];
+    const energy = new Float64Array(8);
+    energy[0] = amplitudes[0] ** 2 / (2 * width * (Math.PI / 2));
+    energy[5] = amplitudes[1] ** 2 / (2 * width * (Math.PI / 2));
+    const waves = { frequencies, directions: Float64Array.from(headings), energy, depth, density: 1025 };
+    const sea = new SpectralSea({ waves });
+    const tracer = new TracerSolver();
+    const mean = depth === Infinity ? undefined : [0.1, 0, -0.045];
+    const world = new PhysicsWorld({ rate }).add(tracer, {
+      capacity: 3,
+      sea,
+      water: mean && { ...water, sample: () => ({ velocity: mean, density: 1025, temperature: 285 }) },
+      stokesSpectrum: waves,
+      waterLevel: level,
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: releaseDepths.map((d, index) => ({
+        material: index === 0 ? 'oil' : 'dye',
+        position: [0, level - d, 0],
+        rate: 60,
+        stop: 1 / 60,
+      })),
+    });
+    world.advance(60);
+    const snapshot = world.takeSnapshot();
+    const seconds = 2.5;
+    world.advance(60 * seconds);
+    const particles = [...tracer.particlesOf()];
+    for (const [index, d] of releaseDepths.entries()) {
+      const wants = waveNumbers.map((k, i) => {
+        // Breivik et al. (2014), eqs. 1 and 4, per monochromatic component; use the cosh/sinh form in finite water.
+        const weight =
+          depth === Infinity ? Math.exp(-2 * k * d) : Math.cosh(2 * k * (depth - d)) / (2 * Math.sinh(k * depth) ** 2);
+        return (amplitudes[i] ** 2 * omega[i] * k * weight + (mean?.[i * 2] ?? 0)) * seconds;
+      });
+      const [x, y, z] = particles[index].position;
+      assert.ok(Math.abs(x - wants[0]) < 1e-12, `${x} vs ${wants[0]} at ${d} m`);
+      assert.ok(Math.abs(z - wants[1]) < 1e-12, `${z} vs ${wants[1]} at ${d} m`);
+      if (index === 0) assert.equal(y, level + sea.elevation(x, z, seconds));
+      else assert.equal(y, level - d);
+    }
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(60 * seconds);
+    assert.equal(world.hash(), hash);
+  }
+});

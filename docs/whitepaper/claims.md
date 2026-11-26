@@ -257,6 +257,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   [Oakey and Greenan (2004), Table 2](https://doi.org/10.1029/2003JC002193),
   [Ledwell et al. (2004), Figure 14](https://doi.org/10.1029/2003JC002194).
 
+- Wave-averaged tracer transport (SEA-15, 2026-11-26). A crossed wave pair moves oil and submerged dye along its
+  analytical Stokes profile in finite and deep water. The horizontal displacement errors are below 10⁻¹² m and
+  the run replays exactly. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after
+  building Physics. [Breivik, Janssen and Bidlot (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

@@ -13211,6 +13211,14 @@ This comparison covers local broadening. The measured layer migration also depen
 [Oakey and Greenan (2004), Table 2](https://doi.org/10.1029/2003JC002193),
 [Ledwell, Duda, Sundermeyer and Seim (2004), Figure 14](https://doi.org/10.1029/2003JC002194).
 
+Wave-averaged Stokes transport uses the directional moments of a fixed wave spectrum. The kernel sums the
+finite-depth Kenyon profile in each frequency band, using two decaying exponentials for its hyperbolic depth factor.
+In deep water this becomes `a²ωk exp(−2kd)` for a wave of amplitude `a`, wavenumber `k` and a parcel at depth `d`
+below still water. The tracer adds this mean transport to a supplied Eulerian current while the sea
+can still provide the instantaneous elevation. The test compares a crossed pair of waves against the analytical
+profile at the surface and two depths, and checks exact replay in finite and deep water. Independent measurements
+of wave-induced mean flow remain open. [Breivik, Janssen and Bidlot, “Approximate Stokes Drift Profiles in Deep Water” (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

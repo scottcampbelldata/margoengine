@@ -3273,6 +3273,27 @@ world.advance(1);
 console.log(dye.budget.water); // 1
 ```
 
+Set `stokesSpectrum` to advect tracers with wave-averaged Stokes drift from a fixed directional spectrum. An
+optional `water` field supplies the Eulerian mean current. With `sea` present, its elevation still sets the local
+surface. Omit `stokesSpectrum` to resolve the existing instantaneous sea and wake velocities.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const dye = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(dye, {
+  stokesSpectrum: {
+    frequencies: Float64Array.of(0.2), directions: Float64Array.of(0), energy: Float64Array.of(0.05),
+    depth: Infinity, density: 1025,
+  },
+  horizontalDiffusivity: 0, verticalDiffusivity: 0,
+  sources: [{ material: 'dye', position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+});
+world.advance(60);
+console.log(dye.particlesOf().next().value!.position[0] > 0); // true
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.
