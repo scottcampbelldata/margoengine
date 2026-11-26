@@ -2673,6 +2673,27 @@ const sea = new SpectralSea({waves: spectrum, patches: [wake]});
 console.log(sea.elevation(-10, 0, 10) === wake.sample(-10, 0).height); // true: a calm sea carries the wake
 ```
 
+Made with `waterBelow: true`, the wake also keeps the water's velocity below its surface: at each step, the gradient of
+its potential at a few depths, each mode decaying as cosh(k (D - d)) / cosh(k D). `velocityAt(x, y, z)` reads it, and a
+`SpectralSea` with the wake among its `patches` adds it to `water.sample`, so the water under a wake moves with it. A
+liquid box held to that sea (`FlipSolver`) takes the wake's waves in at its sides.
+
+```ts
+import {WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const wake = new WakeSolver();
+new PhysicsWorld({rate: {num: 60, den: 1}}).add(wake, {
+  cells: [64, 64],
+  cellSize: 0.25,
+  waterBelow: true,
+  initial: (x) => [0, 0.1 * Math.cos((Math.PI / 4) * x)], // a wave 8 m long: its potential, 0.1 m^2/s
+});
+const k = Math.PI / 4;
+const [u] = wake.velocityAt(1, -0.5, 0); // the water half a metre down
+console.log(Math.abs(u + 0.1 * k * Math.sin(k) * Math.exp(-0.5 * k)) < 0.002); // true: -A k sin(k x) e^(k y)
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.
@@ -2986,6 +3007,44 @@ a linear wave passes through with its amplitude and phase, and a dispersively fo
 jet outrunning its crest (`node scripts/check-breaker.mjs`, minutes a run). How much faster is not yet settled: 1.26 to
 1.72 times the crest speed across starts and grids, where Erinin et al. (2023) measured 1.24 to 1.33 (docs/limits.md
 says why). Cells of 2 cm do not resolve a 15 cm plunger's jet: give a breaking crest a dozen cells.
+
+Giving the sea its water: made with `new FlipSolver(id, {seaSource: true})`, the box publishes `${id}.seaSource`, rows a
+`WakeSolver` made with that field (`new WakeSolver('wake', liquid.seaSourceField)`) adds to its surface. The rows carry
+what leaves over the open sides and, held to a sea, what crosses the sides held to it and what the band removes or adds
+to hold the sea's level, in tiles of `seaTile` m. The box and the wake keep their water between them to round-off, and
+the sea's `water`, with the wake made with `waterBelow`, carries the wake's waves into the box. Waves made inside the box
+still end at its band: their water goes to the wake there, but not yet as the waves they were (docs/limits.md).
+
+```ts
+import {FlipSolver} from 'margoengine/physics/flip';
+import {WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const liquid = new FlipSolver('liquid', {seaSource: true});
+const wake = new WakeSolver('wake', liquid.seaSourceField);
+const sea = {
+  elevation: (x: number, z: number) => wake.sample(x, z).height,
+  water: {
+    sample: (x: number, y: number, z: number, _t: number, o = {velocity: [0, 0, 0] as [number, number, number], density: 1000, temperature: 288}) => {
+      wake.velocityAt(x, y, z, o.velocity);
+      return o;
+    },
+  },
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(wake, {cells: [64, 64], cellSize: 0.125, density: 1000, waterBelow: true})
+  .add(liquid, {
+    cells: [16, 6, 16],
+    cellSize: 0.1,
+    origin: [-0.8, -0.3, -0.8],
+    sea,
+    blend: 3,
+    seaTile: 0.2,
+    initial: (x, y, z) => y < 0.3 || (Math.hypot(x - 0.8, z - 0.8) < 0.25 && y < 0.4), // a mound in the box
+  });
+world.advance(30);
+console.log(liquid.seaSourceField?.name); // 'liquid.seaSource'
+```
 
 ```ts
 import {FlipSolver} from 'margoengine/physics/flip';

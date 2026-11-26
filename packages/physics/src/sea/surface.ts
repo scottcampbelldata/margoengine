@@ -63,8 +63,8 @@ export interface SpectralSeaOptions {
   temperature?: number;
   /**
    * Local surfaces added to the waves: a hull's wake ({@link WakeSolver}), or anything that samples a height, slope and
-   * surface velocity at a point (default none). They add to `sample`, `elevation` and `pressure`; the water below the
-   * surface does not see them (their motion at depth is not modelled).
+   * surface velocity at a point (default none). They add to `sample`, `elevation` and `pressure`, and to the water below
+   * the surface where the patch gives its velocity there (`velocityAt`: a WakeSolver made with `waterBelow`).
    */
   patches?: readonly SeaPatch[];
 }
@@ -76,6 +76,11 @@ export interface SeaPatch {
     z: number,
     out?: { height: number; slope: [number, number]; velocity: [number, number, number] },
   ): { height: number; slope: [number, number]; velocity: [number, number, number] };
+  /**
+   * The patch's water velocity at (x, y, z) below its surface, into `out` (optional: a WakeSolver made with
+   * `waterBelow`). A sea adds it to its water's, so the water under a wake moves with it.
+   */
+  velocityAt?(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
 }
 
 const isField = (waves: WaveSpectrumField | WaveSpectrumSample): waves is WaveSpectrumField =>
@@ -380,6 +385,13 @@ export class SpectralSea implements SeaSurface {
       uz += horizontal * kz;
       w += a * om * sh * sin(theta);
     }
+    for (const patch of this.patches)
+      if (patch.velocityAt) {
+        const v = patch.velocityAt(x, y, z, this.local.velocity);
+        ux += v[0];
+        w += v[1];
+        uz += v[2];
+      }
     this.currentAt(x, y, z, t, this.flow.velocity);
     s.velocity[0] = ux + this.flow.velocity[0];
     s.velocity[1] = w + this.flow.velocity[1];

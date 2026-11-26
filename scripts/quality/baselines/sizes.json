@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20594315,
+  "total": 20595397,
   "history": [
     {
       "date": "2026-10-24",
@@ -13693,6 +13693,18 @@
       "commit": "c5e9da4a40",
       "grew": 1,
       "reason": "SEA-08 bare-hull forward roll damping grows seakeeping from 25160 to 25505 B gzip. The Ikeda lift, friction and eddy terms reuse the hull geometry and the existing implicit roll impulse. A separate entry would repeat the hull setup or add another solver and load-fold connection. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) flip seaSource",
+      "reason": "FlipSolver seaSource: the box publishes its exchange with the sea (open sides, sea sides, band refill) as wake sources in tiles; 12,319 to 12,863 B gzip (this Mac). One solver; nothing to split.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) wake waterBelow",
+      "reason": "WakeSolver waterBelow and velocityAt: the water velocity below the wake at depth layers, and SpectralSea adding a patch velocity to its water; 8,001 to 8,539 B gzip (this Mac). The wake and the sea surface share the entry; a split would duplicate the FFT and grid reading.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14525,7 +14537,7 @@
     "@margoengine/physics/entry": 10205,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 12319,
+    "@margoengine/physics/flip": 12863,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-flow": 6221,
@@ -14554,7 +14566,7 @@
     "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
-    "@margoengine/physics/sea": 8001,
+    "@margoengine/physics/sea": 8539,
     "@margoengine/physics/seakeeping": 26271,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,

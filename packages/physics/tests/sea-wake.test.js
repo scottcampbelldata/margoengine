@@ -202,3 +202,76 @@ test('a sea adds its wake: sample, elevation and pressure carry the wake over th
   }
   assert.throws(() => new SpectralSea({ waves: spectrum, patches: [{}] }), TypeError);
 });
+
+for (const depth of [Infinity, 3])
+  test(`a wake made with waterBelow gives the water's velocity below its surface, the potential's gradient, ${depth} m deep`, () => {
+    // One mode of the surface potential, phi = A cos(k x): below the surface u = -A k sin(k x) cosh(k (y + D)) / cosh(k D)
+    // and w = A k cos(k x) sinh(k (y + D)) / cosh(k D) (e^(k y) in deep water). At the depths the wake keeps the layers
+    // are exact to the transform's round-off; read between cell centres they carry the bilinear reading's error, at most
+    // (k dx)^2 / 8 of the amplitude (0.48 percent here); between the depths, a linear reading of the decay.
+    const n = 64,
+      dx = 0.25,
+      k = (2 * Math.PI * 2) / (n * dx),
+      A = 0.1,
+      wake = new WakeSolver(),
+      w = world().add(wake, {
+        cells: [n, n],
+        cellSize: dx,
+        depth,
+        sponge: 0,
+        waterBelow: true,
+        initial: (x) => [0, A * Math.cos(k * x)],
+      }),
+      exact = (x, y) => {
+        const c = depth < Infinity ? Math.cosh(k * (y + depth)) / Math.cosh(k * depth) : Math.exp(k * y),
+          s = depth < Infinity ? Math.sinh(k * (y + depth)) / Math.cosh(k * depth) : Math.exp(k * y);
+        return [-A * k * Math.sin(k * x) * c, A * k * Math.cos(k * x) * s];
+      };
+    for (const y of [0, -0.125, -0.25, -0.5, -1, -2])
+      for (const x of [-3.03, -1.1, 0.47, 2.2]) {
+        const v = wake.velocityAt(x, y, 0.3),
+          [u, wv] = exact(x, y);
+        assert.ok(Math.abs(v[0] - u) <= 0.0048 * A * k && Math.abs(v[1] - wv) <= 0.0048 * A * k, `${x}, ${y}: ${v}`);
+        assert.ok(Math.abs(v[2]) < 1e-12, 'no flow along z');
+      }
+    // At cell centres on a layer, to round-off.
+    const centre = -8 + 0.5 * dx + 17 * dx,
+      v = wake.velocityAt(centre, -0.5, -8 + 0.5 * dx + 20 * dx),
+      [u] = exact(centre, -0.5);
+    assert.ok(Math.abs(v[0] - u) < 1e-12, `${v[0]} against ${u}`);
+    // A snapshot keeps the layers: a restored run reads the same water as a continuous one.
+    w.advance(10);
+    const saved = w.takeSnapshot(),
+      at = () => wake.velocityAt(0.3, -0.4, 0.2).join(',');
+    w.advance(20);
+    const later = at();
+    w.restoreSnapshot(saved.bytes);
+    assert.notEqual(at(), later);
+    w.advance(20);
+    assert.equal(at(), later);
+  });
+
+test("a sea adds its wake's water below the surface, and a wake without waterBelow refuses to give it", () => {
+  const wake = new WakeSolver();
+  world().add(wake, { cells: [64, 64], cellSize: 1, waterBelow: true, initial: (x) => [0, 0.5 * Math.cos(0.4 * x)] });
+  const spectrum = {
+      frequencies: Float64Array.from([0.1, 0.2]),
+      directions: Float64Array.from([0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]),
+      energy: new Float64Array(8),
+      depth: Infinity,
+      density: 1025,
+    },
+    sea = new SpectralSea({ waves: spectrum, patches: [wake] });
+  for (const [x, y, z] of [
+    [0, -1, 0],
+    [3.3, -2.5, -2.1],
+  ]) {
+    const v = sea.water.sample(x, y, z, 0).velocity,
+      w = wake.velocityAt(x, y, z);
+    assert.ok(Math.hypot(...w) > 0.01, 'the wake moves the water there');
+    for (let a = 0; a < 3; a++) assert.equal(v[a], w[a]);
+  }
+  const plain = new WakeSolver('plain');
+  world().add(plain, { cells: [16, 16], cellSize: 1, sponge: 4 });
+  assert.throws(() => plain.velocityAt(0, -1, 0), /waterBelow/);
+});

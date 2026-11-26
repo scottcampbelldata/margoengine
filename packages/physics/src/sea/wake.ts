@@ -18,6 +18,7 @@
 // Determinism: the transforms are the shared FFT (@margoengine/math/fft, pinned twiddles, a fixed order), the per-mode
 // factors come from pinned cos, sin and exp, and the rest is + - * / and sqrt, so a step gives the same bits everywhere.
 import type { SeaSource } from '@margoengine/math/fields';
+import { MargoError } from '@margoengine/math/errors';
 import { RealFft2 } from '@margoengine/math/fft';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import type {
@@ -75,6 +76,13 @@ export interface WakeParams {
   sources?: (t: number) => readonly SeaSource[];
   /** The surface it starts from: height (m) and surface potential (m^2/s) at each cell centre (default still water). */
   initial?: (x: number, z: number) => readonly [number, number];
+  /**
+   * Keep the water's velocity below the surface for {@link WakeSolver.velocityAt} (default false): at each step the
+   * potential's gradient at a few depths (the still level, then half a cell doubling to half the grid or the bottom),
+   * each mode decaying as cosh(k (D - d)) / cosh(k D), e^(-k d) in deep water. Costs a transform and three inverse
+   * transforms a depth each step; a liquid box held to the sea reads it at its sides.
+   */
+  waterBelow?: boolean;
 }
 
 /** What {@link WakeSolver.sample} gives at a point. */
@@ -118,6 +126,10 @@ export class WakeSolver implements Solver<WakeParams> {
   private stepDt = 0;
   private damp!: Float64Array;
   private press!: Float64Array;
+  private depth = Infinity;
+  /** The depths of the water's velocity layers, m below the still level, and their region (u, v, w per layer). */
+  private belowDepths: number[] = [];
+  private below?: Region;
   private spectra!: [Float64Array, Float64Array, Float64Array];
 
   /**
@@ -158,6 +170,7 @@ export class WakeSolver implements Solver<WakeParams> {
       rate = 0,
       sources,
       initial,
+      waterBelow = false,
     } = params;
     if (!(cells.length === 2 && cells.every((n) => Number.isInteger(n) && n >= 4 && n <= 4096)))
       throw new RangeError(`A wake grid has 4 to 4096 whole cells along x and z (got ${cells}); pass two.`);
@@ -234,6 +247,118 @@ export class WakeSolver implements Solver<WakeParams> {
     this.press = new Float64Array(n);
     const size = 2 * half * this.nz;
     this.spectra = [new Float64Array(size), new Float64Array(size), new Float64Array(size)];
+    this.depth = depth;
+    if (waterBelow) {
+      const deepest = Math.min(depth, 0.5 * Math.min(this.nx, this.nz) * cellSize);
+      this.belowDepths = [0];
+      for (let d = cellSize / 2; d < deepest; d *= 2) this.belowDepths.push(d);
+      if (depth < Infinity) this.belowDepths.push(depth);
+      this.below = host.allocate(`${this.id}:below`, this.belowDepths.length * 3 * n * 8, 'f64', WAKE_LAYOUT);
+      this.layers();
+    }
+  }
+
+  /**
+   * The water's velocity at each layer depth from the surface potential: each mode of phi times i kx (and i kz) for the
+   * horizontal velocity and k sinh(k (D - d)) / cosh(k D) for the vertical, all times its decay cosh(k (D - d)) / cosh(k D)
+   * (Tessendorf's eq. 18 with no flow through the bottom; e^(-k d) and k e^(-k d) in deep water), transformed back.
+   */
+  private layers(): void {
+    const memory = this.host.memory,
+      phi = regionWords(memory, this.potential) as Float64Array,
+      out = regionWords(memory, this.below!) as Float64Array,
+      { nx, nz, dx, fft } = this,
+      n = nx * nz,
+      half = nx / 2 + 1,
+      [F, A, B] = this.spectra,
+      deep = !(this.depth < Infinity);
+    fft.forward(phi, F);
+    const field = new Float64Array(n);
+    this.belowDepths.forEach((d, layer) => {
+      for (let c = 0; c < 3; c++) {
+        for (let j = 0; j < nz; j++)
+          for (let i = 0; i < half; i++) {
+            const m = i + half * j,
+              kx = (2 * PI * i) / (nx * dx),
+              kz = (2 * PI * (j < nz / 2 ? j : j - nz)) / (nz * dx),
+              k = Math.sqrt(kx * kx + kz * kz);
+            // cosh(k (D - d)) / cosh(k D) and sinh(k (D - d)) / cosh(k D), from decaying exponentials only.
+            let ch = exp(-k * d),
+              sh = ch;
+            if (!deep) {
+              const back = exp(-k * (2 * this.depth - d)),
+                bottom = 1 + exp(-2 * k * this.depth);
+              ch = (ch + back) / bottom;
+              sh = (sh - back) / bottom;
+            }
+            const re = F[2 * m]!,
+              im = F[2 * m + 1]!;
+            if (c === 2) {
+              A[2 * m] = k * sh * re;
+              A[2 * m + 1] = k * sh * im;
+            } else {
+              const kk = c === 0 ? kx : kz;
+              A[2 * m] = -kk * ch * im;
+              A[2 * m + 1] = kk * ch * re;
+            }
+          }
+        fft.inverse(A, field);
+        // u, w (vertical), v (along z) stored as x, y, z.
+        out.set(field, (layer * 3 + (c === 2 ? 1 : c === 0 ? 0 : 2)) * n);
+      }
+    });
+    void B;
+  }
+
+  /**
+   * The wake's water velocity at (x, y, z) m from the world's cell, into `out`: the potential's gradient at depth -y below
+   * the still level, read bilinearly across the grid and linearly between the depths it keeps (above the still level, as
+   * there: linear theory has no water above it). 0 outside the grid, as {@link WakeSolver.sample}. Needs `waterBelow`.
+   * @throws MargoError (state) for a wake made without `waterBelow`.
+   */
+  velocityAt(x: number, y: number, z: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
+    if (!this.below)
+      throw new MargoError(
+        'state',
+        "A wake gives the water's velocity below its surface when made with waterBelow: true; pass it.",
+      );
+    out[0] = out[1] = out[2] = 0;
+    const { nx, nz, dx } = this,
+      u = (x - this.x0) / dx - 0.5,
+      v = (z - this.z0) / dx - 0.5;
+    if (!(u >= 1 && v >= 1 && u < nx - 2 && v < nz - 2)) return out;
+    const depths = this.belowDepths,
+      d = Math.min(Math.max(-y, 0), depths[depths.length - 1]!);
+    let layer = 0;
+    while (layer + 2 < depths.length && depths[layer + 1]! < d) layer++;
+    const d0 = depths[layer]!,
+      d1 = depths[Math.min(layer + 1, depths.length - 1)]!,
+      f = d1 > d0 ? (d - d0) / (d1 - d0) : 0,
+      words = regionWords(this.host.memory, this.below) as Float64Array,
+      n = nx * nz,
+      i = Math.floor(u),
+      j = Math.floor(v),
+      fu = u - i,
+      fv = v - j,
+      k = i + nx * j;
+    for (let c = 0; c < 3; c++) {
+      let value = 0;
+      for (const [l, wl] of [
+        [layer, 1 - f],
+        [Math.min(layer + 1, depths.length - 1), f],
+      ] as const) {
+        if (wl === 0) continue;
+        const at = (l * 3 + c) * n + k;
+        value +=
+          wl *
+          ((1 - fu) * (1 - fv) * words[at]! +
+            fu * (1 - fv) * words[at + 1]! +
+            (1 - fu) * fv * words[at + nx]! +
+            fu * fv * words[at + nx + 1]!);
+      }
+      out[c] = value;
+    }
+    return out;
   }
 
   /** The per-mode factors of a step of `dt` s, made once for each new dt. */
@@ -300,6 +425,7 @@ export class WakeSolver implements Solver<WakeParams> {
       h[i]! *= keep;
       phi[i]! *= keep;
     }
+    if (this.below) this.layers();
   }
 
   private stampField(port: Port, cell: Cell, height: Float64Array): void {
@@ -432,6 +558,6 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   extraState(): readonly Region[] {
-    return [this.previous];
+    return this.below ? [this.previous, this.below] : [this.previous];
   }
 }

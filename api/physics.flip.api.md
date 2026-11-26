@@ -42,6 +42,7 @@ export interface FlipParams {
     readonly open?: readonly ('-x' | '+x' | '-y' | '+y' | '-z' | '+z')[];
     readonly sea?: LiquidSea;
     readonly blend?: number;
+    readonly seaTile?: number;
 }
 
 export class FlipSolver implements Solver<FlipParams> {
@@ -65,10 +66,12 @@ export class FlipSolver implements Solver<FlipParams> {
     protected mass: Float64Array[];
     protected open: boolean[];
     protected sinks: number[];
+    protected given: number[];
     protected sea: LiquidSea | null;
     protected blend: number;
     protected time: number;
-    constructor(id?: string);
+    readonly seaSourceField: FieldDescriptor | undefined;
+    constructor(id?: string, options?: FlipOptions);
     describe(): SolverDescription;
     init(host: SolverHost, params?: FlipParams): void;
     protected words(region: Region | null): Float64Array;
@@ -98,7 +101,7 @@ export class FlipSolver implements Solver<FlipParams> {
         substeps: number;
         iterations: number;
     };
-    exportPorts(_tick: number): readonly Port[];
+    exportPorts(tick: number): readonly Port[];
     importPorts(): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
@@ -171,6 +174,10 @@ interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
     readonly optional?: boolean;
+}
+
+interface FlipOptions {
+    readonly seaSource?: boolean;
 }
 
 interface Port {

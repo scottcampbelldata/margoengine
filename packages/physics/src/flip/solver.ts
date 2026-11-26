@@ -8,6 +8,7 @@
 // against time), and against still water's hydrostatic pressure.
 import { MargoError } from '@margoengine/math/errors';
 import {
+  type FieldDescriptor,
   type Port,
   type RateLevel,
   type Region,
@@ -64,7 +65,28 @@ export interface FlipParams {
   readonly sea?: LiquidSea;
   /** Cells of the band held to the sea (default 6). */
   readonly blend?: number;
+  /**
+   * The side of the square tiles its sea sources cover, m (default eight cells): about the wake's cell size or more. Only
+   * for a solver made with `seaSource`.
+   */
+  readonly seaTile?: number;
 }
+
+/** Options fixed when a {@link FlipSolver} is made, because they shape the fields it declares. */
+export interface FlipOptions {
+  /**
+   * Publish the water it gives the sea as a field, `${id}.seaSource`: layout-1 f64 rows of x, z, radius, pressure and
+   * volume, as a WakeSolver made with that field reads them (default false). The rows carry the water that leaves over
+   * the open sides and, for a box in a `sea`, what crosses its sides held to the sea and what its band's refill removes
+   * or adds to hold the sea's level, so a wave made inside the box runs out across the wake and box and wake together
+   * keep their water. The solver then steps at the world's base rate, as the wake does.
+   */
+  readonly seaSource?: boolean;
+}
+
+/** f64 words of a sea source row (x, z, radius, pressure, volume), and the rows' layout, as a WakeSolver reads them. */
+const SEA_SOURCE_WORDS = 5;
+const SEA_SOURCE_LAYOUT = 1;
 
 /** The sea a liquid's box sits in: its surface and the water's velocity below it, on the world clock. */
 export interface LiquidSea {
@@ -108,6 +130,12 @@ export class FlipSolver implements Solver<FlipParams> {
   protected open: boolean[] = [false, false, false, false, false, false];
   /** The water that left over the open sides this step: [x, z, volume] each, world, m and m^3. */
   protected sinks: number[] = [];
+  /**
+   * The water the box gave the sea through its sides held to the sea this step, [x, z, volume] each (world, m and m^3;
+   * negative where the band took water from the sea): what crossed those sides and what the band's refill removed or
+   * added to hold the sea's level. With the open sides' `sinks`, the box's whole exchange with the sea.
+   */
+  protected given: number[] = [];
   protected sea: LiquidSea | null = null;
   protected blend = 6;
   /** The time of the substep being taken, s on the world clock. */
@@ -115,10 +143,38 @@ export class FlipSolver implements Solver<FlipParams> {
   private readonly flow = { velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0 };
   private lastSubsteps = 0;
   private lastIterations = 0;
-  constructor(readonly id = 'liquid') {}
+  /** The field its sea sources go out on, with `seaSource`. */
+  readonly seaSourceField: FieldDescriptor | undefined;
+  private seaRegion: Region | null = null;
+  private seaTile = 0;
+  private seaTiles: [number, number] = [0, 0];
+
+  /**
+   * @param id The solver's id, default 'liquid'.
+   * @param options What shapes its fields: `seaSource` publishes the water it gives the sea.
+   */
+  constructor(
+    readonly id = 'liquid',
+    options: FlipOptions = {},
+  ) {
+    this.seaSourceField = options.seaSource
+      ? Object.freeze({
+          name: `${id}.seaSource`,
+          kind: 'scalarSeries',
+          centring: 'cell',
+          quantity: 'seaSource',
+          unit: 'SI',
+        } satisfies FieldDescriptor)
+      : undefined;
+  }
 
   describe(): SolverDescription {
-    return { id: this.id, fields: [], rate: this.level, stableRate: () => this.level };
+    return {
+      id: this.id,
+      fields: this.seaSourceField ? [{ field: this.seaSourceField, access: 'write' }] : [],
+      rate: this.level,
+      stableRate: () => this.level,
+    };
   }
 
   /**
@@ -138,6 +194,7 @@ export class FlipSolver implements Solver<FlipParams> {
       open = [],
       sea,
       blend = 6,
+      seaTile = 8 * (params.cellSize ?? 0.1),
     } = params;
     if (sea !== undefined && (typeof sea?.elevation !== 'function' || typeof sea?.water?.sample !== 'function'))
       throw new TypeError(
@@ -223,6 +280,24 @@ export class FlipSolver implements Solver<FlipParams> {
     this.particleRegion = host.allocate(`${this.id}:particles`, capacity * PARTICLE_WORDS * 8, 'f64', FLIP_LAYOUT);
     this.countRegion = host.allocate(`${this.id}:count`, 8, 'f64', FLIP_LAYOUT);
     this.pressureRegion = host.allocate(`${this.id}:pressure`, n * 8, 'f64', FLIP_LAYOUT);
+    if (this.seaSourceField) {
+      if (rate !== 0)
+        throw new RangeError(
+          `A liquid that gives the sea its water steps at the world's base rate, as the wake does (got rate ${rate}); pass rate 0.`,
+        );
+      if (!(seaTile >= cellSize && Number.isFinite(seaTile)))
+        throw new RangeError(
+          `A liquid's sea tiles are at least a cell across (got ${seaTile} m for ${cellSize} m cells); pass one.`,
+        );
+      this.seaTile = seaTile;
+      this.seaTiles = [Math.ceil((nx * cellSize) / seaTile - 1e-9), Math.ceil((nz * cellSize) / seaTile - 1e-9)];
+      this.seaRegion = host.allocate(
+        `${this.id}:seaSource`,
+        this.seaTiles[0] * this.seaTiles[1] * SEA_SOURCE_WORDS * 8,
+        'f64',
+        SEA_SOURCE_LAYOUT,
+      );
+    }
     if (initial) this.seed(initial);
     else if (this.sea) this.seedSea(0);
   }
@@ -273,6 +348,7 @@ export class FlipSolver implements Solver<FlipParams> {
 
   step(context: StepContext, dt: number): void {
     this.sinks = [];
+    this.given = [];
     this.beforeStep(context, dt);
     const { p, count } = this.state();
     // Substeps of at most one cell for the fastest particle, as many as the step needs.
@@ -300,6 +376,40 @@ export class FlipSolver implements Solver<FlipParams> {
     }
     this.lastSubsteps = substeps;
     this.afterStep(context, dt);
+    if (this.seaRegion) this.writeSeaSources();
+  }
+
+  /**
+   * The step's sea sources, one row a tile of `seaTile` over the box's footprint (a tile with nothing to give is all zeros,
+   * which the wake skips): the water the box gave the sea in that tile, over its open sides and through its sides held to
+   * the sea, less what its band took from the sea. Box and sea together keep their water: a wave made inside the box
+   * piles water into the band, whose refill hands it to the wake there, and the wake carries it away as its own wave.
+   */
+  private writeSeaSources(): void {
+    const words = this.words(this.seaRegion),
+      { nx, nz, h } = this.grid,
+      tile = this.seaTile,
+      [tx, tz] = this.seaTiles,
+      volume = new Float64Array(tx * tz),
+      tileOf = (x: number, z: number): number => {
+        const a = Math.min(tx - 1, Math.max(0, Math.floor((x - this.origin[0]) / tile))),
+          b = Math.min(tz - 1, Math.max(0, Math.floor((z - this.origin[2]) / tile)));
+        return a + tx * b;
+      };
+    for (const list of [this.sinks, this.given])
+      for (let k = 0; k < list.length; k += 3) volume[tileOf(list[k]!, list[k + 1]!)]! += list[k + 2]!;
+    words.fill(0);
+    for (let b = 0; b < tz; b++)
+      for (let a = 0; a < tx; a++) {
+        const v = volume[a + tx * b]!;
+        if (v === 0) continue;
+        const at = (a + tx * b) * SEA_SOURCE_WORDS;
+        // The tile's centre (the last tile along a side may be cut short by the box).
+        words[at] = this.origin[0] + (a * tile + Math.min((a + 1) * tile, nx * h)) / 2;
+        words[at + 1] = this.origin[2] + (b * tile + Math.min((b + 1) * tile, nz * h)) / 2;
+        words[at + 2] = tile;
+        words[at + 4] = v;
+      }
   }
 
   /** Before a step's substeps (a riding box reads its body and the inflow here). */
@@ -386,10 +496,9 @@ export class FlipSolver implements Solver<FlipParams> {
       }
       if (gone) {
         // Water over an open side goes to the sea below; water through a side held to the sea is the sea's again.
-        if (!this.sea || to[1] < lo || to[1] > top[1]) {
-          const w = this.toWorld(to[0], to[1], to[2]);
-          this.sinks.push(w[0], w[2], volume);
-        }
+        const w = this.toWorld(to[0], to[1], to[2]);
+        if (!this.sea || to[1] < lo || to[1] > top[1]) this.sinks.push(w[0], w[2], volume);
+        else this.given.push(w[0], w[2], volume);
         continue;
       }
       // A particle carried into a solid comes out at the solid's nearest face.
@@ -744,7 +853,12 @@ export class FlipSolver implements Solver<FlipParams> {
       const extra = list.length - target[c]!;
       if (extra <= 0) continue;
       list.sort((a, b) => p[b * PARTICLE_WORDS + 1]! - p[a * PARTICLE_WORDS + 1]! || a - b);
-      for (let n = 0; n < extra; n++) gone[list[n]!] = 1;
+      for (let n = 0; n < extra; n++) {
+        const o = list[n]! * PARTICLE_WORDS,
+          w = this.toWorld(p[o]!, p[o + 1]!, p[o + 2]!);
+        gone[list[n]!] = 1;
+        this.given.push(w[0], w[2], (h * h * h) / 8);
+      }
       held.set(c, list.slice(extra));
     }
     let kept = 0;
@@ -791,6 +905,7 @@ export class FlipSolver implements Solver<FlipParams> {
               at = count * PARTICLE_WORDS;
             p.fill(0, at, at + PARTICLE_WORDS);
             p.set([x, y, z, v[0], v[1], v[2]], at);
+            this.given.push(w[0], w[2], (-h * h * h) / 8);
             count++;
             have++;
           }
@@ -913,8 +1028,10 @@ export class FlipSolver implements Solver<FlipParams> {
     return { substeps: this.lastSubsteps, iterations: this.lastIterations };
   }
 
-  exportPorts(_tick: number): readonly Port[] {
-    return [];
+  exportPorts(tick: number): readonly Port[] {
+    return this.seaRegion && this.seaSourceField
+      ? [{ field: this.seaSourceField.name, region: this.seaRegion, tick, cell: [0, 0, 0] }]
+      : [];
   }
 
   importPorts(): void {}

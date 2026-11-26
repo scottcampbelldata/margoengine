@@ -47,6 +47,7 @@ export interface WakeParams {
     rate?: RateLevel;
     sources?: (t: number) => readonly SeaSource[];
     initial?: (x: number, z: number) => readonly [number, number];
+    waterBelow?: boolean;
 }
 
 export interface WakeSample {
@@ -59,6 +60,7 @@ export class WakeSolver implements Solver<WakeParams> {
     constructor(id?: string, sourceField?: FieldDescriptor);
     describe(): SolverDescription;
     init(host: SolverHost, params?: WakeParams): void;
+    velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
     step(context: StepContext, dt: number): void;
     sample(x: number, z: number, out?: WakeSample): WakeSample;
     get grid(): {
@@ -127,6 +129,7 @@ interface SeaPatch {
         slope: [number, number];
         velocity: [number, number, number];
     };
+    velocityAt?(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
 }
 
 interface Solver<Params = unknown> {
