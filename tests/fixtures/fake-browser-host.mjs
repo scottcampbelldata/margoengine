@@ -4,6 +4,7 @@
 // tests/browser-host.test.js: the suite side (`startHost`) is exercised against a real host process without a browser.
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { writeFile } from 'node:fs/promises';
 import { hostBrowser } from '../../scripts/support/browser-host.mjs';
 
 const settings = JSON.parse(process.argv[2] ?? '{}');
@@ -31,4 +32,14 @@ const launchServer = async (options) => {
   return { process: () => child, wsEndpoint: () => 'ws://127.0.0.1:1/fake', kill: async () => {} };
 };
 // The host releases its input once asked to end, so it ends by its event loop like the real one.
-process.exitCode = await hostBrowser({ settings, launchServer, reapMs: settings.reapMs, logFile: settings.logFile });
+// `sinceFile`: the listed children are not ended; the listing time the host passes on is written there instead.
+const endListed = settings.sinceFile
+  ? (pids, since) => writeFile(settings.sinceFile, JSON.stringify({ pids, since }))
+  : undefined;
+process.exitCode = await hostBrowser({
+  settings,
+  launchServer,
+  reapMs: settings.reapMs,
+  logFile: settings.logFile,
+  ...(endListed ? { endListed, settle: null } : {}),
+});

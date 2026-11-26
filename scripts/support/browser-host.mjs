@@ -55,7 +55,8 @@ async function pollGone(pids, waitMs) {
  * falls back to `end`, the whole tree by helper program), then its pipes. Resolves once every process has been told
  * to end, with the waits as `settled`: the native wait for the browser's exit and the children's handles, bounded by
  * `reapMs`, then the server's own cleanup (its WebSocket server and temporary profile). `settled` resolves to the pids
- * still present at the bound.
+ * still present at the bound. `ended` resolves once `endListed` has ended the listed children: the host acknowledges
+ * the end request only then (KB-HOST-KILLLATE1).
  */
 export function endOwned(
   server,
@@ -64,8 +65,9 @@ export function endOwned(
     reapMs = REAP_MS,
     end = endTree,
     settle = process.platform === 'win32' ? waitSignaled : pollGone,
+    // Ends the listed pids and resolves once each has been told to; their teardown is waited for by `settle` after.
     endListed = process.platform === 'win32'
-      ? (pids, waitMs, sinceMs) => waitSignaled(pids, waitMs, sinceMs, undefined, { kill: true })
+      ? (pids, sinceMs) => waitSignaled(pids, 1, sinceMs, undefined, { kill: true })
       : null,
     listedAt,
     log = console.error,
@@ -104,7 +106,9 @@ export function endOwned(
   const listed = (children ?? []).filter((other) => Number.isInteger(other) && other > 0 && other !== pid);
   // Windows reuses a pid once its process is gone: a child that exited after Chromium listed it may have left its pid
   // to an unrelated process. `endListed` ends each listed pid only through a handle to a process that started no later
-  // than the listing, and waits for it. Without it (POSIX, where pids are not reused that soon) they are signalled here.
+  // than the listing. Without it (POSIX, where pids are not reused that soon) they are signalled here.
+  const ended =
+    endListed && listed.length ? Promise.resolve(endListed(listed, since)).then(() => {}) : Promise.resolve();
   for (const other of endListed ? [] : listed) {
     try {
       process.kill(other, 'SIGKILL');
@@ -144,7 +148,10 @@ export function endOwned(
     // One bound for all of them, waited for side by side: the browser's exit, the listed children's handles, the tree.
     const [browserGone, children, tree] = await Promise.all([
       Promise.race([exited.then(() => 'gone'), late]),
-      listed.length ? (endListed ?? settle)(listed, reapMs, since) : [],
+      // The children's wait starts once they have been ended, for the time the bound has left.
+      listed.length && settle
+        ? ended.then(() => settle(listed, Math.max(1, Math.ceil(reapMs - (performance.now() - started))), since))
+        : [],
       fallback ?? [],
     ]);
     const survivors = [...(browserGone === 'late' ? [pid] : []), ...children, ...tree];
@@ -153,7 +160,7 @@ export function endOwned(
     clearTimeout(timer);
     return survivors;
   })();
-  return { pid, listed, settled };
+  return { pid, listed, ended, settled };
 }
 
 /**
@@ -194,7 +201,8 @@ export async function hostBrowser({
       } catch {
         return;
       }
-      if (message?.end) resolve({ children: Array.isArray(message.children) ? message.children : null });
+      if (message?.end)
+        resolve({ children: Array.isArray(message.children) ? message.children : null, listedAt: message.listedAt });
     });
     lines.once('close', () => resolve({ children: null }));
     input.once?.('error', () => resolve({ children: null }));
@@ -202,7 +210,7 @@ export async function hostBrowser({
   // Nothing more is read: the input is let go, so it does not hold this process open (KB-OWN-EXIT2).
   lines.close();
   const begun = Date.now();
-  const { listed, settled } = endOwned(server, request.children, {
+  const { listed, ended, settled } = endOwned(server, request.children, {
     reapMs,
     end,
     settle,
@@ -210,6 +218,9 @@ export async function hostBrowser({
     listedAt: request.listedAt,
     ...(endListed === undefined ? {} : { endListed }),
   });
+  // Acknowledged once the listed children have been ended, not only asked to be: the suite's close returns after its
+  // grace from here, and Windows PowerShell, which ends them, takes seconds to start on a loaded PC (KB-HOST-KILLLATE1).
+  await ended;
   await say({ terminated: { browser: pid, children: listed } });
   const survivors = await settled;
   const elapsedMs = Date.now() - begun;

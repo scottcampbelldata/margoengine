@@ -680,7 +680,9 @@ public integration, full fuzz, peak-memory or speed result is claimed.
 
 Owned Chromium runs under a browser host process (`scripts/support/browser-host.mjs`,
 2026-11-10): the suite ends the browser through the host, is acknowledged as soon
-as every process has been told to end, and waits for the kernel's teardown of the
+as every process has been ended (on Windows the listed children's kill runs in Windows
+PowerShell, whose start takes 0.6 to about 4 s and is bounded at 10 s, KB-HOST-KILLLATE1),
+and waits for the kernel's teardown of the
 ended processes only up to 2,000 ms, then moves on. The host waits up to 120 s more
 and records any survivor in `test-results/browser-host-survivors.log`. A following GPU job can
 therefore start while the kernel is still freeing the ended browser's GPU

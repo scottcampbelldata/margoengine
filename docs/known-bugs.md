@@ -479,9 +479,9 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   browser: close ends its main process") failed 4 runs of 4 from b7468ab58 on (bisected; it passed on 30629b4eb). Fixed
   2026-11-26: `waitSignaled` ends every checked pid first, then waits for them all against the one deadline; the
   children now end 1 to 4 s after the end request instead of up to `REAP_MS`. Regression: tests/browser-teardown.test.js
-  ("every child is ended before the first wait", fails on the kill-then-wait loop). Still open: KB-HOST-KILLLATE1 below.
+  ("every child is ended before the first wait", fails on the kill-then-wait loop). Then KB-HOST-KILLLATE1 below.
 
-### Open: a hosted Chromium close returns before its listed children are ended (KB-HOST-KILLLATE1, scripts, browser host)
+### Fixed 2026-11-26: a hosted Chromium close returned before its listed children were ended (KB-HOST-KILLLATE1, scripts, browser host)
 
 - **Repro:** `node --test --test-name-pattern="close ends its main process" tests/browser-teardown.test.js` on the
   laptop (2026-11-26, other lanes' suites running): 8 of 13 runs passed after the KB-HOST-COMPATEXIT1 waiter fix. In
@@ -491,8 +491,19 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   takes seconds to start on a loaded PC, while the close waits only `TEARDOWN_GRACE_MS` (2 s). The bare-pid
   `process.kill` before it was synchronous but could end a recycled pid. A terminating Edge child then also stays
   unsignalled past the test's 10 s `waitSignaled`, so it counts as running.
-- **Fix to build:** a waiter started with the host and kept warm, fed pids on its input, so the checked-handle kill runs
-  within milliseconds of the end request.
+  The listing time never reached that check either: `startHost`'s `end` sent no `listedAt` and the host's request
+  parser dropped it, so start times were compared with the host's request time.
+- **Fixed:** the host acknowledges the end request only once the listed children have been ended (`endOwned`'s
+  `ended`: the default `endListed` kills through checked handles and returns; `settle` then waits for their teardown
+  for the time the bound has left), so the suite's grace starts after the kill. The wait stays inside `CLOSE_LIMIT_MS`
+  (worst case about 17 s: listing, PowerShell's start bounded at 10 s, grace). `end` sends `listedAt` and the host
+  passes it on. A warm waiter kept beside the host was the larger alternative, not needed. The real close test passed
+  20 of 20 runs alone (laptop at 90% CPU from other lanes; 8 of 13 before). Regression: tests/browser-host.test.js
+  ("acknowledges the end only once the listed children have been ended", "sends the listing time with the end
+  request"; both fail on the old host and suite).
+- **Still open under heavy load:** beside four CPU hogs (100% CPU) it passed 16 of 20; the 4 failures are not traced
+  yet. Candidates: PowerShell not starting within `waitSignaled`'s 10 s limit (the kill is then never made), or killed
+  Edge children still unsignalled at the end of the test's own 10 s wait.
 
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
