@@ -35,6 +35,7 @@ import {
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
+import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
@@ -202,6 +203,8 @@ export class HullSolver implements Solver<HullParams> {
   private readonly courseLimits = new Map<Hull, number>();
   /** Per hull: 1 once it has radiated, then the radiation force of its last step (body frame, force then moment). */
   private radiated: Region | null = null;
+  /** What a manoeuvring model owns of the hull being stepped (`manoeuvringClaims` flags; 0 when none). */
+  private claim = 0;
   /** Per hull and station: the water's heave and sway velocity at the section, in the body's frame, each of the last `lags` steps. */
   private waves: Region | null = null;
   private diffraction = true;
@@ -277,6 +280,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
         { field: DECK_INFLOW_FIELD, access: 'write' },
         { field: DECK_CLAIMS_FIELD, access: 'read', optional: true },
+        { field: MANOEUVRING_CLAIMS_FIELD, access: 'read', optional: true },
         { field: HULL_BREACHES_FIELD, access: 'write' },
         ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
@@ -546,10 +550,20 @@ export class HullSolver implements Solver<HullParams> {
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
-      t = (context.tick + 0.5) / rateOf(context.level);
+      t = (context.tick + 0.5) / rateOf(context.level),
+      // A ship solver's manoeuvring model owns its hull's surge, sway and yaw damping, and their added mass unless told not to.
+      claimed = context.inputs.get(MANOEUVRING_CLAIMS_FIELD.name),
+      claims = claimed
+        ? new Float64Array(
+            claimed.region.memory?.buffer ?? host.memory.buffer,
+            claimed.region.byteOffset,
+            claimed.region.byteLength / 8,
+          )
+        : undefined;
     for (const [index, hull] of this.hulls.entries()) {
       const at = hull.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
+      this.claim = claims && hull.row < claims.length ? claims[hull.row]! : 0;
       // The pose a fraction of the step on (the body's velocity and spin carried over it), where a load held through the step
       // neither feeds the motion energy nor takes it. The rigid step moves a body by (v + F dt (s + 1) / (2 s m)) dt over its
       // s symplectic-Euler substeps (the `bodies` port gives s), so a restoring load -k x taken at x + theta v dt has the
@@ -1494,6 +1508,8 @@ export class HullSolver implements Solver<HullParams> {
       force[i]! -= ij * dt;
       if (i !== j) force[j]! -= ji * dt;
     }
+    // A manoeuvring model's derivatives hold the surge, sway and yaw damping it claims: those rows are its, not the waves'.
+    if (this.claim & CLAIM_DAMPING) force[0] = force[2] = force[4] = 0;
     // The convolution ends at the step's start (the last velocity the history holds); the load is taken theta of the step on,
     // so the force is carried there along the line through its last two values. Held from the start, it lagged the load by
     // theta dt, a phase error of w theta dt that moved a driven hull's damped response first order in the step (a heaving
@@ -1548,6 +1564,9 @@ export class HullSolver implements Solver<HullParams> {
       memory = this.addedMass ? this.memoryOf(hull, bodies, at, local, dt) : null;
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
     if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
+    // Surge, sway and yaw added mass a manoeuvring model claims are its: their rows and columns leave the hull's.
+    if (this.claim & CLAIM_ADDED_MASS)
+      for (const k of [0, 2, 4]) for (let j = 0; j < 6; j++) body[6 * k + j] = body[6 * j + k] = 0;
     let any = points.length > 0;
     for (let k = 0; k < 36; k++) any ||= body[k] !== 0;
     if (!any) return f;

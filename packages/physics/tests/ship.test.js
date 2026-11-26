@@ -353,6 +353,76 @@ test('in shallow water the hull sinks by its squat through the HullSolver on the
   assert.ok(Math.abs(ships.drawdown(s.midship[0], s.midship[2]) - s.sinkage) < 1e-12);
 });
 
+test('a HullSolver on a ship leaves the surge, sway and yaw the ship claims: a kick decays as the MMG ship alone, not doubly damped', () => {
+  // The same 7 m hull kicked in sway, then in yaw, at 0.6 m/s: once held by the ship solver alone (no gravity, its MMG model
+  // the whole of the water's load), once floating under a HullSolver as well. The ship's derivatives hold the hull's sway
+  // and yaw damping and its added mass, so the hull solver leaves its radiation and added mass in those rows out.
+  const M = KVLCC2_L7,
+    T = M.draught,
+    D = 2 * T,
+    speed = 0.6,
+    run = (floating, kick) => {
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, ...(floating ? {} : { gravity: [0, 0, 0] }) }),
+        body = physics.addBody(null, {
+          position: [0, floating ? D / 2 - T : 0, 0],
+          linearVelocity: [speed, 0, kick.sway],
+          angularVelocity: [0, kick.yaw, 0],
+          colliders: {
+            shape: 'box',
+            halfExtents: [M.length / 2, D / 2, M.beam / 2],
+            mass: 1025 * M.length * M.beam * T,
+          },
+        }),
+        ships = new ShipSolver(),
+        world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(ships, {
+          ships: [
+            { row: body.row, model: { ...M, centre: 0, volume: M.length * M.beam * T }, midship: [0, T - D / 2, 0] },
+          ],
+        });
+      if (floating)
+        world
+          .add(new HullSolver(), {
+            hulls: [{ row: body.row, mesh: boxMesh([M.length, D, M.beam]) }],
+            sea: ships.sea({ elevation: () => 0, density: 1025 }),
+          })
+          .couple(['ship', 'hull', 'rigid'], 'staggered');
+      else world.couple(['ship', 'rigid'], 'staggered');
+      ships.control(0).revolutions = ships.revolutionsFor(0, speed);
+      const out = [];
+      for (let s = 1; s <= 4; s++) {
+        world.advance(60 * s);
+        // The sway in the body's frame: the velocity turned back by the heading.
+        const v = body.linearVelocity,
+          heading = Math.atan2(
+            -2 * (body.rotation[0] * body.rotation[2] - body.rotation[3] * body.rotation[1]),
+            1 - 2 * (body.rotation[1] ** 2 + body.rotation[2] ** 2),
+          );
+        out.push({ sway: v[2] * Math.cos(heading) + v[0] * Math.sin(heading), yaw: body.angularVelocity[1] });
+      }
+      return out;
+    };
+  for (const kick of [
+    { sway: 0.08, yaw: 0 },
+    { sway: 0, yaw: 0.02 },
+  ]) {
+    const alone = run(false, kick),
+      both = run(true, kick);
+    for (let s = 0; s < 4; s++) {
+      assert.ok(
+        Math.abs(both[s].sway - alone[s].sway) < 0.01 * 0.08,
+        `sway ${both[s].sway} against ${alone[s].sway} at ${s + 1} s`,
+      );
+      assert.ok(
+        Math.abs(both[s].yaw - alone[s].yaw) < 0.01 * 0.02,
+        `yaw ${both[s].yaw} against ${alone[s].yaw} at ${s + 1} s`,
+      );
+    }
+    // And the kick does decay, by the MMG model's damping.
+    if (kick.sway) assert.ok(alone[1].sway < 0.95 * kick.sway, `${alone[1].sway}`);
+    else assert.ok(alone[1].yaw < 0.85 * kick.yaw, `${alone[1].yaw}`);
+  }
+});
+
 test("the resolved race: its circulation from the torque, Pennings's propeller within 6 percent, and momentum theory's contraction", () => {
   // Pennings (2016): 2 blades, D 0.15 m, n 38 Hz, J 0.56, K_T 0.18, K_Q 0.027; a boundary-element mean circulation of 0.1287.
   const rho = 1000,

@@ -85,6 +85,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the box's own result to round-off.
 - **Regression:** "water slips along a solid as along the box's own sides: a dam break runs alike on either floor" in
   `packages/physics/tests/flip.test.js`.
+### Fixed 2026-11-26: a ship and a hull solver on one body counted its sway and yaw damping twice (KB-SHIP-DAMP1, physics ship and seakeeping)
+
+- **Repro (before):** a 7 m hull at 0.6 m/s, kicked to 0.08 m/s in sway, held by a `ShipSolver` and floated by a
+  `HullSolver`: 1 s on it swayed at 0.049 m/s, where the same hull under the ship solver alone swayed at 0.076 m/s.
+- **Cause:** the ship's MMG derivatives already hold the hull's sway and yaw damping and its added mass, and the hull
+  solver added its own strip-theory radiation and added mass in the same rows. Only the ship's added mass could be
+  switched off, by a flag in the scene.
+- **Fix:** each force component has one owner. The ship solver writes `manoeuvringClaims` (one word a body row: its
+  surge, sway and yaw damping, and their added mass unless `addedMass: false`), and the hull solver reads it, as it
+  reads `deckClaims`, leaving its radiation in those rows and their rows and columns of the added mass out.
+- **Regression:** "a HullSolver on a ship leaves the surge, sway and yaw the ship claims" in
+  `packages/physics/tests/ship.test.js` (a sway kick and a yaw kick within 1 percent of the ship alone).
 
 ### Fixed 2026-11-26: a cloth torn in two failed to rebuild its surface (KB-SOFT-SPLITDENSITY1, physics soft)
 
@@ -502,8 +514,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 Found by the audit in [physics-solver-audit.md](physics-solver-audit.md); each is fixed by the row's owner with a
 regression test.
 
-- **SEA-09 with SEA-08, sway and yaw damping counted twice.** **Cause:** with `ShipSolver` paired to `HullSolver`,
-  only added mass can be switched off in the manoeuvring model, so both solvers apply hull damping.
 - **SEA-14, entry uses sea-water density whatever the water.** **Cause:** `packages/physics/src/entry/solver.ts`
   hard-codes 1025 kg/m³ in the cavity term instead of reading the water's density.
 - **SEA-01, a calibration case is used as the validation case.** **Cause:** the ST4 sheltering was calibrated at 10

@@ -31,6 +31,7 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
+import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
 import { raceVelocity, thrusterThrust } from './propeller.js';
@@ -64,7 +65,11 @@ export interface Ship {
   readonly thruster?: { readonly diameter: number; readonly power: number; readonly position?: number };
   /** Its block coefficient, for its squat (default the model's volume over L B T). */
   readonly block?: number;
-  /** Hold the added masses and their coupling (default true; false when a HullSolver already carries them). */
+  /**
+   * Hold the added masses and their coupling (default true). The ship claims its hull's surge, sway and yaw damping always,
+   * and their added mass with this (`manoeuvringClaims`), so a HullSolver on the same body leaves its own of those out;
+   * false leaves the added mass to the HullSolver's strips.
+   */
   readonly addedMass?: boolean;
   /** The propeller's blades (default 4) and the water's gas saturation, 0 to 1, for its cavities' hysteresis (default 1). */
   readonly blades?: number;
@@ -152,6 +157,7 @@ export class ShipSolver implements Solver<ShipParams> {
   private runtime: Runtime[] = [];
   private rudders!: Region;
   private forces!: Region;
+  private claims!: Region;
   private cell: [number, number, number] = [0, 0, 0];
   private readonly flowSample: Vec3 = [0, 0, 0];
   /** The water the races move, as a flow field. */
@@ -175,6 +181,7 @@ export class ShipSolver implements Solver<ShipParams> {
       fields: [
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
+        { field: MANOEUVRING_CLAIMS_FIELD, access: 'write' },
       ],
       rate: this.level,
       stableRate: () => this.level,
@@ -250,6 +257,10 @@ export class ShipSolver implements Solver<ShipParams> {
     );
     this.rudders = host.allocate('rudders', ships.length * 8, 'f64', SHIP_LAYOUT);
     this.forces = host.allocate('forces', this.capacity * FORCE_WORDS * 8, 'f64', SHIP_LAYOUT);
+    // What each ship's model owns of its hull, for a HullSolver on the same body.
+    this.claims = host.allocate('claims', this.capacity * 8, 'f64', SHIP_LAYOUT);
+    const claims = regionWords(host.memory, this.claims) as Float64Array;
+    for (const s of ships) claims[s.row] = CLAIM_DAMPING + (s.addedMass === false ? 0 : CLAIM_ADDED_MASS);
   }
 
   /** Ship `index`'s controls, to read and set: `ships.control(0).revolutions = 2`. */
@@ -656,7 +667,10 @@ export class ShipSolver implements Solver<ShipParams> {
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: this.cell }];
+    return [
+      { field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: this.cell },
+      { field: MANOEUVRING_CLAIMS_FIELD.name, region: this.claims, tick, cell: this.cell },
+    ];
   }
 
   stateRegions(): readonly Region[] {
