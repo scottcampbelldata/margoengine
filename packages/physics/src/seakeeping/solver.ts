@@ -30,6 +30,7 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
+import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
@@ -53,6 +54,8 @@ import {
 export interface Hull {
   readonly row: number;
   readonly mesh: HullMesh;
+  /** Include ordinary-strip forward-speed terms in heave and pitch. Omit for the zero-speed radiation model. */
+  readonly course?: HullCourse;
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
    * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
@@ -178,6 +181,9 @@ export class HullSolver implements Solver<HullParams> {
   private radiation = true;
   private lags = 0;
   private history: Region | null = null;
+  private courseHistory: Region | null = null;
+  private course: readonly ({ speed?: number; trimSine: number; historyIndex: number } | null)[] = [];
+  private readonly courseLimits = new Map<Hull, number>();
   /** Per hull: 1 once it has radiated, then the radiation force of its last step (body frame, force then moment). */
   private radiated: Region | null = null;
   /** Per hull and station: the water's heave and sway velocity at the section, in the body's frame, each of the last `lags` steps. */
@@ -268,6 +274,20 @@ export class HullSolver implements Solver<HullParams> {
     );
     this.capacity = capacity;
     this.hulls = hulls;
+    this.courseLimits.clear();
+    let courseCount = 0;
+    this.course = hulls.map(({ course }) => {
+      if (!course) return null;
+      const trim = course.trim ?? 0;
+      if (!(Number.isFinite(trim) && Math.abs(trim) < Math.PI / 2))
+        throw new MargoError(
+          'state',
+          'The steady hull trim is invalid. Use finite radians below 90 degrees in magnitude.',
+        );
+      if (course.speed !== undefined && !Number.isFinite(course.speed))
+        throw new MargoError('state', 'The hull course speed is invalid. Use finite metres per second.');
+      return { speed: course.speed, trimSine: sin(trim), historyIndex: courseCount++ };
+    });
     this.sea = sea;
     this.level = level;
     this.gravity = params.gravity ?? [0, -GRAVITY, 0];
@@ -287,6 +307,15 @@ export class HullSolver implements Solver<HullParams> {
       throw new RangeError(`A hull's radiation memory is ${window} s; pass a finite number of seconds above 0.`);
     // Each hull's velocity (linear then angular), in its body's frame, at each of the last `lags` steps (by tick).
     this.lags = Math.ceil(window * rateOf(level));
+    this.courseHistory = null;
+    if (courseCount > 0) {
+      if (!this.radiation || !this.addedMass)
+        throw new MargoError(
+          'state',
+          'Hull course loads need radiation and added mass. Enable both on the HullSolver.',
+        );
+      this.courseHistory = host.allocate('course', courseCount * courseWords(this.lags) * 8, 'f64', HULL_LAYOUT);
+    }
     if (this.radiation) {
       this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
       this.radiated = host.allocate('radiated', hulls.length * 7 * 8, 'f64', HULL_LAYOUT);
@@ -1251,8 +1280,50 @@ export class HullSolver implements Solver<HullParams> {
       velocity = rotate(conjugate, [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!]),
       spin = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!]),
       slot = tick % lags;
-    ring.set([...velocity, ...spin], 6 * slot);
     const force = [0, 0, 0, 0, 0, 0];
+    const course = this.course[index];
+    const diagonal = memory.pairs[0];
+    if (course && diagonal) {
+      const forward = rotate(q, [1, 0, 0]);
+      const up = rotate(q, [0, 1, 0]);
+      const horizontal = hypot(forward[0], forward[2]);
+      const x = horizontal > 0 ? forward[0] / horizontal : 0;
+      const z = horizontal > 0 ? forward[2] / horizontal : 0;
+      const horizontalSpeed = bodies[at + 10]! * x + bodies[at + 12]! * z;
+      const speed = course.speed ?? horizontalSpeed;
+      let limit = this.courseLimits.get(hull);
+      if (limit === undefined) {
+        limit = courseSpeedLimit(memory, diagonal.kernel, this.sea!.density ?? SEA_WATER, -this.gravity[1]);
+        this.courseLimits.set(hull, limit);
+      }
+      if (!(Math.abs(speed) < limit) && speed !== 0)
+        throw new MargoError(
+          'state',
+          `Course speed ${speed} m/s exceeds this hull's ordinary-strip pitch stability range. Use a speed below ${limit} m/s or choose a hull with stronger longitudinal restoring.`,
+        );
+      // The steady horizontal course has a component along the tilted body's up axis.
+      // Remove that component before ordinary radiation, then add the exact vertical speed terms.
+      velocity[1] -= horizontalSpeed * (x * up[0] + z * up[2]);
+      const words = courseWords(lags);
+      const history = new Float64Array(
+        this.host!.memory.buffer,
+        this.courseHistory!.byteOffset + course.historyIndex * words * 8,
+        words,
+      );
+      [force[1], force[5]] = courseLoad(
+        history,
+        lags,
+        slot,
+        velocity[1],
+        forward[1] - course.trimSine,
+        spin[2],
+        speed,
+        diagonal.kernel,
+        memory.heaveInfinite,
+        dt,
+      );
+    }
+    ring.set([...velocity, ...spin], 6 * slot);
     for (const { i, j, kernel } of memory.pairs) {
       const n = Math.min(lags, kernel.length);
       let ij = 0,
@@ -1421,9 +1492,16 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.radiated, this.waves, this.carry, this.deckWater, this.slam, this.flood].filter(
-      (r): r is Region => r !== null,
-    );
+    return [
+      this.history,
+      this.courseHistory,
+      this.radiated,
+      this.waves,
+      this.carry,
+      this.deckWater,
+      this.slam,
+      this.flood,
+    ].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {

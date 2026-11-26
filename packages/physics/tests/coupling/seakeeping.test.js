@@ -29,6 +29,7 @@ import {
   PhysicsWorld,
   RigidSolver,
   SoftSolver,
+  worldMemory,
 } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -408,6 +409,152 @@ test('HullSolver: on a hull uneven fore and aft, heave drives pitch with the sig
       Math.hypot(got[0] - want[0], got[1] - want[1]) <= 0.03 * Math.hypot(...want),
       `${what}: ${got} against ${want}`,
     );
+});
+
+test('HullSolver forward speed follows both heave-pitch cross terms and the quadratic pitch term of ordinary strip theory', async () => {
+  await Physics.load({ threads: true });
+  const rho = SEA_WATER;
+  const [length, depth, beam, draft] = [4, 0.5, 0.7, 0.25];
+  const mass = rho * length * beam * draft;
+  const inertia = (mass * (length * length + depth * depth)) / 12;
+  const speed = 2;
+  const frequency = 3;
+  const excitation = 80;
+  const mesh = boxMesh([length, depth, beam]);
+  const rest = depth / 2 - draft;
+  const section = heaveSection(lewisForm(beam, draft, beam * draft), frequency, rho, GRAVITY);
+  const heaveMass = section.addedMass * length;
+  const heaveDamping = section.damping * length;
+  const pitchMass = (section.addedMass * length ** 3) / 12;
+  const pitchDamping = (section.damping * length ** 3) / 12;
+  const restoringHeave = rho * GRAVITY * length * beam;
+  const restoringPitch = (rho * GRAVITY * beam * length ** 3) / 12 - (mass * GRAVITY * (depth - draft)) / 2;
+  const [wantHeave, wantPitch] = solve2(
+    [restoringHeave - frequency ** 2 * (mass + heaveMass), frequency * heaveDamping],
+    [-speed * heaveDamping, -frequency * speed * heaveMass],
+    [speed * heaveDamping, frequency * speed * heaveMass],
+    [
+      restoringPitch - frequency ** 2 * (inertia + pitchMass) - speed ** 2 * heaveMass,
+      frequency * pitchDamping + (speed ** 2 * heaveDamping) / frequency,
+    ],
+    [0, -excitation],
+    [0, 0],
+  );
+  const hashes = [];
+  for (const shared of [false, true]) {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+    using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+    const body = physics.addBody(null, {
+      position: [0, rest, 0],
+      linearVelocity: [speed, 0, 0],
+      enabledTranslations: [true, true, false],
+      enabledRotations: [false, false, true],
+      colliders: { shape: 'box', halfExtents: [length / 2, depth / 2, beam / 2], mass },
+    });
+    world.add(new RigidSolver(), { physics });
+    world.add(new HullSolver(), {
+      hulls: [{ row: body.row, mesh, course: { speed } }],
+      sea: { density: rho, elevation: () => 0 },
+      drag: false,
+      slamming: false,
+      greenWater: false,
+      memory: 20,
+    });
+    world.add(driver(body.row, excitation, frequency, 1, 4));
+    world.couple(['drive', 'hull', 'rigid'], 'staggered');
+    const heave = [];
+    const pitch = [];
+    for (let frame = 1; frame <= 38 * 60; frame++) {
+      body.setLinearVelocity([speed, body.linearVelocity[1], 0]);
+      world.advance(frame);
+      heave.push(body.position[1] - rest);
+      pitch.push(2 * body.rotation[2]);
+    }
+    const [actualHeave, actualPitch] = amplitudes([heave, pitch], frequency, 25 * 60);
+    const cases = [
+      ['heave', actualHeave, wantHeave],
+      ['pitch', actualPitch, wantPitch],
+    ].map(([label, actual, want]) => ({
+      label,
+      actual,
+      want,
+      error: Math.hypot(actual[0] - want[0], actual[1] - want[1]) / Math.hypot(...want),
+    }));
+    assert.ok(
+      cases.every(({ error }) => error <= 0.03),
+      JSON.stringify({
+        cases,
+        inertia: body.principalInertia,
+        velocity: body.linearVelocity,
+        angle: pitch.at(-1),
+        heave: heave.at(-1),
+      }),
+    );
+    const snapshot = world.takeSnapshot();
+    world.advance(40 * 60);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(40 * 60);
+    assert.equal(world.hash(), hash);
+    hashes.push(hash);
+  }
+  assert.equal(hashes[0], hashes[1]);
+});
+
+test('HullSolver forward speed gives no radiation load from an unchanged fully trimmed course', () => {
+  const trim = 0.05;
+  const mesh = boxMesh([L, D, B]);
+  const loads = [];
+  for (const [speed, waterRelative] of [
+    [0, undefined],
+    [1, undefined],
+    [1.25, 1],
+  ]) {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60 });
+    const body = physics.addBody(null, {
+      position: [0, D / 2 - T, 0],
+      rotation: [0, 0, Math.sin(trim / 2), Math.cos(trim / 2)],
+      linearVelocity: [speed, 0, 0],
+      lockRotations: true,
+      enabledTranslations: [true, false, false],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh, course: { trim, speed: waterRelative } }],
+        sea: { density: SEA_WATER, elevation: () => 0 },
+        drag: false,
+        slamming: false,
+        greenWater: false,
+        rollDamping: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(120);
+    const { region } = hull.exportPorts(120)[0];
+    const load = new Float64Array(world.memory.buffer, region.byteOffset + body.row * FORCE_WORDS * 8, FORCE_WORDS);
+    loads.push(Array.from(load));
+  }
+  for (const load of loads.slice(1)) {
+    for (const axis of [1, 5]) assert.ok(Math.abs(load[axis] - loads[0][axis]) < 1e-3, `${load} vs ${loads[0]}`);
+  }
+});
+
+test('HullSolver forward speed rejects a broad hull beyond its longitudinal restoring range', () => {
+  const size = [4, 1, 2];
+  using physics = new Physics(null, { fixedTimestep: 1 / 60 });
+  const body = physics.addBody(null, {
+    colliders: { shape: 'box', halfExtents: [2, 0.5, 1], mass: SEA_WATER * 4 },
+  });
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+    .add(new RigidSolver(), { physics })
+    .add(new HullSolver(), {
+      hulls: [{ row: body.row, mesh: boxMesh(size), course: { speed: 2 } }],
+      sea: { density: SEA_WATER, elevation: () => 0 },
+    })
+    .couple(['hull', 'rigid'], 'staggered');
+  assert.throws(() => world.advance(1), /ordinary-strip pitch stability range\. Use a speed below 1\.[0-9]+ m\/s/);
 });
 
 /** A box hull of `size` alone in still water of `density`, its body of `massProperties`, let go at `position` and `rotation`. */

@@ -4455,3 +4455,7 @@ Digitize only the uppermost measured PIV/PLIF point's vertical error bar in each
 Figure 9. The test records both caps in the original 3305 × 1207 raster and includes two pixels
 of digitization allowance. The published theory lines and measured depths never enter the solve.
 [Wang, Jia and Duan (2020), Figure 9](https://www.mdpi.com/2079-6412/10/6/599#coatings-10-00599-f009)
+
+### SEA-08 heave and pitch at forward speed
+
+Build `node scripts/build-modern.js --precompiled --only=physics`, then run `node --test --test-name-pattern "HullSolver forward speed" packages/physics/tests/coupling/seakeeping.test.js`. The fixture compares the complex heave and pitch transfer amplitudes at 3 rad/s and 2 m/s, restores the same course history in both arena types, holds a trimmed body steady, and checks the error when a broad hull loses pitch restoring.

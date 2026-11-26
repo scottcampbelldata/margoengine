@@ -2697,6 +2697,7 @@ console.log(sea.elevation(-10, 0, 10) === wake.sample(-10, 0).height); // true: 
   - Each section's damping at each frequency comes from Ursell-Tasai's multipole solution on its Lewis form: `heaveSection` in heave, `lateralSection` in sway and roll about the centre of mass (and their coupling). The damping is computed twice, once from the pressure on the hull and once from the energy of the waves it sends out, and the two agree.
   - The damping is integrated along the hull at its still-water draft (`hullMemory`), turned into the radiation kernel K(t), and convolved with the hull's motion over the last `memory` seconds (default 20).
   - A hull let go settles, and a hull driven at a frequency heaves as the frequency-domain equation of motion says. `radiation: false` leaves it out.
+- **Near-steady forward course:** set `course: {}` on a hull to use its horizontal forward velocity in the Salvesen–Tuck–Faltinsen heave and pitch terms. With current or a prescribed tow, pass `course.speed` in water-relative m/s. Pass `course.trim` in bow-up radians if the mean attitude is inclined (default zero). The existing radiation and added-mass options must be on. A course speed that would make the strip model lose static pitch restoring is rejected.
 - **Roll's viscous damping:** the eddies a rolling hull sheds at its bilges and the friction of its skin, which potential flow leaves out and which damp a real hull's roll most near its resonance (Ikeda's component method, ITTC 7.5-02-07-04.5). Each section's eddy coefficient (`eddyRollCoefficient`) and skin friction (`frictionGirth`, Kato's laminar law at the hull's natural roll frequency) are integrated along the hull about its centre of mass, and the moment -(eddy |p| + friction) p, p the roll rate, is taken implicitly in the damping, so a light hull stays stable. `rollDamping: false` leaves it out; `viscosity` is the water's kinematic viscosity (default `SEA_VISCOSITY`, 1.19e-6 m^2/s, sea water at 15 degrees C; fresh water 1.14e-6). Bilge keels, skegs and forward speed are not in yet.
 - **The load each step** is taken where a load held through the rigid step neither feeds the motion nor drains it: (s - 1) / (2 s) of the step on, s the substeps the `bodies` port gives (7/16 at 8), the pose carried there by the body's velocity and spin. Taken at the middle, a hull lost about pi w dt / (2 s) of its amplitude a cycle; taken where the step starts, it gained energy. The radiation force, convolved up to the step's start, is carried to the same point along its last two values.
 - **The waves a hull turns:** their diffraction, by strip theory's relative motion principle (Journee and Massie eqs. 8.19 and 8.45-8.47). Each section takes its added mass times the water's acceleration and its radiation memory convolved with the water's velocity, as it takes them for its own motion, at the depths that stand for its motion: its mean draft in heave and its centroid's depth in sway and roll. The Froude-Krylov part is the pressure over the wetted surface. It needs a sea that gives the water's motion (a `SeaSurface`'s `water`, as `SpectralSea`'s does); `diffraction: false` leaves it out. Measured: in head seas a box heaves within 1 percent of strip theory's frequency-domain answer (82 to 267 percent off without the diffraction); held in beam seas, its sway force and roll moment are within 1.5 percent.
@@ -2812,6 +2813,43 @@ for (let frame = 1; frame <= 30 * 60; frame++) {
 }
 console.log(highest > 0.8); // true: it rides the swell's crests
 ```
+
+#### Ship hull on a steady course
+
+Set a tow speed relative to the water and keep the body on that course with the rigid solver or the ship controller. The hull still responds to heave and pitch loads.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {HullSolver, SEA_WATER} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+using physics = new Physics(null, {fixedTimestep: 1 / 60});
+const body = physics.addBody(null, {
+  linearVelocity: [1, 0, 0],
+  colliders: {shape: 'box', halfExtents: [2, 0.25, 0.35], mass: SEA_WATER * 0.7},
+});
+const mesh = {
+  vertices: new Float64Array([
+    -2, -0.25, -0.35, 2, -0.25, -0.35, 2, 0.25, -0.35, -2, 0.25, -0.35,
+    -2, -0.25, 0.35, 2, -0.25, 0.35, 2, 0.25, 0.35, -2, 0.25, 0.35,
+  ]),
+  indices: new Uint32Array([
+    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
+    2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
+  ]),
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(new HullSolver(), {
+    hulls: [{row: body.row, mesh, course: {speed: 1}}],
+    sea: {elevation: () => 0},
+  })
+  .couple(['hull', 'rigid'], 'staggered');
+world.advance(60);
+console.log(body.position);
+```
+
 ### Into the water and out of it (`EntrySolver`, `@margoengine/physics/entry`)
 
 `EntrySolver` is SEA-14: bodies striking the water, going under, breaking out and falling back, a cannonball, a diver, a

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20578940,
+  "total": 20579871,
   "history": [
     {
       "date": "2026-10-24",
@@ -13639,6 +13639,12 @@
       "commit": "d0bd940679",
       "grew": 1,
       "reason": "KB-CAPTURE-TWOEFFECTS1: water keeps one capture pipeline per effect (keyed by that effect's declarations) and its bind groups per view per pipeline, so one water in two capture effects draws each effect's own stage without a rebuild per draw; @margoengine/water measured 34820 B gzip, budget 34779 to 35865. The map lives in the capture draw the entry already carries; a split would move the whole capture path. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "0e64bb363e",
+      "grew": 1,
+      "reason": "SEA-08 optional steady-course radiation grows seakeeping from 23460 to 24518 B gzip. It uses the existing section coefficients, arena and rigid load. Splitting adds a separate entry and repeats or imports the same hull and memory code. Core plus Stage remains 24846 B."
     }
   ],
   "items": {
@@ -14501,7 +14507,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
-    "@margoengine/physics/seakeeping": 24323,
+    "@margoengine/physics/seakeeping": 25254,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,

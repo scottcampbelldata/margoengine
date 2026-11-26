@@ -88,8 +88,14 @@ export interface HeaveSection {
 export interface Hull {
     readonly row: number;
     readonly mesh: HullMesh;
+    readonly course?: HullCourse;
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
+}
+
+export interface HullCourse {
+    readonly speed?: number;
+    readonly trim?: number;
 }
 
 export interface HullMemory {
@@ -97,6 +103,7 @@ export interface HullMemory {
     readonly frequencies: Float64Array;
     readonly pairs: readonly RadiationPair[];
     readonly lateralInfinite: Float64Array;
+    readonly heaveInfinite: number;
     readonly dt: number;
     readonly rollEddy: number;
     readonly rollFriction: number;

@@ -14784,6 +14784,12 @@ The optional granular-flow entry evolves one vertically integrated layer on a fi
 
 The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD asset is 9,620 B raw and 4,255 B gzip. The shared asset is 9,620 B raw and 4,255 B gzip. Core and Stage remain 24,846 B gzip.
 
+### Ship seakeeping forward course
+
+`Hull.course` adds 16 B per radiation lag and an 8 B count per configured solver hull. Change speed or heading slowly compared with the radiation window (20 s by default). The ordinary-strip model represents small vertical motion about a mean trim with a stern region where the section forces tend to zero. Use slender hulls. A runtime guard rejects speeds at which the finite-kernel static longitudinal stiffness reaches zero. A change to the incident wave diffraction, near-zero encounter qualification in following seas, nonlinear planing, forward corrections to roll, and physical tank validation are separate from these vertical radiation terms.
+
+The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

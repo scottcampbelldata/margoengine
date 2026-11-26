@@ -71,6 +71,8 @@ export interface HullMemory {
   readonly pairs: readonly RadiationPair[];
   /** The added mass at infinite frequency in sway, roll, yaw and their couplings, 6 by 6 row-major, about the centre of mass. */
   readonly lateralInfinite: Float64Array;
+  /** Integrated heave added mass at infinite frequency, kg. */
+  readonly heaveInfinite: number;
   /** The step the kernels are sampled at. */
   readonly dt: number;
   /**
@@ -153,6 +155,7 @@ export function hullMemory(
       frequencies: new Float64Array(1),
       pairs: [],
       lateralInfinite: new Float64Array(36),
+      heaveInfinite: 0,
       dt,
       rollEddy: 0,
       rollFriction: 0,
@@ -294,6 +297,7 @@ export function hullMemory(
     frequencies,
     pairs: tables,
     lateralInfinite,
+    heaveInfinite: strips.reduce((mass, strip) => mass + strip.width * stripForms[strip.form]!.a33, 0),
     dt,
     rollEddy,
     rollFriction,
