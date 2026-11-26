@@ -12760,6 +12760,39 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: defects found by the physics solver audit (KB-PHYS-AUDIT1, physics)
+
+The audit in [physics-solver-audit.md](physics-solver-audit.md) read every solver built by Codex. Missing pieces are
+listed there and the rows are REOPENED; these are the defects, each to be fixed by the row's owner with a regression
+test.
+
+- **DYN-05, a reversing train feels the curve the wrong way.** **Repro:** run a rail car backwards through a curve;
+  the lateral load in the car frame flips sign. **Cause:** `packages/physics/src/rail/car.ts` (two places, the bogie
+  and body lateral terms) uses `signedSquare(speed) * curvature`; centripetal acceleration is v²κ whatever the
+  direction.
+- **DYN-05, a flange can never climb.** **Repro:** any flange contact; L/V never exceeds 1. **Cause:** `car.ts` caps
+  the flange force at the vertical load, so no Nadal check can ever trip.
+- **ICE-05, thick ice melts slower than thin ice above freezing.** **Repro:** `ice.test.js` (the melt case) asserts
+  it. **Cause:** `packages/physics/src/ice/model.ts` melts an above-freezing surface by running the quasi-steady Stefan
+  growth law backwards through the ice and snow, so conduction through the slab throttles a surface melt that is set
+  by the surface heat flux.
+- **BREAK-03, a latched crush contact lets bodies pass through.** **Repro:** keep pushing a body into a crush patch
+  after its first stroke with sensor colliders, as the README advises. **Cause:**
+  `packages/physics/src/crush/index.ts` ignores a latched contact until it clears.
+- **ATMO-07, a lightning leader can stall with no flash and no error.** **Repro:** a domain where the leader runs out
+  of candidate cells before it reaches ground or a target. **Cause:** `packages/physics/src/lightning/index.ts` ends
+  growth silently.
+- **DYN-04, host transcendentals in state-feeding vehicle code.** **Repro:** `tyres.ts`, `vehicle.ts`,
+  `motorcycle.ts` and `tracked.ts` call `Math.atan`, `Math.sin` and similar in forces that feed the world hash (an
+  alias `const atan = Math.atan` also hides it). **Cause:** these files predate the pinned-maths rule and
+  `npm run check:pinned-math` does not scan them.
+- **SEA-06, the clean-room record names a fault source the code does not have.** **Repro:** `git grep -i okada --
+  packages` finds nothing. **Cause:** `docs/clean-room.md` (SEA-06) says the solver consumes Okada deformation
+  computed from the natural source model; no such model exists.
+- **SOFT-06, the pV test cannot fail.** **Repro:** `tests/coupling/gas-pressure.test.js` asserts pV is constant, but
+  `soft.ts` computes pressure as nRT/V, so it holds by construction; the public "conserves pV" claim rests on it.
+  Also, doc comments in `soft.ts` and `soft-split.ts` say a cloth is never split, while `splitOnTear: 'all'` splits it.
+
 ### Open 2026-11-26: a hull that has lost its buoyancy sinks with no drag (KB-SEA-SINKDRAG1, physics seakeeping)
 
 - **Repro:** a 20 by 4 by 8 m box barge floating at 2 m with one compartment filling most of it, holed at the bow and

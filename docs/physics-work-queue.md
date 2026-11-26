@@ -13,6 +13,9 @@ against the problems in [physics-demo-review.md](physics-demo-review.md). Read a
    someone else claimed it: pick another.
 3. Build it on your branch. Land it on `main` in working pieces (rebase, fast-forward, never force-push).
 4. When it works with its tests, set Status **LANDED** with the commit, in the same push as the code.
+5. **REOPENED** means an audit in [physics-solver-audit.md](physics-solver-audit.md) found a landed solver short of
+   its catalog row or of the standard below. The owner keeps the row, builds the missing pieces and validation the
+   audit names, and sets **LANDED** again with the new commit when the audit's list is done.
 
 Never take or edit a row owned by someone else. Claim one solver at a time per working session.
 
@@ -312,71 +315,71 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | --- | --- | --- | --- | --- |
 | DYN-08 | Large-scale GPU rigid dynamics | none | Open | OPEN |
 | SOFT-04 | Volumetric solids (FEM) | partial | Codex | BUILDING (codex/physics-volumetric-solids) |
-| SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact | Codex | LANDED a82ff99eb9 |
+| SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a82ff99eb9 |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
-| LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | LANDED 6712e2b2a4 |
+| LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 6712e2b2a4 |
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
-| AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | LANDED c82d68bf98 |
+| AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
 | SEA-03 | Nonlinear waves, rogue waves | none | Claude | LANDED 47be5f699 |
-| SEA-06 | Tsunami and impulse waves | none | Codex | LANDED 1905b1c216 |
+| SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 1905b1c216 |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
-| FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | LANDED (a540dd915c) |
-| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | LANDED (75f931cd2c) |
-| HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
-| HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
+| FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a540dd915c |
+| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 75f931cd2c |
+| HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9f6f7e9004 |
+| HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
-| HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | LANDED b6e01ceb4c |
-| ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | LANDED 80aa218baa |
-| ATMO-06 | Airborne particle transport | stand-in | Codex | LANDED 965fab2df7 |
-| ATMO-07 | Lightning and atmospheric electricity | none | Codex | LANDED 51ccc096bc |
-| ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | LANDED 80679b25b4 |
-| ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | LANDED 93bf3f2435 |
+| HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed b6e01ceb4c |
+| ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80aa218baa |
+| ATMO-06 | Airborne particle transport | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 965fab2df7 |
+| ATMO-07 | Lightning and atmospheric electricity | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 51ccc096bc |
+| ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
+| ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Codex | BUILDING (codex/physics-terramechanics) |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
-| EARTH-07 | Aeolian transport | physics/aeolian | Codex | LANDED d2fa3cb303 |
-| EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | LANDED 32c933e9d0 |
+| EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d2fa3cb303 |
+| EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
-| EARTH-10 | Lava flow | partial | Codex | LANDED 3a35fac405 |
-| ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | LANDED 7f5ad4a8d2 |
-| ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
-| ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | LANDED 7dbf9e06ee |
-| ICE-04 | Pack ice and floes | stand-in | Codex | LANDED (dbc7a0efd9) |
-| ICE-05 | Ice thermodynamics | physics/ice | Codex | LANDED 7b64dddf4f |
+| EARTH-10 | Lava flow | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 3a35fac405 |
+| ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7f5ad4a8d2 |
+| ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 096242cb21 |
+| ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7dbf9e06ee |
+| ICE-04 | Pack ice and floes | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dbc7a0efd9 |
+| ICE-05 | Ice thermodynamics | physics/ice | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7b64dddf4f |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
-| FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
+| FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
-| SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | LANDED 976796766b |
-| SOUND-02 | Enclosed and urban acoustics | physics/room-sound | Codex | LANDED bb16680105 |
-| SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
-| SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
+| SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 976796766b |
+| SOUND-02 | Enclosed and urban acoustics | physics/room-sound | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed bb16680105 |
+| SOUND-03 | Underwater acoustics | physics/underwater | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9f850999d0 |
+| SOUND-04 | Contact and modal sound | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
-| BIO-02 | Plant growth and morphogenesis | biomes/growth with HYDRO-02 soil and live Procedural branch graphs | Codex | LANDED d5e70fde20 |
-| BIO-03 | Forest ecosystem dynamics | sound | Codex | LANDED 609d76e5ce |
-| BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
-| SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
-| SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
-| SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | LANDED 0c11fd27f7 |
-| DYN-04 | Wheeled vehicles on roads | partial | Codex | LANDED 18ded2be7c (physical road contact, wet grip, yielding soil and replayable lane controls) |
-| DYN-05 | Rail vehicle dynamics | none | Codex | LANDED fa79b04868 |
+| BIO-02 | Plant growth and morphogenesis | biomes/growth with HYDRO-02 soil and live Procedural branch graphs | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d5e70fde20 |
+| BIO-03 | Forest ecosystem dynamics | sound | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 609d76e5ce |
+| BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9632f2731c |
+| SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 56f09d5d54 |
+| SPACE-02 | Celestial ephemeris and rotation | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18dbe0de5e |
+| SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 0c11fd27f7 |
+| DYN-04 | Wheeled vehicles on roads | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c |
+| DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
-| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | LANDED cf8fb29389 |
-| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | LANDED 64bedcf038 |
-| LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 708e96a06b |
-| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |
-| LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | LANDED 561885e7a1 |
+| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed cf8fb29389 |
+| LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |
+| LIFE-03 | Aquatic locomotion | physics/life | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
+| LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368 |
+| LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 561885e7a1 |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
 | FLUID-02 | Position based fluids (fast mode) | none | Codex | BUILDING (codex/physics-pbf) |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
-| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | LANDED db1950c88f |
+| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed db1950c88f |
 | ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | BUILDING (codex/physics-synoptic) |
 | EARTH-01 | MPM continuum | stand-in | Open | OPEN |
 | EARTH-02 | Depth-averaged granular flow | partial | Open | OPEN |
@@ -384,7 +387,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-01 | Wildfire spread | partial | Open | OPEN |
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
 | FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
-| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | LANDED a4d123a968 |
+| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
 
 ## Taken
 
