@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'sediment-kernel',
+    crate: 'packages/physics/sediment-kernel',
+    blueprint: 'packages/physics/src/sediment/sediment-kernel.wasm',
+    script: 'packages/physics/scripts/build-sediment-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'sediment-kernel-shared',
+    crate: 'packages/physics/sediment-kernel',
+    blueprint: 'packages/physics/src/sediment/sediment-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-sediment-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'runoff-kernel',
     crate: 'packages/physics/runoff-kernel',
     blueprint: 'packages/physics/src/runoff/runoff-kernel.wasm',

@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
+  the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
+  TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes
+  20 kg/m³ at 960 m² of wet surface, and 3,172 pixels change by more than eight summed RGB levels under
+  both backends. Reproduce with `node --test packages/physics/tests/coupling/sediment.test.js` and
+  `node packages/water/test/sediment-source.browser.mjs` after building Physics and Water.
+
 - Catchment runoff (HYDRO-02, 2026-11-25). The wetting front follows the integrated Green-Ampt ponding solution
   and a steady reach holds its Manning depth. Rain and melt enter the world fields and the volume leaving the
   catchment matches the water received by the flood solver to floating-point roundoff. The storm wets downstream

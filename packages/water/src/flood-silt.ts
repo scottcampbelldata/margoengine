@@ -13,12 +13,12 @@ const BODY = 'let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmissio
 const FOAM = 'color=mix(color,vec3f(0.72,0.77,0.74)*';
 
 /** The WGSL the effect adds: its uniform (the terrain's origin and size, world x and z) and the load, bilinear per cell. */
-function declarations(binding: number): string {
+function declarations(binding: number, channel: 'x' | 'w'): string {
   return `
 struct FloodSilt {origin:vec2f,size:vec2f}
 @group(0) @binding(${binding}) var<uniform> floodSilt:FloodSilt;
 @group(0) @binding(${binding + 1}) var floodSiltMap:texture_2d<f32>;
-fn floodSiltLoad(i:vec2i,n:vec2i)->f32{return textureLoad(floodSiltMap,clamp(i,vec2i(0),n-1),0).w;}
+fn floodSiltLoad(i:vec2i,n:vec2i)->f32{return textureLoad(floodSiltMap,clamp(i,vec2i(0),n-1),0).${channel};}
 fn floodSiltAt(q:vec2f)->f32{
  if(floodSilt.size.x<=0.0||floodSilt.size.y<=0.0){return 0.0;}
  let n=vec2i(textureDimensions(floodSiltMap));let a=(q-floodSilt.origin)/floodSilt.size*vec2f(n)-0.5;
@@ -30,11 +30,11 @@ fn floodSiltAt(q:vec2f)->f32{
 }
 
 /** Patches the Water surface's fragment: the load's absorption, its brown back-scatter and beige foam. */
-export function siltShader(code: string, binding: number): string {
+export function siltShader(code: string, binding: number, channel: 'x' | 'w' = 'w'): string {
   if (!code.includes(TRANSMISSION) || !code.includes(BODY) || !code.includes(FOAM))
     throw fault('failed', 'Flood sediment cannot find the Water surface shader; use matching water package versions');
   return code
-    .replace('struct Result', declarations(binding) + '\nstruct Result')
+    .replace('struct Result', declarations(binding, channel) + '\nstruct Result')
     .replace(
       TRANSMISSION,
       'let silt=floodSiltAt(i.world.xz);let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk+silt*41.0*vec3f(0.07839,0.26818,0.91750))*optical);',

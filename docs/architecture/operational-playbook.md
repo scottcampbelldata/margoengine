@@ -9999,3 +9999,12 @@ mirrored winged-seed rotation, arbitrary fixed colliders, frame-rate independenc
 snapshots. Weather's PA-32 check follows measured hail speeds for two diameters. Its WebGPU fixture checks
 position-driven changes and pixel-identical replay of the physics source. The camera-centred render path also
 passes its existing hail assertions.
+
+### Sediment transport and changing riverbeds (HYDRO-03)
+
+The Rust SIMD sediment module consumes the shallow-water depth and discharge field. It conserves suspended and
+bedload mass with shared finite-volume face transfers. TerrainBed receives Exner elevation changes on the
+triangulated vertex areas, and the shallow-water solver samples the new bed. The mobile bed reserve limits erosion.
+Registry fields expose concentration, bedload capacity and shear. A row-major concentration upload drives the
+existing Flood tint on both rendering backends. Tests verify exact settling, bedload rating, a closed-form Rouse
+profile, travelling sediment, bank migration with root stabilisation, boundary exports and deterministic replay.

@@ -6,6 +6,14 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
+
+The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
+receives conservative elevation changes, and the same concentration controls the Flood tint.
+`packages/physics/tests/coupling/sediment.test.js` compares a moving and a fixed bed and verifies solid
+mass. `packages/water/test/sediment-source.browser.mjs` verifies the rendering link. Flood-body
+feedback, debris impact and dam breach still have their own work-queue rows.
+
 ### Open 2026-11-25 RITS-10 atmospheric-river scene still needs its watershed inputs wired
 
 - **Repro** Re-render RITS-10 at 7:55–8:20 and 9:48–10:15 and check the terrain, streams and valley floor.

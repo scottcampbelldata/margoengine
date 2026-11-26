@@ -31,6 +31,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/sediment-kernel.wasm',
+    label: 'sediment-kernel.wasm',
+    kind: 'Rust SIMD sediment transport',
+    measure: 'file',
+    when: 'SedimentTransport.load(), only from the optional /sediment entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/sediment-kernel-shared.wasm',
+    label: 'sediment-kernel-shared.wasm',
+    kind: 'Rust SIMD sediment transport, shared world memory',
+    measure: 'file',
+    when: 'SedimentTransport.load() on a host with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/runoff-kernel.wasm',
     label: 'runoff-kernel.wasm',
     kind: 'Rust SIMD catchment runoff',

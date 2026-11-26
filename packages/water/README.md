@@ -1160,6 +1160,51 @@ of 100 s over flats 500 m wide leaves most of their water (Doggerland's 260 s N-
 m there; none of it sat in a closed basin), so give the wave the period the scene needs (Storegga's run-in periods were
 tens of minutes) or a smoother bed (lower `roughness`) rather than finer cells (FG-09).
 
+### Display the framework's suspended sediment
+
+Pass a `SedimentTransport` solver as `sediment.source` to sample its concentration for the existing flood
+surface tint. The grid must cover the terrain rectangle in the same X/Z order. The solver owns the concentration.
+The flood surface samples its current values each render and runs its own hydrodynamic updates.
+
+```ts
+import { EngineKernel } from '@margoengine/core';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { SedimentTransport } from '@margoengine/physics/sediment';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Water } from '@margoengine/water';
+import { Flood } from '@margoengine/water/flood';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const grid = { columns: 4, rows: 4, width: 40, depth: 40, centre: [20, 20] as const };
+const terrain = new TerrainBed();
+const sediment = await SedimentTransport.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(terrain, { ...grid, elevations: () => 0 });
+world.add(new ShallowWaterSolver(), { bed: terrain.bed, depth: 1 });
+world.add(sediment, { grid, suspendedMass: 20, settlingVelocity: 0 });
+world.advance(1);
+const map = engine.gpu.createTexture({
+  size: [16, 16],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu.queue.writeTexture({ texture: map }, new Float32Array(256), { bytesPerRow: 64 }, [16, 16]);
+const water = Water.attach(engine, {
+  height: -50,
+  size: [60, 60],
+  terrain: { heightmap: () => map, origin: [0, 0], size: [40, 40] },
+  fill: () => 1,
+});
+const flood = Flood.attach(engine, { surface: water, sediment: { source: sediment } });
+engine.render({ delta: 1 / 60 });
+await flood.settle();
+flood.dispose();
+water.dispose();
+map.destroy();
+engine.dispose();
+```
+
 ### Sliders for the flood: `FLOOD_SETTINGS`
 
 `@margoengine/water/settings` also lists the flood's live controls on the same row shape as `WATER_SETTINGS`:

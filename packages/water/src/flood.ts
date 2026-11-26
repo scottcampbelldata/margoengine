@@ -222,6 +222,11 @@ export interface FloodSediment {
   soil?: (x: number, z: number) => number | undefined;
   /** Tint the Water surface by the load. Default true. */
   tint?: boolean;
+  /** Feed the tint from a physical concentration grid in kg/m³, on the same terrain extent as this flood. */
+  source?: {
+    readonly concentrationSize: readonly [number, number];
+    copyConcentrations(out: Float32Array): void;
+  };
 }
 const SEDIMENT_DEFAULTS = { erosion: 5e-5, criticalShear: 0.2, settling: 0.001 };
 function sedimentText(sediment: FloodSediment): FloodSedimentText {
@@ -234,6 +239,18 @@ function sedimentText(sediment: FloodSediment): FloodSedimentText {
     throw typeError('Flood sediment.soil must be a function (x, z) => erodibility 0..1', 'geometry');
   if (sediment.tint != null && typeof sediment.tint !== 'boolean')
     throw typeError('Flood sediment.tint must be true or false', 'geometry');
+  if (sediment.source !== undefined) {
+    const source = sediment.source;
+    if (
+      typeof source?.copyConcentrations !== 'function' ||
+      !Array.isArray(source.concentrationSize) ||
+      source.concentrationSize.length !== 2
+    )
+      throw typeError(
+        'Flood sediment.source requires a concentrationSize and copyConcentrations(out); pass a grid source',
+        'geometry',
+      );
+  }
   return {
     erosion: finite(sediment.erosion, SEDIMENT_DEFAULTS.erosion, 'sediment.erosion', 0, 0.1),
     criticalShear: finite(sediment.criticalShear, SEDIMENT_DEFAULTS.criticalShear, 'sediment.criticalShear', 0.01, 100),
@@ -606,18 +623,37 @@ export class Flood implements EnginePlugin {
   private readonly tintOwned: { destroy(): void }[] = [];
   /** The surface effect that browns the Water with the sediment the last tick recorded (flood-silt.ts). */
   private tint(device: GPUDevice): void {
-    const place = this.options.surface.options.terrain!,
-      uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-      fallback = device.createTexture({ size: [1, 1], format: 'rgba32float', usage: GPUTextureUsage.TEXTURE_BINDING });
-    this.tintOwned.push(uniform, fallback);
+    const place = this.options.surface.options.terrain!;
+    const source = this.options.sediment?.source;
+    const [w, h] = source?.concentrationSize ?? [1, 1];
+    const limit = device.limits.maxTextureDimension2D;
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > limit || h > limit)
+      throw rangeError(
+        'Flood concentration grid exceeds the device limit; provide positive dimensions within its texture size',
+        'geometry',
+      );
+    const upload = source ? new Float32Array(w * h) : undefined;
+    const uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.tintOwned.push(uniform);
+    const fallback = device.createTexture({
+      size: [w, h],
+      format: source ? 'r32float' : 'rgba32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | (source ? GPUTextureUsage.COPY_DST : 0),
+    });
+    this.tintOwned.push(fallback);
     device.queue.writeBuffer(uniform, 0, new Float32Array([...place.origin, ...place.size]));
     const resources: GPUBindingResource[] = [{ buffer: uniform }, fallback.createView()];
     this.removeTint = addSurfaceEffect(this.options.surface, {
       key: 'flood-sediment',
       vertex: false,
       count: 2,
-      shader: siltShader,
+      shader: (code, binding) => siltShader(code, binding, source ? 'x' : 'w'),
       prepare: () => {
+        if (source && upload) {
+          source.copyConcentrations(upload);
+          device.queue.writeTexture({ texture: fallback }, upload, { bytesPerRow: w * 4 }, [w, h]);
+          return resources;
+        }
         const view = this.solver && !this.solver.disposed ? this.solver.shownView : undefined;
         if (view && resources[1] !== view) resources[1] = view;
         return resources;

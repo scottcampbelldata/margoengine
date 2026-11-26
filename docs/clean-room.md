@@ -12702,3 +12702,37 @@ Margo Engine's own field and solver specifications.
 The solver and its tests were written from equations and specifications. The APW flutter/tumble
 pair, exact grain and plate solutions, cubic blade moment, rigid wall and platform contacts,
 frame-rate and snapshot equality, and physical hail GPU replay are exercised by focused fixtures.
+
+### Sediment transport and channel morphodynamics (HYDRO-03, 2026-11-25)
+
+- E. Meyer-Peter and R. Müller, [Formulas for Bed-Load Transport](https://repository.tudelft.nl/record/uuid:4fda9b61-be28-4703-ab06-43cdc2a21bd7),
+  1948, measures solid flux above a critical Shields stress. M. Wong and G. Parker,
+  [Reanalysis and Correction of Bed-Load Relation of Meyer-Peter and Müller Using Their Own Database](https://doi.org/10.1061/(ASCE)0733-9429(2006)132:11(1159)),
+  2006, Eq. 24, supplies the plane-bed correction. Its dimensionless capacity is
+  `3.97 max(0, Shields − 0.0495)^(3/2)`, scaled by the square root of submerged gravity times median grain diameter
+  cubed. Bed shear follows the same Manning drag used by shallow water. All transferred bed material comes from
+  the mobile layer whose mass is tallied separately.
+- L. van Rijn, [Sediment Transport, Part II. Suspended Load Transport](https://www.leovanrijn-sediment.com/papers/P2-1984b.pdf),
+  1984, Eqs. 1–3, 11–13, 19a and 38, supplies the dimensionless grain size, transport stage, three clear-water settling
+  regimes, Rouse profile and near-bed concentration. The solver holds the concentration below the reference level
+  at its reference value and uses eight-point Gauss-Legendre panels above it. Its depth-mean load relaxes to that
+  profile over one settling time, with a formation-specific representative suspended diameter. The relaxation
+  uses an exponential over the tick, and finite-volume advection uses donor concentration and a shared face
+  water flux. A donor limiter preserves nonnegative sediment carried through each face.
+- C. Paola and V. Voller, [A Generalized Exner Equation for Sediment Mass Balance](https://doi.org/10.1029/2004JF000274),
+  2005, derives solid storage over the bed. In a bed with constant porosity, deposited solid volume divided by
+  the local solid fraction and the triangulated vertex area gives elevation gain. Losses take the opposite
+  sign. Each face uses the same transferred volume on both sides. The open-boundary ledger plus water-column and
+  bed inventories closes the solid mass balance.
+- S. Ikeda, G. Parker and K. Sawai, [Bend Theory of River Meanders. Part 1. Linear Development](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/abs/bend-theory-of-river-meanders-part-1-linear-development/EAE7F1CD6803CC4F4F61148CB4FE96B3),
+  1981, §§2–3, Eqs. 11–13, relates bank erosion and deposition to the tangential velocity perturbation at a bank.
+  The implementation uses the resolved velocity in the bordering wet cell and the reach mean, and routes
+  material across that bank face. Optional root pressure reduces the mobilised area and raises the Shields
+  threshold. This is a local bank exchange on the hydraulic mesh with user-supplied erodibility.
+
+The SIMD module reads the framework's water field and the solver contributes to TerrainBed's existing vertex
+accumulator. Water follows that bed. The same concentration enters the renderer's existing absorption and
+back-scattering law by way of a float texture. Tests reproduce van Rijn's three settling regimes, an analytic
+Rouse profile, Wong–Parker transport, quiescent delta deposition, a two-sided bank transfer and rooted control,
+solid mass balance, the coupled bed and water response, snapshots and backend-equivalent optical results.
+The solver uses the papers and the repository's existing coupling infrastructure.

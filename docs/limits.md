@@ -9054,3 +9054,12 @@ the supplied diameter, positions and velocities.
 The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10,109 B,
 4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
 Core and stage remain at 24,820 B min+gzip combined.
+
+### Sediment transport and bed change (HYDRO-03, 2026-11-25)
+
+`@margoengine/physics/sediment` works on one co-located rectangular TerrainBed and shallow-water grid. It uses a
+representative bed diameter and a representative suspended diameter for dilute transport. The bank model uses
+local near-bank velocity relative to the wet reach mean with user-supplied erodibility and optional root stress.
+The vertex reserve covers the mobile layer the caller declares. Set it to the bedrock clearance when TerrainBed
+has a floor. Fluid momentum and bed evolution exchange one field update per world tick. An open boundary exports
+sediment; external inflow at that edge carries clear water. Use the source grid's same rectangle for Flood tint.

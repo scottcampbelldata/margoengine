@@ -49,6 +49,43 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
+## Sediment transport and bed change
+
+`@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.
+It contributes the Exner elevation change to the same TerrainBed. Water then runs over the updated surface.
+
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { SedimentTransport } from '@margoengine/physics/sediment';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 4, rows: 2, width: 16, depth: 8, centre: [8, 4] as const };
+const terrain = new TerrainBed();
+const sediment = await SedimentTransport.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(terrain, { ...grid, elevations: () => 0 });
+world.add(new ShallowWaterSolver(), {
+  bed: terrain.bed,
+  depth: 1,
+  velocity: () => [1, 0],
+  sides: { maxX: 'open' },
+});
+world.add(sediment, {
+  grid,
+  mobileDepth: 0.1,
+  grainDiameter: 0.0003,
+  open: { maxX: true },
+});
+world.advance(120);
+console.log(sediment.read(1, 0), sediment.budget, terrain.volume());
+```
+
+Use the erodible thickness above the bedrock for `mobileDepth`. The registry exports layout-1 f64 cell grids
+with concentration in kg/m³, bedload capacity in m²/s and shear in Pa. The `rootCohesion` input can add a
+per-cell pressure from vegetation. `bankErodibility` activates lateral exchange in reaches with different
+near-bank and mean water speeds. `budget` reports bed and suspended masses and boundary exports in kg.
+
 ## Rainfall runoff and channel inflow
 
 `@margoengine/physics/runoff` turns rain and snowmelt into soil water, groundwater recharge and routed
