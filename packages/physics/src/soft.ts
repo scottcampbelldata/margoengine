@@ -10,6 +10,7 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
+import { makePlanePieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 
@@ -3823,6 +3824,7 @@ export class SoftBodies implements PhysicsAttachment {
         'imp_beta',
         ...Array.from({ length: 9 }, (_, k) => `o${k}`),
         'flowed',
+        'load',
         'flow_max',
         'smooth',
         'interior',
@@ -4037,8 +4039,17 @@ export class SoftBodies implements PhysicsAttachment {
     for (const [name, view] of Object.entries(this.columns()))
       if (view.byteLength > 0 && !name.startsWith('fc_') && !COLLIDER_COLUMN.test(name))
         out.push([name, view as Float32Array | Uint32Array]);
-    for (const [name, view] of Object.entries(this.cellColumns()))
-      if (view.byteLength > 0) out.push([`cell.${name}`, view as Float32Array | Uint32Array]);
+    const cell = this.cellColumns();
+    for (const [name, view] of Object.entries(cell))
+      if (name !== 'load' && view.byteLength > 0) out.push([`cell.${name}`, view as Float32Array | Uint32Array]);
+    if (
+      cell.load &&
+      this.bodies.some(
+        ({ cellRange, cellMaterial }) =>
+          cellRange.count > 0 && cellMaterial.tearStrain > 0 && cellMaterial.tearSmoothing > 0,
+      )
+    )
+      out.push(['cell.load', cell.load.subarray(0, this.cellTotal)]);
     const fiber = this.fiberWords();
     if (fiber && this.bodies.some(({ cellRange }) => cellRange.count > 0 && fiber[4 * cellRange.first + 3]! > 0))
       out.push(['cell.fiber', fiber]);
@@ -4945,6 +4956,38 @@ export class SoftBodies implements PhysicsAttachment {
         }
       }
     return this.announce(body, torn, [], this.splitAfterTear(body, cutFaces));
+  }
+
+  /**
+   * Slices a tetrahedral solid along a world-space plane, including through its cells.
+   * Returns closed fragments with the original material, rest volume, mass and total linear momentum.
+   * Use a finite blade with {@link SoftBodies.cut} for a cut confined to part of the body.
+   */
+  cutPlane(body: SoftBody, origin: Vec3, normal: Vec3): SoftTearEvent {
+    if (body.removed || !this.bodies.includes(body))
+      throw new MargoError('state', 'The cut needs a live solid in this world. Use the SoftBodies that owns the body.');
+    checkVec(origin, 'Cut-plane origin');
+    const direction = unitDirection(normal, 'Cut-plane normal');
+    if (
+      body.numCells() === 0 ||
+      body.edgeTotal > 0 ||
+      body.cellRange.clusterCount > 0 ||
+      body.skin ||
+      body.surface ||
+      this.attachments.some((item) => item.soft === body) ||
+      this.bound.some((item) => item.soft === body)
+    )
+      throw new MargoError(
+        'state',
+        'A plane cut needs a tetrahedral body without springs, clusters, skin or external bindings. Use SoftBodyDesc.box or a finite face cut.',
+      );
+    if (body.tornCells().length > 0)
+      throw new MargoError(
+        'state',
+        'The solid has pending torn cells. Split it at the tear before making a plane cut.',
+      );
+    const split = makePlanePieces(this, body, (positions) => new SoftBodyDesc(positions), origin, direction);
+    return this.announce(body, [], [], split);
   }
 
   /** @internal Nothing to do after the sync: the particles are read on demand. */

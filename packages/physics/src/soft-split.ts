@@ -408,6 +408,7 @@ function splitCells(
       ...Array.from({ length: 9 }, (_, k) => `o${k}`),
       'vol0',
       'flowed',
+      'load',
     ];
     mine.forEach((t, i) => {
       const row = piece.cellRange.first + i;

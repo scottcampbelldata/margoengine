@@ -29,6 +29,7 @@ fem_columns! {
     (imp_beta, imp.beta),
     (cproxy, proxy), (cpx, pos[0]), (cpy, pos[1]), (cpz, pos[2]), (cqx, quat[0]), (cqy, quat[1]), (cqz, quat[2]), (cqw, quat[3]),
     (clx, lin[0]), (cly, lin[1]), (clz, lin[2]), (cax, ang[0]), (cay, ang[1]), (caz, ang[2]),
+    (load, load),
 }
 
 /// Makes room for tetrahedra, clusters and cluster members. Views over the memory are stale after it, and so are the soft world's.

@@ -16844,6 +16844,8 @@ climber and complete tower still need the DYN-07 contact and animation bindings.
 now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold uses scalar
 cohesion. Grain-dependent timber fracture remains open.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
+Through-element plane cuts work on tetrahedral solids. A finite interior incision still needs
+embedded material geometry and the transfer of skin, spring, cluster and external binding state.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 

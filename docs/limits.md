@@ -9602,6 +9602,15 @@ Geoffrey Irving, Joseph Teran and Ronald Fedkiw described the inversion problem 
 The fourth-order determinant term here keeps the calibrated tangent at rest.
 [Invertible Finite Elements for Robust Simulation of Large Deformation](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf)
 
+`SoftBodies.cutPlane` handles complete planar sections of solids represented by their tetrahedra.
+Each fragment inherits the original material, pins and plastic rest basis. A child of a very close
+intersection still needs a rest basis and nodal mass representable in the native f32 state.
+The operation validates all pieces before replacing the body. It builds the edited topology once
+and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
+continues to slice along existing faces. Embedded skins, separate spring or cluster constraints and
+live external bindings need a separate transfer when introducing new cutting vertices. Snapshots
+of a cut restore in worlds with the same cut topology.
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber

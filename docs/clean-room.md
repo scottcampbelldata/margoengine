@@ -58,6 +58,27 @@ only if the total incremental potential evaluated at that stored position preser
 prior value. Both the compression term and its tangent vanish at the rest volume.
 [Irving et al.](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf).
 
+P. Areias and T. Rabczuk, “Steiner-point free edge cutting of tetrahedral meshes with applications
+in fracture” (2017), gives the affine edge intersection and motivates globally consistent subdivision
+across adjacent elements. Each side of one plane is convex. Margo constructs both clipped polyhedra
+and cones over faces that omit the smallest vertex, triangulating each such face from its own smallest
+vertex. This is the pulling triangulation described by Jesús A. De Loera, Jörg Rambau and Francisco
+Santos in *Triangulations* (2010), §4.3.2. A shared edge receives one global vertex ID, so both
+neighbors choose the same diagonal on any clipped face.
+[Areias and Rabczuk](https://doi.org/10.1016/j.finel.2017.05.001)
+[De Loera, Rambau and Santos](https://link.springer.com/book/10.1007/978-3-642-12971-1).
+
+The child tetrahedron's edge matrix in parent coordinates is `A`. Its rest inverse is
+`A⁻¹ Dₘ⁻¹` and its rest volume fraction is `det A`. The current gradient therefore agrees with
+the parent's, including its plastic deformation. Lumped child quadrature integrates each affine
+parent shape function with its usual `V/4`. Applying those same nonnegative fractions to nodal
+mass and momentum preserves their sums. Neil Molino, Zhaosheng Bao and Ronald Fedkiw (2004) and
+Eftychios Sifakis, Kevin Der and Ronald Fedkiw (2007) describe virtual nodes for multi-plane and
+partial incisions. Those methods embed material in replicas of the uncut tets. The conforming plane
+operation uses actual subdivided tets so its particles and faces can use the existing contact path.
+[Molino, Bao and Fedkiw](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
+[Sifakis, Der and Fedkiw](https://physbam.stanford.edu/papers/stanford2007-04.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

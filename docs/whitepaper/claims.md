@@ -33,6 +33,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   After building Physics, run `node --test packages/physics/tests/coupling/volumetric-orthotropy.test.js`
   and `node packages/physics/tests/volumetric-solids.browser.mjs` for the loaded, rendered rung.
 
+- Volumetric plane cuts (SOFT-04, 2026-11-26). A through-element cut produces closed solid fragments,
+  with analytic one-against-three and two-against-two tetrahedron volumes. The tests verify
+  the original mass and linear momentum, conforming shared faces, pinned particles, material
+  state and smoothed tear loads after a snapshot. Run
+  `node --test packages/physics/tests/coupling/volumetric-cut.test.js`. The cut rung and rigid
+  load replay in both renderers with state hash `1c62fd120af035ef`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

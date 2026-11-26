@@ -49,6 +49,17 @@ try {
       console.log(`LH-4 orthotropic timber y=${timber.y.toFixed(6)} m, ${timber.hash}`);
     }
   }
+  const intact = await page.evaluate(() => window.renderRung({ loaded: true, showBoot: true, solver: 'vertex-block' }));
+  const intactImage = await page.locator('canvas').screenshot();
+  const cut = await page.evaluate(() => window.renderLadderCut());
+  const cutImage = await page.locator('canvas').screenshot();
+  assert.equal(cut.visible, intact.visible + 1);
+  assert.ok(cut.boot[1] < intact.bootHeight);
+  assert.notDeepEqual(cutImage, intactImage);
+  const afterCut = await page.evaluate(() => window.renderLadderCut());
+  assert.equal(afterCut.hash, cut.hash);
+  assert.deepEqual(await page.locator('canvas').screenshot(), cutImage);
+  console.log(`LH-4 oblique cut, boot y=${cut.boot[1].toFixed(6)} m, ${cut.hash}`);
   assert.deepEqual(errors, []);
 } finally {
   await close();

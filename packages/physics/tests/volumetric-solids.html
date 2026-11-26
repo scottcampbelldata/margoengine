@@ -14,7 +14,9 @@
     backend: 'webgpu',
     camera: { position: [0.12, 1.23, 1.38], target: [0, 0.88, 0], near: 0.05, far: 10 },
   });
-  const rungMesh = engine.createMesh().setMaterial(new PbrMaterial({ color: '#c99364', roughness: 0.63 }));
+  const wood = new PbrMaterial({ color: '#c99364', roughness: 0.63 });
+  const rungMesh = engine.createMesh().setMaterial(wood);
+  const cutMesh = engine.createMesh().setMaterial(wood);
   const steel = new PbrMaterial({ color: '#626d76', roughness: 0.5 });
   for (const x of [-0.39, 0.39]) {
     engine.createMesh().setGeometry(box(0.08, 1.58, 0.13)).setMaterial(steel).setPosition([x, 0.79, 0]);
@@ -44,12 +46,27 @@
   window.renderRung = async ({ loaded, showBoot = false, solver, fiber, orthotropy }) => {
     const scene = await ladder(undefined, { mass: loaded ? 35 : 0, solver, fiber, orthotropy });
     scene.world.advance(120);
+    cutMesh.setGeometry(null);
     rungMesh.setGeometry(surface(scene.rung));
     boot.setGeometry(showBoot ? box(0.106, 0.12, 0.12) : null);
     if (showBoot) boot.setPosition(scene.boot.position);
     engine.render({ delta: 1 / 60 });
     await engine.gpu.queue.onSubmittedWorkDone();
     return { ...scene.reading(), hash: scene.world.hash(), visible: engine.stats.visible };
+  };
+
+  window.renderLadderCut = async () => {
+    const scene = await ladder(undefined, { mass: 35, solver: 'vertex-block' });
+    scene.world.advance(120);
+    const { pieces } = scene.soft.cutPlane(scene.rung, [0.031, 0.91, 0], [1, 0.25, 0]);
+    scene.world.advance(145);
+    rungMesh.setGeometry(surface(pieces[0]));
+    cutMesh.setGeometry(surface(pieces[1]));
+    boot.setGeometry(box(0.106, 0.12, 0.12));
+    boot.setPosition(scene.boot.position);
+    engine.render({ delta: 1 / 60 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { hash: scene.world.hash(), visible: engine.stats.visible, boot: scene.boot.position };
   };
 </script>
 </body>

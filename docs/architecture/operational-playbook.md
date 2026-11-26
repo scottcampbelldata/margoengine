@@ -9991,6 +9991,15 @@ shear responses to independent equations, recover an inverted tetrahedron, rejec
 inputs and check snapshot and cut retention. The LH-4 browser fixture renders a loaded orthotropic
 rung, with the rigid reaction and deterministic replay through the same world ports.
 
+Plane cuts clip each affected tetrahedron, use one intersection vertex per old edge, and
+triangulate shared faces using the same global vertex order on each side. Each child rest basis
+is carried by the parent-to-child affine map. The cut prepares every descriptor and preflights
+its masses and geometry before replacing the old body. Linear momentum is transferred with
+the same weights as mass. The optional native tear load joins the snapshot whenever
+smoothed fracture is active and is copied instead of reset during cut or body compaction.
+The browser fixture cuts the loaded LH-4 rung into two meshes and follows the changed boot
+position in both renderers.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is
