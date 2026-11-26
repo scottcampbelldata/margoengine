@@ -249,6 +249,10 @@ export interface Ship {
         readonly power: number;
         readonly position?: number;
     };
+    readonly thrusterOutlet?: {
+        readonly halfSpan: number;
+        readonly depth: number;
+    };
     readonly block?: number;
     readonly addedMass?: boolean;
     readonly blades?: number;

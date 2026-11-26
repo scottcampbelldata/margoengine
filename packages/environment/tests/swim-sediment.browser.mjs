@@ -3,8 +3,9 @@ import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
+const tunnel = process.argv.includes('--thruster');
 const { page, hardware, close } = await openBrowser({
-  startPath: '/packages/environment/tests/swim-sediment.html',
+  startPath: `/packages/environment/tests/swim-sediment.html${tunnel ? '?thruster' : ''}`,
   port: process.argv.includes('--compat') ? 5415 : 5414,
 });
 const uncaught = [];
@@ -54,7 +55,7 @@ try {
   assert.ok(settled.minHeight < inactive.minHeight && settled.maxHeight > inactive.maxHeight);
   assert.ok(Math.abs(settled.bedVolume - inactive.bedVolume) < 1e-12);
   assert.deepEqual(uncaught, []);
-  if (process.argv.includes('--preview') && !hardware?.compat) {
+  if (!tunnel && process.argv.includes('--preview') && !hardware?.compat) {
     await writeFile('test-results/ray-sand-puff.png', lifted.bytes);
   }
   console.log(

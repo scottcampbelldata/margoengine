@@ -3478,7 +3478,8 @@ Set `bedWash` to lift sediment below a resolved propeller or thruster flow. Give
 rectangle in the tracer origin cell, and a `referenceHeight` and `roughnessLength` in metres. Choose the
 reference height inside the local logarithmic layer. The grid defaults to 12 × 12 and supports up to 65,536
 midpoint samples. `bedJets` supplies the grain and pickup settings. `TracerSolver.withBedWash()` exchanges
-the released mass with a live `TerrainBed` using `bedJets.mobileLayer`. For `ShipSolver.water`, put the ship,
+the released mass with a live `TerrainBed` using `bedJets.mobileLayer`. Set `thrusterOutlet` on a ship to include
+its live bow jet in `ShipSolver.water`. Put the ship,
 rigid bodies, tracer and mutable bed in the same staggered group, in that order.
 
 ```ts
@@ -3823,6 +3824,8 @@ Each ship is `{row, model}` and takes these settings:
 - `midship`, `forward` and `up` in the body's frame (defaults the origin, +X and +Y).
 - `rudderRate`: default 2.32 degrees a second, the SOLAS 35-to-30 degrees in 28 s.
 - `thruster`: `{diameter, power, position}` for a bow thruster.
+- `thrusterOutlet`: `{halfSpan, depth}` in metres from the centreline and below the design waterline. Requires a
+  thruster and a depth at least half its diameter. Omit it to keep the tunnel out of the water field.
 - `block` and `addedMass`: `addedMass: false` leaves the surge, sway and yaw added mass to a HullSolver's strips (the ship still claims their damping).
 
 The solver also takes `depth` (a number or a function of (x, z), for squat), `walls` (quays and banks, `{from, to}`) and `density`.
@@ -3836,7 +3839,9 @@ Steer with `control(i)`:
 
 What it gives the rest of the engine:
 - `sea(base)`: the sea drawn down along each hull by its squat (ICORELS and Hooft's form of Tuck's law, Huuska's factor in a channel). Pass it to the `HullSolver` as its sea, so the hull sinks and trims by its own hydrostatics and the drawdown shows. `drawdown(x, z)` reads it.
-- `water`: a water `FlowField` of the propellers' races, the efflux by momentum theory and the jet's zones after Hamill and Kee (2016), for foam, bubbles, the bed and divers.
+- `water`: a water `FlowField` of propeller races and configured tunnel jets, for foam, bubbles, the bed and divers.
+  The tunnel discharges on the side opposite its thrust and follows the rigid hull. Its unconfined flow uses a
+  momentum-normalized Gaussian based on Albertson et al.'s round jet, with no quay or bed-reflection term.
 - `sources(t)`: each hull's draught pressed on the surface, for a `WakeSolver` (`sources: (t) => ships.sources(t)`), so it makes a bow wave and a Kelvin wake.
 - `wash(t)`: where each race boils up to the surface, for a `FoamSolver` ship's `wash`, so the stern boils white even at the quay.
 - The bow thruster: its ideal thrust (4 rho A)^(1/3) P^(2/3) times 0.55, falling to half near a speed of 0.4 of the jet's and recovering beyond.
@@ -3901,6 +3906,24 @@ ships.control(0).revolutions = ships.revolutionsFor(0, 1.18);
 ships.control(0).rudder = (35 * Math.PI) / 180;
 world.advance(60 * 20);
 console.log(body.position[2] > 3); // true: well round to starboard (+Z)
+```
+
+```ts
+import { Physics } from 'margoengine/physics';
+import { KVLCC2_L7, ShipSolver } from 'margoengine/physics/ship';
+import { PhysicsWorld, RigidSolver } from 'margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+const body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [3.5, 0.46, 0.635], mass: 1025 * KVLCC2_L7.volume } });
+const ship = new ShipSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(ship, {
+  ships: [{ row: body.row, model: KVLCC2_L7, thruster: { diameter: 0.2, power: 5, position: 2 },
+    thrusterOutlet: { halfSpan: 0.43, depth: 0.45 } }],
+}).couple(['ship', 'rigid'], 'staggered');
+ship.control(0).thruster = 1;
+world.advance(1);
+console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true, toward port
 ```
 
 ### Loads in the water (`@margoengine/physics/loads`)

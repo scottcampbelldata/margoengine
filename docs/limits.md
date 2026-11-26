@@ -10424,6 +10424,10 @@ The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0
 
 The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core and Stage gain zero bytes.
 
+### Bow tunnel discharge for bed wash (SEA-15)
+
+The optional `Ship.thrusterOutlet` samples a straight submerged round jet. It omits quay and bed reflection, crossflow bending, and travel time after a change in command. The configured diameter and outlet position determine a Gaussian profile whose centreline was 12.7% high against the independent laboratory fit at 20 diameters. Configuring any outlet adds 64 bytes of live state per ship slot. The scoped ship entry grows from 13,770 B to 14,217 B gzip within its 14,951 B ceiling.
+
 ## Points on a deforming mesh (animation/deformed-points, 2026-11-26)
 
 `DeformedPoints` (`@margoengine/animation/deformed-points`) draws one camera-facing quad per vertex of a `gltf/pbr` model, instanced from the 80-byte vertices its deformer wrote (`PBRPrimitive.deformed`), on WebGPU and on the WebGL2 compatibility layer. Defaults: `size` 4, `sizeUnits` 'pixels', `color` white, `opacity` 1, `shape` 'square', `vertexColors` true, `visible` true. One draw and one 256-byte uniform slot per primitive; a primitive with no deformer costs a second copy of its vertices (80 bytes each), uploaded once and again only when its vertex array is replaced. Sizes are not clamped: a world-sized point close to the camera can fill the view, and a size of 0 draws nothing. A point is cut by the near plane as a whole at its centre's depth. Round points are a disc cut from the square with no antialiasing beyond the target's MSAA. Opacity below 1 blends over the frame so far in draw order (pass order 1, after the model) and still writes depth, so points do not sort among themselves. Unlit; no shadows, fog, picking, clipping planes, per-point sizes or textures (`@margoengine/points` has those for clouds it owns). `EXT_mesh_gpu_instancing` primitives show one set of points at their node, not one per instance. Render layers do not filter the points; `visible` does. The small WebGL2 preview tier throws `unsupported`.

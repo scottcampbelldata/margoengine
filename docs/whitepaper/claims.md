@@ -340,6 +340,14 @@ first: each names its scope, its evidence file and how to reproduce it.
   flow on a slope in a different origin cell. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js`
   after building Physics.
 
+- Bow thruster sediment pickup (SEA-15, 2026-11-26). The commanded tunnel direction and rigid pose drive the
+  actual sediment advection and packed-bed debit. Reversing the command switches the outlet and preserves the
+  previously saved jet on restore. The model's free-jet centreline ratio is 0.310 at 20 diameters, versus 0.275
+  from the independent LDA fit. The plume moves 8.6 px downstream and clears after settling on both renderers.
+  Reproduce with `node --test --test-name-pattern='tunnel' packages/physics/tests/ship.test.js packages/physics/tests/coupling/tracers.test.js`
+  and `node packages/environment/tests/swim-sediment.browser.mjs --thruster`, with `--compat` for WebGL2.
+  [Xia and Lam (2009), Tables 1 and 3](https://hub.hku.hk/handle/10722/137242).
+
 - Cohesive floc settling (SEA-15, 2026-11-26). The Winterwerp aggregate-size and fall-speed model converges
   to an independent integrated settling trajectory under constant exposure. With concentration removed,
   shear breaks aggregates back toward primary grains, and the simulation replays exactly. Reproduce with

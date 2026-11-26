@@ -14371,11 +14371,12 @@ It compares the same rigid pose with each liquid mesh hidden in turn. Full layer
 water–glass optics and complete production-cut review remain open.
 [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-One-row or one-column strips without advancing and receding contact-angle hysteresis use a
-direct banded pressure solve. The capillary regression covers a 128-cell strip at 20 μm spacing.
-The multidimensional pressure solve and hysteresis use their existing iterative operators.
+One-row and one-column strips use a direct banded pressure solve with optional advancing and
+receding contact angles. The capillary regression covers a 128-cell strip at 20 μm spacing.
+Two-dimensional patches use the iterative pressure solve. The strip retention check uses a
+derived force bracket. A measured sliding threshold for this solver remains open.
 
-The optional thin-film entry is 16,381 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,188 B raw and each is 6,794 B gzip.
+The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,711 B raw and each is 6,969 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -15059,6 +15060,10 @@ The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0
 `Hull.shortWaveResistance` defaults to false. It uses the mean reference waterline, a projected bow or stern incidence, the absolute forward Froude number and a linear spectral energy sum. It supplies a horizontal axial force through the body centre. Its wall-sided reflection approximation leaves motion-induced head-wave drag, nonlinear breaking and pressure distribution along the hull outside its scope. The conventional speed curve was measured at `λ/L = 0.3`, and finite-depth, large-Froude and strongly following sea extensions are unqualified. The hull must be surface-piercing and the supplied sea must expose spectral wave components.
 
 The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core and Stage gain zero bytes.
+
+### Bow tunnel discharge for bed wash (SEA-15)
+
+The optional `Ship.thrusterOutlet` samples a straight submerged round jet. It omits quay and bed reflection, crossflow bending, and travel time after a change in command. The configured diameter and outlet position determine a Gaussian profile whose centreline was 12.7% high against the independent laboratory fit at 20 diameters. Configuring any outlet adds 64 bytes of live state per ship slot. The scoped ship entry grows from 13,770 B to 14,217 B gzip within its 14,951 B ceiling.
 
 ## Points on a deforming mesh (animation/deformed-points, 2026-11-26)
 

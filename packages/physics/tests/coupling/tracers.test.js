@@ -1085,6 +1085,86 @@ test('SEA-15 bed wash uses the true sloping bed area and the tangential flow in 
   assert.ok(Math.abs(tracer.jetErosion - mass) < 1e-14, `${tracer.jetErosion} vs ${mass} kg`);
 });
 
+test('SEA-15 the native bow tunnel jet cuts and advects the same dry sand from the live bed', async () => {
+  await Physics.load();
+  const dt = 1 / 60;
+  const model = KVLCC2_L7;
+  const density = 1025;
+  const bulk = 2650 * 0.6;
+  const bottom = -0.5;
+  const height = 0.05;
+  const roughness = 0.001;
+  const jetX = 2;
+  const jetZ = -0.7;
+  const physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
+  const body = physics.addBody(null, {
+    position: [0, 0, 0],
+    colliders: {
+      shape: 'box',
+      halfExtents: [model.length / 2, model.draught, model.beam / 2],
+      mass: density * model.volume,
+    },
+  });
+  const ship = new ShipSolver();
+  const terrain = new TerrainBed();
+  const tracer = TracerSolver.withBedWash();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+    .add(new RigidSolver(), { physics })
+    .add(ship, {
+      ships: [
+        {
+          row: body.row,
+          model,
+          thruster: { diameter: 0.2, power: 5, position: jetX },
+          thrusterOutlet: { halfSpan: 0.43, depth: -(bottom + height) },
+        },
+      ],
+    })
+    .add(terrain, {
+      columns: 20,
+      rows: 12,
+      width: 5,
+      depth: 3,
+      elevations: () => bottom,
+      bedrock: () => bottom - 0.025,
+    })
+    .add(tracer, {
+      bed: terrain.bed,
+      water: ship.water,
+      bedWash: {
+        water: ship.water,
+        bounds: [jetX - 0.05, jetZ - 0.05, jetX + 0.05, jetZ + 0.05],
+        cells: [1, 1],
+        referenceHeight: height,
+        roughnessLength: roughness,
+      },
+      bedJets: { mobileLayer: { thickness: 0.025, porosity: 0.4 } },
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+    })
+    .couple(['ship', 'rigid', 'tracers', 'bed'], 'staggered');
+  const bedBefore = terrain.volume(bottom);
+  const controls = ship.control(0);
+  world.advance(1);
+  assert.equal(tracer.jetErosion, 0);
+  controls.thruster = 1;
+  world.advance(2);
+  assert.ok(ship.status(0).thruster > 0);
+  const velocity = ship.water.sample(jetX, bottom + height, jetZ, 2 * dt).velocity;
+  assert.ok(velocity[2] < 0);
+  const raised = tracer.jetErosion;
+  assert.ok(raised > 0 && raised === tracer.budget.water);
+  assert.ok(Math.abs((bedBefore - terrain.volume(bottom)) * bulk - raised) < 1e-12);
+  assert.equal(terrain.refusedVolume(), 0);
+  const snapshot = world.takeSnapshot();
+  world.advance(3);
+  assert.ok(tracer.particlesOf().next().value.position[2] < jetZ);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(3);
+  assert.equal(world.hash(), hash);
+});
+
 test('SEA-15 dense sand pickup reduces error against independent high-velocity flume erosion', (t) => {
   // Heijmeijer et al. (2022), Tables 2–3 and Figure 11. Independent shear and bed retreat in the BOKA flume.
   const observations = [

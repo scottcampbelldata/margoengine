@@ -49,6 +49,7 @@ import { squat } from './squat.js';
 
 type Vec3 = [number, number, number];
 const SHIP_LAYOUT = 1;
+const THRUSTER_JET_WORDS = 8;
 /** A tunnel thruster's figure of merit: its thrust over the momentum bound (installed thrusters give about 0.45 to 0.65). */
 export const THRUSTER_MERIT = 0.55;
 
@@ -63,6 +64,8 @@ export interface Ship {
   readonly up?: readonly [number, number, number];
   /** A bow thruster: its tunnel's diameter, m, its power, W, and its place forward of the midship, m (default 0.42 L). */
   readonly thruster?: { readonly diameter: number; readonly power: number; readonly position?: number };
+  /** Symmetric tunnel outlets in metres for the water field: `halfSpan` from centreline, `depth` below the design waterline. */
+  readonly thrusterOutlet?: { readonly halfSpan: number; readonly depth: number };
   /** Its block coefficient, for its squat (default the model's volume over L B T). */
   readonly block?: number;
   /**
@@ -158,9 +161,10 @@ export class ShipSolver implements Solver<ShipParams> {
   private rudders!: Region;
   private forces!: Region;
   private claims!: Region;
+  private thrusterJets?: Region;
   private cell: [number, number, number] = [0, 0, 0];
   private readonly flowSample: Vec3 = [0, 0, 0];
-  /** The water the races move, as a flow field. */
+  /** The water moved by propeller races and configured bow-thruster outlets, as a flow field. */
   readonly water: FlowField;
 
   constructor(id = 'ship') {
@@ -216,8 +220,29 @@ export class ShipSolver implements Solver<ShipParams> {
       if (!(Number.isInteger(ship?.row) && ship.row >= 0))
         throw new RangeError(`A ship's body row is a whole number, 0 or more (got ${ship?.row}); pass the body's row.`);
       top = Math.max(top, ship.row);
-      if (ship.thruster && !(ship.thruster.diameter > 0 && ship.thruster.power >= 0))
+      if (
+        ship.thruster &&
+        !(
+          ship.thruster.diameter > 0 &&
+          ship.thruster.power >= 0 &&
+          [ship.thruster.diameter, ship.thruster.power, ship.thruster.position ?? 0].every(Number.isFinite)
+        )
+      )
         throw new RangeError('A thruster is {diameter in m above 0, power in W, position}; pass them.');
+      const outlet = ship.thrusterOutlet;
+      if (
+        outlet &&
+        !(
+          ship.thruster &&
+          outlet.halfSpan > 0 &&
+          outlet.depth >= ship.thruster.diameter / 2 &&
+          Number.isFinite(outlet.halfSpan) &&
+          Number.isFinite(outlet.depth)
+        )
+      )
+        throw new RangeError(
+          'A bow thruster outlet needs a tunnel, positive half-span and full submergence; pass finite dimensions in metres and depth at least half the diameter.',
+        );
       if (ship.rudderRate !== undefined && !(ship.rudderRate > 0 && Number.isFinite(ship.rudderRate)))
         throw new RangeError(`A rudder's rate is finite rad/s above 0 (got ${ship.rudderRate}); pass one.`);
       const mmg = new Manoeuvring(
@@ -259,6 +284,9 @@ export class ShipSolver implements Solver<ShipParams> {
     this.forces = host.allocate('forces', this.capacity * FORCE_WORDS * 8, 'f64', SHIP_LAYOUT);
     // What each ship's model owns of its hull, for a HullSolver on the same body.
     this.claims = host.allocate('claims', this.capacity * 8, 'f64', SHIP_LAYOUT);
+    this.thrusterJets = ships.some((ship) => ship.thrusterOutlet)
+      ? host.allocate('thruster-jets', ships.length * THRUSTER_JET_WORDS * 8, 'f64', SHIP_LAYOUT)
+      : undefined;
     const claims = regionWords(host.memory, this.claims) as Float64Array;
     for (const s of ships) claims[s.row] = CLAIM_DAMPING + (s.addedMass === false ? 0 : CLAIM_ADDED_MASS);
   }
@@ -290,6 +318,8 @@ export class ShipSolver implements Solver<ShipParams> {
       rudders = regionWords(this.host.memory, this.rudders) as Float64Array,
       dt = 1 / rateOf(context.level);
     out.fill(0);
+    const jets = this.thrusterJets && (regionWords(this.host.memory, this.thrusterJets) as Float64Array);
+    jets?.fill(0);
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? this.host.memory,
@@ -329,7 +359,7 @@ export class ShipSolver implements Solver<ShipParams> {
       // The bow thruster: its push across the bow, falling as the ship gathers way (the jet bends aft and the low pressure
       // behind its outlet takes back part of it), by the ratio m of the ship's speed to the jet's.
       let push = 0;
-      if (ship.thruster && control.thruster !== 0) {
+      if (ship.thruster && ship.thruster.power > 0 && control.thruster !== 0) {
         const { diameter, power } = ship.thruster,
           full = THRUSTER_MERIT * thrusterThrust(power, diameter, this.density),
           jet = Math.sqrt(full / (this.density * 0.25 * Math.PI * diameter * diameter)),
@@ -338,7 +368,20 @@ export class ShipSolver implements Solver<ShipParams> {
           command = Math.max(-1, Math.min(1, control.thruster));
         push = command * full * loss;
         Y += push;
-        N += (ship.thruster.position ?? 0.42 * L) * push;
+        const forwardOffset = ship.thruster.position ?? 0.42 * L;
+        N += forwardOffset * push;
+        const outlet = ship.thrusterOutlet;
+        if (jets && outlet && Math.abs(command) > 0) {
+          const direction = scale(s, -Math.sign(command));
+          const position = add(
+            add(mid, scale(f, forwardOffset)),
+            add(scale(direction, outlet.halfSpan), scale(up, -outlet.depth)),
+          );
+          jets.set(
+            [...position, ...direction, jet * Math.sqrt(Math.abs(command)), diameter],
+            index * THRUSTER_JET_WORDS,
+          );
+        }
       }
       // Suction toward a wall alongside: the return flow pressed through the gap.
       const suction = this.suction(mid, f, s, Math.sqrt(u * u + v * v), M);
@@ -509,7 +552,7 @@ export class ShipSolver implements Solver<ShipParams> {
     return { force: side * drop * 0.6 * M.length * M.draught };
   }
 
-  /** The races' water velocity at (x, y, z), into a flow sample: their axial speed, still water elsewhere. */
+  /** The races' and configured tunnel jets' water velocity at (x, y, z), into a flow sample. */
   private flow(x: number, y: number, z: number, out?: FlowSample): FlowSample {
     const o = out ?? { velocity: [0, 0, 0], density: 0, temperature: 288.15 },
       p: Vec3 = [x, y, z],
@@ -521,6 +564,32 @@ export class ShipSolver implements Solver<ShipParams> {
       o.velocity[0] += v[0];
       o.velocity[1] += v[1];
       o.velocity[2] += v[2];
+    }
+    if (this.thrusterJets && y <= 0) {
+      const jets = regionWords(this.host.memory, this.thrusterJets) as Float64Array;
+      for (let i = 0; i < jets.length; i += THRUSTER_JET_WORDS) {
+        const speed = jets[i + 6]!;
+        if (!(speed > 0)) continue;
+        const dx = x - jets[i]!,
+          dy = y - jets[i + 1]!,
+          dz = z - jets[i + 2]!;
+        const sx = jets[i + 3]!,
+          sy = jets[i + 4]!,
+          sz = jets[i + 5]!;
+        const distance = dx * sx + dy * sy + dz * sz;
+        if (!(distance >= 0)) continue;
+        const radius = jets[i + 7]! / 2;
+        // Albertson et al. (1950): centreline decay 6.2 D/x in the established round jet.
+        // A momentum-normalized Gaussian keeps the core speed bounded at the outlet.
+        const width = Math.max(radius, distance / 12.4);
+        const rx = (dx - distance * sx) / width,
+          ry = (dy - distance * sy) / width,
+          rz = (dz - distance * sz) / width;
+        const axial = speed * (radius / width) * exp(-0.5 * (rx * rx + ry * ry + rz * rz));
+        o.velocity[0] += axial * sx;
+        o.velocity[1] += axial * sy;
+        o.velocity[2] += axial * sz;
+      }
     }
     o.density = y <= 0 ? this.density : 0;
     o.temperature = 288.15;
@@ -674,7 +743,7 @@ export class ShipSolver implements Solver<ShipParams> {
   }
 
   stateRegions(): readonly Region[] {
-    return [this.rudders];
+    return this.thrusterJets ? [this.rudders, this.thrusterJets] : [this.rudders];
   }
 
   extraState(): readonly Region[] {

@@ -538,8 +538,12 @@ and its upper-size transition differ from the original law, as recorded in the c
 
 A resolved wash field now drives sediment pickup from the actual bed normal and roughness. A native ship's
 propeller lifts sand and debits its volume from TerrainBed, while a stopped screw lifts none. The wash API also
-accepts a supplied thruster field. A native bow-thruster velocity producer and independent entrained-mass validation
-remain open.
+accepts a supplied thruster field. `ShipSolver.water` now supplies a configured bow tunnel's live discharge. A
+reversing command switches outlets, and the SEA-15 bed deforms as the resulting jet carries the same dry mass.
+The fixed-camera sediment test renders 835 WebGPU and 840 WebGL2 sand pixels at lift. Both paths move the plume
+8.6 px downstream and clear it as the bed settles.
+The established free-jet centreline is 12.7% high against Xia and Lam's independent fit at 20 diameters. Confined
+tunnel flow and independent lifted-mass validation remain open.
 
 Cohesive sediment can now grow and break up under supplied local concentration and turbulence. Its evolving
 diameter and porous density drive settling while the dry-mass ledger stays conserved. The settling trajectory

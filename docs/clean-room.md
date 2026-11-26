@@ -13395,6 +13395,17 @@ log-layer assumption at very small clearances remain open. [R. A. Soulsby, “Dy
 [Liao, Wang and Wang, “In situ measurement of sediment resuspension caused by propeller wash” (2015)](https://doi.org/10.1016/j.flowmeasinst.2014.10.008),
 [Toni Llull, “Ship propeller induced scour of non-cohesive sediment in low bed-clearance conditions” (2021), §2.3.3](https://upcommons.upc.edu/server/api/core/bitstreams/14f411e3-4c77-41f1-aeac-86a82213a315/content).
 
+M. L. Albertson, Y. B. Dai, R. A. Jensen and H. Rouse's “Diffusion of Submerged Jets” (1950) gives the
+developed round-jet centreline law `U_c/U_0=6.2D/x` and describes the Gaussian radial profile. We use
+`b=max(D/2,x/12.4)` and `U=U₀(D/2)/b exp(−r²/(2b²))`. The width floor represents the core and keeps
+the section integral `∫ρU² dA=ρπ(D/2)²U₀²` constant. The actual thruster command scales the nozzle
+momentum before the existing hull-speed loss. Discharge follows the rigid body's active outlet and its
+pose is snapshot state. This is a free jet. It leaves out jet bending, quay confinement and wall attachment.
+The independent LDA turbulent-jet fit from L. P. Xia and K. M. Lam (2009), Tables 1 and 3, gives a centreline
+ratio of 0.275 at 20 diameters. The tunnel model gives 0.310, 12.7% high. That comparison covers established
+free-jet flow. The separate bed-transport test uses the native field and checks dry mass and snapshot replay.
+[Albertson et al.](https://doi.org/10.1061/TACEAT.0006302) [Xia and Lam](https://hub.hku.hk/handle/10722/137242).
+
 Cohesive tracers use Winterwerp's aggregate and breakup balance. Setting fractal dimension 2, breakup exponent
 `p = 1` and shear exponent `q = 1/2` in Eq. 1 yields `D′ = D²[k_A c G − k_B G^1.5(D − D_p)]/2`. Freezing
 the positive mobility `D²` gives an exponential relaxation toward the local equilibrium for that step. The

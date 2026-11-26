@@ -13,9 +13,11 @@
     import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
     import { toGeometry } from '/packages/geometry/dist/utils.js';
     import { TerrainBed } from '/packages/physics/dist/earth.js';
+    import { Physics } from '/packages/physics/dist/index.js';
     import { SwimSolver } from '/packages/physics/dist/life.js';
+    import { KVLCC2_L7, ShipSolver } from '/packages/physics/dist/ship.js';
     import { TracerSolver } from '/packages/physics/dist/tracers.js';
-    import { PhysicsWorld } from '/packages/physics/dist/world.js';
+    import { PhysicsWorld, RigidSolver } from '/packages/physics/dist/world.js';
     import { Bloom } from '/packages/post/dist/bloom.js';
     import { heightfieldGeometry } from '/packages/terrain/dist/index.js';
 
@@ -33,14 +35,15 @@
       [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
       side < 0 ? [0, 2, 1, 0, 3, 2, 0, 4, 3] : [0, 1, 2, 0, 2, 3, 0, 3, 4],
     ));
-    const left = wing(-1);
-    const right = wing(1);
+    const tunnel = new URLSearchParams(location.search).has('thruster');
+    const left = tunnel ? null : wing(-1);
+    const right = tunnel ? null : wing(1);
     const errors = [];
     engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
 
     const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-    const swim = await SwimSolver.load();
-    const tracers = TracerSolver.withBedChange();
+    const swim = tunnel ? null : await SwimSolver.load();
+    const tracers = tunnel ? TracerSolver.withBedWash() : TracerSolver.withBedChange();
     const terrain = new TerrainBed();
     const bedHeight = -0.5;
     const layer = { thickness: 0.002, porosity: 0.4 };
@@ -48,27 +51,47 @@
     world.add(terrain, { columns: 80, rows: 80, width: 8, depth: 8,
       elevations: () => bedHeight, bedrock: () => bedHeight - layer.thickness });
     const bed = terrain.bed;
-    world.add(swim, { bodies: [{
-      position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
-      tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
-      fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
-    }] });
-    const water = {
-      medium: 'water', cell: [0, 0, 0],
-      sample(_x, _y, _z, _time, out) {
-        out.velocity[0] = 0.65;
-        out.velocity[1] = 0;
-        out.velocity[2] = 0;
-        out.density = 1025;
-        return out;
-      },
-    };
-    world.add(tracers, {
-      // Eq. 37 uses half the bedform height. Fredsøe et al. (1999) ran with 35 mm ripples.
-      bed, water, bedJets: { availableMass: 0.023, suspensionReferenceHeight: 0.035 / 2, mobileLayer: layer },
-      horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
-    });
-    world.couple([swim.id, 'tracers', 'bed'], 'staggered');
+    let thruster;
+    if (tunnel) {
+      await Physics.load();
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+      const model = KVLCC2_L7;
+      const body = physics.addBody(null, { colliders: {
+        shape: 'box', halfExtents: [model.beam / 2, model.draught, model.length / 2], mass: 1025 * model.volume,
+      } });
+      const ship = new ShipSolver();
+      world.add(new RigidSolver(), { physics }).add(ship, { ships: [{ row: body.row, model, forward: [0, 0, 1],
+        thruster: { diameter: 0.2, power: 5, position: 0 }, thrusterOutlet: { halfSpan: 0.15, depth: 0.45 },
+      }] });
+      thruster = ship.control(0);
+      world.add(tracers, {
+        bed, water: ship.water, bedJets: { mobileLayer: layer },
+        bedWash: { water: ship.water, bounds: [0.25, -0.1, 0.35, 0.1], cells: [1, 1],
+          referenceHeight: 0.05, roughnessLength: 0.001 },
+        horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
+      }).couple(['ship', 'rigid', 'tracers', 'bed'], 'staggered');
+    } else {
+      world.add(swim, { bodies: [{
+        position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
+        tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
+        fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+      }] });
+      const water = {
+        medium: 'water', cell: [0, 0, 0],
+        sample(_x, _y, _z, _time, out) {
+          out.velocity[0] = 0.65;
+          out.velocity[1] = 0;
+          out.velocity[2] = 0;
+          out.density = 1025;
+          return out;
+        },
+      };
+      world.add(tracers, {
+        // Eq. 37 uses half the bedform height. Fredsøe et al. (1999) ran with 35 mm ripples.
+        bed, water, bedJets: { availableMass: 0.023, suspensionReferenceHeight: 0.035 / 2, mobileLayer: layer },
+        horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
+      }).couple([swim.id, 'tracers', 'bed'], 'staggered');
+    }
     const medium = new FogVolumes();
     const fog = VolumetricFog.attach(engine, {
       density: 0, temporal: 0, grid: [56, 34, 44], range: 3.5, ambient: [0.64, 0.72, 0.7],
@@ -79,6 +102,7 @@
     let minHeight = bedHeight;
     let maxHeight = bedHeight;
     window.step = async (frame, show) => {
+      if (thruster) thruster.thruster = frame > 0 && frame <= 20 ? 1 : 0;
       world.advance(frame);
       if (terrain.revisions() !== bedRevision) {
         bedRevision = terrain.revisions();
@@ -91,10 +115,12 @@
           maxHeight = Math.max(maxHeight, mesh.vertices[i]);
         }
       }
-      const ray = swim.read(0);
-      for (const mesh of [left, right]) mesh.setPosition(ray.position);
-      left.setRotation([0, 0, -ray.finDisplacement]);
-      right.setRotation([0, 0, ray.finDisplacement]);
+      if (swim) {
+        const ray = swim.read(0);
+        for (const mesh of [left, right]) mesh.setPosition(ray.position);
+        left.setRotation([0, 0, -ray.finDisplacement]);
+        right.setRotation([0, 0, ray.finDisplacement]);
+      }
       medium.volumes = [...tracers.particlesOf()].filter((particle) => particle.state === 'water').map((particle) => {
         const material = tracers.materialList[particle.material];
         // A grain's projected cross-section per kilogram, with an extinction efficiency of two.

@@ -256,6 +256,65 @@ function plane(extra = {}, options = {}) {
   return { physics, body, ships, world };
 }
 
+test('SEA-15 a live tunnel water jet reverses, keeps nozzle momentum and restores from a snapshot', (t) => {
+  // Xia and Lam (2009), Tables 1 and 3: independently measured round water-jet exit and far-field decay.
+  const density = 1000;
+  const diameter = 0.005;
+  const measuredExit = 1.02;
+  const area = (Math.PI * diameter * diameter) / 4;
+  const thrust = density * area * measuredExit ** 2;
+  const power = (thrust / (0.55 * Math.cbrt(4 * density * area))) ** 1.5;
+  const position = 1,
+    halfSpan = 0.2,
+    depth = 0.2;
+  const config = { thruster: { diameter, power, position }, thrusterOutlet: { halfSpan, depth } };
+  const { world, ships } = plane(config, { params: { density } });
+  const controls = ships.control(0);
+  const sample = (x, y, z) => {
+    const flow = ships.water.sample(x, y, z, 0).velocity;
+    const race = ships.status(0).race;
+    if (!race) return flow;
+    // A windmilling main screw can still generate flow after the hull moves. Isolate the tunnel contribution.
+    const axial = resolvedRace(race, [x, y, z]);
+    return flow.map((speed, i) => speed - axial[i]);
+  };
+  assert.deepEqual(sample(position, -depth, -halfSpan), [0, 0, 0]);
+  controls.thruster = 1;
+  world.advance(1);
+  const exit = sample(position, -depth, -halfSpan);
+  assert.ok(Math.abs(exit[2] + measuredExit) < 32 * Number.EPSILON * measuredExit);
+  assert.deepEqual(exit.slice(0, 2), [0, 0]);
+  assert.ok(Math.abs(ships.status(0).thruster - thrust) < 32 * Number.EPSILON * thrust);
+  assert.deepEqual(sample(position, -depth, halfSpan), [0, 0, 0]);
+  const distance = 20 * diameter;
+  const centre = -sample(position, -depth, -halfSpan - distance)[2];
+  const measured = (measuredExit * 5.5) / 20;
+  const width = distance / 12.4;
+  assert.ok(Math.abs(centre * width - (measuredExit * diameter) / 2) < 32 * Number.EPSILON * diameter);
+  const halfVelocity = -sample(position + Math.sqrt(2 * Math.log(2)) * width, -depth, -halfSpan - distance)[2];
+  assert.ok(Math.abs(2 * halfVelocity - centre) < 32 * Number.EPSILON);
+  assert.ok(Math.abs(centre - measured) < measured, 'decaying jet is closer to the LDA curve than no jet');
+  t.diagnostic(
+    `At 20 diameters: ${(centre / measuredExit).toFixed(3)} simulated, ${(measured / measuredExit).toFixed(3)} from the measured turbulent-jet fit.`,
+  );
+  const snapshot = world.takeSnapshot();
+  controls.thruster = -1;
+  world.advance(2);
+  assert.ok(sample(position, -depth, halfSpan + distance)[2] > 0);
+  assert.deepEqual(sample(position, -depth, -halfSpan - distance), [0, 0, 0]);
+  world.restoreSnapshot(snapshot.bytes);
+  assert.deepEqual(sample(position, -depth, -halfSpan), exit);
+  controls.thruster = 0;
+  world.advance(2);
+  assert.deepEqual(sample(position, -depth, -halfSpan - distance), [0, 0, 0]);
+
+  const unpowered = plane({ ...config, thruster: { ...config.thruster, power: 0 } }, { params: { density } });
+  unpowered.ships.control(0).thruster = 1;
+  unpowered.world.advance(1);
+  assert.equal(unpowered.ships.status(0).thruster, 0);
+  assert.deepEqual(unpowered.ships.water.sample(position, -depth, -halfSpan, 0).velocity, [0, 0, 0]);
+});
+
 test('a rigid body held by the ship solver follows the MMG ship through a turn', () => {
   const speed = (15.5 * 0.514444) / Math.sqrt(320 / 7),
     { body, ships, world } = plane({}, { speed }),
