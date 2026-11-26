@@ -9227,6 +9227,8 @@ Open sides export saltating grains and closed sides retain them. The mass ledger
 dust and open-boundary export. Snow uses a seasonal threshold and optional exposure. Wind stress and dust use exported
 surface fields. Atmosphere feedback needs an ATMO-01 momentum sink and ATMO-06 dust receiver on the matching grid.
 The rendering entry uses the current ground and transport field, and maps moving mass to opacity with `referenceMass`.
+The optional physics entry is 5,633 B min+gzip. Its separate plain and shared Wasm variants are each 8,172 B raw.
+The rendering entry, with its live transport route, is 11,061 B min+gzip.
 
 ### Groundwater and springs (HYDRO-06)
 

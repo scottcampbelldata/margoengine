@@ -1451,11 +1451,11 @@ sampler as `ground`. `referenceMass` sets the moving mass at half visual strengt
 set the effect clock to the corresponding time when seeking a shot.
 
 ```ts
-import { Engine } from 'margoengine/core';
-import { AeolianTransport } from 'margoengine/physics/aeolian';
-import { TerrainBed } from 'margoengine/physics/earth';
-import { PhysicsWorld } from 'margoengine/physics/world';
-import { BlownSand } from 'margoengine/vfx/blown-sand';
+import { Engine } from '@margoengine/core';
+import { AeolianTransport } from '@margoengine/physics/aeolian';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BlownSand } from '@margoengine/vfx/blown-sand';
 
 const engine = await Engine.create(document.querySelector('canvas')!, {
   backend: 'webgpu', camera: { position: [-4, 2, -5], target: [0, 0.4, 2] },

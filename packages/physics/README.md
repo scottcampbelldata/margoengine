@@ -3143,9 +3143,9 @@ solver publishes moving mass, dust emission and the opposing stress on the wind.
 when `load()` is called. Length, velocity and mass use metres, m/s and kilograms.
 
 ```ts
-import { AeolianTransport } from 'margoengine/physics/aeolian';
-import { TerrainBed } from 'margoengine/physics/earth';
-import { PhysicsWorld } from 'margoengine/physics/world';
+import { AeolianTransport } from '@margoengine/physics/aeolian';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { PhysicsWorld } from '@margoengine/physics/world';
 
 const grid = { columns: 16, rows: 8, width: 16, depth: 8, centre: [0, 0] as const };
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
