@@ -4319,7 +4319,10 @@ The optional SOFT-03 strand solver runs its rod and follow-the-leader constraint
 Rust SIMD module that imports the world's memory. Centreline and material-frame rows use
 the world's clock, region allocator and snapshot path. A fixed-camera fixture exercises
 720 solved points on both rendering backends with identical shared and plain memory
-replay. Reciprocal body contact and production skin bindings remain open.
+replay. An optional sweep detects contacts along linear link and capsule trajectories.
+The native collision tests cover the rigid reaction and replay, two-way momentum between
+guide links and sparse pair enumeration. Horse and VRM skin fixtures exercise the engine
+bindings. The named production shots still need bindings.
 
 
 ### N-body and orbital dynamics (SPACE-01)

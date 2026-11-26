@@ -7,6 +7,8 @@ use core::arch::wasm32::{
 use margoengine_physics_kernel_common::pinned::{cos, sin};
 
 mod direct;
+mod self_edges;
+mod sweep;
 
 struct NoHeap;
 unsafe impl core::alloc::GlobalAlloc for NoHeap {
@@ -238,6 +240,7 @@ struct Root {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct Capsule {
     start: V,
     end: V,
@@ -251,6 +254,7 @@ struct RigidCapsule {
     velocity: V,
     angular: V,
     row: f64,
+    previous: Capsule,
 }
 
 #[repr(C)]
@@ -602,19 +606,36 @@ fn contact_edge(
     if s == 0.0 || s == 1.0 {
         return None;
     }
-    let length = gap.length();
-    let overlap = obstacle.radius + ma.radius - length;
+    let overlap = obstacle.radius + ma.radius - gap.length();
+    let fallback = strand.edge.cross(V::X).direction(V::Y);
+    let normal = gap.direction(strand.edge.cross(axis.edge).direction(fallback));
+    edge_response(
+        s,
+        overlap,
+        normal,
+        axis.point(t).add(normal.scale(obstacle.radius)),
+        ma,
+        mb,
+    )
+}
+
+fn edge_response(
+    s: f64,
+    overlap: f64,
+    normal: V,
+    surface: V,
+    ma: &Material,
+    mb: &Material,
+) -> Option<SegmentContact> {
     let alpha = ma.inverse_mass * (1.0 - s);
     let beta = mb.inverse_mass * s;
     let inverse = alpha * (1.0 - s) + beta * s;
     if overlap <= 0.0 || inverse == 0.0 {
         return None;
     }
-    let fallback = strand.edge.cross(V::X).direction(V::Y);
-    let normal = gap.direction(strand.edge.cross(axis.edge).direction(fallback));
     let correction = normal.scale(overlap / inverse);
     Some(SegmentContact {
-        surface: axis.point(t).add(normal.scale(obstacle.radius)),
+        surface,
         first: correction.scale(alpha),
         second: correction.scale(beta),
     })
@@ -640,6 +661,8 @@ fn edge_contacts(
     material: &[Material],
     scratch: &mut [Scratch],
     obstacles: &[Capsule],
+    previous_obstacles: &[Capsule],
+    swept: bool,
     rigid: &[RigidCapsule],
     hits: &mut [Hit],
     reactions: &mut [Reaction],
@@ -651,8 +674,13 @@ fn edge_contacts(
         }
         let mb = slot(material, i + 1);
         let (a, b) = pair(nodes, i, i + 1);
-        for obstacle in obstacles {
-            if let Some(correction) = contact_edge(a, b, ma, mb, obstacle) {
+        let start_a = slot(scratch, i).old.position;
+        let start_b = slot(scratch, i + 1).old.position;
+        for (index, obstacle) in obstacles.iter().enumerate() {
+            let swept_hit = previous_obstacles
+                .get(index)
+                .and_then(|old| sweep::contact(start_a, start_b, a, b, ma, mb, old, obstacle));
+            if let Some(correction) = swept_hit.or_else(|| contact_edge(a, b, ma, mb, obstacle)) {
                 add_contact(a, b, scratch, i, &correction);
             }
         }
@@ -660,7 +688,23 @@ fn edge_contacts(
             if obstacle.row < 0.0 {
                 continue;
             }
-            if let Some(correction) = contact_edge(a, b, ma, mb, &obstacle.shape) {
+            let swept_hit = swept
+                .then(|| {
+                    sweep::contact(
+                        start_a,
+                        start_b,
+                        a,
+                        b,
+                        ma,
+                        mb,
+                        &obstacle.previous,
+                        &obstacle.shape,
+                    )
+                })
+                .flatten();
+            if let Some(correction) =
+                swept_hit.or_else(|| contact_edge(a, b, ma, mb, &obstacle.shape))
+            {
                 add_contact(a, b, scratch, i, &correction);
                 let mut impulse = V::ZERO;
                 if ma.inverse_mass > 0.0 {
@@ -786,6 +830,7 @@ unsafe extern "C" fn advance_strands(
     reactions: *mut Reaction,
     reaction_count: usize,
     direct_blocks: *mut direct::Block,
+    previous_obstacles: *const Capsule,
 ) -> f64 {
     let cfg = unsafe { &*config };
     let nodes = unsafe { core::slice::from_raw_parts_mut(nodes, count) };
@@ -837,6 +882,10 @@ unsafe extern "C" fn advance_strands(
     }
     let iterations = cfg.iterations as usize;
     let contacts = cfg.contact_flags as u8;
+    let swept = contacts & 8 != 0;
+    let previous = unsafe {
+        core::slice::from_raw_parts(previous_obstacles, if swept { colliders } else { 0 })
+    };
     let blocks = unsafe {
         core::slice::from_raw_parts_mut(direct_blocks, if contacts & 4 != 0 { count } else { 0 })
     };
@@ -921,11 +970,16 @@ unsafe extern "C" fn advance_strands(
             }
             if contacts & 2 != 0 {
                 edge_contacts(
-                    nodes, material, scratch, obstacles, bodies, hits, reactions, dt,
+                    nodes, material, scratch, obstacles, previous, swept, bodies, hits, reactions,
+                    dt,
                 );
             }
             if contacts & 1 != 0 {
-                checked += self_contacts(nodes, material, scratch, links, buckets, cfg.grid_size);
+                checked += if contacts & 2 != 0 {
+                    self_edges::run(nodes, material, scratch, links, buckets, swept, None)
+                } else {
+                    self_contacts(nodes, material, scratch, links, buckets, cfg.grid_size)
+                };
             }
         }
     }
@@ -986,6 +1040,17 @@ unsafe extern "C" fn advance_strands(
             let sign = if difference.w < 0.0 { -1.0 } else { 1.0 };
             node.spin = difference.v.scale(2.0 * sign / dt);
         }
+    }
+    if contacts & 3 == 3 {
+        checked += self_edges::run(
+            nodes,
+            material,
+            scratch,
+            links,
+            buckets,
+            false,
+            Some(cfg.friction),
+        );
     }
     checked
 }

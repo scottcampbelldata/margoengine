@@ -14929,6 +14929,30 @@ test measures every length during a wind reversal and contact with a live terrai
 browser fixture draws the solved centreline and frame in a fixed view and repeats the same
 gust against a still-air control.
 
+### Swept strand and capsule contact
+
+- Minchen Li, Danny M. Kaufman and Chenfanfu Jiang,
+  [*Codimensional Incremental Potential Contact*](https://ipc-sim.github.io/C-IPC/file/paper.pdf)
+  (2021), sections 5.3–5.4 and equation 10. Bound the change in separation by endpoint
+  motions after subtracting common translation. A safe advance uses 90% of the available
+  separation divided by its closing bound. The strand solver tightens that bound by
+  projecting endpoint motion onto the current separating normal. Linear endpoints remain
+  in the resulting half-spaces up to that advance.
+- Robert Bridson, Ronald Fedkiw and John Anderson, [*Robust Treatment of Collisions,
+  Contact and Friction for Cloth Animation*](https://graphics.stanford.edu/papers/cloth-sig02/)
+  (2002), sections 7.1–7.3. Edge witness weights distribute the normal and tangential
+  impulse to all movable endpoints. The effective inverse mass is the sum of the squared
+  weights times inverse mass. The tangential impulse is capped by the Coulomb friction
+  budget and the impulse needed to stop sliding.
+
+The crossing-link tests check the exact two-radius separation, equal and opposite
+linear momentum and a pair count below the guide count for disjoint guides. The friction
+test checks equal and opposite impulses including the anchored reactions, and less
+kinetic energy after sliding. Separate
+fixtures drive a kinematic capsule, a rigid capsule at 24 m/s and a second strand all
+the way through an edge between sampled positions. The rigid fixture includes the
+in-flight registry impulse and verifies an exact snapshot replay on both sides of contact.
+
 ### Strand motion on the horse skin
 
 The optional horse driver uses the authored joint hierarchy and applies the solved guides as

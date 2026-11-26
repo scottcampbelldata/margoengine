@@ -4919,7 +4919,9 @@ world.advance(2);
 console.log(body.linearVelocity, strand.sample(0, 1).velocity);
 ```
 
-Set `contactGeometry: 'segments'` in the rod tier to resolve body contacts between guide
-points. The intersection uses the full strand link against the capsule axis. It distributes
-the correction to both movable endpoints and reports the matched rigid reaction when a
-capsule is connected to a body row. The default `'points'` preserves existing guide settings.
+Set `contactGeometry: 'segments'` in the rod tier to resolve contacts along the whole
+guide link at each substep. When `selfCollision` is on, two nonadjacent links also collide
+and exchange contact and friction impulses. A registered rigid capsule receives the
+matching linear and angular impulse. Choose `'swept'` to test both body and self contacts
+along linear endpoint trajectories between substeps. Use a higher rate for fast rotation
+to sample the arc more closely. The default is `'points'`.

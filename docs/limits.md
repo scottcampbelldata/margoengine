@@ -9904,17 +9904,20 @@ Optional dynamic capsule contacts publish an equal reaction to the real RigidSol
 The isolated moving-capsule test closes initial linear momentum including the in-flight
 registry impulse and measures angular response off the body's centre. Use the same
 coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
-Optional segment geometry resolves capsule intersections along each guide edge at substep
-boundaries. Self contact still uses point geometry. Swept-volume collision remains open.
+Optional segment geometry resolves capsule and self intersections along each guide edge
+at substep boundaries. The swept profile tests linear endpoint trajectories for both.
+Increase the dyadic rate when a fast rotating capsule needs a closer approximation of its
+arc. Adjacent links sharing an endpoint are excluded from self contact. The
+26-guide sparse test finds fewer than 26 pairs out of 325 possible link pairs.
 
 The direct solve eliminates one six-by-six block per strand edge in forward and backward
 passes. The work and memory grow linearly along each open guide. It reserves 1,104 bytes
 per authored point for solver scratch. The optional local profile uses less scratch, with
 reduced stiffness accuracy as its link count rises.
 
-The 720-point fixture moved its selected tip 0.4884 m relative to the still-air control and
-changed 3,106 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `64c531bd4b6c08c2` in the fixture. The optional entry is 5,557 B gzip
+The 720-point swept fixture moved its selected tip 0.4698 m relative to the still-air
+control and changed 3,040 pixels with the same camera on WebGPU and WebGL2. Plain, shared
+and restored native state all hash to `82f4cdeb4915b090` in the fixture. The optional entry is 5,557 B gzip
 with a 5,569 B ceiling. The lazy Wasm variants are 34,655 B raw each and 13,675 B
 plain or 13,676 B shared gzip. Core and
 Stage gain zero bytes.

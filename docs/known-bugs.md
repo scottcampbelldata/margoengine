@@ -16972,13 +16972,13 @@ measurements require separate models and evidence.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 
-The native guide solver receives time-sampled kinematic capsules, wind and a common terrain
-bed. Dynamic body capsules exchange impulses through the shared rigid ports, including optional
-contacts along the guide links. Continuous collision and inter-guide friction validation
-remain open. A point may pass a thin obstacle between substeps or slide past a
-capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
-solved guides. The optional horse driver applies the solved frames to the actual horse skin and replays the gait.
-The optional physical rig also binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
+The point profile can miss a thin obstacle between guide points or a crossing between
+substeps. Segment contact covers whole guide links. Swept contact covers linear motion
+between samples for kinematic capsules, dynamic rigid capsules and nonadjacent guide links.
+Tests measure the one-tick rigid reaction at 24 m/s and inter-guide momentum exchange.
+Fast rotation still requires enough substeps to resolve the capsule's arc.
+The optional horse driver applies solved frames to the horse skin, and the physical spring
+rig binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
 
 ### Refined thin strand bending (SOFT-03)
 

@@ -365,3 +365,225 @@ test('direct Cosserat bending follows a measured hair modulus as the guide is re
     previous = continuous - tip;
   }
 });
+
+test('swept geometry catches a kinematic capsule crossing a whole guide within one tick', async () => {
+  const points = [
+      [-0.25, 0, 0],
+      [0.25, 0, 0],
+    ],
+    radius = 0.01;
+  const capsule = (t) => {
+    const center = [0, 0.2 - 24 * t, 0];
+    return { start: center, end: center, radius: 0.06 };
+  };
+  const params = { rate: 0, iterations: 12, damping: 0, friction: 0, selfCollision: false, colliders: [capsule] };
+  const strand = { points, radius, young: 9, drag: 0 };
+  const discrete = await attach([strand], { ...params, contactGeometry: 'segments' }, zero);
+  const swept = await attach([strand], { ...params, contactGeometry: 'swept' }, zero);
+  discrete.world.advance(1);
+  swept.world.advance(1);
+  const end = swept.solver.sample(0, 1);
+  near(discrete.solver.sample(0, 1).position[1], 0, 64 * Number.EPSILON);
+  assert.ok(end.position[1] < -0.2, JSON.stringify(end));
+  assert.deepEqual(swept.solver.sample(0, 0).position, points[0]);
+});
+
+test('a rigid capsule crossing the strand in one tick transfers impulse and replays its swept history', async () => {
+  await Physics.load();
+  const world = new PhysicsWorld({ rate, gravity: zero });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
+  try {
+    const velocity = -24,
+      mass = 2,
+      radius = 0.01,
+      density = 850,
+      span = 0.5;
+    const body = rigid.addBody(null, {
+      position: [0, 0.6, 0],
+      linearVelocity: [0, velocity, 0],
+      colliders: { shape: 'sphere', radius: 0.06, sensor: true, mass },
+    });
+    world.add(new RigidSolver(), { physics: rigid });
+    const solver = await StrandSolver.load({
+      rigidCapsules: [{ body: body.row, start: [0.02, 0, 0], end: [0.02, 0, 0], radius: 0.06 }],
+    });
+    world.add(solver, {
+      strands: [
+        {
+          points: [
+            [-0.25, 0, 0],
+            [0.25, 0, 0],
+          ],
+          radius,
+          density,
+          young: 9,
+          drag: 0,
+        },
+      ],
+      rate: 0,
+      damping: 0,
+      friction: 0,
+      iterations: 1,
+      selfCollision: false,
+      contactGeometry: 'swept',
+    });
+    world.couple(['rigid', solver.id], 'staggered');
+    world.advance(1);
+    near(solver.sample(0, 1).velocity[1], 0, 64 * Number.EPSILON);
+    const start = world.takeSnapshot();
+    world.advance(2);
+    const port = solver.exportPorts(1).find((value) => value.field === BODY_IMPULSES_FIELD.name);
+    const reaction = regionWords(world.memory, port.region),
+      at = body.row * 6;
+    const tip = solver.sample(0, 1),
+      tipMass = 0.5 * density * Math.PI * radius * radius * span;
+    assert.ok(tip.position[1] < -0.2 && reaction[at + 1] > 0 && reaction[at + 5] > 0);
+    near(reaction[at + 1] + tipMass * tip.velocity[1] + mass * body.linearVelocity[1], mass * velocity, 3e-6);
+    const middle = world.takeSnapshot();
+    world.advance(4);
+    const hash = world.hash();
+    assert.ok(body.linearVelocity[1] > velocity);
+    world.restoreSnapshot(middle.bytes);
+    world.advance(4);
+    assert.equal(world.hash(), hash);
+    world.restoreSnapshot(start.bytes);
+    world.advance(4);
+    assert.equal(world.hash(), hash);
+  } finally {
+    rigid.dispose();
+  }
+});
+
+test('sparse segment self contact sees crossing links and exchanges equal internal momentum', async () => {
+  const radius = 0.02,
+    young = 20;
+  const guides = [
+    {
+      points: [
+        [-0.25, 0, 0],
+        [0.25, 0, 0],
+      ],
+      radius,
+      young,
+      drag: 0,
+    },
+    {
+      points: [
+        [0, -0.25, 0.015],
+        [0, 0.25, 0.015],
+      ],
+      radius,
+      young,
+      drag: 0,
+    },
+  ];
+  for (let i = 1; i <= 24; i++)
+    guides.push({
+      points: [
+        [2 * i, 0, 0],
+        [2 * i, 0.5, 0],
+      ],
+      radius,
+      young,
+      drag: 0,
+    });
+  const options = { rate: 0, damping: 0, friction: 0, iterations: 1 };
+  const points = await attach(guides, options, zero);
+  const links = await attach(guides, { ...options, contactGeometry: 'segments' }, zero);
+  points.world.advance(1);
+  links.world.advance(1);
+  const a = links.solver.sample(0, 1),
+    b = links.solver.sample(1, 1);
+  near(points.solver.sample(0, 1).position[2], 0, 32 * Number.EPSILON);
+  near(points.solver.sample(1, 1).position[2], 0.015, 32 * Number.EPSILON);
+  // At the symmetric crossing the two contact weights on the free ends are each 1/2.
+  // The midpoint difference gives exactly the two radii after one position projection.
+  near((0.015 + b.position[2] - a.position[2]) / 2, 2 * radius, 128 * Number.EPSILON);
+  near(a.velocity[2] + b.velocity[2], 0, 256 * Number.EPSILON);
+  assert.ok(links.solver.candidatePairs > 0 && links.solver.candidatePairs < guides.length);
+});
+
+test('a swept strand blocks a whole neighbor link moved through it by an animated root', async () => {
+  const radius = 0.021,
+    young = 2e7;
+  const guides = [
+    {
+      points: [
+        [-0.25, 0, 0],
+        [0.25, 0, 0],
+      ],
+      radius,
+      young,
+      drag: 0,
+    },
+    {
+      points: [
+        [0, -0.25, 0.2],
+        [0, 0.25, 0.2],
+      ],
+      radius,
+      young,
+      drag: 0,
+      anchor: (time) => ({ position: [0, -0.25, time === 0 ? 0.2 : -0.2] }),
+    },
+  ];
+  const options = { rate: 0, iterations: 1, damping: 0, friction: 0 };
+  const stationary = await attach(guides, { ...options, contactGeometry: 'segments' }, zero);
+  const swept = await attach(guides, { ...options, contactGeometry: 'swept' }, zero);
+  stationary.world.advance(1);
+  swept.world.advance(1);
+  near(stationary.solver.sample(0, 1).position[2], 0, 64 * Number.EPSILON);
+  assert.ok(swept.solver.sample(0, 1).position[2] < -0.1);
+});
+
+test('link friction exchanges equal momentum and removes tangential sliding energy', async () => {
+  const radius = 0.02;
+  const guides = [
+    {
+      points: [
+        [-0.25, 0, 0],
+        [0.25, 0, 0],
+      ],
+      radius,
+      young: 10,
+      drag: 1.2,
+    },
+    {
+      points: [
+        [0, -0.25, 0.01],
+        [0, 0.25, 0.01],
+      ],
+      radius,
+      young: 10,
+      drag: 0,
+    },
+  ];
+  const options = { rate: 0, damping: 0, iterations: 1, wind: air([8, 0, 0]), contactGeometry: 'segments' };
+  const clean = await attach(guides, { ...options, friction: 0 }, zero);
+  const rough = await attach(guides, { ...options, friction: 0.5 }, zero);
+  clean.world.advance(1);
+  rough.world.advance(1);
+  const sample = ({ solver }) => [solver.sample(0, 1), solver.sample(1, 1)];
+  const [a, b] = sample(clean).map((tip) => tip.velocity);
+  const [c, d] = sample(rough).map((tip) => tip.velocity);
+  assert.ok(d[0] > b[0] && c[0] < a[0]);
+  // Recover the internal impulses including the reactions on both fixed roots.
+  const [tipA, tipB] = sample(rough).map((tip) => tip.position);
+  const [rootA, rootB] = guides.map((guide) => guide.points[0]);
+  const minus = (u, v) => u.map((x, k) => x - v[k]);
+  const dot = (u, v) => u.reduce((sum, x, k) => sum + x * v[k], 0);
+  const edgeA = minus(tipA, rootA);
+  const edgeB = minus(tipB, rootB);
+  const delta = minus(rootA, rootB);
+  const aa = dot(edgeA, edgeA);
+  const ab = dot(edgeA, edgeB);
+  const bb = dot(edgeB, edgeB);
+  const aw = dot(edgeA, delta);
+  const bw = dot(edgeB, delta);
+  const determinant = aa * bb - ab * ab;
+  const weightA = (ab * bw - bb * aw) / determinant;
+  const weightB = (aa * bw - ab * aw) / determinant;
+  for (let k = 0; k < 3; k++) near((c[k] - a[k]) / weightA + (d[k] - b[k]) / weightB, 0, 128 * Number.EPSILON);
+  const energy = (u, v) => u.reduce((sum, x, k) => sum + x * x + v[k] * v[k], 0);
+  assert.ok(energy(c, d) < energy(a, b));
+});

@@ -68,7 +68,7 @@
       const solver = await StrandSolver.load(), terrain = new TerrainBed();
       const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
       world.add(terrain, { rows: 2, columns: 2, depth: 6, width: 6, centre: [0, 0], elevations: () => 0 });
-      world.add(solver, { strands: guides, fidelity: 'rod', wind: flow, bed: terrain.bed });
+      world.add(solver, { strands: guides, fidelity: 'rod', contactGeometry: 'swept', wind: flow, bed: terrain.bed });
       return { solver, world };
     };
     const gusted = await make(false, wind), shared = await make(true, wind), reference = await make(false, still);

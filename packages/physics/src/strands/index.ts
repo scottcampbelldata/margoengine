@@ -24,8 +24,9 @@ const ENVIRONMENT_WORDS = 8;
 const SCRATCH_WORDS = 25;
 const ROOT_WORDS = 9;
 const CAPSULE_WORDS = 7;
-const RIGID_CAPSULE_WORDS = 17;
-const BODY_INDEX = RIGID_CAPSULE_WORDS - 1;
+const RIGID_CAPSULE_WORDS = 24;
+const BODY_INDEX = 16;
+const PREVIOUS_POSE = 17;
 const CAPSULE_HIT_WORDS = 4;
 const DIRECT_BLOCK_WORDS = 138;
 
@@ -102,8 +103,8 @@ export interface StrandParams {
   readonly friction?: number;
   /** Cloth-like contacts between nonadjacent points, default true in the rod tier. */
   readonly selfCollision?: boolean;
-  /** Rod body contact geometry. 'segments' also resolves capsule contact between adjacent points. Default 'points'. */
-  readonly contactGeometry?: 'points' | 'segments';
+  /** Rod contact geometry. 'swept' also tests trajectories between substeps. Default 'points'. */
+  readonly contactGeometry?: 'points' | 'segments' | 'swept';
   /** World-owned wind, sampled for each point. Default still air at 1.225 kg/m³. */
   readonly wind?: Wind;
   /** Ground in SI world units. Omit for no terrain contact. */
@@ -144,6 +145,7 @@ type Native = {
     reactions: number,
     reactionCount: number,
     directBlocks: number,
+    previousObstacles: number,
   ): number;
 };
 
@@ -257,6 +259,8 @@ export class StrandSolver implements Solver<StrandParams> {
   private reactions?: Region;
   private rigidRows = 0;
   private directBlocks?: Region;
+  private previousObstacles?: Region;
+  private swept = false;
 
   private constructor(
     readonly id: string,
@@ -319,9 +323,10 @@ export class StrandSolver implements Solver<StrandParams> {
     const self = params.selfCollision ?? fidelity === 'rod';
     if (self && fidelity === 'follow') invalid('Use the rod tier for self contact.');
     const contactGeometry = params.contactGeometry ?? 'points';
-    if (contactGeometry !== 'points' && contactGeometry !== 'segments')
-      invalid('Choose point or segment body contact.');
-    if (contactGeometry === 'segments' && fidelity !== 'rod') invalid('Use the rod tier for segment body contact.');
+    if (contactGeometry !== 'points' && contactGeometry !== 'segments' && contactGeometry !== 'swept')
+      invalid('Choose point, segment or swept body contact.');
+    if (contactGeometry !== 'points' && fidelity !== 'rod') invalid('Use the rod tier for segment contact.');
+    this.swept = contactGeometry === 'swept';
     const rodSolve = params.rodSolve ?? (fidelity === 'rod' ? 'direct' : 'local');
     if (rodSolve !== 'local' && rodSolve !== 'direct') invalid('Choose a local or direct rod constraint solve.');
     const direct = rodSolve === 'direct';
@@ -336,7 +341,7 @@ export class StrandSolver implements Solver<StrandParams> {
     this.count = params.strands.reduce((n, guide) => n + guide.points.length, 0);
     const bytes =
       this.count * 8 * (3 * STRAND_WORDS + MATERIAL_WORDS + ENVIRONMENT_WORDS + SCRATCH_WORDS + ROOT_WORDS + 4) +
-      (this.colliders.length * CAPSULE_WORDS +
+      (this.colliders.length * CAPSULE_WORDS * (this.swept ? 2 : 1) +
         (direct ? this.count * DIRECT_BLOCK_WORDS : 0) +
         (this.rigidRows
           ? this.count * CAPSULE_HIT_WORDS +
@@ -361,6 +366,8 @@ export class StrandSolver implements Solver<StrandParams> {
     this.scratch = area('strand-snapshot-of-substep', this.count * SCRATCH_WORDS);
     this.roots = area('strand-anchors', params.strands.length * ROOT_WORDS);
     this.obstacles = area('strand-body-capsules', Math.max(1, this.colliders.length) * CAPSULE_WORDS);
+    if (this.swept && this.colliders.length)
+      this.previousObstacles = area('strand-previous-prescribed-capsules', this.colliders.length * CAPSULE_WORDS);
     this.config = area('strand-step-parameters', 10);
     this.ledger = area('strand-contact-work-and-cell', 4);
     this.links = host.allocate('strand-grid-links', this.count * 16, 'i32', STRAND_LAYOUT);
@@ -370,6 +377,8 @@ export class StrandSolver implements Solver<StrandParams> {
       this.movingCapsules = area('strand-dynamic-body-capsules', this.rigidCapsules.length * RIGID_CAPSULE_WORDS);
       this.capsuleHits = area('strand-rigid-contact-witness', this.count * CAPSULE_HIT_WORDS);
       this.reactions = area('strand-rigid-body-impulses', this.rigidRows * IMPULSE_WORDS);
+      const poses = this.words(this.movingCapsules);
+      for (let i = 0; i < this.rigidCapsules.length; i++) poses[i * RIGID_CAPSULE_WORDS + BODY_INDEX] = -1;
     }
     this.native = new WebAssembly.Instance(native, { env: { memory: host.memory } }).exports as Native;
     if (
@@ -393,7 +402,7 @@ export class StrandSolver implements Solver<StrandParams> {
       fidelity === 'rod' ? iterations : 0,
       follow,
       finite(params.friction ?? 0.25, 'contact friction', 0),
-      Number(self) + 2 * Number(contactGeometry === 'segments') + 4 * Number(direct),
+      Number(self) + 2 * Number(contactGeometry !== 'points') + 4 * Number(direct) + 8 * Number(this.swept),
       2 * maxRadius,
     ]);
     this.anchorAndColliders(0);
@@ -483,7 +492,7 @@ export class StrandSolver implements Solver<StrandParams> {
     };
   }
 
-  private anchorAndColliders(t: number): void {
+  private anchorAndColliders(t: number, previousTime = t): void {
     const roots = this.words(this.roots);
     for (const [i, guide] of this.guides.entries()) {
       const pose = guide.spec.anchor?.(t) ?? { position: guide.root };
@@ -491,8 +500,16 @@ export class StrandSolver implements Solver<StrandParams> {
       roots.set([guide.first, guide.count, ...vector(pose.position), ...frame], ROOT_WORDS * i);
     }
     const data = this.words(this.obstacles);
+    const previous = this.previousObstacles && this.words(this.previousObstacles);
     for (const [i, source] of this.colliders.entries()) {
       const body = typeof source === 'function' ? source(t) : source;
+      if (previous) {
+        const old = typeof source === 'function' ? source(previousTime) : source;
+        previous.set(
+          [...vector(old.start), ...vector(old.end), positive(old.radius, 'previous body capsule radius')],
+          CAPSULE_WORDS * i,
+        );
+      }
       data.set(
         [...vector(body.start), ...vector(body.end), positive(body.radius, 'body capsule radius')],
         CAPSULE_WORDS * i,
@@ -539,7 +556,7 @@ export class StrandSolver implements Solver<StrandParams> {
       }
   }
 
-  private updateRigidCapsules(port: Port | undefined): void {
+  private updateRigidCapsules(port: Port | undefined, dt: number): void {
     if (!this.movingCapsules || !this.reactions) return;
     this.words(this.reactions).fill(0);
     const capsules = this.words(this.movingCapsules);
@@ -555,31 +572,34 @@ export class StrandSolver implements Solver<StrandParams> {
     for (const [index, capsule] of this.rigidCapsules.entries()) {
       const at = index * RIGID_CAPSULE_WORDS,
         body = capsule.body * BODY_WORDS;
+      const existed = capsules[at + BODY_INDEX] === capsule.body;
       capsules[at + BODY_INDEX] = -1;
       if (bodies?.[body + 23] !== 1) continue;
       const origin = sum(xyz(bodies, body), offset);
       const frame = normalized(quaternion(bodies, body + 3));
-      capsules.set(
-        [
-          ...sum(origin, rotate(frame, capsule.start)),
-          ...sum(origin, rotate(frame, capsule.end)),
-          capsule.radius,
-          ...sum(xyz(bodies, body + 7), offset),
-          ...xyz(bodies, body + 10),
-          ...xyz(bodies, body + 13),
-          capsule.body,
-        ],
-        at,
-      );
+      const start = sum(origin, rotate(frame, capsule.start)),
+        end = sum(origin, rotate(frame, capsule.end));
+      const centre = sum(xyz(bodies, body + 7), offset);
+      const linear = xyz(bodies, body + 10),
+        angular = xyz(bodies, body + 13);
+      if (this.swept) {
+        if (existed) capsules.copyWithin(at + PREVIOUS_POSE, at, at + CAPSULE_WORDS);
+        else {
+          const rewind = (point: Vec3) =>
+            difference(point, scaled(sum(linear, cross(angular, difference(point, centre))), dt));
+          capsules.set([...rewind(start), ...rewind(end), capsule.radius], at + PREVIOUS_POSE);
+        }
+      }
+      capsules.set([...start, ...end, capsule.radius, ...centre, ...linear, ...angular, capsule.body], at);
     }
   }
 
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
     const t = (context.tick + 1) * dt;
-    this.anchorAndColliders(t);
+    this.anchorAndColliders(t, context.tick * dt);
     this.sampleEnvironment(t, dt);
-    this.updateRigidCapsules(context.inputs.get(BODIES_FIELD.name));
+    this.updateRigidCapsules(context.inputs.get(BODIES_FIELD.name), dt);
     const config = this.words(this.config);
     config[3] = dt;
     config[4] = exp(-this.damping * dt);
@@ -603,6 +623,7 @@ export class StrandSolver implements Solver<StrandParams> {
       this.reactions?.byteOffset ?? this.config.byteOffset,
       this.rigidRows,
       this.directBlocks?.byteOffset ?? this.config.byteOffset,
+      this.previousObstacles?.byteOffset ?? this.config.byteOffset,
     );
     if (checks < 0)
       throw new MargoError(
@@ -625,7 +646,8 @@ export class StrandSolver implements Solver<StrandParams> {
     return [this.nodes, this.material, this.config, this.ledger];
   }
   extraState(): readonly Region[] {
-    return this.reactions ? [this.reactions] : [];
+    if (!this.reactions) return [];
+    return this.swept && this.movingCapsules ? [this.reactions, this.movingCapsules] : [this.reactions];
   }
 
   /** The current point in an authored guide. */
