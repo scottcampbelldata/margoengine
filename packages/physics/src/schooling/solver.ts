@@ -278,9 +278,11 @@ export class SchoolSolver implements Solver<SchoolParams> {
       orientation > attraction ||
       !(Math.fround(attraction * 2) > 0 && Number.isFinite(Math.fround(attraction * 2)))
     )
-      throw new RangeError('Order the repulsion, orientation and attraction radii from smallest to largest.');
+      throw new RangeError(
+        'Set positive attraction and nonnegative repulsion and orientation radii in ascending order.',
+      );
     if (!(Number.isFinite(vision) && vision >= -1 && vision <= 1))
-      throw new RangeError('visionDot is a cosine from -1 to 1.');
+      throw new RangeError('Set visionDot to a cosine from -1 to 1.');
     const neighbours = count(params.neighbours ?? members.length, 'neighbours', 1);
     const threat = nonnegative(params.predatorRadius ?? 2, 'predatorRadius');
     const prediction = nonnegative(params.predictionSeconds ?? 1, 'predictionSeconds');
@@ -406,7 +408,9 @@ export class SchoolSolver implements Solver<SchoolParams> {
       const ambient = sample?.velocity ?? ORIGIN;
       const rho = sample ? nonnegative(sample.density, 'flow density') : density;
       if (ambient.length !== 3 || !ambient.every((x) => Number.isFinite(Math.fround(x))))
-        throw new RangeError('The school flow sampled a non-finite velocity.');
+        throw new RangeError(
+          'The school flow sampled a non-finite velocity. Provide a finite velocity triple from FlowField.sample.',
+        );
       medium.set(ambient, ambientAt);
       medium[ambientAt + 3] = rho;
     }
@@ -441,7 +445,9 @@ export class SchoolSolver implements Solver<SchoolParams> {
         rows[j + axis]! += velocity[axis]! * dt;
         rows[j + axis + 3] = velocity[axis]!;
         if (!Number.isFinite(Math.fround(rows[j + axis]!)))
-          throw new RangeError('A school member moved outside the numerical range of its origin cell.');
+          throw new RangeError(
+            'A school member moved outside its numerical range. Use an origin cell closer to the member and consistent simulation units.',
+          );
       }
     }
   }

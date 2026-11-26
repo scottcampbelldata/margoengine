@@ -38,12 +38,14 @@ export async function loadSchoolKernel(signal?: AbortSignal): Promise<WebAssembl
       return module;
     }
     const response = await fetch(url, { signal });
-    if (!response.ok) throw new Error('School Wasm HTTP ' + response.status);
+    if (!response.ok)
+      throw new MargoError('failed', 'School Wasm request returned HTTP ' + response.status + '. Check the asset URL.');
     const module = await WebAssembly.compile(await response.arrayBuffer());
     signal?.throwIfAborted();
     return module;
   } catch (cause) {
     signal?.throwIfAborted();
+    if (cause instanceof MargoError) throw cause;
     throw Object.assign(
       new MargoError('failed', 'School kernel failed to load. Use Wasm SIMD and serve the school-kernel.wasm asset.'),
       { cause },
@@ -76,7 +78,11 @@ export function schoolKernel(
       school_alloc: (size: number, alignment: number) => {
         const offset = Math.ceil(cursor / alignment) * alignment;
         const end = offset + (size >>> 0);
-        if (end > limit) throw new MargoError('state', 'School kernel exceeded its neighbour scratch lease.');
+        if (end > limit)
+          throw new MargoError(
+            'state',
+            'School kernel exceeded its scratch region. Run the schooling package build to install matching JavaScript and Wasm.',
+          );
         cursor = end;
         return offset;
       },
