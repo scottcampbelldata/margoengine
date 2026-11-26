@@ -44,6 +44,12 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **LIFE-02:** Reserve static Wasm slot 13 and promote the versioned `groundAnimalPose` and
+  `groundAnimalContact` rows to shared fields when the rigid/animation readers adopt them. Add initial cell and
+  cell size to the solver host, portable bed geometry, and a contact-wrench accumulator for articulated bodies
+  and ground wear. The optional entry uses the live `bed` field with configured geometry, publishes both
+  versioned ports, and accepts an explicit initial cell meanwhile.
+
 - **LIFE-05:** Register slot 10 for the pedestrian SIMD kernel. Provide canonical per-body force
   and stance/position fields and an identity layout for LIFE-06 formations, DYN-07 body and foot
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads

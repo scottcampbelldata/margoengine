@@ -108,6 +108,10 @@
       "types": "./dist/life/index.d.ts",
       "import": "./dist/life.js"
     },
+    "./locomotion": {
+      "types": "./dist/locomotion/index.d.ts",
+      "import": "./dist/locomotion.js"
+    },
     "./pedestrians": {
       "types": "./dist/pedestrians/index.d.ts",
       "import": "./dist/pedestrians.js"

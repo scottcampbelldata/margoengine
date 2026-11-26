@@ -162,6 +162,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'locomotion-kernel',
+    crate: 'packages/physics/locomotion-kernel',
+    blueprint: 'packages/physics/src/locomotion/locomotion-kernel.wasm',
+    script: 'packages/physics/scripts/build-locomotion-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'locomotion-kernel-shared',
+    crate: 'packages/physics/locomotion-kernel',
+    blueprint: 'packages/physics/src/locomotion/locomotion-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-locomotion-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'pedestrian-kernel',
     crate: 'packages/physics/pedestrian-kernel',
     blueprint: 'packages/physics/src/pedestrians/pedestrian-kernel.wasm',

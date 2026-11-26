@@ -3227,6 +3227,10 @@
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
     },
+    "./physics/locomotion": {
+      "types": "./dist/physics/locomotion.d.ts",
+      "import": "./dist/physics/locomotion.js"
+    },
     "./physics/pedestrians": {
       "types": "./dist/physics/pedestrians.d.ts",
       "import": "./dist/physics/pedestrians.js"

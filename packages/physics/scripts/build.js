@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -61,6 +61,7 @@ await build({
         schooling: resolve(root, 'src/schooling/index.ts'),
         life: resolve(root, 'src/life/index.ts'),
         pedestrians: resolve(root, 'src/pedestrians/index.ts'),
+        locomotion: resolve(root, 'src/locomotion/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
@@ -86,6 +87,8 @@ for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/life', name), resolve(dist, name));
+for (const name of ['locomotion-kernel.wasm', 'locomotion-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/locomotion', name), resolve(dist, name));
 for (const name of ['pedestrian-kernel.wasm', 'pedestrian-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/pedestrians', name), resolve(dist, name));
 execFileSync(

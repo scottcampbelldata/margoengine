@@ -9243,3 +9243,22 @@ The optional entry is 3,519 B min+gzip with a 3,775 B ceiling. Plain and shared 
 and 15,525 B raw, or 6,189 B and 6,250 B gzip. A solver reserves 260 B of arena and scratch per cell,
 144 B of fixed config and budget, and a 64 KiB instance stack. Core and stage together stay at
 24,820 B gzip.
+
+### Ground animal locomotion (LIFE-02)
+
+`@margoengine/physics/locomotion` hosts independent body rows, with a one-dimensional clocked chain for a snake
+and fixed world-space stance contacts for lizards, insects, spiders and crabs. Each legged animal has an additional
+torso contact. Body state uses 112 B per row, published contact uses 104 B per element, and three f64 foothold
+values per element are part of replay. Both optional modules import the same world memory and use one static
+slot and a 64 KiB arena stack per solver instance. The world rate ranges from 60 to 7,680 Hz; extreme stiffness,
+damping or gait frequencies that require faster stepping are reported when configuring the group. Storage scales
+with the configured body and contact counts.
+
+The snake's motion uses a planar travelling wave across a heightfield and yaw about world up. The compiled leg
+templates use a single rigid torso and massless compressive legs, with stick-phase anchors and contact forces
+limited by the ground friction cone. These models resolve terrain height and contact normals. A terrain with
+caves or overhanging holds needs a collider-based foot placement system. The pose/contact ports expose
+kinematics and reaction wrenches for downstream animation or an erosion consumer. Inter-animal collision and
+feedback into the live terrain require downstream coupling.
+
+The optional entry measures 15,630 B raw and 6,419 B gzip. The plain Wasm is 9,037 B raw and 4,134 B gzip; the shared Wasm is 9,125 B raw and 4,196 B gzip.

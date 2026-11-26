@@ -5545,3 +5545,10 @@ crevasse depth, preserves closed ice volume to floating-point roundoff, and tran
 computed liquid volume into the real shallow-water solver. Native plain and shared builds, different
 frame rates and snapshot replay agree by state hash. Build Physics and run
 `node --test packages/physics/tests/glacier.test.js packages/physics/tests/coupling/glacier.test.js`.
+
+### Small-animal ground locomotion
+
+LIFE-02 uses an inextensible lateral-undulation chain with anisotropic ground reactions and force-driven
+legged gaits with planted stance feet. The direct Physics fixtures substantiate friction, spring load, gait phase,
+forward and lateral motion, and equal state hashes in plain and shared memory. Coupling fixtures substantiate
+sampling from the real TerrainBed and hash-equivalent replay at multiple display rates. No speed claim is made.

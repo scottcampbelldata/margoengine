@@ -832,6 +832,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/locomotion-kernel.wasm',
+    label: 'locomotion-kernel.wasm',
+    kind: 'Locomotion gait geometry and contact kernel (Rust, SIMD)',
+    measure: 'file',
+    when: '`await GroundLocomotion.load()` (`@margoengine/physics/locomotion`), on demand',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/locomotion-kernel-shared.wasm',
+    label: 'locomotion-kernel-shared.wasm',
+    kind: 'Shared locomotion gait geometry and contact kernel (Rust, SIMD)',
+    measure: 'file',
+    when: 'GroundLocomotion.load() in a runtime with shared world memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/pedestrian-kernel.wasm',
     label: 'pedestrian-kernel.wasm',
     kind: 'Pedestrian contact and avoidance kernel (Rust, SIMD)',

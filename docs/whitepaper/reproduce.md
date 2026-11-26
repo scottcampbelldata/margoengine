@@ -4288,3 +4288,12 @@ timing, contact, fracture and replay fixtures. Run
 `node scripts/wasm-blueprints.mjs --rebuild --compare --only=modal-sound-kernel,modal-sound-kernel-shared`
 to rebuild the plain and shared audio kernels using the pinned Rust target. The Physics README's
 contact and modal sound block checks the dry signal through an offline browser audio context.
+
+### Small-animal ground locomotion
+
+After building the Physics package, run
+`node --test --test-timeout=15000 packages/physics/tests/locomotion.test.js packages/physics/tests/coupling/locomotion.test.js`.
+The fixtures isolate passive spring and slip reactions, then run the authored species gaits on level and shaped
+terrain. Each replay starts from the same solver parameters. Use
+`node packages/physics/scripts/test-browser.js --locomotion-only` in the normal and compatibility environments
+to reproduce lazy asset loading and restoring the published contact state.

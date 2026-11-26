@@ -3199,3 +3199,57 @@ publishes m³ of liquid per world second at each outlet. Pass that descriptor an
 outlet indices to `ShallowWaterSolver`. `calvingField` and `icefallField` publish the ice volume
 in m³ released during the current tick, at the source cell. They reset on the next step. Budget
 volumes use ice density. Use the same climate and suitable time scales for physically linked solvers.
+
+## Ground animal locomotion
+
+`@margoengine/physics/locomotion` loads the optional Rust SIMD solver for a slithering snake, a lizard, an insect,
+a spider or a sideways-moving crab. Choose one or mix the body types in a single `PhysicsWorld`. Give a legged body
+its own hip locations, foot locations and phases to replace the preset gait.
+
+```ts
+import { GroundLocomotion } from '@margoengine/physics/locomotion';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const gait = await GroundLocomotion.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(gait, {
+  bodies: [{ kind: 'snake' }, { kind: 'insect' }, { kind: 'crab' }],
+});
+world.advance(60);
+const snake = gait.read(0);
+const frontFoot = gait.readContact(1, 0);
+if (snake.position[2] <= 0 || !Number.isFinite(frontFoot.position[1])) {
+  throw new Error('Expected the ground animal poses after one second.');
+}
+```
+
+The plane starts at Y=0. To follow production terrain, pass the `TerrainBed` geometry as `bedShape` to
+`GroundLocomotion.load`, and register the bed before the animals. Use the same `cellSize` as the world and set
+`originCell` to the cell passed to `world.add` for an animal group that starts outside the origin cell. The `bed`
+parameter accepts a fixed `Bed` and supplies a surface until a declared live port is available. The remaining static
+fallback is `groundHeight`. The bed's border behavior follows `Bed`.
+
+A snake has 32 links over 1 m by default. Its 0.48 rad bend and two waves advance at 1 Hz, with a 0.025 m belly
+radius and forward, backward and sideways friction coefficients of 0.11, 0.14 and 0.19. The body receives no
+horizontal thrust from its internal wave. Legged bodies derive target speed from `frequency × stride` and drive
+through planted feet. Their default gait alternates diagonal pairs, tripods or tetrapods at a 0.58 duty factor.
+
+| Preset | Legs | Mass (kg) | Hip length × width (m) | Rest leg (m) | Gait (Hz) | Direction |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Lizard | 4 | 0.035 | 0.11 × 0.04 | 0.06 | 3 | +Z |
+| Insect | 6 | 0.003 | 0.037 × 0.015 | 0.023 | 6 | +Z |
+| Spider | 8 | 0.02 | 0.048 × 0.034 | 0.045 | 4 | +Z |
+| Crab | 8 | 0.06 | 0.052 × 0.08 | 0.048 | 4 | +X |
+
+Legged defaults use 0.35 leg lengths of desired travel per cycle, 0.28 leg lengths of swing clearance, 4% stance
+extension, 0.8 friction and a torso ground radius of 0.25 leg lengths. Zero `tractionResponse` and
+`postureResponse` give passive spring legs. Zero `frequency` holds the configured pose phase. The solver derives
+mass-based stiffness and damping from world gravity if omitted. Body and feet coordinates are in SI units,
+Y up and +Z forward before applying heading.
+
+`read` returns the current COM, velocity, quaternion and angular momentum. `readContact` returns the most recent
+reaction force, stance couple, and link midpoint or foot position. For legged animals, the torso contact is the last
+row after the configured feet. For a snake, each row's axis points from tail toward head. Its link endpoints are
+the midpoint plus and minus half a link length along that axis. Consumers can read the versioned
+`GROUND_POSE_FIELD` and `GROUND_CONTACT_FIELD` directly through the world registry. Contact rows are grouped by
+body order and report the samples that produced the last substep. The entry fetches Wasm on `load`, and accepts
+an abort signal.

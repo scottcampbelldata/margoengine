@@ -10130,3 +10130,14 @@ and stiff non-flat grids. Layout-1 f64 fields expose thickness, crevasse depth, 
 and per-step releases. Real HYDRO-01 matches discharged melt volume. Identical full hashes cover
 plain/shared Wasm, frame-rate changes and snapshot replay. The wave-source fixture verifies only
 delivery of released volume to a registry reader. A SEA-06 impulse response needs its own solver.
+
+### Ground locomotion kernel (LIFE-02)
+
+The optional `@margoengine/physics/locomotion` Rust crate prepares gait geometry and applies grounded forces in
+two narrow exports per body. Both memory variants import the world's memory, use static slot 13 and lease an
+arena stack. Only profile construction and Bed sampling are in TypeScript. Linear contact work is measured by
+the configured number of links or feet plus torso, and each one gets its own sampled load.
+
+The Physics fixtures verify inextensible link closure, analytical slip force, a passive spring load, stance and
+swing wrenches, the live TerrainBed interface, deterministic replay after a snapshot, and the two memory variants
+after growth. The focused browser gate checks lazy loading, contact-driven motion and snapshot restoration.

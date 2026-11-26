@@ -13276,3 +13276,19 @@ field contracts.
 The tests derive the exact two-column backward-Euler update, the linear-slope Glen velocity, the Nye
 depth and its hydrostatic increment, and the closed mass balance. The HYDRO-01 fixture measures the actual
 flood inlet volume. A registry-only observer uses the source layout SEA-06 will consume.
+
+### Ground animal locomotion (LIFE-02)
+
+- David L. Hu, Jasmine Nirody, Terri Scott and Michael J. Shelley, [The mechanics of slithering locomotion](https://doi.org/10.1073/pnas.0812533106), 2009, Eq. (2), Eq. (3) and Fig. 1. Use one normalized ground-tangent slip vector for the fore/aft and lateral coefficients. A travelling tangent angle integrates the paper's travelling curvature and supplies an inextensible chain. The discrete midpoint velocities are recentered, and the angular update subtracts the shape angular momentum before integrating yaw. Spring-damper contact load accounts for the bed normal, and `slipSpeed` regularizes tangential slip at zero. The default cloth coefficients come from that experiment. Shape and material settings remain configurable.
+- Philip Holmes, Robert J. Full, Daniel Koditschek and John Guckenheimer, [The Dynamics of Legged Locomotion: Models, Analyses, and Challenges](https://doi.org/10.1137/S0036144504445133), 2006, §3 and Fig. 13. A massless spring leg acts on a loaded body only while in compression. Margo adds axial damping, a prescribed stance rest-length extension and actual terrain normals. Swing feet show the kinematic path and carry zero force.
+- Marc H. Raibert, Michael Chepponis and H. Benjamin Brown Jr., [Running on four legs as though they were one](https://publications.ri.cmu.edu/storage/publications/pub_files/pub3/raibert_m_h_1986_1/raibert_m_h_1986_1.pdf), 1986, Eqs. (2)–(6). Touchdown places the foot at predicted half-stance travel plus the velocity error correction. A grounded PD attitude response uses quaternion error. An active foot may generate shear as well as axial load, with each force and moment sharing the Coulomb budget `|F_t| + |M| / (leg length / 2) ≤ μF_n`. The support lever represents the stance footprint in this reduced model. The world integrates the sum of applied reactions and moments without imposing speed or orientation. Zero gains give passive axial spring contacts.
+- Claire T. Farley and T. Christine Ko, [Mechanics of locomotion in lizards](https://doi.org/10.1242/jeb.200.16.2177), 1997, measured a bouncing trot in two lizard species. Robert J. Full and Michael S. Tu, [Mechanics of six-legged runners](https://polypedal.berkeley.edu/publications/020_Full_TheMechanicsofSixLeggedRunners_JExpBiol_1990.pdf), 1990, Fig. 4, measured alternating insect tripods.
+- Joseph C. Spagna, Edgar A. Valdivia and Vivin Mohan, [Gait characteristics of two fast-running spider species](https://www.americanarachnology.org/journal-joa/joa-all-articles/article/download/arac-39-01-84.pdf/), 2011, measured alternating tetrapods. Reinhard Blickhan and Robert J. Full, [Locomotion energetics of the ghost crab: II](https://doi.org/10.1242/jeb.130.1.155), 1987, measured lateral running and spring-like whole-body motion.
+
+The Wasm regions use double-precision state, pinned sine and cosine and explicit semi-implicit Euler stepping on the
+world's dyadic clock. The fixed-rate bound considers contact-mode stiffness and damping, friction regularization,
+stance/swing sampling and controller response. The engine tests verify Eq. (2), spring reaction, the friction-wrench
+bound, link closure, frictionless motion, swing loads, alternating footholds, lateral crab motion, and plain/shared
+and snapshot replay. The coupling tests compare the published reaction to the actual flat and sloped TerrainBed
+fields. The animal templates reproduce the documented coordination patterns and physical loads. The default masses,
+geometry and controller gains describe a generic starting point for each gait.

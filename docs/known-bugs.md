@@ -16265,3 +16265,10 @@ Advance `GlacierSolver` with a submerged grounded front and its adjacent open-wa
 glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
 to convert the released ice volume and location into a water-source impulse, so the current
 registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.
+
+### Ground animal terrain and rig adapters (LIFE-02)
+
+The engine fixture covers the real TerrainBed-to-contact path. A ground animal placed on an overhang cannot
+reach the underside through a heightfield; its feet see the Bed surface. Supporting a climbing rig needs an
+arbitrary-surface collider field and articulated foot binding. The queue lists the shared contact and terrain
+geometry contract needed for independent impulse and animation consumers.

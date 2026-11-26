@@ -14058,6 +14058,10 @@
       "./glacier": {
         "raw": 7741,
         "gzip": 3519
+      },
+      "./locomotion": {
+        "raw": 15630,
+        "gzip": 6419
       }
     },
     "@margoengine/physics2d": {
@@ -17729,6 +17733,16 @@
       "raw": 6501,
       "gzip": 3628,
       "brotli": 3284
+    },
+    "packages/physics/dist/locomotion-kernel.wasm": {
+      "raw": 9037,
+      "gzip": 4134,
+      "brotli": 3750
+    },
+    "packages/physics/dist/locomotion-kernel-shared.wasm": {
+      "raw": 9125,
+      "gzip": 4196,
+      "brotli": 3803
     },
     "packages/physics/dist/pedestrian-kernel.wasm": {
       "raw": 12041,
