@@ -743,6 +743,26 @@ test.
   it to every mesh's `terrainSurface`. Errors now 1.10 and 0.66 (RTX A6000, Edge 158).
 - **Regression:** the test above (under 1.4 steps with ripples, under 0.3 without), in terrain's `test:gpu`.
 
+### Fixed 2026-11-26: a long multibody chain gained energy until it left the numbers (KB-PHYS-MBSYM1, physics kernel)
+
+- **Repro:** `packages/physics/kernel/tests/multibody_chain.rs`: a 1 m chain of 24 or 64 capsules of radius 1 cm on spherical
+  joints, held as one multibody from a fixed wall, released level under gravity. Before the fix the 24-link chain ran past
+  10^5 m/s within two seconds and the 64-link one was refused as past the numbers at step 19. From the public API, the same
+  happens with `physics.addMultibody` on 24 or more slender links.
+- **Cause:** the projection onto the joint space (`project_tree`, Featherstone's articulated-body pass written for impulses)
+  is exact only on symmetric inertias. Each link's rotational inertia was built a column at a time from f32 rotations, so it was
+  asymmetric in its last bits. The pass from the last link to the first (A - A S D^-1 S^T A, then P^T A P) keeps a symmetric
+  matrix symmetric, but it grows any asymmetry about 3.5 times a link. Near the root the rotational block was as asymmetric as
+  it was large, D = S^T A S stopped being the matrix of the least change of energy, and the "projection" put energy in: up to
+  60 % of the chain's kinetic energy in one step.
+- **Fix:** each link's inertia is built from its principal axes in doubles, each entry once and mirrored. D, each link's
+  articulated inertia and its transport to the parent are made symmetric (`symmetric`, the mean of each pair) at every link.
+  The pass is then the Schur complement of a symmetric positive definite matrix, which is stable. The replay hashes are
+  unchanged (no replay scene has a multibody).
+- **Regression:** `a_long_slender_chain_falls_with_no_more_energy_than_it_had`: 600 steps of 24 and 64 links. No link moves
+  faster than its share of the fall to hanging straight down allows, sqrt(2 (E0 - E_min) / m); the nearest reach 0.597 and
+  0.454 of it.
+
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in
