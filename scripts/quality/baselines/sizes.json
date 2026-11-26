@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20231177,
+  "total": 20234989,
   "history": [
     {
       "date": "2026-10-24",
@@ -12963,6 +12963,12 @@
       "commit": "35f1040045",
       "reason": "SEA-06 adds physics/tsunami at 6538 B gzip (cap 6794 B). Long-wave finite volumes, passive shoreline history and the two independent numerical queries are optional and load stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "52b406322",
+      "reason": "New optional post entry, 0 to 3,556 B gzip: trail (TrailTexture, a fading trail texture painted by motion). Its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13895,6 +13901,7 @@
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
+    "@margoengine/post/trail": 3812,
     "@margoengine/procedural": 18709,
     "@margoengine/procedural/building-plans": 17803,
     "@margoengine/procedural/building-rules": 13427,

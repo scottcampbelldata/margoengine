@@ -12327,6 +12327,15 @@ the overlay blend modes. DepthDownsample: single-sample reversed-Z source, outpu
 `'representative'` is the median of at most 4 x 4 texels of the footprint; reading the stack's resolved depth needs an
 order after 30. GPU cost of none of them measured.
 
+### Trail texture (`@margoengine/post/trail`, 2026-11-26)
+
+WebGPU and the WebGL2 layer. `size` 1 to the device's maxTextureDimension2D per side, fixed at construction;
+`rgba16float`, one value in all four channels. At most 4,096 stamps a frame (`TRAIL_MAX_STAMPS`); later ones that frame
+are dropped. `interpolate` caps the joining stamps at 256 per `move`, so a move longer than 128 radii is joined with
+wider spacing. Speed is the frame's whole path length over its delta, the same weight for every move of the frame.
+Texels below 1/1024 are set to 0 so the trail reaches black. Brushes are round in texels and drawn whole across the
+texture edge (no wrapping). GPU cost not measured.
+
 ## Playground
 
 The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2026-11-26:
