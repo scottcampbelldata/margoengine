@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19145882,
+  "total": 19146080,
   "history": [
     {
       "date": "2026-10-24",
@@ -12453,6 +12453,12 @@
       "commit": "954d88eca7",
       "reason": "FIRE-06 thermal JS grows from 4,054 B to 6,476 B gzip and its shared Wasm from 2,491 B to 5,056 B for the tetrahedral thermoelastic solve and its field API. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, exact per-voxel ray integration and GPU resource ownership. Splitting either entry would duplicate its shared loader or post-stack and depth handling. Core plus stage stays at 24,820 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e050200034",
+      "reason": "FIRE-06 adds an optional thermal entry at 6674 B gzip. Both SIMD builds are 5,120 B gzip and load on demand. The heat-haze entry grows from 11,008 B to 13299 B gzip for volume upload, voxel ray integration, depth handling and resource ownership. Splitting the thermal entry would duplicate the two build selectors. Splitting the heat-haze entry would duplicate its post-stack, depth and texture handling. Core plus stage stays at 24,820 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13256,7 +13262,7 @@
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
-    "@margoengine/physics/thermal": 6732,
+    "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 16490,
