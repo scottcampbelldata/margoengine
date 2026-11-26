@@ -14907,14 +14907,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a two-commit branch replays without running any git hook; a replay never
   overwrites an untracked file that main adds.
 
-### Open 2026-11-26: the selection outline of an instanced mesh marks its instances where its vertex shader did not move them (KB-SEL-INSTMOVE1, selection)
+### Fixed 2026-11-26: the selection outline of an instanced mesh marked its instances where its vertex shader did not move them (KB-SEL-INSTMOVE1, selection)
 
-- **Repro:** the scene of `packages/selection/test/instanced-move.browser.mjs`, then `Selection.attach(engine)` and
-  `selection.set([mesh])`: the outline mask is drawn at x = 0, not where the quads draw at x = 1.5.
-- **Cause:** `packages/selection/src/index.ts` `drawModels` marks gltf/pbr instanced primitives through `ModelDraws`
-  `addInstances` (CPU world matrices, unmoved vertices) and its `mark` filter keeps them out of `PickingPrimitives`,
-  which since KB-PICK-INSTMOVE1 draws instances with the colour pass's vertex move. A fix routes them through
-  `PickingPrimitives` with the mask, with a GPU check that the equal-depth mask matches the drawn instances.
+- **Repro:** the scene of `packages/selection/test/instanced-move.browser.mjs` (two instanced quads moved 1.5 units by
+  a material plugin), then `Selection.attach(engine).set([mesh])`: no outline where the quads draw, on WebGPU and the
+  WebGL2 layer (the equal-depth mask was drawn at the unmoved place, where no surface is).
+- **Cause:** `packages/selection/src/index.ts` `drawModels` marked gltf/pbr instanced primitives through `ModelDraws`
+  `addInstances` (CPU world matrices, unmoved vertices), and its `mark` filter kept them out of `PickingPrimitives`.
+- **Fix:** the filter and that branch are gone: gltf/pbr instanced primitives are marked by `PickingPrimitives` with the
+  mask, through the same instanced pick shader as GPU picking (`instancedDepth` after the vertex move,
+  KB-PICK-INSTMOVE1). `ModelDraws` keeps only models without gltf/pbr mesh sources.
+- **Regression:** `packages/selection/test/instanced-move.browser.mjs` (both back ends: outline pixels at both drawn
+  places, none at the unmoved places); `packages/selection/test/models.test.js` (the mask draws one instanced draw).
 
 ### Fixed 2026-11-26: GPU picking of an instanced mesh tested the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
 

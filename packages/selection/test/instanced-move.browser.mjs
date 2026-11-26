@@ -2,11 +2,14 @@
 // root after `npm run build:packages`:
 //   node packages/selection/test/instanced-move.browser.mjs            (both backends)
 //   MARGO_COMPAT=1 node packages/selection/test/instanced-move.browser.mjs   (the compatibility layer only)
-// GPU picking of an instanced mesh hits each instance where its instance transform and its material's vertex move draw
-// it, and misses where the instance would stand unmoved.
+// GPU picking and the selection outline of an instanced mesh find each instance where its instance transform and its
+// material's vertex move draw it, and nothing where the instance would stand unmoved.
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
+
+process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 
 for (const compat of compatRun() ? [true] : [false, true]) {
   const browser = await openBrowser({ port: 'free', compat }),
@@ -21,7 +24,7 @@ for (const compat of compatRun() ? [true] : [false, true]) {
       const { Engine } = await import('/packages/core/dist/index.js'),
         { UnlitMaterial, createInstancedMesh } = await import('/packages/materials/dist/index.js'),
         { materialPlugin } = await import('/packages/materials/dist/plugins.js'),
-        { Picking } = await import('/packages/selection/dist/index.js');
+        { Picking, Selection } = await import('/packages/selection/dist/index.js');
       const size = 256,
         half = 5 * Math.tan(Math.PI / 6),
         canvas = document.createElement('canvas');
@@ -68,6 +71,30 @@ for (const compat of compatRun() ? [true] : [false, true]) {
         unmovedUp: await pick(0, 1.5),
         unmovedDown: await pick(0, -1.5),
       };
+      // The outline marks the same places (KB-SEL-INSTMOVE1): magenta pixels within 0.7 of each place.
+      Selection.attach(engine, { color: [1, 0, 1], width: 3 }).set([mesh]);
+      await render();
+      engine.render({ delta: 1 / 60 });
+      const bitmap = await createImageBitmap(canvas),
+        copy = new OffscreenCanvas(size, size).getContext('2d');
+      copy.drawImage(bitmap, 0, 0);
+      const data = copy.getImageData(0, 0, size, size).data,
+        px = (x) => Math.round(((x / half + 1) * size) / 2),
+        outline = (x, y) => {
+          let n = 0;
+          for (let row = px(-y - 0.7); row < px(-y + 0.7); row++)
+            for (let col = px(x - 0.7); col < px(x + 0.7); col++) {
+              const k = (row * size + col) * 4;
+              if (data[k] > 200 && data[k + 1] < 60 && data[k + 2] > 200) n++;
+            }
+          return n;
+        };
+      result.outline = {
+        movedUp: outline(1.5, 1.5),
+        movedDown: outline(1.5, -1.5),
+        unmovedUp: outline(0, 1.5),
+        unmovedDown: outline(0, -1.5),
+      };
       engine.dispose();
       return result;
     });
@@ -77,9 +104,14 @@ for (const compat of compatRun() ? [true] : [false, true]) {
     assert.deepEqual(out.movedDown, { instanceId: 1, own: true }, `${leg}: instance 1 is picked where it is drawn`);
     assert.equal(out.unmovedUp, null, `${leg}: instance 0 is not picked where it would stand unmoved`);
     assert.equal(out.unmovedDown, null, `${leg}: instance 1 is not picked where it would stand unmoved`);
+    const o = out.outline;
+    assert.ok(o.movedUp > 20 && o.movedDown > 20, `${leg}: the outline covers both instances where they draw`);
+    assert.deepEqual([o.unmovedUp, o.unmovedDown], [0, 0], `${leg}: and nothing where they would stand unmoved`);
     assert.deepEqual(errors, [], `${leg}: page errors`);
   } finally {
     await browser.close();
   }
 }
-console.log('Instanced picking follows the instance transform and the vertex move on WebGPU and the WebGL2 layer.');
+console.log(
+  'Instanced picking and outlines follow the instance transform and the vertex move on WebGPU and the WebGL2 layer.',
+);
