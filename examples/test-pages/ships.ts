@@ -162,7 +162,8 @@ async function start() {
     applyShipSettings(wakes, SHIP_LOOKS.calmNight, splash);
     applyWaterSettings(sea, { windSpeed: 2 });
     await check('Calm night');
-    if (wakes.look.lampRoughness !== 0.06) console.warn('BUG: the calm night look did not set the lamp roughness');
+    if (wakes.look.lampRoughness !== SHIP_LOOKS.calmNight.lampRoughness)
+      console.warn('BUG: the calm night look did not set the lamp roughness');
   };
   button('btnStorm').onclick = async () => {
     applyShipSettings(wakes, SHIP_LOOKS.heavyWeather, splash);

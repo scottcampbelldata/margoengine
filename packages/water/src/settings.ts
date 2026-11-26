@@ -328,7 +328,7 @@ export const SHIP_SETTINGS: readonly ShipSetting[] = [
   sn('foamLife', 'foam', 40, 1, 600, 1, 's', "Seconds the turbulent wake's foam takes to fade to a third."),
   sn('turbulentWake', 'foam', 1, 0, 3, 0.01, '', 'Strength of the white propeller wash behind the stern: 0 none.'),
   followsWeather(
-    sn('lampRoughness', 'lamps', 0.2, 0.02, 1, 0.01, '', "Roughness of the lamps' glints: 0.05 a long thin glitter path on glassy water, 0.5 a wide smear. Null follows the Water's glitter, which follows the wind (Cox and Munk 1954)."),
+    sn('lampRoughness', 'lamps', 0.2, 0.02, 1, 0.01, '', "Roughness of the lamps' glints, perceptual like the Water's glitter (GGX alpha = roughness^2, widened by the waves' slope variance): 0.2 a long thin glitter path on glassy water, 0.7 a wide smear. Null follows the Water's glitter, which follows the wind (Cox and Munk 1954)."),
     'wind',
   ) as ShipSetting,
   sn('lampIntensity', 'lamps', 1, 0, 100, 0.01, '', "Multiplier of every lamp's intensity."),
@@ -346,7 +346,7 @@ export function shipSettingDefaults(): Record<string, number | null> {
 /** Named looks of ships, each only values of {@link SHIP_SETTINGS}. */
 export const SHIP_LOOKS = {
   /** A glassy harbour at night: long-lived wakes, little foam, sharp lamp paths. */
-  calmNight: { wakeLife: 600, foamLife: 60, turbulentWake: 0.6, lampRoughness: 0.06, lampIntensity: 2 },
+  calmNight: { wakeLife: 600, foamLife: 60, turbulentWake: 0.6, lampRoughness: 0.25, lampIntensity: 2 },
   /** A ship driving into a storm: short-lived wakes torn up by the sea, heavy foam and spray. */
   heavyWeather: { wakeLife: 30, wakeHeight: 1.2, waterlineFoam: 2, turbulentWake: 1.5, sprayRate: 6000, slamBurst: 1200 },
 } as const satisfies Record<string, ShipSettingValues>;
