@@ -10059,3 +10059,13 @@ HYDRO-03 shear and root pressure alter mechanical thresholds. The bed applies ea
 The fixtures compare the numerical step against the closed-form incision and pair-diffusion solutions, measure
 sediment sorting and conservation, replay both memory modes, and read the updated heightfield of a live rigid collider.
 The biome adapter samples the same bed triangles when preparing a geological snapshot for terrain rendering.
+
+## Utility post passes (section 5 evidence, 2026-11-25)
+
+`KawaseBlur`, `LUT1D`, `ColorAverage` and `DepthDownsample` are optional post entries; core and stage unchanged. All four
+use fragment passes only, so the WebGL2 layer runs the same shaders. KawaseBlur keeps its pyramid in the effect's own
+targets, one index range per view, and clamps the first pass to the view's rectangle, so split screens do not bleed.
+Evidence: `packages/post/test/utility-passes-browser.mjs` on WebGPU and the WebGL2 layer
+(blur spread and monotone edge, split-screen isolation, pixel-exact formulas for ColorAverage and LUT1D within one level,
+DepthDownsample texels and normals equal to a CPU reduction in all four modes for 2 x 2 and uneven footprints), and
+`utility-passes.test.js`. Missing: GPU timings, and a visual comparison of the blur against a large Gaussian.

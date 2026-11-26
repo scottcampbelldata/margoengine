@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19358136,
+  "total": 19392223,
   "history": [
     {
       "date": "2026-10-24",
@@ -12645,6 +12645,12 @@
       "commit": "7a5fc90bc",
       "reason": "New optional entry @margoengine/xr/body (BodyTracking, 83 WebXR body joints, soft feature detection, humanoid bone mapping); no core change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "lane-a",
+      "reason": "New optional post entries, 0 to measured B gzip: kawase-blur 8,504, color-average 8,036, lut1d 9,717 (each carries the PostStack; color-average and lut1d reuse the overlay composite for blend modes and masks), depth-downsample 6,770 (carries its DepthTexture capture). Separate entries so an app loads only the pass it imports. Core plus stage unchanged.",
+      "grew": 4
     }
   ],
   "items": {
@@ -13507,18 +13513,22 @@
     "@margoengine/post/bloom": 8379,
     "@margoengine/post/blur": 8532,
     "@margoengine/post/caustics": 11810,
+    "@margoengine/post/color-average": 8292,
     "@margoengine/post/contact-shadows": 8001,
     "@margoengine/post/curvature": 10677,
     "@margoengine/post/decals": 5995,
     "@margoengine/post/depth": 4763,
+    "@margoengine/post/depth-downsample": 7026,
     "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 7455,
     "@margoengine/post/gtao": 14241,
     "@margoengine/post/halftone": 7290,
     "@margoengine/post/heat-haze": 13698,
     "@margoengine/post/image": 14412,
+    "@margoengine/post/kawase-blur": 8760,
     "@margoengine/post/lens": 8456,
     "@margoengine/post/lens-flare": 9203,
+    "@margoengine/post/lut1d": 10009,
     "@margoengine/post/mask": 7322,
     "@margoengine/post/material-decals": 10327,
     "@margoengine/post/motion-blur": 9318,

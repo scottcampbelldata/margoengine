@@ -1597,6 +1597,133 @@ Every effect takes these:
   `engine.onError` (`'state'`, `#borrowed-lost`), and `label.setSource(texture)` with a texture of the new device brings
   it back. A `() => texture` source is read every frame, and an `ImageBitmap` is uploaded again by itself.
 
+## Utility passes: `KawaseBlur`, `LUT1D`, `ColorAverage`, `DepthDownsample`
+
+Four small passes, each its own entry: a wide blur on a small pyramid, a one-dimensional lookup table, a fast
+greyscale and a lower-resolution copy of the scene depth.
+
+### Dual-filter and Kawase blur: `KawaseBlur`
+
+`@margoengine/post/kawase-blur` (8,504 B min+gzip, its own entry; it carries the stack) blurs the frame widely for
+a fraction of a large Gaussian's cost: frosted glass, soft backgrounds, haze. An HDR `PostStack` effect, so it goes
+before a `Tonemap`.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {KawaseBlur} from 'margoengine/post/kawase-blur';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const blur = new KawaseBlur({levels: 4});
+PostStack.attach(stage.engine, [blur, new Tonemap()]);
+blur.options.strength = 0.5; // options are read every frame
+Object.assign(blur.options, {method: 'kawase', size: 'large', resolutionScale: 0.25});
+stage.engine.render();
+const small = blur.texture; // the blurred image at reduced size (rgba16float), for your own passes
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `method` | `'dual'` | `'dual'`: halvings then doublings. `'kawase'`: repeated four-tap passes at one size |
+| `levels` | `3` | Dual: halvings, 1 to 8; each roughly doubles the width |
+| `size` | `'medium'` | Kawase: `'very-small'`, `'small'`, `'medium'`, `'large'`, `'very-large'`, `'huge'` (sigma about 1, 4, 10, 20, 66 and 101 texels of the working size; `KAWASE_KERNELS` lists the passes) |
+| `offsets` | none | Kawase: your own passes, 1 to 32 offsets of 0 to 64 texels, in place of `size` |
+| `scale` | `1` | Factor on every tap offset, 0 to 8; far above 1 shows a pattern |
+| `resolutionScale` | `0.5` | Kawase: working size as a share of the view, 0.0625 to 1 |
+| `strength` | `1` | Share of the blurred frame mixed over the sharp one, 0 to 1; 0 passes the frame |
+| `enabled` | `true` | False passes frames through |
+
+- **Method.** `'dual'` is the dual filter of M. Bjorge, "Bandwidth-Efficient Rendering", SIGGRAPH 2015: five taps a
+  halving, eight a doubling. `'kawase'` is M. Kawase, "Frame Buffer Postprocessing Effects in DOUBLE-S.T.E.A.L
+  (Wreckless)", GDC 2003: four bilinear taps k + 0.5 texels out each pass; below `resolutionScale` 0.5 the frame is
+  halved first, so no texel is skipped. Each view of a split screen blurs on its own.
+- **Limits.** The blur is not an exact Gaussian; very small bright points can flicker at low resolution. GPU cost not
+  measured. WebGPU and the WebGL2 layer.
+
+### One-dimensional LUT: `LUT1D`
+
+`@margoengine/post/lut1d` (9,717 B min+gzip, its own entry; it carries the stack) looks each channel up in a curve:
+film and gamma curves from a 1D `.cube` file, an array or a texture. An LDR `PostStack` effect on display values.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {LUT1D, parseCube1D} from 'margoengine/post/lut1d';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const warm = `LUT_1D_SIZE 3
+0 0 0
+0.56 0.5 0.44
+1 0.98 0.92`;
+const lut = new LUT1D({lut: warm});
+PostStack.attach(stage.engine, [lut]);
+lut.setLUT({data: [1, 1, 1, 0, 0, 0]}); // two entries: an inversion
+lut.setLUT(parseCube1D(warm));
+lut.options.opacity = 0.8;
+stage.engine.render();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `lut` | required | `.cube` text with `LUT_1D_SIZE` (`TITLE`, `DOMAIN_MIN`, `DOMAIN_MAX`, comments), `{data, domainMin, domainMax}` (three numbers an entry; domain `[0, 0, 0]` to `[1, 1, 1]`), a linear-format `GPUTexture` read row by row, or `() => texture` |
+| `blend`, `opacity`, `mask`, `maskRange`, `enabled` | `'normal'`, `1`, `'none'`, by mask, `true` | As on the overlay effects below |
+
+- 2 to 65536 entries, linear interpolation between them (J. Selan, "Using Lookup Tables to Accelerate Color
+  Transformations", GPU Gems 2, 2005; the text format is the 1D table of Adobe's Cube LUT Specification 1.0, 2013).
+  Strings and arrays are read when a new object is handed in. A `GPUTexture` belongs to the device it was made on
+  (docs/conventions.md, "Borrowed GPU objects"). For 3D LUTs use `Tonemap.setLUT`.
+
+### Colour average: `ColorAverage`
+
+`@margoengine/post/color-average` (8,036 B min+gzip, its own entry; it carries the stack) turns each pixel into
+the average of its channels. An LDR `PostStack` effect with the same `blend`, `opacity`, `mask`, `maskRange` and
+`enabled` as the overlay effects.
+
+```ts
+import {createStage} from 'margoengine';
+import {ColorAverage} from 'margoengine/post/color-average';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box({color: '#c08040'});
+const grey = ColorAverage.attach(stage.engine, {opacity: 0.7});
+grey.options.weights = [0.2126, 0.7152, 0.0722]; // Rec. 709 luma; default [1, 1, 1]
+stage.engine.render();
+```
+
+### Depth downsampling: `DepthDownsample`
+
+`@margoengine/post/depth-downsample` (6,770 B min+gzip, its own entry) writes the scene depth, and optionally
+normals, at a lower resolution, for half-resolution ambient occlusion, fog, soft particles and depth-aware
+upsampling. A plugin, not a stack effect: it makes textures.
+
+```ts
+import {createStage} from 'margoengine';
+import {DepthDownsample} from 'margoengine/post/depth-downsample';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+stage.box();
+const half = DepthDownsample.attach(stage.engine, {mode: 'checkerboard'});
+half.onResize(() => console.log('new textures', half.texture?.width, half.texture?.height));
+stage.engine.render();
+const depth = half.texture; // r32float, reversed Z (1 near, 0 empty): textureLoad it in your pass or material
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `depth` | own capture | `() => texture`: a single-sample depth or `r32float` source, reversed Z |
+| `normal` | none | `() => texture`: normals of any size; the kept texel's normal goes to `normalTexture` (`rgba16float`) |
+| `scale` | `0.5` | Output size as a share of the source, 0.0625 to 1 |
+| `width`, `height` | from `scale` | Output texels, from 1/16 of the source up to it |
+| `mode` | `'representative'` | `'representative'` (median depth), `'near'`, `'far'`, `'checkerboard'` (near and far on alternate texels) |
+| `order` | `-4` | Frame-graph order, read at attachment. The default runs before the main pass, after its own capture |
+| `enabled` | `true` | False writes nothing |
+
+- Each texel keeps one source depth of its footprint, never a blend. `'representative'` takes the median of up to
+  4 x 4 texels spread over the footprint; the other modes read all of it. Reductions after Greene, Kass and Miller,
+  "Hierarchical Z-Buffer Visibility", SIGGRAPH 1993, and Bavoil and Andersson, "Stable SSAO in Battlefield 3 with
+  Selective Temporal Filtering", GDC 2012.
+- With its own capture, add gltf/pbr models and materials meshes with `half.add(model)`. A `depth` drawn later in the
+  frame (such as `PostStack`'s `depthTexture`, resolved at order 30) needs a later `order`, or it is a frame old.
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

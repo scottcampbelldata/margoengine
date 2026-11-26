@@ -1623,6 +1623,22 @@
       "types": "./dist/post/overlays.d.ts",
       "import": "./dist/post/overlays.js"
     },
+    "./post/kawase-blur": {
+      "types": "./dist/post/kawase-blur.d.ts",
+      "import": "./dist/post/kawase-blur.js"
+    },
+    "./post/color-average": {
+      "types": "./dist/post/color-average.d.ts",
+      "import": "./dist/post/color-average.js"
+    },
+    "./post/lut1d": {
+      "types": "./dist/post/lut1d.d.ts",
+      "import": "./dist/post/lut1d.js"
+    },
+    "./post/depth-downsample": {
+      "types": "./dist/post/depth-downsample.d.ts",
+      "import": "./dist/post/depth-downsample.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

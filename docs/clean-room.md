@@ -12982,3 +12982,32 @@ uses the two support radii along the line separating body centres. No companion 
 The Rust and TypeScript implementation follows the equations and this repository's terrain and registry contracts.
 The coupling tests cover the implicit result, exact face diffusion, rainfall and sediment balances, the linked
 sediment shear field, the rigid heightfield and deterministic playback.
+
+## Utility post passes: Kawase and dual-filter blur, 1D LUT, colour average, depth downsampling (2026-11-25)
+
+`@margoengine/post/kawase-blur`, `lut1d`, `color-average` and `depth-downsample`. Feature names and options were compared
+with the public API documentation pages of pmndrs postprocessing (KawaseBlurPass, KawaseBlurMaterial, KernelSize,
+MipmapBlurPass, LUT1DEffect, ColorAverageEffect, DepthDownsamplingPass,
+https://pmndrs.github.io/postprocessing/public/docs/); no source of it was read.
+
+Research compared:
+- Masaki Kawase, *Frame Buffer Postprocessing Effects in DOUBLE-S.T.E.A.L (Wreckless)*, GDC 2003. Used: four bilinear
+  taps k + 0.5 texels out per pass. The preset offset lists are Margo's, chosen by the variance each pass adds,
+  (k^2 + (k + 1)^2) / 2 per axis, to match a Gaussian of sigma = kernel width / 6 (checked by a unit test).
+- Marius Bjorge, *Bandwidth-Efficient Rendering*, SIGGRAPH 2015 course "Moving Mobile Graphics". Used: the dual filter
+  (five-tap halving, eight-tap doubling).
+- Jorge Jimenez, *Next Generation Post Processing in Call of Duty: Advanced Warfare*, SIGGRAPH 2014 (13-tap pyramid;
+  Margo's Bloom already uses it; heavier than a plain blur needs).
+- Filip Strugar, *An Investigation of Fast Real-Time GPU-Based Image Blur Algorithms*, Intel, 2014 (compares Gaussian,
+  Kawase and compute blurs by quality and cost).
+- Jeremy Selan, *Using Lookup Tables to Accelerate Color Transformations*, GPU Gems 2, 2005, chapter 24,
+  https://developer.nvidia.com/gpugems/gpugems2/part-iii-high-quality-rendering/chapter-24-using-lookup-tables-accelerate-color
+  and Adobe, *Cube LUT Specification* 1.0, 2013 (the 1D table text format).
+- Rafael Gonzalez and Richard Woods, *Digital Image Processing*, ch. 6 (intensity as the channel mean).
+- Ned Greene, Michael Kass and Gavin Miller, *Hierarchical Z-Buffer Visibility*, SIGGRAPH 1993,
+  https://doi.org/10.1145/166117.166147 (conservative depth reductions); Louis Bavoil and Johan Andersson, *Stable SSAO
+  in Battlefield 3 with Selective Temporal Filtering*, GDC 2012 (alternating min and max); Johannes Kopf, Michael Cohen,
+  Dani Lischinski and Matt Uyttendaele, *Joint Bilateral Upsampling*, SIGGRAPH 2007,
+  https://doi.org/10.1145/1276377.1276497 (what a low-resolution depth guides). The median choice of the representative
+  mode is Margo's: the median is one of the samples, unchanged by the nonlinear depth encoding, and lies on the surface
+  covering most of the footprint.
