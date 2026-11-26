@@ -15057,6 +15057,9 @@ transfer through the live rigid coupling. [Yob et al. (2016)](https://doi.org/10
   films” (1997), equations 2.25–2.30. Substrate-normal gravity and surface tension give the
   reduced pressure. Through-depth integration yields pressure mobility
   `(h³/3 + βh²)/μ` and shear mobility `(h²/2 + βh)/μ` for Navier slip length β.
+  The normal momentum balance in §II.A gives the hydrostatic wall load `ρ (g · n) h`.
+  Integrating the pressure and its first moment over the cells gives the net load and torque
+  about the rigid body's centre of mass.
   [Journal](https://doi.org/10.1103/RevModPhys.69.931) · [Paper](https://www.tmfcr.cz/39/pdf/04-oron.pdf)
 - Leonard W. Schwartz and Richard R. Eley, “Simulation of Droplet Motion on Low-Energy and
   Heterogeneous Surfaces” (1998). Add pressure `A (r² − r³)` for the resolved precursor, where
