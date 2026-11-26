@@ -577,6 +577,10 @@
       "status": "ruled",
       "source": "packages/materials/src/node-types.ts"
     },
+    "materials:Portal.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
     "materials:Texture.source": {
       "status": "ruled",
       "source": "packages/materials/src/built-material.ts"
@@ -668,6 +672,10 @@
     "post:MotionVectors.texture": {
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:RenderGraphTexture.view": {
+      "status": "exempt",
+      "reason": "a per-frame record: a task or RenderGraph replace(slot, view) hands the view for this frame only; the graph keeps it in its frame views and keys bind groups in a WeakMap, so nothing holds it past the frame (rule 6)"
     },
     "post:SceneTarget.color": {
       "status": "exempt",
