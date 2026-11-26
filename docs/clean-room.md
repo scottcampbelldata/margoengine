@@ -11516,6 +11516,20 @@ Written from:
 - Standard gravity 9.80665 m/s^2: the value fixed by the 3rd CGPM (1901) and ISO 80000-3.
 
 Proof: `packages/physics/tests/world.test.js`.
+### Wakes (`WakeSolver`, `@margoengine/physics/sea`, 2026-11-25, SEA-04)
+
+`packages/physics/src/sea/wake.ts` is written from:
+
+- J. Tessendorf, "Simulating Ocean Water", course notes, 1999-2004, read pages 3-4 to 3-15: the linearised potential flow
+  with the pressure kept in the Bernoulli equation (eq. 14), the surface's vertical velocity as an operator on the surface
+  potential (eqs. 19 and 21), and iWave's operator g sqrt(-grad^2) and its finite-depth form with tanh (eqs. 50 to 52).
+  iWave's own numerical kernel is in Tessendorf's "Interactive Water Surfaces" (Game Programming Gems 4, 2004), which was
+  not read; the operator is applied here where it is exact instead, by the shared FFT, and each mode's step is the exact
+  solution of the two linear equations derived here (in the file's header).
+- M. Rabaud and F. Moisy, "Ship wakes: Kelvin or Mach angle?", Physical Review Letters 110, 214503 (2013), arXiv:1304.2653,
+  read (arXiv v1): the wake's angle of largest amplitude is Kelvin's asin(1/3) for Froude numbers up to
+  sqrt(3 / (4 pi)) = 0.49 and narrows above it (their eqs. 3a, 3b and 4). The test of the Kelvin wedge runs at 0.37.
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:

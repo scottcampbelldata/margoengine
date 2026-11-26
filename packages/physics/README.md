@@ -2090,6 +2090,36 @@ console.log(sea.water.sample(10, 6, 0, 3.5).density); // 0: no water 6 m above t
 console.log(sea.pressure(10, -20, 0, 3.5) > 1025 * 9.81 * 19); // true: about 20 m of water above
 ```
 
+### Wakes: the water a hull pushes (`WakeSolver`, `@margoengine/physics/sea`)
+
+`WakeSolver` is SEA-04: the local free surface a hull disturbs, on a grid around the ship, stepped by the world. Each
+Fourier mode of the surface is advanced exactly over a step, with the finite-depth dispersion of water waves (omega^2 =
+g k tanh(k D)), driven by the pressure and displaced volume its `sources` put on the water at each step's time (a hull's
+weight over its waterplane as `SeaSource`s). So the wake's shape comes from the physics alone: transverse waves 2 pi U^2 / g
+long behind a hull at speed U, inside the Kelvin wedge at a Froude number under about 0.5, narrowing at higher ones as
+Rabaud and Moisy (2013) observed. A border of `sponge` cells absorbs what reaches the edge. Its height and potential are
+world state (snapshot, restore, hash). `sample(x, z)` gives the wake's height, slope and surface velocity; pass the solver
+to `SpectralSea` as one of its `patches` and the sea's `sample`, `elevation` and `pressure` carry it, so a hull floats on
+its own wake and on the ships around it.
+
+```ts
+import {SpectralSea, WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const wake = new WakeSolver();
+const world = new PhysicsWorld({rate: {num: 30, den: 1}}).add(wake, {
+  cells: [128, 64],
+  cellSize: 1,
+  // A hull 12 m long at 4 m/s: 0.3 m of water's weight on its waterplane.
+  sources: (t) => [{x: -40 + 4 * t, z: 0, radius: 6, pressure: 1025 * 9.81 * 0.3, volume: 0}],
+});
+world.advance(10 * 30); // ten seconds
+console.log(wake.sample(-10, 0).height !== 0); // true: the wake behind the hull
+const spectrum = {frequencies: Float64Array.from([0.1, 0.2]), directions: Float64Array.from([0, Math.PI]), energy: new Float64Array(4), depth: Infinity, density: 1025};
+const sea = new SpectralSea({waves: spectrum, patches: [wake]});
+console.log(sea.elevation(-10, 0, 10) === wake.sample(-10, 0).height); // true: a calm sea carries the wake
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.

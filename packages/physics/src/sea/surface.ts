@@ -61,6 +61,21 @@ export interface SpectralSeaOptions {
   gravity?: number;
   /** The water's temperature, K, when no current gives one (default 288.15). */
   temperature?: number;
+  /**
+   * Local surfaces added to the waves: a hull's wake ({@link WakeSolver}), or anything that samples a height, slope and
+   * surface velocity at a point (default none). They add to `sample`, `elevation` and `pressure`; the water below the
+   * surface does not see them (their motion at depth is not modelled).
+   */
+  patches?: readonly SeaPatch[];
+}
+
+/** A local surface a sea adds to its waves (`SpectralSea` `patches`): a wake, a splash field. */
+export interface SeaPatch {
+  sample(
+    x: number,
+    z: number,
+    out?: { height: number; slope: [number, number]; velocity: [number, number, number] },
+  ): { height: number; slope: [number, number]; velocity: [number, number, number] };
 }
 
 const isField = (waves: WaveSpectrumField | WaveSpectrumSample): waves is WaveSpectrumField =>
@@ -99,6 +114,12 @@ export class SpectralSea implements SeaSurface {
   private depth = Infinity;
   private waterDensity = 0;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  private readonly patches: readonly SeaPatch[];
+  private readonly local = {
+    height: 0,
+    slope: [0, 0] as [number, number],
+    velocity: [0, 0, 0] as [number, number, number],
+  };
 
   /**
    * @throws TypeError for waves that are neither a spectrum field nor a spectrum; RangeError for a spectrum whose energy
@@ -112,17 +133,24 @@ export class SpectralSea implements SeaSurface {
       current,
       gravity = gravityMagnitude(DEFAULT_GRAVITY),
       temperature = 288.15,
+      patches = [],
     } = options ?? ({} as never);
     if (!waves || typeof waves !== 'object')
       throw new TypeError('A sea needs its waves: a WaveSpectrumField or a spectrum.');
     if (!(gravity > 0 && Number.isFinite(gravity)))
-      throw new RangeError(`Gravity is a finite number above 0 (got ${gravity}); pass m/s^2 such as 9.81, or leave it out for the world's gravity.`);
+      throw new RangeError(
+        `Gravity is a finite number above 0 (got ${gravity}); pass m/s^2 such as 9.81, or leave it out for the world's gravity.`,
+      );
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
-      throw new RangeError(`A sea's seed is a whole number from 0 to 2^32 - 1 (got ${seed}); pass an integer seed in that range.`);
+      throw new RangeError(
+        `A sea's seed is a whole number from 0 to 2^32 - 1 (got ${seed}); pass an integer seed in that range.`,
+      );
     if (!(Number.isFinite(at?.[0]) && Number.isFinite(at?.[1])))
       throw new RangeError('A sea reads its spectrum at a finite [x, z]; pass `at`.');
     if (!(temperature > 0 && Number.isFinite(temperature)))
-      throw new RangeError(`A water temperature is finite kelvin above 0 (got ${temperature}); pass kelvin such as 288.15 (15 C).`);
+      throw new RangeError(
+        `A water temperature is finite kelvin above 0 (got ${temperature}); pass kelvin such as 288.15 (15 C).`,
+      );
     if (current !== undefined && (typeof current.sample !== 'function' || current.medium !== 'water'))
       throw new TypeError('A current is a flow field of water (medium "water"); pass one, or none.');
     this.waves = waves;
@@ -131,6 +159,9 @@ export class SpectralSea implements SeaSurface {
     this.current = current;
     this.g = gravity;
     this.temperature = temperature;
+    if (!Array.isArray(patches) || patches.some((p) => typeof p?.sample !== 'function'))
+      throw new TypeError("A sea's patches are surfaces with sample(x, z); pass WakeSolvers or none.");
+    this.patches = patches;
     this.cell = isField(waves) ? waves.cell : [0, 0, 0];
     const sea = this;
     this.water = {
@@ -161,6 +192,7 @@ export class SpectralSea implements SeaSurface {
     let h = 0;
     for (let n = 0; n < this.count; n++)
       h += this.amp[n]! * cos(this.kx[n]! * x + this.kz[n]! * z - this.omega[n]! * t + this.phase[n]!);
+    for (const patch of this.patches) h += patch.sample(x, z, this.local).height;
     return h;
   }
 
@@ -183,8 +215,12 @@ export class SpectralSea implements SeaSurface {
         : (exp(k * level) + exp(-k * (level + 2 * this.depth))) / (1 + exp(-2 * k * this.depth));
       dynamic += this.amp[n]! * factor * c;
     }
-    if (y >= h) return 0;
-    return this.waterDensity * this.g * (dynamic - y);
+    // A patch (a wake) raises the surface over the point: its height adds to the pressure as water above, the first order
+    // of its own dynamic pressure at depths small next to its wavelengths.
+    let local = 0;
+    for (const patch of this.patches) local += patch.sample(x, z, this.local).height;
+    if (y >= h + local) return 0;
+    return this.waterDensity * this.g * (dynamic + local - y);
   }
 
   /**
@@ -282,6 +318,15 @@ export class SpectralSea implements SeaSurface {
       ux += horizontal * kx;
       uz += horizontal * kz;
       w += a * om * sn;
+    }
+    for (const patch of this.patches) {
+      const l = patch.sample(x, z, this.local);
+      h += l.height;
+      dx += l.slope[0];
+      dz += l.slope[1];
+      ux += l.velocity[0];
+      w += l.velocity[1];
+      uz += l.velocity[2];
     }
     const length = Math.sqrt(dx * dx + 1 + dz * dz);
     s.height = h;

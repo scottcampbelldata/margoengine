@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19352058,
+  "total": 19355880,
   "history": [
     {
       "date": "2026-10-24",
@@ -12627,6 +12627,12 @@
       "commit": "b2a7491a6",
       "reason": "physics/foam is a new optional entry (SEA-13): FoamSolver, whitecaps from the ST4 spectrum's breaking statistics drawn as events, foam carried by the surface drift and windrows, ship wakes, and the spray source functions; its own entry so scenes without foam pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "feat(physics) wakes",
+      "reason": "WakeSolver (SEA-04) joins the physics/sea entry beside SpectralSea and its patches: budget 3,437 to 7,259, measured before and after on this Mac. The wake is the sea's own local surface and SpectralSea carries it, so they share the entry; a bundler drops the solver from an app that imports only SpectralSea, and a separate entry would only add an import.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13434,6 +13440,7 @@
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
+    "@margoengine/physics/foam": 8022,
     "@margoengine/physics/hydro": 6980,
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/landscape": 4603,
@@ -13444,7 +13451,7 @@
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
-    "@margoengine/physics/sea": 3437,
+    "@margoengine/physics/sea": 7259,
     "@margoengine/physics/seakeeping": 10371,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,
@@ -14488,7 +14495,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/foam": 8022
+    "margoengine/web": 577
   }
 }
