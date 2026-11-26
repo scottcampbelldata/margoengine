@@ -295,6 +295,7 @@ await postBrowser(
             } catch (e) {
               warm = String(e.message);
             }
+            // fixed-wait: draw four reference warm frames after shader readiness, before detaching features.
             for (let k = 0; k < 4; k++) await frame();
             const detach = { bounce, localShadows: local, shadows, ibl: lighting };
             window.compatUnits = {

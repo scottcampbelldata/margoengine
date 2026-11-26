@@ -118,7 +118,7 @@ void main() {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     const px = new Uint8Array(4);
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    // A crashed GPU process is seen by the page a little later: wait, then ask again.
+    // fixed-wait: allow a delayed GPU-process crash to reach the page during the observation window.
     await new Promise((r) => setTimeout(r, 1000));
     return {
       renderer,

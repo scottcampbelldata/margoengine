@@ -69,7 +69,7 @@ try {
     let rejected = null;
     const asyncPipeline = await device.createRenderPipelineAsync(descriptor).catch((e) => (rejected = e.message));
     const lost = await Promise.race([device.lost, new Promise((r) => setTimeout(() => r(null), 5000))]);
-    // A task for any error the layer would dispatch.
+    // fixed-wait: observe any delayed uncaptured-error task after the device has reported its loss.
     await new Promise((r) => setTimeout(r, 50));
     canvas.remove();
     return {
