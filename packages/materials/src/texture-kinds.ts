@@ -4,6 +4,7 @@
 // these to allocate, upload and convert.
 import { MargoError } from '@margoengine/math/errors';
 import { P3_TO_SRGB } from '@margoengine/math/color';
+import { f16Bits } from '../../shared/f16.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
@@ -111,31 +112,11 @@ export function validateData(s: DataImage, dimension: TextureDimension): { forma
     );
   return { format, depth };
 }
-const halfScratch = new Float32Array(1),
-  halfBits = new Uint32Array(halfScratch.buffer);
 /** IEEE 754 binary16 bits of `value`, rounded to nearest even; overflow becomes infinity, NaN stays NaN. */
 export function toHalf(value: number): number {
-  halfScratch[0] = value;
-  const x = halfBits[0],
-    sign = (x >>> 16) & 0x8000,
-    exponent = (x >>> 23) & 0xff,
-    mantissa = x & 0x7fffff;
-  if (exponent === 0xff) return sign | 0x7c00 | (mantissa ? 0x200 : 0);
-  const e = exponent - 127 + 15;
-  if (e >= 31) return sign | 0x7c00;
-  if (e <= 0) {
-    if (e < -10) return sign;
-    const m = mantissa | 0x800000,
-      shift = 14 - e,
-      half = m >>> shift,
-      rest = m & ((1 << shift) - 1),
-      mid = 1 << (shift - 1);
-    return sign | (half + +(rest > mid || (rest === mid && (half & 1) === 1)));
-  }
-  const half = (e << 10) | (mantissa >>> 13),
-    rest = mantissa & 0x1fff;
-  return sign | (half + +(rest > 0x1000 || (rest === 0x1000 && (half & 1) === 1)));
+  return f16Bits(value);
 }
+
 /**
  * binary16 bits of every value in `data`, rounded to nearest even like {@link toHalf}. Uses the built-in
  * `Float16Array` bulk conversion where the runtime has it (same IEEE rounding), else a plain loop; never the

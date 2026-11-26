@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openTIFF, parseTIFF } from '../dist/tiff.js';
 import { failed, image, lzwEncode, rejects, rgbaOf, sequence, tiff } from './support/texture-encoders.js';
+import { f16Bits } from '../../shared/f16.js';
 
 const COMPRESSIONS = [1, 5, 32773, 8, 32946],
   LAYOUTS = [{ rowsPerStrip: 3 }, { rowsPerStrip: 1000 }, { tile: [16, 16] }],
@@ -642,7 +643,8 @@ test('TIFF 16, 32 and 64-bit float with the floating point predictor (Predictor 
         { length: width * height * spp },
         (_, i) => [0.5, -1.25, 3.75, 0.125, 1024, 0, -0.0625, 2][i % 8] * (1 + (i % 3)),
       ),
-    exact = (bits, v) => (bits === 16 ? Math.f16round(v) : bits === 32 ? Math.fround(v) : v);
+    // Every value above is exact in binary16, so only binary32 rounds (Node 22 has no Math.f16round).
+    exact = (bits, v) => (bits === 32 ? Math.fround(v) : v);
   for (const bits of [16, 32, 64])
     for (const little of [true, false])
       for (const [spp, photometric] of [
@@ -684,4 +686,63 @@ test('TIFF 16, 32 and 64-bit float with the floating point predictor (Predictor 
                 label,
               );
             }
+});
+
+// KB-NODE22-HALF1: Node 22 has no DataView.getFloat16, setFloat16 or Math.f16round, so the reader, the shared encoder
+// and the test writer must work without them. Where the runtime has them, they are the reference.
+test('TIFF half floats and the binary16 encoder need no built-in float16, and match it where it exists', (t) => {
+  const { getFloat16, setFloat16 } = DataView.prototype,
+    f16round = Math.f16round;
+  t.after(() => {
+    if (getFloat16) Object.assign(DataView.prototype, { getFloat16, setFloat16 });
+    if (f16round) Math.f16round = f16round;
+  });
+  delete DataView.prototype.getFloat16;
+  delete DataView.prototype.setFloat16;
+  delete Math.f16round;
+
+  // Every binary16 pattern as one 256 x 256 image: signed zeros, subnormals, normals, infinities and NaNs.
+  const patterns = Uint16Array.from({ length: 65536 }, (_, i) => i),
+    shape = { width: 256, height: 256, spp: 1, bits: 16, float: true, photometric: 1 },
+    file = tiff({ ...shape, rowsPerStrip: 256, samples: [], raw: [new Uint8Array(patterns.buffer)] }),
+    { samples } = openTIFF(file).read(0),
+    native = new DataView(patterns.buffer),
+    nan = (bits) => (bits & 0x7fff) > 0x7c00;
+  for (let h = 0; h < 65536; h++) {
+    const v = samples[h];
+    if (nan(h)) assert.ok(Number.isNaN(v) && nan(f16Bits(v)), `NaN ${h}`);
+    else assert.equal(f16Bits(v), h, `pattern ${h}`);
+    if (getFloat16) assert.ok(Object.is(v, getFloat16.call(native, h * 2, true)), `native decode ${h}`);
+  }
+
+  // Ties go to the even pattern; a number just either side of a tie, closer than binary32 can tell, does not.
+  const scratch = new DataView(new ArrayBuffer(2)),
+    encodes = (value, bits) => {
+      assert.equal(f16Bits(value), bits, `${value}`);
+      if (!setFloat16) return;
+      setFloat16.call(scratch, 0, value);
+      assert.equal(scratch.getUint16(0), bits, `native encode ${value}`);
+    };
+  for (let h = 0; h < 0x7c00; h++) {
+    // 65536 stands for the pattern past the largest finite half, where overflow to infinity begins.
+    const tie = (samples[h] + (h === 0x7bff ? 65536 : samples[h + 1])) / 2,
+      step = tie * 2 ** -50;
+    for (const [sign, bit] of [
+      [1, 0],
+      [-1, 0x8000],
+    ]) {
+      encodes(sign * tie, bit | (h + (h & 1)));
+      encodes(sign * (tie - step), bit | h);
+      encodes(sign * (tie + step), bit | (h + 1));
+    }
+  }
+  encodes(Number.MIN_VALUE, 0);
+  encodes(-Number.MIN_VALUE, 0x8000);
+  encodes(Number.MAX_VALUE, 0x7c00);
+  encodes(-Infinity, 0xfc00);
+  encodes(-0, 0x8000);
+
+  // The test writer itself stores half floats without DataView.setFloat16.
+  const written = tiff({ ...shape, width: 2, height: 1, samples: [-1.5, 65504] });
+  assert.deepEqual([...openTIFF(written).read(0).samples], [-1.5, 65504]);
 });

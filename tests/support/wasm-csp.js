@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
+/**
+ * Replaces WebAssembly[method] for one test: `fail` answers every call that compiles bytes or a stream, and a module
+ * that is already compiled passes through. Node's own HTTP parser compiles its Wasm in the background after the first
+ * Response and instantiates the compiled module later; a stub that answered that call too rejected a promise nobody
+ * handles, after the test that happened to load it had ended (KB-CSP-STUB1).
+ */
+export function stubCompile(t, method, fail) {
+  const real = WebAssembly[method];
+  return t.mock.method(WebAssembly, method, (source, ...rest) =>
+    source instanceof WebAssembly.Module ? real(source, ...rest) : fail(source, ...rest),
+  );
+}
+
 // Each loader gets a fresh process: module caches and global compilation stubs cannot affect another path.
 export function blockedLoad(url, expression, kind) {
   const result = spawnSync(
