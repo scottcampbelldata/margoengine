@@ -162,10 +162,7 @@
   shellWorld.couple([shell.id, 'rigid'], 'staggered');
   shellWorld.advance(1);
   const shellStart = shellWorld.takeSnapshot();
-  window.drawLiveShell = async (flat) => {
-    shellWorld.restoreSnapshot(shellStart.bytes);
-    if (!flat) shellWorld.advance(9);
-    const mesh = shell.readMesh();
+  async function drawTriangleShell(mesh) {
     const [ax, ay, az, bx, by, bz, cx, cy, cz] = mesh.positions;
     const x = [bx - ax, by - ay, bz - az];
     const y = [cx - ax, cy - ay, cz - az];
@@ -176,7 +173,39 @@
       positions: Float32Array.from(mesh.positions),
       normals: Float32Array.from([...normal, ...normal, ...normal]),
     }, mesh.triangles);
-    return { dent: Math.max(0, -az, -bz, -cz), hash: shellWorld.hash(), visible: engine.stats.visible };
+    return Math.max(0, -az, -bz, -cz);
+  }
+
+  window.drawLiveShell = async (flat) => {
+    shellWorld.restoreSnapshot(shellStart.bytes);
+    if (!flat) shellWorld.advance(9);
+    const dent = await drawTriangleShell(shell.readMesh());
+    return { dent, hash: shellWorld.hash(), visible: engine.stats.visible };
+  };
+
+  window.drawGlancingShell = async (friction) => {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+    const physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: 1 / 480, substeps: 4 });
+    try {
+      const tool = physics.addBody(null, {
+        position: [0.3, 0.2, 0.17], linearVelocity: [0.7, 0.25, -0.8],
+        colliders: { shape: 'sphere', radius: 0.125, mass: 14, sensor: true },
+      });
+      const sheet = await CrushShellSolver.loadRigid({ rate: 3 });
+      world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
+      world.add(sheet, {
+        positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+        triangles: [[0, 1, 2]],
+        material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
+        spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6, friction }],
+      });
+      world.couple([sheet.id, 'rigid'], 'staggered');
+      world.advance(9);
+      const dent = await drawTriangleShell(sheet.readMesh());
+      return { dent, omega: tool.angularVelocity, hash: world.hash(), visible: engine.stats.visible };
+    } finally {
+      physics.dispose();
+    }
   };
 
   const seamWorld = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });

@@ -5572,7 +5572,9 @@ centered sphere, give its radius and effective Hertz contact modulus, and let th
 pair's collision. Match the rigid clock to the shell's `rate`. Add the rigid solver before the
 shell and put the shell first in their staggered group. Use at least two native rigid substeps
 for moving spheres. `readSphereContact` reports the integrated rigid impulse, recoverable
-interface energy and compression at the last substep.
+interface energy and compression at the last substep. Set the sphere's `friction` coefficient
+(default 0) for tangential sticking and sliding. Read angular impulse and the interval's lost
+kinetic energy with `readSphereFriction`.
 
 ```ts
 import { Physics } from '@margoengine/physics';
@@ -5581,10 +5583,10 @@ import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/wor
 
 await Physics.load();
 const gravity = [0, 0, 0] as const;
-const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+const world = new PhysicsWorld({ rate: { num: 480, den: 1 }, gravity, memory: worldMemory(false) });
 using physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: 1 / 480, substeps: 4 });
 const tool = physics.addBody(null, {
-  position: [0.3, 0.2, 0.13], linearVelocity: [0, 0, -0.8],
+  position: [0.3, 0.2, 0.13], linearVelocity: [0.7, 0, -0.8],
   colliders: { shape: 'sphere', radius: 0.125, mass: 14, sensor: true },
 });
 const shell = await CrushShellSolver.loadRigid({ rate: 3 });
@@ -5593,16 +5595,17 @@ world.add(shell, {
   positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
   triangles: [[0, 1, 2]],
   material: { thickness: 0.015, density: 7800, youngModulus: 200e9, poissonRatio: 0.3, yieldStress: 350e6 },
-  spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6 }],
+  spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6, friction: 0.28 }],
 });
 world.couple([shell.id, 'rigid'], 'staggered');
 world.advance(1);
 if (tool.linearVelocity[2]! <= -0.8) throw new Error('Expected the compliant contact to slow the sphere');
+if (shell.readSphereFriction(0).dissipatedEnergy <= 0) throw new Error('Expected energy loss from sliding contact');
 ```
 
 Contact selects the closest live triangle within one sphere radius plus half the thickness.
-The sphere's surface normal is frictionless. Set `cellSize` if the rigid and shell solvers use
-different origin cells. [Contact method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact)
+Set `cellSize` if the rigid and shell solvers use different origin cells.
+[Normal contact checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact) · [Friction method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-shell-friction)
 
 Give `CrushShellSolver` cohesive `seams` where two pieces meet along a prescribed fracture
 line. Each side is a separate boundary edge with matching rest positions in the same

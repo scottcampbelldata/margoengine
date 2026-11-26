@@ -15,7 +15,7 @@ import { type CrushVector, triple, ZERO } from './rigid-contact.js';
 import { type CrushShellAnisotropy, shellAnisotropy } from './shell-anisotropy.js';
 import { SHELL_APERTURE_LAYOUT, SHELL_APERTURE_WORDS, shellApertureField } from './shell-aperture.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
-import { type CrushShellContact, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
+import { type CrushShellContact, type CrushShellFriction, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
 import {
   type CrushSheetSeam,
   type CrushSheetSeamReading,
@@ -270,7 +270,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         }
       : undefined;
     const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount + SEAM_STATE_WORDS * seams.length);
-    const descriptor = host.allocate('shell-descriptor', 168, 'u8', 1);
+    const descriptor = host.allocate('shell-descriptor', 176, 'u8', 1);
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -313,6 +313,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       seams.length,
     ]);
     if (hill) new Float64Array(memory.buffer, descriptor.byteOffset + 136, 4).set(hill.metric);
+    new DataView(memory.buffer).setUint32(descriptor.byteOffset + 168, rigid?.frictionWork?.byteOffset ?? 0, true);
     if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
     this.state = {
@@ -373,6 +374,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       this.requireState();
     const regions = [positions, velocities, faceState, applied, reactions, energy];
     if (rigid) regions.push(rigid.readings);
+    if (rigid?.frictionReadings) regions.push(rigid.frictionReadings);
     if (seams) regions.push(seams);
     if (apertures) regions.push(apertures.region);
     return regions;
@@ -412,6 +414,13 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const { rigid } = this.requireState();
     if (!rigid) throw new MargoError('state', 'Enable rigid-sphere coupling before reading contact.');
     return rigid.read(index);
+  }
+
+  /** Reads the last sphere contact's angular impulse and frictional energy loss. */
+  readSphereFriction(index: number): CrushShellFriction {
+    const { rigid } = this.requireState();
+    if (!rigid) throw new MargoError('state', 'Enable rigid-sphere coupling before reading friction.');
+    return rigid.readFriction(index);
   }
 
   /** Reads the cohesive state and live opening of a configured boundary pair. */

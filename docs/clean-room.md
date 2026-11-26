@@ -15381,6 +15381,15 @@ centre, `M (M+A)^−1 J` produces the intended wet velocity jump through the dry
 An exact receipt removes that contribution from the following inferred external load.
 [Cummins](https://dome.mit.edu/handle/1721.3/49049) · [Journée and Massie](https://ocw.tudelft.nl/wp-content/uploads/OffshoreHydromechanics_Journee_Massie.pdf) · [Wet contact proofs](whitepaper/reproduce.md#break-03-wet-contact-inertia)
 
+Native shell friction applies the same constrained dissipation objective to the live projected
+triangle point. It uses the contact inverse-mass construction of Tobias Preclik, Sebastian Eibl
+and Ulrich Rüde, *The Maximum Dissipation Principle in Rigid-Body Dynamics with Purely Inelastic
+Impacts* (2018), Eqs. 1–3. In each half-kick the tangent solve uses material-point and sphere
+mobility, with the normal Hertz half-impulse setting the Coulomb radius. Node impulses sum
+to the opposite rigid impulse. The moment of this impulse is about the same world point for
+both bodies, and the sphere's first time moments feed the existing rigid accumulator ports.
+[Preclik, Eibl and Rüde](https://arxiv.org/abs/1706.00221) · [Independent balance and replay checks](whitepaper/reproduce.md#break-03-distributed-shell-friction)
+
 Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
 Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
 with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.

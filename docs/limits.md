@@ -9658,8 +9658,11 @@ substep is at most 0.5 divided by the rest mesh frequency bound. Large deformati
 increase the true frequency, so refine the time step and compare the result at the applied
 load. The solver rejects more than 8,192 substeps per world tick. Rigid contact accepts centred
 spheres, a matching shell and rigid tick rate, and at least two rigid substeps for a moving
-body. Each sphere uses the closest live triangle in the current substep. The contact is
-frictionless, with an authored Hertz interface modulus and a compliant skin.
+body. Each sphere uses the closest live triangle in the current substep with an authored Hertz
+interface modulus and a compliant skin. Positive optional Coulomb friction uses barycentric
+material-point mobility and the sphere's staged angular inertia. Multiple spheres apply their
+half-step projections in authored order. Simultaneous manifold friction and distributed surface
+pressure footprints remain open.
 This covers local sheet contact. Multi-point manifolds per sphere, sheet self-contact,
 swept time of impact and layered plastic bending remain open.
 Analytic tests cover world motion, reactions, elastic bending, plastic history and contact

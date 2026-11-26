@@ -1,5 +1,27 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 distributed shell friction
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.
+Run `node packages/physics/tests/crush-plate.browser.mjs` and repeat with `--compat`.
+The force-free tangential predictor takes the rigid velocity at the current sheet
+point and subtracts barycentrically interpolated shell motion. Nodal mobility is
+`Σᵢ wᵢ²/mᵢ`, where fixed nodes contribute zero, and the sphere contributes its linear
+and world angular mobility. Each Verlet half-interval projects the tangential
+impulse to the minimum kinetic energy inside the circular Coulomb bound `μ Jₙ`.
+Both bodies receive opposite impulses at the sheet point. The rigid translation and
+torque retain their first time moments in the existing accumulators.
+
+The fixed-sheet checks cover sticking, a measured impulse ratio of 0.020000 in
+sliding, an independently derived energy balance, and identical replay in both
+memory modes. The moving sheet conserves total linear momentum to 2e-5 N·s and
+angular momentum to 2e-4 N·m·s in each component. The browser compares live mesh
+rendering with a frictionless control under the same glancing trajectory.
+The law uses the constrained kinetic-energy objective of Tobias Preclik, Sebastian
+Eibl and Ulrich Rüde, *The Maximum Dissipation Principle in Rigid-Body Dynamics with
+Purely Inelastic Impacts* (2018). The normal impulse comes from the separate Hertz
+half-step. [Preclik, Eibl and Rüde](https://arxiv.org/abs/1706.00221)
+
 ## BREAK-03 independent NCAP road-car pulse
 
 Use the longitudinal rear-sill accelerometers, channels 93 and 94, from NHTSA's 56 km/h

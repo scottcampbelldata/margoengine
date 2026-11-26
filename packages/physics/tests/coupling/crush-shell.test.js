@@ -156,9 +156,11 @@ async function sphereModel({
   sphereCell = zero,
   shared = false,
   substeps = 4,
+  friction,
+  presentationHz = 60,
 }) {
   await Physics.load({ threads: shared });
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: zero, memory: worldMemory(shared) });
+  const world = new PhysicsWorld({ rate: { num: presentationHz, den: 1 }, gravity: zero, memory: worldMemory(shared) });
   const physics = new Physics(null, {
     arena: world.arena,
     gravity: zero,
@@ -182,7 +184,7 @@ async function sphereModel({
     material,
     pinned,
     cellSize: 2,
-    spheres: [{ body: sphere.row, radius, contactModulus }],
+    spheres: [{ body: sphere.row, radius, contactModulus, friction }],
   });
   world.setCell('rigid', sphereCell);
   world.couple([shell.id, 'rigid'], 'staggered');
@@ -269,6 +271,130 @@ test('moving rigid sphere transfers reciprocal linear and angular momentum to a 
   near(endEnergy, startEnergy, 2e-4);
   world.restoreSnapshot(saved.bytes);
   assert.deepEqual(measure(), first);
+});
+
+test('native shell friction transfers angular impulse and dissipates the measured slip work', async (t) => {
+  const run = async (friction, speed, shared) => {
+    const level = 3;
+    const loaded = await sphereModel({
+      rateLevel: level,
+      presentationHz: 60 << level,
+      fixed: false,
+      pinned: [0, 1, 2],
+      position: [0.25, 0.25, 0.1315],
+      speed: [speed, 0, 0],
+      friction,
+      shared,
+    });
+    using _physics = loaded.physics;
+    const { world, shell, sphere, mass, radius, contactModulus } = loaded;
+    const inertia = 0.4 * mass * radius * radius;
+    world.advance(1);
+    const startVelocity = sphere.linearVelocity;
+    const startAngular = sphere.angularVelocity;
+    const startCenter = sphere.position;
+    const depth = radius + 0.5 * material.thickness - startCenter[2];
+    const initialEnergy =
+      0.5 * mass * startVelocity.reduce((sum, x) => sum + x ** 2, 0) +
+      0.5 * inertia * startAngular.reduce((sum, x) => sum + x ** 2, 0) +
+      (8 / 15) * contactModulus * Math.sqrt(radius * depth) * depth ** 2;
+    const saved = world.takeSnapshot();
+    const measure = () => {
+      let normal = 0;
+      let sliding = 0;
+      let torque = 0;
+      let work = 0;
+      for (let frame = 2; frame <= 12; frame++) {
+        world.advance(frame);
+        const contact = shell.readSphereContact(0);
+        const tangent = shell.readSphereFriction(0);
+        normal += contact.impulse[2];
+        sliding += contact.impulse[0];
+        torque += tangent.angularImpulse[1];
+        work += tangent.dissipatedEnergy;
+        if (friction < 0.1 && contact.compression > 0) {
+          const supports = [0, 1, 2].map((i) => shell.supportReaction(i));
+          const load = supports.reduce((sum, row) => sum + row[2], 0);
+          const tangentLoad = supports.reduce((sum, row) => sum + row[0], 0);
+          near(-tangentLoad / load, friction, 3e-9);
+        }
+      }
+      const v = sphere.linearVelocity;
+      const omega = sphere.angularVelocity;
+      const currentEnergy =
+        0.5 * mass * v.reduce((sum, x) => sum + x ** 2, 0) +
+        0.5 * inertia * omega.reduce((sum, x) => sum + x ** 2, 0) +
+        shell.readSphereContact(0).energy;
+      near(mass * (v[0] - startVelocity[0]), sliding, 1e-5);
+      near(inertia * (omega[1] - startAngular[1]), torque, 1e-6);
+      near(currentEnergy + work, initialEnergy, 6e-4);
+      assert.ok(work > 0 && torque > 0 && normal > 0 && sliding < 0);
+      return { v, omega, work, sliding, normal, torque, hash: world.hash() };
+    };
+    const result = measure();
+    world.restoreSnapshot(saved.bytes);
+    assert.deepEqual(measure(), result);
+    return { ...result, hash: undefined };
+  };
+  const stick = await run(1, 0.1, false);
+  near(stick.v[0] - 0.1325 * stick.omega[1], 0, 5e-4);
+  const slide = await run(0.02, 1.2, false);
+  near(-slide.sliding / slide.normal, 0.02, 3e-9);
+  assert.ok(slide.v[0] > 1);
+  assert.deepEqual(await run(1, 0.1, true), stick);
+  t.diagnostic(
+    `Dry stick dissipates ${stick.work.toFixed(6)} J. Sliding impulse ratio ${(-slide.sliding / slide.normal).toFixed(6)}.`,
+  );
+});
+
+test('a glancing sphere exchanges reciprocal linear and angular momentum with a free sheet', async () => {
+  const scene = await sphereModel({
+    rateLevel: 4,
+    presentationHz: 960,
+    fixed: false,
+    position: [0.3, 0.25, 0.135],
+    speed: [0.6, 0.15, -0.8],
+    friction: 0.28,
+  });
+  using _physics = scene.physics;
+  const { world, sphere, shell, mass, radius } = scene;
+  const nodeMass = (material.density * material.thickness) / 6;
+  const inertia = 0.4 * mass * radius * radius;
+  const cross = ([x, y, z], [a, b, c]) => [y * c - z * b, z * a - x * c, x * b - y * a];
+  const momentum = () => {
+    const linear = sphere.linearVelocity.map((value) => mass * value);
+    const angular = cross(sphere.position, linear).map((value, axis) => value + inertia * sphere.angularVelocity[axis]);
+    const mesh = shell.readMesh();
+    for (let i = 0; i < mesh.positions.length; i += 3) {
+      const p = mesh.velocities.slice(i, i + 3).map((value) => nodeMass * value);
+      const l = cross(mesh.positions.slice(i, i + 3), p);
+      for (let axis = 0; axis < 3; axis++) {
+        linear[axis] += p[axis];
+        angular[axis] += l[axis];
+      }
+    }
+    return { linear, angular };
+  };
+  const before = momentum();
+  let dissipated = 0;
+  for (let frame = 1; frame <= 48; frame++) {
+    world.advance(frame);
+    dissipated += shell.readSphereFriction(0).dissipatedEnergy;
+  }
+  const after = momentum();
+  assert.ok(dissipated > 0.05 && Math.abs(sphere.angularVelocity[1]) > 0.01);
+  assert.ok(shell.readMesh().velocities.some((value, axis) => axis % 3 === 0 && Math.abs(value) > 0.002));
+  for (let axis = 0; axis < 3; axis++) {
+    near(after.linear[axis], before.linear[axis], 2e-5);
+    near(after.angular[axis], before.angular[axis], 2e-4);
+  }
+});
+
+test('a negative sphere friction input gives an actionable solver error', async () => {
+  await assert.rejects(
+    () => sphereModel({ rateLevel: 3, fixed: true, position: [0.25, 0.25, 0.15], friction: -0.01 }),
+    { code: 'state', message: /Choose a finite nonnegative friction coefficient/ },
+  );
 });
 
 test('a one-substep moving rigid integrator cannot realize both contact moments', async () => {

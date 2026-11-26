@@ -2,7 +2,7 @@ use core::ptr::copy_nonoverlapping;
 
 use crate::bending::{angle, bend};
 use crate::cohesive::{CohesiveEdge, History, seam};
-use crate::contact::{closest, contact};
+use crate::contact::{closest, contact, friction_impulse, inertia_product};
 use crate::material::{Hill, Plastic, Steel};
 use crate::math::sqrt;
 use crate::membrane::{Element, Vector, combine, cross, dot, membrane, sub};
@@ -82,6 +82,23 @@ impl Sphere {
 }
 
 #[repr(C)]
+struct SphereFriction {
+    coefficient: f64,
+    angular_velocity: Vector,
+    inverse_inertia: [f64; 6],
+    angular_impulse: Vector,
+    angular_first_moment: Vector,
+    loss: f64,
+    vertices: [u32; 3],
+    padding: u32,
+    weights: Vector,
+    arm: Vector,
+    endpoint_impulse: Vector,
+}
+
+const _: [(); 28 * 8] = [(); core::mem::size_of::<SphereFriction>()];
+
+#[repr(C)]
 struct Shell {
     positions: *mut Vector,
     velocities: *mut Vector,
@@ -105,6 +122,7 @@ struct Shell {
     seam_history: *mut History,
     seam_count: u32,
     hill: Hill,
+    friction: *mut SphereFriction,
 }
 
 struct Workspace {
@@ -155,7 +173,7 @@ impl Shell {
 }
 
 #[inline]
-unsafe fn load<const N: usize>(data: *const Vector, indices: [u32; N]) -> [Vector; N] {
+unsafe fn load<T: Copy, const N: usize>(data: *const T, indices: [u32; N]) -> [T; N] {
     // The host only packs valid vertex indices from checked topology.
     indices.map(|index| unsafe { *data.add(index as usize) })
 }
@@ -208,6 +226,12 @@ impl Workspace {
                 };
                 sphere.force = hit.force;
                 sphere.energy = hit.energy;
+                if !shell.friction.is_null() {
+                    let friction = unsafe { &mut *shell.friction.add(i) };
+                    friction.vertices = vertices;
+                    friction.weights = candidate.weights;
+                    friction.arm = candidate.separation.map(|value| -value);
+                }
                 let reactions = candidate
                     .weights
                     .map(|weight| hit.force.map(|component| -weight * component));
@@ -283,7 +307,102 @@ impl Workspace {
             && unsafe { self.contact_forces(shell) }
     }
 
+    unsafe fn friction_kick(&mut self, shell: &Shell, half_step: f64, remaining: f64) -> bool {
+        for i in 0..shell.sphere_count as usize {
+            let friction = unsafe { &mut *shell.friction.add(i) };
+            let sphere = unsafe { &mut *shell.spheres.add(i) };
+            friction.endpoint_impulse = [0.0; 3];
+            let normal_force = sqrt(dot(sphere.force, sphere.force));
+            if friction.coefficient == 0.0 || normal_force == 0.0 {
+                continue;
+            }
+            let velocities = unsafe { load(self.velocities, friction.vertices) };
+            let inverse_masses = unsafe { load(shell.nodes, friction.vertices) }.map(|node| {
+                if node.fixed == 0.0 {
+                    1.0 / node.mass
+                } else {
+                    0.0
+                }
+            });
+            let surface = combine(
+                velocities[0],
+                friction.weights[0],
+                combine(
+                    velocities[1],
+                    friction.weights[1],
+                    velocities[2],
+                    friction.weights[2],
+                ),
+                1.0,
+            );
+            let relative = sub(
+                combine(
+                    sphere.velocity,
+                    1.0,
+                    cross(friction.angular_velocity, friction.arm),
+                    1.0,
+                ),
+                surface,
+            );
+            let inverse_translation = sphere.inverse_mass
+                + inverse_masses
+                    .iter()
+                    .zip(friction.weights)
+                    .map(|(inverse, weight)| inverse * weight * weight)
+                    .sum::<f64>();
+            if inverse_translation == 0.0 {
+                continue;
+            }
+            let normal = sphere.force.map(|value| value / normal_force);
+            let limit = half_step * normal_force * friction.coefficient;
+            let Some((impulse, loss)) = friction_impulse(
+                relative,
+                normal,
+                friction.arm,
+                inverse_translation,
+                friction.inverse_inertia,
+                limit,
+            ) else {
+                return false;
+            };
+            for (j, vertex) in friction.vertices.into_iter().enumerate() {
+                let velocity = unsafe { &mut *self.velocities.add(vertex as usize) };
+                *velocity = combine(
+                    *velocity,
+                    1.0,
+                    impulse,
+                    -inverse_masses[j] * friction.weights[j],
+                );
+            }
+            sphere.velocity = combine(sphere.velocity, 1.0, impulse, sphere.inverse_mass);
+            sphere.impulse = combine(sphere.impulse, 1.0, impulse, 1.0);
+            sphere.first_moment = combine(sphere.first_moment, 1.0, impulse, remaining);
+            let torque = cross(friction.arm, impulse);
+            friction.angular_velocity = combine(
+                friction.angular_velocity,
+                1.0,
+                inertia_product(friction.inverse_inertia, torque),
+                1.0,
+            );
+            friction.angular_impulse = combine(friction.angular_impulse, 1.0, torque, 1.0);
+            friction.angular_first_moment =
+                combine(friction.angular_first_moment, 1.0, torque, remaining);
+            friction.endpoint_impulse = impulse;
+            friction.loss += loss;
+            if !(friction.loss
+                + dot(sphere.velocity, sphere.velocity)
+                + dot(friction.angular_velocity, friction.angular_velocity))
+            .is_finite()
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     unsafe fn kick(&mut self, shell: &Shell, seconds: f64, remaining: f64, drift: bool) -> bool {
+        let has_friction = !shell.friction.is_null();
+        let immediate_drift = drift && !has_friction;
         for i in 0..shell.node_count as usize {
             let node = unsafe { *shell.nodes.add(i) };
             let force = unsafe { *self.forces.add(i) };
@@ -293,7 +412,7 @@ impl Workspace {
             if node.fixed == 0.0 {
                 let velocity = unsafe { &mut *self.velocities.add(i) };
                 *velocity = combine(*velocity, 1.0, force, 0.5 * seconds / node.mass);
-                if drift {
+                if immediate_drift {
                     let position = unsafe { &mut *self.positions.add(i) };
                     *position = combine(*position, 1.0, *velocity, seconds);
                 }
@@ -301,11 +420,30 @@ impl Workspace {
         }
         for i in 0..shell.sphere_count as usize {
             let sphere = unsafe { &mut *shell.spheres.add(i) };
-            sphere.kick(shell.gravity, seconds, remaining, drift);
+            sphere.kick(shell.gravity, seconds, remaining, immediate_drift);
             if !dot(sphere.velocity, sphere.velocity).is_finite()
                 || !dot(sphere.center, sphere.center).is_finite()
             {
                 return false;
+            }
+        }
+        if has_friction {
+            if !unsafe { self.friction_kick(shell, 0.5 * seconds, remaining) } {
+                return false;
+            }
+            if drift {
+                for i in 0..shell.node_count as usize {
+                    let node = unsafe { *shell.nodes.add(i) };
+                    if node.fixed == 0.0 {
+                        let position = unsafe { &mut *self.positions.add(i) };
+                        let velocity = unsafe { *self.velocities.add(i) };
+                        *position = combine(*position, 1.0, velocity, seconds);
+                    }
+                }
+                for i in 0..shell.sphere_count as usize {
+                    let sphere = unsafe { &mut *shell.spheres.add(i) };
+                    sphere.center = combine(sphere.center, 1.0, sphere.velocity, seconds);
+                }
             }
         }
         true
@@ -374,6 +512,32 @@ unsafe extern "C" fn crush_shell_advance(
     }
     if !(budget.kinetic + budget.applied_work).is_finite() {
         return 0;
+    }
+    if interval > 0.0 && !shell.friction.is_null() {
+        for i in 0..shell.sphere_count as usize {
+            let friction = unsafe { &*shell.friction.add(i) };
+            if friction.coefficient == 0.0
+                || dot(friction.endpoint_impulse, friction.endpoint_impulse) == 0.0
+            {
+                continue;
+            }
+            let surface_force = friction.weights.map(|weight| {
+                friction
+                    .endpoint_impulse
+                    .map(|impulse| -2.0 * weight * impulse / interval)
+            });
+            if !surface_force
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+            {
+                return 0;
+            }
+            unsafe { add_forces(work.forces, friction.vertices, surface_force) };
+        }
+        if (0..nodes).any(|i| !unsafe { *work.forces.add(i) }.iter().all(|x| x.is_finite())) {
+            return 0;
+        }
     }
     for i in 0..nodes {
         let node = unsafe { *shell.nodes.add(i) };

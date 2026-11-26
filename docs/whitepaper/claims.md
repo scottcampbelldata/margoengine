@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Distributed shell friction (BREAK-03, 2026-11-26). Native contact transfers linear
+  and angular impulses to the sphere and its live shell at the same point. The
+  sliding check recovers the specified 0.020000 impulse ratio. A glancing sheet
+  acquires tangential momentum, and the opposed control differs by 1,455 rendered
+  pixels as the sphere gains 3.627 rad/s of spin. [Reproduce](reproduce.md#break-03-distributed-shell-friction)
 - Independent NCAP road-car pulse (BREAK-03, 2026-11-26). A staged envelope derived
   from 2013 Accord sedan test 8035 predicts the separately crashed 2013 Accord coupe
   test 8104 at 55.65 km/h. At 1920 and 3840 Hz, velocity RMS error is 0.376/0.377 m/s

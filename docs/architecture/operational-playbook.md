@@ -2613,7 +2613,11 @@ test exercises analytic gravity, fixed reactions, live bending and plastic repla
 rigid spheres exchange reciprocal contact load through the existing force and impulse
 accumulators. Matching the reaction's impulse and its first time moment keeps both rigid
 velocity and contact-induced travel consistent with the native sphere prediction. The proof
-covers fixed support reactions and moving momentum, energy and replay. Authored cohesive
+covers fixed support reactions and moving momentum, energy and replay. Optional Coulomb
+friction uses node and rigid point mobility within each native half-kick. Its reciprocal tangential
+impulse and angular impulse retain their first time moments. Energy loss is read from snapshot-owned
+interval receipts. The fixed-sheet and live free-sheet checks cover slip, spin, energy and replay.
+Authored cohesive
 seams use two quadrature points and a snapshot-owned maximum-jump history. Their released
 edges separate in the real mesh and expose four vertices and area in a versioned aperture
 port. SEA-10 integrates the live triangles against the pressure head and carries the water on

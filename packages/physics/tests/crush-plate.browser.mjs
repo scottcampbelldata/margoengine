@@ -103,6 +103,18 @@ try {
   console.log(
     `Distributed sheet: ${(1000 * liveShell.dent).toFixed(2)} mm live displacement, ${shellPixels} changed pixels.`,
   );
+  const lowFriction = await page.evaluate(() => window.drawGlancingShell(0));
+  const lowFrictionImage = await decodePNG(await canvas.screenshot());
+  const glancing = await page.evaluate(() => window.drawGlancingShell(0.28));
+  const glancingImage = await canvas.screenshot();
+  const glancingPixels = changedPixels(lowFrictionImage, await decodePNG(glancingImage));
+  assert.deepEqual(lowFriction.omega, [0, 0, 0]);
+  assert.equal(glancing.visible, 1);
+  assert.ok(glancing.omega[1] > 0.05 && glancingPixels > 32);
+  assert.deepEqual(await page.evaluate(() => window.drawGlancingShell(0.28)), glancing);
+  assert.deepEqual(await canvas.screenshot(), glancingImage);
+  await writeFile(`test-results/break03-friction-shell-${device}.png`, glancingImage);
+  console.log(`Glancing sheet contact: ${glancingPixels} pixels, ${glancing.omega[1].toFixed(3)} rad/s spin.`);
   await page.waitForFunction(() => typeof window.drawCohesiveSeam === 'function', null, { timeout: 20_000 });
   const intactSeam = await page.evaluate(() => window.drawCohesiveSeam(true));
   const intactSeamImage = await decodePNG(await canvas.screenshot());

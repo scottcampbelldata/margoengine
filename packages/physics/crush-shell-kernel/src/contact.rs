@@ -77,6 +77,68 @@ pub(crate) fn contact(separation: Vector, skin_radius: f64, stiffness: f64) -> O
     })
 }
 
+pub(crate) fn inertia_product(inverse: [f64; 6], vector: Vector) -> Vector {
+    let [xx, xy, xz, yy, yz, zz] = inverse;
+    let [x, y, z] = vector;
+    [
+        xx * x + xy * y + xz * z,
+        xy * x + yy * y + yz * z,
+        xz * x + yz * y + zz * z,
+    ]
+}
+
+/// Maximum energy dissipation in the tangent plane under a round Coulomb impulse bound.
+pub(crate) fn friction_impulse(
+    relative: Vector,
+    normal: Vector,
+    arm: Vector,
+    inverse_translation: f64,
+    inverse_inertia: [f64; 6],
+    limit: f64,
+) -> Option<(Vector, f64)> {
+    let tangent = combine(relative, 1.0, normal, -dot(relative, normal));
+    let speed = sqrt(dot(tangent, tangent));
+    if speed == 0.0 || limit == 0.0 {
+        return Some(([0.0; 3], 0.0));
+    }
+    let first = tangent.map(|value| value / speed);
+    let second = cross(normal, first);
+    let a = cross(arm, first);
+    let b = cross(arm, second);
+    let ia = inertia_product(inverse_inertia, a);
+    let ib = inertia_product(inverse_inertia, b);
+    let xx = inverse_translation + dot(a, ia);
+    let xy = dot(a, ib);
+    let yy = inverse_translation + dot(b, ib);
+    if !(xx > 0.0 && yy > 0.0 && (speed + limit + xx + yy).is_finite()) {
+        return None;
+    }
+    let solve = |shift: f64| {
+        let ratio = xy / (yy + shift);
+        let along = -speed / (xx + shift - xy * ratio);
+        (along, -ratio * along)
+    };
+    let norm = |(x, y): (f64, f64)| sqrt(x * x + y * y);
+    let (mut x, mut y) = solve(0.0);
+    if norm((x, y)) > limit {
+        let (mut lo, mut hi) = (0.0, speed / limit);
+        for _ in 0..32 {
+            let mid = 0.5 * (lo + hi);
+            if norm(solve(mid)) > limit {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        (x, y) = solve(hi);
+    }
+    let loss = -(speed * x + 0.5 * (xx * x * x + 2.0 * xy * x * y + yy * y * y));
+    if !loss.is_finite() {
+        return None;
+    }
+    Some((combine(first, x, second, y), loss.max(0.0)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +155,28 @@ mod tests {
             assert_eq!(result.weights, weights);
             assert_eq!(result.separation, separation);
         }
+    }
+
+    #[test]
+    fn friction_sticks_with_inertia_cross_response_and_caps_circular_sliding() {
+        let relative = [3., 4., 2.];
+        let normal = [0., 0., 1.];
+        let arm = [0., 0., -0.2];
+        let inverse = [3., 0.7, 0., 2., 0., 4.];
+        let (sticking, loss) = friction_impulse(relative, normal, arm, 2., inverse, 10.).unwrap();
+        let angular = inertia_product(inverse, cross(arm, sticking));
+        let after = combine(
+            combine(relative, 1., sticking, 2.),
+            1.,
+            cross(angular, arm),
+            1.,
+        );
+        assert!(after[0].abs() + after[1].abs() < 1e-12);
+        assert!((loss + 0.5 * dot(relative, sticking)).abs() < 1e-12);
+        let (slide, work) =
+            friction_impulse(relative, normal, arm, 2., [3., 0., 0., 3., 0., 3.], 0.2).unwrap();
+        assert!((slide[0] + 0.12).abs() + (slide[1] + 0.16).abs() < 1e-9);
+        assert!((work - (1. - 0.5 * 2.12 * 0.04)).abs() < 1e-9);
     }
 
     #[test]

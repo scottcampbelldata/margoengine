@@ -11,6 +11,8 @@ export interface CrushShellSphere {
   readonly radius: number;
   /** Effective contact Young modulus in Pa, combining the sphere and sheet materials. */
   readonly contactModulus: number;
+  /** Coulomb coefficient for the live shell surface. Default 0. */
+  readonly friction?: number;
 }
 
 export interface CrushShellContact {
@@ -22,14 +24,24 @@ export interface CrushShellContact {
   readonly energy: number;
 }
 
+export interface CrushShellFriction {
+  /** Integrated angular impulse about the sphere centre in N·m·s. */
+  readonly angularImpulse: CrushVector;
+  /** Relative kinetic energy dissipated by friction during the last interval, J. */
+  readonly dissipatedEnergy: number;
+}
+
 interface SphereSettings {
   readonly body: number;
   readonly radius: number;
   readonly stiffness: number;
+  readonly friction: number;
 }
 
 const SPHERE_WORDS = 20;
 const CONTACT_WORDS = 5;
+const FRICTION_WORK_WORDS = 28;
+const FRICTION_READING_WORDS = 4;
 
 function f64(host: SolverHost, region: Region): Float64Array {
   return regionWords(host.memory, region) as Float64Array;
@@ -48,6 +60,8 @@ export class ShellRigid {
   readonly reactions: Region;
   readonly forces: Region;
   readonly readings: Region;
+  readonly frictionWork?: Region;
+  readonly frictionReadings?: Region;
   readonly spheres: readonly SphereSettings[];
   private readonly capacity: number;
   private readonly rigidSubsteps: Uint32Array;
@@ -71,12 +85,24 @@ export class ShellRigid {
       const stiffness = (4 / 3) * sphere.contactModulus * Math.sqrt(sphere.radius);
       if (!(radius > 0 && Number.isFinite(radius) && stiffness > 0 && Number.isFinite(stiffness)))
         throw new MargoError('state', 'Use positive finite radii and contact moduli for rigid shell spheres.');
-      return { body, radius, stiffness };
+      const friction = sphere.friction ?? 0;
+      if (!(friction >= 0 && Number.isFinite(friction)))
+        throw new MargoError('state', 'Choose a finite nonnegative friction coefficient for rigid shell spheres.');
+      return { body, radius, stiffness, friction };
     });
     this.work = host.allocate('shell-sphere-work', SPHERE_WORDS * this.spheres.length * 8, 'f64', 1);
     this.reactions = host.allocate('shell-sphere-reactions', IMPULSE_WORDS * this.capacity * 8, 'f64', 1);
     this.forces = host.allocate('shell-sphere-forces', FORCE_WORDS * this.capacity * 8, 'f64', 1);
     this.readings = host.allocate('shell-sphere-readings', CONTACT_WORDS * this.spheres.length * 8, 'f64', 1);
+    if (this.spheres.some((sphere) => sphere.friction > 0)) {
+      this.frictionWork = host.allocate('shell-friction-work', FRICTION_WORK_WORDS * this.spheres.length * 8, 'f64', 1);
+      this.frictionReadings = host.allocate(
+        'shell-friction-readings',
+        FRICTION_READING_WORDS * this.spheres.length * 8,
+        'f64',
+        1,
+      );
+    }
   }
 
   stage(context: StepContext, dt: number, velocity: Float64Array, inverseMass: number): number {
@@ -97,6 +123,8 @@ export class ShellRigid {
       );
     const bodies = regionWords(port.region.memory ?? this.host.memory, port.region) as Float32Array;
     const work = f64(this.host, this.work);
+    const frictionWork = this.frictionWork && f64(this.host, this.frictionWork);
+    frictionWork?.fill(0);
     const offset = cellOffset(port.cell, context.cell, this.cellSize);
     const gravity = Math.sqrt(dot(this.host.gravity, this.host.gravity));
     let maxNodeSpeedSquared = 0;
@@ -128,6 +156,13 @@ export class ShellRigid {
         [...center, ...v, inv, sphere.radius, sphere.stiffness, 0, 0, 0, 0, 0, 0, 0, sphere.radius, 0, 0, 0],
         SPHERE_WORDS * i,
       );
+      if (frictionWork && sphere.friction > 0) {
+        const angular = triple(bodies, at + 13);
+        const inertia = bodies.subarray(at + 17, at + 23);
+        if (![...angular, ...inertia].every(Number.isFinite))
+          throw new MargoError('state', 'Use finite angular velocity and inertia for frictional shell contact.');
+        frictionWork.set([sphere.friction, ...angular, ...inertia], i * FRICTION_WORK_WORDS);
+      }
       // Hertz's maximum normal tangent over 0 <= compression <= radius.
       const tangent = 1.5 * sphere.stiffness * Math.sqrt(sphere.radius);
       rateSquared += (inv + inverseMass) * tangent;
@@ -142,6 +177,8 @@ export class ShellRigid {
     const reactions = f64(this.host, this.reactions);
     const forces = f64(this.host, this.forces);
     const readings = f64(this.host, this.readings);
+    const frictionWork = this.frictionWork && f64(this.host, this.frictionWork);
+    const frictionReadings = this.frictionReadings && f64(this.host, this.frictionReadings);
     reactions.fill(0);
     forces.fill(0);
     for (const [i, sphere] of this.spheres.entries()) {
@@ -153,13 +190,37 @@ export class ShellRigid {
         // force impulse acts at a mean fraction (s+1)/(2s) of the drift interval.
         // Match both total impulse and its first time moment with one held force
         // and one start impulse, using the existing rigid accumulator ports.
-        const momentAsImpulse = scale(triple(work, at + 17), 1 / dt);
-        const heldImpulse = scale(sub(impulse, momentAsImpulse), (2 * steps) / (steps - 1));
-        reactions.set(sub(impulse, heldImpulse), sphere.body * IMPULSE_WORDS);
-        forces.set(scale(heldImpulse, 1 / dt), sphere.body * FORCE_WORDS);
+        const inverseDt = 1 / dt;
+        const heldWeight = (2 * steps) / (steps - 1);
+        const mapMoment = (total: CrushVector, moment: CrushVector, axis: number) => {
+          const heldImpulse = scale(sub(total, scale(moment, inverseDt)), heldWeight);
+          reactions.set(sub(total, heldImpulse), sphere.body * IMPULSE_WORDS + axis);
+          forces.set(scale(heldImpulse, inverseDt), sphere.body * FORCE_WORDS + axis);
+        };
+        mapMoment(impulse, triple(work, at + 17), 0);
+        if (frictionWork && sphere.friction > 0) {
+          const frictionAt = i * FRICTION_WORK_WORDS;
+          mapMoment(triple(frictionWork, frictionAt + 10), triple(frictionWork, frictionAt + 13), 3);
+        }
       }
       readings.set([...impulse, sphere.radius - work[at + 16]!, work[at + 15]!], i * CONTACT_WORDS);
+      if (frictionWork && frictionReadings) {
+        const frictionAt = i * FRICTION_WORK_WORDS;
+        frictionReadings.set(
+          [...triple(frictionWork, frictionAt + 10), frictionWork[frictionAt + 16]!],
+          i * FRICTION_READING_WORDS,
+        );
+      }
     }
+  }
+
+  readFriction(index: number): CrushShellFriction {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= this.spheres.length)
+      throw new MargoError('state', 'Choose the index of a configured shell sphere.');
+    if (!this.frictionReadings) return { angularImpulse: [0, 0, 0], dissipatedEnergy: 0 };
+    const words = f64(this.host, this.frictionReadings);
+    const at = index * FRICTION_READING_WORDS;
+    return { angularImpulse: triple(words, at), dissipatedEnergy: words[at + 3]! };
   }
 
   read(index: number): CrushShellContact {
