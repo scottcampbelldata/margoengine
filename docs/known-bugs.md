@@ -16495,3 +16495,10 @@ mass ledger after restore. The existing mud scene still uses its constant source
 depth-averaged effect. Its large-scale breach and soil uptake need the hydraulic source and
 entrainment fields before that scene consumes replayable discharge.
 Run `packages/physics/tests/coupling/viscoplastic.test.js` for the varying-inlet regression.
+
+### Open gas-shell topology and gas-field coupling (SOFT-06)
+
+A closed pressurized shell deforms and transfers impulses through the real rigid contact ports. Tearing an edge
+currently leaves the triangles connected, so the gas stays in its chamber. A pressure vessel that opens dynamically
+will need membrane topology changes and an opening/flow contract. Solver output exposes live recorded pressure and
+volume. A changing atmospheric field requires an application update until the shared pressure ports are available.

@@ -13882,3 +13882,12 @@ the shared resident fraction. Solving momentum plus the graph Laplacian by Jacob
 preserves uniform translation and dissipates differences. The inlets carry reference
 volume in SI units on the same clock. All of the implementation was written in this
 repository from the papers.
+
+## Sealed soft-body gas pressure (SOFT-06)
+
+- Matthias Müller, Bruno Heidelberger, Marcus Hennix and John Ratcliff, [*Position Based Dynamics*](https://doi.org/10.1016/j.jvcir.2007.01.005), 2007, §4.4 equations (13–14). A closed shell has a signed-volume constraint with a gradient that distributes its pressure over the mesh. Use one-sixth of the tetrahedral triple product to obtain cubic metres. On a watertight mesh, the cross-product terms that share each vertex telescope to one-third of the oriented area of each incident triangle.
+- Miles Macklin, Matthias Müller, Nuttapong Chentanez and Tae-Yong Kim, [*Unified Particle Physics for Real-Time Applications*](https://mmacklin.com/uppfrta_preprint.pdf), 2014, §8. Stretch and bending constraints form the shell around its volume constraint, and the same contact pipeline handles the shell and rigid bodies.
+- Maciej Matyka and Mark Ollila, [*Pressure Model of Soft Body Simulation*](https://arxiv.org/abs/physics/0407003), SIGRAD 2003, §2.3 equations (4–5). Isothermal gas stores the constant product `nRT` and has absolute pressure `nRT/V`. The shell feels the difference between its internal pressure and the pressure on the outside.
+- Miles Macklin, Matthias Müller and Nuttapong Chentanez, [*XPBD: Position-Based Simulation of Compliant Constrained Dynamics*](https://mmacklin.com/xpbd.pdf), 2016, equations (17–18). A change `Δλ` in the position multiplier moves each particle by its inverse mass times `∇V Δλ`. Here `λ = h² (nRT/V − pOutside)` uses the gas law directly. Linearizing volume as `Vnext = V + (Σ w|∇V|²) Δλ` gives a quadratic with one positive root. Computing the positive root using the reciprocal form when the free volume term is negative avoids cancellation at high ambient pressure. The solver recomputes geometry inside the existing native constraint pass. A pinned tetrahedron reduces to an affine volume with a closed-form backward-Euler reference.
+
+Only publications and existing Margo code were consulted.

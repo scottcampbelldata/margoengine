@@ -9492,3 +9492,17 @@ entry emits positions and stresses for a separate renderer and leaves grain segr
 bed entrainment to their own solvers.
 
 The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
+
+### Gas-filled soft shells (SOFT-06)
+
+`@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber
+has uniform pressure and a fixed pressure–volume product between fill changes. A changing external pressure or an
+independent chamber uses an explicit fill or a separate body. The model has no through-mesh gas transport,
+thermodynamic heat solve, or automatic gas loss when an edge constraint tears. Use a valid shell without
+self-intersections, and its existing material, contacts and substeps still determine the membrane's mechanics.
+Geometry uses f64 local coordinates for signed volume and f32 particle positions in the existing native step. The gas
+product and ambient pressure also use f32 state columns. Each constraint pass takes work linear in vertices and
+triangles and allocates no new scratch while stepping. The same optional soft Wasm runs under either renderer.
+The complete optional soft entry measures 110,995 B gzip, up from 108,726 B, within its 111,864 B ceiling.
+The separately loaded kernel chunk is 75,819 B gzip, up from 74,174 B, and the native kernel is 211,555 B raw.
+Core plus stage remains 24,820 B gzip.

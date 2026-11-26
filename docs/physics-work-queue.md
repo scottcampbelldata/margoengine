@@ -44,6 +44,9 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **SOFT-06:** Add versioned per-chamber pressure and volume fields to the soft framework entry for atmospheric pressure
+  input and gas feedback. The native soft constraint already uses the rigid contact fields and snapshots the fill.
+
 - **SOUND-02:** Add a shared scene occupancy, surface material and impedance layout for evolving EARTH-02 terrain.
   The room entry accepts explicit air masks and finite convex reflection faces. Its layout-1 registry fields carry
   pressure excitation and receiver samples in Pa with the configured grid and sample clock.

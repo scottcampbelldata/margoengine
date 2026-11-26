@@ -160,6 +160,8 @@ pub struct World {
     pub vb_first: Col<u32>,
     pub vb_count: Col<u32>,
     pub vb_target: Col<f32>,
+    /// External pressure in Pa when `vb_on` is 2 (a gas chamber). `vb_target` is then nRT in Pa m³.
+    pub vb_ambient: Col<f32>,
     pub vb_omega: Col<f32>,
     pub vb_zeta: Col<f32>,
     pub vb_lambda: Col<f32>,
@@ -295,7 +297,7 @@ impl World {
         for v in [&mut self.vgx, &mut self.vgy, &mut self.vgz] {
             grow(v, particles);
         }
-        for v in [&mut self.vb_target, &mut self.vb_omega, &mut self.vb_zeta, &mut self.vb_lambda] {
+        for v in [&mut self.vb_target, &mut self.vb_ambient, &mut self.vb_omega, &mut self.vb_zeta, &mut self.vb_lambda] {
             grow(v, bodies);
         }
         grow(&mut self.vb_on, bodies);

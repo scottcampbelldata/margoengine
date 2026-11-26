@@ -10279,3 +10279,10 @@ material rows, reference-volume ledger and published fields. The 27-node APIC tr
 local plastic return and optional occupied-node PCG step run in arena memory. The coupling
 fixture joins a registered inlet to a real TerrainBed and checks the exact mass ledger and
 matching restore. It compares both memory modes at actual shared and plain instantiation.
+
+### Isothermal gas in the existing soft kernel (SOFT-06)
+
+The optional soft kernel adds an isothermal pressure constraint to its closed-surface pass. The rest of the soft step
+and its staggered rigid coupling use the same solver. Gas packing, external pressure and constraint mode are native
+snapshot columns. Closed-form affine-volume tests cover both signs of the pressure difference and vacuum. The
+world fixture shows actual rigid contact, matching hashes across frame rates and restoration of both gas controls.

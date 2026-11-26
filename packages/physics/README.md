@@ -561,6 +561,39 @@ physics.step();
 console.log(load.force[1] > 0); // true: lift across the wind
 ```
 
+### Gas pressure in a closed shell
+
+`setGasPressure({pressure, volume, ambientPressure})` uses absolute pressures in pascals. The optional `volume` is the
+fill volume in cubic metres. It defaults to the enclosed mesh volume on a description and the current volume on a
+live body. External pressure defaults to 101,325 Pa. The shell expands against its material and contacts, and the
+fixed-temperature gas pressure falls as the volume grows. Use `gasState()` to read the current volume and both
+pressures. `setVolumeFactor` switches back to a volume target or releases it with `null`.
+
+<!-- example:node -->
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc, SoftBodyMaterial } from '@margoengine/physics/soft';
+import { PhysicsWorld, RigidSolver, SoftSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const material = new SoftBodyMaterial();
+material.edgeSoftness = { naturalFrequency: 4, dampingRatio: 1 };
+material.bendSoftness = { naturalFrequency: 2, dampingRatio: 1 };
+const shell = soft.create(SoftBodyDesc.sphere([0, 0, 0], 0.5, { detail: 1 })
+  .setMaterial(material).setParticleMass(0.06).setGasPressure({ pressure: 108_000 }));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(new RigidSolver(), { physics })
+  .add(new SoftSolver(), { soft })
+  .couple(['soft', 'rigid'], 'staggered');
+world.advance(8);
+console.log(shell.gasState());
+```
+
+Keep the shell watertight and outward-wound. The model treats the chamber as one region of uniform pressure at
+constant temperature. Each independently filled region is a separate soft body.
+
 ## How it works
 
 Static meshes loaded by `@margoengine/gltf/pbr` or `@margoengine/fbx` support fitted colliders without attaching core geometry. `physics.addBody(model.root)` gathers the static core/PBR triangles beneath a geometry-free root into one fitted box, preserving the loaded hierarchy. Each descendant's world transform contributes its translation, rotation and scale; the collider uses the body's rotation/translation frame, retaining root scale exactly once because a body has no scale. A node with its own geometry fits only that node, with its scale applied once. Hidden descendants still contribute collision geometry.

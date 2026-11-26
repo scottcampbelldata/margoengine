@@ -717,6 +717,49 @@ const count = (value: number, label: string, least: number): number => {
   return value;
 };
 
+/** Fill parameters for a sealed soft shell at constant temperature. */
+export interface SoftGasPressure {
+  /** Absolute fill pressure, in Pa. It must be positive. */
+  readonly pressure: number;
+  /** Fill volume in m³. Defaults to the created mesh volume on a descriptor, or the live volume on a body. */
+  readonly volume?: number;
+  /** Absolute external pressure, in Pa. Defaults to standard atmosphere (101,325 Pa). */
+  readonly ambientPressure?: number;
+}
+
+/** The closed isothermal chamber's current state. */
+export interface SoftGasState {
+  readonly volume: number;
+  readonly pressure: number;
+  readonly ambientPressure: number;
+}
+
+const GAS_VOLUME_MODE = 2;
+const STANDARD_ATMOSPHERE = 101325;
+
+function checkedGas({ pressure, volume, ambientPressure = STANDARD_ATMOSPHERE }: SoftGasPressure): SoftGasPressure {
+  if (!(pressure > 0 && Number.isFinite(pressure)))
+    throw new RangeError(
+      'A gas fill needs a positive finite absolute pressure in Pa. Supply the pressure of the fill.',
+    );
+  if (volume !== undefined && !(volume > 0 && Number.isFinite(volume)))
+    throw new RangeError('A gas fill needs a positive finite reference volume in m³. Supply the volume of the fill.');
+  if (!(ambientPressure >= 0 && Number.isFinite(Math.fround(ambientPressure))))
+    throw new RangeError(
+      'External pressure must be finite and non-negative in Pa. Supply ambient pressure or zero for vacuum.',
+    );
+  return { pressure, volume, ambientPressure };
+}
+
+function gasProduct(gas: SoftGasPressure, volume: number): number {
+  const product = Math.fround(gas.pressure * (gas.volume ?? volume));
+  if (!(product > 0 && Number.isFinite(product)))
+    throw new RangeError(
+      'The gas pressure-volume product must be a finite positive float32. Adjust the fill or reference volume.',
+    );
+  return product;
+}
+
 /**
  * A soft body before it exists: particles, the edges that hold them and their settings. Builders (`rope`, `cloth`,
  * `clothTube`) and `new SoftBodyDesc(positions)` make one; every setter returns it. Insert it with `SoftBodies.create`.
@@ -744,6 +787,7 @@ export class SoftBodyDesc {
   /** @internal */ shift: Vec3 = [0, 0, 0];
   /** @internal */ shapeMatching = false;
   /** @internal */ volumeFactor: number | null = null;
+  /** @internal */ gas: SoftGasPressure | null = null;
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
@@ -1159,6 +1203,14 @@ export class SoftBodyDesc {
     if (factor !== null && !(factor > 0 && Number.isFinite(factor)))
       throw new RangeError('Volume factor must be a positive number.');
     this.volumeFactor = factor;
+    this.gas = null;
+    return this;
+  }
+
+  /** Fills a watertight, outward-wound triangle shell with ideal gas and replaces the volume target with pressure. */
+  setGasPressure(options: SoftGasPressure): this {
+    this.gas = checkedGas(options);
+    this.volumeFactor = null;
     return this;
   }
 
@@ -1968,7 +2020,27 @@ export class SoftBody {
     if (factor !== null && !this.volumeOn)
       throw new RangeError('This body needs a closed triangle surface to hold a volume.');
     this.owner.setVolume(this, factor);
-    return this;
+    return this.wake();
+  }
+
+  /** Changes the fill of a body created with a closed volume, using its current volume by default. */
+  setGasPressure(options: SoftGasPressure): this {
+    this.check();
+    if (!this.volumeOn)
+      throw new RangeError(
+        'This body has no closed volume. Create it with SoftBodyDesc.setGasPressure or setVolumeFactor.',
+      );
+    if (this.cellRange.count)
+      throw new RangeError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
+    const gas = checkedGas(options);
+    this.owner.setGas(this, gasProduct(gas, this.owner.surfaceVolume(this)), gas.ambientPressure!);
+    return this.wake();
+  }
+
+  /** Current absolute pressures in Pa and enclosed volume in m³, or null while the gas constraint is disabled. */
+  gasState(): SoftGasState | null {
+    this.check();
+    return this.owner.gasState(this);
   }
   /** @internal The spring of a woven sheet's thread, or null for an edge that is none of them. */
   threadSoftness(edge: number): SoftSoftness | null {
@@ -2704,9 +2776,14 @@ export class SoftBodies implements PhysicsAttachment {
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
     if (particles === 0) throw new RangeError('A soft body has at least one particle.');
     // A body that holds its volume needs a closed surface whose triangles face outward.
-    const restVolume = desc.volumeFactor === null ? 0 : this.meshVolume(desc.positions, desc.triangles);
-    if (desc.volumeFactor !== null && !(restVolume > 0))
+    const hasVolume = desc.volumeFactor !== null || desc.gas !== null,
+      restVolume = hasVolume ? this.meshVolume(desc.positions, desc.triangles) : 0;
+    if (hasVolume && (!(restVolume > 0) || !closedSurface(desc.triangles)))
       throw new RangeError('A body that holds its volume needs a closed surface whose triangles face outward.');
+    const gas = desc.gas ? checkedGas(desc.gas) : null,
+      gasLoad = gas ? gasProduct(gas, restVolume) : 0;
+    if (gas && desc.cells.length)
+      throw new RangeError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
     const structural = desc.edgePairs.length / 2,
       edges = structural + desc.bendPairs.length / 2,
       firstParticle = this.particleCount,
@@ -2893,7 +2970,9 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeMaterial(body);
     this.writeCellMaterial(body);
     this.syncCloth();
-    this.syncVolume(desc.volumeFactor);
+    this.syncVolume();
+    if (gas) this.setGas(body, gasLoad, gas.ambientPressure!);
+    else this.setVolume(body, desc.volumeFactor);
     // A surface collider only when asked: the particles and the faces meet rigid bodies in the soft step, and a mesh would answer
     // a second time.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
@@ -2947,9 +3026,9 @@ export class SoftBodies implements PhysicsAttachment {
     }
   }
 
-  /** @internal Sets a body's volume target to `factor` times its rest volume and puts its triangles in the volume search. */
+  /** @internal Initializes the volume target of a newly cut closed piece. */
   setVolumeFactorOf(body: SoftBody, factor: number): void {
-    this.syncVolume(factor);
+    this.syncVolume();
     this.setVolume(body, factor);
   }
 
@@ -2959,11 +3038,16 @@ export class SoftBodies implements PhysicsAttachment {
     for (let t = 0; t < triangles.length; t += 3) {
       const [a, b, c] = [triangles[t]! * 3, triangles[t + 1]! * 3, triangles[t + 2]! * 3] as [number, number, number],
         p = positions;
-      v +=
-        (p[a]! * (p[b + 1]! * p[c + 2]! - p[b + 2]! * p[c + 1]!) +
-          p[a + 1]! * (p[b + 2]! * p[c]! - p[b]! * p[c + 2]!) +
-          p[a + 2]! * (p[b]! * p[c + 1]! - p[b + 1]! * p[c]!)) /
-        6;
+      const ax = p[a]! - p[0]!,
+        ay = p[a + 1]! - p[1]!,
+        az = p[a + 2]! - p[2]!,
+        bx = p[b]! - p[0]!,
+        by = p[b + 1]! - p[1]!,
+        bz = p[b + 2]! - p[2]!,
+        cx = p[c]! - p[0]!,
+        cy = p[c + 1]! - p[1]!,
+        cz = p[c + 2]! - p[2]!;
+      v += (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
     }
     return v;
   }
@@ -2978,10 +3062,33 @@ export class SoftBodies implements PhysicsAttachment {
     const c = this.columns();
     c.vb_on[body.handle] = factor === null ? 0 : 1;
     c.vb_target[body.handle] = (factor ?? 1) * body.surfaceRest;
+    c.vb_ambient[body.handle] = 0;
   }
 
-  /** Lays the triangles of the bodies that hold a volume into the kernel and, for a new body, its target. */
-  private syncVolume(factor: number | null): void {
+  /** @internal Stores the fill entirely in native snapshot columns. */
+  setGas(body: SoftBody, gas: number, ambientPressure: number): void {
+    const c = this.columns();
+    c.vb_on[body.handle] = GAS_VOLUME_MODE;
+    c.vb_target[body.handle] = gas;
+    c.vb_ambient[body.handle] = ambientPressure;
+  }
+
+  /** @internal The chamber's current pressure follows its live volume. */
+  gasState(body: SoftBody): SoftGasState | null {
+    const c = this.columns(),
+      row = body.handle;
+    if (c.vb_on[row] !== GAS_VOLUME_MODE) return null;
+    const volume = this.surfaceVolume(body);
+    if (!(volume > 0 && Number.isFinite(volume)))
+      throw new MargoError(
+        'state',
+        'The gas shell has lost its positive volume. Restore an outward, uncollapsed shell before sampling pressure.',
+      );
+    return { volume, pressure: c.vb_target[row]! / volume, ambientPressure: c.vb_ambient[row]! };
+  }
+
+  /** Lays the triangles of the bodies that have a closed volume into the kernel. */
+  private syncVolume(): void {
     const on = this.bodies.filter((b) => b.volumeOn);
     let triangles = 0;
     for (const b of on) triangles += b.triangleList.length / 3;
@@ -2994,10 +3101,6 @@ export class SoftBodies implements PhysicsAttachment {
       c.vb_first[b.handle] = at / 3;
       c.vb_count[b.handle] = b.triangleList.length / 3;
       for (const v of b.triangleList) c.vtri[at++] = b.firstParticle + v;
-    }
-    if (factor !== null) {
-      const b = this.bodies[this.bodies.length - 1]!;
-      if (b.volumeOn) this.setVolume(b, factor);
     }
   }
 
@@ -3449,6 +3552,7 @@ export class SoftBodies implements PhysicsAttachment {
         'vb_omega',
         'vb_zeta',
         'vb_target',
+        'vb_ambient',
       ] as const,
       ecols = ['rest', 'omega', 'zeta', 'lambda', 'tear', 'eflags'] as const,
       saved = keep.map((b) => ({
@@ -3629,7 +3733,7 @@ export class SoftBodies implements PhysicsAttachment {
     body.surface = null;
     this.bodies.splice(at, 1);
     this.syncCloth();
-    this.syncVolume(null);
+    this.syncVolume();
   }
 
   /** @internal Steps with the world: forces first, then the kernel's pieces with the rigid world's contacts between them. */

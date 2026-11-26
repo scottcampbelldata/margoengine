@@ -5681,3 +5681,10 @@ the implicit solvent case agrees with a discrete occupied-node shear solution. A
 inlet on a live terrain bed has the same state across frame rates, restore and memory modes.
 [Direct tests](../../packages/physics/tests/viscoplastic.test.js) ·
 [Coupling tests](../../packages/physics/tests/coupling/viscoplastic.test.js)
+
+### Isothermal pressure and rigid contact in soft shells (SOFT-06)
+
+A sealed soft chamber conserves `pV` between fills, and the signed pressure difference moves its membrane. The
+native pinned-tetrahedron fixture satisfies an independent backward-Euler balance for compression and expansion.
+The world fixture starts with a real gap, verifies that contact transfers momentum only once the membrane closes
+it, and restores the chamber and rigid-body state bit for bit.
