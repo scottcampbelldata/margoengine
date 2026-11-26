@@ -4712,6 +4712,9 @@ through the initial fields in `SynopticParams`. The default latitude is 45° nor
 Use the high tier for limited higher-order transport, curved-flow pressure and a Fourier terrain-wave uplift
 correction. The fast tier uses first-order upwind transport, geostrophic pressure and direct upslope motion.
 The default condensed-water conversion and fallout times are 1000 s. Supply a `TerrainBed` for the orographic model.
+The advected temperature and terrain elevation set the saturation capacity of each column. Ascent cools the column.
+Vapour condenses once the cooling uses up the saturation deficit. Descending air can evaporate cloud water up to its
+available capacity. Supply `liftSensitivity` in kg/m³ to override the default local moist-adiabatic response.
 Set `timeScale` for a time lapse. Rates and the water ledger refer to physical weather seconds.
 
 Set `layers: { upperMeanWind: [30, 0] }` in the high tier to evolve a sheared atmosphere. `sampleLayers()` reads

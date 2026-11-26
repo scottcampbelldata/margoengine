@@ -4332,6 +4332,12 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+The native ATMO-10 phase change uses the moving temperature in each moisture
+column. Exact tests cover subsaturated and saturated ascent, intermediate
+saturation crossing, and normal-stratification terrain waves. The regional
+weather fixture exercises the real Sky adapter on both renderers. Independent
+observations remain open for transport and precipitation.
+
 The optional EARTH-01 granular kernel has an implicit rate-dependent shear return
 for dense dry material. A manufactured trial stress checks the realized friction,
 plastic incompressibility and exact replay in plain and shared Wasm memory. The

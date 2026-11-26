@@ -242,6 +242,48 @@ test('Smith–Barstad Eq. 19: the irrotational terrain-wave limit attenuates lif
   }
 });
 
+test('a normally stratified moist wave has the Smith–Barstad phase lead and attenuation', async () => {
+  const [nx, nz] = grid;
+  const wind = 16;
+  const amplitude = 400;
+  const scale = 2500;
+  const coriolis = 1e-4;
+  const stability = 0.0104;
+  const k = (2 * Math.PI) / (nx * spacing);
+  const omega = wind * k;
+  assert.ok(coriolis < omega && omega < stability);
+  const terrain = new TerrainBed();
+  const solver = await SynopticWeather.load();
+  const world = new PhysicsWorld({ rate });
+  world.add(terrain, {
+    columns: nx,
+    rows: 1,
+    width: nx * spacing,
+    depth: nz * spacing,
+    centre: [(nx * spacing) / 2, (nz * spacing) / 2],
+    elevations: Array.from({ length: nx + 1 }, (_, i) => amplitude * Math.cos(k * i * spacing)).flatMap((h) => [h, h]),
+  });
+  world.add(solver, {
+    ...options,
+    meanWind: [wind, 0],
+    bed: terrain.bed,
+    coriolis,
+    moistStability: stability,
+    moistDepth: scale,
+  });
+  // Equation 12 supplies the upward-propagating wavenumber. Equation 16 is
+  // the slope wave with amplitude 1/|1−imH| and phase lead arg(1/(1−imH)).
+  const m = k * Math.sqrt((stability * stability - omega * omega) / (omega * omega - coriolis * coriolis));
+  const liftAmplitude = (amplitude * omega) / Math.hypot(1, m * scale);
+  const phaseLead = Math.atan(m * scale);
+  const encodingError = (Math.sqrt(nx) * amplitude * 2 ** -24 * wind * Math.PI) / spacing;
+  const transformError = 64 * Number.EPSILON * amplitude * omega;
+  for (let i = 0; i < nx; i++) {
+    const x = i * spacing;
+    near(solver.sample(x, 0).lift, -liftAmplitude * Math.sin(k * x + phaseLead), encodingError + transformError);
+  }
+});
+
 test('RITS-8 and RITS-9: real terrain produces delayed upslope precipitation, snow and liquid runoff', async () => {
   const synoptic = await SynopticWeather.load();
   const world = new PhysicsWorld({ rate });
@@ -293,6 +335,103 @@ test('RITS-8 and RITS-9: real terrain produces delayed upslope precipitation, sn
   closes(synoptic);
 });
 
+test('orographic ascent condenses only the saturated fraction and uses the transported air temperature', async () => {
+  const [nx, nz] = grid;
+  const elevations = [0, 0, 0, 0, 800, 1600, 1600, 800, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const duration = 25;
+  const east = 20;
+  const lapse = 0.0065;
+  const index = 4;
+  const displacement = (east * duration * (elevations[index + 1] - elevations[index - 1])) / (2 * spacing);
+  const saturation = (seaTemperature) => {
+    const local = seaTemperature - lapse * elevations[index];
+    const vapourGas = 461.5;
+    const airGas = 287.05;
+    const latentHeat = 2.5e6;
+    const vapourPressure = 611.2 * Math.exp((latentHeat / vapourGas) * (1 / 273.15 - 1 / local));
+    const moistureHeight = (vapourGas * local * local) / (latentHeat * lapse);
+    const vapourDensity = vapourPressure / (vapourGas * local);
+    const epsilon = airGas / vapourGas;
+    const mixingRatio = (epsilon * vapourPressure) / (101325 - vapourPressure);
+    const moistLapse =
+      (9.80665 * (1 + (latentHeat * mixingRatio) / (airGas * local))) /
+      (1004 + (latentHeat * latentHeat * mixingRatio * epsilon) / (airGas * local * local));
+    return { capacity: vapourDensity * moistureHeight, formed: (vapourDensity * moistLapse * displacement) / lapse };
+  };
+  const warm = saturation(296);
+  const cool = saturation(280);
+  assert.ok(warm.formed > cool.formed);
+  const cases = [
+    { temperature: 296, vapour: warm.capacity - 2 * warm.formed, expected: 0 },
+    { temperature: 296, vapour: warm.capacity - warm.formed / 2, expected: warm.formed / 2 },
+    { temperature: 296, vapour: warm.capacity, expected: warm.formed },
+    { temperature: 280, vapour: cool.capacity, expected: cool.formed },
+  ];
+  for (const { temperature, vapour, expected } of cases) {
+    const terrain = new TerrainBed();
+    const synoptic = await SynopticWeather.load();
+    const world = new PhysicsWorld({ rate });
+    world.add(terrain, {
+      columns: nx,
+      rows: 1,
+      width: nx * spacing,
+      depth: nz * spacing,
+      centre: [(nx * spacing) / 2, (nz * spacing) / 2],
+      elevations: elevations.flatMap((height) => [height, height]),
+    });
+    world.add(synoptic, {
+      ...options,
+      bed: terrain.bed,
+      fidelity: 'fast',
+      coriolis: 0,
+      meanWind: [east, 0],
+      timeScale: 60 * duration,
+      temperature,
+      vapour,
+      lapseRate: lapse,
+    });
+    world.advance(1);
+    assert.equal(synoptic.budget.substeps, 1);
+    const result = synoptic.sample(index * spacing, 0);
+    const arithmeticError = 256 * Number.EPSILON * vapour;
+    near(vapour - result.vapour, expected, arithmeticError);
+    near(result.cloud + result.hydrometeors + result.precipitation * duration, expected, arithmeticError);
+    closes(synoptic);
+  }
+});
+
+test('atmospheric fallout reaches the runoff ledger as the same liquid volume on the same clock', async () => {
+  const [nx, nz] = grid;
+  const weather = await SynopticWeather.load();
+  const runoff = await RainfallRunoff.load();
+  const world = new PhysicsWorld({ rate });
+  const initial = 1.25;
+  const falloutTime = 90;
+  world.add(weather, { ...options, meanWind: [0, 0], temperature: 296, hydrometeors: initial, falloutTime });
+  const rain = new PrecipitationField({ base: 1, source: weather.rainSource(), wind: weather.wind });
+  const count = nx * nz;
+  world.add(runoff, {
+    nx,
+    nz,
+    dx: spacing,
+    origin: [-spacing / 2, -spacing / 2],
+    elevation: Array(count).fill(0),
+    downstream: Array(count).fill(-1),
+    drainage: 0,
+    conductivity: 0,
+    precipitation: rain,
+  });
+  world.couple([weather.id, runoff.describe().id], 'staggered');
+  const frames = 30;
+  world.advance(frames);
+  const area = count * spacing * spacing;
+  const expectedVolume = (-initial * Math.expm1(-frames / (rate.num * falloutTime)) * area) / 1000;
+  const roundoff = (256 * frames * Number.EPSILON * area * initial) / 1000;
+  near(weather.budget.precipitation / 1000, expectedVolume, roundoff);
+  near(runoff.budget.rain, expectedVolume, roundoff);
+  closes(weather);
+});
+
 test('WIND-2: the live synoptic pressure gradient accelerates real shallow water', async () => {
   const synoptic = await SynopticWeather.load({ water: true });
   const world = new PhysicsWorld({ rate });
@@ -323,8 +462,8 @@ test('WIND-2: the live synoptic pressure gradient accelerates real shallow water
   assert.ok(water.sample(0, 0).velocity[0] > 0);
 });
 
-test('Garratt and Donelan 10 m wind stress matches the measured moderate and saturated regimes on water', async () => {
-  for (const [wind, current, measured] of [
+test('the configured neutral drag curve publishes signed relative wind stress to the water grid', async () => {
+  for (const [wind, current, coefficient] of [
     [12, 2, 0.00142],
     [42, 2, 0.0025],
     [82, 2, 0.0025],
@@ -358,7 +497,7 @@ test('Garratt and Donelan 10 m wind stress matches the measured moderate and sat
     world.advance(1);
     const air = atmosphere.wind.sample(spacing / 2, 10, spacing / 2, 0),
       relative = wind - current;
-    const expected = (air.density * measured * Math.abs(relative) * relative) / 1000;
+    const expected = (air.density * coefficient * Math.abs(relative) * relative) / 1000;
     const forcing = regionWords(world.memory, atmosphere.exportPorts(1)[1].region);
     near(forcing[0], expected, 32 * Number.EPSILON * Math.abs(expected));
     world.advance(2);

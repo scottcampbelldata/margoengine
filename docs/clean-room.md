@@ -533,9 +533,14 @@ following Bram van Leer, “Towards the Ultimate Conservative Difference Scheme.
 [van Leer](https://doi.org/10.1016/0021-9991(77)90095-X).
 
 Helen Dacre et al., “How Do Atmospheric Rivers Form?” (2015), defines the column vapour budget and transport
-vectors. Ronald B. Smith and Idar Barstad, “A Linear Theory of Orographic Precipitation” (2004), Eqs. 1–2
-and 10–19, gives separate cloud and falling reservoirs and the wave-filtered lifting of the prescribed mean wind.
-Their appendix supplies the moisture depth and saturated-column condensation coefficient. The existing
+vectors. Ronald B. Smith and Idar Barstad, “A Linear Theory of Orographic Precipitation” (2004), equations 1–2
+and 10–19, give separate cloud and falling reservoirs and the wave-filtered lifting of the prescribed mean wind.
+Appendix A's saturation pressure and exponential vapour profile give the column capacity `ρs Hw`. The local
+advected temperature sets that capacity and the uplift sensitivity `ρs Γm/Γ`. The phase change compares the
+displaced saturation column with the available vapour. It bounds evaporation by cloud storage and the humidity
+deficit. A manufactured test checks both sides of the saturation threshold and the warm and cool responses. The
+stratified wave test uses the phase and amplitude of `1/(1 − i m Hw)` from equation 16. Equation 19 covers its
+separate neutral limit. The existing
 precipitation service uses the land rain-to-snow transition from Aiguo Dai (2008).
 [Dacre et al.](https://doi.org/10.1175/BAMS-D-14-00031.1),
 [Smith and Barstad](https://doi.org/10.1175/1520-0469%282004%29061%3C1377%3AALTOOP%3E2.0.CO%3B2),
@@ -546,8 +551,9 @@ in a two-level, Quasi-geostrophic Model” (1954), supplies the shear-growth mec
 thickness modes separately in the FFT and integrates their coupled linear tendency with a 2×2 Crank–Nicolson solve.
 Conservative limited fluxes transport both vorticity fields, and the hypsometric relation converts their thickness
 to temperature. J. R. Garratt (1977) supplies the neutral wind-drag coefficients through 21 m/s. M. A. Donelan et al.
-(2004), Figure 2, supplies the measured 0.0025 plateau at 33 m/s and above. The coefficient joins these two domains
-linearly, and the stress uses the relative velocity of air and water.
+(2004), Figure 2, motivates the prescribed high-wind plateau. The coefficient joins these two domains linearly,
+and the stress uses the relative velocity of air and water. The existing test verifies the implemented curve through
+the water port. An independent high-wind observation remains a separate requirement.
 [Phillips](https://doi.org/10.1111/j.2153-3490.1954.tb01123.x),
 [Garratt](https://doi.org/10.1175/1520-0493%281977%29105%3C0915%3ARODCOO%3E2.0.CO%3B2),
 [Donelan et al.](https://doi.org/10.1029/2004GL019460).

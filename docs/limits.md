@@ -9802,14 +9802,17 @@ polar geometry. Pressure follows horizontal balance. The high tier can activate 
 layers, with wind interpolated between their representative altitudes. Vertical shear can amplify temperature
 disturbances through baroclinic growth. The initial fields control the starting contrast and terrain boundary.
 The high tier filters the mean wind's terrain wave with a fixed moist stratification. Local flow anomalies add their
-direct upslope component. The source assumes a humid uplift layer and conserves available vapour through conversion
-and fallout. Cloud output is column mass and Weather uses a display opacity derived from it. The atmosphere uses
+direct upslope component. The advected temperature sets the saturation capacity in the assumed exponential
+moisture column. Dry ascent uses up the column's saturation deficit before any cloud forms. Saturated ascent,
+descent, conversion and fallout conserve the available water in the column budget. The phase-change tests are
+manufactured calculations. The independent river transport and mountain rainfall comparisons remain open.
+Cloud output is column mass and Weather uses a display opacity derived from it. The atmosphere uses
 fixed stratification, upper and lower pressure levels, and a vertically integrated moisture budget. Nonhydrostatic
 vertical momentum, explicit ice microphysics, latent heating feedback and data assimilation require separate models.
 Forecasts and film-length time acceleration use different clock scales. Keep coupled physical budgets on the same scale.
 
-The optional Physics entry measures 7,241 B gzip within a 7,497 B ceiling. The Weather adapter measures 940 B gzip
-within a 1,196 B ceiling. Both optional native assets are 22,154 B raw and 7,388 B gzip.
+The optional Physics entry measures 7,237 B gzip within a 7,497 B ceiling. The Weather adapter measures 940 B gzip
+within a 1,196 B ceiling. Both optional native assets are 23,185 B raw and 7,734 B gzip.
 These entries leave Core, Stage, Physics World and the Weather root unchanged.
 
 ### Cloud-to-ground discharge (ATMO-07)

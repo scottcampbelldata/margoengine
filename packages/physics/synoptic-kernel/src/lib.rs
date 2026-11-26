@@ -339,6 +339,39 @@ fn uplift(
         + mean_lift[at]
 }
 
+fn exchange_vapour(vapour: f64, cloud: f64, temperature: f64, lift: f64, p: &Parameters) -> f64 {
+    if lift == 0.0 || p.lift_sensitivity == 0.0 || (p.lift_sensitivity < 0.0 && p.lapse == 0.0) {
+        return 0.0;
+    }
+    const LATENT_HEAT: f64 = 2.5e6;
+    const VAPOUR_GAS: f64 = 461.5;
+    const AIR_GAS: f64 = 287.05;
+    const GRAVITY: f64 = 9.80665;
+    const GAS_RATIO: f64 = AIR_GAS / VAPOUR_GAS;
+    let pressure = 611.2 * exp((LATENT_HEAT / VAPOUR_GAS) * (1.0 / 273.15 - 1.0 / temperature));
+    let lapse = if p.lapse > 0.0 { p.lapse } else { 0.0065 };
+    // Smith–Barstad Appendix A: integral of the exponentially decreasing saturated vapour density.
+    let capacity = pressure * temperature / (LATENT_HEAT * lapse);
+    let sensitivity = if p.lift_sensitivity >= 0.0 {
+        p.lift_sensitivity
+    } else {
+        // Multiply numerator and denominator of the moist lapse by the dry partial pressure.
+        let dry = (p.base_pressure - pressure).max(0.0);
+        let latent_ratio = LATENT_HEAT * GAS_RATIO / (AIR_GAS * temperature);
+        let moist_lapse = GRAVITY * (dry + latent_ratio * pressure)
+            / (1004.0 * dry + latent_ratio * latent_ratio * AIR_GAS * pressure);
+        pressure * moist_lapse / (VAPOUR_GAS * temperature * lapse)
+    };
+    let exchange = lift * sensitivity;
+    let displaced_capacity = (capacity - exchange).max(0.0);
+    let excess = vapour - displaced_capacity;
+    if exchange > 0.0 {
+        exchange.min(excess.max(0.0)).min(vapour)
+    } else {
+        exchange.max(excess.min(0.0)).max(-cloud)
+    }
+}
+
 fn microphysics(dt: f64, tc: f64, tf: f64) -> (f64, f64, f64) {
     let ec = exp(-dt / tc);
     let ef = exp(-dt / tf);
@@ -500,7 +533,8 @@ pub unsafe extern "C" fn advance_synoptic(
             let vapour = state[count + i] + added;
             let cloud = state[2 * count + i];
             let drops = state[3 * count + i];
-            let source = (p.lift_sensitivity * vertical * dt).max(-cloud).min(vapour);
+            let local_temperature = state[4 * count + i] - p.lapse * height[i];
+            let source = exchange_vapour(vapour, cloud, local_temperature, vertical * dt, &p);
             let condensed = cloud + source;
             let next_cloud = condensed * ec;
             let next_drops = drops * ef + condensed * transition;

@@ -94,7 +94,7 @@ export interface SynopticParams {
   readonly pressure?: number;
   /** Reference air density for balanced pressure in kg/m³, default 1.225. */
   readonly density?: number;
-  /** Moisture sensitivity to terrain uplift in kg/m³. Default Smith–Barstad's saturated reference column at 288.15 K. */
+  /** Moisture sensitivity to terrain uplift in kg/m³. By default, Smith–Barstad's saturated column uses the current local temperature. */
   readonly liftSensitivity?: number;
   /** Moist Brunt–Väisälä frequency in s⁻¹ for the terrain wave response. Default 0.0104. */
   readonly moistStability?: number;
@@ -204,20 +204,6 @@ async function compile(url: URL, signal?: AbortSignal) {
 }
 
 const mod = (i: number, n: number) => ((i % n) + n) % n;
-
-function referenceLift(lapse: number): number {
-  if (lapse === 0) return 0;
-  const t = 288.15,
-    latent = 2.5e6,
-    vaporGas = 461.5,
-    epsilon = AIR_GAS / vaporGas,
-    saturation = 611.2 * exp((latent / vaporGas) * (1 / 273.15 - 1 / t)),
-    mixingRatio = (epsilon * saturation) / (SEA_LEVEL - saturation),
-    moistLapse =
-      (GRAVITY * (1 + (latent * mixingRatio) / (AIR_GAS * t))) /
-      (1004 + (latent * latent * mixingRatio * epsilon) / (AIR_GAS * t * t));
-  return (saturation * moistLapse) / (vaporGas * t * lapse);
-}
 
 function neutralOceanDrag(speed: number): number {
   const fittedEnd = (0.75 + 0.067 * 21) * 0.001;
@@ -389,7 +375,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       beta,
       positive(params.cloudTime ?? 1000, 'cloud conversion time'),
       positive(params.falloutTime ?? 1000, 'fallout time'),
-      number(params.liftSensitivity ?? referenceLift(this.lapse), 'lift sensitivity', 0),
+      params.liftSensitivity === undefined ? -1 : number(params.liftSensitivity, 'lift sensitivity', 0),
       this.lapse,
       positive(params.pressure ?? SEA_LEVEL, 'base pressure'),
       positive(params.density ?? 1.225, 'base air density'),
@@ -443,6 +429,8 @@ export class SynopticWeather implements Solver<SynopticParams> {
       table[2 * i + 1] = -sin(angle);
     }
     let water = 0;
+    let minimumTemperature = Infinity;
+    let maximumElevation = -Infinity;
     for (let j = 0; j < nz; j++)
       for (let i = 0; i < nx; i++) {
         const at = i + nx * j,
@@ -461,12 +449,18 @@ export class SynopticWeather implements Solver<SynopticParams> {
           (bed?.sample(x + originOffset[0]!, z + originOffset[2]!).elevation ?? 0) - originOffset[1]!,
           'bed elevation',
         );
+        minimumTemperature = Math.min(minimumTemperature, data[4 * count + at]!);
+        maximumElevation = Math.max(maximumElevation, geometry[at]!);
         geometry[count + at] = number(valueOf(params.evaporation ?? 0, x, z), 'evaporation rate', 0);
         const sx = (2 * sin((Math.PI * i) / nx)) / dx,
           sz = (2 * sin((Math.PI * j) / nz)) / dz;
         modes[at] = at ? -1 / (sx * sx + sz * sz) : 0;
         modes[count + at] = (sin((2 * Math.PI * i) / nx) / dx) * modes[at]!;
       }
+    if (minimumTemperature <= this.lapse * maximumElevation)
+      bad(
+        'Raise the air temperature or lower the bed elevation or lapse rate so every advected column can stay above absolute zero.',
+      );
     this.initialMass = water * dx * dz;
     for (let j = 0; j < nz; j++)
       for (let i = 0; i < nx; i++) {

@@ -17203,9 +17203,12 @@ a relativistic stress and heat equation. The test-geodesic solve covers that reg
 ### Synoptic development and regional scene binding (ATMO-10)
 
 The regional fields transport fronts, rain and IVT through a fixed map frame. The high tier can resolve the growth
-of shear disturbances in two coupled layers. A browser fixture applies the fields to Sky on both renderers. The
-RITS, WIND and CF production scenes still need bindings to the solved fields. SEA-07's surge port needs an adapter
-once its input layout is available. The published solver applies the corresponding inputs to shallow water today.
+of shear disturbances in two coupled layers. Orographic cloud formation uses saturation and the temperature of
+the transported air. A browser fixture applies the fields to Sky on both renderers. The RITS, WIND and CF
+production scenes still need bindings to the solved fields. SEA-07's surge port needs an adapter once its input
+layout is available. The published solver applies the corresponding inputs to shallow water today. The audit
+also tracks independent rainfall and IVT evidence, combined-layer moisture flux and measured drag validation.
+The staggered same-clock runoff check closes the liquid handoff volume on both ledgers.
 
 ### Continuous lightning weather and calibrated thunder (ATMO-07)
 
