@@ -2504,6 +2504,7 @@ export const entries = [
       'quantizeHeights unit must be a positive number',
       'riverSources needs the river lines (world.rivers) and a heightAt(x, z) function',
       'Invalid landscape grid spacing; supply positive finite metres.',
+      'Use at most 65536 ecosystem species',
       'riverSources needs discharge 0..100000 m^3/s and a finite radius >= 0 metres',
       'riverSources needs a finite discharge 0..100000 m^3/s at each river head; return one',
       'BiomeView water flow must be true, false or { discharge, runoff, substeps }',
