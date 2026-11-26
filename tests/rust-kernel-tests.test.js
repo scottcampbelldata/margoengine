@@ -51,9 +51,14 @@ test('feature-local crates all reach the merge gate once per owning package', ()
 });
 
 test('the kernel npm scripts run the same cargo command check:rust-kernels runs, so a claim citing one is checked', () => {
-  const byScript = { 'test:physics-kernel': 'packages/physics', 'test:physics2d-kernel': 'packages/physics2d' };
-  for (const [script, dir] of Object.entries(byScript)) {
-    const kernel = kernels.find((k) => k.dir === dir);
+  // By manifest, not package folder: physics holds more than one kernel crate (kernel, falling-kernel).
+  const byScript = {
+    'test:physics-kernel': 'packages/physics/kernel/Cargo.toml',
+    'test:physics2d-kernel': 'packages/physics2d/kernel/Cargo.toml',
+  };
+  for (const [script, path] of Object.entries(byScript)) {
+    const kernel = kernels.find((k) => k.manifest === path);
+    assert.ok(kernel, `${path} is a kernel check:rust-kernels runs`);
     assert.equal(manifest.scripts[script], `cargo ${cargoArgs(kernel.manifest).join(' ')}`, script);
   }
   assert.equal(manifest.scripts['check:rust-kernels'], 'node scripts/rust-kernel-tests.mjs');
