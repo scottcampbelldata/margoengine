@@ -78,7 +78,13 @@ horizon and only the ground hides them; they fade by distance into the haze (hal
 strength at 28 km), not by angle. Four octaves of value noise on an integer hash
 (pcg2d, Jarzynski and Olano 2020: no precision loss on phone GPUs), each turned 37°,
 give the shape; coverage remaps it (Schneider 2015) and the fine octaves erode the
-edges. Fine octaves fade to their mean once a pixel covers them. Three samples
+edges. Fine octaves fade to their mean once a pixel covers them. Each element's
+optical depth grows as its depth to the 5/3, as an adiabatic cloud's does (liquid
+water rising linearly above the base; Brenguier et al. 2000), so an element thins
+smoothly to its rim and shades in its thick middle rather than reading as a flat,
+hard-edged stain. Below 80 percent the sheet is broken cloud by definition, with
+blue between the elements; for an even pale grey deck set `coverage` to 0.8 or
+more. The element's own depth and three samples
 toward the sun through the layer give Beer-Lambert self-shadowing with a powder
 term, lit by the sun's transmittance colour with a two-lobe Henyey-Greenstein phase
 (Hillaire 2016); the surrounding sky lights them as ambient, and the lighting moon

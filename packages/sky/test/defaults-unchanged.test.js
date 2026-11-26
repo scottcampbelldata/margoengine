@@ -24,6 +24,9 @@
 // light (the cloud WGSL gained clearSkyLevel, a 15-direction quadrature of daySky, and the fog reads the same
 // overcastLight), so every configuration of the full Sky, whose code carries the cloud WGSL, changed text; no command
 // and no buffer write changed, and only a sky at 80 percent cover or more, or fog under clouds, draws differently.
+// Recorded again with KB-SKY-HOLES-KH1 (2026-11-26): the broken cloud sheet's optical depth goes as its depth to the 5/3
+// (Brenguier et al. 2000) and its own depth shades its sunlight, so every configuration of the full Sky changed text; no
+// buffer write changed, and only skies with cloud cover between 0 and 1 draw differently (sheet-check.html).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

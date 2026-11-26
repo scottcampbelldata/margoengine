@@ -41,7 +41,7 @@ test('the rewrite reaches every anchor of the sky, its night, clouds, fog, refle
         'fn physicalNightSky(',
         'SUN_RADIUS*frame.lookSun.w',
         '*(1.0-frame.sun.w)*frame.lookSun.rgb;',
-        'density*3.0*frame.lookCloud.w/',
+        'thick*3.0*frame.lookCloud.w/',
         '*frame.lookCloud.rgb,opacity);',
         'lookStops:array<vec4f,8>,air3:vec4f}',
       ])

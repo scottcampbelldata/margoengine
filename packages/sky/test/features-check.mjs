@@ -7,7 +7,25 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 const TABLE_TOLERANCE = 0.005;
+// The cloud sheet's bounds (sheet-check.html, 2026-11-26 on the workstation): with the adiabatic profile steps 0.0004
+// and spread 0.53; the flat stains before it measured steps 0.0050 and spread 0.43.
+const SHEET_STEPS_MAX = 0.0015;
+const SHEET_SPREAD_MIN = 0.48;
 const checks = {
+  // The broken cloud sheet thins to its rims and shades within (KB-SKY-HOLES-KH1; sheet-check.html).
+  async sheet(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.cloud > 0.1 && r.cloud < 0.9, `coverage 0.4 shows broken cloud: ${JSON.stringify(r)}`);
+    assert.ok(
+      r.steps < SHEET_STEPS_MAX,
+      `the elements thin toward their rims, with no hard edge: ${JSON.stringify(r)}`,
+    );
+    assert.ok(r.spread > SHEET_SPREAD_MIN, `the elements shade within, not flat stains: ${JSON.stringify(r)}`);
+    console.log(`ok sheet ${samples}x: ${JSON.stringify(r)}`);
+    return r;
+  },
   async weather(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     assert.equal(r.validation, null);
