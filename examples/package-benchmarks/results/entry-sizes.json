@@ -14160,8 +14160,8 @@
         "gzip": 9673
       },
       "./terramechanics": {
-        "raw": 29341,
-        "gzip": 10864
+        "raw": 30643,
+        "gzip": 11340
       },
       "./synoptic": {
         "raw": 17285,
@@ -18139,14 +18139,14 @@
       "brotli": 357
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
-      "raw": 14955,
-      "gzip": 5969,
-      "brotli": 5428
+      "raw": 15004,
+      "gzip": 6009,
+      "brotli": 5440
     },
     "packages/physics/dist/terramechanics-kernel-shared.wasm": {
-      "raw": 14955,
-      "gzip": 5969,
-      "brotli": 5423
+      "raw": 15004,
+      "gzip": 6009,
+      "brotli": 5441
     },
     "packages/physics/dist/synoptic-kernel.wasm": {
       "raw": 22154,

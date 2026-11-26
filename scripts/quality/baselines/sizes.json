@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20435770,
+  "total": 20436261,
   "history": [
     {
       "date": "2026-10-24",
@@ -13203,6 +13203,12 @@
       "commit": "FLUID-01 parcel fields",
       "grew": 1,
       "reason": "FLUID-01 adds optional clocked volume and momentum exchange, growing its entry from 6649 B to 7863 B gzip. A second adapter entry would still need the same particle-region and clock logic. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "166ad8688c",
+      "grew": 1,
+      "reason": "EARTH-05 spatial bedrock and hardpan sampling take the optional entry from 10864 to 11340 B gzip. Keeping both with the existing soil stamp preserves one mass ledger and one native loader. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14073,7 +14079,7 @@
     "@margoengine/physics/strands": 4764,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 11190,
+    "@margoengine/physics/terramechanics": 11681,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
