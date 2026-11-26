@@ -744,12 +744,9 @@ export class Texture {
       if (!made) return undefined;
       let slot = this.slots.get(device);
       if (slot?.lent?.from !== made) {
+        // No float32-filterable check here: a WgslMaterial reads 32-bit float texels with textureLoad, which needs no
+        // filtering (KB-DEPTHTEX-BLACK1). The filtered users (material map slots, envMap) check after they bind.
         const lent = this.lentOf(k, made);
-        if (unfilterable(lent.texture.format) && !device.features.has('float32-filterable'))
-          throw new MargoError(
-            'unsupported',
-            'Texture samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format',
-          );
         slot = this.slotFor(device, lent.texture.mipLevelCount > 1);
         slot.lent = lent;
         slot.views.clear();
@@ -903,13 +900,14 @@ export class Texture {
       throw new TypeError(
         `Material ${slot} needs a 2D Texture, not a ${this.dimension} one; sample it from a WgslMaterial texture instead`,
       );
+    // After the bind: a borrowed texture made by a function has no format until its first bind.
+    const pair = this.bind(device, srgb),
+      o = this.options;
     if (this.unfilterable && !device.features.has('float32-filterable'))
       throw new MargoError(
         'unsupported',
         `Material ${slot} samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format`,
       );
-    const pair = this.bind(device, srgb),
-      o = this.options;
     if (!pair || !tile || (o.wrapS && o.wrapT)) return pair;
     // A triplanar projection reads the map at the world position times the scale, far past [0, 1]: an unset wrap
     // repeats there, as the projection means (the default clamp smeared the edge texels into streaks, KB-TRIPLANAR-SIDES1).

@@ -12691,6 +12691,26 @@ power. EARTH-10 can connect using the layouts requested in the [work queue](phys
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
 
+### Fixed 2026-11-26: a WgslMaterial could not read a borrowed 32-bit float texture, so the depth-texture demo drew black (KB-DEPTHTEX-BLACK1, materials)
+
+- **Repro:** `npm run visual:update` on a186f625f0 (RTX A6000, Edge 158.0.4370.33): `depth-texture-high` and `-phone`
+  captured an all-black canvas in 4 of 4 runs with no page or WGSL error. The page's status, watched as it changed,
+  briefly read `MargoError: Texture samples 32-bit float texels, which needs the device feature float32-filterable`.
+  Chrome 158 gave the same; not a browser change.
+- **Cause:** f6f22a4977 (2026-11-20, borrowed-object rule) added a `float32-filterable` refusal to the shared bind of
+  every Texture made from a GPUTexture. A WgslMaterial reads such a texture with `textureLoad`, which needs no
+  filtering (as its docs say), so DepthTexture's r32float `distance` threw on the first frame, core stopped the loop
+  and the demo then wrote its ready text over the error and reported ready. The visual check took the black canvas.
+- **Fix:** the refusal stays only where texels are filtered: material map slots (`sampled`) and envMap, each now
+  checked after the bind so a function source, whose format is known only then, is refused too. The demo keeps an
+  error on screen and never reports ready after one. Class guard: `scripts/visual-regression.js` fails a view that
+  showed an error text at any moment, even one other text replaced (`scripts/support/shown-errors.js`); on the bug
+  build it fails both depth-texture views with the MargoError above. A guard on GPU work was tried first and dropped:
+  gameplay-sandbox and windy-meadow stop their loop on purpose under reduced motion, so they submit no work either.
+  Regressions: "a borrowed 32-bit float GPUTexture binds to a WgslMaterial without float32-filterable" in
+  packages/materials/test/texture-formats.test.js (fails on the old code) and tests/visual-shown-errors.test.js.
+  Other demos still write their ready text over an onError message; the guard catches them in the visual check.
+
 ### Fixed 2026-11-26: `GPUSceneBVH`'s buffers were missing from the borrowed GPU object registry, so hygiene failed (bvh)
 
 - **Repro:** `node --test tests/borrowed-gpu.test.js` on f9634050e1: five `bvh:GPUSceneBVH` members are unlisted.

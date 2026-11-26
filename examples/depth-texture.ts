@@ -15,7 +15,8 @@ declare global {
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
 const life = new AbortController();
-let dispose = () => {};
+let dispose = () => {},
+  failed = false;
 window.addEventListener(
   'pagehide',
   () => {
@@ -41,6 +42,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 5, 9], target: [0, 0, 0] },
     onError: (error) => {
+      failed = true;
       if (!life.signal.aborted) status.textContent = String(error);
     },
   });
@@ -85,8 +87,12 @@ try {
     });
   window.depthDemo = { depth };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = 'The water material samples the scene depth: foam where rocks meet the surface.';
-  canvas.dataset.ready = 'true';
+  // A frame that failed keeps its error on screen and the page never reports ready (KB-DEPTHTEX-BLACK1: the ready line
+  // replaced the error and the visual check took the black canvas as the picture).
+  if (!failed) {
+    status.textContent = 'The water material samples the scene depth: foam where rocks meet the surface.';
+    canvas.dataset.ready = 'true';
+  }
 } catch (error) {
   if (!life.signal.aborted) status.textContent = String(error);
 }

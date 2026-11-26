@@ -3121,12 +3121,13 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
     intensity = e.intensity;
   if (!map) view = blackCube(device);
   else if (map instanceof Texture) {
+    // After the bind: a borrowed texture made by a function has no format until its first bind.
+    const pair = map.bind(device, true);
     if (map.unfilterable && !device.features.has('float32-filterable'))
       throw new MargoError(
         'unsupported',
         'Material envMap samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features, use a 16-bit float format, or pass the cube through prefilterCube',
       );
-    const pair = map.bind(device, true);
     levels = map.gpuTexture(device)?.mipLevelCount ?? 1;
     if (pair) [view, sampler] = pair;
     else {
