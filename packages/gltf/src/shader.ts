@@ -777,21 +777,24 @@ export interface ExtendedPlan {
 /** Extension textures an extended material may bind: 5 base + 8 = 13, so shadows, IBL and LocalShadows (3) still fit WebGPU's 16. */
 export const extendedTextureLimit = 8;
 /**
- * Binding plan for an extended material's 21 map slots (22 with a diffuse roughness texture): slots sharing a glTF texture share one binding (their UV rows
- * stay per slot); at most `extendedTextureLimit` distinct textures, later slots beyond that fall back to their defaults.
+ * Binding plan for an extended material's 21 map slots (22 with a diffuse roughness texture): slots sharing a glTF texture
+ * in one colour space share one binding (`shareOwner`, over slots 5 to the last; their UV rows stay per slot), so specular
+ * (A) and specular colour (RGB) packed in one texture read its sRGB view, while clearcoat (R, linear) and sheen colour
+ * (RGB, sRGB) in one texture bind twice. Bindings follow each group's first slot; at most `extendedTextureLimit`, later
+ * groups beyond that fall back to their defaults. The view a binding holds is its first sRGB slot's, else its first slot's.
  */
 export function extendedPlan(
   maps: readonly ({ index: number } | undefined)[],
   features: Omit<ExtendedPlan, 'slots'>,
 ): ExtendedPlan {
-  const textures: number[] = [],
+  const owners: number[] = [],
     slots = Array.from({ length: Math.max(21, maps.length) }, (_, k) => {
-      const map = k < 5 ? undefined : maps[k];
-      if (!map) return -1;
-      const j = textures.indexOf(map.index);
+      if (k < 5 || !maps[k]) return -1;
+      const owner = shareOwner(maps, k),
+        j = owners.indexOf(owner);
       if (j >= 0) return j;
-      if (textures.length === extendedTextureLimit) return -1;
-      return textures.push(map.index) - 1;
+      if (owners.length === extendedTextureLimit) return -1;
+      return owners.push(owner) - 1;
     });
   return { slots, ...features };
 }

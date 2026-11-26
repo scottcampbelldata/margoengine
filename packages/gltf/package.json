@@ -36,6 +36,7 @@
     "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat",
     "test:gpu:native-volume": "cd ../.. && node packages/gltf/scripts/test-native-volume.mjs && node packages/gltf/scripts/test-native-volume.mjs --compat",
     "test:gpu:spec-gloss": "cd ../.. && node packages/gltf/scripts/test-spec-gloss-browser.mjs && node packages/gltf/scripts/test-spec-gloss-browser.mjs --compat",
+    "test:gpu:colour-space": "cd ../.. && node packages/gltf/scripts/test-extended-colour-space-browser.mjs && node packages/gltf/scripts/test-extended-colour-space-browser.mjs --compat",
     "test:gpu:dds": "cd ../.. && node packages/gltf/scripts/test-dds-browser.mjs && node packages/gltf/scripts/test-dds-browser.mjs --compat",
     "test:gpu:mask-mips": "cd ../.. && node packages/gltf/scripts/test-mask-mips-browser.mjs && node packages/gltf/scripts/test-mask-mips-browser.mjs --compat",
     "test:gpu:mipmaps": "cd ../.. && node packages/gltf/scripts/test-mipmaps-browser.mjs && node packages/gltf/scripts/test-mipmaps-browser.mjs --compat",
