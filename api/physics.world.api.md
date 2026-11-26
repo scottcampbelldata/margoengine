@@ -48,6 +48,10 @@ export const BODY_WORDS = 25;
 
 export const BYTES: Readonly<Record<ElementType, number>>;
 
+export const CLAIM_ADDED_MASS = 2;
+
+export const CLAIM_DAMPING = 1;
+
 export type Cell = readonly [number, number, number];
 
 export type Centring = 'cell' | 'face' | 'vertex' | 'particle';
@@ -140,6 +144,8 @@ export interface FieldUse {
 export const HYPER_PERIOD: number;
 
 export const IMPULSE_WORDS = 6;
+
+export const MANOEUVRING_CLAIMS_FIELD: FieldDescriptor;
 
 export const MAX_MEMORY_PAGES = 65536;
 

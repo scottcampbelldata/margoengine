@@ -257,8 +257,9 @@ Still open on this row:
 - ICE-04 coupling;
 - validation against SIMMAN 2008 free-running data;
 - a Rust and Wasm kernel;
-- the red flags in the row: sway and yaw damping counted twice when paired with `HullSolver`, the thruster
-  calibrations, the silent squat speed cap, the shaft depth and the quay pull constants.
+- the red flags in the row: the thruster calibrations, the silent squat speed cap, the shaft depth and the quay pull
+  constants. (The sway and yaw damping counted twice with `HullSolver` is fixed: the ship claims its surge, sway and
+  yaw through `manoeuvringClaims`, KB-SHIP-DAMP1.)
 
 **SEA-12 hydrodynamic loads.** Research for the buoyancy righting moment, a design not yet built:
 

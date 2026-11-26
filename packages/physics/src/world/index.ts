@@ -89,4 +89,5 @@ export {
   type RigidSolverParams,
 } from './solvers/rigid.js';
 export { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from './deck.js';
+export { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from './manoeuvring.js';
 export { SoftSolver, type SoftSolverParams } from './solvers/soft.js';
