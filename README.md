@@ -349,7 +349,8 @@ each one compares with native WebGPU. The smaller `@margoengine/webgl2-compat/pr
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
 the package build, gzips it at the default level and prints the figure for your checkout. The build fails if
-core + stage reaches 25,000 B gzip.
+core + stage reaches 25,000 B gzip. It stops with `MEASURE_SIZE_STALE_DIST` when the core or stage dist was
+built from other sources than the ones checked out (after a rebase, say); run `npm run build:packages` first.
 
 `npm run bench` runs every benchmark suite (size, startup, rendering, loading, physics, memory and more;
 `npm run bench -- --list` names them) and reports medians, p95 and machine checks. See
