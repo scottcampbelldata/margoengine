@@ -35,6 +35,18 @@ export interface CircularPlateReading {
     readonly surface?: CrushPlateSurface;
 }
 
+export interface CrushEnvelope {
+    readonly stiffness: number;
+    readonly loading: readonly CrushLoadingPoint[];
+    readonly backingStiffness?: number;
+}
+
+export type CrushEnvelopeGroundPatch = Omit<CrushEnvelopePatch, 'support' | 'radius'>;
+
+export type CrushEnvelopePatch = Omit<CrushPatch, 'material'> & {
+    readonly material: CrushEnvelope;
+};
+
 export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
 
 export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | 'plate' | 'sealStroke'> & {
@@ -44,6 +56,11 @@ export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | '
 export interface CrushInertiaChannel {
     readonly mobility: FieldDescriptor;
     readonly receipt: FieldDescriptor;
+}
+
+export interface CrushLoadingPoint {
+    readonly stroke: number;
+    readonly force: number;
 }
 
 export interface CrushMaterial {
@@ -56,6 +73,7 @@ export interface CrushMaterial {
 
 export interface CrushOptions {
     readonly id?: string;
+    readonly rate?: RateLevel;
     readonly terrain?: BedShape;
 }
 
@@ -65,6 +83,7 @@ export interface CrushParams {
     readonly patches: readonly CrushPatch[];
     readonly groundPatches?: readonly CrushGroundPatch[];
     readonly indentationPatches?: readonly CrushIndentationPatch[];
+    readonly envelopePatches?: readonly (CrushEnvelopePatch | CrushEnvelopeGroundPatch)[];
 }
 
 export interface CrushPatch {
@@ -246,7 +265,7 @@ export interface CrushShellSphere {
 export class CrushSolver implements Solver<CrushParams> {
     readonly id: string;
     readonly damageField: FieldDescriptor;
-    constructor({ id, terrain }?: CrushOptions);
+    constructor({ id, terrain, rate }?: CrushOptions);
     static withContactInertia(channel: CrushInertiaChannel, options?: CrushOptions): CrushSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushParams): void;
@@ -358,6 +377,10 @@ export interface SquareCrushTube {
 export function crushInertiaChannel(id?: string): CrushInertiaChannel;
 
 export function resolveCrush(material: CrushMaterial, effectiveMass: number, closingSpeed: number, permanentStroke?: number): CrushResult;
+
+export function resolveCrushEnvelope(material: CrushEnvelope, effectiveMass: number, closingSpeed: number, permanentStroke?: number): CrushResult;
+
+export function resolveCrushEnvelopeStroke(material: CrushEnvelope, totalStroke: number, permanentStroke?: number): CrushStrokeResult;
 
 export function resolveCrushStroke(material: CrushMaterial, totalStroke: number, permanentStroke?: number): CrushStrokeResult;
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20568784,
+  "total": 20570094,
   "history": [
     {
       "date": "2026-10-24",
@@ -13993,6 +13993,12 @@
       "commit": "3de9ed49e8",
       "grew": 1,
       "reason": "New optional materials/batched-lod entry (BatchedLOD: per-item frustum culling through a refitted bounding volume hierarchy and up to 8 distance levels with hysteresis for BatchedMesh items), before 0 B; 3590 B gzip, ceiling 3846 B. It imports BatchedMesh as a type only, so it adds none of the Material code that materials/batched carries; materials/batched gains boundsInto inside its ceiling and lod shares its level pick as packages/shared/lod-pick.js inside its ceiling."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "da07f5d540",
+      "reason": "BREAK-03 staged crush envelopes change @margoengine/physics/crush from 18559 to 19831 B gzip. Ceiling 19116 to 20426 B. One entry supports staged yielding, a falling load and recoil for both continuous and event contact. A split would repeat the contact and material paths.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14821,7 +14827,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,
-    "@margoengine/physics/crush": 19116,
+    "@margoengine/physics/crush": 20426,
     "@margoengine/physics/decomposition": 11103,
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
