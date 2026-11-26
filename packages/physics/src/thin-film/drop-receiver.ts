@@ -1,16 +1,15 @@
 import { hypot } from '@margoengine/math/pinned';
-import { normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
+import { conjugateQuaternion, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
 import { add, cross, dot, scale, sub } from '@margoengine/math/vec3';
 import { dragIntegrals } from '../airborne/environment.js';
 import { regionWords } from '../world/memory.js';
 import type { Port } from '../world/solver.js';
 import { BODY_WORDS } from '../world/solvers/rigid.js';
+import { prepareTurn, type ReceiverTurn } from './drop-turn.js';
 
 type V3 = readonly [number, number, number];
 type Rotation = readonly [number, number, number, number];
 const STILL: V3 = [0, 0, 0];
-export const RECEIVER_POSE_WORDS = 11;
-
 /** An absorbing plane with the same UV frame and extents as the receiving thin film. */
 export interface ThinFilmDropReceiver {
   /** Lower UV corner in metres, local to bodyRow when mounted or relative to the origin cell. */
@@ -23,12 +22,17 @@ export interface ThinFilmDropReceiver {
   readonly v?: readonly [number, number, number];
   /** Origin cell of the plane. Defaults to [0, 0, 0]. */
   readonly cell?: readonly [number, number, number];
-  /** Rigid body carrying a translating, fixed-orientation plane. Use the flight's rigid option. */
+  /** Rigid body carrying the plane. Use the flight's rigid option. */
   readonly bodyRow?: number;
+  /** Follow the mount's orientation and publish layout-2 impacts. Defaults to false. */
+  readonly followRotation?: boolean;
 }
 
 /** An impact row, f64: u, v, footprint radius, water volume, inward normal speed. Zero volume marks an unused row. */
 export const FILM_IMPACT_WORDS = 5;
+/** Layout 2 adds the world normal and the contact lever arm from the body centre, both XYZ in world axes. */
+export const FILM_SWEPT_IMPACT_WORDS = 11;
+export const FILM_SWEPT_IMPACT_LAYOUT = 2;
 export type Impact = readonly [u: number, v: number, radius: number, volume: number, inwardSpeed: number];
 
 interface PreparedReceiver {
@@ -39,11 +43,13 @@ interface PreparedReceiver {
   readonly n: V3;
   readonly cell: V3;
   readonly bodyRow?: number;
+  readonly followsRotation: boolean;
 }
 
 export interface ReceiverSweep {
   readonly plane: PreparedReceiver;
   readonly velocity: V3;
+  readonly turn?: ReceiverTurn;
 }
 
 function vector(value: V3): boolean {
@@ -82,6 +88,8 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
   const bodyRow = opts.bodyRow;
   if (bodyRow !== undefined && (!Number.isSafeInteger(bodyRow) || bodyRow < 0 || opts.cell !== undefined))
     throw new RangeError('Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.');
+  if (opts.followRotation && bodyRow === undefined)
+    throw new RangeError('Rotating drop receiver has no mount. Supply the receiving film body row.');
   return {
     origin: [...opts.origin],
     size: [opts.size[0]!, opts.size[1]!],
@@ -90,25 +98,29 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     n,
     cell: [cell[0]!, cell[1]!, cell[2]!],
     bodyRow,
+    followsRotation: opts.followRotation ?? false,
   };
 }
 
-export function receiverPose(memory: WebAssembly.Memory, port: Port | undefined, row: number): number[] {
+export function receiverPose(memory: WebAssembly.Memory, port: Port | undefined, receiver: PreparedReceiver): number[] {
+  const row = receiver.bodyRow!;
   const region = port?.region;
   if (!port || region?.layout !== 2 || region.type !== 'f32' || region.byteLength < (row + 1) * BODY_WORDS * 4)
     throw new RangeError('Missing mounted-drop pose. Add the layout-2 RigidSolver with a valid body row first.');
   const at = row * BODY_WORDS;
-  const pose = Array.from(regionWords(memory, region).subarray(at, at + 7));
-  if (!pose.every(Number.isFinite) || pose.slice(3).every((x) => x === 0))
+  const values = regionWords(memory, region);
+  const pose = Array.from(values.subarray(at, at + 7));
+  const centre = receiver.followsRotation ? Array.from(values.subarray(at + 7, at + 10)) : [];
+  if (!pose.every(Number.isFinite) || pose.slice(3).every((x) => x === 0) || !centre.every(Number.isFinite))
     throw new RangeError('Mounted drop receiver has no live body pose. Use a live body row.');
-  return [...pose, ...port.cell, port.tick];
+  return [...pose, ...port.cell, port.tick, ...centre];
 }
 
 function rotation(pose: ArrayLike<number>): Rotation {
   return normalizeQuaternion([pose[3]!, pose[4]!, pose[5]!, pose[6]!]);
 }
 
-export function translateReceiver(
+export function sweepReceiver(
   plane: PreparedReceiver,
   before: ArrayLike<number>,
   after: ArrayLike<number>,
@@ -119,18 +131,28 @@ export function translateReceiver(
     throw new RangeError('Mounted-drop pose did not advance. Step the rigid solver before its staggered flight.');
   const q = rotation(before);
   const endRotation = rotation(after);
+  const cell: V3 = [after[7]!, after[8]!, after[9]!];
+  const shift: V3 = [
+    (before[7]! - cell[0]) * cellSize,
+    (before[8]! - cell[1]) * cellSize,
+    (before[9]! - cell[2]) * cellSize,
+  ];
+  const start = add([before[0]!, before[1]!, before[2]!], shift);
+  if (plane.followsRotation) {
+    const centre = add([before[11]!, before[12]!, before[13]!], shift);
+    const velocity = scale(sub([after[11]!, after[12]!, after[13]!], centre), 1 / dt);
+    const centreToOrigin = rotateByQuaternion(sub(start, centre), conjugateQuaternion(q));
+    return {
+      plane: { ...plane, cell, origin: add(plane.origin, centreToOrigin) },
+      velocity,
+      turn: prepareTurn(q, endRotation, centre, velocity, dt),
+    };
+  }
   const sign =
     q[0] * endRotation[0] + q[1] * endRotation[1] + q[2] * endRotation[2] + q[3] * endRotation[3] < 0 ? -1 : 1;
   const rotationQuantum = 8 / 16_777_216; // Rigid poses are stored as f32 components.
   if (q.some((x, k) => Math.abs(x - sign * endRotation[k]!) > rotationQuantum))
-    throw new RangeError('Mounted drop receiver rotated during translation. Hold the receiver orientation fixed.');
-  const cell: V3 = [after[7]!, after[8]!, after[9]!];
-  const start: V3 = [
-    before[0]! + (before[7]! - cell[0]) * cellSize,
-    before[1]! + (before[8]! - cell[1]) * cellSize,
-    before[2]! + (before[9]! - cell[2]) * cellSize,
-  ];
-  const end: V3 = [after[0]!, after[1]!, after[2]!];
+    throw new RangeError('Mounted drop receiver rotated during translation. Enable followRotation for its swept pose.');
   return {
     plane: {
       ...plane,
@@ -140,7 +162,7 @@ export function translateReceiver(
       n: rotateByQuaternion(plane.n, q),
       cell,
     },
-    velocity: scale(sub(end, start), 1 / dt),
+    velocity: scale(sub([after[0]!, after[1]!, after[2]!], start), 1 / dt),
   };
 }
 

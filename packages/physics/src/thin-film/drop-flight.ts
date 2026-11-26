@@ -17,15 +17,16 @@ import { BODIES_FIELD } from '../world/solvers/rigid.js';
 import { advanceDrop, DropDrag, MAX_FLIGHT_DIAMETER, midpointDropDrag } from './drop-drag.js';
 import {
   FILM_IMPACT_WORDS,
-  type Impact,
+  FILM_SWEPT_IMPACT_LAYOUT,
+  FILM_SWEPT_IMPACT_WORDS,
   prepareReceiver,
-  RECEIVER_POSE_WORDS,
   receiverImpact,
   receiverPose,
   type ReceiverSweep,
+  sweepReceiver,
   type ThinFilmDropReceiver,
-  translateReceiver,
 } from './drop-receiver.js';
+import { turningImpact } from './drop-turn.js';
 import { FILM_DROP_WORDS } from './drips.js';
 
 type Vec3 = readonly [number, number, number];
@@ -92,6 +93,7 @@ interface FlightState {
     readonly draft: Region;
     readonly ledger: Region;
     readonly pose?: Region;
+    readonly impactStride: number;
   };
 }
 
@@ -178,18 +180,21 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     if ((mountedRow !== undefined) !== this.rigid)
       throw invalid('Mounted drop flight needs its rigid connection and receiver bodyRow. Provide both or omit both.');
     const initialPose =
-      mountedRow === undefined ? undefined : receiverPose(host.memory, host.port(BODIES_FIELD.name), mountedRow);
+      plane && mountedRow !== undefined ? receiverPose(host.memory, host.port(BODIES_FIELD.name), plane) : undefined;
     const arrayBytes = BYTES * FILM_FLIGHT_WORDS * capacity;
     const drops = host.allocate('flying-drops', arrayBytes, 'f64', LAYOUT);
     const candidate = host.allocate('working-flying-drops', arrayBytes, 'f64', LAYOUT);
     const meta = host.allocate('flight-ledger', BYTES * 9, 'f64', LAYOUT);
-    const impactBytes = BYTES * FILM_IMPACT_WORDS * (plane ? 2 * capacity : 1);
-    const impacts = host.allocate('drop-impacts', impactBytes, 'f64', LAYOUT);
+    const impactStride = plane?.followsRotation ? FILM_SWEPT_IMPACT_WORDS : FILM_IMPACT_WORDS;
+    const impactLayout = plane?.followsRotation ? FILM_SWEPT_IMPACT_LAYOUT : LAYOUT;
+    const impactBytes = BYTES * impactStride * (plane ? 2 * capacity : 1);
+    const impacts = host.allocate('drop-impacts', impactBytes, 'f64', impactLayout);
     const receiver = plane && {
       plane,
-      draft: host.allocate('working-drop-impacts', impactBytes, 'f64', LAYOUT),
+      draft: host.allocate('working-drop-impacts', impactBytes, 'f64', impactLayout),
       ledger: host.allocate('impact-ledger', BYTES * 2, 'f64', LAYOUT),
-      pose: initialPose ? host.allocate('receiver-pose', BYTES * RECEIVER_POSE_WORDS, 'f64', LAYOUT) : undefined,
+      pose: initialPose ? host.allocate('receiver-pose', BYTES * initialPose.length, 'f64', impactLayout) : undefined,
+      impactStride,
     };
     if (receiver?.pose && initialPose) regionWords(host.memory, receiver.pose).set(initialPose);
     regionWords(host.memory, meta)[1] = -1;
@@ -228,7 +233,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     cell: Cell,
     sweep?: ReceiverSweep,
     elapsed?: number,
-  ): Impact | undefined {
+  ): readonly number[] | undefined {
     if (interval === 0 && !s.receiver) return;
     const wind = s.wind;
     const air =
@@ -253,20 +258,35 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       throw invalid('Wind returned invalid drop flight velocity. Supply three finite components.');
     const rate = midpointDropDrag(target, at, interval, target[at + 7]!, s.gravity, air.velocity, drag);
     if (s.receiver) {
-      const impact = receiverImpact(
-        sweep?.plane ?? s.receiver.plane,
-        target,
-        at,
-        interval,
-        s.gravity,
-        air.velocity,
-        drag.buoyancy,
-        rate,
-        cell,
-        s.cellSize,
-        sweep?.velocity,
-        elapsed,
-      );
+      const impact = sweep?.turn
+        ? turningImpact(
+            sweep.plane,
+            sweep.turn,
+            target,
+            at,
+            interval,
+            s.gravity,
+            air.velocity,
+            drag.buoyancy,
+            rate,
+            cell,
+            s.cellSize,
+            elapsed ?? 0,
+          )
+        : receiverImpact(
+            sweep?.plane ?? s.receiver.plane,
+            target,
+            at,
+            interval,
+            s.gravity,
+            air.velocity,
+            drag.buoyancy,
+            rate,
+            cell,
+            s.cellSize,
+            sweep?.velocity,
+            elapsed,
+          );
       if (impact) return impact;
     }
     advanceDrop(target, at, interval, s.gravity, air.velocity, drag.buoyancy, rate);
@@ -287,8 +307,9 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     const pending = receiver && words(s, receiver.draft);
     const capture = receiver && words(s, receiver.ledger);
     const pose = receiver?.pose && words(s, receiver.pose);
-    const endPose = pose && receiverPose(s.memory, context.inputs.get(BODIES_FIELD.name), receiver!.plane.bodyRow!);
-    const sweep = pose && endPose && translateReceiver(receiver!.plane, pose, endPose, dt, s.cellSize);
+    const endPose = pose && receiverPose(s.memory, context.inputs.get(BODIES_FIELD.name), receiver!.plane);
+    const sweep = pose && endPose && sweepReceiver(receiver!.plane, pose, endPose, dt, s.cellSize);
+    const stride = receiver?.impactStride ?? FILM_IMPACT_WORDS;
     let hits = 0;
     let totalCaptured = capture?.[0] ?? 0;
     let live = 0;
@@ -297,9 +318,9 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     let received = meta[3]!;
     let outflow = meta[4]!;
     let airborne = 0;
-    const record = (impact: Impact) => {
-      pending!.set(impact, hits++ * FILM_IMPACT_WORDS);
-      totalCaptured += impact[3];
+    const record = (impact: readonly number[]) => {
+      pending!.set(impact, hits++ * stride);
+      totalCaptured += impact[3]!;
     };
     for (let i = 0; i < meta[0]!; i++) {
       const source = FILM_FLIGHT_WORDS * i;
@@ -392,8 +413,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     previous.fill(0, live * FILM_FLIGHT_WORDS, meta[0]! * FILM_FLIGHT_WORDS);
     if (pending && capture) {
       const impacts = words(s, s.impacts);
-      impacts.set(pending.subarray(0, hits * FILM_IMPACT_WORDS));
-      impacts.fill(0, hits * FILM_IMPACT_WORDS, capture[1]! * FILM_IMPACT_WORDS);
+      impacts.set(pending.subarray(0, hits * stride));
+      impacts.fill(0, hits * stride, capture[1]! * stride);
       capture.set([totalCaptured, hits]);
     }
     if (pose && endPose) pose.set(endPose);

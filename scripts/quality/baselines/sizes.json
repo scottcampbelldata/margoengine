@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20642983,
+  "total": 20644456,
   "history": [
     {
       "date": "2026-10-24",
@@ -13867,6 +13867,12 @@
       "commit": "80e472d5c8",
       "grew": 1,
       "reason": "SEA-15's resolved propeller-wash pickup moves physics/tracers from 13982 to 14915 B gzip. The optional ceiling rises from 14402 to 15363 B. Bed wash shares the existing sediment pickup, release and conservative terrain exchange. A separate entry would need a second tracer store or a second sediment transfer adapter."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-turning-receiver",
+      "grew": 1,
+      "reason": "FLUID-07 adds bounded angular contact and delivers the hit normal and lever arm to the existing film recoil path. Thin-film rises from 14185 to 15615 B gzip; cap changes from 14611 to 16084 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14744,7 +14750,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 14611,
+    "@margoengine/physics/thin-film": 16084,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 15363,
     "@margoengine/physics/tsunami": 6794,

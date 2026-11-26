@@ -6243,6 +6243,11 @@ drop at the analytical UV contacts. The stationary trial catches neither. The mo
 receives the exact volume, transfers each relative normal impulse once, and replays the
 same state after restore. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+A turning tray absorbs a drop at the analytic sphere–plane contact, and the film's six
+force and torque components use the normal and lever arm there. A separate accelerating
+drop crosses and clears the turning plane between step endpoints. The true first contact
+still deposits its volume once. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

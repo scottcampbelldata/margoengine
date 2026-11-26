@@ -4563,6 +4563,12 @@ with the interpolated rigid endpoint poses gives its UV coordinates and approach
 The two drops cover a fractional birth and a later step carrying an already airborne drop.
 The tray body receives both relative normal impulses, and the stationary tray catches neither.
 
+Run `node --test --test-name-pattern="rotating film" packages/physics/tests/coupling/thin-film.test.js`.
+The half-angle substitution gives an independent closed form for contact with a rolling
+tray. The registered normal and lever arm determine all six recoil components, and the
+world replays the pulse after restore. A separate rigid swing catches a turning drop while
+both endpoints are clear, and an independent vacuum trajectory verifies its UV location.
+
 ### FLUID-07 moving window render
 
 With the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`.

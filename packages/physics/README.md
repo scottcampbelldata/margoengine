@@ -5405,8 +5405,8 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(
 const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
 const mount = physics.addBody(null, {
   gravityScale: 0,
-  lockRotations: true,
   linearVelocity: [0, 0.002, 0],
+  angularVelocity: [0, 0, 0.016],
   colliders: { shape: 'box', halfExtents: [0.08, 0.01, 0.08], mass: 1 },
 });
 const spacing = 0.03;
@@ -5423,7 +5423,7 @@ world.add(film, {
   drains: [false, false, false, true],
   outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
 }).add(flight, {
-  receiver: { bodyRow: mount.row, origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12] },
+  receiver: { bodyRow: mount.row, origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12], followRotation: true },
 }).add(tray, { bodyRow: mount.row, origin: [-0.04, 0, 0.05], cells: [6, 6], spacing: 0.02, depth: 0.0002 });
 world.couple(['rigid', 'tray-flight', 'tray'], 'staggered');
 world.advance(420);
@@ -5447,6 +5447,11 @@ flight's `rigid` connection and the receiver's `bodyRow`. Give the plane in that
 coordinates and hold its orientation fixed. Add the rigid solver first, then order the rigid,
 flight and receiving film in the staggered group when receiving recoil. The flight sweeps the
 tray between consecutive poses and reports normal speed relative to the moving surface.
+Set `followRotation: true` to sweep the mount's orientation too. The impact field then publishes
+layout-2 f64 rows. After the five ordinary impact words come the contact normal XYZ and the
+world-space contact lever arm XYZ from the rigid centre. The receiving film uses those values
+to apply normal recoil and its moment at the instant of contact. Keep the flight and receiving
+film in the same origin cell for their patch-local records.
 An absorbing film mounted on a rigid body can use `impactRecoil: true` to send each impulse and
 its torque to the mount. This is off by default. Use either the mount or a wake as the impact
 momentum receiver.

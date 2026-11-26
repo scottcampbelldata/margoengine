@@ -21,7 +21,7 @@ import {
   prepareOutlets,
   type ThinFilmDripOutlet,
 } from './drips.js';
-import { FILM_IMPACT_WORDS } from './drop-receiver.js';
+import { FILM_IMPACT_WORDS, FILM_SWEPT_IMPACT_LAYOUT, FILM_SWEPT_IMPACT_WORDS } from './drop-receiver.js';
 import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
 
 export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
@@ -32,7 +32,12 @@ export {
   type ThinFilmDropFlightOptions,
   type ThinFilmFlyingDrop,
 } from './drop-flight.js';
-export { FILM_IMPACT_WORDS, type ThinFilmDropReceiver } from './drop-receiver.js';
+export {
+  FILM_IMPACT_WORDS,
+  FILM_SWEPT_IMPACT_LAYOUT,
+  FILM_SWEPT_IMPACT_WORDS,
+  type ThinFilmDropReceiver,
+} from './drop-receiver.js';
 
 /** Binary version of the optional film layout. */
 export const THIN_FILM_LAYOUT = 1;
@@ -360,12 +365,13 @@ function gridInput(
   descriptor: FieldDescriptor,
   stride: number,
   allowScalar: boolean,
+  layout = THIN_FILM_LAYOUT,
 ) {
   const port = context.inputs.get(descriptor.name);
   if (!port) return undefined;
   const r = port.region;
-  if (r.layout !== THIN_FILM_LAYOUT || (r.type !== 'f64' && (!allowScalar || r.type !== 'f32')))
-    throw new RangeError(`Invalid thin-film ${descriptor.name} layout. Use a layout-1 numeric field.`);
+  if (r.layout !== layout || (r.type !== 'f64' && (!allowScalar || r.type !== 'f32')))
+    throw new RangeError(`Invalid thin-film ${descriptor.name} layout. Use a layout-${layout} numeric field.`);
   const values = regionWords(s.memory, r);
   if (allowScalar ? values.length !== 1 && values.length !== s.count : values.length % stride !== 0)
     throw new RangeError(`Invalid thin-film ${descriptor.name} rows. Use the documented layout and patch dimensions.`);
@@ -768,7 +774,16 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const published = descriptor && context.inputs.get(descriptor.name);
     const last = words(s, s.motion)[4]!;
     if (!descriptor || !published || published.tick === last) return { added: 0, tick: last };
-    const impacts = gridInput(s, context, descriptor, FILM_IMPACT_WORDS, false);
+    const swept = published.region.layout === FILM_SWEPT_IMPACT_LAYOUT;
+    const stride = swept ? FILM_SWEPT_IMPACT_WORDS : FILM_IMPACT_WORDS;
+    const impacts = gridInput(
+      s,
+      context,
+      descriptor,
+      stride,
+      false,
+      swept ? FILM_SWEPT_IMPACT_LAYOUT : THIN_FILM_LAYOUT,
+    );
     if (!impacts) return { added: 0, tick: last };
     if (published.cell.some((value, i) => value !== context.cell[i]))
       throw new RangeError('Thin-film impacts have a different cell. Use the film patch cell for its local UV rows.');
@@ -777,25 +792,33 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     let added = 0;
     let force = ORIGIN;
     let torque = ORIGIN;
-    for (let i = 0; i < impacts.length; i += FILM_IMPACT_WORDS) {
+    for (let i = 0; i < impacts.length; i += stride) {
       const volume = number('impact volume', impacts[i + 3]!, 0);
       if (volume === 0) continue;
       const u = number('impact U', impacts[i]!, 0);
       const v = number('impact V', impacts[i + 1]!, 0);
       const r = positive('impact radius', impacts[i + 2]!);
       const inward = number('impact speed', impacts[i + 4]!, 0);
+      const normal: Vec3 = swept ? [impacts[i + 5]!, impacts[i + 6]!, impacts[i + 7]!] : frame.n;
+      if (swept && !(Math.abs(dot(normal, normal) - 1) <= 64 * Number.EPSILON))
+        throw new RangeError('Invalid swept impact normal. Publish a unit normal in world axes.');
       if (u > s.spacing * s.nx || v > s.spacing * s.ny)
         throw new RangeError('Thin-film impact is outside the patch. Use coordinates inside the UV extent.');
       const j = this.spread(s, rates, u, v, r, volume / (s.area * dt));
       added += volume;
       if (this.options.impactRecoil && inward > 0) {
-        const reaction = scale(frame.n, (-density * volume * inward) / dt);
+        const reaction = scale(normal, (-density * volume * inward) / dt);
+        const lever: Vec3 = swept
+          ? [impacts[i + 8]!, impacts[i + 9]!, impacts[i + 10]!]
+          : minus(position(frame, u, v), frame.center);
+        if (!lever.every(Number.isFinite))
+          throw new RangeError('Invalid swept impact lever arm. Publish a finite offset from the body centre.');
         force = plus(force, reaction);
-        torque = plus(torque, cross(minus(position(frame, u, v), frame.center), reaction));
+        torque = plus(torque, cross(lever, reaction));
       }
       if (waves && h[j]! > 0 && inward > 0) {
         // The wave field carries pressure only. The film already counts the deposited water.
-        const projection = Math.max(0, frame.n[1]);
+        const projection = Math.max(0, normal[1]);
         const at = j * WAKE_SOURCE_WORDS;
         const radius = Math.max(r, s.spacing);
         const p = position(frame, ((j % s.nx) + 0.5) * s.spacing, (Math.floor(j / s.nx) + 0.5) * s.spacing);

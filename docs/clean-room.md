@@ -15457,6 +15457,21 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   relative inward speed for the normal recoil. Save the prior rigid pose in the flight
   snapshot to replay a sweep including fractional births.
   [Publisher](https://shop.elsevier.com/books/real-time-collision-detection/ericson/978-1-55860-732-3)
+- Joan Solà, “Quaternion kinematics for the error-state Kalman filter” (2017), Eq. 203.
+  Interpolate the two orientations with the normalized shortest chord and use
+  `2 Im(q̇ q*)` to obtain world-frame angular velocity. For the unnormalized chord
+  `Q(λ) = q0 + λ Δq`, the numerator `Im(Δq Q*)` is constant and `|Q|²` is bounded below
+  by `(1 + |q0 · q1|)/2`. This gives bounds on the normal's first and second derivatives.
+  [Author paper](https://arxiv.org/abs/1711.02508)
+- Xinyu Zhang, Stéphane Redon, Minkyoung Lee and Young J. Kim, “Continuous collision
+  detection for articulated models using Taylor models and temporal culling” (2007),
+  §§5–7. Adapt time-interval culling to a drop sphere and one rotating plane. If signed
+  clearance curvature is bounded by `M`, its deviation from a secant over width `T` is at
+  most `M T²/8`. Subdivide uncertain intervals before solving the first descending root.
+  The normal's derivatives depend only on displacement and speed perpendicular to the
+  rotation axis. At contact use the relative normal speed and the surface-point offset
+  from the rigid centre. The receiving film uses the same normal and offset for its impulse.
+  [Journal](https://doi.org/10.1145/1276377.1276396)
 - Gianpietro E. Cossali, Aldo Coghe and Marco Marengo, “The impact of a single drop on a wetted
   solid surface” (1997). The optional absorbing receiver represents deposition with conserved liquid
   volume. The experiments distinguish deposition from a separate splash regime.

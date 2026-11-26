@@ -11,6 +11,10 @@ export const FILM_FLIGHT_WORDS = 10;
 
 export const FILM_IMPACT_WORDS = 5;
 
+export const FILM_SWEPT_IMPACT_LAYOUT = 2;
+
+export const FILM_SWEPT_IMPACT_WORDS = 11;
+
 export const THIN_FILM_LAYOUT = 1;
 
 export const THIN_FILM_WORDS = 5;
@@ -82,6 +86,7 @@ export interface ThinFilmDropReceiver {
     readonly v?: readonly [number, number, number];
     readonly cell?: readonly [number, number, number];
     readonly bodyRow?: number;
+    readonly followRotation?: boolean;
 }
 
 export interface ThinFilmFlyingDrop {
