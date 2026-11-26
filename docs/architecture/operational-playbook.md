@@ -307,6 +307,23 @@ material on 2,036 hits, front-only faces skip rays from inside a closed mesh, an
 2^(i/4), refit and rebuild, record layout, input checks). Missing: bottom trees built on the GPU, instance add and
 remove after create, and a stackless walk for the compatibility layer (not needed so far: the stack walk runs there).
 
+Piece 6b (same day): `@margoengine/post/rt-reflections` (`RTReflections extends SSR`), hybrid reflections
+(Barre-Brisebois et al. 2019; Stachowiak 2015). SSR gains one internal hook, `traced` (`SSRTrace`): while a subclass's
+scene is live the mirror composite and the stochastic rough trace are patched by text (each patch throws when SSR's
+shader changes shape, and the CPU test reads the patched code), and bind group 1 holds the scene's five buffers and a
+64-byte light uniform. The screen's share of a ray is SSR's own fades (`cover`); the trace adds the rest, `rf - cover`
+on the mirror path and `1 - cover` on rough rays, so no pixel the screen answers fully traces. Traced hits use core's
+BRDF text with the engine sun, a `sceneAny` shadow ray, core's flat ambient and the instance emissive. Read-only storage
+in a fragment shader runs on the WebGL2 layer through its data textures (M4), so no compute pass was needed. Evidence:
+`packages/post/test/rt-reflections-browser.mjs` (in `test:gpu`, native and `--compat`; RTX A6000, identical figures):
+a mirror floor under a box above the view shows the box's underside on 1,415 pixels, median 208 against the closed form
+208.46; the sun behind a plate leaves it unlit, without the plate it reads 248, and `shadows: false` equals that frame
+exactly; a rough floor with `stochastic` shows the box on 2,699 pixels; a disposed scene runs as plain SSR (dark).
+CPU: `packages/post/test/rt-reflections.test.js` (option checks, the patched composite and rough trace, group 1 bound
+once per pass, the light words, steady frames build nothing, no live GPU objects after dispose). SSR's own GPU tests
+(ssr-rough, ssr-cone) pass unchanged. Missing: a GPU cost figure, the a-trous denoise of rough hits, quarter-resolution
+tracing on the WebGL2 layer, and environment light at traced hits.
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object

@@ -58,6 +58,19 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Pixelate } = await load('../dist/pixelate.js');
   const { Bloom } = await load('../dist/bloom.js');
   const { PostStack } = await load('../dist/stack.js');
+  // RTReflections needs a scene on the engine's device; the scene is the caller's (a dependency), released at cleanup.
+  const { RTReflections } = await load('../dist/rt-reflections.js');
+  const { MeshBVH } = await load('../../bvh/dist/index.js');
+  const { GPUSceneBVH } = await load('../../bvh/dist/gpu-scene.js');
+  out.push({
+    name: 'RTReflections.attach',
+    create({ engine, dependency }) {
+      const bvh = MeshBVH.build({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
+        scene = dependency(() => GPUSceneBVH.forShader(engine, [{ bvh }])),
+        plugin = RTReflections.attach(engine, { scene, stochastic: true });
+      return { plugin, dispose: () => plugin.dispose(), cleanup: () => scene.dispose() };
+    },
+  });
   out.push({
     name: 'EffectMask.attach',
     create({ engine }) {

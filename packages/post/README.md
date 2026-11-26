@@ -358,6 +358,55 @@ ssr.options.stochastic = false;                                         // back 
   (mean change from one still frame to the next 0.15/255 against 1.28/255 at the second frame); three more
   `rgba16float` targets (24 B/pixel); GPU cost not measured.
 
+## Ray-traced reflections: `RTReflections`
+
+`@margoengine/post/rt-reflections` is SSR with a ray tracer behind it. The material replay and the Hi-Z march stay as
+above; where the screen holds no hit (the reflected thing is off screen, behind the camera, hidden behind nearer
+geometry, or the ray runs toward the camera) the same ray is traced through a `GPUSceneBVH` from
+`@margoengine/bvh/gpu-scene` (an optional peer). Every SSR option, `add(model)`, `enabled` and `stochastic` work the
+same.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {MeshBVH} from 'margoengine/bvh';
+import {GPUSceneBVH} from 'margoengine/bvh/gpu-scene';
+import {RTReflections} from 'margoengine/post/rt-reflections';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const shape = box(2, 2, 2);
+engine.createMesh().setGeometry(shape).setPosition([0, 3.5, -4]).setMaterial(new PbrMaterial({color: '#ff0000'}));
+const scene = GPUSceneBVH.forShader(engine.gpu!, [
+  {bvh: MeshBVH.fromGeometry(shape), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3.5, -4, 1], material: {color: [1, 0, 0]}},
+]);
+const rt = RTReflections.attach(engine, {scene, maxRoughness: 0.6}); // or put it in your PostStack like SSR
+rt.options.shadows = false;   // skip the sun's shadow ray at traced hits (default true)
+rt.options.stochastic = true; // rough surfaces trace their sampled rays through the scene too
+```
+
+- **Hybrid order** (Barre-Brisebois et al. 2019; Stachowiak 2015). SSR's fades (screen edge, rays toward the camera,
+  back faces, distance) are the share of the ray the screen covers, `cover`. The trace adds the rest of the
+  roughness-faded share, `smoothstep fade − cover`, from the same surface point along the same ray, offset by `bias`
+  (default 0.01 scene units) along the normal, up to `maxDistance` and faded over its last 20% like SSR's hits. So a
+  pixel the screen answers fully never traces, and on-screen and traced reflections meet without a seam.
+- **Shading of traced hits.** Core's own lighting at the hit: the glTF 2.0 metal-rough BRDF of core's shader (GGX,
+  height-correlated Smith, Schlick, Lambert) with the instance's `material` (colour, metalness, roughness, emissive),
+  the engine's sun (`engine.lighting`, read every frame) with a shadow ray toward it through the same scene (`shadows`),
+  core's flat ambient, and the emissive. The view vector is the reflected ray's reverse; the normal is the triangle's
+  geometric normal turned toward it.
+- **Rough surfaces (`stochastic`).** The GGX-sampled ray of each pixel traces the scene where its march leaves a share,
+  and the resolve averages them as before.
+- **Fallback.** A disposed scene, or one made on a device that was lost, runs as plain SSR (the same passes, no
+  trace) until `rt.options.scene` is given a new one. Swapping the scene costs one bind group, not a shader.
+- **Checked on a real GPU** (`test/rt-reflections-browser.mjs`, WebGPU and the WebGL2 layer, identical figures on an
+  RTX A6000): a mirror floor under a red box above the view, which SSR alone leaves dark, shows the box's underside
+  (1,415 pixels), median 208 against the closed form 208.46 (display of the floor's split-sum weight times albedo x
+  ambient + emissive); the sun from below behind a plate leaves it unlit, without the plate it is lit (248), and
+  `shadows: false` equals the unshadowed frame exactly; a rough floor with `stochastic` shows the box on 2,699 pixels.
+- **Limits.** Traced hits see the scene's instances only: what is not in the `GPUSceneBVH` is not traced, and its
+  materials are one record per instance (no textures, no vertex colours). Traced hits get core's sun and flat ambient,
+  not EnvironmentLighting, probes, clustered lights or shadow maps, and no reflection of their own. Flat normals (the
+  triangle's), so a smooth curved mesh reflects faceted. One ray per pixel, no denoise beyond SSR's own resolve. GPU
+  cost not measured yet (build phase).
+
 ## Ground-truth ambient occlusion: `GTAO`
 
 `@margoengine/post/gtao` (10,531 B min+gzip, its own entry; it carries SSAO and the stack) is GTAO, written from

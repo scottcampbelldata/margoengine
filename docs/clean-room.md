@@ -12185,6 +12185,19 @@ Keller, "Efficient Stackless Hierarchy Traversal on GPUs with Backtracking in Co
 https://research.nvidia.com/publication/2016-06_efficient-stackless-hierarchy-traversal-gpus-backtracking-constant-time),
 kept for the compatibility layer if its stack walk proves slow. Written from these papers; no engine's code was read.
 
+### Ray-traced reflections behind screen-space reflections (FG-17 piece 6b, 2026-11-25)
+
+`packages/post/src/rt-reflections.ts` and the `traced` hook in `src/ssr.ts`. Hybrid order, screen-space march first and
+a ray through the scene where it fails (Colin Barre-Brisebois, Henrik Halen, Graham Wihlidal, Andrew Lauritzen, Jasper
+Bekkers, Tomasz Stachowiak and Johan Andersson, "Hybrid Rendering for Real-Time Ray Tracing", Ray Tracing Gems ch. 25,
+2019, https://doi.org/10.1007/978-1-4842-4427-2_25; Tomasz Stachowiak, "Stochastic Screen-Space Reflections", SIGGRAPH
+2015 Advances in Real-Time Rendering course). The share split uses SSR's existing fades as the screen's coverage. Rough
+rays keep SSR's VNDF sampling (Eric Heitz, "Sampling the GGX Distribution of Visible Normals", JCGT 7(4), 2018,
+https://jcgt.org/published/0007/04/01/); compared and not used: spherical-cap VNDF sampling (Jonathan Dupuy and Anis
+Benyoub, "Sampling Visible GGX Normals with Spherical Caps", CGF 2023, https://doi.org/10.1111/cgf.14867), equal in
+distribution, kept for a later speed pass. Hit shading is core's own glTF 2.0 Appendix B BRDF text; traversal is
+`sceneBvhWGSL` of piece 6a. Written from these papers; no engine's code was read.
+
 ### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
 
 `packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and

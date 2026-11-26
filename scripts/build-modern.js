@@ -177,6 +177,7 @@ async function buildPackage(name, output) {
           '@margoengine/decoders/ktx2-stream',
           '@margoengine/text',
           '@margoengine/bvh',
+          '@margoengine/bvh/gpu-scene',
           '@margoengine/splines',
           '@margoengine/splines/frames',
           '@margoengine/vfx',

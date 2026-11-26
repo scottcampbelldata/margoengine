@@ -2267,6 +2267,10 @@
       "types": "./dist/post/gtao.d.ts",
       "import": "./dist/post/gtao.js"
     },
+    "./post/rt-reflections": {
+      "types": "./dist/post/rt-reflections.d.ts",
+      "import": "./dist/post/rt-reflections.js"
+    },
     "./post/ssgi": {
       "types": "./dist/post/ssgi.d.ts",
       "import": "./dist/post/ssgi.js"

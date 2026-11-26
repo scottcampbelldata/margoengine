@@ -9,6 +9,9 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 export class SSR implements EnginePlugin {
     readonly options: SSROptions;
     readonly name = "ssr";
+    protected engine?: Engine;
+    protected stack?: PostStack;
+    protected traced?: SSRTrace;
     constructor(options?: SSROptions);
     static attach(engine: EngineKernel, options?: SSROptions): SSR;
     add(model: SSRModel): () => void;
@@ -42,9 +45,35 @@ export interface SSROptions {
     stochastic?: boolean;
 }
 
+export interface SSRTrace {
+    active(device: GPUDevice): boolean;
+    prepare(context: PostPassContext): void;
+    mirror(code: string, models: boolean): string;
+    rough(code: string): string;
+    group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
+
 // Not exported from this entry, but used by the exports above:
 
 type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+class PostStack implements EnginePlugin {
+    readonly name = "post:stack";
+    constructor(effects?: readonly EnginePlugin[]);
+    static attach(engine: EngineKernel, effects?: readonly EnginePlugin[]): PostStack;
+    static join(engine: EngineKernel, effect: EnginePlugin, index?: number): PostStack;
+    get effects(): readonly EnginePlugin[];
+    get depthTexture(): GPUTexture | undefined;
+    get sceneTexture(): GPUTexture | undefined;
+    addEffect(effect: EnginePlugin, index?: number): this;
+    removeEffect(effect: EnginePlugin): boolean;
+    moveEffect(effect: EnginePlugin, index: number): this;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
 ```

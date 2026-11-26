@@ -308,6 +308,9 @@ export interface SSGIOptions {
 export class SSR implements EnginePlugin {
     readonly options: SSROptions;
     readonly name = "ssr";
+    protected engine?: Engine;
+    protected stack?: PostStack;
+    protected traced?: SSRTrace;
     constructor(options?: SSROptions);
     static attach(engine: EngineKernel, options?: SSROptions): SSR;
     add(model: SSRModel): () => void;
@@ -385,4 +388,12 @@ type PostPassContext = Extract<PassContext, {
 type PostPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface SSRTrace {
+    active(device: GPUDevice): boolean;
+    prepare(context: PostPassContext): void;
+    mirror(code: string, models: boolean): string;
+    rough(code: string): string;
+    group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
 ```

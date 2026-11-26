@@ -50,6 +50,20 @@ export interface SSRCapture {
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
+/** What a ray-traced subclass of SSR (`RTReflections`, @margoengine/post/rt-reflections) gives it: while `active` is true
+ * the composite and rough trace are patched to trace a scene in bind group 1 where the screen holds no hit. */
+export interface SSRTrace {
+  /** True when this frame traces; false runs plain SSR. Validates the subclass's options. */
+  active(device: GPUDevice): boolean;
+  /** Writes this view's tracing uniforms, after SSR's own (render pass `ssr:gbuffer`). */
+  prepare(context: PostPassContext): void;
+  /** The mirror composite with tracing added. */
+  mirror(code: string, models: boolean): string;
+  /** The stochastic rough trace with tracing added. */
+  rough(code: string): string;
+  /** Bind group 1 of a patched pipeline for the view `prepare` last wrote. */
+  group(device: GPUDevice, pipeline: GPURenderPipeline): GPUBindGroup;
+}
 /** What `ssr.add` takes: a gltf/pbr `PBRModel`, a `@margoengine/materials` mesh, a `Terrain` (@margoengine/terrain) or
  * a `Water` (@margoengine/water). */
 export interface SSRModel {
@@ -249,11 +263,13 @@ const formats: GPUTextureFormat[] = ['rgba16float', 'rgb10a2unorm', 'rgb10a2unor
  * matrix is not invertible. */
 export class SSR implements EnginePlugin {
   readonly name = 'ssr';
-  private engine?: Engine;
+  protected engine?: Engine;
   /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
   private device?: GPUDevice;
   private host?: StackHost;
-  private stack?: PostStack;
+  protected stack?: PostStack;
+  /** Set by ray-traced subclasses. */
+  protected traced?: SSRTrace;
   private disposed = false;
   private uniform?: GPUBuffer;
   private sampler?: GPUSampler;
@@ -440,6 +456,7 @@ export class SSR implements EnginePlugin {
     v[39] = +this.enabled;
     this.slice = writeUniform(c.device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     if (!this.enabled) return;
+    if (this.traced?.active(c.device)) this.traced.prepare(c);
     // Material replay of core's lit shader with its lighting in a dead block (every binding stays statically used, so the
     // pass bindings fit the auto layout, but none of the light is computed), from its shading normal `let n=normalize(i.normal)…` and view vector
     // `let v=normalize(frame.eye.xyz-i.position)` (tests/shader-contracts). A 1x scene is replayed depth-equal against its
@@ -523,16 +540,27 @@ export class SSR implements EnginePlugin {
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const models = this.models.size > 0,
       rough = this.stochastic,
-      key = output.format + output.multisample.count + output.hdr + models + rough + premultipliedCanvas(this.engine),
+      traced = this.traced?.active(c.device) ? this.traced : undefined,
+      key =
+        output.format +
+        output.multisample.count +
+        output.hdr +
+        models +
+        rough +
+        premultipliedCanvas(this.engine) +
+        !!traced,
       code = output.hdr ? linearComposite : compositeShader,
       shader = models ? guarded(code) : code;
     if (this.key !== key) {
       this.key = key;
-      const full = rough ? roughComposite(shader, models) : shader;
+      const plain = rough ? roughComposite(shader, models) : shader,
+        full = traced ? traced.mirror(plain, models) : plain;
       this.composite = render(c.device, output.hdr ? full : displayFor(this.engine, full), output.format, {
         multisample: output.multisample,
       });
       this.input = undefined;
+      // The rough trace is patched the same way, so it is rebuilt with the composite.
+      this.roughTrace = undefined;
     }
     if (this.input !== input) {
       this.input = input;
@@ -551,7 +579,7 @@ export class SSR implements EnginePlugin {
       );
       if (rough) {
         const device = c.device;
-        this.roughTrace ??= render(device, roughTraceShader, 'rgba16float');
+        this.roughTrace ??= render(device, traced ? traced.rough(roughTraceShader) : roughTraceShader, 'rgba16float');
         this.roughResolve ??= render(device, roughResolveShader, 'rgba16float');
         this.roughTraceGroups = uniformGroups(this.uniform!, (uniform) =>
           bind(device, this.roughTrace!, [
@@ -583,19 +611,20 @@ export class SSR implements EnginePlugin {
         pass.draw(3);
         pass.end();
       }
-    if (this.enabled && rough) this.traceRough(c);
+    if (this.enabled && rough) this.traceRough(c, traced);
     this.compositeAttachment.view = output.view;
     this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.compositePass);
     pass.setPipeline(this.composite!);
     pass.setBindGroup(0, this.compositeGroups!.get(this.slice));
+    if (traced) pass.setBindGroup(1, traced.group(c.device, this.composite!));
     applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
   /** Rough reflections for this frame: the noisy trace, the resolve against the history, then the resolve becomes the
    * next frame's history. The history restarts after a resize, a switch of `stochastic` or `enabled`. */
-  private traceRough(c: PostPassContext): void {
+  private traceRough(c: PostPassContext, traced: SSRTrace | undefined): void {
     const r = this.roughValues;
     r.set(this.roughFrames ? this.previous : this.values.subarray(16, 32));
     r[16] = this.roughSeed = (this.roughSeed + 1) >>> 0;
@@ -611,6 +640,7 @@ export class SSR implements EnginePlugin {
       const encoder = c.encoder.beginRenderPass(pass);
       encoder.setPipeline(pipeline);
       encoder.setBindGroup(0, groups.get(this.slice));
+      if (traced && pipeline === this.roughTrace) encoder.setBindGroup(1, traced.group(c.device, pipeline));
       encoder.draw(3);
       encoder.end();
     }
