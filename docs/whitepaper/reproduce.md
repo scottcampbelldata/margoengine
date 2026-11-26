@@ -4544,6 +4544,15 @@ clearance at contact. The flight, film and wake ports track the same drop's volu
 normal impulse. A separate turning trajectory catches an impact between two positive
 clearances while a companion outside the tray keeps flying.
 
+### FLUID-07 moving window render
+
+With the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`.
+The 6 mm pane follows a rigid body rolling at 0.35 rad/s. Its film advances at 60 Hz,
+and a wet rim sends detached drops into the flight solver. The test holds the camera
+and engine state fixed while hiding each liquid surface in turn. It compares 640 × 480
+rendered frames and writes the wet captures under `test-results/fluid07-window/`.
+Snapshot replay compares both the world hash and the exact rendered pixels on each backend.
+
 ### SEA-08 hull-to-wake displacement
 
 Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.

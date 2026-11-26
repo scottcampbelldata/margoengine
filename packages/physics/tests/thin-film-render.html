@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Moving wet window</title></head>
+<body style="margin:0">
+<canvas width="640" height="480" style="display:block"></canvas>
+<script type="module">
+  import { Engine } from '/packages/core/dist/extension.js';
+  import { boxGeometry, sphereGeometry } from '/packages/geometry/dist/primitives.js';
+  import { Material, Texture, createMesh } from '/packages/materials/dist/index.js';
+  import { Transmission } from '/packages/materials/dist/transmission.js';
+  import { rotateByQuaternion } from '/packages/math/dist/quat.js';
+  import { PostStack } from '/packages/post/dist/index.js';
+  import { Tonemap } from '/packages/tonemap/dist/index.js';
+  import { Physics } from '../dist/index.js';
+  import { ThinFilmSolver, ThinFilmDropFlight } from '../dist/thin-film.js';
+  import { PhysicsWorld, RigidSolver, worldMemory } from '../dist/world.js';
+
+  const spacing = 0.009;
+  const columns = 32, rows = 36;
+  const width = columns * spacing, height = rows * spacing, glassThickness = 0.006;
+  const corner = [-width / 2, height / 2, -glassThickness / 2];
+  const depth = Float64Array.from({ length: columns * rows }, (_, i) => {
+    const x = i % columns, y = Math.floor(i / columns);
+    const centre = 16 + 0.8 * Math.sin(y * 0.17);
+    const runnel = Math.max(0, 1 - Math.abs(x - centre) / 2.8);
+    const feed = Math.max(0, 1 - Math.hypot(x - 8, (y - 13) * 0.29) / 2.5);
+    return 0.0011 * runnel + 0.0007 * feed;
+  });
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(true) });
+  await Physics.load({ threads: true });
+  const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+  const pane = physics.addBody(null, {
+    position: [0, 0.23, 0],
+    angularVelocity: [0.35, 0, 0],
+    gravityScale: 0,
+    colliders: { shape: 'box', halfExtents: [width / 2, height / 2, glassThickness / 2], mass: 2 },
+  });
+  const film = await ThinFilmSolver.load({ rigid: true, drops: true });
+  const flight = new ThinFilmDropFlight(film.dropsField);
+  world.add(film, {
+    bodyRow: pane.row,
+    cells: [columns, rows],
+    spacing,
+    origin: corner,
+    v: [0, -1, 0],
+    depth,
+    drains: [false, false, false, true],
+    outlets: [{ edge: 'v1', index: 16, radius: 0.0016 }],
+  });
+  world.add(new RigidSolver(), { physics });
+  world.add(flight, { flightTime: 0.28 });
+  const start = world.takeSnapshot();
+  const engine = await Engine.create(document.querySelector('canvas'), {
+    backend: 'webgpu', camera: { position: [0.065, 0.16, -0.73], target: [0, 0.16, 0], near: 0.05, far: 4 },
+  });
+  engine.stop();
+  engine.lighting.direction.set([0.25, 0.55, -1, 2.4]);
+  engine.lighting.radiance.set([1, 0.97, 0.92, 0.28]);
+  const errors = [];
+  engine.onError = error => errors.push(String(error));
+  engine.gpu.addEventListener('uncapturederror', ({ error }) => errors.push(error.message));
+  const stack = PostStack.attach(engine, [new Tonemap({ curve: 'neutral' })]);
+  const transmission = Transmission.attach(engine);
+  const backing = new Material({ color: '#a4a398', roughness: 0.78 });
+  const rib = new Material({ color: '#54636a', roughness: 0.49, metalness: 0.32 });
+  const metal = new Material({ color: '#465259', roughness: 0.45, metalness: 0.41 });
+  const glass = new Material({ transmission: 1, ior: 1.5, roughness: 0.11, thickness: glassThickness });
+  const statics = [];
+  function box(sizes, position, material) {
+    const mesh = createMesh(engine, boxGeometry(...sizes), material);
+    mesh.root.setPosition(position);
+    statics.push(mesh);
+    return mesh;
+  }
+
+  box([1.8, 1.25, 0.06], [0, 0.21, 0.39], backing);
+  box([1.3, 0.04, 0.42], [0, -0.09, 0.14], metal);
+  for (let i = -3; i <= 3; i++) box([0.015, 0.48, 0.045], [i * 0.093, 0.21, 0.33], rib);
+  const glazing = box([width, height, glassThickness], [0, 0, 0], glass);
+  transmission.add(glazing);
+  const frames = [
+    ...[-1, 1].map(sign => ({
+      mesh: box([0.022, height + 0.034, 0.027], [0, 0, 0], metal),
+      offset: [sign * (width + 0.022) / 2, 0, 0],
+    })),
+    ...[-1, 1].map(sign => ({
+      mesh: box([width, 0.023, 0.027], [0, 0, 0], metal),
+      offset: [0, sign * (height + 0.023) / 2, 0],
+    })),
+  ];
+
+  const floatDepths = new Float64Array(columns * rows);
+  const texels = new Uint8Array(columns * rows * 4);
+  const thickness = new Texture({ data: texels, width: columns, height: rows }, {
+    colorSpace: 'linear', flipY: false, mipmaps: false,
+  });
+  const water = new Material({ transmission: 1, thicknessMap: thickness, ior: 1.333, roughness: 0.045 });
+  const droplets = [];
+  let waterMesh;
+  function waterGeometry() {
+    film.depths(floatDepths);
+    const positions = new Float32Array(floatDepths.length * 3);
+    const normals = new Float32Array(positions.length);
+    const uvs = new Float32Array(floatDepths.length * 2);
+    const indices = [];
+    water.thickness = floatDepths.reduce((deepest, value) => Math.max(deepest, value), 0);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < columns; x++) {
+        const i = x + y * columns, h = floatDepths[i];
+        const left = x > 0, right = x + 1 < columns, above = y > 0, below = y + 1 < rows;
+        positions.set([corner[0] + (x + 0.5) * spacing, corner[1] - (y + 0.5) * spacing, corner[2] - h], 3 * i);
+        const du = (floatDepths[i + Number(right)] - floatDepths[i - Number(left)]) / ((Number(left) + Number(right)) * spacing);
+        const dv = (floatDepths[i + columns * Number(below)] - floatDepths[i - columns * Number(above)]) / ((Number(above) + Number(below)) * spacing);
+        const length = Math.hypot(du, dv, 1);
+        normals.set([-du / length, dv / length, -1 / length], 3 * i);
+        uvs.set([(x + 0.5) / columns, 1 - (y + 0.5) / rows], 2 * i);
+        const green = water.thickness > 0 ? Math.round(255 * h / water.thickness) : 0;
+        texels.set([255, green, 0, 255], 4 * (x + (rows - 1 - y) * columns));
+        if (right && below) {
+          const a = i + 1, b = i + columns, c = b + 1;
+          if (h || floatDepths[a] || floatDepths[b]) indices.push(i, a, b);
+          if (floatDepths[a] || floatDepths[c] || floatDepths[b]) indices.push(a, c, b);
+        }
+      }
+    }
+    thickness.update();
+    return { positions, normals, uvs, indices };
+  }
+  function clearWater() {
+    waterMesh?.dispose();
+    waterMesh = undefined;
+    while (droplets.length) {
+      const [mesh, material] = droplets.pop();
+      mesh.dispose();
+      material.dispose();
+    }
+  }
+  async function draw({ wet = true, drops = true } = {}) {
+    clearWater();
+    const position = pane.position, rotation = pane.rotation;
+    glazing.root.setPosition(position).setQuaternion(rotation);
+    for (const { mesh, offset } of frames) {
+      mesh.root.setPosition(rotateByQuaternion(offset, rotation).map((x, i) => x + position[i])).setQuaternion(rotation);
+    }
+    if (wet) {
+      const geometry = waterGeometry();
+      if (geometry.indices.length) {
+        waterMesh = createMesh(engine, geometry, water);
+        waterMesh.root.setPosition(position).setQuaternion(rotation);
+        transmission.add(waterMesh);
+      }
+    }
+    if (drops) {
+      for (const drop of flight.readDrops()) {
+        const material = new Material({ transmission: 1, ior: 1.333, thickness: drop.diameter, roughness: 0.045 });
+        const mesh = createMesh(engine, sphereGeometry(drop.diameter / 2, 16, 8), material);
+        mesh.root.setPosition(drop.position);
+        transmission.add(mesh);
+        droplets.push([mesh, material]);
+      }
+    }
+    await engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { hash: world.hash(), position, rotation, budget: film.budget, drops: flight.readDrops(), errors };
+  }
+  window.wetWindow = {
+    draw,
+    seek(tick) { world.restoreSnapshot(start.bytes); world.advance(tick); },
+    advance() {
+      for (let tick = 1; tick <= 75; tick++) {
+        world.advance(tick);
+        if (tick >= 16 && flight.readDrops().some(drop => drop.age >= 0.08)) return tick;
+      }
+      return 0;
+    },
+    dispose() {
+      clearWater();
+      for (const mesh of statics) mesh.dispose();
+      for (const material of [water, glass, metal, rib, backing]) material.dispose();
+      thickness.dispose();
+      transmission.dispose();
+      stack.dispose();
+      engine.dispose();
+      physics.dispose();
+    },
+  };
+</script>
+</body>
+</html>
