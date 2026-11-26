@@ -196,7 +196,9 @@ Each frame, before any draw, every primitive of an added model that has `instanc
 compacts the kept rows in order, and sets `primitive.redirect`, gltf/pbr's hook for this, which core's `Batch.redirect`
 matches; every draw of the primitive in that frame (main pass, SSAO, outline) reads the kept rows with one indirect draw.
 A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInstancedMesh` all go the same way. With no
-`minRadius` the image is the same as without culling.
+`minRadius` the image is the same as without culling. An instanced primitive whose material reads data by instance
+index (`@margoengine/materials` `instanceAttributes`) is the exception: it draws all its rows in place, unculled, here
+and under `FrontToBack`, since a reordered row would give an instance another's values.
 
 - `culled.add(model, {padding})` and `culled.remove(model)` work at any time. A shader that moves vertices past the
   geometry, such as a displacement map, needs `padding` of at least the farthest it moves them, in the primitive's units.

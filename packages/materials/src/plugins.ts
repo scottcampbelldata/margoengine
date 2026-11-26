@@ -16,6 +16,7 @@ import type { CasterDisplacement } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import type { Material, MaterialFeature, Texture } from './built-material.js';
 import type { MaterialValueCodec } from './serialization.js';
+import type { InstanceAttributes, InstanceAttributeSchema } from './instance-attributes.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
 /** The named points of the stock PBR shader a plugin's WGSL runs at. Each is the body of a function; see the README. */
@@ -44,6 +45,8 @@ export interface MaterialPluginOptions<U extends MaterialPluginValues = Material
   textures?: Readonly<Record<string, Texture>>;
   /** Module-scope WGSL helpers (functions, constants); prefix their names with the plugin's name. Default none. */
   declarations?: string;
+  /** Per-instance values (`instanceAttributes()` of `/instance-attributes`), read at every point as `<name>_<attribute>`. Fixed at creation; their values stay live. Default none. */
+  instanceAttributes?: InstanceAttributes<InstanceAttributeSchema>;
 }
 /** What `materialPlugin()` returns: a material feature with live uniforms and textures. */
 export interface MaterialPlugin<U extends MaterialPluginValues = MaterialPluginValues> extends MaterialFeature {
@@ -55,19 +58,23 @@ export interface MaterialPlugin<U extends MaterialPluginValues = MaterialPluginV
   readonly uniforms: { -readonly [K in keyof U]: MaterialPluginUniform<U[K]> };
   /** Live textures: assign another Texture of the same dimension under the same name. */
   readonly textures: Record<string, Texture>;
+  /** The per-instance values this plugin reads, when it was given any. */
+  readonly instanceAttributes?: InstanceAttributes<InstanceAttributeSchema>;
 }
 
 const help = '; see https://margoengine.com/errors#material-plugins',
   points = ['vertex', 'surface', 'light', 'output'] as const,
-  known = new Set<string>([...points, 'name', 'uniforms', 'textures', 'declarations']),
+  known = new Set<string>([...points, 'name', 'uniforms', 'textures', 'declarations', 'instanceAttributes']),
   identifier = /^[A-Za-z][A-Za-z0-9]*$/,
   // Module-scope names of the PBR shader and its patches, the locals each point gives, and WGSL keywords and types.
   taken =
     /^(?:f|i|s|v|o|p|uv|color|position|normal|front|surface|ambient|hemisphere_ambient|direct_light|layers|ggx|uniforms|shade|displace|fragment|gbuffer|vertex|transparent|capture|(?:base|mr|normal|ao|emissive)(?:Map|Sampler)|margo\w*|mat_\w*|nd\w*|cluster\w*|shadow\w*|alias|break|case|const|continue|continuing|default|diagnostic|discard|else|enable|false|fn|for|if|let|loop|override|requires|return|struct|switch|true|var|while|bool|f16|f32|i32|u32|vec[234][fiuh]?|mat[234]x[234][fh]?|array|atomic|ptr|sampler|texture\w*)$/,
   MAX_PLUGINS = 8,
   MAX_TEXTURES = 4,
-  // Binding of plugin k (its place among a material's plugins) in the material's group: a block of 16 from 300.
+  // Binding of plugin k (its place among a material's plugins) in the material's group: a block of 16 from 300, its
+  // instance attributes after the uniforms and texture pairs.
   first = (k: number) => 300 + 16 * k,
+  ROWS = 1 + 2 * MAX_TEXTURES,
   types: Record<string, string> = {
     '2d': 'texture_2d<f32>',
     '2d-array': 'texture_2d_array<f32>',
@@ -112,7 +119,8 @@ const unsupported = (what: string) =>
 
 /** Internal state of one plugin, reached from its feature object. */
 interface State {
-  readonly id: number;
+  /** Names the plugin in shader and caster caches; renewed when its GPU buffers are freed. */
+  id: number;
   readonly name: string;
   readonly code: MaterialPluginPoints & { declarations?: string };
   readonly sizes: Record<string, number>;
@@ -120,6 +128,7 @@ interface State {
   readonly data: Float32Array;
   readonly textures: Record<string, Texture>;
   readonly buffers: Map<GPUDevice, { buffer: GPUBuffer; last: Float32Array }>;
+  readonly rows: InstanceAttributes<InstanceAttributeSchema> | undefined;
 }
 const states = new WeakMap<MaterialFeature, State>();
 let nextId = 1;
@@ -154,6 +163,7 @@ function entriesOf(p: State, k: number, device: GPUDevice): GPUBindGroupEntry[] 
     const [view, sampler] = texture.bind(device, true) ?? whiteTexture(device, texture.dimension);
     out.push({ binding: base + 1 + 2 * j, resource: view }, { binding: base + 2 + 2 * j, resource: sampler });
   });
+  if (p.rows) out.push(p.rows.entry(device, base + ROWS));
   return out;
 }
 /** Resource declarations, helpers and point functions of `p`, plugin `k`, in `group`; `only` limits the points. */
@@ -167,6 +177,7 @@ function declare(p: State, k: number, group: number, only: readonly (typeof poin
   Object.keys(p.textures).forEach((key, j) => {
     out += `@group(${group}) @binding(${base + 1 + 2 * j}) var ${n}_${key}:${types[p.textures[key].dimension]};\n@group(${group}) @binding(${base + 2 + 2 * j}) var ${n}_${key}Sampler:sampler;\n`;
   });
+  if (p.rows) out += p.rows.declare(n, group, base + ROWS);
   if (p.code.declarations) out += p.code.declarations + '\n';
   const c = p.code;
   if (c.vertex && only.includes('vertex'))
@@ -202,16 +213,26 @@ function vertexBody(code: string): [number, number] | undefined {
   }
   return undefined;
 }
-/** The vertex chain of `list` (plugins with vertex code): `margoPV` from the mesh position and normal through each. */
-const chain = (list: readonly State[]) =>
-  chainStart + list.map((p) => `margoPV=margoPlugin_${p.name}_vertex(margoPV.position,margoPV.normal);`).join('');
+/**
+ * The vertex chain of `list` (plugins with vertex code): `margoPV` from the mesh position and normal through each, each
+ * after its instance attributes of row `row` are loaded.
+ */
+const chain = (list: readonly State[], row: string) =>
+  chainStart +
+  list
+    .map(
+      (p) =>
+        (p.rows ? `margoInstanceLoad_${p.name}(${row});` : '') +
+        `margoPV=margoPlugin_${p.name}_vertex(margoPV.position,margoPV.normal);`,
+    )
+    .join('');
 /**
  * `code` with its vertex stage reading the plugins' moved position and normal in place of the mesh's: every
  * `i.position.xyz` and `i.normal.xyz` of the vertex body, after the chain at its start (and `extra`). The moved normal
  * is `margoNormal`, the name gltf/pbr's instancing and a NodeMaterial's normal move already read; a body that declares
  * one of its own (a NodeMaterial graph) reads `margoPV.normal` inside it instead.
  */
-function moveVertex(code: string, list: readonly State[], extra = ''): string {
+function moveVertex(code: string, list: readonly State[], row: string, extra = ''): string {
   const body = vertexBody(code);
   if (!body || !/\bnormal:vec4f/.test(code) || !code.slice(body[0], body[1]).includes('i.position.xyz'))
     throw unsupported('vertex');
@@ -222,7 +243,7 @@ function moveVertex(code: string, list: readonly State[], extra = ''): string {
       .replaceAll('i.normal.xyz', own ? 'margoPV.normal' : 'margoNormal');
   return (
     code.slice(0, body[0]) +
-    chain(list) +
+    chain(list, row) +
     extra +
     (own ? '' : 'let margoNormal=margoPV.normal;') +
     inner +
@@ -243,7 +264,13 @@ function composeShader(code: string, group: number, list: readonly State[]): str
     .map((p) => `s=margoPlugin_${p.name}_surface(i,s);`)
     .join('');
   if (calls) out = out.replace(surfaceSite, (site) => calls + '\n  ' + site);
-  if (moved.length) out = moveVertex(out, moved);
+  if (moved.length) out = moveVertex(out, moved, 'i.ndInstance');
+  const instanced = list.filter((p) => p.rows);
+  if (instanced.length)
+    out = instanced[0].rows!.host(
+      out,
+      instanced.filter((p) => p.code.surface || p.code.light || p.code.output).map((p) => p.name),
+    );
   return (
     (moved.length ? vertexStruct : '') +
     list.map((p, k) => declare(p, k, group, ['vertex', 'surface', 'light', 'output'])).join('') +
@@ -265,7 +292,14 @@ function composeLit(code: string, list: readonly State[]): string {
   }
   if (output.length) {
     if (!out.includes('return vec4f(color,')) throw unsupported('output');
-    out = out.replace('return vec4f(color,', () => output.join('') + 'return vec4f(color,');
+    out = out
+      .replace('return vec4f(color,', () => output.join('') + 'return vec4f(color,')
+      // Unlit, normal and matcap shadings return before the lit code: their colour goes through the point there.
+      .replace(
+        /return vec4f\(((?:mat_out|normalize)\(.*?),alpha\);/g,
+        (_, own: string) =>
+          `{let v=normalize(f.eye.xyz-i.position);var color:vec3f=${own};${output.join('')}return vec4f(color,alpha);}`,
+      );
   }
   return out;
 }
@@ -296,6 +330,13 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
     used.map(([p, k]) => declare(p, k, group, ['vertex'])).join('');
   // The map moves along the moved normal after the plugins, as the colour pass does.
   const mapMove = own ? 'margoPV.position+=margoPV.normal*margoDisplacement(i.uv);' : '';
+  // A depth pass reads its row from the built-in itself: it draws a primitive's instances in row order.
+  const withRow = (code: string) => {
+    if (!moved.some((p) => p.rows)) return code;
+    const entry = '@vertex fn vertex(';
+    if (!code.includes(entry)) throw unsupported('vertex');
+    return code.replace(entry, `${entry}@builtin(instance_index) margoRow:u32,`);
+  };
   const state: CasterState = {
     device,
     key,
@@ -303,15 +344,16 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
     record: {
       key,
       cuts: false,
-      depth: (code: string, group: number) => declarations(group) + moveVertex(code, moved, phony(moved) + mapMove),
+      depth: (code: string, group: number) =>
+        declarations(group) + withRow(moveVertex(code, moved, 'margoRow', phony(moved) + mapMove)),
       velocity: (code: string, group: number) => {
         const start = '{var o:Out;';
         if (!code.includes(start) || !/\bnormal:vec4f/.test(code)) throw unsupported('vertex');
         return (
           declarations(group) +
-          code.replace(
+          withRow(code).replace(
             start,
-            () => `${start}${chain(moved)}${phony(moved)}${mapMove}let margoPosition=margoPV.position;`,
+            () => `${start}${chain(moved, 'margoRow')}${phony(moved)}${mapMove}let margoPosition=margoPV.position;`,
           )
         );
       },
@@ -337,6 +379,9 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
               : []),
             ...used.flatMap(([p, k]) => [
               ...(p.keys.length ? [{ binding: first(k), visibility: 3, buffer: {} }] : []),
+              ...(p.rows
+                ? [{ binding: first(k) + ROWS, visibility: 3, buffer: { type: 'read-only-storage' as const } }]
+                : []),
               ...Object.values(p.textures).flatMap((t, j) => [
                 {
                   binding: first(k) + 1 + 2 * j,
@@ -387,6 +432,11 @@ export function materialPlugin<U extends MaterialPluginValues = MaterialPluginVa
     throw new TypeError(
       `Material plugin '${name}' declarations may not bind resources; use uniforms and textures${help}`,
     );
+  const rows = options.instanceAttributes;
+  if (rows !== undefined && (typeof Reflect.get(Object(rows), 'entry') !== 'function' || !rows.types))
+    throw new TypeError(
+      `Material plugin '${name}' instanceAttributes must come from instanceAttributes(); pass that object${help}`,
+    );
   const keys = Object.keys(uniforms).map((k) => checkName('uniform', k)),
     sizes: Record<string, number> = {};
   for (const k of keys) sizes[k] = components(uniforms[k], k);
@@ -395,6 +445,12 @@ export function materialPlugin<U extends MaterialPluginValues = MaterialPluginVa
     throw new RangeError(
       `Material plugin '${name}' takes at most ${MAX_TEXTURES} textures; pack channels together${help}`,
     );
+  // An attribute reads as `<name>_<attribute>`, in the namespace of the textures and of the PBR shader's own names.
+  for (const k of Object.keys(rows?.types ?? {}))
+    if (textureKeys.some((t) => k === t || k === t + 'Sampler') || taken.test(`${name}_${k}`))
+      throw new TypeError(
+        `Material plugin instance attribute '${k}' reads as '${name}_${k}', a texture's or the PBR shader's name; rename one${help}`,
+      );
   for (const k of textureKeys) {
     if (k in sizes) throw new TypeError(`Material plugin texture '${k}' is also a uniform; rename one${help}`);
     if (!isTexture(textures[k]))
@@ -439,6 +495,7 @@ export function materialPlugin<U extends MaterialPluginValues = MaterialPluginVa
     data,
     textures: store,
     buffers: new Map(),
+    rows,
   };
   let users = 0;
   const cached = new Map<string, string>();
@@ -448,6 +505,9 @@ export function materialPlugin<U extends MaterialPluginValues = MaterialPluginVa
     code: state.code,
     uniforms: Object.seal(liveUniforms) as MaterialPlugin<U>['uniforms'],
     textures: Object.seal(liveTextures) as Record<string, Texture>,
+    instanceAttributes: rows,
+    // Read by GPU cullers and sorters: reordered instance rows would give instances each other's values.
+    instanceRows: !!rows,
     shader(source, group, material) {
       const list = pluginsOf(material);
       if (list[0] !== state) return source;
@@ -472,12 +532,16 @@ export function materialPlugin<U extends MaterialPluginValues = MaterialPluginVa
       return pluginsOf(material)[0] === state ? casterOf(material, device, map) : undefined;
     },
     attach() {
+      if (!users) rows?.retain();
       users++;
     },
     detach() {
       if (--users > 0) return;
       for (const { buffer } of state.buffers.values()) buffer.destroy();
       state.buffers.clear();
+      rows?.release();
+      // Caster records bind the freed buffers: a material that takes the plugin back must make new ones.
+      state.id = nextId++;
     },
   };
   states.set(feature, state);
@@ -498,6 +562,7 @@ export const materialPluginCodec: MaterialValueCodec = {
       Object.entries(v.uniforms).map(([k, x]) => [k, typeof x === 'number' ? x : Array.from(x)]),
     ),
     textures: { ...v.textures },
+    ...(v.instanceAttributes ? { instanceAttributes: v.instanceAttributes } : {}),
   }),
   restore: (data: MaterialPluginOptions) => materialPlugin(data),
 };

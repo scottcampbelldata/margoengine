@@ -442,6 +442,11 @@ export interface MaterialFeature {
   attach?(material: Material): void;
   /** Called when the feature leaves a material. */
   detach?(material: Material): void;
+  /**
+   * True when the shader reads per-instance data of its own by instance index (`materialPlugin` with
+   * `instanceAttributes`), so a GPU culler or sorter leaves these instances in their own rows.
+   */
+  readonly instanceRows?: boolean;
 }
 const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'] as const,
   names = ['baseMap', 'mrMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'];
@@ -3278,6 +3283,11 @@ class MaterialShading implements PBRMaterialShading {
   }
   get shaderRevision(): number {
     return shaderRevision(this.m);
+  }
+  get instanceRows(): boolean {
+    const added = this.m['added'];
+    for (let k = 0; k < added.length; k++) if (added[k].instanceRows) return true;
+    return false;
   }
   /**
    * gltf/pbr `PBRMaterialShading.version`: the largest change stamp of the material and of every texture its bindings

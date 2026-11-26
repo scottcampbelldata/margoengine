@@ -961,6 +961,7 @@ interface PBRMaterial extends GLTFMaterial {
 interface PBRMaterialShading extends LightingEffect {
     readonly replacesTextures?: boolean;
     readonly texturedTint?: boolean;
+    readonly instanceRows?: boolean;
     lit?(code: string): string;
     readonly shaderRevision?: number;
     readonly version?: number;

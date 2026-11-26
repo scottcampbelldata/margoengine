@@ -8,6 +8,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { CullShape } from './shape.js';
 import { compatTier } from '../../shared/compat.js';
 import { viewSize } from '../../shared/view-rect.js';
+import { readsRows } from '../../shared/instances.js';
 import { OccluderList, type OccluderInput } from './occluders.js';
 import { Pyramid, depthKind, levelTable } from './pyramid.js';
 import {
@@ -349,7 +350,8 @@ export class CulledModels implements EnginePlugin {
           continue;
         }
         this.dropPlain(primitive);
-        if (!instances?.count || primitive.deformed) {
+        // A material that reads its rows by index draws all of them in place.
+        if (!instances?.count || primitive.deformed || readsRows(primitive)) {
           this.drop(primitive);
           continue;
         }

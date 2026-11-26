@@ -1797,6 +1797,11 @@ export interface PBRMaterialShading extends LightingEffect {
   readonly replacesTextures?: boolean;
   readonly texturedTint?: boolean;
   /**
+   * True when the shader reads data of its own by instance index: `@margoengine/culling` then draws these instances in
+   * their own rows instead of compacting or sorting them.
+   */
+  readonly instanceRows?: boolean;
+  /**
    * Rewrites the shader once the model's lighting effects are composed in (`shader` runs before them): Lambert and Phong
    * materials give clustered lights their own BRDF there. Return `code` itself to leave it unchanged.
    */
