@@ -1434,6 +1434,23 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
 6. Add a SEA-12 two-way coupling test, and a Domenici and Blake 1997 fast-start radius check.
 7. Add a SIMD Rust hot loop (`grep` finds no `v128` in `lib.rs`) or record the work counts. Correct limits.md (it does not state the 3 Hz cap or the missing wake consumer).
 
+**Handed back to Codex (2026-11-26), unfinished work on branch `claude/life-03-wip` (fbab02274), not landed:** to-do 3 and
+the form-drag half of to-do 4, plus a moving-wall friction model. Take it, finish it, or drop it; nothing of it is on main.
+- The default maximum tail frequency is the fast bound of Sanchez-Rodriguez, Raufaste and Argentina 2023 (Nature
+  Communications 14, 5569): the root of (L/Lc)^2 = (f0/f)^2 (1 - f/f0)/(1 + kappa f/f0) with f0 = 21 Hz, Lc = 0.5 m,
+  kappa = 4 (`maximumTailFrequency(length)`), replacing the fixed 3 Hz.
+- The body's form drag is Hoerner's form factor on its skin friction, 1 + 1.5 (d/L)^1.5 + 7 (d/L)^3, d = (width height)^1/2.
+  `formDragArea` becomes an extra area, default 0.
+- The laminar share of the skin friction is raised by the moving wall of the swimming wave: the body and cycle mean of the
+  larger of the Blasius and the moving-wall frictions (Ehrenstein and Eloy 2013, JFM, eqs. 5.3 and 5.4 from 2.11 with
+  C_3D = 1.8; about 20% at St 0.3). Computed in the kernel without trig (`moving_wall`).
+- The swim tests pass 25/25. Not done: the Bainbridge/Taylor validation test, docs and README.
+- Measured with published morphometrics (peak-to-peak 0.2 L, wavelength L, tail span 0.25 L, width 0.1 L, height 0.2 L), at
+  0.3 to 0.8 of the maximum frequency for 0.1, 0.3 and 1 m bodies: 0.88 to 0.96 L per beat and St 0.21 to 0.23. That is
+  inside Videler's 0.5 to 1.0 and Taylor's 0.2 to 0.4, but faster than Bainbridge's U = L (3f - 4)/4 (0.75 L a beat). The
+  likely cause is the small-amplitude reactive thrust (Hess and Videler 1984; Anderson et al. 2001). The next step was
+  Lighthill 1971 large-amplitude thrust, whose tail inclination (about 32 degrees here) lowers it.
+
 ### LIFE-04 Collective animal motion (`@margoengine/physics/schooling`, `behavior/src/steering.ts`, commits d50e1fb72, 8f568e67d, de25a7f79, 006faf636, ba4efdc15), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/schooling/solver.ts`, `kernel.ts`, `ports.ts`, the docs/limits.md "Collective animal motion" section, the audit and demo-review rows. `git log --since=2026-11-25` for the schooling paths shows only the 25 Nov fix commits that the audit already covered. No change since the audit adds noise, seeds, or any validation. Ran under run-with-timeout: `node --test packages/physics/tests/coupling/schooling.test.js packages/behavior/tests/steering.test.js`: 28 pass, 0 fail. The browser test (`packages/physics/tests/physics-browser.js` has a school run at 24/30/60 fps) was not run; no `test:browser:school` script exists.
