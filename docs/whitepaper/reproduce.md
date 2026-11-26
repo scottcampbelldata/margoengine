@@ -1,5 +1,37 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 independent NCAP road-car pulse
+
+Use the longitudinal rear-sill accelerometers, channels 93 and 94, from NHTSA's 56 km/h
+full-width frontal program. Test 8035 is a 2013 Honda Accord EX-L four-door sedan
+(1718 kg, 56.26 km/h). Test 8104 is a separate 2013 Accord EX two-door vehicle
+(1682 kg, 55.65 km/h). The reduced model uses the force-displacement approach
+of M. M. Kamal, *Analysis and Simulation of Vehicle to Barrier Impact* (1970),
+with one effective longitudinal mass. [Kamal](https://doi.org/10.4271/700414)
+
+Average the left and right acceleration channels. Remove the mean from −25 ms
+through −5.1 ms, apply standard gravity 9.80665 m/s² per g and orient deceleration
+positive. Smooth with a centered 41-point mean at the recorded 0.1 ms spacing.
+Trapezoid-integrate from zero time with the test's entrance speed, then integrate
+the resulting speed for dynamic stroke. For test 8035 only, multiply deceleration
+by test mass and interpolate force at each 25 mm of compression through the last
+positive-speed sample. Add that final sample (0.733838 m). The unloading stiffness
+is the squared force at the first nonpositive-speed sample divided by twice the recovered
+translational energy at 140 ms, yielding 16.4761 MN/m. First yield is set at 0.5 g
+of the training vehicle's mass. These choices use test 8035 before the separate
+8104 comparison. [8035 metadata](https://nrd.api.nhtsa.dot.gov/nhtsa/vehicle/api/v1/vehicle-database-test-results/test-no/8035) · [8035 left](https://nrd-static.nhtsa.dot.gov/tsv/vehdb/v00000/v08000/v08035/v08035tsv.093) · [8035 right](https://nrd-static.nhtsa.dot.gov/tsv/vehdb/v00000/v08000/v08035/v08035tsv.094)
+
+Test 8104 contributes only measured initial mass and entrance speed to the simulation.
+Use its acceleration, integrated velocity and dynamic stroke as held-out outputs.
+`node --test packages/physics/tests/coupling/crush-staged.test.js` exercises the live rigid
+pair and compares ten fixed 10–100 ms samples. Compute simulated acceleration using the
+4 ms centered velocity change around each sample. At 1920/3840 Hz the solver gives
+4.272/4.246 g acceleration RMS error and 0.376/0.377 m/s velocity RMS error.
+It stops at 74.47/74.52 ms versus 75.5 ms and reaches 0.7080/0.7109 m compared with
+0.7168 m inferred from the measured sill motion. At 140 ms it rebounds at 3.374/3.393 m/s
+versus 2.952 m/s. This is a one-family full-width comparison of gross vehicle motion.
+[8104 metadata](https://nrd.api.nhtsa.dot.gov/nhtsa/vehicle/api/v1/vehicle-database-test-results/test-no/8104) · [8104 left](https://nrd-static.nhtsa.dot.gov/tsv/vehdb/v00000/v08100/v08104/v08104tsv.093) · [8104 right](https://nrd-static.nhtsa.dot.gov/tsv/vehdb/v00000/v08100/v08104/v08104tsv.094)
+
 ## BREAK-03 staged rail crush
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-staged.test.js`.
