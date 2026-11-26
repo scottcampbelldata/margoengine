@@ -14303,13 +14303,17 @@ split faces or edges. An existing front advances through an eligible adjacent te
 when its projected principal plane crosses the material. Front edge flags travel with
 their material through cuts and snapshots. The advancing front drops its released edge from
 all incident tetrahedra. General mixed-mode propagation remains open.
+An authored finite blade seeds eligible tensile fronts where its paired lips share two
+particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
+principal plane that crosses adjacent cell material. An exactly tangent plane alone does not
+advance by opening a coplanar existing face.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-With released front edges retired, the optional entry measures 141,779 B gzip.
-The base is 45,269 B and the lazy native kernel is 96,646 B.
+With prescribed front seeding, the optional entry measures 141,859 B gzip.
+The base is 45,366 B and the lazy native kernel is 96,646 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -14670,16 +14674,46 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   test of a plant in front of shaded ground; then KB-LOOK-TV-BOUNCE1 (sun to sky-ambient ratio) is measured again.
   Until then the timber-valley bounce, shadowTint and penumbra numbers are not evidence.
 
-### Open 2026-11-26: the smoke haze over a burning valley takes no light from the fire (KB-WEATHER-FIREHAZE1, weather)
+### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=fire-line --query=hour=22 --out=<folder>`: the
+  valley under the blowup's smoke (smoke about 0.6, optical depth about 14) glows orange (KB-WEATHER-FIREHAZE1), while
+  the sky above the ridge is a clear starry night blue, which no pall that thick lets through.
+- **Cause:** a `WeatherDrive` writes the load's light into the sky as `atmosphere.scatteredLight` and dims `sunColor`,
+  and both reach only the day sky (`daySky` in `packages/sky/src/look.ts`); the night dome (stars, moon, twilight) is
+  drawn whatever the load, and the fires' light on the layer (`fireHazeLight`) never reaches the dome.
+- **Owed in sky** (with the drive writing it): the night dome dimmed through the load as the sun is by day, and the
+  layer's own glow (the moon's and the fires' light on it) shown over it, with a regression test and a night still.
+
+### Open 2026-11-26: a fire's glow on its smoke ignores the scene's light units (KB-VFX-GLOWUNITS1, vfx)
+
+- **Repro:** packages/vfx/src/lit.ts: a glow of irradiance E lights a puff as a sun of intensity pi E / 1,000 would,
+  whatever the scene's sun is. In a scene whose sun is 5 (timber valley) the column glow is pi / 5 of what the haze of
+  KB-WEATHER-FIREHAZE1 takes (which refers 1,000 W/m^2 to the sky's `lighting.intensity`); in a scene lit in lux
+  (`lighting.intensity: SUN_ILLUMINANCE`, about 108,000) the glow is invisible.
+- **Cause:** the glow's unit is fixed at 1,000 W/m^2 = intensity pi; nothing tells the lit puffs the scene's noon sun.
+- **Owed in vfx:** the glow referred to the scene's noon sun (the engine sun's intensity at the zenith, or an option),
+  with a test of one fire in a scene at sun 5 and one in lux giving the same share of the noon light.
+
+### Fixed 2026-11-26: the smoke haze over a burning valley took no light from the fire (KB-WEATHER-FIREHAZE1, weather and vfx)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=ridge --query=hour=22 --out=<folder>` after the
-  KB-WEATHER-NIGHTHAZE1 fix: the blowup's smoke haze is moonlit (about 0.1 percent of the noon haze after the smoke's
-  own dimming) and reads black (3, 1, 0), while a valley burning under a smoke pall at night glows orange from below.
-- **Cause:** the sky fog's colour (`WeatherDrive.tintFog`) is lit by the sun, the moon and the twilight sky only; the
-  fire fronts the drive already reads (`fires`, for `smokeEmission`) give the haze no light. A `FireFront`'s smoke
-  columns take the fire's glow (vfx); the sky fog does not.
-- **Owed in weather** (with what the front must report in vfx): the flames' radiant power under the layer lighting the
-  smoke from below, as the sun's share lights it from above, with a regression test and a night still.
+  KB-WEATHER-NIGHTHAZE1 fix: the blowup's smoke haze was moonlit only and read black (3, 1, 0 under the ridge), while a
+  valley burning under a smoke pall at night glows orange from below.
+- **Cause:** the sky fog's colour (`WeatherDrive.tintFog`) was lit by the sun, the moon and the twilight sky only; the
+  fire fronts the drive reads for their smoke gave the haze no light, and a front reported no light to give.
+- **Fix:** `FireFront.radiantPower` (vfx) reports the flames' radiant power, the 0.3 of the release its smoke columns
+  glow with (`RADIANT_SHARE`, pinned equal to the smoke entry's `RADIANT_FRACTION`); `fireHazeLight(watts, width)`
+  (weather) turns it into light on the haze, the box model's light as `smokeFromEmission` is its smoke (the upward half,
+  the point-to-disc view factor of the box's area at the layer's middle, over that area, a share of the noon sun's
+  1,000 W/m^2 in the flames' orange), and the drive adds it to the light on the sky fog (`fireLight`, default 1, 0 off).
+  Real frames (960 x 540, 22:00, blowup): the ridge view's lower half went from 2.6, 1.1, 0.2 to 82.8, 47.9, 5.7, the
+  town's to 43.8, 24.3, 3.7 and the fire line's to 37.7, 22.4, 3.9: the valley glows orange under the smoke. Weak spots
+  left: the glow is even over the whole haze (the sky fog has one colour, so no falloff away from the fire), and the sky
+  dome stays a starry blue over the pall (KB-SKY-NIGHTPALL1).
+- **Regression:** `packages/weather/tests/smoke.test.js` (fires light the smoke haze from below: black with no radiant
+  power, the box model's orange with it, `fireLight` scaling, moonlight adding) and `packages/vfx/test/fire-front.test.js`
+  (`radiantPower`: 0 before ignition, then 0.3 of the release, one share with the smoke columns).
 
 ### Fixed 2026-11-26: the moving look evidence read distances from an 8-bit depth mask (KB-SHOT-DEPTH8BIT1, tools/shot)
 
