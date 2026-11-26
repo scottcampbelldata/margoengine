@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20539249,
+  "total": 20539450,
   "history": [
     {
       "date": "2026-10-24",
@@ -13512,6 +13512,18 @@
       "commit": "ee0546999e",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 4206 to 4943 B gzip (ceiling 5199 B) for mass-conservative live bed consolidation and its impulse and energy receipts. Splitting the deposition path would duplicate field binding and the conservative grid. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "02df0f71ae",
+      "grew": 1,
+      "reason": "KB-SHIPLAMP1: ship lamps glitter through the Water's one glint lobe (seaGlint) and lampRoughness is documented as perceptual; @margoengine/water 34759 to 34779 and @margoengine/water/settings 6675 to 6689 B gzip. The text is shader and row strings already inside those entries; no split applies. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "69ca5def52",
+      "grew": 1,
+      "reason": "KB4000: the native volume tint reads KHR_materials_volume thicknessTexture (margoThickness, slot 20); @margoengine/gltf/pbr 92158 to 92204, gltf/prepare 35545 to 35588 and gltf/worker 92644 to 92722 B gzip. The WGSL lives in the shader strings these entries already carry; a split would move the whole tint shader for 46 B. Core plus Stage unchanged."
     }
   ],
   "items": {
@@ -13974,11 +13986,11 @@
     "@margoengine/gltf/material-draw": 688,
     "@margoengine/gltf/meshopt": 1205,
     "@margoengine/gltf/metadata": 2432,
-    "@margoengine/gltf/pbr": 92158,
+    "@margoengine/gltf/pbr": 92204,
     "@margoengine/gltf/pbr-instancing": 3448,
     "@margoengine/gltf/pbr-model": 71859,
     "@margoengine/gltf/physics": 10323,
-    "@margoengine/gltf/prepare": 35545,
+    "@margoengine/gltf/prepare": 35588,
     "@margoengine/gltf/progressive": 101363,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/report": 11799,
@@ -13989,7 +14001,7 @@
     "@margoengine/gltf/splats": 2356,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9808,
-    "@margoengine/gltf/worker": 92644,
+    "@margoengine/gltf/worker": 92722,
     "@margoengine/headless": 3309,
     "@margoengine/headless/accumulate": 4620,
     "@margoengine/headless/compare": 3721,
@@ -15131,7 +15143,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 34759,
+    "@margoengine/water": 34779,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6669,
@@ -15148,7 +15160,7 @@
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
-    "@margoengine/water/settings": 6675,
+    "@margoengine/water/settings": 6689,
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9360,
