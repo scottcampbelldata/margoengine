@@ -13498,7 +13498,7 @@
       "date": "2026-11-26",
       "commit": "lane-d-shadow-instfit",
       "grew": 1,
-      "reason": "KB-SHADOW-INSTFIT1: shadows fits its cascades to an instanced caster's drawn instances (the union of its local box under each instance matrix, cached on PBRInstances.version), so instanced and separate meshes get the same shadow texels. @margoengine/shadows root 22060 to 22106 B gzip (measured). The fit runs each frame in range() beside the existing caster bounds, so it cannot move behind a lazy import."
+      "reason": "KB-SHADOW-INSTFIT1: shadows fits its cascades to an instanced caster's drawn instances (the union of its local box under each instance matrix, cached on PBRInstances.version), so instanced and separate meshes get the same shadow texels. @margoengine/shadows root 22060 to 22106 B gzip measured on a7ff48e5d; on top of 5feaab3d7 (whose golden-ratio soft-filter noise left the row at 22060) the root measures 22229 B, recorded here. The fit runs each frame in range() beside the existing caster bounds, so it cannot move behind a lazy import."
     }
   ],
   "items": {
@@ -14745,7 +14745,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 22106,
+    "@margoengine/shadows": 22229,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/ibl": 10887,
     "@margoengine/shadows/light-function": 2533,
