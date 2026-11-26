@@ -87,6 +87,10 @@
     "./tracers": {
       "types": "./dist/tracers.d.ts",
       "import": "./dist/tracers.js"
+    },
+    "./hydro": {
+      "types": "./dist/hydro/index.d.ts",
+      "import": "./dist/hydro.js"
     }
   },
   "files": [

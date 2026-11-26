@@ -11844,6 +11844,49 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### Rivers, floods and dam breaks: conservative shallow water (HYDRO-01, `@margoengine/physics/hydro`, 2026-11-26)
+
+`packages/physics/src/hydro/shallow.ts` (the finite-volume kernel, K14) and `hydro/index.ts` (`ShallowWaterSolver`, a
+framework solver). The scheme is the one `@margoengine/water/flood` already runs, from its CPU reference
+(packages/water/test/flood-reference.js, Margo's own code, whose header records the papers it was written from: Chen and
+Noelle 2017; Audusse et al. 2004; Harten, Lax and van Leer 1983; Kurganov and Petrova 2007; Borges, Carmona, Costa and Don
+2008; Jiang and Shu 1996; Castro, Costa and Don 2011; Shu and Osher 1988; Chertock, Cui, Kurganov and Wu 2015), carried
+onto the framework's f64 state and the terrain bed. Read again for this solver (papers only; no code of any library, engine
+or paper's companion was opened, SWASHES' and FullSWOF's included):
+
+- A. Kurganov and G. Petrova, "A second-order well-balanced positivity preserving central-upwind scheme for the Saint-Venant
+  system", Commun. Math. Sci. 5(1) 133-160, 2007, https://doi.org/10.4310/CMS.2007.v5.n1.a6, read in full: the one-sided
+  speeds and the desingularised velocity (eq. 2.17) the flux uses, and the Courant bound of its positivity theorem.
+- E. Audusse, F. Bouchut, M.-O. Bristeau, R. Klein and B. Perthame, "A fast and stable well-balanced scheme with hydrostatic
+  reconstruction for shallow water flows", SIAM J. Sci. Comput. 25(6) 2050-2065, 2004,
+  https://doi.org/10.1137/S1064827503431090, read in full: the reconstruction (eqs. 2.9 to 2.16 and 3.1 to 3.9), its lake
+  at rest with dry cells and its positivity (Theorem 2.1, Proposition 2.2), and the centred bed source of second order.
+- A. Bollermann, G. Chen, A. Kurganov and S. Noelle, "A well-balanced reconstruction of wet/dry fronts for the shallow water
+  equations", J. Sci. Comput. 56(2) 267-290, 2013, https://doi.org/10.1007/s10915-012-9677-5, read in full; and Bollermann,
+  Noelle and Lukacova-Medvid'ova 2011 on the draining time in 2D: why a central-upwind scheme with a corner bed needs tiny
+  steps at shorelines, which the cell-centred hydrostatic reconstruction here does not (its step is the Courant bound's).
+- A. Chertock, S. Cui, A. Kurganov and T. Wu, "Well-balanced positivity preserving central-upwind scheme for the shallow water
+  system with friction terms", Int. J. Numer. Methods Fluids 78(6) 355-383, 2015, https://doi.org/10.1002/fld.4023, read
+  (sections 1 to 3), and V. Michel-Dansac, C. Berthon, S. Clain and F. Foucher, "A two-dimensional high-order well-balanced
+  scheme for the shallow water equations with topography and Manning friction", Comput. Fluids 230, 2021, arXiv:2004.04484
+  (eqs. 2.27 to 2.37): the friction update q / (1 + dt g n^2 |u| / h^(4/3)) is the exact solution of the friction ODE at a
+  frozen depth (their eq. 2.29), so it slows the flow, never turns it back, and goes to 0 with the depth.
+- E. D. Schubert and B. F. Sanders, "Building treatments for urban flood inundation models and implications for predictive
+  skill and modeling efficiency", Adv. Water Resour. 41, 2012, https://doi.org/10.1016/j.advwatres.2012.02.012 (as
+  `flood.ts` records it): buildings as raised bed (the building-block method).
+- O. Delestre et al., "SWASHES: a compilation of shallow water analytic solutions for hydraulic and environmental studies",
+  arXiv:1110.0288, read: the closed forms of Ritter's and Stoker's dam breaks, Thacker's planar bowl (4.2.2) and the lake at
+  rest the tests hold the solver to (the originals of Ritter 1892, Stoker 1957 and Thacker 1981 were not read). Manning's
+  normal depth h = (q n / sqrt(S))^(3/5) and the default n = 0.03 of a clean, straight natural channel: Chow, "Open-Channel
+  Hydraulics", 1959, known through these.
+- Garratt's drag coefficient C_D = (0.75 + 0.067 U10) 1e-3 (J. R. Garratt 1977), as `flood.ts` records it.
+
+The cell's bed as the mean of the terrain's two triangles over it, the open side that carries the bed's slope on past the
+edge (with the minmod slope in the ghosts beside it, so a river leaves at its normal depth; a flat ghost bed backed a
+river up, 60 percent too deep near its outlet), the adaptive substeps that end exactly on each tick, the volume ledger of
+inflow, rain and sides weighed as the Runge-Kutta stages weigh them, and `water.flow` are this package's own arrangement.
+Proof: `packages/physics/tests/hydro.test.js` and `tests/coupling/hydro.test.js`.
+
 ### Tracers and slicks in water (SEA-15, `@margoengine/physics/tracers`, 2026-11-25)
 
 `packages/physics/src/tracers.ts` (`TracerSolver`, a framework solver). Written from:

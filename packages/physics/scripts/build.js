@@ -41,6 +41,7 @@ await build({
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
+        hydro: resolve(root, 'src/hydro/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
