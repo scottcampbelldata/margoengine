@@ -158,7 +158,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Bounding-box anchor: HTML or a label pinned to a box corner or face | drei `BBAnchor` | DONE (`boxAnchorPoint`, `@margoengine/labels`) | S | 9cf6c56f0 |
 | Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | MISSING | L |  |
 | Declarative action manager: triggers on a node (pick, long pick, pointer over/out, intersect enter/exit, every frame, keys) with chained actions | Babylon ActionManager | PARTIAL | S to M |  |
-| Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | PARTIAL | S |  |
+| Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | DONE (`OrbitBehaviors`, `@margoengine/controls/behaviors`) | S | bab8bc6f8 |
 | Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | PARTIAL | S |  |
 | Coroutines (page read 2026-11-25): a generator stepped once per frame; a bare `yield` waits one frame, yielding a promise waits for it, yielding another coroutine's promise waits for that coroutine; an async run form returns a promise that resolves on completion and rejects on cancel | Babylon | MISSING | S |  |
 | Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | MISSING | M |  |
