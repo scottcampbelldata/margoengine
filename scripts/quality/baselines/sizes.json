@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20507831,
+  "total": 20508125,
   "history": [
     {
       "date": "2026-10-24",
@@ -13317,6 +13317,12 @@
       "commit": "cfd800032",
       "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-01 rigid pressure response",
+      "grew": 1,
+      "reason": "FLUID-01 includes rigid boundary inertia and reciprocal velocity in the pressure projection, growing its optional entry from 8085 B to 8157 B gzip. Splitting would duplicate the solver binding and field setup. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14143,7 +14149,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/dfsph": 8119,
+    "@margoengine/physics/dfsph": 8413,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 10205,

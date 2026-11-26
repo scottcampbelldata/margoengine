@@ -155,6 +155,9 @@ export interface DfsphParams {
   readonly cellSize?: number;
 }
 
+// Inverse mass, symmetric world-axis inverse inertia, and native delta velocity.
+const BODY_MOBILITY_WORDS = 13;
+
 type State = {
   readonly host: SolverHost;
   readonly kernel: ReturnType<typeof bindDfsphKernel>;
@@ -174,6 +177,7 @@ type State = {
   readonly shapes: Region;
   readonly impulses: Region;
   readonly pressureImpulses: Region;
+  readonly bodyMobility: Region;
   readonly surfaces: readonly PreparedBoundary[];
   readonly bodyCapacity: number;
   readonly sampleCount: number;
@@ -342,7 +346,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
         ((3 * DFSPH_PARTICLE_WORDS + WORK_WORDS) * words +
           (BOUNDARY_WORDS + Number(capillary)) * sampleCount +
           SOLID_WORDS * surfaces.length +
-          2 * IMPULSE_WORDS * bodyCapacity) +
+          (2 * IMPULSE_WORDS + BODY_MOBILITY_WORDS) * bodyCapacity) +
       4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount)) +
       this.parcelCapacity * DFSPH_PARCEL_WORDS * 8;
     if (bytes >= MAX_MEMORY_PAGES * 65536)
@@ -417,6 +421,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       shapes: f64('dfsph-solids', surfaces.length * SOLID_WORDS),
       impulses: f64('dfsph-body-impulses', bodyCapacity * IMPULSE_WORDS),
       pressureImpulses: f64('dfsph-pressure-impulses', bodyCapacity * IMPULSE_WORDS),
+      bodyMobility: f64('dfsph-body-mobility', bodyCapacity * BODY_MOBILITY_WORDS),
     };
     this.state = state;
     if (state.parcels) numbers(state, state.parcels.clock)[0] = -1;
@@ -464,6 +469,13 @@ export class DfsphSolver implements Solver<DfsphParams> {
         'DFSPH cannot read this bodies port. Use the same body capacity as the layout-2 RigidSolver.',
       );
     const bodies = port && (regionWords(state.host.memory, port.region) as Float32Array);
+    const mobility = numbers(state, state.bodyMobility);
+    if (bodies) {
+      for (let row = 0; row < state.bodyCapacity; row++) {
+        const at = row * BODY_WORDS + 16;
+        mobility.set(bodies.subarray(at, at + 7), row * BODY_MOBILITY_WORDS);
+      }
+    } else mobility.fill(0);
     writeBoundaries(
       state.surfaces,
       numbers(state, state.shapes),
@@ -499,6 +511,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       state.boundaryColor.byteOffset,
       state.pressurePairs.byteOffset,
       state.pressurePairCapacity,
+      state.bodyMobility.byteOffset,
     );
     if (error)
       throw new MargoError(

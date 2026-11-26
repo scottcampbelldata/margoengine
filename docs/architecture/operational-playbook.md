@@ -10609,6 +10609,9 @@ momentum, refusal and replay, with vertical momentum in a separate receipt ledge
 records the required owner's reservation and applied-flux receipt for wet/dry cells and breaking crests.
 The native capillary energy has a flat-interface normalization derived from its cubic kernel.
 A measured 34 g droplet oscillates in 0.885 s against the 0.742 s Rayleigh prediction.
+The DFSPH pressure step includes rigid recoil in its Jacobian line solve through the existing bodies port.
+At a 1,000:1 liquid-to-rigid mass ratio the real plate and particle reach the closed-form shared velocity
+in one iteration, with matched impulse, nonincreasing kinetic energy and exact replay on both memory modes.
 
 Section 5, Tonemap colour enhancement (2026-11-26): `@margoengine/tonemap/enhance` patches a scene-linear step in front
 of the display curve of both Tonemap shaders (the SDR one clamps its result at 0, the ColorOutput one keeps colours
