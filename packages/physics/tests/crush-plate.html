@@ -81,9 +81,10 @@
   };
 
   const circleRadius = 0.1114;
-  const circular = new CircularPlateIndentation({
+  const circularParams = {
     radius: circleRadius, thickness: 0.001, indenterRadius: 0.025, strength: 497e6, hardening: 0.19,
-  });
+  };
+  const circular = new CircularPlateIndentation(circularParams);
   const radialRest = [0, 0];
   const radialFaces = [];
   const rings = 12;
@@ -100,15 +101,48 @@
     }
   }
 
-  window.drawIndentedPlate = async (flat) => {
-    const stroke = flat ? 0 : 0.8 * circular.fractureStroke;
-    const { surface, force } = circular.read(stroke, radialRest);
+  async function drawCircular(surface) {
     for (let i = 0; i < surface.positions.length; i += 3) {
       surface.positions[i] += 0.3;
       surface.positions[i + 1] += 0.14;
     }
     await drawSurface(surface, radialFaces);
+  }
+
+  window.drawIndentedPlate = async (flat) => {
+    const stroke = flat ? 0 : 0.8 * circular.fractureStroke;
+    const { surface, force } = circular.read(stroke, radialRest);
+    await drawCircular(surface);
     return { stroke, force, visible: engine.stats.visible, rim: surface.positions.at(-1) };
+  };
+
+  const membraneWorld = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity });
+  const membranePhysics = new Physics(null, { arena: membraneWorld.arena, gravity });
+  const membrane = membranePhysics.addBody(null, {
+    position: [-0.405, 0, 0],
+    colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 400, sensor: true },
+  });
+  const roundSupport = membranePhysics.addBody(null, {
+    position: [-0.175, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.025, mass: 600, sensor: true },
+  });
+  const indentation = new CrushSolver();
+  const membraneCapacity = membranePhysics.kernel.capacity;
+  membraneWorld.add(new RigidSolver(), { physics: membranePhysics, capacity: membraneCapacity });
+  membraneWorld.add(indentation, { bodyCapacity: membraneCapacity, patches: [], indentationPatches: [{
+    body: membrane.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.14,
+    support: { body: roundSupport.row, point: [-0.025, 0, 0] }, indentation: circularParams,
+  }] });
+  membraneWorld.couple(['rigid', indentation.id], 'staggered');
+  membraneWorld.advance(1);
+  const membraneInitial = membraneWorld.takeSnapshot();
+  window.drawNativeIndentation = async () => {
+    membraneWorld.restoreSnapshot(membraneInitial.bytes);
+    membrane.setLinearVelocity([2.6, 0, 0]);
+    membraneWorld.advance(5);
+    const { surface, stroke, work, fractured } = indentation.readIndentation(0, radialRest);
+    await drawCircular(surface);
+    return { stroke, work, fractured, hash: membraneWorld.hash(), rim: surface.positions.at(-1) };
   };
 </script>
 </body>

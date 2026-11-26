@@ -77,6 +77,16 @@ try {
   console.log(
     `Circular membrane: ${(1000 * dent.stroke).toFixed(2)} mm dent, ${dent.force.toFixed(0)} N reaction, ${dentPixels} changed pixels.`,
   );
+  const nativeDent = await page.evaluate(() => window.drawNativeIndentation());
+  const nativeImage = await canvas.screenshot();
+  assert.equal(nativeDent.fractured, true);
+  assert.equal(nativeDent.rim, 0);
+  assert.ok(nativeDent.work > 0 && nativeDent.stroke > dent.stroke);
+  assert.ok(changedPixels(await decodePNG(dentImage), await decodePNG(nativeImage)) > 32);
+  assert.deepEqual(await page.evaluate(() => window.drawNativeIndentation()), nativeDent);
+  assert.deepEqual(await canvas.screenshot(), nativeImage);
+  await writeFile(`test-results/break03-native-membrane-${device}.png`, nativeImage);
+  console.log(`Native membrane retained ${(1000 * nativeDent.stroke).toFixed(2)} mm at fracture.`);
 } finally {
   await close();
 }

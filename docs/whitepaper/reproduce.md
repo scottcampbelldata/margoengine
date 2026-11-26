@@ -54,6 +54,13 @@ coupon coefficients define the predictions. The browser test `node packages/phys
 and the same command with `--compat` compare the deformed disc with its flat control, using the
 same rest coordinates and camera. [Simonsen and Lauridsen (2000)](https://doi.org/10.1016/S0734-743X(00)00024-5)
 
+Run `node --test packages/physics/tests/coupling/crush-indentation.test.js` for the live
+rigid pair. The 250 J and 800 J approach cases compare the measured loss of relative
+kinetic energy with the dent ledger. The higher case retains the rupture dent and stops
+transferring impulse. A separate floating pair checks that the break opens a real
+compartment and partial denting keeps its aperture shut. The same browser runner renders
+the native fractured state from `readIndentation` and restores it exactly.
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard

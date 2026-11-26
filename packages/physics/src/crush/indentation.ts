@@ -99,7 +99,7 @@ export class CircularPlateIndentation {
       const force = forceFactor * equilibrium;
       const previous = table[i - 1]!;
       const work = previous.work + 0.5 * (stroke - previous.stroke) * (previous.force + force);
-      if (!(stroke > previous.stroke && Number.isFinite(force) && Number.isFinite(work)))
+      if (!(stroke > previous.stroke && force > previous.force && work > previous.work && Number.isFinite(work)))
         throw new MargoError(
           'state',
           'Choose plate dimensions, strength and hardening with a finite increasing loading branch.',
@@ -138,6 +138,27 @@ export class CircularPlateIndentation {
       fractured,
       surface: rest && this.surface(load, sine, rest),
     };
+  }
+
+  /** Inverts the intact loading work, clamping at the onset of rupture. */
+  strokeForWork(work: number): number {
+    positive(work, 'circular plate work', 0);
+    if (work === 0) return 0;
+    if (work >= this.fractureWork) return this.fractureStroke;
+    let low = 0;
+    let high = SAMPLES;
+    while (high - low > 1) {
+      const middle = (low + high) >>> 1;
+      if (this.knots[middle]!.work <= work) low = middle;
+      else high = middle;
+    }
+    const a = this.knots[low]!;
+    const b = this.knots[high]!;
+    const area = (work - a.work) / (b.work - a.work); // float division: normalized work in this secant
+    if (area === 0) return a.stroke;
+    const ratio = a.force / b.force; // float division: normalize to the upper force to avoid squaring newtons
+    const fraction = (area * (1 + ratio)) / (ratio + Math.sqrt(ratio * ratio + area * (1 - ratio * ratio))); // float division
+    return a.stroke + fraction * (b.stroke - a.stroke);
   }
 
   private radial(sine: number): number {
@@ -228,4 +249,31 @@ export class CircularPlateIndentation {
     }
     return { positions, normals };
   }
+}
+
+interface MembraneImpact {
+  readonly stroke: number;
+  readonly work: number;
+  readonly force: number;
+  readonly impulse: number;
+  readonly fractured: boolean;
+}
+
+/** Energy balance for a normal contact with a rate-independent membrane and no elastic rebound. */
+export function indentByImpulse(
+  plate: CircularPlateIndentation,
+  prior: number,
+  closing: number,
+  inverseMass: number,
+): MembraneImpact | undefined {
+  if (!(closing > 0)) return undefined;
+  const available = (0.5 * closing * closing) / inverseMass; // float division
+  const work = Math.min(plate.fractureWork, prior + available);
+  if (!(work > prior)) return undefined;
+  const lost = work - prior;
+  const fractured = work >= plate.fractureWork;
+  const continues = fractured ? Math.sqrt(Math.max(0, closing * closing - 2 * inverseMass * lost)) : 0;
+  const impulse = (2 * lost) / (closing + continues); // float division: impulse from loss of kinetic energy
+  const stroke = plate.strokeForWork(work);
+  return { stroke, work, force: plate.read(stroke).force ?? plate.fractureForce, impulse, fractured };
 }

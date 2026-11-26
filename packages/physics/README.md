@@ -5270,6 +5270,42 @@ if (!dent.force || !dent.surface || dent.surface.positions[2] !== dent.stroke) {
 }
 ```
 
+On moving bodies, add the circular plate to `CrushSolver.indentationPatches`. Choose the
+body-local plate anchor, normal and support point as with ordinary patches. The station
+absorbs the available normal energy up to localization. An intact dent stays plastically
+deformed and can support a later load up to its retained loading force. Permanent rupture
+releases the normal reaction and sets the existing seal-loss field to `1`. Use
+`readIndentation(index, xy)` to render the retained dent. Its index follows the ordinary
+and ground patches, and can also drive a compartment opening's `crushPatch` index.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const hull = physics.addBody(null, {
+  position: [-0.405, 0, 0], linearVelocity: [2.2, 0, 0],
+  colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 400, sensor: true },
+});
+const crush = new CrushSolver();
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(crush, { bodyCapacity, patches: [], indentationPatches: [{
+  body: hull.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.1114,
+  support: { point: [-0.2, 0, 0] },
+  indentation: { radius: 0.1114, thickness: 0.001, indenterRadius: 0.025, strength: 497e6, hardening: 0.19 },
+}] });
+world.couple(['rigid', crush.id], 'staggered');
+world.advance(3);
+const dent = crush.readIndentation(0, [0, 0, 0.05, 0]);
+if (!dent.fractured || crush.read(0).sealLoss !== 1)
+  throw new Error('Expected the native plate contact to open the seal and retain its dent');
+```
+
 `CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable

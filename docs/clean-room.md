@@ -15348,6 +15348,16 @@ are the inputs. The predictions are 25.47, 29.49, 41.80 and 57.39 mm versus meas
 versus measured 159.17, 254.24, 575.20 and 1687.30 J. The lower work on the two smaller
 tips remains visible. The regime is quasi-static, axisymmetric, and ends at localization.
 
+The native impulse path uses relative normal speed `v` and inverse mass `w` from
+the shared RigidSolver port. Append `min(v²/(2w), Wf − Wprior)` to retained material
+work, invert the monotone work integral to obtain the new stroke, then solve
+`J = 2ΔW/(v + √(v² − 2wΔW))`. Both bodies receive opposite impulses at the shared
+point. An intact dent can carry a lower continuing normal load up to its previous force
+without growing. Rupture releases the station and latches its seal loss, which uses
+the existing SEA-10 aperture contract. The geometric layer samples the same stored
+permanent stroke. The coupled moving pair measures the change in relative kinetic
+energy independently of the work ledger.
+
 Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
 and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
 E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and

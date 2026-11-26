@@ -16,6 +16,12 @@ import type {
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { type CompressionStep, stepCompression } from './continuous.js';
 import { traceGround } from './ground.js';
+import {
+  CircularPlateIndentation,
+  indentByImpulse,
+  type CircularPlateParams,
+  type CircularPlateReading,
+} from './indentation.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
 import { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse } from './plate.js';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
@@ -106,6 +112,11 @@ export interface CrushPatch {
 /** A hull or chassis station that automatically finds a support on the world terrain bed. */
 export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
 
+/** A circular membrane station loaded by a smooth spherical support. */
+export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | 'plate' | 'sealStroke'> & {
+  readonly indentation: CircularPlateParams;
+};
+
 /** Optional entry and registry settings. */
 export interface CrushOptions {
   /** Solver ID and output prefix. Default 'crush'. */
@@ -124,6 +135,8 @@ export interface CrushParams {
   readonly patches: readonly CrushPatch[];
   /** Optional ground stations. Their damage records follow the ordinary patches. */
   readonly groundPatches?: readonly CrushGroundPatch[];
+  /** Optional membrane stations. Their damage records follow the ordinary and ground patches. */
+  readonly indentationPatches?: readonly CrushIndentationPatch[];
 }
 
 /** State of one contact patch. Peak and impulse fields describe its most recent impact. */
@@ -149,12 +162,18 @@ export interface CrushPlateState {
 }
 
 type PatchInput = CrushPatch | (CrushGroundPatch & { readonly terrain: true });
-type Patch = PatchInput & {
-  readonly material: Required<CrushMaterial>;
-  readonly response: 'impact' | 'continuous';
-  readonly friction: number;
-  readonly sealStroke: number;
-};
+type Patch =
+  | (PatchInput & {
+      readonly material: Required<CrushMaterial>;
+      readonly response: 'impact' | 'continuous';
+      readonly friction: number;
+      readonly sealStroke: number;
+    })
+  | (Omit<CrushIndentationPatch, 'indentation'> & {
+      readonly indentation: CircularPlateIndentation;
+      readonly friction: number;
+      readonly plate?: undefined;
+    });
 
 interface State {
   readonly host: SolverHost;
@@ -245,6 +264,15 @@ function cellOffset(from: Cell, to: Cell, size: number | undefined): CrushVector
   return scale(difference, size ?? 0);
 }
 
+function preparedSupport(support: CrushSupport, body: number, capacity: number): CrushSupport {
+  const other = support.body === undefined ? undefined : rowIndex(support.body, capacity);
+  if (other === body) throw new MargoError('state', 'Choose opposing crush contacts on distinct rigid body rows.');
+  const cell = support.cell && vector(support.cell, 'barrier cell');
+  if (cell && !cell.every(Number.isSafeInteger))
+    throw new MargoError('state', 'Use a crush barrier cell as three safe integer coordinates.');
+  return { body: other, point: vector(support.point, 'support anchor'), cell };
+}
+
 function supportImpulse(depth: number, closing: number, inverseMass: number, stiffness: number, dt: number): number {
   if (depth === 0 && closing <= 0) return 0;
   const damping = 2 * Math.sqrt(stiffness / inverseMass); // float division: critical damping of the relative mass
@@ -273,6 +301,36 @@ function recordCompression(
   if (!continuing) damage[at + 7]! += 1;
 }
 
+function pushPair(
+  bodies: Float32Array,
+  out: Float64Array,
+  body: number,
+  other: number | undefined,
+  contact: CrushVector,
+  normal: CrushVector,
+  a: AtContact,
+  b: AtContact | undefined,
+  normalImpulse: number,
+  friction: number,
+): void {
+  const impulse = scale(normal, normalImpulse);
+  impulseAt(out, body, scale(impulse, -1), a.arm);
+  if (b && other !== undefined) impulseAt(out, other, impulse, b.arm);
+  if (friction > 0) {
+    const slide = frictionImpulse(
+      bodies,
+      body,
+      atContact(bodies, out, body, contact, normal),
+      other,
+      other === undefined ? undefined : atContact(bodies, out, other, contact, normal),
+      normal,
+      friction * normalImpulse,
+    );
+    impulseAt(out, body, slide, a.arm);
+    if (b && other !== undefined) impulseAt(out, other, scale(slide, -1), b.arm);
+  }
+}
+
 function impact(
   state: State,
   patch: Patch,
@@ -294,6 +352,8 @@ function impact(
   const anchor = add(triple(bodies, body * BODY_WORDS), rotate(patch.anchor));
   const at = CRUSH_WORDS * index;
   const permanent = damage[at]!;
+  const membrane = 'indentation' in patch;
+  if (membrane && damage[at + CRUSH_SEAL_LOSS_WORD] === 1) return;
   if (patch.plate && plateStrokes) plateStrokes[index] = permanent;
   const ground =
     terrain && !support
@@ -319,7 +379,7 @@ function impact(
   const normal = ground?.normal ?? facing;
   const gap = ground?.gap ?? dot(separation!, normal);
   const clearance = gap + permanent;
-  const continuous = patch.response === 'continuous';
+  const continuous = !membrane && patch.response === 'continuous';
   if (!continuous && clearance > 0) latched[index] = 0;
   const contact = add(anchor, scale(normal, ground ? gap : 0.5 * gap));
   const a = atContact(bodies, out, body, contact, normal);
@@ -344,6 +404,37 @@ function impact(
       return;
     }
   }
+  if (membrane) {
+    // The intact dent supports its prior loading force. Relative motion beyond
+    // that reaction can do more irreversible work or reach the first rupture.
+    const previous = damage[at + 1]!;
+    let held = 0;
+    if (latched[index] && closing > 0) {
+      const force = patch.indentation.read(permanent).force!;
+      const stop = closing / inverse; // float division: need no rebound from a rigid-plastic support
+      held = Math.min(dt * force, stop);
+    }
+    const turn = indentByImpulse(patch.indentation, previous, closing - inverse * held, inverse);
+    const reaction = held + (turn?.impulse ?? 0);
+    if (reaction > 0) pushPair(bodies, out, body, otherBody, contact, normal, a, b, reaction, patch.friction);
+    if (turn) {
+      damage.set(
+        [
+          turn.stroke,
+          turn.work,
+          turn.stroke,
+          turn.force,
+          (latched[index] ? damage[at + 4]! : 0) + reaction,
+          0,
+          turn.fractured ? 1 : 0,
+          damage[at + 7]! + (latched[index] ? 0 : 1),
+        ],
+        at,
+      );
+      latched[index] = 1;
+    }
+    return;
+  }
   const step = continuous
     ? stepCompression(patch.material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay)
     : undefined;
@@ -353,22 +444,7 @@ function impact(
     ? (step?.impulse ?? 0)
     : (result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt));
   if (normalImpulse === 0) return;
-  const impulse = scale(normal, normalImpulse);
-  impulseAt(out, body, scale(impulse, -1), a.arm);
-  if (b && otherBody !== undefined) impulseAt(out, otherBody, impulse, b.arm);
-  if (patch.friction > 0) {
-    const slide = frictionImpulse(
-      bodies,
-      body,
-      atContact(bodies, out, body, contact, normal),
-      otherBody,
-      otherBody === undefined ? undefined : atContact(bodies, out, otherBody, contact, normal),
-      normal,
-      patch.friction * normalImpulse,
-    );
-    impulseAt(out, body, slide, a.arm);
-    if (b && otherBody !== undefined) impulseAt(out, otherBody, scale(slide, -1), b.arm);
-  }
+  pushPair(bodies, out, body, otherBody, contact, normal, a, b, normalImpulse, patch.friction);
   if (step) {
     recordCompression(damage, at, step, patch.sealStroke, latched[index] !== 0);
     if (patch.plate && plateStrokes) plateStrokes[index] = step.totalStroke;
@@ -429,7 +505,11 @@ export class CrushSolver implements Solver<CrushParams> {
 
   init(host: SolverHost, params: CrushParams): void {
     const capacity = params.bodyCapacity;
-    if (!Number.isSafeInteger(capacity) || capacity < 1 || !(params.patches?.length || params.groundPatches?.length))
+    if (
+      !Number.isSafeInteger(capacity) ||
+      capacity < 1 ||
+      !(params.patches?.length || params.groundPatches?.length || params.indentationPatches?.length)
+    )
       throw new MargoError(
         'state',
         'Choose the RigidSolver body capacity and provide at least one crush contact patch.',
@@ -470,17 +550,26 @@ export class CrushSolver implements Solver<CrushParams> {
           );
         return { ...common, terrain: true };
       }
-      const other = patch.support.body === undefined ? undefined : rowIndex(patch.support.body, capacity);
-      if (other === body) throw new MargoError('state', 'Choose opposing crush contacts on distinct rigid body rows.');
-      const cell = patch.support.cell && vector(patch.support.cell, 'barrier cell');
-      if (cell && !cell.every(Number.isSafeInteger))
-        throw new MargoError('state', 'Use a crush barrier cell as three safe integer coordinates.');
       return {
         ...common,
         radius: positive(patch.radius, 'contact radius'),
-        support: { body: other, point: vector(patch.support.point, 'support anchor'), cell },
+        support: preparedSupport(patch.support, body, capacity),
       };
     });
+    for (const patch of params.indentationPatches ?? []) {
+      const body = rowIndex(patch.body, capacity);
+      const normal = vector(patch.normal, 'indentation normal');
+      const length = positive(hypot(...normal), 'indentation normal length');
+      patches.push({
+        body,
+        normal: scale(normal, 1 / length), // float division: unit normal
+        anchor: vector(patch.anchor, 'indentation anchor'),
+        radius: positive(patch.radius, 'indentation contact radius'),
+        friction: positive(patch.friction ?? 0, 'indentation friction coefficient', 0),
+        support: preparedSupport(patch.support, body, capacity),
+        indentation: new CircularPlateIndentation(patch.indentation),
+      });
+    }
     this.state = {
       host,
       patches,
@@ -573,6 +662,16 @@ export class CrushSolver implements Solver<CrushParams> {
       sealLoss,
       buckling: stroke < plate.length ? resolvePlateBuckling(plate, stroke, rest) : undefined,
     };
+  }
+
+  /** Samples the permanent circular dent or the retained shape at the onset of rupture. */
+  readIndentation(index: number, rest?: ArrayLike<number>): CircularPlateReading {
+    const { host, patches, damage } = this.requireState();
+    const patch = Number.isSafeInteger(index) ? patches[index] : undefined;
+    if (!patch || !('indentation' in patch))
+      throw new MargoError('state', 'Choose a configured circular indentation station to sample its dent.');
+    const stroke = (regionWords(host.memory, damage) as Float64Array)[index * CRUSH_WORDS]!;
+    return patch.indentation.read(stroke, rest);
   }
 
   private requireState(): State {

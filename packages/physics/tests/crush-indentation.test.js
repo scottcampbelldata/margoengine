@@ -39,6 +39,7 @@ test('loading accumulates irreversible work and stops reporting intact force at 
     assert.ok(next.force > previous.force && next.work > previous.work);
     assert.ok(next.contactRadius > previous.contactRadius);
     assert.equal(next.fractured, false);
+    near(plate.strokeForWork(next.work), next.stroke, 1e-14);
     previous = next;
   }
   const fractured = plate.read(2 * plate.fractureStroke);
@@ -46,6 +47,7 @@ test('loading accumulates irreversible work and stops reporting intact force at 
   assert.equal(fractured.force, undefined);
   assert.equal(fractured.stroke, plate.fractureStroke);
   assert.equal(fractured.work, plate.fractureWork);
+  assert.equal(plate.strokeForWork(2 * plate.fractureWork), plate.fractureStroke);
 });
 
 test('radial sampling keeps the held edge fixed and supplies unit normals at its deformed positions', () => {
