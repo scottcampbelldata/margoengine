@@ -188,7 +188,7 @@ From the three.js examples gallery, example by example (names only).
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| Occluder fade: find the meshes between the camera and a target and dither them out, then back in (the dither fade of `@margoengine/lod` and the selection x-ray exist; nothing finds the occluders) | three.js examples (`webgpu_tsl_occlusion_dither`) | PARTIAL | S |  |
+| Occluder fade: find the meshes between the camera and a target and dither them out, then back in (the dither fade of `@margoengine/lod` and the selection x-ray exist; nothing finds the occluders) | three.js examples (`webgpu_tsl_occlusion_dither`) | DONE | S | 0d986eb9d |
 | Transform gizmo driven by an XR controller ray (`TransformControls` takes DOM pointer events and screen points only; XR has rays, grab and drag) | three.js examples (`webxr_xr_controls_transform`) | DONE (`@margoengine/xr/gizmo` `XRGizmo`; ray methods of `@margoengine/controls/transform`; not run on a headset) | S | 7c5ce6388 |
 
 ## Needs a maintainer decision or hardware first
