@@ -17616,14 +17616,23 @@ disk. The fracture work reduces its footprint and thickens its subgrid pile whil
 single. Explicit bonds, fracture-created rows and contact with grounded bathymetry are needed to
 move those blocks independently.
 
+### Fixed 2026-11-26: staged crush accepted stale rigid contact rows (BREAK-03)
+
+A staged station could evaluate a contact using a different rigid tick or solve after the
+rigid accumulator had already been consumed. The station now verifies the rigids are from
+the preceding tick and names the required same-rate staggered order. The staged crush coupling
+test covers both incompatible schedules.
+
 ### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
 
 A crush station now opens an authored SEA-10 compartment aperture when its seal fails. It transfers
 the inflowing water and its mass to the hull. A flooding hull with exterior hydrodynamic added mass
 disabled used to dereference an absent carried-inertia region when the first water entered. The region is
 now allocated for compartments and the live crush-to-flood test exercises that setting.
-`packages/physics/tests/coupling/crush.test.js` reproduces the connection. Distributed rupture geometry
-and EF-11's production breakup sequence remain open. PA-52 remains open for its other paths.
+`packages/physics/tests/coupling/crush.test.js` reproduces the connection. A cohesive shell seam can
+also open SEA-10 through its live polygon, covered by `packages/physics/tests/coupling/crush-shell-flood.test.js`.
+Automatic tearing, direct water pressure on the deforming shell, and EF-11's production breakup
+sequence remain open. PA-52 remains open for its other paths.
 
 ### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
 

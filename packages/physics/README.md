@@ -5285,7 +5285,7 @@ if (loading.force >= 4500 || impact.peakForce !== 4500) throw new Error('Expecte
 For live progressive contact, add a station to `envelopePatches` with this `material`
 and set `response: 'continuous'`. Omit the support and radius for a live terrain station. In `new CrushSolver({ rate })`, level 0 is 60 Hz and each
 increase doubles that rate up to level 7 at 7,680 Hz. Use the same fixed timestep on
-the rigid solver. Use a higher rate level when a falling load changes too steeply within a step.
+the rigid solver and run crush before rigid in the same staggered group. Use a higher rate level when a falling load changes too steeply within a step.
 The existing one-event impact path also accepts the envelope.
 
 ```ts

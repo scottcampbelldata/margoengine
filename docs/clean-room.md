@@ -15362,6 +15362,25 @@ uses the independent prescribed travel and material properties from Yob et al. a
 levels of the driving sequence at the world's fixed 60 Hz rate.
 [Simo and Hughes (1998)](https://doi.org/10.1007/b98904)
 
+Staged station loads use the force-envelope form of Mayville, Johnson, Stringfellow and Tyrell,
+*The Development of a Rail Passenger Coach Car Crush Zone* (2003), and the pretest dashed trace
+in Jacobsen et al., *Crash Energy Management: One- and Two-Car Passenger Rail Impact Tests*
+(2016), Figure 4. The control points give `p = x − F/k` and piecewise-linear `F(x)`. The engine
+integrates the full segment for incident work, `F dp` for permanent work, and evaluates the
+elastic energy separately. The continuous solver checks that `x + h²wF(x)` increases along each
+active segment and that the rigid input is one tick old at the same rate. The FRA experiment
+holds out the measured pulse and peak displacement. NHTSA 8035 supplies only the road-car
+calibration. Independently measured NHTSA 8104 supplies the comparison outputs.
+[Mayville et al.](https://ntlrepository.blob.core.windows.net/lib/47000/47400/47474/rail_cw_2003_2.pdf) · [FRA report](https://rosap.ntl.bts.gov/view/dot/12397) · [NCAP raw channels and reduction](whitepaper/reproduce.md#break-03-independent-ncap-road-car-pulse)
+
+The optional wet channel forms instantaneous mobility from the rigid inertia and the zero-time
+water contribution. This takes the added mass term from W. E. Cummins, *The Impulse Response
+Function and Ship Motions* (1962), and the circular-cylinder strip limit of J. M. J. Journée and
+W. W. Massie, *Offshore Hydromechanics* (2001), §7.3.1. For physical impulse `J` about the rigid
+centre, `M (M+A)^−1 J` produces the intended wet velocity jump through the dry integrator.
+An exact receipt removes that contribution from the following inferred external load.
+[Cummins](https://dome.mit.edu/handle/1721.3/49049) · [Journée and Massie](https://ocw.tudelft.nl/wp-content/uploads/OffshoreHydromechanics_Journee_Massie.pdf) · [Wet contact proofs](whitepaper/reproduce.md#break-03-wet-contact-inertia)
+
 Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
 Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
 with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.

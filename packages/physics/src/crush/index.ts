@@ -230,6 +230,7 @@ interface State {
   readonly host: SolverHost;
   readonly patches: readonly Patch[];
   readonly capacity: number;
+  readonly staged: boolean;
   readonly cellSize?: number;
   readonly damage: Region;
   readonly contacts: Region;
@@ -698,6 +699,7 @@ export class CrushSolver implements Solver<CrushParams> {
       host,
       patches,
       capacity,
+      staged: !!params.envelopePatches?.length,
       cellSize: params.cellSize === undefined ? undefined : positive(params.cellSize, 'world cell width'),
       damage: host.allocate('crush-damage', patches.length * CRUSH_WORDS * F64, 'f64', CRUSH_LAYOUT),
       contacts: host.allocate('crush-contacts', patches.length, 'u8', CRUSH_LAYOUT),
@@ -723,6 +725,11 @@ export class CrushSolver implements Solver<CrushParams> {
       port.region.byteLength !== state.capacity * BODY_WORDS * F32
     )
       throw new MargoError('state', 'Set the crush body capacity to match the RigidSolver layout-2 bodies port.');
+    if (state.staged && port.tick !== context.tick - 1)
+      throw new MargoError(
+        'state',
+        'Run staged crush before the rigid solver at the same rate in their staggered group.',
+      );
     const bodies = regionWords(state.host.memory, port.region) as Float32Array;
     let wet: WetContactStep | undefined;
     if (this.wet && state.wetReceipt) {

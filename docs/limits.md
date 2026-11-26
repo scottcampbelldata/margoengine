@@ -9676,6 +9676,7 @@ Staged contact can use a positive piecewise-linear virgin loading envelope with 
 and recoverable-adjusted permanent stroke. The only supported unloading law is one linear
 stiffness followed by elastic backing at compaction. Continuous contact requires a rigid
 rate fast enough to keep the implicit response monotone across each traversed falling branch.
+Use the same rate and place crush before rigid in their staggered group.
 The held-out single-coach test qualifies compression from a pretest design curve at 960 and 1920 Hz.
 It predicts rebound speeds of 1.49–1.61 mph versus about 3.3 mph measured. An independently tested Accord coupe qualifies the full-width 56 km/h road-car pulse for one vehicle family. Rebound speed is 0.42–0.44 m/s high. Occupant motion, other road-car families, oblique impacts and inter-car joints remain open.
 

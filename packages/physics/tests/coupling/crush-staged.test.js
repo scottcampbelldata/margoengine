@@ -90,11 +90,15 @@ const coachTest = {
   material: cemDesign(),
 };
 
-async function pulse(level, end, { collisionMass, speed, material } = coachTest) {
+async function pulse(
+  level,
+  end,
+  { collisionMass, speed, material, rigidLevel = level, rigidFirst = false } = coachTest,
+) {
   await Physics.load();
   const hz = 60 * 2 ** level;
   const world = new PhysicsWorld({ rate: { num: hz, den: 1 }, gravity: zero, memory: worldMemory(false) });
-  using physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / hz });
+  using physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / (60 * 2 ** rigidLevel) });
   const body = physics.addBody(null, {
     linearVelocity: [speed, 0, 0],
     colliders: { shape: 'box', halfExtents: [1.5, 1, 1], mass: collisionMass, sensor: true },
@@ -117,7 +121,7 @@ async function pulse(level, end, { collisionMass, speed, material } = coachTest)
       },
     ],
   });
-  world.couple([crush.id, 'rigid'], 'staggered');
+  world.couple(rigidFirst ? ['rigid', crush.id] : [crush.id, 'rigid'], 'staggered');
   let frame = 0;
   let before = body.linearVelocity[0];
   let stop;
@@ -142,6 +146,12 @@ async function pulse(level, end, { collisionMass, speed, material } = coachTest)
 
 test('a time step too coarse to resolve a falling load gives an actionable rate error', async () => {
   await assert.rejects(() => pulse(0, 0.12), { code: 'state', message: /Increase crush rate/ });
+});
+
+test('staged crush rejects rigid contacts from the wrong clock or order', async () => {
+  const diagnosis = { code: 'state', message: /Run staged crush before the rigid solver at the same rate/ };
+  await assert.rejects(() => pulse(5, 0.01, { ...coachTest, rigidLevel: 4 }), diagnosis);
+  await assert.rejects(() => pulse(5, 0.01, { ...coachTest, rigidFirst: true }), diagnosis);
 });
 
 test('independent FRA full-scale passenger-coach data bounds a staged native crush pulse', async (t) => {
