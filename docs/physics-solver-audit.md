@@ -94,9 +94,10 @@ The worst cases, where the gap is closest to the row not being met:
   seeding are uncited heuristics, nothing is validated, and the limits file does not say so.
 - **ATMO-05 cyclones and vortices:** every vortex is a prescribed analytic field, not a solved flow; the cited
   Willoughby profile is not built and the presets are uncited.
-- **BREAK-03 ductile crushing:** a one-dimensional elastic-plastic spring at preset contact points; the plating,
-  friction and grounding mechanics of the cited ship-collision models are absent, and a latched contact lets bodies
-  pass through.
+- **BREAK-03 ductile crushing:** the initial station model lacked sustained support, friction, grounding,
+  live plating and SEA-10 linkage. The current package supplies those on its reduced station path
+  and provides a distributed triangular shell with bending and plane-stress yielding under nodal loads.
+  Distributed shell contact, fracture, and measured full-scale vessel and vehicle response remain open.
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the

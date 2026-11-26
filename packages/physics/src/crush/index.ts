@@ -54,6 +54,13 @@ export {
 } from './girder-joint.js';
 export { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse, type CrushPlateSurface } from './plate.js';
 export {
+  type CrushShellBudget,
+  type CrushShellFace,
+  type CrushShellMaterial,
+  type CrushShellParams,
+  CrushShellSolver,
+} from './shell.js';
+export {
   resolveGirder,
   type GirderFiber,
   type GirderLoading,

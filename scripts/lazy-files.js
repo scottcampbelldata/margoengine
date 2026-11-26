@@ -79,6 +79,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/crush-shell-kernel.wasm',
+    label: 'crush-shell-kernel.wasm',
+    kind: 'Rust thin-sheet plane-stress plasticity and hinge bending',
+    measure: 'file',
+    when: 'CrushShellSolver.load() from the optional /crush entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/crush-shell-kernel-shared.wasm',
+    label: 'crush-shell-kernel-shared.wasm',
+    kind: 'Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory',
+    measure: 'file',
+    when: 'the shell loader on a host supporting shared world memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/viscoplastic-kernel.wasm',
     label: 'viscoplastic-kernel.wasm',
     kind: 'Rust SIMD three-dimensional elastoviscoplastic material points',

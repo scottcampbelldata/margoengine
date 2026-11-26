@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -198,6 +198,8 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
 
 for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/thin-film', name), resolve(dist, name));
+for (const name of ['crush-shell-kernel.wasm', 'crush-shell-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/crush', name), resolve(dist, name));
 
 for (const name of ['viscoplastic-kernel.wasm', 'viscoplastic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/viscoplastic', name), resolve(dist, name));
