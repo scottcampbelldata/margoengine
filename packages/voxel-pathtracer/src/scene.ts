@@ -59,7 +59,8 @@ export const MEDIA = 1,
   SUNLIT = 128,
   VOXELWISE = 256,
   CONTACT = 512,
-  CUTOUT = 1024;
+  CUTOUT = 1024,
+  SUBSURFACE = 2048;
 /** Glass and mirror instances whose deflection of distant light is light-sampled, each (README, "Lighting"). */
 const MAX_DEFLECTORS = 8;
 const VOLUME = 2,
@@ -635,6 +636,7 @@ export function resolveMaterial(m: TraceMaterial, name: string, textures?: numbe
   const tint = m.tint === undefined ? true : bool(m.tint, 'tint'),
     voxelwise = bool(m.voxelwise, 'voxelwise'),
     sunlit = bool(m.sunlit, 'sunlit'),
+    subsurface = bool(m.subsurface, 'subsurface'),
     contactTransmission = bool(m.contactTransmission, 'contactTransmission');
   const faces =
     m.texture === undefined ? undefined : typeof m.texture === 'number' ? Array(6).fill(m.texture) : m.texture;
@@ -665,6 +667,7 @@ export function resolveMaterial(m: TraceMaterial, name: string, textures?: numbe
     emissionColor,
     cameraEmission,
     sunlit,
+    subsurface,
     voxelwise,
     contactTransmission,
     ...(faces === undefined ? {} : { texture: faces as unknown as ResolvedTraceMaterial['texture'] }),
@@ -717,7 +720,10 @@ function packMaterial(material: TraceMaterial, name: string, out: Float32Array, 
   if (alpha < DELTA_ALPHA) flags |= SMOOTH;
   if (m.coat === 'additive') flags |= ADDITIVE;
   if (!m.tint) flags |= UNTINTED;
-  if (m.sunlit && media) flags |= SUNLIT;
+  if (m.sunlit && media && !m.subsurface) flags |= SUNLIT;
+  if (m.subsurface && media) flags |= SUBSURFACE;
+  // A subsurface medium's walk scatters by the single-scattering albedo that shows `color` (the metal slot holds it).
+  const lobe = m.subsurface && media ? subsurfaceAlbedo(color) : metalColor;
   if (m.voxelwise && pGlass > 0 && pGlass < 1) flags |= VOXELWISE;
   if (m.contactTransmission && pGlass > 0 && pGlass < 1) flags |= CONTACT;
   if (cutout > 0 && faces !== undefined && !media) flags |= CUTOUT;
@@ -743,9 +749,9 @@ function packMaterial(material: TraceMaterial, name: string, out: Float32Array, 
       // Cauchy coefficient (square micrometres) of the glass lobe's dispersion.
       pGlass > 0 ? cauchyB(ior, abbe) : 0,
       // The metal lobe's reflectance at normal incidence.
-      Math.min(metalColor[0], 1),
-      Math.min(metalColor[1], 1),
-      Math.min(metalColor[2], 1),
+      Math.min(lobe[0], 1),
+      Math.min(lobe[1], 1),
+      Math.min(lobe[2], 1),
       // Radiance camera rays see (w: 1 when set; surfaces only).
       cameraEmission >= 0 && !media ? glow[0] * cameraEmission : 0,
       cameraEmission >= 0 && !media ? glow[1] * cameraEmission : 0,
@@ -759,6 +765,20 @@ function packMaterial(material: TraceMaterial, name: string, out: Float32Array, 
     ],
     base,
   );
+}
+
+/**
+ * Single-scattering albedo of a subsurface medium whose surface shows the linear colour `color`: an isotropic walk
+ * behind a diffuse interface, Chiang, Kutz and Burley 2016, "Practical and Controllable Subsurface Scattering for
+ * Production Path Tracing", equation 1 (a fit of the rendered slab albedo; within 0.001 of van de Hulst's
+ * (1 - s)(1 - 0.139 s) / (1 + 1.17 s), s = sqrt(1 - albedo), inverted).
+ */
+export function subsurfaceAlbedo(color: readonly number[]): [number, number, number] {
+  const one = (a: number) => {
+    const x = Math.min(Math.max(a, 0), 1);
+    return 1 - Math.exp(x * (-5.09406 + x * (2.61188 - 4.31805 * x)));
+  };
+  return [one(color[0]), one(color[1]), one(color[2])];
 }
 
 /** Emissive faces of a model under a material table (reused while the emissive and see-through sets are unchanged). */

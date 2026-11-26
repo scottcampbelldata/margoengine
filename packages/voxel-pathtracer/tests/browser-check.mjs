@@ -316,6 +316,53 @@ try {
     for (const name of ['rough plastic 1', 'white blend', 'white subsurface'])
       assert.ok(r[name].mean > 0.85 && r[name].mean < 1.005, `${name}: ${r[name].mean}`);
   }
+  if (wanted('subsurface')) {
+    const r = await run('subsurface');
+    // Oracle: an isotropic walk in a half-space entered by a cosine lobe; share[n] of the walks leave after n steps.
+    let seed = 12345;
+    const random = () => {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      return ((seed >>> 0) + 0.5) / 4294967296;
+    };
+    const walks = 2e6,
+      share = new Float64Array(257);
+    for (let i = 0; i < walks; i++) {
+      let z = 0,
+        mu = -Math.sqrt(random());
+      for (let n = 0; n <= 256; n++) {
+        z -= mu * Math.log(random());
+        if (z > 0) {
+          share[n] += 1 / walks;
+          break;
+        }
+        mu = 2 * random() - 1;
+      }
+    }
+    const leaves = (albedo, steps) => share.slice(0, steps + 1).reduce((sum, v, n) => sum + v * albedo ** n, 0),
+      chiang = (a) => 1 - Math.exp(a * (-5.09406 + a * (2.61188 - 4.31805 * a)));
+    for (const [name, s] of Object.entries(r)) {
+      if (name === 'errors') continue;
+      console.log(`  ${name}: mean ${s.mean.toFixed(4)} over ${s.pixels} px (sd ${s.sd.toFixed(4)})`);
+    }
+    for (const steps of [1, 2, 6, 12])
+      near(r[`walk ${steps}`].mean, leaves(chiang(1), steps), 0.01, `a walk of ${steps} steps under a diffuse surface`);
+    // Chiang, Kutz and Burley's inversion is a fit of the rendered albedo: the surface shows its colour within 0.02.
+    for (const a of [0.2, 0.5, 0.8]) {
+      near(r[`colour ${a}`].mean, leaves(chiang(a), 256), 0.01, `colour ${a}: the walk's own albedo`);
+      near(r[`colour ${a}`].mean, a, 0.02, `colour ${a}: the surface shows its colour`);
+      near(r[`colour ${a}`].albedo[0], a, 1e-6, `colour ${a}: the albedo guide is the surface colour`);
+    }
+    near(r['colour rgb'].mean, 0.2126 * 0.8 + 0.7152 * 0.5 + 0.0722 * 0.2, 0.02, 'a coloured surface shows its colour');
+    assert.ok(r.shadow.pixels > 30 && r.shadow.mean === 0, `a subsurface volume blocks the sun: ${r.shadow.mean}`);
+    near(
+      r['shadow of a plain medium'].mean,
+      0.5 * Math.exp(-2),
+      0.005,
+      'a plain medium of that density lets light through',
+    );
+  }
   if (wanted('glasslight')) {
     const r = await run('glasslight');
     for (const [name, s] of Object.entries(r)) {

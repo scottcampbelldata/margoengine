@@ -136,6 +136,7 @@ interface TraceMaterial {
     emissionColor?: TraceVec3;
     cameraEmission?: number;
     sunlit?: boolean;
+    subsurface?: boolean;
     voxelwise?: boolean;
     contactTransmission?: boolean;
     texture?: number | readonly [number, number, number, number, number, number];

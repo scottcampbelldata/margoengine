@@ -57,6 +57,18 @@ export interface TraceMaterial {
    */
   sunlit?: boolean;
   /**
+   * Compatible addition: a medium under a diffuse surface (wax, skin, marble, milk), after Chiang, Kutz and Burley 2016.
+   * A ray that meets the volume from outside enters it in a cosine lobe about the inward normal, walks inside with mean
+   * free path 1 / `density` and leaves through the surface in a cosine lobe about the outward normal, where lights are
+   * sampled; so the volume shows a matte solid with crisp edges that light bleeds through, and it blocks shadow rays.
+   * `color` is the colour the surface shows: the walk's single-scattering albedo is derived from it (their equation
+   * 1), so a thick volume in a white sky returns `color` within 0.02. Entering and leaving are a diffuse event each;
+   * the steps inside count against `bounceLimits.subsurface` (256 at most) and not against `maxBounces`, within the
+   * path's 20 x `maxBounces` + 32 steps of every kind. Touching
+   * subsurface voxels of different materials form one volume; `sunlit` does nothing on it. Default false.
+   */
+  subsurface?: boolean;
+  /**
    * Compatible addition: for a `blend` volume, every voxel face inside it picks a lobe again, so light passes straight
    * through the glass share and the rest scatters at that face. Default false (the volume is one piece of material).
    */
@@ -500,11 +512,11 @@ export interface TraceBounceLimits {
   diffuse?: number;
   /** Specular and glossy events: metal and coat reflections, glass reflection and refraction. */
   specular?: number;
-  /** Scattering events in media (other than `sunlit` ones) and interior scattering. */
+  /** Scattering events in media (other than `sunlit` and `subsurface` ones) and interior scattering. */
   scatter?: number;
   /**
-   * Scattering events in `sunlit` media (MagicaVoxel's subsurface), where each diffuse event earlier on the path uses 4
-   * of them.
+   * Scattering events in `sunlit` media, where each diffuse event earlier on the path uses 4 of them, and the steps of
+   * a walk inside a `subsurface` medium (256 when absent).
    */
   subsurface?: number;
   /**

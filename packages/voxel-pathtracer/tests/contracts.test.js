@@ -644,7 +644,10 @@ test("on the WebGL2 layer trace compiles as the route's staged fragment programs
   assert.ok(!/\baccum\b/.test(sums), 'the fragment shader stores nothing');
   assert.ok(layer.modules.some((code) => code.includes('fn add')));
   for (const stage of ['hit', 'vertex', 'surface', 'shadow'])
-    assert.ok(layer.draws.some((d) => d.label === `voxel-pathtracer ${stage}`), stage);
+    assert.ok(
+      layer.draws.some((d) => d.label === `voxel-pathtracer ${stage}`),
+      stage,
+    );
   assert.ok(!layer.kernels.includes('trace'), 'no trace compute pipeline for the CPU tier');
   // The preview kernel is one program holding a closest hit and a shadow ray, slower for Direct3D's compiler than the
   // whole staged tracer, so the route does without it (docs/limits.md).
@@ -670,4 +673,18 @@ test('the trace shader source: octant test, metal-and-glass exit, declarations w
   const declarations = await readFile(new URL('../dist/shaders.d.ts', import.meta.url), 'utf8');
   assert.ok(declarations.length < 4096, `dist/shaders.d.ts is ${declarations.length} B`);
   assert.doesNotMatch(declarations, /@compute|@group/);
+});
+
+test('subsurface: a medium under a diffuse surface is a checked material field; its walk may take 256 steps', () => {
+  const wax = { id: 1, type: 'media', color: [0.9, 0.75, 0.5], density: 2, subsurface: true },
+    checked = validateTraceMaterial(wax);
+  assert.equal(checked.ok, true, JSON.stringify(checked));
+  assert.deepEqual(checked.unknown, []);
+  assert.deepEqual(
+    validateTraceMaterial({ ...wax, subsurface: 'yes' }).problems.map((p) => p.field),
+    ['subsurface'],
+  );
+  assert.equal(resolveTraceOptions({ bounceLimits: { subsurface: 256 } }).bounceLimits.subsurface, 256);
+  assert.throws(() => resolveTraceOptions({ bounceLimits: { subsurface: 257 } }), RangeError);
+  assert.throws(() => resolveTraceOptions({ bounceLimits: { diffuse: 65 } }), RangeError);
 });

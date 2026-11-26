@@ -126,7 +126,11 @@ function bounceLimits(value: unknown): Required<TraceBounceLimits> | undefined {
     );
   const o = value as Record<string, unknown>,
     cap = (k: keyof TraceBounceLimits) =>
-      o[k] === undefined ? BOUNCE_FREE : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
+      o[k] === undefined
+        ? BOUNCE_FREE
+        : k === 'subsurface'
+          ? whole(o[k], `bounceLimits.${k}`, 1, 256, 'pass 1 to 256, or leave it out')
+          : whole(o[k], `bounceLimits.${k}`, 1, 64, 'pass 1 to 64, or leave it out');
   return {
     diffuse: cap('diffuse'),
     specular: cap('specular'),
@@ -408,6 +412,7 @@ const MATERIAL_FIELDS = [
   'emissionColor',
   'cameraEmission',
   'sunlit',
+  'subsurface',
   'voxelwise',
   'contactTransmission',
   'texture',

@@ -6,6 +6,37 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed in part 2026-11-26: the voxel path tracer had no subsurface under a diffuse surface (KB1673, voxel-pathtracer)
+
+- **Repro (before):** a `media` material is a cloud: a ray that grazes its edge crosses little of it and sees through,
+  so a block of it has soft, see-through edges and lets shadow rays pass. `{ type: 'media', subsurface: true }` was
+  an unknown field. Against MagicaVoxel's `_sss` block (the six `G` boards, 1,024 samples) the fitted sun-lit cloud
+  matches the block's middle within 2 levels but leaves a bright rim of differences along every edge.
+- **Cause:** the tracer had no surface on a medium. Chiang, Kutz and Burley 2016 ("Practical and Controllable
+  Subsurface Scattering for Production Path Tracing", SIGGRAPH Talks, <https://doi.org/10.1145/2897839.2927433>) put a
+  diffuse interface on the volume and derive the walk's single-scattering albedo from the colour the surface shows
+  (their equation 1; it agrees within 0.001 with the inverse of van de Hulst's half-space albedo
+  (1 - s)(1 - 0.139 s) / (1 + 1.17 s), s = sqrt(1 - albedo), "Multiple Light Scattering", 1980).
+- **Fix:** `subsurface: true` on a `media` material (`packages/voxel-pathtracer/src/shaders.ts`, `scene.ts`): a cosine
+  lobe into the volume at its surface, an isotropic walk, a cosine lobe out where lights are sampled; the volume blocks
+  shadow rays; `bounceLimits.subsurface` (now up to 256) caps the walk. WebGPU and the WebGL2 layer give the same
+  numbers.
+- **Regression:** `packages/voxel-pathtracer/tests/browser-check.mjs subsurface` (in `test:gpu:light-transport`):
+  a dense white cube cut after 1, 2, 6 and 12 steps returns 0.207, 0.324, 0.532 and 0.650 against an independent
+  half-space walk's 0.204, 0.320, 0.528 and 0.644 (bound 0.01); surfaces of colour 0.2, 0.5 and 0.8 return 0.205,
+  0.506 and 0.800 (bound 0.02); the floor under the cube is black under the sun where a plain medium lets exp(-2)
+  through. `tests/contracts.test.js` checks the field and the 256 cap. Both fail on the parent.
+- **Still open (MagicaVoxel's `_sss`):** the mapping keeps the fitted sun-lit cloud, because no setting of the new
+  model beats it on the references on disk. What the diffuse interface explains, measured on the `G` boards: the crisp
+  edges; the black shadow behind the block (0 to 5 levels in both, 6 to 9 with the cloud); the light the block throws
+  on its neighbours at diffuse cap 4 and not at cap 2 (entering and leaving are two diffuse events); and the sky-lit
+  level, when the walk is cut after 3 steps per diffuse cap: a half-space walk returns 0.529 after 6 steps and 0.648
+  after 12, a ratio of 0.816 against MagicaVoxel's (136 / 149)^2.2 = 0.818, and a dense block renders 139 and 153
+  against its 136 and 149. What it does not: under the sun at 60 degrees that dense block renders 221 and 242 against
+  190 and 205, and at the fitted density the top darkens toward the faces the sun does not light, where MagicaVoxel's
+  stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
+  model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
+
 ### Fixed 2026-11-26: a faded occluder turned solid for the length of a level cross-fade (KB-LOD-FADECOMBO1, lod)
 
 - **Repro:** `LODFade` and `OccluderFade` (`@margoengine/lod/fade`, `@margoengine/lod/occluder-fade`) on one engine; a
@@ -11107,6 +11138,9 @@ This fixes that colour conversion only. In the recorded 16 x 16 base / 8 x 8 x 6
 error 7,398,780. The existing cloud model has no diffuse surface interface and still shows broad soft edges.
 Chiang, Kutz and Burley 2016 describe the distinction between apparent surface albedo and single-scattering
 albedo with a diffuse interface. That is a candidate transport cause to investigate, not an established match.
+Investigated 2026-11-26 (KB1673 above): the tracer now has that interface (`subsurface`), and it accounts for the
+soft edges, the shadow and the sky-lit level, but not for the sun-lit level on the references on disk; the mapping is
+unchanged.
 Neither this record nor the gamma fix closes exact parity. The full zero-error oracle remains required.
 
 ### Fixed in batch 99: media-boundary emitter MIS distance

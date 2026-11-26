@@ -164,9 +164,13 @@ function mediaSource(input: string): string {
       let pdf=dot(st,relative)/3.0;
       thr*=relative*st*md.albedo/pdf;p=o+d*ts;
       if(feature){feature=false;res.albedo=tint*md.albedo;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
-      bounces++;
-      if((material(medium).flags&SUNLIT)!=0u){if(bounces>f.config.x||nu+4u*nd>=(f.limits.z>>16u)){break;}nu++;}
-      else{if(bounces>f.config.x||nm>=(f.limits.z&0xffffu)){break;}nm++;}
+      let mf=material(medium).flags;
+      if((mf&SUBSURFACE)!=0u){if(nu>=min(f.limits.z>>16u,WALK)){break;}nu++;}
+      else{
+       bounces++;
+       if((mf&SUNLIT)!=0u){if(bounces>f.config.x||nu+4u*nd>=(f.limits.z>>16u)){break;}nu++;}
+       else{if(bounces>f.config.x||nm>=(f.limits.z&0xffffu)){break;}nm++;}
+      }
       scatter=true;
      }else{thr*=relative/(dot(relative,vec3f(1.0))/3.0);}
     }

@@ -301,6 +301,23 @@ except `id`, `color` and `type` are optional.
   sampled through.
 - Media voxels of one index form one volume; light entering it is attenuated and scattered, and next-event estimation
   works from inside it (shadow rays are attenuated through media, blocked by anything else).
+- Subsurface (addition): `subsurface: true` on a `media` material puts the medium under a diffuse surface (wax, skin,
+  marble, milk), after Chiang, Kutz and Burley 2016, "Practical and Controllable Subsurface Scattering for Production
+  Path Tracing". A ray that meets the volume enters it in a cosine lobe about the inward normal, walks inside with mean
+  free path 1 / `density` and leaves in a cosine lobe about the outward normal, where lights are sampled. The volume
+  shows a matte solid with crisp edges that light bleeds through over about a mean free path, and it blocks shadow
+  rays. `color` is the colour the surface shows: the walk's single-scattering albedo comes from it by their equation
+  1, so a thick volume in a white sky returns `color` within 0.02. Entering and leaving are a diffuse event each; the
+  steps inside count against `bounceLimits.subsurface` (256 at most), not `maxBounces`, within the path's
+  20 x `maxBounces` + 32 steps of every kind. Default false.
+
+  ```ts
+  import type { TraceMaterial } from '@margoengine/voxel-pathtracer';
+
+  // Wax: its surface shows this colour, and light travels about half a voxel under it.
+  const wax: TraceMaterial = { id: 1, type: 'media', subsurface: true, color: [0.9, 0.75, 0.5], density: 2 };
+  ```
+
 - Compatible additions for other renderers' material models (the MagicaVoxel mapping below sets them):
   - `metalColor`: the metal lobe's reflectance at normal incidence, when it differs from `color` (default `color`).
   - `coat: 'additive'`: the coat adds to the whole diffuse base instead of taking its reflection out of it (default
@@ -312,7 +329,7 @@ except `id`, `color` and `type` are optional.
     `bounceLimits.subsurface` (each diffuse event earlier on the path uses 4 of them) instead of `scatter`; with
     `transparentShadows` off a shadow ray from inside it crosses the rest of its volume and nothing after it (only its
     start cell for a sun ray from a path that entered through a face turned from the sun), so mainly faces toward the
-    sun glow.
+    sun glow. It does nothing on a `subsurface` medium.
   - `voxelwise` (blend): every voxel face inside the volume picks a lobe again; light passes straight through the
     glass share and the rest scatters there.
   - `contactTransmission` (blend): a ray leaving the volume into the air passes only with the glass share's
@@ -411,7 +428,7 @@ The engine camera is used as is: perspective by default, orthographic (or any af
 | `clamp` (largest luminance a path may add; biased firefly control) | Infinity | above 0 | yes |
 | `toneMapping` | `'neutral'` (Khronos PBR Neutral, Margo's display transform) | `'neutral'`, `'linear'`, `'aces-narkowicz'` (Narkowicz's ACES fit after x0.6), `'agx'` (AgX, the same transform as Tonemap and ImagePost) | no |
 | `gamma` (display encoding after tone mapping) | sRGB | 1-5 (power 1 / gamma), or undefined for sRGB | no |
-| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?, internalReflections?}` each 1-64 (`internalReflections` 0-64: reflections inside glass kept in full, each later one goes on with probability 1/2), or null | yes |
+| `bounceLimits` (events per kind on top of `maxBounces`) | none | `{diffuse?, specular?, scatter?, subsurface?, internalReflections?}` each 1-64 (`subsurface` 1-256: scattering events in `sunlit` media and the steps of a walk in a `subsurface` medium; `internalReflections` 0-64: reflections inside glass kept in full, each later one goes on with probability 1/2), or null | yes |
 | `transparentShadows` (shadow rays through glass and media) | true | boolean; false: any voxel blocks them | yes |
 | `sunSpecular` (the sun lights glossy lobes, is seen in reflections) | true | boolean; false: diffuse lobes only | yes |
 | `sunInMedia` (the sun lights media directly) | true | boolean | yes |
@@ -894,7 +911,7 @@ console.log(material.color); // [128 / 255, 128 / 255, 128 / 255]
 ## Parity status and known gaps
 
 Implemented and verified as above: voxel traversal with shared transformed instances; diffuse, plastic, metal, glass,
-emissive, blended and media materials; subsurface scattering by random walk; sun, sky, ground, HDR environment maps,
+emissive, blended and media materials; subsurface scattering by random walk, in glass and under a diffuse surface; sun, sky, ground, HDR environment maps,
 emissive voxels and area lights with next-event estimation; depth of field with round and polygonal apertures;
 instance motion blur; perspective and orthographic cameras; progressive accumulation with a stable seed; a denoiser;
 PNG and float captures with cancellation; device-loss recovery.
@@ -902,7 +919,9 @@ PNG and float captures with cancellation; device-loss recovery.
 Not done or not verified, stated plainly:
 
 - **MagicaVoxel parity is not complete:** next to a subsurface block under the sun at diffuse cap 4 some tiles are
-  7-16 levels off; subsurface is fitted at one density only;
+  7-16 levels off; subsurface is fitted at one density only, as a sun-lit cloud whose edges are soft where
+  MagicaVoxel's are crisp (the `subsurface` option gives the crisp surface, the black shadow and the sky-lit level, not
+  yet the sun-lit one: docs/known-bugs.md, KB1673);
   glass over a lit floor is 1-2 levels brighter; under the atmosphere, a view into a low sun matches on 98.7% of
   pixels and very dense air settings by 2-3 levels on average; with the ground off its sky below the horizon is
   within 4.2 levels on average (2-degree blocks), not per pixel.

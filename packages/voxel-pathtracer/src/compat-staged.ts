@@ -87,7 +87,8 @@ const LOOP = 'for(var it=0u;it<limit;it++){';
 const HIT_END = 'if(walking){walkAdvance=false;}else{mediaAdvance=false;}';
 const CALL = 'let add=thr*direct(';
 const ARGS = 'select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes';
-const DIRECT = 'fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<function,Walk>,mask:u32)->vec3f {';
+const DIRECT =
+  'fn direct(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,medium:u32,mInst:u32,w:ptr<function,Walk>,mask:u32)->vec3f {';
 // The light kinds' loop; its bound is `5u`, or an expression a feature puts there (triangle meshes add two kinds).
 const LIGHTS = /for\(var q=0u;q<([^;{}]+);q\+\+\)\{/g;
 // Light kinds the route runs when the bound is not a literal: the stages skip kinds at or past the bound, so any bound
@@ -113,7 +114,14 @@ const SAMPLE = 'let r=radiance(px);';
 const SPLIT_FLAG = 'let split=(f.config.z&SPLIT)!=0u;';
 const IMAGES = /@group\(0\) @binding\((6|7|8|10)\) var<storage,read_write> \w+:array<vec4f>;\n/g;
 // Declarations whose type the initializer does not show.
-const HINTS: Record<string, string> = { limit: 'u32', p: 'vec3f', fogged: 'bool', sunOnly: 'bool', lobes: 'u32' };
+const HINTS: Record<string, string> = {
+  limit: 'u32',
+  p: 'vec3f',
+  fogged: 'bool',
+  sunOnly: 'bool',
+  lobes: 'u32',
+  skinIn: 'bool',
+};
 
 function unique(text: string, marker: string, from = 0): number {
   const i = text.indexOf(marker, from);
@@ -278,7 +286,8 @@ function hoist(text: string, known: Map<string, string>, T: Types): { text: stri
     if (depth !== 0) continue;
     const [, , name, ann] = m,
       at = m.index + m[0].length;
-    let init: string | undefined, end = at;
+    let init: string | undefined,
+      end = at;
     if (m[4] === '=') {
       let p = 0;
       for (; end < text.length; end++) {
@@ -302,9 +311,7 @@ function hoist(text: string, known: Map<string, string>, T: Types): { text: stri
 }
 // Whether `text` may assign `name` (conservatively: any assignment, increment, member store or pointer to it).
 const assigns = (text: string, name: string) =>
-  new RegExp(
-    `(?<![\\w.])${name}(?:\\.\\w+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]?=(?!=)|\\+\\+|--)|&${name}\\b`,
-  ).test(text);
+  new RegExp(`(?<![\\w.])${name}(?:\\.\\w+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]?=(?!=)|\\+\\+|--)|&${name}\\b`).test(text);
 
 // `text` split at the top-level (outside parentheses) occurrences of `op` (`||` or `&&`), each part without the
 // parentheses that wrap all of it.
@@ -360,7 +367,14 @@ function kindTest(term: string): ((q: number) => boolean) | undefined {
   const m = /^q(==|!=|<=|>=|<|>)(\d+)u$/.exec(term);
   if (!m) return undefined;
   const n = Number(m[2]);
-  return { '==': (q: number) => q === n, '!=': (q: number) => q !== n, '<': (q: number) => q < n, '<=': (q: number) => q <= n, '>': (q: number) => q > n, '>=': (q: number) => q >= n }[m[1]];
+  return {
+    '==': (q: number) => q === n,
+    '!=': (q: number) => q !== n,
+    '<': (q: number) => q < n,
+    '<=': (q: number) => q <= n,
+    '>': (q: number) => q > n,
+    '>=': (q: number) => q >= n,
+  }[m[1]];
 }
 // Whether condition `cond` holds for kind q: true, false, or undefined when it depends on more than q.
 function kindHolds(cond: string, q: number): boolean | undefined {
@@ -393,7 +407,10 @@ function idleKinds(code: string, light: string, kinds: number): FrameTest[][][] 
   if (!fs || !/var<uniform> f:Frame;/.test(code)) return none();
   const fieldAt = new Map<string, number>();
   let words = 0;
-  for (const field of fs[1].split(/,(?![^<]*>)/).map((s) => s.trim()).filter(Boolean)) {
+  for (const field of fs[1]
+    .split(/,(?![^<]*>)/)
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     const m = /^(\w+):(?:vec4[fiu]|vec4<(?:f32|u32|i32)>|array<vec4[fiu],(\d+)>)$/.exec(field);
     if (!m) return none();
     fieldAt.set(m[1], words);
@@ -407,8 +424,13 @@ function idleKinds(code: string, light: string, kinds: number): FrameTest[][][] 
       let m: RegExpExecArray | null, w: number | undefined;
       if ((m = /^f\.(\w+)\.([xyzw])>0\.0$/.exec(t)) && (w = word(m[1], m[2])) !== undefined)
         return { word: w, test: 'positive' };
-      if ((m = /^f\.(\w+)\.([xyzw])==0u$/.exec(t)) && (w = word(m[1], m[2])) !== undefined) return { word: w, test: 'zero' };
-      if ((m = /^\(f\.(\w+)\.([xyzw])&(\w+)\)==0u$/.exec(t)) && (w = word(m[1], m[2])) !== undefined && consts.has(m[3]))
+      if ((m = /^f\.(\w+)\.([xyzw])==0u$/.exec(t)) && (w = word(m[1], m[2])) !== undefined)
+        return { word: w, test: 'zero' };
+      if (
+        (m = /^\(f\.(\w+)\.([xyzw])&(\w+)\)==0u$/.exec(t)) &&
+        (w = word(m[1], m[2])) !== undefined &&
+        consts.has(m[3])
+      )
         return { word: w, test: 'none', mask: consts.get(m[3])! };
       return undefined;
     };
@@ -416,7 +438,9 @@ function idleKinds(code: string, light: string, kinds: number): FrameTest[][][] 
   const list = statements(light),
     chainOf = (s: string) => {
       const b = branches(s);
-      return b && b[b.length - 1].cond === undefined && b.every((x) => x.cond === undefined || kindHolds(x.cond, 0) !== undefined)
+      return b &&
+        b[b.length - 1].cond === undefined &&
+        b.every((x) => x.cond === undefined || kindHolds(x.cond, 0) !== undefined)
         ? b
         : undefined;
     },
@@ -499,7 +523,12 @@ export function stagedTrace(source: string): StagedTrace {
     const open = code.indexOf('{', m.index);
     bodies.set(m[1], code.slice(open + 1, matching(code, open)));
   }
-  const changes = new Map([...bodies].map(([name, text]) => [name, new Set(privates.filter((p) => assigns(text, p.name)).map((p) => p.name))]));
+  const changes = new Map(
+    [...bodies].map(([name, text]) => [
+      name,
+      new Set(privates.filter((p) => assigns(text, p.name)).map((p) => p.name)),
+    ]),
+  );
   for (let grew = true; grew; ) {
     grew = false;
     for (const [name, text] of bodies)
@@ -570,9 +599,7 @@ export function stagedTrace(source: string): StagedTrace {
     lightKnown = new Map(known),
     sample = hoist(walkPtr(light.slice(0, si)), lightKnown, T);
   // A prologue that changes private state runs in every light program: no kind's passes may be left out then.
-  const idle = touched(dPrologue).size
-    ? Array.from({ length: kinds }, () => [])
-    : idleKinds(code, light, kinds);
+  const idle = touched(dPrologue).size ? Array.from({ length: kinds }, () => []) : idleKinds(code, light, kinds);
   sample.decls.push({ name: 'v', type: T.fns.get('shadow') ?? 'f32' });
   const shadowText = walkPtr(tail.slice(0, off).replace(SHADOW, 'v=shadow(o,wi,dist);')),
     gatherText = walkPtr(tail.slice(off));
@@ -608,8 +635,10 @@ export function stagedTrace(source: string): StagedTrace {
     ],
     scratch: Decl[] = sample.decls.map((d) => ({ ...d, name: 'l_' + d.name, local: d.name }) as Decl);
   for (const d of [...control, ...path, ...scratch])
-    if (new RegExp(`\\b(fn|const|var<\\w+>|override|struct) ${d.name}\\b`).test(prefix) &&
-      !privates.some((p) => p.name === d.name))
+    if (
+      new RegExp(`\\b(fn|const|var<\\w+>|override|struct) ${d.name}\\b`).test(prefix) &&
+      !privates.some((p) => p.name === d.name)
+    )
       throw stale(`the name ${d.name}`);
 
   // The vertex in two programs (one compiled program held both, and Direct3D's compiler took 71 s for it at the first
@@ -808,9 +837,10 @@ ${unpackPath}${nonFields.map((d) => ` var ${d.name}:${d.type};\n`).join('')} ${S
     gather: lightStage(code_.gather, '&&!S.z_lskip'),
     finish,
   };
-  const writes = Object.fromEntries(
-    (Object.keys(modules) as Stage[]).map((s) => [s, written(s)]),
-  ) as unknown as Record<Stage, number[]>;
+  const writes = Object.fromEntries((Object.keys(modules) as Stage[]).map((s) => [s, written(s)])) as unknown as Record<
+    Stage,
+    number[]
+  >;
   // Where the census reads z_fin and z_it (control words, so on page 0).
   const word = (name: string) => at.get(control.find((d) => d.name === name)!)!,
     texel = (w: number) => `textureLoad(zp0,g,${w >> 2},0).${'xyzw'[w & 3]}`,

@@ -571,6 +571,29 @@ window.check={
  // Sunlight through smooth glass (light sampling through refraction chains, MIS with path sampling), closed forms with
  // the exact unpolarised Fresnel the tracer uses: a floating slab's transparent shadow on a floor, and a floor seen
  // through a wide slab resting on it (light refracted in, trapped light returned by internal reflection).
+ // Subsurface: a medium under a diffuse surface (Chiang, Kutz and Burley 2016) in a uniform sky of radiance 1.
+ async subsurface(){
+  const out={},cubeMask=(image)=>(i)=>image.instance[i]===0;
+  const run=async(name,material,options={})=>{
+   look([14,10,18],[0,0,0],{fov:35});
+   out[name]=await withTracer({...furnace([{id:1,type:'media',subsurface:true,...material}]),models:[model('cube',[32,32,32],()=>1)],instances:[{id:'cube',modelId:'cube',matrix:translate(-4,-4,-4,0.25)}]},{maxBounces:64,...options},async(t)=>{const image=await t.renderImage({width:96,height:72,samples:512,aovs:true,jitter:false});return {...stats(image,cubeMask(image)),albedo:[image.albedo[3*(36*96+48)],image.albedo[3*(36*96+48)+1],image.albedo[3*(36*96+48)+2]]};});
+  };
+  // A dense white cube (32 voxels of 4 mean free paths each) is a half-space under every pixel: a walk cut after N steps returns the share of walks that
+  // have left by then, each step weighted by the single-scattering albedo of white.
+  for(const steps of [1,2,6,12])await run(`walk ${steps}`,{color:[1,1,1],density:64},{bounceLimits:{subsurface:steps}});
+  // The surface shows its colour: the walk's albedo is the inverse of the multiple-scattering albedo.
+  for(const a of [0.2,0.5,0.8])await run(`colour ${a}`,{color:[a,a,a],density:64});
+  await run('colour rgb',{color:[0.8,0.5,0.2],density:64});
+  // It blocks light: under a sun straight above and a black sky the floor beneath it is black, where a plain medium of
+  // the same density lets exp(-2) of the sun through (seen from the side, under the cube; no bounce light).
+  for(const subsurface of [true,false]){
+   look([0,6,30],[0,0,0],{fov:20});
+   const scene={revision:1,models:[model('p',[64,1,64],()=>1),solid(8,2)],instances:[{id:'p',modelId:'p',matrix:translate(-32,-1,-32)},{id:'m',modelId:'cube',matrix:translate(-4,2,-4)}],materials:[{id:1,color:[0.5,0.5,0.5],type:'diffuse'},{id:2,color:[1,1,1],type:'media',density:0.25,subsurface}],environment:{skyIntensity:0,sunDirection:[0,1,0],sunIntensity:Math.PI,sunAngularSize:0}};
+   out[subsurface?'shadow':'shadow of a plain medium']=await withTracer(scene,{maxBounces:1},async(t)=>{const image=await t.renderImage({width:48,height:48,samples:256,aovs:true,jitter:false});
+    return stats(image,(i)=>image.instance[i]===0&&Math.abs((i%48)-23.5)<8&&Math.abs(Math.floor(i/48)-23.5)<1.5);});
+  }
+  return out;
+ },
  async glasslight(){
   const out={},fres=(ci,eta)=>{const s2=eta*eta*(1-ci*ci);if(s2>=1)return 1;const ct=Math.sqrt(1-s2),rs=(eta*ci-ct)/(eta*ci+ct),rp=(ci-eta*ct)/(ci+eta*ct);return 0.5*(rs*rs+rp*rp);};
   const ior=1.5,deg=Math.PI/180;

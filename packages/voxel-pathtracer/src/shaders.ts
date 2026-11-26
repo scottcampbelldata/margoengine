@@ -47,6 +47,7 @@ import {
   MEDIA,
   SMOOTH,
   SUNLIT,
+  SUBSURFACE,
   UNTINTED,
   VOXELWISE,
 } from './scene.js';
@@ -270,6 +271,9 @@ const NO_COMPENSATION=${FLAG_NO_COMPENSATION}u;
 const ADDITIVE=${ADDITIVE}u;
 const UNTINTED=${UNTINTED}u;
 const SUNLIT=${SUNLIT}u;
+const SUBSURFACE=${SUBSURFACE}u;
+// Steps of one walk under a diffuse surface at most.
+const WALK=256u;
 const VOXELWISE=${VOXELWISE}u;
 const CONTACT=${CONTACT}u;
 const CUTOUT=${CUTOUT}u;
@@ -540,10 +544,11 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through; with
 // opaque shadows none, except the sun-lit volume the shadow ray starts in, or only its start cell for a sun ray from a
 // walk that entered the volume through a face turned from the sun: as in MagicaVoxel's subsurface, light reaches a
-// point in it through that volume alone, mostly from its faces toward the light).
+// point in it through that volume alone, mostly from its faces toward the light). A subsurface volume blocks light: its
+// diffuse surface is where light enters it.
 fn extinction(v:u32,own:bool)->f32 {
  let x=mat(v*MV+3u);let fl=u32(x.w);
- return select(-1.0,x.x,(fl&MEDIA)!=0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&own)));
+ return select(-1.0,x.x,(fl&MEDIA)!=0u&&(fl&SUBSURFACE)==0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&own)));
 }
 // Optical depth along a shadow ray through one model, -1 when blocked.
 fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
@@ -1061,7 +1066,7 @@ fn mediumOf(id:u32)->Medium {
  if(id==0u){return r;}
  let m=material(id);
  r.g=m.g;
- if((m.flags&MEDIA)!=0u){r.sigma=m.density;r.albedo=m.color;r.media=true;r.emit=m.emission;}
+ if((m.flags&MEDIA)!=0u){r.sigma=m.density;r.albedo=select(m.color,m.metalColor,(m.flags&SUBSURFACE)!=0u);r.media=true;r.emit=m.emission;}
  else{r.sigma=m.scatter;r.albedo=vec3f(1.0);r.absorb=m.density*-log(max(m.color,vec3f(1e-4)));}
  return r;
 }
@@ -1533,7 +1538,7 @@ fn radiance(px:vec2u)->Path {
     } else {
      let mb=material(h.value);
      // Glass to media or to other glass: left to path sampling (the path side ends its chain there too).
-     if(wGlass){stop=true;}
+     if(wGlass||(mb.flags&SUBSURFACE)!=0u){stop=true;}
      else if((mb.flags&MEDIA)!=0u){wMedium=h.value;wInst=h.inst;wo=wp;walkAdvance=true;}
      else if(isMirror(mb)&&mirrorAt(h.inst)){wT*=schlick3(mb.metalColor,ci);wN++;wG=h.inst;wd=reflect(wd,wn);wo=wp+woff;}
      else if(mb.glass<0.999||!clearGlass(mb)){stop=true;}
@@ -1590,17 +1595,23 @@ fn radiance(px:vec2u)->Path {
      thr*=exp(-md.absorb*ts)*md.albedo;
      p=o+d*ts;
      if(feature){feature=false;res.albedo=tint*md.albedo;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
-     bounces++;
+     // A step of the walk under a diffuse surface: counted by the subsurface cap alone (at most WALK), not by maxBounces
+     // (the path loop's own limit ends a walk too).
      // Sun-lit media: each diffuse event before takes 4 from the subsurface cap (MagicaVoxel's neighbours of subsurface
      // blocks under diffuse caps 2 and 4).
-     if((material(medium).flags&SUNLIT)!=0u){if(bounces>f.config.x||nu+4u*nd>=(f.limits.z>>16u)){break;}nu++;}
-     else{if(bounces>f.config.x||nm>=(f.limits.z&0xffffu)){break;}nm++;}
+     let mf=material(medium).flags;
+     if((mf&SUBSURFACE)!=0u){if(nu>=min(f.limits.z>>16u,WALK)){break;}nu++;}
+     else{
+      bounces++;
+      if((mf&SUNLIT)!=0u){if(bounces>f.config.x||nu+4u*nd>=(f.limits.z>>16u)){break;}nu++;}
+      else{if(bounces>f.config.x||nm>=(f.limits.z&0xffffu)){break;}nm++;}
+     }
      scatter=true;
     }
    }
    if(!scatter){thr*=exp(-md.absorb*h.t);}
   }
-  var n=vec3f(0.0);var off=vec3f(0.0);var m:Mat;var soft=true;
+  var n=vec3f(0.0);var off=vec3f(0.0);var m:Mat;var soft=true;var skinOut=false;
   if(scatter){m=material(medium);}
   else {
    if(h.inst==NONE){
@@ -1637,8 +1648,11 @@ fn radiance(px:vec2u)->Path {
     // back inside off the blend's other lobes (a diffuse event). Without metal that is the glass share itself; with it,
     // MagicaVoxel lets more light out than the share its metal leaves (B boards: half metal, half glass over white).
     var inner=false;
+    // Leaving a subsurface volume into empty space or a plain medium: its diffuse surface, seen from inside.
+    let other=h.value==0u||(material(h.value).flags&(MEDIA|SUBSURFACE))==MEDIA;
+    skinOut=other&&medium!=0u&&(material(medium).flags&SUBSURFACE)!=0u;
     if(h.value==0u&&medium!=0u){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass/max(1e-6,1.0-0.4*mc.metal)){inner=true;}}
-    if(h.value==0u&&!inner){
+    if(h.value==0u&&!inner&&!skinOut){
      // Leaving a volume into empty space: media end without a surface, glass refracts out or reflects back in.
      var mm=material(medium);
      if((mm.flags&MEDIA)!=0u){medium=0u;mInst=NONE;o=p;mediaAdvance=true;continue;}
@@ -1664,13 +1678,30 @@ fn radiance(px:vec2u)->Path {
      continue;
     }
     m=material(h.value);
-    if(inner){m=material(medium);m.glass=0.0;}
+    if(skinOut){
+     // The far side of the surface is a white cosine lobe (the walk has carried the colour): light is sampled there and
+     // the path leaves about the outward normal (Chiang, Kutz and Burley 2016, a diffuse interface). The direction is
+     // mirrored in the surface, so the lobe sees it arrive from outside.
+     m=lineMat(vec3f(1.0));n=-n;off=-off;d=reflect(d,n);
+     medium=h.value;mInst=select(NONE,h.inst,h.value!=0u);
+    }
+    else if(inner){m=material(medium);m.glass=0.0;}
     else if((m.flags&MEDIA)!=0u){
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      sunFace=dot(n,f.sun.xyz)>0.0;
+     if((m.flags&SUBSURFACE)!=0u&&(medium==0u||(material(medium).flags&SUBSURFACE)==0u)){
+      // Into a subsurface volume through its diffuse surface: a diffuse event that turns the path into a cosine lobe
+      // about the inward normal; the walk inside gathers no light until it leaves.
+      if(nd>=f.limits.x||bounces>=f.config.x){break;}
+      if(feature){feature=false;res.albedo=tint*m.color;res.normal=n;res.primary=select(0.0,1.0,bounces==0u);}
+      nd++;bounces++;diffuse=true;
+      medium=h.value;mInst=h.inst;o=p;d=cosineDir(-n);mediaAdvance=true;
+      lastPdf=0.0;lastVertex=o;sunPdf=0.0;chainOk=false;
+      continue;
+     }
      medium=h.value;mInst=h.inst;o=p;mediaAdvance=true;continue;
     }
-    if(!inner){let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;}
+    if(!inner&&!skinOut){let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;}
     // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.
     if(bounces==0u&&medium==0u){
      if(f.edges.w>0.0&&edgeBand(h,lp)){m=lineMat(f.edges.xyz);}
@@ -1691,7 +1722,9 @@ fn radiance(px:vec2u)->Path {
   // event too many, and only the light-sampled MIS share of that longer path, since the same limit cuts its BSDF share
   // below. A medium vertex checks its count where it scatters.
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
-  if(soft&&(scatter||bounces<f.config.x)){
+  // Inside a subsurface volume no light is sampled: it arrives through the surface, where the walk leaves.
+  let skinIn=medium!=0u&&(material(medium).flags&SUBSURFACE)!=0u&&!skinOut;
+  if(soft&&!skinIn&&(scatter||bounces<f.config.x)){
    var walk:Walk;
    let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<(f.limits.y&0xffffu));
    let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
@@ -1707,9 +1740,10 @@ fn radiance(px:vec2u)->Path {
    let md=mediumOf(medium);
    diffuse=true;
    let wi=sampleHg(d,md.g);
-   lastPdf=select(0.0,hgPdf(dot(d,wi),md.g),md.media);
+   lastPdf=select(0.0,hgPdf(dot(d,wi),md.g),md.media&&!skinIn);
    lastVertex=p;
    sunPdf=hgPdf(dot(d,wi),md.g);jChain=1.0;chainOk=true;chainSet=md.media;
+   if(skinIn){chainOk=false;}
    glassStart=!md.media;deflections=0u;deflectOk=true;
    o=p;d=wi;
    if(!roulette(&thr,bounces)){done=true;}
@@ -1747,7 +1781,7 @@ fn radiance(px:vec2u)->Path {
    medium=h.value;mInst=h.inst;o=p-off;if((m.flags&UNTINTED)==0u){thr*=m.color;}
   } else {o=p+off;}
   if(feature){tint*=guideWeight(s,m.alpha,n,wo,etaI/m.ior,(m.flags&SMOOTH)!=0u);}
-  d=s.wi;lastPdf=select(0.0,s.pdf,inAir);lastVertex=o;
+  d=s.wi;lastPdf=select(0.0,s.pdf,inAir&&!skinIn);lastVertex=o;if(skinIn){chainOk=false;}
   bounces++;
   if(bounces>f.config.x||!roulette(&thr,bounces)){done=true;}
  }
