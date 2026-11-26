@@ -39,6 +39,8 @@ export interface SoilContactRigidParams extends RigidSolverParams {
 
 export interface SoilContactRigidOptions {
   readonly id?: string;
+  /** Publish live wheel spin in the same order as the soil patch records. Use soilWheelPhaseField. */
+  readonly wheelPhase?: FieldDescriptor;
   /** Read the live bed and update the supplied collider before sampling wheel and belt loads. */
   readonly terrain?: BedShape;
 }
@@ -56,11 +58,12 @@ function heading(vehicle: Vehicle | TrackedVehicle, forward: Point = [0, 0, 1]):
   return scale > 0 ? [x / scale, z / scale] : [0, 1];
 }
 
-function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding): number {
+function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, phases?: Float64Array): number {
   const { vehicle, patches, ground } = binding;
   const [x, z] = heading(vehicle, binding.forward);
   for (const [index, patch] of patches.entries()) {
     const wheel = vehicle.wheel(index);
+    if (phases) phases[at / SOIL_PATCH_WORDS] = wheel.rotation;
     if (wheel.contactPoint && wheel.load > 0 && (!ground || ground === wheel.ground)) {
       const azimuth = wheel.steering;
       const longitudinal = -wheel.slipRatio * patch.length;
@@ -133,8 +136,10 @@ export class SoilContactRigidSolver extends RigidSolver {
   private cell: Cell = [0, 0, 0];
   private lastTick = -1;
   private readonly terrain?: BedShape;
+  private readonly phase?: FieldDescriptor;
   private ground?: PhysicsCollider;
   private heights?: Region;
+  private phases?: Region;
 
   constructor(
     readonly soilField: FieldDescriptor,
@@ -142,6 +147,7 @@ export class SoilContactRigidSolver extends RigidSolver {
   ) {
     super(options.id ?? 'rigid');
     this.terrain = options.terrain && { ...options.terrain, centre: [...options.terrain.centre] };
+    this.phase = options.wheelPhase && { ...options.wheelPhase };
   }
 
   override describe() {
@@ -151,6 +157,7 @@ export class SoilContactRigidSolver extends RigidSolver {
       fields: [
         ...base.fields,
         { field: this.soilField, access: 'write' as const },
+        ...(this.phase ? [{ field: this.phase, access: 'write' as const }] : []),
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
     };
@@ -178,6 +185,7 @@ export class SoilContactRigidSolver extends RigidSolver {
     super.init(host, params);
     this.memory = host.memory;
     this.patches = host.allocate('rigid-soil-patches', rows * SOIL_PATCH_WORDS * 8, 'f64', SOIL_LAYOUT);
+    if (this.phase) this.phases = host.allocate('rigid-soil-wheel-phase', rows * 8, 'f64', SOIL_LAYOUT);
     this.motion = host.allocate(
       'rigid-soil-motion',
       8 * (1 + this.vehicles.reduce((n, v) => n + v.motionStateWords, 0)),
@@ -250,9 +258,13 @@ export class SoilContactRigidSolver extends RigidSolver {
     this.cell = context.cell;
     const out = regionWords(this.memory, this.patches) as Float64Array;
     out.fill(0);
+    const phases = this.phases ? (regionWords(this.memory, this.phases) as Float64Array) : undefined;
+    phases?.fill(0);
     let at = 0;
     for (const binding of this.wheels)
-      at = binding.vehicle.valid ? wheelLoads(out, at, binding) : at + binding.patches.length * SOIL_PATCH_WORDS;
+      at = binding.vehicle.valid
+        ? wheelLoads(out, at, binding, phases)
+        : at + binding.patches.length * SOIL_PATCH_WORDS;
     for (const binding of this.tracks)
       at = binding.vehicle.valid ? trackLoads(out, at, binding) : at + binding.patches.length * SOIL_PATCH_WORDS;
     this.syncMotion(context.tick);
@@ -260,10 +272,20 @@ export class SoilContactRigidSolver extends RigidSolver {
   }
 
   override exportPorts(tick: number): readonly Port[] {
-    return [...super.exportPorts(tick), { field: this.soilField.name, region: this.patches, tick, cell: this.cell }];
+    return [
+      ...super.exportPorts(tick),
+      { field: this.soilField.name, region: this.patches, tick, cell: this.cell },
+      ...(this.phase && this.phases ? [{ field: this.phase.name, region: this.phases, tick, cell: this.cell }] : []),
+    ];
   }
 
   override stateRegions(): readonly Region[] {
-    return [...super.stateRegions(), this.patches, this.motion, ...(this.heights ? [this.heights] : [])];
+    return [
+      ...super.stateRegions(),
+      this.patches,
+      this.motion,
+      ...(this.heights ? [this.heights] : []),
+      ...(this.phases ? [this.phases] : []),
+    ];
   }
 }

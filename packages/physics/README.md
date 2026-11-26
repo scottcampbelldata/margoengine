@@ -4728,6 +4728,11 @@ finds the loaded arc and uses the computed contact length. Set a measured topsoi
 `peakFraction`, `peakSlip` and `exitFraction` default to 0.4, 0.3 and 0. Use the same modes as the
 [executable moving-wheel example](tests/coupling/terramechanics.test.js).
 
+Set `lugCount` and `lugWidth` with `lugHeight` to cut individual evenly spaced grouser marks. Pass the
+same descriptor from `soilWheelPhaseField()` as `wheelPhase` to both the rigid adapter and the resolved
+solver. The adapter publishes each real wheel's spin angle. Resolve lug width on both the projected
+profile and the physical terrain grid.
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone

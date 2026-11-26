@@ -4,7 +4,13 @@ import { Physics, TrackedVehicle, Vehicle } from '@margoengine/physics';
 import { AirborneParticles } from '@margoengine/physics/airborne';
 import { BedCollider, bedVertexAreas, TerrainBed } from '@margoengine/physics/earth';
 import { LeggedLocomotion } from '@margoengine/physics/legged';
-import { SoilContactRigidSolver, soilPatchField, Terramechanics, wheelSoil } from '@margoengine/physics/terramechanics';
+import {
+  SoilContactRigidSolver,
+  soilPatchField,
+  soilWheelPhaseField,
+  Terramechanics,
+  wheelSoil,
+} from '@margoengine/physics/terramechanics';
 import { PhysicsWorld, regionWords, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -421,6 +427,71 @@ test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and mode
   }
 });
 
+test('live spin phase cuts with a discrete grouser and repeats at one tooth pitch', async () => {
+  const terrain = { columns: 100, rows: 100, width: 0.2, depth: 0.2, centre: [0, 0] };
+  const input = soilPatchField('grouser-load');
+  const wheelPhase = soilWheelPhaseField('grouser-phase');
+  const radius = 0.15735;
+  const lugHeight = 0.01;
+  const lugCount = 4;
+  const wheel = { radius, lugHeight, lugCount, lugWidth: 0.008 };
+  const material = { cohesiveModulus: 0, frictionalModulus: 2_407_400, exponent: 0.84, compaction: 1 };
+  async function stamp(angle, shared) {
+    let load, phase;
+    const bench = {
+      describe: () => ({
+        id: 'grouser-rig',
+        rate: 0,
+        stableRate: () => 0,
+        fields: [
+          { field: input, access: 'write' },
+          { field: wheelPhase, access: 'write' },
+        ],
+      }),
+      init(host) {
+        load = host.allocate('grouser-load', 80, 'f64', 1);
+        phase = host.allocate('grouser-phase', 8, 'f64', 1);
+        regionWords(host.memory, load).set([0, 0, 0, 1, 0.12, 0.08, 80, 0, 0, 0]);
+        regionWords(host.memory, phase)[0] = angle;
+      },
+      step() {},
+      exportPorts: (tick) => [
+        { field: input.name, region: load, tick, cell: [0, 0, 0] },
+        { field: wheelPhase.name, region: phase, tick, cell: [0, 0, 0] },
+      ],
+      importPorts() {},
+      stateRegions: () => [load, phase],
+      extraState: () => [],
+    };
+    const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase });
+    const bed = new TerrainBed();
+    const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
+      .add(bed, { ...terrain, elevations: () => 0 })
+      .add(bench)
+      .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
+      .couple(['grouser-rig', 'terramechanics', 'bed'], 'staggered');
+    world.advance(1);
+    const areas = bedVertexAreas(terrain);
+    const pressure = regionWords(world.memory, world.fields.port(soil.pressureField.name).region);
+    close(
+      pressure.reduce((sum, value, i) => sum + value * areas[i], 0),
+      80,
+      1024 * eps * 80,
+    );
+    const centre = 50 * 101 + 50;
+    return { elevations: bed.elevations(), centre, rim: soil.read(0).sinkage, pressure: pressure[centre] };
+  }
+  const down = await stamp(0, false);
+  const pitch = (2 * Math.PI) / lugCount;
+  const gap = await stamp(0.5 * pitch, false);
+  const repeat = await stamp(pitch, true);
+  close(-down.elevations[down.centre], down.rim + lugHeight, 1024 * eps);
+  assert.equal(gap.elevations[gap.centre], 0);
+  assert.ok(down.pressure > 0 && gap.pressure === 0);
+  assert.deepEqual(repeat.elevations, down.elevations);
+  assert.equal(gap.rim, down.rim);
+});
+
 async function steps(kind, speed) {
   const terrain = { columns: 48, rows: 120, width: 3.6, depth: 9, centre: [0, 2] };
   const legged = await LeggedLocomotion.load({ bedShape: terrain });
@@ -480,8 +551,9 @@ async function coupledVehicles(tier) {
   await Physics.load();
   const terrain = { columns: 28, rows: 40, width: 4.2, depth: 6, centre: [0, 1] };
   const contact = soilPatchField();
-  const soil = await Terramechanics.load({ input: contact, tier });
-  const rigid = new SoilContactRigidSolver(contact, { terrain });
+  const wheelPhase = tier === 'resolved' ? soilWheelPhaseField() : undefined;
+  const soil = await Terramechanics.load({ input: contact, tier, wheelPhase });
+  const rigid = new SoilContactRigidSolver(contact, { terrain, wheelPhase });
   const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
   const bed = new TerrainBed();
   world.add(bed, { ...terrain, elevations: () => 0 });
@@ -545,7 +617,10 @@ async function coupledVehicles(tier) {
     inputRows: 6,
     material: { dustFraction: 0 },
     profiles: tier === 'resolved' ? [null, null, null, null, lug, lug] : undefined,
-    rollingWheels: tier === 'resolved' ? [...wheels.map(({ radius }) => ({ radius })), null, null] : undefined,
+    rollingWheels:
+      tier === 'resolved'
+        ? [...wheels.map(({ radius }) => ({ radius, lugHeight: 0.012, lugWidth: 0.03, lugCount: 8 })), null, null]
+        : undefined,
   });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
   world.advance(7);
@@ -554,6 +629,10 @@ async function coupledVehicles(tier) {
   assert.equal(soil.read(4).normalForce, tracked.track(0).load);
   assert.ok(vehicle.wheelGround(0).sinkage > 0);
   assert.ok(floor.collider.heightfieldHeights().some((h) => h < 0));
+  if (wheelPhase) {
+    const phases = regionWords(world.memory, world.fields.port(wheelPhase.name).region);
+    assert.equal(phases[0], vehicle.wheel(0).rotation);
+  }
   const mark = world.takeSnapshot();
   world.advance(24);
   const hash = world.hash();

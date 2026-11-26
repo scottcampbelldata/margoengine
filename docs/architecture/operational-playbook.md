@@ -10524,6 +10524,8 @@ uses the published rigid load and signed shear displacement, and the bed continu
 The configured hardpan depth and excavation bedrock can use separate vertex grids. Their copied values are
 snapshot state. Soil cuts reference the same floor data supplied to TerrainBed, so no rejected volume enters
 the compaction, berm or dust ledger.
+The optional wheel-phase field carries one angle per external row. The native rolling profile combines
+the steady rim bearing envelope with the live projected lug tips before normalizing the bed pressure.
 
 ### Divergence-free particle pressure
 

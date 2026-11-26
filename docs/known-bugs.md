@@ -16873,7 +16873,8 @@ exchange of changing subsurface properties still needs a shared soil contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
-Live 3D tread intersection, high-slip digging and measured berm profiles remain EARTH-05 work.
+It stamps individual evenly spaced lugs from live wheel spin. General moving 3D tread intersection,
+measured high-slip digging forces and measured berm profiles remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

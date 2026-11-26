@@ -39,6 +39,7 @@ export interface SoilContactProfile {
 
 export interface SoilContactRigidOptions {
     readonly id?: string;
+    readonly wheelPhase?: FieldDescriptor;
     readonly terrain?: BedShape;
 }
 
@@ -105,6 +106,8 @@ export interface SoilRollingWheel {
     readonly peakFraction?: number;
     readonly peakSlip?: number;
     readonly exitFraction?: number;
+    readonly lugCount?: number;
+    readonly lugWidth?: number;
 }
 
 export class Terramechanics implements Solver<TerramechanicsParams> {
@@ -152,6 +155,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
 export interface TerramechanicsOptions {
     readonly id?: string;
     readonly input?: FieldDescriptor;
+    readonly wheelPhase?: FieldDescriptor;
     readonly legged?: boolean;
     readonly tier?: SoilContactTier;
     readonly signal?: AbortSignal;
@@ -193,6 +197,8 @@ export interface WheelSoilBinding {
 }
 
 export function soilPatchField(name?: string): FieldDescriptor;
+
+export function soilWheelPhaseField(name?: string): FieldDescriptor;
 
 export function wheelSoil(width: number, length: number, material?: SoilMaterial, elliptical?: boolean, resolvedContact?: {
     readonly rounded?: boolean;
