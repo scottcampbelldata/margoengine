@@ -12130,9 +12130,28 @@ numerical errors.
 `lateralSection` in `packages/physics/src/seakeeping/radiation.ts` solves a section swaying and rolling, and `memory.ts`
 adds the sway, roll and yaw pairs. Written from the same book (Journee and Massie 2001, Part 2): the antisymmetric
 multipoles and wave of Tasai's Lewis form, the stream function's body condition in sway and roll, and the sway, roll and
-sway-roll coefficients. Two of the book's printed signs disagree with its own definitions; the solver follows the
-definitions, and the tests show which is right (the damping from the pressure equals the energy the waves carry away only
-with these signs, and the coupling then comes out reciprocal, a24 = a42 and b24 = b42).
+sway-roll coefficients. Two printed signs are not followed; each printed form, the correction and its proof:
+- **The sway body condition (eq. 7.66).** Printed: Psi0 = -x' r0 cos(theta) + C on the circle (heave: -y' r0 sin(theta);
+  roll: -beta' r0^2 / 2). Used: Psi0 = +x' y0 + C (on the circle +x' r0 cos(theta)). Proof by re-derivation: heave and
+  sway are both rigid translations, so their stream functions take one orientation of the contour; with n ds = (dy, -dx)
+  a translation U along x gives dPsi = U dy, Psi = +U y0, and one V along y gives Psi = -V x0. On the book's circle
+  (x0 = r0 sin(theta), y0 = r0 cos(theta)) the printed heave, -y' x0, is that orientation and the printed sway, -x' y0, is
+  the other: they cannot both hold, and the sway alone disagrees (the printed roll, a rotation in the same orientation,
+  agrees with the heave). Integrating the book's own differential form (eq. 7.65) on that circle gives +x' r0 cos(theta)
+  too. Checked in the code by rigid kinematics: a roll about an axis p below the origin is the roll about the origin plus
+  the translation the roll gives the origin, so a44(p) = a44(0) + 2 p a24(0) + p^2 a22 and the same for the damping;
+  measured on a box section (B 2 m, T 0.5 m) at 2 and 4 rad/s and p = 0.25 and -0.5 m, within 0.1 percent with the sign
+  used, and off by 6 percent to 8 times with the printed one (the roll about p, which the printed roll condition gives and which is not in question, holds the translation as +p y0). Energy and reciprocity cannot tell the two apart (the printed
+  sign turns both couplings together).
+- **The antisymmetric multipoles' stream function (eq. 7.108, and 7.76 on the circle).** Printed: psi_A = +cos((2m+1)
+  theta) - xi sum (...) cos((2m+2n) theta), with phi_A = sin((2m+1) theta) - xi sum (...) sin((2m+2n) theta). Used: psi_A
+  = -cos((2m+1) theta) + xi sum (...) cos((2m+2n) theta), phi_A as printed. Proof by Cauchy-Riemann in the book's own
+  convention: its heave pair (eq. 7.107), phi = e^(-2m alpha) cos(2m theta) with psi = +e^(-2m alpha) sin(2m theta), is
+  phi - i psi = e^(-2m zeta) (zeta = alpha + i theta); the sway potential sin((2m+1) theta) e^(-(2m+1) alpha) is the real
+  part of i e^(-(2m+1) zeta), whose -imaginary part is -cos((2m+1) theta) e^(-(2m+1) alpha). Physical check: with the
+  printed sign the damping from the pressure is 0.85 to 1.83 of the energy the waves carry away and the couplings are not
+  reciprocal (a24 / a42 from -0.20 to 0.43); with the sign used, 1.000 within 0.2 percent and reciprocal within 0.2
+  percent (the same box section, 2 to 6 rad/s).
 
 These are this package's own, each checked:
 - **The roll about the centre of mass**, by the stream function's body condition -(x^2 + (y - pivot)^2) / 2, so the
