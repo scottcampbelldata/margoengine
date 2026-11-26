@@ -658,7 +658,7 @@ const data = new Uint8Array(header.length + name.length + 36);
 data.set([...header, ...name]);
 new Float32Array(data.buffer, header.length + name.length, 9).set([0, 0, 0, 1, 0, 0, 0, 1, 0]);
 const model = parsePRWM(data);
-console.log(model.positions.length, [...model.indices]); // 9 [0, 1, 2]
+console.log(model.positions.length, [...model.indices!]); // 9 [0, 1, 2]
 ```
 
 ## Babylon scenes
