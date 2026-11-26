@@ -12906,7 +12906,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "0a86343197",
+      "commit": "386297db1f",
       "reason": "ATMO-06 adds the optional 8260 B gzip environmental airborne solver. Wind sampling, source conservation and terrain deposition share parcel state. Splitting them would duplicate the field setup and accounting. Core plus stage gains 0 B.",
       "grew": 1
     }

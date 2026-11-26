@@ -1,5 +1,5 @@
 {
-  "commit": "5628424515",
+  "commit": "386297db1f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14106,6 +14106,10 @@
       "./thin-film": {
         "raw": 14421,
         "gzip": 5917
+      },
+      "./airborne": {
+        "raw": 18860,
+        "gzip": 8260
       }
     },
     "@margoengine/physics2d": {
@@ -17957,6 +17961,16 @@
       "raw": 9209,
       "gzip": 3995,
       "brotli": 3521
+    },
+    "packages/physics/dist/airborne-kernel.wasm": {
+      "raw": 610,
+      "gzip": 439,
+      "brotli": 410
+    },
+    "packages/physics/dist/airborne-kernel-shared.wasm": {
+      "raw": 610,
+      "gzip": 439,
+      "brotli": 410
     }
   },
   "splits": {
