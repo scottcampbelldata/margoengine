@@ -1041,13 +1041,26 @@ reporting) gets an invalid light or a failed package load. WebGPU only; install 
 
 - `<PointLight>`: `position` [0, 0, 0], `color` '#ffffff' (hex is sRGB, an `[r, g, b]` array linear), `intensity` 1,
   `range` 0 (unlimited; otherwise the distance where it ends, windowed smoothly), `decay` 2 (inverse square; 0 none) and
-  `radius` 0 (a point; above 0 a sphere of light with a disc highlight). Up to 1,024 point and spot lights per Canvas.
-- `<SpotLight>`: the point light's props plus `direction` [0, -1, 0], `angle` pi / 4 (cone half-angle, up to pi / 2) and
-  `penumbra` 0 (share of the cone that fades, 0 to 1).
+  `radius` 0 (a point; above 0 a sphere of light with a disc highlight). Up to 1,024 point and spot lights per Canvas
+  (`<ClusteredLighting maxLights>` raises it). `shadow` (false) gives it an integrated shadow map: `true`, or its
+  `near` (default `min(0.1, far / 100)`), `far` (default `range`; required when `range` is 0), `bias` (0.0005),
+  `normalBias` (0.02 world units) and `resolution` (texels, one number or `[width, height]`; default the maps'
+  `resolution`). It needs `<ClusteredLighting shadows>`; without it the light is an error.
+- `<SpotLight>`: the point light's props, `shadow` included, plus `direction` [0, -1, 0], `angle` pi / 4 (cone
+  half-angle, up to pi / 2) and `penumbra` 0 (share of the cone that fades, 0 to 1).
 - `<RectAreaLight>`: `position` [0, 0, 0], `direction` [0, -1, 0] (the side it faces), `width` 1, `height` 1, `up`
   (default [0, 1, 0], or [0, 0, 1] when `direction` is vertical), `color` '#ffffff', `intensity` 1 and `twoSided` false.
   Shaded with linearly transformed cosines (GGX specular, Lambert diffuse); every fragment evaluates every area light, at
   most 64 per Canvas, so keep them few. It loads `@margoengine/clustered/area` when the first one mounts.
+- `<ClusteredLighting>`: the options of the shared `Clustered` (`ClusteredOptions`), with the engine's defaults:
+  `grid` [16, 9, 24] (clusters along screen X, Y and log depth, each 1 to 128, product at most 32,768), `maxLights` 1,024
+  (most point and spot lights, up to 65,536; the light buffer grows in pages of 1,024 as lights mount) and `shadows`
+  false (the integrated shadow maps: `true`, or `resolution` 512, the texels of every map layer, and `maxLights` 4, the
+  lights with a `shadow`, 1 to 32; each of those slots reserves six `depth32float` layers). With `shadows`, every
+  `castShadow` mesh and model of the Canvas casts into the maps. Mount one per Canvas or `<Scene>`, anywhere in it. The
+  engine fixes these options at construction, so changing a prop (or mounting or unmounting the component) makes the
+  shared lighting again with the same lights; keep them constant while the scene runs. `onError` gets an invalid option
+  or a caster the maps refuse.
 
 ```tsx
 import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
@@ -1063,6 +1076,29 @@ export function LitRoom() {
       <Mesh>
         <BoxGeometry />
         <LambertMaterial color="#d0d0d0" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+A lamp with a shadow map, in a lighting with a finer grid and room for 4,096 lights:
+
+```tsx
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { PlaneGeometry } from '@margoengine/react/geometry';
+import { ClusteredLighting, SpotLight } from '@margoengine/react/clustered';
+
+export function ShadowedLamp() {
+  return (
+    <Canvas>
+      <ClusteredLighting grid={[24, 14, 32]} maxLights={4096} shadows={{ resolution: 1024, maxLights: 2 }} />
+      <SpotLight position={[0, 4, 0]} angle={0.6} penumbra={0.3} intensity={30} range={12} shadow={{ resolution: 512 }} />
+      <Mesh castShadow position={[0, 0.5, 0]}>
+        <BoxGeometry />
+      </Mesh>
+      <Mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <PlaneGeometry args={[10, 10]} />
       </Mesh>
     </Canvas>
   );

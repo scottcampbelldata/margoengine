@@ -55,7 +55,7 @@ const expected = {
     'useTexture',
     'useVideoTexture',
   ],
-  './clustered': ['PointLight', 'RectAreaLight', 'SpotLight'],
+  './clustered': ['ClusteredLighting', 'PointLight', 'RectAreaLight', 'SpotLight'],
   './xr-pointer': ['XRPointerEvents', 'dispatchXRPointer'],
   '.': [
     'BoxGeometry',

@@ -5,9 +5,9 @@ import type { ContactSource } from '@margoengine/studio';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
 import type { Vec3 } from '@margoengine/math';
 import { Mesh, type MeshProps } from './components.js';
-import { casters } from './casters.js';
+import { syncCasters, type AddedCasters } from './casters.js';
 import { subscribeFrame } from './frame-priority.js';
-import { live, report, useMesh, useScene, type Registry } from './internal.js';
+import { live, report, useMesh, useScene } from './internal.js';
 import { inScene } from './scene-owner.js';
 import { optionalPeer } from './optional.js';
 import { rangeError } from '../../shared/errors.js';
@@ -98,7 +98,6 @@ const Lights = /* @__PURE__ */ createContext<Set<{ current: Light | null }> | nu
 // A light this many times its own distance from the group: the drei lights are directional, and at 1000 times the
 // perspective of a disk light differs from parallel projection by under 0.1% of a caster's height.
 const FAR = 1000;
-const pbrSource = Symbol.for('margoengine.pbr-source.v1');
 const positive = (v: number, infinite = false) => (v >= 1 && Number.isFinite(v)) || (infinite && v === Infinity);
 const length = (m: ArrayLike<number>, o: number) => Math.hypot(m[o], m[o + 1], m[o + 2]);
 
@@ -205,31 +204,12 @@ function Binding({
       attaching = false,
       seen = '',
       shadows: AmbientShadows | null = null;
-    const added = new Map<object, { target: object; remove: () => void }>();
+    const added: AddedCasters = new Map();
     const fail = (error: unknown) => {
       if (active && !scene.engine.disposed) report(scene, error, latest.current.onError);
     };
-    // A mesh drawn by <TextureMaterial> or another materials owner casts through its materials mesh (its own geometry
-    // is cleared); the materials mesh is re-added when the owner rebuilds it.
-    const target = (entry: object): object | null => {
-      if (!('attachments' in entry)) return entry;
-      const mesh = live(entry as Registry);
-      return (mesh && (mesh as unknown as Record<symbol, object | undefined>)[pbrSource]) || mesh;
-    };
     // Every castShadow mesh and model of the Canvas casts, as in drei; re-added when its mesh is recreated.
-    const sync = (s: AmbientShadows) => {
-      const set = casters(scene.engine);
-      for (const [entry, was] of added)
-        if (!set.has(entry) || target(entry) !== was.target) {
-          was.remove();
-          added.delete(entry);
-        }
-      for (const entry of set) {
-        const t = target(entry);
-        if (!t || added.has(entry)) continue;
-        added.set(entry, { target: t, remove: s.add(t as ContactSource | MeshHandle) });
-      }
-    };
+    const sync = (s: AmbientShadows) => syncCasters(scene.engine, added, (t) => s.add(t as ContactSource | MeshHandle));
     const look = () => {
       const root = live(registry);
       if (!root || attaching) return;
