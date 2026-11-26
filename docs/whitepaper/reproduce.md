@@ -37,6 +37,14 @@ relative rotation and examines the SEA-10 aperture. It checks dry partial damage
 Bernoulli/Boyle bounds and replay. The control uses the same two prebuilt bodies and fracture
 with its aperture shut.
 
+## BREAK-03 terrain grounding
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics` and run
+`node --test packages/physics/tests/coupling/crush-ground.test.js`. The live bed supplies an
+oblique plane, an intervening ridge and a cell with one raised corner. The analytical normal
+speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
+The ridge test compares a saved run and its replay in both world memory modes.
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard

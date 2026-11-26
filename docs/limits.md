@@ -9595,6 +9595,13 @@ the seam breaks. Its location and dimensions come from the hull opening, indepen
 subsequent gap between the halves. Distributed shell fracture, cyclic plastic history,
 automatic shell-part generation and the measured floating-tank breakup remain open.
 
+Ground stations intersect a finite triangulated heightfield along their local linear trajectory
+for one coupling tick. The first intersected face supplies the reaction normal throughout the
+tick. Each station has its own authored anchor and material. The bed acts as an immovable
+support. Deforming sediment, obstructions with overhangs, and distributed plate tearing around
+a rock require additional models. The oblique and cross-grid tests use analytical terrain input.
+The measured grounding-force and rupture histories remain open.
+
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 24016 B minified and 9430 B gzip under its 9719 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)

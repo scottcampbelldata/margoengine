@@ -5222,6 +5222,43 @@ keeps yielding under a sustained push. Its most recent contact's peak fields ret
 from that contact, and `impulse` sums the normal impulse through the contact. Permanent stroke
 and work survive unloading and reach the linked compartment aperture when the seal fails.
 
+For grounding, give `CrushSolver` the live `TerrainBed` grid shape and author the hull stations
+in `groundPatches`. Their damage records follow the ordinary patches. Each station finds
+the first bed triangle reached by its motion during the
+step. The triangle supplies the support direction and the station's outward normal selects
+which side of the hull can take the load. Put this reaction on the stations whose colliders
+use sensors or collision filtering for the bed. Set `cellSize` when the bed and the rigid bodies
+use different cells. The ground patch works with both contact modes and uses the existing
+friction, seal and plate options.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const hull = physics.addBody(null, {
+  position: [-0.05, 0.04, 0], linearVelocity: [3, -1, 0],
+  colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 4, sensor: true },
+});
+const terrain = { columns: 4, rows: 2, width: 4, depth: 2, centre: [0, 0] as const };
+const crush = new CrushSolver({ terrain });
+const bodyCapacity = physics.kernel.capacity;
+world.add(new TerrainBed(), { ...terrain, elevations: x => 0.5 * x });
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(crush, { bodyCapacity, patches: [], groundPatches: [{
+  body: hull.row, anchor: [0, 0, 0], normal: [0, -1, 0],
+  material: { stiffness: 800, yieldForce: 16, stroke: 0.45 }, friction: 0.2,
+}] });
+world.couple(['bed', 'rigid', crush.id], 'staggered');
+world.advance(6);
+if (crush.read(0).absorbedEnergy <= 0) throw new Error('Expected work in the grounding station');
+```
+
 ```ts
 import { Physics } from '@margoengine/physics';
 import { CrushSolver } from '@margoengine/physics/crush';

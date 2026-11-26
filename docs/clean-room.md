@@ -15287,6 +15287,19 @@ using the dry orifice's Bernoulli discharge above and the maximum air and floodw
 that one step could build below. The control repeats the same fracture with its aperture shut.
 [Dankowski (2013)](https://tore.tuhh.de/entities/publication/c9f6ab74-3ae3-4dae-8aa1-ff7bf96a86b2)
 
+Preben T. Pedersen's “Ship grounding and hull-girder strength” (1994) separates the first
+contact impulse and the continued frictional response. Bo C. Simonsen's “Ship grounding
+on rock—I. Theory” (1997) separates exterior rigid-body motion from local material resistance.
+The terrain adapter follows that split and supplies the existing station with the actual
+heightfield support normal. John Amanatides and Andrew Woo, “A Fast Voxel Traversal Algorithm”
+(1987), march through grid crossings in order. On a two-dimensional bed, use successive
+x/z cell edges and split each interval at its triangle diagonal. Inside the interval,
+signed distance to the face is affine, so solving its zero with the surviving permanent
+stroke gives the first support. Use the same triangles as the terrain's ordinary collision mesh.
+[Pedersen (1994)](https://doi.org/10.1016/0951-8339(94)90008-6)
+[Simonsen (1997)](https://doi.org/10.1016/S0951-8339(98)00002-1)
+[Amanatides and Woo (1987)](https://doi.org/10.2312/egtp.19871000)
+
 Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
 and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
 E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and

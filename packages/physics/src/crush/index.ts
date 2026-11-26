@@ -1,5 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
+import type { Bed } from '@margoengine/math/fields';
 import { hypot } from '@margoengine/math/pinned';
+import { BED_FIELD, bedFromPort, bedVertexCount, type BedShape } from '../earth/bed.js';
 import { regionWords } from '../world/memory.js';
 import type {
   Cell,
@@ -13,6 +15,7 @@ import type {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { type CompressionStep, stepCompression } from './continuous.js';
+import { traceGround } from './ground.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
 import { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse } from './plate.js';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
@@ -99,10 +102,15 @@ export interface CrushPatch {
   readonly sealStroke?: number;
 }
 
+/** A hull or chassis station that automatically finds a support on the world terrain bed. */
+export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
+
 /** Optional entry and registry settings. */
 export interface CrushOptions {
   /** Solver ID and output prefix. Default 'crush'. */
   readonly id?: string;
+  /** Grid shape of the live TerrainBed to read when a ground patch is configured. */
+  readonly terrain?: BedShape;
 }
 
 /** Parameters for auto-detecting near-contact patch events from a RigidSolver. */
@@ -113,6 +121,8 @@ export interface CrushParams {
   readonly cellSize?: number;
   /** Stable ordering of configured contact surfaces. */
   readonly patches: readonly CrushPatch[];
+  /** Optional ground stations. Their damage records follow the ordinary patches. */
+  readonly groundPatches?: readonly CrushGroundPatch[];
 }
 
 /** State of one contact patch. Peak and impulse fields describe its most recent impact. */
@@ -137,12 +147,13 @@ export interface CrushPlateState {
   readonly buckling?: CrushPlateResponse;
 }
 
-interface Patch extends CrushPatch {
+type PatchInput = CrushPatch | (CrushGroundPatch & { readonly terrain: true });
+type Patch = PatchInput & {
   readonly material: Required<CrushMaterial>;
   readonly response: 'impact' | 'continuous';
   readonly friction: number;
   readonly sealStroke: number;
-}
+};
 
 interface State {
   readonly host: SolverHost;
@@ -220,13 +231,17 @@ function frictionImpulse(
 }
 
 function fixedAnchor(support: CrushSupport, cell: Cell, size: number | undefined): CrushVector {
-  const difference = sub(support.cell ?? ZERO, cell);
+  return add(support.point, cellOffset(support.cell ?? ZERO, cell, size));
+}
+
+function cellOffset(from: Cell, to: Cell, size: number | undefined): CrushVector {
+  const difference = sub(from, to);
   if (!size && difference.some((value) => value !== 0))
     throw new MargoError(
       'state',
-      'Set the world cell size when a crush barrier is in a different cell from the rigid bodies.',
+      'Set the world cell size when a crush support surface is in a different cell from the rigid bodies.',
     );
-  return add(support.point, scale(difference, size ?? 0));
+  return scale(difference, size ?? 0);
 }
 
 function supportImpulse(depth: number, closing: number, inverseMass: number, stiffness: number, dt: number): number {
@@ -268,26 +283,46 @@ function impact(
   latched: Uint8Array,
   plateStrokes: Float64Array | undefined,
   dt: number,
+  terrain: Bed | undefined,
 ): void {
-  const { body, support } = patch;
+  const { body } = patch;
+  const support = 'support' in patch ? patch.support : undefined;
+  const otherBody = support?.body;
   const rotate = rotation(bodies, body);
-  const normal = rotate(patch.normal);
+  const facing = rotate(patch.normal);
   const anchor = add(triple(bodies, body * BODY_WORDS), rotate(patch.anchor));
-  const other =
-    support.body === undefined
-      ? fixedAnchor(support, port.cell, state.cellSize)
-      : add(triple(bodies, support.body * BODY_WORDS), rotation(bodies, support.body)(support.point));
-  const separation = sub(other, anchor);
-  const gap = dot(separation, normal);
   const at = CRUSH_WORDS * index;
   const permanent = damage[at]!;
   if (patch.plate && plateStrokes) plateStrokes[index] = permanent;
+  const ground =
+    terrain && !support
+      ? traceGround(
+          terrain,
+          add(anchor, cellOffset(port.cell, terrain.cell, state.cellSize)),
+          atContact(bodies, out, body, anchor, facing).velocity,
+          facing,
+          permanent,
+          dt,
+        )
+      : undefined;
+  if (!support && !ground) {
+    latched[index] = 0;
+    return;
+  }
+  const other = support
+    ? otherBody === undefined
+      ? fixedAnchor(support, port.cell, state.cellSize)
+      : add(triple(bodies, otherBody * BODY_WORDS), rotation(bodies, otherBody)(support.point))
+    : undefined;
+  const separation = other && sub(other, anchor);
+  const normal = ground?.normal ?? facing;
+  const gap = ground?.gap ?? dot(separation!, normal);
   const clearance = gap + permanent;
   const continuous = patch.response === 'continuous';
   if (!continuous && clearance > 0) latched[index] = 0;
-  const contact = add(anchor, scale(normal, 0.5 * gap));
+  const contact = add(anchor, scale(normal, ground ? gap : 0.5 * gap));
   const a = atContact(bodies, out, body, contact, normal);
-  const b = support.body === undefined ? undefined : atContact(bodies, out, support.body, contact, normal);
+  const b = otherBody === undefined ? undefined : atContact(bodies, out, otherBody, contact, normal);
   const relative = sub(a.velocity, b?.velocity ?? ZERO);
   const closing = dot(relative, normal);
   const inverse = a.inverseMass + (b?.inverseMass ?? 0);
@@ -298,13 +333,15 @@ function impact(
       return;
     }
   } else if (!latched[index] && (!(closing > 0) || clearance > dt * closing)) return;
-  const delay = clearance > 0 ? clearance / closing : 0; // float division: time to the first normal contact
-  const lateral = sub(separation, scale(normal, gap));
-  const travel = sub(relative, scale(normal, closing));
-  const offset = sub(lateral, scale(travel, delay));
-  if (dot(offset, offset) > patch.radius * patch.radius) {
-    latched[index] = 0;
-    return;
+  const delay = ground?.delay ?? (clearance > 0 ? clearance / closing : 0); // float division: first normal contact
+  if (separation && 'radius' in patch) {
+    const lateral = sub(separation, scale(normal, gap));
+    const travel = sub(relative, scale(normal, closing));
+    const offset = sub(lateral, scale(travel, delay));
+    if (dot(offset, offset) > patch.radius * patch.radius) {
+      latched[index] = 0;
+      return;
+    }
   }
   const step = continuous
     ? stepCompression(patch.material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay)
@@ -317,19 +354,19 @@ function impact(
   if (normalImpulse === 0) return;
   const impulse = scale(normal, normalImpulse);
   impulseAt(out, body, scale(impulse, -1), a.arm);
-  if (b && support.body !== undefined) impulseAt(out, support.body, impulse, b.arm);
+  if (b && otherBody !== undefined) impulseAt(out, otherBody, impulse, b.arm);
   if (patch.friction > 0) {
     const slide = frictionImpulse(
       bodies,
       body,
       atContact(bodies, out, body, contact, normal),
-      support.body,
-      support.body === undefined ? undefined : atContact(bodies, out, support.body, contact, normal),
+      otherBody,
+      otherBody === undefined ? undefined : atContact(bodies, out, otherBody, contact, normal),
       normal,
       patch.friction * normalImpulse,
     );
     impulseAt(out, body, slide, a.arm);
-    if (b && support.body !== undefined) impulseAt(out, support.body, scale(slide, -1), b.arm);
+    if (b && otherBody !== undefined) impulseAt(out, otherBody, scale(slide, -1), b.arm);
   }
   if (step) {
     recordCompression(damage, at, step, patch.sealStroke, latched[index] !== 0);
@@ -357,10 +394,15 @@ function impact(
 export class CrushSolver implements Solver<CrushParams> {
   readonly id: string;
   readonly damageField: FieldDescriptor;
+  private readonly terrain: BedShape | undefined;
   private state: State | undefined;
 
-  constructor({ id = 'crush' }: CrushOptions = {}) {
+  constructor({ id = 'crush', terrain }: CrushOptions = {}) {
     this.id = id;
+    if (terrain) {
+      bedVertexCount(terrain);
+      this.terrain = { ...terrain, centre: [terrain.centre[0], terrain.centre[1]] };
+    }
     this.damageField = {
       name: `${id}:damage`,
       kind: 'surfaceSampleSet',
@@ -379,18 +421,23 @@ export class CrushSolver implements Solver<CrushParams> {
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
         { field: this.damageField, access: 'write' },
+        ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
     };
   }
 
   init(host: SolverHost, params: CrushParams): void {
     const capacity = params.bodyCapacity;
-    if (!Number.isSafeInteger(capacity) || capacity < 1 || !params.patches?.length)
+    if (!Number.isSafeInteger(capacity) || capacity < 1 || !(params.patches?.length || params.groundPatches?.length))
       throw new MargoError(
         'state',
         'Choose the RigidSolver body capacity and provide at least one crush contact patch.',
       );
-    const patches = params.patches.map((patch): Patch => {
+    const all: PatchInput[] = [
+      ...(params.patches ?? []),
+      ...(params.groundPatches ?? []).map((patch) => ({ ...patch, terrain: true as const })),
+    ];
+    const patches = all.map((patch): Patch => {
       const material = crushMaterial(patch.material);
       const response = patch.response ?? 'impact';
       if (response !== 'impact' && response !== 'continuous')
@@ -404,21 +451,32 @@ export class CrushSolver implements Solver<CrushParams> {
       const body = rowIndex(patch.body, capacity);
       const normal = vector(patch.normal, 'normal');
       const length = positive(hypot(...normal), 'normal length');
+      const common = {
+        body,
+        material,
+        response,
+        plate,
+        friction: positive(patch.friction ?? 0, 'friction coefficient', 0),
+        normal: scale(normal, 1 / length), // float division: unit normal
+        anchor: vector(patch.anchor, 'anchor'),
+        sealStroke: positive(patch.sealStroke ?? material.stroke, 'seal stroke', Number.MIN_VALUE, material.stroke),
+      };
+      if ('terrain' in patch) {
+        if (!this.terrain)
+          throw new MargoError(
+            'state',
+            'Give CrushSolver the TerrainBed grid shape before configuring a ground patch.',
+          );
+        return { ...common, terrain: true };
+      }
       const other = patch.support.body === undefined ? undefined : rowIndex(patch.support.body, capacity);
       if (other === body) throw new MargoError('state', 'Choose opposing crush contacts on distinct rigid body rows.');
       const cell = patch.support.cell && vector(patch.support.cell, 'barrier cell');
       if (cell && !cell.every(Number.isSafeInteger))
         throw new MargoError('state', 'Use a crush barrier cell as three safe integer coordinates.');
       return {
-        body,
-        material,
-        response,
-        plate,
-        friction: positive(patch.friction ?? 0, 'friction coefficient', 0),
-        normal: scale(normal, 1 / length),
-        anchor: vector(patch.anchor, 'anchor'), // float division: unit normal
+        ...common,
         radius: positive(patch.radius, 'contact radius'),
-        sealStroke: positive(patch.sealStroke ?? material.stroke, 'seal stroke', Number.MIN_VALUE, material.stroke),
         support: { body: other, point: vector(patch.support.point, 'support anchor'), cell },
       };
     });
@@ -449,11 +507,18 @@ export class CrushSolver implements Solver<CrushParams> {
     )
       throw new MargoError('state', 'Set the crush body capacity to match the RigidSolver layout-2 bodies port.');
     const bodies = regionWords(state.host.memory, port.region) as Float32Array;
+    const terrainPort = this.terrain && context.inputs.get(BED_FIELD.name);
+    if (this.terrain && !terrainPort)
+      throw new MargoError('state', 'Add TerrainBed to the PhysicsWorld and couple it with the crush ground patches.');
+    const terrain =
+      terrainPort &&
+      this.terrain &&
+      bedFromPort(terrainPort.region.memory ?? state.host.memory, terrainPort, this.terrain);
     const damage = regionWords(state.host.memory, state.damage) as Float64Array;
     const contacts = regionWords(state.host.memory, state.contacts) as Uint8Array;
     const plateStrokes = state.plateStrokes && (regionWords(state.host.memory, state.plateStrokes) as Float64Array);
     for (let i = 0; i < state.patches.length; i++)
-      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt);
+      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt, terrain);
   }
 
   importPorts(_tick: number): void {}

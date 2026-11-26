@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Terrain grounding (BREAK-03, 2026-11-26). A native hull station exchanges the exact elastic oblique
+  impulse with the bed. It catches an intervening ridge and the second triangle of an individual cell.
+  Both memory modes give the same contact record and bit-exact snapshot replay.
+  [Reproduce](reproduce.md#break-03-terrain-grounding)
 - Girder-triggered flooding (BREAK-03 / SEA-10, 2026-11-26). A strained seam releases two floating
   hull pieces and opens a compartment. The first inflow falls within independently derived
   hydrostatic bounds, the water adds draft against a control with the same fracture, and replay
