@@ -6,6 +6,7 @@ mod grid;
 mod layer;
 mod material;
 mod tensor;
+mod wake;
 
 fn at<T>(items: &[T], index: usize) -> &T {
     items.get(index).unwrap_or_else(|| unreachable())
@@ -68,13 +69,12 @@ struct Plane {
     offset: f64,
 }
 
-fn speed_squared(point: &Point, wave: &Material, spacing: f64) -> f64 {
+fn speed_squared(point: &Point, velocity: V, wave: &Material, spacing: f64) -> f64 {
     let (mu, lambda) = wave.moduli(point.plastic);
     let inverse_density = point.rest_volume / point.mass;
     let wave_speed = sqrt((2.0 * mu + lambda) * inverse_density);
     let affine_norm = sqrt(point.affine.iter().map(|&v| dot(v, v)).sum());
-    let speed =
-        sqrt(dot(point.velocity, point.velocity)) + 1.5 * spacing * affine_norm + wave_speed;
+    let speed = sqrt(dot(velocity, velocity)) + 1.5 * spacing * affine_norm + wave_speed;
     speed * speed
 }
 
@@ -95,18 +95,22 @@ unsafe extern "C" fn mpm_scatter(
     active: *mut u32,
     control: *const Control,
     dt: f64,
+    kicks: *const V,
+    driven: i32,
 ) -> i32 {
     let points = unsafe { core::slice::from_raw_parts(points, count) };
+    let kicks = unsafe { core::slice::from_raw_parts(kicks, if driven == 0 { 0 } else { count }) };
     let materials = unsafe { core::slice::from_raw_parts(models, model_count) };
     let nodes = unsafe { core::slice::from_raw_parts_mut(nodes, slots) };
     let active = unsafe { core::slice::from_raw_parts_mut(active, count * 27) };
     let control = unsafe { &*control };
     let factor = 4.0 / (control.spacing * control.spacing);
     let mut used = 0;
-    for point in points {
+    for (i, point) in points.iter().enumerate() {
+        let velocity = add(point.velocity, kicks.get(i).copied().unwrap_or(ZERO));
         let material = at(materials, point.material as usize);
         let test = dt / control.spacing;
-        if speed_squared(point, material, control.spacing) * test * test > 0.16 {
+        if speed_squared(point, velocity, material, control.spacing) * test * test > 0.16 {
             grid::clear(nodes, used_prefix(active, used));
             return -1;
         }
@@ -126,7 +130,7 @@ unsafe extern "C" fn mpm_scatter(
                 scale(stress[i], scale_stress),
             )
         });
-        let momentum = scale(point.velocity, point.mass);
+        let momentum = scale(velocity, point.mass);
         grid::stencil(
             point.position,
             control.spacing,

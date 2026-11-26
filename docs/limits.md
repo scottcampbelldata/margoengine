@@ -9978,9 +9978,13 @@ bedrock. The projection represents the volume in each ground column, including
 particles above its surface. Use it for a shallow layer. Separating suspended
 material and reconstructing overhangs need a different output.
 
-The first increment covers dry or cohesive granular material and snow. Explicit
-pore-water transport, reciprocal contact with dynamic bodies, the voxel material
-handoff, the measured inertial regime and the persistent ray-bed imprint remain open.
+The first increment covers dry or cohesive granular material and snow. The BB-7 reference fixture now drives the live bed with the actual pectoral wake.
+At 45 frames the fin-on case cuts about 49.6 μm and raises an adjacent region by
+about 73.0 μm relative to the still-fin case. This is a reduced one-way bed-shear
+model. It tracks the received horizontal impulse and preserves each grain's mass.
+The field does not return unresolved water momentum or pore pressure. Explicit
+pore-water transport, reciprocal dynamic contact, the voxel material handoff
+and measured inertial flow remain open.
 
 ### Physical strand guides (SOFT-03)
 

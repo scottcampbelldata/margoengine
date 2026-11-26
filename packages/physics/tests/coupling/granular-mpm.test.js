@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TerrainBed, bedVertexAreas, bedVolume } from '../../dist/earth.js';
+import { SWIM_WAKE_FIELD, SwimSolver } from '../../dist/life.js';
 import { GRANULAR_MPM_LAYOUT, GRANULAR_MPM_WORDS, GranularMpmSolver } from '../../dist/granular-mpm.js';
 import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent } from './harness.js';
@@ -213,4 +214,131 @@ test('the material layer produces an exact, conserved translation of persistent 
   world.restoreSnapshot(snapshot.bytes);
   world.advance(frame);
   assert.equal(world.hash(), hash);
+});
+
+test('BB-7 the ray wake moves the granular layer and leaves a replayable bed imprint', async () => {
+  const shape = { columns: 20, rows: 20, width: 0.8, depth: 0.8, centre: [0, 0] };
+  const density = 1025;
+  const pitch = 0.04;
+  const points = block([-0.3, -0.53, -0.3], pitch, [16, 2, 16]);
+  const surfaceY = -0.48;
+  async function make(active, shared = false) {
+    const world = new PhysicsWorld({ rate, memory: worldMemory(shared), gravity: [0, -9.80665, 0] });
+    const terrain = new TerrainBed();
+    const sand = await GranularMpmSolver.load({ projectBed: true, bedWakes: true });
+    const swimmer = await SwimSolver.load();
+    world.add(terrain, { ...shape, elevations: () => surfaceY });
+    world.add(swimmer, {
+      bodies: [
+        {
+          position: [0, -0.2, 0],
+          mass: (density * Math.PI * 0.2 * 0.2) / 6,
+          length: 1,
+          width: 0.2,
+          height: 0.2,
+          wettedArea: 0,
+          tail: { amplitude: 0, span: 0.16, wavelength: 0.85 },
+          fins: { area: 0.05, strokeAmplitude: active ? 0.2 : 0, strokeFrequency: 1 },
+          steering: [0, 1, 0],
+        },
+      ],
+    });
+    world.add(sand, {
+      points,
+      spacing: 0.08,
+      rate: 4,
+      floor: -0.56,
+      bedSurface: terrain.bed,
+      materials: [{ young: 25000 }],
+    });
+    world.couple([swimmer.id, sand.id, terrain.id], 'staggered');
+    return { world, terrain, sand, swimmer };
+  }
+
+  const moving = await make(true);
+  const still = await make(false);
+  const shared = await make(true, true);
+  moving.world.advance(1);
+  const wakePort = moving.swimmer.exportPorts(moving.world.tick).find(({ field }) => field === SWIM_WAKE_FIELD.name);
+  const liveWake = regionWords(moving.world.memory, wakePort.region);
+  near(moving.sand.wakeImpulse[2], 0.05 * liveWake[13], 4e-14);
+  assert.ok(liveWake[12] < 0);
+  moving.world.advance(5);
+  const snapshot = moving.world.takeSnapshot();
+  moving.world.advance(45);
+  still.world.advance(45);
+  shared.world.advance(45);
+  assert.ok(moving.sand.wakeImpulse[2] > 0);
+  const a = moving.terrain.bed.elevations;
+  const b = still.terrain.bed.elevations;
+  const differences = Array.from(a, (value, index) => value - b[index]);
+  // The real terrain port is f32. A material layer change must survive the
+  // rounding of both ports; magnitude is checked by the conserved forcing
+  // and analytical layer-transfer tests independently.
+  const heightRounding = 2 ** -23 * Math.max(...Array.from(b, Math.abs));
+  assert.ok(
+    Math.min(...differences) < -heightRounding && Math.max(...differences) > heightRounding,
+    JSON.stringify({
+      cut: Math.min(...differences),
+      deposit: Math.max(...differences),
+      impulse: moving.sand.wakeImpulse,
+    }),
+  );
+  for (let i = 0; i < points.length; i++) assert.equal(moving.sand.sample(i).mass, points[i].volume * 1600);
+  const hash = moving.world.hash();
+  assert.equal(shared.world.hash(), hash);
+  moving.world.restoreSnapshot(snapshot.bytes);
+  moving.world.advance(45);
+  assert.equal(moving.world.hash(), hash);
+});
+
+test('a partly occupied jet footprint delivers its volume share once across a faster sand clock', async () => {
+  const world = new PhysicsWorld({ rate, gravity: zero, memory: worldMemory(false) });
+  const terrain = new TerrainBed();
+  const sand = await GranularMpmSolver.load({ projectBed: true, bedWakes: true });
+  const impulseX = 0.09;
+  const down = 0.45;
+  const height = 0.1;
+  const radius = 0.12;
+  const depth = 0.1;
+  const volume = 0.00001;
+  const reach = (height * impulseX) / down;
+  const spread = radius + 0.1 * Math.hypot(height, reach);
+  const jet = [-reach, height, 0, impulseX, -down, 0, radius, 1];
+  let published;
+  const driver = {
+    id: 'held-jet',
+    describe: () => ({
+      id: 'held-jet',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: SWIM_WAKE_FIELD, access: 'write' }],
+    }),
+    init(host) {
+      published = host.allocate('held-jet-row', 8 * 8, 'f64', 1);
+      regionWords(host.memory, published).set(jet);
+    },
+    step() {},
+    exportPorts(tick) {
+      return [{ field: SWIM_WAKE_FIELD.name, region: published, tick, cell: zero }];
+    },
+    importPorts() {},
+    stateRegions: () => [published],
+    extraState: () => [],
+  };
+  world.add(driver, {});
+  world.add(terrain, { columns: 2, rows: 2, width: 2, depth: 2, centre: [0, 0], elevations: () => 0 });
+  world.add(sand, {
+    points: [{ position: zero, volume }],
+    bedSurface: terrain.bed,
+    wakeDepth: depth,
+    rate: 4,
+    materials: [{ young: 1000 }],
+  });
+  world.couple([driver.id, sand.id, terrain.id], 'staggered');
+  world.advance(1);
+  const supportedVolume = (Math.PI * spread * spread * depth) / 6;
+  const expected = (0.05 * impulseX * volume) / supportedVolume;
+  near(sand.wakeImpulse[0], expected, 2e-15);
+  near(sand.sample(0).mass * sand.sample(0).velocity[0], expected, 2e-15);
 });
