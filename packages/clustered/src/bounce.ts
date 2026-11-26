@@ -419,7 +419,9 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
   add(model: BounceModel): () => void {
     if (this.disposed) throw new MargoError('disposed', 'LightBounce is disposed; attach a new LightBounce');
     if (typeof model?.setCapture !== 'function')
-      throw new TypeError('LightBounce add takes a model with a capture hook (gltf/pbr PBRModel, materials mesh, Terrain)');
+      throw new TypeError(
+        'LightBounce add takes a model with a capture hook (gltf/pbr PBRModel, materials mesh, Terrain)',
+      );
     const remove = captureModel(this.models, model, this.hook);
     this.invalidate();
     return () => {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20201252,
+  "total": 20201260,
   "history": [
     {
       "date": "2026-10-24",
@@ -12921,6 +12921,12 @@
       "commit": "976796766b",
       "grew": 2,
       "reason": "SOUND-01 optional entries: @margoengine/physics/outdoor-sound 4391 B gzip from zero, @margoengine/audio/outdoor 1191 B gzip from zero. Applications can use the path solver without Web Audio, or bind a path to playback without loading physics."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "0b41b70120",
+      "grew": 1,
+      "reason": "KB-BOUNCE-CAPTURE2 clustered/bounce grows from 15,419 to 15,427 B gzip: LightBounce.add documents and names the materials mesh it now takes (its TypeError lists it). Words only, no code; no split could hold them."
     }
   ],
   "items": {
@@ -13097,7 +13103,7 @@
     "@margoengine/clustered/area": 14883,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 15419,
+    "@margoengine/clustered/bounce": 15427,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6713,
     "@margoengine/clustered/cube-projector": 4716,

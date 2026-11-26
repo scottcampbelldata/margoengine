@@ -352,8 +352,7 @@ export interface PBRCapture {
 const captured = new Map<string, Map<string, string>>();
 /** `code` (the lit PBR shader) with a `capture` entry point returning `margoCapture(s,v,k)`; the beauty fragment becomes a dead `margoShade` call. */
 export function capturePBR(code: string, declarations: string, keep?: string): string {
-  const key = keep ? `${keep}
-${code}` : code;
+  const key = keep ? `${keep}\n${code}` : code;
   let cache = captured.get(declarations),
     out = cache?.get(key);
   if (out !== undefined) return out;
