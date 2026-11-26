@@ -59,6 +59,7 @@ export interface ShadowOptions {
     samples?: number;
     blockerSamples?: number;
     focus?: number;
+    jitter?: boolean;
     bias?: number;
     normalBias?: number;
     casterMargin?: number;

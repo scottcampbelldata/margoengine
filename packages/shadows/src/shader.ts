@@ -82,6 +82,22 @@ export interface SoftShadowOptions {
   blockerSamples?: number;
   /** Blocker-to-receiver distance, world units, 0 or more, of the sharpest penumbra. Default 0. */
   focus?: number;
+  /** Turn the noise a golden-ratio step each frame. Default true. */
+  jitter?: boolean;
+}
+/**
+ * The `'soft'` filter's noise turn this frame, a fraction of a turn in [0, 1): frame n's golden-ratio step, fract(n phi),
+ * the 1D additive recurrence with the lowest discrepancy (M. Roberts, "The Unreasonable Effectiveness of Quasirandom
+ * Sequences", 2018; H. Weyl 1916), so any run of frames spreads its turns evenly round the circle and an average of k
+ * frames samples k times the taps (temporal supersampling of a rotated kernel: L. Yang, D. Nehab, P. V. Sander,
+ * P. Sitthi-amorn, J. Lawrence and H. Hoppe, "Amortized Supersampling", SIGGRAPH Asia 2009; B. Karis, "High Quality
+ * Temporal Supersampling", SIGGRAPH 2014 course). Worked in double precision on the CPU, so a long run keeps its steps.
+ * 0 with `jitter: false`.
+ */
+export function jitterTurn(o: SoftShadowOptions, frames: number): number {
+  if (o.jitter === false) return 0;
+  const turn = frames * 0.6180339887498949;
+  return turn - Math.floor(turn);
 }
 /**
  * Checks the `'soft'` filter's counts and focus for `Shadows` and `VirtualShadows` alike; both write them, in this
@@ -98,6 +114,8 @@ export function checkSoft(o: SoftShadowOptions): void {
   const focus = o.focus ?? 0;
   if (!(focus < 3.4028235677973366e38) || !(focus >= 0))
     throw new RangeError('Invalid shadow options; focus must be finite and 0 or more.');
+  if (o.jitter !== undefined && o.jitter !== true && o.jitter !== false)
+    throw new TypeError('Invalid shadow options; jitter must be true or false.');
 }
 /**
  * The PCSS body both entries' `'soft'` filters run (Fernando 2005, "Percentage-Closer Soft Shadows"): a blocker search
@@ -137,7 +155,8 @@ const filters: Record<ShadowFilter, string> = {
   // golden angle (2.39996323 rad, shadowGolden) from tap j-1. No constant tables: drivers can place indexed constant
   // arrays in per-pixel scratch memory, which phone GPUs handle badly. Each pixel starts the spiral at its own angle
   // from interleaved gradient noise of its screen position (Jimenez 2014), so a penumbra shows fine noise instead of
-  // the steps of one pattern shared by every pixel. No time term: the same view renders the same pixels every frame.
+  // the steps of one pattern shared by every pixel, plus the frame's golden-ratio turn (soft.w, `jitter`), so averaged
+  // frames integrate new taps: the same view and frame count render the same pixels.
   // PCSS blocker search and penumbra estimate: Fernando 2005, "Percentage-Closer Soft Shadows". Tap counts come from
   // the frame (shadowFrame.soft: x filter taps, y blocker reads, `samples` and `blockerSamples`): Fernando 2005 notes the
   // counts trade quality for speed with the light size, and Bavoil 2008 (GDC, "Advanced Soft Shadow Mapping Techniques")
@@ -150,7 +169,7 @@ const filters: Record<ShadowFilter, string> = {
   // itself (min(...,0)): a surface behind the receiver cannot shade it, however the plane tilts on that side, which
   // keeps a curved or faceted receiver from reading its own far side, or the ground behind it, as a blocker.
   soft: pcss({
-    start: /* wgsl */ `let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));
+    start: /* wgsl */ `let angle=(noise.x+shadowFrame.soft.w)*6.2831853;let turn=vec2f(cos(angle),sin(angle));
   let search=max(texel.x,shadowFrame.settings.x*max(reference-shadowFrame.nearest[layer],0.0)*shadowFrame.ranges[layer]*length(rowX)*0.5);`,
     read: /* wgsl */ `let coord=vec2i((uv+offset)*dimensions);
     if(any(coord<vec2i(0))||any(coord>=vec2i(dimensions))){continue;}
