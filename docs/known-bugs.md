@@ -16430,3 +16430,12 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
+
+## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
+
+The live path receives aeolian mineral dust and whitecaps through registry fields. Existing footage and the
+legacy water spray and debris renderers still use their earlier particles. Footstep dust can use the emission port;
+the coupling fixture supplies its measured rate without an EARTH-05 source writer. The mass ledger tracks vapour
+and deposited mass. Temperature, humidity and bed composition feedback need coastal or ground output layouts with
+positions. Embers, ash, high-speed debris and snow are outside the environmental water/mineral scope here. See
+[Framework requests](physics-work-queue.md#framework-requests).

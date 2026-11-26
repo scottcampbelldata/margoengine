@@ -148,6 +148,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'airborne-kernel',
+    crate: 'packages/physics/airborne-kernel',
+    blueprint: 'packages/physics/src/airborne/airborne-kernel.wasm',
+    script: 'packages/physics/scripts/build-airborne-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'airborne-kernel-shared',
+    crate: 'packages/physics/airborne-kernel',
+    blueprint: 'packages/physics/src/airborne/airborne-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-airborne-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'aeolian-kernel',
     crate: 'packages/physics/aeolian-kernel',
     blueprint: 'packages/physics/src/aeolian/aeolian-kernel.wasm',

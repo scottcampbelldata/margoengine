@@ -111,6 +111,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/airborne-kernel.wasm',
+    label: 'airborne-kernel.wasm',
+    kind: 'Rust SIMD environmental particle transport',
+    measure: 'file',
+    when: 'AirborneParticles.load() from the optional /airborne entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/airborne-kernel-shared.wasm',
+    label: 'airborne-kernel-shared.wasm',
+    kind: 'Rust SIMD environmental particle transport, shared world memory',
+    measure: 'file',
+    when: 'AirborneParticles.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/aeolian-kernel.wasm',
     label: 'aeolian-kernel.wasm',
     kind: 'Rust SIMD aeolian transport',

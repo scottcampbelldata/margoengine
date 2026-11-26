@@ -13732,3 +13732,19 @@ the symmetric cell pressure operator K. It solves
 mass remap. A patch mounted on a body uses the published pose, angular velocity and the previous
 centre velocity. The impact couples to the wave-pressure field through the incoming normal
 momentum divided by step duration and the analytical area of the raised-cosine footprint.
+
+## ATMO-06 environmental airborne particles
+
+- Roland Clift, John R. Grace and Martin E. Weber, *Bubbles, Drops, and Particles* (1978). Spherical drag starts from the Stokes force 3πμd |Δu|. Schiller–Naumann multiplies it by 1 + 0.15 Re^0.687 with Re = ρₐ d |Δu| / μ. The spherical approximation uses Cᴅ = 0.44 above Re = 1,000. Cross-section divided by particle mass is 3/(2ρₚd). [Original volume](https://books.google.com/books?id=n8gRAQAAIAAJ).
+- C. N. Davies, *Definitive Equations for the Fluid Resistance of Spheres* (1945). The slip factor 1 + (λ/r)[1.257 + 0.4 exp(−1.1r/λ)] divides the low-Re drag rate. Mean free path follows from gas viscosity, density and molecular mean speed. [Published paper](https://doi.org/10.1088/0959-5309/57/4/301).
+- William Sutherland, *The Viscosity of Gases and Molecular Force* (1893). The viscosity ratio is (T/T₀)^(3/2)(T₀ + S)/(T + S) with dry-air coefficients and temperature in kelvins. [Original paper](https://doi.org/10.1080/14786449308620508).
+- D. J. Thomson, *Criteria for the Selection of Stochastic Models of Particle Trajectories in Turbulent Flows* (1987). Use the homogeneous Gaussian case. Set a = exp(−Δt/Tᴸ). Each gust component keeps a times its prior value and takes an independent Gaussian increment with standard deviation σ√(1 − a²), sampled by the parcel and tick's Philox keys. [Original paper](https://doi.org/10.1017/S0022112087001940).
+- James Clerk Maxwell, steady diffusion to a sphere (1877), and V. A. Vlasov, *On a Theory of Mass Transfer During the Evaporation of a Spherical Droplet* (2021). The diffusive mass flux is 4πrDᵥ times the difference between the saturated and ambient vapour densities. Combining it with spherical volume gives d(d²)/dt = −8Dᵥ times that density difference divided by liquid density. The Buck CR-1A manual supplies the saturation equation. [Mass-transfer paper](https://doi.org/10.1016/j.ijheatmasstransfer.2021.121597) · [Buck Research manual](https://www.hygrometers.com/wp-content/uploads/CR-1A-users-manual-2009-12.pdf).
+- M. D. Petters and S. M. Kreidenweis, *A Single Parameter Representation of Hygroscopic Growth and Cloud Condensation Nucleus Activity* (2007). Equation 6 with a flat interface gives the wet-to-dry diameter-cubed ratio 1 + κ RH/(1 − RH). Table 1 gives κ = 1.12 for mean measured sodium chloride growth. Shrinkage stops at equilibrium or at the dry solute when ambient humidity is zero. [Original paper](https://doi.org/10.5194/acp-7-1961-2007).
+- S. L. Gong, *A Parameterization of Sea-Salt Aerosol Source Function for Sub- and Super-Micron Particles* (2003), and E. L. Andreas, *A New Sea Spray Generation Function* (1998). The existing SEA-13 Gong source is per area of active whitecap. Three midpoint bins integrate the source over 1–20 µm r₈₀. SEA-13's formation convention sets r₀ ≈ 2r₈₀. The number flux times formation volume, density and patch area gives each representative mass-rate band. [Gong](https://doi.org/10.1029/2003GB002079) · [Andreas](https://doi.org/10.1175/1520-0485%281998%29028%3C2175%3AANSSGF%3E2.0.CO%3B2).
+
+The equation for frozen local wind and drag over a step is dv/dt = −β(v − u) + g(1 − ρₐ/ρₚ).
+Its analytical velocity and displacement use the exponential decay, its time integral and the
+integral of that integral. The Rust kernel computes X and Y together and uses the same arithmetic
+order for Z. Field reads precede the native batch. The transported materials are environmental
+mineral dust and water droplets.

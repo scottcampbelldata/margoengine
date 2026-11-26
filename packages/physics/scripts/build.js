@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -78,6 +78,7 @@ await build({
         landscape: resolve(root, 'src/landscape/index.ts'),
         'drainage-fog': resolve(root, 'src/drainage-fog/index.ts'),
         snowpack: resolve(root, 'src/snowpack/index.ts'),
+        airborne: resolve(root, 'src/airborne/index.ts'),
         aeolian: resolve(root, 'src/aeolian/index.ts'),
         groundwater: resolve(root, 'src/groundwater/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
@@ -143,6 +144,8 @@ await copyFile(resolve(root, 'src/vegetation-kernel-shared.wasm'), resolve(dist,
 for (const name of ['falling-kernel.wasm', 'falling-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/falling', name), resolve(dist, name));
 
+for (const name of ['airborne-kernel.wasm', 'airborne-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/airborne', name), resolve(dist, name));
 for (const name of ['modal-sound-kernel.wasm', 'modal-sound-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/modal-sound', name), resolve(dist, name));
 

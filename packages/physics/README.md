@@ -3736,3 +3736,34 @@ the deposited water and the wake receives the normal impulse.
 
 Use `depths()` for a render texture, `filmField` to consume substrate, depth and drip records, and
 `dripsField` for cell discharge in m³/s. The options document the default water and wall properties.
+
+## Windborne dust, mist and sea spray
+
+`@margoengine/physics/airborne` moves individual environmental parcels using local wind, diameter-dependent
+drag, gravity and evaporation. Read the poses for scene particles and the ledger for mass accounting.
+
+```ts
+import { AirborneParticles } from '@margoengine/physics/airborne';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const particles = await AirborneParticles.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(particles, {
+  capacity: 128,
+  initial: [{ kind: 'freshwater-mist', diameter: 0.00008, mass: 0.00001, position: [0, 1, 0] }],
+  wind: {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [3, 0.3, 0], density: 1.225, temperature: 288.15 }),
+  },
+  humidity: 0.98,
+});
+world.advance(30);
+console.log(particles.readParticles(), particles.budget);
+```
+
+Enable `terrain` and match the actual `TerrainBed` grid for world-space deposition. Pass
+`dustField: aeolian.dustField` to receive mineral dust emitted by EARTH-07. Enable `whitecaps` with the
+matching SEA-13 grid in `spray` to turn active whitecaps into three measured-source diameter bands.
+Supply `sources` for existing waterfall mist or mineral footstep dust. If `emissions` is enabled, an
+optional source owns one layout-1 f64 kg/s value for each row. Closed mass accounting includes the
+discrete parcels, waiting source mass, vapour, settled mass and open outflow.

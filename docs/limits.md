@@ -9429,3 +9429,19 @@ surface. Detaching films, contact-angle dynamics on a steep drop, thin-film inte
 general rain damping of ocean waves are outside this equation.
 
 The optional thin-film entry is 5,917 B gzip with a 6,173 B ceiling. Both Wasm assets are 9,209 B raw and each is 3,995 B gzip. Core plus stage remains 24,820 B gzip.
+
+### Environmental airborne transport (ATMO-06)
+
+The optional `@margoengine/physics/airborne` advances mineral dust, freshwater mist and sea spray at 240 Hz.
+Source parcels represent many physical particles. Each parcel holds 16 f64 words in the arena. Sources retain
+pending mass and get round-robin emission turns when the parcel allocation is full. Both native builds are
+610 B raw. The optional entry is 8,260 B gzip. Core plus stage remains 24,820 B gzip. The portable and shared variants use the same SIMD arithmetic and import the world memory without
+an initial static region.
+
+The drag law is for rounded particles in environmental air. The Stokes option checks Re ≤ 0.1; the default
+uses a transitional correlation and a constant-drag large-particle approximation. Wind and drag are held during
+one 1/240 s interval, so gradients are resolved at the local query rate. Homogeneous turbulence approaches the
+specified variance from a zero initial fluctuation. The wet-droplet evaporation model is diffusion-limited with
+prescribed humidity and a salt-dependent equilibrium diameter. It conserves the dry sea salt remaining after water loss. Mixed atmospheric chemistry,
+collisions between droplets and two-way air heating need separate fields. Deposition tests use heightfield
+subdivision at half the smallest horizontal cell width; the aggregate ledger retains the mass.

@@ -10236,3 +10236,11 @@ transactional during a step. The solver consumes the live rigid body record and 
 turns physical precipitation into intercepted water, and sends independently held impact pressure to
 the optional WakeSolver. Depth, capillary redistribution, drying and edge drainage have independent
 closed-form or volume checks. Plain/shared builds, frame cadence and restore agree bit for bit.
+
+### Environmental airborne batch (ATMO-06)
+
+The optional native kernel integrates two Cartesian lanes at once, with a third scalar lane in the same operation
+order. Host-side queries supply each particle's local Wind conditions, then the solver runs the batch over its
+arena state. Both native module initializations leave sentinel-filled world memory untouched. Direct checks cover
+the closed-form Stokes trajectory, exact droplet mass changes, source buffering and two real producers through
+the field registry. A production Vite build preserves both lazy Wasm files.

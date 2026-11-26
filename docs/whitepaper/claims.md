@@ -5638,3 +5638,12 @@ the window and the wind-driven direction of runnels. An impact on a wet platform
 water exactly once and applies pressure to a zero-net-volume dispersive ring.
 [Closed-form tests](../../packages/physics/tests/thin-film.test.js) ·
 [Coupling tests](../../packages/physics/tests/coupling/thin-film.test.js)
+
+### Resolved dust and water droplet trajectories (ATMO-06)
+
+`packages/physics/tests/airborne.test.js` compares both memory builds with the closed-form Stokes trajectory and
+a diffusion-limited wet diameter squared. A dry sea-spray parcel retains the configured salt mass fraction.
+The homogeneous turbulence fixture compares the sample mean and variance with the analytic OU distribution.
+`packages/physics/tests/coupling/airborne.test.js` drives dust from a real aeolian bed, passes active SEA-13
+whitecaps into three airborne bands and reproduces a wind-advected ground dust pulse. It checks mass closure,
+frame-rate invariance and exact replay. These are solver and source-link checks.

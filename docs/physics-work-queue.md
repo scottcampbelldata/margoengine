@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **ATMO-06:** Promote the environmental source flux and deposited/vapour mass fields for EARTH-05 footstep dust
+  and air/soil feedback. Publish source-grid geometry where types currently describe only rows. The airborne
+  entry reads the existing EARTH-07 dust and SEA-13 whitecap fields on matching geometry and exposes the scoped ports.
+
 - **BREAK-03:** SEA-10 needs a versioned compartment opening and resulting carried water mass and inertia. The
   current crush entry publishes calibrated seal loss and posts matched normal and angular impulses through the
   rigid ports. A contact effective-inertia port would share resolved fluid added mass during shorter crush events.
