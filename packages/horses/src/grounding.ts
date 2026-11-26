@@ -1,6 +1,6 @@
 import { fitHorseHooves, poseHooves, type HorsePose, type HorseSkeleton } from './model.js';
 
-type PathFrame = { x: number; z: number; heading: number };
+type PathFrame = { x: number; z: number; heading: number; bank?: number };
 type Point = [number, number];
 type Plant = { anchor?: Point; release?: { time: number; offset: Point } };
 
@@ -58,7 +58,7 @@ export function horseGrounding(skeleton: HorseSkeleton, ground: (x: number, z: n
       left = sample(frame, lateral, 0),
       right = sample(frame, -lateral, 0);
     const pitch = slope(hind - fore, 2 * longitudinal),
-      roll = slope(left - right, 2 * lateral),
+      roll = slope(left - right, 2 * lateral) + (frame.bank ?? 0),
       bodyShift = (fore + hind + left + right) / 4 - rootHeight;
     const targets = poseHooves(skeleton, pose).map(([x, y, z], i) => {
       const pad = toWorld(frame, x, z),

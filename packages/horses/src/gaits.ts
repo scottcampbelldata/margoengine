@@ -19,6 +19,7 @@
 //   trot): H. H. F. Buchner, H. H. C. M. Savelberg, H. C. Schamhardt and A. Barneveld, "Head and trunk movement
 //   adaptations in horses with experimentally induced fore- or hindlimb lameness", Equine Veterinary Journal
 //   28(1):71-76, 1996.
+import { pow } from '@margoengine/math/pinned';
 import type { HorseBody } from './anatomy.js';
 
 /** The four natural gaits. */
@@ -60,10 +61,50 @@ export interface GaitPattern {
  * long suspension.
  */
 export const GAIT_PATTERNS: Readonly<Record<Gait, GaitPattern>> = {
-  walk: { strike: [0, 0.25, 0.5, 0.75], froude: [0, 0.4], duty: [0.75, 0.6], preferred: 0.24, bounces: 2, rise: 0.025, pitch: 0.02, lift: [0.08, 0.07], nod: 0.12 },
-  trot: { strike: [0, 0.5, 0.5, 0], froude: [0.4, 2.4], duty: [0.48, 0.36], preferred: 1.5, bounces: 2, rise: 0.05, pitch: 0.015, lift: [0.17, 0.13], nod: 0.03 },
-  canter: { strike: [0.24, 0.5, 0, 0.28], froude: [2.4, 6.5], duty: [0.46, 0.36], preferred: 4.6, bounces: 1, rise: 0.065, pitch: 0.14, lift: [0.18, 0.15], nod: 0.16 },
-  gallop: { strike: [0.11, 0.47, 0, 0.36], froude: [6.5, 40], duty: [0.32, 0.22], preferred: 18, bounces: 1, rise: 0.055, pitch: 0.1, lift: [0.22, 0.18], nod: 0.2 },
+  walk: {
+    strike: [0, 0.25, 0.5, 0.75],
+    froude: [0, 0.4],
+    duty: [0.75, 0.6],
+    preferred: 0.24,
+    bounces: 2,
+    rise: 0.025,
+    pitch: 0.02,
+    lift: [0.08, 0.07],
+    nod: 0.12,
+  },
+  trot: {
+    strike: [0, 0.5, 0.5, 0],
+    froude: [0.4, 2.4],
+    duty: [0.48, 0.36],
+    preferred: 1.5,
+    bounces: 2,
+    rise: 0.05,
+    pitch: 0.015,
+    lift: [0.17, 0.13],
+    nod: 0.03,
+  },
+  canter: {
+    strike: [0.24, 0.5, 0, 0.28],
+    froude: [2.4, 6.5],
+    duty: [0.46, 0.36],
+    preferred: 4.6,
+    bounces: 1,
+    rise: 0.065,
+    pitch: 0.14,
+    lift: [0.18, 0.15],
+    nod: 0.16,
+  },
+  gallop: {
+    strike: [0.11, 0.47, 0, 0.36],
+    froude: [6.5, 40],
+    duty: [0.32, 0.22],
+    preferred: 18,
+    bounces: 1,
+    rise: 0.055,
+    pitch: 0.1,
+    lift: [0.22, 0.18],
+    nod: 0.2,
+  },
 };
 
 /** Standard gravity, m/s^2. */
@@ -75,13 +116,15 @@ const hipHeight = (body: Pick<HorseBody, 'hipJoint'>): number => {
   return h;
 };
 const speedOf = (speed: number): number => {
-  if (!(speed >= 0) || !Number.isFinite(speed)) throw new RangeError('A gait speed must be a finite number of metres per second, 0 or more');
+  if (!(speed >= 0) || !Number.isFinite(speed))
+    throw new RangeError('A gait speed must be a finite number of metres per second, 0 or more');
   return speed;
 };
 
 /** Froude number u^2/gh of a speed for this horse (h its hip joint height). */
 export function froude(body: Pick<HorseBody, 'hipJoint'>, speed: number): number {
-  return speedOf(speed) ** 2 / (GRAVITY * hipHeight(body));
+  const value = speedOf(speed);
+  return (value * value) / (GRAVITY * hipHeight(body));
 }
 
 /** The speed in m/s of a Froude number for this horse. */
@@ -107,7 +150,7 @@ export function preferredSpeed(body: Pick<HorseBody, 'hipJoint'>, gait: Gait): n
 /** Stride length in metres at this speed: lambda = 2.3 h (u^2/gh)^0.3 (Alexander and Jayes 1983). 0 at rest. */
 export function strideLength(body: Pick<HorseBody, 'hipJoint'>, speed: number): number {
   const fr = froude(body, speed);
-  return fr === 0 ? 0 : 2.3 * hipHeight(body) * fr ** 0.3;
+  return fr === 0 ? 0 : 2.3 * hipHeight(body) * pow(fr, 0.3);
 }
 
 /** Strides per second at this speed: speed over stride length. */
@@ -153,7 +196,11 @@ const wrap = (x: number): number => x - Math.floor(x);
  * Where a hoof is in its cycle at stride phase `phase` (0 to 1): `stance` true while it bears weight, and `t` running 0
  * to 1 through the stance or through the swing.
  */
-export function hoofPhase(s: Pick<Stride, 'duty' | 'strike'>, hoof: number, phase: number): { stance: boolean; t: number } {
+export function hoofPhase(
+  s: Pick<Stride, 'duty' | 'strike'>,
+  hoof: number,
+  phase: number,
+): { stance: boolean; t: number } {
   const local = wrap(phase - s.strike[hoof]);
   return local < s.duty ? { stance: true, t: local / s.duty } : { stance: false, t: (local - s.duty) / (1 - s.duty) };
 }
