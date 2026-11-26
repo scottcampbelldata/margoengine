@@ -4477,6 +4477,14 @@ threshold the remaining shear drives the implicit face response. The inclined ca
 checks the energy and volume on transposed gravity directions.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
+Run `node --test --test-name-pattern="measured capillary spreading" packages/physics/tests/thin-film.test.js`.
+The input is a one-microlitre shallow cap above a 50 nm precursor. The large-scale
+capillary limit omits gravity. The fixed-clock check begins after four capillary times and
+uses the radial mass moment to estimate the radius at three samples separated by time doubling.
+It checks both exponent intervals against the independent observations and repeats with half the
+cell size. The experiment's absolute radius history supplies no initialization.
+[Cazabat and Cohen Stuart (1986)](https://doi.org/10.1021/j100280a075) · [Ehrhard (1993), Table 2](https://doi.org/10.1017/S0022112093003167)
+
 ### FLUID-07 measured inclined film
 
 Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`

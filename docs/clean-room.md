@@ -15210,6 +15210,14 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   stiffness then enters the symmetric face solve as a diagonal, and the exact face
   preconditioner includes the sum of the two adjacent stiffnesses.
   [Journal](https://doi.org/10.1006/jcis.1998.5448)
+- A. M. Cazabat and M. A. Cohen Stuart, “Dynamics of wetting: effects of surface roughness”
+  (1986), and Peter Ehrhard, “Experiments on isothermal and non-isothermal spreading”
+  (1993), Table 2. Their spherical-drop measurements give the complete-wetting,
+  capillary-controlled exponent interval 0.094–0.125 for silicone oils on glass.
+  The independent solver check uses a fixed one-microlitre shallow cap and the
+  zero-gravity limit of the film equations. Multiplying the viscosity and clock by the
+  same factor preserves those equations. No measured radii or exponents set the model.
+  [Cazabat and Cohen Stuart](https://doi.org/10.1021/j100280a075) · [Ehrhard](https://doi.org/10.1017/S0022112093003167)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
   pressure. Equation 10 brackets the stationary contact front by the advancing and receding
@@ -15270,6 +15278,7 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   (1976). Use the Davies-number relation for a steady wake and the Bond number and
   physical-property number for a deformed drop with an unsteady wake. Both terminal Reynolds
   relations use volume-equivalent diameter. The maximum modeled diameter is 7 mm.
+  Integer products and pinned transcendental functions keep the flight state replayable.
   [Journal](https://doi.org/10.1175/1520-0469(1976)033%3C0851:TVASOC%3E2.0.CO;2)
 - Pao K. Wang and Hans R. Pruppacher, “Acceleration to Terminal Velocity of Cloud and
   Raindrops” (1977). Invert Beard's relation at the instantaneous Reynolds number to get

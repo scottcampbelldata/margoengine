@@ -1,4 +1,5 @@
-import { cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
+import { hypot } from '@margoengine/math/pinned';
+import { cross, dot, scale, sub } from '@margoengine/math/vec3';
 import { dragIntegrals } from '../airborne/environment.js';
 
 type V3 = readonly [number, number, number];
@@ -34,6 +35,11 @@ function vector(value: V3): boolean {
   return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 }
 
+function unit(value: V3): V3 {
+  const length = hypot(...value);
+  return length > 0 ? scale(value, 1 / length) : [0, 0, 0];
+}
+
 export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
   if (!opts || typeof opts !== 'object')
     throw new TypeError('Invalid drop receiver. Pass an object with its origin and UV dimensions.');
@@ -54,8 +60,8 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     throw new RangeError(
       'Invalid drop receiver. Use a finite plane, positive UV dimensions and one integer origin cell.',
     );
-  const u = normalize(rawU);
-  const v = normalize(sub(rawV, scale(u, dot(rawV, u))));
+  const u = unit(rawU);
+  const v = unit(sub(rawV, scale(u, dot(rawV, u))));
   const n = cross(u, v);
   if (!(dot(n, n) > 0)) throw new RangeError('Drop receiver tangents have no area. Use two nonparallel directions.');
   return {

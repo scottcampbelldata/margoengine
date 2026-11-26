@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { hostMath } from '../../../../scripts/check-pinned-math.mjs';
 import { Physics } from '../../dist/index.js';
 import { WAKE_SOURCE_WORDS, WakeSolver } from '../../dist/sea.js';
 import {
@@ -14,6 +16,15 @@ import { BODY_FORCES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory 
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const rate = { num: 60, den: 1 };
+
+test('Thin-film state helpers use pinned arithmetic', () => {
+  const directory = new URL('../../src/thin-film/', import.meta.url);
+  for (const name of readdirSync(directory).filter((file) => file.endsWith('.ts'))) {
+    const source = readFileSync(new URL(name, directory), 'utf8');
+    assert.deepEqual(hostMath(source), [], name);
+  }
+});
+
 const rainVelocity = [0, -7, 4];
 const empty = { rate: 0, intercept: 0, slope: 0, fallSpeed: 0, impactRate: 0, energyFlux: 0, waterContent: 0 };
 const storm = (velocity = rainVelocity) => ({

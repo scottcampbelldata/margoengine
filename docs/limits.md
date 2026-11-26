@@ -9583,7 +9583,9 @@ The optional `wetting` model gives the film a finite equilibrium contact angle b
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
-water balance. Measured spreading remains open.
+water balance. The complete-wetting capillary limit matches the independently measured
+0.094–0.125 radius exponent on 40 × 40 and 80 × 80 grids. Absolute contact-line traces
+and measured partially wetting slip remain open.
 The optional backing angle map adds one f64 value per film cell. Its pressure and
 implicit stiffness both vary by cell, and the exact two-cell check covers conservative
 motion toward the more wettable side and snapshot replay.
@@ -9613,7 +9615,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 13,199 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 13,202 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

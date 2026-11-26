@@ -6164,6 +6164,11 @@ directions. A 32 × 32 tilted cap lowers its gravitational, capillary and wettin
 together, conserves film volume and gives the same rotated response in both grid axes.
 [Reproduce](reproduce.md#fluid-07-precursor-wetting)
 
+Complete wetting gives a capillary spreading exponent within the independently measured
+0.094–0.125 interval for silicone oil on glass, across two time octaves and a twofold
+grid refinement. The reduced calculation uses a fixed smooth cap and tests the exponent.
+[Reproduce](reproduce.md#fluid-07-precursor-wetting)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

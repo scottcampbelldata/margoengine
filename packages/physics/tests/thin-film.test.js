@@ -266,6 +266,62 @@ test('ThinFilmSolver: a tilted cap with wetting hysteresis loses energy in eithe
   assert.ok(downhill > 0);
 });
 
+test('ThinFilmSolver: complete wetting has the measured capillary spreading exponent under refinement', async () => {
+  const width = 0.012;
+  const initialRadius = 0.0017;
+  const volume = 1e-9;
+  const precursorDepth = 5e-8;
+  const centreDepth = (2 * volume) / (Math.PI * initialRadius ** 2);
+  const tension = 0.0205;
+  // Rescale the Stokes time by 1/10 to represent the 0.020 Pa s experiment.
+  const viscosity = 0.002;
+  const capillaryTime = (3 * viscosity * initialRadius ** 4) / (tension * centreDepth ** 3);
+  const first = Math.ceil((4 * capillaryTime) / dt);
+  const frames = [first, 2 * first, 4 * first];
+  const measured = [0.094, 0.125]; // Cazabat and Cohen Stuart (1986), reported by Ehrhard (1993), Table 2.
+  let coarse;
+  for (const n of [40, 80]) {
+    const spacing = width / n;
+    const r2 = Array.from({ length: n * n }, (_, i) => {
+      const u = ((i % n) + 0.5 - n * 0.5) * spacing;
+      const v = (Math.floor(i / n) + 0.5 - n * 0.5) * spacing;
+      return u * u + v * v;
+    });
+    const profile = r2.map((r) => Math.max(0, 1 - r / initialRadius ** 2));
+    const scale = volume / (spacing ** 2 * profile.reduce((sum, value) => sum + value, 0));
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate, gravity: [0, 0, 0] }).add(film, {
+      cells: [n, n],
+      spacing,
+      depth: profile.map((h) => precursorDepth + scale * h),
+      viscosity,
+      surfaceTension: tension,
+      wetting: { contactAngle: 0, precursorDepth },
+    });
+    const radii = frames.map((frame) => {
+      world.advance(frame);
+      const depth = film.depths();
+      let water = 0;
+      let moment = 0;
+      for (const [i, h] of depth.entries()) {
+        const excess = h - precursorDepth;
+        water += excess;
+        moment += r2[i] * excess;
+      }
+      close(water * spacing ** 2, volume, 64 * frame * Number.EPSILON * volume);
+      // A shallow parabolic cap has a radial second moment of R²/3.
+      return Math.sqrt((3 * moment) / water);
+    });
+    for (let i = 1; i < radii.length; i++) {
+      const exponent = Math.log2(radii[i] / radii[i - 1]);
+      assert.ok(exponent >= measured[0] && exponent <= measured[1], `n=${n}, local exponent ${exponent}`);
+    }
+    if (coarse) {
+      for (const [i, radius] of radii.entries()) close(radius, coarse[i], width / 40);
+    } else coarse = radii;
+  }
+});
+
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {

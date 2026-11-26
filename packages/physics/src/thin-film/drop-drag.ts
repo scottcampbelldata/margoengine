@@ -5,6 +5,10 @@ const MIN_TERMINAL_DIAMETER = 0.000019;
 const WAKE_TRANSITION = 0.00107;
 export const MAX_FLIGHT_DIAMETER = 0.007;
 
+function cube(value: number): number {
+  return value * value * value;
+}
+
 function steadyWakeRe(d: number, davies: number): number {
   const x = ln(davies * d * d * d);
   const y =
@@ -40,11 +44,14 @@ export class DropDrag {
   ) {
     this.buoyancy = 1 - air / water;
     this.viscosity = airViscosity(temperature);
+    const viscositySquared = this.viscosity * this.viscosity;
     const densityGravity = (water - air) * g;
-    this.davies = (4 * air * densityGravity) / (3 * this.viscosity ** 2);
+    this.davies = (4 * air * densityGravity) / (3 * viscositySquared);
     this.bond = (4 * densityGravity) / (3 * surfaceTension);
     this.property =
-      densityGravity > 0 ? pow((surfaceTension ** 3 * air ** 2) / (this.viscosity ** 4 * densityGravity), 1 / 6) : 0;
+      densityGravity > 0
+        ? pow((cube(surfaceTension) * air * air) / (viscositySquared * viscositySquared * densityGravity), 1 / 6)
+        : 0;
     this.reMin = this.davies > 0 ? steadyWakeRe(MIN_TERMINAL_DIAMETER, this.davies) : 0;
     this.reTransition = this.property > 0 ? unsteadyWakeRe(WAKE_TRANSITION, this.bond, this.property) : 0;
     this.reMax = this.property > 0 ? unsteadyWakeRe(MAX_FLIGHT_DIAMETER, this.bond, this.property) : 0;
@@ -60,7 +67,7 @@ export class DropDrag {
     // Reynolds number. Substitute its terminal force balance into the actual drag.
     if (re > this.reMax) {
       const maxSpeed = (this.viscosity * this.reMax) / (this.air * diameter);
-      return (this.g * this.buoyancy * (MAX_FLIGHT_DIAMETER / diameter) ** 3 * speed) / (maxSpeed * maxSpeed);
+      return (this.g * this.buoyancy * cube(MAX_FLIGHT_DIAMETER / diameter) * speed) / (maxSpeed * maxSpeed);
     }
     const small = re <= this.reTransition;
     let low = small ? MIN_TERMINAL_DIAMETER : WAKE_TRANSITION;
@@ -72,7 +79,7 @@ export class DropDrag {
       else high = mid;
     }
     const equivalent = 0.5 * (low + high);
-    return (this.g * this.buoyancy * (equivalent / diameter) ** 3) / speed;
+    return (this.g * this.buoyancy * cube(equivalent / diameter)) / speed;
   }
 }
 
