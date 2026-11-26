@@ -14978,7 +14978,8 @@ Batch 247 job 1 fills the missing painted-geometry input: optional SDFScene2D no
 
 ### Batch 218 job 1
 
-**Status:** open (owner: blender).
+**Status:** closed (fixed in b65c07c20c; confirmed on main 2026-11-26: webgl2-compat device.test.js,
+compute-limits.test.js and corpus tests, the transitions CPU tests and its GPU check on WebGPU and WebGL2 pass).
 
 The former crossfade-only live composition gap is closed for all four built-ins, greyscale masks and trusted custom WGSL. CPU lifecycle/validation tests and full-live-browser pixel fixtures cover the added modes; the existing live recovery and resize checks remain.
 
@@ -16117,7 +16118,9 @@ Update 2026-11-11 (bug sweep L2 round 2, KB6250d/e/f): closed as rival unsupport
 
 ### hygiene gate 6: TypeScript async API threw "getNodeId requires a RemoteNode" once (2026-11-10)
 
-**Status:** open (owner: tiles, usdz).
+**Status:** closed (fixed 2026-11-11, KB6254a; confirmed on main 2026-11-26: tests/declaration-snapshot.test.js
+passes once its source check allows the formatter's line break, which had turned it red; the wrong-scene dispose
+sites listed as open below use `sceneOf` and their scene tests in physics, physics2d and ragdoll pass).
 
 `npm run hygiene` in the lane-P worktree (bp-161, branch from 5ecb5ab1a, packages freshly built) failed once at
 `scripts/hygiene.js` gate 6 (`checker.getSymbolAtLocation(await program.getSourceFile(dts))`) with

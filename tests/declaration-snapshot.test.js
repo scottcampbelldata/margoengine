@@ -44,7 +44,7 @@ test('hygiene gate 6 checks the source file before asking the checker for its sy
   const source = await readFile(new URL('../scripts/hygiene.js', import.meta.url), 'utf8');
   assert.match(
     source,
-    /const file = await program\.getSourceFile\(dts\);\s*\n[^\n]*\n\s*if \(!file\) throw missingDeclaration/,
+    /const file = await program\.getSourceFile\(dts\);\s*\n[^\n]*\n\s*if \(!file\)\s*throw missingDeclaration/,
   );
   assert.doesNotMatch(source, /getSymbolAtLocation\(await program\.getSourceFile/);
 });
