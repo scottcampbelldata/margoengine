@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20387428,
+  "total": 20387833,
   "history": [
     {
       "date": "2026-10-24",
@@ -13137,6 +13137,12 @@
       "commit": "ded69116e",
       "reason": "physics/rogue ceiling 7930 to 9,251 B (built 7,674 to 8,982 B): the three sisters, runs of high waves by Kimura's chain (elliptic integrals, Rice's law, Marcum's Q), the spectral and corrected kappa, the group spacing and placed sister groups. In the rogue entry because placing sisters needs the nonlinear sea it stands them in; a split would load the sea twice.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "460d6e29ff",
+      "grew": 1,
+      "reason": "EARTH-05 sampled projected treads and shoe profiles take the optional entry from 9692 to 10085 B gzip. The existing native contact integral supports each geometry, so a separate entry would duplicate the coupling and loader. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14002,7 +14008,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 9983,
+    "@margoengine/physics/terramechanics": 10388,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
