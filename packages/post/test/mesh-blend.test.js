@@ -101,6 +101,11 @@ test('MeshBlend tags capture models through their hook and releases it', () => {
     hook.declarations('struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f}'),
     /fn margoSSR\([^]*vec4f\(0\.25,/,
   );
+  // Core's lit shader (lit scatter's stage) spells it `struct Frame { camera`.
+  assert.match(
+    hook.declarations('struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f }'),
+    /fn margoSSR\([^]*vec4f\(0\.25,/,
+  );
   assert.throws(() => hook.declarations('fn other() {}'), /terrain/);
   blend.tag(model, 0.5);
   assert.equal(calls.restored, 1, 'tagging again swaps the hook');
