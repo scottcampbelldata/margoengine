@@ -51,9 +51,22 @@ pub struct Work {
     solid_slope: f64,
     heads: [u32; 27],
     heads_padding: u32,
+    pressure_first: u32,
+    pressure_count: u32,
 }
 
-const _: () = assert!(core::mem::size_of::<Work>() == 49 * 8);
+const _: () = assert!(core::mem::size_of::<Work>() == 50 * 8);
+
+#[repr(C)]
+pub struct PressurePair {
+    gradient: Vec3,
+    distance: f64,
+    index: u32,
+    padding: u32,
+}
+
+const _: () = assert!(core::mem::size_of::<PressurePair>() == 40);
+const UNCACHED: u32 = u32::MAX;
 
 #[inline]
 fn cubic(q: f64) -> f64 {
@@ -147,15 +160,24 @@ fn visit(
     boundary: &[Boundary],
     grid: &Grid<'_>,
     settings: &Settings,
-    heads: &[u32; 27],
-    use_neighbor: impl FnMut(usize, f64, Vec3, f64),
+    work: &Work,
+    cache: &[PressurePair],
+    mut use_neighbor: impl FnMut(usize, f64, Vec3),
 ) {
-    neighborhood(points, boundary, grid, settings, settings.support).around(
-        i,
-        item(points, i).position,
-        heads,
-        use_neighbor,
-    );
+    if work.pressure_count == UNCACHED {
+        neighborhood(points, boundary, grid, settings, settings.support).around(
+            i,
+            item(points, i).position,
+            &work.heads,
+            |j, q, grad, _| use_neighbor(j, q, grad),
+        );
+    } else {
+        let start = work.pressure_first as usize;
+        for row in start..start + work.pressure_count as usize {
+            let p = item(cache, row);
+            use_neighbor(p.index as usize, p.distance, p.gradient);
+        }
+    }
 }
 #[inline]
 fn body_velocity(object: &Solid, at: Vec3) -> Vec3 {
@@ -431,9 +453,11 @@ fn prepare(
     boundary: &[Boundary],
     grid: &Grid<'_>,
     settings: &Settings,
+    cache: &mut [PressurePair],
     evaluations: &mut f64,
     neighborhoods: &mut f64,
-) {
+) -> usize {
+    let mut cursor = 0;
     let inverse_h = 1.0 / settings.support;
     let mass_scale = inverse_h * inverse_h * inverse_h / settings.rest;
     let lattice = PlanarLattice::new(settings);
@@ -456,27 +480,42 @@ fn prepare(
         let mut density = particle.mass * mass_scale * CUBIC + wall_density;
         let mut centre = wall_gradient;
         let mut diagonal = 0.0;
-        visit(
-            i,
-            points,
-            boundary,
-            grid,
-            settings,
-            &heads,
-            |j, _, grad, weight| {
-                *evaluations += 1.0;
-                density += weight;
-                centre = add(centre, grad);
-                // Boundary particles have prescribed velocity during the liquid solve.
-                if j < points.len() {
-                    diagonal += norm2(grad);
-                }
-            },
-        );
+        let first = cursor;
+        let mut complete = true;
+        let neighbors = neighborhood(points, boundary, grid, settings, settings.support);
+        neighbors.around(i, particle.position, &heads, |j, distance, grad, weight| {
+            *evaluations += 1.0;
+            density += weight;
+            centre = add(centre, grad);
+            // Boundary particles have prescribed velocity during the liquid solve.
+            if j < points.len() {
+                diagonal += norm2(grad);
+            }
+            if let Some(slot) = cache.get_mut(cursor) {
+                *slot = PressurePair {
+                    gradient: grad,
+                    distance,
+                    index: j as u32,
+                    padding: 0,
+                };
+                cursor += 1;
+            } else {
+                complete = false;
+            }
+        });
         let denominator = diagonal + norm2(centre);
         let w = item_mut(work, i);
         w.wall_gradient = wall_gradient;
         w.heads = heads;
+        w.pressure_first = first as u32;
+        w.pressure_count = if complete {
+            (cursor - first) as u32
+        } else {
+            // A complete row can always use the normal grid. Roll back the
+            // partial write to leave its slots available for later rows.
+            cursor = first;
+            UNCACHED
+        };
         w.wall_drag = wall_drag;
         w.inverse = if denominator > 0.0 {
             1.0 / denominator
@@ -485,6 +524,7 @@ fn prepare(
         };
         item_mut(points, i).density = density * settings.rest;
     }
+    cursor
 }
 
 fn pressure_error(
@@ -494,6 +534,7 @@ fn pressure_error(
     shapes: &[Solid],
     grid: &Grid<'_>,
     settings: &Settings,
+    cache: &[PressurePair],
     dt: f64,
     density: bool,
     evaluations: &mut f64,
@@ -508,8 +549,9 @@ fn pressure_error(
             boundary,
             grid,
             settings,
-            &w.heads,
-            |j, _, grad, _| {
+            w,
+            cache,
+            |j, _, grad| {
                 *evaluations += 1.0;
                 let velocity = if j < points.len() {
                     item(points, j).velocity
@@ -549,6 +591,7 @@ fn pressure_velocity(
     trial: &mut [Reaction],
     grid: &Grid<'_>,
     settings: &Settings,
+    cache: &[PressurePair],
     evaluations: &mut f64,
 ) -> f64 {
     trial.fill([0.0; 6]);
@@ -561,8 +604,9 @@ fn pressure_velocity(
             boundary,
             grid,
             settings,
-            &item(work, i).heads,
-            |j, _, grad, _| {
+            item(work, i),
+            cache,
+            |j, _, grad| {
                 *evaluations += 1.0;
                 if j < points.len() {
                     change = sub(change, scale(grad, lambda + item(work, j).lambda));
@@ -612,6 +656,7 @@ fn pressure(
     trial: &mut [Reaction],
     grid: &Grid<'_>,
     settings: &Settings,
+    cache: &[PressurePair],
     dt: f64,
     density: bool,
     evaluations: &mut f64,
@@ -626,6 +671,7 @@ fn pressure(
         shapes,
         grid,
         settings,
+        cache,
         dt,
         density,
         evaluations,
@@ -662,6 +708,7 @@ fn pressure(
             trial,
             grid,
             settings,
+            cache,
             evaluations,
         );
         fraction
@@ -679,6 +726,7 @@ fn pressure(
             shapes,
             grid,
             settings,
+            cache,
             dt,
             density,
             evaluations,
@@ -701,6 +749,7 @@ fn pressure(
             trial,
             grid,
             settings,
+            cache,
             evaluations,
         );
         if fraction == 0.0 {
@@ -717,6 +766,7 @@ fn pressure(
             shapes,
             grid,
             settings,
+            cache,
             dt,
             density,
             evaluations,
@@ -818,6 +868,7 @@ fn diffuse(
     reactions: &mut [Reaction],
     grid: &Grid<'_>,
     settings: &Settings,
+    cache: &[PressurePair],
     dt: f64,
     evaluations: &mut f64,
 ) -> f64 {
@@ -830,16 +881,17 @@ fn diffuse(
         w.rhs = p.velocity;
         let wall_scale = settings.rest / p.density;
         let drag = settings.viscosity * dt * wall_scale * wall_scale;
-        w.residual = scale(w.wall_drag.multiply(p.velocity), -drag);
-        w.diagonal = add([1.0; 3], scale(w.wall_drag.diagonal, drag));
+        let mut residual = scale(w.wall_drag.multiply(p.velocity), -drag);
+        let mut diagonal = add([1.0; 3], scale(w.wall_drag.diagonal, drag));
         visit(
             i,
             points,
             boundary,
             grid,
             settings,
-            &w.heads,
-            |j, q, grad, _| {
+            w,
+            cache,
+            |j, q, grad| {
                 *evaluations += 1.0;
                 let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
                 let v = if j < points.len() {
@@ -849,12 +901,14 @@ fn diffuse(
                     body_velocity(item(shapes, b.shape as usize), b.position)
                 };
                 for k in 0..3 {
-                    w.diagonal[k] += weight * axis[k] * axis[k];
+                    diagonal[k] += weight * axis[k] * axis[k];
                 }
-                w.residual = add(w.residual, along(axis, sub(v, p.velocity), weight));
+                residual = add(residual, along(axis, sub(v, p.velocity), weight));
             },
         );
-        w.direction = precondition(w.residual, w.diagonal);
+        w.residual = residual;
+        w.diagonal = diagonal;
+        w.direction = precondition(residual, diagonal);
         squared += dot(w.direction, w.residual);
     }
     let target = squared * 1e-20;
@@ -874,8 +928,9 @@ fn diffuse(
                 boundary,
                 grid,
                 settings,
-                &item(work, i).heads,
-                |j, q, grad, _| {
+                item(work, i),
+                cache,
+                |j, q, grad| {
                     *evaluations += 1.0;
                     let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
                     let neighbor = if j < points.len() {
@@ -916,8 +971,9 @@ fn diffuse(
             boundary,
             grid,
             settings,
-            &item(work, i).heads,
-            |j, q, grad, _| {
+            item(work, i),
+            cache,
+            |j, q, grad| {
                 *evaluations += 1.0;
                 if j >= points.len() {
                     let b = item(boundary, j - points.len());
@@ -1066,9 +1122,11 @@ pub unsafe extern "C" fn solve_dfsph(
     trial: *mut Reaction,
     body_count: usize,
     settings: *const Settings,
-    stats: *mut [f64; 11],
+    stats: *mut [f64; 12],
     dt: f64,
     boundary_color: *mut f64,
+    pair_cache: *mut PressurePair,
+    pair_capacity: usize,
 ) -> u32 {
     let (points, work, boundary, shapes, reactions, trial, settings, stats) = unsafe {
         (
@@ -1082,6 +1140,7 @@ pub unsafe extern "C" fn solve_dfsph(
             &mut *stats,
         )
     };
+    let cache = unsafe { core::slice::from_raw_parts_mut(pair_cache, pair_capacity) };
     let surface = settings
         .liquid_vapor
         .max(settings.solid_liquid)
@@ -1133,12 +1192,13 @@ pub unsafe extern "C" fn solve_dfsph(
     let mut divergence_error = 0.0;
     let mut normal_impulse = 0.0;
     rebuild(&mut grid, points, boundary);
-    prepare(
+    let mut cached = prepare(
         points,
         work,
         boundary,
         &grid,
         settings,
+        cache,
         &mut evaluations,
         &mut neighborhoods,
     );
@@ -1184,6 +1244,7 @@ pub unsafe extern "C" fn solve_dfsph(
             reactions,
             &grid,
             settings,
+            cache,
             step,
             &mut evaluations,
         );
@@ -1196,6 +1257,7 @@ pub unsafe extern "C" fn solve_dfsph(
             trial,
             &grid,
             settings,
+            cache,
             step,
             true,
             &mut evaluations,
@@ -1207,12 +1269,13 @@ pub unsafe extern "C" fn solve_dfsph(
             normal_impulse += contacts(settings, p, shapes, reactions);
         }
         rebuild(&mut grid, points, boundary);
-        prepare(
+        cached += prepare(
             points,
             work,
             boundary,
             &grid,
             settings,
+            cache,
             &mut evaluations,
             &mut neighborhoods,
         );
@@ -1225,6 +1288,7 @@ pub unsafe extern "C" fn solve_dfsph(
             trial,
             &grid,
             settings,
+            cache,
             step,
             false,
             &mut evaluations,
@@ -1259,6 +1323,7 @@ pub unsafe extern "C" fn solve_dfsph(
         viscosity_rounds,
         normal_impulse,
         neighborhoods,
+        cached as f64,
     ];
     grid.clear();
     0

@@ -4355,7 +4355,9 @@ pressure and viscosity values from the native kernel's published equations using
 calculation. Run `node packages/physics/tests/dfsph.browser.mjs` and repeat with `--compat` to check that the
 Water package displays the same simulated mass and front on both backends. The experimental diagnostic
 `node packages/physics/tests/dfsph-lab.mjs` compares the channel surge against the unaffected laboratory
-clock intervals and returns a failure when a tolerance is missed.
+clock intervals and returns a failure when a tolerance is missed. Pass `--refined` for the verified
+accurate 18-row case. The default coarse run and the refined `--interactive` option reproduce the
+early fronts.
 
 ### Strand guides (SOFT-03)
 

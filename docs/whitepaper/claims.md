@@ -5891,3 +5891,11 @@ pass sees the new pair immediately. The force traversal order and support tests 
 The accurate profile's free surface completes the first mode in 1.168 s in the 640-particle rectangular
 tank. The independent linear prediction is 1.165 s. The difference is within one 120 Hz frame and the
 mass remains 58.32 kg. The smaller-depth and narrow-channel cases continue to need validation.
+
+### FLUID-01 refined surge release
+
+The exact-gradient cache retains fluid and boundary pair order for every pressure and viscosity iteration.
+A dense-ring regression exercises cached and fallback rows and compares every fluid result against an
+uncached run. At a 11,664-particle refinement step with 92,226,298 pair uses, the solver prepares 1,294,348
+reusable pressure records and performs 46,656 neighborhood queries. The refined accurate Martin–Moyce
+fixture passes both historical surge intervals under the original sampling allowance.

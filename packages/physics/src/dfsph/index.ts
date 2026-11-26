@@ -1,6 +1,6 @@
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { MAX_MEMORY_PAGES, regionWords } from '../world/memory.js';
+import { DYNAMIC_BASE, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -44,9 +44,10 @@ export const DFSPH_PARTICLE_WORDS = 8;
 const ZERO: Cell = [0, 0, 0];
 const ONE: Vec3 = [1, 1, 1];
 const SETTINGS_WORDS = 27;
-const WORK_WORDS = 49;
+const WORK_WORDS = 50;
+const PRESSURE_PAIR_WORDS = 5;
 const BUCKET_WORDS = 4;
-const STATS_WORDS = 11;
+const STATS_WORDS = 12;
 const MODAL_WORDS = 5;
 const CUBIC = 8 / Math.PI;
 
@@ -75,6 +76,8 @@ export interface DfsphStatistics {
   readonly pairEvaluations: number;
   /** Sparse-grid neighborhoods retrieved during the last world step. */
   readonly neighborhoodSearches: number;
+  /** Complete pressure and viscosity neighbor records prepared for reuse across iterations. */
+  readonly cachedPressurePairs: number;
   /** Mean positive predicted excess density as a fraction of rest density. */
   readonly compression: number;
   /** Mean positive normalized density rate, s⁻¹. */
@@ -136,6 +139,8 @@ export interface DfsphParams {
   readonly divergenceTolerance?: number;
   /** Warm start both pressure passes from the previous substep. Default true. */
   readonly warmStart?: boolean;
+  /** Cache exact kernel gradients in the arena between constraint iterations. Default true. */
+  readonly cacheNeighbors?: boolean;
   /** Kinematic viscosity, m²/s. Default 10⁻⁶ (fresh water near 20 °C). */
   readonly viscosity?: number;
   /** Maximum implicit viscosity iterations per substep. Default 32 accurate or 12 interactive. */
@@ -164,6 +169,8 @@ type State = {
   readonly used: Region;
   readonly boundary: Region;
   readonly boundaryColor: Region;
+  readonly pressurePairs: Region;
+  readonly pressurePairCapacity: number;
   readonly shapes: Region;
   readonly impulses: Region;
   readonly pressureImpulses: Region;
@@ -342,6 +349,20 @@ export class DfsphSolver implements Solver<DfsphParams> {
       throw new RangeError(
         'DFSPH grid and state exceed the wasm32 arena. Reserve fewer points or use coarser boundary sampling.',
       );
+    const ratio = support / spacing;
+    const pairsPerParticle = Math.min(
+      capacity + sampleCount - 1,
+      Math.ceil(((4 * Math.PI) / 3) * ratio * ratio * ratio),
+    );
+    const pairsInArena = Math.max(
+      0,
+      Math.floor((MAX_MEMORY_PAGES * 65536 - DYNAMIC_BASE - STACK_BYTES - bytes) / (PRESSURE_PAIR_WORDS * 8)),
+    );
+    const pairWorkBudget = Math.floor((3 * bytes) / (PRESSURE_PAIR_WORDS * 8));
+    const pressurePairCapacity =
+      (params.cacheNeighbors ?? true) && capacity > 0
+        ? Math.min(capacity * pairsPerParticle, pairsInArena, pairWorkBudget)
+        : 0;
     const settings = [
       ...host.gravity,
       ...lower,
@@ -391,6 +412,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
       used: host.allocate('dfsph-occupied-buckets', Math.max(1, words + sampleCount) * 4, 'u32', DFSPH_LAYOUT),
       boundary: f64('dfsph-boundaries', sampleCount * BOUNDARY_WORDS),
       boundaryColor: f64('dfsph-boundary-interface', capillary ? sampleCount : 0),
+      pressurePairCapacity,
+      pressurePairs: f64('dfsph-pressure-pairs', pressurePairCapacity * PRESSURE_PAIR_WORDS),
       shapes: f64('dfsph-solids', surfaces.length * SOLID_WORDS),
       impulses: f64('dfsph-body-impulses', bodyCapacity * IMPULSE_WORDS),
       pressureImpulses: f64('dfsph-pressure-impulses', bodyCapacity * IMPULSE_WORDS),
@@ -474,6 +497,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
       state.stats.byteOffset,
       dt,
       state.boundaryColor.byteOffset,
+      state.pressurePairs.byteOffset,
+      state.pressurePairCapacity,
     );
     if (error)
       throw new MargoError(
@@ -566,6 +591,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       divergenceIterations: s[3]!,
       pairEvaluations: s[4]!,
       neighborhoodSearches: s[10]!,
+      cachedPressurePairs: s[11]!,
       compression: s[5]!,
       maximumSpeed: s[6]!,
       divergence: s[7]!,

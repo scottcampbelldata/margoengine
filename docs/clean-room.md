@@ -328,7 +328,9 @@ energy difference. The SI example uses the IAPWS tabulated 0.07274 N/m for pure 
 
 The lab diagnostic follows J. C. Martin and W. J. Moyce (1952), *An Experimental Study of the Collapse of Liquid
 Columns on a Rigid Horizontal Plane*, section 3 and Table 2. The measured spread intervals exclude the unknown
-diaphragm release time. The early narrow-channel surge remains reproducible with `--capillary`.
+diaphragm release time. At 18 particles across the short initial cross-section, the accurate profile reaches the
+two stations in 0.709754 and 1.183967 normalized time units. Both fit the unchanged experimental ranges
+and time-quantization allowance. The 12-particle and interactive cases retain their earlier discrepancy.
 [Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf).
 
 Nils Thürey, Matthias Müller-Fischer, Simon Schirm and Markus Gross (2007), *Real-time Breaking Waves for

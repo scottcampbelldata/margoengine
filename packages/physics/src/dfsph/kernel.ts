@@ -11,6 +11,11 @@ export async function loadDfsphKernel(memory: WebAssembly.Memory, signal?: Abort
 
 export function bindDfsphKernel(host: SolverHost, module: WebAssembly.Module, memory: WebAssembly.Memory) {
   return bindLiquidKernel(host, module, memory, 'dfsph') as (
-    ...args: [...Parameters<PbfKernel['solve_pbf']>, boundaryColor: number]
+    ...args: [
+      ...Parameters<PbfKernel['solve_pbf']>,
+      boundaryColor: number,
+      pressurePairs: number,
+      pressurePairCapacity: number,
+    ]
   ) => number;
 }

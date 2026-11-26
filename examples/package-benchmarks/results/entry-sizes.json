@@ -14176,8 +14176,8 @@
         "gzip": 6103
       },
       "./dfsph": {
-        "raw": 19946,
-        "gzip": 7930
+        "raw": 20294,
+        "gzip": 8085
       },
       "./strands": {
         "raw": 12661,
@@ -18177,14 +18177,14 @@
       "brotli": 6237
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
-      "raw": 29616,
-      "gzip": 11643,
-      "brotli": 10093
+      "raw": 33255,
+      "gzip": 12667,
+      "brotli": 10780
     },
     "packages/physics/dist/dfsph-kernel-shared.wasm": {
-      "raw": 29616,
-      "gzip": 11643,
-      "brotli": 10091
+      "raw": 33255,
+      "gzip": 12667,
+      "brotli": 10766
     },
     "packages/physics/dist/strand-kernel.wasm": {
       "raw": 21184,

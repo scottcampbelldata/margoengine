@@ -56,6 +56,7 @@ export interface DfsphParams {
     readonly densityTolerance?: number;
     readonly divergenceTolerance?: number;
     readonly warmStart?: boolean;
+    readonly cacheNeighbors?: boolean;
     readonly viscosity?: number;
     readonly viscosityIterations?: number;
     readonly friction?: number;
@@ -115,6 +116,7 @@ export interface DfsphStatistics {
     readonly viscosityIterations: number;
     readonly pairEvaluations: number;
     readonly neighborhoodSearches: number;
+    readonly cachedPressurePairs: number;
     readonly compression: number;
     readonly divergence: number;
     readonly maximumSpeed: number;

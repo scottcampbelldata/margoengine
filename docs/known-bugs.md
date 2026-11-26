@@ -16928,13 +16928,18 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 
 ### Divergence-free narrow-channel surge and boundary exchange (FLUID-01, PA-22)
 
-After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`. The interactive and accurate
+After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`.
+This coarse setup uses 12 rows across the water column. The interactive and accurate
 tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.399 and 0.508 against the
 original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
 measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
 Both pressure and physical wall viscosity are included. The original release diaphragm still needs an
 explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
 The SEA-04 and HYDRO-01 production endpoints remain open.
+
+At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
+using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement
+spans and their allowances.
 
 The deep-fill standing wave meets the analytic one-frame tolerance. Set the fixture's `ny` to 5 for a
 shallower fill that reproduces a period near 1.448 s versus the 1.326 s linear reference. This smaller

@@ -9753,7 +9753,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 7,930 B gzip. Each lazy native asset measures 29,616 B raw and 11,643 B gzip.
+The DFSPH entry measures 8,085 B gzip. Each lazy native asset measures 33,255 B raw and 12,667 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -9764,6 +9764,10 @@ native loops. The grid reuses 27 connected-list head indices per fluid row betwe
 This takes 112 extra bytes per reserved particle row, including alignment. A rebuild refreshes those
 indices before new density or divergence calculations. Capillary interactions centred on solid samples
 take their own neighborhood query from the same grid.
+A second scratch allocation can hold each complete pressure neighborhood's exact 40-byte pair records.
+The default reservation uses the kernel's spherical support and the reserved particle count, limited by
+three times the base solver region estimate and the wasm32 arena. If a row cannot fit, the same kernel and
+order are evaluated from the indexed cell heads. Disable scratch reuse with `cacheNeighbors: false`.
 
 Closed planar walls sample the outside volume of the cubic pressure kernel on a rest lattice. The sample
 spacing fits each axis of the domain and every exterior site belongs to the union of closed faces.

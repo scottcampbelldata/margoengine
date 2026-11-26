@@ -4635,6 +4635,8 @@ contacts alone, or per-face `walls` settings for open edges. The optional `surfa
 separate liquid–air surface energy in N/m. Use `solidLiquidTension` and `solidVaporTension` in the same units
 to select wetting. A larger solid–air value favours wetting and a larger solid–liquid value repels.
 The implicit viscosity applies at closed planar walls as well as sampled solid shapes.
+By default pressure and viscosity reuse the exact sampled gradient records during a geometry step. Set
+`cacheNeighbors: false` if arena memory is tight. The fallback evaluates the same kernel and pair order.
 
 A fixed or rigid-body box, sphere or capsule uses sampled pressure at its moving surface. For live rigid
 exchange, load with `rigid: true`, set the boundary's `body` row and use

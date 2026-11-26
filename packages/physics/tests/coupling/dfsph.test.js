@@ -10,6 +10,7 @@ import {
 import { Physics } from '../../dist/index.js';
 import { ModalSoundSolver } from '../../dist/modal-sound.js';
 import { BODY_IMPULSES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { measureSurge } from '../dfsph-lab.mjs';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const ZERO = [0, 0, 0];
@@ -758,4 +759,43 @@ test('the accurate liquid reproduces the fundamental gravity-wave period in a cl
   }
   assert.ok(Math.abs(period - expectedPeriod) <= 1 / rate, `wave period ${period} versus ${expectedPeriod} s`);
   near(liquid.mass, 1000 * length * depth * width);
+});
+
+test('partial and disabled pressure caches preserve pair forces exactly', async () => {
+  const count = 40;
+  const particles = Array.from({ length: count }, (_, i) => {
+    const angle = (2 * Math.PI * i) / count;
+    return {
+      position: [0.38 * Math.cos(angle), 0, 0.38 * Math.sin(angle)],
+      velocity: [0.03 * Math.cos(angle), 0, 0.03 * Math.sin(angle)],
+    };
+  });
+  const identical = [];
+  for (const cacheNeighbors of [false, true]) {
+    const { world, liquid } = await solve({
+      particles,
+      spacing: 0.5,
+      support: 1,
+      viscosity: 0.01,
+      cacheNeighbors,
+      densityIterations: 1,
+      bounds: wide,
+    });
+    assert.equal(liquid.statistics.pairEvaluations, count * (count - 1));
+    if (cacheNeighbors) {
+      assert.ok(liquid.statistics.cachedPressurePairs > 0);
+      assert.ok(liquid.statistics.cachedPressurePairs < liquid.statistics.pairEvaluations);
+    } else {
+      assert.equal(liquid.statistics.cachedPressurePairs, 0);
+    }
+    world.advance(1);
+    identical.push(particles.map((_, row) => liquid.sample(row)));
+  }
+  assert.deepEqual(identical[0], identical[1]);
+});
+
+test('refined accurate DFSPH matches both measured Martin–Moyce surge intervals', { timeout: 90000 }, async () => {
+  const trials = await measureSurge({ profile: 'accurate', resolution: 18, capillarity: true });
+  for (const { elapsed, minimum, maximum, error, matches } of trials)
+    assert.ok(matches, `surge interval ${elapsed} outside ${minimum}–${maximum} ± ${error}`);
 });
