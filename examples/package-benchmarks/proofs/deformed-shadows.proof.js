@@ -8,7 +8,7 @@
 // Skinned and morphed gltf/pbr casters needed no change (Shadows reads `primitive.deformed`); gltf-pbr-lighting-hooks.proof.js
 // still records gltf/pbr + shadows identical, and gltf/pbr now takes lightPBR from packages/shared.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref] [pin] [--current]
-// --current advanced to e2177dc6e5 (67e90fef9d before core's vertex stage kept a finite normal at a zero determinant, KB-GLTFA B1; 1bfb44bdd before Shadows' soft filter read its tap counts and focus from the frame uniform).
+// --current advanced to 4ac01b34e9 (Shadows' soft filter turns its noise a golden-ratio step each frame, KB-LOOK-TV-PENUMBRA1; e2177dc6e5 before it; 67e90fef9d before core's vertex stage kept a finite normal at a zero determinant, KB-GLTFA B1; 1bfb44bdd before Shadows' soft filter read its tap counts and focus from the frame uniform).
 // Pinned: 38d448e against 282e751, the commit that made this claim. --current: 1bfb44bdd against the working tree (7588d9dd25 before the VAT entry's position was @invariant; 1fdb559080 before shadow casters' positions were @invariant; 667d1a26 and 2cd81c1
 // before the PCSS search spanned to the nearest caster, claims.md); 56ee987 changed VAT to PBR Neutral; a126213/43aa191 changed shadow sampling and its pixel-scale uniform (claims.md).
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
 
-const { ref, pin } = refs('38d448e', '282e751', 'e2177dc6e5'); // 38d448e: the commit before 5l.j
+const { ref, pin } = refs('38d448e', '282e751', '4ac01b34e9'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),
