@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20667551,
+  "total": 20668949,
   "history": [
     {
       "date": "2026-10-24",
@@ -13945,6 +13945,12 @@
       "commit": "f8c292a91d",
       "reason": "New optional entry @margoengine/animation/deformed-points: 0 to 4286 B gzip, ceiling 4542 B. One instanced quad strip per vertex of a skinned or morphed mesh, drawn from the deformation pass's own output buffer; it adds no skinning code. The animation root stays inside its ceiling. Core plus stage unchanged at 24846 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "408e506ac4",
+      "reason": "BREAK-03 reciprocal sphere contact advances the optional crush entry from 16020 to 17377 B gzip. The ceiling rises from 16501 to 17899 B. The shell bridge matches both impulse and its first time moment using the existing body force and impulse ports. A separate entry would duplicate the shell and rigid setup for the same sheet. The collision and contact-force loops stay in the lazy Wasm module.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14771,7 +14777,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 16501,
+    "@margoengine/physics/crush": 17899,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,

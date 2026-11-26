@@ -134,6 +134,12 @@ export interface CrushShellBudget {
     readonly appliedWork: number;
 }
 
+export interface CrushShellContact {
+    readonly impulse: CrushVector;
+    readonly compression: number;
+    readonly energy: number;
+}
+
 export interface CrushShellFace {
     readonly stress: CrushVector;
     readonly equivalentPlasticStrain: number;
@@ -156,6 +162,8 @@ export interface CrushShellParams {
     readonly pinned?: readonly number[];
     readonly velocities?: readonly CrushVector[];
     readonly resolution?: number;
+    readonly spheres?: readonly CrushShellSphere[];
+    readonly cellSize?: number;
 }
 
 export class CrushShellSolver implements Solver<CrushShellParams> {
@@ -165,6 +173,11 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     static load(options?: {
         readonly id?: string;
         readonly signal?: AbortSignal;
+    }): Promise<CrushShellSolver>;
+    static loadRigid(options?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+        readonly rate?: RateLevel;
     }): Promise<CrushShellSolver>;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushShellParams): void;
@@ -180,8 +193,15 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         triangles: Uint32Array;
     };
     supportReaction(vertex: number): CrushVector;
+    readSphereContact(index: number): CrushShellContact;
     readFace(face: number): CrushShellFace;
     readBudget(): CrushShellBudget;
+}
+
+export interface CrushShellSphere {
+    readonly body: number;
+    readonly radius: number;
+    readonly contactModulus: number;
 }
 
 export class CrushSolver implements Solver<CrushParams> {
