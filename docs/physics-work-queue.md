@@ -348,7 +348,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | DYN-08 | Large-scale GPU rigid dynamics | none | Open | OPEN |
-| SOFT-04 | Volumetric solids (FEM) | native FEM and Projective Dynamics with validated elastic materials, reciprocal contact, cutting and fracture | Codex | BUILDING (codex/physics-volumetric-solids-reopen) |
+| SOFT-04 | Volumetric solids (FEM) | native FEM, Projective Dynamics and finite-chain rubber with reciprocal contact, cutting and fracture | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a0de32ed1b |
 | SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a82ff99eb9 |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
