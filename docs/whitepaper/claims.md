@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Wing stall drag (AERO-03, 2026-11-26). A 25° fixed wing matches the analytic plate drag, and a flapping wing's
+  separated force and torque are independent of the attached profile coefficient. A mixed-flow fixture checks the
+  attached share of area and zero attached circulation on separated panels. The original light flapping-wing case
+  retains its stability bounds. Run `node --test packages/physics/tests/flight.test.js`.
+
 - Layered tissue (SOFT-05, 2026-11-26). One tetrahedral specimen shares particle degrees of freedom across
   three authored materials. Its axial displacement matches the sum of the cells' stiffnesses and masses, and a
   cut carries each parent's material and exact volume-weighted fragment mass within floating-point error.

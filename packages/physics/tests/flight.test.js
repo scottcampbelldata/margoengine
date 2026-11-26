@@ -80,6 +80,32 @@ test('past the stall angle a fixed wing loses lift as a flat plate does; a flapp
   assert.ok(Math.abs(cl0) < 0.05 && Math.abs(cd90 - 2.04) < 0.01);
 });
 
+test('profile drag is absent from fully separated plate and flapping panels', () => {
+  const alpha = (25 * Math.PI) / 180;
+  const plate = 1.17 * Math.sin(alpha) ** 2;
+  for (const profileDrag of [0.008, 0.1]) {
+    const fixed = wingLoad(alpha, { profileDrag, separation: 'plate' });
+    assert.ok(Math.abs(fixed.cd - plate) < 128 * Number.EPSILON, `${fixed.cd} instead of plate drag ${plate}`);
+    const plain = wingLoad(alpha, { separation: 'flapping' });
+    const skinned = wingLoad(alpha, { profileDrag, separation: 'flapping' });
+    assert.deepEqual(skinned.wing.force, plain.wing.force);
+    assert.deepEqual(skinned.wing.torque, plain.wing.torque);
+  }
+});
+
+test('profile drag covers only the attached area of a wing in spatially varying flow', () => {
+  const alpha = (25 * Math.PI) / 180;
+  // The inner half of this rectangular wing sees edge-on flow. The outer half is past stall.
+  const wind = ([x]) => (Math.abs(x) < 1.5 ? [0, 0, -U] : [0, U * Math.sin(alpha), -U * Math.cos(alpha)]);
+  const profileDrag = 0.1;
+  const plain = wingLoad(0, { wind });
+  const skinned = wingLoad(0, { wind, profileDrag });
+  const addedDrag = skinned.cd - plain.cd;
+  assert.ok(Math.abs(addedDrag - profileDrag / 2) < 128 * Number.EPSILON, `added drag coefficient ${addedDrag}`);
+  assert.equal(skinned.cl, plain.cl);
+  assert.ok(skinned.wing.circulation.every((circulation) => circulation === 0));
+});
+
 test('angleOf is the arctangent to the last bit or two, from arithmetic alone', () => {
   for (const [y, x] of [
     [0, 1],

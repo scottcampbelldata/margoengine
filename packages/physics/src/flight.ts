@@ -89,7 +89,7 @@ export interface WingOptions {
    * leading-edge vortex holds its lift (Su et al.). Default 'flapping' with `flap`, 'plate' without.
    */
   separation?: 'plate' | 'flapping';
-  /** Profile drag coefficient of the wing's surface, along the air past each panel (default 0.008: both sides' skin friction). */
+  /** Profile drag coefficient of attached panels, along the relative wind. Default 0.008 for both sides' skin friction. */
   profileDrag?: number;
 }
 
@@ -344,13 +344,7 @@ export class WingForce implements PhysicsAttachment, AirLoad {
     const separation = this.options.separation ?? (this.options.flap ? 'flapping' : 'plate'),
       law = separation === 'flapping' ? separatedWing : PLATE,
       stall = this.options.stall ?? 0.26;
-    const profileDrag = this.options.profileDrag ?? PROFILE_DRAG,
-      areas: number[] = [];
-    for (let s = 0; s < ns; s++)
-      for (let c = 0; c < nc; c++) {
-        const d = crossOf(sub(corner(c + 1, s + 1), corner(c, s)), sub(corner(c, s + 1), corner(c + 1, s)));
-        areas.push(hypot(d[0], d[1], d[2]) / 2);
-      }
+    const profileDrag = this.options.profileDrag ?? PROFILE_DRAG;
     let circulation: Float64Array = new Float64Array(0);
     const wrench: Wrench = (dv, dw) => {
       const v = add(v0, dv),
@@ -367,13 +361,7 @@ export class WingForce implements PhysicsAttachment, AirLoad {
           const mean = scale(add(add(vel(c, s), vel(c + 1, s)), add(vel(c, s + 1), vel(c + 1, s + 1))), 0.25);
           relative.push(sub(air[c + nc * s]!, mean));
         }
-      const loads = latticeLoads({ nc, ns, corner, relative, density: rho }, stall, law);
-      // Profile drag along the air past each panel: 1/2 rho |v| v A C_d0.
-      for (let m = 0; m < loads.forces.length; m++) {
-        const r = relative[m]!,
-          speed = hypot(r[0], r[1], r[2]);
-        loads.forces[m] = add(loads.forces[m]!, scale(r, 0.5 * rho[m]! * speed * areas[m]! * profileDrag));
-      }
+      const loads = latticeLoads({ nc, ns, corner, relative, density: rho, profileDrag }, stall, law);
       if (dv[0] === 0 && dv[1] === 0 && dv[2] === 0 && dw[0] === 0 && dw[1] === 0 && dw[2] === 0)
         circulation = loads.circulation;
       let force: Vec3 = [0, 0, 0],

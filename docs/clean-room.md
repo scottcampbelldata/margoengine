@@ -13233,6 +13233,15 @@ descent, the arctangent from arithmetic (`angleOf`), the load held as a force th
 load (a finite-difference Jacobian of the force and torque in the body's velocity and spin, then the backward Euler step of
 the load and gravity) are this package's own arrangement. Proof: `packages/physics/tests/flight.test.js`.
 
+The separated-wing equations of Yunxing Su, Xiaozhou Fan, Kyohei Onoue, Hamid Vejdani and Kenneth Breuer (2026)
+give the complete quasi-steady drag coefficient. Profile drag was previously added again after the separated law.
+The stalled panel now takes its separated load and carries zero attached-flow horseshoe circulation. Attached panels
+retain the vortex-lattice force and profile drag over their own area. The distinction between attached circulation
+and empirical separated section loads follows Thomas Ozoroski's discussion of viscous corrections to the linear
+lattice (2015). The existing abrupt stall remains a reduced model. The analytic 25° plate and mixed-flow tests
+check the two force paths. The original light flapping-wing regression checks stable integration.
+[Su et al.](https://doi.org/10.1111/nyas.70142) [Ozoroski, NASA/CR–2015–218969](https://ntrs.nasa.gov/citations/20160000765)
+
 #### The air's loads in a world (`AirSolver` of `@margoengine/physics/flight`, `air-hold.ts`, 2026-11-25)
 
 No outside source: the framework's own `bodyForces` contract (docs/physics-framework.md, section 4) and the rigid solver's

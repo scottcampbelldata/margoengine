@@ -25,6 +25,8 @@ export interface LatticeSurface {
   readonly relative: readonly Vec3[];
   /** The air's density at each panel, kg/m^3. */
   readonly density: readonly number[];
+  /** Profile drag coefficient for panels in attached flow. Default 0. */
+  readonly profileDrag?: number;
 }
 
 /**
@@ -64,7 +66,7 @@ export function latticeLoads(
   separated: SeparatedLaw,
   slopes = false,
 ): LatticeLoads {
-  const { nc, ns, relative, density } = surface,
+  const { nc, ns, relative, density, profileDrag = 0 } = surface,
     n = nc * ns,
     at = (c: number, s: number) => surface.corner(c, s),
     boundA: Vec3[] = [],
@@ -111,24 +113,29 @@ export function latticeLoads(
     };
   // a_km Gamma_m = -V_k . n_k
   const matrix = new Float64Array(n * n),
-    rhs = new Float64Array(n);
+    rhs = new Float64Array(n),
+    sinStall = sin(stall),
+    speeds = relative.map((v) => hypot(v[0], v[1], v[2])),
+    stalled = relative.map((v, m) => speeds[m]! > 1e-9 && abs(dot(v, normal[m]!)) / speeds[m]! > sinStall);
   for (let k = 0; k < n; k++) {
-    for (let m = 0; m < n; m++) matrix[k * n + m] = dot(horseshoe(m, colloc[k]!), normal[k]!);
+    if (stalled[k]) {
+      // The separated law owns this panel's load. It contributes no attached horseshoe circulation.
+      matrix[k * n + k] = 1;
+      continue;
+    }
+    for (let m = 0; m < n; m++) if (!stalled[m]) matrix[k * n + m] = dot(horseshoe(m, colloc[k]!), normal[k]!);
     rhs[k] = -dot(relative[k]!, normal[k]!);
   }
   const gamma = solve(matrix, rhs, n),
-    sinStall = sin(stall),
     // A panel's circulation answers the air's speed through it by row m of the inverse at column m (rhs_m is minus it).
     answer = slopes ? inverseDiagonal(matrix, n) : null,
     slope = slopes ? new Float64Array(n) : null;
   for (let m = 0; m < n; m++) {
     const v = relative[m]!,
-      speed = hypot(v[0], v[1], v[2]);
+      speed = speeds[m]!;
     if (!(speed > 1e-9)) continue;
-    const nm = normal[m]!,
-      vn = dot(v, nm),
-      sinA = (vn < 0 ? -vn : vn) / speed;
-    if (sinA > sinStall) {
+    const nm = normal[m]!;
+    if (stalled[m]) {
       forces[m] = separated(v, nm, area[m]!, density[m]!);
       if (slope) {
         // Whatever the law: its load along the normal a hair either side of this speed through the panel.
@@ -141,9 +148,12 @@ export function latticeLoads(
     }
     // Attached: Kutta-Joukowski on the bound segment, with the air there and every vortex's induced velocity.
     let induced: Vec3 = [0, 0, 0];
-    for (let j = 0; j < n; j++) induced = add(induced, scale(horseshoe(j, points[m]!), gamma[j]!));
+    for (let j = 0; j < n; j++) if (!stalled[j]) induced = add(induced, scale(horseshoe(j, points[m]!), gamma[j]!));
     const lift = crossOf(add(v, induced), sub(boundB[m]!, boundA[m]!));
     forces[m] = scale(lift, density[m]! * gamma[m]!);
+    if (profileDrag > 0) {
+      forces[m] = add(forces[m]!, scale(v, 0.5 * density[m]! * speed * area[m]! * profileDrag));
+    }
     if (slope && answer) slope[m] = density[m]! * abs(dot(lift, nm)) * abs(answer[m]!);
   }
   return { forces, points, circulation: gamma, ...(slope ? { slopes: slope } : {}) };
