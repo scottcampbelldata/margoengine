@@ -14150,6 +14150,10 @@
       "./lightning": {
         "raw": 14160,
         "gzip": 5861
+      },
+      "./lava": {
+        "raw": 14845,
+        "gzip": 6304
       }
     },
     "@margoengine/physics2d": {
@@ -18085,6 +18089,16 @@
       "raw": 2357,
       "gzip": 1155,
       "brotli": 1048
+    },
+    "packages/physics/dist/lava-kernel.wasm": {
+      "raw": 9735,
+      "gzip": 4127,
+      "brotli": 3822
+    },
+    "packages/physics/dist/lava-kernel-shared.wasm": {
+      "raw": 9735,
+      "gzip": 4127,
+      "brotli": 3804
     }
   },
   "splits": {

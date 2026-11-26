@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20302814,
+  "total": 20309374,
   "history": [
     {
       "date": "2026-10-24",
@@ -13023,6 +13023,12 @@
       "commit": "51ccc096bc",
       "grew": 1,
       "reason": "ATMO-07 adds the optional physics/lightning entry from zero to 5861 B gzip with a lazy SIMD potential solver and timed segments. Sky lightning-bolt moves from 5335 to 5403 B with a supplied channel shared by the renderer and its lights. An additional Sky entry would duplicate the existing bolt pipeline."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "eaedb9d6f6",
+      "reason": "EARTH-10 adds physics/lava at 6304 B gzip (cap 6560 B). Depth-averaged lava, enthalpy transport, shoreline discharge and ice coupling are optional and load stateless native assets. Core plus stage is 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13858,6 +13864,7 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/iceberg": 5418,
     "@margoengine/physics/landscape": 4603,
+    "@margoengine/physics/lava": 6560,
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/lightning": 6117,
