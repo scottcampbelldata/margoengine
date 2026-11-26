@@ -9238,6 +9238,9 @@ and thickness. It represents accretion and scouring. Fracturing a three-dimensio
 model. The slab field reports a static interface safety factor, with no assessment of fracture propagation.
 Weather's blocked footprints and drag act on the dense avalanche layer. The powder cloud is transported separately.
 
+The optional snowpack entry is 5,737 B min+gzip. Its plain and shared Wasm variants are each 6,455 B raw. The
+Weather avalanche entry is 7,195 B min+gzip with its obstacle terms.
+
 ### Dune and snow transport (EARTH-07)
 
 The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.
