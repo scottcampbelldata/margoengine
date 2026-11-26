@@ -453,7 +453,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
 | DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial: water as a medium landed 1b7d95a48, curtains in a moving hull 3d1e785d7 | Claude | CLAIMED |
-| SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
+| SOFT-02 | Rods, ropes, cables, chains (Cosserat) | elastic rods (`@margoengine/physics/rod`: bend, twist and stretch in a multibody's direct solve, pins, cast-off) with water loads per segment (`segmentLoads` in `@margoengine/physics/loads`: buoyancy, Morison drag and inertia, vortex lift); validated against a cantilever in a current, a catenary, a taut cable's frequency and strumming lock-in (`packages/physics/tests/rod.test.js`, `loads-segments.test.js`) | Claude | LANDED d53e71328 |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
