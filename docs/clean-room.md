@@ -39,6 +39,25 @@ solve. Both routes use the same rest-volume and stiffness-damping scaling as the
 [Wood Handbook](https://research.fs.usda.gov/treesearch/62244),
 [Hernandez et al.](https://filedn.eu/l8vDXhPLwQPyaW6XewVeXCk/publications/anisotropic_strain_limiting/paper.pdf).
 
+Eftychios Sifakis and Jernej Barbič, “FEM Simulation of 3D Deformable Solids: Theory and
+Discretization” (2012), uses Green strain `(FᵀF−I)/2` to remove dependence on rigid rotation.
+The full orthotropic material evaluates that strain in the authored axes. Its three engineering
+shears are twice the corresponding off-diagonal strains. The normal compliance has diagonal
+`1/Eᵢ` and symmetric off-diagonal `−νᵢⱼ/Eᵢ`; its inverse gives the normal stress coefficients.
+The shear stresses use the three independently supplied shear moduli. Tables 5–1 and 5–2 in
+C. Adam Senalik and Benjamin Farber, “Mechanical Properties of Wood” (2021), supply the
+Douglas-fir ratios for an independent numerical specimen.
+[Sifakis and Barbič](https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf)
+[Senalik and Farber](https://research.fs.usda.gov/treesearch/62244).
+
+Green strain also vanishes under a reflection. Geoffrey Irving, Joseph Teran and Ronald Fedkiw,
+“Invertible Finite Elements for Robust Simulation of Large Deformation” (2004), describes this
+inversion problem. The implementation here adds `c max(0,1−det F)⁴/4`, where `c` is the mean
+normal stiffness. Each vertex block uses a positive curvature approximation and accepts a position
+only if the total incremental potential evaluated at that stored position preserves or lowers the
+prior value. Both the compression term and its tangent vanish at the rest volume.
+[Irving et al.](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
