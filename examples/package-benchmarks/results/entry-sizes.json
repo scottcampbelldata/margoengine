@@ -446,6 +446,10 @@
       "./forest": {
         "raw": 16512,
         "gzip": 7194
+      },
+      "./growth": {
+        "raw": 12386,
+        "gzip": 5474
       }
     },
     "@margoengine/blender": {
@@ -17971,6 +17975,16 @@
       "raw": 610,
       "gzip": 439,
       "brotli": 410
+    },
+    "packages/biomes/dist/growth-kernel.wasm": {
+      "raw": 601,
+      "gzip": 449,
+      "brotli": 408
+    },
+    "packages/biomes/dist/growth-kernel-shared.wasm": {
+      "raw": 601,
+      "gzip": 449,
+      "brotli": 415
     }
   },
   "splits": {

@@ -435,6 +435,10 @@
       "types": "./dist/biomes/erosion-wasm.d.ts",
       "import": "./dist/biomes/erosion-wasm.js"
     },
+    "./biomes/growth": {
+      "types": "./dist/biomes/growth.d.ts",
+      "import": "./dist/biomes/growth.js"
+    },
     "./biomes/forest": {
       "types": "./dist/biomes/forest.d.ts",
       "import": "./dist/biomes/forest.js"
