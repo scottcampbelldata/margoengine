@@ -41,12 +41,11 @@ import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './ha
 
 await Physics.load();
 
-/** A box hull of `size` (x, y, z), each face a 4 by 4 grid, wound outward. */
-function boxMesh([sx, sy, sz], [ox, oy, oz] = [0, 0, 0]) {
+/** A box hull of `size` (x, y, z), each face a grid of n by n cells, wound outward. */
+function boxMesh([sx, sy, sz], [ox, oy, oz] = [0, 0, 0], n = 4) {
   const h = [sx / 2, sy / 2, sz / 2],
     vertices = [],
-    indices = [],
-    n = 4;
+    indices = [];
   for (const [axis, sign] of [
     [0, 1],
     [0, -1],
@@ -1420,6 +1419,114 @@ test('HullSolver wake source: translation lifts the leading waterline and conser
     if (dV === 0) assert.ok(wake.heights().every((h) => h === 0));
     else assert.ok(wake.sample(-L / 2, 0).height > 0 && wake.sample(L / 2, 0).height < 0);
   }
+});
+
+test('HullSolver wake pressure returns its own wave-making resistance to the moving hull', async (proof) => {
+  await Physics.load({ threads: true });
+  const density = 1024;
+  const mass = density * L * B * T;
+  const cellSize = 0.25;
+  const frames = 60;
+  const mesh = boxMesh([L, D, B], undefined, 16);
+  const forceTolerance = 4096 * Number.EPSILON * density * GRAVITY * B * D * D;
+  const impulseTolerance = mass * frames * 2 ** -24;
+  const run = (feedback, shared) => {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+    using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, D / 2 - T, 0],
+      linearVelocity: [1, 0, 0],
+      enabledTranslations: [true, false, false],
+      enabledRotations: [false, false, false],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass },
+    });
+    const hull = new HullSolver('hull', { minimumRadius: 0.35, advance: true });
+    const wake = new WakeSolver('wake', hull.wakeSourceField);
+    const sea = new SpectralSea({
+      waves: {
+        frequencies: Float64Array.of(0.5),
+        directions: Float64Array.of(0),
+        energy: Float64Array.of(0),
+        depth: 3,
+        density,
+      },
+      patches: feedback ? [wake] : [],
+    });
+    world
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh }],
+        sea,
+        radiation: false,
+        addedMass: false,
+        rollDamping: false,
+        drag: false,
+        diffraction: false,
+        drift: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .add(wake, { cells: [64, 48], cellSize, depth: 3, sponge: 4, density })
+      .couple(['hull', 'wake', 'rigid'], 'staggered');
+    world.advance(1);
+    const breaks = [-B / 2];
+    for (let z = wake.grid.origin[1] + 0.5 * cellSize; z < B / 2; z += cellSize) {
+      if (z > -B / 2) breaks.push(z);
+    }
+    breaks.push(B / 2);
+    const pressureIntegral = (x) => {
+      let integral = 0;
+      let left = T + wake.sample(x, breaks[0]).height;
+      for (let i = 1; i < breaks.length; i++) {
+        const right = T + wake.sample(x, breaks[i]).height;
+        assert.ok(Math.min(left, right) > 0 && Math.max(left, right) < D);
+        // At a fixed x the sampled depth is affine between these cell centres.
+        integral += ((breaks[i] - breaks[i - 1]) * (left * left + left * right + right * right)) / 3;
+        left = right;
+      }
+      return 0.5 * density * GRAVITY * integral;
+    };
+    let impulse = 0;
+    let pressureWork = 0;
+    let maxResidual = 0;
+    let snapshot;
+    for (let frame = 2; frame <= frames; frame++) {
+      const [x] = body.position;
+      const before = body.linearVelocity[0];
+      const predicted = feedback ? pressureIntegral(x - L / 2) - pressureIntegral(x + L / 2) : 0;
+      world.advance(frame);
+      const { region } = hull.exportPorts(world.tick)[0];
+      const force = new Float64Array(
+        world.memory.buffer,
+        region.byteOffset + body.row * FORCE_WORDS * 8,
+        FORCE_WORDS,
+      )[0];
+      maxResidual = Math.max(maxResidual, Math.abs(force - predicted));
+      impulse += force / 60;
+      pressureWork += (force * (before + body.linearVelocity[0])) / 120;
+      if (frame === 15) snapshot = world.takeSnapshot();
+    }
+    const speed = body.linearVelocity[0];
+    const gauge = wake.sample(3.5, 0).height;
+    assert.ok(maxResidual <= forceTolerance, JSON.stringify({ maxResidual, forceTolerance }));
+    assert.ok(Math.abs(mass * (speed - 1) - impulse) <= impulseTolerance);
+    assert.ok(Math.abs(0.5 * mass * (speed * speed - 1) - pressureWork) <= impulseTolerance);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(frames);
+    assert.equal(world.hash(), hash);
+    return { hash, speed, gauge, maxResidual, impulse, pressureWork };
+  };
+  const control = run(false, false);
+  const returning = run(true, false);
+  assert.deepEqual(run(true, true), returning);
+  assert.equal(control.speed, 1);
+  assert.ok(control.gauge > 0 && returning.gauge > 0, 'both setups generate a travelling wake');
+  assert.ok(
+    returning.speed < control.speed && returning.pressureWork < 0,
+    'only the coupled wake takes energy from surge',
+  );
+  proof.diagnostic(JSON.stringify(returning));
 });
 
 /** A box hull of `size` alone in still water of `density`, its body of `massProperties`, let go at `position` and `rotation`. */

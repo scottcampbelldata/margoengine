@@ -10397,6 +10397,8 @@ The optional `HullWake.advance` flag starts off. It adds one source row per stat
 
 The advancing-hull seakeeping entry is 31,849 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
 
+Using the same wake as a `SpectralSea` patch returns pressure to the advancing hull. The prism test accounts for its rigid impulse and work from the two face pressures. This pressure law treats the wake height as a near-surface head, and the full dispersive grid energy ledger remains open. [Coupling and bounds](./clean-room.md#sea-08-pa-13-wake-pressure-returned-to-the-moving-hull)
+
 The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0 mm near the bow, versus 63.8 and 77.9 mm measured at the two fixed-sinkage towing speeds. The crest arrives farther aft in the numerical case. [Measured conditions and reproduction](./clean-room.md#sea-08-independently-measured-wigley-waterline)
 
 ### Seakeeping short-wave resistance

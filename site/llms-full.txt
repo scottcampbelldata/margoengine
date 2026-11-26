@@ -14269,13 +14269,19 @@ spheres, a matching shell and rigid tick rate, and at least two rigid substeps f
 body. Each sphere uses the closest live triangle in the current substep. The contact is
 frictionless, with an authored Hertz interface modulus and a compliant skin.
 This covers local sheet contact. Multi-point manifolds per sphere, sheet self-contact,
-swept time of impact, layered plastic bending, breakup and opening geometry remain open.
+swept time of impact and layered plastic bending remain open.
 Analytic tests cover world motion, reactions, elastic bending, plastic history and contact
 momentum. The measured rupture check above uses the separate circular station.
-The optional shell loader fetches the 8,446 B plain Wasm asset (4,305 B gzip). On hosts with
+The distributed seam model opens authored coincident boundaries after both quadrature
+points release. It uses the same separation law for tensile and tangential relative motion.
+An already released seam preserves its fracture work even if its physical opening closes.
+The aperture area is the two-triangle surface between the current edge pairs.
+Unilateral lip contact, automatic crack paths, mode-dependent cohesive properties,
+independent measured shell fracture, and SEA-10 flow through the live shell opening remain open.
+The optional shell loader fetches the 10,030 B plain Wasm asset (4,951 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 46480 B minified and 17377 B gzip under its 17899 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 48684 B minified and 18174 B gzip under its 18720 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14335,6 +14341,10 @@ For fully developed glycerol flow on a 20° glass plate, the modeled depths at t
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
+An independent glycerine release video also supports the cube-root law for the incline front
+before fingering. It supplies a normalized front increment. The absolute movie lengths,
+recording-to-laboratory clock relationship and finger growth remain outside the validation.
+[Reproduce](whitepaper/reproduce.md#fluid-07-incline-front-history)
 
 `surfaceGeometry()` draws the cell-centred height field as a triangulated free surface in
 the backing's local frame. This geometry has the spatial resolution of the film grid.
@@ -15021,6 +15031,8 @@ The current-relative seakeeping entry is 31,633 B gzip with a 32,500 B ceiling. 
 The optional `HullWake.advance` flag starts off. It adds one source row per station face plus the two end faces, for `stations + 1` additional rows per hull. It uses the signed rigid-body speed along the horizontal hull axis relative to the mean surface flow and the untrimmed section areas at the hull’s still-water draft. Only freely moving, surface-piercing hulls emit this source. The depth-integrated approximation sends its volume to the same linear dispersive grid as heave, pitch and roll. Grid propagation keeps the wakes in the grid’s frame, and accuracy near broad bows, breaking waves and strong spatial currents remains unqualified. A vessel’s advance pressure wake and displacement wake are alternative inputs for the same effect.
 
 The advancing-hull seakeeping entry is 31,849 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
+
+Using the same wake as a `SpectralSea` patch returns pressure to the advancing hull. The prism test accounts for its rigid impulse and work from the two face pressures. This pressure law treats the wake height as a near-surface head, and the full dispersive grid energy ledger remains open. [Coupling and bounds](./clean-room.md#sea-08-pa-13-wake-pressure-returned-to-the-moving-hull)
 
 The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0 mm near the bow, versus 63.8 and 77.9 mm measured at the two fixed-sinkage towing speeds. The crest arrives farther aft in the numerical case. [Measured conditions and reproduction](./clean-room.md#sea-08-independently-measured-wigley-waterline)
 

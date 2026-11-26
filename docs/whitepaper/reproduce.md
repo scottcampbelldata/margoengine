@@ -4791,6 +4791,8 @@ Build Physics and run `node --test --test-name-pattern "through the mean current
 
 Build Physics and run `node --test --test-name-pattern "wake source" packages/physics/tests/coupling/seakeeping.test.js`. The analytic prism gives the signed source volume from the submerged section area and the distance swept during one tick, with zero net grid volume. Both memory modes restore and replay exactly. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-advance` on WebGPU and with `MARGO_COMPAT=1` for the moving waterline renderer.
 
+Run `node --test --test-name-pattern "wake pressure returns" packages/physics/tests/coupling/seakeeping.test.js` for the returning pressure. The analytical oracle uses the discrete surface height on the two end faces and compares every held force, as well as the body's impulse, work and restored state. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-pressure` on WebGPU and with `MARGO_COMPAT=1` for the drawn wake coupled back to the moving hull. [Coupling and fixtures](../clean-room.md#sea-08-pa-13-wake-pressure-returned-to-the-moving-hull)
+
 For the independent Wigley tank comparison, run `node packages/physics/tests/coupling/measure-wigley-waterline.mjs 0.025` after building Physics. Pass `0.05` for the coarser grid. It reports the observed and predicted nondimensional elevations by station for both towing speeds with fixed trim and sinkage. The near-bow amplitude and phase residual remain open. [Primary data and numerical settings](../clean-room.md#sea-08-independently-measured-wigley-waterline)
 
 ### SEA-08 axial resistance in short waves

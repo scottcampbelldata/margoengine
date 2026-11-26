@@ -20,6 +20,7 @@ import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const modes = [
+  ['--hull-pressure', 'feedback'],
   ['--hull-advance', 'advance'],
   ['--bilge-keels', 'bilge'],
   ['--surge-panels', 'surge'],
@@ -41,7 +42,8 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
-    const advance = motion === 'advance';
+    const feedback = motion === 'feedback';
+    const advance = motion === 'advance' || feedback;
     const surge = motion === 'surge';
     const tide = motion === 'tide';
     const reflection = motion === 'reflection';
@@ -80,6 +82,7 @@ try {
     const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] });
     let wake;
     let hash;
+    let hullSpeed;
     if (hullMotion) {
       const { HullSolver } = await import('/packages/physics/dist/seakeeping.js');
       const { Physics } = await import('/packages/physics/dist/index.js');
@@ -100,14 +103,18 @@ try {
             },
           }
         : undefined;
-      const loadSea = incident
-        ? new SpectralSea({ waves: spectrum, seed: 5, patches: [wake], current })
-        : { elevation: () => 0 };
+      const loadSea = feedback
+        ? new SpectralSea({ waves: { ...spectrum, energy: new Float64Array(nf * nd), depth: 3 }, patches: [wake] })
+        : incident
+          ? new SpectralSea({ waves: spectrum, seed: 5, patches: [wake], current })
+          : { elevation: () => 0 };
       const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
       const body = physics.addBody(null, {
         position: [0, 0.25, 0],
         linearVelocity: [advance ? 1.5 : forwardCourse ? 1 : 0, advance ? 0 : -0.5, 0],
         angularVelocity: advance ? [0, 0, 0] : [0.1, 0, 0.125],
+        enabledTranslations: feedback ? [true, false, false] : undefined,
+        enabledRotations: feedback ? [false, false, false] : undefined,
         colliders: { shape: 'box', halfExtents: [2, 0.75, 1], mass: 4100 },
       });
       const mesh = {
@@ -139,6 +146,7 @@ try {
           sea: loadSea,
           drift: false,
           drag: !advance,
+          diffraction: !advance,
           radiation: !advance,
           rollDamping: !advance,
           greenWater: false,
@@ -154,6 +162,7 @@ try {
       world.advance(45);
       if (world.hash() !== hash)
         throw new Error('Hull-and-wake replay drift. Inspect the source state and the wake FFT.');
+      hullSpeed = body.linearVelocity[0];
       physics[Symbol.dispose]();
     } else {
       // A hull-sized pressure patch crosses a 64 m wake grid at 3 m/s, leaving its crests behind it.
@@ -169,7 +178,11 @@ try {
     const sea = new SpectralSea({ waves: spectrum, seed: 5, patches: [wake] }),
       // 40 m on 256 segments inside the wake grid's 64 m: the farthest vertex and the cells either side of it stay
       // more than a cell and a half from the grid's edge.
-      water = Water.attach(engine, { size: hullMotion ? [16, 16] : [40, 40], segments: 256, sea }),
+      water = Water.attach(engine, {
+        size: feedback ? [12, 12] : hullMotion ? [16, 16] : [40, 40],
+        segments: 256,
+        sea,
+      }),
       drawn = WaterWake.attach(engine, { surface: water, wake }),
       samples = [];
     const heights = wake.heights(),
@@ -216,6 +229,7 @@ try {
     return {
       samples,
       hash,
+      hullSpeed,
       radiated: hullMotion ? wake.sample(3.5, 0).height : null,
       waves: sea.waveCount,
       H,
@@ -226,6 +240,8 @@ try {
     };
   }, motion);
   assert.equal(result.error, null);
+  if (motion === 'feedback')
+    assert.ok(result.hullSpeed < 1.5, 'the pressure of the drawn wake slows the advancing hull');
   if (motion !== 'pressure') {
     assert.ok(Math.abs(result.radiated) > 1e-4, 'the radiated wave reaches a distant gauge');
     console.log('Hull-and-wake replay', result.hash, 'distant gauge', result.radiated);
