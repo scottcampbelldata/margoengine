@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20539477,
+  "total": 20542695,
   "history": [
     {
       "date": "2026-10-24",
@@ -13542,6 +13542,12 @@
       "commit": "b6781020ba",
       "grew": 1,
       "reason": "Measured at the lane A landing: gltf/pbr 92204 to 92219 and gltf/worker 92722 to 92734 B gzip come from b6781020ba (shadow cascades fit an instanced caster) and d31534edc1 (selection picks instanced meshes), which landed without a size row. Their WGSL and fields sit in the instancing code these entries carry. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "db99fe1456",
+      "reason": "SOFT-05 creates the optional skeletal tissue entry at 2962 B gzip (3218 B ceiling). It owns fixed bone targets and the normal sliding impulse. Tissue/body identity checks move the shared soft entry from 145660 to 145708 B gzip within the unchanged budget. Splitting the small bindings further would add another request. The native soft kernel stays behind SoftBodies.attach.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14418,6 +14424,7 @@
     "@margoengine/physics/terramechanics": 15161,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
+    "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 6404,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,

@@ -192,6 +192,7 @@ export class SoftBodies implements PhysicsAttachment {
     iterations: number;
     wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null;
     private constructor();
+    ownsTissueBone(bone: PhysicsBody): boolean;
     static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
     debugRender(options?: {
         edges?: boolean;
@@ -339,6 +340,7 @@ export class SoftBody {
     selfFriction: number;
     selfThickness: number;
     get valid(): boolean;
+    belongsTo(soft: SoftBodies): boolean;
     private get c();
     numParticles(): number;
     particlePosition(index: number): Vec3;
