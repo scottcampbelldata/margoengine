@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'orbit-kernel',
+    crate: 'packages/physics/orbit-kernel',
+    blueprint: 'packages/physics/src/orbit/orbit-kernel.wasm',
+    script: 'packages/physics/scripts/build-orbit-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'orbit-kernel-shared',
+    crate: 'packages/physics/orbit-kernel',
+    blueprint: 'packages/physics/src/orbit/orbit-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-orbit-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'thermal-kernel',
     crate: 'packages/physics/thermal-kernel',
     blueprint: 'packages/physics/src/thermal/thermal-kernel.wasm',
