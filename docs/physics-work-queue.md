@@ -425,7 +425,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | DYN-07 | Dynamic character, balance, push response | partial | Codex | OPEN |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
-| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
+| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | BUILDING (codex/physics-flight-stall) |
 | ATMO-01 | Boundary-layer wind field | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
 | ATMO-03 | Moist convection and cloud dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8833dbf0c |
