@@ -257,7 +257,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | --- | --- | --- | --- | --- |
 | DYN-08 | Large-scale GPU rigid dynamics | none | Open | OPEN |
 | SOFT-04 | Volumetric solids (FEM) | partial | Open | OPEN |
-| SOFT-06 | Pressure bodies | none | Open | OPEN |
+| SOFT-06 | Pressure bodies | none | Codex | BUILDING (codex/physics-pressure-bodies) |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
 | LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | LANDED 6712e2b2a4 |
