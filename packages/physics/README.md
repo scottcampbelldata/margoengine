@@ -3176,6 +3176,42 @@ scrape power times speed, rolling proxy power in W and rolling power times speed
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
 
+## Layered snowpack
+
+`Snowpack` stores each column's snow mass, enthalpy and depth. Snow settles under its weight, conserves heat
+between layers, retains liquid in its pores and drains meltwater into the ground. Wind moves surface snow and
+builds a lee overhang at a steep edge. The same column publishes the weakest slope interface for an avalanche.
+
+```ts
+import { Snowpack } from '@margoengine/physics/snowpack';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const snowpack = await Snowpack.load();
+world.add(snowpack, {
+  width: 3, depth: 3, cellSize: 4, origin: [-4, -4],
+  layers: [{ mass: 50, density: 250, temperature: 273.15 }],
+  topHeat: 250, secondsPerSecond: 3600,
+});
+world.advance(60);
+console.log(snowpack.read(1, 1).mass, snowpack.read(1, 1).runoff);
+```
+
+Layers are given surface-first. Snowfall gets a dedicated surface layer. Mass rates use kg/(m² s), net surface and
+basal heat use W/m² into the pack, and all temperatures use kelvin. For a real `TerrainBed`, load with `followTerrain`
+and use the same cell counts, spacing and cell-centre locations. Port bindings may send one uniform row across the grid
+or one row for each column. Bind `SurfaceEnergySolver.energyFluxField` as `topHeat` with `stride: 5` and
+`weights: [1, -1, -1]` for net radiation minus sensible and latent losses. Supply the basal exchange separately.
+
+- `runoffField` gives layout-1 f64 per-column liquid-equivalent m/s, accepted by `RainfallRunoff`'s rain input.
+  `dischargeField` gives the same liquid in m³/s, accepted by `ShallowWaterSolver`'s mapped `outlets` input.
+  Route each column to one receiver for a conserved watershed.
+- `coverField` gives layout-1 f32 `[ground, snowDepth]` pairs. Pass `field: snowpack` to Weather's `Snow` and
+  `snow: snowpack` to its `Avalanche`. The display uses the world snapshot's current cover and the slab is sampled at release.
+- `columnField` gives layout-1 f64 rows of mass, liquid, temperature, depth, stability, slab depth, the X and Z overhang,
+  overhang mass, unused heat, drained heat and slab mass. `read(column, row)` exposes the same values with units and
+  `layer(column, row, layer)` gives the physical layer's mass, enthalpy and depth.
+
 ## Aeolian transport
 
 `AeolianTransport` lifts loose sand or snow, transports it across a `TerrainBed`, and deposits it when the wind

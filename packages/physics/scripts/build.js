@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -73,6 +73,7 @@ await build({
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),
+        snowpack: resolve(root, 'src/snowpack/index.ts'),
         aeolian: resolve(root, 'src/aeolian/index.ts'),
         groundwater: resolve(root, 'src/groundwater/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
@@ -112,6 +113,8 @@ await copyFile(resolve(root, 'src/sediment/sediment-kernel-shared.wasm'), resolv
 await copyFile(resolve(root, 'src/orbit/orbit-kernel.wasm'), resolve(dist, 'orbit-kernel.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel-shared.wasm'), resolve(dist, 'orbit-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/landscape/landscape-kernel.wasm'), resolve(dist, 'landscape-kernel.wasm'));
+await copyFile(resolve(root, 'src/snowpack/snowpack-kernel.wasm'), resolve(dist, 'snowpack-kernel.wasm'));
+await copyFile(resolve(root, 'src/snowpack/snowpack-kernel-shared.wasm'), resolve(dist, 'snowpack-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/aeolian/aeolian-kernel.wasm'), resolve(dist, 'aeolian-kernel.wasm'));
 await copyFile(resolve(root, 'src/aeolian/aeolian-kernel-shared.wasm'), resolve(dist, 'aeolian-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/groundwater/groundwater-kernel.wasm'), resolve(dist, 'groundwater-kernel.wasm'));

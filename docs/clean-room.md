@@ -13279,6 +13279,45 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Layered snowpack and dense avalanche obstacles (ICE-01)
+
+- P. Bartelt and M. Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X%2802%2900074-5).
+  Equations 45–48 couple sensible heat and water/ice mass through fusion. The solver integrates layer enthalpy
+  relative to melting ice, with `333700 J/kg` of latent heat and equal and opposite conduction between adjacent
+  layers. Its scalar backward-Euler interface solve keeps mass and energy balanced through the melting plateau.
+- M. Lehning, P. Bartelt, R. L. Brown, C. Fierz and P. Satyawali (2002), [Part II, Snow microstructure](https://doi.org/10.1016/S0165-232X%2802%2900073-3).
+  Equation 36 gives the fresh-snow effective viscosity `0.007 rho^(4.75 - T_C / 40)`. This implementation uses
+  that bulk relation until the caller provides a measured viscosity for an older or crusted layer. Mid-layer
+  overburden compresses the volume, limited by the volume of the ice itself. Part III describes the operational
+  surface forcing and settling balance. [Part III, meteorological forcing](https://doi.org/10.1016/S0165-232X%2802%2900072-1).
+- N. R. Hedstrom and J. W. Pomeroy (1998), [Measurements and modelling of snow interception in the boreal forest](https://research-groups.usask.ca/hydrology/documents/pubs/papers/hedstrom_pomeroy_1998.pdf).
+  Their new-snow density relation is `67.92 + 51.25 exp(T_C / 2.59)` kg/m³, evaluated at a freezing temperature
+  or below. This closure sets the layer's added volume from its snowfall mass.
+- M. Sturm, J. Holmgren, M. König and K. Morris (1997), [The thermal conductivity of seasonal snow](https://doi.org/10.3189/S0022143000002781).
+  The linear and quadratic branches use density in g/cm³, with the switch at 0.156. From 0.60 to solid ice the
+  implementation interpolates to 2.2 W/(m K). A volume-weighted contribution from retained water uses 0.56 W/(m K).
+- S. C. Colbeck (1974), [The capillary effects on water percolation in homogeneous snow](https://doi.org/10.3189/S002214300002339X).
+  The default retained water fills 7% of the pore volume. Excess falls to the next layer, where it can refreeze,
+  or leaves as runoff if there is no next layer. This is a gravity storage balance with immediate drainage.
+- M. Lehning, H. Löwe, M. Ryser and N. Raderschall (2008), [Inhomogeneous precipitation distribution and snow transport in steep terrain](https://doi.org/10.1029/2007WR006545).
+  Their comparison separates wind redistribution at short scales from preferential precipitation at ridge scale.
+  Here the Pomeroy and Gray (1990) Equation 11 exposed-snow flux is passed conservatively to adjacent downwind
+  columns. The lee sides with smaller transport capacity accumulate the deficit. Surface snowfall is an independent
+  forcing. [Pomeroy and Gray, Saltation of snow](https://doi.org/10.1029/WR026i007p01583).
+- H. Yu, G. Li, B. Walter, M. Lehning, J. Zhang and N. Huang (2023), [Wind conditions for snow cornice formation in a wind tunnel](https://doi.org/10.5194/tc-17-639-2023).
+  Equation 9 relates the caught mass per unit ridge width to incident mass flux. This implementation tags that
+  fraction of the crossing mass at a steep lee break. With rectangular cross-section it converts the mass to
+  overhang length using density and thickness. The default accretion window from one to two threshold speeds
+  follows their observed range. Above that range the tagged overhang snow is exposed to scouring.
+- J. Schweizer, J. B. Jamieson and M. Schneebeli (2003), [Snow avalanche formation](https://doi.org/10.1029/2002RG000123).
+  The local stability diagnostic compares the overburden's slope-parallel stress to the interface cohesion and
+  friction from its normal stress. Measured strengths are inputs. Root support adds an interface stress.
+- M. Teich, J.-T. Fischer, T. Feistl, P. Bebi, M. Christen and A. Grêt-Regamey (2014), [Computational snow avalanche simulation in forested terrain](https://doi.org/10.5194/nhess-14-2233-2014).
+  Their depth-averaged momentum balance shows that obstacles matter to runout. The dense-flow implementation
+  applies distributed quadratic resistance using H. M. Nepf (1999), [Drag, turbulence, and diffusion in flow through emergent vegetation](https://doi.org/10.1029/1998WR900069),
+  with user-supplied `Cd * frontalArea / 2` per unit volume. Impermeable cells reflect the normal velocity in the
+  neighboring ghost state and exchange zero mass.
+
 ### Aeolian transport and blowing snow (EARTH-07)
 
 - G. Sauermann, K. Kroy and H. J. Herrmann (2001), [Continuum saltation model for sand dunes](https://doi.org/10.1103/PhysRevE.64.031305).

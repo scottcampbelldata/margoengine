@@ -10111,6 +10111,16 @@ cover the analytic impulse and held-force convolution, resting contact, rolling 
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
 
+### Snowpack evidence (ICE-01)
+
+`Snowpack` keeps mass, enthalpy, geometry and cover in its PhysicsWorld arena. Each Wasm variant has an empty
+data section and tests verify that loading leaves a filled arena unchanged. `snowpack.test.js` checks phase
+energy, compaction, wet retention, exact conduction, cornices, live slope stability and frame/seek replay.
+It reads the actual surface-energy entry and feeds the shallow-water/runoff entries through the registry. The browser test
+renders the snow before and after melt through Weather's existing surface path on WebGPU and the WebGL2 layer.
+The existing avalanche now reads the live pack at release. Its tests check mass conservation at a building
+face and reduced momentum through a vegetation patch. The powder-cloud model uses its separate transport.
+
 ### Aeolian transport evidence (EARTH-07)
 
 `AeolianTransport` owns its arenas and writes conservative change through `TerrainBed`'s accumulation field.

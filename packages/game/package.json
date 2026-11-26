@@ -2287,6 +2287,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/snowpack": {
+      "types": "./dist/physics/snowpack.d.ts",
+      "import": "./dist/physics/snowpack.js"
+    },
     "./physics/aeolian": {
       "types": "./dist/physics/aeolian.d.ts",
       "import": "./dist/physics/aeolian.js"

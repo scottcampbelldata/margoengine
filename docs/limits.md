@@ -9225,6 +9225,19 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
 
+### Layered snowpack (ICE-01)
+
+The model resolves a vertical column for each sample, with a fresh surface layer and the configured initial layers.
+It represents freeze/thaw, surface-settling overburden, pairwise conduction, capillary storage and gravity drainage.
+It uses bulk density and viscosity. Grain metamorphism, vapor diffusion and hydraulic travel time through the pack
+require more state. The optional Weather renderer consumes the stored ground and snow depth directly.
+
+Snow drift uses local near-surface wind and the flux capacity of adjacent columns, with closed lateral boundaries.
+The overhang stores a labeled fraction of the rim mass and gives a direction and extension at its specified density
+and thickness. It represents accretion and scouring. Fracturing a three-dimensional cornice requires a structural
+model. The slab field reports a static interface safety factor, with no assessment of fracture propagation.
+Weather's blocked footprints and drag act on the dense avalanche layer. The powder cloud is transported separately.
+
 ### Dune and snow transport (EARTH-07)
 
 The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.

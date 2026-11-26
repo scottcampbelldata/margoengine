@@ -164,6 +164,10 @@
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./snowpack": {
+      "types": "./dist/snowpack/index.d.ts",
+      "import": "./dist/snowpack.js"
+    },
     "./aeolian": {
       "types": "./dist/aeolian/index.d.ts",
       "import": "./dist/aeolian.js"

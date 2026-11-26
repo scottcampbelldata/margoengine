@@ -31,6 +31,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/snowpack-kernel.wasm',
+    label: 'snowpack-kernel.wasm',
+    kind: 'Rust SIMD layered snowpack',
+    measure: 'file',
+    when: 'Snowpack.load() from the optional /snowpack entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/snowpack-kernel-shared.wasm',
+    label: 'snowpack-kernel-shared.wasm',
+    kind: 'Rust SIMD layered snowpack, shared world memory',
+    measure: 'file',
+    when: 'Snowpack.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/glacier-kernel.wasm',
     label: 'glacier-kernel.wasm',
     kind: 'Rust SIMD shallow-ice flow and fracture',
