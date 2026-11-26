@@ -14323,6 +14323,10 @@ Nucleation can select another eligible cell in the same step. An authored blade 
 a geometry error when its exact requested cut cannot be represented.
 With coplanar mixed-mode toughness, the optional entry measures 145,660 B gzip.
 The base is 45,885 B and the lazy native kernel is 100,020 B.
+Measured gelatin and passive flesh stiffnesses are checked in the small-strain elastic
+regime. The thin freshwater ice case checks elastic fracture against strain inferred
+from measured beam stiffness and failure load. Gel and tissue rheology, time-dependent
+ice flow, fracture under changing temperature, and ice-water feedback are separate models.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
