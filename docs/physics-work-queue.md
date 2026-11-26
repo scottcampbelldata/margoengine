@@ -284,7 +284,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
-| BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
+| BIO-02 | Plant growth and morphogenesis | none | Codex | BUILDING (codex/physics-bio02) |
 | BIO-03 | Forest ecosystem dynamics | sound | Codex | LANDED 609d76e5ce |
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
