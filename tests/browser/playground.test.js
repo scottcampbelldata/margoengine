@@ -5,11 +5,12 @@
 //   node scripts/run-with-timeout.mjs --max=5 -- npm run test:playground:browser
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { server } from '../../scripts/serve-playground.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
-import { single } from '../../site/playground/share.js';
+import { runMessage, single } from '../../site/playground/share.js';
 import { templates } from '../../site/playground/templates.js';
 import { decodePNG } from '../support/png.js';
 
@@ -191,6 +192,75 @@ test('the playground runs templates, reports errors with lines and codes, and op
     } finally {
       await other.close();
     }
+    // The run frame on its own: opened at the top level it is still sandboxed (by its header), posts nothing and runs
+    // nothing, even when a run message comes from its own window (where parent === window).
+    const port = server.address().port;
+    const loner = await context.newPage();
+    await loner.goto(`http://127.0.0.1:${port}/site/playground/frame/`, ready);
+    assert.equal(await loner.evaluate(() => self.origin), 'null', 'sandboxed when opened directly');
+    const ranAlone = await loner.evaluate(
+      async (message) => {
+        postMessage(message, '*');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return { title: document.title, maps: document.querySelectorAll('script[type=importmap]').length };
+      },
+      runMessage(single("document.title = 'ran';"), `http://127.0.0.1:${port}/node_modules/`),
+    );
+    assert.deepEqual(ranAlone, { title: 'Margo Engine playground', maps: 0 });
+    await loner.close();
+
+    // Framed by a test page to try the frame's own checks, as on a host that ignores _headers: the page and a copy of
+    // the frame are written under test-results/, which the server sends with no site headers. A frame copy from the
+    // page's origin answers; one from another origin (localhost against 127.0.0.1) stays silent; and a message from a
+    // sibling frame instead of the parent runs nothing.
+    const probeDir = new URL('../../test-results/playground-probe/', import.meta.url);
+    await mkdir(new URL('frame/', probeDir), { recursive: true });
+    await copyFile(
+      new URL('../../site/playground/frame/index.html', import.meta.url),
+      new URL('frame/index.html', probeDir),
+    );
+    await writeFile(new URL('index.html', probeDir), '<!doctype html><title>probe</title><body></body>');
+    const probe = await context.newPage();
+    await probe.goto(`http://127.0.0.1:${port}/test-results/playground-probe/`);
+    const tryFrame = (host, from) =>
+      probe.evaluate(
+        async ({ src, message, from }) => {
+          const frame = Object.assign(document.createElement('iframe'), { src });
+          frame.setAttribute('sandbox', 'allow-scripts');
+          const heard = [];
+          addEventListener(
+            'message',
+            (e) =>
+              e.source === frame.contentWindow &&
+              heard.push(e.data.kind === 'error' ? `error: ${e.data.text}` : e.data.kind),
+          );
+          document.body.append(frame);
+          await new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (from === 'parent') frame.contentWindow.postMessage(message, '*');
+          else {
+            // A sibling frame posts the run message to the run frame.
+            const sibling = document.createElement('iframe');
+            sibling.setAttribute('sandbox', 'allow-scripts');
+            sibling.srcdoc = `<script>parent.frames[0].postMessage(${JSON.stringify(message)}, '*')</script>`;
+            document.body.append(sibling);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          frame.remove();
+          document.querySelectorAll('iframe').forEach((f) => f.remove());
+          return heard;
+        },
+        {
+          src: `http://${host}:${port}/test-results/playground-probe/frame/`,
+          message: runMessage(single("console.log('ran');"), `http://127.0.0.1:${port}/node_modules/`),
+          from,
+        },
+      );
+    assert.deepEqual(await tryFrame('127.0.0.1', 'parent'), ['ready', 'log', 'done'], 'the control runs');
+    assert.deepEqual(await tryFrame('localhost', 'parent'), [], 'a parent of another origin gets nothing');
+    assert.deepEqual(await tryFrame('127.0.0.1', 'sibling'), ['ready'], 'a message from a sibling runs nothing');
+    await probe.close();
+
     // Page errors include the frame's: the only ones are the error template's own, on purpose.
     assert.deepEqual(
       errors.filter((message) => !/^Mesh disposed/.test(message)),

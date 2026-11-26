@@ -205,6 +205,8 @@ test('the run message and the download carry the files safely', () => {
   assert.ok(html.includes(scriptText(JSON.stringify(runMessage(files)))));
   assert.ok(html.indexOf('window.MARGO_PLAYGROUND') < html.indexOf("const CHANNEL = 'margo-playground'"));
   assert.throws(() => downloadDocument('<html></html>', files), /marker/);
+  assert.ok(frameHtml.includes('<meta http-equiv="Content-Security-Policy"'));
+  assert.ok(!html.includes('<meta http-equiv="Content-Security-Policy"'), 'a saved file is the visitor own page');
 });
 
 test('the playground page keeps a strict policy; only the sandboxed run frame gets the loose one', () => {
@@ -228,6 +230,26 @@ test('the playground page keeps a strict policy; only the sandboxed run frame ge
   }
   const frame = policy('/playground/frame/');
   assert.ok(frame['script-src'].includes('https://cdn.jsdelivr.net') && frame['script-src'].includes('blob:'));
+  // The frame is sandboxed by its own header too, so opened directly it is still an opaque origin.
+  assert.deepEqual(frame.sandbox, ['allow-scripts']);
+  // Its meta policy repeats the script and connect sources, for a host that ignores _headers; a meta policy cannot
+  // carry sandbox or frame-ancestors, so it has neither.
+  const frameHtml = readFileSync(new URL('../site/playground/frame/index.html', import.meta.url), 'utf8');
+  const meta = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(frameHtml);
+  assert.ok(meta, 'the frame has a meta policy');
+  const metaPolicy = Object.fromEntries(
+    meta[1].split(';').map((part) => {
+      const [name, ...values] = part.trim().split(/\s+/);
+      return [name, values];
+    }),
+  );
+  for (const directive of ['script-src', 'connect-src', 'default-src', 'object-src', 'base-uri'])
+    assert.deepEqual(metaPolicy[directive], frame[directive], directive);
+  assert.equal(metaPolicy.sandbox, undefined);
+  assert.equal(metaPolicy['frame-ancestors'], undefined);
+  // The frame takes a run message only from its parent, from the playground's origin, and only when framed.
+  assert.match(frameHtml, /event\.source === top && event\.origin === home/);
+  assert.match(frameHtml, /const framed = parent !== window/);
   // The page loads the frame by URL in a sandbox without allow-same-origin, never as srcdoc (which inherits the policy).
   const page = readFileSync(new URL('../site/playground/playground.js', import.meta.url), 'utf8');
   assert.match(page, /setAttribute\('sandbox', 'allow-scripts'\)/);

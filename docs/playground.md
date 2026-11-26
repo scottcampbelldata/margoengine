@@ -75,13 +75,17 @@ read the page, its `localStorage` (the saved versions) or its cookies, and it ca
 navigate the page. The frame is a separate document rather than `srcdoc`, because a `srcdoc` document inherits its
 parent's Content Security Policy, which would force the page's policy open.
 
-- **Messages, both ways**: the frame posts `ready`; the page answers with one run message (`runMessage`: the code and
-  the packages base), and the frame accepts it only from `parent` and only in that shape (code a string within 256 KiB,
-  the base null or an http(s) URL ending in `/`), once. The frame imports the code as a blob module after adding the
-  import map, so error lines are lines of the code itself. The page accepts a message only when `event.source` is the
-  current frame's window, then only when it matches `parseFrameMessage` (`site/playground/share.js`: a known `kind` and
-  `level`, text capped at 4,000 characters, a positive integer line, an error code of lowercase letters, digits and
-  dashes). Text is shown with `textContent`, never as HTML.
+- **Messages, both ways**: the frame posts `ready`; the page answers with one run message (`runMessage`: the files
+  and the packages base). The frame does nothing at all unless it is framed (`parent !== window`) by a page of the
+  playground's origin (`location.ancestorOrigins[0]` equals the frame URL's origin, where the browser has
+  `ancestorOrigins`), and it accepts a run message only when `event.source` is its parent and `event.origin` is the
+  playground's origin, only in the run message's shape (at most 12 valid file names, `main.js` first, 256 KiB of code,
+  the base null or an http(s) URL ending in `/`), and only once. Everything else is dropped silently. The frame's own
+  origin is opaque (`'null'`), so the origin it expects is its URL's (`location.origin`). The page accepts a message
+  only when `event.source` is the current frame's window, then only when it matches `parseFrameMessage`
+  (`site/playground/share.js`: a known `kind` and `level`, text capped at 4,000 characters, a valid file name and a
+  positive integer line, an error code of lowercase letters, digits and dashes). Text is shown with `textContent`,
+  never as HTML.
 - **Share links are untrusted input**: the `#code=` value is capped (64 KiB of text), must be base64url, must
   decompress (deflate-raw) within 256 KiB and must be UTF-8. Anything else is refused with a message that says why
   (`MargoError` code `playground-link`); the editor keeps the visitor's code and nothing runs until they press Run, so
@@ -90,8 +94,13 @@ parent's Content Security Policy, which would force the page's policy open.
 - **Content Security Policy** (`site/_headers`): the page, `/playground/*`, allows its own scripts only
   (`script-src 'self'`, nothing inline), `connect-src 'self'` and `frame-src 'self'`; it talks to no other host. Only
   `/playground/frame/*` gets the loose policy the code needs: inline script (the import map), `blob:` modules,
-  jsDelivr, and `https:` for the models and textures the code fetches. `npm run playground` serves both with these
-  headers, so the browser test runs under the real policies.
+  jsDelivr, and `https:` for the models and textures the code fetches. That policy starts with `sandbox
+  allow-scripts`, so the frame is an opaque origin even when it is opened directly or framed without the attribute.
+  The frame repeats its policy in a `<meta http-equiv="Content-Security-Policy">`, a backup for a host that ignores
+  `_headers`; a meta policy cannot carry `sandbox` or `frame-ancestors` (CSP Level 3, section 3.3), so those two live
+  in `_headers` only, and on such a host the frame's own parent and origin checks above are what stop a stranger page.
+  Download HTML leaves the meta policy out: the saved file is the visitor's own page. `npm run playground` serves
+  `site/` with these headers, so the browser test runs under the real policies.
 
 ## Tests
 
@@ -99,7 +108,9 @@ parent's Content Security Policy, which would force the page's policy open.
   a decompression bomb, not UTF-8), the version history and full or blocked storage, the run message and the download, the
   policies (no `unsafe-inline` and no `https:` on the page, the loose one on the frame only), the message schema, and
   that every template imports only entries in the import map.
-- `npm run test:playground:browser` (after `npm run build:packages`): in Chromium, a template runs and draws, the frame
+- `npm run test:playground:browser` (after `npm run build:packages`): in Chromium, the run frame opened on its own is
+  sandboxed and runs nothing; framed by a test page without the site's headers, it answers a parent of its own origin,
+  stays silent in a parent of another origin and ignores a run message from a sibling frame; a template runs and draws, the frame
   has an opaque origin and cannot reach its parent, a forged message is ignored, an error shows its line and its
   error-help link, a version restores, the page's response policy is strict, a share link opens and runs while the
   saved code stays, Back to my code returns it, Run makes the shared code the saved one, and a damaged link says so.

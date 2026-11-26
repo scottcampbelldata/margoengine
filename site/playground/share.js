@@ -225,13 +225,16 @@ export function runMessage(files, packages = null) {
 
 /**
  * The file Download saves: the frame document with the run message built in, so it runs on its own (from a local
- * server or HTTPS) with no page around it. `frameHtml` is the text of site/playground/frame/index.html.
+ * server or HTTPS) with no page around it, and without the frame's meta policy. `frameHtml` is the text of
+ * site/playground/frame/index.html.
  */
 export function downloadDocument(frameHtml, files, packages = null) {
   const marker = '<!-- run -->';
   if (!frameHtml.includes(marker)) throw new Error('The frame document has no <!-- run --> marker');
   const config = `<script>window.MARGO_PLAYGROUND = ${scriptText(JSON.stringify(runMessage(files, packages)))};</script>`;
-  return frameHtml.replace(marker, () => config);
+  // The frame's meta policy backs up the site's headers; a saved file is the visitor's own page and loads its packages
+  // from wherever the playground did (a local server included), so it goes.
+  return frameHtml.replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/, '').replace(marker, () => config);
 }
 
 const LEVELS = new Set(['log', 'info', 'warn', 'error', 'debug']);

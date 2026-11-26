@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
+  <!-- A backup of the policy site/_headers gives /playground/frame/*, in case a host ignores _headers. A meta policy
+       cannot carry `sandbox` or `frame-ancestors`, so those two stay in _headers only (docs/playground.md). Download
+       HTML leaves this line out: a saved file is the visitor's own page. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: blob: data:; worker-src 'self' blob: https://cdn.jsdelivr.net; font-src 'self' https:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Margo Engine playground</title>
   <style>html,body{margin:0;height:100%;background:#111;color:#eee;font:16px system-ui,sans-serif}#scene{position:fixed;inset:0}</style>
 </head>
@@ -18,13 +22,19 @@
 // (a blob URL cannot be the base of a relative import), so files may import each other, cycles included, and stack
 // lines are lines of each file. Console output and errors go back to the parent. A downloaded file sets
 // window.MARGO_PLAYGROUND instead and runs at once.
+// Opened any other way it does nothing: not at the top level (site/_headers also sandboxes it there), not in a parent
+// from another origin, and it takes a run message only from its parent window, sent from the playground's own origin.
 (() => {
   'use strict';
   const CHANNEL = 'margo-playground';
   const MAX_CODE = 256 * 1024, MAX_FILES = 12, FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}\.js$/;
   const CDN_MAP = 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/importmap.json';
   const CDN = /^https:\/\/cdn\.jsdelivr\.net\/npm\/((?:@[^/]+\/)?[^@/]+)@[^/]+\/(.+)$/;
-  const top = parent !== window ? parent : null;
+  // The playground's origin: this document's URL origin (its own origin is opaque, 'null', in the sandbox).
+  const home = location.origin;
+  // Framed, and by a page of the playground's origin where the browser says so (Chromium and WebKit).
+  const framed = parent !== window && (!location.ancestorOrigins || location.ancestorOrigins[0] === home);
+  const top = framed ? parent : null;
   const urls = new Map(); // blob URL -> file name
   let started = false;
 
@@ -113,7 +123,9 @@
 
   if (window.MARGO_PLAYGROUND) run(window.MARGO_PLAYGROUND);
   else if (top) {
-    addEventListener('message', (event) => { if (event.source === top) run(event.data); });
+    addEventListener('message', (event) => {
+      if (event.source === top && event.origin === home) run(event.data);
+    });
     send({ kind: 'ready' });
   }
 })();
