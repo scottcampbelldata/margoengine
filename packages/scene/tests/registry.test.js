@@ -203,3 +203,19 @@ test('a template can build from another template, and dispose releases everythin
   assert.equal(registry.refCount('res'), 0);
   assert.equal([...e.meshes.values()].length, 2); // the instance and its leaf; both prototypes and their subtrees are gone
 });
+
+test('userData overrides never reach a prototype: __proto__, constructor and prototype are refused, normal keys apply', async () => {
+  using e = await make();
+  const registry = new AssetRegistry();
+  registry.defineTemplate('t', () => e.createMesh());
+  const before = [...e.meshes.values()].length;
+  for (const key of ['__proto__', 'constructor', 'prototype']) {
+    const overrides = JSON.parse(`{"userData":{"${key}":{"polluted":1}}}`);
+    await assert.rejects(registry.instantiate('t', overrides), { name: 'TypeError', message: /not allowed/ });
+  }
+  assert.equal({}.polluted, undefined);
+  assert.equal([...e.meshes.values()].length, before); // refused before anything was built
+  const copy = await registry.instantiate('t', JSON.parse('{"userData":{"hp":3}}'));
+  assert.equal(userData(copy).hp, 3);
+  assert.equal(Object.getPrototypeOf(userData(copy)), Object.getPrototypeOf({}));
+});

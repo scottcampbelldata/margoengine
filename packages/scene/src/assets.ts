@@ -384,6 +384,18 @@ function checkMap(value: unknown): Record<string, string | { url: string; type?:
   return value as Record<string, string | { url: string; type?: string }>;
 }
 
+/** The own enumerable entries of per-instance userData; `__proto__`, `constructor` and `prototype` are refused, as in an asset map. */
+function checkUserData(data: Record<string, unknown> | undefined): [string, unknown][] {
+  if (data === undefined) return [];
+  if (typeof data !== 'object' || data === null || Array.isArray(data))
+    throw typeError('instance userData must be a plain object; check the overrides', 'arguments');
+  return Object.keys(data).map((key) => {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype')
+      throw typeError(`instance userData key "${key}" is not allowed; use another name`, 'arguments');
+    return [key, data[key]];
+  });
+}
+
 interface Slot<T> {
   source: AssetSource<T>;
   type?: string;
@@ -797,6 +809,7 @@ export class AssetRegistry<T = unknown> {
 
   private async instantiateFrom(name: string, overrides: AssetInstanceOverrides, signal: AbortSignal | undefined, chain: string[]): Promise<Mesh> {
     this.live();
+    const extra = checkUserData(overrides.userData);
     const root = await this.prototypeOf(name, signal, chain);
     const { cloneSubtree, traverse, userData } = await this.loadTools();
     const copy = cloneSubtree(root, { parent: overrides.parent ?? null });
@@ -806,7 +819,11 @@ export class AssetRegistry<T = unknown> {
       if (overrides.rotation) copy.setRotation(overrides.rotation);
       if (overrides.scale) copy.setScale(overrides.scale);
       if (overrides.visible !== undefined) copy.visible = overrides.visible;
-      if (overrides.userData) Object.assign(userData(copy), overrides.userData);
+      if (extra.length) {
+        const target = userData(copy);
+        // defineProperty never runs a setter, so no key can reach a prototype
+        for (const [key, value] of extra) Object.defineProperty(target, key, { value, writable: true, enumerable: true, configurable: true });
+      }
       const material = overrides.material;
       if (material) traverse(copy, (mesh) => void mesh.setMaterial(material));
       overrides.apply?.(copy);
