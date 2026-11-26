@@ -14666,6 +14666,27 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: a grid-particle plunging breaker's jet-to-crest speed does not converge with the grid (KB-FLIP-CREST1, physics, flip)
+
+- **Repro:** after `npm run build -w @margoengine/physics`, run `node packages/physics/scripts/check-breaker.mjs 0.55
+  0.0125 1.6`, then `... 0.55 0.0125 1.2` and `... 0.55 0.009 1.6` (steepness, cell size in m, start in s before the
+  focus). The printed "jet over crest" is 1.26, 1.46 and 1.72 (Apple M6). Erinin et al. (2023) measured the jet tip's
+  impact speed at 1.24 to 1.33 times the crest's speed at jet formation. The value moves with the start and grows as the
+  cells shrink, so it does not converge.
+- **Cause:** not yet established. A study is under way (refined grids, the measure, the depth, surface tension). The
+  candidates are:
+  - **The measure is not theirs.** The script takes the fastest particle's horizontal speed above the still level in
+    the 0.17 s after the crest's peak. Erinin et al. take the speed of the jet tip, a point on the profile, at impact,
+    from cubic fits to its path. A maximum over more particles grows as the cells shrink.
+  - **The water is shallower than theirs.** The box holds 0.6 m of water against their 0.91 m, and the sea is
+    deep-water linear theory. The packet's longest components (k h about 1.2 at 0.6 m) disperse differently, so where
+    and how hard the packet breaks moves with the start.
+  - **No surface tension.** At their scale a jet tip a few millimetres thick retracts at the Taylor-Culick speed
+    (0.2 to 0.4 m/s), and Margo's liquid has no surface tension.
+- **Status:** `docs/limits.md` ("Grid-particle liquids") states the scatter, and the README says the comparison is not
+  yet like-for-like. This entry closes when the measure is like-for-like and the ratio converges, or when the
+  difference that remains is explained.
+
 ### Open 2026-11-26: a scene's background colour comes out lighter once a post effect captures the scene (KB-CLEAR-CAPTURE1, core)
 
 - **Repro:** `engine.scene.background = '#808080'` draws 128,128,128. With `Tonemap.attach(engine)`,
