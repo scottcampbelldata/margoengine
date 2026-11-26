@@ -209,3 +209,27 @@ test('a snapshot restores the deck water bit for bit', () => {
 
 void BODIES_FIELD;
 void BODY_WORDS;
+
+test('a light hull carrying three times its mass of water falls freely at g and stays bounded (no added-mass blow-up)', () => {
+  // 200 kg of hull with 0.6 m^3 of water on deck, let go in the air. The water's load fed back as it stood diverged in a
+  // few steps (thousands of km/s, the added-mass instability); carried as added mass the pair falls together at g.
+  const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] }),
+    hull = physics.addBody(null, {
+      position: [0, 0, 0],
+      colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 200 },
+    }),
+    deck = new DeckWaterSolver('deckWater', { inflow: false }),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(deck, {
+        row: hull.row,
+        offset: [-1, 0.5, -0.5],
+        cells: [10, 6, 5],
+        cellSize: 0.2,
+        initial: (x, y) => y < 0.3,
+      })
+      .couple(['deckWater', 'rigid'], 'staggered');
+  world.advance(60);
+  const v = hull.linearVelocity[1];
+  assert.ok(Math.abs(v + G) < 0.05 * G, `after 1 s the hull falls at ${v} m/s, against ${-G}`);
+});

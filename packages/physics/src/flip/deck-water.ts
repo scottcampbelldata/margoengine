@@ -1,8 +1,12 @@
 // Green water on a hull's deck (FLUID-03): a grid-particle liquid in a box that rides with a rigid body. The box's cells
 // are fixed in the body's frame, so the water feels the frame's acceleration besides gravity, per unit mass
 // R^T (g - a_c) - alpha x r - w x (w x r) - 2 w x v (r from the centre of mass, w and alpha the body's spin and its rate,
-// a_c its centre's acceleration, all in the body's axes), the d'Alembert, centrifugal, Euler and Coriolis terms of a
-// rotating frame (H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10). The sea comes in
+// a_c its centre's acceleration, from the last step), the d'Alembert, Euler, centrifugal and Coriolis terms of a rotating
+// frame (H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10). Fed back to the hull as
+// it is, that load diverges when the water outweighs the hull (the added-mass instability of P. Causin, J.-F. Gerbeau and
+// F. Nobile, Comput. Methods Appl. Mech. Eng. 194, 2005). So the water rides with the hull as added mass, in the hull
+// solver's solve: the load held is M (M + A)^-1 (F + A a_last + W) - W, A the water as a rigid body about the centre,
+// F its pressure on the deck and A a_last the rigid share of the last step's acceleration that F already holds. The sea comes in
 // where it overtops the bulwarks, from the hull solver's `deckInflow` port; water that crosses an open side goes back to
 // the sea (`seaSources()`); and the deck's load, the water's pressure on the box's walls and solids, holds the body
 // through `bodyForces`. It claims its hull in `deckClaims`, so the hull solver leaves its own deck load out: one owner
@@ -39,8 +43,6 @@ export interface DeckWaterOptions {
   readonly inflow?: boolean;
 }
 
-/** f64 words of the frame's memory: a flag, the centre's velocity and the spin at the last step. */
-const FRAME_WORDS = 7;
 const DECK_LAYOUT = 1;
 
 /** Green water on a hull's deck, riding its body. `id` is `'deckWater'` unless a world holds more. */
@@ -49,7 +51,6 @@ export class DeckWaterSolver extends FlipSolver {
   private bodyCapacity = 0;
   private offset: V3 = [0, 0, 0];
   private readonly inflow: boolean;
-  private frame: Region | null = null;
   private forcesRegion: Region | null = null;
   private claimsRegion: Region | null = null;
   private inflowCarry: Region | null = null;
@@ -60,6 +61,12 @@ export class DeckWaterSolver extends FlipSolver {
   private spin: V3 = [0, 0, 0];
   private spinRate: V3 = [0, 0, 0];
   private uniform: V3 = [0, -9.81, 0];
+  /** The hull's last acceleration, world axes: the centre's (3) and the spin's rate (3). */
+  private lastAcceleration = [0, 0, 0, 0, 0, 0];
+  private frame: Region | null = null;
+  /** The hull's mass and its world inertia this step (Infinity and zeros for a hull that does not move). */
+  private hullMass = Infinity;
+  private hullInertia: Float64Array = new Float64Array(9);
 
   constructor(id = 'deckWater', options: DeckWaterOptions = {}) {
     super(id);
@@ -96,11 +103,12 @@ export class DeckWaterSolver extends FlipSolver {
     this.row = row;
     this.bodyCapacity = rows;
     this.offset = [offset[0], offset[1], offset[2]];
-    this.frame = host.allocate(`${this.id}:frame`, FRAME_WORDS * 8, 'f64', DECK_LAYOUT);
     this.forcesRegion = host.allocate(`${this.id}:forces`, rows * FORCE_WORDS * 8, 'f64', DECK_LAYOUT);
     this.claimsRegion = host.allocate(`${this.id}:claims`, rows * 8, 'f64', DECK_LAYOUT);
     // The inflow's volume not yet made into particles, m^3, and the particles it has made (for their places).
     this.inflowCarry = host.allocate(`${this.id}:inflow`, 2 * 8, 'f64', DECK_LAYOUT);
+    // The hull's velocity and spin at the last step, for its acceleration: a flag, then six words.
+    this.frame = host.allocate(`${this.id}:frame`, 7 * 8, 'f64', DECK_LAYOUT);
     (regionWords(host.memory, this.claimsRegion) as Float64Array)[row] = 1;
   }
 
@@ -122,10 +130,9 @@ export class DeckWaterSolver extends FlipSolver {
         z + this.offset[2] - this.centre[2],
       ],
       w = this.spin,
-      al = this.spinRate,
       wr = cross(w, r),
       wwr = cross(w, wr),
-      ar = cross(al, r),
+      ar = cross(this.spinRate, r),
       wv = cross(w, v);
     for (let a = 0; a < 3; a++) out[a] = this.uniform[a]! - ar[a]! - wwr[a]! - 2 * wv[a]!;
     return out;
@@ -156,9 +163,20 @@ export class DeckWaterSolver extends FlipSolver {
       ac: V3 = had ? [(v[0] - frame[1]!) / dt, (v[1] - frame[2]!) / dt, (v[2] - frame[3]!) / dt] : [0, 0, 0],
       dw: V3 = had ? [(w[0] - frame[4]!) / dt, (w[1] - frame[5]!) / dt, (w[2] - frame[6]!) / dt] : [0, 0, 0];
     frame.set([1, v[0], v[1], v[2], w[0], w[1], w[2]]);
+    this.lastAcceleration = [ac[0], ac[1], ac[2], dw[0], dw[1], dw[2]];
     this.spin = rotate(inverse, w);
     this.spinRate = rotate(inverse, dw);
     this.uniform = rotate(inverse, [this.gravity[0] - ac[0], this.gravity[1] - ac[1], this.gravity[2] - ac[2]]);
+    const inverseMass = rows[at + 16]!;
+    this.hullMass = inverseMass > 0 ? 1 / inverseMass : Infinity;
+    this.hullInertia = invertSymmetric([
+      rows[at + 17]!,
+      rows[at + 18]!,
+      rows[at + 19]!,
+      rows[at + 20]!,
+      rows[at + 21]!,
+      rows[at + 22]!,
+    ]);
     (regionWords(host.memory, this.claimsRegion!) as Float64Array)[this.row] = 1;
     if (this.inflow) this.takeInflow(context, dt);
   }
@@ -267,13 +285,78 @@ export class DeckWaterSolver extends FlipSolver {
         }
     const fw = rotate(this.q, force),
       tw = rotate(this.q, torque),
-      w = this.row * FORCE_WORDS;
-    out[w] = fw[0];
-    out[w + 1] = fw[1];
-    out[w + 2] = fw[2];
-    out[w + 3] = tw[0];
-    out[w + 4] = tw[1];
-    out[w + 5] = tw[2];
+      w = this.row * FORCE_WORDS,
+      held = this.carried([...fw, ...tw]);
+    for (let k = 0; k < 6; k++) out[w + k] = held[k]!;
+  }
+
+  /**
+   * The load held over the step so the hull moves as if it carried its deck water rigidly: M (M + A)^-1 (F + W) - W in
+   * world axes, A the water's mass m, its first moment m c about the hull's centre and its inertia about it, M the hull's
+   * mass and inertia, W its weight. A hull that does not move takes F as it is.
+   */
+  private carried(f: number[]): number[] {
+    if (!(this.hullMass < Infinity)) return f;
+    const { p, count } = this.state(),
+      h = this.grid.h,
+      m = this.density * ((h * h * h) / 8),
+      a = new Float64Array(36);
+    let total = 0;
+    const first: V3 = [0, 0, 0],
+      inertia = new Float64Array(9);
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        r = rotate(this.q, [
+          p[o]! + this.offset[0] - this.centre[0],
+          p[o + 1]! + this.offset[1] - this.centre[1],
+          p[o + 2]! + this.offset[2] - this.centre[2],
+        ]),
+        r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+      total += m;
+      for (let i = 0; i < 3; i++) {
+        first[i]! += m * r[i]!;
+        for (let j = 0; j < 3; j++) inertia[3 * i + j]! += m * ((i === j ? r2 : 0) - r[i]! * r[j]!);
+      }
+    }
+    // A = [[m I, -[m c]x], [[m c]x, I_c]]: a rigid body's mass matrix about a point not its centre.
+    const [cx, cy, cz] = first,
+      skew = [0, -cz, cy, cz, 0, -cx, -cy, cx, 0];
+    for (let i = 0; i < 3; i++) {
+      a[i * 6 + i] = total;
+      for (let j = 0; j < 3; j++) {
+        a[i * 6 + j + 3] = -skew[3 * i + j]!;
+        a[(i + 3) * 6 + j] = skew[3 * i + j]!;
+        a[(i + 3) * 6 + j + 3] = inertia[3 * i + j]!;
+      }
+    }
+    const M = this.hullMass,
+      g = this.gravity,
+      weight = [M * g[0], M * g[1], M * g[2], 0, 0, 0],
+      system = new Float64Array(36),
+      rhs = new Float64Array(6);
+    for (let i = 0; i < 3; i++) {
+      system[i * 6 + i] = M + a[i * 6 + i]!;
+      for (let j = 0; j < 3; j++) system[(i + 3) * 6 + j + 3] = this.hullInertia[3 * i + j]! + a[(i + 3) * 6 + j + 3]!;
+    }
+    for (let i = 0; i < 6; i++)
+      for (let j = 0; j < 6; j++)
+        if (!((i < 3 && j < 3 && i === j) || (i >= 3 && j >= 3))) system[i * 6 + j] = a[i * 6 + j]!;
+    // The pressure F holds the water's reaction to the last step's acceleration; its rigid share A a_last goes back in, so
+    // the solve carries it implicitly.
+    for (let i = 0; i < 6; i++) {
+      let back = 0;
+      for (let j = 0; j < 6; j++) back += a[i * 6 + j]! * this.lastAcceleration[j]!;
+      rhs[i] = f[i]! + back + weight[i]!;
+    }
+    const acc = solve6(system, rhs),
+      out = [0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 3; i++) {
+      out[i] = M * acc[i]! - weight[i]!;
+      let t = 0;
+      for (let j = 0; j < 3; j++) t += this.hullInertia[3 * i + j]! * acc[j + 3]!;
+      out[i + 3] = t;
+    }
+    return out;
   }
 
   override exportPorts(tick: number): readonly Port[] {
@@ -286,6 +369,60 @@ export class DeckWaterSolver extends FlipSolver {
   override stateRegions(): readonly Region[] {
     return [...super.stateRegions(), this.frame, this.inflowCarry].filter((r): r is Region => r !== null);
   }
+}
+
+/** The inverse of a symmetric 3 by 3 matrix given as xx, xy, xz, yy, yz, zz, row-major (zeros where it is singular). */
+function invertSymmetric(e: readonly number[]): Float64Array {
+  const [a, b, c, d, f, g] = e as [number, number, number, number, number, number],
+    A = d * g - f * f,
+    B = c * f - b * g,
+    C = b * f - c * d,
+    det = a * A + b * B + c * C,
+    out = new Float64Array(9);
+  if (!(det !== 0 && Number.isFinite(det))) return out;
+  const k = 1 / det;
+  out.set([
+    A * k,
+    B * k,
+    C * k,
+    B * k,
+    (a * g - c * c) * k,
+    (b * c - a * f) * k,
+    C * k,
+    (b * c - a * f) * k,
+    (a * d - b * b) * k,
+  ]);
+  return out;
+}
+
+/** Solves the 6 by 6 system (row-major) by Gaussian elimination with partial pivoting, in a fixed order. */
+function solve6(matrix: Float64Array, rhs: Float64Array): Float64Array {
+  const a = matrix.slice(),
+    b = rhs.slice(),
+    n = 6;
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let row = col + 1; row < n; row++)
+      if (Math.abs(a[row * n + col]!) > Math.abs(a[pivot * n + col]!)) pivot = row;
+    if (a[pivot * n + col] === 0) continue;
+    if (pivot !== col) {
+      for (let k = 0; k < n; k++) [a[col * n + k], a[pivot * n + k]] = [a[pivot * n + k]!, a[col * n + k]!];
+      [b[col], b[pivot]] = [b[pivot]!, b[col]!];
+    }
+    for (let row = col + 1; row < n; row++) {
+      const f = a[row * n + col]! / a[col * n + col]!;
+      if (f === 0) continue;
+      for (let k = col; k < n; k++) a[row * n + k]! -= f * a[col * n + k]!;
+      b[row]! -= f * b[col]!;
+    }
+  }
+  const x = new Float64Array(n);
+  for (let row = n - 1; row >= 0; row--) {
+    let sum = b[row]!;
+    for (let k = row + 1; k < n; k++) sum -= a[row * n + k]! * x[k]!;
+    x[row] = a[row * n + row]! !== 0 ? sum / a[row * n + row]! : 0;
+  }
+  return x;
 }
 
 function cross(a: readonly number[], b: readonly number[]): V3 {

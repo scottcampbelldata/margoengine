@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19475807,
+  "total": 19476527,
   "history": [
     {
       "date": "2026-10-24",
@@ -12741,6 +12741,12 @@
       "commit": "feat(physics) grid-particle liquids",
       "reason": "New optional physics/flip entry (FLUID-03): FlipSolver (APIC on a MAC grid, the ghost-fluid free surface, MIC(0) conjugate gradients) and DeckWaterSolver (a box riding a hull, the deckInflow and deckClaims ports), 8,443 B gzip (this Mac). One solver and its subclass; a split would load the shared grid twice.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) deck water added mass",
+      "reason": "physics/flip 8,443 to 9,163 B gzip (this Mac): DeckWaterSolver carries its deck water as rigid added mass in an implicit 6 by 6 solve (the water's mass, first moment and inertia about the hull's centre), so water heavier than its hull no longer diverges. The solve and its two small helpers are the hull solver's scheme; importing seakeeping for them would load far more.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13552,7 +13558,7 @@
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 8443,
+    "@margoengine/physics/flip": 9163,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,
