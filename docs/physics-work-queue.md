@@ -284,7 +284,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
-| SEA-05 | Nearshore waves and surf zone | partial | Claude | CLAIMED |
+| SEA-05 | Nearshore waves and surf zone | partial | Claude | LANDED 8c7453cd8 |
 | DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
