@@ -383,6 +383,86 @@ Tp 9.3 s. Stable air gives 5.23 m and unstable air 7.22 m; the split is in Kahma
 - Snow: Locatelli and Hobbs (1974, JGR) give fall-speed and mass laws for aggregates of unrimed dendrites, for
   densely rimed dendrites and for the graupel types, but not for single dendrites. Their table belongs in the test.
 
+**SEA-04 boundaries and hull sources.** Research handed to Codex, which builds the upgrade:
+
+- Walls are a Neumann condition (∂φ/∂n = 0, the wave's slope across the wall zero). Masking the height to zero
+  (h ← O h, as iWave does) is a Dirichlet wall: it flips the reflected wave's phase, puts a node at the wall and
+  diffracts weakly. Schreck, Hafner and Wojtan (2019, "Fundamental solutions for water wave animation", SIGGRAPH,
+  doi 10.1145/3306346.3323002) show the difference.
+  - Their method places Helmholtz sources −(i/4) H₀⁽²⁾(k|x − y|) inside each obstacle per wavenumber. A least-squares
+    fit cancels the incoming wave at boundary samples λ/6 apart (sources λ/3 apart). Moving obstacles are
+    time-delayed.
+- Water Surface Wavelets (Jeschke et al. 2018, doi 10.1145/3197517.3201336) reflect an amplitude A(x, k, t) at a wall
+  by k_r = k − 2 (n · k) n. That is geometric optics with no true diffraction, in deep water only. Water Wave Packets
+  (Jeschke and Wojtan 2017) add ghost packets for diffraction at grazing incidence.
+- A grid alternative is Neumann volume penalisation (Kolomenskiy and Schneider 2009, JCP 228, 5687; Kadoch et al.
+  2012, arXiv 1403.5948): −∇·[(1 − χ) + η χ] ∇v = f, error O(η), condition number O(1/η).
+- Partial reflection in the mild-slope equation (Berkhoff 1972; Tsay and Liu 1983, as CGWAVE uses it):
+  ∂η/∂n = α η with α = i k (1 − K_r)/(1 + K_r). A sponge layer (Kirby 1998, FUNWAVE) damps over 2 to 3 wavelengths.
+- Exact checks for the tests:
+  - A standing wave at a wall: η = 2A cos kx cos ωt, an antinode at the wall, the height doubled.
+  - The semi-infinite breakwater (Sommerfeld; Penney and Price 1952):
+    - F = [½ + f(σᵢ)] e^(−ikr cos(θ − θ₀)) + R [½ + f(σᵣ)] e^(−ikr cos(θ + θ₀));
+    - f(s) = ((1 + i)/2) ∫₀ˢ e^(−iπu²/2) du, with σᵢ = 2 √(kr/π) sin((θ − θ₀)/2) and
+      σᵣ = −2 √(kr/π) sin((θ + θ₀)/2);
+    - |½ + f| is 0.045, 0.111, 0.203 and 0.5 at σ = −5, −2, −1 and 0, with a peak of 1.1707 at σ = 1.217.
+  - MacCamy and Fuchs: run-up η/A on a vertical cylinder, front and rear.
+
+    | ka | Front | Rear |
+    | --- | --- | --- |
+    | 0.1 | 1.004 | 0.998 |
+    | 0.5 | 1.432 | 0.995 |
+    | 1.0 | 1.707 | 0.888 |
+    | 2.0 | 1.859 | 0.732 |
+    | 4.0 | 1.947 | 0.543 |
+
+    The force is F = 4 ρ g A tanh(kd)/k² · A(ka), with A(ka) = 1/|H₁′(ka)| = 0.0159, 0.394, 1.077 and 1.762 at ka =
+    0.1, 0.5, 1 and 2.
+- The hull as a source: Wave Particles (Yuksel, Keyser and House 2007) emit V = A_face (U · N) dt per face at the
+  waterline. A pressure patch (Darmon, Benzaquen and Raphaël 2014, JFM 738, R3) gives the Kelvin wake.
+
+**SEA-13 bubbles and plumes.** Research handed to Codex, from the FW-4 build (`@margoengine/physics/bubbles` already
+carries a ship race's air as parcels):
+
+- Where air enters (Moraga et al. 2005, Mecánica Computacional XXIV; the journal version is Comput. Fluids 37(3),
+  2008): the breaking bow wave, the hull's contact line and the transom.
+  - Their source is E = S₀ f_E(D) dD Σ δ(x − x_s), where the water is less than φ_ent deep and moving down faster than
+    v_ent = 0.22 m/s.
+  - Measured void fractions are 10 to 20 percent at the bow wave, the contact line and the transom (DTMB 5415,
+    Fr 0.35).
+- Castro's thesis (2011, University of Iowa, R/V Athena) gives an entrainment rate and the propeller's effect:
+  - S = S₀ D_ent E Λ(α), with E = (∂Uₙ/∂n) k/(g φ_ent v̄_ent), only where ∂Uₙ/∂n > 0 and the depth is under φ_ent
+    (10 cm);
+  - Λ = max(0, (α_c − 0.7)/0.3);
+  - a spectrum of r^−2.35 up to 2.5 mm, in 15 groups from 10 µm to 4 mm;
+  - rectified diffusion grows bubbles from about 23.5 to 400 µm and from 130 to 700 µm as they pass the propeller
+    (Raju et al. 2009, DTMB P5168).
+- In breaking crests, Ma, Shi and Kirby (2011, via Kirby et al., ICCE 2012) give
+  B = (c_b/4π)(σ/ρ)⁻¹ α_l ε f(a) da / Σ a² f da.
+- Deane and Stokes (2002): the size spectrum goes as r^−3/2 below 1 mm radius and r^−10/3 above.
+- Wake measurements:
+  - Trevorrow, Vagle and Farmer (1994, JASA 95(4), abstract): the top 5 to 6 m, up to 66 m wide at 10 kn, 7 to 12 m
+    deep, strong for about 7.5 min.
+  - Stanic et al. (2009, IEEE JOE 34(1), abstract): spectral slope −3.6, void 4e-7 in a young wake.
+  - Trevorrow (2006, Canadian Acoustics 34(3)): the wake about two drafts deep.
+- Background ocean void (Castro's fit to Melville 1995): α(z) = 1e-4 for z < 0.5 m, then
+  1.8e-5/((0.1 + z)³ (1 − 0.098 z)) to 7.5 m.
+- Dirty-bubble rise speed (Thorpe 1982; Keeling 1993; as Deike and Melville 2018, GRL 45, 10482 give it), with
+  ν = 1.05e-6:
+  - w = (2r²g/9ν)[√(η² + 2η) − η], with η = 10.82/χ and χ = g r³/ν²;
+  - 0.50, 1.58, 3.49, 6.75 and 9.99 cm/s at 50, 100, 200 and 500 µm and 1 mm;
+  - turbulence slows it 30 to 70 percent.
+- Dissolution (Castro):
+  - ṁ = 2π Sh κ R (C∞ − C₀), with C₀ = H (p + 2σ/R), κ = 2e-9 m²/s and Sc = 500;
+  - about 2 min for 100 µm and 2.5 s for 10 µm at the Athena's stern;
+  - Weber et al. (2005) needed gas transfer about 15 times slower than for clean bubbles to explain wakes that last
+    about 30 min.
+- Bubbles last 0.3 to 30 s on the surface in salt water (Anguelova and Huq 2017).
+- Propeller cavitation:
+  - σₙ = (p − p_v)/(½ ρ (nD)²);
+  - inception at σᵢ ≈ −C_p,min = k C_l² Re^0.4 (Billet and Holl, via Brandao 2024);
+  - an upper bound on the tip-vortex cavity, r_c = Γ/(2π W √σ) (Pennings 2016 thesis).
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point
