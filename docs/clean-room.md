@@ -194,6 +194,13 @@ particle identities. Exactly two common particles identify a bonded lip edge. Th
 avoids interpreting an exposed edge on a fully separated fragment as a front.
 [Arbitrary Cutting of Deformable Tetrahedralized Objects](https://physbam.stanford.edu/papers/stanford2007-04.pdf).
 
+O'Brien and Hodgins (1999), §4.3, retain the orientation of a material crack while updating
+its neighbors. When the propagation plane equals an existing bonded facet, Margo releases
+the two incident sides of that facet directly. Only cells that contain the released edge
+insert its midpoint. The native side test treats sums within their arithmetic roundoff
+as lying in the plane. No geometric offset is introduced to split a coincident face.
+[Graphical Modeling and Animation of Brittle Fracture](https://doi.org/10.1145/311535.311550).
+
 Shewchuk's 1997 work on robust geometric predicates motivates checking the determinant
 in the coordinates that the native kernel will hold. An automatic crack is eligible only
 when the replacement has representable f32 vertex positions, affine rest bases and nodal masses.

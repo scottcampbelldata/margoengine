@@ -829,6 +829,7 @@ Under continued tension, an adjacent eligible cell can extend the crack from its
 front edge. The old segment stops participating once its two lips separate.
 To prescribe where the crack starts, use `soft.cutTriangle(solid, blade)` on a solid with
 nucleation enabled. A bonded lip edge becomes eligible for continued tensile growth.
+When the next crack plane coincides with a still-bonded face, the solver opens that face.
 The fracture step chooses a cut that fits the native mesh's precision.
 Nucleation is off by default. Pass `null` to clear the option on the descriptor.
 

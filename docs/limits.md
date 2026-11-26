@@ -9677,8 +9677,8 @@ their material through cuts and snapshots. The advancing front drops its release
 all incident tetrahedra. General mixed-mode propagation remains open.
 An authored finite blade seeds eligible tensile fronts where its paired lips share two
 particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
-principal plane that crosses adjacent cell material. An exactly tangent plane alone does not
-advance by opening a coplanar existing face.
+principal plane that crosses adjacent cell material or coincides with a bonded face. A plane
+that only touches an exposed face cannot advance.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.

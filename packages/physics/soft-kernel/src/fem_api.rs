@@ -17,6 +17,11 @@ pub extern "C" fn soft_fem_fracture_edge() -> u32 {
     world().fem.fracture_edge
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_fracture_face() -> u32 {
+    world().fem.fracture_face
+}
+
 macro_rules! fem_columns {
     ($(($name:ident, $($field:tt)+),)*) => {
         #[allow(non_camel_case_types)]

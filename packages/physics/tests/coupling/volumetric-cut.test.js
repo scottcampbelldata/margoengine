@@ -375,6 +375,62 @@ test('pure opening extends a prescribed finite crack through the bonded material
   assert.equal(replay.world.hash(), control.world.hash());
 });
 
+test('a crack releases an exactly coincident bonded face without sliver cells', async () => {
+  // A precracked tetrahedral fan: vertices 4 and 5 are distinct lips behind the shared edge 0–1.
+  // The entire remaining ligament is the original coplanar face 0–1–2.
+  const nodes = [
+    [-1, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [0, -1, 0],
+    [0, -1, 0],
+    [0, 0, -1],
+  ];
+  const desc = new SoftBodyDesc(nodes)
+    .setCells([0, 1, 2, 3, 0, 1, 3, 4, 0, 1, 5, 6, 0, 1, 6, 2])
+    .setSurface()
+    .setParticleRadius(0)
+    .setPinnedParticles(nodes.map((_, i) => i))
+    .setTensileNucleation(0.01);
+  const { soft, body, world } = await specimen(desc);
+  const flags = soft.cellColumns().flags;
+  for (let i = 0; i < body.cellRange.count; i++) flags[body.cellRange.first + i] |= 1 << 6;
+  world.advance(1);
+  const events = [];
+  soft.onTear((event) => events.push(event));
+  const mass = body.mass();
+  body.setParticleKinematicTarget(3, [0, 0, 1.25]);
+  body.setParticleKinematicTarget(6, [0, 0, -1.25]);
+  world.advance(2);
+  assert.equal(events.length, 1, 'the bonded face opens under pure normal strain');
+  const { pieces } = events[0];
+  assert.equal(pieces.length, 2);
+  const native = soft.cellColumns();
+  let area = 0;
+  let volume = 0;
+  let totalMass = 0;
+  for (const piece of pieces) {
+    closed(piece);
+    // The cone center averages at most six tetrahedron boundary vertices. The smallest cap
+    // triangle has at least 1/8 of its parent face area. Each original rest volume is 1/3 m³.
+    const { first, count } = piece.cellRange;
+    const smallest = Math.min(...native.vol0.subarray(first, first + count));
+    assert.ok(smallest >= 1 / (3 * 6 * 8) - 4 * epsilon32);
+    volume += piece.volume();
+    totalMass += piece.mass();
+    const flat = piece.triangles();
+    for (let i = 0; i < flat.length; i += 3) {
+      const [a, b, c] = Array.from(flat.subarray(i, i + 3), (particle) => piece.particlePosition(particle));
+      if ([a, b, c].every((v) => v[2] === 0))
+        area += Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2;
+    }
+  }
+  bound(area, 4, 4);
+  bound(totalMass, mass, mass);
+  bound(volume, 5 / 3, 5 / 3);
+});
+
 test('a finite blade that misses the solid leaves all state alone', async () => {
   const { world, soft, body } = await specimen(tetrahedron());
   const before = world.hash();

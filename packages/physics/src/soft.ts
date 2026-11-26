@@ -38,6 +38,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_tensile_nucleation(first: number, count: number, threshold: number): number;
   soft_fem_fracture_axis(): number;
   soft_fem_fracture_edge(): number;
+  soft_fem_fracture_face(): number;
   memory: WebAssembly.Memory;
   soft_reserve(particles: number, edges: number, bodies: number, colliders: number): void;
   soft_column(id: number): number;
@@ -5291,9 +5292,10 @@ export class SoftBodies implements PhysicsAttachment {
         const direction: Vec3 = [axis[0]!, axis[1]!, axis[2]!];
         const cell = row - first;
         const front = TETRA_EDGES[this.exports.soft_fem_fracture_edge() >>> 0];
+        const face = this.exports.soft_fem_fracture_face() >>> 0;
         const split = this.splitGeometrically(
           body,
-          (current, cells) => planNucleatedCut(current, cells, cell, direction, front),
+          (current, cells) => planNucleatedCut(current, cells, cell, direction, front, face),
           cell,
           true,
         );

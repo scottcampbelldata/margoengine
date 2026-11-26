@@ -15,6 +15,7 @@ struct Candidate {
     stretch: f64,
     axis: Vec3,
     edge: u32,
+    face: u32,
 }
 
 /// Largest eigenvalue of F F^T and its world-space eigenvector, via symmetric Jacobi rotations.
@@ -66,8 +67,8 @@ fn principal_stretch(f: Columns, minimum: f64) -> Option<(f64, Vec3)> {
     Some((tensor[index][index], directions[index]))
 }
 
-/// A propagation plane must pass through its old front edge and cross the interior material.
-fn continuing_axis(points: [Vec3; 4], axis: Vec3, flags: u32) -> Option<(u32, Vec3)> {
+/// A propagation plane must pass through its old edge and cross interior material or coincide with a bonded face.
+fn continuing_axis(points: [Vec3; 4], axis: Vec3, flags: u32, bonded: [bool; 4]) -> Option<(u32, Vec3, u32)> {
     let mut best = None;
     let mut balance = 0.0;
     for (edge, (a, b, c, d)) in EDGES.into_iter().enumerate() {
@@ -87,16 +88,26 @@ fn continuing_axis(points: [Vec3; 4], axis: Vec3, flags: u32) -> Option<(u32, Ve
         }
         let scale = sqrt64(length_squared).recip();
         let normal = perpendicular.map(|x| x * scale);
-        let distance = |p: usize| dot(normal, [0, 1, 2].map(|i| points[p][i] - points[a][i]));
+        let distance = |p: usize| {
+            let terms = [0, 1, 2].map(|i| normal[i] * (points[p][i] - points[a][i]));
+            let value = terms.into_iter().sum::<f64>();
+            let error = 8.0 * f64::EPSILON * terms.into_iter().map(f64::abs).sum::<f64>();
+            if value.abs() <= error { 0.0 } else { value }
+        };
         let u = distance(c);
         let v = distance(d);
-        if u * v >= 0.0 {
+        let (ratio, face) = if u * v < 0.0 {
+            (u.abs().min(v.abs()) / (u.abs() + v.abs()), NONE)
+        } else if u == 0.0 && v != 0.0 && bonded[d] {
+            (0.0, d as u32)
+        } else if v == 0.0 && u != 0.0 && bonded[c] {
+            (0.0, c as u32)
+        } else {
             continue;
-        }
-        let ratio = u.abs().min(v.abs()) / (u.abs() + v.abs());
-        if ratio > balance {
+        };
+        if best.is_none() || ratio > balance {
             balance = ratio;
-            best = Some((edge as u32, normal));
+            best = Some((edge as u32, normal, face));
         }
     }
     best
@@ -127,27 +138,29 @@ impl World {
             if stretch <= limit {
                 continue;
             }
-            let (edge, axis) = if at_front {
+            let (edge, axis, face) = if at_front {
                 let points = corners.map(|p| [self.x[p] as f64, self.y[p] as f64, self.z[p] as f64]);
-                let Some(front) = continuing_axis(points, axis, flags) else {
+                let bonded = self.fem.nb.each_ref().map(|neighbors| neighbors[t] != NONE);
+                let Some(front) = continuing_axis(points, axis, flags, bonded) else {
                     continue;
                 };
                 front
             } else {
-                (NONE, axis)
+                (NONE, axis, NONE)
             };
-            *selected = Some(Candidate { cell: t, stretch, axis, edge });
+            *selected = Some(Candidate { cell: t, stretch, axis, edge, face });
         }
         let Some(candidate) = existing.or(fresh) else { return NONE };
         self.fem.fracture_axis = candidate.axis;
         self.fem.fracture_edge = candidate.edge;
+        self.fem.fracture_face = candidate.face;
         candidate.cell as u32
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CRACK_FRONT_SHIFT, continuing_axis, dot, principal_stretch};
+    use super::{CRACK_FRONT_SHIFT, NONE, continuing_axis, dot, principal_stretch};
 
     #[test]
     fn rotated_and_compressed_principal_stretches_match_the_analytic_spectrum() {
@@ -165,8 +178,17 @@ mod tests {
     fn projected_axis_advances_through_the_existing_edge_without_cutting_a_tangent() {
         let tet = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, -1.0], [0.0, 1.0, 1.0]];
         let front = 1 << CRACK_FRONT_SHIFT;
-        assert_eq!(continuing_axis(tet, [0.6, 0.0, 0.8], front), Some((0, [0.0, 0.0, 1.0])));
-        assert_eq!(continuing_axis(tet, [1.0, 0.0, 0.0], front), None);
-        assert_eq!(continuing_axis(tet, [0.0, 1.0, 0.0], front), None);
+        assert_eq!(continuing_axis(tet, [0.6, 0.0, 0.8], front, [false; 4]), Some((0, [0.0, 0.0, 1.0], NONE)));
+        assert_eq!(continuing_axis(tet, [1.0, 0.0, 0.0], front, [true; 4]), None);
+        assert_eq!(continuing_axis(tet, [0.0, 1.0, 0.0], front, [true; 4]), None);
+    }
+
+    #[test]
+    fn coincident_plane_can_release_a_bonded_face_but_never_a_free_face() {
+        let tet = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 1.0]];
+        let front = 1 << CRACK_FRONT_SHIFT;
+        let normal = [0.0, 0.0, 1.0];
+        assert_eq!(continuing_axis(tet, normal, front, [false, false, false, true]), Some((0, normal, 3)));
+        assert_eq!(continuing_axis(tet, normal, front, [false, false, true, false]), None);
     }
 }

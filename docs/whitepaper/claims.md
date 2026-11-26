@@ -109,6 +109,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   from the unloaded incised state reproduces the final hash. Run
   `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Coplanar tensile continuation (SOFT-04, 2026-11-26). A four-cell precracked specimen
+  opens exactly on its bonded plane under pure extension. Both new lips have the geometric
+  area expected from the original triangle. The two closed pieces conserve mass and volume,
+  and every new rest cell exceeds the derived minimum volume. The adjacent free face cannot
+  be selected as a new crack. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`
+  and `cargo test --manifest-path packages/physics/soft-kernel/Cargo.toml --lib tensile_nucleation`.
+
 - Load-driven tensile fracture (SOFT-04, 2026-11-26). A 35 kg rigid boot initiates a tensile
   crack on step 4 with a measured 122.86 N boot reaction. At step 18 the fixture has advanced
   15 fracture events and both renderers replay state hash `67aefc4a2ce1fed7`. Every marked

@@ -248,6 +248,7 @@ export function planNucleatedCut(
   cell: number,
   normal: Vec3,
   front?: readonly [number, number],
+  face?: number,
 ): SlicePlan | null {
   const tetrahedron = (id: number): Tet => [cells[4 * id]!, cells[4 * id + 1]!, cells[4 * id + 2]!, cells[4 * id + 3]!];
   const seed = tetrahedron(cell);
@@ -263,6 +264,13 @@ export function planNucleatedCut(
   if (releasedFront) {
     for (const particle of releasedFront) distances[particle] = 0;
     geometry.splitCrackEdge(...releasedFront);
+    if (face !== undefined && FACES[face])
+      return releaseFrontFace(
+        cells,
+        geometry,
+        FACES[face].map((slot) => seed[slot]),
+        releasedFront,
+      );
   }
   const halves = SIGNS.map((side) =>
     FACES.map((face) => faceIntersection(seed, face, side, distances, (a, b) => geometry.sectionEdge(a, b))),
@@ -319,6 +327,40 @@ export function planNucleatedCut(
     ...incisionPieces(children, geometry.points, severed, nextFront.size > 0 ? nextFront : undefined),
     releasedFront,
   };
+}
+
+/** Exactly coplanar growth releases the bonded facet once, without creating a sliver on either side. */
+function releaseFrontFace(
+  cells: Uint32Array,
+  geometry: IncisionGeometry,
+  face: number[],
+  releasedFront: readonly [number, number],
+): SlicePlan | null {
+  const key = faceKey(face);
+  const triangles = geometry.triangles(geometry.refineEdges(face), true);
+  const severed = new Set(triangles.map(faceKey));
+  const children: SliceCell[] = [];
+  let incident = 0;
+  for (let i = 0; i < cells.length; i += 4) {
+    const tet: Tet = [cells[i]!, cells[i + 1]!, cells[i + 2]!, cells[i + 3]!];
+    const parent = i / 4;
+    if (!releasedFront.every((particle) => tet.includes(particle))) {
+      children.push({ parent, nodes: tet, inverse: null, fraction: 1 });
+      continue;
+    }
+    const surface = FACES.flatMap((slots) => {
+      const old = slots.map((slot) => tet[slot]);
+      if (faceKey(old) === key) {
+        incident++;
+        return triangles;
+      }
+      const refined = geometry.refineEdges(old);
+      return geometry.triangles(refined, refined.length !== old.length);
+    });
+    addCones(children, geometry, parent, tet, surface);
+  }
+  if (incident !== 2) return null;
+  return { points: geometry.points, ...incisionPieces(children, geometry.points, severed, true), releasedFront };
 }
 
 function addCones(
