@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19189718,
+  "total": 19191073,
   "history": [
     {
       "date": "2026-10-24",
@@ -12513,6 +12513,12 @@
       "commit": "7a5fc90bc0",
       "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "1f398a3add",
+      "reason": "ecs/coroutines is the new optional entry of 3ddcd16437 (1099 B gzip); its size row was lost in a rebase, which left the sizes gate red on main.",
+      "grew": 1
     }
   ],
   "items": {
@@ -12825,6 +12831,7 @@
     "@margoengine/ecs": 4815,
     "@margoengine/ecs dist/workers/parallel.js": 750,
     "@margoengine/ecs/changes": 882,
+    "@margoengine/ecs/coroutines": 1355,
     "@margoengine/ecs/engine": 2064,
     "@margoengine/ecs/growable": 2237,
     "@margoengine/ecs/objects": 1580,
