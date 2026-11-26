@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20081843,
+  "total": 20085632,
   "history": [
     {
       "date": "2026-10-24",
@@ -12801,6 +12801,12 @@
       "commit": "046ee7e0d",
       "reason": "physics/rogue is a new optional entry (SEA-03): NonlinearSea, the second-order random sea (Dalzell's sum and difference kernels over equal-variance components), the ECMWF freak-wave statistics, rogue waves as constrained NewWaves placed or drawn, and the SeaSurface contract; 7,674 B gzip, its own entry so scenes without nonlinear seas pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/body, 0 to 3,533 B gzip measured (budget 3,789): the hand and pose landmark to humanoid skeleton driver with joint limits and smoothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13317,6 +13323,7 @@
     "@margoengine/ifc/worker": 1828,
     "@margoengine/ifc/write": 10300,
     "@margoengine/input": 5722,
+    "@margoengine/input/body": 3789,
     "@margoengine/input/face": 3737,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,

@@ -322,6 +322,48 @@ console.log(model.primitives[0].weights, face.state.rotation);
 
 ARKit is a trademark of Apple Inc.; only its published blendshape names are used.
 
+## Webcam hands and body to a skeleton
+
+`@margoengine/input/body` poses a humanoid skeleton from Pose Landmarker (33 points) and Hand Landmarker (21 points per hand) frames: each mapped bone turns from its rest direction onto the landmark direction, a second direction fixes the twist of the hips, chest and hands, and each joint stays within its limit. Bones are the VRM humanoid names; `humanoidBones` in `@margoengine/rigging/retarget` maps Mixamo, Godot and other rigs onto them.
+
+```ts
+import {Skeleton} from 'margoengine/animation';
+import {BodyDriver} from 'margoengine/input/body';
+import {landmarkStream, type Landmark} from 'margoengine/input/landmarks';
+
+// A T-pose arm: shoulder, upper arm, forearm and hand, its left at +x (a loaded skin's skeleton fits).
+const skeleton = new Skeleton([
+  {name: 'upperChest', parent: -1, translation: [0, 1.3, 0]},
+  {name: 'leftUpperArm', parent: 0, translation: [0.17, 0.1, 0]},
+  {name: 'leftLowerArm', parent: 1, translation: [0.27, 0, 0]},
+  {name: 'leftHand', parent: 2, translation: [0.25, 0, 0]},
+]);
+using body = new BodyDriver(skeleton, {parts: ['pose']});
+
+// Recorded PoseLandmarker world points (metres, y down): a T-pose, then the forearm raised.
+const point = (x: number, y: number, z = 0): Landmark => ({x, y, z, visibility: 0.99});
+const pose = (wrist: Landmark) => {
+  const points = Array.from({length: 33}, () => point(0, 0));
+  points[11] = point(0.17, -0.45);
+  points[13] = point(0.44, -0.45);
+  points[15] = wrist;
+  return points;
+};
+const frame = (time: number, points: Landmark[]) => ({time, faces: [], hands: [], poses: [{landmarks: points, worldLandmarks: points}]});
+body.calibrate(frame(0, pose(point(0.69, -0.45))));
+
+const source = landmarkStream({buffer: 30});
+for (let time = 33; time <= 990; time += 33) source.push(frame(time, pose(point(0.44, -0.7))));
+source.close();
+await body.drive(source, {signal: AbortSignal.timeout(5000)});
+console.log(skeleton.getPose(2).rotation); // the elbow bent 90 degrees about +z
+```
+
+- `update(frame, time?)` poses the bones from the frame's first pose and one hand per side and returns `{tracked, driven, time}`; `drive(source, {signal, onUpdate})` does it for every frame of a `LandmarkSource`, such as `webcamLandmarks`.
+- `calibrate(frame)`: the person stands in the skeleton's rest pose (T-pose or A-pose) and their landmark directions become the rest directions, so proportions and camera tilt drop out. Uncalibrated, the skeleton's own rest directions are used.
+- Options: `bones` (humanoid name to skeleton name, or the index map `humanoidBones` returns; default the humanoid names, case-insensitive), `parts` (`['pose', 'hands']`), `minVisibility` (0.5: a hidden point leaves its bone where it was), `minScore` (0.5), `hold` (0.5 s, then back to the rest pose), `smoothing` (one-euro `{minCutoff: 1.5, beta: 0.3}` on each direction, or false), `mirror` (false; swaps left and right for a selfie picture), `aspect` (1; for image points when the detector gives no world points) and `limits` (radians per bone name).
+- `POSE_TARGETS` and `handTargets(side)` list the driven bones with their landmarks and default limits (elbows and knees 2.7 rad, fingers 1.6 to 1.9, chest and neck 1). A limit bounds the turn from the bone's rest rotation relative to its parent, as a cone about the rest pose; hinge axes are not enforced. Twist about a bone is kept only where a side direction gives it (hips, chest, hands): upper arms and legs take the shortest turn.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/input

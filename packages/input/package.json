@@ -73,6 +73,10 @@
     "./face": {
       "types": "./dist/face.d.ts",
       "import": "./dist/face.js"
+    },
+    "./body": {
+      "types": "./dist/body.d.ts",
+      "import": "./dist/body.js"
     }
   },
   "files": [

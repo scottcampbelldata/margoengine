@@ -18,6 +18,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { VectorInput, wasd } = await load('../dist/vector.js');
   const { landmarkStream } = await load('../dist/landmarks.js');
   const { FaceDriver } = await load('../dist/face.js');
+  const { BodyDriver } = await load('../dist/body.js');
   const entries = [];
   const input = () => new Input(actions, { target: new EventTarget(), gamepads: () => [] });
   // `make` returns { release, cleanup? } and runs, like the release, with timers watched.
@@ -151,6 +152,32 @@ export async function fixtures(load = (entry) => import(entry)) {
     return {
       release: () => {
         face.dispose();
+        source.dispose();
+      },
+      cleanup: () => driving,
+    };
+  });
+  own('BodyDriver', () => {
+    const skeleton = {
+      names: ['hips', 'spine', 'leftUpperArm', 'leftLowerArm'],
+      parents: [-1, 0, 1, 2],
+      getPose: (i) => ({
+        translation: [
+          [0, 1, 0],
+          [0, 0.3, 0],
+          [0.2, 0, 0],
+          [0.3, 0, 0],
+        ][i],
+        rotation: [0, 0, 0, 1],
+      }),
+      setPose() {},
+    };
+    const body = new BodyDriver(skeleton),
+      source = landmarkStream();
+    const driving = body.drive(source);
+    return {
+      release: () => {
+        body.dispose();
         source.dispose();
       },
       cleanup: () => driving,

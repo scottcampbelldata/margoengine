@@ -2079,6 +2079,10 @@
       "types": "./dist/input/face.d.ts",
       "import": "./dist/input/face.js"
     },
+    "./input/body": {
+      "types": "./dist/input/body.d.ts",
+      "import": "./dist/input/body.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

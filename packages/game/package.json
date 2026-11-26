@@ -1559,6 +1559,10 @@
       "types": "./dist/input/face.d.ts",
       "import": "./dist/input/face.js"
     },
+    "./input/body": {
+      "types": "./dist/input/body.d.ts",
+      "import": "./dist/input/body.js"
+    },
     "./lighting2d/sdf": {
       "types": "./dist/lighting2d/sdf.d.ts",
       "import": "./dist/lighting2d/sdf.js"

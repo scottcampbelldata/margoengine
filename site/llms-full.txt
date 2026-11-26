@@ -3144,6 +3144,11 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   need the detector's blendshape scores. Landmark weights are distance ratios against a neutral face, so they read
   best after `calibrate` on the person; the head rotation from landmarks has no translation.
 
+- Webcam hands and body to a skeleton (`@margoengine/input/body`, 2026-11-26): no detector shipped; the app supplies
+  one. Each bone follows one landmark direction, so twist about a bone is kept only where a side direction gives it
+  (hips, chest, hands); upper arms and legs take the shortest turn. Joint limits are cones about the rest rotation
+  relative to the parent, not hinge axes; the root is rotated, never moved; one pose and one hand per side are read.
+
 - Webcam landmarks (`@margoengine/input/landmarks`, 2026-11-26): no detector shipped; the app supplies one. Margo
   bundles no trained weights and never downloads a model; frames come from the app's own detector (MediaPipe Tasks
   results plug in through `fromMediaPipe`). A stream keeps only the newest `buffer` frames (default 1) for a slow reader.
