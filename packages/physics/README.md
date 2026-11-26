@@ -2852,12 +2852,16 @@ Rogue waves are real events, each a constrained NewWave: the most likely shape o
 - `seed` (default 0), `gravity`, `current` (a water `FlowField` added to the waves' motion) and `temperature` (default 288.15 K);
 - `rogues`: `false`, a list of crests to place (`{position: [x, z], time, crest}`), or a region (`{min, max, from, to}`, default the 2 km square about `at` over the first hour) where the rogues focusing adds beyond the second order's own are drawn at the rate the statistics give. A long-crested narrow storm draws several an hour; a short-crested sea, whose R is above 1, draws none.
 
+Runs of high waves, the Great Lakes' "three sisters":
+- `runStatistics(spectrum, threshold, {method, kappa, period})`: how often a wave above `threshold` H_s is followed by another, by Kimura's (1980) chain of successive heights. It reports that chance (`persistence`), the mean run, `runsPerHour(j)` and `inARowPerHour(j)`. The correlation comes from the spectrum by Battjes and van Vledder (default), or by van Vledder's corrected estimate (`method: 'corrected'`), which gives longer groups. In a 10 s storm sea, three waves in a row above 1.5 H_s come about a hundred times as often as independent waves would bring them.
+- `sisters(spectrum, {position, time}, crests)`: three crests at one place, a group's crest spacing apart. The spacing is `groupSpacing`, the sea's autocovariance's first maximum after its first minimum. Pass them to a `NonlinearSea` as its `rogues`, and it stands them up together as three successive crests at their heights.
+
 Reading the sea:
 - `elevation(x, z, t)`, `linearElevation(x, z, t)`, `sample(x, z, t)` (height, normal, velocity, current, depth, density), `velocity(x, y, z, t)` (linear theory under Wheeler's stretching), `pressure(x, y, z, t)` and `water`;
 - `statistics`, `rogues` and `variance`.
 
 ```ts
-import {NonlinearSea} from 'margoengine/physics/rogue';
+import {NonlinearSea, sisters} from 'margoengine/physics/rogue';
 import {jonswap} from 'margoengine/physics/waves';
 
 // The North Sea on 1 January 1995: H_s 11.9 m, a peak period of 15 s in 70 m of water, and the Draupner wave's 18.5 m crest.
@@ -2872,6 +2876,15 @@ console.log(sea.elevation(0, 0, 600).toFixed(1)); // 18.5
 console.log(sea.elevation(0, 0, 600) - sea.linearElevation(0, 0, 600) > 1); // true: the bound waves lift the crest
 console.log(sea.statistics.rogueCrestChance > Math.exp(-12.5)); // true: crests pass 1.25 H_s more often than Rayleigh's
 console.log(sea.elevation(0, 0, 100) === new NonlinearSea({spectrum, rogues: false}).elevation(0, 0, 100)); // true
+
+// Lake Superior's three sisters: three crests of 7, 8 and 9 m at one place, one after another.
+const superior = jonswap(
+  {height: 7, period: 10, direction: 0},
+  {frequencies, directions, energy: new Float64Array(40 * 36), depth: 150, density: 1000},
+);
+const three = sisters(superior, {position: [0, 0], time: 300}, [7, 8, 9]);
+const lake = new NonlinearSea({spectrum: superior, rogues: three});
+console.log(three.map((e) => lake.elevation(0, 0, e.time).toFixed(1)).join(' ')); // 7.0 8.0 9.0
 ```
 
 ### Solver modules on one memory

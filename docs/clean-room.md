@@ -12318,6 +12318,20 @@ wave model, any HOS or NLS solver or any wave library was opened; no companion c
 - J. D. Wheeler, "Method for calculating forces produced by irregular waves", J. Petroleum Technology 22, 359-367, 1970 (as
   the offshore literature restates it): stretching linear kinematics to the instantaneous surface.
 
+Added the same day, runs of high waves (the three sisters, `packages/physics/src/rogue/groups.ts`):
+- A. Kimura, "Statistical properties of random wave groups", Proc. 17th ICCE, 1980, https://doi.org/10.9753/icce.v17.175
+  (eqs. 5 to 19, tables 1 and 2, read): the two-dimensional Rayleigh law of successive heights, the correlation of eq. 7, p22,
+  the mean run and runs of j waves.
+- J. A. Battjes and G. Ph. van Vledder, "Verification of Kimura's theory for wave group statistics", Proc. 19th ICCE, 1984,
+  https://doi.org/10.9753/icce.v19.43 (eqs. 3 to 5, read): kappa from the spectrum at T_m02, biased toward short groups.
+- G. Ph. van Vledder, "Statistics of wave group parameters", Proc. 23rd ICCE, 1992 (eqs. 2.8, 4.3, 4.4 and 9.6 to 9.8, read):
+  the corrected correlation of successive heights.
+- F. Fedele, "Stochastic wave groups in weakly nonlinear random waves", 2008 (sections 1 to 4, read), restating Lindgren
+  (1970) and Boccotti: the expected group about a large crest from the autocovariance.
+The elliptic integrals by the arithmetic-geometric mean, Marcum's Q by Simpson's rule over the scaled Rice density, p22 as
+the integral of Rice's law over the high first heights, and three sisters as three constrained crests a group spacing apart
+are this package's own arrangement. Proof: `packages/physics/tests/sisters.test.js`.
+
 The equal-variance draw (stratified quantiles of the frequency marginal, the direction from the bin's distribution), the
 joint solve of several events' crest and slope constraints, the secant correction of each linear crest for the second order's
 rise, the events' space-time window with amplitudes that vary over it, the rate of drawn rogues (one wave per zero-crossing

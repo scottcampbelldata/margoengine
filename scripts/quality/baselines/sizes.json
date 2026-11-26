@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20386107,
+  "total": 20387428,
   "history": [
     {
       "date": "2026-10-24",
@@ -13131,6 +13131,12 @@
       "commit": "d19267aa1e",
       "grew": 1,
       "reason": "ATMO-10's optional synoptic entry increases from 5911 to 7241 B gzip with two-layer baroclinic growth, hypsometric temperature, altitude-dependent winds and measured ocean stress. A split would duplicate the regional grid, native loader and field outputs."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ded69116e",
+      "reason": "physics/rogue ceiling 7930 to 9,251 B (built 7,674 to 8,982 B): the three sisters, runs of high waves by Kimura's chain (elliptic integrals, Rice's law, Marcum's Q), the spectral and corrected kappa, the group spacing and placed sister groups. In the rogue entry because placing sisters needs the nonlinear sea it stands them in; a split would load the sea twice.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13981,7 +13987,7 @@
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,
-    "@margoengine/physics/rogue": 7930,
+    "@margoengine/physics/rogue": 9251,
     "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,

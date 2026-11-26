@@ -30,7 +30,7 @@ export const ALWAYS = [
   'packages/physics/src/foam/spray.ts',
   'packages/physics/src/foam/index.ts',
   'packages/physics/src/surf/index.ts',
-  'packages/physics/src/rogue/index.ts',
+  'packages/physics/src/rogue/*.ts',
   'packages/physics/src/ship/*.ts',
   'packages/physics/src/loads/*.ts',
   'packages/physics/src/pbf/*.ts',

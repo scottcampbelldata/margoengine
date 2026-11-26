@@ -49,6 +49,18 @@ export interface RogueRegion {
     readonly to?: number;
 }
 
+export interface RunStatistics {
+    kappa: number;
+    correlation: number;
+    exceedance: number;
+    persistence: number;
+    meanRun: number;
+    period: number;
+    wavesPerHour: number;
+    runsPerHour(j: number): number;
+    inARowPerHour(j: number): number;
+}
+
 export interface SeaStatistics {
     significantHeight: number;
     peakPeriod: number;
@@ -77,7 +89,13 @@ export function crestChance(xi: number, s: Pick<SeaStatistics, 'kurtosis' | 'ske
 
 export function expectedMaximum(waves: number, s: Pick<SeaStatistics, 'kurtosis'>): number;
 
+export function groupSpacing(spectrum: WaveSpectrumSample): number;
+
 export function heightChance(h: number, s: Pick<SeaStatistics, 'kurtosis'>): number;
+
+export function heightCorrelation(kappa: number): number;
+
+export function kappaFor(correlation: number): number;
 
 export function kurtosisFactor(r: number): number;
 
@@ -86,5 +104,20 @@ export function pairKernels(a: WaveComponent, b: WaveComponent, depth?: number, 
     difference: number;
 };
 
+export function runStatistics(spectrum: WaveSpectrumSample, threshold?: number, options?: {
+    readonly method?: 'spectral' | 'corrected';
+    readonly kappa?: number;
+    readonly period?: number;
+}): RunStatistics;
+
 export function seaStatistics(spectrum: WaveSpectrumSample, options?: SeaStatisticsOptions): SeaStatistics;
+
+export function sisters(spectrum: WaveSpectrumSample, at: {
+    readonly position: readonly [number, number];
+    readonly time: number;
+}, crests: number | readonly [number, number, number], spacing?: number): {
+    position: [number, number];
+    time: number;
+    crest: number;
+}[];
 ```

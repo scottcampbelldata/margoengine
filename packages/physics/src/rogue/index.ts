@@ -45,6 +45,8 @@ import { cos, exp, ln, sin } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { bandWidth, wavenumber } from '../waves/spectral.js';
 
+export { groupSpacing, heightCorrelation, kappaFor, type RunStatistics, runStatistics, sisters } from './groups.js';
+
 const TWO_PI = 6.283185307179586;
 const PI = 3.141592653589793;
 const SQRT_PI = 1.772453850905516;
