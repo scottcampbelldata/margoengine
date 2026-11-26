@@ -250,7 +250,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
 | SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
-| SOUND-04 | Contact and modal sound | none | Codex | BUILDING (codex/physics-lane-3) |
+| SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
 | BIO-03 | Forest ecosystem dynamics | sound | Open | OPEN |
