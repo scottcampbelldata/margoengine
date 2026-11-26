@@ -4407,3 +4407,10 @@ particle mass to match the fluid velocity-squared metric. At each iteration it a
 impulse through the rigid inverse mass and inertia and updates the sampled boundary velocity.
 The fluid–rigid part follows Gissler et al. (2019), §§3.1–3.3 and Equations 2–4. The world retains
 its own rigid contact solver. [Interlinked SPH Pressure Solvers for Strong Fluid-Rigid Coupling](https://cg.informatik.uni-freiburg.de/publications/2019_TOG_strongCoupling_v2.pdf)
+
+Run the same coupling file with `--test-name-pattern="direct contact"` to isolate a sliding impact
+from either pressure solve. Along a direction j the local velocity response adds the fluid inverse mass,
+the rigid translation and (I⁻¹(r × j)) × r. The normal impulse stops approach. Then the tangent direction
+is projected in this mobility metric so the friction step preserves the solved normal velocity.
+The test reconstructs the relative velocity from the returned wrench and independently checks the
+projected 40% slip reduction, conservation of linear momentum and the energy change.

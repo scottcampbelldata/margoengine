@@ -856,7 +856,76 @@ fn remove_inward(p: &mut Particle, normal: Vec3, surface_velocity: Vec3, frictio
     scale(change, -p.mass)
 }
 
-fn contacts(settings: &Settings, p: &mut Particle, shapes: &[Solid], out: &mut [Reaction]) -> f64 {
+fn mobility_at(body: &BodyMobility, arm: Vec3, force: Vec3, liquid_inverse_mass: f64) -> Vec3 {
+    let torque = cross(arm, force);
+    let (linear, angular) = body.response(&[
+        force[0], force[1], force[2], torque[0], torque[1], torque[2],
+    ]);
+    add(
+        scale(force, liquid_inverse_mass),
+        add(linear, cross(angular, arm)),
+    )
+}
+
+fn moving_contact(
+    p: &mut Particle,
+    shape: &Solid,
+    normal: Vec3,
+    at: Vec3,
+    friction: f64,
+    body: &BodyMobility,
+    pending: &Reaction,
+) -> Vec3 {
+    let arm = sub(at, shape.centre);
+    let (linear, angular) = body.response(pending);
+    let surface_velocity = add(body_velocity(shape, at), add(linear, cross(angular, arm)));
+    let relative = sub(p.velocity, surface_velocity);
+    let inward = dot(relative, normal);
+    if inward >= 0.0 {
+        return ZERO;
+    }
+    let inverse = 1.0 / p.mass;
+    let normal_change = mobility_at(body, arm, normal, inverse);
+    let normal_mobility = dot(normal, normal_change);
+    let magnitude = -inward / normal_mobility;
+    let mut impulse = scale(normal, magnitude);
+    if friction > 0.0 {
+        let relative_after_normal = add(relative, scale(normal_change, magnitude));
+        let tangent = sub(
+            relative_after_normal,
+            scale(normal, dot(relative_after_normal, normal)),
+        );
+        let slip = length(tangent);
+        if slip > 0.0 {
+            let direction = scale(tangent, 1.0 / slip);
+            // Remove tangent speed along an impulse direction with zero normal
+            // velocity response. Limit that impulse to keep contact unilateral.
+            let cross_mobility = dot(direction, normal_change);
+            let friction_direction =
+                sub(direction, scale(normal, cross_mobility / normal_mobility));
+            let drag_mobility = dot(
+                friction_direction,
+                mobility_at(body, arm, friction_direction, inverse),
+            );
+            let mut drag = friction * slip / drag_mobility;
+            let normal_fraction = dot(friction_direction, normal);
+            if normal_fraction > 0.0 {
+                drag = drag.min(magnitude / normal_fraction);
+            }
+            impulse = sub(impulse, scale(friction_direction, drag));
+        }
+    }
+    p.velocity = add(p.velocity, scale(impulse, inverse));
+    scale(impulse, -1.0)
+}
+
+fn contacts(
+    settings: &Settings,
+    p: &mut Particle,
+    shapes: &[Solid],
+    out: &mut [Reaction],
+    mobility: &[BodyMobility],
+) -> f64 {
     let mut normal_impulse = 0.0;
     let walls = settings.walls as u32;
     for axis in 0..3 {
@@ -877,7 +946,20 @@ fn contacts(settings: &Settings, p: &mut Particle, shapes: &[Solid], out: &mut [
         if let Some((normal, depth)) = clip_solid(shape, p.position, settings.radius) {
             p.position = add(p.position, scale(normal, depth));
             let at = sub(p.position, scale(normal, settings.radius));
-            let impulse = remove_inward(p, normal, body_velocity(shape, at), settings.friction);
+            let impulse = if shape.body < 0.0 {
+                remove_inward(p, normal, body_velocity(shape, at), settings.friction)
+            } else {
+                let row = shape.body as usize;
+                moving_contact(
+                    p,
+                    shape,
+                    normal,
+                    at,
+                    settings.friction,
+                    item(mobility, row),
+                    item(out, row),
+                )
+            };
             normal_impulse += dot(normal, impulse).abs();
             record_impulse(out, shape, at, impulse);
         }
@@ -1335,7 +1417,7 @@ pub unsafe extern "C" fn solve_dfsph(
         density_error = error * step;
         for p in points.iter_mut() {
             p.position = add(p.position, scale(p.velocity, step));
-            normal_impulse += contacts(settings, p, shapes, reactions);
+            normal_impulse += contacts(settings, p, shapes, reactions, mobility);
         }
         rebuild(&mut grid, points, boundary);
         cached += prepare(

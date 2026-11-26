@@ -288,6 +288,79 @@ test('the native pressure projection includes the recoil of a light rigid plate'
   }
 });
 
+test('a direct contact on a light plate conserves momentum and dissipates sliding energy', async () => {
+  await Physics.load({ threads: false });
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(false) });
+  const rigid = new Physics(null, { arena: world.arena, gravity: ZERO, fixedTimestep: DT });
+  try {
+    const halfExtents = [0.035, 0.7, 0.7];
+    const plate = rigid.addBody(null, {
+      colliders: { shape: 'box', halfExtents, mass: 0.125, sensor: true },
+    });
+    world.add(new RigidSolver(), { physics: rigid, capacity: rigid.kernel.capacity });
+    const liquid = await DfsphSolver.load(world.memory, { rigid: true });
+    const velocity = [-0.375, 0.375, 0];
+    const friction = 0.4;
+    world.add(liquid, {
+      bounds: wide,
+      spacing: 0.5,
+      viscosity: 0,
+      friction,
+      divergenceTolerance: 1000,
+      boundaries: [{ body: plate.row, halfExtents }],
+      particles: [{ position: [0.29, 0.2, 0], velocity }],
+    });
+    world.couple(['rigid', liquid.id], 'implicitPressure');
+    world.advance(1);
+    assert.equal(liquid.statistics.densityIterations, 0);
+    assert.equal(liquid.statistics.divergenceIterations, 0);
+    const sample = liquid.sample(0);
+    near(sample.position[0], halfExtents[0] + 0.25);
+    const bodyPort = world.fields.port(BODIES_FIELD.name);
+    const bodies = regionWords(world.memory, bodyPort.region);
+    const body = bodies.subarray(plate.row * BODY_WORDS);
+    const inverseMass = body[16];
+    const [xx, xy, xz, yy, yz, zz] = body.subarray(17, 23);
+    const arm = [halfExtents[0] - body[7], sample.position[1] - body[8], sample.position[2] - body[9]];
+    const cross = ([ax, ay, az], [bx, by, bz]) => [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
+    const dot = (a, b) => a.reduce((sum, value, index) => sum + value * b[index], 0);
+    const rigidResponse = (impulse, [tx, ty, tz]) => ({
+      linear: impulse.map((value) => inverseMass * value),
+      angular: [xx * tx + xy * ty + xz * tz, xy * tx + yy * ty + yz * tz, xz * tx + yz * ty + zz * tz],
+    });
+    const atContact = ({ linear, angular }) => cross(angular, arm).map((value, axis) => linear[axis] + value);
+    const normal = [1, 0, 0];
+    const normalVelocity = atContact(rigidResponse(normal, cross(arm, normal)));
+    normalVelocity[0] += 1 / sample.mass;
+    const normalImpulse = -velocity[0] / normalVelocity[0];
+    const slip = velocity.map((value, axis) => value + normalImpulse * normalVelocity[axis]);
+    const slipSpeed = Math.hypot(...slip);
+    const slipDirection = slip.map((value) => value / slipSpeed);
+    const port = liquid.exportPorts(0).find(({ field }) => field === BODY_IMPULSES_FIELD.name);
+    const impulse = regionWords(world.memory, port.region).subarray(6 * plate.row, 6 * plate.row + 6);
+    const force = impulse.subarray(0, 3);
+    const torque = impulse.subarray(3);
+    for (const [axis, expected] of cross(arm, force).entries()) near(torque[axis], expected);
+    const response = rigidResponse(force, torque);
+    const recoil = atContact(response);
+    const remaining = sample.velocity.map((value, axis) => value - recoil[axis]);
+    near(remaining[0], 0);
+    near(dot(remaining, slipDirection), (1 - friction) * slipSpeed);
+    assert.ok(force[0] < 0 && force[1] > 0);
+    for (let axis = 0; axis < 3; axis++)
+      near(sample.mass * sample.velocity[axis] + force[axis], sample.mass * velocity[axis]);
+    const energyBefore = (sample.mass * dot(velocity, velocity)) / 2;
+    const energyAfter =
+      (sample.mass * dot(sample.velocity, sample.velocity) +
+        dot(force, response.linear) +
+        dot(torque, response.angular)) /
+      2;
+    assert.ok(energyAfter < energyBefore);
+  } finally {
+    rigid.dispose();
+  }
+});
+
 test('warm pressure and the dual-clock fluid replay bit-for-bit on both memory modes', async () => {
   const particles = pair(0.3, [0.2, 0, 0]);
   const make = async (num, shared) =>

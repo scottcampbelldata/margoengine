@@ -18495,14 +18495,14 @@
       "brotli": 6237
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
-      "raw": 34052,
-      "gzip": 13010,
-      "brotli": 11022
+      "raw": 35566,
+      "gzip": 13676,
+      "brotli": 11665
     },
     "packages/physics/dist/dfsph-kernel-shared.wasm": {
-      "raw": 34052,
-      "gzip": 13010,
-      "brotli": 11100
+      "raw": 35566,
+      "gzip": 13676,
+      "brotli": 11681
     },
     "packages/physics/dist/lightning-kernel.wasm": {
       "raw": 2357,

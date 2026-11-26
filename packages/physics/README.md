@@ -4681,6 +4681,8 @@ exchange, load with `rigid: true`, set the boundary's `body` row and use
 `modalContactField` to excite resonances from hard liquid impacts. Run both at the same world rate.
 Each pressure iteration evaluates rigid boundary velocities after their reciprocal linear and angular
 impulse. The solver takes inverse mass and world-axis inverse inertia from the rigid body field.
+At a direct contact, friction removes the configured fraction of projected tangent slip while preserving
+the normal contact constraint and applying the matching wrench to the solid.
 
 Use `parcelCapacity` when a second world solver owns a liquid volume and momentum ledger. Register
 `parcelFields.requests` as its output and `parcelFields.receipts` as its input on the same dyadic rate,

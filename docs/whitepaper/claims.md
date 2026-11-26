@@ -5953,3 +5953,7 @@ A 125 kg liquid sample approaching a 0.125 kg rigid plate at 0.375 m/s gives bot
 speed in one pressure iteration. The opposite impulse of 0.046828 N·s preserves momentum and the
 kinetic energy decreases to the constrained minimum. Plain and shared native memory replay identically.
 [Reproduce](reproduce.md#fluid-01-rigid-recoil)
+
+The direct moving-solid collision uses the effective contact mass and projected friction. The independent
+light-plate test measures zero normal slip, removal of 40% of the selected tangent slip, the matching
+off-centre rigid torque and lower kinetic energy. [Reproduce](reproduce.md#fluid-01-rigid-recoil)
