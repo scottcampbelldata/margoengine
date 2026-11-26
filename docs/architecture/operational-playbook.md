@@ -10344,7 +10344,11 @@ mixes in the mirrored colour. Fragment work only, so the WebGL2 layer runs the s
 `packages/post/test/mesh-blend-browser.mjs` on WebGPU and the WebGL2 layer (a tagged box's seam with the ground
 softens into red-green mixes; an untagged box's seam, the sky, the tagged box's pixels next to the sky and its sides in
 front of far ground keep every pixel; untagging restores the frame) and `mesh-blend.test.js` (falloff, depth-slope
-rejection from either side, options and tags). Missing: GPU timings, and glTF and terrain tagging.
+rejection from either side, options and tags). gltf/pbr models, materials meshes and terrain are tagged through the
+capture hook SceneTargets uses (one hook per tagged model writing its radius and a key counted down from the top of the
+key range), drawn into the same tag target inside the tag pass: `packages/post/test/mesh-blend-models-browser.mjs` on
+WebGPU and the WebGL2 layer (a tagged Box.glb sunk in a flat terrain softens its seam, the sky keeps every pixel,
+untagging restores the frame, and tagging the terrain softens the same seam). Missing: GPU timings.
 
 ## Image filter graph (section 5 evidence, 2026-11-26)
 

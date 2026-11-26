@@ -74,3 +74,41 @@ test('MeshBlend checks its options and tags, and needs a stack', () => {
   blend.dispose();
   assert.throws(() => blend.setup({ gpu: {} }), /disposed/);
 });
+
+test('MeshBlend tags capture models through their hook and releases it', () => {
+  const calls = { set: 0, restored: 0 };
+  let hook;
+  const model = {
+    setCapture(h) {
+      calls.set++;
+      hook = h;
+      return () => calls.restored++;
+    },
+    onDispose: () => () => {},
+    draw() {},
+  };
+  const blend = new MeshBlend();
+  const remove = blend.tag(model, 0.25);
+  assert.equal(calls.set, 1);
+  assert.equal(blend.tags.get(model), 0.25);
+  assert.deepEqual(
+    hook.targets.map((t) => t.format),
+    ['rgba16float'],
+  );
+  // The hook writes the model's radius and its key for a gltf/pbr surface and for terrain, and refuses anything else.
+  assert.match(hook.declarations('struct Surface {n:vec3f}'), /fn margoCapture\(s:Surface[^]*vec4f\(0\.25,/);
+  assert.match(
+    hook.declarations('struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f}'),
+    /fn margoSSR\([^]*vec4f\(0\.25,/,
+  );
+  assert.throws(() => hook.declarations('fn other() {}'), /terrain/);
+  blend.tag(model, 0.5);
+  assert.equal(calls.restored, 1, 'tagging again swaps the hook');
+  assert.equal(blend.tags.get(model), 0.5);
+  remove();
+  assert.equal(calls.restored, 2);
+  assert.equal(blend.tags.size, 0);
+  blend.tag(model, 0.1);
+  blend.dispose();
+  assert.equal(calls.restored, 3, 'dispose releases tagged models');
+});

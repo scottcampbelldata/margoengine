@@ -9269,15 +9269,20 @@ texture edge (no wrapping). GPU cost not measured.
 
 ### Mesh blending (`@margoengine/post/mesh-blend`, 2026-11-26)
 
-WebGPU and the WebGL2 layer; an HDR PostStack effect. Core meshes can be tagged (a tag on a parent covers its child
-meshes); terrain, glTF models and other plugin-drawn surfaces take part only as the untagged side of a seam. Keys are
-entity id + 1 in two float16-exact halves, so entity ids up to 4,194,302; radii up to 65,504 world units. The tag
-pass redraws every core mesh once per view at 1x into an `rgba16float` target with its own `depth32float`; the radius
-table is 256 texels wide, one `r32float` per entity slot, rewritten each frame. One seam per pixel: the nearest of at
+WebGPU and the WebGL2 layer; an HDR PostStack effect. Core meshes (a tag on a parent covers its child meshes),
+gltf/pbr models, materials meshes and terrain can be tagged; other plugin-drawn surfaces (imposters, particles, water)
+take part only as the untagged side of a seam. Keys are entity id + 1 in two float16-exact halves; a tagged model
+takes a key counted down from 4,194,303, one per tag (65,536 before they repeat), so entity ids must stay below
+4,128,767 for the two ranges to stay apart. Radii up to 65,504 world units. The tag pass redraws every core mesh, and
+each tagged model and terrain through its capture hook with its own material (alpha masks, skinning and morphs as
+drawn), once per view at 1x into an `rgba16float` target with its own `depth32float`; changing a model's radius
+compiles its capture shader again. The radius table is 256 texels wide, one `r32float` per entity slot, rewritten each
+frame. One seam per pixel: the nearest of at
 most 4 candidates on the search spiral that passes the depth test; where three surfaces meet the nearest wins. The
 search reaches `maxPixels` (128 at most), so a radius wider on screen is cut. A tag pass surface counts where its
 depth matches the resolved scene depth within 0.2% and one pixel's depth span; a pixel whose centre holds no
-matching core surface borrows a neighbour's tag within 1% and two spans, so a seam can shift by a pixel. At mesh
+matching surface borrows a neighbour's tag whose depth matches within 0.2% and that neighbour's own span, so a seam can
+shift by a pixel. At mesh
 corners the spiral sampling leaves a faint speckle at the edge of the radius. GPU cost not measured.
 
 ### Spatial upscaler (`@margoengine/post/upscale`, 2026-11-26)
