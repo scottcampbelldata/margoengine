@@ -152,8 +152,8 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Infinite shader grid with cell and section sizes and distance fade (`GridHelper` is finite) | drei `Grid` | DONE (`@margoengine/lines/infinite-grid`) | S | f144ef66b |
 | Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | MISSING | S |  |
 | Light probe helper and positional-audio cone helper | three.js | MISSING | S |  |
-| Raycaster helper (ray and hits) and BVH tree visualiser with a depth slider | three.js, three-mesh-bvh | DONE (`@margoengine/lines/tree-helpers`: `RaycasterHelper`, `BVHHelper`) | S | ff2474072 |
-| Octree helper for `points/src/octree.ts` | three.js | DONE (`@margoengine/lines/tree-helpers`: `OctreeHelper`) | S | ff2474072 |
+| Raycaster helper (ray and hits) and BVH tree visualiser with a depth slider | three.js, three-mesh-bvh | DONE (`@margoengine/lines/tree-helpers`: `RaycasterHelper`, `BVHHelper`) | S | 312af62b9 |
+| Octree helper for `points/src/octree.ts` | three.js | DONE (`@margoengine/lines/tree-helpers`: `OctreeHelper`) | S | 312af62b9 |
 | Cycle raycast: repeat a pick to step through overlapping hits | drei | DONE (`CycleRaycast`, `@margoengine/selection`) | S | 29bb42e10 |
 | Bounding-box anchor: HTML or a label pinned to a box corner or face | drei `BBAnchor` | DONE (`boxAnchorPoint`, `@margoengine/labels`) | S | 9cf6c56f0 |
 | Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | MISSING | L |  |
