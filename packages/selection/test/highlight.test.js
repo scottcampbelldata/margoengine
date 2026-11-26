@@ -2,6 +2,7 @@
 import test from 'node:test';
 import { Selection } from '../dist/index.js';
 import { Highlight } from '../dist/highlight.js';
+import { setRenderLayers } from '../../cameras/dist/layers.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 test('highlight validates mutable styles and its mask-only path needs no distance-field compute', () => {
   for (const options of [
@@ -79,4 +80,31 @@ test('highlight refuses the small WebGL2 preview during setup with its own coded
   } finally {
     engine.dispose();
   }
+});
+
+test('highlight layers limit which selected meshes glow, and the option is live', () => {
+  const h = optionalGPU(),
+    effect = new Highlight({ layers: 2 }),
+    on = { id: 3, check() {} },
+    off = { id: 4, check() {} };
+  setRenderLayers(on, 2);
+  setRenderLayers(off, 1);
+  h.engine.meshes.set(3, on);
+  h.engine.meshes.set(4, off);
+  h.engine.use(effect);
+  effect.set([on, off]);
+  const flags = () => {
+    h.frame();
+    const writes = h.bufferWrites.filter((w) => w.bytes === 64);
+    const last = writes[writes.length - 1].buffer;
+    return [...new Uint32Array(last.data, 0, 16)];
+  };
+  const first = flags();
+  assert.deepEqual([first[3], first[4]], [1, 0]);
+  effect.options.layers = 3;
+  const second = flags();
+  assert.deepEqual([second[3], second[4]], [1, 1]);
+  effect.options.layers = 1.5;
+  assert.throws(() => h.frame(), RangeError);
+  effect.dispose();
 });

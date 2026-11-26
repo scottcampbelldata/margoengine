@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20506586,
+  "total": 20522371,
   "history": [
     {
       "date": "2026-10-24",
@@ -13311,6 +13311,12 @@
       "commit": "353704a4b2ffc8b52ac4e711838717dbf07de872",
       "grew": 1,
       "reason": "SOFT-03 moves the optional strands entry from 5557 to 5806 B gzip for swept link and capsule contact plus the retained rigid capsule poses. A split would duplicate the native loader and collide with the existing field ownership. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "55b0f51fb",
+      "reason": "new mesh-edit/geometry entry; selection layers option",
+      "grew": 1
     }
   ],
   "items": {
@@ -14057,6 +14063,7 @@
     "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-batch": 10775,
     "@margoengine/mesh-edit/boolean-exact": 10618,
+    "@margoengine/mesh-edit/geometry": 15785,
     "@margoengine/mesh-edit/hull": 12352,
     "@margoengine/mesh-edit/modeling": 35466,
     "@margoengine/mesh-edit/modifiers": 8564,

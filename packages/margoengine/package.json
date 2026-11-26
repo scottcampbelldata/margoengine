@@ -2927,6 +2927,10 @@
       "types": "./dist/mesh-edit/modeling.d.ts",
       "import": "./dist/mesh-edit/modeling.js"
     },
+    "./mesh-edit/geometry": {
+      "types": "./dist/mesh-edit/geometry.d.ts",
+      "import": "./dist/mesh-edit/geometry.js"
+    },
     "./mesh-edit/boolean-exact": {
       "types": "./dist/mesh-edit/boolean-exact.d.ts",
       "import": "./dist/mesh-edit/boolean-exact.js"

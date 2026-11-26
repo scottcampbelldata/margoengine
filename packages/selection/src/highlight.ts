@@ -38,6 +38,8 @@ export interface HighlightOptions {
   innerGlow?: boolean;
   /** Halo outside visible selected pixels. Default true. */
   outerGlow?: boolean;
+  /** Render-layer mask: only selected meshes sharing a bit with it glow, as `SpatialPickingOptions.layers` limits picking. Mutable. Default every layer. */
+  layers?: number;
 }
 class MaskSelection extends Selection {
   protected override outlineVisible = false;
@@ -85,7 +87,14 @@ export class Highlight implements EnginePlugin {
   constructor(readonly options: HighlightOptions = {}) {
     this.name = options.name ?? 'selection-highlight';
     this.validate();
-    this.selection = new MaskSelection({ name: this.name, algorithm: 'morphological' });
+    const own = this.options;
+    this.selection = new MaskSelection({
+      name: this.name,
+      algorithm: 'morphological',
+      get layers() {
+        return own.layers;
+      },
+    });
   }
   /** Attach an optional effect; separate named effects may style separate mesh groups. */
   static attach(engine: EngineKernel, options: HighlightOptions = {}): Highlight {

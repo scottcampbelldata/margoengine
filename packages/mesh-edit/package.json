@@ -31,6 +31,10 @@
       "types": "./dist/modeling.d.ts",
       "import": "./dist/modeling.js"
     },
+    "./geometry": {
+      "types": "./dist/geometry.d.ts",
+      "import": "./dist/geometry.js"
+    },
     "./boolean-exact": {
       "types": "./dist/boolean-exact.d.ts",
       "import": "./dist/boolean-exact.js"

@@ -11,6 +11,8 @@ declare const GPUMapMode: { READ: number };
 export interface AreaPickingOptions {
   maxPixels?: number /** Capture ordinary point IDs in the beauty pass. Default false. */;
   capture?: boolean;
+  /** Render-layer mask: a view's own `layers` wins, else this one, else the camera's; only meshes sharing a bit are selected. Default every layer. */
+  layers?: number;
 }
 /** Visible triangle selection at exact raster pixel centres. This picker also supports ordinary point queries. */
 export class AreaPicking extends Picking {
@@ -19,6 +21,9 @@ export class AreaPicking extends Picking {
     const max = areaOptions.maxPixels ?? 16777216;
     if (!Number.isSafeInteger(max) || max < 1)
       throw new RangeError('Area maxPixels must be a positive safe integer; choose a readback budget.');
+    const layers = areaOptions.layers;
+    if (layers !== undefined && (!Number.isInteger(layers) || layers < 0 || layers > 0xffffffff))
+      throw new RangeError('Area layers must be an integer from 0 to 0xffffffff; build one with layerMask().');
   }
   /** Attach instead of Picking to share its scene, source and point-query protocol. */
   static override attach(engine: EngineKernel, options: AreaPickingOptions = {}): AreaPicking {
@@ -76,7 +81,9 @@ export class AreaPicking extends Picking {
     }
     if (right <= left || bottom <= top) return [];
     const out: PickHit[] = [];
-    await this.queryContext((left + right) / 2, (top + bottom) / 2, view, async (chosen) => {
+    const layers = this.areaOptions.layers,
+      scoped = layers !== undefined && view?.layers === undefined ? ({ ...view, layers } as RenderView) : view;
+    await this.queryContext((left + right) / 2, (top + bottom) / 2, scoped, async (chosen) => {
       signal?.throwIfAborted();
       const w = canvas.width,
         h = canvas.height,
