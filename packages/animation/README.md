@@ -82,7 +82,7 @@ A scale key of 0 on any axis plays like any other (glTF 2.0 section 3.5.3): pop-
 zero work as exported, and CPU poses (`skin.pose`, `bakeVAT`) give a flattened vertex a finite normal.
 
 
-A model whose primitives are all hidden skips its GPU deformation: its clips keep running, its joints keep moving, and its deformed vertices wait at the last pose shown. They catch up in the first frame it shows, before anything draws it. `GPUDynamicBVH` and `readPickingGeometry` on a hidden model read that last pose.
+A model whose primitives are all hidden skips its GPU deformation: its clips keep running, its joints keep moving, and its deformed vertices wait at the last pose shown. They catch up in the first frame it shows, before anything draws it. `GPUDynamicBVH` and `readPickingGeometry` on a hidden model read that last pose. A hidden model that `DeformedPoints` draws (`@margoengine/animation/deformed-points`) keeps deforming, because the points read its vertices.
 
 `skeleton` plays a model on the joints of another model of the same file, so the two can never drift apart. It has no clips of its own, and `@margoengine/lod/auto` uses it for the levels of a skinned model:
 
@@ -646,6 +646,53 @@ console.log(m[7]); // 2: a point on this bone rides 2 m up
 ```
 
 Morph targets stay at the weights they had when baked.
+
+## Points on a deforming mesh (`@margoengine/animation/deformed-points`)
+
+`DeformedPoints` draws every vertex of a model as a point where the model's deformer last put it, so a skinned or
+morphed triangle mesh shows as a moving cloud of its own vertices. The points are instanced straight from the buffer the
+deformation pass wrote: no second skinning pass, no CPU work per vertex, one draw per primitive.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {DeformedPoints} from 'margoengine/animation/deformed-points';
+const stage = await createStage('#viewport', {backend: 'webgpu', capacity: 2048});
+// Copy this repository's CC0 RobotExpressive asset to the same public URL in your app.
+const model = await loadGLTF(stage.engine, '/examples/assets/robot-expressive.glb');
+Animation.attach(model).play('Dance');
+
+const points = DeformedPoints.attach(model, {size: 3, color: '#ffcc00'});
+model.root.visible = false; // the points alone; leave it true to draw them over the mesh
+points.set({shape: 'round', sizeUnits: 'world', size: 0.02}); // 2 cm discs that shrink with distance
+points.opacity = 0.8; // every option is also a live field
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `size` | `4` | Point diameter: pixels of the view, or world units with `sizeUnits: 'world'`. Finite, 0 or more |
+| `sizeUnits` | `'pixels'` | `'pixels'` keeps a constant screen size; `'world'` shrinks with distance |
+| `color` | white | `'#rrggbb'`, `'#rgb'` or `0xrrggbb` (sRGB), or a linear `[r, g, b]` array. Change it with `set({color})`; `points.color` reads the linear RGB |
+| `opacity` | `1` | 0 to 1. Below 1 the points blend over what is already drawn and still write depth |
+| `shape` | `'square'` | `'square'`, or `'round'` (a disc cut from the square, no antialiasing of its own) |
+| `vertexColors` | `true` | Multiplies `color` by each vertex's colour (glTF `COLOR_0`; white where the mesh has none) |
+
+`points.visible` (default `true`) turns the points off and on, `points.count` is the number of points, and
+`points.dispose()` (or `using`) frees them; disposing the model disposes its points. `set(options)` checks every value
+and changes nothing when one is out of range (RangeError; TypeError for a `vertexColors` that is not a boolean or a
+colour that is not one).
+
+The deformer can be `Animation` (skins and morph targets, any skinning mode), `Skin` on raw data, `MorphWeightPlayer`
+or a geometry cache player. A primitive no deformer writes draws its own vertices at its node, so the rigid parts of a
+model show too. The points are unlit, depth tested against the scene, and written in the target's own encoding (sRGB on
+a display target, linear on an HDR one). They cast no shadows, are not fogged and are not picked. A primitive drawn with
+`EXT_mesh_gpu_instancing` shows its points once, at its node. `pointScale(cameraMatrix, size, sizeUnits, width, height)`
+is the size maths the shader uses, for tools that need a point's footprint on screen.
+
+`packages/animation/tests/deformed-points-browser.mjs` draws a skinned strip and a morphed triangle, both hidden, as
+points on real WebGPU and on the WebGL2 compatibility layer: every vertex's point is on the pixel its pose projects to
+at three clip times and three morph weights, covers its 5 x 5 pixels within 10 percent, and nothing else draws.
 
 ## Geometry caches (`@margoengine/animation/geometry-cache`)
 

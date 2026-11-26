@@ -10815,3 +10815,7 @@ An opted-in `HullSolver` writes signed waterplane volume at the same world rate 
 ### SEA-08 encounter-frequency incident forcing
 
 The correction to heave and pitch is computed from the spectral components while the old strip convolution continues to read the live water field. Each distinct section form retains the frequency-domain heave mass and damping only when a forward course and spectral diffraction are in use. A tapered-hull beam-wave control isolates the mass gradient. Head and following waves check the signed encounter terms, and a live wake at depth checks that the correction does not replace the water signal.
+
+## Points on a deforming mesh (section 5 evidence, 2026-11-26)
+
+`@margoengine/animation/deformed-points` adds no deformation arithmetic: it binds the deformation pass's output (`PBRPrimitive.deformed`, 80-byte vertices at `deformedOffset`) as an instance-step vertex buffer and draws a four-vertex strip per vertex in pass order 1, after the batched deformation pass (order -10). `Animation` skips a model whose nodes are all hidden unless a reader is counted for it (`packages/animation/src/deform-readers.ts`), which the points register while set up. Evidence that exists: the CPU test (size maths against direct projection, recorded draw, reader count) and the browser check on native WebGPU and the WebGL2 compatibility layer (every vertex's point on its projected pixel, hidden model, skin and morph). Evidence still missing: no run on a second GPU vendor or on Firefox and Safari, and no measured frame cost for large meshes.

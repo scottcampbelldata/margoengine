@@ -11,6 +11,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { GLTFInteractivity } = await load('../dist/interactivity.js');
   const { VATCrowd, bakeVAT } = await load('../dist/vat.js');
   const { SkinnedCrowd, bakeBones } = await load('../dist/instanced-skin.js');
+  const { DeformedPoints } = await load('../dist/deformed-points.js');
   const { GeometryCachePlayer, encodeGeometryCache } = await load('../dist/geometry-cache.js');
   const model = (engine, data = skinnedStrip()) => new PBRModel(engine, new GLTFAsset(data.doc, data.buffers));
   const morphData = () => {
@@ -65,6 +66,14 @@ export async function fixtures(load = (entry) => import(entry)) {
       create({ engine }) {
         const mesh = model(engine),
           plugin = factory ? GLTFInteractivity.attach(mesh) : new GLTFInteractivity(mesh);
+        return { plugin, dispose: () => plugin.dispose(), cleanup: () => mesh.dispose() };
+      },
+    });
+    entries.push({
+      name: 'DeformedPoints' + suffix,
+      create({ engine }) {
+        const mesh = model(engine),
+          plugin = factory ? DeformedPoints.attach(mesh) : new DeformedPoints(mesh);
         return { plugin, dispose: () => plugin.dispose(), cleanup: () => mesh.dispose() };
       },
     });
