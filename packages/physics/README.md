@@ -3225,6 +3225,26 @@ world.advance(60);
 console.log(oil.budget.surface, [...oil.particlesOf()].length); // 0.025 64
 ```
 
+Set `evaporation` for a release with a modified distillation curve. Supply slick temperature and initial boiling
+point in kelvin, the slope in kelvin per distilled volume fraction, and air-side transfer in m/s. All four inputs
+stay constant for the release. `evaporatedMass` is cumulative vapour mass in kilograms. Add it to the water,
+surface and bed terms to account for `budget.released`.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const oil = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(oil, {
+  oilSpills: [{
+    mass: 0.025, position: [0, 0], spreadingCoefficient: 0.0003,
+    evaporation: { temperature: 290, initialBoilingPoint: 400, distillationSlope: 650, massTransferCoefficient: 0.003 },
+  }],
+});
+world.advance(600);
+console.log(oil.evaporatedMass > 0); // true
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

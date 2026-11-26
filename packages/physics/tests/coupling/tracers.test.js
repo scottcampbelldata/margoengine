@@ -226,3 +226,97 @@ test('SEA-15 a delayed oil spill keeps its slots and follows the current alongsi
   assert.ok(Math.abs(centre(0) - (4 + 0.25 * dt)) < 8 * Number.EPSILON);
   assert.ok(Math.abs(centre(2) - (2 - 0.5 * dt)) < 8 * Number.EPSILON);
 });
+
+test('SEA-15 evaporation integrates the spreading area and conserves released, liquid and vapour mass', () => {
+  const mass = 0.025;
+  const volume = mass / 870;
+  const buoyancy = 9.80665 * (1 - 870 / 1025);
+  const tension = 0.0003;
+  const evaporation = {
+    temperature: 290,
+    initialBoilingPoint: 400,
+    distillationSlope: 650,
+    massTransferCoefficient: 0.003,
+  };
+  const expected = (age) => {
+    // Integrate the published radius curves by midpoint quadrature, independently of the solver's analytic area integral.
+    const width = age / 32_768;
+    let area = 0;
+    for (let i = 0; i < 32_768; i++) {
+      const t = (i + 0.5) * width;
+      const inertial = 1.14 * (buoyancy * volume * t ** 2) ** 0.25;
+      const viscous = 1.45 * ((buoyancy * volume ** 2 * t ** 1.5) / 1e-3) ** (1 / 6);
+      const surface = 2.3 * ((tension ** 2 * t ** 3) / (1025 ** 2 * 1e-6)) ** 0.25;
+      area += Math.max(Math.min(inertial, viscous), surface) ** 2;
+    }
+    const theta = (evaporation.massTransferCoefficient * Math.PI * area * width) / volume;
+    const gradient = (10.3 * evaporation.distillationSlope) / evaporation.temperature;
+    return (
+      (mass *
+        Math.log1p(
+          gradient * theta * Math.exp(6.3 - (10.3 * evaporation.initialBoilingPoint) / evaporation.temperature),
+        )) /
+      gradient
+    );
+  };
+  const start = 0.25;
+  const times = [0.8, 10.3, 40.3]; // One age in each Fay regime, at clock times common to both rates.
+  const reference = times.map((time) => expected(time - start));
+  const coarse = [];
+  for (const rate of [30, 60]) {
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+      capacity: 8,
+      oilSpills: [{ mass, position: [0, 0], start, spreadingCoefficient: tension, parcels: 8, evaporation }],
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+    });
+    world.advance(Math.floor(start * rate));
+    assert.equal(tracer.evaporatedMass, 0);
+    assert.equal(tracer.budget.released, 0);
+    let save;
+    for (const [i, time] of times.entries()) {
+      world.advance(Math.round(time * rate));
+      const want = reference[i];
+      assert.ok(Math.abs(tracer.evaporatedMass - want) < 2e-10, `${tracer.evaporatedMass} vs ${want} kg`);
+      if (rate === 30) coarse.push(tracer.evaporatedMass);
+      else assert.equal(tracer.evaporatedMass, coarse[i]);
+      const { released, surface } = tracer.budget;
+      const parcelMass = [...tracer.particlesOf()].reduce((sum, p) => sum + p.mass, 0);
+      assert.equal(released, mass);
+      assert.ok(Math.abs(surface + tracer.evaporatedMass - released) < 1e-15);
+      assert.ok(Math.abs(surface - parcelMass) < 1e-15);
+      if (i === 1) save = world.takeSnapshot();
+    }
+    const hash = world.hash();
+    world.restoreSnapshot(save.bytes);
+    world.advance(Math.round(times.at(-1) * rate));
+    assert.equal(world.hash(), hash);
+  }
+});
+
+test('SEA-15 a completely evaporated release clears its parcels and leaves the other slick unchanged', () => {
+  const tracer = new TracerSolver();
+  const config = { temperature: 300, initialBoilingPoint: 300, distillationSlope: 0, massTransferCoefficient: 3 };
+  const world = new PhysicsWorld().add(tracer, {
+    capacity: 4,
+    oilSpills: [
+      { mass: 0.02, position: [-1, 0], spreadingCoefficient: 0.01, parcels: 2, evaporation: config },
+      {
+        mass: 0.03,
+        position: [1, 0],
+        spreadingCoefficient: 0,
+        parcels: 2,
+        evaporation: { ...config, massTransferCoefficient: 0 },
+      },
+    ],
+    horizontalDiffusivity: 0,
+  });
+  world.advance(120);
+  const parcels = [...tracer.particlesOf()];
+  assert.equal(parcels.length, 2);
+  assert.equal(parcels[0].mass + parcels[1].mass, 0.03);
+  assert.equal(tracer.evaporatedMass, 0.02);
+  assert.ok(Math.abs(tracer.budget.surface - 0.03) < 1e-16);
+  assert.equal(tracer.budget.released, 0.05);
+});

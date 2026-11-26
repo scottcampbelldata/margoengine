@@ -13188,6 +13188,19 @@ transitions. Antipodal equal-area parcels give the initial patch; each step expa
 and applies the usual surface advection and diffusion. The closed-form check uses all three regimes and exact
 mass and snapshot replay. Independent field validation of oil extent remains open.
 
+Oil evaporation follows W. Stiver and D. Mackay, [“Evaporation rate of spills of hydrocarbons and petroleum mixtures” (1984)](https://doi.org/10.1021/es00129a006).
+The [Environment Canada catalogue (1990), §3.1](https://publications.gc.ca/collections/collection_2020/eccc/en84/En84-183-1990-eng.pdf)
+gives the working equation `F = ln(1 + C θ exp(A − B T₀/T))/C`, with `A = 6.3`, `B = 10.3`,
+`C = B T_G/T` and exposure `θ = ∫kA(t)dt/V₀`. D. Mackay, I. A. Buist, R. Mascarenhas and S. Paterson,
+[“Oil Spill Processes and Models” (1980), chapter 3](https://publications.gc.ca/collections/collection_2020/eccc/en40/En40-980-1980-eng.pdf),
+uses the initial volume in its exposure normalization. This implementation integrates each active Fay radius
+squared over its exact age interval. It uses a constant surface temperature and transfer coefficient and the initial
+oil density, so the explicit volume fraction is also the mass fraction. Evaporation removes mass from the floating
+parcels and records it as vapour in snapshot state. M. Fingas's [pan experiments (1997)](https://doi.org/10.1016/S0304-3894(97)00051-4)
+find that many crude oils are weakly sensitive to wind. The transfer coefficient is explicit, and independent measured
+validation of the expanding-slick evaporation model remains open. The early, intermediate and late analytical cases
+compare against independent quadrature at 30 and 60 world steps per second.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

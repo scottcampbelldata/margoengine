@@ -479,7 +479,7 @@ pellets settle farther than the fines. The measured sediment plume and original 
 
 The tracer entry can now query a live `SeaSurface`: the slick follows wave height and surface velocity,
 and submerged dye follows the sea's depth flow in a different origin cell. The test checks live SEA-02
-coupling and exact replay. Oil spreading, weathering and independent dispersion measurements remain open.
+coupling and exact replay. Independent dispersion measurements remain open.
 
 BB-7's live terrain exchange now debits the parcels' packed volume from a finite mobile layer and deposits
 it under the settled grains. The CPU and render fixtures check cut, deposit, final volume and replay.
@@ -489,8 +489,10 @@ The SEA-15 consumer is rebased on Lane D's `4ec0717e8a`. A calm-spectrum test wi
 confirms submerged dye follows the analytical potential gradient through `SpectralSea.water`.
 
 Finite instantaneous oil releases now use Fay's three radial laws, with mass conservation, current transport and
-snapshot replay checked separately. Oil film thickness and weathering, scale-dependent diffusion and independent
-measured slick-extent validation remain open.
+snapshot replay checked separately. Stiver–Mackay evaporation uses the integrated Fay area and preserves a separate
+vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
+The remaining oil work includes film thickness, dispersion into droplets, and independent measured slick-extent and
+evaporation validation. Scale-dependent dye diffusion remains open.
 
 ## Verification passes
 

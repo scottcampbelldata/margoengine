@@ -24,3 +24,32 @@ export function fayRadius([inertial, viscous, surface]: FayCoefficients, age: nu
   // Viscous resistance eventually slows gravity spreading. Surface tension takes over when its radius exceeds it.
   return Math.max(Math.min(inertial * half, viscous * quarter), surface * half * quarter);
 }
+
+/** Integrated circular area since release, m²·s. Each active Fay radius is a power of time. */
+export function fayAreaTime([inertial, viscous, surface]: FayCoefficients, age: number): number {
+  if (inertial === 0 || viscous === 0) return ((2 * Math.PI) / 5) * surface * surface * age * age * Math.sqrt(age);
+  const gravityCrossingRoot = viscous / inertial;
+  const surfaceCrossingRoot = inertial / surface;
+  const inertialUntil = Math.min(age, fourth(Math.min(gravityCrossingRoot, surfaceCrossingRoot)));
+  const inertialScale = inertial * inertialUntil;
+  let areaTime = 0.5 * inertialScale * inertialScale;
+  let surfaceSince = inertialUntil;
+  if (gravityCrossingRoot < surfaceCrossingRoot) {
+    const viscousCrossingRoot = viscous / surface;
+    surfaceSince = Math.min(age, viscousCrossingRoot * viscousCrossingRoot);
+    areaTime +=
+      (2 / 3) * viscous * viscous * (surfaceSince * Math.sqrt(surfaceSince) - inertialUntil * Math.sqrt(inertialUntil));
+  }
+  if (surfaceSince < age)
+    areaTime +=
+      (2 / 5) *
+      surface *
+      surface *
+      (age * age * Math.sqrt(age) - surfaceSince * surfaceSince * Math.sqrt(surfaceSince));
+  return Math.PI * areaTime;
+}
+
+function fourth(value: number): number {
+  const square = value * value;
+  return square * square;
+}

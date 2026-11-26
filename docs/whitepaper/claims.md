@@ -243,6 +243,8 @@ first: each names its scope, its evidence file and how to reproduce it.
 - Finite oil release (SEA-15, 2026-11-26). An instantaneous surface release recovers Fay's three
   circular spreading radii from the parcel second moment, conserves its prescribed mass, and replays from a
   snapshot. A delayed release shares a world with an ordinary dye source and moves with the given current.
+  Stiver–Mackay vapour loss at 30 and 60 steps/s agrees within 2 × 10⁻¹⁰ kg with quadrature across the
+  three radius regimes. The liquid and vapour ledger balance within 10⁻¹⁵ kg, with exact snapshot replay.
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,

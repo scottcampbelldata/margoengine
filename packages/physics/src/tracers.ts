@@ -16,8 +16,8 @@
 //   it, the wind drift factor (3 percent by default, the traditional constant; Liu, Li and Mu, Frontiers in Marine Science
 //   2023, read in its abstract).
 //
-// Finite oil spills add Fay's axisymmetric spreading to the water, wind and turbulent parcel motion. Remaining limits:
-// oil weathering and flocculation are unresolved, and diffusivities are constant. Settled parcels remain in the bed ledger.
+// Finite oil spills add Fay's axisymmetric spreading and optional Stiver–Mackay evaporation. Diffusivities are constant.
+// Settled parcels remain in the bed ledger. Dispersion into oil droplets and flocculation are unresolved.
 
 import type { Bed, FlowField, FlowSample, SeaSurface, SeaSurfaceSample, Wind } from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
@@ -27,6 +27,12 @@ import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.
 import { MargoError } from '@margoengine/math/errors';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
+import {
+  type EvaporationRates,
+  evaporatedFraction,
+  evaporationRates,
+  type TracerOilEvaporation,
+} from './tracer-evaporation.js';
 import { type FayCoefficients, fayCoefficients, fayRadius } from './tracer-fay.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
@@ -44,6 +50,7 @@ import type {
 } from './world/solver.js';
 
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
+export type { TracerOilEvaporation } from './tracer-evaporation.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
 export const TRACER_FIELD: FieldDescriptor = {
@@ -143,6 +150,8 @@ export interface TracerOilSpill {
   material?: TracerMaterial;
   /** Slots reserved for this release (default 128, at least two). Counts against `capacity`. */
   parcels?: number;
+  /** Stiver–Mackay vapour loss from the expanding slick (default no evaporation). */
+  evaporation?: TracerOilEvaporation;
 }
 
 /** Settings of a {@link TracerSolver}; each has a default. */
@@ -223,6 +232,7 @@ interface OilSpillState {
   position: readonly [number, number];
   start: number;
   profile: FayCoefficients;
+  evaporation?: EvaporationRates;
 }
 
 function pickupRate(shear: number, bed: JetBed): number {
@@ -282,6 +292,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private sources: { material: number; source: TracerSource }[] = [];
   private readonly oilSpills: OilSpillState[] = [];
   private spillRadii?: Region;
+  private spillVapour?: Region;
   private emissionCapacity = 0;
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
@@ -523,8 +534,9 @@ export class TracerSolver implements Solver<TracerParams> {
           'unsupported',
           'Oil spreading needs finite mass, position, time and tension with oil lighter than the water; pass positive mass, nonnegative time and tension, and a floating material.',
         );
+      const volume = mass / material.density;
       const profile = fayCoefficients(
-        mass / material.density,
+        volume,
         this.g * (1 - material.density / waterDensity),
         waterDensity,
         viscosity,
@@ -544,11 +556,14 @@ export class TracerSolver implements Solver<TracerParams> {
         mass,
         start,
         profile,
+        evaporation: spill.evaporation && evaporationRates(spill.evaporation, volume),
       });
     }
     this.emissionCapacity = first;
     if (this.oilSpills.length)
       this.spillRadii = this.host.allocate('fay-spill-radii', 8 * this.oilSpills.length, 'f64', 1);
+    if (this.oilSpills.some((spill) => spill.evaporation))
+      this.spillVapour = this.host.allocate('oil-spill-vapour', 8 * this.oilSpills.length, 'f64', 1);
   }
 
   private initBreachMixes(mixes: readonly BreachTracerMix[], firstSlot: number): number {
@@ -665,10 +680,11 @@ export class TracerSolver implements Solver<TracerParams> {
   private spreadOil(time: number, words: Float64Array, book: Float64Array): void {
     if (!this.spillRadii) return;
     const radii = regionWords(this.host.memory, this.spillRadii) as Float64Array;
+    const vapour = this.spillVapour && (regionWords(this.host.memory, this.spillVapour) as Float64Array);
     for (let i = 0; i < this.oilSpills.length; i++) {
       const spill = this.oilSpills[i]!;
       const age = time - spill.start;
-      if (!(age > 0)) continue;
+      if (!(age > 0) || vapour?.[i] === spill.mass) continue;
       const radius = fayRadius(spill.profile, age);
       if (!(radius > 0 && Number.isFinite(radius)))
         throw new MargoError(
@@ -684,6 +700,24 @@ export class TracerSolver implements Solver<TracerParams> {
         this.expandOil(spill, radius / previous, words);
       }
       radii[i] = radius;
+      if (vapour && spill.evaporation) {
+        const previousMass = vapour[i]!;
+        const evaporated = spill.mass * evaporatedFraction(spill.evaporation, spill.profile, age);
+        if (evaporated > previousMass) {
+          vapour[i] = evaporated;
+          book[2]! -= evaporated - previousMass;
+          this.setOilMass(spill, spill.mass - evaporated, words);
+        }
+      }
+    }
+  }
+
+  private setOilMass(spill: OilSpillState, mass: number, words: Float64Array): void {
+    const share = mass / spill.count;
+    const last = (spill.first + spill.count - 1) * STRIDE;
+    for (let p = spill.first * STRIDE; p <= last; p += STRIDE) {
+      words[p + 3] = p === last ? mass - share * (spill.count - 1) : share;
+      if (mass === 0) words[p + 5] = FREE;
     }
   }
 
@@ -968,6 +1002,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const regions = [this.particles, this.ledger];
     if (this.bedExchange) regions.push(...this.bedExchange.regions());
     if (this.spillRadii) regions.push(this.spillRadii);
+    if (this.spillVapour) regions.push(this.spillVapour);
     return regions;
   }
 
@@ -979,6 +1014,13 @@ export class TracerSolver implements Solver<TracerParams> {
   get budget(): { released: number; water: number; surface: number; bed: number } {
     const b = this.book();
     return { released: b[0]!, water: b[1]!, surface: b[2]!, bed: b[3]! };
+  }
+
+  /** Cumulative oil vapour, kg. Included in `budget.released` and excluded from the liquid and bed terms. */
+  get evaporatedMass(): number {
+    if (!this.spillVapour) return 0;
+    const vapour = regionWords(this.host.memory, this.spillVapour) as Float64Array;
+    return vapour.reduce((total, mass) => total + mass, 0);
   }
 
   /** Cumulative kg lifted out of the erodible layer by water jets. Included in `budget.released`. */
