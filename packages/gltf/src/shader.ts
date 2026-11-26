@@ -472,10 +472,12 @@ export function shareOwner(maps: readonly unknown[], k: number, end: number = ma
 /**
  * Native glTF physical maps: absent extension slots have their exact one-texel fallback value without a sampler, and
  * slots sharing a glTF texture sample one binding (`shareOwner`), so a material with clearcoat R + roughness G, sheen
- * RGB + A and specular A + RGB packed as the extensions suggest binds 5 extension textures, not 8.
+ * RGB + A and specular A + RGB packed as the extensions suggest binds 5 extension textures, not 8. `packed` reads the
+ * five base maps from one array (`packBaseShader`); gltf/pbr asks for it only when the composed shader would pass the
+ * device's per-stage texture limit. Defaults to false.
  */
-export function sparsePhysicalShader(maps: readonly unknown[]): string {
-  let key = 0;
+export function sparsePhysicalShader(maps: readonly unknown[], packed = false): string {
+  let key = +packed;
   for (let k = 5; k < 13; k++) {
     const owner = shareOwner(maps, k, 13);
     key = key * 9 + (owner < 0 ? 0 : owner - 4);
@@ -499,7 +501,7 @@ export function sparsePhysicalShader(maps: readonly unknown[]): string {
             : 'vec4f(1)',
       );
   }
-  if (maps.slice(5, 13).filter(Boolean).length >= 6) code = packBaseShader(code);
+  if (packed) code = packBaseShader(code);
   sparsePhysical.set(key, code);
   return code;
 }
@@ -756,7 +758,10 @@ export function transmissionPBR(code: string, declarations: string): string {
  * -1 for the slot's default value. Base slots 0-4 always keep their own bindings 0-9 (text patches use them).
  */
 export interface ExtendedPlan {
-  /** Packed base layers reserve compatibility units for storage and shadow sampling. */
+  /**
+   * The five base maps read from one array, freeing four texture units. gltf/pbr sets it on the plan it composes only when
+   * the shader with its lighting would pass the device's per-stage texture limit; `extendedPlan` leaves it unset.
+   */
   readonly packedBase?: boolean;
   /** Optional spec/gloss conversion, implemented only by the spec-gloss entry. Defaults to false. */
   readonly specularGlossiness?: boolean;
@@ -788,7 +793,7 @@ export function extendedPlan(
       if (textures.length === extendedTextureLimit) return -1;
       return textures.push(map.index) - 1;
     });
-  return { slots, ...features, packedBase: textures.length >= 6 };
+  return { slots, ...features };
 }
 // KHR_materials_anisotropy: the texture's direction (default +X) rotated by anisotropyRotation in tangent space, as a
 // world tangent orthogonal to the shading normal, and the strength; plus the bent normal its notes suggest for IBL.

@@ -167,9 +167,11 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Regression:** `packages/webgl2-compat/test/glsl.test.js` (the struct form past the limit, per stage, and the plain
   form within it), `packages/webgl2-compat/test/lost-context-browser.mjs` and `scripts/compat-units-gpu-check.js
   --compat` (both in webgl2-compat's test:gpu; the check passes on native WebGPU, ANGLE Direct3D 11 and Vulkan).
-  Still open from the same row: the room the plan in the row asks for (shared glTF bindings, packing by the device
-  limit, a coded count before linking); a scene that needs more than 16 units still gets the layer's coded
-  `unsupported`.
+  The room the plan in the row asks for landed after it: glTF slots sharing a texture bind it once (2026-11-25), gltf
+  materials past the device limit pack their base maps, and the layer counts units per stage before linking and
+  refuses past a limit with code `unsupported` (errors#texture-units) (2026-11-26; `packages/gltf/test/materials-ext.test.js`,
+  `packages/webgl2-compat/test/device.test.js`). A scene that needs more than 16 units even packed still gets that
+  coded refusal.
 - **Sources:** Direct3D 11 has 128 shader resource slots, 16 sampler slots and 14 constant buffer slots per stage, so
   the 16 is ANGLE's own table, not the API's (Microsoft, "Direct3D 11.3 Functional Specification", 2015, section 21
   limits, https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm). A struct member of a
