@@ -125,12 +125,18 @@ export interface SoilRollingWheel {
   readonly peakSlip?: number;
   /** Exit angle divided by entry angle, in [-1, 0]. Default zero. */
   readonly exitFraction?: number;
+  /** Count of evenly spaced lugs around the rim. Default zero for the steady contact envelope. */
+  readonly lugCount?: number;
+  /** Lug width in the direction of travel, m. Required for phase-resolved lugs. */
+  readonly lugWidth?: number;
 }
 
 export interface TerramechanicsOptions {
   readonly id?: string;
   /** Read an external SOIL_LAYOUT F64 patch field, e.g. one returned by `soilPatchField`. */
   readonly input?: FieldDescriptor;
+  /** Optional wheel spin samples in the same row order as input. Use soilWheelPhaseField. */
+  readonly wheelPhase?: FieldDescriptor;
   /** Read the real LIFE-01 contact field. Provide `feet` at initialization. Default false. */
   readonly legged?: boolean;
   /** Resolved contacts expose a vertex pressure field and conservative berm relaxation. Default 'mean'. */
@@ -174,6 +180,11 @@ export interface SoilBudget {
 
 export function soilPatchField(name = 'soilContactPatch'): FieldDescriptor {
   return { name, kind: 'surfaceSampleSet', quantity: 'soilContactPatch', unit: 'record', centring: 'particle' };
+}
+
+/** One f64 wheel-spin angle in radians per external contact row, using SOIL_LAYOUT. */
+export function soilWheelPhaseField(name = 'soilWheelPhase'): FieldDescriptor {
+  return { name, kind: 'surfaceSampleSet', quantity: 'wheelSpin', unit: 'rad', centring: 'particle' };
 }
 
 function finite(value: number, label: string, lower = -Infinity, upper = Infinity): number {
@@ -243,6 +254,18 @@ type ProfileSlot = Pick<SoilContactProfile, 'columns' | 'rows' | 'area' | 'perim
 function rollingWheel(wheel: SoilRollingWheel): Required<SoilRollingWheel> {
   const radius = positive(wheel.radius, 'wheel radius');
   const lugHeight = finite(wheel.lugHeight ?? 0, 'wheel lug height', 0);
+  const lugCount = wheel.lugCount ?? 0;
+  if (!Number.isSafeInteger(lugCount) || lugCount < 0)
+    throw new MargoError(
+      'state',
+      'A wheel lug count must be a nonnegative integer. Provide the number of evenly spaced lugs.',
+    );
+  const lugWidth = lugCount > 0 ? positive(wheel.lugWidth ?? 0, 'wheel lug width') : 0;
+  if (lugCount > 0 && (lugHeight === 0 || lugCount * lugWidth >= 2 * Math.PI * radius))
+    throw new MargoError(
+      'state',
+      'The discrete wheel lugs cannot fit around the rim. Use positive height and width below their spacing.',
+    );
   const peakFraction = finite(
     wheel.peakFraction ?? 0.4,
     'wheel pressure peak fraction',
@@ -257,6 +280,8 @@ function rollingWheel(wheel: SoilRollingWheel): Required<SoilRollingWheel> {
     peakFraction,
     peakSlip: finite(wheel.peakSlip ?? 0.3, 'wheel pressure peak slip increment', 0, 1 - Number.EPSILON - peakFraction),
     exitFraction: finite(wheel.exitFraction ?? 0, 'wheel exit fraction', -1, 0),
+    lugCount,
+    lugWidth,
   };
 }
 
@@ -282,6 +307,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   readonly responseField: FieldDescriptor;
   readonly pressureField?: FieldDescriptor;
   private readonly input?: FieldDescriptor;
+  private readonly phase?: FieldDescriptor;
   private readonly legged: boolean;
   private terrain!: BedShape;
   private material!: Required<SoilMaterial>;
@@ -319,6 +345,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     if (tier !== 'mean' && tier !== 'resolved')
       throw new MargoError('state', 'Unknown soil contact tier. Choose mean or resolved.');
     this.input = options.input && { ...options.input };
+    this.phase = options.wheelPhase && { ...options.wheelPhase };
+    if (this.phase && !this.input)
+      throw new MargoError('state', 'Wheel phase needs external wheel loads. Provide the matching soil patch field.');
     this.legged = options.legged ?? false;
     this.dustField = {
       name: `${this.id}:dust`,
@@ -360,6 +389,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         { field: this.responseField, access: 'write' as const },
         ...(this.pressureField ? [{ field: this.pressureField, access: 'write' as const }] : []),
         ...(this.input ? [{ field: this.input, access: 'read' as const }] : []),
+        ...(this.phase ? [{ field: this.phase, access: 'read' as const }] : []),
         ...(this.legged ? [{ field: LEGGED_CONTACT_FIELD, access: 'read' as const }] : []),
       ],
     };
@@ -406,6 +436,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         'A rolling load has two footprint geometries. Choose a cylindrical wheel or a sampled profile for that row.',
       );
     this.rolling = rolling.map((wheel) => wheel && rollingWheel(wheel));
+    if (!this.phase && this.rolling.some((wheel) => wheel && wheel.lugCount > 0))
+      throw new MargoError('state', 'Discrete wheel lugs need a phase port. Provide a soil wheel phase reader.');
     if (profiles.length && (!this.pressureField || profiles.length !== responses))
       throw new MargoError(
         'state',
@@ -426,7 +458,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 37);
+    this.nativePatch = allocate('soil-patch-scratch', 40);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -516,7 +548,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     return [(port.cell[0] - this.cell[0]) * this.cellSize, (port.cell[2] - this.cell[2]) * this.cellSize];
   }
 
-  private stamp(patch: Patch, row: number, bed: Region, dt: number): void {
+  private stamp(patch: Patch, row: number, bed: Region, dt: number, phase = 0): void {
     const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, flags] = patch;
     if (finite(load, 'normal load', 0) === 0) return;
     if (
@@ -625,6 +657,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       material.friction,
       material.shearLength,
       0,
+      rolling?.lugCount ?? 0,
+      rolling?.lugWidth ?? 0,
+      finite(phase, 'wheel phase'),
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -737,6 +772,19 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           'The soil contact port differs from the configured capacity. Provide one layout-1 f64 record per row.',
         );
       const [x, z] = this.shift(port);
+      const phase = this.phase && context.inputs.get(this.phase.name);
+      if (
+        this.phase &&
+        (!phase ||
+          phase.region.type !== 'f64' ||
+          phase.region.layout !== SOIL_LAYOUT ||
+          phase.region.byteLength !== this.inputRows * 8)
+      )
+        throw new MargoError(
+          'state',
+          'Wheel phase does not match the load rows. Provide one layout-1 angle per contact.',
+        );
+      const phases = phase ? this.words(phase.region) : null;
       for (let i = 0; i < this.inputRows; i++) {
         const at = i * SOIL_PATCH_WORDS;
         this.stamp(
@@ -755,6 +803,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           this.fixed.length + i,
           bed.region,
           dt,
+          phases?.[i],
         );
       }
     }

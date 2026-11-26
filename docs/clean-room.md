@@ -169,6 +169,15 @@ the two publications’ related rigs and settings.
 [Ding et al. (2011)](https://www.sciencedirect.com/science/article/pii/S0022489810000601),
 [SOKENDAI thesis appendix](https://ir.soken.ac.jp/record/2467/files/%E7%94%B21413_%E6%9C%AC%E6%96%87.pdf).
 
+K. Skonieczny, S. J. Moreland and D. S. Wettergreen, “A Grouser Spacing Equation for Determining
+Appropriate Geometry of Planetary Rover Wheels” (2012), Fig. 8, relates tire and lug geometry to the
+point where a rotating lug enters the soil. Ding et al. (2010), Eq. 2, gives the corresponding periodicity.
+The resolved phase path projects each effective lug tip, with radius `R + h`, onto the bed. A tip at
+signed angle `θ` reaches `(R + h)cos(θ)` below the axle and lands `(R + h)sin(θ)` along travel.
+Its projected width is an authored strip. The phase fixture checks exact vertical contact at zero phase,
+an unloaded gap at half a pitch, and identical terrain after a full pitch across native memory variants.
+[Skonieczny et al.](https://publications.ri.cmu.edu/storage/publications/pub_files/2012/10/SkoniecznyIROS2012.pdf).
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”

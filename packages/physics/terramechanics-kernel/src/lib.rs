@@ -59,6 +59,9 @@ struct Patch {
     friction: f64,
     shear_length: f64,
     projected_area: f64,
+    lug_count: f64,
+    lug_width: f64,
+    phase: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -276,13 +279,24 @@ fn rolling_load(p: &Patch, entry: f64) -> f64 {
     2.0 * p.half_width * force
 }
 
-const ROLLING_ROWS: usize = 33;
+const ROLLING_ROWS: usize = 65;
 
-fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> f64 {
+#[derive(Clone, Copy)]
+struct RollingCut {
+    rim: f64,
+    deepest: f64,
+}
+
+fn phase_offset(angle: f64, pitch: f64) -> f64 {
+    let offset = angle % pitch;
+    if offset < 0.0 { offset + pitch } else { offset }
+}
+
+fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> Option<RollingCut> {
     let mut lo = 0.0;
     let mut hi = core::f64::consts::FRAC_PI_2;
     if rolling_load(p, hi) < p.load {
-        return f64::NAN;
+        return None;
     }
     while hi - lo > 1e-9 {
         let middle = 0.5 * (lo + hi);
@@ -295,30 +309,83 @@ fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> f64 
     let entry = 0.5 * (lo + hi);
     let (exit, peak) = rolling_angle(p, entry);
     let rim = p.wheel_radius;
-    let rear = rim * sin(exit);
-    let fore = rim * sin(entry);
-    let shift = 0.5 * (rear + fore);
-    let highest = contact_depth(rim, entry, peak);
-    for i in 1..ROLLING_ROWS - 1 {
-        let position = rear + (fore - rear) * (i as f64 / (ROLLING_ROWS - 1) as f64);
-        let angle = arc_sin(position / rim);
-        let mapped = if angle < peak {
-            entry - (angle - exit) * ((entry - peak) / (peak - exit))
-        } else {
-            angle
-        };
-        let value = (contact_depth(rim, entry, mapped) / highest).clamp(0.0, 1.0);
-        depth[i] = value;
-        depth[i + ROLLING_ROWS] = value;
+    let rim_rear = rim * sin(exit);
+    let rim_fore = rim * sin(entry);
+    let rim_cut =
+        (contact_depth(rim, entry, 0.0) + p.lug_height * p.drive_slip - p.lug_support).max(0.0);
+    if rim_cut > rim {
+        return None;
     }
+    let highest = contact_depth(rim, entry, peak);
+    let phased = p.lug_count > 0.0;
+    let tip = rim + p.lug_height;
+    let hub = rim - rim_cut;
+    let half_lug = 0.5 * p.lug_width;
+    let mut rear = rim_rear;
+    let mut fore = rim_fore;
+    let mut cap = rim_cut;
+    let mut phase = 0.0;
+    let mut pitch = 0.0;
+    let mut engaged = false;
+    if phased {
+        pitch = core::f64::consts::TAU / p.lug_count;
+        phase = phase_offset(-p.phase, pitch);
+        let limit = 2.0 * arc_sin(root(0.5 * (1.0 - hub / tip)));
+        let nearest = if phase <= 0.5 * pitch {
+            phase
+        } else {
+            phase - pitch
+        };
+        engaged = nearest.abs() <= limit;
+        if engaged {
+            let first = (-limit + phase_offset(phase + limit, pitch)).min(nearest);
+            let last = (limit - phase_offset(limit - phase, pitch)).max(nearest);
+            rear = rear.min(tip * sin(first) - half_lug);
+            fore = fore.max(tip * sin(last) + half_lug);
+            cap = cap.max(tip * cos(nearest) - hub);
+        }
+    }
+    let rows = if phased { ROLLING_ROWS } else { 33 };
+    let first = usize::from(!phased);
+    for i in first..rows - first {
+        let position = rear + (fore - rear) * (i as f64 / (rows - 1) as f64);
+        let mut profile = 0.0;
+        if position >= rim_rear && position <= rim_fore {
+            let angle = arc_sin(position / rim);
+            let mapped = if angle < peak {
+                entry - (angle - exit) * ((entry - peak) / (peak - exit))
+            } else {
+                angle
+            };
+            profile = (contact_depth(rim, entry, mapped) / highest).clamp(0.0, 1.0);
+        }
+        let value = if engaged && cap > 0.0 {
+            let angle = arc_sin(position / tip);
+            let closest = angle + phase_offset(phase - angle + 0.5 * pitch, pitch) - 0.5 * pitch;
+            let lug = if (position - tip * sin(closest)).abs() <= half_lug {
+                (tip * cos(closest) - hub).max(0.0)
+            } else {
+                0.0
+            };
+            (profile * rim_cut).max(lug) / cap
+        } else {
+            profile
+        };
+        depth[i] = value;
+        depth[i + rows] = value;
+    }
+    let shift = 0.5 * (rear + fore);
     p.x += shift * p.forward_x;
     p.z += shift * p.forward_z;
     p.half_length = 0.5 * (fore - rear);
     p.profile = depth.as_ptr() as usize as f64;
     p.profile_columns = 2.0;
-    p.profile_rows = ROLLING_ROWS as f64;
+    p.profile_rows = rows as f64;
     p.projected_area = (fore - rear) * (2.0 * p.half_width);
-    (contact_depth(rim, entry, 0.0) + p.lug_height * p.drive_slip - p.lug_support).max(0.0)
+    Some(RollingCut {
+        rim: rim_cut,
+        deepest: cap,
+    })
 }
 
 /// Rasterizes one moving soil contact into pending bed deltas, using exact nodal areas for the mass ledger.
@@ -349,10 +416,9 @@ pub unsafe extern "C" fn stamp(
     let mut local = *source;
     let mut rolling_shape = [0.0; ROLLING_ROWS * 2];
     let rolling_depth = if local.wheel_radius > 0.0 {
-        let depth = rolling_footprint(&mut local, &mut rolling_shape);
-        if !depth.is_finite() {
+        let Some(depth) = rolling_footprint(&mut local, &mut rolling_shape) else {
             return f64::NAN;
-        }
+        };
         source.projected_area = local.projected_area;
         Some(depth)
     } else {
@@ -400,7 +466,7 @@ pub unsafe extern "C" fn stamp(
             return f64::NAN;
         }
         if let Some(depth) = rolling_depth {
-            settlement = depth;
+            settlement = depth.deepest;
         }
         layered = rolling_depth.is_none() && p.lower_stiffness > 0.0 && settlement > p.transition;
         if layered {
@@ -547,7 +613,7 @@ pub unsafe extern "C" fn stamp(
     if resolved {
         *work += visit;
     }
-    settlement
+    rolling_depth.map_or(settlement, |depth| depth.rim)
 }
 
 /// Conservative gravity redistribution of freshly displaced material outside the current contact patches.
