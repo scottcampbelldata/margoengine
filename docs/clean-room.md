@@ -285,6 +285,14 @@ bottom. A bounded Newton solve removes vertices as they become dry, then distrib
 requested volume over the resulting profile. The fixture checks three partial fill amounts and
 independently computes the swept area from Eq. 4.3. [Pavlov (2023), Chapter 4](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=45).
 
+At intermediate angles, Figure 4.2f and Eqs. 4.13–4.18 describe a step under the trailing
+edge of the rotating grousers. Its initial band is the projection of the wheel width
+`b cos β` about that edge. The solver uses node coverage for partly intersected band cells.
+It fills the deepest cells of the band and then uses any remaining trailing room if that
+band reaches the original terrain. A mirrored ±22.5° test verifies the plateau, the band
+boundary, the projected face-plus-rim transport volume and conservation.
+[Pavlov (2023), Figure 4.2 and §4.2](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=42).
+
 The cross-track banks settle with a conservative face flux from a common elevation state.
 The dry granular finite-volume treatments by Roger P. Denlinger and Richard M. Iverson (2004)
 and A. Mangeney-Castelnau et al. (2003) motivated equal and opposite transfers that stop at a

@@ -573,7 +573,7 @@ unsafe fn deposit_backfill(
     (x_start, x_end, z_start, z_end): (usize, usize, usize, usize),
     (travel_x, travel_z): (f64, f64),
     volume: f64,
-    bottom_first: bool,
+    band: Option<(f64, f64)>,
     areas: *const f64,
     track_relief: *mut f64,
     deltas: *mut f64,
@@ -582,17 +582,30 @@ unsafe fn deposit_backfill(
     if volume <= 0.0 || track_relief.is_null() {
         return 0.0;
     }
+    let half_cell = 0.5 * (travel_z.abs() * lattice.dx + travel_x.abs() * lattice.dz);
+    let coverage = |rx: f64, rz: f64| {
+        if rx * travel_x + rz * travel_z >= 0.0 {
+            return 0.0;
+        }
+        if let Some((centre, half_width)) = band {
+            let cross = rx * travel_z - rz * travel_x - centre;
+            let width = (cross + half_cell).min(half_width) - (cross - half_cell).max(-half_width);
+            width.max(0.0) / (2.0 * half_cell)
+        } else {
+            1.0
+        }
+    };
     let capacity = |level: f64| {
         let mut volume = 0.0;
         let mut wet_area = 0.0;
         for x in x_start..x_end {
-            let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
+            let rx = lattice.origin_x + x as f64 * lattice.dx - p.x;
             for z in z_start..z_end {
-                let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
                 let i = x * lattice.nz + z;
                 let thickness = level - *track_relief.add(i);
-                if along < 0.0 && thickness > 0.0 {
-                    let area = *areas.add(i);
+                if thickness > 0.0 {
+                    let rz = lattice.origin_z + z as f64 * lattice.dz - p.z;
+                    let area = *areas.add(i) * coverage(rx, rz);
                     volume += thickness * area;
                     wet_area += area;
                 }
@@ -605,11 +618,11 @@ unsafe fn deposit_backfill(
     let mut sweeps = 1;
     let returned = volume.min(rear_volume);
     if returned > 0.0 {
-        // In nearly straight travel the same volume raises the deepest rear stations to a
-        // common bottom. Capacity is convex and piecewise linear in that bottom's elevation.
+        // The same volume raises the deepest selected stations to a common bottom.
+        // Capacity is convex and piecewise linear in that bottom's elevation.
         // Newton from the flat ground stays above the root and drops wet area at each break.
         for _ in 0..f64::MANTISSA_DIGITS {
-            if !bottom_first || rear_volume <= returned {
+            if rear_volume <= returned {
                 break;
             }
             let next = level - (rear_volume - returned) / wet_area;
@@ -630,14 +643,12 @@ unsafe fn deposit_backfill(
         }
         let scale = returned / rear_volume;
         for x in x_start..x_end {
-            let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
+            let rx = lattice.origin_x + x as f64 * lattice.dx - p.x;
             for z in z_start..z_end {
-                let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
+                let rz = lattice.origin_z + z as f64 * lattice.dz - p.z;
                 let i = x * lattice.nz + z;
-                if along < 0.0 {
-                    let thickness = (level - *track_relief.add(i)).max(0.0) * scale;
-                    add_bed_change(deltas, track_relief, i, thickness);
-                }
+                let thickness = (level - *track_relief.add(i)).max(0.0) * scale * coverage(rx, rz);
+                add_bed_change(deltas, track_relief, i, thickness);
             }
         }
         sweeps += 1;
@@ -701,18 +712,37 @@ unsafe fn deposit_cross_track(
     let backfill = if front_aligned {
         0.0
     } else {
-        deposit_backfill(
+        // The rear edge projects to a width b*cos(beta) and trails the contact midpoint.
+        let band = (!centred).then_some((-p.half_length * sine, p.half_width * inverse));
+        let placed = deposit_backfill(
             p,
             &lattice,
             cut_bounds,
             (travel_x, travel_z),
             requested,
-            centred,
+            band,
             areas,
             track_relief,
             deltas,
             work,
-        )
+        );
+        if band.is_some() && placed < requested {
+            placed
+                + deposit_backfill(
+                    p,
+                    &lattice,
+                    cut_bounds,
+                    (travel_x, travel_z),
+                    requested - placed,
+                    None,
+                    areas,
+                    track_relief,
+                    deltas,
+                    work,
+                )
+        } else {
+            placed
+        }
     };
     let banks = loose - backfill;
     let transferred = if front_aligned { requested } else { backfill };

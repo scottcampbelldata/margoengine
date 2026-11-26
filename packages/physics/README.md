@@ -4943,8 +4943,8 @@ soil. The default is zero. The turning lugs return part of the loose cut into th
 At large obliquity, they move that share to the opposite bank instead. A locked wheel carries no soil.
 The returned amount is limited to the loose cut and the solver's remaining depression behind
 the wheel. On nearly straight passes, the deepest part fills first to form a level bottom.
-Later passes can fill earlier cuts, and the same pressure footprint counts each excavation
-depth only once.
+At intermediate angles, the projected trailing lug edge makes a step within the trench.
+Later passes can fill earlier cuts, and the same pressure footprint counts each excavation depth only once.
 
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';

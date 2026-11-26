@@ -9892,8 +9892,10 @@ physical width uses the configured repose slope; slope zero uses the default rin
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
 [0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
 banks at large obliquity. At travel angles under 10°, partial backfill placed within the trench
-forms a flat bottom from the deepest part of the rear depression. Cross-track banks settle with
-one simultaneous sparse transfer pass per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
+forms a flat bottom from the deepest part of the rear depression. At intermediate angles,
+backfill first forms a step across the projected trailing lug band. Cross-track banks settle
+with one simultaneous sparse transfer pass per solver step. The solver stores eight history
+bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique

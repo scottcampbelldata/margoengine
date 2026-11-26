@@ -732,6 +732,67 @@ test('partial straight grouser backfill forms a flat bottom with the independent
   }
 });
 
+test('oblique grouser backfill forms a step inside the projected trailing lug band', async () => {
+  const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03, slip: 0 };
+  const grouserFill = 0.09;
+  const spacing = 0.004;
+  for (const [degrees, shared] of [
+    [22.5, false],
+    [-22.5, true],
+  ]) {
+    const angle = (degrees * Math.PI) / 180;
+    const lateral = Math.tan(angle);
+    const fixed = await rollingBench(terrain, material, wheel, { ...rig, lateral, shared });
+    const turning = await rollingBench(terrain, material, { ...wheel, grouserFill }, { ...rig, lateral, shared });
+    fixed.world.advance(1);
+    turning.world.advance(1);
+    const before = fixed.bed.elevations();
+    const after = turning.bed.elevations();
+    const sine = Math.sin(angle);
+    const cosine = Math.cos(angle);
+    const halfBand = (rig.width / 2) * cosine;
+    const halfCell = (spacing / 2) * (cosine + Math.abs(sine));
+    let level;
+    let volume = 0;
+    let inside = 0;
+    for (let i = 0; i < before.length; i++) {
+      if (before[i] >= 0 || after[i] <= before[i]) continue;
+      const x = spacing * Math.floor(i / (terrain.rows + 1)) - terrain.width / 2;
+      const zFromAxle = spacing * (i % (terrain.rows + 1)) - terrain.depth / 2 + 0.16;
+      const cross = Math.abs(x * cosine + zFromAxle * sine);
+      assert.ok(cross <= halfBand + halfCell);
+      if (cross < halfBand - halfCell) {
+        inside++;
+        level ??= after[i];
+        close(after[i], level, 32 * eps * Math.abs(level));
+      }
+      volume += (after[i] - before[i]) * spacing * spacing;
+    }
+    assert.ok(inside > 1);
+    const depth = fixed.soil.read(0).sinkage;
+    const halfChord = Math.sqrt(depth * (2 * wheel.radius - depth));
+    const arc = Math.acos(1 - depth / wheel.radius);
+    const rimArea = rig.width * depth * cosine;
+    const segmentArea = (wheel.radius ** 2 * arc - (wheel.radius - depth) * halfChord) * Math.abs(sine);
+    const radiusRatio = wheel.radius / (wheel.radius + 0.5 * wheel.lugHeight);
+    const sweptArea = radiusRatio * rig.width * wheel.lugHeight * grouserFill;
+    assert.ok(sweptArea < rimArea);
+    const expected = fixed.soil.budget.removed * (sweptArea / (rimArea + segmentArea));
+    close(volume, expected, 512 * eps * expected);
+    close(turning.bed.volume(), 0, 2048 * eps * fixed.soil.budget.removed);
+    assert.equal(turning.soil.budget.exported, 0);
+  }
+});
+
 test('rolling grousers reuse older trailing cut capacity without excavating it twice', async () => {
   const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
   const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };
