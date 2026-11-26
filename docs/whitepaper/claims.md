@@ -297,6 +297,9 @@ first: each names its scope, its evidence file and how to reproduce it.
   analytical Stokes profile in finite and deep water. The horizontal displacement errors are below 10⁻¹² m and
   the run replays exactly. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after
   building Physics. [Breivik, Janssen and Bidlot (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
+  In the 120 mm shallow-platform experiment, the simulated Stokes drift falls inside the observed envelope at five
+  depths. The RMS difference across the 15 points from three consecutive blocks is 0.82 mm/s.
+  [Melito et al. (2026), Figure 7](https://link.springer.com/article/10.1007/s42286-026-00154-9/figures/7).
 
 - Horizontal tracer dispersion (SEA-15, 2026-11-26). The four-thirds law reproduces cubic radial variance from
   two release times and replays exactly. A separate calibration on Poje's drifters places all nine held-out Cape

@@ -583,6 +583,59 @@ test('SEA-15 wave-averaged tracers follow the directional Stokes transport in de
   }
 });
 
+test('SEA-15 shallow-wave Stokes drift agrees with independent particle-tracking profiles', (t) => {
+  // Melito et al. (2026), section 3.1: camera waterline, measured above the platform.
+  const depth = 0.12;
+  const period = 1;
+  const amplitude = 0.025 / 2;
+  const density = 1000;
+  const spectrum = {
+    frequencies: new Float64Array([1 / period]),
+    directions: new Float64Array([0]),
+    energy: new Float64Array([(amplitude * amplitude * period) / (4 * Math.PI)]),
+    depth,
+    density,
+  };
+  // Fig. 7 red triangles, mm/s, for the three six-wave blocks. The velocity observations come from the
+  // Lagrangian–Eulerian difference of subsurface particle tracks. No velocity enters the simulated spectrum.
+  const profiles = [
+    [0.05, [7.2, 6.5, 5.1]],
+    [0.06, [6.0, 4.7, 4.6]],
+    [0.075, [5.2, 4.4, 4.0]],
+    [0.09, [5.6, 4.8, 3.7]],
+    [0.1, [4.7, 4.0, 4.0]],
+  ];
+  const tracer = new TracerSolver();
+  const hz = 60;
+  const world = new PhysicsWorld({ rate: { num: hz, den: 1 } }).add(tracer, {
+    waterDensity: density,
+    bed: depth,
+    stokesSpectrum: spectrum,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    sources: profiles.map(([depth]) => ({ material: 'dye', rate: hz, stop: 1 / hz, position: [0, -depth, 0] })),
+  });
+  const duration = 6;
+  world.advance(hz * duration);
+  const particles = [...tracer.particlesOf()];
+  assert.equal(particles.length, profiles.length);
+  // Axis tick spacing is 5 mm/s per 48 pixels. Allow two pixels for reading an overlapping marker.
+  const digitization = (2 * 5) / 48;
+  const velocities = [];
+  let squared = 0;
+  for (const [i, [depth, blocks]] of profiles.entries()) {
+    const [x, y, z] = particles[i].position;
+    const speed = (x / duration) * 1000;
+    assert.equal(y, -depth);
+    assert.equal(z, 0);
+    assert.ok(speed >= Math.min(...blocks) - digitization && speed <= Math.max(...blocks) + digitization);
+    for (const measured of blocks) squared += (speed - measured) ** 2;
+    velocities.push(speed.toFixed(2));
+  }
+  const rmse = Math.sqrt(squared / (profiles.length * 3));
+  t.diagnostic(`Drift ${velocities.join(', ')} mm/s. RMS error across the 15 measured values ${rmse.toFixed(2)} mm/s.`);
+});
+
 function radialVariance(particles) {
   const n = particles.length;
   const cx = particles.reduce((sum, p) => sum + p.position[0], 0) / n;

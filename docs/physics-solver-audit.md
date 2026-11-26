@@ -519,7 +519,10 @@ Migration under solar heating and shelf-scale dispersion remain open.
 
 Tracers can use wave-averaged Stokes transport from a fixed directional spectrum and a separate mean current.
 The crossed-wave test checks the directional sum and depth decay in finite and deep water. The normal live-velocity
-mode still follows the SEA-04 wake potential. Independent wave-induced drift measurements remain open.
+mode still follows the SEA-04 wake potential. In Melito et al.'s 120 mm shallow platform experiment, a wave spectrum
+driven by measured water elevation falls inside the three independent subsurface tracking profiles' envelope at
+five sampled depths. The RMS discrepancy across the 15 reported points is 0.82 mm/s. Field and breaking-wave
+transport measurements remain open.
 
 Horizontal dispersion can now increase with release scale. The benchmark uses Poje et al.'s separate drifter data
 for calibration and Okubo's nine Cape Kennedy dye extents for comparison. Each independent dye extent is closer

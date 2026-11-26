@@ -13337,7 +13337,16 @@ In deep water this becomes `a²ωk exp(−2kd)` for a wave of amplitude `a`, wav
 below still water. The tracer adds this mean transport to a supplied Eulerian current while the sea
 can still provide the instantaneous elevation. The test compares a crossed pair of waves against the analytical
 profile at the surface and two depths, and checks exact replay in finite and deep water. Independent measurements
-of wave-induced mean flow remain open. [Breivik, Janssen and Bidlot, “Approximate Stokes Drift Profiles in Deep Water” (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
+of wave-induced mean flow in the field remain open. [Breivik, Janssen and Bidlot, “Approximate Stokes Drift Profiles in Deep Water” (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
+
+L. Melito, N. Soori, M. Postacchini, B. Khorbatly, H. Kalisch and M. Brocchini,
+[“Long-Wave Modulation of Stokes Drift and Mass Transport in Short Waves” (2026)](https://doi.org/10.1007/s42286-026-00154-9),
+§3.1 supplies the measured 0.025 m wave height, 1 s period and 0.12 m depth for the shallow-platform check.
+§3.4 and Fig. 7 supply the held-out Stokes component from fitted Lagrangian and Eulerian velocities tracked below
+the surface. We read the red marker centres in three six-wave blocks at 50, 60, 75, 90 and 100 mm depth. The plot
+axis separates 5 mm/s by approximately 48 px. The test admits a two-pixel reading margin around the blocks'
+envelope. The 15 points share one wave configuration and give a 0.82 mm/s RMS discrepancy. The benchmark covers
+weakly nonlinear monochromatic drift over a shallow platform, without a field return-flow or breaking-wave claim.
 
 The optional horizontal mixing law evolves the radial variance `q` of each release as `dq/dt = 4K_ref (3√q/L_ref)^b`.
 The solver integrates this ordinary differential equation exactly, then splits each variance increment equally
