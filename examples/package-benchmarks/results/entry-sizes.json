@@ -1388,8 +1388,8 @@
         "gzip": 18446
       },
       "./fog-volumes": {
-        "raw": 2704,
-        "gzip": 1382
+        "raw": 5283,
+        "gzip": 2243
       },
       "./density-volume": {
         "raw": 8980,
@@ -14094,6 +14094,10 @@
       "./pack-ice": {
         "raw": 12205,
         "gzip": 5112
+      },
+      "./drainage-fog": {
+        "raw": 10863,
+        "gzip": 4666
       }
     },
     "@margoengine/physics2d": {
@@ -17925,6 +17929,16 @@
       "raw": 5716,
       "gzip": 2534,
       "brotli": 2332
+    },
+    "packages/physics/dist/drainage-fog-kernel.wasm": {
+      "raw": 8955,
+      "gzip": 3273,
+      "brotli": 2865
+    },
+    "packages/physics/dist/drainage-fog-kernel-shared.wasm": {
+      "raw": 8955,
+      "gzip": 3273,
+      "brotli": 2870
     }
   },
   "splits": {

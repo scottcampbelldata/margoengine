@@ -9239,6 +9239,8 @@ it while settling and external surface inputs exchange water with the ground.
 The visual grid interpolates extinction horizontally and uses the bulk column thickness vertically. Its storage is
 16 bytes per column plus the 48-byte header, limited by the device's storage binding and buffer sizes. Analytic fog
 volumes and the live grid each work as an optional `VolumetricFog` medium.
+The optional solver is 4,666 bytes gzip with an 8,955-byte lazy Wasm asset per memory mode. The optional
+fog renderer is 2,243 bytes gzip.
 
 ### Layered snowpack (ICE-01)
 

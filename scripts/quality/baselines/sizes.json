@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20163758,
+  "total": 20169541,
   "history": [
     {
       "date": "2026-10-24",
@@ -12873,6 +12873,12 @@
       "commit": "eab592cfd1",
       "reason": "ICE-04 adds physics/pack-ice at 5112 B gzip with lazy no-slot SIMD assets. Water/ice changes from 13079 to 13297 B for the structural SeaIce pose reader. A separate adapter would duplicate matrix code. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "80679b25b4",
+      "grew": 2,
+      "reason": "ATMO-08 entry sizes, previous record to current: @margoengine/physics/drainage-fog 0→4666 B (ceiling 0→4922 B); @margoengine/environment/fog-volumes 1382→2243 B (ceiling 1638→2499 B). The drainage-fog entry integrates the registry and lazily loads the arena solver. The live renderer samples resolved optical columns using one storage binding and shares the existing volumetric pipeline. An additional entry would add a module for the same environment medium interface."
     }
   ],
   "items": {
@@ -13208,7 +13214,7 @@
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 8421,
     "@margoengine/environment/exr-write": 2084,
-    "@margoengine/environment/fog-volumes": 1638,
+    "@margoengine/environment/fog-volumes": 2499,
     "@margoengine/environment/gi": 19000,
     "@margoengine/environment/ground": 5064,
     "@margoengine/environment/lightformer": 3402,
@@ -13688,6 +13694,7 @@
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
