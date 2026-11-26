@@ -5860,6 +5860,9 @@ negative drawbar impulse, positive spin impulse and precise restored state.
 At 45° of oblique travel, the native sidewall force matches an exact symmetric-wheel integral
 within its derived quadrature error. Reversing obliquity reverses the force exactly across shared
 and plain Wasm. An actual wheel consumes the separate side force and slows its lateral slip.
+The cross-track depositor closes the volume on both berms of a centered wheel. A second
+fixture cuts the same rolling footprint next to an open boundary and confirms that only
+the supported bank's half is deposited. Both cases replay exactly.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

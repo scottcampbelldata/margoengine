@@ -10602,6 +10602,9 @@ speeds down to zero travel. The same rigid impulse bound handles the reversed ax
 The optional right-axis force field pairs the combined rim shear with the sidewall pressure
 integral. The rigid adapter applies it after longitudinal traction, then recomputes the current
 contact velocity. The lateral impulse respects the available grip and stops at zero side slip.
+The optional cross-track depositor reweights the actual loose cut volume into separate
+repose-slope banks. It enumerates only their projected node bounds, schedules their faces
+for the same conservative repose sweep and records the share of each missing bank as export.
 
 ### Divergence-free particle pressure
 

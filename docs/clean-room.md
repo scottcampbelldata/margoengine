@@ -220,6 +220,19 @@ and exact seek. It uses the signed speed ratio even below 1 m/s.
 [Pavlov and Johnson (2024)](https://doi.org/10.1016/j.jterra.2023.08.004),
 [Pavlov (2023), Chapter 5](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf).
 
+Catherine Pavlov and Aaron M. Johnson, “Soil Displacement Terramechanics for Wheel-Based
+Trenching with a Planetary Rover” (2019), and Pavlov’s 2023 CMU dissertation, Eqs. 4.1, 4.2
+and 4.4, split excavated soil across travel and derive initial pile height from triangular
+cross-sections at the angle of repose. The wheel face projects a circular segment across
+the direction of travel, and the rim projects a rectangle. This optional depositor uses their
+area ratio between 10° and 80° and equal shares at other angles. It builds each side from the
+actual cut volume after compaction and dust. Separate quadrature over the physical terrain
+areas closes both banks' volumes. Each vertex integrates its partial overlap with the wedge.
+The coupled fixture verifies both banks, a deliberately
+missing bank at an open boundary and exact seek. The full scanned berm profiles and the
+publication's closed-form inward refilling and soil carried in grousers remain separate work.
+[Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
+
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
 magnitudes in the shear law and projects the force in the direction of the local slip velocity
 (dissertation Eqs. 5.10–5.14 and 5.20–5.21). The sidewall depth is measured from the chord between

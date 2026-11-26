@@ -74,6 +74,7 @@ struct Patch {
     lateral_slip: f64,
     side_weight: f64,
     camber: f64,
+    berm_slope: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -357,7 +358,12 @@ fn rolling_load<const REACTION: bool>(
     } else {
         (0.0, 0.0, peak, entry, entry)
     };
-    let lateral_active = p.lateral_slip != 0.0;
+    let lateral_slip = if p.side_reaction != 0.0 {
+        p.lateral_slip
+    } else {
+        0.0
+    };
+    let lateral_active = lateral_slip != 0.0;
     let sin_exit = if lateral_active { sin(exit) } else { 0.0 };
     let cos_exit = if lateral_active { cos(exit) } else { 0.0 };
     let chord = if lateral_active {
@@ -400,16 +406,16 @@ fn rolling_load<const REACTION: bool>(
                 );
                 mobilized_motion(
                     distance,
-                    shear_radius * (entry - at) * p.lateral_slip,
+                    shear_radius * (entry - at) * lateral_slip,
                     velocity,
-                    p.lateral_slip,
+                    lateral_slip,
                     p.shear_length * (1.0 + p.skid),
                 )
             } else {
                 let travel = 1.0 - p.drive_slip;
                 let slide = rim * ((lug_entry - at) - travel * (lug_sine - sine));
                 if lateral_active {
-                    let velocity = travel * p.lateral_slip;
+                    let velocity = travel * lateral_slip;
                     mobilized_motion(
                         slide.max(0.0),
                         shear_radius * (lug_entry - at) * velocity,
@@ -470,6 +476,158 @@ const ROLLING_ROWS: usize = 65;
 struct RollingCut {
     rim: f64,
     deepest: f64,
+}
+
+struct BermLattice {
+    nx: usize,
+    nz: usize,
+    dx: f64,
+    dz: f64,
+    origin_x: f64,
+    origin_z: f64,
+}
+
+fn berm_right_share(p: &Patch, depth: f64, cosine: f64, sine: f64) -> f64 {
+    let sin_abs = sine.abs();
+    if !(sin(core::f64::consts::PI / 18.0)..=sin(4.0 * core::f64::consts::PI / 9.0))
+        .contains(&sin_abs)
+    {
+        return 0.5;
+    }
+    let radius = p.wheel_radius;
+    let centre_height = radius - depth;
+    // Project the submerged wheel-face segment and the rim rectangle across travel.
+    let angle = 2.0 * arc_sin(root(0.5 * depth / radius));
+    let chord = root(depth * (radius + centre_height));
+    let section = sin_abs * (radius * radius * angle - centre_height * chord).max(0.0);
+    let face = 2.0 * p.half_width * depth * cosine;
+    let area = section + face;
+    if area == 0.0 {
+        return 0.5;
+    }
+    if sine > 0.0 {
+        face / area
+    } else {
+        section / area
+    }
+}
+
+fn berm_node_weight(height: f64, slope: f64, distance: f64, grid_width: f64) -> f64 {
+    let start = (distance - grid_width).max(0.0);
+    let end = (distance + grid_width).min(height / slope);
+    // Average the linear wedge over the vertex's projected support, including partial overlap.
+    if end > start {
+        (end - start) * (height - 0.5 * slope * (start + end)) / (2.0 * grid_width)
+    } else {
+        0.0
+    }
+}
+
+unsafe fn deposit_cross_track(
+    p: &Patch,
+    lattice: BermLattice,
+    halo: f64,
+    depth: f64,
+    loose: f64,
+    areas: *const f64,
+    deltas: *mut f64,
+    rim: *mut f64,
+    faces: *mut u32,
+    work: *mut f64,
+) -> f64 {
+    let BermLattice {
+        nx,
+        nz,
+        dx,
+        dz,
+        origin_x,
+        origin_z,
+    } = lattice;
+    let inverse = 1.0 / slip_magnitude(1.0, p.lateral_slip);
+    let sine = p.lateral_slip * inverse;
+    let span = p.half_length * inverse + p.half_width * sine.abs();
+    let reach = p.half_width * inverse + p.half_length * sine.abs();
+    let travel_x = p.forward_x * inverse - p.forward_z * sine;
+    let travel_z = p.forward_z * inverse + p.forward_x * sine;
+    let right = loose * berm_right_share(p, depth, inverse, sine);
+    let left = loose - right;
+    // Each side has triangular cross-section h²/(2*slope) and extends for twice span.
+    let height_left = root(left * p.berm_slope / span);
+    let height_right = root(right * p.berm_slope / span);
+    let grid_width = travel_z.abs() * dx + travel_x.abs() * dz;
+    let outside = reach + height_left.max(height_right) / p.berm_slope + grid_width;
+    let (x_start, x_end) = bounds(
+        p.x,
+        travel_x.abs() * span + travel_z.abs() * outside,
+        origin_x,
+        dx,
+        nx,
+    );
+    let (z_start, z_end) = bounds(
+        p.z,
+        travel_z.abs() * span + travel_x.abs() * outside,
+        origin_z,
+        dz,
+        nz,
+    );
+    let mut left_area = 0.0;
+    let mut right_area = 0.0;
+    for x in x_start..x_end {
+        let rx = origin_x + x as f64 * dx - p.x;
+        for z in z_start..z_end {
+            let rz = origin_z + z as f64 * dz - p.z;
+            let i = x * nz + z;
+            let transverse = rx * travel_z - rz * travel_x;
+            let outside_contact = transverse.abs() - reach;
+            let along = rx * travel_x + rz * travel_z;
+            let weight = if outside_contact >= 0.0
+                && along.abs() <= span
+                && raster(p, halo, rx, rz).0 == 0.0
+            {
+                if transverse > 0.0 {
+                    berm_node_weight(height_right, p.berm_slope, outside_contact, grid_width)
+                } else {
+                    -berm_node_weight(height_left, p.berm_slope, outside_contact, grid_width)
+                }
+            } else {
+                0.0
+            };
+            *rim.add(i) = weight;
+            if weight > 0.0 {
+                right_area += weight * *areas.add(i);
+            } else {
+                left_area -= weight * *areas.add(i);
+            }
+        }
+    }
+    let left_scale = if left_area > 0.0 {
+        left / left_area
+    } else {
+        0.0
+    };
+    let right_scale = if right_area > 0.0 {
+        right / right_area
+    } else {
+        0.0
+    };
+    let queue = FaceQueue::new(faces, nx * nz);
+    for x in x_start..x_end {
+        for z in z_start..z_end {
+            let i = x * nz + z;
+            let weight = *rim.add(i);
+            let deposit = if weight > 0.0 {
+                weight * right_scale
+            } else {
+                -weight * left_scale
+            };
+            *deltas.add(i) += deposit;
+            if deposit > 0.0 && *deltas.add(i) > 0.0 {
+                queue.around(i, nx, nz, 0);
+            }
+        }
+    }
+    *work += 2.0 * ((x_end - x_start) * (z_end - z_start)) as f64;
+    f64::from(left_area > 0.0) * left + f64::from(right_area > 0.0) * right
 }
 
 fn phase_offset(angle: f64, pitch: f64) -> f64 {
@@ -932,25 +1090,48 @@ pub unsafe extern "C" fn stamp(
             *deltas.add(i) -= cut;
             *dust.add(i) += cut * p.dust_flux;
             removed += cut * area;
-            let distance = length(rx, rz);
-            let normal = if distance > 0.0 {
-                (p.slip_x * rx + p.slip_z * rz) / distance
-            } else {
-                0.0
-            };
-            let weight = if coverage == 0.0 {
-                ring * (1.0 + p.shear_share * normal)
-            } else {
-                0.0
-            };
-            *rim.add(i) = weight;
-            rim_area += weight * area;
+            if p.berm_slope == 0.0 {
+                let distance = length(rx, rz);
+                let normal = if distance > 0.0 {
+                    (p.slip_x * rx + p.slip_z * rz) / distance
+                } else {
+                    0.0
+                };
+                let weight = if coverage == 0.0 {
+                    ring * (1.0 + p.shear_share * normal)
+                } else {
+                    0.0
+                };
+                *rim.add(i) = weight;
+                rim_area += weight * area;
+            }
         }
     }
     let compacted = removed * p.compaction;
     let suspended = removed * p.dust;
     let loose = removed - compacted - suspended;
-    let deposited = if rim_area > 0.0 {
+    let berm_depth = rolling_depth.filter(|_| p.berm_slope > 0.0 && loose > 0.0);
+    let deposited = if let Some(depth) = berm_depth {
+        deposit_cross_track(
+            p,
+            BermLattice {
+                nx,
+                nz,
+                dx,
+                dz,
+                origin_x,
+                origin_z,
+            },
+            halo,
+            depth.rim,
+            loose,
+            areas,
+            deltas,
+            rim,
+            faces,
+            work,
+        )
+    } else if rim_area > 0.0 {
         let fill = loose / rim_area;
         let queue = FaceQueue::new(faces, nx * nz);
         for x in x_start..x_end {
