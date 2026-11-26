@@ -2995,7 +2995,7 @@ For a moving cabin, attach its fixed fittings and camera to the hull's rigid pos
 
 #### Hull motion drives a dispersive wake
 
-Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. The example starts with a downward initial velocity. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Pass the wake to `SpectralSea.patches` to query its surface, and to `WaterWake` to draw it.
+Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. Set `advance: true` to displace water at the leading end and draw it in behind the hull as it moves, alongside sources from heave, pitch and roll. It uses the rigid body's signed forward speed through the mean current and the hull mesh at its still-water draft. Omit `advance` to keep only the vertical motion sources. When a ship already supplies its advance wake through `ShipSolver` pressure, use one advance source per hull. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Pass the wake to `SpectralSea.patches` to query its surface, and to `WaterWake` to draw it.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -3006,7 +3006,7 @@ import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
 await Physics.load();
 using physics = new Physics(null, {fixedTimestep: 1 / 60});
 const body = physics.addBody(null, {
-  linearVelocity: [0, -0.25, 0],
+  linearVelocity: [1, 0, 0],
   colliders: {shape: 'box', halfExtents: [2, 0.25, 0.35], mass: SEA_WATER * 0.7},
 });
 const mesh = {
@@ -3019,7 +3019,7 @@ const mesh = {
     2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
   ]),
 };
-const hull = new HullSolver('hull', {minimumRadius: 0.35});
+const hull = new HullSolver('hull', {minimumRadius: 0.35, advance: true});
 const wake = new WakeSolver('wake', hull.wakeSourceField);
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})

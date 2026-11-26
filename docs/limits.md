@@ -10351,3 +10351,9 @@ The 3D axial seakeeping entry is 31,553 B gzip with a 32,500 B ceiling. Core and
 A configured `Hull.course` uses the surface sample’s mean current when speed is omitted. This is a surface reference velocity at the hull centre, with no depth average over strong shear. An explicit water-relative speed is supported. The incident phase follows the hull’s actual motion relative to the coordinates in which the wave spectrum is defined.
 
 The current-relative seakeeping entry is 31,633 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
+
+### Seakeeping bow and stern displacement
+
+The optional `HullWake.advance` flag starts off. It adds one source row per station face plus the two end faces, for `stations + 1` additional rows per hull. It uses the signed rigid-body speed along the horizontal hull axis relative to the mean surface flow and the untrimmed section areas at the hull’s still-water draft. Only freely moving, surface-piercing hulls emit this source. The depth-integrated approximation sends its volume to the same linear dispersive grid as heave, pitch and roll. Grid propagation keeps the wakes in the grid’s frame, and accuracy near broad bows, breaking waves and strong spatial currents remains unqualified. A vessel’s advance pressure wake and displacement wake are alternative inputs for the same effect.
+
+The advancing-hull seakeeping entry is 31,849 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.

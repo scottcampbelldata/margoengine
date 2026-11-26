@@ -6329,3 +6329,7 @@ The refined half-sphere driven through the real rigid force port agrees with the
 ### SEA-08 forward course in tidal flow
 
 With 1 m/s world velocity and 0.25 m/s longitudinal current, the inferred course gives the exact same six held loads as an explicit 0.75 m/s. A matching drift current gives the same loads as an explicitly zero course. The previous world-velocity inference changed heave by 54.63 N and roll by 3.044 N m in this fixture.
+
+### SEA-08 bow and stern displacement
+
+A 4 m prismatic hull moving at 0.75 m/s through the water transfers 12.5 L from its trailing end to its leading end in one 60 Hz tick. Its net grid volume stays zero, and the source’s longitudinal first moment equals swept volume times hull length. Astern travel reverses the sign, and an equal drift current yields zero displacement. The replay is exact in plain and shared memory. Both renderers sample the outgoing wake at 1,362 vertices and agree with the physics surface. Tank amplitudes and production film bindings remain open. [Derivation and held-out experiment](../clean-room.md#sea-08-displacement-from-a-translating-hull)

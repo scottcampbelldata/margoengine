@@ -168,6 +168,7 @@ export class HullSolver implements Solver<HullParams> {
 
 export interface HullWake {
     readonly minimumRadius?: number;
+    readonly advance?: boolean;
 }
 
 export interface LateralSection {

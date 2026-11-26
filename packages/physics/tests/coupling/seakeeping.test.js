@@ -1065,29 +1065,31 @@ test('HullSolver infers its forward course through the mean current while retain
   assert.deepEqual(held(1, undefined), held(1, 0), 'a hull that drifts with the tide has zero advective course');
 });
 
-function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
+function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T, advance = false, current = 0) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });
+  // Use an exactly representable reciprocal body mass for the submerged area checks.
+  const density = advance ? 1024 : SEA_WATER;
   const body = physics.addBody(null, {
     position: [0, y, 0],
     linearVelocity,
     angularVelocity,
-    colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+    colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: density * L * B * T },
   });
-  const hull = new HullSolver('hull', { minimumRadius: 0.35 });
+  const hull = new HullSolver('hull', { minimumRadius: 0.35, advance });
   const wake = new WakeSolver('wake', hull.wakeSourceField);
   world
     .add(new RigidSolver(), { physics })
     .add(hull, {
       hulls: [{ row: body.row, mesh: boxMesh([L, D, B]) }],
-      sea: { elevation: () => 0 },
+      sea: { density, elevation: () => 0, sample: () => ({ current: [current, 0, 0] }) },
       radiation: false,
       rollDamping: false,
       drag: false,
       greenWater: false,
       slamming: false,
     })
-    .add(wake, { cells: [48, 32], cellSize: 0.25, depth: 3, sponge: 0 })
+    .add(wake, { cells: [48, 32], cellSize: 0.25, depth: 3, sponge: 0, density })
     .couple(['hull', 'wake', 'rigid'], 'staggered');
   return { world, hull, wake, body, physics };
 }
@@ -1178,11 +1180,80 @@ test('HullSolver wake source: pitch and roll drive reciprocal dipoles while stea
 
 test('HullSolver wake source ignores hulls wholly above or below the water surface', () => {
   for (const y of [-3, 3]) {
-    const { world, hull, wake, physics } = radiatingBox([0, -0.25, 0], [0, 0, 0], undefined, y);
+    const { world, hull, wake, physics } = radiatingBox([1, -0.25, 0], [0, 0, 0], undefined, y, true);
     using _rigid = physics;
     world.advance(1);
     assert.ok(readHullWake(world, hull).every(({ volume }) => volume === 0));
     assert.ok(wake.heights().every((h) => h === 0));
+  }
+});
+
+test('HullSolver wake source: translation lifts the leading waterline and conserves displaced volume', async () => {
+  await Physics.load({ threads: true });
+  const hashes = [];
+  for (const shared of [false, true]) {
+    const { world, hull, wake, physics } = radiatingBox(
+      [1, 0, 0],
+      [0, 0, 0],
+      worldMemory(shared),
+      undefined,
+      true,
+      0.25,
+    );
+    using _rigid = physics;
+    world.advance(1);
+    const rows = readHullWake(world, hull);
+    assert.equal(rows.length, 3 * 24 + 1);
+    const dV = (B * T * 0.75) / 60;
+    const leading = rows.at(-1);
+    const trailing = rows[48];
+    nearWake(leading.volume, dV);
+    nearWake(trailing.volume, -dV);
+    nearWake(leading.x, L / 2);
+    nearWake(trailing.x, -L / 2);
+    assert.ok(rows.every(({ z, pressure }) => pressure === 0 && Number.isFinite(z)));
+    assert.ok(
+      rows.slice(0, 48).every(({ volume }) => volume === 0),
+      'a level hull emits no vertical flux',
+    );
+    assert.ok(
+      rows.slice(49, -1).every(({ volume }) => Math.abs(volume) < 1e-14),
+      'the prism is uniform inside',
+    );
+    nearWake(
+      rows.reduce((volume, row) => volume + row.x * row.volume, 0),
+      L * dV,
+    );
+    nearWake(
+      wake.heights().reduce((volume, h) => volume + h * 0.25 ** 2, 0),
+      0,
+    );
+    assert.ok(wake.sample(L / 2, 0).height > 0 && wake.sample(-L / 2, 0).height < 0);
+    world.advance(12);
+    const snapshot = world.takeSnapshot();
+    world.advance(25);
+    const hash = world.hash();
+    assert.ok(Math.abs(wake.sample(3.5, 0).height) > 1e-4, 'outgoing wave reaches a gauge beyond the bow');
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(25);
+    assert.equal(world.hash(), hash);
+    hashes.push(hash);
+  }
+  assert.equal(hashes[0], hashes[1]);
+
+  for (const [speed, current] of [
+    [-1, 0],
+    [0.25, 0.25],
+  ]) {
+    const { world, hull, wake, physics } = radiatingBox([speed, 0, 0], [0, 0, 0], undefined, undefined, true, current);
+    using _rigid = physics;
+    world.advance(1);
+    const rows = readHullWake(world, hull);
+    const dV = (B * T * (speed - current)) / 60;
+    nearWake(rows.at(-1).volume, dV);
+    nearWake(rows[48].volume, -dV);
+    if (dV === 0) assert.ok(wake.heights().every((h) => h === 0));
+    else assert.ok(wake.sample(-L / 2, 0).height > 0 && wake.sample(L / 2, 0).height < 0);
   }
 });
 

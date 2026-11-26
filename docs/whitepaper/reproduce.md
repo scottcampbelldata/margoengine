@@ -4653,3 +4653,7 @@ Build Physics and run `node --test --test-name-pattern "3D surge mass" packages/
 ### SEA-08 an inferred course through the tide
 
 Build Physics and run `node --test --test-name-pattern "through the mean current" packages/physics/tests/coupling/seakeeping.test.js`. The controlled course and the inferred one see the same waves and mean tide. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --tidal-course` with WebGPU and again with `MARGO_COMPAT=1`. The test compares the drawn wake against its numerical surface and verifies restored replay.
+
+### SEA-08 bow and stern displacement
+
+Build Physics and run `node --test --test-name-pattern "wake source" packages/physics/tests/coupling/seakeeping.test.js`. The analytic prism gives the signed source volume from the submerged section area and the distance swept during one tick, with zero net grid volume. Both memory modes restore and replay exactly. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-advance` on WebGPU and with `MARGO_COMPAT=1` for the moving waterline renderer.

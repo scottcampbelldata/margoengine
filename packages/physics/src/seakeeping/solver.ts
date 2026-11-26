@@ -99,6 +99,8 @@ export interface Hull {
 export interface HullWake {
   /** Minimum radius of the surface patches in metres. Default 0, using their geometric size. */
   readonly minimumRadius?: number;
+  /** Displace water at the advancing end and draw it in behind the hull. Default false. */
+  readonly advance?: boolean;
 }
 
 /** What a {@link HullSolver} is made from. */
@@ -285,6 +287,8 @@ export class HullSolver implements Solver<HullParams> {
   private wakeSources: Region | null = null;
   private readonly wakePlanes = new Map<Hull, { waterline: number; sections: readonly Section[] }>();
   private readonly wakeRadius: number | null;
+  private readonly wakeAdvance: boolean;
+  private wakeRowsPerHull = 0;
 
   /** Pass the crush damage or girder seam field to enable structural compartment openings. */
   constructor(
@@ -297,6 +301,7 @@ export class HullSolver implements Solver<HullParams> {
     if (!(Number.isFinite(radius) && radius >= 0))
       throw new MargoError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
     this.wakeRadius = wake ? radius : null;
+    this.wakeAdvance = wake?.advance ?? false;
     if (crushDamage && (crushDamage.kind !== 'surfaceSampleSet' || crushDamage.quantity !== CRUSH_DAMAGE_QUANTITY))
       throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
     if (girderSeams && (girderSeams.kind !== 'surfaceSampleSet' || girderSeams.quantity !== GIRDER_SEAM_QUANTITY))
@@ -416,9 +421,10 @@ export class HullSolver implements Solver<HullParams> {
     if (this.wakeRadius !== null) {
       if (level !== 0)
         throw new MargoError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
+      this.wakeRowsPerHull = 2 * this.stations + (this.wakeAdvance ? this.stations + 1 : 0);
       this.wakeSources = host.allocate(
         'wakeSources',
-        hulls.length * this.stations * 2 * WAKE_SOURCE_WORDS * 8,
+        hulls.length * this.wakeRowsPerHull * WAKE_SOURCE_WORDS * 8,
         'f64',
         WAKE_SOURCE_LAYOUT,
       );
@@ -568,7 +574,7 @@ export class HullSolver implements Solver<HullParams> {
     return water && typeof water.sample === 'function' ? water : null;
   }
 
-  private inferredCourseSpeed(
+  private throughWaterSpeed(
     velocity: readonly number[],
     rotation: readonly [number, number, number, number],
     centre: Vec3,
@@ -686,9 +692,14 @@ export class HullSolver implements Solver<HullParams> {
           this.dragOf(hull, bodies[at + 16]!, v, spin, pose, centre, t),
         );
       const course = this.course[index];
-      const speed = course ? (course.speed ?? this.inferredCourseSpeed(v, turned, centre, t)) : 0;
-      if (wake && this.loads.surfacePiercing && bodies[at + 16]! > 0)
-        this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, dt, wake);
+      const wetWake = wake && this.loads.surfacePiercing && bodies[at + 16]! > 0;
+      const throughWater =
+        (wetWake && this.wakeAdvance) || (course && course.speed === undefined)
+          ? this.throughWaterSpeed(v, turned, centre, t)
+          : 0;
+      const speed = course ? (course.speed ?? throughWater) : 0;
+      if (wetWake)
+        this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, throughWater, dt, wake);
       if (this.radiation)
         this.radiate(
           hull,
@@ -729,7 +740,7 @@ export class HullSolver implements Solver<HullParams> {
     }
   }
 
-  /** Project the wet boundary's vertical flux onto its still-water waterplane. */
+  /** Project the wet boundary's vertical and longitudinal fluxes onto its still-water waterplane. */
   private displaceWake(
     hull: Hull,
     index: number,
@@ -738,6 +749,7 @@ export class HullSolver implements Solver<HullParams> {
     centre: Vec3,
     heave: number,
     spin: readonly number[],
+    throughWater: number,
     dt: number,
     rows: Float64Array,
   ): void {
@@ -747,7 +759,7 @@ export class HullSolver implements Solver<HullParams> {
       plane = { waterline, sections: hullSections(hull.mesh, waterline, this.stations) };
       this.wakePlanes.set(hull, plane);
     }
-    let at = index * this.stations * 2 * WAKE_SOURCE_WORDS;
+    let at = index * this.wakeRowsPerHull * WAKE_SOURCE_WORDS;
     const gauss = 1 / (2 * Math.sqrt(3));
     for (const { x, width, breadth } of plane.sections) {
       const radius = Math.max(this.wakeRadius!, 0.5 * hypot(width, 0.5 * breadth));
@@ -763,6 +775,27 @@ export class HullSolver implements Solver<HullParams> {
         rows[at + 2] = radius;
         rows[at + 4] = -area * vertical * dt;
         at += WAKE_SOURCE_WORDS;
+      }
+    }
+    if (this.wakeAdvance && throughWater !== 0) {
+      const { sections, waterline } = plane;
+      const first = sections[0]!;
+      const start = first.x - first.width / 2;
+      const surface = rotate(pose.rotation, [0, waterline, 0]);
+      const forward = rotate(pose.rotation, [1, 0, 0]);
+      // The depth integral of the slender-hull source sheet is -U dA/dx. Adjacent
+      // sections share a face, so their volume change transfers water without adding it.
+      for (let i = 0; i <= sections.length; i++, at += WAKE_SOURCE_WORDS) {
+        const after = sections[i];
+        const before = sections[i - 1];
+        const volume = ((before?.area ?? 0) - (after?.area ?? 0)) * throughWater * dt;
+        if (volume === 0) continue;
+        const x = start + i * first.width;
+        const breadth = Math.max(before?.breadth ?? 0, after?.breadth ?? 0);
+        rows[at] = pose.position[0] + surface[0] + forward[0] * x;
+        rows[at + 1] = pose.position[2] + surface[2] + forward[2] * x;
+        rows[at + 2] = Math.max(this.wakeRadius!, 0.5 * hypot(first.width, breadth));
+        rows[at + 4] = volume;
       }
     }
   }

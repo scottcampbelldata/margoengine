@@ -20,6 +20,7 @@ import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const modes = [
+  ['--hull-advance', 'advance'],
   ['--bilge-keels', 'bilge'],
   ['--surge-panels', 'surge'],
   ['--tidal-course', 'tide'],
@@ -39,6 +40,7 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
+    const advance = motion === 'advance';
     const surge = motion === 'surge';
     const tide = motion === 'tide';
     const incident = motion === 'incident' || surge || tide;
@@ -77,7 +79,7 @@ try {
       const { HullSolver } = await import('/packages/physics/dist/seakeeping.js');
       const { Physics } = await import('/packages/physics/dist/index.js');
       await Physics.load();
-      const hull = new HullSolver('hull', { minimumRadius: 0.35 });
+      const hull = new HullSolver('hull', { minimumRadius: 0.35, advance });
       wake = new WakeSolver('wake', hull.wakeSourceField);
       const current = tide
         ? {
@@ -99,8 +101,8 @@ try {
       const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
       const body = physics.addBody(null, {
         position: [0, 0.25, 0],
-        linearVelocity: [forwardCourse ? 1 : 0, -0.5, 0],
-        angularVelocity: [0.1, 0, 0.125],
+        linearVelocity: [advance ? 1.5 : forwardCourse ? 1 : 0, advance ? 0 : -0.5, 0],
+        angularVelocity: advance ? [0, 0, 0] : [0.1, 0, 0.125],
         colliders: { shape: 'box', halfExtents: [2, 0.75, 1], mass: 4100 },
       });
       const mesh = {
@@ -130,6 +132,9 @@ try {
           ],
           sea: loadSea,
           drift: false,
+          drag: !advance,
+          radiation: !advance,
+          rollDamping: !advance,
           greenWater: false,
           slamming: false,
         })
