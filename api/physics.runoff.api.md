@@ -106,6 +106,7 @@ type FieldKind = 'uniformGrid' | 'sparseGrid' | 'heightfield' | 'particleSet' | 
 interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
+    readonly optional?: boolean;
 }
 
 type GridNumber = number | ArrayLike<number>;

@@ -104,12 +104,21 @@ test('a driven cone replays bit for bit', async () => {
   assert.equal(hash(), hash());
 });
 
-test('a driven cone holds a swing against gravity with its anchor where it was: the motor pushes along its own rows, not the cone\'s', async () => {
+test("a driven cone holds a swing against gravity with its anchor where it was: the motor pushes along its own rows, not the cone's", async () => {
   await Physics.load();
   const physics = new Physics(null);
   const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
-    body = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
-    joint = physics.addJoint(top, body, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
+    body = physics.addBody(null, {
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 },
+    }),
+    joint = physics.addJoint(top, body, {
+      type: 'cone',
+      anchorB: [0, 0.5, 0],
+      axis: [0, -1, 0],
+      swing: 0.5,
+      twist: [-0.4, 0.4],
+    });
   joint.setRotationMotor(about([0, 0, 1], 0.3), { model: 'force', stiffness: 40, damping: 4 });
   let stray = 0;
   for (let i = 0; i < 360; i++) {
@@ -141,11 +150,22 @@ test('a cone whose rest pose lies off its frames holds that pose under a motor a
         rotation: rest,
         colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], offset: [0, 0.5, 0], mass: 2 },
       }),
-      joint = physics.addJoint(top, rod, { type: 'cone', frameA: product(rest, quarter), frameB: quarter, swing: 3, twist: [-0.5, 0.5] });
+      joint = physics.addJoint(top, rod, {
+        type: 'cone',
+        frameA: product(rest, quarter),
+        frameB: quarter,
+        swing: 3,
+        twist: [-0.5, 0.5],
+      });
     const w = 2 * Math.PI * 8;
     let widest = 0;
     for (let i = 0; i < 120; i++) {
-      joint.setRotationMotor(rest, { model, stiffness: model === 'force' ? 0.67 * w * w : w * w, damping: model === 'force' ? 2 * 0.67 * w * 0.7 : 2 * w * 0.7, maxForce: 1e6 });
+      joint.setRotationMotor(rest, {
+        model,
+        stiffness: model === 'force' ? 0.67 * w * w : w * w,
+        damping: model === 'force' ? 2 * 0.67 * w * 0.7 : 2 * w * 0.7,
+        maxForce: 1e6,
+      });
       physics.step();
       // The rod's turn from where it was placed.
       const q = product([-rest[0], -rest[1], -rest[2], rest[3]], rod.rotation);

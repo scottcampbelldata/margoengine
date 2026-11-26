@@ -12,6 +12,8 @@ export interface CouplingNode {
   readonly writes: readonly string[];
   /** Fields it reads. */
   readonly reads: readonly string[];
+  /** Those of them it does without when no solver writes them (optional reads). */
+  readonly optionalReads?: readonly string[];
   /** Fields it adds to (impulses, heat, mass): an edge back to the field's writer. */
   readonly accumulates: readonly string[];
 }
@@ -61,7 +63,7 @@ export function couplingGraph(nodes: readonly CouplingNode[], partial = false): 
   for (const node of [...nodes].sort((a, b) => byText(a.id, b.id))) {
     for (const field of [...node.reads].sort(byText)) {
       const from = writer.get(field);
-      if (from === undefined && partial) continue;
+      if (from === undefined && (partial || node.optionalReads?.includes(field))) continue;
       if (from === undefined)
         throw new RangeError(
           `Solver "${node.id}" reads field "${field}", which no solver writes; add the solver that owns it.`,

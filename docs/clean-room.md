@@ -12610,6 +12610,36 @@ These are this package's own, derived and checked:
   with the mean of the two waves' coefficients, so a coefficient of either sign is taken.
 - **Oblique waves** by their share across the hull squared. That scaling is assumed, not derived.
 
+### A hull's green water: shallow water on its deck (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-26)
+
+`packages/physics/src/seakeeping/deck.ts` (`deckOf`, `stepDeck`) moves the water on a hull's deck, and `solver.ts`
+(`deckLoad`) couples it to the hull and the sea. Written from:
+- S. Zhang and A. M. Reed, "Green water effect on ship motions and loads via dam breaking model", 39th IWWWFB, 2024
+  (https://sites.dundee.ac.uk/iwwwfb2024/wp-content/uploads/sites/197/2024/04/IWWWFB39_57.pdf): the shallow-water
+  equations in the deck's frame, gravity replaced by the frame's effective acceleration, the deck's pressure hydrostatic,
+  the sea coming aboard as a dam that breaks;
+- J. J. Stoker, *Water Waves*, 1957, known through the paper and the literature: Ritter's dam break on a dry bed;
+- E. Audusse, F. Bouchut, M.-O. Bristeau, R. Klein and B. Perthame, "A fast and stable well-balanced scheme with hydrostatic
+  reconstruction for shallow water flows", SIAM J. Sci. Comput. 25(6), 2004: the hydrostatic reconstruction;
+- E. F. Toro, *Shock-Capturing Methods for Free-Surface Shallow Flows*, Wiley, 2001, known through the literature:
+  Rusanov's flux and boundary conditions by Riemann invariants.
+
+These are this package's own, each checked (`packages/physics/tests/seakeeping.test.js` and
+`tests/coupling/seakeeping.test.js`):
+- **A two-dimensional deck grid**, where the paper solves one-dimensional strips along the waves.
+- **Every edge takes the sea in or lets the water go**, by the characteristic state between the deck's water and the sea,
+  clamped to critical flow from upstream where it would be supercritical. Over a dry edge from still sea that is
+  Ritter's state at the dam (4/9 of the height, 2/3 of sqrt(g h)): measured equal to (8/27) sqrt(g) h^1.5 within 1e-4.
+  Into the air it is critical depth at the brink. Rusanov's flux at the dry edge instead passed 1.4 times that.
+- **The deck from the mesh**, the highest upward face over each cell above the still waterline.
+- **The deck's faces taken out of the Froude-Krylov integration** while the deck water counts their sea: a box held
+  with its deck under still water takes the whole submerged box's buoyancy within 1e-4.
+- **The `deckInflow` and `deckClaims` fields**, so a liquid solver on the deck takes the water that comes aboard and
+  owns its load once.
+
+Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
+on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
