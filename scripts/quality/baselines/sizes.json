@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20514292,
+  "total": 20518864,
   "history": [
     {
       "date": "2026-10-24",
@@ -13425,6 +13425,12 @@
       "commit": "95d3b28ef9",
       "grew": 0,
       "reason": "SOFT-04 adds paired material lip tracking for prescribed tensile fronts, moving the soft entry from 141779 to 141859 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4c26d51447",
+      "grew": 1,
+      "reason": "SOFT-04 adds native bonded-face nomination and direct coplanar cleavage without sliver cells, moving the soft entry from 141859 to 142266 B gzip. @margoengine/physics/soft: 141962 to 146534 B ceiling (142266 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14290,7 +14296,7 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 141962,
+    "@margoengine/physics/soft": 146534,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 46399,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
     "@margoengine/physics/strands": 6518,
