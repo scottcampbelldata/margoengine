@@ -10497,7 +10497,7 @@ New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 
 
 ### Hull-launch cavity and splash
 
-EntryBody.effectsOnly follows the hull for cavity and splash and leaves its fluid force and displacement in HullSolver. The optional cavityPressure field applies zero gauge pressure behind the transverse contact plane through the hull center while the cavity is open. HullSolver clips pressure and form drag against the plane. The model treats the cavity as vented and uses the existing entry contact-plane approximation. The other hydrostatic, slamming and wake models retain their existing geometry. Observed entry events still carry the source body's speed, direction and height on the live surface. The entry moved from 9,033 to 9,053 B gzip under its 9,304 B ceiling. Core and Stage gain zero bytes.
+EntryBody.effectsOnly follows the hull for cavity and splash and leaves its fluid force and displacement in HullSolver. The optional cavityPressure field applies zero gauge pressure behind the transverse contact plane through the hull center while the cavity is open. HullSolver clips pressure and form drag against the plane. The model treats the cavity as vented and uses the existing entry contact-plane approximation. The other hydrostatic, slamming and wake models retain their existing geometry. Observed entry events still carry the source body's speed, direction and height on the live surface. Entry moved from 9,053 to 9,429 B gzip. Seakeeping moved from 33,986 to 34,437 B gzip. Both are within their recorded ceilings and Core and Stage gain zero bytes.
 
 ### Seakeeping full KVLCC2 head-wave benchmark
 
