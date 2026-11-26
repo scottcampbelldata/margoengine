@@ -196,8 +196,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - Surface tension: by Taylor (1959) and Culick (1960), a jet tip 5 to 10 mm thick retracts at
     sqrt(2 sigma / (rho e)) = 0.12 to 0.17 m/s. A liquid without it runs its tip 6 to 9 percent fast at lab scale,
     against a gap of half again in height.
-  What is left grows with refinement: the focusing crest still gains height as the cells shrink, so the coarser grids'
-  numerical damping holds it down, and Margo plunges only crests 1.4 to 1.7 times Erinin et al.'s. Their crest stands
+  What is left grows with refinement: the focusing crest still gains height as the cells shrink, and Margo plunges only
+  crests 1.4 to 1.7 times Erinin et al.'s.
+
+  Checked with the upstream gauges as the control (Erinin et al.'s group is fixed by its gauge record, not by S):
+  - Gauges from x = -2.6 to 0.5 m read the box's surface (its highest particle) against the sea's linear packet. Up to
+    the focus the box carries the group as the sea gives it, at both 1.25 and 0.9 cm cells: the rms surface within 2 to
+    18 percent of the packet's, the crests within 1 to 5 percent of each other from x = -2.6 to -1.0 m. At S = 0.3 the
+    crest stays within 5 to 30 percent of linear, as crest asymmetry gives.
+  - The grids part only from the focus on: 146 against 155 mm at x = 0, and 148 against 165 mm at 0.5 m (S = 0.55).
+  So the coarse grids do not damp the focusing group, and the box's band (8 cells at its ends, 1.8 m or more from the
+  break) does not touch the face. The difference is made at the steepening crest itself.
+  Erinin et al.'s crest at breaking (108 to 112 mm) sits at the linear focus height of the packet they ran (about
+  109 mm at S = 0.5). Margo's crest reaches 1.3 to 1.5 times its linear height before it overturns. A real crest tips
+  over sooner, so Margo's crest resists overturning for want of resolution at its tip. Their crest stands
   near the packet's linear focus height (about 103 mm at S = 0.55). Two of the solver's own limits work against
   overturning: its first-order placement of the free surface, and two bodies of water joining about a cell before they
   touch (docs/limits.md, "Grid-particle liquids").
