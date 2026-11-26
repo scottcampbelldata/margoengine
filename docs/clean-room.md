@@ -14129,6 +14129,20 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### Physics worlds in netcode: rollback, snapshot diffs and server bodies (`@margoengine/netcode/physics`, 2026-11-26)
+
+Built from texts only; no other code was read.
+
+- The GGPO documentation (ggpo.net) and G. Fiedler, "Deterministic Lockstep", Gaffer On Games, 2014: peers step the same
+  deterministic simulation, a wrong guess of an input is undone by loading the state before it and stepping again.
+- G. Fiedler, "Snapshot Compression", Gaffer On Games, 2015: a state sent as its difference from a baseline both ends hold.
+- G. Fiedler, "Snapshot Interpolation", Gaffer On Games, 2014: a client plays a server's bodies back between the states it
+  has, a little behind (the existing `SnapshotBuffer`).
+- Margo's own: the physics world as its own rollback state through its snapshot, loaded before and saved after each step;
+  the diff as runs of unchanged 32-bit words and XORed changed ones, with varint counts.
+- Checked against: every confirmed frame of two peers under latency, jitter and loss equal to the world stepped offline;
+  a diff undone exactly; a thrown ball's interpolated path against its stepped one.
+
 ### Joint armature, the augmented mass and each coordinate's inverse inertia (`@margoengine/physics` multibodies, 2026-11-26)
 
 Built from texts only; no other code was read. Rapier's augmented mass and MuJoCo's armature were matched by name from their

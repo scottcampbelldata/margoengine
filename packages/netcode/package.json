@@ -31,6 +31,10 @@
       "types": "./dist/rollback.d.ts",
       "import": "./dist/rollback.js"
     },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
+    },
     "./websocket": {
       "types": "./dist/websocket.d.ts",
       "import": "./dist/websocket.js"
