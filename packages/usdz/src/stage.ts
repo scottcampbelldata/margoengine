@@ -187,6 +187,16 @@ function ancestorAt(path: string, k: number): string {
   }
   return path;
 }
+/** The selection for `set` that a path ending in variant selections makes at its last prim: `/C{vs=y}` and `vs` give `y`. */
+function pathSelection(path: string, set: string): string | undefined {
+  for (let end = path.length; path[end - 1] === '}'; ) {
+    const open = path.lastIndexOf('{', end - 1),
+      [name, value] = path.slice(open + 1, end - 1).split('=');
+    if (name === set) return value;
+    end = open;
+  }
+  return undefined;
+}
 
 /** Index one layer's spec map: children and properties by prim, variant paths included. */
 export function indexLayer(id: string, specs: Specs): Layer {
@@ -550,6 +560,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   const promoted = new Set<Node>();
   /** The node a specializes placeholder left under the index root. */
   const realOf = new WeakMap<Node, Node>();
+  /** Context nodes of `chainContext` whose path passes through a variant chosen at the path read. */
+  const chose = new WeakSet<Node>();
   /** Queues the nodes of a placed graft: none has arcs left to follow; its class arcs still imply theirs. */
   function settleGraft(top: Node, lift: boolean) {
     const walk = (n: Node) => {
@@ -1094,6 +1106,9 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
    * the path that maps back into it; the arcs of that chain read at their class's parent. Class arcs off the chain are
    * not read: an inherit carried down from `/R` to `/C`, whose `/C/b` selects `vs = "x"`, gives no `/C{vs=x}a`, where a
    * payload's `l2.usda /M/b` selecting `vs = "y"` does. A parent that only the root namespace's identity maps reads none.
+   * A class arc off the chain that is stronger than the new arc and already went into a variant at the path read gives
+   * that variant's selection in its place (KB1942c part 32): `/Q/c/a` inheriting `/C` reached `/C{vs=y}`, so the arc
+   * implied at `/Q/c/a/a/b` takes `vs = "y"` for `/C` there.
    */
   function chainContext(placed: Node, near: Node, arc: Node): Node[] {
     const parent = parentOf(stripVariants(placed.path)),
@@ -1108,12 +1123,17 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     const nodes = strength(build!.top);
     near.children = kids;
     placed.parent = undefined;
+    let stronger = true;
     for (const n of nodes) {
+      if (n === placed) stronger = false;
       if (n === placed || chain.has(n)) ctx.push({ ...n, path: parentOf(n.path) });
       else if (!isClass(n)) {
         const at = unmapPath(n.steps, up);
-        if (at !== undefined)
-          ctx.push({ ...n, path: under(stripVariants(n.path), at) ? ancestorAt(n.path, depthOf(at)) : at });
+        if (at === undefined) continue;
+        const read: Node = { ...n, path: under(stripVariants(n.path), at) ? ancestorAt(n.path, depthOf(at)) : at };
+        ctx.push(read);
+        // A variant a stronger class arc chose at the path read (KB1942c part 32).
+        if (stronger && n.kind === 'variant' && read.path !== at) chose.add(read);
       }
     }
     return ctx;
@@ -1332,8 +1352,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     const { node, set, order } = found;
     node.settled.add(set);
     let selection: string | undefined = atRoot ? options.variants?.[primPath]?.[set] : undefined;
+    // Seen on OpenUSD (black-box stages, KB1942c part 32), the specification does not say: in the context of an implied
+    // arc that stands for another implied arc, a variant that a stronger class arc off the chain chose at the path read
+    // gives its selection in its place among the context's authored selections. An implied arc that stands for an
+    // authored one, and a class arc weaker than the new arc, give none this way.
     if (selection === undefined)
-      search: for (const n of [...(build!.ctx ?? []), ...nodes])
+      search: for (const n of [...(build!.ctx ?? []), ...nodes]) {
+        if (chose.has(n) && (selection = pathSelection(n.path, set)) !== undefined) break;
         for (const entry of n.stack.layers) {
           const choices = specAt(entry, n.path)?.fields.variantSelection as Record<string, string> | undefined;
           const value = choices?.[set];
@@ -1342,6 +1367,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
             break search;
           }
         }
+      }
     if (!selection) return true;
     const path = `${node.path}{${set}=${selection}}`;
     if (!node.stack.layers.some((entry) => specAt(entry, path))) return true;
