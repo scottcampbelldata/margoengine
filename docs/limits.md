@@ -9810,6 +9810,10 @@ closed 1 m² periodic wet cell, with reciprocal volume and horizontal momentum a
 vertical ledger. Production wet/dry cells and the breaking crest need owner-side reservation and receipt
 of applied fluxes.
 
+The measured quadrupole period of a 20.10 mm free water drop is 1.481 s, compared with the
+0.742 s Rayleigh limit for the same density, tension and rest volume. The separated surface
+energy and pressure updates need more validation for shape frequencies.
+
 ### Position-based particle water (FLUID-02)
 
 The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.

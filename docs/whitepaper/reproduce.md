@@ -4380,3 +4380,12 @@ sources are −ΔV/Δt m³/s and −Δpₓ,𝓏/(ρ A Δt) m²/s², where A is t
 density. The vertical ledger records −Δpᵧ. This uses the conservative volume and velocity mixture of
 Chentanez and Müller (2010), §2.4.1, Equation 18, with the represented volume equal to the physical
 particle volume. [Real-time Simulation of Large Bodies of Water with Small Scale Details](https://diglib.eg.org/items/d0320015-4b07-416b-8f41-047485c9f7f3)
+
+### FLUID-01 capillary shape oscillation
+
+Build Physics and run `node packages/physics/tests/dfsph-capillary-lab.mjs`. The released ellipsoid
+preserves the volume of its 2,176-particle sphere. The benchmark derives its equivalent radius from
+that rest volume and uses the two zero crossings of the signed quadrupole moment to estimate one full
+period. The current solver measures 1.481 s. Rayleigh's small-disturbance solution is
+ω² = 8 σ/(ρ R³), or 0.742 s at the fixture's parameters. This comparison records a failure of the
+current split solve to match the continuum period. [On the Capillary Phenomena of Jets, Lord Rayleigh (1879)](https://www.jstor.org/stable/113738)

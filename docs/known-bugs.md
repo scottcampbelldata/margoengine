@@ -16945,6 +16945,13 @@ capacity refusal, the last wet depth and snapshot replay. General HYDRO-01 needs
 boundary when its wet/dry limiter can clip signed volume or horizontal momentum. SEA-04 still needs
 a paired volume and momentum receipt.
 
+The separated capillary and pressure updates also produce a slow shape oscillation in a free droplet.
+Run `node packages/physics/tests/dfsph-capillary-lab.mjs` after building Physics. With 2,176 particles,
+20.10 mm equivalent radius and the measured water tension 0.07274 N/m, the first quadrupole period is 1.481 s
+against the 0.742 s Rayleigh prediction. This fixture starts an equal-volume ellipsoid from rest without
+gravity or a container impact. The period provides a separate accuracy check for the planned unified
+pressure and surface-energy solve at several resolutions.
+
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement
 spans and their allowances.
