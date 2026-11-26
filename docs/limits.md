@@ -8829,6 +8829,28 @@ The optional physics/celestial entry ships independently of the physics and sky 
 
 ## Physics solver settings and speed caps (own solver)
 
+Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
+- Enforced: 2 to 4,096 links; radius, density and moduli positive and finite; damping 0 or more; `loads` a provider with `apply`. `segmentLoads`: roughness, drag, added mass and viscosity finite and 0 or more, period above 0 (Infinity a steady current), a Strouhal number above 0.
+- By method, the links:
+  - A rod is rigid capsule links. It bends between links, at joints EI / l apart. A link's capsule radius is cut to half its length, so keep links longer than the rod is thick.
+  - Links of one rod do not touch each other unless `selfContacts` is set.
+- By method, the ends:
+  - A clamp to `'fixed'` at the start is the tree's root and solved with its springs; any other clamp turns as a joint spring in the joint passes, which holds a light link only up to about EI / l of a few links.
+  - A pin's gap under a load F is F h^2 / (10^6 m), m the end link's mass, and its pull is handed to the other body after the tree's solve.
+  - A line pulled taut by a kinematic body stretches without end, as a kinematic body cannot be held.
+- By method, the water:
+  - The surface is read at a link's two ends and taken straight across it.
+  - Added mass is put on a link's mass all three ways, so along the link it is overstated by C_a rho V, which the chain mostly carries.
+  - One wake oscillator per link and the same phase start for all, so the shedding is in step along a rod.
+  - Drag, flow and pins act only on links of a multibody tree (kernel FLOW_X, DRAG_ACROSS, JOINT_PIN). The water's loads come from the `loads` provider (`segmentLoads` of `@margoengine/physics/loads`).
+  - The drag across the drag crisis (Re 2e5 to 5e5) is a straight line in log Re, without the crisis's dip; below Re 1 it is held at the fit's Re 1 value. KC comes from the waves' `period`; a steady current is `period: Infinity`.
+- State: the loads provider's wake oscillators live outside the world's snapshot: take `rod.takeState()` with `physics.takeSnapshot()`.
+- Measured (`packages/physics/tests/rod.test.js`):
+  - a cantilever in a current within 0.03 % of its springs and 0.06 % of the continuous beam at 32 links;
+  - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;
+  - a taut cable's ring within 0.07 % of the beam-string frequency;
+  - strumming that locks to the cable's frequency in still water at reduced velocities 5 and 7, swinging 0.53 and 0.59 diameters, and follows the shedding at 2 (0.013 diameters).
+
 The world's region allocator (`Arena`, 2026-11-26): a WebAssembly memory cannot shrink, so freed regions are reused by later ones that fit (lowest free block first) and the top comes down as the highest region goes, but the memory keeps its largest size. Its free blocks are a list searched in address order, a cost in the number of free blocks per call, fine for the few hundred regions a world holds. Regions are handed out on the main thread only, never during a threaded step. The rigid kernel lives in an arena's regions (its world's block, a 1 MiB stack and 720 KiB of batch-query records, about 1.8 MiB above the world's own size), one kernel per memory, and on a shared memory it needs the threaded build (`loadKernel({threads: true})`, about 247 KB deflated, loaded only on that call). Threads (`useThreads`, `stepAsync`) solve a step's islands only: the broad and narrow phases, the island build and the step's end run on the main thread, so a world of one big island gains nothing, and a thread is a worker with a 1 MiB stack region. `stepAsync` is asynchronous, so the engine plugin's `Physics.step` keeps stepping on one thread. The soft and 2D kernels still run in memories of their own until they move into world regions.
 
 Substep levels per island in 3D (2026-11-25): an island steps at the world's substeps times 2^k, k chosen each step from its own state, and never finer than 7,680 substeps a second (the finest tick of `@margoengine/math/clock`): at a 1/60 s step that is 128 substeps, 2^5 times the default 4. A body in contact turning faster than 0.5054 rad per substep at that cap (about 3,880 rad/s) is stepped at the cap and may gain energy against friction; a structure that would need contacts stiffer than a quarter of the cap's rate to stand may tip. The cost of a level is that island's work times 2^k: the Physics-API replay scene, where a 1 to 10 cm body spun to 1,000 to 3,000 rad/s by the scene's torque impulses touches a 16-body cluster and keeps it at the finest level on about 35 percent of its steps, takes about 190 s per 1,000 steps on the Mac in Wasm against 3.2 s with fixed substeps; the kernel replay scenes take 0.4 s for 10,000 steps either way. The replay proof therefore runs that scene's 10,000 steps with fixed substeps and 500 with levels. Speed-phase item: a multirate solve, where a fast body steps at its own finer level inside its island while the rest of the island stays coarse, would take that cost back; until then the whole island steps at the level its fastest body in contact needs. `adaptiveSubsteps: false` turns the levels off.

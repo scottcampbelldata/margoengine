@@ -11,7 +11,11 @@
 // The sphere's drag over all Reynolds numbers is F. A. Morrison's fit ("An Introduction to Fluid Mechanics", Cambridge
 // University Press, 2013, eq. 1, data correlation for Re <= 1e6, read). The wake oscillator's lift magnification under an
 // imposed motion is M. L. Facchinetti, E. de Langre and F. Biolley, "Vortex-induced travelling waves along a cable", Eur. J.
-// Mech. B/Fluids 23, 2004 (eq. 5, read), with A / epsilon = 40.
+// Mech. B/Fluids 23, 2004 (eq. 5, read), with A / epsilon = 40; its wake oscillator, driven by the cylinder's acceleration
+// across the flow, is M. L. Facchinetti, E. de Langre and F. Biolley, "Coupling of structure and wake oscillators in
+// vortex-induced vibrations", J. Fluids Struct. 19, 2004 (eq. 2, read), epsilon 0.3 and A 12. Below the drag crisis a
+// circular cylinder's drag follows its Reynolds number: C_D = 1 + 10 Re^(-2/3) for 1 < Re < 2e5 (the curve fit of F. M.
+// White, "Viscous Fluid Flow", 2nd ed., McGraw-Hill 1991, read), where DNV's steady drag is the post-critical value.
 import { ln, pow } from '@margoengine/math/pinned';
 
 const LN10 = 2.302585092994046;
@@ -43,26 +47,49 @@ export function wakeAmplification(kc: number, steady: number): number {
   return 1 + (cpi - 1) * (12 / kc);
 }
 
+/**
+ * A circular cylinder's steady drag at Reynolds number `re` and relative roughness k / D: White's subcritical fit 1 + 10
+ * Re^(-2/3) up to Re 2e5 (held at its Re 1 value below 1), DNV's post-critical C_DS(k / D) from Re 5e5, and between them a
+ * straight line in log Re across the drag crisis (the crisis's dip to about 0.3 on a smooth cylinder near Re 5e5 is not
+ * followed: a margin of a few hundred thousand in Re that a hose, a cable or a pile in the sea rarely sits in).
+ */
+export function reynoldsDrag(re: number, roughness = 0): number {
+  if (!(re >= 0 && Number.isFinite(re)))
+    throw new RangeError(`A Reynolds number is finite and 0 or more (got ${re}); pass one.`);
+  const post = steadyDrag(roughness),
+    white = (r: number) => 1 + 10 * pow(r, -2 / 3);
+  if (re <= 2e5) return white(Math.max(re, 1));
+  if (re >= 5e5) return post;
+  const s = ln(re / 2e5) / ln(2.5);
+  return white(2e5) + (post - white(2e5)) * s;
+}
+
 /** The added mass coefficient of a circular cylinder at KC with steady drag C_DS (DNV-RP-C205 6.9.1). */
 export function cylinderAddedMass(kc: number, steady = 0.65): number {
   if (!(kc >= 0)) throw new RangeError(`KC is 0 or more (got ${kc}); pass one.`);
   return kc < 3 ? 1 : Math.max(1 - 0.044 * (kc - 3), 0.6 - (steady - 0.65));
 }
 
-/** A circular member's drag and added mass coefficients at KC, its relative roughness and a current's share (DNV 6.7 to 6.9). */
+/**
+ * A circular member's drag and added mass coefficients at KC, its relative roughness and a current's share (DNV 6.7 to 6.9).
+ * With its Reynolds number `re`, the steady drag is {@link reynoldsDrag}'s, so a thin member below the drag crisis takes its
+ * subcritical drag; without, DNV's post-critical steady drag.
+ */
 export function cylinderCoefficients(
   kc: number,
   roughness = 0,
   current = 0,
   orbital = 1,
+  re?: number,
 ): { drag: number; addedMass: number } {
-  const steady = steadyDrag(roughness),
+  const steady = re === undefined ? steadyDrag(roughness) : reynoldsDrag(re, roughness),
     // A current above 0.4 of the waves' velocity: the steady drag alone; else KC* with the current in it.
     drag =
       current > 0.4 * orbital
         ? steady
         : steady * wakeAmplification(kc * (orbital > 0 ? (orbital + current) / orbital : 1), steady);
-  return { drag, addedMass: cylinderAddedMass(kc, steady) };
+  // The added mass falls with KC by DNV's post-critical steady drag, whatever the drag at this Reynolds number.
+  return { drag, addedMass: cylinderAddedMass(kc, re === undefined ? steady : steadyDrag(roughness)) };
 }
 
 /**
@@ -129,4 +156,26 @@ export function liftMagnification(amplitude: number, ratio = 40): number {
     k = next;
   }
   return k;
+}
+
+/**
+ * One step `dt` of a cylinder's wake oscillator q (Facchinetti, de Langre and Biolley 2004): q'' + eps w_f (q^2 - 1) q' +
+ * w_f^2 q = forcing, eps 0.3, at the shedding's angular frequency `wf`, `forcing` the coupling to the cylinder, A / D times
+ * its acceleration across the flow (0 for a cylinder held still). `state` holds q and q' at `2 index` and `2 index + 1`;
+ * it is stepped in substeps of at most 0.05 rad of the shedding's phase by semi-implicit Euler, and the new q returned.
+ */
+export function wakeStep(state: Float64Array, index: number, wf: number, forcing: number, dt: number): number {
+  const eps = 0.3,
+    steps = Math.max(1, Math.ceil((wf * dt) / 0.05)),
+    h = dt / steps;
+  let q = state[2 * index]!,
+    dq = state[2 * index + 1]!;
+  for (let k = 0; k < steps; k++) {
+    // Semi-implicit Euler: the velocity first, then the position with it.
+    dq += h * (-eps * wf * (q * q - 1) * dq - wf * wf * q + forcing);
+    q += h * dq;
+  }
+  state[2 * index] = q;
+  state[2 * index + 1] = dq;
+  return q;
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20626455,
+  "total": 20631743,
   "history": [
     {
       "date": "2026-10-24",
@@ -13819,6 +13819,12 @@
       "commit": "C-PID-01-02",
       "grew": 1,
       "reason": "@margoengine/physics base measured 94,001 B gzip (the budget was 93,993): PidController gains split linear and angular axes and gains, a capped command with conditional integration against windup, a whole-pose apply and its integrals read back, and PdController and pdErrors join it (Rapier parity rows C-PID-01 and C-PID-02). The controllers are root exports, so a separate entry would move an existing root export and break the API. Budget (measured + max(3%, 256 B)): 93,993 to 96,821 B. Core plus stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "rod",
+      "reason": "New optional entry @margoengine/physics/rod (3,934 B gzip): elastic rods on a multibody, their water loads taken from the loads entry. @margoengine/physics/loads grows 8,342 to 9,696 B for segmentLoads (the per-segment loads a rod solves implicitly), the shared water sampler and wake step, and Reynolds drag below the drag crisis: one copy of the member physics for LoadSolver and rods. A separate entry would duplicate the coefficients and the wake oscillator or make LoadSolver import from it for the same bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14665,7 +14671,7 @@
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/lightning": 6117,
-    "@margoengine/physics/loads": 8342,
+    "@margoengine/physics/loads": 9696,
     "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
@@ -14676,6 +14682,7 @@
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/rod": 3934,
     "@margoengine/physics/rogue": 9251,
     "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,

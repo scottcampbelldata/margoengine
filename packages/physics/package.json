@@ -81,6 +81,10 @@
       "types": "./dist/world/index.d.ts",
       "import": "./dist/world.js"
     },
+    "./rod": {
+      "types": "./dist/rod/index.d.ts",
+      "import": "./dist/rod.js"
+    },
     "./earth": {
       "types": "./dist/earth/index.d.ts",
       "import": "./dist/earth.js"
