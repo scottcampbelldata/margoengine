@@ -554,8 +554,9 @@ console.log(storm.regionAt(0, 0), storm.windAt(25000, 0).speed.toFixed(1)); // '
 `windAt(x, z, t)` gives the surface wind (speed, gust, `[x, z]` velocity and the weather's direction),
 `rainAt(x, z, t)` the rain rate in mm/h, `coverAt(x, z, height, t)` the cloud cover parts (the shader's field on the
 CPU), `regionAt(x, z, t)` the part of the storm (`'eye'`, `'eyewall'`, `'moat'`, `'outerEyewall'`, `'band'`,
-`'shield'` or `'outside'`) and `weatherAt(x, z, t)` the weather on the weather's scales with its weight (the wind capped
-at the weather's 60 m/s; `windAt` has the true speed). `hollandWind(r)`, `hollandPressure(r)` and `hollandMaxWind()`
+`'shield'` or `'outside'`) and `weatherAt(x, z, t)` the weather with its weight and the full mean wind speed.
+`StormVortex.fromHurricane(storm.resolved)` from `@margoengine/physics/vortices` shares that profile with physical
+consumers. `hollandWind(r)`, `hollandPressure(r)` and `hollandMaxWind()`
 are the profile itself. The `hurricane.*` rows of `SKY_SETTINGS` drive every option while `volumetric.type` is
 `'hurricane'` (below); `type: 'hurricane'` alone draws the default storm at the origin.
 

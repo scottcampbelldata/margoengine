@@ -2343,6 +2343,10 @@
       "types": "./dist/physics/drainage-fog.d.ts",
       "import": "./dist/physics/drainage-fog.js"
     },
+    "./physics/vortices": {
+      "types": "./dist/physics/vortices.d.ts",
+      "import": "./dist/physics/vortices.js"
+    },
     "./physics/snowpack": {
       "types": "./dist/physics/snowpack.d.ts",
       "import": "./dist/physics/snowpack.js"

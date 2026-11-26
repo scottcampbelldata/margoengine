@@ -80,6 +80,7 @@ await build({
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),
         'drainage-fog': resolve(root, 'src/drainage-fog/index.ts'),
+        vortices: resolve(root, 'src/vortices/index.ts'),
         snowpack: resolve(root, 'src/snowpack/index.ts'),
         airborne: resolve(root, 'src/airborne/index.ts'),
         aeolian: resolve(root, 'src/aeolian/index.ts'),

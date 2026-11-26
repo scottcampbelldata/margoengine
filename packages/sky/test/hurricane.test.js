@@ -168,17 +168,16 @@ test('calm in the eye, gusts in the eyewall and bands, rain following the bands 
   }
 });
 
-test('the storm moves, has an outer eyewall when asked, and clamps its weather to the weather range', () => {
+test('the storm moves, has an outer eyewall, and publishes the full mean wind', () => {
   const storm = new Hurricane({ velocity: [5, 0], outerEyewall: 120000, pressureDrop: 150 });
   assert.deepEqual(storm.centerAt(3600), [18000, 0]);
   assert.equal(storm.regionAt(18000, 0, 3600), 'eye');
   assert.equal(storm.regionAt(120000, 0), 'outerEyewall');
   // A secondary wind maximum under the outer eyewall (Willoughby, Clos and Shoreibah 1982).
   assert.ok(storm.windAt(120000, 0).speed > storm.windAt(95000, 0).speed);
-  assert.ok(
-    storm.windAt(30000, 0).speed > 60 && storm.weatherAt(30000, 0).wind === 60,
-    'the weather caps the wind at 60 m/s',
-  );
+  const intense = storm.windAt(30000, 0).speed;
+  assert.ok(intense > 60);
+  assert.equal(storm.weatherAt(30000, 0).wind, intense);
   assert.equal(storm.weatherAt(1e6, 0).weight, 0);
   assert.equal(storm.weatherAt(100000, 0).weight, 1);
   for (const bad of [

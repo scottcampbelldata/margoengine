@@ -6,6 +6,15 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: visual vortices supplied neither full wind nor loads (PA-31)
+
+- **Repro:** Sample the eyewall of a 150 hPa hurricane or put a rigid object and a water grid under a moving vortex.
+- **Cause:** The visual weather sample capped mean wind and the storm had no physical consumer.
+- **Fix:** Sky reports the full speed. A matching `StormVortex` drives plant sway and publishes real rigid loads,
+  pressure forcing, and wind stress for the world-stepped water.
+- **Regression:** `packages/physics/tests/coupling/vortices.test.js` covers the >60 m/s case, real rigid debris,
+  a moving shallow-water reach and the CY-14 gale. The Sky hurricane and tornado suites check shared balances.
+
 ### Fixed 2026-11-26: simulated earthquake loads lacked a propagating ground field (EARTH-08)
 
 - **Repro:** Trigger a moment below a layered site. Scene shake parameters could move a camera, but the ground

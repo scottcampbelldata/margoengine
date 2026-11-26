@@ -8,6 +8,14 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Vortex forcing (ATMO-05, 2026-11-26). The storm has prescribed motion and intensity. The atmosphere uses
+  a radial pressure profile with a height envelope. It represents no storm formation, terrain interaction,
+  or evolving supercell. Bodies use configured drag area and a pressure lever. Their load field records
+  threshold crossings for structural consumers. Water sees spatial atmospheric pressure and wind stress.
+  The neutral drag coefficient saturates above 33 m/s. The physics wind keeps its full speed. WeatherRegions
+  keeps its 60 m/s styling range. The standalone GPU Flood retains its scalar preview settings.
+  The optional physical entry is 6,113 bytes gzip.
+
 - Seismic waves (EARTH-08, 2026-11-26). One plane-strain section resolves in-plane P and SV, with
   a level, traction-free top. Pick cell spacing for the shortest wavelength in the scene. The world
   chooses a dyadic rate that keeps the elastic Courant number at or below 0.95. The damped outer strip

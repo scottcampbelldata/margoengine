@@ -211,6 +211,10 @@
       "types": "./dist/drainage-fog/index.d.ts",
       "import": "./dist/drainage-fog.js"
     },
+    "./vortices": {
+      "types": "./dist/vortices/index.d.ts",
+      "import": "./dist/vortices.js"
+    },
     "./snowpack": {
       "types": "./dist/snowpack/index.d.ts",
       "import": "./dist/snowpack.js"

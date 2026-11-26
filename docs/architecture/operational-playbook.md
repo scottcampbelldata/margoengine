@@ -4280,6 +4280,12 @@ and amplification through a softer site. A registered ground reader applies the 
 to an actual rigid body. Building and soil states share the solver's world clock. Native Chromium and
 Node replay identical f64 worlds in both memory modes.
 
+### Vortex wind and pressure (ATMO-05)
+
+Sky and Physics share the Holland and compact-vortex radial balances. Physics reuses the ordinary rigid body-force
+and shallow surface-water accumulators. Tests measure a rigid body's drag step, pressure and 10 m wind stress in the
+water source, conserved basin volume, the CY-14 plant response and deterministic probe replay.
+
 ### Ice thermodynamics (ICE-05)
 
 The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,
