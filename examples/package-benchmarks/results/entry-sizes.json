@@ -14896,8 +14896,8 @@
         "gzip": 7296
       },
       "./crush": {
-        "raw": 54789,
-        "gzip": 19879
+        "raw": 56347,
+        "gzip": 20253
       },
       "./legged": {
         "raw": 29240,
@@ -19161,14 +19161,14 @@
       "brotli": 3875
     },
     "packages/physics/dist/crush-shell-kernel.wasm": {
-      "raw": 11106,
-      "gzip": 5410,
-      "brotli": 4797
+      "raw": 14430,
+      "gzip": 6981,
+      "brotli": 6208
     },
     "packages/physics/dist/crush-shell-kernel-shared.wasm": {
-      "raw": 11106,
-      "gzip": 5410,
-      "brotli": 4798
+      "raw": 14430,
+      "gzip": 6981,
+      "brotli": 6209
     }
   },
   "splits": {

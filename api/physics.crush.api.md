@@ -193,6 +193,11 @@ export interface CrushShellFace {
     readonly dissipatedDensity: number;
 }
 
+export interface CrushShellFriction {
+    readonly angularImpulse: CrushVector;
+    readonly dissipatedEnergy: number;
+}
+
 export interface CrushShellMaterial {
     readonly thickness: number;
     readonly density: number;
@@ -251,6 +256,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     };
     supportReaction(vertex: number): CrushVector;
     readSphereContact(index: number): CrushShellContact;
+    readSphereFriction(index: number): CrushShellFriction;
     readSeam(index: number): CrushSheetSeamReading;
     readFace(face: number): CrushShellFace;
     readBudget(): CrushShellBudget;
@@ -260,6 +266,7 @@ export interface CrushShellSphere {
     readonly body: number;
     readonly radius: number;
     readonly contactModulus: number;
+    readonly friction?: number;
 }
 
 export class CrushSolver implements Solver<CrushParams> {
