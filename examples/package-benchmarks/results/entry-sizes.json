@@ -14820,8 +14820,8 @@
         "gzip": 5861
       },
       "./strands": {
-        "raw": 15052,
-        "gzip": 6262
+        "raw": 15272,
+        "gzip": 6329
       },
       "./synoptic": {
         "raw": 17285,
@@ -18525,14 +18525,14 @@
       "brotli": 357
     },
     "packages/physics/dist/strand-kernel.wasm": {
-      "raw": 43921,
-      "gzip": 17445,
-      "brotli": 14710
+      "raw": 44959,
+      "gzip": 17942,
+      "brotli": 15143
     },
     "packages/physics/dist/strand-kernel-shared.wasm": {
-      "raw": 43921,
-      "gzip": 17445,
-      "brotli": 14775
+      "raw": 44959,
+      "gzip": 17942,
+      "brotli": 15147
     },
     "packages/physics/dist/synoptic-kernel.wasm": {
       "raw": 22154,
